@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { parseFountain, FountainBlock } from '../lib/fountain';
 import { AlertCircle } from 'lucide-react';
 
@@ -9,10 +9,17 @@ interface EditorProps {
 
 export default function Editor({ script, onChange }: EditorProps) {
   const [blocks, setBlocks] = useState<FountainBlock[]>([]);
+  const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setBlocks(parseFountain(script));
   }, [script]);
+
+  const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
+    if (overlayRef.current) {
+      overlayRef.current.scrollTop = e.currentTarget.scrollTop;
+    }
+  };
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#E4E3E0] overflow-hidden">
@@ -26,7 +33,10 @@ export default function Editor({ script, onChange }: EditorProps) {
       <div className="flex-1 overflow-y-auto p-8 flex justify-center">
         <div className="w-full max-w-3xl bg-white shadow-xl min-h-[1056px] p-16 font-mono text-[14px] leading-relaxed relative">
           {/* Overlay for syntax highlighting and linting */}
-          <div className="absolute inset-16 pointer-events-none whitespace-pre-wrap break-words">
+          <div
+            ref={overlayRef}
+            className="absolute inset-16 pointer-events-none whitespace-pre-wrap break-words overflow-hidden"
+          >
             {blocks.map((block, idx) => (
               <div 
                 key={block.id} 
@@ -59,6 +69,7 @@ export default function Editor({ script, onChange }: EditorProps) {
           <textarea
             value={script}
             onChange={(e) => onChange(e.target.value)}
+            onScroll={handleScroll}
             className="absolute inset-16 w-[calc(100%-8rem)] h-[calc(100%-8rem)] resize-none outline-none bg-transparent text-transparent caret-black whitespace-pre-wrap break-words"
             spellCheck={false}
           />
