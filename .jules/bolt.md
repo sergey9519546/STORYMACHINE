@@ -1,0 +1,3 @@
+## 2024-05-18 - Expensive String Parsing in Render Loop
+**Learning:** Found a heavy string parsing operation (`parseFountain`) being called on every render in the `Sidebar` component. Since `Sidebar` receives the `scriptText` as a prop and likely re-renders frequently as the user types in the main IDE, parsing the entire script (which involves splitting lines, regex matching, and iterating) on every keystroke creates a significant performance bottleneck in the editor experience.
+**Action:** Always wrap expensive synchronous string parsing or data transformation functions with `useMemo` when they depend on specific props, so they are only recalculated when those specific props (e.g. `scriptText`, `searchQuery`) actually change.

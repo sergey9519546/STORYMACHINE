@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Ghost, Crosshair, Target, Heart, PlusCircle, List, Users, Search, ChevronRight } from 'lucide-react';
 import { parseFountain } from '../lib/fountain';
 import { clsx, type ClassValue } from 'clsx';
@@ -29,18 +29,18 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
   const [activeTab, setActiveTab] = useState<'scenes' | 'characters'>('scenes');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const blocks = parseFountain(scriptText);
-  const scenes = blocks
+  const blocks = useMemo(() => parseFountain(scriptText), [scriptText]);
+  const scenes = useMemo(() => blocks
     .map((b, i) => ({ ...b, index: i }))
-    .filter(b => b.type === 'scene_heading');
+    .filter(b => b.type === 'scene_heading'), [blocks]);
 
-  const filteredScenes = scenes.filter(s => 
+  const filteredScenes = useMemo(() => scenes.filter(s =>
     s.text.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  ), [scenes, searchQuery]);
 
-  const filteredCharacters = characters.filter(c => 
+  const filteredCharacters = useMemo(() => characters.filter(c =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  ), [characters, searchQuery]);
 
   return (
     <div className="w-80 bg-white dark:bg-zinc-950 text-black dark:text-white flex flex-col h-full border-r-4 border-black dark:border-zinc-800 shrink-0">
