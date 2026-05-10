@@ -6,6 +6,10 @@ import { Stage } from './server/engine/Stage.ts';
 import { Orchestrator } from './server/engine/Orchestrator.ts';
 import type { CharacterSheet, Location } from './server/engine/types.ts';
 
+const asyncHandler = (fn: express.RequestHandler) => (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -24,25 +28,17 @@ async function startServer() {
     res.json({ status: 'initialized' });
   });
 
-  app.post('/api/turn', async (req, res) => {
+  app.post('/api/turn', asyncHandler(async (req, res) => {
     const { agentId } = req.body;
-    try {
-      const action = await orchestrator.runTurn(agentId);
-      res.json({ action });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+    const action = await orchestrator.runTurn(agentId);
+    res.json({ action });
+  }));
 
-  app.post('/api/run-room', async (req, res) => {
+  app.post('/api/run-room', asyncHandler(async (req, res) => {
     const { nodeId } = req.body;
-    try {
-      await orchestrator.runRoomSimulation(nodeId);
-      res.json({ status: 'completed' });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+    await orchestrator.runRoomSimulation(nodeId);
+    res.json({ status: 'completed' });
+  }));
 
   app.get('/api/ledger', (req, res) => {
     res.json(stage.getFullLedger());
@@ -58,12 +54,11 @@ async function startServer() {
   // --- SCRIPTIDE API ROUTES ---
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-  app.post('/api/scriptide/world-build', async (req, res) => {
+  app.post('/api/scriptide/world-build', asyncHandler(async (req, res) => {
     const { beat } = req.body;
-    try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.1-pro-preview',
-        contents: `SYSTEM ROLE: You are a master screenwriter and world-builder. Your task is to generate or expand a scene based on the user's beat outline.
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.1-pro-preview',
+      contents: `SYSTEM ROLE: You are a master screenwriter and world-builder. Your task is to generate or expand a scene based on the user's beat outline.
 
 OBJECTIVE: Write visceral, evocative action lines and scene descriptions that establish mood, time, and place. 
 
@@ -75,19 +70,15 @@ STRICT CONSTRAINTS:
 
 INPUT: ${beat}
 OUTPUT: Generate the Scene Heading and Action lines.`,
-      });
-      res.json({ result: response.text });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+    });
+    res.json({ result: response.text });
+  }));
 
-  app.post('/api/scriptide/refine-dialogue', async (req, res) => {
+  app.post('/api/scriptide/refine-dialogue', asyncHandler(async (req, res) => {
     const { dialogue, profiles } = req.body;
-    try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.1-pro-preview',
-        contents: `SYSTEM ROLE: You are an expert dialogue doctor, specializing in subtext, character voice, and dramatic irony.
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.1-pro-preview',
+      contents: `SYSTEM ROLE: You are an expert dialogue doctor, specializing in subtext, character voice, and dramatic irony.
 
 OBJECTIVE: Analyze the provided dialogue and rewrite it to remove "on-the-nose" exposition. Characters rarely say exactly what they mean; they speak around their desires, use deflection, or weaponize their words.
 
@@ -100,19 +91,15 @@ INSTRUCTIONS:
 INPUT DIALOGUE: ${dialogue}
 CHARACTER PROFILES: ${JSON.stringify(profiles)}
 OUTPUT: Provide 2 alternative versions of the dialogue exchange, explaining the subtextual strategy used in each.`,
-      });
-      res.json({ result: response.text });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+    });
+    res.json({ result: response.text });
+  }));
 
-  app.post('/api/scriptide/analyze-tension', async (req, res) => {
+  app.post('/api/scriptide/analyze-tension', asyncHandler(async (req, res) => {
     const { scene } = req.body;
-    try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.1-pro-preview',
-        contents: `SYSTEM ROLE: You are a structural script consultant heavily influenced by Alfred Hitchcock's theory of suspense and modern thriller pacing.
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.1-pro-preview',
+      contents: `SYSTEM ROLE: You are a structural script consultant heavily influenced by Alfred Hitchcock's theory of suspense and modern thriller pacing.
 
 OBJECTIVE: Analyze the provided scene or sequence and identify opportunities to heighten psychological stakes, dread, or anticipation.
 
@@ -124,37 +111,29 @@ ANALYSIS CRITERIA:
 
 INPUT SCENE: ${scene}
 OUTPUT: A bulleted diagnostic report with 3 actionable, specific suggestions to rewrite the scene for maximum tension.`,
-      });
-      res.json({ result: response.text });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+    });
+    res.json({ result: response.text });
+  }));
 
-  app.post('/api/scriptide/clean-action', async (req, res) => {
+  app.post('/api/scriptide/clean-action', asyncHandler(async (req, res) => {
     const { text } = req.body;
-    try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.1-pro-preview',
-        contents: `SYSTEM ROLE: You are a strict script editor enforcing a "Semantic Firewall".
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.1-pro-preview',
+      contents: `SYSTEM ROLE: You are a strict script editor enforcing a "Semantic Firewall".
 OBJECTIVE: The following action block contains forbidden camera directions or technical jargon (e.g., "We see", "Pan to", "Close up").
 Rewrite it into pure, visceral environmental action. Describe what is happening in the world, not what the camera is doing. Remove any mention of the audience or the lens.
 
 INPUT: ${text}
 OUTPUT: Just the rewritten action text, nothing else.`,
-      });
-      res.json({ result: response.text });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+    });
+    res.json({ result: response.text });
+  }));
 
-  app.post('/api/scriptide/character-profile', async (req, res) => {
+  app.post('/api/scriptide/character-profile', asyncHandler(async (req, res) => {
     const { profile } = req.body;
-    try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.1-pro-preview',
-        contents: `SYSTEM ROLE: You are a character designer and novelist specializing in psychological realism and "Show, Don't Tell" characterization.
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.1-pro-preview',
+      contents: `SYSTEM ROLE: You are a character designer and novelist specializing in psychological realism and "Show, Don't Tell" characterization.
 
 OBJECTIVE: Generate a visceral, detailed physical description of a character based on their psychological profile (Ghost, Lie, Want, Need). The description should reflect their internal state through external details.
 
@@ -173,11 +152,14 @@ Want (External Goal): ${profile.want}
 Need (Internal Truth): ${profile.need}
 
 OUTPUT: A visceral character description.`,
-      });
-      res.json({ result: response.text });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
+    });
+    res.json({ result: response.text });
+  }));
+
+  // Global Error Handler
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error(err);
+    res.status(500).json({ error: 'Internal Server Error' });
   });
 
   // Vite middleware for development
