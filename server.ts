@@ -6,6 +6,13 @@ import { Stage } from './server/engine/Stage.ts';
 import { Orchestrator } from './server/engine/Orchestrator.ts';
 import type { CharacterSheet, Location } from './server/engine/types.ts';
 
+
+// Async handler to wrap API routes and catch errors
+const asyncHandler = (fn: express.RequestHandler): express.RequestHandler =>
+  (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -17,50 +24,46 @@ async function startServer() {
   const orchestrator = new Orchestrator(stage);
 
   // API Routes for Story Machine
-  app.post('/api/init', (req, res) => {
+  app.post('/api/init', asyncHandler(async (req, res) => {
     const { nodes, agents } = req.body;
     if (nodes) nodes.forEach((n: any) => orchestrator.registerNode(n));
     if (agents) agents.forEach((a: any) => orchestrator.registerAgent(a));
     res.json({ status: 'initialized' });
-  });
+  }));
 
-  app.post('/api/turn', async (req, res) => {
+  app.post('/api/turn', asyncHandler(async (req, res) => {
     const { agentId } = req.body;
-    try {
+
       const action = await orchestrator.runTurn(agentId);
       res.json({ action });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
 
-  app.post('/api/run-room', async (req, res) => {
+  }));
+
+  app.post('/api/run-room', asyncHandler(async (req, res) => {
     const { nodeId } = req.body;
-    try {
+
       await orchestrator.runRoomSimulation(nodeId);
       res.json({ status: 'completed' });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
 
-  app.get('/api/ledger', (req, res) => {
+  }));
+
+  app.get('/api/ledger', asyncHandler(async (req, res) => {
     res.json(stage.getFullLedger());
-  });
+  }));
 
-  app.get('/api/state', (req, res) => {
+  app.get('/api/state', asyncHandler(async (req, res) => {
     res.json({
       agents: stage.getAllAgents(),
       nodes: stage.getAllLocations()
     });
-  });
+  }));
 
   // --- SCRIPTIDE API ROUTES ---
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-  app.post('/api/scriptide/world-build', async (req, res) => {
+  app.post('/api/scriptide/world-build', asyncHandler(async (req, res) => {
     const { beat } = req.body;
-    try {
+
       const response = await ai.models.generateContent({
         model: 'gemini-3.1-pro-preview',
         contents: `SYSTEM ROLE: You are a master screenwriter and world-builder. Your task is to generate or expand a scene based on the user's beat outline.
@@ -77,14 +80,12 @@ INPUT: ${beat}
 OUTPUT: Generate the Scene Heading and Action lines.`,
       });
       res.json({ result: response.text });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
 
-  app.post('/api/scriptide/refine-dialogue', async (req, res) => {
+  }));
+
+  app.post('/api/scriptide/refine-dialogue', asyncHandler(async (req, res) => {
     const { dialogue, profiles } = req.body;
-    try {
+
       const response = await ai.models.generateContent({
         model: 'gemini-3.1-pro-preview',
         contents: `SYSTEM ROLE: You are an expert dialogue doctor, specializing in subtext, character voice, and dramatic irony.
@@ -102,14 +103,12 @@ CHARACTER PROFILES: ${JSON.stringify(profiles)}
 OUTPUT: Provide 2 alternative versions of the dialogue exchange, explaining the subtextual strategy used in each.`,
       });
       res.json({ result: response.text });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
 
-  app.post('/api/scriptide/analyze-tension', async (req, res) => {
+  }));
+
+  app.post('/api/scriptide/analyze-tension', asyncHandler(async (req, res) => {
     const { scene } = req.body;
-    try {
+
       const response = await ai.models.generateContent({
         model: 'gemini-3.1-pro-preview',
         contents: `SYSTEM ROLE: You are a structural script consultant heavily influenced by Alfred Hitchcock's theory of suspense and modern thriller pacing.
@@ -126,14 +125,12 @@ INPUT SCENE: ${scene}
 OUTPUT: A bulleted diagnostic report with 3 actionable, specific suggestions to rewrite the scene for maximum tension.`,
       });
       res.json({ result: response.text });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
 
-  app.post('/api/scriptide/clean-action', async (req, res) => {
+  }));
+
+  app.post('/api/scriptide/clean-action', asyncHandler(async (req, res) => {
     const { text } = req.body;
-    try {
+
       const response = await ai.models.generateContent({
         model: 'gemini-3.1-pro-preview',
         contents: `SYSTEM ROLE: You are a strict script editor enforcing a "Semantic Firewall".
@@ -144,14 +141,12 @@ INPUT: ${text}
 OUTPUT: Just the rewritten action text, nothing else.`,
       });
       res.json({ result: response.text });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
 
-  app.post('/api/scriptide/character-profile', async (req, res) => {
+  }));
+
+  app.post('/api/scriptide/character-profile', asyncHandler(async (req, res) => {
     const { profile } = req.body;
-    try {
+
       const response = await ai.models.generateContent({
         model: 'gemini-3.1-pro-preview',
         contents: `SYSTEM ROLE: You are a character designer and novelist specializing in psychological realism and "Show, Don't Tell" characterization.
@@ -175,9 +170,14 @@ Need (Internal Truth): ${profile.need}
 OUTPUT: A visceral character description.`,
       });
       res.json({ result: response.text });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
+
+  }));
+
+
+  // Global error handling middleware
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error('Server Error:', err.message || err);
+    res.status(500).json({ error: 'Internal Server Error' });
   });
 
   // Vite middleware for development
