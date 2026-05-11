@@ -7,10 +7,18 @@ export class Orchestrator {
   private agents: Map<string, Agent> = new Map();
   private director: DirectorNode;
   private stage: Stage;
+  private locationMap: Map<string, Location> = new Map();
 
   constructor(stage: Stage) {
     this.stage = stage;
     this.director = new DirectorNode(stage);
+
+    // Initialize locationMap from existing stage locations
+    const locations = this.stage.getAllLocations();
+    for (const loc of locations) {
+      this.locationMap.set(loc.location_id, loc);
+      this.locationMap.set(loc.name.toLowerCase(), loc);
+    }
   }
 
   public registerAgent(sheet: CharacterSheet) {
@@ -20,6 +28,8 @@ export class Orchestrator {
 
   public registerNode(node: Location) {
     this.stage.addLocation(node);
+    this.locationMap.set(node.location_id, node);
+    this.locationMap.set(node.name.toLowerCase(), node);
   }
 
   public async runTurn(agentId: string) {
@@ -35,9 +45,8 @@ export class Orchestrator {
 
     // 3. Handle physical relocation
     if (action.action_type === 'RELOCATE' && action.target) {
-      // Find location by name
-      const locations = this.stage.getAllLocations();
-      const targetLoc = locations.find(l => l.name.toLowerCase() === action.target!.toLowerCase() || l.location_id === action.target);
+      // Find location by name or ID using O(1) map lookup
+      const targetLoc = this.locationMap.get(action.target.toLowerCase()) || this.locationMap.get(action.target);
       if (targetLoc) {
         this.stage.updateAgentLocation(agentId, targetLoc.location_id);
       }
@@ -73,8 +82,7 @@ export class Orchestrator {
         this.stage.recordAction(agentSheet.char_id, action, location_id);
 
         if (action.action_type === 'RELOCATE' && action.target) {
-          const locations = this.stage.getAllLocations();
-          const targetLoc = locations.find(l => l.name.toLowerCase() === action.target!.toLowerCase() || l.location_id === action.target);
+          const targetLoc = this.locationMap.get(action.target.toLowerCase()) || this.locationMap.get(action.target);
           if (targetLoc) {
             console.log(`[Orchestrator] ${currentSheet.name} relocated to ${targetLoc.name}. Breaking Dialogue Lock.`);
             this.stage.updateAgentLocation(agentSheet.char_id, targetLoc.location_id);
