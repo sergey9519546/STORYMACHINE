@@ -1,0 +1,3 @@
+## 2024-05-13 - [Editor Double-Render Cycle Elimination]
+**Learning:** The `Editor` component in `src/components/Editor.tsx` used an anti-pattern of maintaining derived state (`blocks`) via `useState` and `useEffect` reacting to the `script` prop. This resulted in an unnecessary double-render cycle on every keystroke, which is extremely costly in high-frequency input components, especially since parsing can be complex.
+**Action:** Always enforce `useMemo` for synchronously derived state from props instead of `useEffect` + `useState` to prevent unnecessary double-render cycles, especially in high-frequency input components.
