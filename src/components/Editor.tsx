@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { parseFountain, FountainBlock } from '../lib/fountain';
 import { AlertCircle } from 'lucide-react';
 
@@ -8,11 +8,9 @@ interface EditorProps {
 }
 
 export default function Editor({ script, onChange }: EditorProps) {
-  const [blocks, setBlocks] = useState<FountainBlock[]>([]);
-
-  useEffect(() => {
-    setBlocks(parseFountain(script));
-  }, [script]);
+  // Use useMemo for derived state from props instead of useEffect + useState
+  // to prevent unnecessary double-render cycles in high-frequency input components
+  const blocks = useMemo(() => parseFountain(script), [script]);
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#E4E3E0] overflow-hidden">
