@@ -1,0 +1,3 @@
+## 2024-05-13 - [Performance] Prevent unnecessary re-renders in Editor components
+**Learning:** High-frequency input components like `Editor` and its siblings like `Sidebar` are prone to performance bottlenecks when deriving complex state (like parsing a whole Fountain script) synchronously during render or inside an effect that triggers a subsequent render. Using `useEffect` + `useState` for derived state from props leads to double-rendering, and skipping memoization altogether causes parsing on every keystroke.
+**Action:** Enforce `useMemo` for derived state computation (such as `blocks` from `script` text) in `Editor.tsx` and `Sidebar.tsx` to optimize component performance.
