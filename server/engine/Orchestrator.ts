@@ -1,17 +1,20 @@
 import { Stage } from './Stage.ts';
 import { Agent } from './Agent.ts';
-import type { CharacterSheet, Location } from './types.ts';
+import type { CharacterSheet, Location, EpistemicUpdate } from './types.ts';
 import { DirectorNode } from './DirectorNode.ts';
+import { CausalSpine } from './CausalSpine.ts';
 
 export class Orchestrator {
   private agents: Map<string, Agent> = new Map();
   private director: DirectorNode;
   private stage: Stage;
+  private spine: CausalSpine;
   private locationMap: Map<string, Location> = new Map();
 
   constructor(stage: Stage) {
     this.stage = stage;
     this.director = new DirectorNode(stage);
+    this.spine = new CausalSpine(stage);
     for (const loc of this.stage.getAllLocations()) {
       this.locationMap.set(loc.location_id, loc);
       this.locationMap.set(loc.name.toLowerCase(), loc);
@@ -36,8 +39,22 @@ export class Orchestrator {
     const action = await agent.takeTurn();
 
     const currentNodeId = this.stage.getAgent(agentId)!.current_location_id;
-    this.stage.recordAction(agentId, action, currentNodeId);
+    const action_id = this.stage.recordAction(agentId, action, currentNodeId);
     this.stage.incrementTurnCount();
+    const turnIndex = this.stage.getTurnCount();
+
+    // Build EventCard for the spine
+    const actionEntry = {
+      action_id,
+      timestamp: Date.now(),
+      char_id: agentId,
+      location_id: currentNodeId,
+      action_type: action.action_type,
+      target_char_id: action.target ?? null,
+      content: action.content,
+      is_audible: action.action_type !== 'EXAMINE',
+    } as import('./types.ts').ActionLogEntry;
+    this.spine.processEvent(actionEntry, turnIndex);
 
     if (action.action_type === 'RELOCATE' && action.target) {
       const targetLoc = this.locationMap.get(action.target.toLowerCase()) ?? this.locationMap.get(action.target);
@@ -46,9 +63,10 @@ export class Orchestrator {
       }
     }
 
-    // Update the acting agent's epistemic state after their own action
+    // Update the acting agent's epistemic state and run spine
     const recentActions = this.stage.getSensoryFilter(currentNodeId, 3);
-    await agent.updateEpistemics(recentActions);
+    const update = await agent.updateEpistemics(recentActions);
+    this._runSpineForUpdate(update, action_id, currentNodeId);
 
     return action;
   }
@@ -83,8 +101,22 @@ export class Orchestrator {
 
         console.log(`[Orchestrator] ${currentSheet.name}'s turn in ${location_id}`);
         const action = await agent.takeTurn();
-        this.stage.recordAction(agentSheet.char_id, action, location_id);
+        const action_id = this.stage.recordAction(agentSheet.char_id, action, location_id);
         this.stage.incrementTurnCount();
+        const turnIndex = this.stage.getTurnCount();
+
+        // Build EventCard for the spine
+        const actionEntry = {
+          action_id,
+          timestamp: Date.now(),
+          char_id: agentSheet.char_id,
+          location_id,
+          action_type: action.action_type,
+          target_char_id: action.target ?? null,
+          content: action.content,
+          is_audible: action.action_type !== 'EXAMINE',
+        } as import('./types.ts').ActionLogEntry;
+        this.spine.processEvent(actionEntry, turnIndex);
 
         if (action.action_type === 'RELOCATE' && action.target) {
           const targetLoc = this.locationMap.get(action.target.toLowerCase()) ?? this.locationMap.get(action.target);
@@ -97,14 +129,16 @@ export class Orchestrator {
         }
 
         // ── Epistemic update for all agents in room after each action ──
-        // Each agent observes what just happened and updates their belief graph
         const recentActions = this.stage.getSensoryFilter(location_id, turnCount + 1);
-        await Promise.all(
+        const epistemicUpdates = await Promise.all(
           agentsInRoom
             .map(a => this.agents.get(a.char_id))
             .filter((a): a is Agent => a !== undefined)
             .map(a => a.updateEpistemics(recentActions))
         );
+        for (const update of epistemicUpdates) {
+          this._runSpineForUpdate(update, action_id, location_id);
+        }
 
         turnCount++;
         if (turnCount >= maxTurns) break;
@@ -127,6 +161,57 @@ export class Orchestrator {
     // ── Director Node: perspective-bounded room evaluation ──
     console.log(`[Orchestrator] Running Director Node evaluation for ${location_id}`);
     const allActions = this.stage.getSensoryFilter(location_id, turnCount);
-    await this.director.evaluateRoom(location_id, allActions);
+    const directorUpdates = await this.director.evaluateRoom(location_id, allActions);
+    const lastActionId = allActions[allActions.length - 1]?.action_id ?? '';
+    for (const update of directorUpdates) {
+      this._runSpineForUpdate(update, lastActionId, location_id);
+    }
+  }
+
+  // ── Spine wiring helper ─────────────────────────────────────────────────────
+  // Called after every EpistemicUpdate to create contradiction edges, goal
+  // mutations, dramatic pressure, and beat traces.  Pure deterministic; no AI.
+  private _runSpineForUpdate(
+    update: EpistemicUpdate,
+    triggerEventId: string,
+    locationId: string,
+  ): void {
+    if (!update.contradiction_detected || update.new_beliefs.length === 0) return;
+
+    const edges = this.spine.processBeliefUpdate(
+      update.char_id,
+      update.new_beliefs,
+      triggerEventId,
+      update.contradiction_detected,
+      update.contradicted_propositions,
+    );
+
+    if (edges.length === 0) return;
+
+    const { mutations, pressures } = this.spine.processContradiction(
+      update.char_id,
+      edges,
+      triggerEventId,
+    );
+
+    if (mutations.length > 0 || pressures.length > 0) {
+      const agent = this.stage.getAgent(update.char_id);
+      const agentName = agent?.name ?? update.char_id;
+      this.spine.createBeatTrace({
+        triggerEventId,
+        beatType: 'contradiction_discovered',
+        participants: [update.char_id, ...new Set(edges.map(e => {
+          // include the source agent of the contradicted belief if known
+          const allBeliefs = agent?.beliefs ?? [];
+          return allBeliefs.find(b => b.id === e.from_belief_id)?.source_agent_id ?? '';
+        }).filter(Boolean))],
+        causalChain: [triggerEventId],
+        locationId,
+        narrativeSummary: `${agentName} discovers a contradiction in their belief graph, triggering ${mutations.length} goal mutation(s) and ${pressures.length} dramatic pressure(s).`,
+        fountainHint: `${agentName.toUpperCase()} pauses — something doesn't add up. The air between them changes.`,
+      });
+
+      console.log(`[Spine] Contradiction: ${agentName} → ${edges.length} edge(s), ${mutations.length} mutation(s), ${pressures.length} pressure(s)`);
+    }
   }
 }

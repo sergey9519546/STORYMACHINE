@@ -374,14 +374,15 @@ async function startServer() {
     res.json({ agents: stage.getAllAgents(), nodes: stage.getAllLocations() });
   }));
 
-  // Export current simulation as a Fountain screenplay draft
+  // Export current simulation as a Fountain screenplay draft (with beat traces)
   app.get('/api/ledger/fountain', gameLimiter, asyncHandler(async (req, res) => {
     const log = stage.getFullLedger();
     const agents = stage.getAllAgents();
     const locations = stage.getAllLocations();
-    const fountain = transcriptToFountain(log, agents, locations);
+    const beatTraces = stage.getAllBeatTraces();
+    const fountain = transcriptToFountain(log, agents, locations, undefined, beatTraces);
     const characters = extractCharactersFromLog(agents);
-    res.json({ fountain, characters, turnCount: log.length });
+    res.json({ fountain, characters, turnCount: log.length, beatTraceCount: beatTraces.length });
   }));
 
   // Run a self-contained simulation and return Fountain output without polluting main stage
@@ -453,6 +454,32 @@ async function startServer() {
   // Current Setup/Turn/Prestige illusion phase
   app.get('/api/simulation/illusion-state', gameLimiter, asyncHandler(async (req, res) => {
     res.json(stage.getIllusionState());
+  }));
+
+  // ── Causal-Epistemic Spine endpoints ──────────────────────────────────────
+
+  // All beat traces (narrative beats with causal chains)
+  app.get('/api/beat-traces', gameLimiter, asyncHandler(async (req, res) => {
+    res.json(stage.getAllBeatTraces());
+  }));
+
+  // Active dramatic pressure on a specific agent (bias signals not yet applied)
+  app.get('/api/dramatic-pressure/:charId', gameLimiter, asyncHandler(async (req, res) => {
+    const charId = req.params.charId?.substring(0, 128);
+    if (!charId) { res.status(400).json({ error: 'charId is required' }); return; }
+    res.json(stage.getActivePressures(charId));
+  }));
+
+  // All belief edges (contradiction graph)
+  app.get('/api/belief-edges', gameLimiter, asyncHandler(async (req, res) => {
+    res.json(stage.getAllBeliefEdges());
+  }));
+
+  // Goal mutations for a specific agent
+  app.get('/api/goal-mutations/:charId', gameLimiter, asyncHandler(async (req, res) => {
+    const charId = req.params.charId?.substring(0, 128);
+    if (!charId) { res.status(400).json({ error: 'charId is required' }); return; }
+    res.json(stage.getGoalMutations(charId));
   }));
 
   // QBN choice filtering — filter available choices by accumulated qualities

@@ -11,6 +11,7 @@ import type {
   AttachmentStyle,
   DefenseMechanism,
   BeliefSource,
+  EpistemicUpdate,
 } from './types.ts';
 import { Stage } from './Stage.ts';
 import { safeJsonParse } from '../../src/lib/json.ts';
@@ -134,13 +135,13 @@ export class Agent {
     history: ActionLogEntry[],
     otherAgents: CharacterSheet[],
   ): string {
-    // ── History block ──
+    // ── History block (numbered so updateEpistemics can reference by index) ──
     const historyStr = history.length === 0
       ? '(Silence. You are the first to speak.)'
-      : history.map(e => {
+      : history.map((e, i) => {
           const name = this.stage.getAgent(e.char_id)?.name ?? 'Unknown';
           const tag = e.action_type === 'LIE' ? 'SPEAK' : e.action_type; // LIE appears as SPEAK to observers
-          return `[${tag}] ${name}: ${e.content}`;
+          return `[${i}] [${tag}] ${name}: ${e.content}`;
         }).join('\n');
 
     // ── Beliefs block (top 10 by confidence) ──
@@ -169,10 +170,17 @@ export class Agent {
     // ── Psychology block ──
     const actionBias = describeActionBias(this.sheet.darkTriad, this.sheet.attachmentStyle, this.sheet.suspicion_score);
 
+    // ── Dramatic Pressure (Director's bias signal — consumed once) ──
+    const activePressures = this.stage.getActivePressures(this.sheet.char_id);
+    const pressureBlock = activePressures.length > 0
+      ? `\nSITUATIONAL AWARENESS (your read of what is happening right now):\n${activePressures.map(p => `- ${p.bias_hint}`).join('\n')}\n`
+      : '';
+    for (const p of activePressures) this.stage.markPressureApplied(p.pressure_id);
+
     return `You are ${this.sheet.name}. Your public persona: ${this.sheet.public_mask}
 
 HIDDEN DIRECTIVE: Your true motive is: "${this.sheet.hidden_motive}". Never state this directly. Every action serves it.
-
+${pressureBlock}
 PSYCHOLOGICAL PROFILE:
 ${describeAttachment(this.sheet.attachmentStyle)}
 ${describeDefenses(this.sheet.defenseMechanisms)}
@@ -201,21 +209,28 @@ Choose your next action. Output a NarrativeAction JSON. Use action_type LIE only
   // ── Epistemic update (replaces evaluateState) ────────────────────────────────
   // Called after each turn to update beliefs + theory of mind based on what was observed.
 
-  public async updateEpistemics(recentActions: ActionLogEntry[]): Promise<void> {
-    if (recentActions.length === 0) return;
+  public async updateEpistemics(recentActions: ActionLogEntry[]): Promise<EpistemicUpdate> {
+    const empty: EpistemicUpdate = {
+      char_id: this.sheet.char_id,
+      new_beliefs: [],
+      contradiction_detected: false,
+      contradicted_propositions: [],
+    };
+    if (recentActions.length === 0) return empty;
     this.refreshSheet();
 
     const observableActions = recentActions.filter(
       a => a.location_id === this.sheet.current_location_id || a.char_id === this.sheet.char_id,
     );
-    if (observableActions.length === 0) return;
+    if (observableActions.length === 0) return empty;
 
     const otherAgentsInRoom = this.stage.getAgentsInLocation(this.sheet.current_location_id)
       .filter(a => a.char_id !== this.sheet.char_id);
 
-    const actionSummary = observableActions.map(a => {
+    // Numbered so Gemini can reference by index when reporting source_action_index
+    const actionSummary = observableActions.map((a, i) => {
       const name = this.stage.getAgent(a.char_id)?.name ?? 'Unknown';
-      return `[${a.action_type}] ${name}: ${a.content}`;
+      return `[${i}] [${a.action_type}] ${name}: ${a.content}`;
     }).join('\n');
 
     const currentBeliefsSummary = (this.sheet.beliefs ?? [])
@@ -257,9 +272,19 @@ Based on what you just witnessed:
                   proposition: { type: Type.STRING },
                   confidence: { type: Type.NUMBER, description: '0.0-1.0' },
                   source: { type: Type.STRING, enum: ['witnessed', 'told', 'inferred'] },
+                  source_action_index: {
+                    type: Type.INTEGER,
+                    description: 'Index (0-based) of the action in the numbered list that caused this belief. -1 if not traceable to a specific action.',
+                    nullable: true,
+                  },
                 },
                 required: ['proposition', 'confidence', 'source'],
               },
+            },
+            contradicted_propositions: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: 'Verbatim text of prior beliefs that the new observations contradict.',
             },
             updatedTheoryOfMind: {
               type: Type.ARRAY,
@@ -276,21 +301,23 @@ Based on what you just witnessed:
             },
             contradiction_detected: { type: Type.BOOLEAN },
           },
-          required: ['newSuspicionScore', 'newBeliefs', 'updatedTheoryOfMind', 'contradiction_detected'],
+          required: ['newSuspicionScore', 'newBeliefs', 'updatedTheoryOfMind', 'contradiction_detected', 'contradicted_propositions'],
         },
       },
     });
 
     const result = safeJsonParse<{
       newSuspicionScore: number;
-      newBeliefs: Array<{ proposition: string; confidence: number; source: string }>;
+      newBeliefs: Array<{ proposition: string; confidence: number; source: string; source_action_index?: number | null }>;
       updatedTheoryOfMind: Array<{ agent_name: string; believed_motive: string; trust_level: number; new_believed_knowledge?: string[] }>;
       contradiction_detected: boolean;
+      contradicted_propositions: string[];
     }>(response.text ?? '{}', {
       newSuspicionScore: this.sheet.suspicion_score,
       newBeliefs: [],
       updatedTheoryOfMind: [],
       contradiction_detected: false,
+      contradicted_propositions: [],
     });
 
     // ── Update suspicion ──
@@ -301,13 +328,21 @@ Based on what you just witnessed:
     const existingProps = new Set(existingBeliefs.map(b => b.proposition.toLowerCase()));
     const freshBeliefs: Belief[] = result.newBeliefs
       .filter(b => b.proposition && !existingProps.has(b.proposition.toLowerCase()))
-      .map(b => ({
-        id: randomUUID(),
-        proposition: b.proposition,
-        confidence: Math.max(0, Math.min(1, b.confidence)),
-        source: (b.source as BeliefSource) ?? 'inferred',
-        acquired_at: this.stage.getTurnCount(),
-      }));
+      .map(b => {
+        // Resolve source agent + event from the indexed action list
+        const srcIdx = typeof b.source_action_index === 'number' && b.source_action_index >= 0
+          ? b.source_action_index : null;
+        const srcAction = srcIdx !== null ? observableActions[srcIdx] : null;
+        return {
+          id: randomUUID(),
+          proposition: b.proposition,
+          confidence: Math.max(0, Math.min(1, b.confidence)),
+          source: (b.source as BeliefSource) ?? 'inferred',
+          source_agent_id: srcAction?.char_id,
+          source_event_id: srcAction?.action_id,
+          acquired_at: this.stage.getTurnCount(),
+        };
+      });
 
     if (freshBeliefs.length > 0) {
       this.stage.updateAgentBeliefs(this.sheet.char_id, [...existingBeliefs, ...freshBeliefs]);
@@ -335,10 +370,18 @@ Based on what you just witnessed:
       }
       this.stage.updateTheoryOfMind(this.sheet.char_id, currentToM);
     }
+
+    return {
+      char_id: this.sheet.char_id,
+      new_beliefs: freshBeliefs,
+      contradiction_detected: result.contradiction_detected ?? false,
+      contradicted_propositions: result.contradicted_propositions ?? [],
+      source_event_id: observableActions.length > 0 ? observableActions[observableActions.length - 1].action_id : undefined,
+    };
   }
 
   // ── Legacy evaluateState — kept for backward compatibility ──────────────────
-  public async evaluateState(recentActions: ActionLogEntry[]): Promise<void> {
+  public async evaluateState(recentActions: ActionLogEntry[]): Promise<EpistemicUpdate> {
     return this.updateEpistemics(recentActions);
   }
 }

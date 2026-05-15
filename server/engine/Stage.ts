@@ -13,6 +13,12 @@ import type {
   BigFive,
   AttachmentStyle,
   DefenseMechanism,
+  EventCard,
+  EventProposition,
+  BeliefEdge,
+  GoalMutation,
+  DramaticPressure,
+  BeatTrace,
 } from './types.ts';
 import { safeJsonParse } from '../../src/lib/json.ts';
 
@@ -83,12 +89,82 @@ export class Stage {
         total_turns INTEGER DEFAULT 0
       );
 
+      CREATE TABLE IF NOT EXISTS Event_Cards (
+        event_id TEXT PRIMARY KEY,
+        char_id TEXT REFERENCES Characters(char_id),
+        action_type TEXT NOT NULL,
+        content TEXT NOT NULL,
+        location_id TEXT NOT NULL,
+        turn_index INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS Event_Propositions (
+        proposition_id TEXT PRIMARY KEY,
+        event_id TEXT REFERENCES Event_Cards(event_id),
+        content TEXT NOT NULL,
+        is_lie INTEGER NOT NULL DEFAULT 0,
+        asserted_by TEXT NOT NULL,
+        perceived_truth INTEGER NOT NULL DEFAULT 1
+      );
+
+      CREATE TABLE IF NOT EXISTS Belief_Edges (
+        edge_id TEXT PRIMARY KEY,
+        from_belief_id TEXT NOT NULL,
+        to_belief_id TEXT NOT NULL,
+        edge_type TEXT NOT NULL,
+        discovered_by TEXT NOT NULL,
+        source_event_id TEXT NOT NULL,
+        turn_index INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS Goal_Mutations (
+        mutation_id TEXT PRIMARY KEY,
+        char_id TEXT REFERENCES Characters(char_id),
+        turn_index INTEGER NOT NULL,
+        trigger_event_id TEXT NOT NULL,
+        trigger_belief_id TEXT,
+        mutation_type TEXT NOT NULL,
+        description TEXT NOT NULL,
+        old_subgoal TEXT,
+        new_subgoal TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS Dramatic_Pressure (
+        pressure_id TEXT PRIMARY KEY,
+        target_char_id TEXT REFERENCES Characters(char_id),
+        source_char_id TEXT,
+        trigger_event_id TEXT NOT NULL,
+        pressure_type TEXT NOT NULL,
+        intensity REAL NOT NULL DEFAULT 50,
+        bias_hint TEXT NOT NULL,
+        expires_at_turn INTEGER NOT NULL,
+        applied INTEGER NOT NULL DEFAULT 0
+      );
+
+      CREATE TABLE IF NOT EXISTS Beat_Traces (
+        beat_id TEXT PRIMARY KEY,
+        turn_index INTEGER NOT NULL,
+        location_id TEXT NOT NULL,
+        trigger_event_id TEXT NOT NULL,
+        beat_type TEXT NOT NULL,
+        participants_json TEXT NOT NULL DEFAULT '[]',
+        causal_chain_json TEXT NOT NULL DEFAULT '[]',
+        narrative_summary TEXT NOT NULL,
+        fountain_hint TEXT NOT NULL
+      );
+
       CREATE INDEX IF NOT EXISTS idx_actionlog_location
         ON Action_Log(location_id, is_audible, timestamp);
       CREATE INDEX IF NOT EXISTS idx_knowledge_char
         ON Knowledge_Ledger(char_id);
       CREATE INDEX IF NOT EXISTS idx_charstate_location
         ON Character_State(current_location_id);
+      CREATE INDEX IF NOT EXISTS idx_pressure_target
+        ON Dramatic_Pressure(target_char_id, applied, expires_at_turn);
+      CREATE INDEX IF NOT EXISTS idx_beat_location
+        ON Beat_Traces(location_id);
+      CREATE INDEX IF NOT EXISTS idx_belief_edges_from
+        ON Belief_Edges(from_belief_id);
     `);
 
     // Seed illusion state if not present
@@ -246,12 +322,13 @@ export class Stage {
 
   // ── Action log ───────────────────────────────────────────────────────────────
 
-  public recordAction(char_id: string, action: NarrativeAction, location_id: string) {
+  public recordAction(char_id: string, action: NarrativeAction, location_id: string): string {
+    const action_id = randomUUID();
     this.db.prepare(`
       INSERT INTO Action_Log (action_id, timestamp, char_id, location_id, action_type, target_char_id, content, is_audible)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      randomUUID(),
+      action_id,
       Date.now(),
       char_id,
       location_id,
@@ -260,6 +337,7 @@ export class Stage {
       action.content,
       action.action_type !== 'EXAMINE' ? 1 : 0,
     );
+    return action_id;
   }
 
   public getSensoryFilter(location_id: string, limit: number = 10): ActionLogEntry[] {
@@ -306,5 +384,170 @@ export class Stage {
 
   public incrementTurnCount() {
     this.db.prepare('UPDATE Illusion_State SET total_turns = total_turns + 1 WHERE id = 1').run();
+  }
+
+  // ── Causal-Epistemic Spine ───────────────────────────────────────────────────
+
+  public recordEventCard(card: Omit<EventCard, 'propositions'>): void {
+    this.db.prepare(`
+      INSERT OR IGNORE INTO Event_Cards (event_id, char_id, action_type, content, location_id, turn_index)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(card.event_id, card.char_id, card.action_type, card.content, card.location_id, card.turn_index);
+  }
+
+  public addEventPropositions(propositions: EventProposition[]): void {
+    const stmt = this.db.prepare(`
+      INSERT OR IGNORE INTO Event_Propositions (proposition_id, event_id, content, is_lie, asserted_by, perceived_truth)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    for (const p of propositions) {
+      stmt.run(p.proposition_id, p.event_id, p.content, p.is_lie ? 1 : 0, p.asserted_by, p.perceived_truth ? 1 : 0);
+    }
+  }
+
+  public getEventPropositions(event_id: string): EventProposition[] {
+    const rows = this.db.prepare('SELECT * FROM Event_Propositions WHERE event_id = ?').all(event_id) as Array<Record<string, unknown>>;
+    return rows.map(r => ({
+      proposition_id: r.proposition_id as string,
+      event_id: r.event_id as string,
+      content: r.content as string,
+      is_lie: (r.is_lie as number) === 1,
+      asserted_by: r.asserted_by as string,
+      perceived_truth: (r.perceived_truth as number) === 1,
+    }));
+  }
+
+  public addBeliefEdge(edge: BeliefEdge): void {
+    this.db.prepare(`
+      INSERT OR IGNORE INTO Belief_Edges (edge_id, from_belief_id, to_belief_id, edge_type, discovered_by, source_event_id, turn_index)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(edge.edge_id, edge.from_belief_id, edge.to_belief_id, edge.edge_type, edge.discovered_by, edge.source_event_id, edge.turn_index);
+  }
+
+  public getBeliefEdgesForBelief(belief_id: string): BeliefEdge[] {
+    const rows = this.db.prepare(
+      'SELECT * FROM Belief_Edges WHERE from_belief_id = ? OR to_belief_id = ?'
+    ).all(belief_id, belief_id) as Array<Record<string, unknown>>;
+    return rows.map(r => ({
+      edge_id: r.edge_id as string,
+      from_belief_id: r.from_belief_id as string,
+      to_belief_id: r.to_belief_id as string,
+      edge_type: r.edge_type as BeliefEdge['edge_type'],
+      discovered_by: r.discovered_by as string,
+      source_event_id: r.source_event_id as string,
+      turn_index: r.turn_index as number,
+    }));
+  }
+
+  public getAllBeliefEdges(): BeliefEdge[] {
+    const rows = this.db.prepare('SELECT * FROM Belief_Edges ORDER BY turn_index ASC').all() as Array<Record<string, unknown>>;
+    return rows.map(r => ({
+      edge_id: r.edge_id as string,
+      from_belief_id: r.from_belief_id as string,
+      to_belief_id: r.to_belief_id as string,
+      edge_type: r.edge_type as BeliefEdge['edge_type'],
+      discovered_by: r.discovered_by as string,
+      source_event_id: r.source_event_id as string,
+      turn_index: r.turn_index as number,
+    }));
+  }
+
+  public recordGoalMutation(mutation: GoalMutation): void {
+    this.db.prepare(`
+      INSERT INTO Goal_Mutations (mutation_id, char_id, turn_index, trigger_event_id, trigger_belief_id,
+        mutation_type, description, old_subgoal, new_subgoal)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      mutation.mutation_id, mutation.char_id, mutation.turn_index, mutation.trigger_event_id,
+      mutation.trigger_belief_id ?? null, mutation.mutation_type, mutation.description,
+      mutation.old_subgoal ?? null, mutation.new_subgoal ?? null,
+    );
+  }
+
+  public getGoalMutations(char_id: string): GoalMutation[] {
+    const rows = this.db.prepare('SELECT * FROM Goal_Mutations WHERE char_id = ? ORDER BY turn_index ASC').all(char_id) as Array<Record<string, unknown>>;
+    return rows.map(r => ({
+      mutation_id: r.mutation_id as string,
+      char_id: r.char_id as string,
+      turn_index: r.turn_index as number,
+      trigger_event_id: r.trigger_event_id as string,
+      trigger_belief_id: r.trigger_belief_id as string | undefined,
+      mutation_type: r.mutation_type as GoalMutation['mutation_type'],
+      description: r.description as string,
+      old_subgoal: r.old_subgoal as string | undefined,
+      new_subgoal: r.new_subgoal as string | undefined,
+    }));
+  }
+
+  public addDramaticPressure(pressure: DramaticPressure): void {
+    this.db.prepare(`
+      INSERT INTO Dramatic_Pressure (pressure_id, target_char_id, source_char_id, trigger_event_id,
+        pressure_type, intensity, bias_hint, expires_at_turn, applied)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      pressure.pressure_id, pressure.target_char_id, pressure.source_char_id ?? null,
+      pressure.trigger_event_id, pressure.pressure_type, pressure.intensity,
+      pressure.bias_hint, pressure.expires_at_turn, pressure.applied ? 1 : 0,
+    );
+  }
+
+  public getActivePressures(char_id: string): DramaticPressure[] {
+    const currentTurn = this.getTurnCount();
+    const rows = this.db.prepare(`
+      SELECT * FROM Dramatic_Pressure
+      WHERE target_char_id = ? AND applied = 0 AND expires_at_turn > ?
+      ORDER BY intensity DESC
+    `).all(char_id, currentTurn) as Array<Record<string, unknown>>;
+    return rows.map(r => ({
+      pressure_id: r.pressure_id as string,
+      target_char_id: r.target_char_id as string,
+      source_char_id: r.source_char_id as string | undefined,
+      trigger_event_id: r.trigger_event_id as string,
+      pressure_type: r.pressure_type as DramaticPressure['pressure_type'],
+      intensity: r.intensity as number,
+      bias_hint: r.bias_hint as string,
+      expires_at_turn: r.expires_at_turn as number,
+      applied: (r.applied as number) === 1,
+    }));
+  }
+
+  public markPressureApplied(pressure_id: string): void {
+    this.db.prepare('UPDATE Dramatic_Pressure SET applied = 1 WHERE pressure_id = ?').run(pressure_id);
+  }
+
+  public addBeatTrace(trace: BeatTrace): void {
+    this.db.prepare(`
+      INSERT INTO Beat_Traces (beat_id, turn_index, location_id, trigger_event_id, beat_type,
+        participants_json, causal_chain_json, narrative_summary, fountain_hint)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      trace.beat_id, trace.turn_index, trace.location_id, trace.trigger_event_id,
+      trace.beat_type, JSON.stringify(trace.participants), JSON.stringify(trace.causal_chain),
+      trace.narrative_summary, trace.fountain_hint,
+    );
+  }
+
+  public getAllBeatTraces(): BeatTrace[] {
+    const rows = this.db.prepare('SELECT * FROM Beat_Traces ORDER BY turn_index ASC').all() as Array<Record<string, unknown>>;
+    return this._parseBeatRows(rows);
+  }
+
+  public getBeatTracesForLocation(location_id: string): BeatTrace[] {
+    const rows = this.db.prepare('SELECT * FROM Beat_Traces WHERE location_id = ? ORDER BY turn_index ASC').all(location_id) as Array<Record<string, unknown>>;
+    return this._parseBeatRows(rows);
+  }
+
+  private _parseBeatRows(rows: Array<Record<string, unknown>>): BeatTrace[] {
+    return rows.map(r => ({
+      beat_id: r.beat_id as string,
+      turn_index: r.turn_index as number,
+      location_id: r.location_id as string,
+      trigger_event_id: r.trigger_event_id as string,
+      beat_type: r.beat_type as BeatTrace['beat_type'],
+      participants: safeJsonParse<string[]>(r.participants_json as string, []),
+      causal_chain: safeJsonParse<string[]>(r.causal_chain_json as string, []),
+      narrative_summary: r.narrative_summary as string,
+      fountain_hint: r.fountain_hint as string,
+    }));
   }
 }

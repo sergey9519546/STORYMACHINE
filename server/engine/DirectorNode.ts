@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import { Stage } from './Stage.ts';
-import type { ActionLogEntry, PerspectiveEvaluation, BeliefSource } from './types.ts';
+import type { ActionLogEntry, PerspectiveEvaluation, BeliefSource, EpistemicUpdate } from './types.ts';
 import { safeJsonParse } from '../../src/lib/json.ts';
 import { randomUUID } from 'crypto';
 
@@ -26,11 +26,11 @@ export class DirectorNode {
   // The Director evaluates tension from each observer's perspective independently.
   // No agent's hidden motive or private knowledge is shared across agents.
 
-  public async evaluateRoom(location_id: string, recentActions: ActionLogEntry[]): Promise<void> {
-    if (recentActions.length === 0) return;
+  public async evaluateRoom(location_id: string, recentActions: ActionLogEntry[]): Promise<EpistemicUpdate[]> {
+    if (recentActions.length === 0) return [];
 
     const agentsInRoom = this.stage.getAgentsInLocation(location_id);
-    if (agentsInRoom.length === 0) return;
+    if (agentsInRoom.length === 0) return [];
 
     // Observable transcript — what any agent in the room could perceive
     // LIE actions appear as SPEAK to observers; only the Director knows which is which
@@ -64,13 +64,23 @@ export class DirectorNode {
       }
     }
 
-    // ── Propagate belief updates back to each observer ──
+    // ── Propagate belief updates back to each observer (with source fields) ──
+    const epistemicUpdates: EpistemicUpdate[] = [];
+    // Map action_id → the action for source resolution
+    const actionById = new Map(recentActions.map(a => [a.action_id, a]));
+
     for (const eval_ of evaluations) {
-      if (eval_.new_beliefs.length === 0) continue;
       const observer = this.stage.getAgent(eval_.observer_id);
       if (!observer) continue;
+
       const existingBeliefs = observer.beliefs ?? [];
       const existingProps = new Set(existingBeliefs.map(b => b.proposition.toLowerCase()));
+
+      // For Director evaluations, beliefs sourced from SPEAK/LIE actions
+      // are attributed to the last audible non-self action in the transcript
+      const lastExternalAction = [...recentActions].reverse()
+        .find(a => a.char_id !== eval_.observer_id && a.is_audible);
+
       const freshBeliefs = eval_.new_beliefs
         .filter(b => b.proposition && !existingProps.has(b.proposition.toLowerCase()))
         .map(b => ({
@@ -78,11 +88,25 @@ export class DirectorNode {
           proposition: b.proposition,
           confidence: Math.max(0, Math.min(1, b.confidence)),
           source: (b.source as BeliefSource) ?? 'inferred',
+          source_agent_id: b.source === 'told' ? lastExternalAction?.char_id : undefined,
+          source_event_id: b.source === 'told' ? lastExternalAction?.action_id : undefined,
           acquired_at: this.stage.getTurnCount(),
         }));
+
       if (freshBeliefs.length > 0) {
         this.stage.updateAgentBeliefs(observer.char_id, [...existingBeliefs, ...freshBeliefs]);
       }
+
+      const triggerEventId = lastExternalAction?.action_id
+        ?? recentActions[recentActions.length - 1]?.action_id ?? '';
+
+      epistemicUpdates.push({
+        char_id: eval_.observer_id,
+        new_beliefs: freshBeliefs,
+        contradiction_detected: eval_.contradiction_detected,
+        contradicted_propositions: (eval_ as PerspectiveEvaluation & { contradicted_propositions?: string[] }).contradicted_propositions ?? [],
+        source_event_id: triggerEventId,
+      });
     }
 
     // ── Advance illusion state based on aggregate tension ──
@@ -92,6 +116,8 @@ export class DirectorNode {
 
     // Log aggregate tension
     console.log(`[Director] Avg tension delta: ${avgTensionDelta.toFixed(1)}, contradictions: ${contradictionsFound}/${evaluations.length} observers`);
+
+    return epistemicUpdates;
   }
 
   private async evaluatePerspective(
@@ -167,7 +193,12 @@ From ${observer.name}'s perspective only:
               },
             },
           },
-          required: ['tension_delta', 'contradiction_detected', 'new_beliefs', 'suspicion_updates'],
+            contradicted_propositions: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: 'Verbatim text of prior beliefs that the new events contradict.',
+          },
+        required: ['tension_delta', 'contradiction_detected', 'new_beliefs', 'suspicion_updates', 'contradicted_propositions'],
         },
       },
     });
@@ -177,11 +208,13 @@ From ${observer.name}'s perspective only:
       contradiction_detected: boolean;
       new_beliefs: Array<{ proposition: string; confidence: number; source: string }>;
       suspicion_updates: Array<{ agent_name: string; delta: number; reason: string }>;
+      contradicted_propositions: string[];
     }>(response.text ?? '{}', {
       tension_delta: 0,
       contradiction_detected: false,
       new_beliefs: [],
       suspicion_updates: [],
+      contradicted_propositions: [],
     });
 
     // Resolve agent names → char_ids for suspicion updates
@@ -209,6 +242,7 @@ From ${observer.name}'s perspective only:
       contradiction_detected: raw.contradiction_detected ?? false,
       new_beliefs: safeBeliefs,
       suspicion_updates: filteredUpdates,
+      contradicted_propositions: raw.contradicted_propositions ?? [],
     };
   }
 
@@ -241,6 +275,6 @@ From ${observer.name}'s perspective only:
   }
 
   private emptyEvaluation(observer_id: string): PerspectiveEvaluation {
-    return { observer_id, tension_delta: 0, contradiction_detected: false, new_beliefs: [], suspicion_updates: [] };
+    return { observer_id, tension_delta: 0, contradiction_detected: false, new_beliefs: [], suspicion_updates: [], contradicted_propositions: [] };
   }
 }

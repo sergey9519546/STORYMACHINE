@@ -82,6 +82,7 @@ export interface Belief {
   confidence: number;          // 0–1: witnessed≈1.0, told≈0.7, inferred≈0.4
   source: BeliefSource;
   source_agent_id?: string;    // who told me this
+  source_event_id?: string;    // action_id of the event that produced this belief
   acquired_at: number;         // turn index
   contradicts?: string[];      // IDs of beliefs this contradicts
 }
@@ -152,6 +153,111 @@ export interface CharacterSheet {
   goalStack?: GoalStack;
 }
 
+// ── Causal-Epistemic Spine types ─────────────────────────────────────────────
+
+// A discrete truth-claim extracted from one narrative action
+export interface EventProposition {
+  proposition_id: string;
+  event_id: string;           // FK → ActionLogEntry.action_id
+  content: string;
+  is_lie: boolean;            // Director ground truth; observers see perceived_truth
+  asserted_by: string;        // char_id of the speaker/actor
+  perceived_truth: boolean;   // what observers believe (always true unless EXAMINE reveals otherwise)
+}
+
+// Wraps an ActionLogEntry with its extracted propositions
+export interface EventCard {
+  event_id: string;           // same UUID as ActionLogEntry.action_id (1:1)
+  char_id: string;
+  action_type: ActionLogEntry['action_type'];
+  content: string;
+  location_id: string;
+  turn_index: number;
+  propositions: EventProposition[];
+}
+
+// Directed edge in the belief graph
+export type BeliefEdgeType = 'contradicts' | 'supports' | 'supersedes';
+
+export interface BeliefEdge {
+  edge_id: string;
+  from_belief_id: string;     // the older belief being contradicted/supported
+  to_belief_id: string;       // the newer belief that creates the relationship
+  edge_type: BeliefEdgeType;
+  discovered_by: string;      // char_id holding both beliefs
+  source_event_id: string;    // the event that revealed this relationship
+  turn_index: number;
+}
+
+// A recorded mutation to a character's goal stack
+export type GoalMutationType =
+  | 'subgoal_added'
+  | 'subgoal_achieved'
+  | 'subgoal_blocked'
+  | 'terminal_threatened';
+
+export interface GoalMutation {
+  mutation_id: string;
+  char_id: string;
+  turn_index: number;
+  trigger_event_id: string;
+  trigger_belief_id?: string;
+  mutation_type: GoalMutationType;
+  description: string;
+  old_subgoal?: string;
+  new_subgoal?: string;
+}
+
+// Director bias signal — biases an agent's next action, never puppets them
+export type DramaticPressureType =
+  | 'confrontation_imminent'
+  | 'evidence_against'
+  | 'ally_compromised'
+  | 'goal_blocked'
+  | 'revelation_due';
+
+export interface DramaticPressure {
+  pressure_id: string;
+  target_char_id: string;
+  source_char_id?: string;    // who created this pressure (undefined = situational)
+  trigger_event_id: string;
+  pressure_type: DramaticPressureType;
+  intensity: number;          // 0–100
+  bias_hint: string;          // natural-language context injected into the agent prompt
+  expires_at_turn: number;    // pressure dissipates after this turn index
+  applied: boolean;           // true once injected into a prompt
+}
+
+// Causal record of one significant narrative beat
+export type BeatType =
+  | 'inciting_action'
+  | 'contradiction_discovered'
+  | 'goal_mutated'
+  | 'pressure_applied'
+  | 'revelation'
+  | 'turning_point';
+
+export interface BeatTrace {
+  beat_id: string;
+  turn_index: number;
+  location_id: string;
+  trigger_event_id: string;
+  beat_type: BeatType;
+  participants: string[];     // char_ids
+  causal_chain: string[];     // event_ids in causal order (oldest first)
+  narrative_summary: string;  // one human-readable sentence
+  fountain_hint: string;      // suggested Fountain treatment for the screenplay
+}
+
+// Returned by updateEpistemics() and evaluateRoom() so Orchestrator can feed CausalSpine
+export interface EpistemicUpdate {
+  char_id: string;
+  new_beliefs: Belief[];                  // freshly merged beliefs (with IDs and source fields set)
+  contradiction_detected: boolean;
+  contradicted_propositions: string[];    // text of beliefs that were contradicted
+  source_event_id?: string;              // primary trigger event for this update
+}
+
 // ── Director evaluation result ───────────────────────────────────────────────
 
 export interface PerspectiveEvaluation {
@@ -168,4 +274,5 @@ export interface PerspectiveEvaluation {
     source: BeliefSource;
   }>;
   contradiction_detected: boolean;
+  contradicted_propositions: string[];            // text of beliefs the new observations contradict
 }

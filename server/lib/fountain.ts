@@ -1,4 +1,4 @@
-import type { ActionLogEntry, CharacterSheet, Location } from '../engine/types.ts';
+import type { ActionLogEntry, CharacterSheet, Location, BeatTrace } from '../engine/types.ts';
 
 // Converts a Story Machine action log into Fountain screenplay format.
 // LIE actions appear as normal dialogue to the script reader (surface text)
@@ -9,6 +9,7 @@ export function transcriptToFountain(
   agents: CharacterSheet[],
   locations: Location[],
   metadata?: { title?: string; author?: string },
+  beatTraces?: BeatTrace[],
 ): string {
   if (log.length === 0) return 'Title: Empty Draft\n\n// No actions were recorded.\n';
 
@@ -24,6 +25,14 @@ export function transcriptToFountain(
   lines.push(`Draft date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`);
   lines.push(`Contact: Generated via OASIS Architecture`);
   lines.push('');
+
+  // Index beat traces by trigger_event_id for O(1) lookup
+  const beatByEvent = new Map<string, BeatTrace[]>();
+  for (const beat of beatTraces ?? []) {
+    const list = beatByEvent.get(beat.trigger_event_id) ?? [];
+    list.push(beat);
+    beatByEvent.set(beat.trigger_event_id, list);
+  }
 
   let currentLocationId = '';
   let sceneNumber = 1;
@@ -61,6 +70,13 @@ export function transcriptToFountain(
 
       currentLocationId = entry.location_id;
       sceneNumber++;
+    }
+
+    // Emit beat-trace notes immediately before the triggering action
+    const beatsForEntry = beatByEvent.get(entry.action_id) ?? [];
+    for (const beat of beatsForEntry) {
+      lines.push(`[[BEAT (${beat.beat_type}): ${beat.fountain_hint}]]`);
+      lines.push('');
     }
 
     switch (entry.action_type) {
