@@ -1,9 +1,9 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig} from 'vite';
+import { defineConfig } from 'vite';
 
-export default defineConfig(({mode}) => {
+export default defineConfig(({ mode: _mode }) => {
   return {
     plugins: [react(), tailwindcss()],
     resolve: {
@@ -12,9 +12,23 @@ export default defineConfig(({mode}) => {
       },
     },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            // Core React runtime — tiny, always needed
+            'vendor-react': ['react', 'react-dom'],
+            // Animation library — large, shared across pages
+            'vendor-motion': ['motion'],
+            // Chart library — only used in EngineVisualizer
+            'vendor-recharts': ['recharts'],
+            // Icon library
+            'vendor-lucide': ['lucide-react'],
+          },
+        },
+      },
     },
   };
 });

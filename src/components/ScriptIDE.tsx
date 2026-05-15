@@ -74,23 +74,27 @@ const renderHighlightedText = (text: string) => {
   });
 };
 
+// Safe localStorage wrapper — private browsing or storage quota errors throw in some browsers
+const lsGet = (key: string): string | null => { try { return localStorage.getItem(key); } catch { return null; } };
+const lsSet = (key: string, val: string): void => { try { localStorage.setItem(key, val); } catch { /* quota exceeded or private mode */ } };
+
 export default function ScriptIDE({ initialConfig, onOpenStoryMachine }: ScriptIDEProps) {
   const [engineState, setEngineState] = useState<EngineState | null>(null);
-  const [scriptText, setScriptText] = useState<string>(() => localStorage.getItem('script_draft') || "");
+  const [scriptText, setScriptText] = useState<string>(() => lsGet('script_draft') || "");
   const [activeTab, setActiveTab] = useState<"production" | "analysis" | "codex" | "storyEngine" | "research" | "titlePage">("production");
   const [showDirectorHUD, setShowDirectorHUD] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
+  const [isDarkMode, setIsDarkMode] = useState(() => lsGet('theme') === 'dark');
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [isTypewriterSound, setIsTypewriterSound] = useState(true);
-  const [snapshots, setSnapshots] = useState<{ id: string; name: string; text: string; date: string }[]>(() => safeJsonParse(localStorage.getItem('script_snapshots'), []));
+  const [snapshots, setSnapshots] = useState<{ id: string; name: string; text: string; date: string }[]>(() => safeJsonParse(lsGet('script_snapshots'), []));
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [titlePage, setTitlePage] = useState({ title: "UNTITLED SCRIPT", author: "AUTHOR NAME", contact: "CONTACT INFO" });
-  const [researchNotes, setResearchNotes] = useState<{ id: string; title: string; content: string }[]>(() => safeJsonParse(localStorage.getItem('research_notes'), []));
+  const [researchNotes, setResearchNotes] = useState<{ id: string; title: string; content: string }[]>(() => safeJsonParse(lsGet('research_notes'), []));
   const [isSaving, setIsSaving] = useState(false);
   
   const [actionModal, setActionModal] = useState<{ show: boolean; charName: string; cursor: number }>({ show: false, charName: "", cursor: 0 });
   const [actionInput, setActionInput] = useState("");
-  const [characters, setCharacters] = useState<Character[]>(() => safeJsonParse(localStorage.getItem('script_characters'), []));
+  const [characters, setCharacters] = useState<Character[]>(() => safeJsonParse(lsGet('script_characters'), []));
   const [directorsLayer, setDirectorsLayer] = useState(false);
   const [isCleaning, setIsCleaning] = useState<number | null>(null);
   
@@ -100,11 +104,11 @@ export default function ScriptIDE({ initialConfig, onOpenStoryMachine }: ScriptI
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    localStorage.setItem('script_draft', scriptText);
-    localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
-    localStorage.setItem('script_snapshots', JSON.stringify(snapshots));
-    localStorage.setItem('script_characters', JSON.stringify(characters));
-    localStorage.setItem('research_notes', JSON.stringify(researchNotes));
+    lsSet('script_draft', scriptText);
+    lsSet('theme', isDarkMode ? 'dark' : 'light');
+    lsSet('script_snapshots', JSON.stringify(snapshots));
+    lsSet('script_characters', JSON.stringify(characters));
+    lsSet('research_notes', JSON.stringify(researchNotes));
     
     setIsSaving(true);
     const timer = setTimeout(() => setIsSaving(false), 800);

@@ -578,7 +578,7 @@ export default function DirectorPanel({
                     ...state,
                     protagonist: {
                       ...protagonist,
-                      psychology: { ...protagonist.psychology, attachmentStyle: e.target.value as any }
+                      psychology: { ...protagonist.psychology, attachmentStyle: e.target.value as 'secure' | 'anxious' | 'avoidant' | 'anxious_avoidant' }
                     }
                   })}
                   className={inputClass}
