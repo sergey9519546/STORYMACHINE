@@ -20,6 +20,12 @@ export interface RetrievalOptions {
   minScore?: number;
 }
 
+interface CachedTokens {
+  titleTokens: string[];
+  keywordsLower: string[];
+  contentTokenSet: Set<string>;
+}
+
 /**
  * The CodexEngine acts as the RAG (Retrieval-Augmented Generation) memory system.
  * It stores the entire "Story Bible" and retrieves only the most relevant canon
@@ -27,14 +33,25 @@ export interface RetrievalOptions {
  */
 export class CodexEngine {
   private entries: Map<string, CodexEntry>;
+  private tokenCache: Map<string, CachedTokens>;
   private ai?: GoogleGenAI;
 
   constructor(initialEntries: CodexEntry[] = [], apiKey?: string) {
     this.entries = new Map();
-    initialEntries.forEach(entry => this.entries.set(entry.id, entry));
+    this.tokenCache = new Map();
+    initialEntries.forEach(entry => this.addEntrySync(entry));
     if (apiKey) {
       this.ai = new GoogleGenAI({ apiKey });
     }
+  }
+
+  private addEntrySync(entry: CodexEntry): void {
+    this.entries.set(entry.id, entry);
+    this.tokenCache.set(entry.id, {
+      titleTokens: this.tokenize(entry.title),
+      keywordsLower: entry.keywords.map(k => k.toLowerCase()),
+      contentTokenSet: new Set(this.tokenize(entry.content)),
+    });
   }
 
   /**
@@ -62,11 +79,12 @@ export class CodexEngine {
         entry.embedding = embedding;
       }
     }
-    this.entries.set(entry.id, entry);
+    this.addEntrySync(entry);
   }
 
   public removeEntry(id: string): void {
     this.entries.delete(id);
+    this.tokenCache.delete(id);
   }
 
   public getEntry(id: string): CodexEntry | undefined {
@@ -151,22 +169,22 @@ export class CodexEngine {
    */
   private calculateRelevanceScore(queryTokens: string[], entry: CodexEntry): number {
     let score = 0;
+    const cache = this.tokenCache.get(entry.id);
+    const titleTokens = cache ? cache.titleTokens : this.tokenize(entry.title);
+    const entryKeywords = cache ? cache.keywordsLower : entry.keywords.map(k => k.toLowerCase());
+    const contentTokenSet = cache ? cache.contentTokenSet : new Set(this.tokenize(entry.content));
 
     // 1. Title Match (Highest Weight)
-    const titleTokens = this.tokenize(entry.title);
     for (const qt of queryTokens) {
       if (titleTokens.includes(qt)) score += 3.0;
     }
 
     // 2. Keyword Match (High Weight)
-    const entryKeywords = entry.keywords.map(k => k.toLowerCase());
     for (const qt of queryTokens) {
       if (entryKeywords.some(k => k.includes(qt))) score += 2.0;
     }
 
     // 3. Content Match (Lower Weight, TF-lite)
-    const contentTokens = this.tokenize(entry.content);
-    const contentTokenSet = new Set(contentTokens);
     for (const qt of queryTokens) {
       if (contentTokenSet.has(qt)) score += 0.5;
     }
