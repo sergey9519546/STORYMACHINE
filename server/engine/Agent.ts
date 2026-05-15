@@ -18,6 +18,7 @@ import type {
 } from './types.ts';
 import { Stage } from './Stage.ts';
 import { safeJsonParse } from '../../src/lib/json.ts';
+import { logger } from '../lib/logger.ts';
 
 // ── Psychology prompt helpers ────────────────────────────────────────────────
 
@@ -140,17 +141,27 @@ export class Agent {
         },
       },
     }), 30_000, `takeTurn:${this.sheet.name}`).catch(err => {
-      console.error(`[Agent/${this.sheet.name}] takeTurn error: ${(err as Error).message}`);
+      const e = err as Error;
+      logger.error('agent_ai_error', {
+        agent: this.sheet.name,
+        method: 'takeTurn',
+        error_type: e.message.includes('timeout') ? 'timeout' : 'upstream',
+        message: e.message,
+      });
       return null;
     });
 
     if (!response) return { action_type: 'SPEAK' as const, content: '...', target: null };
 
     type Candidate = NarrativeAction & { reasoning?: string; goal_score?: number };
+    const rawText = response.text || '{}';
     const raw = safeJsonParse<{ candidates: Candidate[] }>(
-      response.text || '{}',
+      rawText,
       { candidates: [{ action_type: 'SPEAK', content: '', target: null }] },
     );
+    if (!raw.candidates?.length || !raw.candidates[0]?.content) {
+      logger.warn('agent_parse_fallback', { agent: this.sheet.name, method: 'takeTurn', preview: rawText.substring(0, 120) });
+    }
 
     const best = (raw.candidates ?? []).reduce<Candidate>(
       (top, c) => ((c.goal_score ?? 0) > (top.goal_score ?? 0) ? c : top),
@@ -399,12 +410,19 @@ Based on what you just witnessed:
         },
       },
     }), 30_000, `updateEpistemics:${this.sheet.name}`).catch(err => {
-      console.error(`[Agent/${this.sheet.name}] updateEpistemics error: ${(err as Error).message}`);
+      const e = err as Error;
+      logger.error('agent_ai_error', {
+        agent: this.sheet.name,
+        method: 'updateEpistemics',
+        error_type: e.message.includes('timeout') ? 'timeout' : 'upstream',
+        message: e.message,
+      });
       return null;
     });
 
     if (!response) return empty;
 
+    const epistemicsRawText = response.text ?? '{}';
     const result = safeJsonParse<{
       newSuspicionScore: number;
       newBeliefs: Array<{ proposition: string; confidence: number; source: string; source_action_index?: number | null }>;
@@ -413,13 +431,16 @@ Based on what you just witnessed:
       contradicted_propositions: string[];
       goal_stack_update?: { add_subgoal?: string | null; mark_achieved?: string | null } | null;
       level2_tom?: Array<{ about_agent: string; they_believe_about_you: string; confidence: number }>;
-    }>(response.text ?? '{}', {
+    }>(epistemicsRawText, {
       newSuspicionScore: this.sheet.suspicion_score,
       newBeliefs: [],
       updatedTheoryOfMind: [],
       contradiction_detected: false,
       contradicted_propositions: [],
     });
+    if (!result.newBeliefs?.length && epistemicsRawText.length > 10) {
+      logger.warn('agent_parse_fallback', { agent: this.sheet.name, method: 'updateEpistemics', preview: epistemicsRawText.substring(0, 120) });
+    }
 
     // ── Update suspicion ──
     this.stage.updateAgentSuspicion(this.sheet.char_id, result.newSuspicionScore);
@@ -573,10 +594,14 @@ Based on what you just witnessed:
       },
     }), 20_000, `synthesizeReflections:${this.sheet.name}`);
 
+    const reflRaw = response.text ?? '{}';
     const parsed = safeJsonParse<{ reflections: Array<{ insight: string; confidence: number }> }>(
-      response.text ?? '{}',
+      reflRaw,
       { reflections: [] },
     );
+    if (!parsed.reflections?.length && reflRaw.length > 10) {
+      logger.warn('agent_parse_fallback', { agent: this.sheet.name, method: 'synthesizeReflections', preview: reflRaw.substring(0, 120) });
+    }
 
     const existingBeliefsFull = this.sheet.beliefs ?? [];
     const existingProps = new Set(existingBeliefsFull.map(b => b.proposition.toLowerCase()));
@@ -594,7 +619,7 @@ Based on what you just witnessed:
 
     if (reflectionBeliefs.length > 0) {
       this.stage.updateAgentBeliefs(this.sheet.char_id, [...existingBeliefsFull, ...reflectionBeliefs]);
-      console.log(`[Agent/${this.sheet.name}] Memory reflection: +${reflectionBeliefs.length} insights`);
+      logger.info('agent_reflection', { agent: this.sheet.name, new_insights: reflectionBeliefs.length });
     }
   }
 

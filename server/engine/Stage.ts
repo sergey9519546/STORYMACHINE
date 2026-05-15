@@ -279,15 +279,35 @@ export class Stage {
       suspicion_score: stateRow.base_suspicion_score as number,
       is_alive: (stateRow.is_alive as number) === 1,
       knowledge_vector: knowledgeRows.map(k => k.fact_description as string),
-      beliefs: safeJsonParse<Belief[]>(stateRow.beliefs_json as string, []),
-      theoryOfMind: safeJsonParse<Record<string, TheoryOfMind>>(stateRow.theory_of_mind_json as string, {}),
-      goalStack: stateRow.goal_stack_json
-        ? safeJsonParse<GoalStack>(stateRow.goal_stack_json as string, undefined as unknown as GoalStack)
-        : undefined,
-      darkTriad: safeJsonParse<DarkTriad>(stateRow.dark_triad_json as string, DEFAULT_DARK_TRIAD),
-      bigFive: safeJsonParse<BigFive>(stateRow.big_five_json as string, DEFAULT_BIG_FIVE),
+      beliefs: (() => {
+        const v = safeJsonParse<unknown>(stateRow.beliefs_json as string, []);
+        return Array.isArray(v) ? (v as Belief[]) : [];
+      })(),
+      theoryOfMind: (() => {
+        const v = safeJsonParse<unknown>(stateRow.theory_of_mind_json as string, {});
+        return (v && typeof v === 'object' && !Array.isArray(v)) ? (v as Record<string, TheoryOfMind>) : {};
+      })(),
+      goalStack: (() => {
+        if (!stateRow.goal_stack_json) return undefined;
+        const v = safeJsonParse<unknown>(stateRow.goal_stack_json as string, null);
+        if (!v || typeof v !== 'object') return undefined;
+        const g = v as Record<string, unknown>;
+        if (!g.terminal || !Array.isArray(g.instrumental)) return undefined;
+        return v as GoalStack;
+      })(),
+      darkTriad: (() => {
+        const v = safeJsonParse<unknown>(stateRow.dark_triad_json as string, null);
+        return (v && typeof v === 'object' && 'machiavellianism' in (v as object)) ? (v as DarkTriad) : DEFAULT_DARK_TRIAD;
+      })(),
+      bigFive: (() => {
+        const v = safeJsonParse<unknown>(stateRow.big_five_json as string, null);
+        return (v && typeof v === 'object' && 'openness' in (v as object)) ? (v as BigFive) : DEFAULT_BIG_FIVE;
+      })(),
       attachmentStyle: (stateRow.attachment_style as AttachmentStyle) ?? 'secure',
-      defenseMechanisms: safeJsonParse<DefenseMechanism[]>(stateRow.defense_mechanisms_json as string, []),
+      defenseMechanisms: (() => {
+        const v = safeJsonParse<unknown>(stateRow.defense_mechanisms_json as string, []);
+        return Array.isArray(v) ? (v as DefenseMechanism[]) : [];
+      })(),
     };
   }
 
