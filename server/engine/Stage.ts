@@ -467,7 +467,16 @@ export class Stage {
 
   public getGoalMutations(char_id: string): GoalMutation[] {
     const rows = this.db.prepare('SELECT * FROM Goal_Mutations WHERE char_id = ? ORDER BY turn_index ASC').all(char_id) as Array<Record<string, unknown>>;
-    return rows.map(r => ({
+    return rows.map(r => this._parseGoalMutationRow(r));
+  }
+
+  public getAllGoalMutations(): GoalMutation[] {
+    const rows = this.db.prepare('SELECT * FROM Goal_Mutations ORDER BY turn_index ASC').all() as Array<Record<string, unknown>>;
+    return rows.map(r => this._parseGoalMutationRow(r));
+  }
+
+  private _parseGoalMutationRow(r: Record<string, unknown>): GoalMutation {
+    return {
       mutation_id: r.mutation_id as string,
       char_id: r.char_id as string,
       turn_index: r.turn_index as number,
@@ -477,7 +486,7 @@ export class Stage {
       description: r.description as string,
       old_subgoal: r.old_subgoal as string | undefined,
       new_subgoal: r.new_subgoal as string | undefined,
-    }));
+    };
   }
 
   public addDramaticPressure(pressure: DramaticPressure): void {

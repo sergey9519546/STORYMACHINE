@@ -560,6 +560,12 @@ async function startServer() {
     res.json(stage.getGoalMutations(charId));
   }));
 
+  // All goal mutations across all agents
+  app.get('/api/goal-mutations', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    res.json(stage.getAllGoalMutations());
+  }));
+
   // QBN choice filtering — filter by accumulated qualities AND consequenceScope ceiling
   app.post('/api/qbn/filter-choices', gameLimiter, asyncHandler(async (req, res) => {
     const { choices, qualities, maxScope } = req.body ?? {};

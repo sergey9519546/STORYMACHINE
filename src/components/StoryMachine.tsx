@@ -5,19 +5,40 @@ import type {
   ActionLogEntry,
   IllusionState,
   Belief,
+  BeatTrace,
+  BeliefEdge,
+  GoalMutation,
 } from "../../server/engine/types";
-import { FileDown, Brain, Eye, AlertTriangle } from "lucide-react";
+import { FileDown, Brain, Eye, AlertTriangle, GitBranch, Target, Zap } from "lucide-react";
 
 interface StoryMachineProps {
   onClose?: () => void;
   onExportToIDE?: (fountain: string, characters: Array<{ name: string; ghost: string; lie: string; want: string; need: string }>) => void;
 }
 
+const BEAT_COLORS: Record<string, string> = {
+  inciting_action:          'bg-blue-600',
+  contradiction_discovered: 'bg-[#FF4444]',
+  goal_mutated:             'bg-orange-500',
+  pressure_applied:         'bg-purple-600',
+  revelation:               'bg-yellow-500',
+  turning_point:            'bg-green-600',
+};
+
+const INFO_POS_LABEL: Record<string, string> = {
+  superior: 'AUD > CHARS',
+  inferior: 'CHARS > AUD',
+  parity:   'PARITY',
+};
+
 export default function StoryMachine({ onClose, onExportToIDE }: StoryMachineProps) {
   const [agents, setAgents] = useState<CharacterSheet[]>([]);
   const [nodes, setNodes] = useState<Location[]>([]);
   const [ledger, setLedger] = useState<ActionLogEntry[]>([]);
   const [illusionState, setIllusionState] = useState<IllusionState | null>(null);
+  const [beatTraces, setBeatTraces] = useState<BeatTrace[]>([]);
+  const [beliefEdges, setBeliefEdges] = useState<BeliefEdge[]>([]);
+  const [goalMutations, setGoalMutations] = useState<GoalMutation[]>([]);
   const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const ledgerEndRef = useRef<HTMLDivElement>(null);
@@ -27,6 +48,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
     fetchState();
     fetchLedger();
     fetchIllusionState();
+    fetchSpineData();
   }, []);
 
   useEffect(() => {
@@ -53,6 +75,21 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       setIllusionState(data);
     }
   };
+
+  const fetchSpineData = async () => {
+    const [beatsRes, edgesRes, mutationsRes] = await Promise.all([
+      fetch("/api/beat-traces"),
+      fetch("/api/belief-edges"),
+      fetch("/api/goal-mutations"),
+    ]);
+    if (beatsRes.ok)     setBeatTraces(await beatsRes.json() as BeatTrace[]);
+    if (edgesRes.ok)     setBeliefEdges(await edgesRes.json() as BeliefEdge[]);
+    if (mutationsRes.ok) setGoalMutations(await mutationsRes.json() as GoalMutation[]);
+  };
+
+  const refreshAll = useCallback(async () => {
+    await Promise.all([fetchState(), fetchLedger(), fetchIllusionState(), fetchSpineData()]);
+  }, []);
 
   const handleInit = async () => {
     setLoading(true);
@@ -115,7 +152,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       body: JSON.stringify({ nodes: initialNodes, agents: initialAgents }),
     });
 
-    await Promise.all([fetchState(), fetchLedger(), fetchIllusionState()]);
+    await refreshAll();
     setLoading(false);
   };
 
@@ -126,7 +163,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ agentId }),
     });
-    await Promise.all([fetchState(), fetchLedger(), fetchIllusionState()]);
+    await refreshAll();
     setLoading(false);
   };
 
@@ -137,7 +174,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ nodeId }),
     });
-    await Promise.all([fetchState(), fetchLedger(), fetchIllusionState()]);
+    await refreshAll();
     setLoading(false);
   };
 
@@ -265,6 +302,8 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                   .sort((a, b) => b.confidence - a.confidence)
                   .slice(0, 5);
                 const tomEntries = Object.values(agent.theoryOfMind ?? {});
+                const agentEdges = beliefEdges.filter(e => e.discovered_by === agent.char_id);
+                const agentMutations = goalMutations.filter(m => m.char_id === agent.char_id);
 
                 return (
                   <div key={agent.char_id} className="bg-white p-4 brutal-border-thick brutal-shadow">
@@ -273,6 +312,11 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                         {agent.name}
                       </h3>
                       <div className="flex items-center gap-1">
+                        {agentEdges.length > 0 && (
+                          <span className="text-[9px] bg-[#FF4444] text-white px-1.5 py-0.5 font-bold uppercase">
+                            {agentEdges.length} CONTRADICTION{agentEdges.length !== 1 ? 'S' : ''}
+                          </span>
+                        )}
                         <span className="text-[10px] bg-black text-white px-2 py-1 uppercase font-bold tracking-widest">
                           {nodes.find(n => n.location_id === agent.current_location_id)?.name || agent.current_location_id}
                         </span>
@@ -334,7 +378,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                       </div>
                     </div>
 
-                    {/* Belief graph + ToM panel */}
+                    {/* Expanded: Beliefs + ToM + Contradictions + Goal Mutations */}
                     {isExpanded && (
                       <div className="mt-3 pt-3 border-t-2 border-black space-y-3">
                         {topBeliefs.length > 0 && (
@@ -352,7 +396,68 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                                     </div>
                                     <span className="text-[8px] text-gray-400">{Math.round(b.confidence * 100)}%</span>
                                   </div>
-                                  <span className="text-gray-800 leading-tight">{b.proposition}</span>
+                                  <span className={`text-gray-800 leading-tight ${(b.contradicts?.length ?? 0) > 0 ? 'text-[#FF4444]' : ''}`}>
+                                    {b.proposition}
+                                    {(b.contradicts?.length ?? 0) > 0 && ' ⚡'}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {agentEdges.length > 0 && (
+                          <div>
+                            <div className="flex items-center gap-1 mb-2">
+                              <GitBranch className="w-3 h-3 text-[#FF4444]" />
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-[#FF4444]">
+                                Contradiction Edges
+                              </span>
+                            </div>
+                            <div className="space-y-1.5">
+                              {agentEdges.slice(0, 4).map((edge) => (
+                                <div key={edge.edge_id} className="text-[10px] font-mono bg-red-50 p-2 border border-red-200">
+                                  <div className="flex items-center justify-between mb-0.5">
+                                    <span className="font-bold text-[#FF4444] uppercase">{edge.edge_type}</span>
+                                    {edge.severity != null && (
+                                      <span className="text-[8px] text-gray-500">sev {edge.severity}</span>
+                                    )}
+                                  </div>
+                                  <div className="text-gray-500 text-[9px]">turn {edge.turn_index}</div>
+                                  {edge.severity != null && (
+                                    <div className="mt-1 w-full bg-gray-200 h-1 border border-gray-300">
+                                      <div
+                                        className="h-full bg-[#FF4444]"
+                                        style={{ width: `${edge.severity}%` }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {agentMutations.length > 0 && (
+                          <div>
+                            <div className="flex items-center gap-1 mb-2">
+                              <Target className="w-3 h-3 text-orange-500" />
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600">
+                                Goal Mutations
+                              </span>
+                            </div>
+                            <div className="space-y-1.5">
+                              {agentMutations.slice(-4).map((m) => (
+                                <div key={m.mutation_id} className="text-[10px] font-mono bg-orange-50 p-2 border border-orange-200">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-bold text-orange-600 uppercase text-[9px]">
+                                      {m.mutation_type.replace(/_/g, ' ')}
+                                    </span>
+                                    <span className="text-[8px] text-gray-400">t{m.turn_index}</span>
+                                  </div>
+                                  {m.new_subgoal && (
+                                    <div className="text-gray-700 mt-0.5 italic">"{m.new_subgoal}"</div>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -385,7 +490,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                           </div>
                         )}
 
-                        {topBeliefs.length === 0 && tomEntries.length === 0 && (
+                        {topBeliefs.length === 0 && tomEntries.length === 0 && agentEdges.length === 0 && agentMutations.length === 0 && (
                           <p className="text-[10px] text-gray-400 font-mono italic">
                             No epistemic data yet. Run a dialogue lock to populate.
                           </p>
@@ -476,6 +581,81 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           </section>
         </div>
       </div>
+
+      {/* Causal Spine Panel */}
+      {beatTraces.length > 0 && (
+        <section className="mt-10">
+          <div className="flex items-center gap-3 mb-4 border-b-4 border-black pb-3">
+            <Zap className="w-5 h-5" />
+            <h2 className="text-xl font-bold uppercase text-black tracking-widest">Causal Spine</h2>
+            <span className="text-xs font-mono text-gray-500">
+              {beatTraces.length} beat{beatTraces.length !== 1 ? 's' : ''} ·{' '}
+              {beliefEdges.length} contradiction{beliefEdges.length !== 1 ? 's' : ''} ·{' '}
+              {goalMutations.length} mutation{goalMutations.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+
+          <div className="relative">
+            {/* Vertical timeline spine */}
+            <div className="absolute left-[11px] top-0 bottom-0 w-0.5 bg-black" />
+
+            <div className="space-y-4 pl-8">
+              {beatTraces.map((beat) => {
+                const colorClass = BEAT_COLORS[beat.beat_type] ?? 'bg-gray-600';
+                const infoPos = beat.information_position;
+                const participants = beat.participants
+                  .map(id => agents.find(a => a.char_id === id)?.name ?? id)
+                  .join(', ');
+
+                return (
+                  <div key={beat.beat_id} className="relative">
+                    {/* Timeline dot */}
+                    <div className={`absolute -left-[25px] top-3 w-3 h-3 rounded-full border-2 border-black ${colorClass}`} />
+
+                    <div className="bg-white brutal-border brutal-shadow p-4">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <span className={`text-[10px] px-2 py-0.5 text-white font-bold uppercase tracking-widest ${colorClass}`}>
+                          {beat.beat_type.replace(/_/g, ' ')}
+                        </span>
+                        {infoPos && (
+                          <span className="text-[9px] px-1.5 py-0.5 border border-black font-bold uppercase font-mono">
+                            {INFO_POS_LABEL[infoPos] ?? infoPos}
+                          </span>
+                        )}
+                        <span className="text-[9px] text-gray-400 font-mono">t{beat.turn_index}</span>
+                        {participants && (
+                          <span className="text-[9px] text-gray-500 font-mono uppercase">{participants}</span>
+                        )}
+                      </div>
+
+                      <p className="text-sm font-mono text-black leading-snug">
+                        {beat.narrative_summary}
+                      </p>
+
+                      {beat.fountain_hint && (
+                        <p className="mt-2 text-[11px] text-gray-500 italic font-mono border-l-2 border-gray-300 pl-2">
+                          {beat.fountain_hint}
+                        </p>
+                      )}
+
+                      {beat.causal_chain.length > 1 && (
+                        <div className="mt-2 text-[9px] font-mono text-gray-400 flex gap-1 flex-wrap items-center">
+                          <GitBranch className="w-2.5 h-2.5" />
+                          {beat.causal_chain.map((id, i) => (
+                            <span key={id}>
+                              {id.substring(0, 8)}…{i < beat.causal_chain.length - 1 && <span className="mx-0.5">→</span>}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
