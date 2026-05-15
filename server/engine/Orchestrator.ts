@@ -33,20 +33,22 @@ export class Orchestrator {
     const agent = this.agents.get(agentId);
     if (!agent) throw new Error('Agent not found');
 
-    // 1. Agent takes action
     const action = await agent.takeTurn();
 
-    // 2. Record action in the Script Ledger
     const currentNodeId = this.stage.getAgent(agentId)!.current_location_id;
     this.stage.recordAction(agentId, action, currentNodeId);
+    this.stage.incrementTurnCount();
 
-    // 3. Handle physical relocation
     if (action.action_type === 'RELOCATE' && action.target) {
-      const targetLoc = this.locationMap.get(action.target.toLowerCase()) || this.locationMap.get(action.target);
+      const targetLoc = this.locationMap.get(action.target.toLowerCase()) ?? this.locationMap.get(action.target);
       if (targetLoc) {
         this.stage.updateAgentLocation(agentId, targetLoc.location_id);
       }
     }
+
+    // Update the acting agent's epistemic state after their own action
+    const recentActions = this.stage.getSensoryFilter(currentNodeId, 3);
+    await agent.updateEpistemics(recentActions);
 
     return action;
   }
@@ -59,9 +61,16 @@ export class Orchestrator {
     }
 
     console.log(`[Orchestrator] Initiating Dialogue Lock in ${location_id} with ${agentsInRoom.length} agents.`);
-    
-    // Initiative Order based on suspicion (highest suspicion goes first)
-    agentsInRoom.sort((a, b) => b.suspicion_score - a.suspicion_score);
+
+    // ── Initiative order: LOWEST suspicion first ──
+    // In realistic social dynamics, guilty parties are reactive, not proactive.
+    // Agents with low suspicion (innocent/composed) set the frame of the conversation.
+    agentsInRoom.sort((a, b) => {
+      const diff = a.suspicion_score - b.suspicion_score;
+      // Add small random jitter to break ties without perfect determinism
+      if (Math.abs(diff) < 10) return Math.random() - 0.5;
+      return diff;
+    });
 
     let turnCount = 0;
     while (turnCount < maxTurns) {
@@ -69,16 +78,16 @@ export class Orchestrator {
         const agent = this.agents.get(agentSheet.char_id);
         if (!agent) continue;
 
-        // Check if agent is still in the room
         const currentSheet = this.stage.getAgent(agentSheet.char_id);
         if (currentSheet?.current_location_id !== location_id) continue;
 
         console.log(`[Orchestrator] ${currentSheet.name}'s turn in ${location_id}`);
         const action = await agent.takeTurn();
         this.stage.recordAction(agentSheet.char_id, action, location_id);
+        this.stage.incrementTurnCount();
 
         if (action.action_type === 'RELOCATE' && action.target) {
-          const targetLoc = this.locationMap.get(action.target.toLowerCase()) || this.locationMap.get(action.target);
+          const targetLoc = this.locationMap.get(action.target.toLowerCase()) ?? this.locationMap.get(action.target);
           if (targetLoc) {
             console.log(`[Orchestrator] ${currentSheet.name} relocated to ${targetLoc.name}. Breaking Dialogue Lock.`);
             this.stage.updateAgentLocation(agentSheet.char_id, targetLoc.location_id);
@@ -87,21 +96,37 @@ export class Orchestrator {
           }
         }
 
+        // ── Epistemic update for all agents in room after each action ──
+        // Each agent observes what just happened and updates their belief graph
+        const recentActions = this.stage.getSensoryFilter(location_id, turnCount + 1);
+        await Promise.all(
+          agentsInRoom
+            .map(a => this.agents.get(a.char_id))
+            .filter((a): a is Agent => a !== undefined)
+            .map(a => a.updateEpistemics(recentActions))
+        );
+
         turnCount++;
         if (turnCount >= maxTurns) break;
       }
 
-      // Re-evaluate who is in the room
       agentsInRoom = this.stage.getAgentsInLocation(location_id);
       if (agentsInRoom.length < 2) {
         console.log(`[Orchestrator] Dialogue Lock broken in ${location_id}. Not enough agents.`);
         break;
       }
+
+      // Re-sort by suspicion after each full round (dynamics shift)
+      agentsInRoom.sort((a, b) => {
+        const diff = a.suspicion_score - b.suspicion_score;
+        if (Math.abs(diff) < 10) return Math.random() - 0.5;
+        return diff;
+      });
     }
 
-    // 5. State Evaluation Engine (Director Node)
+    // ── Director Node: perspective-bounded room evaluation ──
     console.log(`[Orchestrator] Running Director Node evaluation for ${location_id}`);
-    const recentActions = this.stage.getSensoryFilter(location_id, turnCount);
-    await this.director.evaluateRoom(location_id, recentActions);
+    const allActions = this.stage.getSensoryFilter(location_id, turnCount);
+    await this.director.evaluateRoom(location_id, allActions);
   }
 }

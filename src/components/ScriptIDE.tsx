@@ -25,6 +25,10 @@ interface Character {
 interface ScriptIDEProps {
   initialConfig: StoryConfig;
   onOpenStoryMachine?: () => void;
+  // Fountain text exported from Story Machine — applied once then cleared
+  importedScript?: string;
+  importedCharacters?: Array<{ name: string; ghost: string; lie: string; want: string; need: string }>;
+  onImportConsumed?: () => void;
 }
 
 const SCRIPT_ELEMENTS = {
@@ -78,7 +82,7 @@ const renderHighlightedText = (text: string) => {
 const lsGet = (key: string): string | null => { try { return localStorage.getItem(key); } catch { return null; } };
 const lsSet = (key: string, val: string): void => { try { localStorage.setItem(key, val); } catch { /* quota exceeded or private mode */ } };
 
-export default function ScriptIDE({ initialConfig, onOpenStoryMachine }: ScriptIDEProps) {
+export default function ScriptIDE({ initialConfig, onOpenStoryMachine, importedScript, importedCharacters, onImportConsumed }: ScriptIDEProps) {
   const [engineState, setEngineState] = useState<EngineState | null>(null);
   const [scriptText, setScriptText] = useState<string>(() => lsGet('script_draft') || "");
   const [activeTab, setActiveTab] = useState<"production" | "analysis" | "codex" | "storyEngine" | "research" | "titlePage">("production");
@@ -122,6 +126,26 @@ export default function ScriptIDE({ initialConfig, onOpenStoryMachine }: ScriptI
       document.documentElement.classList.remove('dark');
     }
   }, [isDarkMode]);
+
+  // Consume an imported Fountain script from Story Machine
+  useEffect(() => {
+    if (!importedScript) return;
+    setScriptText(importedScript);
+    setActiveTab('production');
+
+    // Merge imported characters into the character list (avoid duplicates by name)
+    if (importedCharacters && importedCharacters.length > 0) {
+      setCharacters(prev => {
+        const existingNames = new Set(prev.map(c => c.name.toLowerCase()));
+        const newChars: Character[] = importedCharacters
+          .filter(c => !existingNames.has(c.name.toLowerCase()))
+          .map(c => ({ id: crypto.randomUUID(), ...c }));
+        return [...prev, ...newChars];
+      });
+    }
+
+    onImportConsumed?.();
+  }, [importedScript]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     // Initialize empty state

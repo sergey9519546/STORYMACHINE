@@ -1,64 +1,79 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import type {
   CharacterSheet,
   Location,
   ActionLogEntry,
+  IllusionState,
+  Belief,
 } from "../../server/engine/types";
+import { FileDown, Brain, Eye, AlertTriangle } from "lucide-react";
 
 interface StoryMachineProps {
   onClose?: () => void;
+  onExportToIDE?: (fountain: string, characters: Array<{ name: string; ghost: string; lie: string; want: string; need: string }>) => void;
 }
 
-export default function StoryMachine({ onClose }: StoryMachineProps) {
+export default function StoryMachine({ onClose, onExportToIDE }: StoryMachineProps) {
   const [agents, setAgents] = useState<CharacterSheet[]>([]);
   const [nodes, setNodes] = useState<Location[]>([]);
   const [ledger, setLedger] = useState<ActionLogEntry[]>([]);
+  const [illusionState, setIllusionState] = useState<IllusionState | null>(null);
+  const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const ledgerEndRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchState();
     fetchLedger();
+    fetchIllusionState();
   }, []);
+
+  useEffect(() => {
+    ledgerEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [ledger]);
 
   const fetchState = async () => {
     const res = await fetch("/api/state");
-    const data = await res.json();
+    const data = await res.json() as { agents: CharacterSheet[]; nodes: Location[] };
     setAgents(data.agents);
     setNodes(data.nodes);
   };
 
   const fetchLedger = async () => {
     const res = await fetch("/api/ledger");
-    const data = await res.json();
+    const data = await res.json() as ActionLogEntry[];
     setLedger(data);
   };
 
-  useEffect(() => {
-    ledgerEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [ledger]);
+  const fetchIllusionState = async () => {
+    const res = await fetch("/api/simulation/illusion-state");
+    if (res.ok) {
+      const data = await res.json() as IllusionState;
+      setIllusionState(data);
+    }
+  };
+
   const handleInit = async () => {
     setLoading(true);
+
     const initialNodes: Location[] = [
       {
         location_id: "room_a",
         name: "The Study",
-        description:
-          "A dimly lit study with a large mahogany desk. Dust motes dance in the sliver of moonlight.",
+        description: "A dimly lit study with a large mahogany desk. Dust motes dance in the sliver of moonlight.",
         adjacent_locations: ["hallway"],
       },
       {
         location_id: "hallway",
         name: "Main Hallway",
-        description:
-          "A long, echoing hallway with portraits of stern ancestors.",
+        description: "A long, echoing hallway with portraits of stern ancestors.",
         adjacent_locations: ["room_a", "room_b"],
       },
       {
         location_id: "room_b",
         name: "The Conservatory",
-        description:
-          "A glass-walled room filled with overgrown, exotic plants. It smells of damp earth.",
+        description: "A glass-walled room filled with overgrown, exotic plants. It smells of damp earth.",
         adjacent_locations: ["hallway"],
       },
     ];
@@ -67,32 +82,30 @@ export default function StoryMachine({ onClose }: StoryMachineProps) {
       {
         char_id: "agent_1",
         name: "Detective Vance",
-        public_mask:
-          "A world-weary, cynical detective who speaks in short, clipped sentences.",
-        hidden_motive:
-          "Find the torn letter before anyone else does to protect a past mistake.",
-        knowledge_vector: [
-          "The victim was poisoned",
-          "The study was the last known location",
-        ],
+        public_mask: "A world-weary, cynical detective who speaks in short, clipped sentences.",
+        hidden_motive: "Find the torn letter before anyone else does to protect a past mistake.",
+        knowledge_vector: ["The victim was poisoned", "The study was the last known location"],
         suspicion_score: 20,
         current_location_id: "room_a",
         is_alive: true,
+        darkTriad: { machiavellianism: 65, narcissism: 40, psychopathy: 30 },
+        bigFive: { openness: 60, conscientiousness: 85, extraversion: 35, agreeableness: 30, neuroticism: 55 },
+        attachmentStyle: "avoidant",
+        defenseMechanisms: ["rationalization", "intellectualization"],
       },
       {
         char_id: "agent_2",
         name: "Lady Eleanor",
-        public_mask:
-          "A grieving widow, elegant and softly spoken, prone to dramatic sighs.",
-        hidden_motive:
-          "Ensure Vance does not find the letter. Misdirect him to the Conservatory.",
-        knowledge_vector: [
-          "The letter is in the desk",
-          "Vance is getting too close",
-        ],
+        public_mask: "A grieving widow, elegant and softly spoken, prone to dramatic sighs.",
+        hidden_motive: "Ensure Vance does not find the letter. Misdirect him to the Conservatory.",
+        knowledge_vector: ["The letter is in the desk", "Vance is getting too close"],
         suspicion_score: 10,
         current_location_id: "room_a",
         is_alive: true,
+        darkTriad: { machiavellianism: 80, narcissism: 60, psychopathy: 25 },
+        bigFive: { openness: 70, conscientiousness: 60, extraversion: 65, agreeableness: 55, neuroticism: 70 },
+        attachmentStyle: "anxious_avoidant",
+        defenseMechanisms: ["projection", "displacement", "denial"],
       },
     ];
 
@@ -102,8 +115,7 @@ export default function StoryMachine({ onClose }: StoryMachineProps) {
       body: JSON.stringify({ nodes: initialNodes, agents: initialAgents }),
     });
 
-    await fetchState();
-    await fetchLedger();
+    await Promise.all([fetchState(), fetchLedger(), fetchIllusionState()]);
     setLoading(false);
   };
 
@@ -114,8 +126,7 @@ export default function StoryMachine({ onClose }: StoryMachineProps) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ agentId }),
     });
-    await fetchState();
-    await fetchLedger();
+    await Promise.all([fetchState(), fetchLedger(), fetchIllusionState()]);
     setLoading(false);
   };
 
@@ -126,10 +137,40 @@ export default function StoryMachine({ onClose }: StoryMachineProps) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ nodeId }),
     });
-    await fetchState();
-    await fetchLedger();
+    await Promise.all([fetchState(), fetchLedger(), fetchIllusionState()]);
     setLoading(false);
   };
+
+  const handleExport = useCallback(async () => {
+    if (ledger.length === 0) return;
+    setIsExporting(true);
+    try {
+      const res = await fetch("/api/ledger/fountain");
+      const data = await res.json() as {
+        fountain: string;
+        characters: Array<{ name: string; ghost: string; lie: string; want: string; need: string }>;
+        turnCount: number;
+      };
+      if (onExportToIDE) {
+        onExportToIDE(data.fountain, data.characters);
+      } else {
+        const blob = new Blob([data.fountain], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "storymachine-draft.fountain";
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } finally {
+      setIsExporting(false);
+    }
+  }, [ledger.length, onExportToIDE]);
+
+  const illusionColor =
+    illusionState?.phase === "Prestige" ? "#FF4444"
+      : illusionState?.phase === "Turn" ? "#FF8800"
+      : "#22cc44";
 
   return (
     <div className="min-h-screen bg-[#f4f4f0] text-black p-8 font-sans">
@@ -139,10 +180,28 @@ export default function StoryMachine({ onClose }: StoryMachineProps) {
             Story Machine
           </h1>
           <p className="text-gray-600 text-sm mt-1 font-mono uppercase">
-            OASIS Architecture Prototype
+            OASIS Architecture — Perspective-Bounded Simulation
           </p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex gap-3 items-center flex-wrap justify-end">
+          {illusionState && (
+            <div
+              className="text-[10px] font-bold uppercase tracking-widest px-3 py-2 brutal-border"
+              style={{ background: illusionColor, color: "white" }}
+            >
+              Phase: {illusionState.phase} · {illusionState.total_turns} turns
+            </div>
+          )}
+          {ledger.length > 0 && (
+            <button
+              onClick={handleExport}
+              disabled={isExporting}
+              className="bg-[#FF4444] hover:bg-black text-white px-4 py-2 font-bold uppercase tracking-wider disabled:opacity-50 brutal-border brutal-shadow-hover transition-colors flex items-center gap-2 text-xs"
+            >
+              <FileDown className="w-4 h-4" />
+              {isExporting ? "Exporting…" : "Export to Script IDE"}
+            </button>
+          )}
           <button
             onClick={onClose}
             className="bg-white text-black px-4 py-2 font-bold uppercase tracking-wider brutal-border brutal-shadow-hover hover:bg-gray-100 transition-colors"
@@ -152,7 +211,7 @@ export default function StoryMachine({ onClose }: StoryMachineProps) {
           <button
             onClick={handleInit}
             disabled={loading}
-            className="bg-[#FF4444] hover:bg-black text-white px-4 py-2 font-bold uppercase tracking-wider disabled:opacity-50 brutal-border brutal-shadow-hover transition-colors"
+            className="bg-black hover:bg-[#FF4444] text-white px-4 py-2 font-bold uppercase tracking-wider disabled:opacity-50 brutal-border brutal-shadow-hover transition-colors"
           >
             Initialize Scenario
           </button>
@@ -160,40 +219,37 @@ export default function StoryMachine({ onClose }: StoryMachineProps) {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Agents & Nodes */}
+        {/* Left: Agents & Nodes */}
         <div className="space-y-8">
           <section>
             <h2 className="text-xl font-bold mb-4 uppercase text-black border-b-2 border-black pb-2">
               The Stage
             </h2>
             <div className="space-y-4">
-              {nodes.map((node) => (
-                <div
-                  key={node.location_id}
-                  className="bg-white p-4 brutal-border-thick brutal-shadow"
-                >
-                  <h3 className="font-bold text-lg text-black uppercase tracking-wider">
-                    {node.name}
-                  </h3>
-                  <p className="text-sm text-gray-700 mt-2 font-mono">
-                    {node.description}
-                  </p>
-                  <div className="mt-4 text-xs text-gray-500 font-mono uppercase border-t-2 border-dashed border-gray-300 pt-2">
-                    Connected: {node.adjacent_locations.join(", ")}
+              {nodes.map((node) => {
+                const here = agents.filter(a => a.current_location_id === node.location_id);
+                return (
+                  <div key={node.location_id} className="bg-white p-4 brutal-border-thick brutal-shadow">
+                    <h3 className="font-bold text-lg text-black uppercase tracking-wider">{node.name}</h3>
+                    <p className="text-sm text-gray-700 mt-2 font-mono">{node.description}</p>
+                    <div className="mt-2 text-xs text-gray-500 font-mono uppercase">
+                      {here.length > 0 ? `Present: ${here.map(a => a.name).join(", ")}` : "Empty"}
+                    </div>
+                    <div className="mt-1 text-xs text-gray-400 font-mono uppercase border-t border-dashed border-gray-200 pt-1">
+                      Connected: {node.adjacent_locations.join(", ")}
+                    </div>
+                    <button
+                      onClick={() => handleRunRoom(node.location_id)}
+                      disabled={loading}
+                      className="mt-4 w-full bg-black hover:bg-[#FF4444] text-white py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50 brutal-border transition-colors"
+                    >
+                      Run Dialogue Lock (5 Turns)
+                    </button>
                   </div>
-                  <button
-                    onClick={() => handleRunRoom(node.location_id)}
-                    disabled={loading}
-                    className="mt-4 w-full bg-black hover:bg-[#FF4444] text-white py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50 brutal-border transition-colors"
-                  >
-                    Run Dialogue Lock (5 Turns)
-                  </button>
-                </div>
-              ))}
+                );
+              })}
               {nodes.length === 0 && (
-                <p className="text-gray-500 italic font-mono text-sm">
-                  No nodes initialized.
-                </p>
+                <p className="text-gray-500 italic font-mono text-sm">No nodes initialized.</p>
               )}
             </div>
           </section>
@@ -203,128 +259,201 @@ export default function StoryMachine({ onClose }: StoryMachineProps) {
               Agents
             </h2>
             <div className="space-y-4">
-              {agents.map((agent) => (
-                <div
-                  key={agent.char_id}
-                  className="bg-white p-4 brutal-border-thick brutal-shadow"
-                >
-                  <div className="flex justify-between items-start border-b-2 border-black pb-2 mb-2">
-                    <h3 className="font-bold text-lg text-black uppercase tracking-wider">
-                      {agent.name}
-                    </h3>
-                    <span className="text-[10px] bg-black text-white px-2 py-1 uppercase font-bold tracking-widest">
-                      Loc:{" "}
-                      {nodes.find(
-                        (n) => n.location_id === agent.current_location_id,
-                      )?.name || agent.current_location_id}
-                    </span>
-                  </div>
-                  <div className="mt-3 space-y-2 text-xs font-mono">
-                    <p>
-                      <span className="font-bold uppercase text-black">
-                        Mask:
-                      </span>{" "}
-                      {agent.public_mask}
-                    </p>
-                    <p>
-                      <span className="font-bold uppercase text-black">
-                        Shadow:
-                      </span>{" "}
-                      {agent.hidden_motive}
-                    </p>
-                    <p>
-                      <span className="font-bold uppercase text-black">
-                        Suspicion:
-                      </span>{" "}
-                      <span
-                        className={
-                          agent.suspicion_score > 50
-                            ? "text-[#FF4444] font-bold"
-                            : "text-black"
-                        }
-                      >
-                        {agent.suspicion_score}/100
-                      </span>
-                    </p>
-                    <div className="border-t-2 border-dashed border-gray-300 pt-2 mt-2">
-                      <span className="font-bold uppercase text-black">
-                        Knowledge:
-                      </span>
-                      <ul className="list-disc list-inside pl-2 mt-1 text-gray-700">
-                        {agent.knowledge_vector.map((k, i) => (
-                          <li key={i}>{k}</li>
-                        ))}
-                      </ul>
+              {agents.map((agent) => {
+                const isExpanded = expandedAgent === agent.char_id;
+                const topBeliefs = (agent.beliefs ?? [])
+                  .sort((a, b) => b.confidence - a.confidence)
+                  .slice(0, 5);
+                const tomEntries = Object.values(agent.theoryOfMind ?? {});
+
+                return (
+                  <div key={agent.char_id} className="bg-white p-4 brutal-border-thick brutal-shadow">
+                    <div className="flex justify-between items-start border-b-2 border-black pb-2 mb-2">
+                      <h3 className="font-bold text-lg text-black uppercase tracking-wider">
+                        {agent.name}
+                      </h3>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] bg-black text-white px-2 py-1 uppercase font-bold tracking-widest">
+                          {nodes.find(n => n.location_id === agent.current_location_id)?.name || agent.current_location_id}
+                        </span>
+                        <button
+                          onClick={() => setExpandedAgent(isExpanded ? null : agent.char_id)}
+                          title="Toggle belief graph"
+                          className="p-1 border-2 border-black hover:bg-black hover:text-white transition-colors"
+                        >
+                          <Brain className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
+
+                    <div className="space-y-2 text-xs font-mono">
+                      <p><span className="font-bold uppercase">Mask:</span> {agent.public_mask}</p>
+                      <p><span className="font-bold uppercase">Shadow:</span> {agent.hidden_motive}</p>
+
+                      <div>
+                        <div className="flex justify-between mb-0.5">
+                          <span className="font-bold uppercase">Suspicion</span>
+                          <span className={agent.suspicion_score > 60 ? "text-[#FF4444] font-bold" : ""}>
+                            {agent.suspicion_score}/100
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 h-2 border border-black">
+                          <div
+                            className="h-full transition-all duration-500"
+                            style={{
+                              width: `${agent.suspicion_score}%`,
+                              background: agent.suspicion_score > 60 ? "#FF4444"
+                                : agent.suspicion_score > 30 ? "#FF8800" : "#22cc44",
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {agent.darkTriad && (
+                        <div className="flex flex-wrap gap-1">
+                          {agent.darkTriad.machiavellianism > 60 && (
+                            <span className="text-[9px] px-1.5 py-0.5 bg-gray-800 text-white font-bold uppercase">Machiavellian</span>
+                          )}
+                          {agent.darkTriad.narcissism > 60 && (
+                            <span className="text-[9px] px-1.5 py-0.5 bg-gray-700 text-white font-bold uppercase">Narcissist</span>
+                          )}
+                          {agent.darkTriad.psychopathy > 60 && (
+                            <span className="text-[9px] px-1.5 py-0.5 bg-[#FF4444] text-white font-bold uppercase">Psychopathic</span>
+                          )}
+                          {agent.attachmentStyle && agent.attachmentStyle !== "secure" && (
+                            <span className="text-[9px] px-1.5 py-0.5 border border-black font-bold uppercase">{agent.attachmentStyle}</span>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="border-t border-dashed border-gray-300 pt-2">
+                        <span className="font-bold uppercase">Knowledge:</span>
+                        <ul className="list-disc list-inside pl-2 mt-1 text-gray-700">
+                          {agent.knowledge_vector.map((k, i) => <li key={i}>{k}</li>)}
+                        </ul>
+                      </div>
+                    </div>
+
+                    {/* Belief graph + ToM panel */}
+                    {isExpanded && (
+                      <div className="mt-3 pt-3 border-t-2 border-black space-y-3">
+                        {topBeliefs.length > 0 && (
+                          <div>
+                            <div className="flex items-center gap-1 mb-2">
+                              <Eye className="w-3 h-3" />
+                              <span className="text-[10px] font-bold uppercase tracking-wider">Belief Graph</span>
+                            </div>
+                            <div className="space-y-1.5">
+                              {topBeliefs.map((b: Belief, i) => (
+                                <div key={i} className="flex items-start gap-2 text-[10px] font-mono">
+                                  <div className="w-10 shrink-0 mt-1">
+                                    <div className="w-full bg-gray-200 h-1.5 border border-gray-400">
+                                      <div className="h-full bg-black" style={{ width: `${b.confidence * 100}%` }} />
+                                    </div>
+                                    <span className="text-[8px] text-gray-400">{Math.round(b.confidence * 100)}%</span>
+                                  </div>
+                                  <span className="text-gray-800 leading-tight">{b.proposition}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {tomEntries.length > 0 && (
+                          <div>
+                            <div className="flex items-center gap-1 mb-2">
+                              <Brain className="w-3 h-3" />
+                              <span className="text-[10px] font-bold uppercase tracking-wider">Theory of Mind</span>
+                            </div>
+                            <div className="space-y-1.5">
+                              {tomEntries.map((tom, i) => {
+                                const subject = agents.find(a => a.char_id === tom.subject_id);
+                                return (
+                                  <div key={i} className="text-[10px] font-mono bg-gray-50 p-2 border border-gray-200">
+                                    <span className="font-bold">{subject?.name ?? tom.subject_id}</span>
+                                    <span className="text-gray-500"> trust: {Math.round(tom.trust_level * 100)}%</span>
+                                    <div className="text-gray-600 italic mt-0.5">"{tom.believed_motive}"</div>
+                                    {tom.believed_knowledge.length > 0 && (
+                                      <div className="text-gray-400 mt-0.5">
+                                        Knows: {tom.believed_knowledge.slice(0, 2).join("; ")}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {topBeliefs.length === 0 && tomEntries.length === 0 && (
+                          <p className="text-[10px] text-gray-400 font-mono italic">
+                            No epistemic data yet. Run a dialogue lock to populate.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => handleTurn(agent.char_id)}
+                      disabled={loading}
+                      className="mt-4 w-full bg-white text-black hover:bg-black hover:text-white py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50 brutal-border transition-colors"
+                    >
+                      Force Turn
+                    </button>
                   </div>
-                  <button
-                    onClick={() => handleTurn(agent.char_id)}
-                    disabled={loading}
-                    className="mt-4 w-full bg-white text-black hover:bg-black hover:text-white py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50 brutal-border transition-colors"
-                  >
-                    Force Turn
-                  </button>
-                </div>
-              ))}
+                );
+              })}
               {agents.length === 0 && (
-                <p className="text-gray-500 italic font-mono text-sm">
-                  No agents initialized.
-                </p>
+                <p className="text-gray-500 italic font-mono text-sm">No agents initialized.</p>
               )}
             </div>
           </section>
         </div>
 
-        {/* Right Column: Script Ledger */}
+        {/* Right: Script Ledger */}
         <div className="lg:col-span-2">
           <section className="h-full flex flex-col">
-            <h2 className="text-xl font-bold mb-4 uppercase text-black border-b-2 border-black pb-2">
-              Script Ledger
-            </h2>
+            <div className="flex justify-between items-center mb-4 border-b-2 border-black pb-2">
+              <h2 className="text-xl font-bold uppercase text-black">Script Ledger</h2>
+              {ledger.length > 0 && (
+                <span className="text-xs font-mono text-gray-500">{ledger.length} actions recorded</span>
+              )}
+            </div>
             <div className="flex-1 bg-white brutal-border-thick brutal-shadow p-6 overflow-y-auto font-mono text-sm space-y-6 min-h-[600px]">
               {ledger.map((entry) => {
-                const agent = agents.find((a) => a.char_id === entry.char_id);
-                const node = nodes.find(
-                  (n) => n.location_id === entry.location_id,
-                );
+                const agent = agents.find(a => a.char_id === entry.char_id);
+                const node = nodes.find(n => n.location_id === entry.location_id);
+                const isLie = entry.action_type === "LIE";
                 return (
                   <div
                     key={entry.action_id}
-                    className="border-l-4 border-black pl-4 py-2 bg-gray-50"
+                    className={`border-l-4 pl-4 py-2 ${isLie ? "border-[#FF4444] bg-red-50" : "border-black bg-gray-50"}`}
                   >
                     <div className="text-[10px] text-gray-500 mb-2 uppercase tracking-widest font-bold">
-                      [{new Date(entry.timestamp).toLocaleTimeString()}] @{" "}
-                      {node?.name || entry.location_id}
+                      [{new Date(entry.timestamp).toLocaleTimeString()}] @ {node?.name || entry.location_id}
                     </div>
-                    <div className="flex items-start gap-2 mb-2">
-                      <span className="font-bold text-black uppercase">
-                        {agent?.name || entry.char_id}
-                      </span>
-                      <span className="text-[10px] px-2 py-0.5 bg-black text-white uppercase font-bold tracking-widest">
+                    <div className="flex items-start gap-2 mb-2 flex-wrap">
+                      <span className="font-bold text-black uppercase">{agent?.name || entry.char_id}</span>
+                      <span className={`text-[10px] px-2 py-0.5 uppercase font-bold tracking-widest ${isLie ? "bg-[#FF4444] text-white" : "bg-black text-white"}`}>
                         {entry.action_type}
                       </span>
-                      {entry.target_char_id &&
-                        entry.action_type === "RELOCATE" && (
-                          <span className="text-blue-600 font-bold uppercase text-xs mt-0.5">
-                            →{" "}
-                            {nodes.find(
-                              (n) => n.location_id === entry.target_char_id,
-                            )?.name || entry.target_char_id}
-                          </span>
-                        )}
-                      {entry.target_char_id &&
-                        entry.action_type === "SPEAK" && (
-                          <span className="text-[#FF4444] font-bold uppercase text-xs mt-0.5">
-                            to{" "}
-                            {agents.find(
-                              (a) => a.char_id === entry.target_char_id,
-                            )?.name || entry.target_char_id}
-                          </span>
-                        )}
+                      {isLie && (
+                        <span className="text-[10px] flex items-center gap-1 text-[#FF4444] font-bold">
+                          <AlertTriangle className="w-3 h-3" /> LIE
+                        </span>
+                      )}
+                      {entry.target_char_id && entry.action_type === "RELOCATE" && (
+                        <span className="text-blue-600 font-bold uppercase text-xs">
+                          → {nodes.find(n => n.location_id === entry.target_char_id)?.name || entry.target_char_id}
+                        </span>
+                      )}
+                      {entry.target_char_id && (entry.action_type === "SPEAK" || entry.action_type === "LIE") && (
+                        <span className="text-[#FF4444] font-bold uppercase text-xs">
+                          to {agents.find(a => a.char_id === entry.target_char_id)?.name || entry.target_char_id}
+                        </span>
+                      )}
                     </div>
-                    <div className="text-black whitespace-pre-wrap leading-relaxed">
-                      {entry.content}
-                    </div>
+                    <div className="text-black whitespace-pre-wrap leading-relaxed">{entry.content}</div>
                   </div>
                 );
               })}
@@ -333,6 +462,17 @@ export default function StoryMachine({ onClose }: StoryMachineProps) {
               )}
               <div ref={ledgerEndRef} />
             </div>
+
+            {ledger.length > 0 && (
+              <button
+                onClick={handleExport}
+                disabled={isExporting}
+                className="mt-4 w-full bg-[#FF4444] hover:bg-black text-white py-3 text-xs font-bold uppercase tracking-wider disabled:opacity-50 brutal-border brutal-shadow-hover transition-colors flex items-center justify-center gap-2"
+              >
+                <FileDown className="w-4 h-4" />
+                {isExporting ? "Converting to Fountain…" : `Export ${ledger.length} Actions → Script IDE`}
+              </button>
+            )}
           </section>
         </div>
       </div>

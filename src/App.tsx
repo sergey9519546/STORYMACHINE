@@ -1,4 +1,4 @@
-import React, { useState, Suspense, lazy } from 'react';
+import React, { useState, Suspense, lazy, useCallback } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { StoryConfig } from './types';
 
@@ -15,16 +15,45 @@ const LoadingFallback = () => (
 export default function App() {
   const [config, setConfig] = useState<StoryConfig | null>(null);
   const [showStoryMachine, setShowStoryMachine] = useState(false);
+  // Fountain text + extracted character list coming from a Story Machine export
+  const [importedScript, setImportedScript] = useState<string | undefined>(undefined);
+  const [importedCharacters, setImportedCharacters] = useState<
+    Array<{ name: string; ghost: string; lie: string; want: string; need: string }> | undefined
+  >(undefined);
+
+  const handleExportToIDE = useCallback(
+    (fountain: string, characters: Array<{ name: string; ghost: string; lie: string; want: string; need: string }>) => {
+      setImportedScript(fountain);
+      setImportedCharacters(characters);
+      setShowStoryMachine(false);
+    },
+    [],
+  );
+
+  const handleClearImport = useCallback(() => {
+    setImportedScript(undefined);
+    setImportedCharacters(undefined);
+  }, []);
 
   return (
     <ErrorBoundary>
       <Suspense fallback={<LoadingFallback />}>
-        {showStoryMachine
-          ? <StoryMachine onClose={() => setShowStoryMachine(false)} />
-          : config
-            ? <ScriptIDE initialConfig={config} onOpenStoryMachine={() => setShowStoryMachine(true)} />
-            : <StartScreen onStart={setConfig} isGenerating={false} />
-        }
+        {showStoryMachine ? (
+          <StoryMachine
+            onClose={() => setShowStoryMachine(false)}
+            onExportToIDE={handleExportToIDE}
+          />
+        ) : config ? (
+          <ScriptIDE
+            initialConfig={config}
+            onOpenStoryMachine={() => setShowStoryMachine(true)}
+            importedScript={importedScript}
+            importedCharacters={importedCharacters}
+            onImportConsumed={handleClearImport}
+          />
+        ) : (
+          <StartScreen onStart={setConfig} isGenerating={false} />
+        )}
       </Suspense>
     </ErrorBoundary>
   );

@@ -7,6 +7,7 @@ import { rateLimit } from 'express-rate-limit';
 import { Stage } from './server/engine/Stage.ts';
 import { Orchestrator } from './server/engine/Orchestrator.ts';
 import type { CharacterSheet, Location } from './server/engine/types.ts';
+import { transcriptToFountain, extractCharactersFromLog } from './server/lib/fountain.ts';
 
 // ── Startup validation ────────────────────────────────────────────────────────
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -371,6 +372,110 @@ async function startServer() {
 
   app.get('/api/state', asyncHandler(async (req, res) => {
     res.json({ agents: stage.getAllAgents(), nodes: stage.getAllLocations() });
+  }));
+
+  // Export current simulation as a Fountain screenplay draft
+  app.get('/api/ledger/fountain', gameLimiter, asyncHandler(async (req, res) => {
+    const log = stage.getFullLedger();
+    const agents = stage.getAllAgents();
+    const locations = stage.getAllLocations();
+    const fountain = transcriptToFountain(log, agents, locations);
+    const characters = extractCharactersFromLog(agents);
+    res.json({ fountain, characters, turnCount: log.length });
+  }));
+
+  // Run a self-contained simulation and return Fountain output without polluting main stage
+  app.post('/api/simulate-to-fountain', gameLimiter, asyncHandler(async (req, res) => {
+    const { nodes: nodesPayload, agents: agentPayload, location_id, maxTurns, title, author } = req.body ?? {};
+
+    if (!nodesPayload || !Array.isArray(nodesPayload) || !agentPayload || !Array.isArray(agentPayload)) {
+      res.status(400).json({ error: 'nodes and agents arrays are required' });
+      return;
+    }
+
+    const simStage = new Stage(':memory:');
+    const simOrchestrator = new Orchestrator(simStage);
+
+    (nodesPayload as unknown[]).slice(0, 10).forEach((raw) => {
+      if (typeof raw !== 'object' || raw === null) return;
+      const n = raw as Record<string, unknown>;
+      try {
+        simOrchestrator.registerNode({
+          location_id: requireString(n.location_id, 'location_id', 64),
+          name: requireString(n.name, 'name', 256),
+          description: requireString(n.description, 'description', 2000),
+          adjacent_locations: Array.isArray(n.adjacent_locations)
+            ? (n.adjacent_locations as unknown[]).filter((a): a is string => typeof a === 'string').slice(0, 10)
+            : [],
+        });
+      } catch { /* skip malformed */ }
+    });
+
+    (agentPayload as unknown[]).slice(0, 10).forEach((raw) => {
+      if (typeof raw !== 'object' || raw === null) return;
+      const a = raw as Record<string, unknown>;
+      try {
+        simOrchestrator.registerAgent({
+          char_id: requireString(a.char_id, 'char_id', 64),
+          name: requireString(a.name, 'name', 256),
+          public_mask: requireString(a.public_mask, 'public_mask', 2000),
+          hidden_motive: requireString(a.hidden_motive, 'hidden_motive', 2000),
+          knowledge_vector: Array.isArray(a.knowledge_vector)
+            ? (a.knowledge_vector as unknown[]).filter((k): k is string => typeof k === 'string').slice(0, 50)
+            : [],
+          suspicion_score: typeof a.suspicion_score === 'number' ? Math.max(0, Math.min(100, a.suspicion_score)) : 0,
+          current_location_id: typeof a.current_location_id === 'string' ? a.current_location_id.substring(0, 64) : '',
+          is_alive: a.is_alive !== false,
+        } as CharacterSheet);
+      } catch { /* skip malformed */ }
+    });
+
+    const runLocationId = typeof location_id === 'string' ? location_id
+      : (nodesPayload[0] as Record<string, unknown>)?.location_id ?? '';
+    const turns = typeof maxTurns === 'number' ? Math.min(maxTurns, 10) : 5;
+
+    if (runLocationId) {
+      await simOrchestrator.runRoomSimulation(String(runLocationId), turns);
+    }
+
+    const log = simStage.getFullLedger();
+    const simAgents = simStage.getAllAgents();
+    const simLocations = simStage.getAllLocations();
+    const fountain = transcriptToFountain(log, simAgents, simLocations, {
+      title: typeof title === 'string' ? title : 'Story Machine Draft',
+      author: typeof author === 'string' ? author : 'STORYMACHINE',
+    });
+    const characters = extractCharactersFromLog(simAgents);
+
+    res.json({ fountain, characters, turnCount: log.length, agents: simAgents });
+  }));
+
+  // Current Setup/Turn/Prestige illusion phase
+  app.get('/api/simulation/illusion-state', gameLimiter, asyncHandler(async (req, res) => {
+    res.json(stage.getIllusionState());
+  }));
+
+  // QBN choice filtering — filter available choices by accumulated qualities
+  app.post('/api/qbn/filter-choices', gameLimiter, asyncHandler(async (req, res) => {
+    const { choices, qualities } = req.body ?? {};
+    if (!Array.isArray(choices)) {
+      res.status(400).json({ error: 'choices must be an array' });
+      return;
+    }
+    const q = typeof qualities === 'object' && qualities !== null
+      ? (qualities as Record<string, number>) : {};
+
+    const available = (choices as unknown[]).filter((raw) => {
+      if (typeof raw !== 'object' || raw === null) return false;
+      const c = raw as Record<string, unknown>;
+      const reqs = c.qbnRequirements;
+      if (!reqs || typeof reqs !== 'object') return true;
+      return Object.entries(reqs as Record<string, number>).every(
+        ([quality, required]) => (q[quality] ?? 0) >= required,
+      );
+    });
+
+    res.json({ available, filtered: choices.length - available.length });
   }));
 
   // ── ScriptIDE AI routes ────────────────────────────────────────────────────
