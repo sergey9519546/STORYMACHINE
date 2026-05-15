@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { EngineState, StoryConfig, ScriptBlock } from "../types";
 import { analyzeScriptBlock } from "../services/director";
 import { parseFountain, FountainBlock } from "../lib/fountain";
@@ -24,9 +24,9 @@ const SCRIPT_ELEMENTS = {
   TRANSITION: /^(CUT TO:|FADE IN:|FADE OUT:|DISSOLVE TO:)$/i,
 };
 
-const renderHighlightedText = (text: string) => {
+// ⚡ Bolt Performance Optimization: Accept parsed blocks instead of re-parsing
+const renderHighlightedText = (text: string, blocks: FountainBlock[]) => {
   const lines = text.split('\n');
-  const blocks = parseFountain(text);
 
   // Since we need exact 1:1 sync with textarea line breaks,
   // map formatting classes to each line index
@@ -81,6 +81,13 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
   const [directorsLayer, setDirectorsLayer] = useState(false);
   const [isCleaning, setIsCleaning] = useState<number | null>(null);
   
+  // ⚡ Bolt Performance Optimization: Memoize the Fountain parse result
+  // to avoid O(N) re-parsing multiple times per render cycle.
+  const parsedScriptBlocks = useMemo(() => parseFountain(scriptText), [scriptText]);
+
+  // ⚡ Bolt Performance Optimization: Memoize highlighted text rendering
+  const highlightedContent = useMemo(() => renderHighlightedText(scriptText, parsedScriptBlocks), [scriptText, parsedScriptBlocks]);
+
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const highlightRef = useRef<HTMLDivElement>(null);
@@ -392,8 +399,9 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
       if (data.error) throw new Error(data.error);
 
       const newText = data.result;
-      const blocks = parseFountain(scriptText);
-      blocks[index].text = newText;
+      // ⚡ Bolt Performance Optimization: Clone from memoized blocks
+      const blocks = [...parsedScriptBlocks];
+      blocks[index] = { ...blocks[index], text: newText };
       const newScript = blocks.map(b => b.text).join('\n');
       setScriptText(newScript);
       triggerAnalysis(newScript);
@@ -404,8 +412,9 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
     }
   };
 
-  const getScriptStats = () => {
-    const blocks = parseFountain(scriptText);
+  // ⚡ Bolt Performance Optimization: Memoize script stats derived from parsed blocks
+  const stats = useMemo(() => {
+    const blocks = parsedScriptBlocks;
     const charCounts: Record<string, number> = {};
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
@@ -434,9 +443,7 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
     const estimatedMinutes = Math.ceil(wordCount / 250);
 
     return { charData, locData, dialogueLines, actionLines, wordCount, estimatedMinutes };
-  };
-
-  const stats = getScriptStats();
+  }, [scriptText, parsedScriptBlocks]);
 
   const takeSnapshot = () => {
     const name = prompt("Enter snapshot name:", `Version ${snapshots.length + 1}`);
@@ -721,7 +728,7 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
             className="absolute inset-0 p-8 font-courier text-lg leading-relaxed pointer-events-none whitespace-pre-wrap break-words overflow-hidden z-0"
             aria-hidden="true"
           >
-            {renderHighlightedText(scriptText)}
+            {highlightedContent}
           </div>
 
           {/* Input Layer */}
@@ -896,8 +903,8 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
                     <Camera className="w-4 h-4" /> Director's Shot List
                   </h2>
                   {(() => {
-                    const parsedBlocks = parseFountain(scriptText);
-                    const shotBlocks = parsedBlocks.filter(b => b.type === 'shot');
+                    // ⚡ Bolt Performance Optimization: Reuse memoized blocks
+                    const shotBlocks = parsedScriptBlocks.filter(b => b.type === 'shot');
                     
                     if (shotBlocks.length === 0) {
                       return <p className="text-[10px] font-mono text-gray-500 uppercase">No explicit shots defined.</p>;
@@ -971,8 +978,8 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
                   <ShieldAlert className="w-4 h-4" /> Semantic Firewall
                 </h2>
                 {(() => {
-                  const parsedBlocks = parseFountain(scriptText);
-                  const lintedBlocks = parsedBlocks.map((b, i) => ({...b, index: i})).filter(b => b.lintErrors && b.lintErrors.length > 0);
+                  // ⚡ Bolt Performance Optimization: Reuse memoized blocks
+                  const lintedBlocks = parsedScriptBlocks.map((b, i) => ({...b, index: i})).filter(b => b.lintErrors && b.lintErrors.length > 0);
                   
                   if (lintedBlocks.length === 0) {
                     return <p className="text-[10px] font-mono text-green-600 uppercase font-bold">No camera bleed detected. Action is pure.</p>;

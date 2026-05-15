@@ -1,0 +1,3 @@
+## 2025-03-09 - O(N) Double-Render Cycle Bottleneck in React High-Frequency Input Component
+**Learning:** Found a severe performance anti-pattern in `src/components/ScriptIDE.tsx` where an expensive O(N) operation (`parseFountain`) was called synchronously multiple times per render cycle (for highlighting, stats, linting, etc.). Because editors are high-frequency input components, executing O(N) operations without memoization causes massive input lag and freezes the main thread.
+**Action:** Always enforce the use of `useMemo` for derived state from props or fast-changing state in editors. Extract expensive operations into a single memoized value at the top of the component and reuse that value across all rendering functions.
