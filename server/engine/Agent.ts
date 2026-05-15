@@ -1,6 +1,6 @@
 import { Type } from '@google/genai';
 import { randomUUID } from 'crypto';
-import { getAI } from './ai.ts';
+import { getAI, withTimeout } from './ai.ts';
 import type {
   CharacterSheet,
   NarrativeAction,
@@ -112,7 +112,7 @@ export class Agent {
     const prompt = this.buildEnhancedPrompt(currentNode, sensoryFilter, otherAgents);
 
     // ── ToT Planning: generate 3 candidates, self-select the best ──
-    const response = await getAI().models.generateContent({
+    const response = await withTimeout(getAI().models.generateContent({
       model: 'gemini-2.5-pro',
       contents: prompt,
       config: {
@@ -139,7 +139,12 @@ export class Agent {
           required: ['candidates'],
         },
       },
+    }), 30_000, `takeTurn:${this.sheet.name}`).catch(err => {
+      console.error(`[Agent/${this.sheet.name}] takeTurn error: ${(err as Error).message}`);
+      return null;
     });
+
+    if (!response) return { action_type: 'SPEAK' as const, content: '...', target: null };
 
     type Candidate = NarrativeAction & { reasoning?: string; goal_score?: number };
     const raw = safeJsonParse<{ candidates: Candidate[] }>(
@@ -284,10 +289,12 @@ Generate 3 candidate actions. Score each 0–100 on goal alignment. The best-sco
     const otherAgentsInRoom = this.stage.getAgentsInLocation(this.sheet.current_location_id)
       .filter(a => a.char_id !== this.sheet.char_id);
 
-    // Numbered so Gemini can reference by index when reporting source_action_index
+    // Numbered so Gemini can reference by index when reporting source_action_index.
+    // LIE appears as SPEAK — epistemic isolation: the character doesn't know which statements are lies.
     const actionSummary = observableActions.map((a, i) => {
       const name = this.stage.getAgent(a.char_id)?.name ?? 'Unknown';
-      return `[${i}] [${a.action_type}] ${name}: ${a.content}`;
+      const tag = a.action_type === 'LIE' ? 'SPEAK' : a.action_type;
+      return `[${i}] [${tag}] ${name}: ${a.content}`;
     }).join('\n');
 
     const currentBeliefsSummary = (this.sheet.beliefs ?? [])
@@ -320,7 +327,7 @@ Based on what you just witnessed:
 3. Update your model of each other agent — what do you now think their motive is, and what do THEY now think YOU know?
 4. Did anything you observed contradict what you believed?`;
 
-    const response = await getAI().models.generateContent({
+    const response = await withTimeout(getAI().models.generateContent({
       model: 'gemini-2.5-pro',
       contents: prompt,
       config: {
@@ -391,7 +398,12 @@ Based on what you just witnessed:
           required: ['newSuspicionScore', 'newBeliefs', 'updatedTheoryOfMind', 'contradiction_detected', 'contradicted_propositions'],
         },
       },
+    }), 30_000, `updateEpistemics:${this.sheet.name}`).catch(err => {
+      console.error(`[Agent/${this.sheet.name}] updateEpistemics error: ${(err as Error).message}`);
+      return null;
     });
+
+    if (!response) return empty;
 
     const result = safeJsonParse<{
       newSuspicionScore: number;
@@ -535,7 +547,7 @@ Based on what you just witnessed:
 
     const existingBeliefs = (this.sheet.beliefs ?? []).slice(0, 5).map(b => b.proposition).join('; ');
 
-    const response = await getAI().models.generateContent({
+    const response = await withTimeout(getAI().models.generateContent({
       model: 'gemini-2.5-pro',
       contents: `You are ${this.sheet.name}. Reflect on these recent events and synthesize exactly 3 high-level insights.\n\nEvents:\n${transcript}\n\nExisting beliefs: ${existingBeliefs || 'none'}\n\nOutput 3 reflective insights that go beyond the surface events — patterns, implications, strategic assessments.`,
       config: {
@@ -559,7 +571,7 @@ Based on what you just witnessed:
           required: ['reflections'],
         },
       },
-    });
+    }), 20_000, `synthesizeReflections:${this.sheet.name}`);
 
     const parsed = safeJsonParse<{ reflections: Array<{ insight: string; confidence: number }> }>(
       response.text ?? '{}',

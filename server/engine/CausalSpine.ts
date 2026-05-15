@@ -144,7 +144,10 @@ export class CausalSpine {
 
     const turnIndex = this.stage.getTurnCount();
 
-    // Find all agents whose told-beliefs are now contradicted (potential liars)
+    // Find all agents whose told-beliefs are now contradicted (potential liars).
+    // Primary path: source_agent_id set on the belief (when Gemini resolved source_action_index).
+    // Fallback: source_event_id set but source_agent_id absent — look up EventProposition.asserted_by,
+    // which is the authoritative ground truth written deterministically by processEvent().
     const allBeliefs = discoverer.beliefs ?? [];
     const suspectIds = new Set<string>();
 
@@ -152,6 +155,11 @@ export class CausalSpine {
       const fromBelief = allBeliefs.find(b => b.id === edge.from_belief_id);
       if (fromBelief?.source_agent_id) {
         suspectIds.add(fromBelief.source_agent_id);
+      } else if (fromBelief?.source_event_id) {
+        const props = this.stage.getEventPropositions(fromBelief.source_event_id);
+        for (const p of props) {
+          if (p.asserted_by !== discoverer_id) suspectIds.add(p.asserted_by);
+        }
       }
     }
 

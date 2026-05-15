@@ -3,7 +3,7 @@ import { Stage } from './Stage.ts';
 import type { ActionLogEntry, PerspectiveEvaluation, BeliefSource, EpistemicUpdate, IllusionElement } from './types.ts';
 import { safeJsonParse } from '../../src/lib/json.ts';
 import { randomUUID } from 'crypto';
-import { getAI } from './ai.ts';
+import { getAI, withTimeout } from './ai.ts';
 
 export class DirectorNode {
   private stage: Stage;
@@ -161,7 +161,7 @@ From ${observer.name}'s perspective only:
 3. What new facts did they derive from what they saw/heard?
 4. How has their suspicion of each other person changed?`;
 
-    const response = await getAI().models.generateContent({
+    const response = await withTimeout(getAI().models.generateContent({
       model: 'gemini-2.5-pro',
       contents: prompt,
       config: {
@@ -205,7 +205,12 @@ From ${observer.name}'s perspective only:
         required: ['tension_delta', 'contradiction_detected', 'new_beliefs', 'suspicion_updates', 'contradicted_propositions'],
         },
       },
+    }), 30_000, `evaluatePerspective:${observer_id}`).catch(err => {
+      console.error(`[Director] evaluatePerspective fallback: ${(err as Error).message}`);
+      return null;
     });
+
+    if (!response) return this.emptyEvaluation(observer_id);
 
     const raw = safeJsonParse<{
       tension_delta: number;

@@ -330,6 +330,10 @@ function sessionId(req: express.Request): string {
   return typeof raw === 'string' && raw.trim() ? raw.substring(0, 64) : 'default';
 }
 
+// Prevents two concurrent runRoomSimulation() calls for the same session+room from
+// interleaving writes to Action_Log and Character_State.
+const runningRooms = new Set<string>();
+
 // ── Server ────────────────────────────────────────────────────────────────────
 async function startServer() {
   const app = express();
@@ -397,10 +401,23 @@ async function startServer() {
   }));
 
   app.post('/api/run-room', asyncHandler(async (req, res) => {
-    const { orchestrator } = getOrCreateSession(sessionId(req));
+    const sid = sessionId(req);
     const nodeId = requireString(req.body?.nodeId, 'nodeId', 128);
-    await orchestrator.runRoomSimulation(nodeId);
-    res.json({ status: 'completed' });
+    const lockKey = `${sid}:${nodeId}`;
+
+    if (runningRooms.has(lockKey)) {
+      res.status(409).json({ error: 'Simulation already running for this room. Please wait.' });
+      return;
+    }
+
+    const { orchestrator } = getOrCreateSession(sid);
+    runningRooms.add(lockKey);
+    try {
+      await orchestrator.runRoomSimulation(nodeId);
+      res.json({ status: 'completed' });
+    } finally {
+      runningRooms.delete(lockKey);
+    }
   }));
 
   app.get('/api/ledger', asyncHandler(async (req, res) => {

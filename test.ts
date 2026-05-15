@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { safeJsonParse } from './src/lib/json.ts';
+import { withTimeout } from './server/engine/ai.ts';
 
 describe('safeJsonParse', () => {
   it('returns parsed value for valid JSON object', () => {
@@ -539,5 +540,154 @@ describe('Stage — spine table isolation', () => {
       action_type: 'SPEAK', content: 'Hello.', target: null,
     }, 'room1');
     assert.match(action_id, /^[0-9a-f-]{36}$/);
+  });
+});
+
+// ── Phase A — withTimeout ──────────────────────────────────────────────────────
+
+describe('withTimeout', () => {
+  it('resolves when promise settles before deadline', async () => {
+    const result = await withTimeout(Promise.resolve(42), 1_000, 'test-resolve');
+    assert.equal(result, 42);
+  });
+
+  it('rejects with timeout error when promise exceeds deadline', async () => {
+    const never = new Promise<never>(() => { /* intentionally never resolves */ });
+    await assert.rejects(
+      () => withTimeout(never, 10, 'test-slow'),
+      (err: Error) => /timeout/i.test(err.message),
+    );
+  });
+
+  it('propagates rejection from the original promise (no double-wrap)', async () => {
+    await assert.rejects(
+      () => withTimeout(Promise.reject(new Error('upstream failure')), 1_000, 'test-reject'),
+      { message: 'upstream failure' },
+    );
+  });
+
+  it('label appears in timeout message', async () => {
+    const never = new Promise<never>(() => {});
+    await assert.rejects(
+      () => withTimeout(never, 10, 'my-label'),
+      (err: Error) => err.message.includes('my-label'),
+    );
+  });
+});
+
+// ── Phase B — Source genealogy fallback via EventProposition ─────────────────
+
+describe('CausalSpine — source genealogy fallback', () => {
+  it('finds suspect via EventProposition.asserted_by when source_agent_id missing from belief', () => {
+    const stage = makeStage();
+    const spine = new CausalSpine(stage);
+
+    // Alice makes a LIE → CausalSpine writes EventProposition with asserted_by='alice'
+    const lieAction: ActionLogEntry = {
+      action_id: 'evt-lie-fallback',
+      timestamp: 1000,
+      char_id: 'alice',
+      location_id: 'room1',
+      action_type: 'LIE',
+      target_char_id: 'bob',
+      content: "The cabinet was locked all morning.",
+      is_audible: true,
+    };
+    spine.processEvent(lieAction, 1);
+
+    // Bob's belief has source_event_id pointing at the lie, but source_agent_id NOT set
+    // (simulates Gemini omitting source_action_index → null)
+    const fromBelief: Belief = {
+      id: 'b-from-fallback',
+      proposition: "The cabinet was locked all morning",
+      confidence: 0.7,
+      source: 'told',
+      source_event_id: 'evt-lie-fallback',  // event_id IS set
+      // source_agent_id is deliberately omitted
+      acquired_at: 1,
+    };
+    const toBelief: Belief = {
+      id: 'b-to-fallback',
+      proposition: "Alice's glove was inside the cabinet",
+      confidence: 0.9,
+      source: 'witnessed',
+      acquired_at: 2,
+    };
+    stage.updateAgentBeliefs('bob', [{ ...fromBelief, contradicts: ['b-to-fallback'] }, toBelief]);
+
+    const edge = {
+      edge_id: 'edge-fallback-1',
+      from_belief_id: 'b-from-fallback',
+      to_belief_id: 'b-to-fallback',
+      edge_type: 'contradicts' as const,
+      discovered_by: 'bob',
+      source_event_id: 'evt-lie-fallback',
+      turn_index: 2,
+    };
+
+    const { mutations, pressures } = spine.processContradiction('bob', [edge], 'evt-lie-fallback');
+
+    assert.ok(mutations.length >= 1, 'Bob should get a confrontation goal even without source_agent_id');
+    assert.ok(
+      mutations[0].new_subgoal?.toLowerCase().includes('confront'),
+      'New subgoal should be a confrontation goal',
+    );
+
+    const alicePressure = pressures.find(p => p.target_char_id === 'alice');
+    assert.ok(alicePressure, 'Alice should have confrontation_imminent pressure via EventProposition fallback');
+    assert.equal(alicePressure!.pressure_type, 'confrontation_imminent');
+
+    const bobPressure = pressures.find(p => p.target_char_id === 'bob');
+    assert.ok(bobPressure, 'Bob should have evidence_against pressure');
+  });
+
+  it('does not add discoverer as own suspect via EventProposition fallback', () => {
+    // If Bob speaks and Bob also observes it, Bob should not be his own suspect
+    const stage = makeStage();
+    const spine = new CausalSpine(stage);
+
+    const speakAction: ActionLogEntry = {
+      action_id: 'evt-self-speak',
+      timestamp: 1000,
+      char_id: 'bob',
+      location_id: 'room1',
+      action_type: 'SPEAK',
+      target_char_id: null,
+      content: 'Everything is fine here.',
+      is_audible: true,
+    };
+    spine.processEvent(speakAction, 1);
+
+    const belief: Belief = {
+      id: 'b-self',
+      proposition: 'Everything is fine here',
+      confidence: 0.6,
+      source: 'told',
+      source_event_id: 'evt-self-speak',
+      acquired_at: 1,
+    };
+    const contra: Belief = {
+      id: 'b-contra',
+      proposition: 'Something is clearly wrong here',
+      confidence: 0.9,
+      source: 'witnessed',
+      acquired_at: 2,
+    };
+    stage.updateAgentBeliefs('bob', [{ ...belief, contradicts: ['b-contra'] }, contra]);
+
+    const edge = {
+      edge_id: 'edge-self-1',
+      from_belief_id: 'b-self',
+      to_belief_id: 'b-contra',
+      edge_type: 'contradicts' as const,
+      discovered_by: 'bob',
+      source_event_id: 'evt-self-speak',
+      turn_index: 2,
+    };
+
+    const { pressures } = spine.processContradiction('bob', [edge], 'evt-self-speak');
+    // Bob's own SPEAK should not make Bob a suspect against himself
+    const bobAsSuspect = pressures.find(p => p.target_char_id === 'bob' && p.pressure_type === 'confrontation_imminent');
+    assert.equal(bobAsSuspect, undefined, 'Discoverer should not be listed as their own suspect');
   });
 });
