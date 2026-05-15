@@ -18,18 +18,32 @@ export async function analyzeScriptBlock(
   }).filter(b => b.text.trim().length > 0);
 
   // All AI work (Gemini analysis, image generation, audio generation) happens server-side
-  const response = await fetch('/api/analyze-script', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      scriptText,
-      characters,
-      engineState: {
-        directorState: engineState.directorState,
-        protagonist: { visualAnchor: engineState.protagonist?.visualAnchor ?? '' },
-      },
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60_000); // 60s — image+audio gen takes time
+
+  let response: Response;
+  try {
+    response = await fetch('/api/analyze-script', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        scriptText,
+        characters,
+        engineState: {
+          directorState: engineState.directorState,
+          protagonist: { visualAnchor: engineState.protagonist?.visualAnchor ?? '' },
+        },
+      }),
+      signal: controller.signal,
+    });
+  } catch (e) {
+    clearTimeout(timeoutId);
+    if (e instanceof DOMException && e.name === 'AbortError') {
+      throw new Error('Analysis request timed out (60s). Try a shorter script.');
+    }
+    throw e;
+  }
+  clearTimeout(timeoutId);
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({ error: response.statusText })) as { error?: string };

@@ -517,8 +517,8 @@ OUTPUT: A visceral character description.`,
       ? engineState.protagonist.visualAnchor.substring(0, 500) : '';
 
     const prompt = `Analyze the following screenplay script.
-Current Director State: ${JSON.stringify(engineState?.directorState ?? {})}
-Characters Profile: ${JSON.stringify(characters)}
+Current Director State: ${JSON.stringify(engineState?.directorState ?? {}).substring(0, 5000)}
+Characters Profile: ${JSON.stringify(characters).substring(0, 2000)}
 
 Script Text:
 ${scriptText.substring(0, 8000)}
@@ -590,6 +590,10 @@ Validate dialogue against character profiles and flag inconsistencies in dialogu
   }
 
   const PORT = Number(process.env.PORT ?? 3000);
+  if (isNaN(PORT) || PORT < 1 || PORT > 65535) {
+    console.error(`FATAL: Invalid PORT value "${process.env.PORT}". Must be 1–65535.`);
+    process.exit(1);
+  }
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });

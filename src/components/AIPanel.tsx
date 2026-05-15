@@ -1,21 +1,30 @@
 import React, { useState } from 'react';
 import { Sparkles, MessageSquare, Activity, Loader2, User } from 'lucide-react';
 import { motion } from 'motion/react';
+// The ScriptIDE character type (simpler than the full game Character in types.ts)
+interface ScriptCharacter {
+  id: string;
+  name: string;
+  ghost: string;
+  lie: string;
+  want: string;
+  need: string;
+}
 
 interface AIPanelProps {
   script: string;
-  characters: any[];
+  characters: ScriptCharacter[];
   onApplySuggestion: (suggestion: string) => void;
 }
 
-export default function AIPanel({ script, characters, onApplySuggestion }: AIPanelProps) {
+export default function AIPanel({ script: _script, characters, onApplySuggestion }: AIPanelProps) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'world' | 'dialogue' | 'tension' | 'character'>('world');
   const [selectedChar, setSelectedChar] = useState<string>('');
   const [input, setInput] = useState('');
 
-  const runPrompt = async (endpoint: string, payload: any) => {
+  const runPrompt = async (endpoint: string, payload: Record<string, unknown>) => {
     setLoading(true);
     setResult(null);
     try {
@@ -24,11 +33,11 @@ export default function AIPanel({ script, characters, onApplySuggestion }: AIPan
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      const data = await response.json();
+      const data = await response.json() as { result?: string; error?: string };
       if (data.error) throw new Error(data.error);
-      setResult(data.result);
-    } catch (err: any) {
-      setResult(`Error: ${err.message}`);
+      setResult(data.result ?? null);
+    } catch (err: unknown) {
+      setResult(`Error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setLoading(false);
     }
@@ -40,27 +49,27 @@ export default function AIPanel({ script, characters, onApplySuggestion }: AIPan
         <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-black pb-2 flex items-center gap-2">
           <Sparkles className="w-4 h-4" /> Story Engine
         </h2>
-        
+
         <div className="flex border-b-2 border-black mb-4">
-          <button 
+          <button
             onClick={() => setActiveTab('world')}
             className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${activeTab === 'world' ? 'bg-black text-white' : 'bg-white text-black hover:bg-gray-100'}`}
           >
             World
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('dialogue')}
             className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors border-l-2 border-black ${activeTab === 'dialogue' ? 'bg-black text-white' : 'bg-white text-black hover:bg-gray-100'}`}
           >
             Dialogue
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('tension')}
             className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors border-l-2 border-black ${activeTab === 'tension' ? 'bg-black text-white' : 'bg-white text-black hover:bg-gray-100'}`}
           >
             Tension
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('character')}
             className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors border-l-2 border-black ${activeTab === 'character' ? 'bg-black text-white' : 'bg-white text-black hover:bg-gray-100'}`}
           >
