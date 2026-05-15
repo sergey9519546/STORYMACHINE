@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { EngineState, StoryConfig, ScriptBlock } from "../types";
 import { analyzeScriptBlock } from "../services/director";
 import { parseFountain, FountainBlock } from "../lib/fountain";
@@ -24,9 +24,8 @@ const SCRIPT_ELEMENTS = {
   TRANSITION: /^(CUT TO:|FADE IN:|FADE OUT:|DISSOLVE TO:)$/i,
 };
 
-const renderHighlightedText = (text: string) => {
+const renderHighlightedText = (text: string, blocks: FountainBlock[]) => {
   const lines = text.split('\n');
-  const blocks = parseFountain(text);
 
   // Since we need exact 1:1 sync with textarea line breaks,
   // map formatting classes to each line index
@@ -64,6 +63,9 @@ const renderHighlightedText = (text: string) => {
 export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
   const [engineState, setEngineState] = useState<EngineState | null>(null);
   const [scriptText, setScriptText] = useState<string>(() => localStorage.getItem('script_draft') || "");
+  // PERFORMANCE OPTIMIZATION: Memoize parseFountain to prevent O(N) AST generation overhead
+  // from repeating multiple times synchronously per keystroke/render loop.
+  const parsedBlocks = useMemo(() => parseFountain(scriptText), [scriptText]);
   const [activeTab, setActiveTab] = useState<"production" | "analysis" | "codex" | "storyEngine" | "research" | "titlePage">("production");
   const [showDirectorHUD, setShowDirectorHUD] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
@@ -405,7 +407,7 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
   };
 
   const getScriptStats = () => {
-    const blocks = parseFountain(scriptText);
+    const blocks = parsedBlocks;
     const charCounts: Record<string, number> = {};
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
@@ -721,7 +723,7 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
             className="absolute inset-0 p-8 font-courier text-lg leading-relaxed pointer-events-none whitespace-pre-wrap break-words overflow-hidden z-0"
             aria-hidden="true"
           >
-            {renderHighlightedText(scriptText)}
+            {renderHighlightedText(scriptText, parsedBlocks)}
           </div>
 
           {/* Input Layer */}
@@ -896,7 +898,6 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
                     <Camera className="w-4 h-4" /> Director's Shot List
                   </h2>
                   {(() => {
-                    const parsedBlocks = parseFountain(scriptText);
                     const shotBlocks = parsedBlocks.filter(b => b.type === 'shot');
                     
                     if (shotBlocks.length === 0) {
@@ -971,7 +972,6 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
                   <ShieldAlert className="w-4 h-4" /> Semantic Firewall
                 </h2>
                 {(() => {
-                  const parsedBlocks = parseFountain(scriptText);
                   const lintedBlocks = parsedBlocks.map((b, i) => ({...b, index: i})).filter(b => b.lintErrors && b.lintErrors.length > 0);
                   
                   if (lintedBlocks.length === 0) {
