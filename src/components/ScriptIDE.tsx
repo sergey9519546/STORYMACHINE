@@ -198,11 +198,8 @@ export default function ScriptIDE({ initialConfig, onOpenStoryMachine, importedS
     });
   }, [initialConfig]);
 
-  // Track panel open/close frequency as biometric signal
   useEffect(() => {
-    if (!engineState) return;
     panelToggleCountRef.current += 1;
-    const freq = panelToggleCountRef.current;
     setEngineState(prev => {
       if (!prev) return prev;
       return {
@@ -211,12 +208,12 @@ export default function ScriptIDE({ initialConfig, onOpenStoryMachine, importedS
           ...prev.directorState,
           playerModel: {
             ...prev.directorState.playerModel,
-            biometrics: { ...prev.directorState.playerModel.biometrics, panelToggleFrequency: freq }
+            biometrics: { ...prev.directorState.playerModel.biometrics, panelToggleFrequency: panelToggleCountRef.current }
           }
         }
       };
     });
-  }, [showDirectorHUD]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [showDirectorHUD]);
 
   const handleScroll = () => {
     if (editorRef.current && highlightRef.current) {
@@ -232,7 +229,6 @@ export default function ScriptIDE({ initialConfig, onOpenStoryMachine, importedS
     const text = e.target.value;
     setScriptText(text);
 
-    // Track keystroke cadence for readTimeTrend biometric
     const now = performance.now();
     keystrokeTimesRef.current.push(now);
     if (keystrokeTimesRef.current.length > 20) keystrokeTimesRef.current.shift();
@@ -243,9 +239,9 @@ export default function ScriptIDE({ initialConfig, onOpenStoryMachine, importedS
       const secondHalf = gaps.slice(Math.floor(gaps.length / 2));
       const avgFirst = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
       const avgSecond = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
-      const trend: 'accelerating' | 'decelerating' | 'stable' =
-        avgSecond < avgFirst * 0.85 ? 'accelerating' :
-        avgSecond > avgFirst * 1.15 ? 'decelerating' : 'stable';
+      let trend: 'accelerating' | 'decelerating' | 'stable' = 'stable';
+      if (avgSecond < avgFirst * 0.85) trend = 'accelerating';
+      else if (avgSecond > avgFirst * 1.15) trend = 'decelerating';
       setEngineState(prev => {
         if (!prev) return prev;
         const bm = prev.directorState.playerModel.biometrics;

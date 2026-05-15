@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion } from "motion/react";
 import { GameState, Choice } from "../types";
 import {
@@ -172,28 +172,37 @@ export default function DirectorPanel({
   const [activeTab, setActiveTab] = useState<string>("scene");
   const [availableIndices, setAvailableIndices] = useState<Set<number>>(new Set(currentScene.choices.map((_, i) => i)));
   const filterRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  // ── QBN frontend loop: filter choices by accumulated qualities ──
+  const choicesKey = useMemo(() => JSON.stringify(currentScene.choices), [currentScene.choices]);
+  const qualitiesKey = useMemo(() => JSON.stringify(directorState.qbnQualities), [directorState.qbnQualities]);
+
   useEffect(() => {
     if (filterRef.current) clearTimeout(filterRef.current);
+    abortRef.current?.abort();
     filterRef.current = setTimeout(() => {
       const choices = currentScene.choices;
       if (choices.length === 0) { setAvailableIndices(new Set()); return; }
+      const controller = new AbortController();
+      abortRef.current = controller;
       fetch('/api/qbn/filter-choices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ choices, qualities: directorState.qbnQualities ?? {} }),
+        signal: controller.signal,
       })
         .then(r => r.json())
         .then((data: { available: Choice[] }) => {
           const availTexts = new Set((data.available ?? []).map(c => c.text));
           setAvailableIndices(new Set(choices.map((c, i) => availTexts.has(c.text) ? i : -1).filter(i => i >= 0)));
         })
-        .catch(() => setAvailableIndices(new Set(choices.map((_, i) => i))));
+        .catch(err => { if (err.name !== 'AbortError') setAvailableIndices(new Set(choices.map((_, i) => i))); });
     }, 400);
-    return () => { if (filterRef.current) clearTimeout(filterRef.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(currentScene.choices), JSON.stringify(directorState.qbnQualities)]);
+    return () => {
+      if (filterRef.current) clearTimeout(filterRef.current);
+      abortRef.current?.abort();
+    };
+  }, [choicesKey, qualitiesKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const SegmentedMeter = ({ value, onChange, max = 100, segments = 10 }: { value: number, onChange: (v: number) => void, max?: number, segments?: number }) => {
     const filledSegments = Math.round((value / max) * segments);
