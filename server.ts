@@ -3,7 +3,7 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { type GoogleGenAI, Type, Modality } from '@google/genai';
-import { getAI } from './server/engine/ai.ts';
+import { getAI, withTimeout } from './server/engine/ai.ts';
 import { rateLimit } from 'express-rate-limit';
 import { Stage } from './server/engine/Stage.ts';
 import { Orchestrator } from './server/engine/Orchestrator.ts';
@@ -57,11 +57,11 @@ function pcmToWav(pcmData: Buffer, sampleRate: number, numChannels: number): Buf
 
 async function generateImageServer(ai: GoogleGenAI, prompt: string): Promise<string | undefined> {
   try {
-    const response = await ai.models.generateContent({
+    const response = await withTimeout(ai.models.generateContent({
       model: GEMINI_IMG_MODEL,
       contents: { parts: [{ text: prompt }] },
       config: { imageConfig: { aspectRatio: '16:9' } },
-    });
+    }), 25_000, 'generateImage');
     for (const part of response.candidates?.[0]?.content?.parts ?? []) {
       if (part.inlineData?.data) {
         return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
@@ -76,14 +76,14 @@ async function generateImageServer(ai: GoogleGenAI, prompt: string): Promise<str
 async function generateAudioServer(ai: GoogleGenAI, text: string): Promise<string | undefined> {
   if (!text) return undefined;
   try {
-    const response = await ai.models.generateContent({
+    const response = await withTimeout(ai.models.generateContent({
       model: GEMINI_TTS_MODEL,
       contents: [{ parts: [{ text }] }],
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } } },
       },
-    });
+    }), 20_000, 'generateAudio');
     const inlineData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
     if (!inlineData?.data || inlineData.data.length === 0) return undefined;
 
@@ -623,7 +623,7 @@ async function startServer() {
   // ── ScriptIDE AI routes ────────────────────────────────────────────────────
   app.post('/api/scriptide/world-build', aiLimiter, asyncHandler(async (req, res) => {
     const beat = requireString(req.body?.beat, 'beat');
-    const response = await ai.models.generateContent({
+    const response = await withTimeout(ai.models.generateContent({
       model: GEMINI_MODEL,
       contents: `SYSTEM ROLE: You are a master screenwriter and world-builder. Your task is to generate or expand a scene based on the user's beat outline.
 
@@ -637,7 +637,7 @@ STRICT CONSTRAINTS:
 
 INPUT: ${beat}
 OUTPUT: Generate the Scene Heading and Action lines.`,
-    });
+    }), 30_000, 'world-build');
     res.json({ result: response.text });
   }));
 
@@ -667,7 +667,7 @@ OUTPUT: Generate the Scene Heading and Action lines.`,
       });
     }
 
-    const response = await ai.models.generateContent({
+    const response = await withTimeout(ai.models.generateContent({
       model: GEMINI_MODEL,
       contents: `SYSTEM ROLE: You are an expert dialogue doctor, specializing in subtext, character voice, and dramatic irony.
 
@@ -682,13 +682,13 @@ INSTRUCTIONS:
 INPUT DIALOGUE: ${dialogue}
 CHARACTER PROFILES: ${JSON.stringify(profiles)}
 OUTPUT: Provide 2 alternative versions of the dialogue exchange, explaining the subtextual strategy used in each.`,
-    });
+    }), 30_000, 'refine-dialogue');
     res.json({ result: response.text });
   }));
 
   app.post('/api/scriptide/analyze-tension', aiLimiter, asyncHandler(async (req, res) => {
     const scene = requireString(req.body?.scene, 'scene');
-    const response = await ai.models.generateContent({
+    const response = await withTimeout(ai.models.generateContent({
       model: GEMINI_MODEL,
       contents: `SYSTEM ROLE: You are a structural script consultant influenced by Hitchcock's theory of suspense.
 
@@ -702,20 +702,20 @@ ANALYSIS CRITERIA:
 
 INPUT SCENE: ${scene}
 OUTPUT: A bulleted diagnostic report with 3 actionable suggestions.`,
-    });
+    }), 30_000, 'analyze-tension');
     res.json({ result: response.text });
   }));
 
   app.post('/api/scriptide/clean-action', aiLimiter, asyncHandler(async (req, res) => {
     const text = requireString(req.body?.text, 'text');
-    const response = await ai.models.generateContent({
+    const response = await withTimeout(ai.models.generateContent({
       model: GEMINI_MODEL,
       contents: `SYSTEM ROLE: You are a strict script editor enforcing a "Semantic Firewall".
 OBJECTIVE: Rewrite the following action block — remove all camera directions and technical jargon. Describe what happens in the world, not what the camera does.
 
 INPUT: ${text}
 OUTPUT: Just the rewritten action text, nothing else.`,
-    });
+    }), 30_000, 'clean-action');
     res.json({ result: response.text });
   }));
 
@@ -731,7 +731,7 @@ OUTPUT: Just the rewritten action text, nothing else.`,
     const want  = requireString(profile.want,  'profile.want');
     const need  = requireString(profile.need,  'profile.need');
 
-    const response = await ai.models.generateContent({
+    const response = await withTimeout(ai.models.generateContent({
       model: GEMINI_MODEL,
       contents: `SYSTEM ROLE: You are a character designer specializing in psychological realism and "Show, Don't Tell".
 
@@ -751,7 +751,7 @@ Want (External Goal): ${want}
 Need (Internal Truth): ${need}
 
 OUTPUT: A visceral character description.`,
-    });
+    }), 30_000, 'character-profile');
     res.json({ result: response.text });
   }));
 
@@ -797,7 +797,7 @@ Validate dialogue against character profiles and flag inconsistencies in dialogu
 Identify whether any comedy misdirection technique is active (clue_delivery, false_safety, desensitization, or none).
 Ensure throughline commentary addresses all active throughlines listed above.`;
 
-    const analysisResponse = await ai.models.generateContent({
+    const analysisResponse = await withTimeout(ai.models.generateContent({
       model: GEMINI_MODEL,
       contents: prompt,
       config: {
@@ -805,7 +805,7 @@ Ensure throughline commentary addresses all active throughlines listed above.`;
         responseMimeType: 'application/json',
         responseSchema: AnalyzeScriptSchema,
       },
-    });
+    }), 45_000, 'analyze-script');
 
     const rawText = (analysisResponse.text ?? '{}')
       .replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();

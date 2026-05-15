@@ -9,6 +9,7 @@ import type {
   EventCard,
   EventProposition,
   GoalMutation,
+  InformationPosition,
 } from './types.ts';
 import { Stage } from './Stage.ts';
 
@@ -103,6 +104,7 @@ export class CausalSpine {
             discovered_by: char_id,
             source_event_id: sourceEventId,
             turn_index: turnIndex,
+            severity: Math.round(existing.confidence * newBelief.confidence * 100),
           };
           this.stage.addBeliefEdge(edge);
           edges.push(edge);
@@ -196,6 +198,33 @@ export class CausalSpine {
         mutations.push(mutation);
       }
 
+      // ── Mutate SUSPECT's goal stack: prepend defensive subgoal ──
+      if (suspect.goalStack) {
+        const repairGoal = {
+          id: randomUUID(),
+          description: `Deflect ${discoverer.name}'s suspicion and protect your position`,
+          value: 85,
+          achieved: false,
+        };
+        this.stage.updateGoalStack(suspectId, {
+          ...suspect.goalStack,
+          instrumental: [repairGoal, ...suspect.goalStack.instrumental],
+          last_planned_at: turnIndex,
+        });
+        const suspectMutation: GoalMutation = {
+          mutation_id: randomUUID(),
+          char_id: suspectId,
+          turn_index: turnIndex,
+          trigger_event_id: triggerEventId,
+          trigger_belief_id: edges[0]?.to_belief_id,
+          mutation_type: 'subgoal_added',
+          description: `${suspect.name} faces scrutiny; added defensive subgoal`,
+          new_subgoal: repairGoal.description,
+        };
+        this.stage.recordGoalMutation(suspectMutation);
+        mutations.push(suspectMutation);
+      }
+
       // ── DramaticPressure on the SUSPECT: confrontation_imminent ──
       const suspectPressure: DramaticPressure = {
         pressure_id: randomUUID(),
@@ -230,7 +259,7 @@ export class CausalSpine {
     return { mutations, pressures };
   }
 
-  // 4. Create and persist a BeatTrace.
+  // 4. Create and persist a BeatTrace. information_position derived from beatType when not given.
   public createBeatTrace(params: {
     triggerEventId: string;
     beatType: BeatType;
@@ -239,7 +268,16 @@ export class CausalSpine {
     locationId: string;
     narrativeSummary: string;
     fountainHint: string;
+    informationPosition?: InformationPosition;
   }): BeatTrace {
+    const defaultPosition: Record<BeatType, InformationPosition> = {
+      inciting_action:         'superior',
+      contradiction_discovered:'parity',
+      goal_mutated:            'superior',
+      pressure_applied:        'superior',
+      revelation:              'parity',
+      turning_point:           'parity',
+    };
     const trace: BeatTrace = {
       beat_id: randomUUID(),
       turn_index: this.stage.getTurnCount(),
@@ -250,9 +288,37 @@ export class CausalSpine {
       causal_chain: params.causalChain,
       narrative_summary: params.narrativeSummary,
       fountain_hint: params.fountainHint,
+      information_position: params.informationPosition ?? defaultPosition[params.beatType],
     };
     this.stage.addBeatTrace(trace);
     return trace;
+  }
+
+  // 5. Determine which agents can observe an event.
+  //    EXAMINE is private; SPEAK/LIE/RELOCATE are visible to all in the same location.
+  public resolveVisibility(
+    entry: ActionLogEntry,
+    allAgents: Array<{ char_id: string; current_location_id: string }>,
+  ): string[] {
+    if (entry.action_type === 'EXAMINE') return [entry.char_id];
+    return allAgents
+      .filter(a => a.current_location_id === entry.location_id)
+      .map(a => a.char_id);
+  }
+
+  // 6. Snapshot of the current causal state for DirectorNode (no AI calls).
+  public summarizeForDirector(turnIndex: number): {
+    recentBeats: BeatTrace[];
+    recentEdges: BeliefEdge[];
+    activeEdgeCount: number;
+  } {
+    const allBeats  = this.stage.getAllBeatTraces();
+    const allEdges  = this.stage.getAllBeliefEdges();
+    return {
+      recentBeats:     allBeats.filter(b => b.turn_index  >= turnIndex - 3),
+      recentEdges:     allEdges.filter(e => e.turn_index  >= turnIndex - 2),
+      activeEdgeCount: allEdges.length,
+    };
   }
 
   // ── Heuristic: shared content words ≥ 40% of the smaller set ───────────────

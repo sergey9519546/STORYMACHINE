@@ -187,6 +187,7 @@ export interface BeliefEdge {
   discovered_by: string;      // char_id holding both beliefs
   source_event_id: string;    // the event that revealed this relationship
   turn_index: number;
+  severity?: number;          // 0–100: product of both beliefs' confidence values
 }
 
 // A recorded mutation to a character's goal stack
@@ -209,12 +210,19 @@ export interface GoalMutation {
 }
 
 // Director bias signal — biases an agent's next action, never puppets them
+// Canonical spec types (UPPERCASE) added alongside legacy snake_case for backward compat.
 export type DramaticPressureType =
   | 'confrontation_imminent'
   | 'evidence_against'
   | 'ally_compromised'
   | 'goal_blocked'
-  | 'revelation_due';
+  | 'revelation_due'
+  | 'CONFRONT'
+  | 'WITHHOLD'
+  | 'ESCALATE'
+  | 'COOL'
+  | 'REDIRECT'
+  | 'REVEAL';
 
 export interface DramaticPressure {
   pressure_id: string;
@@ -237,16 +245,19 @@ export type BeatType =
   | 'revelation'
   | 'turning_point';
 
+export type InformationPosition = 'superior' | 'inferior' | 'parity';
+
 export interface BeatTrace {
   beat_id: string;
   turn_index: number;
   location_id: string;
   trigger_event_id: string;
   beat_type: BeatType;
-  participants: string[];     // char_ids
-  causal_chain: string[];     // event_ids in causal order (oldest first)
-  narrative_summary: string;  // one human-readable sentence
-  fountain_hint: string;      // suggested Fountain treatment for the screenplay
+  participants: string[];          // char_ids
+  causal_chain: string[];          // event_ids in causal order (oldest first)
+  narrative_summary: string;       // one human-readable sentence
+  fountain_hint: string;           // suggested Fountain treatment for the screenplay
+  information_position?: InformationPosition; // audience vs characters knowledge state
 }
 
 // Returned by updateEpistemics() and evaluateRoom() so Orchestrator can feed CausalSpine

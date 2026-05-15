@@ -691,3 +691,305 @@ describe('CausalSpine — source genealogy fallback', () => {
     assert.equal(bobAsSuspect, undefined, 'Discoverer should not be listed as their own suspect');
   });
 });
+
+// ── Phase B — suspect goal mutation, severity, getActiveBeliefEdges ──────────
+
+describe('CausalSpine — suspect defensive goal mutation', () => {
+  it('Alice gets a deflect subgoal when Bob discovers her contradiction', () => {
+    const stage = makeStage();
+    const spine = new CausalSpine(stage);
+
+    const liedBelief: Belief = {
+      id: 'b-lie-def',
+      proposition: 'Alice was home all night reading',
+      confidence: 0.7,
+      source: 'told',
+      source_agent_id: 'alice',
+      source_event_id: 'evt-lie-def',
+      acquired_at: 1,
+    };
+    const witnessedBelief: Belief = {
+      id: 'b-wit-def',
+      proposition: 'Alice was at the library at midnight',
+      confidence: 0.9,
+      source: 'witnessed',
+      acquired_at: 2,
+    };
+    stage.updateAgentBeliefs('bob', [
+      { ...liedBelief, contradicts: ['b-wit-def'] },
+      witnessedBelief,
+    ]);
+
+    const edge = {
+      edge_id: 'edge-def-1',
+      from_belief_id: 'b-lie-def',
+      to_belief_id: 'b-wit-def',
+      edge_type: 'contradicts' as const,
+      discovered_by: 'bob',
+      source_event_id: 'evt-lie-def',
+      turn_index: 2,
+    };
+
+    const { mutations } = spine.processContradiction('bob', [edge], 'evt-lie-def');
+
+    // Alice should also get a defensive mutation
+    const aliceMutation = mutations.find(m => m.char_id === 'alice');
+    assert.ok(aliceMutation, 'Alice should receive a defensive goal mutation');
+    assert.equal(aliceMutation!.mutation_type, 'subgoal_added');
+    assert.ok(
+      aliceMutation!.new_subgoal?.toLowerCase().includes('deflect') ||
+      aliceMutation!.new_subgoal?.toLowerCase().includes('suspicion') ||
+      aliceMutation!.new_subgoal?.toLowerCase().includes('protect'),
+      'Alice subgoal should be defensive',
+    );
+
+    // Alice's goal stack should have the defensive goal at the front
+    const aliceUpdated = stage.getAgent('alice');
+    assert.ok(aliceUpdated?.goalStack?.instrumental[0].description.toLowerCase().match(/deflect|suspicion|protect/));
+  });
+});
+
+describe('CausalSpine — BeliefEdge severity', () => {
+  it('severity equals round(fromConfidence * toConfidence * 100)', () => {
+    const stage = makeStage();
+    const spine = new CausalSpine(stage);
+
+    const fromBelief: Belief = {
+      id: 'b-sev-from',
+      proposition: 'Alice was home all evening',
+      confidence: 0.7,
+      source: 'told',
+      source_agent_id: 'alice',
+      source_event_id: 'evt-sev-1',
+      acquired_at: 1,
+    };
+    const toBelief: Belief = {
+      id: 'b-sev-to',
+      proposition: 'Alice was seen at the docks that evening',
+      confidence: 0.8,
+      source: 'witnessed',
+      acquired_at: 2,
+    };
+    stage.updateAgentBeliefs('bob', [fromBelief, toBelief]);
+
+    const edges = spine.processBeliefUpdate(
+      'bob',
+      [toBelief],
+      'evt-sev-1',
+      true,
+      ['Alice was home all evening'],
+    );
+
+    assert.ok(edges.length >= 1, 'Should produce at least one edge');
+    const edge = edges[0];
+    const expectedSeverity = Math.round(0.7 * 0.8 * 100); // 56
+    assert.equal(edge.severity, expectedSeverity, `severity should be ${expectedSeverity}`);
+
+    // Also verify it was persisted with severity
+    const stored = stage.getAllBeliefEdges();
+    const storedEdge = stored.find(e => e.edge_id === edge.edge_id);
+    assert.ok(storedEdge, 'Edge should be persisted');
+    assert.equal(storedEdge!.severity, expectedSeverity, 'Persisted severity should match');
+  });
+});
+
+describe('Stage — getActiveBeliefEdges', () => {
+  it('returns edges discovered by the given character', () => {
+    const stage = makeStage();
+
+    const fromBelief: Belief = {
+      id: 'b-active-from',
+      proposition: 'The door was locked',
+      confidence: 0.7,
+      source: 'told',
+      acquired_at: 1,
+    };
+    const toBelief: Belief = {
+      id: 'b-active-to',
+      proposition: 'The door was wide open last night',
+      confidence: 0.9,
+      source: 'witnessed',
+      acquired_at: 2,
+    };
+    stage.updateAgentBeliefs('bob', [fromBelief, toBelief]);
+
+    stage.addBeliefEdge({
+      edge_id: 'edge-active-1',
+      from_belief_id: 'b-active-from',
+      to_belief_id: 'b-active-to',
+      edge_type: 'contradicts',
+      discovered_by: 'bob',
+      source_event_id: 'evt-active-1',
+      turn_index: 2,
+      severity: 63,
+    });
+
+    const bobEdges = stage.getActiveBeliefEdges('bob');
+    assert.ok(bobEdges.length >= 1, 'Bob should have at least one active edge');
+    assert.ok(bobEdges.every(e => e.discovered_by === 'bob'), 'All returned edges should be for Bob');
+    assert.equal(bobEdges[0].severity, 63);
+
+    const aliceEdges = stage.getActiveBeliefEdges('alice');
+    assert.equal(aliceEdges.length, 0, 'Alice should have no edges');
+  });
+});
+
+describe('CausalSpine — resolveVisibility', () => {
+  it('EXAMINE is private to the actor only', () => {
+    const stage = makeStage();
+    const spine = new CausalSpine(stage);
+
+    const examineEntry: ActionLogEntry = {
+      action_id: 'evt-exam-vis',
+      timestamp: 1000,
+      char_id: 'bob',
+      location_id: 'room1',
+      action_type: 'EXAMINE',
+      target_char_id: null,
+      content: 'Dust on the mantle.',
+      is_audible: false,
+    };
+
+    const allAgents = [
+      { char_id: 'alice', current_location_id: 'room1' },
+      { char_id: 'bob',   current_location_id: 'room1' },
+    ];
+
+    const visible = spine.resolveVisibility(examineEntry, allAgents);
+    assert.deepEqual(visible, ['bob'], 'EXAMINE should only be visible to the actor');
+  });
+
+  it('SPEAK is visible to all agents in the same location', () => {
+    const stage = makeStage();
+    const spine = new CausalSpine(stage);
+
+    const speakEntry: ActionLogEntry = {
+      action_id: 'evt-speak-vis',
+      timestamp: 1001,
+      char_id: 'alice',
+      location_id: 'room1',
+      action_type: 'SPEAK',
+      target_char_id: null,
+      content: 'The ledger is gone.',
+      is_audible: true,
+    };
+
+    const allAgents = [
+      { char_id: 'alice', current_location_id: 'room1' },
+      { char_id: 'bob',   current_location_id: 'room1' },
+    ];
+
+    const visible = spine.resolveVisibility(speakEntry, allAgents);
+    assert.ok(visible.includes('alice'));
+    assert.ok(visible.includes('bob'));
+  });
+
+  it('SPEAK is not visible to agents in a different location', () => {
+    const stage = makeStage();
+    const spine = new CausalSpine(stage);
+
+    const speakEntry: ActionLogEntry = {
+      action_id: 'evt-speak-diff',
+      timestamp: 1002,
+      char_id: 'alice',
+      location_id: 'room1',
+      action_type: 'SPEAK',
+      target_char_id: null,
+      content: 'Psst — over here.',
+      is_audible: true,
+    };
+
+    const allAgents = [
+      { char_id: 'alice', current_location_id: 'room1' },
+      { char_id: 'bob',   current_location_id: 'library' },
+    ];
+
+    const visible = spine.resolveVisibility(speakEntry, allAgents);
+    assert.ok(visible.includes('alice'));
+    assert.ok(!visible.includes('bob'), 'Bob is in a different room and should not hear Alice');
+  });
+});
+
+describe('CausalSpine — summarizeForDirector', () => {
+  it('returns recentBeats within the last 3 turns', () => {
+    const stage = makeStage();
+    const spine = new CausalSpine(stage);
+
+    // Create beats at various turn indices
+    spine.createBeatTrace({
+      triggerEventId: 'evt-old',
+      beatType: 'inciting_action',
+      participants: ['alice'],
+      causalChain: ['evt-old'],
+      locationId: 'room1',
+      narrativeSummary: 'Old beat.',
+      fountainHint: '',
+    });
+
+    // Record 5 actions to advance turn counter
+    for (let i = 0; i < 5; i++) {
+      stage.recordAction('alice', { action_type: 'SPEAK', content: `line ${i}`, target: null }, 'room1');
+    }
+
+    spine.createBeatTrace({
+      triggerEventId: 'evt-recent',
+      beatType: 'goal_mutated',
+      participants: ['bob'],
+      causalChain: ['evt-recent'],
+      locationId: 'room1',
+      narrativeSummary: 'Recent beat.',
+      fountainHint: '',
+    });
+
+    const turnIndex = stage.getTurnCount();
+    const summary = spine.summarizeForDirector(turnIndex);
+
+    assert.ok(summary.recentBeats.some(b => b.trigger_event_id === 'evt-recent'), 'Recent beat should be included');
+    assert.equal(summary.activeEdgeCount, 0, 'No edges created yet');
+  });
+
+  it('activeEdgeCount reflects stored edges', () => {
+    const stage = makeStage();
+    const spine = new CausalSpine(stage);
+
+    stage.addBeliefEdge({
+      edge_id: 'edge-count-1',
+      from_belief_id: 'b1',
+      to_belief_id: 'b2',
+      edge_type: 'contradicts',
+      discovered_by: 'bob',
+      source_event_id: 'evt-x',
+      turn_index: 1,
+    });
+
+    const summary = spine.summarizeForDirector(1);
+    assert.equal(summary.activeEdgeCount, 1);
+  });
+
+  it('information_position defaults correctly per beatType', () => {
+    const stage = makeStage();
+    const spine = new CausalSpine(stage);
+
+    const contrad = spine.createBeatTrace({
+      triggerEventId: 'e1',
+      beatType: 'contradiction_discovered',
+      participants: ['alice', 'bob'],
+      causalChain: ['e1'],
+      locationId: 'room1',
+      narrativeSummary: 'Contradiction.',
+      fountainHint: '',
+    });
+    assert.equal(contrad.information_position, 'parity');
+
+    const inciting = spine.createBeatTrace({
+      triggerEventId: 'e2',
+      beatType: 'inciting_action',
+      participants: ['alice'],
+      causalChain: ['e2'],
+      locationId: 'room1',
+      narrativeSummary: 'Inciting.',
+      fountainHint: '',
+    });
+    assert.equal(inciting.information_position, 'superior');
+  });
+});

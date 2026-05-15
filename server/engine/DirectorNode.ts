@@ -121,6 +121,9 @@ export class DirectorNode {
       this._checkConsistency(location_id, agentsInRoom.map(a => a.char_id));
     }
 
+    // ── J: Belief-Edge pressure — read high-severity edges, emit canonical pressure ──
+    this._checkBeliefEdges(location_id);
+
     return epistemicUpdates;
   }
 
@@ -366,6 +369,41 @@ From ${observer.name}'s perspective only:
         applied: false,
       });
       console.log(`[Director] Consistency alert for ${agent.name}: ${contradicted.length} contradiction(s)`);
+    }
+  }
+
+  // ── J: Belief-Edge pressure ──
+  // Reads the deterministic contradiction graph and emits canonical CONFRONT/WITHHOLD/etc.
+  // pressure for any agent whose belief edges reach the high-severity threshold.
+  // Guards against duplicate pressure for the same trigger event.
+  private _checkBeliefEdges(location_id: string): void {
+    const agents = this.stage.getAgentsInLocation(location_id);
+    const turnIndex = this.stage.getTurnCount();
+
+    for (const agent of agents) {
+      const edges = this.stage.getActiveBeliefEdges(agent.char_id);
+      const highEdges = edges.filter(e => (e.severity ?? 0) >= 50);
+      if (highEdges.length === 0) continue;
+
+      // Use the most severe unaddressed edge
+      const worst = highEdges.sort((a, b) => (b.severity ?? 0) - (a.severity ?? 0))[0];
+
+      // Skip if we already have active pressure from this event
+      const existing = this.stage.getActivePressures(agent.char_id);
+      if (existing.some(p => p.trigger_event_id === worst.source_event_id)) continue;
+
+      this.stage.addDramaticPressure({
+        pressure_id: randomUUID(),
+        target_char_id: agent.char_id,
+        trigger_event_id: worst.source_event_id,
+        pressure_type: 'CONFRONT',
+        intensity: Math.min(100, Math.round((worst.severity ?? 50) + 20)),
+        bias_hint: `A high-severity contradiction in your belief system demands resolution. You cannot remain passive — act on what you know.`,
+        expires_at_turn: turnIndex + 4,
+        applied: false,
+      });
+
+      console.log(`[Director] High-severity edge (${worst.severity?.toFixed(0)}) → CONFRONT pressure on ${agent.name}`);
     }
   }
 

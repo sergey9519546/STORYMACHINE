@@ -113,7 +113,8 @@ export class Stage {
         edge_type TEXT NOT NULL,
         discovered_by TEXT NOT NULL,
         source_event_id TEXT NOT NULL,
-        turn_index INTEGER NOT NULL
+        turn_index INTEGER NOT NULL,
+        severity REAL
       );
 
       CREATE TABLE IF NOT EXISTS Goal_Mutations (
@@ -149,7 +150,8 @@ export class Stage {
         participants_json TEXT NOT NULL DEFAULT '[]',
         causal_chain_json TEXT NOT NULL DEFAULT '[]',
         narrative_summary TEXT NOT NULL,
-        fountain_hint TEXT NOT NULL
+        fountain_hint TEXT NOT NULL,
+        information_position TEXT
       );
 
       CREATE INDEX IF NOT EXISTS idx_actionlog_location
@@ -413,37 +415,42 @@ export class Stage {
 
   public addBeliefEdge(edge: BeliefEdge): void {
     this.db.prepare(`
-      INSERT OR IGNORE INTO Belief_Edges (edge_id, from_belief_id, to_belief_id, edge_type, discovered_by, source_event_id, turn_index)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(edge.edge_id, edge.from_belief_id, edge.to_belief_id, edge.edge_type, edge.discovered_by, edge.source_event_id, edge.turn_index);
+      INSERT OR IGNORE INTO Belief_Edges (edge_id, from_belief_id, to_belief_id, edge_type, discovered_by, source_event_id, turn_index, severity)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(edge.edge_id, edge.from_belief_id, edge.to_belief_id, edge.edge_type, edge.discovered_by, edge.source_event_id, edge.turn_index, edge.severity ?? null);
+  }
+
+  private _parseEdgeRow(r: Record<string, unknown>): BeliefEdge {
+    return {
+      edge_id: r.edge_id as string,
+      from_belief_id: r.from_belief_id as string,
+      to_belief_id: r.to_belief_id as string,
+      edge_type: r.edge_type as BeliefEdge['edge_type'],
+      discovered_by: r.discovered_by as string,
+      source_event_id: r.source_event_id as string,
+      turn_index: r.turn_index as number,
+      severity: r.severity != null ? (r.severity as number) : undefined,
+    };
   }
 
   public getBeliefEdgesForBelief(belief_id: string): BeliefEdge[] {
     const rows = this.db.prepare(
       'SELECT * FROM Belief_Edges WHERE from_belief_id = ? OR to_belief_id = ?'
     ).all(belief_id, belief_id) as Array<Record<string, unknown>>;
-    return rows.map(r => ({
-      edge_id: r.edge_id as string,
-      from_belief_id: r.from_belief_id as string,
-      to_belief_id: r.to_belief_id as string,
-      edge_type: r.edge_type as BeliefEdge['edge_type'],
-      discovered_by: r.discovered_by as string,
-      source_event_id: r.source_event_id as string,
-      turn_index: r.turn_index as number,
-    }));
+    return rows.map(r => this._parseEdgeRow(r));
   }
 
   public getAllBeliefEdges(): BeliefEdge[] {
     const rows = this.db.prepare('SELECT * FROM Belief_Edges ORDER BY turn_index ASC').all() as Array<Record<string, unknown>>;
-    return rows.map(r => ({
-      edge_id: r.edge_id as string,
-      from_belief_id: r.from_belief_id as string,
-      to_belief_id: r.to_belief_id as string,
-      edge_type: r.edge_type as BeliefEdge['edge_type'],
-      discovered_by: r.discovered_by as string,
-      source_event_id: r.source_event_id as string,
-      turn_index: r.turn_index as number,
-    }));
+    return rows.map(r => this._parseEdgeRow(r));
+  }
+
+  // All contradiction edges belonging to a specific agent (by discovered_by).
+  public getActiveBeliefEdges(char_id: string): BeliefEdge[] {
+    const rows = this.db.prepare(
+      'SELECT * FROM Belief_Edges WHERE discovered_by = ? ORDER BY turn_index DESC'
+    ).all(char_id) as Array<Record<string, unknown>>;
+    return rows.map(r => this._parseEdgeRow(r));
   }
 
   public recordGoalMutation(mutation: GoalMutation): void {
@@ -512,12 +519,12 @@ export class Stage {
   public addBeatTrace(trace: BeatTrace): void {
     this.db.prepare(`
       INSERT INTO Beat_Traces (beat_id, turn_index, location_id, trigger_event_id, beat_type,
-        participants_json, causal_chain_json, narrative_summary, fountain_hint)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        participants_json, causal_chain_json, narrative_summary, fountain_hint, information_position)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       trace.beat_id, trace.turn_index, trace.location_id, trace.trigger_event_id,
       trace.beat_type, JSON.stringify(trace.participants), JSON.stringify(trace.causal_chain),
-      trace.narrative_summary, trace.fountain_hint,
+      trace.narrative_summary, trace.fountain_hint, trace.information_position ?? null,
     );
   }
 
@@ -542,6 +549,7 @@ export class Stage {
       causal_chain: safeJsonParse<string[]>(r.causal_chain_json as string, []),
       narrative_summary: r.narrative_summary as string,
       fountain_hint: r.fountain_hint as string,
+      information_position: r.information_position as BeatTrace['information_position'] ?? undefined,
     }));
   }
 }
