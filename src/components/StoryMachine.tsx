@@ -5,7 +5,11 @@ import type {
   ActionLogEntry,
 } from "../../server/engine/types";
 
-export default function StoryMachine() {
+interface StoryMachineProps {
+  onClose?: () => void;
+}
+
+export default function StoryMachine({ onClose }: StoryMachineProps) {
   const [agents, setAgents] = useState<CharacterSheet[]>([]);
   const [nodes, setNodes] = useState<Location[]>([]);
   const [ledger, setLedger] = useState<ActionLogEntry[]>([]);
@@ -140,9 +144,7 @@ export default function StoryMachine() {
         </div>
         <div className="flex gap-4">
           <button
-            onClick={() =>
-              window.dispatchEvent(new CustomEvent("close-story-machine"))
-            }
+            onClick={onClose}
             className="bg-white text-black px-4 py-2 font-bold uppercase tracking-wider brutal-border brutal-shadow-hover hover:bg-gray-100 transition-colors"
           >
             Back to IDE

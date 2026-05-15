@@ -506,7 +506,7 @@ export async function generateInitialState(config: StoryConfig): Promise<GameSta
 
   // 1. Generate Character
   const charResponse = await getAI().models.generateContent({
-    model: "gemini-3.1-pro-preview",
+    model: "gemini-2.5-pro",
     contents: `Create a compelling protagonist for a psychological thriller graphic novel based on the theme: "${config.theme}". 
     Additional Backstory/Information: "${config.backstory || "None provided"}".
     Build the character on a Ghost -> Lie -> Want/Need foundation. Avoid Mary Sue traits. Include deep psychological traits and speech patterns.`,
@@ -593,7 +593,7 @@ Use the provided schema to output your internal state and the next scene. Includ
 `;
 
   const dirResponse = await getAI().models.generateContent({
-    model: "gemini-3.1-pro-preview",
+    model: "gemini-2.5-pro",
     contents: initialPrompt,
     config: {
       responseMimeType: "application/json",
@@ -771,7 +771,7 @@ export async function analyzeScriptBlock(
   `;
 
   const response = await getAI().models.generateContent({
-    model: 'gemini-3.1-pro-preview',
+    model: 'gemini-2.5-pro',
     contents: prompt,
     config: {
       systemInstruction: `You are the AI Director, a strict narrative dungeon master enforcing psychological and structural rules of screenwriting. You analyze script text and provide deep narrative insights and cinematic direction.`,
@@ -947,7 +947,7 @@ export async function analyzeScriptBlock(
     .replace(/```json\n?/g, "")
     .replace(/```\n?/g, "")
     .trim();
-  const analysisData = safeJsonParse(cleanText, null);
+  const analysisData = safeJsonParse<{sceneAnalysis: any; updatedDirectorState: any} | null>(cleanText, null);
   if (!analysisData) {
     throw new Error("Failed to parse analysis data.");
   }
@@ -1041,7 +1041,7 @@ CRITICAL FORMATTING RULE: The narrativeText MUST be formatted strictly as a prof
 `;
 
   const dirResponse = await getAI().models.generateContent({
-    model: "gemini-3.1-pro-preview",
+    model: "gemini-2.5-pro",
     contents: prompt,
     config: {
       responseMimeType: "application/json",

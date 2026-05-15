@@ -52,6 +52,15 @@ export class Stage {
           content TEXT NOT NULL,
           is_audible INTEGER DEFAULT 1
       );
+
+      CREATE INDEX IF NOT EXISTS idx_actionlog_location
+        ON Action_Log(location_id, is_audible, timestamp);
+
+      CREATE INDEX IF NOT EXISTS idx_knowledge_char
+        ON Knowledge_Ledger(char_id);
+
+      CREATE INDEX IF NOT EXISTS idx_charstate_location
+        ON Character_State(current_location_id);
     `);
   }
 

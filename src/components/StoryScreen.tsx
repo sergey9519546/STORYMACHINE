@@ -95,9 +95,9 @@ export default function StoryScreen({
   };
 
   const trinityStateData = {
-    id: currentScene.commentary?.evaluatorScores?.ego || 0.3,
-    ego: currentScene.commentary?.evaluatorScores?.superego || 0.6,
-    superego: currentScene.commentary?.evaluatorScores?.storymind || 0.4,
+    id: currentScene.commentary?.evaluatorScores?.narrator || 0.3,
+    ego: currentScene.commentary?.evaluatorScores?.ego || 0.6,
+    superego: currentScene.commentary?.evaluatorScores?.superego || 0.4,
     activeDefense: state.protagonist.psychology.defenseMechanisms?.[0] || 'rationalization'
   };
 

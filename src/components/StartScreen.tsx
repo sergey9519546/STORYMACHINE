@@ -610,9 +610,9 @@ export default function StartScreen({
                           </div>
                         </div>
                         {percentage > 90 ? (
-                          <AlertTriangle className="w-3 h-3 text-red-400" title="Approaching context limit" />
+                          <AlertTriangle className="w-3 h-3 text-red-400" aria-label="Approaching context limit" />
                         ) : (
-                          <Info className="w-3 h-3 text-gray-400" title="Estimated token count for AI context" />
+                          <Info className="w-3 h-3 text-gray-400" aria-label="Estimated token count for AI context" />
                         )}
                       </div>
                     );
@@ -634,7 +634,7 @@ export default function StartScreen({
                   icon={Settings}
                   options={EXPLAINERS.format}
                   selectedValue={format}
-                  onSelect={setFormat}
+                  onSelect={(val) => setFormat(val as StoryConfig["format"])}
                 />
               </motion.div>
             )}
@@ -652,7 +652,7 @@ export default function StartScreen({
                   icon={Settings}
                   options={EXPLAINERS.structure}
                   selectedValue={structure}
-                  onSelect={setStructure}
+                  onSelect={(val) => setStructure(val as StoryConfig["structure"])}
                 />
               </motion.div>
             )}
@@ -670,7 +670,7 @@ export default function StartScreen({
                   icon={Settings}
                   options={EXPLAINERS.directorStyle}
                   selectedValue={directorStyle}
-                  onSelect={setDirectorStyle}
+                  onSelect={(val) => setDirectorStyle(val as StoryConfig["directorStyle"])}
                 />
               </motion.div>
             )}
@@ -688,7 +688,7 @@ export default function StartScreen({
                   icon={Settings}
                   options={EXPLAINERS.emotionalArc}
                   selectedValue={emotionalArc}
-                  onSelect={setEmotionalArc}
+                  onSelect={(val) => setEmotionalArc(val as StoryConfig["emotionalArc"])}
                 />
               </motion.div>
             )}

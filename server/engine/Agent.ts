@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 import type { CharacterSheet, NarrativeAction, ActionLogEntry, Location } from './types.ts';
 import { Stage } from './Stage.ts';
 import { safeJsonParse } from "../../src/lib/json.ts";
@@ -34,17 +34,17 @@ export class Agent {
     const prompt = this.buildPrompt(currentNode, sensoryFilter, otherAgents);
 
     const response = await this.ai.models.generateContent({
-      model: 'gemini-3.1-pro-preview',
+      model: 'gemini-2.5-pro',
       contents: prompt,
       config: {
         systemInstruction: `You are playing the role of ${this.sheet.name}. You must output a strict JSON object representing your next action.`,
         responseMimeType: 'application/json',
         responseSchema: {
-          type: "OBJECT" as any,
+          type: Type.OBJECT,
           properties: {
-            action_type: { type: "STRING" as any, enum: ['SPEAK', 'EXAMINE', 'LIE', 'RELOCATE'] },
-            target: { type: "STRING" as any, nullable: true, description: 'The name of the character being spoken to, or room moving to.' },
-            content: { type: "STRING" as any, description: 'The actual dialogue spoken or action taken.' }
+            action_type: { type: Type.STRING, enum: ['SPEAK', 'EXAMINE', 'LIE', 'RELOCATE'] },
+            target: { type: Type.STRING, nullable: true, description: 'The name of the character being spoken to, or room moving to.' },
+            content: { type: Type.STRING, description: 'The actual dialogue spoken or action taken.' }
           },
           required: ['action_type', 'content']
         }
@@ -95,16 +95,16 @@ Based on your motives and the current tension, choose your next action and outpu
       2. newKnowledge: Any new facts you have deduced or learned (array of strings). Return an empty array if nothing new.`;
 
     const response = await this.ai.models.generateContent({
-      model: 'gemini-3.1-pro-preview',
+      model: 'gemini-2.5-pro',
       contents: prompt,
       config: {
         systemInstruction: `You are evaluating the state of the world as ${this.sheet.name}. Update your internal state based on recent events.`,
         responseMimeType: 'application/json',
         responseSchema: {
-          type: "OBJECT" as any,
+          type: Type.OBJECT,
           properties: {
-            newSuspicionScore: { type: "INTEGER" as any },
-            newKnowledge: { type: "ARRAY" as any, items: { type: "STRING" as any } }
+            newSuspicionScore: { type: Type.INTEGER },
+            newKnowledge: { type: Type.ARRAY, items: { type: Type.STRING } }
           },
           required: ['newSuspicionScore', 'newKnowledge']
         }
@@ -119,8 +119,12 @@ Based on your motives and the current tension, choose your next action and outpu
     }
     
     if (result.newKnowledge && result.newKnowledge.length > 0) {
-      this.sheet.knowledge_vector = [...new Set([...this.sheet.knowledge_vector, ...result.newKnowledge])];
-      this.stage.updateAgentKnowledge(this.sheet.char_id, this.sheet.knowledge_vector);
+      const existingSet = new Set(this.sheet.knowledge_vector);
+      const newFacts = result.newKnowledge.filter((f: string) => !existingSet.has(f));
+      if (newFacts.length > 0) {
+        this.sheet.knowledge_vector = [...this.sheet.knowledge_vector, ...newFacts];
+        this.stage.updateAgentKnowledge(this.sheet.char_id, newFacts);
+      }
     }
   }
 }

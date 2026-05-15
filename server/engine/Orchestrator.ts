@@ -82,11 +82,11 @@ export class Orchestrator {
           if (targetLoc) {
             console.log(`[Orchestrator] ${currentSheet.name} relocated to ${targetLoc.name}. Breaking Dialogue Lock.`);
             this.stage.updateAgentLocation(agentSheet.char_id, targetLoc.location_id);
-            // Break the conversation lock if someone leaves
+            turnCount++;
             break;
           }
         }
-        
+
         turnCount++;
         if (turnCount >= maxTurns) break;
       }

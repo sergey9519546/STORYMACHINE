@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { EngineState, StoryConfig, ScriptBlock } from "../types";
 import { analyzeScriptBlock } from "../services/director";
 import { parseFountain, FountainBlock } from "../lib/fountain";
 import { safeJsonParse } from "../lib/json";
-import { Loader2, Play, Settings2, BookOpen, Film, Mic, User, MessageSquare, MapPin, Activity, Sparkles, ShieldAlert, Camera, Download, Layers, Save, Trash2, History, BarChart3, Users } from "lucide-react";
+import { Loader2, Settings2, BookOpen, Film, Mic, Activity, Sparkles, ShieldAlert, Camera, Download, Layers, Save, Trash2, History, BarChart3, Users, Map as MapIcon } from "lucide-react";
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, 
   PieChart, Pie, Cell 
@@ -13,8 +13,18 @@ import Sidebar from "./Sidebar";
 import AIPanel from "./AIPanel";
 import DirectorPanel from "./DirectorPanel";
 
+interface Character {
+  id: string;
+  name: string;
+  ghost: string;
+  lie: string;
+  want: string;
+  need: string;
+}
+
 interface ScriptIDEProps {
   initialConfig: StoryConfig;
+  onOpenStoryMachine?: () => void;
 }
 
 const SCRIPT_ELEMENTS = {
@@ -23,6 +33,9 @@ const SCRIPT_ELEMENTS = {
   PARENTHETICAL: /^(\(.*\))$/,
   TRANSITION: /^(CUT TO:|FADE IN:|FADE OUT:|DISSOLVE TO:)$/i,
 };
+
+// Stable decorative bar heights — avoids Math.random() in render path
+const TENSION_BARS = [42, 67, 31, 88, 55, 23, 76, 44, 91, 38, 62, 17, 84, 50, 29, 73, 46, 95, 33, 60];
 
 const renderHighlightedText = (text: string) => {
   const lines = text.split('\n');
@@ -61,7 +74,7 @@ const renderHighlightedText = (text: string) => {
   });
 };
 
-export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
+export default function ScriptIDE({ initialConfig, onOpenStoryMachine }: ScriptIDEProps) {
   const [engineState, setEngineState] = useState<EngineState | null>(null);
   const [scriptText, setScriptText] = useState<string>(() => localStorage.getItem('script_draft') || "");
   const [activeTab, setActiveTab] = useState<"production" | "analysis" | "codex" | "storyEngine" | "research" | "titlePage">("production");
@@ -77,7 +90,7 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
   
   const [actionModal, setActionModal] = useState<{ show: boolean; charName: string; cursor: number }>({ show: false, charName: "", cursor: 0 });
   const [actionInput, setActionInput] = useState("");
-  const [characters, setCharacters] = useState<any[]>(() => safeJsonParse(localStorage.getItem('script_characters'), []));
+  const [characters, setCharacters] = useState<Character[]>(() => safeJsonParse(localStorage.getItem('script_characters'), []));
   const [directorsLayer, setDirectorsLayer] = useState(false);
   const [isCleaning, setIsCleaning] = useState<number | null>(null);
   
@@ -160,14 +173,20 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
     }
   };
 
+  const highlightedText = useMemo(() => renderHighlightedText(scriptText), [scriptText]);
+  const parsedBlocks = useMemo(() => parseFountain(scriptText), [scriptText]);
+
   const handleScriptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value;
     setScriptText(text);
 
     if (isTypewriterSound) {
-      const audio = new Audio('https://www.soundjay.com/communication/typewriter-key-1.mp3');
-      audio.volume = 0.1;
-      audio.play().catch(() => {});
+      if (!audioRef.current) {
+        audioRef.current = new Audio('https://www.soundjay.com/communication/typewriter-key-1.mp3');
+        audioRef.current.volume = 0.1;
+      }
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(() => {});
     }
 
     // Sync scroll
@@ -393,8 +412,9 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
 
       const newText = data.result;
       const blocks = parseFountain(scriptText);
-      blocks[index].text = newText;
-      const newScript = blocks.map(b => b.text).join('\n');
+      const updatedBlocks = [...blocks];
+      updatedBlocks[index] = { ...updatedBlocks[index], text: newText };
+      const newScript = updatedBlocks.map(b => b.text).join('\n');
       setScriptText(newScript);
       triggerAnalysis(newScript);
     } catch (err) {
@@ -436,7 +456,7 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
     return { charData, locData, dialogueLines, actionLines, wordCount, estimatedMinutes };
   };
 
-  const stats = getScriptStats();
+  const stats = useMemo(() => getScriptStats(), [scriptText]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const takeSnapshot = () => {
     const name = prompt("Enter snapshot name:", `Version ${snapshots.length + 1}`);
@@ -447,7 +467,7 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
         text: scriptText,
         date: new Date().toLocaleString()
       };
-      setSnapshots([newSnapshot, ...snapshots]);
+      setSnapshots([newSnapshot, ...snapshots].slice(0, 20));
     }
   };
 
@@ -523,7 +543,7 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
 
         <div className="bg-white dark:bg-zinc-800 p-4 brutal-border-thick brutal-shadow">
           <h3 className="text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
-            <Map className="w-4 h-4" /> Top Locations
+            <MapIcon className="w-4 h-4" /> Top Locations
           </h3>
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
@@ -705,8 +725,8 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
             >
               <Download className="w-3 h-3" /> Export .Fountain
             </button>
-            <button 
-              onClick={() => window.dispatchEvent(new CustomEvent('open-story-machine'))}
+            <button
+              onClick={onOpenStoryMachine}
               className="bg-[#FF4444] text-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-colors brutal-border"
             >
               Launch Machine
@@ -721,7 +741,7 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
             className="absolute inset-0 p-8 font-courier text-lg leading-relaxed pointer-events-none whitespace-pre-wrap break-words overflow-hidden z-0"
             aria-hidden="true"
           >
-            {renderHighlightedText(scriptText)}
+            {highlightedText}
           </div>
 
           {/* Input Layer */}
@@ -839,11 +859,11 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
                     <div className="space-y-4">
                       <h3 className="text-[10px] font-bold uppercase opacity-50">Narrative Tension</h3>
                       <div className="h-40 flex items-end gap-1 bg-zinc-50 dark:bg-zinc-950 p-2 brutal-border">
-                        {[...Array(20)].map((_, i) => (
-                          <div 
-                            key={i} 
-                            className="flex-1 bg-black dark:bg-white" 
-                            style={{ height: `${Math.random() * 100}%`, opacity: 0.1 + (i * 0.04) }}
+                        {TENSION_BARS.map((h, i) => (
+                          <div
+                            key={i}
+                            className="flex-1 bg-black dark:bg-white"
+                            style={{ height: `${h}%`, opacity: 0.1 + (i * 0.04) }}
                           />
                         ))}
                       </div>
@@ -896,7 +916,6 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
                     <Camera className="w-4 h-4" /> Director's Shot List
                   </h2>
                   {(() => {
-                    const parsedBlocks = parseFountain(scriptText);
                     const shotBlocks = parsedBlocks.filter(b => b.type === 'shot');
                     
                     if (shotBlocks.length === 0) {
@@ -971,7 +990,6 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
                   <ShieldAlert className="w-4 h-4" /> Semantic Firewall
                 </h2>
                 {(() => {
-                  const parsedBlocks = parseFountain(scriptText);
                   const lintedBlocks = parsedBlocks.map((b, i) => ({...b, index: i})).filter(b => b.lintErrors && b.lintErrors.length > 0);
                   
                   if (lintedBlocks.length === 0) {

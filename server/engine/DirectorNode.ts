@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 import { Stage } from './Stage.ts';
 import type { ActionLogEntry } from './types.ts';
 import { safeJsonParse } from "../../src/lib/json.ts";
@@ -47,19 +47,19 @@ export class DirectorNode {
       `Return a JSON array of suspicion updates. For each update, provide the char_id to update, the suspicionDelta (a number between -20 and 20 to add to their score), and a brief reason.`;
 
     const response = await this.ai.models.generateContent({
-      model: 'gemini-3.1-pro-preview',
+      model: 'gemini-2.5-pro',
       contents: prompt,
       config: {
         systemInstruction: `You are the Director Node. You analyze transcripts and update the psychological tension (suspicion scores) of the agents based on lies, contradictions, and suspicious behavior.`,
         responseMimeType: 'application/json',
         responseSchema: {
-          type: "ARRAY" as any,
+          type: Type.ARRAY,
           items: {
-            type: "OBJECT" as any,
+            type: Type.OBJECT,
             properties: {
-              char_id: { type: "STRING" as any },
-              suspicionDelta: { type: "INTEGER" as any },
-              reason: { type: "STRING" as any }
+              char_id: { type: Type.STRING },
+              suspicionDelta: { type: Type.INTEGER },
+              reason: { type: Type.STRING }
             },
             required: ['char_id', 'suspicionDelta', 'reason']
           }
@@ -67,7 +67,7 @@ export class DirectorNode {
       }
     });
 
-    const updates = safeJsonParse(response.text || '[]', []);
+    const updates = safeJsonParse<Array<{char_id: string; suspicionDelta: number; reason: string}>>(response.text || '[]', []);
     
     for (const update of updates) {
       const agent = this.stage.getAgent(update.char_id);
