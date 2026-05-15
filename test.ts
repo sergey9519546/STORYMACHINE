@@ -543,6 +543,57 @@ describe('Stage — spine table isolation', () => {
   });
 });
 
+describe('Stage — getAllGoalMutations', () => {
+  it('returns mutations across all characters', () => {
+    const stage = makeStage();
+    const spine = new CausalSpine(stage);
+
+    // Give Bob a belief sourced from Alice so the spine fires for both
+    const fromBelief: Belief = {
+      id: 'b-bulk-from',
+      proposition: 'Alice never left the house',
+      confidence: 0.7,
+      source: 'told',
+      source_agent_id: 'alice',
+      source_event_id: 'evt-bulk-1',
+      acquired_at: 1,
+    };
+    const toBelief: Belief = {
+      id: 'b-bulk-to',
+      proposition: 'Alice was spotted outside at midnight',
+      confidence: 0.9,
+      source: 'witnessed',
+      acquired_at: 2,
+    };
+    stage.updateAgentBeliefs('bob', [{ ...fromBelief, contradicts: ['b-bulk-to'] }, toBelief]);
+
+    const edge = {
+      edge_id: 'edge-bulk-1',
+      from_belief_id: 'b-bulk-from',
+      to_belief_id: 'b-bulk-to',
+      edge_type: 'contradicts' as const,
+      discovered_by: 'bob',
+      source_event_id: 'evt-bulk-1',
+      turn_index: 2,
+    };
+    spine.processContradiction('bob', [edge], 'evt-bulk-1');
+
+    const all = stage.getAllGoalMutations();
+    assert.ok(all.length >= 2, 'Should have mutations for both Bob (confront) and Alice (deflect)');
+    assert.ok(all.some(m => m.char_id === 'bob'),   'Bob should have a mutation');
+    assert.ok(all.some(m => m.char_id === 'alice'), 'Alice should have a mutation');
+    // All mutations come back in turn order
+    for (let i = 1; i < all.length; i++) {
+      assert.ok(all[i].turn_index >= all[i - 1].turn_index, 'Mutations should be in turn order');
+    }
+  });
+
+  it('returns empty array on a fresh stage', () => {
+    const stage = makeStage();
+    assert.equal(stage.getAllGoalMutations().length, 0);
+  });
+});
+
 // ── Phase A — withTimeout ──────────────────────────────────────────────────────
 
 describe('withTimeout', () => {

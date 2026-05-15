@@ -515,13 +515,14 @@ async function startServer() {
     const log = simStage.getFullLedger();
     const simAgents = simStage.getAllAgents();
     const simLocations = simStage.getAllLocations();
+    const simBeatTraces = simStage.getAllBeatTraces();
     const fountain = transcriptToFountain(log, simAgents, simLocations, {
       title: typeof title === 'string' ? title : 'Story Machine Draft',
       author: typeof author === 'string' ? author : 'STORYMACHINE',
-    });
+    }, simBeatTraces);
     const characters = extractCharactersFromLog(simAgents);
 
-    res.json({ fountain, characters, turnCount: log.length, agents: simAgents });
+    res.json({ fountain, characters, turnCount: log.length, agents: simAgents, beatTraceCount: simBeatTraces.length });
   }));
 
   // Current Setup/Turn/Prestige illusion phase

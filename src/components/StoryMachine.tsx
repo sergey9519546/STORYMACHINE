@@ -82,9 +82,12 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       fetch("/api/belief-edges"),
       fetch("/api/goal-mutations"),
     ]);
-    if (beatsRes.ok)     setBeatTraces(await beatsRes.json() as BeatTrace[]);
-    if (edgesRes.ok)     setBeliefEdges(await edgesRes.json() as BeliefEdge[]);
-    if (mutationsRes.ok) setGoalMutations(await mutationsRes.json() as GoalMutation[]);
+    if (beatsRes.ok)          setBeatTraces(await beatsRes.json() as BeatTrace[]);
+    else console.error("[spine] beat-traces", beatsRes.status);
+    if (edgesRes.ok)          setBeliefEdges(await edgesRes.json() as BeliefEdge[]);
+    else console.error("[spine] belief-edges", edgesRes.status);
+    if (mutationsRes.ok)      setGoalMutations(await mutationsRes.json() as GoalMutation[]);
+    else console.error("[spine] goal-mutations", mutationsRes.status);
   };
 
   const refreshAll = useCallback(async () => {

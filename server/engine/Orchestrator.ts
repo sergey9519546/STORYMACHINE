@@ -120,6 +120,23 @@ export class Orchestrator {
         } as import('./types.ts').ActionLogEntry;
         this.spine.processEvent(actionEntry, turnIndex);
 
+        // ── inciting_action beat: fired immediately when a LIE is recorded ──
+        if (action.action_type === 'LIE') {
+          const liar = this.stage.getAgent(agentSheet.char_id);
+          const witnesses = this.spine.resolveVisibility(actionEntry,
+            this.stage.getAllAgents().map(a => ({ char_id: a.char_id, current_location_id: a.current_location_id })),
+          ).filter(id => id !== agentSheet.char_id);
+          this.spine.createBeatTrace({
+            triggerEventId: action_id,
+            beatType: 'inciting_action',
+            participants: [agentSheet.char_id, ...witnesses],
+            causalChain: [action_id],
+            locationId: location_id,
+            narrativeSummary: `${liar?.name ?? agentSheet.char_id} plants a false claim that may detonate later.`,
+            fountainHint: `${(liar?.name ?? agentSheet.char_id).toUpperCase()} speaks — but the words cost something. A beat. The room shifts.`,
+          });
+        }
+
         if (action.action_type === 'RELOCATE' && action.target) {
           const targetLoc = this.locationMap.get(action.target.toLowerCase()) ?? this.locationMap.get(action.target);
           if (targetLoc) {
