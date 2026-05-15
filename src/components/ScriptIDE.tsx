@@ -108,6 +108,8 @@ export default function ScriptIDE({ initialConfig, onOpenStoryMachine, importedS
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const highlightRef = useRef<HTMLDivElement>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const panelToggleCountRef = useRef(0);
+  const keystrokeTimesRef = useRef<number[]>([]);
 
   useEffect(() => {
     lsSet('script_draft', scriptText);
@@ -196,6 +198,26 @@ export default function ScriptIDE({ initialConfig, onOpenStoryMachine, importedS
     });
   }, [initialConfig]);
 
+  // Track panel open/close frequency as biometric signal
+  useEffect(() => {
+    if (!engineState) return;
+    panelToggleCountRef.current += 1;
+    const freq = panelToggleCountRef.current;
+    setEngineState(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        directorState: {
+          ...prev.directorState,
+          playerModel: {
+            ...prev.directorState.playerModel,
+            biometrics: { ...prev.directorState.playerModel.biometrics, panelToggleFrequency: freq }
+          }
+        }
+      };
+    });
+  }, [showDirectorHUD]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleScroll = () => {
     if (editorRef.current && highlightRef.current) {
       highlightRef.current.scrollTop = editorRef.current.scrollTop;
@@ -209,6 +231,37 @@ export default function ScriptIDE({ initialConfig, onOpenStoryMachine, importedS
   const handleScriptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value;
     setScriptText(text);
+
+    // Track keystroke cadence for readTimeTrend biometric
+    const now = performance.now();
+    keystrokeTimesRef.current.push(now);
+    if (keystrokeTimesRef.current.length > 20) keystrokeTimesRef.current.shift();
+    if (keystrokeTimesRef.current.length >= 6) {
+      const times = keystrokeTimesRef.current;
+      const gaps = times.slice(1).map((t, i) => t - times[i]);
+      const firstHalf = gaps.slice(0, Math.floor(gaps.length / 2));
+      const secondHalf = gaps.slice(Math.floor(gaps.length / 2));
+      const avgFirst = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
+      const avgSecond = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
+      const trend: 'accelerating' | 'decelerating' | 'stable' =
+        avgSecond < avgFirst * 0.85 ? 'accelerating' :
+        avgSecond > avgFirst * 1.15 ? 'decelerating' : 'stable';
+      setEngineState(prev => {
+        if (!prev) return prev;
+        const bm = prev.directorState.playerModel.biometrics;
+        if (bm.readTimeTrend === trend) return prev;
+        return {
+          ...prev,
+          directorState: {
+            ...prev.directorState,
+            playerModel: {
+              ...prev.directorState.playerModel,
+              biometrics: { ...bm, readTimeTrend: trend }
+            }
+          }
+        };
+      });
+    }
 
     if (isTypewriterSound) {
       try {
