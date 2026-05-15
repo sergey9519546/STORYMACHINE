@@ -1,5 +1,6 @@
-import { GoogleGenAI, Type } from '@google/genai';
+import { Type } from '@google/genai';
 import { randomUUID } from 'crypto';
+import { getAI } from './ai.ts';
 import type {
   CharacterSheet,
   NarrativeAction,
@@ -8,10 +9,12 @@ import type {
   Belief,
   TheoryOfMind,
   DarkTriad,
+  BigFive,
   AttachmentStyle,
   DefenseMechanism,
   BeliefSource,
   EpistemicUpdate,
+  Goal,
 } from './types.ts';
 import { Stage } from './Stage.ts';
 import { safeJsonParse } from '../../src/lib/json.ts';
@@ -60,25 +63,34 @@ function describeActionBias(
   return lines.length > 0 ? lines.join(' ') : 'Choose whichever action best serves your immediate goal.';
 }
 
+function deriveSpeechPattern(bigFive: BigFive | undefined): string {
+  if (!bigFive) return '';
+  const cues: string[] = [];
+  if (bigFive.openness > 70)           cues.push('Use complex vocabulary and abstract metaphors.');
+  if (bigFive.conscientiousness > 70)  cues.push('Speak precisely; complete your thoughts; cite specific facts and timelines.');
+  if (bigFive.extraversion > 70)       cues.push('Fill silences; speak at length; assert rather than question.');
+  else if (bigFive.extraversion < 30)  cues.push('Speak in short bursts; let silences do work for you.');
+  if (bigFive.agreeableness > 70)      cues.push('Hedge statements; ask clarifying questions; avoid direct confrontation.');
+  if (bigFive.neuroticism > 70)        cues.push('Speech fragments under stress; emotion bleeds into your word choice.');
+  return cues.join(' ');
+}
+
+function computeDefenseLevel(neuroticism: number, suspicion: number): string {
+  if (neuroticism > 70 && suspicion > 60) return 'breaking_point — your composure is cracking; concealment is becoming visibly costly';
+  if (neuroticism > 60 || suspicion > 50) return 'high — you are actively working to maintain your facade';
+  if (neuroticism > 40 || suspicion > 30) return 'medium — some unease, but still controlled';
+  return 'low — calm and composed';
+}
+
 // ── Agent class ──────────────────────────────────────────────────────────────
 
 export class Agent {
   private sheet: CharacterSheet;
   private stage: Stage;
-  private _ai: GoogleGenAI | null = null;
 
   constructor(sheet: CharacterSheet, stage: Stage) {
     this.sheet = sheet;
     this.stage = stage;
-  }
-
-  private get ai(): GoogleGenAI {
-    if (!this._ai) {
-      const key = process.env.GEMINI_API_KEY;
-      if (!key) throw new Error('GEMINI_API_KEY environment variable is required');
-      this._ai = new GoogleGenAI({ apiKey: key });
-    }
-    return this._ai;
   }
 
   // Re-hydrate sheet from Stage so we always have current state
@@ -99,34 +111,51 @@ export class Agent {
 
     const prompt = this.buildEnhancedPrompt(currentNode, sensoryFilter, otherAgents);
 
-    const response = await this.ai.models.generateContent({
+    // ── ToT Planning: generate 3 candidates, self-select the best ──
+    const response = await getAI().models.generateContent({
       model: 'gemini-2.5-pro',
       contents: prompt,
       config: {
-        systemInstruction: `You are playing the role of ${this.sheet.name}. You must output a strict JSON object representing your next action.`,
+        systemInstruction: `You are playing the role of ${this.sheet.name}. Generate exactly 3 candidate actions, then score each on how well it serves your goal (0–100). You will take the highest-scoring action.`,
         responseMimeType: 'application/json',
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            action_type: { type: Type.STRING, enum: ['SPEAK', 'EXAMINE', 'LIE', 'RELOCATE'] },
-            target: { type: Type.STRING, nullable: true, description: 'Name of character being addressed, or location name if RELOCATE.' },
-            content: { type: Type.STRING, description: 'The actual dialogue or action description.' },
-            reasoning: { type: Type.STRING, description: 'Internal reasoning (not spoken). How this action serves your goal.' },
+            candidates: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  action_type: { type: Type.STRING, enum: ['SPEAK', 'EXAMINE', 'LIE', 'RELOCATE'] },
+                  target:      { type: Type.STRING, nullable: true },
+                  content:     { type: Type.STRING },
+                  reasoning:   { type: Type.STRING, description: 'Why this action serves your goal.' },
+                  goal_score:  { type: Type.INTEGER, description: '0–100: alignment with current goal.' },
+                },
+                required: ['action_type', 'content', 'reasoning', 'goal_score'],
+              },
+            },
           },
-          required: ['action_type', 'content'],
+          required: ['candidates'],
         },
       },
     });
 
-    const raw = safeJsonParse<NarrativeAction & { reasoning?: string }>(
+    type Candidate = NarrativeAction & { reasoning?: string; goal_score?: number };
+    const raw = safeJsonParse<{ candidates: Candidate[] }>(
       response.text || '{}',
-      { action_type: 'SPEAK', content: '', target: null },
+      { candidates: [{ action_type: 'SPEAK', content: '', target: null }] },
+    );
+
+    const best = (raw.candidates ?? []).reduce<Candidate>(
+      (top, c) => ((c.goal_score ?? 0) > (top.goal_score ?? 0) ? c : top),
+      raw.candidates[0] ?? { action_type: 'SPEAK', content: '', target: null },
     );
 
     return {
-      action_type: raw.action_type,
-      target: raw.target ?? null,
-      content: raw.content,
+      action_type: best.action_type,
+      target: best.target ?? null,
+      content: best.content,
     };
   }
 
@@ -169,6 +198,27 @@ export class Agent {
 
     // ── Psychology block ──
     const actionBias = describeActionBias(this.sheet.darkTriad, this.sheet.attachmentStyle, this.sheet.suspicion_score);
+    const speechPattern = deriveSpeechPattern(this.sheet.bigFive);
+    const defenseLevel = computeDefenseLevel(this.sheet.bigFive?.neuroticism ?? 50, this.sheet.suspicion_score);
+
+    // ── B: Outline Conditioning — IllusionState phase as beat hint ──
+    const illusionPhase = this.stage.getIllusionState().phase;
+    const beatHint = illusionPhase === 'Setup'
+      ? 'NARRATIVE PHASE: SETUP — establish relationships, plant seeds, position for later plays.'
+      : illusionPhase === 'Turn'
+      ? 'NARRATIVE PHASE: TURN — a contradiction has emerged; press toward confrontation or defense.'
+      : 'NARRATIVE PHASE: PRESTIGE — the illusion is collapsing; act as if everything is being recontextualized.';
+
+    // ── D: Dynamic Persuasion — personality-based approach hints per target ──
+    const persuasionHints = otherAgents.map(other => {
+      const bf = other.bigFive;
+      if (!bf) return `  - With ${other.name}: appeal to their self-interest directly.`;
+      if (bf.agreeableness > 70)      return `  - With ${other.name}: use shared-values appeals and appeals to harmony.`;
+      if (bf.openness > 70)           return `  - With ${other.name}: offer novel framing and intellectual arguments.`;
+      if (bf.conscientiousness > 70)  return `  - With ${other.name}: present systematic facts and timelines.`;
+      if (bf.neuroticism > 70)        return `  - With ${other.name}: offer reassurance and certainty.`;
+      return `  - With ${other.name}: direct appeal to their stated self-interest.`;
+    }).join('\n');
 
     // ── Dramatic Pressure (Director's bias signal — consumed once) ──
     const activePressures = this.stage.getActivePressures(this.sheet.char_id);
@@ -184,6 +234,8 @@ ${pressureBlock}
 PSYCHOLOGICAL PROFILE:
 ${describeAttachment(this.sheet.attachmentStyle)}
 ${describeDefenses(this.sheet.defenseMechanisms)}
+CURRENT DEFENSE LEVEL: ${defenseLevel}
+${speechPattern ? `SPEECH PATTERN: ${speechPattern}` : ''}
 
 YOUR CURRENT GOALS:
 ${goalStr}
@@ -203,7 +255,12 @@ ${historyStr}
 
 BEHAVIORAL TENDENCY: ${actionBias}
 
-Choose your next action. Output a NarrativeAction JSON. Use action_type LIE only when you are deliberately saying something you know to be false. RELOCATE only when moving to a specific named location. EXAMINE when observing something without speaking.`;
+${beatHint}
+
+PERSUASION LEVERAGE:
+${persuasionHints || '  (No other agents present.)'}
+
+Generate 3 candidate actions. Score each 0–100 on goal alignment. The best-scoring will be selected.`;
   }
 
   // ── Epistemic update (replaces evaluateState) ────────────────────────────────
@@ -240,6 +297,12 @@ Choose your next action. Output a NarrativeAction JSON. Use action_type LIE only
 
     const otherAgentNames = otherAgentsInRoom.map(a => a.name).join(', ');
 
+    // ToM² context: what do you think others know / believe?
+    const tomSummary = Object.values(this.sheet.theoryOfMind ?? {}).slice(0, 3).map(tom => {
+      const n = this.stage.getAgent(tom.subject_id)?.name ?? tom.subject_id;
+      return `  - You believe ${n} knows: ${tom.believed_knowledge.slice(0, 2).join('; ') || 'nothing confirmed'}`;
+    }).join('\n');
+
     const prompt = `You are ${this.sheet.name}. You just witnessed these events:
 
 ${actionSummary}
@@ -248,13 +311,16 @@ Your existing beliefs: ${currentBeliefsSummary || 'none yet'}
 Others in the room: ${otherAgentNames || 'none'}
 Your motive: ${this.sheet.hidden_motive}
 
+LEVEL-2 THEORY OF MIND (what you think others know):
+${tomSummary || '  (No established models yet.)'}
+
 Based on what you just witnessed:
 1. Has your suspicion level changed? (0-100)
 2. What NEW facts did you learn or deduce? (Be specific propositions)
-3. Update your model of each other agent — what do you now think their motive is? Do you trust them more or less?
+3. Update your model of each other agent — what do you now think their motive is, and what do THEY now think YOU know?
 4. Did anything you observed contradict what you believed?`;
 
-    const response = await this.ai.models.generateContent({
+    const response = await getAI().models.generateContent({
       model: 'gemini-2.5-pro',
       contents: prompt,
       config: {
@@ -300,6 +366,27 @@ Based on what you just witnessed:
               },
             },
             contradiction_detected: { type: Type.BOOLEAN },
+            goal_stack_update: {
+              type: Type.OBJECT,
+              nullable: true,
+              properties: {
+                add_subgoal: { type: Type.STRING, nullable: true, description: 'A new instrumental subgoal to prepend, or null.' },
+                mark_achieved: { type: Type.STRING, nullable: true, description: 'Exact or partial description of the subgoal now achieved, or null.' },
+              },
+            },
+            level2_tom: {
+              type: Type.ARRAY,
+              description: 'Level-2 Theory of Mind: what you now believe each other agent believes about you or the situation.',
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  about_agent: { type: Type.STRING, description: 'Name of the agent whose beliefs you are modeling.' },
+                  they_believe_about_you: { type: Type.STRING },
+                  confidence: { type: Type.NUMBER, description: '0.0-1.0' },
+                },
+                required: ['about_agent', 'they_believe_about_you', 'confidence'],
+              },
+            },
           },
           required: ['newSuspicionScore', 'newBeliefs', 'updatedTheoryOfMind', 'contradiction_detected', 'contradicted_propositions'],
         },
@@ -312,6 +399,8 @@ Based on what you just witnessed:
       updatedTheoryOfMind: Array<{ agent_name: string; believed_motive: string; trust_level: number; new_believed_knowledge?: string[] }>;
       contradiction_detected: boolean;
       contradicted_propositions: string[];
+      goal_stack_update?: { add_subgoal?: string | null; mark_achieved?: string | null } | null;
+      level2_tom?: Array<{ about_agent: string; they_believe_about_you: string; confidence: number }>;
     }>(response.text ?? '{}', {
       newSuspicionScore: this.sheet.suspicion_score,
       newBeliefs: [],
@@ -351,12 +440,15 @@ Based on what you just witnessed:
       if (highConf.length > 0) this.stage.updateAgentKnowledge(this.sheet.char_id, highConf);
     }
 
-    // ── Update theory of mind ──
-    if (result.updatedTheoryOfMind.length > 0) {
+    // ── Update theory of mind + CICERO trust decay ──
+    {
       const currentToM = { ...(this.sheet.theoryOfMind ?? {}) };
+      const observedIds = new Set<string>();
+
       for (const entry of result.updatedTheoryOfMind) {
         const targetAgent = otherAgentsInRoom.find(a => a.name === entry.agent_name);
         if (!targetAgent) continue;
+        observedIds.add(targetAgent.char_id);
         const existing = currentToM[targetAgent.char_id];
         currentToM[targetAgent.char_id] = {
           subject_id: targetAgent.char_id,
@@ -365,10 +457,59 @@ Based on what you just witnessed:
           believed_knowledge: [
             ...(existing?.believed_knowledge ?? []),
             ...(entry.new_believed_knowledge ?? []),
-          ].slice(0, 20), // cap at 20 facts per ToM entry
+          ].slice(0, 20),
         } satisfies TheoryOfMind;
       }
+
+      // E: CICERO trust decay — unobserved agents lose 0.01 trust per update
+      for (const [agentId, tom] of Object.entries(currentToM)) {
+        if (!observedIds.has(agentId)) {
+          currentToM[agentId] = { ...tom, trust_level: Math.max(0, tom.trust_level - 0.01) };
+        }
+      }
+
+      // C: Level-2 ToM — store as extra believed_knowledge entries prefixed "[L2]"
+      for (const l2 of (result.level2_tom ?? [])) {
+        const targetAgent = otherAgentsInRoom.find(a => a.name === l2.about_agent);
+        if (!targetAgent || l2.confidence < 0.4) continue;
+        const entry = currentToM[targetAgent.char_id];
+        if (entry) {
+          const l2Fact = `[L2] They believe about you: ${l2.they_believe_about_you}`;
+          if (!entry.believed_knowledge.includes(l2Fact)) {
+            entry.believed_knowledge = [...entry.believed_knowledge, l2Fact].slice(0, 20);
+          }
+        }
+      }
+
       this.stage.updateTheoryOfMind(this.sheet.char_id, currentToM);
+    }
+
+    // ── Self-directed goal stack mutation ──
+    const gsu = result.goal_stack_update;
+    if (gsu) {
+      this.refreshSheet();
+      const gs = this.sheet.goalStack;
+      if (gs) {
+        let changed = false;
+        if (gsu.add_subgoal) {
+          const newGoal: Goal = { id: randomUUID(), description: gsu.add_subgoal, value: 70, achieved: false };
+          gs.instrumental = [newGoal, ...gs.instrumental];
+          gs.last_planned_at = this.stage.getTurnCount();
+          changed = true;
+        }
+        if (gsu.mark_achieved) {
+          const needle = gsu.mark_achieved.toLowerCase();
+          const idx = gs.instrumental.findIndex(g => g.description.toLowerCase().includes(needle));
+          if (idx >= 0) { gs.instrumental[idx].achieved = true; changed = true; }
+        }
+        if (changed) this.stage.updateGoalStack(this.sheet.char_id, gs);
+      }
+    }
+
+    // ── F: Memory Stream + Reflection (every 5 turns) ──
+    const turnCount = this.stage.getTurnCount();
+    if (turnCount > 0 && turnCount % 5 === 0) {
+      this.synthesizeReflections().catch(() => { /* non-blocking */ });
     }
 
     return {
@@ -378,6 +519,71 @@ Based on what you just witnessed:
       contradicted_propositions: result.contradicted_propositions ?? [],
       source_event_id: observableActions.length > 0 ? observableActions[observableActions.length - 1].action_id : undefined,
     };
+  }
+
+  // ── F: Memory Stream reflection synthesis ────────────────────────────────────
+  // Called every 5 turns: generate 3 high-level insight beliefs from recent memory.
+  private async synthesizeReflections(): Promise<void> {
+    this.refreshSheet();
+    const recentFull = this.stage.getSensoryFilter(this.sheet.current_location_id, 10);
+    if (recentFull.length === 0) return;
+
+    const transcript = recentFull.map(a => {
+      const name = this.stage.getAgent(a.char_id)?.name ?? 'Unknown';
+      return `[${a.action_type}] ${name}: ${a.content}`;
+    }).join('\n');
+
+    const existingBeliefs = (this.sheet.beliefs ?? []).slice(0, 5).map(b => b.proposition).join('; ');
+
+    const response = await getAI().models.generateContent({
+      model: 'gemini-2.5-pro',
+      contents: `You are ${this.sheet.name}. Reflect on these recent events and synthesize exactly 3 high-level insights.\n\nEvents:\n${transcript}\n\nExisting beliefs: ${existingBeliefs || 'none'}\n\nOutput 3 reflective insights that go beyond the surface events — patterns, implications, strategic assessments.`,
+      config: {
+        systemInstruction: `You are ${this.sheet.name} in a reflective moment. Synthesize insights, not observations.`,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            reflections: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  insight: { type: Type.STRING },
+                  confidence: { type: Type.NUMBER, description: '0.0-1.0' },
+                },
+                required: ['insight', 'confidence'],
+              },
+            },
+          },
+          required: ['reflections'],
+        },
+      },
+    });
+
+    const parsed = safeJsonParse<{ reflections: Array<{ insight: string; confidence: number }> }>(
+      response.text ?? '{}',
+      { reflections: [] },
+    );
+
+    const existingBeliefsFull = this.sheet.beliefs ?? [];
+    const existingProps = new Set(existingBeliefsFull.map(b => b.proposition.toLowerCase()));
+
+    const reflectionBeliefs: Belief[] = (parsed.reflections ?? [])
+      .filter(r => r.insight && !existingProps.has(r.insight.toLowerCase()))
+      .slice(0, 3)
+      .map(r => ({
+        id: randomUUID(),
+        proposition: r.insight,
+        confidence: Math.max(0, Math.min(1, r.confidence)),
+        source: 'inferred' as BeliefSource,
+        acquired_at: this.stage.getTurnCount(),
+      }));
+
+    if (reflectionBeliefs.length > 0) {
+      this.stage.updateAgentBeliefs(this.sheet.char_id, [...existingBeliefsFull, ...reflectionBeliefs]);
+      console.log(`[Agent/${this.sheet.name}] Memory reflection: +${reflectionBeliefs.length} insights`);
+    }
   }
 
   // ── Legacy evaluateState — kept for backward compatibility ──────────────────

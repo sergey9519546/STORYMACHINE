@@ -2,12 +2,13 @@ import 'dotenv/config';
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
-import { GoogleGenAI, Type, Modality } from '@google/genai';
+import { type GoogleGenAI, Type, Modality } from '@google/genai';
+import { getAI } from './server/engine/ai.ts';
 import { rateLimit } from 'express-rate-limit';
 import { Stage } from './server/engine/Stage.ts';
 import { Orchestrator } from './server/engine/Orchestrator.ts';
 import type { CharacterSheet, Location } from './server/engine/types.ts';
-import { transcriptToFountain, extractCharactersFromLog } from './server/lib/fountain.ts';
+import { transcriptToFountain, extractCharactersFromLog, syuzhetSort, wrapSyuzhetFountain } from './server/lib/fountain.ts';
 
 // ── Startup validation ────────────────────────────────────────────────────────
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -188,9 +189,10 @@ const AnalyzeScriptSchema = {
           },
           required: ['passed', 'sinCheck', 'horizonCheck', 'subtextGap'],
         },
-        informationPosition: { type: Type.STRING },
-        audioDialogue:       { type: Type.STRING },
-        imagePrompt:         { type: Type.STRING },
+        informationPosition:  { type: Type.STRING },
+        comedyMisdirection:   { type: Type.STRING, enum: ['clue_delivery', 'false_safety', 'desensitization', 'none'], nullable: true },
+        audioDialogue:        { type: Type.STRING },
+        imagePrompt:          { type: Type.STRING },
         extractedDialogue: {
           type: Type.ARRAY,
           items: {
@@ -217,7 +219,7 @@ const AnalyzeScriptSchema = {
         },
       },
       required: ['composition', 'metrics', 'commentary', 'qualityValidation',
-                 'informationPosition', 'audioDialogue', 'imagePrompt'],
+                 'informationPosition', 'audioDialogue', 'imagePrompt', 'comedyMisdirection'],
     },
     updatedDirectorState: {
       type: Type.OBJECT,
@@ -294,14 +296,46 @@ const AnalyzeScriptSchema = {
   required: ['sceneAnalysis', 'updatedDirectorState'],
 };
 
+// ── Session management ────────────────────────────────────────────────────────
+interface Session {
+  stage: Stage;
+  orchestrator: Orchestrator;
+  lastAccess: number;
+}
+const sessions = new Map<string, Session>();
+const SESSION_TTL_MS = 30 * 60 * 1000;
+
+function getOrCreateSession(sessionId: string): Session {
+  let session = sessions.get(sessionId);
+  if (!session) {
+    const s = new Stage(':memory:');
+    session = { stage: s, orchestrator: new Orchestrator(s), lastAccess: Date.now() };
+    sessions.set(sessionId, session);
+  }
+  session.lastAccess = Date.now();
+  return session;
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, s] of sessions) {
+    if (now - s.lastAccess > SESSION_TTL_MS) sessions.delete(id);
+  }
+}, 60_000).unref();
+
+function sessionId(req: express.Request): string {
+  const raw = req.method === 'GET'
+    ? req.query.sessionId
+    : req.body?.sessionId;
+  return typeof raw === 'string' && raw.trim() ? raw.substring(0, 64) : 'default';
+}
+
 // ── Server ────────────────────────────────────────────────────────────────────
 async function startServer() {
   const app = express();
   app.use(express.json({ limit: '1mb' }));
 
-  const stage = new Stage(':memory:');
-  const orchestrator = new Orchestrator(stage);
-  const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+  const ai = getAI();
 
   // ── Story Machine routes (game simulation) ─────────────────────────────────
   app.use('/api/init',     gameLimiter);
@@ -312,6 +346,7 @@ async function startServer() {
 
   app.post('/api/init', asyncHandler(async (req, res) => {
     const { nodes, agents } = req.body;
+    const { orchestrator } = getOrCreateSession(sessionId(req));
 
     if (nodes && Array.isArray(nodes)) {
       (nodes as unknown[]).slice(0, 50).forEach((raw) => {
@@ -351,38 +386,59 @@ async function startServer() {
       });
     }
 
-    res.json({ status: 'initialized' });
+    res.json({ status: 'initialized', sessionId: sessionId(req) });
   }));
 
   app.post('/api/turn', asyncHandler(async (req, res) => {
+    const { orchestrator } = getOrCreateSession(sessionId(req));
     const agentId = requireString(req.body?.agentId, 'agentId', 128);
     const action = await orchestrator.runTurn(agentId);
     res.json({ action });
   }));
 
   app.post('/api/run-room', asyncHandler(async (req, res) => {
+    const { orchestrator } = getOrCreateSession(sessionId(req));
     const nodeId = requireString(req.body?.nodeId, 'nodeId', 128);
     await orchestrator.runRoomSimulation(nodeId);
     res.json({ status: 'completed' });
   }));
 
   app.get('/api/ledger', asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
     res.json(stage.getFullLedger());
   }));
 
   app.get('/api/state', asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
     res.json({ agents: stage.getAllAgents(), nodes: stage.getAllLocations() });
   }));
 
+  // Reset a session (clears all simulation state for this sessionId)
+  app.post('/api/reset', gameLimiter, asyncHandler(async (req, res) => {
+    const sid = sessionId(req);
+    sessions.delete(sid);
+    res.json({ status: 'reset', sessionId: sid });
+  }));
+
   // Export current simulation as a Fountain screenplay draft (with beat traces)
+  // ?syuzhet=true  → Syuzhet reconstruction: reorder by information-reveal order
   app.get('/api/ledger/fountain', gameLimiter, asyncHandler(async (req, res) => {
-    const log = stage.getFullLedger();
+    const { stage } = getOrCreateSession(sessionId(req));
+    const rawLog = stage.getFullLedger();
     const agents = stage.getAllAgents();
     const locations = stage.getAllLocations();
     const beatTraces = stage.getAllBeatTraces();
+    const useSyuzhet = req.query.syuzhet === 'true';
+    const log = useSyuzhet ? syuzhetSort(rawLog, beatTraces) : rawLog;
     const fountain = transcriptToFountain(log, agents, locations, undefined, beatTraces);
     const characters = extractCharactersFromLog(agents);
-    res.json({ fountain, characters, turnCount: log.length, beatTraceCount: beatTraces.length });
+    res.json({
+      fountain: wrapSyuzhetFountain(fountain, useSyuzhet),
+      characters,
+      turnCount: rawLog.length,
+      beatTraceCount: beatTraces.length,
+      syuzhetMode: useSyuzhet,
+    });
   }));
 
   // Run a self-contained simulation and return Fountain output without polluting main stage
@@ -453,6 +509,7 @@ async function startServer() {
 
   // Current Setup/Turn/Prestige illusion phase
   app.get('/api/simulation/illusion-state', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
     res.json(stage.getIllusionState());
   }));
 
@@ -460,11 +517,13 @@ async function startServer() {
 
   // All beat traces (narrative beats with causal chains)
   app.get('/api/beat-traces', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
     res.json(stage.getAllBeatTraces());
   }));
 
   // Active dramatic pressure on a specific agent (bias signals not yet applied)
   app.get('/api/dramatic-pressure/:charId', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
     const charId = req.params.charId?.substring(0, 128);
     if (!charId) { res.status(400).json({ error: 'charId is required' }); return; }
     res.json(stage.getActivePressures(charId));
@@ -472,37 +531,76 @@ async function startServer() {
 
   // All belief edges (contradiction graph)
   app.get('/api/belief-edges', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
     res.json(stage.getAllBeliefEdges());
   }));
 
   // Goal mutations for a specific agent
   app.get('/api/goal-mutations/:charId', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
     const charId = req.params.charId?.substring(0, 128);
     if (!charId) { res.status(400).json({ error: 'charId is required' }); return; }
     res.json(stage.getGoalMutations(charId));
   }));
 
-  // QBN choice filtering — filter available choices by accumulated qualities
+  // QBN choice filtering — filter by accumulated qualities AND consequenceScope ceiling
   app.post('/api/qbn/filter-choices', gameLimiter, asyncHandler(async (req, res) => {
-    const { choices, qualities } = req.body ?? {};
+    const { choices, qualities, maxScope } = req.body ?? {};
     if (!Array.isArray(choices)) {
       res.status(400).json({ error: 'choices must be an array' });
       return;
     }
     const q = typeof qualities === 'object' && qualities !== null
       ? (qualities as Record<string, number>) : {};
+    const scopeOrder: Record<string, number> = { micro: 0, macro: 1, crisis: 2 };
+    const maxScopeLevel = typeof maxScope === 'string' && maxScope in scopeOrder
+      ? scopeOrder[maxScope] : 2;
 
     const available = (choices as unknown[]).filter((raw) => {
       if (typeof raw !== 'object' || raw === null) return false;
       const c = raw as Record<string, unknown>;
+
+      // QBN quality gate
       const reqs = c.qbnRequirements;
-      if (!reqs || typeof reqs !== 'object') return true;
-      return Object.entries(reqs as Record<string, number>).every(
-        ([quality, required]) => (q[quality] ?? 0) >= required,
-      );
+      if (reqs && typeof reqs === 'object') {
+        const passes = Object.entries(reqs as Record<string, number>).every(
+          ([quality, required]) => (q[quality] ?? 0) >= required,
+        );
+        if (!passes) return false;
+      }
+
+      // Consequence scope ceiling
+      const scope = c.consequenceScope as string | undefined;
+      if (scope && scope in scopeOrder && scopeOrder[scope] > maxScopeLevel) return false;
+
+      return true;
     });
 
     res.json({ available, filtered: choices.length - available.length });
+  }));
+
+  // NCP Storyform — derive narrative context protocol schema from goals and throughlines
+  app.post('/api/ncp-storyform', gameLimiter, asyncHandler(async (req, res) => {
+    const { throughlines, characters } = req.body ?? {};
+    const tl = typeof throughlines === 'object' && throughlines !== null ? throughlines as Record<string, unknown> : {};
+    const chars = Array.isArray(characters) ? (characters as unknown[]).slice(0, 10) : [];
+
+    const storyform: Record<string, unknown> = {
+      objectiveStory: tl.objectiveStory ?? null,
+      mainCharacter: {
+        throughline: tl.mainCharacter ?? null,
+        protagonist: chars[0] ?? null,
+      },
+      influenceCharacter: {
+        throughline: tl.influenceCharacter ?? null,
+        character: chars[1] ?? null,
+      },
+      relationshipStory: tl.relationshipStory ?? null,
+      activeThroughlines: Array.isArray(tl.activeThroughlines) ? tl.activeThroughlines : [],
+      computed_at: Date.now(),
+    };
+
+    res.json(storyform);
   }));
 
   // ── ScriptIDE AI routes ────────────────────────────────────────────────────
@@ -648,9 +746,29 @@ OUTPUT: A visceral character description.`,
     const visualAnchor = typeof engineState?.protagonist?.visualAnchor === 'string'
       ? engineState.protagonist.visualAnchor.substring(0, 500) : '';
 
+    // ── Active Codex RAG: inject known facts for consistency ──
+    const activeCodexEntries = Array.isArray(engineState?.directorState?.activeCodexEntries)
+      ? (engineState.directorState.activeCodexEntries as Array<Record<string, string>>).slice(0, 5) : [];
+    const codexBlock = activeCodexEntries.length > 0
+      ? `\n\nRAG MEMORY (active codex — ensure scene is consistent with these facts):\n${activeCodexEntries.map(e => `- [${e.title ?? ''}]: ${e.content ?? ''}`).join('\n')}`
+      : '';
+
+    // ── Information Position bias from previous scene ──
+    const prevInfoPos = typeof engineState?.currentAnalysis?.informationPosition === 'string'
+      ? engineState.currentAnalysis.informationPosition : null;
+    const infoPosBias = prevInfoPos
+      ? `\nPrevious scene information position was "${prevInfoPos}". Consider how this asymmetry should evolve.`
+      : '';
+
+    // ── Throughline context ──
+    const tl = engineState?.directorState?.throughlines as Record<string, unknown> | undefined;
+    const activeTl = Array.isArray(tl?.activeThroughlines) && tl.activeThroughlines.length > 0
+      ? `\nACTIVE THROUGHLINES: ${(tl.activeThroughlines as string[]).join(', ')}. Objective: "${tl.objectiveStory ?? ''}". Relationship: "${tl.relationshipStory ?? ''}".`
+      : '';
+
     const prompt = `Analyze the following screenplay script.
 Current Director State: ${JSON.stringify(engineState?.directorState ?? {}).substring(0, 5000)}
-Characters Profile: ${JSON.stringify(characters).substring(0, 2000)}
+Characters Profile: ${JSON.stringify(characters).substring(0, 2000)}${infoPosBias}${activeTl}${codexBlock}
 
 Script Text:
 ${scriptText.substring(0, 8000)}
@@ -658,7 +776,9 @@ ${scriptText.substring(0, 8000)}
 Provide a detailed SceneAnalysis and updated DirectorState.
 Include cinematic composition, narrative metrics, director commentary, and quality validation.
 Extract the most impactful line of dialogue for TTS (audioDialogue) and a highly detailed imagePrompt for storyboard generation.
-Validate dialogue against character profiles and flag inconsistencies in dialogueInconsistencies.`;
+Validate dialogue against character profiles and flag inconsistencies in dialogueInconsistencies.
+Identify whether any comedy misdirection technique is active (clue_delivery, false_safety, desensitization, or none).
+Ensure throughline commentary addresses all active throughlines listed above.`;
 
     const analysisResponse = await ai.models.generateContent({
       model: GEMINI_MODEL,
@@ -698,9 +818,19 @@ Validate dialogue against character profiles and flag inconsistencies in dialogu
       generateAudioServer(ai, audioText),
     ]);
 
+    // ── 5-Evaluator scoring flags ──
+    const scores = (analysisData.sceneAnalysis.commentary as Record<string, unknown> | undefined)?.evaluatorScores as Record<string, number> | undefined;
+    const evaluatorWarnings: string[] = [];
+    if (scores) {
+      if ((scores.audience ?? 1) < 0.4) evaluatorWarnings.push('LOW_AUDIENCE_SCORE: Scene lacks emotional engagement for the audience.');
+      if ((scores.ego ?? 0) > 0.8)      evaluatorWarnings.push('EGO_SPIKE: Character behaviour is inconsistent with their established psychological profile.');
+      if ((scores.storymind ?? 1) < 0.3) evaluatorWarnings.push('STORYMIND_ALERT: Scene is drifting from the core dramatic argument.');
+    }
+
     res.json({
       sceneAnalysis: { ...analysisData.sceneAnalysis, imageUrl, audioUrl },
       updatedDirectorState: analysisData.updatedDirectorState,
+      evaluatorWarnings,
     });
   }));
 

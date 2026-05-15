@@ -1,5 +1,44 @@
 import type { ActionLogEntry, CharacterSheet, Location, BeatTrace } from '../engine/types.ts';
 
+// ── Syuzhet Reconstruction ───────────────────────────────────────────────────
+// Reorders the action log from chronological (fabula) to information-reveal
+// order (syuzhet). The most dramatic event (a revelation or turning_point beat)
+// becomes the opening; what preceded it is presented as flashback.
+export function syuzhetSort(
+  log: ActionLogEntry[],
+  beatTraces: BeatTrace[],
+): ActionLogEntry[] {
+  if (log.length < 3 || beatTraces.length === 0) return log;
+
+  const PRIORITY: Record<string, number> = { revelation: 3, turning_point: 2, contradiction_discovered: 1 };
+  const highBeats = beatTraces
+    .filter(b => b.beat_type in PRIORITY)
+    .sort((a, b) => (PRIORITY[b.beat_type] ?? 0) - (PRIORITY[a.beat_type] ?? 0));
+
+  const pivotEventId = highBeats[0]?.trigger_event_id;
+  if (!pivotEventId) return log;
+
+  const pivotIdx = log.findIndex(e => e.action_id === pivotEventId);
+  if (pivotIdx <= 0) return log;
+
+  const before  = log.slice(0, pivotIdx);
+  const pivot   = log.slice(pivotIdx);
+
+  // Syuzhet order: climax first → then flashback to the beginning
+  return [...pivot, ...before];
+}
+
+// Inserts FLASHBACK markers into a Fountain output when the log was syuzhet-sorted.
+export function wrapSyuzhetFountain(fountain: string, wasSorted: boolean): string {
+  if (!wasSorted) return fountain;
+  const fadeLine = 'FADE OUT.\n\nTHE END';
+  const marker = '\n\nFLASHBACK — EARLIER\n\n';
+  const pivot = fountain.indexOf('INT. ');
+  const second = fountain.indexOf('INT. ', pivot + 5);
+  if (second === -1) return fountain;
+  return fountain.slice(0, second) + marker + fountain.slice(second).replace(fadeLine, '\n\nEND FLASHBACK\n\n' + fadeLine);
+}
+
 // Converts a Story Machine action log into Fountain screenplay format.
 // LIE actions appear as normal dialogue to the script reader (surface text)
 // but are annotated with a Fountain note for the production team.
@@ -136,9 +175,9 @@ export function extractCharactersFromLog(
 ): Array<{ name: string; ghost: string; lie: string; want: string; need: string }> {
   return agents.map(a => ({
     name: a.name,
-    ghost: `Hidden motive: ${a.hidden_motive}`,
+    ghost: '',
     lie: a.public_mask,
     want: a.hidden_motive,
-    need: 'Unknown — to be determined by the writer',
+    need: '',
   }));
 }

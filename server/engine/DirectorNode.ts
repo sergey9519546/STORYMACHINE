@@ -1,24 +1,16 @@
-import { GoogleGenAI, Type } from '@google/genai';
+import { Type } from '@google/genai';
 import { Stage } from './Stage.ts';
-import type { ActionLogEntry, PerspectiveEvaluation, BeliefSource, EpistemicUpdate } from './types.ts';
+import type { ActionLogEntry, PerspectiveEvaluation, BeliefSource, EpistemicUpdate, IllusionElement } from './types.ts';
 import { safeJsonParse } from '../../src/lib/json.ts';
 import { randomUUID } from 'crypto';
+import { getAI } from './ai.ts';
 
 export class DirectorNode {
   private stage: Stage;
-  private _ai: GoogleGenAI | null = null;
+  private _tensionHistory: number[] = [];  // H: track tension deltas for pivot detection
 
   constructor(stage: Stage) {
     this.stage = stage;
-  }
-
-  private get ai(): GoogleGenAI {
-    if (!this._ai) {
-      const key = process.env.GEMINI_API_KEY;
-      if (!key) throw new Error('GEMINI_API_KEY environment variable is required');
-      this._ai = new GoogleGenAI({ apiKey: key });
-    }
-    return this._ai;
   }
 
   // ── Perspective-bounded room evaluation ─────────────────────────────────────
@@ -112,10 +104,22 @@ export class DirectorNode {
     // ── Advance illusion state based on aggregate tension ──
     const avgTensionDelta = evaluations.reduce((s, e) => s + e.tension_delta, 0) / Math.max(1, evaluations.length);
     const contradictionsFound = evaluations.filter(e => e.contradiction_detected).length;
-    this.advanceIllusionState(avgTensionDelta, contradictionsFound, recentActions.length);
+    this.advanceIllusionState(avgTensionDelta, contradictionsFound);
 
     // Log aggregate tension
     console.log(`[Director] Avg tension delta: ${avgTensionDelta.toFixed(1)}, contradictions: ${contradictionsFound}/${evaluations.length} observers`);
+
+    // ── A: Pacing Controller ──
+    this._checkPacing(location_id, recentActions.length);
+
+    // ── H: Auto-Pivot Detection ──
+    this._detectPivot(location_id, avgTensionDelta, recentActions);
+
+    // ── I: Narrative Consistency Checker (every 5 turns) ──
+    const totalTurns = this.stage.getTurnCount();
+    if (totalTurns > 0 && totalTurns % 5 === 0) {
+      this._checkConsistency(location_id, agentsInRoom.map(a => a.char_id));
+    }
 
     return epistemicUpdates;
   }
@@ -157,7 +161,7 @@ From ${observer.name}'s perspective only:
 3. What new facts did they derive from what they saw/heard?
 4. How has their suspicion of each other person changed?`;
 
-    const response = await this.ai.models.generateContent({
+    const response = await getAI().models.generateContent({
       model: 'gemini-2.5-pro',
       contents: prompt,
       config: {
@@ -254,13 +258,11 @@ From ${observer.name}'s perspective only:
   private advanceIllusionState(
     avgTensionDelta: number,
     contradictionsFound: number,
-    actionsThisTurn: number,
   ): void {
     const state = this.stage.getIllusionState();
-    const totalTurns = state.total_turns + actionsThisTurn;
+    const totalTurns = this.stage.getTurnCount();
 
     let nextPhase = state.phase;
-    const updates: Partial<typeof state> = { total_turns: totalTurns };
 
     if (state.phase === 'Setup' && (totalTurns >= 10 || (avgTensionDelta > 10 && totalTurns >= 5))) {
       nextPhase = 'Turn';
@@ -270,8 +272,96 @@ From ${observer.name}'s perspective only:
       console.log('[Director] Illusion phase: Turn → Prestige');
     }
 
-    if (nextPhase !== state.phase) updates.phase = nextPhase;
-    this.stage.updateIllusionState(updates);
+    if (nextPhase !== state.phase) {
+      const element: IllusionElement = {
+        description: this._plantedElementDescription(state.phase, nextPhase, totalTurns),
+        turn_index: totalTurns,
+        is_load_bearing: nextPhase === 'Prestige',
+      };
+      this.stage.updateIllusionState({
+        phase: nextPhase,
+        planted_elements: [...state.planted_elements, element],
+      });
+    }
+  }
+
+  private _plantedElementDescription(fromPhase: string, toPhase: string, turn: number): string {
+    if (toPhase === 'Turn') {
+      return `At turn ${turn}: the inciting lie has been planted. Observers now hold a false belief that will become structurally important.`;
+    }
+    return `At turn ${turn}: the contradiction has been surfaced. The illusion collapses — what was hidden will now be revealed.`;
+  }
+
+  // ── A: Pacing Controller ──
+  private _checkPacing(location_id: string, actionCount: number): void {
+    const totalTurns = this.stage.getTurnCount();
+    if (totalTurns < 6 || actionCount >= 2) return;
+    const agents = this.stage.getAgentsInLocation(location_id);
+    for (const agent of agents) {
+      this.stage.addDramaticPressure({
+        pressure_id: randomUUID(),
+        target_char_id: agent.char_id,
+        trigger_event_id: 'pacing_controller',
+        pressure_type: 'revelation_due',
+        intensity: 40,
+        bias_hint: 'The scene is losing momentum. Something must happen — say something unexpected, reveal a new piece of information, or make a decisive move.',
+        expires_at_turn: totalTurns + 3,
+        applied: false,
+      });
+    }
+    console.log(`[Director] Pacing lag detected at turn ${totalTurns} — injected momentum pressure`);
+  }
+
+  // ── H: Auto-Pivot Detection ──
+  private _detectPivot(location_id: string, avgTensionDelta: number, recentActions: ActionLogEntry[]): void {
+    this._tensionHistory.push(avgTensionDelta);
+    if (this._tensionHistory.length > 5) this._tensionHistory.shift();
+    if (this._tensionHistory.length < 3) return;
+
+    // Sign-change twice in 3 consecutive readings = pivot
+    let signChanges = 0;
+    for (let i = 1; i < this._tensionHistory.length; i++) {
+      if (Math.sign(this._tensionHistory[i]) !== Math.sign(this._tensionHistory[i - 1])) signChanges++;
+    }
+    if (signChanges < 2) return;
+
+    const agents = this.stage.getAgentsInLocation(location_id);
+    const lastActionId = recentActions[recentActions.length - 1]?.action_id ?? randomUUID();
+    this.stage.addBeatTrace({
+      beat_id: randomUUID(),
+      turn_index: this.stage.getTurnCount(),
+      location_id,
+      trigger_event_id: lastActionId,
+      beat_type: 'turning_point',
+      participants: agents.map(a => a.char_id),
+      causal_chain: recentActions.slice(-3).map(a => a.action_id),
+      narrative_summary: 'Auto-pivot detected: the emotional valence of the scene has reversed twice. A turning point has been reached.',
+      fountain_hint: 'The room shifts. What was certain is now in doubt. Someone has crossed a line.',
+    });
+    console.log(`[Director] Auto-pivot detected at turn ${this.stage.getTurnCount()}`);
+    this._tensionHistory = [];  // reset after pivot
+  }
+
+  // ── I: Narrative Consistency Checker ──
+  private _checkConsistency(location_id: string, charIds: string[]): void {
+    for (const charId of charIds) {
+      const agent = this.stage.getAgent(charId);
+      if (!agent) continue;
+      const beliefs = agent.beliefs ?? [];
+      const contradicted = beliefs.filter(b => (b.contradicts ?? []).length > 0);
+      if (contradicted.length === 0) continue;
+      this.stage.addDramaticPressure({
+        pressure_id: randomUUID(),
+        target_char_id: charId,
+        trigger_event_id: 'consistency_checker',
+        pressure_type: 'evidence_against',
+        intensity: 55,
+        bias_hint: `You hold ${contradicted.length} contradictory belief(s). Something you believe cannot be true simultaneously with something else you believe. This cognitive dissonance is pressing on your decision-making.`,
+        expires_at_turn: this.stage.getTurnCount() + 4,
+        applied: false,
+      });
+      console.log(`[Director] Consistency alert for ${agent.name}: ${contradicted.length} contradiction(s)`);
+    }
   }
 
   private emptyEvaluation(observer_id: string): PerspectiveEvaluation {

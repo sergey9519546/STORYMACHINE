@@ -95,7 +95,9 @@ export default function ScriptIDE({ initialConfig, onOpenStoryMachine, importedS
   const [titlePage, setTitlePage] = useState({ title: "UNTITLED SCRIPT", author: "AUTHOR NAME", contact: "CONTACT INFO" });
   const [researchNotes, setResearchNotes] = useState<{ id: string; title: string; content: string }[]>(() => safeJsonParse(lsGet('research_notes'), []));
   const [isSaving, setIsSaving] = useState(false);
-  
+  const [snapshotModal, setSnapshotModal] = useState<{ open: boolean; name: string }>({ open: false, name: '' });
+  const [restoreModal, setRestoreModal] = useState<{ open: boolean; text: string }>({ open: false, text: '' });
+
   const [actionModal, setActionModal] = useState<{ show: boolean; charName: string; cursor: number }>({ show: false, charName: "", cursor: 0 });
   const [actionInput, setActionInput] = useState("");
   const [characters, setCharacters] = useState<Character[]>(() => safeJsonParse(lsGet('script_characters'), []));
@@ -105,7 +107,7 @@ export default function ScriptIDE({ initialConfig, onOpenStoryMachine, importedS
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const highlightRef = useRef<HTMLDivElement>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
     lsSet('script_draft', scriptText);
@@ -209,12 +211,22 @@ export default function ScriptIDE({ initialConfig, onOpenStoryMachine, importedS
     setScriptText(text);
 
     if (isTypewriterSound) {
-      if (!audioRef.current) {
-        audioRef.current = new Audio('https://www.soundjay.com/communication/typewriter-key-1.mp3');
-        audioRef.current.volume = 0.1;
-      }
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => {});
+      try {
+        if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
+        const ctx = audioCtxRef.current;
+        const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.04), ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < data.length; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.008));
+        }
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        const gain = ctx.createGain();
+        gain.gain.value = 0.18;
+        src.connect(gain);
+        gain.connect(ctx.destination);
+        src.start();
+      } catch { /* audio context unavailable */ }
     }
 
     // Sync scroll
@@ -487,23 +499,30 @@ export default function ScriptIDE({ initialConfig, onOpenStoryMachine, importedS
   const stats = useMemo(() => getScriptStats(), [scriptText]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const takeSnapshot = () => {
-    const name = prompt("Enter snapshot name:", `Version ${snapshots.length + 1}`);
-    if (name) {
+    setSnapshotModal({ open: true, name: `Version ${snapshots.length + 1}` });
+  };
+
+  const confirmSnapshot = () => {
+    if (snapshotModal.name.trim()) {
       const newSnapshot = {
         id: Date.now().toString(),
-        name,
+        name: snapshotModal.name.trim(),
         text: scriptText,
-        date: new Date().toLocaleString()
+        date: new Date().toLocaleString(),
       };
       setSnapshots([newSnapshot, ...snapshots].slice(0, 20));
     }
+    setSnapshotModal({ open: false, name: '' });
   };
 
   const restoreSnapshot = (text: string) => {
-    if (confirm("Restore this version? Current unsaved changes will be lost.")) {
-      setScriptText(text);
-      triggerAnalysis(text);
-    }
+    setRestoreModal({ open: true, text });
+  };
+
+  const confirmRestore = () => {
+    setScriptText(restoreModal.text);
+    triggerAnalysis(restoreModal.text);
+    setRestoreModal({ open: false, text: '' });
   };
 
   const deleteSnapshot = (id: string) => {
@@ -1230,6 +1249,58 @@ export default function ScriptIDE({ initialConfig, onOpenStoryMachine, importedS
               });
             }}
           />
+        )}
+      </AnimatePresence>
+
+      {/* ── Snapshot name modal ── */}
+      <AnimatePresence>
+        {snapshotModal.open && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60"
+          >
+            <motion.div
+              initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
+              className="bg-white dark:bg-zinc-800 p-6 brutal-border-thick brutal-shadow w-80 space-y-4"
+            >
+              <h3 className="font-bold uppercase text-xs tracking-widest">Save Snapshot</h3>
+              <input
+                type="text"
+                value={snapshotModal.name}
+                onChange={e => setSnapshotModal(s => ({ ...s, name: e.target.value }))}
+                onKeyDown={e => { if (e.key === 'Enter') confirmSnapshot(); if (e.key === 'Escape') setSnapshotModal({ open: false, name: '' }); }}
+                autoFocus
+                className="w-full border-2 border-black px-3 py-2 font-mono text-sm dark:bg-zinc-700 dark:text-white"
+                placeholder="Version name…"
+              />
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setSnapshotModal({ open: false, name: '' })} className="px-4 py-2 text-xs font-bold uppercase border-2 border-black hover:bg-gray-100 dark:hover:bg-zinc-700">Cancel</button>
+                <button onClick={confirmSnapshot} className="px-4 py-2 text-xs font-bold uppercase bg-black text-white hover:bg-gray-800">Save</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Restore confirm modal ── */}
+      <AnimatePresence>
+        {restoreModal.open && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60"
+          >
+            <motion.div
+              initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
+              className="bg-white dark:bg-zinc-800 p-6 brutal-border-thick brutal-shadow w-80 space-y-4"
+            >
+              <h3 className="font-bold uppercase text-xs tracking-widest">Restore Snapshot?</h3>
+              <p className="text-xs text-gray-600 dark:text-gray-400">Current unsaved changes will be lost.</p>
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setRestoreModal({ open: false, text: '' })} className="px-4 py-2 text-xs font-bold uppercase border-2 border-black hover:bg-gray-100 dark:hover:bg-zinc-700">Cancel</button>
+                <button onClick={confirmRestore} className="px-4 py-2 text-xs font-bold uppercase bg-black text-white hover:bg-[#FF4444]">Restore</button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

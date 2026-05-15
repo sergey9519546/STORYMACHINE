@@ -347,11 +347,13 @@ function ChoiceStep({
 interface StartScreenProps {
   onStart: (config: StoryConfig) => void;
   isGenerating: boolean;
+  onOpenStoryMachine?: () => void;
 }
 
 export default function StartScreen({
   onStart,
   isGenerating,
+  onOpenStoryMachine,
 }: StartScreenProps) {
   const [theme, setTheme] = useState("");
   const [backstory, setBackstory] = useState("");
@@ -738,12 +740,12 @@ export default function StartScreen({
 
         <div className="text-sm md:text-base text-black font-mono uppercase tracking-widest space-y-2 border-t-[8px] border-black pt-8 flex flex-col items-center">
           <button
-            onClick={() => window.dispatchEvent(new CustomEvent('open-story-machine'))}
+            onClick={() => onOpenStoryMachine?.()}
             className="mb-8 px-6 py-2 bg-black text-white font-mono text-sm uppercase tracking-widest hover:bg-[#FF4444] transition-colors brutal-border-thick brutal-shadow-hover flex items-center gap-2"
           >
             <Cpu className="w-4 h-4" /> Open OASIS Story Machine
           </button>
-          <p className="font-bold">Powered by Gemini 3.1 Pro & Flash Image Preview</p>
+          <p className="font-bold">Powered by Gemini 2.5 Pro</p>
           <p className="text-gray-600">
             Experience Management • Dynamic Generation • Psychological Modeling
           </p>

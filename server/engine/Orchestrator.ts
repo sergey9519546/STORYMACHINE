@@ -40,7 +40,6 @@ export class Orchestrator {
 
     const currentNodeId = this.stage.getAgent(agentId)!.current_location_id;
     const action_id = this.stage.recordAction(agentId, action, currentNodeId);
-    this.stage.incrementTurnCount();
     const turnIndex = this.stage.getTurnCount();
 
     // Build EventCard for the spine
@@ -59,6 +58,7 @@ export class Orchestrator {
     if (action.action_type === 'RELOCATE' && action.target) {
       const targetLoc = this.locationMap.get(action.target.toLowerCase()) ?? this.locationMap.get(action.target);
       if (targetLoc) {
+        action.content = `→ ${targetLoc.name}`;
         this.stage.updateAgentLocation(agentId, targetLoc.location_id);
       }
     }
@@ -92,6 +92,9 @@ export class Orchestrator {
 
     let turnCount = 0;
     while (turnCount < maxTurns) {
+      let lastActionId = '';
+      let didRelocate = false;
+
       for (const agentSheet of agentsInRoom) {
         const agent = this.agents.get(agentSheet.char_id);
         if (!agent) continue;
@@ -102,10 +105,9 @@ export class Orchestrator {
         console.log(`[Orchestrator] ${currentSheet.name}'s turn in ${location_id}`);
         const action = await agent.takeTurn();
         const action_id = this.stage.recordAction(agentSheet.char_id, action, location_id);
-        this.stage.incrementTurnCount();
+        lastActionId = action_id;
         const turnIndex = this.stage.getTurnCount();
 
-        // Build EventCard for the spine
         const actionEntry = {
           action_id,
           timestamp: Date.now(),
@@ -121,15 +123,23 @@ export class Orchestrator {
         if (action.action_type === 'RELOCATE' && action.target) {
           const targetLoc = this.locationMap.get(action.target.toLowerCase()) ?? this.locationMap.get(action.target);
           if (targetLoc) {
+            action.content = `→ ${targetLoc.name}`;
             console.log(`[Orchestrator] ${currentSheet.name} relocated to ${targetLoc.name}. Breaking Dialogue Lock.`);
             this.stage.updateAgentLocation(agentSheet.char_id, targetLoc.location_id);
+            didRelocate = true;
             turnCount++;
             break;
           }
         }
 
-        // ── Epistemic update for all agents in room after each action ──
-        const recentActions = this.stage.getSensoryFilter(location_id, turnCount + 1);
+        turnCount++;
+        if (turnCount >= maxTurns) break;
+      }
+
+      // ── Batch epistemic updates: ONCE per agent per ROUND (not per action) ──
+      // This prevents O(agents × actions) Gemini calls (fanout explosion).
+      if (!didRelocate && lastActionId) {
+        const recentActions = this.stage.getSensoryFilter(location_id, maxTurns);
         const epistemicUpdates = await Promise.all(
           agentsInRoom
             .map(a => this.agents.get(a.char_id))
@@ -137,11 +147,8 @@ export class Orchestrator {
             .map(a => a.updateEpistemics(recentActions))
         );
         for (const update of epistemicUpdates) {
-          this._runSpineForUpdate(update, action_id, location_id);
+          this._runSpineForUpdate(update, lastActionId, location_id);
         }
-
-        turnCount++;
-        if (turnCount >= maxTurns) break;
       }
 
       agentsInRoom = this.stage.getAgentsInLocation(location_id);

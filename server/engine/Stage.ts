@@ -85,8 +85,7 @@ export class Stage {
         id INTEGER PRIMARY KEY CHECK (id = 1),
         phase TEXT DEFAULT 'Setup',
         planted_elements_json TEXT DEFAULT '[]',
-        pending_recontextualization_json TEXT DEFAULT '[]',
-        total_turns INTEGER DEFAULT 0
+        pending_recontextualization_json TEXT DEFAULT '[]'
       );
 
       CREATE TABLE IF NOT EXISTS Event_Cards (
@@ -363,7 +362,7 @@ export class Stage {
       phase: (row.phase as IllusionState['phase']) ?? 'Setup',
       planted_elements: safeJsonParse(row.planted_elements_json as string, []),
       pending_recontextualization: safeJsonParse(row.pending_recontextualization_json as string, []),
-      total_turns: (row.total_turns as number) ?? 0,
+      total_turns: this.getTurnCount(),
     };
   }
 
@@ -372,18 +371,13 @@ export class Stage {
     const next = { ...current, ...state };
     this.db.prepare(`
       UPDATE Illusion_State
-      SET phase = ?, planted_elements_json = ?, pending_recontextualization_json = ?, total_turns = ?
+      SET phase = ?, planted_elements_json = ?, pending_recontextualization_json = ?
       WHERE id = 1
     `).run(
       next.phase,
       JSON.stringify(next.planted_elements),
       JSON.stringify(next.pending_recontextualization),
-      next.total_turns,
     );
-  }
-
-  public incrementTurnCount() {
-    this.db.prepare('UPDATE Illusion_State SET total_turns = total_turns + 1 WHERE id = 1').run();
   }
 
   // ── Causal-Epistemic Spine ───────────────────────────────────────────────────
