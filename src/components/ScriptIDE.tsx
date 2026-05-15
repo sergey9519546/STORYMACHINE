@@ -25,21 +25,38 @@ const SCRIPT_ELEMENTS = {
 };
 
 const renderHighlightedText = (text: string) => {
+  const lines = text.split('\n');
   const blocks = parseFountain(text);
-  return blocks.map((block, i) => {
-    let className = "mb-1 ";
-    if (block.type === 'scene_heading') className += "font-bold uppercase text-blue-600 dark:text-blue-400 mt-4";
-    if (block.type === 'character') className += "text-center font-bold uppercase w-1/2 mx-auto mt-4";
-    if (block.type === 'parenthetical') className += "text-center italic w-1/3 mx-auto text-sm opacity-80";
-    if (block.type === 'dialogue') className += "text-center w-1/2 mx-auto mb-4";
-    if (block.type === 'transition') className += "text-right uppercase font-bold mt-4";
-    if (block.type === 'centered') className += "text-center";
-    if (block.type === 'lyrics') className += "italic text-zinc-500";
-    
+
+  // Since we need exact 1:1 sync with textarea line breaks,
+  // map formatting classes to each line index
+  const lineClasses: Record<number, string> = {};
+  let currentLineIdx = 0;
+
+  blocks.forEach(block => {
+    const blockLines = block.text.split('\n');
+    blockLines.forEach((lineText, idx) => {
+      let className = "";
+      if (block.type === 'scene_heading') className = "font-bold text-blue-600 dark:text-blue-400";
+      if (block.type === 'character') className = "font-bold text-purple-600 dark:text-purple-400";
+      if (block.type === 'parenthetical') className = "italic text-zinc-500";
+      if (block.type === 'dialogue') className = "text-zinc-800 dark:text-zinc-200";
+      if (block.type === 'transition') className = "font-bold uppercase text-orange-500";
+      if (block.type === 'lyrics') className = "italic text-zinc-500";
+
+      lineClasses[currentLineIdx] = className;
+      currentLineIdx++;
+    });
+  });
+
+  return lines.map((line, i) => {
+    // Return text as exactly typed, but wrapped in colored spans.
+    // We add a trailing space or newline space if empty so empty lines have height.
     return (
-      <div key={i} className={className}>
-        {block.text}
-      </div>
+      <span key={i} className={lineClasses[i] || ""}>
+        {line || " "}
+        {i < lines.length - 1 ? "\n" : ""}
+      </span>
     );
   });
 };
@@ -300,6 +317,9 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
     // Smooth scroll to the line
     const lineHeight = 24; // Approximate
     editorRef.current.scrollTop = lineIndex * lineHeight - 100;
+
+    // Force scroll sync
+    handleScroll();
   };
 
   const analysisGenerationRef = useRef<number>(0);
