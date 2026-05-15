@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { parseFountain, FountainBlock } from '../lib/fountain';
 import { AlertCircle } from 'lucide-react';
 
@@ -8,12 +8,8 @@ interface EditorProps {
 }
 
 export default function Editor({ script, onChange }: EditorProps) {
-  const [blocks, setBlocks] = useState<FountainBlock[]>([]);
+  const blocks = useMemo<FountainBlock[]>(() => parseFountain(script), [script]);
   const overlayRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setBlocks(parseFountain(script));
-  }, [script]);
 
   const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
     if (overlayRef.current) {
