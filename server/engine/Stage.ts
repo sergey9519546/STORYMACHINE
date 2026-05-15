@@ -19,6 +19,7 @@ import type {
   GoalMutation,
   DramaticPressure,
   BeatTrace,
+  StageSnapshot,
 } from './types.ts';
 import { safeJsonParse } from '../../src/lib/json.ts';
 
@@ -31,6 +32,24 @@ export class Stage {
   constructor(dbPath: string = ':memory:') {
     this.db = new Database(dbPath);
     this.initSchema();
+    this.runMigrations();
+  }
+
+  // ── Schema versioning ────────────────────────────────────────────────────────
+  // Each entry in MIGRATIONS corresponds to one schema version increment.
+  // Applied sequentially from the current user_version onward.
+  private runMigrations(): void {
+    const current = this.db.pragma('user_version', { simple: true }) as number;
+    const MIGRATIONS: Array<() => void> = [
+      // v0 → v1: base schema already applied by initSchema (CREATE IF NOT EXISTS).
+      () => { /* no-op */ },
+    ];
+    for (let i = current; i < MIGRATIONS.length; i++) {
+      this.db.transaction(() => {
+        MIGRATIONS[i]();
+        this.db.pragma(`user_version = ${i + 1}`);
+      })();
+    }
   }
 
   private initSchema() {
@@ -560,5 +579,47 @@ export class Stage {
       fountain_hint: r.fountain_hint as string,
       information_position: r.information_position as BeatTrace['information_position'] ?? undefined,
     }));
+  }
+
+  // ── Session snapshot export / import ─────────────────────────────────────────
+
+  public exportSnapshot(): StageSnapshot {
+    return {
+      schema_version: this.db.pragma('user_version', { simple: true }) as number,
+      exported_at: Date.now(),
+      locations: this.getAllLocations(),
+      agents: this.getAllAgents(),
+      action_log: this.getFullLedger(),
+      illusion_state: (() => {
+        const s = this.getIllusionState();
+        return { phase: s.phase, planted_elements: s.planted_elements, pending_recontextualization: s.pending_recontextualization };
+      })(),
+      beat_traces: this.getAllBeatTraces(),
+      belief_edges: this.getAllBeliefEdges(),
+      goal_mutations: this.getAllGoalMutations(),
+    };
+  }
+
+  // Restore a snapshot into this (empty) Stage instance.
+  // Idempotent: uses INSERT OR IGNORE so re-importing is safe.
+  public importSnapshot(snap: StageSnapshot): void {
+    for (const loc of snap.locations) this.addLocation(loc);
+    for (const agent of snap.agents)   this.addAgent(agent);
+    for (const entry of snap.action_log) this._insertRawAction(entry);
+    this.updateIllusionState(snap.illusion_state);
+    for (const edge of snap.belief_edges)     this.addBeliefEdge(edge);
+    for (const mut of snap.goal_mutations)    this.recordGoalMutation(mut);
+    for (const beat of snap.beat_traces)      this.addBeatTrace(beat);
+  }
+
+  private _insertRawAction(entry: ActionLogEntry): void {
+    this.db.prepare(`
+      INSERT OR IGNORE INTO Action_Log
+        (action_id, timestamp, char_id, location_id, action_type, target_char_id, content, is_audible)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      entry.action_id, entry.timestamp, entry.char_id, entry.location_id,
+      entry.action_type, entry.target_char_id ?? null, entry.content, entry.is_audible ? 1 : 0,
+    );
   }
 }

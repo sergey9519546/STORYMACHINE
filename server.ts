@@ -7,8 +7,9 @@ import { getAI, withTimeout } from './server/engine/ai.ts';
 import { rateLimit } from 'express-rate-limit';
 import { Stage } from './server/engine/Stage.ts';
 import { Orchestrator } from './server/engine/Orchestrator.ts';
-import type { CharacterSheet, Location } from './server/engine/types.ts';
+import type { CharacterSheet, Location, StageSnapshot } from './server/engine/types.ts';
 import { transcriptToFountain, extractCharactersFromLog, syuzhetSort, wrapSyuzhetFountain } from './server/lib/fountain.ts';
+import { logger, requestLogger } from './server/lib/logger.ts';
 
 // ── Startup validation ────────────────────────────────────────────────────────
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -327,7 +328,10 @@ function sessionId(req: express.Request): string {
   const raw = req.method === 'GET'
     ? req.query.sessionId
     : req.body?.sessionId;
-  return typeof raw === 'string' && raw.trim() ? raw.substring(0, 64) : 'default';
+  if (typeof raw !== 'string' || !raw.trim()) return 'default';
+  const cleaned = raw.trim().substring(0, 64);
+  // Accept alphanumeric + hyphens/underscores only — reject injection attempts.
+  return /^[a-zA-Z0-9_-]{1,64}$/.test(cleaned) ? cleaned : 'default';
 }
 
 // Prevents two concurrent runRoomSimulation() calls for the same session+room from
@@ -338,6 +342,12 @@ const runningRooms = new Set<string>();
 async function startServer() {
   const app = express();
   app.use(express.json({ limit: '1mb' }));
+  app.use(requestLogger());
+
+  // Health check — no rate limit, no auth, responds even when Gemini is down.
+  app.get('/health', (_req, res) => {
+    res.json({ status: 'ok', uptime: Math.round(process.uptime()), sessions: sessions.size });
+  });
 
   const ai = getAI();
 
@@ -380,7 +390,7 @@ async function startServer() {
             public_mask: requireString(a.public_mask, 'public_mask', 2000),
             hidden_motive: requireString(a.hidden_motive, 'hidden_motive', 2000),
             knowledge_vector: Array.isArray(a.knowledge_vector)
-              ? (a.knowledge_vector as unknown[]).filter((k): k is string => typeof k === 'string').slice(0, 100)
+              ? (a.knowledge_vector as unknown[]).filter((k): k is string => typeof k === 'string').slice(0, 100).map(k => k.substring(0, 500))
               : [],
             suspicion_score: typeof a.suspicion_score === 'number' ? Math.max(0, Math.min(100, a.suspicion_score)) : 0,
             current_location_id: typeof a.current_location_id === 'string' ? a.current_location_id.substring(0, 64) : '',
@@ -517,8 +527,8 @@ async function startServer() {
     const simLocations = simStage.getAllLocations();
     const simBeatTraces = simStage.getAllBeatTraces();
     const fountain = transcriptToFountain(log, simAgents, simLocations, {
-      title: typeof title === 'string' ? title : 'Story Machine Draft',
-      author: typeof author === 'string' ? author : 'STORYMACHINE',
+      title:  typeof title  === 'string' ? title.substring(0, 256)  : 'Story Machine Draft',
+      author: typeof author === 'string' ? author.substring(0, 256) : 'STORYMACHINE',
     }, simBeatTraces);
     const characters = extractCharactersFromLog(simAgents);
 
@@ -565,6 +575,34 @@ async function startServer() {
   app.get('/api/goal-mutations', gameLimiter, asyncHandler(async (req, res) => {
     const { stage } = getOrCreateSession(sessionId(req));
     res.json(stage.getAllGoalMutations());
+  }));
+
+  // ── Session snapshot export / import ──────────────────────────────────────
+  // Export: download a JSON snapshot of the full simulation state.
+  app.get('/api/session/export', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const snapshot = stage.exportSnapshot();
+    res.setHeader('Content-Disposition', 'attachment; filename="storymachine-session.json"');
+    res.json(snapshot);
+  }));
+
+  // Import: restore a previously exported snapshot into a fresh session.
+  app.post('/api/session/import', gameLimiter, asyncHandler(async (req, res) => {
+    const snap = req.body as StageSnapshot;
+    if (!snap || typeof snap !== 'object' || !Array.isArray(snap.agents) || !Array.isArray(snap.locations)) {
+      res.status(400).json({ error: 'Invalid snapshot: must include agents and locations arrays' });
+      return;
+    }
+    const sid = sessionId(req);
+    // Replace existing session with a fresh one, then import.
+    sessions.delete(sid);
+    const { stage, orchestrator } = getOrCreateSession(sid);
+    stage.importSnapshot(snap);
+    // Re-register agents and nodes into the orchestrator for future turns.
+    for (const agent of stage.getAllAgents())     orchestrator.registerAgent(agent);
+    for (const loc   of stage.getAllLocations())  orchestrator.registerNode(loc);
+    logger.info('session_imported', { sid, agents: snap.agents.length, actions: snap.action_log.length });
+    res.json({ status: 'imported', sessionId: sid, agents: snap.agents.length, turns: snap.action_log.length });
   }));
 
   // QBN choice filtering — filter by accumulated qualities AND consequenceScope ceiling
@@ -859,10 +897,15 @@ Ensure throughline commentary addresses all active throughlines listed above.`;
   }));
 
   // ── Global error handler ───────────────────────────────────────────────────
-  app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-    console.error('Server Error:', err.message);
-    const message = process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message;
-    res.status(500).json({ error: message });
+  // Always log full error + stack server-side; never expose internals to client.
+  app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    logger.error('unhandled_error', {
+      message: err.message,
+      stack: err.stack,
+      method: req.method,
+      path: req.path,
+    });
+    res.status(500).json({ error: 'Internal Server Error' });
   });
 
   // ── Static serving ─────────────────────────────────────────────────────────

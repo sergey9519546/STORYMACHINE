@@ -1044,3 +1044,83 @@ describe('CausalSpine — summarizeForDirector', () => {
     assert.equal(inciting.information_position, 'superior');
   });
 });
+
+// ── Stage — snapshot export / import ─────────────────────────────────────────
+
+describe('Stage — exportSnapshot / importSnapshot', () => {
+  it('round-trips locations and agents through export → import', () => {
+    const source = makeStage();
+    const snap = source.exportSnapshot();
+
+    assert.ok(snap.schema_version >= 1, 'schema_version should be set by migration runner');
+    assert.ok(snap.exported_at > 0);
+    assert.equal(snap.locations.length, 1);
+    assert.equal(snap.agents.length, 2);
+
+    // Import into a fresh stage
+    const target = new Stage(':memory:');
+    target.importSnapshot(snap);
+
+    const locs = target.getAllLocations();
+    assert.equal(locs.length, 1);
+    assert.equal(locs[0].location_id, 'room1');
+
+    const agents = target.getAllAgents();
+    assert.equal(agents.length, 2);
+    assert.ok(agents.some(a => a.name === 'Alice'));
+    assert.ok(agents.some(a => a.name === 'Bob'));
+  });
+
+  it('round-trips action log entries preserving action_id and content', () => {
+    const source = makeStage();
+    source.recordAction('alice', { action_type: 'SPEAK', content: 'Hello, Bob.', target: 'bob' }, 'room1');
+    source.recordAction('bob',   { action_type: 'SPEAK', content: 'Good evening.', target: null }, 'room1');
+
+    const snap = source.exportSnapshot();
+    assert.equal(snap.action_log.length, 2);
+
+    const target = new Stage(':memory:');
+    target.importSnapshot(snap);
+
+    const log = target.getFullLedger();
+    assert.equal(log.length, 2);
+    assert.equal(log[0].content, 'Hello, Bob.');
+    assert.equal(log[1].content, 'Good evening.');
+    assert.equal(log[0].action_id, snap.action_log[0].action_id, 'action_id should be preserved');
+  });
+
+  it('round-trips beat traces', () => {
+    const source = makeStage();
+    const spine = new CausalSpine(source);
+    spine.createBeatTrace({
+      triggerEventId: 'evt-snap-1',
+      beatType: 'revelation',
+      participants: ['alice', 'bob'],
+      causalChain: ['evt-snap-1'],
+      locationId: 'room1',
+      narrativeSummary: 'The truth emerges.',
+      fountainHint: 'ALICE — silent.',
+      informationPosition: 'parity',
+    });
+
+    const snap = source.exportSnapshot();
+    assert.equal(snap.beat_traces.length, 1);
+
+    const target = new Stage(':memory:');
+    target.importSnapshot(snap);
+
+    const beats = target.getAllBeatTraces();
+    assert.equal(beats.length, 1);
+    assert.equal(beats[0].narrative_summary, 'The truth emerges.');
+    assert.equal(beats[0].information_position, 'parity');
+  });
+
+  it('empty stage exports a valid snapshot with empty arrays', () => {
+    const stage = new Stage(':memory:');
+    const snap = stage.exportSnapshot();
+    assert.equal(snap.locations.length, 0);
+    assert.equal(snap.agents.length, 0);
+    assert.equal(snap.action_log.length, 0);
+    assert.equal(snap.beat_traces.length, 0);
+  });
+});

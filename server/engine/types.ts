@@ -287,3 +287,18 @@ export interface PerspectiveEvaluation {
   contradiction_detected: boolean;
   contradicted_propositions: string[];            // text of beliefs the new observations contradict
 }
+
+// ── Session snapshot (export / import) ───────────────────────────────────────
+
+export interface StageSnapshot {
+  schema_version: number;
+  exported_at: number;
+  locations: Location[];
+  agents: CharacterSheet[];
+  action_log: ActionLogEntry[];
+  illusion_state: Pick<IllusionState, 'phase' | 'planted_elements' | 'pending_recontextualization'>;
+  beat_traces: BeatTrace[];
+  belief_edges: BeliefEdge[];
+  goal_mutations: GoalMutation[];
+}
+
