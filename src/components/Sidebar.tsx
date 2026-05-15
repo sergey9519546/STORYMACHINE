@@ -25,6 +25,97 @@ interface SidebarProps {
   onNavigate: (lineIndex: number) => void;
 }
 
+const LONG_FIELD_MAX = 500;
+const LONG_FIELD_WARN_THRESHOLD = 450;
+
+function CharacterNameField({
+  charId,
+  value,
+  onUpdate,
+}: {
+  charId: string;
+  value: string;
+  onUpdate: (id: string, field: keyof Character, value: string) => void;
+}) {
+  const [touched, setTouched] = useState(false);
+
+  const errorMsg = touched
+    ? value.trim() === ''
+      ? 'Name cannot be empty.'
+      : value.length > 100
+      ? 'Name must be 100 characters or fewer.'
+      : null
+    : null;
+
+  return (
+    <div className="mb-4">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onUpdate(charId, 'name', e.target.value)}
+        onBlur={() => setTouched(true)}
+        className={cn(
+          "bg-transparent text-sm font-bold outline-none w-full border-b-2 pb-1 focus:border-[#FF4444] transition-colors uppercase tracking-widest",
+          errorMsg ? "border-red-500 dark:border-red-400" : "border-black dark:border-zinc-700"
+        )}
+        placeholder="CHARACTER NAME"
+        aria-invalid={!!errorMsg}
+        aria-describedby={errorMsg ? `name-error-${charId}` : undefined}
+      />
+      {errorMsg && (
+        <p id={`name-error-${charId}`} className="text-red-600 dark:text-red-400 text-[10px] font-mono mt-1" role="alert">
+          {errorMsg}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function LongTextField({
+  charId,
+  field,
+  value,
+  placeholder,
+  onUpdate,
+}: {
+  charId: string;
+  field: keyof Character;
+  value: string;
+  placeholder: string;
+  onUpdate: (id: string, field: keyof Character, value: string) => void;
+}) {
+  const displayValue = value.slice(0, LONG_FIELD_MAX);
+  const count = displayValue.length;
+  const nearLimit = count >= LONG_FIELD_WARN_THRESHOLD;
+
+  return (
+    <div className="flex-1 relative">
+      <textarea
+        value={displayValue}
+        onChange={(e) => {
+          const capped = e.target.value.slice(0, LONG_FIELD_MAX);
+          onUpdate(charId, field, capped);
+        }}
+        className="w-full bg-zinc-50 dark:bg-zinc-900 text-[10px] outline-none resize-none h-12 p-2 brutal-border focus:border-[#FF4444] font-mono"
+        placeholder={placeholder}
+        maxLength={LONG_FIELD_MAX}
+        aria-describedby={nearLimit ? `count-${charId}-${String(field)}` : undefined}
+      />
+      {nearLimit && (
+        <p
+          id={`count-${charId}-${String(field)}`}
+          className={cn(
+            "text-[9px] font-mono text-right mt-0.5",
+            count >= LONG_FIELD_MAX ? "text-red-500 dark:text-red-400" : "text-yellow-600 dark:text-yellow-400"
+          )}
+        >
+          {count}/{LONG_FIELD_MAX}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter, scriptText, onNavigate }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<'scenes' | 'characters'>('scenes');
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,9 +139,10 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
 
   return (
     <div className="w-80 bg-white dark:bg-zinc-950 text-black dark:text-white flex flex-col h-full border-r-4 border-black dark:border-zinc-800 shrink-0">
-      <div className="flex bg-black text-white shrink-0">
-        <button 
+      <div role="navigation" className="flex bg-black text-white shrink-0">
+        <button
           onClick={() => setActiveTab('scenes')}
+          aria-selected={activeTab === 'scenes'}
           className={cn(
             "flex-1 p-3 text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-colors",
             activeTab === 'scenes' ? "bg-[#FF4444]" : "hover:bg-zinc-900"
@@ -58,8 +150,9 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
         >
           <List className="w-3 h-3" /> Scenes
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('characters')}
+          aria-selected={activeTab === 'characters'}
           className={cn(
             "flex-1 p-3 text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-colors",
             activeTab === 'characters' ? "bg-[#FF4444]" : "hover:bg-zinc-900"
@@ -72,11 +165,12 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
       <div className="p-3 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
         <div className="relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-400" />
-          <input 
+          <input
             type="text"
             placeholder="SEARCH..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            aria-label="Search scenes or characters"
             className="w-full bg-zinc-100 dark:bg-zinc-900 p-2 pl-8 text-[10px] font-mono outline-none brutal-border"
           />
         </div>
@@ -101,7 +195,7 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
           </div>
         ) : (
           <div className="space-y-6">
-            <button 
+            <button
               onClick={onAddCharacter}
               className="w-full p-2 bg-black text-white text-[10px] font-bold uppercase tracking-widest hover:bg-[#FF4444] transition-colors brutal-border flex items-center justify-center gap-2"
             >
@@ -110,30 +204,29 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
 
             {filteredCharacters.map(char => (
               <div key={char.id} className="bg-white dark:bg-zinc-800 p-4 brutal-border-thick brutal-shadow">
-                <input
-                  type="text"
+                <CharacterNameField
+                  charId={char.id}
                   value={char.name}
-                  onChange={(e) => onUpdateCharacter(char.id, 'name', e.target.value)}
-                  className="bg-transparent text-sm font-bold outline-none w-full mb-4 border-b-2 border-black dark:border-zinc-700 pb-1 focus:border-[#FF4444] transition-colors uppercase tracking-widest"
-                  placeholder="CHARACTER NAME"
+                  onUpdate={onUpdateCharacter}
                 />
-                
+
                 <div className="space-y-4">
                   {[
-                    { icon: Ghost, label: 'Ghost', field: 'ghost', placeholder: 'What haunts them?' },
-                    { icon: Crosshair, label: 'Lie', field: 'lie', placeholder: 'What lie do they believe?' },
-                    { icon: Target, label: 'Want', field: 'want', placeholder: 'What do they want?' },
-                    { icon: Heart, label: 'Need', field: 'need', placeholder: 'What do they need?' },
+                    { icon: Ghost, label: 'Ghost', field: 'ghost' as keyof Character, placeholder: 'What haunts them?' },
+                    { icon: Crosshair, label: 'Lie', field: 'lie' as keyof Character, placeholder: 'What lie do they believe?' },
+                    { icon: Target, label: 'Want', field: 'want' as keyof Character, placeholder: 'What do they want?' },
+                    { icon: Heart, label: 'Need', field: 'need' as keyof Character, placeholder: 'What do they need?' },
                   ].map(item => (
                     <div key={item.field} className="flex items-start gap-3">
                       <item.icon className="w-3 h-3 text-black dark:text-white mt-1 shrink-0" />
                       <div className="flex-1">
                         <label className="text-[8px] font-bold uppercase tracking-widest text-black dark:text-zinc-400 block mb-1">{item.label}</label>
-                        <textarea
-                          value={char[item.field as keyof Character]}
-                          onChange={(e) => onUpdateCharacter(char.id, item.field as keyof Character, e.target.value)}
-                          className="w-full bg-zinc-50 dark:bg-zinc-900 text-[10px] outline-none resize-none h-12 p-2 brutal-border focus:border-[#FF4444] font-mono"
+                        <LongTextField
+                          charId={char.id}
+                          field={item.field}
+                          value={char[item.field]}
                           placeholder={item.placeholder}
+                          onUpdate={onUpdateCharacter}
                         />
                       </div>
                     </div>
