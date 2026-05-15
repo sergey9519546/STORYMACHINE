@@ -1,5 +1,6 @@
 import React, { useState, Suspense, lazy, useCallback } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
+import { GameStateProvider } from './contexts/GameStateContext';
 import { StoryConfig } from './types';
 
 const StartScreen  = lazy(() => import('./components/StartScreen'));
@@ -36,6 +37,7 @@ export default function App() {
   }, []);
 
   return (
+    <GameStateProvider>
     <ErrorBoundary>
       <Suspense fallback={<LoadingFallback />}>
         {showStoryMachine ? (
@@ -56,5 +58,6 @@ export default function App() {
         )}
       </Suspense>
     </ErrorBoundary>
+    </GameStateProvider>
   );
 }

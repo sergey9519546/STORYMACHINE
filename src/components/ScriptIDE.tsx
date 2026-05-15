@@ -1385,6 +1385,7 @@ export default function ScriptIDE({
       <AnimatePresence>
         {showDirectorHUD && engineState && (
           <DirectorPanel
+            onClose={() => setShowDirectorHUD(false)}
             state={{
               config: engineState.config,
               protagonist: engineState.protagonist,
