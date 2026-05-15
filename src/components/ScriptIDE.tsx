@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { EngineState, StoryConfig, ScriptBlock } from "../types";
 import { analyzeScriptBlock } from "../services/director";
 import { parseFountain, FountainBlock } from "../lib/fountain";
@@ -24,43 +24,6 @@ const SCRIPT_ELEMENTS = {
   TRANSITION: /^(CUT TO:|FADE IN:|FADE OUT:|DISSOLVE TO:)$/i,
 };
 
-const renderHighlightedText = (text: string) => {
-  const lines = text.split('\n');
-  const blocks = parseFountain(text);
-
-  // Since we need exact 1:1 sync with textarea line breaks,
-  // map formatting classes to each line index
-  const lineClasses: Record<number, string> = {};
-  let currentLineIdx = 0;
-
-  blocks.forEach(block => {
-    const blockLines = block.text.split('\n');
-    blockLines.forEach((lineText, idx) => {
-      let className = "";
-      if (block.type === 'scene_heading') className = "font-bold text-blue-600 dark:text-blue-400";
-      if (block.type === 'character') className = "font-bold text-purple-600 dark:text-purple-400";
-      if (block.type === 'parenthetical') className = "italic text-zinc-500";
-      if (block.type === 'dialogue') className = "text-zinc-800 dark:text-zinc-200";
-      if (block.type === 'transition') className = "font-bold uppercase text-orange-500";
-      if (block.type === 'lyrics') className = "italic text-zinc-500";
-
-      lineClasses[currentLineIdx] = className;
-      currentLineIdx++;
-    });
-  });
-
-  return lines.map((line, i) => {
-    // Return text as exactly typed, but wrapped in colored spans.
-    // We add a trailing space or newline space if empty so empty lines have height.
-    return (
-      <span key={i} className={lineClasses[i] || ""}>
-        {line || " "}
-        {i < lines.length - 1 ? "\n" : ""}
-      </span>
-    );
-  });
-};
-
 export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
   const [engineState, setEngineState] = useState<EngineState | null>(null);
   const [scriptText, setScriptText] = useState<string>(() => localStorage.getItem('script_draft') || "");
@@ -80,6 +43,39 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
   const [characters, setCharacters] = useState<any[]>(() => safeJsonParse(localStorage.getItem('script_characters'), []));
   const [directorsLayer, setDirectorsLayer] = useState(false);
   const [isCleaning, setIsCleaning] = useState<number | null>(null);
+
+  const parsedScriptBlocks = useMemo(() => parseFountain(scriptText), [scriptText]);
+
+  const highlightedScriptText = useMemo(() => {
+    const lines = scriptText.split('\n');
+    const lineClasses: Record<number, string> = {};
+    let currentLineIdx = 0;
+
+    parsedScriptBlocks.forEach(block => {
+      const blockLines = block.text.split('\n');
+      blockLines.forEach((lineText, idx) => {
+        let className = "";
+        if (block.type === 'scene_heading') className = "font-bold text-blue-600 dark:text-blue-400";
+        if (block.type === 'character') className = "font-bold text-purple-600 dark:text-purple-400";
+        if (block.type === 'parenthetical') className = "italic text-zinc-500";
+        if (block.type === 'dialogue') className = "text-zinc-800 dark:text-zinc-200";
+        if (block.type === 'transition') className = "font-bold uppercase text-orange-500";
+        if (block.type === 'lyrics') className = "italic text-zinc-500";
+
+        lineClasses[currentLineIdx] = className;
+        currentLineIdx++;
+      });
+    });
+
+    return lines.map((line, i) => {
+      return (
+        <span key={i} className={lineClasses[i] || ""}>
+          {line || " "}
+          {i < lines.length - 1 ? "\n" : ""}
+        </span>
+      );
+    });
+  }, [scriptText, parsedScriptBlocks]);
   
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const editorRef = useRef<HTMLTextAreaElement>(null);
@@ -392,9 +388,7 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
       if (data.error) throw new Error(data.error);
 
       const newText = data.result;
-      const blocks = parseFountain(scriptText);
-      blocks[index].text = newText;
-      const newScript = blocks.map(b => b.text).join('\n');
+      const newScript = parsedScriptBlocks.map((b, i) => i === index ? newText : b.text).join('\n');
       setScriptText(newScript);
       triggerAnalysis(newScript);
     } catch (err) {
@@ -405,7 +399,7 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
   };
 
   const getScriptStats = () => {
-    const blocks = parseFountain(scriptText);
+    const blocks = parsedScriptBlocks;
     const charCounts: Record<string, number> = {};
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
@@ -721,7 +715,7 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
             className="absolute inset-0 p-8 font-courier text-lg leading-relaxed pointer-events-none whitespace-pre-wrap break-words overflow-hidden z-0"
             aria-hidden="true"
           >
-            {renderHighlightedText(scriptText)}
+            {highlightedScriptText}
           </div>
 
           {/* Input Layer */}
@@ -896,7 +890,7 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
                     <Camera className="w-4 h-4" /> Director's Shot List
                   </h2>
                   {(() => {
-                    const parsedBlocks = parseFountain(scriptText);
+                    const parsedBlocks = parsedScriptBlocks;
                     const shotBlocks = parsedBlocks.filter(b => b.type === 'shot');
                     
                     if (shotBlocks.length === 0) {
@@ -971,7 +965,7 @@ export default function ScriptIDE({ initialConfig }: ScriptIDEProps) {
                   <ShieldAlert className="w-4 h-4" /> Semantic Firewall
                 </h2>
                 {(() => {
-                  const parsedBlocks = parseFountain(scriptText);
+                  const parsedBlocks = parsedScriptBlocks;
                   const lintedBlocks = parsedBlocks.map((b, i) => ({...b, index: i})).filter(b => b.lintErrors && b.lintErrors.length > 0);
                   
                   if (lintedBlocks.length === 0) {
