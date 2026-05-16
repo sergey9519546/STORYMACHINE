@@ -1,0 +1,3 @@
+## 2024-05-24 - React anti-pattern: High-frequency synchronous parsing in render
+**Learning:** Found a specific codebase bottleneck in `ScriptIDE.tsx` where typing in a high-frequency input (the script editor textarea) triggered an expensive `parseFountain(scriptText)` parse *unconditionally on every render*. Because `parseFountain` splits the entire script by newline and runs string matching across hundreds of blocks, typing felt sluggish.
+**Action:** Always wrap expensive synchronous string parsing operations (like O(N) parsers) in `useMemo` when they depend on text input that updates on every keystroke. Ensure child computations (`renderHighlightedText`, `getScriptStats`) accept the memoized `blocks` rather than reparsing the raw text.
