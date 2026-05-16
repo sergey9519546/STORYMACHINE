@@ -4,18 +4,21 @@ import { Agent } from './Agent.ts';
 import type { CharacterSheet, Location, EpistemicUpdate } from './types.ts';
 import { DirectorNode } from './DirectorNode.ts';
 import { CausalSpine } from './CausalSpine.ts';
+import { AppraisalEngine } from './AppraisalEngine.ts';
 
 export class Orchestrator {
   private agents: Map<string, Agent> = new Map();
   private director: DirectorNode;
   private stage: Stage;
   private spine: CausalSpine;
+  private appraiser: AppraisalEngine;
   private locationMap: Map<string, Location> = new Map();
 
   constructor(stage: Stage) {
     this.stage = stage;
     this.director = new DirectorNode(stage);
     this.spine = new CausalSpine(stage);
+    this.appraiser = new AppraisalEngine(stage);
     for (const loc of this.stage.getAllLocations()) {
       this.locationMap.set(loc.location_id, loc);
       this.locationMap.set(loc.name.toLowerCase(), loc);
@@ -69,6 +72,7 @@ export class Orchestrator {
     const recentActions = this.stage.getSensoryFilter(currentNodeId, 3);
     const update = await agent.updateEpistemics(recentActions);
     this._runSpineForUpdate(update, action_id, currentNodeId);
+    this.appraiser.appraise(update);
 
     return action;
   }
@@ -170,6 +174,7 @@ export class Orchestrator {
         );
         for (const update of epistemicUpdates) {
           this._runSpineForUpdate(update, lastActionId, location_id);
+          this.appraiser.appraise(update);
         }
       }
 
@@ -194,7 +199,11 @@ export class Orchestrator {
     const lastActionId = allActions[allActions.length - 1]?.action_id ?? '';
     for (const update of directorUpdates) {
       this._runSpineForUpdate(update, lastActionId, location_id);
+      this.appraiser.appraise(update);
     }
+
+    // ── OCC contagion: emotions diffuse between co-present agents ──
+    this.appraiser.applyContagion(location_id);
   }
 
   // ── Spine wiring helper ─────────────────────────────────────────────────────

@@ -218,6 +218,16 @@ export class Agent {
     const speechPattern = deriveSpeechPattern(this.sheet.bigFive);
     const defenseLevel = computeDefenseLevel(this.sheet.bigFive?.neuroticism ?? 50, this.sheet.suspicion_score);
 
+    // ── G: OCC Emotional State ──
+    const emotionBlock = (() => {
+      const es = this.sheet.emotionState;
+      if (!es || es.dominant === 'neutral' || es.intensity < 15) return '';
+      const angerTarget = es.dominant === 'anger' && es.anger_target_id
+        ? ` — directed at ${this.stage.getAgent(es.anger_target_id)?.name ?? 'someone in this room'}`
+        : '';
+      return `\nCURRENT EMOTIONAL STATE: ${es.dominant.toUpperCase()} (intensity ${es.intensity}/100)${angerTarget}. This colors everything — not stated aloud, felt beneath the surface. Let it shape your word choice and what you hold back.`;
+    })();
+
     // ── B: Outline Conditioning — IllusionState phase as beat hint ──
     const illusionPhase = this.stage.getIllusionState().phase;
     const beatHint = illusionPhase === 'Setup'
@@ -277,7 +287,7 @@ ${beatHint}
 PERSUASION LEVERAGE:
 ${persuasionHints || '  (No other agents present.)'}
 
-Generate 3 candidate actions. Score each 0–100 on goal alignment. The best-scoring will be selected.`;
+Generate 3 candidate actions. Score each 0–100 on goal alignment. The best-scoring will be selected.${emotionBlock}`;
   }
 
   // ── Epistemic update (replaces evaluateState) ────────────────────────────────

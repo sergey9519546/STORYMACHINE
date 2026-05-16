@@ -8,6 +8,7 @@ import type {
   Belief,
   TheoryOfMind,
   GoalStack,
+  EmotionState,
   IllusionState,
   DarkTriad,
   BigFive,
@@ -43,6 +44,8 @@ export class Stage {
     const MIGRATIONS: Array<() => void> = [
       // v0 → v1: base schema already applied by initSchema (CREATE IF NOT EXISTS).
       () => { /* no-op */ },
+      // v1 → v2: OCC emotion state column
+      () => { this.db.exec('ALTER TABLE Character_State ADD COLUMN emotion_state_json TEXT'); },
     ];
     for (let i = current; i < MIGRATIONS.length; i++) {
       this.db.transaction(() => {
@@ -308,6 +311,15 @@ export class Stage {
         const v = safeJsonParse<unknown>(stateRow.defense_mechanisms_json as string, []);
         return Array.isArray(v) ? (v as DefenseMechanism[]) : [];
       })(),
+      emotionState: (() => {
+        const raw = stateRow.emotion_state_json as string | null;
+        if (!raw) return undefined;
+        const v = safeJsonParse<unknown>(raw, null);
+        if (!v || typeof v !== 'object') return undefined;
+        const e = v as Record<string, unknown>;
+        if (typeof e.dominant !== 'string') return undefined;
+        return v as EmotionState;
+      })(),
     };
   }
 
@@ -358,6 +370,17 @@ export class Stage {
   public updateGoalStack(char_id: string, goalStack: GoalStack | null) {
     this.db.prepare('UPDATE Character_State SET goal_stack_json = ? WHERE char_id = ?')
       .run(goalStack ? JSON.stringify(goalStack) : null, char_id);
+  }
+
+  public updateEmotionState(char_id: string, emotion: EmotionState) {
+    this.db.prepare('UPDATE Character_State SET emotion_state_json = ? WHERE char_id = ?')
+      .run(JSON.stringify(emotion), char_id);
+  }
+
+  public getRecentGoalMutations(char_id: string, sinceTurn: number): GoalMutation[] {
+    return this.db.prepare(
+      'SELECT * FROM Goal_Mutations WHERE char_id = ? AND turn_index >= ?'
+    ).all(char_id, sinceTurn) as GoalMutation[];
   }
 
   // ── Action log ───────────────────────────────────────────────────────────────

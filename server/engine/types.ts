@@ -125,6 +125,25 @@ export interface IllusionState {
   total_turns: number;
 }
 
+// ── OCC Emotion model ────────────────────────────────────────────────────────
+// Emotions are deterministic appraisals of events relative to goals.
+// Computed by AppraisalEngine — no LLM calls involved.
+
+export type EmotionType = 'neutral' | 'joy' | 'distress' | 'anger' | 'fear' | 'pride' | 'shame';
+
+export interface EmotionState {
+  joy: number;               // 0–100: goal achieved, positive surprise
+  distress: number;          // 0–100: goal blocked, contradiction discovered
+  anger: number;             // 0–100: distress attributed to another agent's action
+  anger_target_id?: string;  // char_id the anger is directed at
+  fear: number;              // 0–100: anticipated threat, confrontation_imminent
+  pride: number;             // 0–100: own successful deception or achievement
+  shame: number;             // 0–100: own failure exposed
+  dominant: EmotionType;     // whichever dimension exceeds the threshold
+  intensity: number;         // overall peak (max of all six dimensions)
+  last_updated_at: number;   // turn index of last update
+}
+
 // ── Combined character sheet (full runtime state) ────────────────────────────
 // New psychology/belief fields are optional so existing init payloads still work.
 
@@ -151,6 +170,9 @@ export interface CharacterSheet {
   beliefs?: Belief[];
   theoryOfMind?: Record<string, TheoryOfMind>;
   goalStack?: GoalStack;
+
+  // OCC Emotional state (populated by AppraisalEngine each turn)
+  emotionState?: EmotionState;
 }
 
 // ── Causal-Epistemic Spine types ─────────────────────────────────────────────

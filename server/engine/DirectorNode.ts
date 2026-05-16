@@ -110,7 +110,7 @@ export class DirectorNode {
     console.log(`[Director] Avg tension delta: ${avgTensionDelta.toFixed(1)}, contradictions: ${contradictionsFound}/${evaluations.length} observers`);
 
     // ── A: Pacing Controller ──
-    this._checkPacing(location_id, recentActions.length);
+    this._checkPacing(location_id, recentActions);
 
     // ── H: Auto-Pivot Detection ──
     this._detectPivot(location_id, avgTensionDelta, recentActions);
@@ -301,10 +301,59 @@ From ${observer.name}'s perspective only:
   }
 
   // ── A: Pacing Controller ──
-  private _checkPacing(location_id: string, actionCount: number): void {
+  // Measures real text statistics from the action log: sentence-length variance
+  // and action density. Produces specific momentum pressure based on what's wrong.
+  // Pure deterministic — no LLM calls.
+  private _measurePacing(recentActions: ActionLogEntry[]): {
+    avgSentenceLen: number;
+    sentenceLenVariance: number;   // normalized 0–1 (stddev ~8 words = 1.0)
+    actionDensity: number;          // non-speech actions per 100 words
+    tempo: 'fast' | 'medium' | 'slow';
+    monotonyRisk: boolean;          // variance < 0.15 over 4+ sentences
+  } {
+    const speech = recentActions.filter(a => a.action_type === 'SPEAK' || a.action_type === 'LIE');
+    const nonSpeech = recentActions.filter(a => a.action_type !== 'SPEAK' && a.action_type !== 'LIE');
+
+    const allText = speech.map(a => a.content).join(' ');
+    const sentences = allText.split(/[.!?]+/).map(s => s.trim()).filter(Boolean);
+    const wordLens = sentences.map(s => s.split(/\s+/).filter(Boolean).length);
+
+    const avgLen = wordLens.length > 0
+      ? wordLens.reduce((s, l) => s + l, 0) / wordLens.length
+      : 0;
+    const variance = wordLens.length > 1
+      ? wordLens.reduce((s, l) => s + Math.pow(l - avgLen, 2), 0) / wordLens.length
+      : 0;
+    const normVariance = Math.min(1, variance / 64);  // 8-word stddev → 1.0
+
+    const totalWords = allText.split(/\s+/).filter(Boolean).length;
+    const density = totalWords > 0 ? (nonSpeech.length / totalWords) * 100 : 0;
+
+    let tempo: 'fast' | 'medium' | 'slow' = 'medium';
+    if (density > 0.5 && avgLen < 8) tempo = 'fast';
+    else if (density < 0.15 && avgLen > 20) tempo = 'slow';
+
+    return { avgSentenceLen: avgLen, sentenceLenVariance: normVariance, actionDensity: density, tempo, monotonyRisk: normVariance < 0.15 && sentences.length >= 4 };
+  }
+
+  private _checkPacing(location_id: string, recentActions: ActionLogEntry[]): void {
     const totalTurns = this.stage.getTurnCount();
     const agents = this.stage.getAgentsInLocation(location_id);
-    if (totalTurns < 6 || actionCount >= agents.length * 2) return;
+    if (totalTurns < 6 || agents.length === 0) return;
+
+    const m = this._measurePacing(recentActions);
+
+    let hint: string | null = null;
+    if (m.monotonyRisk) {
+      hint = 'The scene is rhythmically stale — every line the same shape. Break the pattern: a fragment, a question, an unexpected silence, a one-word reply.';
+    } else if (m.tempo === 'slow' && m.avgSentenceLen > 25) {
+      hint = 'The scene is dragging. Short, punchy lines. No digressions. Something must happen — say it and mean it.';
+    } else if (m.actionDensity < 0.1 && recentActions.length >= agents.length * 2) {
+      hint = 'The scene is losing momentum. Something must happen — say something unexpected, reveal a new piece of information, or make a decisive move.';
+    }
+
+    if (!hint) return;
+
     for (const agent of agents) {
       this.stage.addDramaticPressure({
         pressure_id: randomUUID(),
@@ -312,12 +361,12 @@ From ${observer.name}'s perspective only:
         trigger_event_id: 'pacing_controller',
         pressure_type: 'revelation_due',
         intensity: 40,
-        bias_hint: 'The scene is losing momentum. Something must happen — say something unexpected, reveal a new piece of information, or make a decisive move.',
+        bias_hint: hint,
         expires_at_turn: totalTurns + 3,
         applied: false,
       });
     }
-    console.log(`[Director] Pacing lag detected at turn ${totalTurns} — injected momentum pressure`);
+    console.log(`[Director] Pacing (tempo=${m.tempo}, monotony=${m.monotonyRisk}, density=${m.actionDensity.toFixed(2)}) at turn ${totalTurns}`);
   }
 
   // ── H: Auto-Pivot Detection ──
