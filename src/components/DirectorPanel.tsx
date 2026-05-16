@@ -228,6 +228,8 @@ export default function DirectorPanel({
   const [newQualityValue, setNewQualityValue] = useState("0");
   const [outlineBeats, setOutlineBeats] = useState<OutlineBeat[]>([]);
   const [outlineSaved, setOutlineSaved] = useState<boolean | null>(null);
+  const [pacingTarget, setPacingTarget] = useState<'slow' | 'medium' | 'fast'>('medium');
+  const [pacingSaved, setPacingSaved] = useState<boolean | null>(null);
 
   // ── Refs ──────────────────────────────────────────────────────────────────
 
@@ -247,12 +249,16 @@ export default function DirectorPanel({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [directorState.tensionLevel, directorState.menaceGauge]);
 
-  // ── Load saved outline from engine on mount ───────────────────────────────
+  // ── Load saved outline + pacing target from engine on mount ─────────────
 
   useEffect(() => {
     fetch("/api/outline")
       .then(r => r.ok ? r.json() as Promise<{ beats: OutlineBeat[] }> : { beats: [] })
       .then(data => { if (data.beats.length > 0) setOutlineBeats(data.beats); })
+      .catch(() => {});
+    fetch("/api/pacing-target")
+      .then(r => r.ok ? r.json() as Promise<{ target: 'slow' | 'medium' | 'fast' | null }> : { target: null })
+      .then(data => { if (data.target) setPacingTarget(data.target); })
       .catch(() => {});
   }, []);
 
@@ -361,6 +367,19 @@ export default function DirectorPanel({
       setTimeout(() => setOutlineSaved(null), 2000);
     } catch { setOutlineSaved(false); }
   }, [outlineBeats]);
+
+  const savePacingTarget = useCallback(async (target: 'slow' | 'medium' | 'fast') => {
+    setPacingTarget(target);
+    try {
+      const res = await fetch("/api/pacing-target", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target }),
+      });
+      setPacingSaved(res.ok);
+      setTimeout(() => setPacingSaved(null), 1500);
+    } catch { setPacingSaved(false); }
+  }, []);
 
   const addOutlineBeat = () => {
     setOutlineBeats(prev => [...prev, {
@@ -972,6 +991,33 @@ export default function DirectorPanel({
         {/* ── Outline ── */}
         {activeTab === "outline" && (
           <section className="space-y-4">
+            {/* Pacing Target */}
+            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-xs uppercase tracking-widest">Pacing Target</span>
+                {pacingSaved === true && <span className="text-green-600 font-bold uppercase text-[10px] tracking-widest">Saved ✓</span>}
+                {pacingSaved === false && <span className="text-[#FF4444] font-bold uppercase text-[10px] tracking-widest">Error ✗</span>}
+              </div>
+              <p className="text-[10px] font-mono text-gray-500 uppercase leading-relaxed">
+                Controls how aggressively the Pacing Controller fires pressure. "Fast" forces urgency; "slow" allows contemplation; "medium" fires only when clearly adrift.
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {(['slow', 'medium', 'fast'] as const).map(opt => (
+                  <button
+                    key={opt}
+                    onClick={() => savePacingTarget(opt)}
+                    className={`py-2 brutal-border-thick uppercase font-bold tracking-widest text-xs transition-colors ${
+                      pacingTarget === opt
+                        ? 'bg-black text-white'
+                        : 'bg-white text-black hover:bg-gray-100'
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-5">
               <p className="text-[10px] font-mono text-gray-500 uppercase leading-relaxed">
                 Author beats that override Director prompts when the engine enters the matching phase and turn range. Saved beats persist across room rounds.

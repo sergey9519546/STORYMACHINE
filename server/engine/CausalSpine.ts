@@ -267,6 +267,53 @@ export class CausalSpine {
       };
       this.stage.addDramaticPressure(discovererPressure);
       pressures.push(discovererPressure);
+
+      // ── GoalMutation: subgoal_blocked on the SUSPECT ──
+      // The suspect's active deception/concealment subgoal is now endangered.
+      if (suspect.goalStack) {
+        const activeGoals = suspect.goalStack.instrumental.filter(g => !g.achieved);
+        const blockedGoal = activeGoals.find(g =>
+          /deceive|lie|mislead|manipulate|conceal|hide|deflect|protect/i.test(g.description),
+        ) ?? activeGoals[0];
+        if (blockedGoal) {
+          const blockedMutation: GoalMutation = {
+            mutation_id: randomUUID(),
+            char_id: suspectId,
+            turn_index: turnIndex,
+            trigger_event_id: triggerEventId,
+            trigger_belief_id: edges[0]?.to_belief_id,
+            mutation_type: 'subgoal_blocked',
+            description: `${suspect.name}'s subgoal "${blockedGoal.description}" is now blocked by ${discoverer.name}'s discovery`,
+            old_subgoal: blockedGoal.description,
+          };
+          this.stage.recordGoalMutation(blockedMutation);
+          mutations.push(blockedMutation);
+        }
+      }
+
+      // ── GoalMutation: terminal_threatened on the DISCOVERER when high-severity ──
+      // If the contradiction is severe enough AND overlaps with the discoverer's terminal
+      // goal, the discoverer's core objective itself is now at risk.
+      const worstSeverity = Math.max(...edges.map(e => e.severity ?? 0));
+      if (worstSeverity >= 75 && discoverer.goalStack) {
+        const terminalDesc = discoverer.goalStack.terminal.description;
+        const contradictedText = edges
+          .map(e => allBeliefs.find(b => b.id === e.from_belief_id)?.proposition ?? '')
+          .join(' ');
+        if (this._overlap(contradictedText, terminalDesc)) {
+          const threatenedMutation: GoalMutation = {
+            mutation_id: randomUUID(),
+            char_id: discoverer_id,
+            turn_index: turnIndex,
+            trigger_event_id: triggerEventId,
+            trigger_belief_id: edges[0]?.from_belief_id,
+            mutation_type: 'terminal_threatened',
+            description: `${discoverer.name}'s terminal objective is threatened: the contradiction undermines a core assumption`,
+          };
+          this.stage.recordGoalMutation(threatenedMutation);
+          mutations.push(threatenedMutation);
+        }
+      }
     }
 
     return { mutations, pressures };

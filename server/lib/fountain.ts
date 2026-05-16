@@ -56,14 +56,14 @@ export function wrapSyuzhetFountain(fountain: string, wasSorted: boolean): strin
 
   const fadeLine = 'FADE OUT.\n\nTHE END';
 
-  // Collect positions of all INT./EXT. scene headings
+  // Collect positions of all INT./EXT./INT.-EXT. scene headings
   const positions: number[] = [];
-  let search = 0;
-  for (;;) {
-    const next = fountain.indexOf('INT. ', search);
-    if (next === -1) break;
-    positions.push(next);
-    search = next + 5;
+  const HEADING_RE = /(?:^|\n)((?:INT\.\/EXT\.|INT\.|EXT\.) )/g;
+  let m: RegExpExecArray | null;
+  while ((m = HEADING_RE.exec(fountain)) !== null) {
+    // position of the scene heading text itself (skip leading \n)
+    const pos = m.index + (m[0].startsWith('\n') ? 1 : 0);
+    positions.push(pos);
   }
   if (positions.length < 2) return fountain;
 

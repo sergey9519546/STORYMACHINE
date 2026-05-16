@@ -612,6 +612,26 @@ async function startServer() {
     res.json({ status: 'cleared' });
   }));
 
+  // ── Writer pacing target ──────────────────────────────────────────────────
+  // GET returns the current target ('slow' | 'medium' | 'fast' | null).
+  // POST sets a new target; body: { target: 'slow' | 'medium' | 'fast' }
+  app.get('/api/pacing-target', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const target = stage.getIllusionState().pacing_target ?? null;
+    res.json({ target });
+  }));
+
+  app.post('/api/pacing-target', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { target } = req.body as { target?: string };
+    if (!target || !['slow', 'medium', 'fast'].includes(target)) {
+      res.status(400).json({ error: 'target must be "slow", "medium", or "fast"' });
+      return;
+    }
+    stage.updateIllusionState({ pacing_target: target as 'slow' | 'medium' | 'fast' });
+    res.json({ target });
+  }));
+
   // ── Session snapshot export / import ──────────────────────────────────────
   // Export: download a JSON snapshot of the full simulation state.
   app.get('/api/session/export', gameLimiter, asyncHandler(async (req, res) => {

@@ -342,14 +342,39 @@ From ${observer.name}'s perspective only:
     if (totalTurns < 6 || agents.length === 0) return;
 
     const m = this._measurePacing(recentActions);
+    const target = this.stage.getIllusionState().pacing_target ?? 'medium';
 
     let hint: string | null = null;
-    if (m.monotonyRisk) {
-      hint = 'The scene is rhythmically stale — every line the same shape. Break the pattern: a fragment, a question, an unexpected silence, a one-word reply.';
-    } else if (m.tempo === 'slow' && m.avgSentenceLen > 25) {
-      hint = 'The scene is dragging. Short, punchy lines. No digressions. Something must happen — say it and mean it.';
-    } else if (m.actionDensity < 0.1 && recentActions.length >= agents.length * 2) {
-      hint = 'The scene is losing momentum. Something must happen — say something unexpected, reveal a new piece of information, or make a decisive move.';
+    let intensity = 40;
+
+    if (target === 'fast') {
+      // Writer wants urgency — any slow drift or monotony triggers harder push
+      if (m.monotonyRisk) {
+        hint = 'The scene is rhythmically stale — every line the same shape. Break the pattern with a fragment, an accusation, a sudden shift.';
+        intensity = 55;
+      } else if (m.tempo === 'slow' || m.actionDensity < 0.2) {
+        hint = 'The scene is losing urgency. Cut to the chase — short, punchy lines. Something decisive must happen now.';
+        intensity = 60;
+      }
+    } else if (target === 'slow') {
+      // Writer wants deliberate contemplation — only fire if it's actively too fast or too monotone
+      if (m.monotonyRisk) {
+        hint = 'The scene is becoming rhythmically automatic. Let silences breathe — a pause, an unfinished thought, an unexpected observation.';
+        intensity = 30;
+      } else if (m.tempo === 'fast' && m.actionDensity > 0.8) {
+        hint = 'The scene is moving too quickly through its emotional beats. Slow down — let weight settle before the next move.';
+        intensity = 35;
+      }
+      // If tempo is 'slow' and target is 'slow', no pressure needed
+    } else {
+      // Default: medium target — fire when clearly wrong
+      if (m.monotonyRisk) {
+        hint = 'The scene is rhythmically stale — every line the same shape. Break the pattern: a fragment, a question, an unexpected silence, a one-word reply.';
+      } else if (m.tempo === 'slow' && m.avgSentenceLen > 25) {
+        hint = 'The scene is dragging. Short, punchy lines. No digressions. Something must happen — say it and mean it.';
+      } else if (m.actionDensity < 0.1 && recentActions.length >= agents.length * 2) {
+        hint = 'The scene is losing momentum. Something must happen — say something unexpected, reveal a new piece of information, or make a decisive move.';
+      }
     }
 
     if (!hint) return;
@@ -360,13 +385,13 @@ From ${observer.name}'s perspective only:
         target_char_id: agent.char_id,
         trigger_event_id: 'pacing_controller',
         pressure_type: 'revelation_due',
-        intensity: 40,
+        intensity,
         bias_hint: hint,
         expires_at_turn: totalTurns + 3,
         applied: false,
       });
     }
-    console.log(`[Director] Pacing (tempo=${m.tempo}, monotony=${m.monotonyRisk}, density=${m.actionDensity.toFixed(2)}) at turn ${totalTurns}`);
+    console.log(`[Director] Pacing target=${target} measured=(tempo=${m.tempo}, monotony=${m.monotonyRisk}, density=${m.actionDensity.toFixed(2)}) at turn ${totalTurns}`);
   }
 
   // ── H: Auto-Pivot Detection ──

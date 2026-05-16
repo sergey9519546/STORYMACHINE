@@ -125,7 +125,8 @@ export interface IllusionState {
   planted_elements: IllusionElement[];
   pending_recontextualization: string[];
   total_turns: number;
-  outline?: OutlineBeat[];  // optional writer-authored beat sheet
+  outline?: OutlineBeat[];      // optional writer-authored beat sheet
+  pacing_target?: 'slow' | 'medium' | 'fast';  // writer-set pacing intent
 }
 
 // ── Persuasion strategy ──────────────────────────────────────────────────────
