@@ -50,11 +50,7 @@ export class Orchestrator {
     const currentNodeId = this.stage.getAgent(agentId)!.current_location_id;
 
     if (action.action_type === 'RELOCATE' && action.target) {
-<<<<<<< HEAD
       const targetLoc = this.locationMap.get(action.target.toLowerCase()) ?? this.locationMap.get(action.target);
-=======
-      const targetLoc = this.locationMap.get(action.target.toLowerCase()) || this.locationMap.get(action.target);
->>>>>>> origin/main
       if (targetLoc) {
         action.content = `→ ${targetLoc.name}`;
         this.stage.updateAgentLocation(agentId, targetLoc.location_id);
