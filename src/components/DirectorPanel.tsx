@@ -230,6 +230,12 @@ export default function DirectorPanel({
   const [outlineSaved, setOutlineSaved] = useState<boolean | null>(null);
   const [pacingTarget, setPacingTarget] = useState<'slow' | 'medium' | 'fast'>('medium');
   const [pacingSaved, setPacingSaved] = useState<boolean | null>(null);
+  const [storyStructure, setStoryStructure] = useState<string>('');
+  const [emotionalArc, setEmotionalArc] = useState<string>('');
+  const [directorStyle, setDirectorStyle] = useState<string>('');
+  const [expectedTurns, setExpectedTurns] = useState<number>(20);
+  const [presetSaved, setPresetSaved] = useState<boolean | null>(null);
+  const [applyingPreset, setApplyingPreset] = useState(false);
 
   // ── Refs ──────────────────────────────────────────────────────────────────
 
@@ -249,16 +255,26 @@ export default function DirectorPanel({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [directorState.tensionLevel, directorState.menaceGauge]);
 
-  // ── Load saved outline + pacing target from engine on mount ─────────────
+  // ── Load saved outline + story config from engine on mount ──────────────
 
   useEffect(() => {
     fetch("/api/outline")
       .then(r => r.ok ? r.json() as Promise<{ beats: OutlineBeat[] }> : { beats: [] })
       .then(data => { if (data.beats.length > 0) setOutlineBeats(data.beats); })
       .catch(() => {});
-    fetch("/api/pacing-target")
-      .then(r => r.ok ? r.json() as Promise<{ target: 'slow' | 'medium' | 'fast' | null }> : { target: null })
-      .then(data => { if (data.target) setPacingTarget(data.target); })
+    fetch("/api/story-config")
+      .then(r => r.ok ? r.json() as Promise<{
+        structure: string | null; emotional_arc: string | null;
+        director_style: string | null; expected_turns: number; pacing_target: string | null;
+      }> : null)
+      .then(data => {
+        if (!data) return;
+        if (data.structure) setStoryStructure(data.structure);
+        if (data.emotional_arc) setEmotionalArc(data.emotional_arc);
+        if (data.director_style) setDirectorStyle(data.director_style);
+        if (data.expected_turns) setExpectedTurns(data.expected_turns);
+        if (data.pacing_target) setPacingTarget(data.pacing_target as 'slow' | 'medium' | 'fast');
+      })
       .catch(() => {});
   }, []);
 
@@ -379,6 +395,43 @@ export default function DirectorPanel({
       setPacingSaved(res.ok);
       setTimeout(() => setPacingSaved(null), 1500);
     } catch { setPacingSaved(false); }
+  }, []);
+
+  const applyStructurePreset = useCallback(async () => {
+    if (!storyStructure) return;
+    setApplyingPreset(true);
+    try {
+      const res = await fetch("/api/outline/apply-preset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ structure: storyStructure, expectedTurns }),
+      });
+      if (res.ok) {
+        const data = await res.json() as { beats: OutlineBeat[] };
+        setOutlineBeats(data.beats);
+        setPresetSaved(true);
+      } else { setPresetSaved(false); }
+    } catch { setPresetSaved(false); }
+    setApplyingPreset(false);
+    setTimeout(() => setPresetSaved(null), 2000);
+  }, [storyStructure, expectedTurns]);
+
+  const saveEmotionalArc = useCallback(async (arc: string) => {
+    setEmotionalArc(arc);
+    await fetch("/api/emotional-arc", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ arc }),
+    }).catch(() => {});
+  }, []);
+
+  const saveDirectorStyle = useCallback(async (style: string) => {
+    setDirectorStyle(style);
+    await fetch("/api/director-style", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ style }),
+    }).catch(() => {});
   }, []);
 
   const addOutlineBeat = () => {
@@ -991,6 +1044,131 @@ export default function DirectorPanel({
         {/* ── Outline ── */}
         {activeTab === "outline" && (
           <section className="space-y-4">
+
+            {/* ── Story Architecture ── */}
+            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-4">
+              <span className="font-bold text-xs uppercase tracking-widest block">Story Architecture</span>
+              <p className="text-[10px] font-mono text-gray-500 uppercase leading-relaxed">
+                Select a narrative structure to auto-populate the beat sheet below. Choose an emotional arc so the engine steers tension toward the right curve. Set a cinematic style to modulate agent tone and director pressure.
+              </p>
+
+              {/* Structure preset */}
+              <div>
+                <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest block mb-1">Narrative Structure</label>
+                <select
+                  value={storyStructure}
+                  onChange={e => setStoryStructure(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">— None —</option>
+                  <option value="save_the_cat">Save the Cat (15 beats)</option>
+                  <option value="dan_harmon">Dan Harmon Story Circle (8)</option>
+                  <option value="john_yorke">John Yorke 5 Acts</option>
+                  <option value="freytag">Freytag's Pyramid (5)</option>
+                  <option value="sequence">Sequence Approach (8)</option>
+                  <option value="kishotenketsu">Kishōtenketsu (4)</option>
+                </select>
+              </div>
+
+              {/* Expected turns + apply */}
+              {storyStructure && (
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest block mb-1">Expected Total Turns</label>
+                    <input
+                      type="number"
+                      min={4}
+                      max={200}
+                      value={expectedTurns}
+                      onChange={e => setExpectedTurns(Math.max(4, Number(e.target.value)))}
+                      className={inputClass}
+                    />
+                    <p className="text-[9px] text-gray-400 mt-1 font-mono uppercase">Beat turn ranges will be scaled to this session length.</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={applyStructurePreset}
+                      disabled={applyingPreset}
+                      className="flex-1 py-2 bg-black text-white brutal-border-thick hover:bg-[#FF4444] transition-colors uppercase font-bold tracking-widest text-xs brutal-shadow-hover disabled:opacity-40"
+                    >
+                      {applyingPreset ? 'Applying…' : 'Apply Preset → Beats'}
+                    </button>
+                    {presetSaved === true && <span className="text-green-600 font-bold uppercase text-[10px] tracking-widest shrink-0">Applied ✓</span>}
+                    {presetSaved === false && <span className="text-[#FF4444] font-bold uppercase text-[10px] tracking-widest shrink-0">Error ✗</span>}
+                  </div>
+                </div>
+              )}
+
+              {/* Emotional arc */}
+              <div>
+                <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest block mb-1">Emotional Arc</label>
+                <select
+                  value={emotionalArc}
+                  onChange={e => saveEmotionalArc(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">— None (no tension curve) —</option>
+                  <option value="rags_to_riches">Rags to Riches (steady rise)</option>
+                  <option value="riches_to_rags">Riches to Rags (tragic fall)</option>
+                  <option value="man_in_a_hole">Man in a Hole (fall → rise)</option>
+                  <option value="icarus">Icarus (rise → fall)</option>
+                  <option value="cinderella">Cinderella (rise → fall → rise)</option>
+                  <option value="oedipus">Oedipus (fall → rise → fall)</option>
+                </select>
+                {emotionalArc && (
+                  <p className="text-[9px] text-gray-400 mt-1 font-mono uppercase">Engine will emit ESCALATE/COOL pressure when tension deviates &gt;22pts from the curve.</p>
+                )}
+              </div>
+
+              {/* Emotional arc tension curve visualization */}
+              {emotionalArc && (() => {
+                const CURVES: Record<string, number[]> = {
+                  rags_to_riches:  [10, 20, 30, 45, 58, 68, 78, 88],
+                  riches_to_rags:  [80, 72, 63, 54, 44, 33, 22, 12],
+                  man_in_a_hole:   [48, 36, 24, 16, 28, 46, 64, 80],
+                  icarus:          [18, 32, 52, 68, 80, 84, 62, 36],
+                  cinderella:      [28, 52, 72, 80, 52, 32, 58, 88],
+                  oedipus:         [72, 56, 42, 52, 68, 52, 35, 18],
+                };
+                const curve = CURVES[emotionalArc];
+                if (!curve) return null;
+                const W = 200; const H = 48;
+                const pts = curve.map((v, i) => `${(i / (curve.length - 1)) * W},${H - (v / 100) * H}`).join(' ');
+                return (
+                  <div className="bg-gray-50 border-2 border-black p-2">
+                    <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-label={`Tension curve for ${emotionalArc}`}>
+                      <polyline points={pts} fill="none" stroke="#FF4444" strokeWidth="2.5" strokeLinejoin="round" />
+                      <line x1="0" y1={H / 2} x2={W} y2={H / 2} stroke="#ccc" strokeWidth="1" strokeDasharray="4,4" />
+                    </svg>
+                    <div className="flex justify-between text-[9px] font-mono text-gray-400 uppercase mt-0.5">
+                      <span>start</span><span>middle</span><span>end</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Director style */}
+              <div>
+                <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest block mb-1">Cinematic Style</label>
+                <select
+                  value={directorStyle}
+                  onChange={e => saveDirectorStyle(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">— None —</option>
+                  <option value="hitchcock">Hitchcock — Voyeuristic Suspense</option>
+                  <option value="fincher">Fincher — Procedural & Cynical</option>
+                  <option value="nolan">Nolan — Cerebral & Non-Linear</option>
+                  <option value="villeneuve">Villeneuve — Atmospheric Dread</option>
+                  <option value="aster">Aster — Grief Horror</option>
+                  <option value="lynch">Lynch — Surreal Nightmare</option>
+                </select>
+                {directorStyle && (
+                  <p className="text-[9px] text-gray-400 mt-1 font-mono uppercase">Injected into every agent's character prompt and modulates Director pressure tone.</p>
+                )}
+              </div>
+            </div>
+
             {/* Pacing Target */}
             <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-3">
               <div className="flex items-center justify-between">

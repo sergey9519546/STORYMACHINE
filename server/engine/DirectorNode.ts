@@ -4,10 +4,12 @@ import type { ActionLogEntry, PerspectiveEvaluation, BeliefSource, EpistemicUpda
 import { safeJsonParse } from '../../src/lib/json.ts';
 import { randomUUID } from 'crypto';
 import { getAI, getModel, withTimeout } from './ai.ts';
+import { expectedTensionAt, STYLE_MODIFIERS } from '../lib/structure-presets.ts';
 
 export class DirectorNode {
   private stage: Stage;
   private _tensionHistory: number[] = [];  // H: track tension deltas for pivot detection
+  private _tensionAccumulator = 50;        // F: cumulative tension estimate (starts at midpoint)
 
   constructor(stage: Stage) {
     this.stage = stage;
@@ -111,6 +113,12 @@ export class DirectorNode {
 
     // ── A: Pacing Controller ──
     this._checkPacing(location_id, recentActions);
+
+    // ── F: Emotional Arc Deviation ──
+    this._tensionAccumulator = Math.max(0, Math.min(100,
+      this._tensionAccumulator + avgTensionDelta * 0.4,
+    ));
+    this._checkArcDeviation(location_id);
 
     // ── H: Auto-Pivot Detection ──
     this._detectPivot(location_id, avgTensionDelta, recentActions);
@@ -379,6 +387,13 @@ From ${observer.name}'s perspective only:
 
     if (!hint) return;
 
+    // Append director-style suffix when active
+    const directorStyle = this.stage.getIllusionState().director_style;
+    if (directorStyle) {
+      const styleMod = STYLE_MODIFIERS[directorStyle];
+      if (styleMod?.pacingHintSuffix) hint += styleMod.pacingHintSuffix;
+    }
+
     for (const agent of agents) {
       this.stage.addDramaticPressure({
         pressure_id: randomUUID(),
@@ -391,7 +406,7 @@ From ${observer.name}'s perspective only:
         applied: false,
       });
     }
-    console.log(`[Director] Pacing target=${target} measured=(tempo=${m.tempo}, monotony=${m.monotonyRisk}, density=${m.actionDensity.toFixed(2)}) at turn ${totalTurns}`);
+    console.log(`[Director] Pacing target=${target} style=${directorStyle ?? 'none'} measured=(tempo=${m.tempo}, monotony=${m.monotonyRisk}) at turn ${totalTurns}`);
   }
 
   // ── H: Auto-Pivot Detection ──
@@ -422,6 +437,67 @@ From ${observer.name}'s perspective only:
     });
     console.log(`[Director] Auto-pivot detected at turn ${this.stage.getTurnCount()}`);
     this._tensionHistory = [];  // reset after pivot
+  }
+
+  // ── F: Emotional Arc Deviation Check ──
+  // Compares the cumulative measured tension to the expected tension for the
+  // selected emotional_arc at the current story position. Emits ESCALATE when
+  // the story is running too calm, COOL when running too hot.
+  private _checkArcDeviation(location_id: string): void {
+    const state = this.stage.getIllusionState();
+    const arc = state.emotional_arc;
+    if (!arc) return;
+
+    const totalTurns = this.stage.getTurnCount();
+    const expectedTotal = state.expected_turns ?? 20;
+    const position = Math.min(1, totalTurns / expectedTotal);
+    const expectedTension = expectedTensionAt(arc, position);
+    if (expectedTension === null) return;
+
+    const deviation = this._tensionAccumulator - expectedTension;
+    const THRESHOLD = 22;  // ±22 points before correction fires
+    if (Math.abs(deviation) < THRESHOLD) return;
+
+    const agents = this.stage.getAgentsInLocation(location_id);
+    if (agents.length === 0) return;
+
+    const styleMod = state.director_style ? STYLE_MODIFIERS[state.director_style] : null;
+
+    if (deviation < 0) {
+      // Story running BELOW expected tension — push up
+      const hint = styleMod
+        ? `The scene needs more intensity. ${styleMod.pacingHintSuffix}`
+        : `The scene is running quieter than its arc demands at this point. Escalate — raise the stakes, reveal something, or force a confrontation.`;
+      for (const agent of agents) {
+        this.stage.addDramaticPressure({
+          pressure_id: randomUUID(),
+          target_char_id: agent.char_id,
+          trigger_event_id: 'arc_deviation',
+          pressure_type: 'ESCALATE',
+          intensity: Math.min(100, Math.round(Math.abs(deviation) * 0.8)),
+          bias_hint: hint,
+          expires_at_turn: totalTurns + 3,
+          applied: false,
+        });
+      }
+      console.log(`[Director] Arc deviation: tension ${this._tensionAccumulator.toFixed(0)} vs expected ${expectedTension} — ESCALATE`);
+    } else {
+      // Story running ABOVE expected tension — cool down
+      const hint = `The scene is more intense than the ${arc.replace(/_/g, ' ')} arc calls for at this stage. Ease the pressure — a moment of apparent calm, false security, or quiet revelation before the next wave.`;
+      for (const agent of agents) {
+        this.stage.addDramaticPressure({
+          pressure_id: randomUUID(),
+          target_char_id: agent.char_id,
+          trigger_event_id: 'arc_deviation',
+          pressure_type: 'COOL',
+          intensity: Math.min(100, Math.round(Math.abs(deviation) * 0.6)),
+          bias_hint: hint,
+          expires_at_turn: totalTurns + 2,
+          applied: false,
+        });
+      }
+      console.log(`[Director] Arc deviation: tension ${this._tensionAccumulator.toFixed(0)} vs expected ${expectedTension} — COOL`);
+    }
   }
 
   // ── I: Narrative Consistency Checker ──
@@ -511,18 +587,24 @@ From ${observer.name}'s perspective only:
       const existing = this.stage.getActivePressures(agent.char_id);
       if (existing.some(p => p.trigger_event_id === worst.source_event_id)) continue;
 
+      const state = this.stage.getIllusionState();
+      const styleMod = state.director_style ? STYLE_MODIFIERS[state.director_style] : null;
+      const intensityBoost = styleMod?.beliefEdgeIntensityBoost ?? 0;
+      const baseHint = styleMod?.confrontationHintOverride
+        ?? `A high-severity contradiction in your belief system demands resolution. You cannot remain passive — act on what you know.`;
+
       this.stage.addDramaticPressure({
         pressure_id: randomUUID(),
         target_char_id: agent.char_id,
         trigger_event_id: worst.source_event_id,
         pressure_type: 'CONFRONT',
-        intensity: Math.min(100, Math.round((worst.severity ?? 50) + 20)),
-        bias_hint: `A high-severity contradiction in your belief system demands resolution. You cannot remain passive — act on what you know.`,
+        intensity: Math.min(100, Math.round((worst.severity ?? 50) + 20 + intensityBoost)),
+        bias_hint: baseHint,
         expires_at_turn: turnIndex + 4,
         applied: false,
       });
 
-      console.log(`[Director] High-severity edge (${worst.severity?.toFixed(0)}) → CONFRONT pressure on ${agent.name}`);
+      console.log(`[Director] High-severity edge (${worst.severity?.toFixed(0)}) → CONFRONT pressure on ${agent.name} [style: ${state.director_style ?? 'none'}]`);
     }
   }
 

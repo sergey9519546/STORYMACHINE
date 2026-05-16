@@ -9,6 +9,7 @@ import { Stage } from './server/engine/Stage.ts';
 import { Orchestrator } from './server/engine/Orchestrator.ts';
 import type { CharacterSheet, Location, StageSnapshot } from './server/engine/types.ts';
 import { transcriptToFountain, extractCharactersFromLog, syuzhetSort, wrapSyuzhetFountain } from './server/lib/fountain.ts';
+import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES, STYLE_MODIFIERS } from './server/lib/structure-presets.ts';
 import { logger, requestLogger } from './server/lib/logger.ts';
 
 // ── Startup validation ────────────────────────────────────────────────────────
@@ -612,6 +613,64 @@ async function startServer() {
     res.json({ status: 'cleared' });
   }));
 
+  // ── Story architecture config ─────────────────────────────────────────────
+  // GET returns all persisted story config (structure, emotional_arc, director_style, expected_turns).
+  // Individual POST endpoints set each field separately so the UI can update one at a time.
+
+  app.get('/api/story-config', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const s = stage.getIllusionState();
+    res.json({
+      structure: s.structure ?? null,
+      emotional_arc: s.emotional_arc ?? null,
+      director_style: s.director_style ?? null,
+      expected_turns: s.expected_turns ?? 20,
+      pacing_target: s.pacing_target ?? null,
+    });
+  }));
+
+  // Apply a structure preset — instantiates beat templates into OutlineBeat[] and persists.
+  app.post('/api/outline/apply-preset', gameLimiter, asyncHandler(async (req, res) => {
+    const { structure, expectedTurns } = req.body as { structure?: string; expectedTurns?: number };
+    const VALID_STRUCTURES = Object.keys(STRUCTURE_NAMES);
+    if (!structure || !VALID_STRUCTURES.includes(structure)) {
+      res.status(400).json({ error: `structure must be one of: ${VALID_STRUCTURES.join(', ')}` });
+      return;
+    }
+    const n = Math.max(4, Math.min(200, Number(expectedTurns) || 20));
+    const { stage } = getOrCreateSession(sessionId(req));
+    const beats = instantiatePreset(structure, n);
+    stage.setOutline(beats);
+    stage.updateIllusionState({ structure: structure as import('./server/engine/types.ts').IllusionState['structure'], expected_turns: n });
+    res.json({ beats, structure, expected_turns: n, beat_count: beats.length });
+  }));
+
+  // Set emotional arc — persists to IllusionState for engine arc-deviation checks.
+  app.post('/api/emotional-arc', gameLimiter, asyncHandler(async (req, res) => {
+    const { arc } = req.body as { arc?: string };
+    const VALID = Object.keys(ARC_TENSION_CURVES);
+    if (!arc || !VALID.includes(arc)) {
+      res.status(400).json({ error: `arc must be one of: ${VALID.join(', ')}` });
+      return;
+    }
+    const { stage } = getOrCreateSession(sessionId(req));
+    stage.updateIllusionState({ emotional_arc: arc as NonNullable<import('./server/engine/types.ts').IllusionState['emotional_arc']> });
+    res.json({ arc });
+  }));
+
+  // Set director style — persists to IllusionState for agent prompt + pressure modulation.
+  app.post('/api/director-style', gameLimiter, asyncHandler(async (req, res) => {
+    const { style } = req.body as { style?: string };
+    const VALID = Object.keys(STYLE_MODIFIERS);
+    if (!style || !VALID.includes(style)) {
+      res.status(400).json({ error: `style must be one of: ${VALID.join(', ')}` });
+      return;
+    }
+    const { stage } = getOrCreateSession(sessionId(req));
+    stage.updateIllusionState({ director_style: style as NonNullable<import('./server/engine/types.ts').IllusionState['director_style']> });
+    res.json({ style });
+  }));
+
   // ── Writer pacing target ──────────────────────────────────────────────────
   // GET returns the current target ('slow' | 'medium' | 'fast' | null).
   // POST sets a new target; body: { target: 'slow' | 'medium' | 'fast' }
@@ -859,6 +918,7 @@ OUTPUT: A visceral character description.`,
   app.post('/api/analyze-script', aiLimiter, asyncHandler(async (req, res) => {
     const scriptText = requireString(req.body?.scriptText, 'scriptText');
     const engineState = req.body?.engineState ?? {};
+    const storyConfig = engineState?.config as Record<string, unknown> ?? {};
     const characters = Array.isArray(req.body?.characters) ? (req.body.characters as unknown[]).slice(0, 20) : [];
     const visualAnchor = typeof engineState?.protagonist?.visualAnchor === 'string'
       ? engineState.protagonist.visualAnchor.substring(0, 500) : '';
@@ -883,10 +943,21 @@ OUTPUT: A visceral character description.`,
       ? `\nACTIVE THROUGHLINES: ${(tl.activeThroughlines as string[]).join(', ')}. Objective: "${tl.objectiveStory ?? ''}". Relationship: "${tl.relationshipStory ?? ''}".`
       : '';
 
+    // ── Story architecture config — injected so AI analysis is structure-aware ──
+    const structure = typeof storyConfig.structure === 'string' ? storyConfig.structure : null;
+    const emotionalArc = typeof storyConfig.emotionalArc === 'string' ? storyConfig.emotionalArc : null;
+    const dirStyle = typeof storyConfig.directorStyle === 'string' ? storyConfig.directorStyle : null;
+    const structureBlock = (structure || emotionalArc || dirStyle) ? `
+STORY ARCHITECTURE:
+${structure ? `- Narrative Structure: ${STRUCTURE_NAMES[structure] ?? structure} — ensure the structuralNode field names a beat from this specific structure.` : ''}
+${emotionalArc ? `- Emotional Arc: ${emotionalArc.replace(/_/g, ' ')} — evaluate whether the current tension level matches this arc's expected trajectory at the scene's story position. ArcMeter and tension scores should reflect alignment with this shape.` : ''}
+${dirStyle ? `- Cinematic Style: ${dirStyle} — ${STYLE_MODIFIERS[dirStyle]?.agentInstruction?.split('.')[0] ?? dirStyle}. Let this style govern composition choices, information position bias, and commentary tone.` : ''}
+` : '';
+
     const prompt = `Analyze the following screenplay script.
 Current Director State: ${JSON.stringify(engineState?.directorState ?? {}).substring(0, 5000)}
 Characters Profile: ${JSON.stringify(characters).substring(0, 2000)}${infoPosBias}${activeTl}${codexBlock}
-
+${structureBlock}
 Script Text:
 ${scriptText.substring(0, 8000)}
 
@@ -895,7 +966,9 @@ Include cinematic composition, narrative metrics, director commentary, and quali
 Extract the most impactful line of dialogue for TTS (audioDialogue) and a highly detailed imagePrompt for storyboard generation.
 Validate dialogue against character profiles and flag inconsistencies in dialogueInconsistencies.
 Identify whether any comedy misdirection technique is active (clue_delivery, false_safety, desensitization, or none).
-Ensure throughline commentary addresses all active throughlines listed above.`;
+Ensure throughline commentary addresses all active throughlines listed above.
+${structure ? `structuralNode must name a specific beat from the ${structure} structure (e.g. "Catalyst", "Midpoint", "Ten — Twist").` : ''}
+${dirStyle ? `Cinematic composition and commentary must be filtered through the ${dirStyle} style.` : ''}`;
 
     const analysisResponse = await withTimeout(ai.models.generateContent({
       model: GEMINI_MODEL,

@@ -127,6 +127,11 @@ export interface IllusionState {
   total_turns: number;
   outline?: OutlineBeat[];      // optional writer-authored beat sheet
   pacing_target?: 'slow' | 'medium' | 'fast';  // writer-set pacing intent
+  // Story architecture config (persisted in engine so Director + Agents can read them)
+  structure?: 'save_the_cat' | 'dan_harmon' | 'john_yorke' | 'freytag' | 'sequence' | 'kishotenketsu';
+  emotional_arc?: 'rags_to_riches' | 'riches_to_rags' | 'man_in_a_hole' | 'icarus' | 'cinderella' | 'oedipus';
+  director_style?: 'hitchcock' | 'fincher' | 'nolan' | 'villeneuve' | 'aster' | 'lynch';
+  expected_turns?: number;      // writer's estimate of total session length for arc curve
 }
 
 // ── Persuasion strategy ──────────────────────────────────────────────────────

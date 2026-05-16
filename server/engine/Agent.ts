@@ -1,6 +1,7 @@
 import { Type } from '@google/genai';
 import { randomUUID } from 'crypto';
 import { getAI, getModel, withTimeout } from './ai.ts';
+import { STYLE_MODIFIERS } from '../lib/structure-presets.ts';
 import type {
   CharacterSheet,
   NarrativeAction,
@@ -282,6 +283,11 @@ export class Agent {
     // ── B: Outline Conditioning — writer beat sheet (if set) or 3-phase fallback ──
     const illusionState = this.stage.getIllusionState();
     const illusionPhase = illusionState.phase;
+
+    // ── Cinematic Style Instruction ──
+    const styleBlock = illusionState.director_style
+      ? `\n${STYLE_MODIFIERS[illusionState.director_style]?.agentInstruction ?? ''}\n`
+      : '';
     const currentTurn = this.stage.getTurnCount();
     const activeBeat = illusionState.outline?.find(b =>
       b.phase === illusionPhase && currentTurn >= b.turn_start && currentTurn <= b.turn_end,
@@ -340,7 +346,7 @@ ${beatHint}
 
 PERSUASION LEVERAGE:
 ${persuasionHints || '  (No other agents present.)'}
-
+${styleBlock}
 Generate 3 candidate actions. Score each 0–100 on goal alignment. The best-scoring will be selected.${emotionBlock}`;
   }
 
