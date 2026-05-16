@@ -18,8 +18,6 @@ export default defineConfig(({ mode: _mode }) => {
       rollupOptions: {
         output: {
           manualChunks: {
-            // Core React runtime — tiny, always needed
-            'vendor-react': ['react', 'react-dom'],
             // Animation library — large, shared across pages
             'vendor-motion': ['motion'],
             // Chart library — only used in EngineVisualizer

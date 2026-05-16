@@ -23,8 +23,8 @@ const CONTAGION_RATE = 0.08;   // base bleed rate per round × trust
 const EMOTION_DIMS = ['joy', 'distress', 'anger', 'fear', 'pride', 'shame'] as const;
 type NumericDim = typeof EMOTION_DIMS[number];
 
-function blank(turn: number): EmotionState {
-  return { joy: 0, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'neutral', intensity: 0, last_updated_at: turn };
+function blank(): EmotionState {
+  return { joy: 0, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'neutral', intensity: 0, last_updated_at: -1 };
 }
 
 function setDominant(e: EmotionState): void {
@@ -51,7 +51,10 @@ export class AppraisalEngine {
     if (!agent) return;
 
     const turnIndex = this.stage.getTurnCount();
-    const current = agent.emotionState ?? blank(turnIndex);
+    const current = agent.emotionState ?? blank();
+    // Skip if already appraised this turn (prevents double-counting when the acting
+    // agent also appears as a Director observer for the same turn index).
+    if (current.last_updated_at >= turnIndex) return;
     const next: EmotionState = { ...current };
 
     // ── Decay toward baseline ──
@@ -134,7 +137,7 @@ export class AppraisalEngine {
     const turnIndex = this.stage.getTurnCount();
     const snap: Record<string, EmotionState> = {};
     for (const a of agents) {
-      snap[a.char_id] = a.emotionState ?? blank(turnIndex);
+      snap[a.char_id] = a.emotionState ?? blank();
     }
 
     for (const a of agents) {

@@ -34,6 +34,11 @@ const PERSIST_SESSIONS = SESSION_DB_DIR !== ':memory:';
 const asyncHandler = (fn: express.RequestHandler): express.RequestHandler =>
   (req, res, next) => { Promise.resolve(fn(req, res, next)).catch(next); };
 
+class ValidationError extends Error {
+  status = 400;
+  constructor(message: string) { super(message); this.name = 'ValidationError'; }
+}
+
 const requireString = (val: unknown, name: string, maxLen = 20_000): string => {
   if (typeof val !== 'string' || val.trim() === '') throw new Error(`${name} is required`);
   if (val.length > maxLen) throw new Error(`${name} exceeds maximum length`);
@@ -358,10 +363,16 @@ function sessionId(req: express.Request): string {
   const raw = req.method === 'GET'
     ? req.query.sessionId
     : req.body?.sessionId;
+  // No sessionId provided — fall back to 'default' (acceptable for single-user use)
+  if (raw === undefined || raw === null || raw === '') return 'default';
   if (typeof raw !== 'string' || !raw.trim()) return 'default';
   const cleaned = raw.trim().substring(0, 64);
-  // Accept alphanumeric + hyphens/underscores only — reject injection attempts.
-  return /^[a-zA-Z0-9_-]{1,64}$/.test(cleaned) ? cleaned : 'default';
+  // A sessionId was explicitly supplied but is malformed — reject with 400 rather
+  // than silently falling back to 'default', which could leak another user's session.
+  if (!/^[a-zA-Z0-9_-]{1,64}$/.test(cleaned)) {
+    throw new ValidationError('sessionId must match [a-zA-Z0-9_-]{1,64}');
+  }
+  return cleaned;
 }
 
 // Prevents two concurrent runRoomSimulation() calls for the same session+room from
@@ -396,6 +407,11 @@ async function startServer() {
   app.post('/api/init', asyncHandler(async (req, res) => {
     const { nodes, agents } = req.body;
     const { orchestrator } = getOrCreateSession(sessionId(req));
+
+    const truncatedNodes  = Array.isArray(nodes)  && nodes.length  > 50;
+    const truncatedAgents = Array.isArray(agents) && agents.length > 50;
+    if (truncatedNodes)  logger.warn('init_truncated', { field: 'nodes',  sent: nodes.length,  limit: 50 });
+    if (truncatedAgents) logger.warn('init_truncated', { field: 'agents', sent: agents.length, limit: 50 });
 
     if (nodes && Array.isArray(nodes)) {
       (nodes as unknown[]).slice(0, 50).forEach((raw) => {
@@ -435,7 +451,12 @@ async function startServer() {
       });
     }
 
-    res.json({ status: 'initialized', sessionId: sessionId(req) });
+    res.json({
+      status: 'initialized',
+      sessionId: sessionId(req),
+      ...(truncatedNodes  ? { warning_nodes:  `Only first 50 of ${nodes.length} nodes registered`  } : {}),
+      ...(truncatedAgents ? { warning_agents: `Only first 50 of ${agents.length} agents registered` } : {}),
+    });
   }));
 
   app.post('/api/turn', asyncHandler(async (req, res) => {
@@ -520,6 +541,7 @@ async function startServer() {
 
     const simStage = new Stage(':memory:');
     const simOrchestrator = new Orchestrator(simStage);
+    try {
 
     (nodesPayload as unknown[]).slice(0, 10).forEach((raw) => {
       if (typeof raw !== 'object' || raw === null) return;
@@ -574,6 +596,9 @@ async function startServer() {
     const characters = extractCharactersFromLog(simAgents);
 
     res.json({ fountain, characters, turnCount: log.length, agents: simAgents, beatTraceCount: simBeatTraces.length });
+    } finally {
+      simStage.close();
+    }
   }));
 
   // Current Setup/Turn/Prestige illusion phase
@@ -1106,6 +1131,16 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    // Malformed JSON body — Express throws a SyntaxError with a 'body' property.
+    if (err instanceof SyntaxError && 'body' in err) {
+      res.status(400).json({ error: 'Invalid JSON in request body' });
+      return;
+    }
+    // Application-level validation errors (e.g. bad sessionId format).
+    if (err instanceof ValidationError) {
+      res.status(400).json({ error: err.message });
+      return;
+    }
     logger.error('unhandled_error', {
       message: err.message,
       stack: err.stack,

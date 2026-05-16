@@ -204,7 +204,7 @@ export class Agent {
 
     const best = (raw.candidates ?? []).reduce<Candidate>(
       (top, c) => ((c.goal_score ?? 0) > (top.goal_score ?? 0) ? c : top),
-      raw.candidates[0] ?? { action_type: 'SPEAK', content: '', target: null },
+      (raw.candidates ?? [])[0] ?? { action_type: 'SPEAK', content: '', target: null },
     );
 
     return {

@@ -190,12 +190,13 @@ export class CausalSpine {
           value: 80,
           achieved: false,
         };
-        const updatedStack = {
+        const updatedStack: GoalStack = {
           ...discoverer.goalStack,
           instrumental: [confrontGoal, ...discoverer.goalStack.instrumental],
           last_planned_at: turnIndex,
         };
         this.stage.updateGoalStack(discoverer_id, updatedStack);
+        discoverer = { ...discoverer, goalStack: updatedStack };
 
         const mutation: GoalMutation = {
           mutation_id: randomUUID(),

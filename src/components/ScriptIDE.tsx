@@ -203,6 +203,9 @@ export default function ScriptIDE({
   const panelToggleCountRef = useRef(0);
   const keystrokeTimesRef = useRef<number[]>([]);
   const analysisGenerationRef = useRef<number>(0);
+  // Always-current ref so async callbacks (triggerAnalysis) see the latest engineState
+  // rather than a stale closure from 2 s ago.
+  const engineStateRef = useRef<EngineState | null>(null);
 
   // ── Persist to localStorage ──────────────────────────────────────────────────
   useEffect(() => {
@@ -225,6 +228,22 @@ export default function ScriptIDE({
       document.documentElement.classList.remove("dark");
     }
   }, [isDarkMode]);
+
+  // Keep engineStateRef in sync so triggerAnalysis always reads the latest state (F3).
+  useEffect(() => {
+    engineStateRef.current = engineState;
+  }, [engineState]);
+
+  // Cleanup typing timeout and AudioContext on unmount (F2a, F2b).
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      if (audioCtxRef.current) {
+        audioCtxRef.current.close().catch(() => { /* ignore */ });
+        audioCtxRef.current = null;
+      }
+    };
+  }, []);
 
   // ── Consume imported Fountain script ────────────────────────────────────────
   useEffect(() => {
@@ -399,13 +418,14 @@ export default function ScriptIDE({
 
   // ── AI analysis ──────────────────────────────────────────────────────────────
   const triggerAnalysis = async (text: string) => {
-    if (!text.trim() || !engineState) return;
+    const currentEngineState = engineStateRef.current;
+    if (!text.trim() || !currentEngineState) return;
 
     const currentGeneration = ++analysisGenerationRef.current;
     setEngineState((prev) => (prev ? { ...prev, isAnalyzing: true } : null));
 
     try {
-      const newState = await analyzeScriptBlock(engineState, text, characters);
+      const newState = await analyzeScriptBlock(currentEngineState, text, characters);
       if (currentGeneration === analysisGenerationRef.current) {
         setEngineState(newState);
       }

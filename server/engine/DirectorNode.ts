@@ -8,11 +8,16 @@ import { expectedTensionAt, STYLE_MODIFIERS } from '../lib/structure-presets.ts'
 
 export class DirectorNode {
   private stage: Stage;
-  private _tensionHistory: number[] = [];  // H: track tension deltas for pivot detection
-  private _tensionAccumulator = 50;        // F: cumulative tension estimate (starts at midpoint)
+  private _tensionHistory: number[] = [];
+  private _tensionAccumulator = 50;
 
   constructor(stage: Stage) {
     this.stage = stage;
+    // Restore tension state from the persisted DB so server restarts don't reset
+    // arc-deviation and pivot detection.
+    const ts = stage.getDirectorTensionState();
+    this._tensionAccumulator = ts.accumulator;
+    this._tensionHistory = ts.history;
   }
 
   // ── Perspective-bounded room evaluation ─────────────────────────────────────
@@ -131,6 +136,9 @@ export class DirectorNode {
 
     // ── J: Belief-Edge pressure — read high-severity edges, emit canonical pressure ──
     this._checkBeliefEdges(location_id);
+
+    // Persist tension state so arc-deviation and pivot detection survive restarts.
+    this.stage.saveDirectorTensionState(this._tensionAccumulator, this._tensionHistory);
 
     return epistemicUpdates;
   }
@@ -422,10 +430,14 @@ From ${observer.name}'s perspective only:
     if (this._tensionHistory.length > 5) this._tensionHistory.shift();
     if (this._tensionHistory.length < 3) return;
 
-    // Sign-change twice in 3 consecutive readings = pivot
+    // Sign-change twice in 3 consecutive non-zero readings = pivot.
+    // Skip zero entries: Math.sign(0)===0 would match both positive and negative
+    // neighbors, generating spurious turning points on flat tension sequences.
     let signChanges = 0;
     for (let i = 1; i < this._tensionHistory.length; i++) {
-      if (Math.sign(this._tensionHistory[i]) !== Math.sign(this._tensionHistory[i - 1])) signChanges++;
+      const prev = Math.sign(this._tensionHistory[i - 1]);
+      const curr = Math.sign(this._tensionHistory[i]);
+      if (prev !== 0 && curr !== 0 && prev !== curr) signChanges++;
     }
     if (signChanges < 2) return;
 

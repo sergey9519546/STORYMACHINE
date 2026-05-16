@@ -248,16 +248,23 @@ export class Stage {
       VALUES (?, ?, ?, ?)
     `).run(agent.char_id, agent.name, agent.public_mask, agent.hidden_motive);
 
-    // Seed belief graph from knowledge_vector (each fact becomes a witnessed belief)
-    const seedBeliefs: Belief[] = agent.knowledge_vector.map(fact => ({
-      id: randomUUID(),
-      proposition: fact,
-      confidence: 1.0,
-      source: 'witnessed' as const,
-      acquired_at: 0,
-    }));
+    // Seed belief graph from knowledge_vector (each fact becomes a witnessed belief).
+    // Skip seeds whose proposition already appears in agent.beliefs (avoids duplication
+    // when re-importing a snapshot that was already seeded on first addAgent call).
+    const existingProps = new Set(
+      (agent.beliefs ?? []).map(b => b.proposition.toLowerCase()),
+    );
+    const seedBeliefs: Belief[] = agent.knowledge_vector
+      .filter(fact => !existingProps.has(fact.toLowerCase()))
+      .map(fact => ({
+        id: randomUUID(),
+        proposition: fact,
+        confidence: 1.0,
+        source: 'witnessed' as const,
+        acquired_at: 0,
+      }));
 
-    // Merge any pre-supplied beliefs with the seeded ones
+    // Merge unique seeds with any pre-supplied beliefs
     const allBeliefs = [...seedBeliefs, ...(agent.beliefs ?? [])];
 
     this.db.prepare(`
@@ -434,13 +441,13 @@ export class Stage {
 
   public getLastActionForAgent(char_id: string): ActionLogEntry | undefined {
     return this.db.prepare(
-      'SELECT * FROM Action_Log WHERE char_id = ? ORDER BY timestamp DESC LIMIT 1',
+      'SELECT * FROM Action_Log WHERE char_id = ? ORDER BY rowid DESC LIMIT 1',
     ).get(char_id) as ActionLogEntry | undefined;
   }
 
   public getSensoryFilter(location_id: string, limit: number = 10): ActionLogEntry[] {
     return (this.db.prepare(
-      'SELECT * FROM Action_Log WHERE location_id = ? AND is_audible = 1 ORDER BY timestamp DESC LIMIT ?'
+      'SELECT * FROM Action_Log WHERE location_id = ? AND is_audible = 1 ORDER BY rowid DESC LIMIT ?'
     ).all(location_id, limit) as ActionLogEntry[]).reverse();
   }
 
@@ -501,6 +508,29 @@ export class Stage {
   public setOutline(beats: OutlineBeat[]): void {
     this.db.prepare('UPDATE Illusion_State SET outline_json = ? WHERE id = 1')
       .run(JSON.stringify(beats));
+  }
+
+  // ── Director tension state persistence (survives server restart) ─────────────
+  // Stored inside config_json alongside the story architecture fields so no new
+  // schema migration is required.
+
+  public getDirectorTensionState(): { accumulator: number; history: number[] } {
+    const row = this.db.prepare('SELECT config_json FROM Illusion_State WHERE id = 1').get() as { config_json: string | null } | undefined;
+    if (!row) return { accumulator: 50, history: [] };
+    const config = safeJsonParse<Record<string, unknown>>(row.config_json ?? '{}', {});
+    return {
+      accumulator: typeof config.tension_accumulator === 'number' ? config.tension_accumulator : 50,
+      history: Array.isArray(config.tension_history) ? config.tension_history as number[] : [],
+    };
+  }
+
+  public saveDirectorTensionState(accumulator: number, history: number[]): void {
+    const row = this.db.prepare('SELECT config_json FROM Illusion_State WHERE id = 1').get() as { config_json: string | null } | undefined;
+    if (!row) return;
+    const config = safeJsonParse<Record<string, unknown>>(row.config_json ?? '{}', {});
+    config.tension_accumulator = accumulator;
+    config.tension_history = history;
+    this.db.prepare('UPDATE Illusion_State SET config_json = ? WHERE id = 1').run(JSON.stringify(config));
   }
 
   // ── Persuasion log ──────────────────────────────────────────────────────────

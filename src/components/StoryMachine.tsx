@@ -102,6 +102,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
 
   const fetchState = async () => {
     const res = await fetch("/api/state");
+    if (!res.ok) { console.error("[state]", res.status); return; }
     const data = await res.json() as { agents: CharacterSheet[]; nodes: Location[] };
     setAgents(data.agents);
     setNodes(data.nodes);
@@ -112,6 +113,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
 
   const fetchLedger = async () => {
     const res = await fetch("/api/ledger");
+    if (!res.ok) { console.error("[ledger]", res.status); return; }
     const data = await res.json() as ActionLogEntry[];
     setLedger(data);
   };
@@ -221,24 +223,34 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
 
   const handleTurn = async (agentId: string) => {
     setLoading(true);
-    await fetch("/api/turn", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ agentId }),
-    });
-    await refreshAll();
-    setLoading(false);
+    try {
+      await fetch("/api/turn", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentId }),
+      });
+      await refreshAll();
+    } catch (e) {
+      console.error("[turn]", e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRunRoom = async (nodeId: string) => {
     setLoading(true);
-    await fetch("/api/run-room", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nodeId }),
-    });
-    await refreshAll();
-    setLoading(false);
+    try {
+      await fetch("/api/run-room", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nodeId }),
+      });
+      await refreshAll();
+    } catch (e) {
+      console.error("[run-room]", e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleExport = useCallback(async () => {
