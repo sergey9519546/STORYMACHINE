@@ -38,6 +38,12 @@ export class Stage {
     this.runMigrations();
   }
 
+  // Release the underlying SQLite handle. For file-backed sessions the data
+  // remains on disk and can be re-opened later; for ':memory:' it is discarded.
+  public close(): void {
+    try { this.db.close(); } catch { /* already closed */ }
+  }
+
   // ── Schema versioning ────────────────────────────────────────────────────────
   // Each entry in MIGRATIONS corresponds to one schema version increment.
   // Applied sequentially from the current user_version onward.

@@ -13,6 +13,7 @@ import type {
   DramaticPressure,
 } from "../../server/engine/types";
 import { FileDown, Brain, Eye, AlertTriangle, GitBranch, Target, Zap, Smile, Shuffle } from "lucide-react";
+import ScenarioBuilder from "./storymachine/ScenarioBuilder";
 
 // ── Emotion display helpers ───────────────────────────────────────────────────
 
@@ -69,6 +70,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [activePressures, setActivePressures] = useState<Array<{ char_id: string; pressures: DramaticPressure[] }>>([]);
   const ledgerEndRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
+  const [showBuilder, setShowBuilder] = useState(false);
 
   const fetchActivePressures = useCallback(async () => {
     const res = await fetch("/api/dramatic-pressure-all");
@@ -140,9 +142,28 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
     await Promise.all([fetchState(), fetchLedger(), fetchIllusionState(), fetchSpineData(), fetchActivePressures()]);
   }, [fetchPersuasionLog, fetchActivePressures]);
 
-  const handleInit = async () => {
+  // Wipes any existing session, posts a fresh scenario, and refreshes all panels.
+  const submitScenario = useCallback(async (payload: { nodes: Location[]; agents: CharacterSheet[] }) => {
+    setShowBuilder(false);
     setLoading(true);
+    // Reset first so a new scenario never inherits stale agents/ledger from a
+    // prior session (sessions now persist to disk between server restarts).
+    await fetch("/api/reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    await fetch("/api/init", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    await refreshAll();
+    setLoading(false);
+  }, [refreshAll]);
 
+  // The original hardcoded scenario, now offered as a one-click preset.
+  const loadExample = useCallback(() => {
     const initialNodes: Location[] = [
       {
         location_id: "room_a",
@@ -195,15 +216,8 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       },
     ];
 
-    await fetch("/api/init", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nodes: initialNodes, agents: initialAgents }),
-    });
-
-    await refreshAll();
-    setLoading(false);
-  };
+    submitScenario({ nodes: initialNodes, agents: initialAgents });
+  }, [submitScenario]);
 
   const handleTurn = async (agentId: string) => {
     setLoading(true);
@@ -306,11 +320,11 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             Back to IDE
           </button>
           <button
-            onClick={handleInit}
+            onClick={() => setShowBuilder(true)}
             disabled={loading}
             className="bg-black hover:bg-[#FF4444] text-white px-4 py-2 font-bold uppercase tracking-wider disabled:opacity-50 brutal-border brutal-shadow-hover transition-colors"
           >
-            Initialize Scenario
+            Build Scenario
           </button>
         </div>
       </header>
@@ -820,6 +834,15 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             </div>
           </div>
         </section>
+      )}
+
+      {showBuilder && (
+        <ScenarioBuilder
+          onSubmit={submitScenario}
+          onLoadExample={loadExample}
+          onClose={() => setShowBuilder(false)}
+          busy={loading}
+        />
       )}
     </div>
   );

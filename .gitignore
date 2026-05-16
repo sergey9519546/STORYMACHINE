@@ -8,3 +8,4 @@ coverage/
 !.env.example
 *.wav
 .claude/
+data/

@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
+import fs from 'fs';
 import { type GoogleGenAI, Type, Modality } from '@google/genai';
 import { getAI, withTimeout } from './server/engine/ai.ts';
 import { rateLimit } from 'express-rate-limit';
@@ -23,6 +24,11 @@ if (!GEMINI_API_KEY) {
 const GEMINI_MODEL     = process.env.GEMINI_MODEL      ?? 'gemini-2.5-pro';
 const GEMINI_IMG_MODEL = process.env.GEMINI_IMG_MODEL  ?? 'gemini-2.5-flash-preview-image-generation';
 const GEMINI_TTS_MODEL = process.env.GEMINI_TTS_MODEL  ?? 'gemini-2.5-flash-preview-tts';
+
+// Directory for per-session SQLite files. Sessions survive a server restart.
+// Set SESSION_DB_DIR=':memory:' to opt out of disk persistence (ephemeral runs).
+const SESSION_DB_DIR = process.env.SESSION_DB_DIR ?? path.join(process.cwd(), 'data', 'sessions');
+const PERSIST_SESSIONS = SESSION_DB_DIR !== ':memory:';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const asyncHandler = (fn: express.RequestHandler): express.RequestHandler =>
@@ -307,10 +313,16 @@ interface Session {
 const sessions = new Map<string, Session>();
 const SESSION_TTL_MS = 30 * 60 * 1000;
 
+function dbPathFor(sessionId: string): string {
+  return PERSIST_SESSIONS ? path.join(SESSION_DB_DIR, `${sessionId}.db`) : ':memory:';
+}
+
 function getOrCreateSession(sessionId: string): Session {
   let session = sessions.get(sessionId);
   if (!session) {
-    const s = new Stage(':memory:');
+    // For a persisted session this opens the existing file; the Orchestrator
+    // constructor re-hydrates agents + locations, so the session resumes intact.
+    const s = new Stage(dbPathFor(sessionId));
     session = { stage: s, orchestrator: new Orchestrator(s), lastAccess: Date.now() };
     sessions.set(sessionId, session);
   }
@@ -318,10 +330,27 @@ function getOrCreateSession(sessionId: string): Session {
   return session;
 }
 
+// Evict a session from memory AND delete its persisted DB file — a true wipe.
+function destroySession(sessionId: string): void {
+  const session = sessions.get(sessionId);
+  if (session) { session.stage.close(); sessions.delete(sessionId); }
+  if (PERSIST_SESSIONS) {
+    const base = path.join(SESSION_DB_DIR, `${sessionId}.db`);
+    for (const suffix of ['', '-wal', '-shm', '-journal']) {
+      try { fs.unlinkSync(base + suffix); } catch { /* file absent — fine */ }
+    }
+  }
+}
+
+// TTL cleanup: evict idle sessions from memory and release the file handle.
+// The DB file remains on disk so the session resumes on next access.
 setInterval(() => {
   const now = Date.now();
   for (const [id, s] of sessions) {
-    if (now - s.lastAccess > SESSION_TTL_MS) sessions.delete(id);
+    if (now - s.lastAccess > SESSION_TTL_MS) {
+      s.stage.close();
+      sessions.delete(id);
+    }
   }
 }, 60_000).unref();
 
@@ -341,6 +370,11 @@ const runningRooms = new Set<string>();
 
 // ── Server ────────────────────────────────────────────────────────────────────
 async function startServer() {
+  if (PERSIST_SESSIONS) {
+    fs.mkdirSync(SESSION_DB_DIR, { recursive: true });
+    logger.info('session_persistence', { dir: SESSION_DB_DIR });
+  }
+
   const app = express();
   app.use(express.json({ limit: '1mb' }));
   app.use(requestLogger());
@@ -450,7 +484,7 @@ async function startServer() {
   // Reset a session (clears all simulation state for this sessionId)
   app.post('/api/reset', gameLimiter, asyncHandler(async (req, res) => {
     const sid = sessionId(req);
-    sessions.delete(sid);
+    destroySession(sid);
     res.json({ status: 'reset', sessionId: sid });
   }));
 
@@ -714,8 +748,8 @@ async function startServer() {
       return;
     }
     const sid = sessionId(req);
-    // Replace existing session with a fresh one, then import.
-    sessions.delete(sid);
+    // Replace existing session with a fresh one (wipes any persisted DB), then import.
+    destroySession(sid);
     const { stage, orchestrator } = getOrCreateSession(sid);
     stage.importSnapshot(snap);
     // Re-register agents and nodes into the orchestrator for future turns.
@@ -793,12 +827,31 @@ async function startServer() {
     return typeof ctx === 'string' ? ctx.substring(0, 8000) : '';
   };
 
+  // Lenient character-profile sanitizer for endpoints where profiles are
+  // optional context (not the primary input).
+  const sanitizeProfiles = (raw: unknown): Array<Record<string, string>> => {
+    if (!Array.isArray(raw)) return [];
+    return (raw as unknown[]).slice(0, 20).map((p) => {
+      if (typeof p !== 'object' || p === null) return { name: '', ghost: '', lie: '', want: '', need: '' };
+      const prof = p as Record<string, unknown>;
+      const s = (v: unknown, max = 1000) => (typeof v === 'string' ? v.substring(0, max) : '');
+      return { name: s(prof.name, 256), ghost: s(prof.ghost), lie: s(prof.lie), want: s(prof.want), need: s(prof.need) };
+    }).filter((p) => p.name);
+  };
+
+  // Renders profiles as a compact prompt block for continuity-aware generation.
+  const profilesBlock = (profiles: Array<Record<string, string>>): string =>
+    profiles.length > 0
+      ? `\nCHARACTERS (keep every depiction consistent with these profiles — never contradict a want, lie, or wound):\n${profiles.map(p => `- ${p.name}: wants "${p.want || '?'}"; clings to the false belief "${p.lie || '?'}"; wounded by "${p.ghost || '?'}"`).join('\n')}\n`
+      : '';
+
   app.post('/api/scriptide/world-build', aiLimiter, asyncHandler(async (req, res) => {
     const beat = requireString(req.body?.beat, 'beat');
     const scriptContext = scriptContextOf(req.body);
     const contextBlock = scriptContext
       ? `\nEXISTING SCRIPT (for continuity — match the established tone, characters, locations, and facts; do not contradict them):\n${scriptContext}\n`
       : '';
+    const wbProfiles = profilesBlock(sanitizeProfiles(req.body?.profiles));
     const response = await withTimeout(ai.models.generateContent({
       model: GEMINI_MODEL,
       contents: `SYSTEM ROLE: You are a master screenwriter and world-builder. Your task is to generate or expand a scene based on the user's beat outline.
@@ -810,7 +863,7 @@ STRICT CONSTRAINTS:
 2. NO CAMERA DIRECTIONS: You are strictly forbidden from using camera terminology (e.g., "We see", "Pan to", "Close up", "Wide shot", "Angle on"). Describe the environment and the action as it happens in the world, not through a lens.
 3. SENSORY WRITING: Focus on lighting, sound, texture, and kinetic movement. Use active verbs. Avoid "is/are" where possible.
 4. ECONOMY: Keep action blocks to 4 lines maximum. Break up text to control the reader's pacing.
-${contextBlock}
+${contextBlock}${wbProfiles}
 INPUT: ${beat}
 OUTPUT: Generate the Scene Heading and Action lines.`,
     }), 30_000, 'world-build');
@@ -872,6 +925,7 @@ OUTPUT: Provide 2 alternative versions of the dialogue exchange, explaining the 
     const tnContextBlock = tnContext
       ? `\nSURROUNDING SCRIPT (consider how tension carries over from adjacent scenes):\n${tnContext}\n`
       : '';
+    const tnProfiles = profilesBlock(sanitizeProfiles(req.body?.profiles));
     const response = await withTimeout(ai.models.generateContent({
       model: GEMINI_MODEL,
       contents: `SYSTEM ROLE: You are a structural script consultant influenced by Hitchcock's theory of suspense.
@@ -883,9 +937,9 @@ ANALYSIS CRITERIA:
 2. The Ticking Clock: Is there a time constraint? If not, suggest a micro-deadline.
 3. The Dilemma: Are the choices too easy? Propose a "best bad choice" scenario.
 4. Pacing: Suggest where to slow down to build dread, or speed up to simulate panic.
-${tnContextBlock}
+${tnContextBlock}${tnProfiles}
 INPUT SCENE: ${scene}
-OUTPUT: A bulleted diagnostic report with 3 actionable suggestions.`,
+OUTPUT: A bulleted diagnostic report with 3 actionable suggestions. Where a character's want, lie, or wound is relevant, ground the suggestion in it.`,
     }), 30_000, 'analyze-tension');
     res.json({ result: response.text });
   }));

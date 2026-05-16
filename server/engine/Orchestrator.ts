@@ -23,6 +23,11 @@ export class Orchestrator {
       this.locationMap.set(loc.location_id, loc);
       this.locationMap.set(loc.name.toLowerCase(), loc);
     }
+    // Re-hydrate agents from a persisted Stage so a server restart (or any fresh
+    // Orchestrator over an existing DB) resumes the session without re-init.
+    for (const sheet of this.stage.getAllAgents()) {
+      this.agents.set(sheet.char_id, new Agent(sheet, this.stage));
+    }
   }
 
   public registerAgent(sheet: CharacterSheet) {
@@ -73,6 +78,18 @@ export class Orchestrator {
     const update = await agent.updateEpistemics(recentActions);
     this._runSpineForUpdate(update, action_id, currentNodeId);
     this.appraiser.appraise(update);
+
+    // ── Director evaluation ──
+    // Single turns run the full Director pass (perspective evaluation, illusion-state
+    // advance, pacing / arc / consistency / pivot checks) so they are first-class —
+    // not a degraded path that silently skips narrative progression.
+    const roomActions = this.stage.getSensoryFilter(currentNodeId, 6);
+    const directorUpdates = await this.director.evaluateRoom(currentNodeId, roomActions);
+    for (const u of directorUpdates) {
+      this._runSpineForUpdate(u, action_id, currentNodeId);
+      this.appraiser.appraise(u);
+    }
+    this.appraiser.applyContagion(currentNodeId);
 
     return action;
   }

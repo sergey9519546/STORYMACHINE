@@ -88,7 +88,7 @@ export default function AIPanel({ script, characters, onApplySuggestion }: AIPan
                 className="w-full h-32 p-3 border-2 border-black bg-gray-50 text-sm outline-none focus:border-[#FF4444] resize-none font-mono"
               />
               <button
-                onClick={() => runPrompt('world-build', { beat: input, scriptContext: script })}
+                onClick={() => runPrompt('world-build', { beat: input, scriptContext: script, profiles: characters })}
                 disabled={loading || !input}
                 className="w-full bg-black text-white py-3 text-xs font-bold uppercase tracking-wider hover:bg-[#FF4444] disabled:opacity-50 transition-colors flex items-center justify-center gap-2 brutal-border brutal-shadow-hover disabled:pointer-events-none"
               >
@@ -128,7 +128,7 @@ export default function AIPanel({ script, characters, onApplySuggestion }: AIPan
                 className="w-full h-32 p-3 border-2 border-black bg-gray-50 text-sm outline-none focus:border-[#FF4444] resize-none font-mono"
               />
               <button
-                onClick={() => runPrompt('analyze-tension', { scene: input, scriptContext: script })}
+                onClick={() => runPrompt('analyze-tension', { scene: input, scriptContext: script, profiles: characters })}
                 disabled={loading || !input}
                 className="w-full bg-black text-white py-3 text-xs font-bold uppercase tracking-wider hover:bg-[#FF4444] disabled:opacity-50 transition-colors flex items-center justify-center gap-2 brutal-border brutal-shadow-hover disabled:pointer-events-none"
               >
