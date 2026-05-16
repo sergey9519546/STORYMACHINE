@@ -668,6 +668,33 @@ export class Stage {
     }));
   }
 
+  public getAllActivePressures(): Array<{ char_id: string; pressures: DramaticPressure[] }> {
+    const currentTurn = this.getTurnCount();
+    const rows = this.db.prepare(`
+      SELECT * FROM Dramatic_Pressure
+      WHERE applied = 0 AND expires_at_turn > ?
+      ORDER BY target_char_id, intensity DESC
+    `).all(currentTurn) as Array<Record<string, unknown>>;
+
+    const grouped = new Map<string, DramaticPressure[]>();
+    for (const r of rows) {
+      const charId = r.target_char_id as string;
+      if (!grouped.has(charId)) grouped.set(charId, []);
+      grouped.get(charId)!.push({
+        pressure_id: r.pressure_id as string,
+        target_char_id: charId,
+        source_char_id: r.source_char_id as string | undefined,
+        trigger_event_id: r.trigger_event_id as string,
+        pressure_type: r.pressure_type as DramaticPressure['pressure_type'],
+        intensity: r.intensity as number,
+        bias_hint: r.bias_hint as string,
+        expires_at_turn: r.expires_at_turn as number,
+        applied: (r.applied as number) === 1,
+      });
+    }
+    return Array.from(grouped.entries()).map(([char_id, pressures]) => ({ char_id, pressures }));
+  }
+
   // ── Session snapshot export / import ─────────────────────────────────────────
 
   public exportSnapshot(): StageSnapshot {

@@ -2,41 +2,83 @@ import type { ActionLogEntry, CharacterSheet, Location, BeatTrace } from '../eng
 
 // ── Syuzhet Reconstruction ───────────────────────────────────────────────────
 // Reorders the action log from chronological (fabula) to information-reveal
-// order (syuzhet). The most dramatic event (a revelation or turning_point beat)
-// becomes the opening; what preceded it is presented as flashback.
+// order (syuzhet):
+//   Act I   — opens on the highest-drama beat (revelation / turning_point)
+//   Act II  — flashes back to show buried cause (up to and including inciting action)
+//   Act III — "hidden middle": what happened between the inciting cause and the climax
+// Falls back to simple two-act (climax first, then full flashback) when no
+// inciting_action beat is available.
 export function syuzhetSort(
   log: ActionLogEntry[],
   beatTraces: BeatTrace[],
 ): ActionLogEntry[] {
-  if (log.length < 3 || beatTraces.length === 0) return log;
+  if (log.length < 4 || beatTraces.length === 0) return log;
 
-  const PRIORITY: Record<string, number> = { revelation: 3, turning_point: 2, contradiction_discovered: 1 };
-  const highBeats = beatTraces
+  const PRIORITY: Record<string, number> = {
+    revelation: 4, turning_point: 3, contradiction_discovered: 2, inciting_action: 1,
+  };
+
+  // Pick the highest-drama beat as the opening pivot
+  const sortedBeats = beatTraces
     .filter(b => b.beat_type in PRIORITY)
-    .sort((a, b) => (PRIORITY[b.beat_type] ?? 0) - (PRIORITY[a.beat_type] ?? 0));
+    .sort((a, b) => (PRIORITY[b.beat_type] ?? 0) - (PRIORITY[a.beat_type] ?? 0) || b.turn_index - a.turn_index);
 
-  const pivotEventId = highBeats[0]?.trigger_event_id;
-  if (!pivotEventId) return log;
+  const mainPivot = sortedBeats.find(b => b.beat_type !== 'inciting_action');
+  if (!mainPivot) return log;
 
-  const pivotIdx = log.findIndex(e => e.action_id === pivotEventId);
+  const pivotIdx = log.findIndex(e => e.action_id === mainPivot.trigger_event_id);
   if (pivotIdx <= 0) return log;
 
-  const before  = log.slice(0, pivotIdx);
-  const pivot   = log.slice(pivotIdx);
+  const afterPivot = log.slice(pivotIdx);
 
-  // Syuzhet order: climax first → then flashback to the beginning
-  return [...pivot, ...before];
+  // Find the buried cause (inciting_action must be earlier in the log)
+  const inciting = beatTraces.find(b => b.beat_type === 'inciting_action');
+  const incitingIdx = inciting
+    ? log.findIndex(e => e.action_id === inciting.trigger_event_id)
+    : -1;
+
+  if (incitingIdx > 0 && incitingIdx < pivotIdx - 1) {
+    const buriedCause   = log.slice(0, incitingIdx + 1);
+    const hiddenMiddle  = log.slice(incitingIdx + 1, pivotIdx);
+    // Three-act: climax → buried cause → hidden middle
+    return [...afterPivot, ...buriedCause, ...hiddenMiddle];
+  }
+
+  // Two-act fallback: climax first → full flashback
+  return [...afterPivot, ...log.slice(0, pivotIdx)];
 }
 
-// Inserts FLASHBACK markers into a Fountain output when the log was syuzhet-sorted.
+// Wraps a Fountain draft with FLASHBACK section markers.
+// For a two-act sort (one pivot) it inserts one FLASHBACK header.
+// For a three-act sort (pivot + inciting act) it inserts two.
 export function wrapSyuzhetFountain(fountain: string, wasSorted: boolean): string {
   if (!wasSorted) return fountain;
+
   const fadeLine = 'FADE OUT.\n\nTHE END';
-  const marker = '\n\nFLASHBACK — EARLIER\n\n';
-  const pivot = fountain.indexOf('INT. ');
-  const second = fountain.indexOf('INT. ', pivot + 5);
-  if (second === -1) return fountain;
-  return fountain.slice(0, second) + marker + fountain.slice(second).replace(fadeLine, '\n\nEND FLASHBACK\n\n' + fadeLine);
+
+  // Collect positions of all INT./EXT. scene headings
+  const positions: number[] = [];
+  let search = 0;
+  for (;;) {
+    const next = fountain.indexOf('INT. ', search);
+    if (next === -1) break;
+    positions.push(next);
+    search = next + 5;
+  }
+  if (positions.length < 2) return fountain;
+
+  // Insert FLASHBACK header before the second scene (start of flashback)
+  const before2   = fountain.slice(0, positions[1]);
+  let   rest      = '\n\nFLASHBACK — EARLIER\n\n' + fountain.slice(positions[1]);
+
+  // If there is a third scene, insert FLASHBACK — CONTINUED before it
+  if (positions.length >= 3) {
+    const shift   = '\n\nFLASHBACK — EARLIER\n\n'.length;
+    const third   = positions[2] + shift;
+    rest          = rest.slice(0, third) + '\n\nFLASHBACK — CONTINUED\n\n' + rest.slice(third);
+  }
+
+  return (before2 + rest).replace(fadeLine, '\n\nEND FLASHBACK\n\n' + fadeLine);
 }
 
 // Converts a Story Machine action log into Fountain screenplay format.
@@ -153,8 +195,11 @@ export function transcriptToFountain(
       }
 
       case 'RELOCATE': {
-        const destination = entry.target_char_id ?? entry.content ?? 'another room';
-        lines.push(`${agent?.name ?? agentName} moves toward ${destination}.`);
+        // content is recorded as "→ LocationName" by the Orchestrator
+        const destination = entry.content.startsWith('→ ')
+          ? entry.content.slice(2)
+          : entry.target_char_id ?? entry.content ?? 'another room';
+        lines.push(`${agent?.name ?? agentName} moves to ${destination}.`);
         lines.push('');
         break;
       }

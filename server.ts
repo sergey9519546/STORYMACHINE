@@ -577,6 +577,12 @@ async function startServer() {
     res.json(stage.getAllGoalMutations());
   }));
 
+  // All active (unapplied, unexpired) dramatic pressures across all agents
+  app.get('/api/dramatic-pressure-all', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    res.json(stage.getAllActivePressures());
+  }));
+
   // Persuasion log for one agent
   app.get('/api/persuasion/:charId', gameLimiter, asyncHandler(async (req, res) => {
     const { stage } = getOrCreateSession(sessionId(req));

@@ -10,6 +10,7 @@ import type {
   GoalMutation,
   EmotionType,
   PersuasionRecord,
+  DramaticPressure,
 } from "../../server/engine/types";
 import { FileDown, Brain, Eye, AlertTriangle, GitBranch, Target, Zap, Smile, Shuffle } from "lucide-react";
 
@@ -63,16 +64,24 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [goalMutations, setGoalMutations] = useState<GoalMutation[]>([]);
   const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [syuzhetMode, setSyuzhetMode] = useState(false);
   const [persuasionLog, setPersuasionLog] = useState<Record<string, PersuasionRecord[]>>({});
+  const [activePressures, setActivePressures] = useState<Array<{ char_id: string; pressures: DramaticPressure[] }>>([]);
   const ledgerEndRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
+
+  const fetchActivePressures = useCallback(async () => {
+    const res = await fetch("/api/dramatic-pressure-all");
+    if (res.ok) setActivePressures(await res.json() as Array<{ char_id: string; pressures: DramaticPressure[] }>);
+  }, []);
 
   useEffect(() => {
     fetchState();
     fetchLedger();
     fetchIllusionState();
     fetchSpineData();
-  }, []);
+    fetchActivePressures();
+  }, [fetchActivePressures]);
 
   const fetchPersuasionLog = useCallback(async (agentIds: string[]) => {
     const entries = await Promise.all(
@@ -128,8 +137,8 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   };
 
   const refreshAll = useCallback(async () => {
-    await Promise.all([fetchState(), fetchLedger(), fetchIllusionState(), fetchSpineData()]);
-  }, [fetchPersuasionLog]);
+    await Promise.all([fetchState(), fetchLedger(), fetchIllusionState(), fetchSpineData(), fetchActivePressures()]);
+  }, [fetchPersuasionLog, fetchActivePressures]);
 
   const handleInit = async () => {
     setLoading(true);
@@ -222,7 +231,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
     if (ledger.length === 0) return;
     setIsExporting(true);
     try {
-      const res = await fetch("/api/ledger/fountain");
+      const res = await fetch(`/api/ledger/fountain?syuzhet=${syuzhetMode}`);
       const data = await res.json() as {
         fountain: string;
         characters: Array<{ name: string; ghost: string; lie: string; want: string; need: string }>;
@@ -242,7 +251,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
     } finally {
       setIsExporting(false);
     }
-  }, [ledger.length, onExportToIDE]);
+  }, [ledger.length, onExportToIDE, syuzhetMode]);
 
   const illusionColor =
     illusionState?.phase === "Prestige" ? "#FF4444"
@@ -270,14 +279,25 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             </div>
           )}
           {ledger.length > 0 && (
-            <button
-              onClick={handleExport}
-              disabled={isExporting}
-              className="bg-[#FF4444] hover:bg-black text-white px-4 py-2 font-bold uppercase tracking-wider disabled:opacity-50 brutal-border brutal-shadow-hover transition-colors flex items-center gap-2 text-xs"
-            >
-              <FileDown className="w-4 h-4" />
-              {isExporting ? "Exporting…" : "Export to Script IDE"}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSyuzhetMode(m => !m)}
+                title="Syuzhet mode: reorders the screenplay by information-reveal priority (revelation first, then flashback)"
+                className={`text-[10px] px-3 py-2 font-bold uppercase tracking-widest brutal-border brutal-shadow-hover transition-colors ${
+                  syuzhetMode ? "bg-black text-white" : "bg-white text-black hover:bg-gray-100"
+                }`}
+              >
+                Syuzhet {syuzhetMode ? "ON" : "OFF"}
+              </button>
+              <button
+                onClick={handleExport}
+                disabled={isExporting}
+                className="bg-[#FF4444] hover:bg-black text-white px-4 py-2 font-bold uppercase tracking-wider disabled:opacity-50 brutal-border brutal-shadow-hover transition-colors flex items-center gap-2 text-xs"
+              >
+                <FileDown className="w-4 h-4" />
+                {isExporting ? "Exporting…" : "Export to Script IDE"}
+              </button>
+            </div>
           )}
           <button
             onClick={onClose}
@@ -463,6 +483,29 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                           </div>
                         </div>
                       )}
+
+                      {/* ── Dramatic Pressure queue ── */}
+                      {(() => {
+                        const pq = activePressures.find(p => p.char_id === agent.char_id)?.pressures ?? [];
+                        if (pq.length === 0) return null;
+                        return (
+                          <div className="border-t border-dashed border-gray-200 pt-2">
+                            <div className="flex items-center gap-1 mb-1">
+                              <Zap className="w-3 h-3 text-purple-600" />
+                              <span className="text-[9px] font-bold uppercase text-purple-600">{pq.length} pressure{pq.length !== 1 ? 's' : ''}</span>
+                            </div>
+                            <div className="space-y-0.5">
+                              {pq.slice(0, 3).map(p => (
+                                <div key={p.pressure_id} className="flex items-center gap-1.5 text-[9px] font-mono pl-1">
+                                  <span className="px-1 py-0.5 bg-purple-100 text-purple-800 font-bold uppercase leading-none">{p.pressure_type.replace(/_/g, ' ')}</span>
+                                  <span className="text-gray-400">{p.intensity}</span>
+                                </div>
+                              ))}
+                              {pq.length > 3 && <div className="text-[9px] text-gray-400 pl-1">+{pq.length - 3} more…</div>}
+                            </div>
+                          </div>
+                        );
+                      })()}
 
                       {agent.darkTriad && (
                         <div className="flex flex-wrap gap-1 pt-1">
@@ -680,14 +723,30 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             </div>
 
             {ledger.length > 0 && (
-              <button
-                onClick={handleExport}
-                disabled={isExporting}
-                className="mt-4 w-full bg-[#FF4444] hover:bg-black text-white py-3 text-xs font-bold uppercase tracking-wider disabled:opacity-50 brutal-border brutal-shadow-hover transition-colors flex items-center justify-center gap-2"
-              >
-                <FileDown className="w-4 h-4" />
-                {isExporting ? "Converting to Fountain…" : `Export ${ledger.length} Actions → Script IDE`}
-              </button>
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSyuzhetMode(m => !m)}
+                    title="Syuzhet: reveal-order reconstruction. Opens on the highest-drama beat, then flashback to cause."
+                    className={`text-[10px] px-3 py-2 font-bold uppercase tracking-widest brutal-border transition-colors ${
+                      syuzhetMode ? "bg-black text-white" : "bg-white text-black border-black hover:bg-gray-100"
+                    }`}
+                  >
+                    Syuzhet {syuzhetMode ? "ON" : "OFF"}
+                  </button>
+                  <span className="text-[9px] text-gray-400 font-mono flex-1">
+                    {syuzhetMode ? "Revelation-first ordering" : "Chronological order"}
+                  </span>
+                </div>
+                <button
+                  onClick={handleExport}
+                  disabled={isExporting}
+                  className="w-full bg-[#FF4444] hover:bg-black text-white py-3 text-xs font-bold uppercase tracking-wider disabled:opacity-50 brutal-border brutal-shadow-hover transition-colors flex items-center justify-center gap-2"
+                >
+                  <FileDown className="w-4 h-4" />
+                  {isExporting ? "Converting to Fountain…" : `Export ${ledger.length} Actions → Script IDE`}
+                </button>
+              </div>
             )}
           </section>
         </div>

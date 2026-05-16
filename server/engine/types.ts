@@ -99,8 +99,10 @@ export interface TheoryOfMind {
 export interface Goal {
   id: string;
   description: string;
-  value: number;    // importance 0–100
+  value: number;       // importance 0–100
   achieved: boolean;
+  depends_on?: string[]; // IDs of sibling goals that must be achieved before this one is actionable
+  priority?: number;    // explicit ordering override; higher = more urgent (defaults to value)
 }
 
 export interface GoalStack {

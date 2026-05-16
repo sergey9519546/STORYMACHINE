@@ -15,6 +15,7 @@ import type {
   BeliefSource,
   EpistemicUpdate,
   Goal,
+  GoalStack,
   PersuasionStrategy,
 } from './types.ts';
 import { Stage } from './Stage.ts';
@@ -104,6 +105,18 @@ function selectPersuasionStrategy(target: CharacterSheet): PersuasionStrategy {
   if (bf.agreeableness > 70) return 'reciprocity';
   if (bf.neuroticism > 70) return 'emotion';
   return 'social_proof';
+}
+
+// ── Goal DAG helper ──────────────────────────────────────────────────────────
+// Returns active (unachieved) goals whose declared dependencies are all satisfied,
+// sorted by priority (or value) descending. Falls back to all active goals when
+// no depends_on fields are set (fully backward compatible).
+function getReadyGoals(gs: GoalStack): Goal[] {
+  const active = gs.instrumental.filter(g => !g.achieved);
+  const achievedIds = new Set(gs.instrumental.filter(g => g.achieved).map(g => g.id));
+  return active
+    .filter(g => (g.depends_on ?? []).every(dep => achievedIds.has(dep)))
+    .sort((a, b) => (b.priority ?? b.value) - (a.priority ?? a.value));
 }
 
 // ── Agent class ──────────────────────────────────────────────────────────────
@@ -231,9 +244,23 @@ export class Agent {
         }).join('\n')
       : '  (You have not yet formed models of the others here.)';
 
-    // ── Goal block ──
+    // ── Goal block (DAG-aware: shows only unblocked goals) ──
     const goalStr = this.sheet.goalStack
-      ? `TERMINAL OBJECTIVE: ${this.sheet.goalStack.terminal.description}\nCURRENT SUBGOAL: ${this.sheet.goalStack.instrumental[0]?.description ?? 'gather information and orient yourself'}`
+      ? (() => {
+          const gs = this.sheet.goalStack!;
+          const ready = getReadyGoals(gs);
+          const next = ready[0] ?? gs.instrumental.filter(g => !g.achieved)[0];
+          const blocked = gs.instrumental.filter(
+            g => !g.achieved && (g.depends_on ?? []).some(dep => !gs.instrumental.find(x => x.id === dep)?.achieved),
+          );
+          return [
+            `TERMINAL OBJECTIVE: ${gs.terminal.description}`,
+            `CURRENT SUBGOAL: ${next?.description ?? 'gather information and orient yourself'}`,
+            blocked.length > 0
+              ? `BLOCKED (awaiting prerequisites): ${blocked.map(g => g.description).join('; ')}`
+              : '',
+          ].filter(Boolean).join('\n');
+        })()
       : `TERMINAL OBJECTIVE: ${this.sheet.hidden_motive}\nCURRENT SUBGOAL: Assess who in this room is a threat or an asset to your objective.`;
 
     // ── Psychology block ──
