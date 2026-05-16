@@ -62,6 +62,10 @@ export class Stage {
         `);
         this.db.exec('ALTER TABLE Illusion_State ADD COLUMN outline_json TEXT');
       },
+      // v3 → v4: story architecture config (pacing target, structure, emotional arc, director style)
+      () => {
+        this.db.exec('ALTER TABLE Illusion_State ADD COLUMN config_json TEXT');
+      },
     ];
     for (let i = current; i < MIGRATIONS.length; i++) {
       this.db.transaction(() => {
@@ -448,27 +452,43 @@ export class Stage {
   public getIllusionState(): IllusionState {
     const row = this.db.prepare('SELECT * FROM Illusion_State WHERE id = 1').get() as Record<string, unknown>;
     const outlineRaw = row.outline_json as string | null;
+    // Story architecture config lives in a single JSON blob (config_json) so new
+    // fields can be added without a schema migration each time.
+    const config = safeJsonParse<Partial<IllusionState>>((row.config_json as string) ?? '{}', {});
     return {
       phase: (row.phase as IllusionState['phase']) ?? 'Setup',
       planted_elements: safeJsonParse(row.planted_elements_json as string, []),
       pending_recontextualization: safeJsonParse(row.pending_recontextualization_json as string, []),
       total_turns: this.getTurnCount(),
       outline: outlineRaw ? safeJsonParse<OutlineBeat[]>(outlineRaw, []) : undefined,
+      pacing_target: config.pacing_target,
+      structure: config.structure,
+      emotional_arc: config.emotional_arc,
+      director_style: config.director_style,
+      expected_turns: config.expected_turns,
     };
   }
 
   public updateIllusionState(state: Partial<IllusionState>) {
     const current = this.getIllusionState();
     const next = { ...current, ...state };
+    const config = {
+      pacing_target: next.pacing_target,
+      structure: next.structure,
+      emotional_arc: next.emotional_arc,
+      director_style: next.director_style,
+      expected_turns: next.expected_turns,
+    };
     this.db.prepare(`
       UPDATE Illusion_State
-      SET phase = ?, planted_elements_json = ?, pending_recontextualization_json = ?, outline_json = ?
+      SET phase = ?, planted_elements_json = ?, pending_recontextualization_json = ?, outline_json = ?, config_json = ?
       WHERE id = 1
     `).run(
       next.phase,
       JSON.stringify(next.planted_elements),
       JSON.stringify(next.pending_recontextualization),
       next.outline ? JSON.stringify(next.outline) : null,
+      JSON.stringify(config),
     );
   }
 
@@ -715,7 +735,17 @@ export class Stage {
       action_log: this.getFullLedger(),
       illusion_state: (() => {
         const s = this.getIllusionState();
-        return { phase: s.phase, planted_elements: s.planted_elements, pending_recontextualization: s.pending_recontextualization };
+        return {
+          phase: s.phase,
+          planted_elements: s.planted_elements,
+          pending_recontextualization: s.pending_recontextualization,
+          outline: s.outline,
+          pacing_target: s.pacing_target,
+          structure: s.structure,
+          emotional_arc: s.emotional_arc,
+          director_style: s.director_style,
+          expected_turns: s.expected_turns,
+        };
       })(),
       beat_traces: this.getAllBeatTraces(),
       belief_edges: this.getAllBeliefEdges(),

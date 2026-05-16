@@ -278,14 +278,21 @@ From ${observer.name}'s perspective only:
     const state = this.stage.getIllusionState();
     const totalTurns = this.stage.getTurnCount();
 
+    // Phase boundaries scale to the writer's expected session length so the
+    // engine's Setup/Turn/Prestige machine aligns with the structure preset's
+    // beat-sheet phases (which instantiatePreset() assigns at the 33%/66% marks).
+    const expectedTurns = state.expected_turns ?? 20;
+    const setupEnd = Math.max(4, Math.round(expectedTurns * 0.33));
+    const turnEnd  = Math.max(setupEnd + 3, Math.round(expectedTurns * 0.66));
+
     let nextPhase = state.phase;
 
-    if (state.phase === 'Setup' && (totalTurns >= 10 || (avgTensionDelta > 10 && totalTurns >= 5))) {
+    if (state.phase === 'Setup' && (totalTurns >= setupEnd || (avgTensionDelta > 10 && totalTurns >= Math.round(setupEnd / 2)))) {
       nextPhase = 'Turn';
-      console.log('[Director] Illusion phase: Setup → Turn');
-    } else if (state.phase === 'Turn' && (totalTurns >= 20 || (contradictionsFound >= 2 && totalTurns >= 12))) {
+      console.log(`[Director] Illusion phase: Setup → Turn (turn ${totalTurns}/${setupEnd})`);
+    } else if (state.phase === 'Turn' && (totalTurns >= turnEnd || (contradictionsFound >= 2 && totalTurns >= setupEnd + 2))) {
       nextPhase = 'Prestige';
-      console.log('[Director] Illusion phase: Turn → Prestige');
+      console.log(`[Director] Illusion phase: Turn → Prestige (turn ${totalTurns}/${turnEnd})`);
     }
 
     if (nextPhase !== state.phase) {

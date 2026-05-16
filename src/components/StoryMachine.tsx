@@ -701,11 +701,6 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                           <AlertTriangle className="w-3 h-3" /> LIE
                         </span>
                       )}
-                      {entry.target_char_id && entry.action_type === "RELOCATE" && (
-                        <span className="text-blue-600 font-bold uppercase text-xs">
-                          → {nodes.find(n => n.location_id === entry.target_char_id)?.name || entry.target_char_id}
-                        </span>
-                      )}
                       {entry.target_char_id && (entry.action_type === "SPEAK" || entry.action_type === "LIE") && (
                         <span className="text-[#FF4444] font-bold uppercase text-xs">
                           to {agents.find(a => a.char_id === entry.target_char_id)?.name || entry.target_char_id}

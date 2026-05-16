@@ -354,7 +354,10 @@ export interface StageSnapshot {
   locations: Location[];
   agents: CharacterSheet[];
   action_log: ActionLogEntry[];
-  illusion_state: Pick<IllusionState, 'phase' | 'planted_elements' | 'pending_recontextualization'>;
+  illusion_state: Pick<IllusionState,
+    | 'phase' | 'planted_elements' | 'pending_recontextualization'
+    | 'outline' | 'pacing_target' | 'structure' | 'emotional_arc'
+    | 'director_style' | 'expected_turns'>;
   beat_traces: BeatTrace[];
   belief_edges: BeliefEdge[];
   goal_mutations: GoalMutation[];

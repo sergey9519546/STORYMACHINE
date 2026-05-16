@@ -17,7 +17,7 @@ interface AIPanelProps {
   onApplySuggestion: (suggestion: string) => void;
 }
 
-export default function AIPanel({ script: _script, characters, onApplySuggestion }: AIPanelProps) {
+export default function AIPanel({ script, characters, onApplySuggestion }: AIPanelProps) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'world' | 'dialogue' | 'tension' | 'character'>('world');
@@ -88,7 +88,7 @@ export default function AIPanel({ script: _script, characters, onApplySuggestion
                 className="w-full h-32 p-3 border-2 border-black bg-gray-50 text-sm outline-none focus:border-[#FF4444] resize-none font-mono"
               />
               <button
-                onClick={() => runPrompt('world-build', { beat: input })}
+                onClick={() => runPrompt('world-build', { beat: input, scriptContext: script })}
                 disabled={loading || !input}
                 className="w-full bg-black text-white py-3 text-xs font-bold uppercase tracking-wider hover:bg-[#FF4444] disabled:opacity-50 transition-colors flex items-center justify-center gap-2 brutal-border brutal-shadow-hover disabled:pointer-events-none"
               >
@@ -108,7 +108,7 @@ export default function AIPanel({ script: _script, characters, onApplySuggestion
                 className="w-full h-32 p-3 border-2 border-black bg-gray-50 text-sm outline-none focus:border-[#FF4444] resize-none font-mono"
               />
               <button
-                onClick={() => runPrompt('refine-dialogue', { dialogue: input, profiles: characters })}
+                onClick={() => runPrompt('refine-dialogue', { dialogue: input, profiles: characters, scriptContext: script })}
                 disabled={loading || !input}
                 className="w-full bg-black text-white py-3 text-xs font-bold uppercase tracking-wider hover:bg-[#FF4444] disabled:opacity-50 transition-colors flex items-center justify-center gap-2 brutal-border brutal-shadow-hover disabled:pointer-events-none"
               >
@@ -128,7 +128,7 @@ export default function AIPanel({ script: _script, characters, onApplySuggestion
                 className="w-full h-32 p-3 border-2 border-black bg-gray-50 text-sm outline-none focus:border-[#FF4444] resize-none font-mono"
               />
               <button
-                onClick={() => runPrompt('analyze-tension', { scene: input })}
+                onClick={() => runPrompt('analyze-tension', { scene: input, scriptContext: script })}
                 disabled={loading || !input}
                 className="w-full bg-black text-white py-3 text-xs font-bold uppercase tracking-wider hover:bg-[#FF4444] disabled:opacity-50 transition-colors flex items-center justify-center gap-2 brutal-border brutal-shadow-hover disabled:pointer-events-none"
               >

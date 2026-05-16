@@ -421,11 +421,17 @@ async function startServer() {
       return;
     }
 
+    // Optional maxTurns — clamped to a safe range to bound LLM fan-out per request.
+    const rawMaxTurns = req.body?.maxTurns;
+    const maxTurns = typeof rawMaxTurns === 'number' && Number.isFinite(rawMaxTurns)
+      ? Math.max(2, Math.min(12, Math.round(rawMaxTurns)))
+      : 5;
+
     const { orchestrator } = getOrCreateSession(sid);
     runningRooms.add(lockKey);
     try {
-      await orchestrator.runRoomSimulation(nodeId);
-      res.json({ status: 'completed' });
+      await orchestrator.runRoomSimulation(nodeId, maxTurns);
+      res.json({ status: 'completed', maxTurns });
     } finally {
       runningRooms.delete(lockKey);
     }
@@ -780,8 +786,19 @@ async function startServer() {
   }));
 
   // ── ScriptIDE AI routes ────────────────────────────────────────────────────
+  // Optional script context — the current editor contents, capped, so AI
+  // suggestions stay consistent with established tone, characters, and facts.
+  const scriptContextOf = (body: unknown): string => {
+    const ctx = (body as Record<string, unknown> | undefined)?.scriptContext;
+    return typeof ctx === 'string' ? ctx.substring(0, 8000) : '';
+  };
+
   app.post('/api/scriptide/world-build', aiLimiter, asyncHandler(async (req, res) => {
     const beat = requireString(req.body?.beat, 'beat');
+    const scriptContext = scriptContextOf(req.body);
+    const contextBlock = scriptContext
+      ? `\nEXISTING SCRIPT (for continuity — match the established tone, characters, locations, and facts; do not contradict them):\n${scriptContext}\n`
+      : '';
     const response = await withTimeout(ai.models.generateContent({
       model: GEMINI_MODEL,
       contents: `SYSTEM ROLE: You are a master screenwriter and world-builder. Your task is to generate or expand a scene based on the user's beat outline.
@@ -793,7 +810,7 @@ STRICT CONSTRAINTS:
 2. NO CAMERA DIRECTIONS: You are strictly forbidden from using camera terminology (e.g., "We see", "Pan to", "Close up", "Wide shot", "Angle on"). Describe the environment and the action as it happens in the world, not through a lens.
 3. SENSORY WRITING: Focus on lighting, sound, texture, and kinetic movement. Use active verbs. Avoid "is/are" where possible.
 4. ECONOMY: Keep action blocks to 4 lines maximum. Break up text to control the reader's pacing.
-
+${contextBlock}
 INPUT: ${beat}
 OUTPUT: Generate the Scene Heading and Action lines.`,
     }), 30_000, 'world-build');
@@ -826,6 +843,10 @@ OUTPUT: Generate the Scene Heading and Action lines.`,
       });
     }
 
+    const dlgContext = scriptContextOf(req.body);
+    const dlgContextBlock = dlgContext
+      ? `\nSURROUNDING SCRIPT (preserve each character's established voice and the scene's continuity):\n${dlgContext}\n`
+      : '';
     const response = await withTimeout(ai.models.generateContent({
       model: GEMINI_MODEL,
       contents: `SYSTEM ROLE: You are an expert dialogue doctor, specializing in subtext, character voice, and dramatic irony.
@@ -837,7 +858,7 @@ INSTRUCTIONS:
 2. Rewrite the dialogue so the characters are fighting for their 'Want' indirectly.
 3. Differentiate voices based on provided psychological profiles.
 4. Add brief, behavior-revealing parentheticals only if absolutely necessary.
-
+${dlgContextBlock}
 INPUT DIALOGUE: ${dialogue}
 CHARACTER PROFILES: ${JSON.stringify(profiles)}
 OUTPUT: Provide 2 alternative versions of the dialogue exchange, explaining the subtextual strategy used in each.`,
@@ -847,6 +868,10 @@ OUTPUT: Provide 2 alternative versions of the dialogue exchange, explaining the 
 
   app.post('/api/scriptide/analyze-tension', aiLimiter, asyncHandler(async (req, res) => {
     const scene = requireString(req.body?.scene, 'scene');
+    const tnContext = scriptContextOf(req.body);
+    const tnContextBlock = tnContext
+      ? `\nSURROUNDING SCRIPT (consider how tension carries over from adjacent scenes):\n${tnContext}\n`
+      : '';
     const response = await withTimeout(ai.models.generateContent({
       model: GEMINI_MODEL,
       contents: `SYSTEM ROLE: You are a structural script consultant influenced by Hitchcock's theory of suspense.
@@ -858,7 +883,7 @@ ANALYSIS CRITERIA:
 2. The Ticking Clock: Is there a time constraint? If not, suggest a micro-deadline.
 3. The Dilemma: Are the choices too easy? Propose a "best bad choice" scenario.
 4. Pacing: Suggest where to slow down to build dread, or speed up to simulate panic.
-
+${tnContextBlock}
 INPUT SCENE: ${scene}
 OUTPUT: A bulleted diagnostic report with 3 actionable suggestions.`,
     }), 30_000, 'analyze-tension');
