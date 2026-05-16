@@ -11,6 +11,10 @@ export function getAI(): GoogleGenAI {
   return _shared;
 }
 
+export function getModel(): string {
+  return process.env.GEMINI_MODEL ?? 'gemini-2.5-pro';
+}
+
 // Wraps a promise with a hard deadline. Clears the timer on settle so Node can exit cleanly.
 export function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {

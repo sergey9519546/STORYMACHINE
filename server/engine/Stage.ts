@@ -621,7 +621,8 @@ export class Stage {
   }
 
   // Restore a snapshot into this (empty) Stage instance.
-  // Idempotent: uses INSERT OR IGNORE so re-importing is safe.
+  // Characters use INSERT OR REPLACE (overwrites existing state).
+  // Spine data (edges, mutations, beats) uses INSERT OR IGNORE so partial re-imports are safe.
   public importSnapshot(snap: StageSnapshot): void {
     for (const loc of snap.locations) this.addLocation(loc);
     for (const agent of snap.agents)   this.addAgent(agent);

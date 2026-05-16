@@ -1,6 +1,6 @@
 import { Type } from '@google/genai';
 import { randomUUID } from 'crypto';
-import { getAI, withTimeout } from './ai.ts';
+import { getAI, getModel, withTimeout } from './ai.ts';
 import type {
   CharacterSheet,
   NarrativeAction,
@@ -88,6 +88,7 @@ function computeDefenseLevel(neuroticism: number, suspicion: number): string {
 export class Agent {
   private sheet: CharacterSheet;
   private stage: Stage;
+  private _reflectionInFlight = false;
 
   constructor(sheet: CharacterSheet, stage: Stage) {
     this.sheet = sheet;
@@ -114,7 +115,7 @@ export class Agent {
 
     // ── ToT Planning: generate 3 candidates, self-select the best ──
     const response = await withTimeout(getAI().models.generateContent({
-      model: 'gemini-2.5-pro',
+      model: getModel(),
       contents: prompt,
       config: {
         systemInstruction: `You are playing the role of ${this.sheet.name}. Generate exactly 3 candidate actions, then score each on how well it serves your goal (0–100). You will take the highest-scoring action.`,
@@ -339,7 +340,7 @@ Based on what you just witnessed:
 4. Did anything you observed contradict what you believed?`;
 
     const response = await withTimeout(getAI().models.generateContent({
-      model: 'gemini-2.5-pro',
+      model: getModel(),
       contents: prompt,
       config: {
         systemInstruction: `You are updating the internal state of ${this.sheet.name} based on recent observations.`,
@@ -541,8 +542,11 @@ Based on what you just witnessed:
 
     // ── F: Memory Stream + Reflection (every 5 turns) ──
     const turnCount = this.stage.getTurnCount();
-    if (turnCount > 0 && turnCount % 5 === 0) {
-      this.synthesizeReflections().catch(() => { /* non-blocking */ });
+    if (turnCount > 0 && turnCount % 5 === 0 && !this._reflectionInFlight) {
+      this._reflectionInFlight = true;
+      this.synthesizeReflections()
+        .catch(e => logger.warn('agent_reflection_error', { agent: this.sheet.name, message: (e as Error).message }))
+        .finally(() => { this._reflectionInFlight = false; });
     }
 
     return {
@@ -569,7 +573,7 @@ Based on what you just witnessed:
     const existingBeliefs = (this.sheet.beliefs ?? []).slice(0, 5).map(b => b.proposition).join('; ');
 
     const response = await withTimeout(getAI().models.generateContent({
-      model: 'gemini-2.5-pro',
+      model: getModel(),
       contents: `You are ${this.sheet.name}. Reflect on these recent events and synthesize exactly 3 high-level insights.\n\nEvents:\n${transcript}\n\nExisting beliefs: ${existingBeliefs || 'none'}\n\nOutput 3 reflective insights that go beyond the surface events — patterns, implications, strategic assessments.`,
       config: {
         systemInstruction: `You are ${this.sheet.name} in a reflective moment. Synthesize insights, not observations.`,

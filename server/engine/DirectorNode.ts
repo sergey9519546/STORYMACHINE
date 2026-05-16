@@ -3,7 +3,7 @@ import { Stage } from './Stage.ts';
 import type { ActionLogEntry, PerspectiveEvaluation, BeliefSource, EpistemicUpdate, IllusionElement } from './types.ts';
 import { safeJsonParse } from '../../src/lib/json.ts';
 import { randomUUID } from 'crypto';
-import { getAI, withTimeout } from './ai.ts';
+import { getAI, getModel, withTimeout } from './ai.ts';
 
 export class DirectorNode {
   private stage: Stage;
@@ -165,7 +165,7 @@ From ${observer.name}'s perspective only:
 4. How has their suspicion of each other person changed?`;
 
     const response = await withTimeout(getAI().models.generateContent({
-      model: 'gemini-2.5-pro',
+      model: getModel(),
       contents: prompt,
       config: {
         systemInstruction: `You are the Director Node. Evaluate this scene from a single bounded perspective. You know who lied but the observer does not — factor this in when evaluating whether contradictions were apparent.`,
@@ -199,13 +199,13 @@ From ${observer.name}'s perspective only:
                 required: ['agent_name', 'delta', 'reason'],
               },
             },
-          },
             contradicted_propositions: {
-            type: Type.ARRAY,
-            items: { type: Type.STRING },
-            description: 'Verbatim text of prior beliefs that the new events contradict.',
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: 'Verbatim text of prior beliefs that the new events contradict.',
+            },
           },
-        required: ['tension_delta', 'contradiction_detected', 'new_beliefs', 'suspicion_updates', 'contradicted_propositions'],
+          required: ['tension_delta', 'contradiction_detected', 'new_beliefs', 'suspicion_updates', 'contradicted_propositions'],
         },
       },
     }), 30_000, `evaluatePerspective:${observer_id}`).catch(err => {
@@ -303,8 +303,8 @@ From ${observer.name}'s perspective only:
   // ── A: Pacing Controller ──
   private _checkPacing(location_id: string, actionCount: number): void {
     const totalTurns = this.stage.getTurnCount();
-    if (totalTurns < 6 || actionCount >= 2) return;
     const agents = this.stage.getAgentsInLocation(location_id);
+    if (totalTurns < 6 || actionCount >= agents.length * 2) return;
     for (const agent of agents) {
       this.stage.addDramaticPressure({
         pressure_id: randomUUID(),

@@ -8,7 +8,9 @@ import type {
   DramaticPressure,
   EventCard,
   EventProposition,
+  Goal,
   GoalMutation,
+  GoalStack,
   InformationPosition,
 } from './types.ts';
 import { Stage } from './Stage.ts';
@@ -141,7 +143,7 @@ export class CausalSpine {
     const pressures: DramaticPressure[] = [];
     if (edges.length === 0) return { mutations, pressures };
 
-    const discoverer = this.stage.getAgent(discoverer_id);
+    let discoverer = this.stage.getAgent(discoverer_id);
     if (!discoverer) return { mutations, pressures };
 
     const turnIndex = this.stage.getTurnCount();
@@ -168,6 +170,17 @@ export class CausalSpine {
     for (const suspectId of suspectIds) {
       const suspect = this.stage.getAgent(suspectId);
       if (!suspect || suspectId === discoverer_id) continue;
+
+      // ── Auto-initialize goalStack from hidden_motive if not yet set ──
+      if (!discoverer.goalStack) {
+        const initialStack: GoalStack = {
+          terminal: { id: randomUUID(), description: discoverer.hidden_motive, value: 100, achieved: false } as Goal,
+          instrumental: [],
+          last_planned_at: turnIndex,
+        };
+        this.stage.updateGoalStack(discoverer_id, initialStack);
+        discoverer = { ...discoverer, goalStack: initialStack };
+      }
 
       // ── Mutate discoverer's goal stack: prepend confrontation subgoal ──
       if (discoverer.goalStack) {

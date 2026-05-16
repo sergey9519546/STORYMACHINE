@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Stage } from './Stage.ts';
 import { Agent } from './Agent.ts';
 import type { CharacterSheet, Location, EpistemicUpdate } from './types.ts';
@@ -39,6 +40,15 @@ export class Orchestrator {
     const action = await agent.takeTurn();
 
     const currentNodeId = this.stage.getAgent(agentId)!.current_location_id;
+
+    if (action.action_type === 'RELOCATE' && action.target) {
+      const targetLoc = this.locationMap.get(action.target.toLowerCase()) ?? this.locationMap.get(action.target);
+      if (targetLoc) {
+        action.content = `→ ${targetLoc.name}`;
+        this.stage.updateAgentLocation(agentId, targetLoc.location_id);
+      }
+    }
+
     const action_id = this.stage.recordAction(agentId, action, currentNodeId);
     const turnIndex = this.stage.getTurnCount();
 
@@ -54,14 +64,6 @@ export class Orchestrator {
       is_audible: action.action_type !== 'EXAMINE',
     } as import('./types.ts').ActionLogEntry;
     this.spine.processEvent(actionEntry, turnIndex);
-
-    if (action.action_type === 'RELOCATE' && action.target) {
-      const targetLoc = this.locationMap.get(action.target.toLowerCase()) ?? this.locationMap.get(action.target);
-      if (targetLoc) {
-        action.content = `→ ${targetLoc.name}`;
-        this.stage.updateAgentLocation(agentId, targetLoc.location_id);
-      }
-    }
 
     // Update the acting agent's epistemic state and run spine
     const recentActions = this.stage.getSensoryFilter(currentNodeId, 3);
@@ -86,7 +88,7 @@ export class Orchestrator {
     agentsInRoom.sort((a, b) => {
       const diff = a.suspicion_score - b.suspicion_score;
       // Add small random jitter to break ties without perfect determinism
-      if (Math.abs(diff) < 10) return Math.random() - 0.5;
+      if (Math.abs(diff) < 10) return a.char_id < b.char_id ? -1 : 1;
       return diff;
     });
 
@@ -104,6 +106,21 @@ export class Orchestrator {
 
         console.log(`[Orchestrator] ${currentSheet.name}'s turn in ${location_id}`);
         const action = await agent.takeTurn();
+
+        if (action.action_type === 'RELOCATE' && action.target) {
+          const targetLoc = this.locationMap.get(action.target.toLowerCase()) ?? this.locationMap.get(action.target);
+          if (targetLoc) {
+            action.content = `→ ${targetLoc.name}`;
+            this.stage.updateAgentLocation(agentSheet.char_id, targetLoc.location_id);
+            const action_id = this.stage.recordAction(agentSheet.char_id, action, location_id);
+            lastActionId = action_id;
+            console.log(`[Orchestrator] ${currentSheet.name} relocated to ${targetLoc.name}. Breaking Dialogue Lock.`);
+            didRelocate = true;
+            turnCount++;
+            break;
+          }
+        }
+
         const action_id = this.stage.recordAction(agentSheet.char_id, action, location_id);
         lastActionId = action_id;
         const turnIndex = this.stage.getTurnCount();
@@ -137,18 +154,6 @@ export class Orchestrator {
           });
         }
 
-        if (action.action_type === 'RELOCATE' && action.target) {
-          const targetLoc = this.locationMap.get(action.target.toLowerCase()) ?? this.locationMap.get(action.target);
-          if (targetLoc) {
-            action.content = `→ ${targetLoc.name}`;
-            console.log(`[Orchestrator] ${currentSheet.name} relocated to ${targetLoc.name}. Breaking Dialogue Lock.`);
-            this.stage.updateAgentLocation(agentSheet.char_id, targetLoc.location_id);
-            didRelocate = true;
-            turnCount++;
-            break;
-          }
-        }
-
         turnCount++;
         if (turnCount >= maxTurns) break;
       }
@@ -177,7 +182,7 @@ export class Orchestrator {
       // Re-sort by suspicion after each full round (dynamics shift)
       agentsInRoom.sort((a, b) => {
         const diff = a.suspicion_score - b.suspicion_score;
-        if (Math.abs(diff) < 10) return Math.random() - 0.5;
+        if (Math.abs(diff) < 10) return a.char_id < b.char_id ? -1 : 1;
         return diff;
       });
     }
@@ -200,7 +205,20 @@ export class Orchestrator {
     triggerEventId: string,
     locationId: string,
   ): void {
-    if (!update.contradiction_detected || update.new_beliefs.length === 0) return;
+    if (!update.contradiction_detected) return;
+    if (update.new_beliefs.length === 0) {
+      this.stage.addDramaticPressure({
+        pressure_id: randomUUID(),
+        target_char_id: update.char_id,
+        trigger_event_id: update.source_event_id ?? triggerEventId,
+        pressure_type: 'CONFRONT',
+        intensity: 45,
+        bias_hint: `Something you heard contradicts what you already know. You sense the inconsistency, even if you can't place it yet. Trust that instinct.`,
+        expires_at_turn: this.stage.getTurnCount() + 3,
+        applied: false,
+      });
+      return;
+    }
 
     const edges = this.spine.processBeliefUpdate(
       update.char_id,
