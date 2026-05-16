@@ -16,6 +16,7 @@ import type {
   EpistemicUpdate,
   Goal,
   GoalStack,
+  GoalMutation,
   PersuasionStrategy,
 } from './types.ts';
 import { Stage } from './Stage.ts';
@@ -582,23 +583,53 @@ Based on what you just witnessed:
     }
 
     // ── Self-directed goal stack mutation ──
+    // Record GoalMutation rows so AppraisalEngine can appraise joy/distress correctly.
     const gsu = result.goal_stack_update;
     if (gsu) {
       this.refreshSheet();
       const gs = this.sheet.goalStack;
       if (gs) {
         let changed = false;
+        const triggerEventId = observableActions[observableActions.length - 1]?.action_id ?? 'epistemic_update';
+        const turnIndex = this.stage.getTurnCount();
+
         if (gsu.add_subgoal) {
           const newGoal: Goal = { id: randomUUID(), description: gsu.add_subgoal, value: 70, achieved: false };
           gs.instrumental = [newGoal, ...gs.instrumental];
-          gs.last_planned_at = this.stage.getTurnCount();
+          gs.last_planned_at = turnIndex;
           changed = true;
+          const mut: GoalMutation = {
+            mutation_id: randomUUID(),
+            char_id: this.sheet.char_id,
+            turn_index: turnIndex,
+            trigger_event_id: triggerEventId,
+            mutation_type: 'subgoal_added',
+            description: `${this.sheet.name} formed new subgoal: "${gsu.add_subgoal}"`,
+            new_subgoal: gsu.add_subgoal,
+          };
+          this.stage.recordGoalMutation(mut);
         }
+
         if (gsu.mark_achieved) {
           const needle = gsu.mark_achieved.toLowerCase();
           const idx = gs.instrumental.findIndex(g => g.description.toLowerCase().includes(needle));
-          if (idx >= 0) { gs.instrumental[idx].achieved = true; changed = true; }
+          if (idx >= 0) {
+            const achieved = gs.instrumental[idx];
+            gs.instrumental[idx].achieved = true;
+            changed = true;
+            const mut: GoalMutation = {
+              mutation_id: randomUUID(),
+              char_id: this.sheet.char_id,
+              turn_index: turnIndex,
+              trigger_event_id: triggerEventId,
+              mutation_type: 'subgoal_achieved',
+              description: `${this.sheet.name} achieved subgoal: "${achieved.description}"`,
+              old_subgoal: achieved.description,
+            };
+            this.stage.recordGoalMutation(mut);
+          }
         }
+
         if (changed) this.stage.updateGoalStack(this.sheet.char_id, gs);
       }
     }

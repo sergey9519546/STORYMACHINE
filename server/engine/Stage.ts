@@ -394,9 +394,12 @@ export class Stage {
   }
 
   public getRecentGoalMutations(char_id: string, sinceTurn: number): GoalMutation[] {
+    // Use a 5-turn lookback window so mutations written by processContradiction
+    // and updateEpistemics (which may differ by a turn due to batch ordering) are
+    // all visible to the AppraisalEngine in the same invocation.
     return this.db.prepare(
       'SELECT * FROM Goal_Mutations WHERE char_id = ? AND turn_index >= ?'
-    ).all(char_id, sinceTurn) as GoalMutation[];
+    ).all(char_id, Math.max(0, sinceTurn - 4)) as GoalMutation[];
   }
 
   // ── Action log ───────────────────────────────────────────────────────────────
@@ -417,6 +420,12 @@ export class Stage {
       action.action_type !== 'EXAMINE' ? 1 : 0,
     );
     return action_id;
+  }
+
+  public getLastActionForAgent(char_id: string): ActionLogEntry | undefined {
+    return this.db.prepare(
+      'SELECT * FROM Action_Log WHERE char_id = ? ORDER BY timestamp DESC LIMIT 1',
+    ).get(char_id) as ActionLogEntry | undefined;
   }
 
   public getSensoryFilter(location_id: string, limit: number = 10): ActionLogEntry[] {

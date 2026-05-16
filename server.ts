@@ -591,7 +591,13 @@ async function startServer() {
     res.json(stage.getPersuasionLog(charId, 20));
   }));
 
-  // Writer sets a structured beat-sheet outline (POST) or clears it (DELETE)
+  // Writer reads, sets, or clears the structured beat-sheet outline
+  app.get('/api/outline', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const illusion = stage.getIllusionState();
+    res.json({ beats: illusion.outline ?? [] });
+  }));
+
   app.post('/api/outline', gameLimiter, asyncHandler(async (req, res) => {
     const { stage } = getOrCreateSession(sessionId(req));
     const beats = req.body?.beats;

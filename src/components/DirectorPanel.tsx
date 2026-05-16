@@ -247,6 +247,15 @@ export default function DirectorPanel({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [directorState.tensionLevel, directorState.menaceGauge]);
 
+  // ── Load saved outline from engine on mount ───────────────────────────────
+
+  useEffect(() => {
+    fetch("/api/outline")
+      .then(r => r.ok ? r.json() as Promise<{ beats: OutlineBeat[] }> : { beats: [] })
+      .then(data => { if (data.beats.length > 0) setOutlineBeats(data.beats); })
+      .catch(() => {});
+  }, []);
+
   // ── Escape key ────────────────────────────────────────────────────────────
 
   useEffect(() => {

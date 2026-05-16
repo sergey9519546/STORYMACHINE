@@ -109,7 +109,14 @@ export class AppraisalEngine {
       }
     }
 
-    // Clear anger target if anger has decayed to negligible
+    // ── Pride: successful deception — agent just lied and it wasn't detected ──
+    // Last action by this agent was LIE AND no contradiction surfaced this update.
+    const lastAction = this.stage.getLastActionForAgent(update.char_id);
+    if (lastAction?.action_type === 'LIE' && !update.contradiction_detected) {
+      next.pride = Math.min(100, next.pride + 20);
+    }
+
+    // Clear anger target once anger has decayed to negligible
     if (next.anger < 10) next.anger_target_id = undefined;
 
     setDominant(next);

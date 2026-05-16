@@ -74,7 +74,9 @@ export function wrapSyuzhetFountain(fountain: string, wasSorted: boolean): strin
   // If there is a third scene, insert FLASHBACK — CONTINUED before it
   if (positions.length >= 3) {
     const shift   = '\n\nFLASHBACK — EARLIER\n\n'.length;
-    const third   = positions[2] + shift;
+    // `rest` starts at fountain[positions[1]], so fountain[positions[2]] maps to
+    // rest[positions[2] - positions[1] + shift] (accounting for the inserted marker).
+    const third   = positions[2] - positions[1] + shift;
     rest          = rest.slice(0, third) + '\n\nFLASHBACK — CONTINUED\n\n' + rest.slice(third);
   }
 
