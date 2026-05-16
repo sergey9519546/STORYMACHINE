@@ -577,6 +577,29 @@ async function startServer() {
     res.json(stage.getAllGoalMutations());
   }));
 
+  // Persuasion log for one agent
+  app.get('/api/persuasion/:charId', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const charId = req.params.charId?.substring(0, 128);
+    if (!charId) { res.status(400).json({ error: 'charId is required' }); return; }
+    res.json(stage.getPersuasionLog(charId, 20));
+  }));
+
+  // Writer sets a structured beat-sheet outline (POST) or clears it (DELETE)
+  app.post('/api/outline', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const beats = req.body?.beats;
+    if (!Array.isArray(beats)) { res.status(400).json({ error: 'beats array required' }); return; }
+    stage.setOutline(beats);
+    res.json({ status: 'ok', beatCount: beats.length });
+  }));
+
+  app.delete('/api/outline', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    stage.setOutline([]);
+    res.json({ status: 'cleared' });
+  }));
+
   // ── Session snapshot export / import ──────────────────────────────────────
   // Export: download a JSON snapshot of the full simulation state.
   app.get('/api/session/export', gameLimiter, asyncHandler(async (req, res) => {

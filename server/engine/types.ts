@@ -123,6 +123,34 @@ export interface IllusionState {
   planted_elements: IllusionElement[];
   pending_recontextualization: string[];
   total_turns: number;
+  outline?: OutlineBeat[];  // optional writer-authored beat sheet
+}
+
+// ── Persuasion strategy ──────────────────────────────────────────────────────
+// Named strategy selected deterministically per target from Big Five + emotion state.
+// Recorded to DB so the writer can observe what tactic each character is using.
+
+export type PersuasionStrategy = 'logic' | 'emotion' | 'authority' | 'reciprocity' | 'social_proof';
+
+export interface PersuasionRecord {
+  id: string;
+  agent_id: string;
+  target_id: string;
+  strategy: PersuasionStrategy;
+  turn: number;
+}
+
+// ── Structured story outline ─────────────────────────────────────────────────
+// Writer-authored beat sheet, optionally persisted in IllusionState.
+// When present, each matching OutlineBeat replaces the generic phase hint in agent prompts.
+
+export interface OutlineBeat {
+  phase: 'Setup' | 'Turn' | 'Prestige';
+  turn_start: number;
+  turn_end: number;
+  goal: string;        // narrative goal for this beat
+  constraint: string;  // what must not happen yet
+  avoid: string;       // character behaviors to avoid
 }
 
 // ── OCC Emotion model ────────────────────────────────────────────────────────

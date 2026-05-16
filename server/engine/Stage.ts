@@ -10,6 +10,8 @@ import type {
   GoalStack,
   EmotionState,
   IllusionState,
+  OutlineBeat,
+  PersuasionRecord,
   DarkTriad,
   BigFive,
   AttachmentStyle,
@@ -46,6 +48,20 @@ export class Stage {
       () => { /* no-op */ },
       // v1 → v2: OCC emotion state column
       () => { this.db.exec('ALTER TABLE Character_State ADD COLUMN emotion_state_json TEXT'); },
+      // v2 → v3: persuasion log + outline column on illusion state
+      () => {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS Persuasion_Log (
+            id TEXT PRIMARY KEY,
+            agent_id TEXT NOT NULL,
+            target_id TEXT NOT NULL,
+            strategy TEXT NOT NULL,
+            turn INTEGER NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS idx_persuasion_agent ON Persuasion_Log(agent_id, turn);
+        `);
+        this.db.exec('ALTER TABLE Illusion_State ADD COLUMN outline_json TEXT');
+      },
     ];
     for (let i = current; i < MIGRATIONS.length; i++) {
       this.db.transaction(() => {
@@ -422,11 +438,13 @@ export class Stage {
 
   public getIllusionState(): IllusionState {
     const row = this.db.prepare('SELECT * FROM Illusion_State WHERE id = 1').get() as Record<string, unknown>;
+    const outlineRaw = row.outline_json as string | null;
     return {
       phase: (row.phase as IllusionState['phase']) ?? 'Setup',
       planted_elements: safeJsonParse(row.planted_elements_json as string, []),
       pending_recontextualization: safeJsonParse(row.pending_recontextualization_json as string, []),
       total_turns: this.getTurnCount(),
+      outline: outlineRaw ? safeJsonParse<OutlineBeat[]>(outlineRaw, []) : undefined,
     };
   }
 
@@ -435,13 +453,39 @@ export class Stage {
     const next = { ...current, ...state };
     this.db.prepare(`
       UPDATE Illusion_State
-      SET phase = ?, planted_elements_json = ?, pending_recontextualization_json = ?
+      SET phase = ?, planted_elements_json = ?, pending_recontextualization_json = ?, outline_json = ?
       WHERE id = 1
     `).run(
       next.phase,
       JSON.stringify(next.planted_elements),
       JSON.stringify(next.pending_recontextualization),
+      next.outline ? JSON.stringify(next.outline) : null,
     );
+  }
+
+  public setOutline(beats: OutlineBeat[]): void {
+    this.db.prepare('UPDATE Illusion_State SET outline_json = ? WHERE id = 1')
+      .run(JSON.stringify(beats));
+  }
+
+  // ── Persuasion log ──────────────────────────────────────────────────────────
+
+  public recordPersuasion(record: PersuasionRecord): void {
+    this.db.prepare(
+      'INSERT OR REPLACE INTO Persuasion_Log (id, agent_id, target_id, strategy, turn) VALUES (?, ?, ?, ?, ?)',
+    ).run(record.id, record.agent_id, record.target_id, record.strategy, record.turn);
+  }
+
+  public getLastPersuasionForTarget(agent_id: string, target_id: string): PersuasionRecord | undefined {
+    return this.db.prepare(
+      'SELECT * FROM Persuasion_Log WHERE agent_id = ? AND target_id = ? ORDER BY turn DESC LIMIT 1',
+    ).get(agent_id, target_id) as PersuasionRecord | undefined;
+  }
+
+  public getPersuasionLog(agent_id: string, limit = 10): PersuasionRecord[] {
+    return this.db.prepare(
+      'SELECT * FROM Persuasion_Log WHERE agent_id = ? ORDER BY turn DESC LIMIT ?',
+    ).all(agent_id, limit) as PersuasionRecord[];
   }
 
   // ── Causal-Epistemic Spine ───────────────────────────────────────────────────

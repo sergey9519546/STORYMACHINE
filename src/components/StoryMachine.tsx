@@ -8,8 +8,30 @@ import type {
   BeatTrace,
   BeliefEdge,
   GoalMutation,
+  EmotionType,
+  PersuasionRecord,
 } from "../../server/engine/types";
-import { FileDown, Brain, Eye, AlertTriangle, GitBranch, Target, Zap } from "lucide-react";
+import { FileDown, Brain, Eye, AlertTriangle, GitBranch, Target, Zap, Smile, Shuffle } from "lucide-react";
+
+// ── Emotion display helpers ───────────────────────────────────────────────────
+
+const EMOTION_COLOR: Record<EmotionType, string> = {
+  neutral:  'bg-gray-200 text-gray-600',
+  joy:      'bg-green-500 text-white',
+  distress: 'bg-red-800 text-white',
+  anger:    'bg-[#FF4444] text-white',
+  fear:     'bg-purple-600 text-white',
+  pride:    'bg-yellow-400 text-black',
+  shame:    'bg-gray-500 text-white',
+};
+
+const PERSUASION_BADGE: Record<string, string> = {
+  logic:        'bg-blue-600 text-white',
+  emotion:      'bg-pink-500 text-white',
+  authority:    'bg-gray-800 text-white',
+  reciprocity:  'bg-teal-600 text-white',
+  social_proof: 'bg-orange-500 text-white',
+};
 
 interface StoryMachineProps {
   onClose?: () => void;
@@ -41,6 +63,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [goalMutations, setGoalMutations] = useState<GoalMutation[]>([]);
   const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [persuasionLog, setPersuasionLog] = useState<Record<string, PersuasionRecord[]>>({});
   const ledgerEndRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
 
@@ -49,6 +72,17 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
     fetchLedger();
     fetchIllusionState();
     fetchSpineData();
+  }, []);
+
+  const fetchPersuasionLog = useCallback(async (agentIds: string[]) => {
+    const entries = await Promise.all(
+      agentIds.map(id =>
+        fetch(`/api/persuasion/${id}`).then(r => r.ok ? r.json() as Promise<PersuasionRecord[]> : [])
+      )
+    );
+    const map: Record<string, PersuasionRecord[]> = {};
+    agentIds.forEach((id, i) => { map[id] = entries[i] ?? []; });
+    setPersuasionLog(map);
   }, []);
 
   useEffect(() => {
@@ -60,6 +94,9 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
     const data = await res.json() as { agents: CharacterSheet[]; nodes: Location[] };
     setAgents(data.agents);
     setNodes(data.nodes);
+    if (data.agents.length > 0) {
+      fetchPersuasionLog(data.agents.map(a => a.char_id));
+    }
   };
 
   const fetchLedger = async () => {
@@ -92,7 +129,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
 
   const refreshAll = useCallback(async () => {
     await Promise.all([fetchState(), fetchLedger(), fetchIllusionState(), fetchSpineData()]);
-  }, []);
+  }, [fetchPersuasionLog]);
 
   const handleInit = async () => {
     setLoading(true);
@@ -356,8 +393,79 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                         </div>
                       </div>
 
+                      {/* ── OCC Emotion state ── */}
+                      {agent.emotionState && agent.emotionState.dominant !== 'neutral' && (
+                        <div className="border-t border-dashed border-gray-200 pt-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Smile className="w-3 h-3 shrink-0" />
+                            <span className={`text-[9px] px-1.5 py-0.5 font-bold uppercase ${EMOTION_COLOR[agent.emotionState.dominant]}`}>
+                              {agent.emotionState.dominant} {agent.emotionState.intensity}/100
+                            </span>
+                            {agent.emotionState.anger_target_id && (
+                              <span className="text-[9px] text-[#FF4444] font-bold uppercase">
+                                → {agents.find(a => a.char_id === agent.emotionState!.anger_target_id)?.name ?? '?'}
+                              </span>
+                            )}
+                            {/* mini emotion bars */}
+                            <div className="flex gap-0.5 items-end h-3">
+                              {(['joy','distress','anger','fear','pride','shame'] as const).map(k => (
+                                <div
+                                  key={k}
+                                  title={`${k}: ${agent.emotionState![k]}`}
+                                  className={`w-1.5 transition-all ${EMOTION_COLOR[k].split(' ')[0]}`}
+                                  style={{ height: `${Math.max(2, (agent.emotionState![k] / 100) * 12)}px` }}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ── Goal stack summary ── */}
+                      {agent.goalStack && (
+                        <div className="border-t border-dashed border-gray-200 pt-2">
+                          <div className="flex items-start gap-1 mb-1">
+                            <Target className="w-3 h-3 shrink-0 mt-0.5" />
+                            <div>
+                              <div className="text-[9px] font-bold uppercase text-gray-500 mb-0.5">Terminal</div>
+                              <div className="text-[10px] font-mono text-black leading-tight">{agent.goalStack.terminal.description}</div>
+                            </div>
+                          </div>
+                          {agent.goalStack.instrumental.filter(g => !g.achieved).slice(0, 2).map(g => (
+                            <div key={g.id} className="text-[9px] font-mono text-orange-700 pl-4 flex items-center gap-1">
+                              <span>▸</span><span className="truncate">{g.description}</span>
+                            </div>
+                          ))}
+                          {agent.goalStack.instrumental.filter(g => g.achieved).length > 0 && (
+                            <div className="text-[9px] text-green-600 pl-4 font-bold">
+                              ✓ {agent.goalStack.instrumental.filter(g => g.achieved).length} achieved
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* ── Persuasion strategies in use ── */}
+                      {(persuasionLog[agent.char_id] ?? []).length > 0 && (
+                        <div className="border-t border-dashed border-gray-200 pt-2">
+                          <div className="flex items-center gap-1 mb-1">
+                            <Shuffle className="w-3 h-3" />
+                            <span className="text-[9px] font-bold uppercase text-gray-500">Persuasion</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {[...new Map((persuasionLog[agent.char_id] ?? []).map(r => [r.target_id, r])).values()]
+                              .slice(0, 4)
+                              .map(r => (
+                                <span key={r.target_id} className={`text-[9px] px-1.5 py-0.5 font-bold uppercase ${PERSUASION_BADGE[r.strategy] ?? 'bg-gray-400 text-white'}`}>
+                                  {r.strategy} → {agents.find(a => a.char_id === r.target_id)?.name ?? r.target_id}
+                                </span>
+                              ))
+                            }
+                          </div>
+                        </div>
+                      )}
+
                       {agent.darkTriad && (
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-1 pt-1">
                           {agent.darkTriad.machiavellianism > 60 && (
                             <span className="text-[9px] px-1.5 py-0.5 bg-gray-800 text-white font-bold uppercase">Machiavellian</span>
                           )}

@@ -400,24 +400,69 @@ From ${observer.name}'s perspective only:
   }
 
   // ── I: Narrative Consistency Checker ──
+  // Runs every 5 turns. Pure deterministic — no LLM calls.
+  // Checks: (1) belief contradictions, (2) goal/personality mismatch, (3) goal stack overload.
   private _checkConsistency(location_id: string, charIds: string[]): void {
+    const totalTurns = this.stage.getTurnCount();
+
     for (const charId of charIds) {
       const agent = this.stage.getAgent(charId);
       if (!agent) continue;
+
+      // ── Belief contradiction pressure ──
       const beliefs = agent.beliefs ?? [];
       const contradicted = beliefs.filter(b => (b.contradicts ?? []).length > 0);
-      if (contradicted.length === 0) continue;
-      this.stage.addDramaticPressure({
-        pressure_id: randomUUID(),
-        target_char_id: charId,
-        trigger_event_id: 'consistency_checker',
-        pressure_type: 'evidence_against',
-        intensity: 55,
-        bias_hint: `You hold ${contradicted.length} contradictory belief(s). Something you believe cannot be true simultaneously with something else you believe. This cognitive dissonance is pressing on your decision-making.`,
-        expires_at_turn: this.stage.getTurnCount() + 4,
-        applied: false,
-      });
-      console.log(`[Director] Consistency alert for ${agent.name}: ${contradicted.length} contradiction(s)`);
+      if (contradicted.length > 0) {
+        this.stage.addDramaticPressure({
+          pressure_id: randomUUID(),
+          target_char_id: charId,
+          trigger_event_id: 'consistency_checker',
+          pressure_type: 'evidence_against',
+          intensity: 55,
+          bias_hint: `You hold ${contradicted.length} contradictory belief(s). Something you believe cannot be true simultaneously with something else you believe. This cognitive dissonance is pressing on your decision-making.`,
+          expires_at_turn: totalTurns + 4,
+          applied: false,
+        });
+        console.log(`[Director] Consistency: ${agent.name} has ${contradicted.length} belief contradiction(s)`);
+      }
+
+      // ── Goal/personality coherence ──
+      const dt = agent.darkTriad;
+      if (dt && dt.machiavellianism < 30) {
+        const activeGoals = agent.goalStack?.instrumental.filter(g => !g.achieved) ?? [];
+        const deceptionGoals = activeGoals.filter(g =>
+          /deceive|lie|mislead|manipulate|conceal|hide/i.test(g.description),
+        );
+        if (deceptionGoals.length > 1) {
+          this.stage.addDramaticPressure({
+            pressure_id: randomUUID(),
+            target_char_id: charId,
+            trigger_event_id: 'consistency_checker',
+            pressure_type: 'COOL',
+            intensity: 50,
+            bias_hint: `Your conscience is catching up with you. You're not someone who deceives easily — the weight of what you're planning feels wrong. Consider a more honest path.`,
+            expires_at_turn: totalTurns + 3,
+            applied: false,
+          });
+          console.log(`[Director] Consistency: ${agent.name} (low-Mach) has ${deceptionGoals.length} deception subgoals — conscience pressure injected`);
+        }
+      }
+
+      // ── Goal stack overload ──
+      const activeCount = (agent.goalStack?.instrumental ?? []).filter(g => !g.achieved).length;
+      if (activeCount > 5) {
+        this.stage.addDramaticPressure({
+          pressure_id: randomUUID(),
+          target_char_id: charId,
+          trigger_event_id: 'consistency_checker',
+          pressure_type: 'REDIRECT',
+          intensity: 40,
+          bias_hint: `You're juggling too many competing priorities. Something has to give — focus on what matters most right now and let go of the peripheral plans.`,
+          expires_at_turn: totalTurns + 2,
+          applied: false,
+        });
+        console.log(`[Director] Consistency: ${agent.name} has ${activeCount} active subgoals (overload)`);
+      }
     }
   }
 

@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "motion/react";
 import { GameState, Choice, DefenseMechanism } from "../types";
+import type { OutlineBeat } from "../../server/engine/types";
 import {
   Brain,
   Heart,
@@ -15,6 +16,7 @@ import {
   X,
   Shield,
   Hash,
+  BookOpen,
 } from "lucide-react";
 
 // ─── Mini sparkline ───────────────────────────────────────────────────────────
@@ -224,6 +226,8 @@ export default function DirectorPanel({
   );
   const [newQualityKey, setNewQualityKey] = useState("");
   const [newQualityValue, setNewQualityValue] = useState("0");
+  const [outlineBeats, setOutlineBeats] = useState<OutlineBeat[]>([]);
+  const [outlineSaved, setOutlineSaved] = useState<boolean | null>(null);
 
   // ── Refs ──────────────────────────────────────────────────────────────────
 
@@ -337,6 +341,37 @@ export default function DirectorPanel({
   const textareaClass =
     "w-full bg-white brutal-border-thick px-3 py-2 mt-1 text-black focus:outline-none focus:ring-0 focus:bg-gray-50 min-h-[80px] resize-y font-mono text-sm brutal-shadow-focus";
 
+  const saveOutline = useCallback(async () => {
+    try {
+      const res = await fetch("/api/outline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ beats: outlineBeats }),
+      });
+      setOutlineSaved(res.ok);
+      setTimeout(() => setOutlineSaved(null), 2000);
+    } catch { setOutlineSaved(false); }
+  }, [outlineBeats]);
+
+  const addOutlineBeat = () => {
+    setOutlineBeats(prev => [...prev, {
+      phase: "Setup",
+      turn_start: 0,
+      turn_end: 10,
+      goal: "",
+      constraint: "",
+      avoid: "",
+    }]);
+  };
+
+  const updateOutlineBeat = (idx: number, field: keyof OutlineBeat, value: string | number) => {
+    setOutlineBeats(prev => prev.map((b, i) => i === idx ? { ...b, [field]: value } : b));
+  };
+
+  const removeOutlineBeat = (idx: number) => {
+    setOutlineBeats(prev => prev.filter((_, i) => i !== idx));
+  };
+
   const tabs = [
     { id: "scene",       label: "Scene",      icon: Clapperboard },
     { id: "metrics",     label: "Metrics",    icon: BarChart },
@@ -349,6 +384,7 @@ export default function DirectorPanel({
     { id: "quality",     label: "Quality",    icon: ShieldCheck },
     { id: "memory",      label: "Memory",     icon: Zap },
     { id: "qbn",         label: "QBN",        icon: Hash },
+    { id: "outline",     label: "Outline",    icon: BookOpen },
   ];
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -920,6 +956,149 @@ export default function DirectorPanel({
                   ))}
                 </div>
               </div>
+            </div>
+          </section>
+        )}
+
+        {/* ── Outline ── */}
+        {activeTab === "outline" && (
+          <section className="space-y-4">
+            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-5">
+              <p className="text-[10px] font-mono text-gray-500 uppercase leading-relaxed">
+                Author beats that override Director prompts when the engine enters the matching phase and turn range. Saved beats persist across room rounds.
+              </p>
+
+              <button
+                onClick={addOutlineBeat}
+                className="w-full py-2 bg-black text-white brutal-border-thick hover:bg-[#FF4444] transition-colors uppercase font-bold tracking-widest text-xs brutal-shadow-hover"
+              >
+                + Add Beat
+              </button>
+
+              {outlineBeats.length === 0 ? (
+                <div className="p-8 text-center border-2 border-dashed border-gray-300 text-gray-400 font-mono text-xs uppercase">
+                  No beats. Add one above or let the Director improvise.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {outlineBeats.map((beat, idx) => (
+                    <div key={idx} className="bg-gray-50 p-4 brutal-border-thick brutal-shadow relative space-y-3">
+                      <button
+                        onClick={() => removeOutlineBeat(idx)}
+                        aria-label={`Remove beat ${idx + 1}`}
+                        className="absolute top-3 right-3 text-gray-400 hover:text-[#FF4444] font-bold text-xl leading-none transition-colors"
+                      >
+                        ×
+                      </button>
+
+                      <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-gray-500 pr-6">
+                        <BookOpen className="w-3 h-3" />
+                        <span>Beat {idx + 1}</span>
+                      </div>
+
+                      {/* Phase + turn range row */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">Phase</label>
+                          <select
+                            value={beat.phase}
+                            onChange={(e) => updateOutlineBeat(idx, "phase", e.target.value)}
+                            className={inputClass}
+                          >
+                            <option value="Setup">Setup</option>
+                            <option value="Turn">Turn</option>
+                            <option value="Prestige">Prestige</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">Turn start</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={beat.turn_start}
+                            onChange={(e) => updateOutlineBeat(idx, "turn_start", Number(e.target.value))}
+                            className={inputClass}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">Turn end</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={beat.turn_end}
+                            onChange={(e) => updateOutlineBeat(idx, "turn_end", Number(e.target.value))}
+                            className={inputClass}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Goal */}
+                      <div>
+                        <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">Goal (what must happen)</label>
+                        <textarea
+                          value={beat.goal}
+                          onChange={(e) => updateOutlineBeat(idx, "goal", e.target.value)}
+                          className={textareaClass}
+                          rows={2}
+                          placeholder="e.g. Alice discovers the letter hidden in the study"
+                        />
+                      </div>
+
+                      {/* Constraint */}
+                      <div>
+                        <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">Constraint (how it must happen)</label>
+                        <textarea
+                          value={beat.constraint}
+                          onChange={(e) => updateOutlineBeat(idx, "constraint", e.target.value)}
+                          className={textareaClass}
+                          rows={2}
+                          placeholder="e.g. Without direct confrontation — she must infer it"
+                        />
+                      </div>
+
+                      {/* Avoid */}
+                      <div>
+                        <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">Avoid (forbidden paths)</label>
+                        <textarea
+                          value={beat.avoid}
+                          onChange={(e) => updateOutlineBeat(idx, "avoid", e.target.value)}
+                          className={textareaClass}
+                          rows={2}
+                          placeholder="e.g. Do not let Bob speak; keep the setting indoors"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Save button */}
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  onClick={saveOutline}
+                  className="flex-1 py-2 bg-black text-white brutal-border-thick hover:bg-[#FF4444] transition-colors uppercase font-bold tracking-widest text-xs brutal-shadow-hover"
+                >
+                  Save to Engine
+                </button>
+                {outlineSaved === true && (
+                  <span className="text-green-600 font-bold uppercase text-[10px] tracking-widest">Saved ✓</span>
+                )}
+                {outlineSaved === false && (
+                  <span className="text-[#FF4444] font-bold uppercase text-[10px] tracking-widest">Error ✗</span>
+                )}
+              </div>
+
+              {outlineBeats.length > 0 && (
+                <button
+                  onClick={async () => {
+                    await fetch("/api/outline", { method: "DELETE" });
+                    setOutlineBeats([]);
+                  }}
+                  className="w-full py-1.5 bg-white text-gray-400 brutal-border hover:text-[#FF4444] hover:border-[#FF4444] transition-colors uppercase font-bold tracking-widest text-[10px]"
+                >
+                  Clear All Beats
+                </button>
+              )}
             </div>
           </section>
         )}

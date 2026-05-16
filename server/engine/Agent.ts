@@ -15,6 +15,7 @@ import type {
   BeliefSource,
   EpistemicUpdate,
   Goal,
+  PersuasionStrategy,
 } from './types.ts';
 import { Stage } from './Stage.ts';
 import { safeJsonParse } from '../../src/lib/json.ts';
@@ -81,6 +82,28 @@ function computeDefenseLevel(neuroticism: number, suspicion: number): string {
   if (neuroticism > 60 || suspicion > 50) return 'high — you are actively working to maintain your facade';
   if (neuroticism > 40 || suspicion > 30) return 'medium — some unease, but still controlled';
   return 'low — calm and composed';
+}
+
+// ── Persuasion strategy selection ────────────────────────────────────────────
+// Deterministic: no LLM calls. Maps target Big Five + emotion to a named strategy.
+
+const PERSUASION_HINT: Record<PersuasionStrategy, (name: string) => string> = {
+  logic:       (n) => `use facts, evidence, and logical arguments. ${n} responds to systematic reasoning.`,
+  emotion:     (n) => `appeal to feelings, shared vulnerability, or empathy. ${n} is in an emotional state.`,
+  authority:   (n) => `invoke your credibility and track record. ${n} trusts you — use it deliberately.`,
+  reciprocity: (n) => `appeal to fairness and mutual exchange. ${n} values harmony and what you've done for them.`,
+  social_proof:(n) => `reference what others believe or have decided. ${n} responds to social consensus.`,
+};
+
+function selectPersuasionStrategy(target: CharacterSheet): PersuasionStrategy {
+  const bf = target.bigFive;
+  const emotion = target.emotionState;
+  if (!bf) return 'social_proof';
+  if (emotion && (emotion.dominant === 'distress' || emotion.dominant === 'fear') && emotion.intensity > 35) return 'emotion';
+  if (bf.openness > 70 || bf.conscientiousness > 70) return 'logic';
+  if (bf.agreeableness > 70) return 'reciprocity';
+  if (bf.neuroticism > 70) return 'emotion';
+  return 'social_proof';
 }
 
 // ── Agent class ──────────────────────────────────────────────────────────────
@@ -228,23 +251,26 @@ export class Agent {
       return `\nCURRENT EMOTIONAL STATE: ${es.dominant.toUpperCase()} (intensity ${es.intensity}/100)${angerTarget}. This colors everything — not stated aloud, felt beneath the surface. Let it shape your word choice and what you hold back.`;
     })();
 
-    // ── B: Outline Conditioning — IllusionState phase as beat hint ──
-    const illusionPhase = this.stage.getIllusionState().phase;
-    const beatHint = illusionPhase === 'Setup'
+    // ── B: Outline Conditioning — writer beat sheet (if set) or 3-phase fallback ──
+    const illusionState = this.stage.getIllusionState();
+    const illusionPhase = illusionState.phase;
+    const currentTurn = this.stage.getTurnCount();
+    const activeBeat = illusionState.outline?.find(b =>
+      b.phase === illusionPhase && currentTurn >= b.turn_start && currentTurn <= b.turn_end,
+    );
+    const beatHint = activeBeat
+      ? `NARRATIVE BEAT [${illusionPhase.toUpperCase()}]\nGOAL: ${activeBeat.goal}\nCONSTRAINT: ${activeBeat.constraint}\nAVOID: ${activeBeat.avoid}`
+      : illusionPhase === 'Setup'
       ? 'NARRATIVE PHASE: SETUP — establish relationships, plant seeds, position for later plays.'
       : illusionPhase === 'Turn'
       ? 'NARRATIVE PHASE: TURN — a contradiction has emerged; press toward confrontation or defense.'
       : 'NARRATIVE PHASE: PRESTIGE — the illusion is collapsing; act as if everything is being recontextualized.';
 
-    // ── D: Dynamic Persuasion — personality-based approach hints per target ──
+    // ── D: Dynamic Persuasion — named strategy per target, recorded to Stage ──
     const persuasionHints = otherAgents.map(other => {
-      const bf = other.bigFive;
-      if (!bf) return `  - With ${other.name}: appeal to their self-interest directly.`;
-      if (bf.agreeableness > 70)      return `  - With ${other.name}: use shared-values appeals and appeals to harmony.`;
-      if (bf.openness > 70)           return `  - With ${other.name}: offer novel framing and intellectual arguments.`;
-      if (bf.conscientiousness > 70)  return `  - With ${other.name}: present systematic facts and timelines.`;
-      if (bf.neuroticism > 70)        return `  - With ${other.name}: offer reassurance and certainty.`;
-      return `  - With ${other.name}: direct appeal to their stated self-interest.`;
+      const strategy = selectPersuasionStrategy(other);
+      this.stage.recordPersuasion({ id: randomUUID(), agent_id: this.sheet.char_id, target_id: other.char_id, strategy, turn: currentTurn });
+      return `  - With ${other.name} [${strategy}]: ${PERSUASION_HINT[strategy](other.name)}`;
     }).join('\n');
 
     // ── Dramatic Pressure (Director's bias signal — consumed once) ──
