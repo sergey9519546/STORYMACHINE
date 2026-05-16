@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "motion/react";
-import { GameState, Choice } from "../types";
+import { GameState, Choice, DefenseMechanism } from "../types";
+import type { OutlineBeat } from "../../server/engine/types";
 import {
   Brain,
   Heart,
@@ -11,60 +12,105 @@ import {
   Clapperboard,
   BarChart,
   MessageSquare,
-  GitBranch
+  GitBranch,
+  X,
+  Shield,
+  Hash,
+  BookOpen,
 } from "lucide-react";
+
+// ─── Mini sparkline ───────────────────────────────────────────────────────────
+
+function SparkLine({
+  data,
+  color,
+  height = 40,
+}: {
+  data: number[];
+  color: string;
+  height?: number;
+}) {
+  if (data.length < 2) {
+    return (
+      <div
+        className="w-full border-b-2 border-gray-200"
+        style={{ height }}
+        aria-hidden="true"
+      />
+    );
+  }
+  const max = Math.max(...data, 1);
+  const w = 200;
+  const pts = data
+    .map((v, i) => {
+      const x = (i / (data.length - 1)) * w;
+      const y = height - (v / max) * height;
+      return `${x},${y}`;
+    })
+    .join(" ");
+  return (
+    <svg
+      width="100%"
+      height={height}
+      viewBox={`0 0 ${w} ${height}`}
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const ALL_DEFENSE_MECHS: DefenseMechanism[] = [
+  "rationalization",
+  "intellectualization",
+  "projection",
+  "displacement",
+  "denial",
+  "dissociation",
+  "repression",
+];
+
+// ─── Props ────────────────────────────────────────────────────────────────────
 
 interface DirectorPanelProps {
   state: GameState;
   onUpdateState: (newState: GameState) => void;
+  onClose?: () => void;
 }
+
+// ─── Component ───────────────────────────────────────────────────────────────
 
 export default function DirectorPanel({
   state,
   onUpdateState,
+  onClose,
 }: DirectorPanelProps) {
   const { protagonist, directorState, currentScene } = state;
 
-  const updateProtagonist = (
-    field: keyof typeof protagonist,
-    value: string,
-  ) => {
+  // ── Updaters ─────────────────────────────────────────────────────────────
+
+  const updateProtagonist = (field: keyof typeof protagonist, value: string) => {
+    onUpdateState({ ...state, protagonist: { ...protagonist, [field]: value } });
+  };
+
+  const updateArcMeter = (field: keyof typeof directorState.arcMeter, value: number) => {
     onUpdateState({
       ...state,
-      protagonist: { ...protagonist, [field]: value },
+      directorState: { ...directorState, arcMeter: { ...directorState.arcMeter, [field]: value } },
     });
   };
 
-  const updateArcMeter = (
-    field: keyof typeof directorState.arcMeter,
-    value: number,
-  ) => {
+  const updatePlayerModel = (field: keyof typeof directorState.playerModel, value: string | number) => {
     onUpdateState({
       ...state,
-      directorState: {
-        ...directorState,
-        arcMeter: { ...directorState.arcMeter, [field]: value },
-      },
+      directorState: { ...directorState, playerModel: { ...directorState.playerModel, [field]: value } },
     });
   };
 
-  const updatePlayerModel = (
-    field: keyof typeof directorState.playerModel,
-    value: string | number,
-  ) => {
-    onUpdateState({
-      ...state,
-      directorState: {
-        ...directorState,
-        playerModel: { ...directorState.playerModel, [field]: value },
-      },
-    });
-  };
-
-  const updateBigFive = (
-    field: keyof typeof directorState.playerModel.bigFive,
-    value: number,
-  ) => {
+  const updateBigFive = (field: keyof typeof directorState.playerModel.bigFive, value: number) => {
     onUpdateState({
       ...state,
       directorState: {
@@ -77,71 +123,41 @@ export default function DirectorPanel({
     });
   };
 
-  const updateComposition = (
-    field: keyof typeof currentScene.composition,
-    value: string,
-  ) => {
+  const updateComposition = (field: keyof typeof currentScene.composition, value: string) => {
     onUpdateState({
       ...state,
-      currentScene: {
-        ...currentScene,
-        composition: { ...currentScene.composition, [field]: value },
-      },
+      currentScene: { ...currentScene, composition: { ...currentScene.composition, [field]: value } },
     });
   };
 
-  const updateQuality = (
-    field: keyof typeof directorState.qualityValidation,
-    value: string | boolean,
-  ) => {
+  const updateQuality = (field: keyof typeof directorState.qualityValidation, value: string | boolean) => {
     onUpdateState({
       ...state,
       directorState: {
         ...directorState,
-        qualityValidation: {
-          ...directorState.qualityValidation,
-          [field]: value,
-        },
+        qualityValidation: { ...directorState.qualityValidation, [field]: value },
       },
     });
   };
 
-  const updateMemory = (
-    field: keyof typeof directorState.memory,
-    value: string,
-  ) => {
+  const updateMemory = (field: keyof typeof directorState.memory, value: string) => {
     onUpdateState({
       ...state,
       directorState: {
         ...directorState,
-        memory: {
-          ...directorState.memory,
-          [field]: value.split("\n").filter((s) => s.trim() !== ""),
-        },
+        memory: { ...directorState.memory, [field]: value.split("\n").filter((s) => s.trim() !== "") },
       },
     });
   };
 
   const updateScene = (field: keyof typeof currentScene, value: string) => {
-    onUpdateState({
-      ...state,
-      currentScene: {
-        ...currentScene,
-        [field]: value,
-      },
-    });
+    onUpdateState({ ...state, currentScene: { ...currentScene, [field]: value } });
   };
 
   const updateChoice = (index: number, field: keyof Choice, value: string) => {
     const newChoices = [...currentScene.choices];
     newChoices[index] = { ...newChoices[index], [field]: value };
-    onUpdateState({
-      ...state,
-      currentScene: {
-        ...currentScene,
-        choices: newChoices,
-      },
-    });
+    onUpdateState({ ...state, currentScene: { ...currentScene, choices: newChoices } });
   };
 
   const addChoice = () => {
@@ -160,72 +176,338 @@ export default function DirectorPanel({
   const removeChoice = (index: number) => {
     const newChoices = [...currentScene.choices];
     newChoices.splice(index, 1);
+    onUpdateState({ ...state, currentScene: { ...currentScene, choices: newChoices } });
+  };
+
+  const toggleDefenseMech = (mech: DefenseMechanism) => {
+    const active = protagonist.psychology.defenseMechanisms.includes(mech);
+    const mechs = active
+      ? protagonist.psychology.defenseMechanisms.filter((m) => m !== mech)
+      : [...protagonist.psychology.defenseMechanisms, mech];
     onUpdateState({
       ...state,
-      currentScene: {
-        ...currentScene,
-        choices: newChoices,
+      protagonist: {
+        ...protagonist,
+        psychology: { ...protagonist.psychology, defenseMechanisms: mechs },
       },
     });
   };
 
-  const [activeTab, setActiveTab] = React.useState<string>("scene");
+  const setDefenseLevel = (level: typeof protagonist.psychology.currentDefenseLevel) => {
+    onUpdateState({
+      ...state,
+      protagonist: {
+        ...protagonist,
+        psychology: { ...protagonist.psychology, currentDefenseLevel: level },
+      },
+    });
+  };
 
-  const SegmentedMeter = ({ value, onChange, max = 100, segments = 10 }: { value: number, onChange: (v: number) => void, max?: number, segments?: number }) => {
+  const updateQbnQuality = (key: string, value: number) => {
+    onUpdateState({
+      ...state,
+      directorState: {
+        ...directorState,
+        qbnQualities: { ...(directorState.qbnQualities ?? {}), [key]: value },
+      },
+    });
+  };
+
+  const removeQbnQuality = (key: string) => {
+    const { [key]: _removed, ...rest } = directorState.qbnQualities ?? {};
+    onUpdateState({ ...state, directorState: { ...directorState, qbnQualities: rest } });
+  };
+
+  // ── Local state ───────────────────────────────────────────────────────────
+
+  const [activeTab, setActiveTab] = useState<string>("scene");
+  const [availableIndices, setAvailableIndices] = useState<Set<number>>(
+    new Set(currentScene.choices.map((_, i) => i))
+  );
+  const [newQualityKey, setNewQualityKey] = useState("");
+  const [newQualityValue, setNewQualityValue] = useState("0");
+  const [outlineBeats, setOutlineBeats] = useState<OutlineBeat[]>([]);
+  const [outlineSaved, setOutlineSaved] = useState<boolean | null>(null);
+  const [pacingTarget, setPacingTarget] = useState<'slow' | 'medium' | 'fast'>('medium');
+  const [pacingSaved, setPacingSaved] = useState<boolean | null>(null);
+  const [storyStructure, setStoryStructure] = useState<string>('');
+  const [emotionalArc, setEmotionalArc] = useState<string>('');
+  const [directorStyle, setDirectorStyle] = useState<string>('');
+  const [expectedTurns, setExpectedTurns] = useState<number>(20);
+  const [presetSaved, setPresetSaved] = useState<boolean | null>(null);
+  const [applyingPreset, setApplyingPreset] = useState(false);
+
+  // ── Refs ──────────────────────────────────────────────────────────────────
+
+  const filterRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const tensionHistoryRef = useRef<Array<{ tension: number; menace: number }>>([]);
+  const choicesKey = JSON.stringify(currentScene.choices);
+  const qualitiesKey = JSON.stringify(directorState.qbnQualities);
+
+  // ── Track tension history ─────────────────────────────────────────────────
+
+  useEffect(() => {
+    tensionHistoryRef.current = [
+      ...tensionHistoryRef.current.slice(-29),
+      { tension: directorState.tensionLevel ?? 0, menace: directorState.menaceGauge ?? 0 },
+    ];
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [directorState.tensionLevel, directorState.menaceGauge]);
+
+  // ── Load saved outline + story config from engine on mount ──────────────
+
+  useEffect(() => {
+    fetch("/api/outline")
+      .then(r => r.ok ? r.json() as Promise<{ beats: OutlineBeat[] }> : { beats: [] })
+      .then(data => { if (data.beats.length > 0) setOutlineBeats(data.beats); })
+      .catch(() => {});
+    fetch("/api/story-config")
+      .then(r => r.ok ? r.json() as Promise<{
+        structure: string | null; emotional_arc: string | null;
+        director_style: string | null; expected_turns: number; pacing_target: string | null;
+      }> : null)
+      .then(data => {
+        if (!data) return;
+        if (data.structure) setStoryStructure(data.structure);
+        if (data.emotional_arc) setEmotionalArc(data.emotional_arc);
+        if (data.director_style) setDirectorStyle(data.director_style);
+        if (data.expected_turns) setExpectedTurns(data.expected_turns);
+        if (data.pacing_target) setPacingTarget(data.pacing_target as 'slow' | 'medium' | 'fast');
+      })
+      .catch(() => {});
+  }, []);
+
+  // ── Escape key ────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!onClose) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  // ── QBN filter choices ────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (filterRef.current) clearTimeout(filterRef.current);
+    abortRef.current?.abort();
+    filterRef.current = setTimeout(() => {
+      const choices = currentScene.choices;
+      if (choices.length === 0) {
+        setAvailableIndices(new Set());
+        return;
+      }
+      const controller = new AbortController();
+      abortRef.current = controller;
+      fetch("/api/qbn/filter-choices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ choices, qualities: directorState.qbnQualities ?? {} }),
+        signal: controller.signal,
+      })
+        .then((r) => r.json())
+        .then((data: { available: Choice[] }) => {
+          const availTexts = new Set((data.available ?? []).map((c) => c.text));
+          setAvailableIndices(
+            new Set(choices.map((c, i) => (availTexts.has(c.text) ? i : -1)).filter((i) => i >= 0))
+          );
+        })
+        .catch((err) => {
+          if (err.name !== "AbortError") setAvailableIndices(new Set(choices.map((_, i) => i)));
+        });
+    }, 400);
+    return () => {
+      if (filterRef.current) clearTimeout(filterRef.current);
+      abortRef.current?.abort();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [choicesKey, qualitiesKey]);
+
+  // ── Sub-components ────────────────────────────────────────────────────────
+
+  const SegmentedMeter = ({
+    value,
+    onChange,
+    max = 100,
+    segments = 10,
+  }: {
+    value: number;
+    onChange: (v: number) => void;
+    max?: number;
+    segments?: number;
+  }) => {
     const filledSegments = Math.round((value / max) * segments);
     return (
-      <div className="flex gap-1 w-full cursor-pointer h-6" onClick={(e) => {
-        const rect = e.currentTarget.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const percentage = Math.max(0, Math.min(1, x / rect.width));
-        onChange(Math.round(percentage * max));
-      }}>
+      <div
+        className="flex gap-1 w-full cursor-pointer h-6"
+        role="slider"
+        aria-valuenow={value}
+        aria-valuemin={0}
+        aria-valuemax={max}
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const percentage = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+          onChange(Math.round(percentage * max));
+        }}
+      >
         {Array.from({ length: segments }).map((_, i) => (
           <div
             key={i}
-            className={`flex-1 border-2 border-black transition-colors ${i < filledSegments ? 'bg-[#FF4444]' : 'bg-transparent hover:bg-gray-200'}`}
+            className={`flex-1 border-2 border-black transition-colors ${
+              i < filledSegments ? "bg-[#FF4444]" : "bg-transparent hover:bg-gray-200"
+            }`}
           />
         ))}
       </div>
     );
   };
 
+  // ── Styles ────────────────────────────────────────────────────────────────
+
   const inputClass =
     "w-full bg-white brutal-border-thick px-3 py-2 mt-1 text-black focus:outline-none focus:ring-0 focus:bg-gray-50 font-mono text-sm brutal-shadow-focus";
   const textareaClass =
     "w-full bg-white brutal-border-thick px-3 py-2 mt-1 text-black focus:outline-none focus:ring-0 focus:bg-gray-50 min-h-[80px] resize-y font-mono text-sm brutal-shadow-focus";
 
+  const saveOutline = useCallback(async () => {
+    try {
+      const res = await fetch("/api/outline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ beats: outlineBeats }),
+      });
+      setOutlineSaved(res.ok);
+      setTimeout(() => setOutlineSaved(null), 2000);
+    } catch { setOutlineSaved(false); }
+  }, [outlineBeats]);
+
+  const savePacingTarget = useCallback(async (target: 'slow' | 'medium' | 'fast') => {
+    setPacingTarget(target);
+    try {
+      const res = await fetch("/api/pacing-target", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target }),
+      });
+      setPacingSaved(res.ok);
+      setTimeout(() => setPacingSaved(null), 1500);
+    } catch { setPacingSaved(false); }
+  }, []);
+
+  const applyStructurePreset = useCallback(async () => {
+    if (!storyStructure) return;
+    setApplyingPreset(true);
+    try {
+      const res = await fetch("/api/outline/apply-preset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ structure: storyStructure, expectedTurns }),
+      });
+      if (res.ok) {
+        const data = await res.json() as { beats: OutlineBeat[] };
+        setOutlineBeats(data.beats);
+        setPresetSaved(true);
+      } else { setPresetSaved(false); }
+    } catch { setPresetSaved(false); }
+    setApplyingPreset(false);
+    setTimeout(() => setPresetSaved(null), 2000);
+  }, [storyStructure, expectedTurns]);
+
+  const saveEmotionalArc = useCallback(async (arc: string) => {
+    setEmotionalArc(arc);
+    await fetch("/api/emotional-arc", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ arc }),
+    }).catch(() => {});
+  }, []);
+
+  const saveDirectorStyle = useCallback(async (style: string) => {
+    setDirectorStyle(style);
+    await fetch("/api/director-style", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ style }),
+    }).catch(() => {});
+  }, []);
+
+  const addOutlineBeat = () => {
+    setOutlineBeats(prev => [...prev, {
+      phase: "Setup",
+      turn_start: 0,
+      turn_end: 10,
+      goal: "",
+      constraint: "",
+      avoid: "",
+    }]);
+  };
+
+  const updateOutlineBeat = (idx: number, field: keyof OutlineBeat, value: string | number) => {
+    setOutlineBeats(prev => prev.map((b, i) => i === idx ? { ...b, [field]: value } : b));
+  };
+
+  const removeOutlineBeat = (idx: number) => {
+    setOutlineBeats(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const tabs = [
+    { id: "scene",       label: "Scene",      icon: Clapperboard },
+    { id: "metrics",     label: "Metrics",    icon: BarChart },
+    { id: "commentary",  label: "Commentary", icon: MessageSquare },
+    { id: "throughlines",label: "Throughlines",icon: GitBranch },
+    { id: "character",   label: "Character",  icon: Eye },
+    { id: "psychology",  label: "Psychology", icon: Brain },
+    { id: "arc",         label: "Arc",        icon: Activity },
+    { id: "player",      label: "Player",     icon: Heart },
+    { id: "quality",     label: "Quality",    icon: ShieldCheck },
+    { id: "memory",      label: "Memory",     icon: Zap },
+    { id: "qbn",         label: "QBN",        icon: Hash },
+    { id: "outline",     label: "Outline",    icon: BookOpen },
+  ];
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
     <motion.div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="director-panel-title"
       initial={{ x: "100%" }}
       animate={{ x: 0 }}
       exit={{ x: "100%" }}
       transition={{ type: "spring", damping: 25, stiffness: 200 }}
       className="fixed top-0 right-0 w-[500px] h-screen bg-white brutal-border-thick text-black p-8 overflow-y-auto font-mono text-sm z-50 brutal-shadow"
     >
+      {/* Header */}
       <div className="flex items-center gap-4 mb-6 pb-4 border-b-[8px] border-black">
-        <Brain className="w-8 h-8 text-black" />
-        <h2 className="text-2xl font-display uppercase tracking-widest text-black">
+        <Brain className="w-8 h-8 text-black shrink-0" />
+        <h2
+          id="director-panel-title"
+          className="text-2xl font-display uppercase tracking-widest text-black flex-1"
+        >
           AI Director State
         </h2>
+        {onClose && (
+          <button
+            onClick={onClose}
+            aria-label="Close Director panel"
+            className="p-2 brutal-border hover:bg-black hover:text-white transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
+      {/* Tab bar */}
       <div className="flex flex-wrap gap-2 mb-8">
-        {[
-          { id: "scene", label: "Scene", icon: Clapperboard },
-          { id: "metrics", label: "Metrics", icon: BarChart },
-          { id: "commentary", label: "Commentary", icon: MessageSquare },
-          { id: "throughlines", label: "Throughlines", icon: GitBranch },
-          { id: "character", label: "Character", icon: Eye },
-          { id: "psychology", label: "Psychology", icon: Brain },
-          { id: "arc", label: "Arc", icon: Activity },
-          { id: "player", label: "Player", icon: Heart },
-          { id: "quality", label: "Quality", icon: ShieldCheck },
-          { id: "memory", label: "Memory", icon: Zap },
-        ].map((tab) => (
+        {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
+            aria-pressed={activeTab === tab.id}
             className={`px-3 py-2 text-xs font-bold uppercase tracking-widest brutal-border-thick transition-colors flex items-center gap-2 brutal-shadow-hover ${
               activeTab === tab.id
                 ? "bg-[#FF4444] text-white border-[#FF4444]"
@@ -239,348 +521,172 @@ export default function DirectorPanel({
       </div>
 
       <div className="space-y-12 pb-24">
-        {/* Current Scene */}
+
+        {/* ── Scene ── */}
         {activeTab === "scene" && (
-        <section className="space-y-4">
-          <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-5">
-            <div>
-              <label className="text-black font-bold uppercase tracking-wider text-xs">Narrative Text:</label>
-              <textarea
-                value={currentScene.narrativeText}
-                onChange={(e) => updateScene("narrativeText", e.target.value)}
-                className={textareaClass}
-                rows={4}
-              />
-            </div>
-            <div>
-              <label className="text-black font-bold uppercase tracking-wider text-xs">Image Prompt:</label>
-              <textarea
-                value={currentScene.imagePrompt}
-                onChange={(e) => updateScene("imagePrompt", e.target.value)}
-                className={textareaClass}
-                rows={3}
-              />
-            </div>
-            <div>
-              <label className="text-black font-bold uppercase tracking-wider text-xs">Audio Dialogue:</label>
-              <textarea
-                value={currentScene.audioDialogue}
-                onChange={(e) => updateScene("audioDialogue", e.target.value)}
-                className={textareaClass}
-                rows={2}
-              />
-            </div>
-            <div>
-              <label className="text-black font-bold uppercase tracking-wider text-xs">Beat:</label>
-              <input
-                type="text"
-                value={currentScene.beat}
-                onChange={(e) => updateScene("beat", e.target.value)}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className="text-black font-bold uppercase tracking-wider text-xs">Information Position:</label>
-              <select
-                value={currentScene.informationPosition || "parity"}
-                onChange={(e) => updateScene("informationPosition", e.target.value)}
-                className={inputClass}
-              >
-                <option value="superior">Superior (Audience knows more)</option>
-                <option value="inferior">Inferior (Characters know more)</option>
-                <option value="parity">Parity (Audience = Characters)</option>
-              </select>
-            </div>
-            {currentScene.isQBNMode && (
-              <div className="bg-black text-white p-3 brutal-border-thick font-bold uppercase tracking-widest text-xs">
-                QBN Mode Active (Investigation)
+          <section className="space-y-4">
+            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-5">
+              <div>
+                <label className="text-black font-bold uppercase tracking-wider text-xs">Narrative Text:</label>
+                <textarea value={currentScene.narrativeText} onChange={(e) => updateScene("narrativeText", e.target.value)} className={textareaClass} rows={4} />
               </div>
-            )}
-            {currentScene.comedyMisdirection && (
-              <div className="bg-yellow-400 text-black p-3 brutal-border-thick font-bold uppercase tracking-widest text-xs">
-                Comedy Misdirection: {currentScene.comedyMisdirection.replace('_', ' ')}
+              <div>
+                <label className="text-black font-bold uppercase tracking-wider text-xs">Image Prompt:</label>
+                <textarea value={currentScene.imagePrompt} onChange={(e) => updateScene("imagePrompt", e.target.value)} className={textareaClass} rows={3} />
               </div>
-            )}
-            <div>
-              <label className="text-black font-bold uppercase tracking-wider text-xs">Composition:</label>
-              <div className="space-y-3 mt-2">
-                <div>
-                  <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">
-                    Camera Angle
-                  </label>
-                  <input
-                    type="text"
-                    value={currentScene.composition.cameraAngle}
-                    onChange={(e) =>
-                      updateComposition("cameraAngle", e.target.value)
-                    }
-                    className={inputClass}
-                  />
+              <div>
+                <label className="text-black font-bold uppercase tracking-wider text-xs">Audio Dialogue:</label>
+                <textarea value={currentScene.audioDialogue} onChange={(e) => updateScene("audioDialogue", e.target.value)} className={textareaClass} rows={2} />
+              </div>
+              <div>
+                <label className="text-black font-bold uppercase tracking-wider text-xs">Beat:</label>
+                <input type="text" value={currentScene.beat} onChange={(e) => updateScene("beat", e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="text-black font-bold uppercase tracking-wider text-xs">Information Position:</label>
+                <select value={currentScene.informationPosition || "parity"} onChange={(e) => updateScene("informationPosition", e.target.value)} className={inputClass}>
+                  <option value="superior">Superior (Audience knows more)</option>
+                  <option value="inferior">Inferior (Characters know more)</option>
+                  <option value="parity">Parity (Audience = Characters)</option>
+                </select>
+              </div>
+              {currentScene.isQBNMode && (
+                <div className="bg-black text-white p-3 brutal-border-thick font-bold uppercase tracking-widest text-xs">
+                  QBN Mode Active (Investigation)
                 </div>
-                <div>
-                  <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">
-                    Shot Type
-                  </label>
-                  <input
-                    type="text"
-                    value={currentScene.composition.shotType}
-                    onChange={(e) =>
-                      updateComposition("shotType", e.target.value)
-                    }
-                    className={inputClass}
-                  />
+              )}
+              {currentScene.comedyMisdirection && (
+                <div className="bg-yellow-400 text-black p-3 brutal-border-thick font-bold uppercase tracking-widest text-xs">
+                  Comedy Misdirection: {currentScene.comedyMisdirection.replace("_", " ")}
                 </div>
-                <div>
-                  <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">
-                    Lighting
-                  </label>
-                  <input
-                    type="text"
-                    value={currentScene.composition.lighting}
-                    onChange={(e) =>
-                      updateComposition("lighting", e.target.value)
-                    }
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">
-                    Color Palette
-                  </label>
-                  <input
-                    type="text"
-                    value={currentScene.composition.colorPalette}
-                    onChange={(e) =>
-                      updateComposition("colorPalette", e.target.value)
-                    }
-                    className={inputClass}
-                  />
+              )}
+              <div>
+                <label className="text-black font-bold uppercase tracking-wider text-xs">Composition:</label>
+                <div className="space-y-3 mt-2">
+                  {(["cameraAngle", "shotType", "lighting", "colorPalette"] as const).map((field) => (
+                    <div key={field}>
+                      <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">
+                        {field.replace(/([A-Z])/g, " $1")}
+                      </label>
+                      <input type="text" value={currentScene.composition[field]} onChange={(e) => updateComposition(field, e.target.value)} className={inputClass} />
+                    </div>
+                  ))}
                 </div>
               </div>
-            </div>
 
-            <div className="pt-4 border-t-[4px] border-black">
-              <div className="flex justify-between items-center mb-4">
-                <label className="text-black font-bold uppercase tracking-wider text-xs">Choices:</label>
-                <button
-                  onClick={addChoice}
-                  className="px-3 py-2 bg-black text-white brutal-border-thick hover:bg-white hover:text-black transition-colors uppercase font-bold tracking-widest text-xs brutal-shadow-hover"
-                >
-                  + Add
-                </button>
-              </div>
-              <div className="space-y-4">
-                {currentScene.choices.map((choice, idx) => (
-                  <div
-                    key={idx}
-                    className="bg-white p-4 brutal-border-thick brutal-shadow relative"
-                  >
-                    <button
-                      onClick={() => removeChoice(idx)}
-                      className="absolute top-2 right-2 text-black hover:text-gray-500 font-bold text-2xl leading-none"
-                    >
-                      ×
-                    </button>
-                    <div className="mb-3 pr-6">
-                      <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">
-                        Text
-                      </label>
-                      <input
-                        type="text"
-                        value={choice.text}
-                        onChange={(e) =>
-                          updateChoice(idx, "text", e.target.value)
-                        }
-                        className={inputClass}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">
-                        Intent
-                      </label>
-                      <input
-                        type="text"
-                        value={choice.intent}
-                        onChange={(e) =>
-                          updateChoice(idx, "intent", e.target.value)
-                        }
-                        className={inputClass}
-                      />
-                    </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">
-                          Scope
-                        </label>
-                        <select
-                          value={choice.consequenceScope}
-                          onChange={(e) =>
-                            updateChoice(idx, "consequenceScope", e.target.value)
-                          }
-                          className={inputClass}
-                        >
-                          <option value="micro">Micro</option>
-                          <option value="macro">Macro</option>
-                          <option value="crisis">Crisis</option>
-                        </select>
+              <div className="pt-4 border-t-[4px] border-black">
+                <div className="flex justify-between items-center mb-4">
+                  <label className="text-black font-bold uppercase tracking-wider text-xs">Choices:</label>
+                  <button onClick={addChoice} className="px-3 py-2 bg-black text-white brutal-border-thick hover:bg-white hover:text-black transition-colors uppercase font-bold tracking-widest text-xs brutal-shadow-hover">
+                    + Add
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  {currentScene.choices.map((choice, idx) => (
+                    <div key={idx} className={`bg-white p-4 brutal-border-thick brutal-shadow relative ${!availableIndices.has(idx) ? "opacity-60" : ""}`}>
+                      {!availableIndices.has(idx) && (
+                        <span className="absolute top-2 left-2 bg-[#FF4444] text-white text-[8px] px-2 py-0.5 font-bold uppercase tracking-widest">LOCKED</span>
+                      )}
+                      <button onClick={() => removeChoice(idx)} aria-label={`Remove choice ${idx + 1}`} className="absolute top-2 right-2 text-black hover:text-gray-500 font-bold text-2xl leading-none">×</button>
+                      <div className="mb-3 pr-6">
+                        <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">Text</label>
+                        <input type="text" value={choice.text} onChange={(e) => updateChoice(idx, "text", e.target.value)} className={inputClass} />
                       </div>
                       <div>
-                        <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">
-                          Taxonomy
-                        </label>
-                        <select
-                          value={choice.taxonomy || "exploratory"}
-                          onChange={(e) =>
-                            updateChoice(idx, "taxonomy", e.target.value)
-                          }
-                          className={inputClass}
-                        >
-                          <option value="didactic">Didactic</option>
-                          <option value="reflective">Reflective</option>
-                          <option value="exploratory">Exploratory</option>
-                        </select>
+                        <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">Intent</label>
+                        <input type="text" value={choice.intent} onChange={(e) => updateChoice(idx, "intent", e.target.value)} className={inputClass} />
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">Scope</label>
+                          <select value={choice.consequenceScope} onChange={(e) => updateChoice(idx, "consequenceScope", e.target.value)} className={inputClass}>
+                            <option value="micro">Micro</option>
+                            <option value="macro">Macro</option>
+                            <option value="crisis">Crisis</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">Taxonomy</label>
+                          <select value={choice.taxonomy || "exploratory"} onChange={(e) => updateChoice(idx, "taxonomy", e.target.value)} className={inputClass}>
+                            <option value="didactic">Didactic</option>
+                            <option value="reflective">Reflective</option>
+                            <option value="exploratory">Exploratory</option>
+                          </select>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
         )}
 
-        {/* Protagonist Profile */}
+        {/* ── Character ── */}
         {activeTab === "character" && (
-        <section className="space-y-4">
-          <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-5">
-            <div>
-              <label className="text-black font-bold uppercase tracking-wider text-xs">Name:</label>
-              <input
-                type="text"
-                value={protagonist.name}
-                onChange={(e) => updateProtagonist("name", e.target.value)}
-                className={inputClass}
-              />
+          <section className="space-y-4">
+            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-5">
+              {(["name", "ghost", "lie", "want", "need"] as const).map((field) => (
+                <div key={field}>
+                  <label className="text-black font-bold uppercase tracking-wider text-xs">{field}:</label>
+                  {field === "name" ? (
+                    <input type="text" value={protagonist[field]} onChange={(e) => updateProtagonist(field, e.target.value)} className={inputClass} />
+                  ) : (
+                    <textarea value={protagonist[field]} onChange={(e) => updateProtagonist(field, e.target.value)} className={textareaClass} />
+                  )}
+                </div>
+              ))}
             </div>
-            <div>
-              <label className="text-black font-bold uppercase tracking-wider text-xs">Ghost:</label>
-              <textarea
-                value={protagonist.ghost}
-                onChange={(e) => updateProtagonist("ghost", e.target.value)}
-                className={textareaClass}
-              />
-            </div>
-            <div>
-              <label className="text-black font-bold uppercase tracking-wider text-xs">Lie:</label>
-              <textarea
-                value={protagonist.lie}
-                onChange={(e) => updateProtagonist("lie", e.target.value)}
-                className={textareaClass}
-              />
-            </div>
-            <div>
-              <label className="text-black font-bold uppercase tracking-wider text-xs">Want:</label>
-              <textarea
-                value={protagonist.want}
-                onChange={(e) => updateProtagonist("want", e.target.value)}
-                className={textareaClass}
-              />
-            </div>
-            <div>
-              <label className="text-black font-bold uppercase tracking-wider text-xs">Need:</label>
-              <textarea
-                value={protagonist.need}
-                onChange={(e) => updateProtagonist("need", e.target.value)}
-                className={textareaClass}
-              />
-            </div>
-          </div>
-        </section>
+          </section>
         )}
 
-        {/* Psychology */}
+        {/* ── Psychology ── */}
         {activeTab === "psychology" && (
           <section className="space-y-4">
             <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-6">
-              <h3 className="font-display text-xl uppercase tracking-widest border-b-[4px] border-black pb-2">
-                Dark Triad
-              </h3>
-              
-              <div>
-                <div className="flex justify-between mb-2 font-bold uppercase tracking-widest text-xs">
-                  <label>Machiavellianism</label>
-                  <span>{protagonist.psychology.darkTriad?.machiavellianism || 0}%</span>
-                </div>
-                <SegmentedMeter
-                  value={protagonist.psychology.darkTriad?.machiavellianism || 0}
-                  onChange={(v) => onUpdateState({
-                    ...state,
-                    protagonist: {
-                      ...protagonist,
-                      psychology: {
-                        ...protagonist.psychology,
-                        darkTriad: { ...protagonist.psychology.darkTriad, machiavellianism: v }
-                      }
+              <h3 className="font-display text-xl uppercase tracking-widest border-b-[4px] border-black pb-2">Dark Triad</h3>
+              {(["machiavellianism", "narcissism", "psychopathy"] as const).map((trait) => (
+                <div key={trait}>
+                  <div className="flex justify-between mb-2 font-bold uppercase tracking-widest text-xs">
+                    <label>{trait}</label>
+                    <span>{protagonist.psychology.darkTriad?.[trait] || 0}%</span>
+                  </div>
+                  <SegmentedMeter
+                    value={protagonist.psychology.darkTriad?.[trait] || 0}
+                    onChange={(v) =>
+                      onUpdateState({
+                        ...state,
+                        protagonist: {
+                          ...protagonist,
+                          psychology: {
+                            ...protagonist.psychology,
+                            darkTriad: { ...protagonist.psychology.darkTriad, [trait]: v },
+                          },
+                        },
+                      })
                     }
-                  })}
-                />
-              </div>
-
-              <div>
-                <div className="flex justify-between mb-2 font-bold uppercase tracking-widest text-xs">
-                  <label>Narcissism</label>
-                  <span>{protagonist.psychology.darkTriad?.narcissism || 0}%</span>
+                  />
                 </div>
-                <SegmentedMeter
-                  value={protagonist.psychology.darkTriad?.narcissism || 0}
-                  onChange={(v) => onUpdateState({
-                    ...state,
-                    protagonist: {
-                      ...protagonist,
-                      psychology: {
-                        ...protagonist.psychology,
-                        darkTriad: { ...protagonist.psychology.darkTriad, narcissism: v }
-                      }
-                    }
-                  })}
-                />
-              </div>
+              ))}
 
-              <div>
-                <div className="flex justify-between mb-2 font-bold uppercase tracking-widest text-xs">
-                  <label>Psychopathy</label>
-                  <span>{protagonist.psychology.darkTriad?.psychopathy || 0}%</span>
-                </div>
-                <SegmentedMeter
-                  value={protagonist.psychology.darkTriad?.psychopathy || 0}
-                  onChange={(v) => onUpdateState({
-                    ...state,
-                    protagonist: {
-                      ...protagonist,
-                      psychology: {
-                        ...protagonist.psychology,
-                        darkTriad: { ...protagonist.psychology.darkTriad, psychopathy: v }
-                      }
-                    }
-                  })}
-                />
-              </div>
-
-              <h3 className="font-display text-xl uppercase tracking-widest border-b-[4px] border-black pb-2 mt-8">
-                Core Profile
-              </h3>
+              <h3 className="font-display text-xl uppercase tracking-widest border-b-[4px] border-black pb-2 mt-8">Core Profile</h3>
 
               <div>
                 <label className="text-black font-bold uppercase tracking-wider text-xs">Attachment Style:</label>
                 <select
                   value={protagonist.psychology.attachmentStyle || "secure"}
-                  onChange={(e) => onUpdateState({
-                    ...state,
-                    protagonist: {
-                      ...protagonist,
-                      psychology: { ...protagonist.psychology, attachmentStyle: e.target.value as any }
-                    }
-                  })}
+                  onChange={(e) =>
+                    onUpdateState({
+                      ...state,
+                      protagonist: {
+                        ...protagonist,
+                        psychology: {
+                          ...protagonist.psychology,
+                          attachmentStyle: e.target.value as typeof protagonist.psychology.attachmentStyle,
+                        },
+                      },
+                    })
+                  }
                   className={inputClass}
                 >
                   <option value="secure">Secure</option>
@@ -594,457 +700,732 @@ export default function DirectorPanel({
                 <label className="text-black font-bold uppercase tracking-wider text-xs">Formative Wound:</label>
                 <textarea
                   value={protagonist.psychology.formativeWound || ""}
-                  onChange={(e) => onUpdateState({
-                    ...state,
-                    protagonist: {
-                      ...protagonist,
-                      psychology: { ...protagonist.psychology, formativeWound: e.target.value }
-                    }
-                  })}
+                  onChange={(e) =>
+                    onUpdateState({
+                      ...state,
+                      protagonist: {
+                        ...protagonist,
+                        psychology: { ...protagonist.psychology, formativeWound: e.target.value },
+                      },
+                    })
+                  }
                   className={textareaClass}
                   rows={2}
                 />
               </div>
 
+              {/* Defense mechanisms */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Shield className="w-4 h-4" />
+                  <label className="text-black font-bold uppercase tracking-wider text-xs">Defense Mechanisms:</label>
+                </div>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {ALL_DEFENSE_MECHS.map((mech) => {
+                    const active = protagonist.psychology.defenseMechanisms.includes(mech);
+                    return (
+                      <button
+                        key={mech}
+                        onClick={() => toggleDefenseMech(mech)}
+                        aria-pressed={active}
+                        className={`px-2 py-1 text-[10px] font-bold uppercase brutal-border transition-colors ${
+                          active ? "bg-black text-white" : "bg-white text-gray-400 border-gray-300 hover:border-black hover:text-black"
+                        }`}
+                      >
+                        {mech}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div>
+                  <label className="text-black font-bold uppercase tracking-wider text-xs">Defense Level:</label>
+                  <div className="flex gap-2 mt-2">
+                    {(["low", "medium", "high", "breaking_point"] as const).map((lvl) => (
+                      <button
+                        key={lvl}
+                        onClick={() => setDefenseLevel(lvl)}
+                        aria-pressed={protagonist.psychology.currentDefenseLevel === lvl}
+                        className={`flex-1 py-1.5 text-[9px] font-bold uppercase brutal-border transition-colors ${
+                          protagonist.psychology.currentDefenseLevel === lvl
+                            ? lvl === "breaking_point"
+                              ? "bg-[#FF4444] text-white"
+                              : lvl === "high"
+                              ? "bg-orange-500 text-white"
+                              : lvl === "medium"
+                              ? "bg-yellow-400 text-black"
+                              : "bg-green-500 text-white"
+                            : "bg-white text-gray-400 border-gray-300 hover:border-black hover:text-black"
+                        }`}
+                      >
+                        {lvl.replace("_", " ")}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
         )}
 
-        {/* Arc Meter & Tension */}
+        {/* ── Arc ── */}
         {activeTab === "arc" && (
-        <section className="space-y-4">
-          <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-6">
-            <div>
-              <label className="text-black font-bold uppercase tracking-wider text-xs">Structural Node:</label>
-              <input
-                type="text"
-                value={directorState.structuralNode || ""}
-                onChange={(e) =>
-                  onUpdateState({
-                    ...state,
-                    directorState: { ...directorState, structuralNode: e.target.value },
-                  })
-                }
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <div className="flex justify-between mb-2 font-bold uppercase tracking-widest text-xs">
-                <label>Tension Level</label>
-                <span>{directorState.tensionLevel ?? 0}%</span>
+          <section className="space-y-4">
+            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-6">
+              <div>
+                <label className="text-black font-bold uppercase tracking-wider text-xs">Structural Node:</label>
+                <input
+                  type="text"
+                  value={directorState.structuralNode || ""}
+                  onChange={(e) => onUpdateState({ ...state, directorState: { ...directorState, structuralNode: e.target.value } })}
+                  className={inputClass}
+                />
               </div>
-              <SegmentedMeter
-                value={directorState.tensionLevel ?? 0}
-                onChange={(v) =>
-                  onUpdateState({
-                    ...state,
-                    directorState: { ...directorState, tensionLevel: v },
-                  })
-                }
-              />
-            </div>
-            <div>
-              <div className="flex justify-between mb-2 font-bold uppercase tracking-widest text-xs">
-                <label>Menace Gauge</label>
-                <span>{directorState.menaceGauge ?? 0}%</span>
+
+              {(
+                [
+                  ["tensionLevel", "Tension Level"],
+                  ["menaceGauge", "Menace Gauge"],
+                  ["tensionSpace", "Tension Space"],
+                  ["unreliableNarratorScore", "Unreliable Narrator Score"],
+                ] as const
+              ).map(([field, label]) => (
+                <div key={field}>
+                  <div className="flex justify-between mb-2 font-bold uppercase tracking-widest text-xs">
+                    <label>{label}</label>
+                    <span>{directorState[field] ?? 0}%</span>
+                  </div>
+                  <SegmentedMeter
+                    value={directorState[field] ?? 0}
+                    onChange={(v) => onUpdateState({ ...state, directorState: { ...directorState, [field]: v } })}
+                  />
+                </div>
+              ))}
+
+              {/* Live tension/menace sparkline */}
+              {tensionHistoryRef.current.length >= 2 && (
+                <div className="pt-4 border-t-[4px] border-black">
+                  <span className="text-black font-bold uppercase tracking-wider text-xs block mb-2">Tension History</span>
+                  <div className="bg-gray-50 brutal-border p-2 space-y-2">
+                    <SparkLine data={tensionHistoryRef.current.map((d) => d.tension)} color="#FF4444" height={36} />
+                    <SparkLine data={tensionHistoryRef.current.map((d) => d.menace)} color="#000000" height={24} />
+                    <div className="flex gap-4 text-[9px] font-mono text-gray-500">
+                      <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-[#FF4444] inline-block" />tension</span>
+                      <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-black inline-block" />menace</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-4 border-t-[4px] border-black">
+                {(
+                  [
+                    ["lieBelief", "Lie Belief"],
+                    ["needAwareness", "Need Awareness"],
+                    ["internalConflict", "Internal Conflict"],
+                  ] as const
+                ).map(([field, label]) => (
+                  <div key={field} className="mb-4">
+                    <div className="flex justify-between mb-2 font-bold uppercase tracking-widest text-xs">
+                      <label>{label}</label>
+                      <span>{directorState.arcMeter[field]}%</span>
+                    </div>
+                    <SegmentedMeter value={directorState.arcMeter[field]} onChange={(v) => updateArcMeter(field, v)} />
+                  </div>
+                ))}
               </div>
-              <SegmentedMeter
-                value={directorState.menaceGauge ?? 0}
-                onChange={(v) =>
-                  onUpdateState({
-                    ...state,
-                    directorState: { ...directorState, menaceGauge: v },
-                  })
-                }
-              />
             </div>
-            <div>
-              <div className="flex justify-between mb-2 font-bold uppercase tracking-widest text-xs">
-                <label>Tension Space</label>
-                <span>{directorState.tensionSpace ?? 0}%</span>
-              </div>
-              <SegmentedMeter
-                value={directorState.tensionSpace ?? 0}
-                onChange={(v) =>
-                  onUpdateState({
-                    ...state,
-                    directorState: { ...directorState, tensionSpace: v },
-                  })
-                }
-              />
-            </div>
-            <div>
-              <div className="flex justify-between mb-2 font-bold uppercase tracking-widest text-xs">
-                <label>Unreliable Narrator Score</label>
-                <span>{directorState.unreliableNarratorScore ?? 0}%</span>
-              </div>
-              <SegmentedMeter
-                value={directorState.unreliableNarratorScore ?? 0}
-                onChange={(v) =>
-                  onUpdateState({
-                    ...state,
-                    directorState: { ...directorState, unreliableNarratorScore: v },
-                  })
-                }
-              />
-            </div>
-            <div className="pt-4 border-t-[4px] border-black">
-              <div className="flex justify-between mb-2 font-bold uppercase tracking-widest text-xs">
-                <label>Lie Belief</label>
-                <span>{directorState.arcMeter.lieBelief}%</span>
-              </div>
-              <SegmentedMeter
-                value={directorState.arcMeter.lieBelief}
-                onChange={(v) => updateArcMeter("lieBelief", v)}
-              />
-            </div>
-            <div>
-              <div className="flex justify-between mb-2 font-bold uppercase tracking-widest text-xs">
-                <label>Need Awareness</label>
-                <span>{directorState.arcMeter.needAwareness}%</span>
-              </div>
-              <SegmentedMeter
-                value={directorState.arcMeter.needAwareness}
-                onChange={(v) => updateArcMeter("needAwareness", v)}
-              />
-            </div>
-            <div>
-              <div className="flex justify-between mb-2 font-bold uppercase tracking-widest text-xs">
-                <label>Internal Conflict</label>
-                <span>{directorState.arcMeter.internalConflict}%</span>
-              </div>
-              <SegmentedMeter
-                value={directorState.arcMeter.internalConflict}
-                onChange={(v) => updateArcMeter("internalConflict", v)}
-              />
-            </div>
-          </div>
-        </section>
+          </section>
         )}
 
-        {/* Narrative Metrics */}
+        {/* ── Metrics ── */}
         {activeTab === "metrics" && currentScene.metrics && (
           <section className="space-y-4">
             <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="font-bold text-xs uppercase tracking-widest">Pivot Strength</span>
-                <span className="font-mono bg-black text-white px-2 py-1">{currentScene.metrics.pivotStrength?.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="font-bold text-xs uppercase tracking-widest">Cliffhanger Strength</span>
-                <span className="font-mono bg-black text-white px-2 py-1">{currentScene.metrics.cliffhangerStrength?.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="font-bold text-xs uppercase tracking-widest">Twist Impact</span>
-                <span className="font-mono bg-black text-white px-2 py-1">{currentScene.metrics.twistImpact?.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="font-bold text-xs uppercase tracking-widest">Surprise</span>
-                <span className="font-mono bg-black text-white px-2 py-1">{currentScene.metrics.surprise?.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="font-bold text-xs uppercase tracking-widest">Suspense</span>
-                <span className="font-mono bg-black text-white px-2 py-1">{currentScene.metrics.suspense?.toFixed(2)}</span>
-              </div>
+              {(
+                [
+                  ["pivotStrength", "Pivot Strength"],
+                  ["cliffhangerStrength", "Cliffhanger Strength"],
+                  ["twistImpact", "Twist Impact"],
+                  ["surprise", "Surprise"],
+                  ["suspense", "Suspense"],
+                ] as const
+              ).map(([field, label]) => (
+                <div key={field} className="flex justify-between items-center">
+                  <span className="font-bold text-xs uppercase tracking-widest">{label}</span>
+                  <span className="font-mono bg-black text-white px-2 py-1">{currentScene.metrics[field]?.toFixed(2)}</span>
+                </div>
+              ))}
             </div>
           </section>
         )}
 
-        {/* Director Commentary */}
+        {/* ── Commentary ── */}
         {activeTab === "commentary" && currentScene.commentary && (
           <section className="space-y-4">
             <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-4">
-              <div>
-                <span className="font-bold text-xs uppercase tracking-widest block mb-1">Tension Rationale</span>
-                <p className="text-sm">{currentScene.commentary.tensionRationale}</p>
-              </div>
-              <div>
-                <span className="font-bold text-xs uppercase tracking-widest block mb-1">Information Position Rationale</span>
-                <p className="text-sm">{currentScene.commentary.informationPositionRationale}</p>
-              </div>
-              <div>
-                <span className="font-bold text-xs uppercase tracking-widest block mb-1">Defense Mechanism Rationale</span>
-                <p className="text-sm">{currentScene.commentary.defenseMechanismRationale}</p>
-              </div>
-              <div>
-                <span className="font-bold text-xs uppercase tracking-widest block mb-1">Throughline Rationale</span>
-                <p className="text-sm">{currentScene.commentary.throughlineRationale}</p>
-              </div>
-              
+              {(
+                [
+                  ["tensionRationale", "Tension Rationale"],
+                  ["informationPositionRationale", "Information Position Rationale"],
+                  ["defenseMechanismRationale", "Defense Mechanism Rationale"],
+                  ["throughlineRationale", "Throughline Rationale"],
+                ] as const
+              ).map(([field, label]) => (
+                <div key={field}>
+                  <span className="font-bold text-xs uppercase tracking-widest block mb-1">{label}</span>
+                  <p className="text-sm">{currentScene.commentary[field]}</p>
+                </div>
+              ))}
+
               <div className="pt-4 border-t-[4px] border-black">
                 <span className="font-bold text-xs uppercase tracking-widest block mb-3">Evaluator Scores</span>
-                <div className="grid grid-cols-2 gap-2 text-xs font-bold uppercase">
-                  <div className="flex justify-between"><span>Ego:</span> <span>{currentScene.commentary.evaluatorScores?.ego}</span></div>
-                  <div className="flex justify-between"><span>Superego:</span> <span>{currentScene.commentary.evaluatorScores?.superego}</span></div>
-                  <div className="flex justify-between"><span>Narrator:</span> <span>{currentScene.commentary.evaluatorScores?.narrator}</span></div>
-                  <div className="flex justify-between"><span>Audience:</span> <span>{currentScene.commentary.evaluatorScores?.audience}</span></div>
-                  <div className="flex justify-between col-span-2"><span>Storymind:</span> <span>{currentScene.commentary.evaluatorScores?.storymind}</span></div>
-                </div>
+                {(
+                  [
+                    ["ego", "Ego"],
+                    ["superego", "Superego"],
+                    ["narrator", "Narrator"],
+                    ["audience", "Audience"],
+                    ["storymind", "Storymind"],
+                  ] as const
+                ).map(([key, label]) => {
+                  const score = currentScene.commentary.evaluatorScores?.[key] ?? 0;
+                  return (
+                    <div key={key} className="mb-2">
+                      <div className="flex justify-between text-[10px] font-bold uppercase mb-1">
+                        <span>{label}</span>
+                        <span>{score}</span>
+                      </div>
+                      <div className="w-full bg-gray-100 h-2 border border-gray-300">
+                        <div className="h-full bg-black transition-all" style={{ width: `${Math.min(100, score)}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </section>
         )}
 
-        {/* Throughlines */}
+        {/* ── Throughlines ── */}
         {activeTab === "throughlines" && directorState.throughlines && (
           <section className="space-y-4">
             <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-4">
-              <div className={`p-3 border-2 border-black ${directorState.throughlines.activeThroughlines?.includes("objectiveStory") ? "bg-black text-white" : "bg-white text-black"}`}>
-                <span className="font-bold text-xs uppercase tracking-widest block mb-1">Objective Story (They)</span>
-                <p className="text-sm">{directorState.throughlines.objectiveStory}</p>
+              {(
+                [
+                  ["objectiveStory", "Objective Story (They)"],
+                  ["mainCharacter", "Main Character (I)"],
+                  ["influenceCharacter", "Influence Character (You)"],
+                  ["relationshipStory", "Relationship Story (We)"],
+                ] as const
+              ).map(([field, label]) => {
+                const active = directorState.throughlines.activeThroughlines?.includes(field as "objectiveStory");
+                return (
+                  <div key={field} className={`p-3 border-2 border-black ${active ? "bg-black text-white" : "bg-white text-black"}`}>
+                    <span className="font-bold text-xs uppercase tracking-widest block mb-1">{label}</span>
+                    <p className="text-sm">{directorState.throughlines[field as keyof typeof directorState.throughlines] as string}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* ── Player ── */}
+        {activeTab === "player" && (
+          <section className="space-y-4">
+            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-5">
+              <div>
+                <label className="text-black font-bold uppercase tracking-wider text-xs">Inferred Intent:</label>
+                <input type="text" value={directorState.playerModel.inferredIntent} onChange={(e) => updatePlayerModel("inferredIntent", e.target.value)} className={inputClass} />
               </div>
-              <div className={`p-3 border-2 border-black ${directorState.throughlines.activeThroughlines?.includes("mainCharacter") ? "bg-black text-white" : "bg-white text-black"}`}>
-                <span className="font-bold text-xs uppercase tracking-widest block mb-1">Main Character (I)</span>
-                <p className="text-sm">{directorState.throughlines.mainCharacter}</p>
+              <div>
+                <label className="text-black font-bold uppercase tracking-wider text-xs">Detected Emotion:</label>
+                <input type="text" value={directorState.playerModel.detectedEmotion} onChange={(e) => updatePlayerModel("detectedEmotion", e.target.value)} className={inputClass} />
               </div>
-              <div className={`p-3 border-2 border-black ${directorState.throughlines.activeThroughlines?.includes("influenceCharacter") ? "bg-black text-white" : "bg-white text-black"}`}>
-                <span className="font-bold text-xs uppercase tracking-widest block mb-1">Influence Character (You)</span>
-                <p className="text-sm">{directorState.throughlines.influenceCharacter}</p>
+              <div>
+                <div className="flex justify-between mb-2 mt-4 font-bold uppercase tracking-widest text-xs">
+                  <label>Engagement Level</label>
+                  <span>{directorState.playerModel.engagementLevel}%</span>
+                </div>
+                <SegmentedMeter value={directorState.playerModel.engagementLevel} onChange={(v) => updatePlayerModel("engagementLevel", v)} />
               </div>
-              <div className={`p-3 border-2 border-black ${directorState.throughlines.activeThroughlines?.includes("relationshipStory") ? "bg-black text-white" : "bg-white text-black"}`}>
-                <span className="font-bold text-xs uppercase tracking-widest block mb-1">Relationship Story (We)</span>
-                <p className="text-sm">{directorState.throughlines.relationshipStory}</p>
+
+              <div className="pt-4 border-t-[4px] border-black">
+                <label className="text-black font-bold uppercase tracking-wider text-xs mb-4 block">Big Five Personality:</label>
+                <div className="space-y-4">
+                  {(["openness", "conscientiousness", "extraversion", "agreeableness", "neuroticism"] as const).map((trait) => (
+                    <div key={trait}>
+                      <div className="flex justify-between mb-2">
+                        <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">{trait}</label>
+                        <span className="text-[10px] font-bold">{directorState.playerModel.bigFive?.[trait] || 0}%</span>
+                      </div>
+                      <SegmentedMeter value={directorState.playerModel.bigFive?.[trait] || 0} onChange={(v) => updateBigFive(trait, v)} />
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </section>
         )}
 
-        {/* Player Model */}
-        {activeTab === "player" && (
-        <section className="space-y-4">
-          <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-5">
-            <div>
-              <label className="text-black font-bold uppercase tracking-wider text-xs">Inferred Intent:</label>
-              <input
-                type="text"
-                value={directorState.playerModel.inferredIntent}
-                onChange={(e) =>
-                  updatePlayerModel("inferredIntent", e.target.value)
-                }
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className="text-black font-bold uppercase tracking-wider text-xs">Detected Emotion:</label>
-              <input
-                type="text"
-                value={directorState.playerModel.detectedEmotion}
-                onChange={(e) =>
-                  updatePlayerModel("detectedEmotion", e.target.value)
-                }
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <div className="flex justify-between mb-2 mt-4 font-bold uppercase tracking-widest text-xs">
-                <label>Engagement Level</label>
-                <span>{directorState.playerModel.engagementLevel}%</span>
-              </div>
-              <SegmentedMeter
-                value={directorState.playerModel.engagementLevel}
-                onChange={(v) => updatePlayerModel("engagementLevel", v)}
-              />
-            </div>
-
-            <div className="pt-4 border-t-[4px] border-black">
-              <label className="text-black font-bold uppercase tracking-wider text-xs mb-4 block">
-                Big Five Personality:
-              </label>
-              <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">
-                      Openness
-                    </label>
-                    <span className="text-[10px] font-bold">
-                      {directorState.playerModel.bigFive?.openness || 0}%
-                    </span>
-                  </div>
-                  <SegmentedMeter
-                    value={directorState.playerModel.bigFive?.openness || 0}
-                    onChange={(v) => updateBigFive("openness", v)}
-                  />
-                </div>
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">
-                      Conscientiousness
-                    </label>
-                    <span className="text-[10px] font-bold">
-                      {directorState.playerModel.bigFive?.conscientiousness ||
-                        0}
-                      %
-                    </span>
-                  </div>
-                  <SegmentedMeter
-                    value={directorState.playerModel.bigFive?.conscientiousness || 0}
-                    onChange={(v) => updateBigFive("conscientiousness", v)}
-                  />
-                </div>
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">
-                      Extraversion
-                    </label>
-                    <span className="text-[10px] font-bold">
-                      {directorState.playerModel.bigFive?.extraversion || 0}%
-                    </span>
-                  </div>
-                  <SegmentedMeter
-                    value={directorState.playerModel.bigFive?.extraversion || 0}
-                    onChange={(v) => updateBigFive("extraversion", v)}
-                  />
-                </div>
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">
-                      Agreeableness
-                    </label>
-                    <span className="text-[10px] font-bold">
-                      {directorState.playerModel.bigFive?.agreeableness || 0}%
-                    </span>
-                  </div>
-                  <SegmentedMeter
-                    value={directorState.playerModel.bigFive?.agreeableness || 0}
-                    onChange={(v) => updateBigFive("agreeableness", v)}
-                  />
-                </div>
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">
-                      Neuroticism
-                    </label>
-                    <span className="text-[10px] font-bold">
-                      {directorState.playerModel.bigFive?.neuroticism || 0}%
-                    </span>
-                  </div>
-                  <SegmentedMeter
-                    value={directorState.playerModel.bigFive?.neuroticism || 0}
-                    onChange={(v) => updateBigFive("neuroticism", v)}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-        )}
-
-        {/* Quality Validation */}
+        {/* ── Quality ── */}
         {activeTab === "quality" && (
-        <section className="space-y-4">
-          <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-5">
-            <div className="flex items-center gap-3">
-              <label className="text-black font-bold uppercase tracking-wider text-xs">Status (Passed):</label>
-              <input
-                type="checkbox"
-                checked={directorState.qualityValidation.passed}
-                onChange={(e) => updateQuality("passed", e.target.checked)}
-                className="w-5 h-5 accent-black"
-              />
+          <section className="space-y-4">
+            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-5">
+              <div className="flex items-center gap-3">
+                <label className="text-black font-bold uppercase tracking-wider text-xs">Status (Passed):</label>
+                <input type="checkbox" checked={directorState.qualityValidation.passed} onChange={(e) => updateQuality("passed", e.target.checked)} className="w-5 h-5 accent-black" />
+              </div>
+              <div>
+                <label className="text-black font-bold uppercase tracking-wider text-xs">Sin Check:</label>
+                <textarea value={directorState.qualityValidation.sinCheck} onChange={(e) => updateQuality("sinCheck", e.target.value)} className={textareaClass} />
+              </div>
+              <div>
+                <label className="text-black font-bold uppercase tracking-wider text-xs">Horizon Check:</label>
+                <textarea value={directorState.qualityValidation.horizonCheck} onChange={(e) => updateQuality("horizonCheck", e.target.value)} className={textareaClass} />
+              </div>
+              <div className="flex items-center gap-3 mt-4">
+                <label className="text-black font-bold uppercase tracking-wider text-xs">Subtext Gap (On The Nose?):</label>
+                <input type="checkbox" checked={!directorState.qualityValidation.subtextGap} readOnly className="w-5 h-5 accent-black" />
+              </div>
             </div>
-            <div>
-              <label className="text-black font-bold uppercase tracking-wider text-xs">Sin Check:</label>
-              <textarea
-                value={directorState.qualityValidation.sinCheck}
-                onChange={(e) => updateQuality("sinCheck", e.target.value)}
-                className={textareaClass}
-              />
-            </div>
-            <div>
-              <label className="text-black font-bold uppercase tracking-wider text-xs">Horizon Check:</label>
-              <textarea
-                value={directorState.qualityValidation.horizonCheck}
-                onChange={(e) => updateQuality("horizonCheck", e.target.value)}
-                className={textareaClass}
-              />
-            </div>
-            <div className="flex items-center gap-3 mt-4">
-              <label className="text-black font-bold uppercase tracking-wider text-xs">Subtext Gap (Is On The Nose?):</label>
-              <input
-                type="checkbox"
-                checked={!directorState.qualityValidation.subtextGap}
-                readOnly
-                className="w-5 h-5 accent-black"
-              />
-            </div>
-          </div>
-        </section>
+          </section>
         )}
 
-        {/* Memory System */}
+        {/* ── Memory ── */}
         {activeTab === "memory" && (
-        <section className="space-y-4">
-          <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-5">
-            <div>
-              <label className="text-black font-bold uppercase tracking-wider text-xs block mb-2">
-                Episodic (One per line):
-              </label>
-              <textarea
-                value={directorState.memory.episodic.join("\n")}
-                onChange={(e) => updateMemory("episodic", e.target.value)}
-                className={textareaClass}
-                rows={4}
-              />
+          <section className="space-y-4">
+            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-5">
+              {(["episodic", "semantic", "procedural"] as const).map((field) => (
+                <div key={field}>
+                  <label className="text-black font-bold uppercase tracking-wider text-xs block mb-2">
+                    {field} (one per line):
+                  </label>
+                  <textarea
+                    value={directorState.memory[field].join("\n")}
+                    onChange={(e) => updateMemory(field, e.target.value)}
+                    className={textareaClass}
+                    rows={4}
+                  />
+                </div>
+              ))}
+
+              <div className="pt-4 border-t-[4px] border-black">
+                <label className="text-black font-bold uppercase tracking-wider text-xs block mb-2">Active Secrets:</label>
+                <div className="space-y-2">
+                  {directorState.activeSecrets?.map((secret, idx) => (
+                    <div key={idx} className="p-3 border-2 border-black bg-gray-50 flex flex-col gap-1">
+                      <span className="font-bold text-xs uppercase">{secret.owner}</span>
+                      <span className="text-sm">{secret.content}</span>
+                      <span className={`text-[10px] uppercase font-bold ${secret.revealed ? "text-red-600" : "text-green-600"}`}>
+                        {secret.revealed ? "REVEALED" : "HIDDEN"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-4 border-t-[4px] border-black">
+                <label className="text-black font-bold uppercase tracking-wider text-xs block mb-2">NPCs:</label>
+                <div className="space-y-2">
+                  {directorState.npcs?.map((npc, idx) => (
+                    <div key={idx} className="p-3 border-2 border-black bg-gray-50 flex flex-col gap-1">
+                      <span className="font-bold text-xs uppercase">{npc.name} ({npc.role})</span>
+                      <span className="text-sm">Agenda: {npc.agenda}</span>
+                      <span className="text-[10px] uppercase font-bold text-gray-500">Trust: {npc.trustworthiness}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="text-black font-bold uppercase tracking-wider text-xs block mb-2">
-                Semantic (One per line):
-              </label>
-              <textarea
-                value={directorState.memory.semantic.join("\n")}
-                onChange={(e) => updateMemory("semantic", e.target.value)}
-                className={textareaClass}
-                rows={4}
-              />
-            </div>
-            <div>
-              <label className="text-black font-bold uppercase tracking-wider text-xs block mb-2">
-                Procedural (One per line):
-              </label>
-              <textarea
-                value={directorState.memory.procedural.join("\n")}
-                onChange={(e) => updateMemory("procedural", e.target.value)}
-                className={textareaClass}
-                rows={4}
-              />
-            </div>
-            
-            <div className="pt-4 border-t-[4px] border-black">
-              <label className="text-black font-bold uppercase tracking-wider text-xs block mb-2">
-                Active Secrets:
-              </label>
-              <div className="space-y-2">
-                {directorState.activeSecrets?.map((secret, idx) => (
-                  <div key={idx} className="p-3 border-2 border-black bg-gray-50 flex flex-col gap-1">
-                    <span className="font-bold text-xs uppercase">{secret.owner}</span>
-                    <span className="text-sm">{secret.content}</span>
-                    <span className={`text-[10px] uppercase font-bold ${secret.revealed ? 'text-red-600' : 'text-green-600'}`}>
-                      {secret.revealed ? 'REVEALED' : 'HIDDEN'}
-                    </span>
+          </section>
+        )}
+
+        {/* ── Outline ── */}
+        {activeTab === "outline" && (
+          <section className="space-y-4">
+
+            {/* ── Story Architecture ── */}
+            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-4">
+              <span className="font-bold text-xs uppercase tracking-widest block">Story Architecture</span>
+              <p className="text-[10px] font-mono text-gray-500 uppercase leading-relaxed">
+                Select a narrative structure to auto-populate the beat sheet below. Choose an emotional arc so the engine steers tension toward the right curve. Set a cinematic style to modulate agent tone and director pressure.
+              </p>
+
+              {/* Structure preset */}
+              <div>
+                <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest block mb-1">Narrative Structure</label>
+                <select
+                  value={storyStructure}
+                  onChange={e => setStoryStructure(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">— None —</option>
+                  <option value="save_the_cat">Save the Cat (15 beats)</option>
+                  <option value="dan_harmon">Dan Harmon Story Circle (8)</option>
+                  <option value="john_yorke">John Yorke 5 Acts</option>
+                  <option value="freytag">Freytag's Pyramid (5)</option>
+                  <option value="sequence">Sequence Approach (8)</option>
+                  <option value="kishotenketsu">Kishōtenketsu (4)</option>
+                </select>
+              </div>
+
+              {/* Expected turns + apply */}
+              {storyStructure && (
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest block mb-1">Expected Total Turns</label>
+                    <input
+                      type="number"
+                      min={4}
+                      max={200}
+                      value={expectedTurns}
+                      onChange={e => setExpectedTurns(Math.max(4, Number(e.target.value)))}
+                      className={inputClass}
+                    />
+                    <p className="text-[9px] text-gray-400 mt-1 font-mono uppercase">Beat turn ranges will be scaled to this session length.</p>
                   </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={applyStructurePreset}
+                      disabled={applyingPreset}
+                      className="flex-1 py-2 bg-black text-white brutal-border-thick hover:bg-[#FF4444] transition-colors uppercase font-bold tracking-widest text-xs brutal-shadow-hover disabled:opacity-40"
+                    >
+                      {applyingPreset ? 'Applying…' : 'Apply Preset → Beats'}
+                    </button>
+                    {presetSaved === true && <span className="text-green-600 font-bold uppercase text-[10px] tracking-widest shrink-0">Applied ✓</span>}
+                    {presetSaved === false && <span className="text-[#FF4444] font-bold uppercase text-[10px] tracking-widest shrink-0">Error ✗</span>}
+                  </div>
+                </div>
+              )}
+
+              {/* Emotional arc */}
+              <div>
+                <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest block mb-1">Emotional Arc</label>
+                <select
+                  value={emotionalArc}
+                  onChange={e => saveEmotionalArc(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">— None (no tension curve) —</option>
+                  <option value="rags_to_riches">Rags to Riches (steady rise)</option>
+                  <option value="riches_to_rags">Riches to Rags (tragic fall)</option>
+                  <option value="man_in_a_hole">Man in a Hole (fall → rise)</option>
+                  <option value="icarus">Icarus (rise → fall)</option>
+                  <option value="cinderella">Cinderella (rise → fall → rise)</option>
+                  <option value="oedipus">Oedipus (fall → rise → fall)</option>
+                </select>
+                {emotionalArc && (
+                  <p className="text-[9px] text-gray-400 mt-1 font-mono uppercase">Engine will emit ESCALATE/COOL pressure when tension deviates &gt;22pts from the curve.</p>
+                )}
+              </div>
+
+              {/* Emotional arc tension curve visualization */}
+              {emotionalArc && (() => {
+                const CURVES: Record<string, number[]> = {
+                  rags_to_riches:  [10, 20, 30, 45, 58, 68, 78, 88],
+                  riches_to_rags:  [80, 72, 63, 54, 44, 33, 22, 12],
+                  man_in_a_hole:   [48, 36, 24, 16, 28, 46, 64, 80],
+                  icarus:          [18, 32, 52, 68, 80, 84, 62, 36],
+                  cinderella:      [28, 52, 72, 80, 52, 32, 58, 88],
+                  oedipus:         [72, 56, 42, 52, 68, 52, 35, 18],
+                };
+                const curve = CURVES[emotionalArc];
+                if (!curve) return null;
+                const W = 200; const H = 48;
+                const pts = curve.map((v, i) => `${(i / (curve.length - 1)) * W},${H - (v / 100) * H}`).join(' ');
+                return (
+                  <div className="bg-gray-50 border-2 border-black p-2">
+                    <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-label={`Tension curve for ${emotionalArc}`}>
+                      <polyline points={pts} fill="none" stroke="#FF4444" strokeWidth="2.5" strokeLinejoin="round" />
+                      <line x1="0" y1={H / 2} x2={W} y2={H / 2} stroke="#ccc" strokeWidth="1" strokeDasharray="4,4" />
+                    </svg>
+                    <div className="flex justify-between text-[9px] font-mono text-gray-400 uppercase mt-0.5">
+                      <span>start</span><span>middle</span><span>end</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Director style */}
+              <div>
+                <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest block mb-1">Cinematic Style</label>
+                <select
+                  value={directorStyle}
+                  onChange={e => saveDirectorStyle(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">— None —</option>
+                  <option value="hitchcock">Hitchcock — Voyeuristic Suspense</option>
+                  <option value="fincher">Fincher — Procedural & Cynical</option>
+                  <option value="nolan">Nolan — Cerebral & Non-Linear</option>
+                  <option value="villeneuve">Villeneuve — Atmospheric Dread</option>
+                  <option value="aster">Aster — Grief Horror</option>
+                  <option value="lynch">Lynch — Surreal Nightmare</option>
+                </select>
+                {directorStyle && (
+                  <p className="text-[9px] text-gray-400 mt-1 font-mono uppercase">Injected into every agent's character prompt and modulates Director pressure tone.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Pacing Target */}
+            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-xs uppercase tracking-widest">Pacing Target</span>
+                {pacingSaved === true && <span className="text-green-600 font-bold uppercase text-[10px] tracking-widest">Saved ✓</span>}
+                {pacingSaved === false && <span className="text-[#FF4444] font-bold uppercase text-[10px] tracking-widest">Error ✗</span>}
+              </div>
+              <p className="text-[10px] font-mono text-gray-500 uppercase leading-relaxed">
+                Controls how aggressively the Pacing Controller fires pressure. "Fast" forces urgency; "slow" allows contemplation; "medium" fires only when clearly adrift.
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {(['slow', 'medium', 'fast'] as const).map(opt => (
+                  <button
+                    key={opt}
+                    onClick={() => savePacingTarget(opt)}
+                    className={`py-2 brutal-border-thick uppercase font-bold tracking-widest text-xs transition-colors ${
+                      pacingTarget === opt
+                        ? 'bg-black text-white'
+                        : 'bg-white text-black hover:bg-gray-100'
+                    }`}
+                  >
+                    {opt}
+                  </button>
                 ))}
               </div>
             </div>
 
-            <div className="pt-4 border-t-[4px] border-black">
-              <label className="text-black font-bold uppercase tracking-wider text-xs block mb-2">
-                NPCs:
-              </label>
-              <div className="space-y-2">
-                {directorState.npcs?.map((npc, idx) => (
-                  <div key={idx} className="p-3 border-2 border-black bg-gray-50 flex flex-col gap-1">
-                    <span className="font-bold text-xs uppercase">{npc.name} ({npc.role})</span>
-                    <span className="text-sm">Agenda: {npc.agenda}</span>
-                    <span className="text-[10px] uppercase font-bold text-gray-500">
-                      Trust: {npc.trustworthiness}%
-                    </span>
-                  </div>
-                ))}
+            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-5">
+              <p className="text-[10px] font-mono text-gray-500 uppercase leading-relaxed">
+                Author beats that override Director prompts when the engine enters the matching phase and turn range. Saved beats persist across room rounds.
+              </p>
+
+              <button
+                onClick={addOutlineBeat}
+                className="w-full py-2 bg-black text-white brutal-border-thick hover:bg-[#FF4444] transition-colors uppercase font-bold tracking-widest text-xs brutal-shadow-hover"
+              >
+                + Add Beat
+              </button>
+
+              {outlineBeats.length === 0 ? (
+                <div className="p-8 text-center border-2 border-dashed border-gray-300 text-gray-400 font-mono text-xs uppercase">
+                  No beats. Add one above or let the Director improvise.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {outlineBeats.map((beat, idx) => (
+                    <div key={idx} className="bg-gray-50 p-4 brutal-border-thick brutal-shadow relative space-y-3">
+                      <button
+                        onClick={() => removeOutlineBeat(idx)}
+                        aria-label={`Remove beat ${idx + 1}`}
+                        className="absolute top-3 right-3 text-gray-400 hover:text-[#FF4444] font-bold text-xl leading-none transition-colors"
+                      >
+                        ×
+                      </button>
+
+                      <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-gray-500 pr-6">
+                        <BookOpen className="w-3 h-3" />
+                        <span>Beat {idx + 1}</span>
+                      </div>
+
+                      {/* Phase + turn range row */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">Phase</label>
+                          <select
+                            value={beat.phase}
+                            onChange={(e) => updateOutlineBeat(idx, "phase", e.target.value)}
+                            className={inputClass}
+                          >
+                            <option value="Setup">Setup</option>
+                            <option value="Turn">Turn</option>
+                            <option value="Prestige">Prestige</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">Turn start</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={beat.turn_start}
+                            onChange={(e) => updateOutlineBeat(idx, "turn_start", Number(e.target.value))}
+                            className={inputClass}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">Turn end</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={beat.turn_end}
+                            onChange={(e) => updateOutlineBeat(idx, "turn_end", Number(e.target.value))}
+                            className={inputClass}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Goal */}
+                      <div>
+                        <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">Goal (what must happen)</label>
+                        <textarea
+                          value={beat.goal}
+                          onChange={(e) => updateOutlineBeat(idx, "goal", e.target.value)}
+                          className={textareaClass}
+                          rows={2}
+                          placeholder="e.g. Alice discovers the letter hidden in the study"
+                        />
+                      </div>
+
+                      {/* Constraint */}
+                      <div>
+                        <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">Constraint (how it must happen)</label>
+                        <textarea
+                          value={beat.constraint}
+                          onChange={(e) => updateOutlineBeat(idx, "constraint", e.target.value)}
+                          className={textareaClass}
+                          rows={2}
+                          placeholder="e.g. Without direct confrontation — she must infer it"
+                        />
+                      </div>
+
+                      {/* Avoid */}
+                      <div>
+                        <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">Avoid (forbidden paths)</label>
+                        <textarea
+                          value={beat.avoid}
+                          onChange={(e) => updateOutlineBeat(idx, "avoid", e.target.value)}
+                          className={textareaClass}
+                          rows={2}
+                          placeholder="e.g. Do not let Bob speak; keep the setting indoors"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Save button */}
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  onClick={saveOutline}
+                  className="flex-1 py-2 bg-black text-white brutal-border-thick hover:bg-[#FF4444] transition-colors uppercase font-bold tracking-widest text-xs brutal-shadow-hover"
+                >
+                  Save to Engine
+                </button>
+                {outlineSaved === true && (
+                  <span className="text-green-600 font-bold uppercase text-[10px] tracking-widest">Saved ✓</span>
+                )}
+                {outlineSaved === false && (
+                  <span className="text-[#FF4444] font-bold uppercase text-[10px] tracking-widest">Error ✗</span>
+                )}
               </div>
+
+              {outlineBeats.length > 0 && (
+                <button
+                  onClick={async () => {
+                    await fetch("/api/outline", { method: "DELETE" });
+                    setOutlineBeats([]);
+                  }}
+                  className="w-full py-1.5 bg-white text-gray-400 brutal-border hover:text-[#FF4444] hover:border-[#FF4444] transition-colors uppercase font-bold tracking-widest text-[10px]"
+                >
+                  Clear All Beats
+                </button>
+              )}
             </div>
-          </div>
-        </section>
+          </section>
         )}
+
+        {/* ── QBN Qualities ── */}
+        {activeTab === "qbn" && (
+          <section className="space-y-4">
+            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-5">
+              <p className="text-[10px] font-mono text-gray-500 uppercase leading-relaxed">
+                Quality-Based Narrative values used to gate choices. Edit directly or add new qualities below.
+              </p>
+
+              {/* Add new quality */}
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">Name</label>
+                  <input
+                    type="text"
+                    value={newQualityKey}
+                    onChange={(e) => setNewQualityKey(e.target.value)}
+                    placeholder="e.g. CLUE_COUNT"
+                    className={inputClass}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newQualityKey.trim()) {
+                        updateQbnQuality(newQualityKey.trim(), Number(newQualityValue));
+                        setNewQualityKey("");
+                        setNewQualityValue("0");
+                      }
+                    }}
+                  />
+                </div>
+                <div className="w-24">
+                  <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest">Value</label>
+                  <input
+                    type="number"
+                    value={newQualityValue}
+                    onChange={(e) => setNewQualityValue(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    if (!newQualityKey.trim()) return;
+                    updateQbnQuality(newQualityKey.trim(), Number(newQualityValue));
+                    setNewQualityKey("");
+                    setNewQualityValue("0");
+                  }}
+                  className="px-3 py-2 bg-black text-white brutal-border-thick hover:bg-[#FF4444] transition-colors uppercase font-bold text-xs brutal-shadow-hover shrink-0"
+                >
+                  Add
+                </button>
+              </div>
+
+              {/* Existing qualities */}
+              {Object.keys(directorState.qbnQualities ?? {}).length === 0 ? (
+                <div className="p-8 text-center border-2 border-dashed border-gray-300 text-gray-400 font-mono text-xs uppercase">
+                  No qualities set. Add one above.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {Object.entries(directorState.qbnQualities ?? {}).map(([key, val]) => (
+                    <div key={key} className="flex items-center gap-2 bg-gray-50 p-2 brutal-border">
+                      <span className="flex-1 font-mono text-xs font-bold uppercase truncate" title={key}>{key}</span>
+                      <input
+                        type="number"
+                        value={val}
+                        onChange={(e) => updateQbnQuality(key, Number(e.target.value))}
+                        aria-label={`Value for quality ${key}`}
+                        className="w-20 bg-white brutal-border px-2 py-1 text-xs font-mono text-right focus:outline-none"
+                      />
+                      <button
+                        onClick={() => removeQbnQuality(key)}
+                        aria-label={`Remove quality ${key}`}
+                        className="text-gray-400 hover:text-[#FF4444] font-bold text-xl leading-none transition-colors"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Active secrets with QBN context */}
+              {currentScene.isQBNMode && (
+                <div className="pt-4 border-t-[4px] border-black">
+                  <div className="bg-black text-white p-3 font-bold uppercase tracking-widest text-xs">
+                    QBN Mode Active — {Object.keys(directorState.qbnQualities ?? {}).length} qualities governing {currentScene.choices.length} choices
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
       </div>
     </motion.div>
   );

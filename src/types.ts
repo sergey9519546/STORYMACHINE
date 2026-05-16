@@ -231,5 +231,5 @@ export interface GameState {
   directorState: DirectorState;
   currentScene: Scene;
   history: Scene[];
-  ncpStoryform?: any; // Narrative Context Protocol JSON schema
+  ncpStoryform?: Record<string, unknown>; // Narrative Context Protocol JSON schema
 }
