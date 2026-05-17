@@ -1,0 +1,3 @@
+## 2024-05-17 - Unnecessary Fountain Parsing in ScriptIDE
+**Learning:** `ScriptIDE.tsx` renders syntax highlighting on every keystroke by parsing the entire script multiple times. This was extracted into a single `useMemo` call. When resolving code review feedback regarding imports, ensuring top-level imports and managing react-hooks/exhaustive-deps warnings is critical for passing lint checks.
+**Action:** Always place imports at the top-level of the file to comply with standard linting rules, and double check that all required dependencies in `useMemo` hooks are included to avoid stale data or linter warnings.
