@@ -314,6 +314,7 @@ interface Session {
   stage: Stage;
   orchestrator: Orchestrator;
   lastAccess: number;
+  _turnQueue: Promise<void>;  // serializes concurrent /api/turn calls per session
 }
 const sessions = new Map<string, Session>();
 const SESSION_TTL_MS = 30 * 60 * 1000;
@@ -328,7 +329,7 @@ function getOrCreateSession(sessionId: string): Session {
     // For a persisted session this opens the existing file; the Orchestrator
     // constructor re-hydrates agents + locations, so the session resumes intact.
     const s = new Stage(dbPathFor(sessionId));
-    session = { stage: s, orchestrator: new Orchestrator(s), lastAccess: Date.now() };
+    session = { stage: s, orchestrator: new Orchestrator(s), lastAccess: Date.now(), _turnQueue: Promise.resolve() };
     sessions.set(sessionId, session);
   }
   session.lastAccess = Date.now();
@@ -460,10 +461,24 @@ async function startServer() {
   }));
 
   app.post('/api/turn', asyncHandler(async (req, res) => {
-    const { orchestrator } = getOrCreateSession(sessionId(req));
+    const session = getOrCreateSession(sessionId(req));
     const agentId = requireString(req.body?.agentId, 'agentId', 128);
-    const action = await orchestrator.runTurn(agentId);
-    res.json({ action });
+
+    // Per-session serialization: each turn is chained behind the previous so
+    // concurrent requests for the same session run sequentially, not in parallel,
+    // preventing state corruption in the SQLite-backed engine.
+    let resolveSlot!: () => void;
+    const slot = new Promise<void>(r => { resolveSlot = r; });
+    const prev = session._turnQueue;
+    session._turnQueue = slot;
+
+    try {
+      await prev;
+      const action = await session.orchestrator.runTurn(agentId);
+      res.json({ action });
+    } finally {
+      resolveSlot();
+    }
   }));
 
   app.post('/api/run-room', asyncHandler(async (req, res) => {

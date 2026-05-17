@@ -161,17 +161,22 @@ export class CausalSpine {
       }
     }
 
-    // Rewrite Belief.contradicts[] arrays for affected beliefs
+    // Rewrite Belief.contradicts[] arrays and decay confidence of superseded beliefs
     if (edges.length > 0) {
+      const contradictedIds = new Set(edges.map(e => e.from_belief_id));
       const updatedBeliefs = allBeliefs.map(b => {
         const outgoing = edges.filter(e => e.from_belief_id === b.id).map(e => e.to_belief_id);
         const incoming = edges.filter(e => e.to_belief_id === b.id).map(e => e.from_belief_id);
         const extra = [...outgoing, ...incoming];
-        if (extra.length === 0) return b;
-        return {
-          ...b,
-          contradicts: [...new Set([...(b.contradicts ?? []), ...extra])],
-        };
+        const contradicts = extra.length > 0
+          ? [...new Set([...(b.contradicts ?? []), ...extra])]
+          : b.contradicts;
+        // Contradicted (superseded) beliefs lose half their confidence — they're still
+        // in the graph for traceability but carry reduced epistemic weight.
+        const confidence = contradictedIds.has(b.id)
+          ? Math.max(0.05, b.confidence * 0.5)
+          : b.confidence;
+        return { ...b, contradicts, confidence };
       });
       this.stage.updateAgentBeliefs(char_id, updatedBeliefs);
     }
@@ -433,6 +438,22 @@ export class CausalSpine {
   // Used as a fallback when Gemini's contradicted_propositions doesn't match exactly.
   private _overlap(a: string, b: string): boolean {
     if (!a || !b) return false;
+    const negationRe = /\bisn?'?t\b|\bwasn?'?t\b|\baren?'?t\b|\bweren?'?t\b|\bnot\b|\bnever\b|\bno\b/i;
+    const hasNeg = (s: string) => negationRe.test(s);
+    const strip = (s: string) => s.toLowerCase().replace(negationRe, '').replace(/\s+/g, ' ').trim();
+
+    // Negation-pair detection: one belief affirms, the other denies the same claim.
+    // Use a lower overlap threshold because the stripped forms will be nearly identical.
+    if (hasNeg(a) !== hasNeg(b)) {
+      const sA = new Set((strip(a).match(/\b\w{4,}\b/g) ?? []));
+      const sB = new Set((strip(b).match(/\b\w{4,}\b/g) ?? []));
+      if (sA.size > 0 && sB.size > 0) {
+        let shared = 0;
+        for (const w of sA) if (sB.has(w)) shared++;
+        if (shared / Math.min(sA.size, sB.size) >= 0.35) return true;
+      }
+    }
+
     const wordsA = new Set((a.toLowerCase().match(/\b\w{4,}\b/g) ?? []));
     const wordsB = new Set((b.toLowerCase().match(/\b\w{4,}\b/g) ?? []));
     if (wordsA.size === 0 || wordsB.size === 0) return false;

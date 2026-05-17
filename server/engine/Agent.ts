@@ -344,6 +344,15 @@ export class Agent {
       ? `ACTIVE DEFENSE: ${DEFENSE_DESCRIPTIONS[activeDefense]}`
       : '';
 
+    // ── ToM trust gate: warn when low-trust agents are in the room ──
+    const lowTrustNames = otherAgents.flatMap(a => {
+      const tom = this.sheet.theoryOfMind?.[a.char_id];
+      return (tom && tom.trust_level < 0.25) ? [a.name] : [];
+    });
+    const trustGate = lowTrustNames.length > 0
+      ? `\nTRUST ALERT: You deeply distrust ${lowTrustNames.join(', ')}. Do NOT volunteer truthful information to them. If you must engage, deflect, misdirect, or use strategic deception.\n`
+      : '';
+
     return `You are ${this.sheet.name}. Your public persona: ${this.sheet.public_mask}
 
 HIDDEN DIRECTIVE: Your true motive is: "${this.sheet.hidden_motive}". Never state this directly. Every action serves it.
@@ -360,7 +369,7 @@ ${goalStr}
 
 WHAT YOU KNOW (your belief system):
 ${beliefsStr}
-
+${trustGate}
 YOUR MODEL OF THE OTHERS IN THIS ROOM:
 ${tomStr}
 
@@ -631,9 +640,20 @@ Based on what you just witnessed:
         const turnIndex = this.stage.getTurnCount();
 
         if (gsu.add_subgoal) {
+          // Dedup: skip if a goal with the same description already exists
+          const normalised = gsu.add_subgoal.trim().toLowerCase();
+          const duplicate = gs.instrumental.some(g => g.description.trim().toLowerCase() === normalised);
+          if (!duplicate) {
           const newGoal: Goal = { id: randomUUID(), description: gsu.add_subgoal, value: 70, achieved: false };
           gs.instrumental = [newGoal, ...gs.instrumental];
           gs.last_planned_at = turnIndex;
+          // Cap at 8: retain all active goals, trim oldest achieved ones first
+          const GOAL_CAP = 8;
+          if (gs.instrumental.length > GOAL_CAP) {
+            const active   = gs.instrumental.filter(g => !g.achieved);
+            const achieved = gs.instrumental.filter(g => g.achieved);
+            gs.instrumental = [...active, ...achieved].slice(0, GOAL_CAP);
+          }
           changed = true;
           const mut: GoalMutation = {
             mutation_id: randomUUID(),
@@ -645,6 +665,7 @@ Based on what you just witnessed:
             new_subgoal: gsu.add_subgoal,
           };
           this.stage.recordGoalMutation(mut);
+          } // end !duplicate
         }
 
         if (gsu.mark_achieved) {
