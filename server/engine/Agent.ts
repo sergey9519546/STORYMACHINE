@@ -1,6 +1,6 @@
 import { Type } from '@google/genai';
 import { randomUUID } from 'crypto';
-import { getAI, getModel, getTemperature, withTimeout } from './ai.ts';
+import { getModel, getTemperature, generateContent } from './ai.ts';
 import { STYLE_MODIFIERS } from '../lib/structure-presets.ts';
 import type {
   CharacterSheet,
@@ -22,7 +22,7 @@ import type {
   PersuasionStrategy,
 } from './types.ts';
 import { Stage } from './Stage.ts';
-import { safeJsonParse } from '../../src/lib/json.ts';
+import { safeJsonParse } from '../lib/json.ts';
 import { logger } from '../lib/logger.ts';
 
 // ── Psychology prompt helpers ────────────────────────────────────────────────
@@ -195,8 +195,9 @@ export class Agent {
     const prompt = this.buildEnhancedPrompt(currentNode, sensoryFilter, otherAgents);
 
     // ── ToT Planning: generate 3 candidates, self-select the best ──
-    const response = await withTimeout(getAI().models.generateContent({
-      model: getModel(),
+    // High-volume per-turn call — routed to the fast model tier.
+    const response = await generateContent({
+      model: getModel('fast'),
       contents: prompt,
       config: {
         temperature: getTemperature(),
@@ -223,7 +224,7 @@ export class Agent {
           required: ['candidates'],
         },
       },
-    }), 30_000, `takeTurn:${this.sheet.name}`).catch(err => {
+    }, { label: `takeTurn:${this.sheet.name}`, timeoutMs: 30_000 }).catch(err => {
       const e = err as Error;
       logger.error('agent_ai_error', {
         agent: this.sheet.name,
@@ -484,8 +485,8 @@ Based on what you just witnessed:
 3. Update your model of each other agent — what do you now think their motive is, and what do THEY now think YOU know?
 4. Did anything you observed contradict what you believed?`;
 
-    const response = await withTimeout(getAI().models.generateContent({
-      model: getModel(),
+    const response = await generateContent({
+      model: getModel('fast'),
       contents: prompt,
       config: {
         temperature: getTemperature(),
@@ -556,7 +557,7 @@ Based on what you just witnessed:
           required: ['newSuspicionScore', 'newBeliefs', 'updatedTheoryOfMind', 'contradiction_detected', 'contradicted_propositions'],
         },
       },
-    }), 30_000, `updateEpistemics:${this.sheet.name}`).catch(err => {
+    }, { label: `updateEpistemics:${this.sheet.name}`, timeoutMs: 30_000 }).catch(err => {
       const e = err as Error;
       logger.error('agent_ai_error', {
         agent: this.sheet.name,
@@ -765,8 +766,8 @@ Based on what you just witnessed:
 
     const existingBeliefs = (this.sheet.beliefs ?? []).slice(0, 5).map(b => b.proposition).join('; ');
 
-    const response = await withTimeout(getAI().models.generateContent({
-      model: getModel(),
+    const response = await generateContent({
+      model: getModel('fast'),
       contents: `You are ${this.sheet.name}. Reflect on these recent events and synthesize exactly 3 high-level insights.\n\nEvents:\n${transcript}\n\nExisting beliefs: ${existingBeliefs || 'none'}\n\nOutput 3 reflective insights that go beyond the surface events — patterns, implications, strategic assessments.`,
       config: {
         temperature: getTemperature(),
@@ -790,7 +791,7 @@ Based on what you just witnessed:
           required: ['reflections'],
         },
       },
-    }), 20_000, `synthesizeReflections:${this.sheet.name}`);
+    }, { label: `synthesizeReflections:${this.sheet.name}`, timeoutMs: 20_000 });
 
     const reflRaw = response.text ?? '{}';
     const parsed = safeJsonParse<{ reflections: Array<{ insight: string; confidence: number }> }>(

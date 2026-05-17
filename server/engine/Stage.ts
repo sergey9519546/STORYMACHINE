@@ -24,7 +24,7 @@ import type {
   BeatTrace,
   StageSnapshot,
 } from './types.ts';
-import { safeJsonParse } from '../../src/lib/json.ts';
+import { safeJsonParse } from '../lib/json.ts';
 
 const DEFAULT_DARK_TRIAD: DarkTriad = { machiavellianism: 50, narcissism: 50, psychopathy: 50 };
 const DEFAULT_BIG_FIVE: BigFive = { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 };
@@ -297,55 +297,50 @@ export class Stage {
     }
   }
 
-  public getAgent(char_id: string): CharacterSheet | undefined {
-    const charRow = this.db.prepare('SELECT * FROM Characters WHERE char_id = ?').get(char_id) as Record<string, unknown> | undefined;
-    if (!charRow) return undefined;
-
-    const stateRow = this.db.prepare('SELECT * FROM Character_State WHERE char_id = ?').get(char_id) as Record<string, unknown> | undefined;
-    if (!stateRow) return undefined;
-
-    const knowledgeRows = this.db.prepare('SELECT * FROM Knowledge_Ledger WHERE char_id = ?').all(char_id) as Array<Record<string, unknown>>;
-
+  // Maps a merged Characters + Character_State row (plus the agent's knowledge
+  // facts) into a CharacterSheet. Shared by getAgent and the batched bulk
+  // fetchers so the JSON-column parsing logic lives in exactly one place.
+  private _rowToSheet(row: Record<string, unknown>, knowledgeFacts: string[]): CharacterSheet {
     return {
-      char_id: charRow.char_id as string,
-      name: charRow.name as string,
-      public_mask: charRow.public_mask as string,
-      hidden_motive: charRow.hidden_motive as string,
-      current_location_id: stateRow.current_location_id as string,
-      suspicion_score: stateRow.base_suspicion_score as number,
-      is_alive: (stateRow.is_alive as number) === 1,
-      knowledge_vector: knowledgeRows.map(k => k.fact_description as string),
+      char_id: row.char_id as string,
+      name: row.name as string,
+      public_mask: row.public_mask as string,
+      hidden_motive: row.hidden_motive as string,
+      current_location_id: row.current_location_id as string,
+      suspicion_score: row.base_suspicion_score as number,
+      is_alive: (row.is_alive as number) === 1,
+      knowledge_vector: knowledgeFacts,
       beliefs: (() => {
-        const v = safeJsonParse<unknown>(stateRow.beliefs_json as string, []);
+        const v = safeJsonParse<unknown>(row.beliefs_json as string, []);
         return Array.isArray(v) ? (v as Belief[]) : [];
       })(),
       theoryOfMind: (() => {
-        const v = safeJsonParse<unknown>(stateRow.theory_of_mind_json as string, {});
+        const v = safeJsonParse<unknown>(row.theory_of_mind_json as string, {});
         return (v && typeof v === 'object' && !Array.isArray(v)) ? (v as Record<string, TheoryOfMind>) : {};
       })(),
       goalStack: (() => {
-        if (!stateRow.goal_stack_json) return undefined;
-        const v = safeJsonParse<unknown>(stateRow.goal_stack_json as string, null);
+        if (!row.goal_stack_json) return undefined;
+        const v = safeJsonParse<unknown>(row.goal_stack_json as string, null);
         if (!v || typeof v !== 'object') return undefined;
         const g = v as Record<string, unknown>;
         if (!g.terminal || !Array.isArray(g.instrumental)) return undefined;
         return v as GoalStack;
       })(),
       darkTriad: (() => {
-        const v = safeJsonParse<unknown>(stateRow.dark_triad_json as string, null);
+        const v = safeJsonParse<unknown>(row.dark_triad_json as string, null);
         return (v && typeof v === 'object' && 'machiavellianism' in (v as object)) ? (v as DarkTriad) : DEFAULT_DARK_TRIAD;
       })(),
       bigFive: (() => {
-        const v = safeJsonParse<unknown>(stateRow.big_five_json as string, null);
+        const v = safeJsonParse<unknown>(row.big_five_json as string, null);
         return (v && typeof v === 'object' && 'openness' in (v as object)) ? (v as BigFive) : DEFAULT_BIG_FIVE;
       })(),
-      attachmentStyle: (stateRow.attachment_style as AttachmentStyle) ?? 'secure',
+      attachmentStyle: (row.attachment_style as AttachmentStyle) ?? 'secure',
       defenseMechanisms: (() => {
-        const v = safeJsonParse<unknown>(stateRow.defense_mechanisms_json as string, []);
+        const v = safeJsonParse<unknown>(row.defense_mechanisms_json as string, []);
         return Array.isArray(v) ? (v as DefenseMechanism[]) : [];
       })(),
       emotionState: (() => {
-        const raw = stateRow.emotion_state_json as string | null;
+        const raw = row.emotion_state_json as string | null;
         if (!raw) return undefined;
         const v = safeJsonParse<unknown>(raw, null);
         if (!v || typeof v !== 'object') return undefined;
@@ -356,16 +351,51 @@ export class Stage {
     };
   }
 
+  public getAgent(char_id: string): CharacterSheet | undefined {
+    const row = this.db.prepare(`
+      SELECT c.*, s.* FROM Characters c
+      JOIN Character_State s ON c.char_id = s.char_id
+      WHERE c.char_id = ?
+    `).get(char_id) as Record<string, unknown> | undefined;
+    if (!row) return undefined;
+
+    const knowledgeRows = this.db.prepare(
+      'SELECT fact_description FROM Knowledge_Ledger WHERE char_id = ?'
+    ).all(char_id) as Array<{ fact_description: string }>;
+
+    return this._rowToSheet(row, knowledgeRows.map(k => k.fact_description));
+  }
+
+  // Batched bulk fetch: one JOIN for character+state, one scan for all
+  // knowledge facts — replaces the previous N+1 (3 queries per agent).
+  private _getAgentsBatched(stateFilter: string, params: unknown[]): CharacterSheet[] {
+    const rows = this.db.prepare(`
+      SELECT c.*, s.* FROM Characters c
+      JOIN Character_State s ON c.char_id = s.char_id
+      ${stateFilter}
+    `).all(...params) as Array<Record<string, unknown>>;
+    if (rows.length === 0) return [];
+
+    // One query for every agent's knowledge facts, grouped in memory.
+    const knowledgeByAgent = new Map<string, string[]>();
+    const knowledgeRows = this.db.prepare(
+      'SELECT char_id, fact_description FROM Knowledge_Ledger'
+    ).all() as Array<{ char_id: string; fact_description: string }>;
+    for (const k of knowledgeRows) {
+      const list = knowledgeByAgent.get(k.char_id);
+      if (list) list.push(k.fact_description);
+      else knowledgeByAgent.set(k.char_id, [k.fact_description]);
+    }
+
+    return rows.map(r => this._rowToSheet(r, knowledgeByAgent.get(r.char_id as string) ?? []));
+  }
+
   public getAllAgents(): CharacterSheet[] {
-    const rows = this.db.prepare('SELECT char_id FROM Characters').all() as Array<{ char_id: string }>;
-    return rows.map(r => this.getAgent(r.char_id)).filter((a): a is CharacterSheet => a !== undefined);
+    return this._getAgentsBatched('', []);
   }
 
   public getAgentsInLocation(location_id: string): CharacterSheet[] {
-    const rows = this.db.prepare(
-      'SELECT char_id FROM Character_State WHERE current_location_id = ?'
-    ).all(location_id) as Array<{ char_id: string }>;
-    return rows.map(r => this.getAgent(r.char_id)).filter((a): a is CharacterSheet => a !== undefined);
+    return this._getAgentsBatched('WHERE s.current_location_id = ?', [location_id]);
   }
 
   // ── Agent state mutations ────────────────────────────────────────────────────

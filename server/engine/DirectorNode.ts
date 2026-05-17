@@ -1,10 +1,10 @@
 import { Type } from '@google/genai';
 import { Stage } from './Stage.ts';
 import type { ActionLogEntry, PerspectiveEvaluation, BeliefSource, EpistemicUpdate, IllusionElement, IllusionState } from './types.ts';
-import { safeJsonParse } from '../../src/lib/json.ts';
+import { safeJsonParse } from '../lib/json.ts';
 import { randomUUID } from 'crypto';
 import { logger } from '../lib/logger.ts';
-import { getAI, getModel, withTimeout } from './ai.ts';
+import { getModel, generateContent } from './ai.ts';
 import { expectedTensionAt, STYLE_MODIFIERS } from '../lib/structure-presets.ts';
 import { analyzeSubtext } from '../lib/subtext-meter.ts';
 
@@ -189,8 +189,8 @@ From ${observer.name}'s perspective only:
 3. What new facts did they derive from what they saw/heard?
 4. How has their suspicion of each other person changed?`;
 
-    const response = await withTimeout(getAI().models.generateContent({
-      model: getModel(),
+    const response = await generateContent({
+      model: getModel('pro'),
       contents: prompt,
       config: {
         systemInstruction: `You are the Director Node. Evaluate this scene from a single bounded perspective. You know who lied but the observer does not — factor this in when evaluating whether contradictions were apparent.`,
@@ -233,7 +233,7 @@ From ${observer.name}'s perspective only:
           required: ['tension_delta', 'contradiction_detected', 'new_beliefs', 'suspicion_updates', 'contradicted_propositions'],
         },
       },
-    }), 30_000, `evaluatePerspective:${observer_id}`).catch(err => {
+    }, { label: `evaluatePerspective:${observer_id}`, timeoutMs: 30_000 }).catch(err => {
       console.error(`[Director] evaluatePerspective fallback: ${(err as Error).message}`);
       return null;
     });
