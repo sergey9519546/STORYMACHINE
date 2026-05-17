@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { EngineState } from "../../types";
 import { parseFountain } from "../../lib/fountain";
 import {
@@ -21,7 +21,8 @@ export default function AnalysisPanel({
   isCleaning,
   onCleanAction,
 }: AnalysisPanelProps) {
-  const parsedBlocks = parseFountain(scriptText);
+  // ⚡ Bolt: wrap parseFountain with useMemo to prevent double-renders on high-frequency typing
+  const parsedBlocks = useMemo(() => parseFountain(scriptText), [scriptText]);
 
   return (
     <div

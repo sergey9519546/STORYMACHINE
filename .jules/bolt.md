@@ -1,0 +1,3 @@
+## 2026-05-17 - ⚡ Bolt: UseMemo on parseFountain
+**Learning:** `parseFountain` is an expensive string parsing function that was being called multiple times synchronously on every render in high-frequency input components (`ScriptIDE.tsx` and `AnalysisPanel.tsx`).
+**Action:** Enforce `useMemo` on `parseFountain` and pass the memoized `parsedBlocks` down to components and functions (like `renderHighlightedText`) to avoid unnecessary double-render cycles or multiple synchronous parses per render cycle.
