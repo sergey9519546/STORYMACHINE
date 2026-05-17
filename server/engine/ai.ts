@@ -14,6 +14,23 @@ export function getAI(): GoogleGenAI {
   return _shared;
 }
 
+// ── LLM provider seam ────────────────────────────────────────────────────────
+// generateContent() delegates to the active provider rather than calling Gemini
+// directly. This makes the engine's AI paths testable (swap in a mock provider)
+// and leaves room for alternate LLM backends without touching call sites.
+export interface LLMProvider {
+  generate(params: GenerateContentParameters): Promise<GenerateContentResponse>;
+}
+
+const geminiProvider: LLMProvider = {
+  generate: (params) => getAI().models.generateContent(params),
+};
+
+let _provider: LLMProvider = geminiProvider;
+
+export function setLLMProvider(p: LLMProvider): void { _provider = p; }
+export function resetLLMProvider(): void { _provider = geminiProvider; }
+
 // Model tiering. High-volume per-turn calls (agent actions) can run on the
 // fast tier to cut cost/latency; quality-critical calls stay on the pro tier.
 // Override per tier with GEMINI_FAST_MODEL / GEMINI_MODEL.
@@ -101,7 +118,7 @@ export async function generateContent(
   let ok = false;
   try {
     const res = await withRetry(
-      () => withTimeout(getAI().models.generateContent(params), timeoutMs, label),
+      () => withTimeout(_provider.generate(params), timeoutMs, label),
       label,
       maxAttempts,
     );

@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { safeJsonParse } from './src/lib/json.ts';
-import { withTimeout } from './server/engine/ai.ts';
+import { withTimeout, generateContent, setLLMProvider, resetLLMProvider } from './server/engine/ai.ts';
 import { analyzeSubtext } from './server/lib/subtext-meter.ts';
 import { scoreBelief, retrieveBeliefs } from './server/lib/memory.ts';
 import { metrics } from './server/lib/metrics.ts';
@@ -1492,5 +1492,51 @@ describe('metrics', () => {
     metrics.reset();
     const snap = metrics.snapshot() as { ai: { total_calls: number } };
     assert.equal(snap.ai.total_calls, 0);
+  });
+});
+
+describe('ai — LLM provider seam', () => {
+  it('generateContent delegates to the active provider', async () => {
+    setLLMProvider({ generate: async () => ({ text: 'MOCK_OUTPUT' } as never) });
+    try {
+      const res = await generateContent({ model: 'x', contents: 'y' }, { label: 'unit:test' });
+      assert.equal(res.text, 'MOCK_OUTPUT');
+    } finally {
+      resetLLMProvider();
+    }
+  });
+
+  it('retries a transient failure then succeeds', async () => {
+    let attempts = 0;
+    setLLMProvider({
+      generate: async () => {
+        attempts++;
+        if (attempts < 2) throw new Error('503 Service Unavailable');
+        return { text: 'RECOVERED' } as never;
+      },
+    });
+    try {
+      const res = await generateContent({ model: 'x', contents: 'y' }, { label: 'unit:retry', maxAttempts: 3 });
+      assert.equal(res.text, 'RECOVERED');
+      assert.equal(attempts, 2, 'should have retried exactly once');
+    } finally {
+      resetLLMProvider();
+    }
+  });
+
+  it('does not retry a non-transient failure', async () => {
+    let attempts = 0;
+    setLLMProvider({
+      generate: async () => { attempts++; throw new Error('400 Bad Request: invalid schema'); },
+    });
+    try {
+      await assert.rejects(
+        generateContent({ model: 'x', contents: 'y' }, { label: 'unit:fatal', maxAttempts: 3 }),
+        /400/,
+      );
+      assert.equal(attempts, 1, 'a 400 should fail immediately without retry');
+    } finally {
+      resetLLMProvider();
+    }
   });
 });
