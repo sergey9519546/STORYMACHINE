@@ -599,7 +599,9 @@ Based on what you just witnessed:
       .filter(b => b.proposition && !existingProps.has(b.proposition.toLowerCase()))
       .map(b => {
         // Resolve source agent + event from the indexed action list
-        const srcIdx = typeof b.source_action_index === 'number' && b.source_action_index >= 0
+        const srcIdx = typeof b.source_action_index === 'number'
+          && b.source_action_index >= 0
+          && b.source_action_index < observableActions.length
           ? b.source_action_index : null;
         const srcAction = srcIdx !== null ? observableActions[srcIdx] : null;
         return {
@@ -683,27 +685,27 @@ Based on what you just witnessed:
           const normalised = gsu.add_subgoal.trim().toLowerCase();
           const duplicate = gs.instrumental.some(g => g.description.trim().toLowerCase() === normalised);
           if (!duplicate) {
-          const newGoal: Goal = { id: randomUUID(), description: gsu.add_subgoal, value: 70, achieved: false };
-          gs.instrumental = [newGoal, ...gs.instrumental];
-          gs.last_planned_at = turnIndex;
-          // Cap at 8: retain all active goals, trim oldest achieved ones first
-          const GOAL_CAP = 8;
-          if (gs.instrumental.length > GOAL_CAP) {
-            const active   = gs.instrumental.filter(g => !g.achieved);
-            const achieved = gs.instrumental.filter(g => g.achieved);
-            gs.instrumental = [...active, ...achieved].slice(0, GOAL_CAP);
-          }
-          changed = true;
-          const mut: GoalMutation = {
-            mutation_id: randomUUID(),
-            char_id: this.sheet.char_id,
-            turn_index: turnIndex,
-            trigger_event_id: triggerEventId,
-            mutation_type: 'subgoal_added',
-            description: `${this.sheet.name} formed new subgoal: "${gsu.add_subgoal}"`,
-            new_subgoal: gsu.add_subgoal,
-          };
-          this.stage.recordGoalMutation(mut);
+            const newGoal: Goal = { id: randomUUID(), description: gsu.add_subgoal, value: 70, achieved: false };
+            gs.instrumental = [newGoal, ...gs.instrumental];
+            gs.last_planned_at = turnIndex;
+            // Cap at 8: retain all active goals, trim oldest achieved ones first
+            const GOAL_CAP = 8;
+            if (gs.instrumental.length > GOAL_CAP) {
+              const active   = gs.instrumental.filter(g => !g.achieved);
+              const achieved = gs.instrumental.filter(g => g.achieved);
+              gs.instrumental = [...active, ...achieved].slice(0, GOAL_CAP);
+            }
+            changed = true;
+            const mut: GoalMutation = {
+              mutation_id: randomUUID(),
+              char_id: this.sheet.char_id,
+              turn_index: turnIndex,
+              trigger_event_id: triggerEventId,
+              mutation_type: 'subgoal_added',
+              description: `${this.sheet.name} formed new subgoal: "${gsu.add_subgoal}"`,
+              new_subgoal: gsu.add_subgoal,
+            };
+            this.stage.recordGoalMutation(mut);
           } // end !duplicate
         }
 

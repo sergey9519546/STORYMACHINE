@@ -32,7 +32,13 @@ const PERSIST_SESSIONS = SESSION_DB_DIR !== ':memory:';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const asyncHandler = (fn: express.RequestHandler): express.RequestHandler =>
-  (req, res, next) => { Promise.resolve(fn(req, res, next)).catch(next); };
+  (req, res, next) => {
+    try {
+      Promise.resolve(fn(req, res, next)).catch(next);
+    } catch (e) {
+      next(e);
+    }
+  };
 
 class ValidationError extends Error {
   status = 400;
@@ -512,7 +518,7 @@ async function startServer() {
   // Sends newline-delimited Server-Sent Events as each agent acts, so the client
   // can display real-time progress instead of waiting for the full simulation.
   // Uses the same runningRooms lock as the batch endpoint to prevent overlap.
-  app.get('/api/run-room-stream', async (req, res) => {
+  app.get('/api/run-room-stream', gameLimiter, async (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -1196,8 +1202,7 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
       },
     }), 45_000, 'analyze-script');
 
-    const rawText = (analysisResponse.text ?? '{}')
-      .replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const rawText = analysisResponse.text ?? '{}';
     const analysisData = safeJsonParse<{ sceneAnalysis: Record<string, unknown>; updatedDirectorState: Record<string, unknown> } | null>(rawText, null);
     if (!analysisData?.sceneAnalysis) {
       res.status(500).json({ error: 'Failed to parse AI analysis response.' });

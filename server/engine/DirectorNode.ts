@@ -3,6 +3,7 @@ import { Stage } from './Stage.ts';
 import type { ActionLogEntry, PerspectiveEvaluation, BeliefSource, EpistemicUpdate, IllusionElement, IllusionState } from './types.ts';
 import { safeJsonParse } from '../../src/lib/json.ts';
 import { randomUUID } from 'crypto';
+import { logger } from '../lib/logger.ts';
 import { getAI, getModel, withTimeout } from './ai.ts';
 import { expectedTensionAt, STYLE_MODIFIERS } from '../lib/structure-presets.ts';
 import { analyzeSubtext } from '../lib/subtext-meter.ts';
@@ -60,7 +61,7 @@ export class DirectorNode {
         if (!target) continue;
         const newScore = Math.max(0, Math.min(100, target.suspicion_score + update.delta));
         this.stage.updateAgentSuspicion(update.char_id, newScore);
-        console.log(`[Director] ${target.name} suspicion ${update.delta > 0 ? '+' : ''}${update.delta} → ${newScore}. Reason: ${update.reason}`);
+        logger.info('suspicion_update', { agent: target.name, delta: update.delta, score: newScore, reason: update.reason });
       }
     }
 
@@ -110,12 +111,16 @@ export class DirectorNode {
     }
 
     // ── Advance illusion state based on aggregate tension ──
+    // Use max (not mean) tension so a single high-tension observer isn't diluted
+    // by observers who detected nothing — one contradiction in 4 agents is still
+    // a real event, not 0.25× an event.
+    const maxTensionDelta = evaluations.reduce((m, e) => Math.max(m, e.tension_delta), 0);
     const avgTensionDelta = evaluations.reduce((s, e) => s + e.tension_delta, 0) / Math.max(1, evaluations.length);
+    const peakTensionDelta = evaluations.some(e => e.contradiction_detected) ? maxTensionDelta : avgTensionDelta;
     const contradictionsFound = evaluations.filter(e => e.contradiction_detected).length;
-    this.advanceIllusionState(avgTensionDelta, contradictionsFound, location_id);
+    this.advanceIllusionState(peakTensionDelta, contradictionsFound, location_id);
 
-    // Log aggregate tension
-    console.log(`[Director] Avg tension delta: ${avgTensionDelta.toFixed(1)}, contradictions: ${contradictionsFound}/${evaluations.length} observers`);
+    logger.info('director_eval', { tensionDelta: peakTensionDelta.toFixed(1), contradictions: contradictionsFound, observers: evaluations.length });
 
     // ── A: Pacing Controller ──
     this._checkPacing(location_id, recentActions);
@@ -302,10 +307,10 @@ From ${observer.name}'s perspective only:
 
     if (state.phase === 'Setup' && (totalTurns >= setupEnd || (avgTensionDelta > 10 && totalTurns >= Math.round(setupEnd / 2)))) {
       nextPhase = 'Turn';
-      console.log(`[Director] Illusion phase: Setup → Turn (turn ${totalTurns}/${setupEnd})`);
+      logger.info('illusion_phase', { from: 'Setup', to: 'Turn', turn: totalTurns, setupEnd });
     } else if (state.phase === 'Turn' && (totalTurns >= turnEnd || (contradictionsFound >= 2 && totalTurns >= setupEnd + 2))) {
       nextPhase = 'Prestige';
-      console.log(`[Director] Illusion phase: Turn → Prestige (turn ${totalTurns}/${turnEnd})`);
+      logger.info('illusion_phase', { from: 'Turn', to: 'Prestige', turn: totalTurns, turnEnd });
     }
 
     if (nextPhase !== state.phase) {
@@ -354,7 +359,7 @@ From ${observer.name}'s perspective only:
             applied: false,
           });
         }
-        console.log(`[Director] Prestige payoff: ${recontexts.length} element(s) recontextualized, REVEAL pressure emitted to ${agents.length} agent(s)`);
+        logger.info('prestige_payoff', { recontexts: recontexts.length, agents: agents.length });
       }
 
       this.stage.updateIllusionState(update);
@@ -466,7 +471,7 @@ From ${observer.name}'s perspective only:
         applied: false,
       });
     }
-    console.log(`[Director] Pacing target=${target} style=${directorStyle ?? 'none'} measured=(tempo=${m.tempo}, monotony=${m.monotonyRisk}) at turn ${totalTurns}`);
+    logger.info('pacing_check', { target, style: directorStyle ?? 'none', tempo: m.tempo, monotony: m.monotonyRisk, turn: totalTurns });
   }
 
   // ── H: Auto-Pivot Detection ──
@@ -499,7 +504,7 @@ From ${observer.name}'s perspective only:
       narrative_summary: 'Auto-pivot detected: the emotional valence of the scene has reversed twice. A turning point has been reached.',
       fountain_hint: 'The room shifts. What was certain is now in doubt. Someone has crossed a line.',
     });
-    console.log(`[Director] Auto-pivot detected at turn ${this.stage.getTurnCount()}`);
+    logger.info('auto_pivot', { turn: this.stage.getTurnCount() });
     this._tensionHistory = [];  // reset after pivot
   }
 
@@ -544,7 +549,7 @@ From ${observer.name}'s perspective only:
           applied: false,
         });
       }
-      console.log(`[Director] Arc deviation: tension ${this._tensionAccumulator.toFixed(0)} vs expected ${expectedTension} — ESCALATE`);
+      logger.info('arc_deviation', { direction: 'escalate', tension: this._tensionAccumulator, expected: expectedTension });
     } else {
       // Story running ABOVE expected tension — cool down
       const hint = `The scene is more intense than the ${arc.replace(/_/g, ' ')} arc calls for at this stage. Ease the pressure — a moment of apparent calm, false security, or quiet revelation before the next wave.`;
@@ -560,7 +565,7 @@ From ${observer.name}'s perspective only:
           applied: false,
         });
       }
-      console.log(`[Director] Arc deviation: tension ${this._tensionAccumulator.toFixed(0)} vs expected ${expectedTension} — COOL`);
+      logger.info('arc_deviation', { direction: 'cool', tension: this._tensionAccumulator, expected: expectedTension });
     }
   }
 
@@ -588,7 +593,7 @@ From ${observer.name}'s perspective only:
           expires_at_turn: totalTurns + 4,
           applied: false,
         });
-        console.log(`[Director] Consistency: ${agent.name} has ${contradicted.length} belief contradiction(s)`);
+        logger.info('consistency_contradiction', { agent: agent.name, count: contradicted.length });
       }
 
       // ── Goal/personality coherence ──
@@ -609,7 +614,7 @@ From ${observer.name}'s perspective only:
             expires_at_turn: totalTurns + 3,
             applied: false,
           });
-          console.log(`[Director] Consistency: ${agent.name} (low-Mach) has ${deceptionGoals.length} deception subgoals — conscience pressure injected`);
+          logger.info('conscience_pressure', { agent: agent.name, deceptionGoals: deceptionGoals.length });
         }
       }
 
@@ -626,7 +631,7 @@ From ${observer.name}'s perspective only:
           expires_at_turn: totalTurns + 2,
           applied: false,
         });
-        console.log(`[Director] Consistency: ${agent.name} has ${activeCount} active subgoals (overload)`);
+        logger.info('goal_overload', { agent: agent.name, activeCount });
       }
     }
   }
@@ -668,7 +673,7 @@ From ${observer.name}'s perspective only:
         applied: false,
       });
 
-      console.log(`[Director] High-severity edge (${worst.severity?.toFixed(0)}) → CONFRONT pressure on ${agent.name} [style: ${state.director_style ?? 'none'}]`);
+      logger.info('belief_edge_confront', { agent: agent.name, severity: worst.severity, style: state.director_style ?? 'none' });
     }
   }
 
@@ -684,7 +689,7 @@ From ${observer.name}'s perspective only:
     const analysis = analyzeSubtext(dialogue);
     const turnIndex = this.stage.getTurnCount();
 
-    console.log(`[Director] Subtext score: ${analysis.score}/100 (${analysis.onTheNoseCount} otn / ${analysis.subtextCount} subtext across ${analysis.totalLines} lines)`);
+    logger.info('subtext_score', { score: analysis.score, onTheNose: analysis.onTheNoseCount, subtext: analysis.subtextCount, lines: analysis.totalLines });
 
     if (analysis.score >= 60) {
       const agents = this.stage.getAgentsInLocation(location_id).filter(a => a.is_alive);
@@ -708,7 +713,7 @@ From ${observer.name}'s perspective only:
           applied: false,
         });
       }
-      console.log(`[Director] COOL pressure emitted to ${agents.length} agent(s) — subtext score ${analysis.score}`);
+      logger.info('subtext_cool_pressure', { agents: agents.length, score: analysis.score });
     }
   }
 

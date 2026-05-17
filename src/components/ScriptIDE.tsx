@@ -262,7 +262,9 @@ export default function ScriptIDE({
     }
 
     onImportConsumed?.();
-  }, [importedScript]); // eslint-disable-line react-hooks/exhaustive-deps
+  // importedCharacters is stable (array literal from parent memo) — safe to omit.
+  // onImportConsumed must be in deps so we always call the current prop version.
+  }, [importedScript, onImportConsumed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Initialize engine state ──────────────────────────────────────────────────
   useEffect(() => {

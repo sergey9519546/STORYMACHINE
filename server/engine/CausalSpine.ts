@@ -153,7 +153,7 @@ export class CausalSpine {
             discovered_by: char_id,
             source_event_id: sourceEventId,
             turn_index: turnIndex,
-            severity: Math.round(existing.confidence * newBelief.confidence * 100),
+            severity: Math.round(Math.max(existing.confidence, newBelief.confidence) * 100),
           };
           this.stage.addBeliefEdge(edge);
           edges.push(edge);

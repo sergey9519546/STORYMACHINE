@@ -69,6 +69,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [persuasionLog, setPersuasionLog] = useState<Record<string, PersuasionRecord[]>>({});
   const [activePressures, setActivePressures] = useState<Array<{ char_id: string; pressures: DramaticPressure[] }>>([]);
   const ledgerEndRef = useRef<HTMLDivElement>(null);
+  const evtSourceRef = useRef<EventSource | null>(null);
   const [loading, setLoading] = useState(false);
   const [streamLog, setStreamLog] = useState<string[]>([]);
   const [showBuilder, setShowBuilder] = useState(false);
@@ -77,6 +78,9 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
     const res = await fetch("/api/dramatic-pressure-all");
     if (res.ok) setActivePressures(await res.json() as Array<{ char_id: string; pressures: DramaticPressure[] }>);
   }, []);
+
+  // Close any in-flight SSE connection when the component unmounts
+  useEffect(() => () => { evtSourceRef.current?.close(); }, []);
 
   useEffect(() => {
     fetchState();
@@ -245,11 +249,13 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   };
 
   const handleRunRoom = async (nodeId: string) => {
+    evtSourceRef.current?.close();
     setLoading(true);
     setStreamLog([]);
     try {
       const url = `/api/run-room-stream?nodeId=${encodeURIComponent(nodeId)}`;
       const evtSource = new EventSource(url);
+      evtSourceRef.current = evtSource;
       await new Promise<void>((resolve, reject) => {
         evtSource.onmessage = (e) => {
           try {
@@ -263,11 +269,16 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
               setStreamLog(prev => [...prev, `— Round ${event.round} complete —`]);
             } else if (event.type === 'simulation_complete') {
               evtSource.close();
+              evtSourceRef.current = null;
               resolve();
             }
           } catch { /* ignore parse errors */ }
         };
-        evtSource.onerror = () => { evtSource.close(); reject(new Error('SSE connection lost')); };
+        evtSource.onerror = () => {
+          evtSource.close();
+          evtSourceRef.current = null;
+          reject(new Error('SSE connection lost'));
+        };
       });
       await refreshAll();
     } catch (e) {

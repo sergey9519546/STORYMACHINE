@@ -59,7 +59,7 @@ export class AppraisalEngine {
 
     // ── Decay toward baseline ──
     for (const k of EMOTION_DIMS) {
-      next[k] = Math.round(next[k] * DECAY);
+      next[k] = Math.ceil(next[k] * DECAY);
     }
 
     // ── Appraise recent goal mutations ──

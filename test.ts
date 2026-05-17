@@ -802,7 +802,7 @@ describe('CausalSpine — suspect defensive goal mutation', () => {
 });
 
 describe('CausalSpine — BeliefEdge severity', () => {
-  it('severity equals round(fromConfidence * toConfidence * 100)', () => {
+  it('severity equals round(max(fromConfidence, toConfidence) * 100)', () => {
     const stage = makeStage();
     const spine = new CausalSpine(stage);
 
@@ -834,7 +834,7 @@ describe('CausalSpine — BeliefEdge severity', () => {
 
     assert.ok(edges.length >= 1, 'Should produce at least one edge');
     const edge = edges[0];
-    const expectedSeverity = Math.round(0.7 * 0.8 * 100); // 56
+    const expectedSeverity = Math.round(Math.max(0.7, 0.8) * 100); // 80
     assert.equal(edge.severity, expectedSeverity, `severity should be ${expectedSeverity}`);
 
     // Also verify it was persisted with severity
