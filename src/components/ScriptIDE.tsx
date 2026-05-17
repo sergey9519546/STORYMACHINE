@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { EngineState, StoryConfig } from "../types";
 import { analyzeScriptBlock } from "../services/director";
-import { parseFountain } from "../lib/fountain";
+import { parseFountain, FountainBlock } from "../lib/fountain";
 import { safeJsonParse } from "../lib/json";
 import {
   Loader2,
@@ -74,9 +74,8 @@ const TENSION_BARS = [
 
 // ─── Syntax highlighting ─────────────────────────────────────────────────────
 
-const renderHighlightedText = (text: string) => {
+const renderHighlightedText = (text: string, blocks: FountainBlock[]) => {
   const lines = text.split("\n");
-  const blocks = parseFountain(text);
 
   const lineClasses: Record<number, string> = {};
   let currentLineIdx = 0;
@@ -339,14 +338,13 @@ export default function ScriptIDE({
   }, [showDirectorHUD]);
 
   // ── Memos ────────────────────────────────────────────────────────────────────
-  const highlightedText = useMemo(
-    () => renderHighlightedText(scriptText),
-    [scriptText]
-  );
   const parsedBlocks = useMemo(() => parseFountain(scriptText), [scriptText]);
+  const highlightedText = useMemo(
+    () => renderHighlightedText(scriptText, parsedBlocks),
+    [scriptText, parsedBlocks]
+  );
 
   const stats = useMemo(() => {
-    const blocks = parseFountain(scriptText);
     const charCounts: Record<string, number> = {};
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
@@ -354,7 +352,7 @@ export default function ScriptIDE({
     let wordCount = scriptText.trim().split(/\s+/).length;
     if (scriptText.trim() === "") wordCount = 0;
 
-    blocks.forEach((block) => {
+    parsedBlocks.forEach((block) => {
       if (block.type === "character") {
         const name = block.text.trim().toUpperCase();
         charCounts[name] = (charCounts[name] || 0) + 1;
@@ -387,7 +385,7 @@ export default function ScriptIDE({
       wordCount,
       estimatedMinutes,
     };
-  }, [scriptText]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [scriptText, parsedBlocks]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Scroll sync ──────────────────────────────────────────────────────────────
   const handleScroll = () => {
@@ -712,8 +710,7 @@ export default function ScriptIDE({
       if (data.error) throw new Error(data.error);
 
       const newText = data.result;
-      const blocks = parseFountain(scriptText);
-      const updatedBlocks = [...blocks];
+      const updatedBlocks = [...parsedBlocks];
       updatedBlocks[index] = { ...updatedBlocks[index], text: newText };
       const newScript = updatedBlocks.map((b) => b.text).join("\n");
       setScriptText(newScript);
