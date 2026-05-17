@@ -342,6 +342,9 @@ export class Orchestrator {
 
     // ── OCC contagion: emotions diffuse between co-present agents ──
     this.appraiser.applyContagion(location_id);
+    // Suspicion contagion: distressed/fearful agents raise others' suspicion,
+    // weighted by distrust. Runs after Director updates to layer on top correctly.
+    this.appraiser.applySuspicionContagion(location_id);
 
     onProgress?.({ type: 'simulation_complete', totalTurns: turnCount });
   }

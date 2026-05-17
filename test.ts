@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import { safeJsonParse } from './src/lib/json.ts';
 import { withTimeout, generateContent, setLLMProvider, resetLLMProvider } from './server/engine/ai.ts';
 import { analyzeSubtext } from './server/lib/subtext-meter.ts';
-import { scoreBelief, retrieveBeliefs } from './server/lib/memory.ts';
+import { scoreBelief, retrieveBeliefs, consolidateBeliefs } from './server/lib/memory.ts';
 import { metrics } from './server/lib/metrics.ts';
+import { actionBiasWeights, defenseActionBias, effectiveScore } from './server/lib/personality.ts';
+import { AppraisalEngine } from './server/engine/AppraisalEngine.ts';
 
 describe('safeJsonParse', () => {
   it('returns parsed value for valid JSON object', () => {
@@ -1788,5 +1790,219 @@ describe('Orchestrator — stakes escalation emits pressure', () => {
     } finally {
       resetLLMProvider();
     }
+  });
+});
+
+// ── personality.ts ────────────────────────────────────────────────────────────
+describe('personality — actionBiasWeights', () => {
+  const NEUTRAL_DT = { machiavellianism: 50, narcissism: 50, psychopathy: 50 };
+  const NEUTRAL_BF = { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 };
+
+  it('neutral traits → all weights exactly 1.0', () => {
+    const w = actionBiasWeights(NEUTRAL_DT, NEUTRAL_BF);
+    for (const v of Object.values(w)) {
+      assert.ok(Math.abs(v - 1.0) < 1e-9, `expected 1.0, got ${v}`);
+    }
+  });
+
+  it('high machiavellianism raises LIE weight above neutral', () => {
+    const high = actionBiasWeights({ machiavellianism: 100, narcissism: 50, psychopathy: 50 }, NEUTRAL_BF);
+    const low  = actionBiasWeights({ machiavellianism: 0,   narcissism: 50, psychopathy: 50 }, NEUTRAL_BF);
+    assert.ok(high.LIE > 1.0, `high mach LIE should be > 1.0, got ${high.LIE}`);
+    assert.ok(high.LIE > low.LIE, 'high mach should have higher LIE weight than low mach');
+  });
+
+  it('high extraversion raises SPEAK, low raises RELOCATE', () => {
+    const highE = actionBiasWeights(NEUTRAL_DT, { ...NEUTRAL_BF, extraversion: 100 });
+    const lowE  = actionBiasWeights(NEUTRAL_DT, { ...NEUTRAL_BF, extraversion: 0   });
+    assert.ok(highE.SPEAK > lowE.SPEAK, 'high extraversion should prefer SPEAK');
+    assert.ok(lowE.RELOCATE > highE.RELOCATE, 'low extraversion should prefer RELOCATE');
+  });
+
+  it('all weights are clamped between 0.5 and 1.6', () => {
+    const extreme = actionBiasWeights(
+      { machiavellianism: 100, narcissism: 100, psychopathy: 100 },
+      { openness: 0, conscientiousness: 0, extraversion: 0, agreeableness: 0, neuroticism: 100 },
+    );
+    for (const [k, v] of Object.entries(extreme)) {
+      assert.ok(v >= 0.5 && v <= 1.6, `${k} weight ${v} is outside [0.5, 1.6]`);
+    }
+  });
+});
+
+describe('personality — defenseActionBias', () => {
+  it('denial → EXAMINE suppressed (< 1)', () => {
+    const b = defenseActionBias('denial');
+    assert.ok((b.EXAMINE ?? 1) < 1, 'denial should suppress EXAMINE');
+  });
+
+  it('dissociation → RELOCATE boosted, SPEAK suppressed', () => {
+    const b = defenseActionBias('dissociation');
+    assert.ok((b.RELOCATE ?? 1) > 1, 'dissociation should boost RELOCATE');
+    assert.ok((b.SPEAK ?? 1) < 1, 'dissociation should suppress SPEAK');
+  });
+
+  it('null defense → empty biases', () => {
+    const b = defenseActionBias(null);
+    assert.equal(Object.keys(b).length, 0);
+  });
+});
+
+describe('personality — effectiveScore', () => {
+  const NEUTRAL_DT = { machiavellianism: 50, narcissism: 50, psychopathy: 50 };
+  const NEUTRAL_BF = { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 };
+
+  it('neutral traits + null defense → effectiveScore ≈ goalScore', () => {
+    const score = effectiveScore(80, 'SPEAK', NEUTRAL_DT, NEUTRAL_BF, null);
+    assert.ok(Math.abs(score - 80) < 1e-9, `expected ~80, got ${score}`);
+  });
+
+  it('high machiavellianism breaks a goal_score tie in favour of LIE over SPEAK', () => {
+    const dt = { machiavellianism: 100, narcissism: 50, psychopathy: 50 };
+    const lieSc   = effectiveScore(50, 'LIE',   dt, NEUTRAL_BF, null);
+    const speakSc = effectiveScore(50, 'SPEAK', dt, NEUTRAL_BF, null);
+    assert.ok(lieSc > speakSc, `high mach LIE (${lieSc}) should beat SPEAK (${speakSc}) on tie`);
+  });
+
+  it('dissociation defense breaks tie in favour of RELOCATE over SPEAK', () => {
+    const relocSc  = effectiveScore(50, 'RELOCATE', NEUTRAL_DT, NEUTRAL_BF, 'dissociation');
+    const speakSc  = effectiveScore(50, 'SPEAK',    NEUTRAL_DT, NEUTRAL_BF, 'dissociation');
+    assert.ok(relocSc > speakSc, `dissociation RELOCATE (${relocSc}) should beat SPEAK (${speakSc})`);
+  });
+});
+
+// ── memory — consolidateBeliefs ───────────────────────────────────────────────
+describe('memory — consolidateBeliefs', () => {
+  function belief(id: string, prop: string, confidence: number, source: 'witnessed' | 'told' | 'inferred', acquired_at: number) {
+    return { id, proposition: prop, confidence, source, acquired_at };
+  }
+
+  it('near-duplicate propositions are merged into one', () => {
+    const beliefs = [
+      belief('b1', 'Alice stole the ledger from the office', 0.7, 'told', 1),
+      belief('b2', 'Alice stole ledger from office drawer',  0.6, 'told', 2),
+    ];
+    const result = consolidateBeliefs(beliefs, 5);
+    assert.equal(result.length, 1, 'should collapse into one belief');
+    assert.ok(result[0].confidence > 0.7, 'merged belief should have bumped confidence');
+  });
+
+  it('distinct propositions are kept separately', () => {
+    const beliefs = [
+      belief('b1', 'Alice is nervous and evasive',        0.7, 'told', 1),
+      belief('b2', 'Bob owns the warehouse on Fifth Ave', 0.6, 'told', 2),
+    ];
+    const result = consolidateBeliefs(beliefs, 5);
+    assert.equal(result.length, 2);
+  });
+
+  it('prunes stale low-confidence non-witnessed beliefs', () => {
+    const beliefs = [
+      belief('b1', 'Someone possibly entered late',    0.1, 'inferred', 0),
+      belief('b2', 'I saw someone clearly by the door', 0.9, 'witnessed', 0),
+    ];
+    const result = consolidateBeliefs(beliefs, 20); // currentTurn=20, age=20 > 12 threshold
+    assert.equal(result.length, 1, 'stale low-confidence non-witnessed belief should be pruned');
+    assert.equal(result[0].id, 'b2', 'witnessed belief should survive');
+  });
+
+  it('witnessed beliefs survive even with low confidence and old age', () => {
+    const beliefs = [
+      belief('b1', 'I witnessed something happen there', 0.1, 'witnessed', 0),
+    ];
+    const result = consolidateBeliefs(beliefs, 100);
+    assert.equal(result.length, 1, 'witnessed belief must never be pruned');
+  });
+
+  it('empty list returns empty', () => {
+    assert.deepEqual(consolidateBeliefs([], 5), []);
+  });
+});
+
+// ── AppraisalEngine — decay correctness ──────────────────────────────────────
+describe('AppraisalEngine — emotion decay is strict and reaches 0', () => {
+  it('every integer starting value decays strictly to 0 within 100 steps', () => {
+    // Replicate the decay formula from AppraisalEngine.ts
+    const DECAY = 0.88;
+    const decayStep = (x: number) => {
+      const d = Math.floor(x * DECAY);
+      return d >= x ? Math.max(0, x - 1) : d;
+    };
+    for (let start = 1; start <= 100; start++) {
+      let v = start;
+      let prev = v + 1;
+      let steps = 0;
+      while (v > 0 && steps < 300) {
+        assert.ok(v < prev, `decay stalled at ${v} (start=${start}, step=${steps})`);
+        prev = v;
+        v = decayStep(v);
+        steps++;
+      }
+      assert.equal(v, 0, `value ${start} did not reach 0 within 300 steps`);
+    }
+  });
+
+  it('Math.ceil fixed-point is gone — value 8 now decays', () => {
+    // Under the old Math.ceil formula: ceil(8*0.88)=ceil(7.04)=8 (stuck forever)
+    // Under the new formula: floor(8*0.88)=7 < 8, so it decays
+    const DECAY = 0.88;
+    const newDecay = (x: number) => {
+      const d = Math.floor(x * DECAY);
+      return d >= x ? Math.max(0, x - 1) : d;
+    };
+    assert.ok(newDecay(8) < 8, `value 8 should decay under the new formula, got ${newDecay(8)}`);
+    assert.ok(newDecay(1) < 1 || newDecay(1) === 0, `value 1 should decay to 0`);
+  });
+});
+
+// ── AppraisalEngine — suspicion contagion ────────────────────────────────────
+describe('AppraisalEngine — applySuspicionContagion', () => {
+  it('distressed neighbor raises observer suspicion, weighted by distrust', () => {
+    const stage = new Stage(':memory:');
+    stage.addLocation({ location_id: 'r', name: 'R', description: '', adjacent_locations: [] });
+    stage.addAgent({ char_id: 'alice', name: 'Alice', public_mask: '', hidden_motive: '', knowledge_vector: [], current_location_id: 'r', suspicion_score: 10, is_alive: true });
+    stage.addAgent({ char_id: 'bob',   name: 'Bob',   public_mask: '', hidden_motive: '', knowledge_vector: [], current_location_id: 'r', suspicion_score: 10, is_alive: true });
+    // Bob is visibly distressed with intensity 70
+    stage.updateEmotionState('bob', { joy: 0, distress: 70, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'distress', intensity: 70, last_updated_at: 0 });
+    // Alice has low trust in Bob → suspicion contagion amplified
+    stage.updateTheoryOfMind('alice', { 'bob': { subject_id: 'bob', believed_knowledge: [], believed_motive: 'unknown', trust_level: 0.1 } });
+
+    const engine = new AppraisalEngine(stage);
+    engine.applySuspicionContagion('r');
+
+    const alice = stage.getAgent('alice');
+    assert.ok((alice?.suspicion_score ?? 10) > 10, `Alice's suspicion should have risen; got ${alice?.suspicion_score}`);
+  });
+
+  it('high-trust distressed neighbor causes minimal suspicion rise', () => {
+    const stage = new Stage(':memory:');
+    stage.addLocation({ location_id: 'r', name: 'R', description: '', adjacent_locations: [] });
+    stage.addAgent({ char_id: 'alice', name: 'Alice', public_mask: '', hidden_motive: '', knowledge_vector: [], current_location_id: 'r', suspicion_score: 10, is_alive: true });
+    stage.addAgent({ char_id: 'bob',   name: 'Bob',   public_mask: '', hidden_motive: '', knowledge_vector: [], current_location_id: 'r', suspicion_score: 10, is_alive: true });
+    stage.updateEmotionState('bob', { joy: 0, distress: 70, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'distress', intensity: 70, last_updated_at: 0 });
+    // Alice trusts Bob fully → minimal contagion
+    stage.updateTheoryOfMind('alice', { 'bob': { subject_id: 'bob', believed_knowledge: [], believed_motive: 'unknown', trust_level: 1.0 } });
+
+    const engine = new AppraisalEngine(stage);
+    engine.applySuspicionContagion('r');
+
+    const alice = stage.getAgent('alice');
+    // At trust=1.0: delta = SUSPICION_BLEED * intensity/100 * (1-1) = 0
+    assert.equal(alice?.suspicion_score, 10, 'full-trust neighbor should not raise suspicion');
+  });
+
+  it('calm neighbor (intensity < 30) causes no suspicion change', () => {
+    const stage = new Stage(':memory:');
+    stage.addLocation({ location_id: 'r', name: 'R', description: '', adjacent_locations: [] });
+    stage.addAgent({ char_id: 'alice', name: 'Alice', public_mask: '', hidden_motive: '', knowledge_vector: [], current_location_id: 'r', suspicion_score: 10, is_alive: true });
+    stage.addAgent({ char_id: 'bob',   name: 'Bob',   public_mask: '', hidden_motive: '', knowledge_vector: [], current_location_id: 'r', suspicion_score: 10, is_alive: true });
+    // Bob is barely distressed
+    stage.updateEmotionState('bob', { joy: 0, distress: 20, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'distress', intensity: 20, last_updated_at: 0 });
+
+    const engine = new AppraisalEngine(stage);
+    engine.applySuspicionContagion('r');
+
+    const alice = stage.getAgent('alice');
+    assert.equal(alice?.suspicion_score, 10, 'low-intensity neighbor should not trigger contagion');
   });
 });

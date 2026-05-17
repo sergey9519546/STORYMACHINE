@@ -237,7 +237,7 @@ From ${observer.name}'s perspective only:
         },
       },
     }, { label: `evaluatePerspective:${observer_id}`, timeoutMs: 30_000 }).catch(err => {
-      console.error(`[Director] evaluatePerspective fallback: ${(err as Error).message}`);
+      logger.error('director_eval_error', { observer_id, message: (err as Error).message });
       return null;
     });
 

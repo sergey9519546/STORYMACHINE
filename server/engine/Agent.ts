@@ -2,6 +2,7 @@ import { Type } from '@google/genai';
 import { randomUUID } from 'crypto';
 import { getModel, getTemperature, generateContent } from './ai.ts';
 import { STYLE_MODIFIERS } from '../lib/structure-presets.ts';
+import { effectiveScore, type ActionType } from '../lib/personality.ts';
 import type {
   CharacterSheet,
   NarrativeAction,
@@ -24,7 +25,7 @@ import type {
 import { Stage } from './Stage.ts';
 import { safeJsonParse } from '../lib/json.ts';
 import { logger } from '../lib/logger.ts';
-import { retrieveBeliefs } from '../lib/memory.ts';
+import { retrieveBeliefs, consolidateBeliefs } from '../lib/memory.ts';
 
 // ── Psychology prompt helpers ────────────────────────────────────────────────
 
@@ -248,12 +249,23 @@ export class Agent {
       logger.warn('agent_parse_fallback', { agent: this.sheet.name, method: 'takeTurn', preview: rawText.substring(0, 120) });
     }
 
+    // Re-rank candidates by personality + defense-adjusted effective score.
+    // The LLM's goal_score still dominates — personality is a nudge, not a veto.
+    const dt = this.sheet.darkTriad ?? { machiavellianism: 50, narcissism: 50, psychopathy: 50 };
+    const bf = this.sheet.bigFive ?? { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 };
+    const activeDefense = selectActiveDefense(this.sheet.defenseMechanisms, this.sheet.emotionState);
+    const VALID_ACTIONS = new Set<string>(['SPEAK', 'EXAMINE', 'LIE', 'RELOCATE']);
     const best = (raw.candidates ?? []).reduce<Candidate>(
-      (top, c) => ((c.goal_score ?? 0) > (top.goal_score ?? 0) ? c : top),
+      (top, c) => {
+        const cType = VALID_ACTIONS.has(c.action_type) ? c.action_type as ActionType : 'SPEAK';
+        const tType = VALID_ACTIONS.has(top.action_type) ? top.action_type as ActionType : 'SPEAK';
+        const cScore = effectiveScore(c.goal_score ?? 0, cType, dt, bf, activeDefense);
+        const tScore = effectiveScore(top.goal_score ?? 0, tType, dt, bf, activeDefense);
+        return cScore > tScore ? c : top;
+      },
       (raw.candidates ?? [])[0] ?? { action_type: 'SPEAK', content: '', target: null },
     );
 
-    const VALID_ACTIONS = new Set<string>(['SPEAK', 'EXAMINE', 'LIE', 'RELOCATE']);
     return {
       action_type: VALID_ACTIONS.has(best.action_type)
         ? best.action_type as NarrativeAction['action_type']
@@ -641,8 +653,16 @@ Based on what you just witnessed:
         };
       });
 
-    if (freshBeliefs.length > 0) {
-      this.stage.updateAgentBeliefs(this.sheet.char_id, [...existingBeliefs, ...freshBeliefs]);
+    const mergedBeliefs = [...existingBeliefs, ...freshBeliefs];
+    const currentTurn = this.stage.getTurnCount();
+
+    // Every 5 turns: consolidate near-duplicates and prune stale low-confidence beliefs.
+    const finalBeliefs = (currentTurn > 0 && currentTurn % 5 === 0)
+      ? consolidateBeliefs(mergedBeliefs, currentTurn)
+      : mergedBeliefs;
+
+    if (finalBeliefs.length !== existingBeliefs.length || freshBeliefs.length > 0) {
+      this.stage.updateAgentBeliefs(this.sheet.char_id, finalBeliefs);
       // Also add high-confidence beliefs to legacy knowledge_vector
       const highConf = freshBeliefs.filter(b => b.confidence >= 0.7).map(b => b.proposition);
       if (highConf.length > 0) this.stage.updateAgentKnowledge(this.sheet.char_id, highConf);

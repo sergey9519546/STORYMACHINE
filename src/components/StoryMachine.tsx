@@ -159,20 +159,27 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const submitScenario = useCallback(async (payload: { nodes: Location[]; agents: CharacterSheet[] }) => {
     setShowBuilder(false);
     setLoading(true);
-    // Reset first so a new scenario never inherits stale agents/ledger from a
-    // prior session (sessions now persist to disk between server restarts).
-    await fetch("/api/reset", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    await fetch("/api/init", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    await refreshAll();
-    setLoading(false);
+    try {
+      // Reset first so a new scenario never inherits stale agents/ledger from a
+      // prior session (sessions now persist to disk between server restarts).
+      const resetRes = await fetch("/api/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!resetRes.ok) throw new Error(`Reset failed: ${resetRes.status}`);
+      const initRes = await fetch("/api/init", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!initRes.ok) throw new Error(`Init failed: ${initRes.status}`);
+      await refreshAll();
+    } catch (e) {
+      console.error("[submitScenario]", e);
+    } finally {
+      setLoading(false);
+    }
   }, [refreshAll]);
 
   // The original hardcoded scenario, now offered as a one-click preset.
@@ -294,6 +301,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
     setIsExporting(true);
     try {
       const res = await fetch(`/api/ledger/fountain?syuzhet=${syuzhetMode}`);
+      if (!res.ok) throw new Error(`Export failed: ${res.status}`);
       const data = await res.json() as {
         fountain: string;
         characters: Array<{ name: string; ghost: string; lie: string; want: string; need: string }>;
@@ -310,6 +318,8 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
         a.click();
         URL.revokeObjectURL(url);
       }
+    } catch (e) {
+      console.error("[handleExport]", e);
     } finally {
       setIsExporting(false);
     }

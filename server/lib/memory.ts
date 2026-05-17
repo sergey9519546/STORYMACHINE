@@ -46,6 +46,69 @@ export function scoreBelief(
   return 0.35 * recency + 0.35 * importance + 0.30 * relevance;
 }
 
+// ── Memory consolidation & forgetting ───────────────────────────────────────
+// Merges near-duplicate beliefs and prunes stale low-confidence ones.
+// Called every 5 turns from Agent.updateEpistemics to keep the belief list lean.
+// Pure: takes beliefs in, returns the consolidated list. Never mutates in place.
+//
+// Merge rule: two beliefs whose content-word Jaccard overlap ≥ 0.6 are
+//   collapsed into one — keep the higher-confidence version, bump confidence
+//   by +0.05 (capped at 1), preserve earliest acquired_at, union contradicts.
+// Prune rule: drop if confidence < 0.2 AND age > 12 turns,
+//   UNLESS source === 'witnessed' (first-hand facts are permanent).
+export function consolidateBeliefs(beliefs: Belief[], currentTurn: number): Belief[] {
+  if (beliefs.length === 0) return beliefs;
+
+  const jaccard = (a: string, b: string): number => {
+    const wa = contentWords(a);
+    const wb = contentWords(b);
+    if (wa.size === 0 && wb.size === 0) return 0;
+    let inter = 0;
+    for (const w of wa) if (wb.has(w)) inter++;
+    return inter / (wa.size + wb.size - inter);
+  };
+
+  // Greedy merge pass: iterate through beliefs in acquisition order; merge any
+  // later belief that strongly overlaps an already-kept belief.
+  const kept: Belief[] = [];
+  const merged = new Set<string>(); // ids already absorbed
+
+  for (let i = 0; i < beliefs.length; i++) {
+    if (merged.has(beliefs[i].id)) continue;
+    let base = { ...beliefs[i] };
+
+    for (let j = i + 1; j < beliefs.length; j++) {
+      if (merged.has(beliefs[j].id)) continue;
+      if (jaccard(base.proposition, beliefs[j].proposition) >= 0.6) {
+        // Keep the higher-confidence one as the base; bump confidence slightly.
+        if (beliefs[j].confidence > base.confidence) {
+          base = {
+            ...beliefs[j],
+            acquired_at: Math.min(base.acquired_at, beliefs[j].acquired_at),
+            contradicts: [...new Set([...(base.contradicts ?? []), ...(beliefs[j].contradicts ?? [])])],
+          };
+        } else {
+          base = {
+            ...base,
+            contradicts: [...new Set([...(base.contradicts ?? []), ...(beliefs[j].contradicts ?? [])])],
+          };
+        }
+        base = { ...base, confidence: Math.min(1, base.confidence + 0.05) };
+        merged.add(beliefs[j].id);
+      }
+    }
+
+    kept.push(base);
+  }
+
+  // Prune pass: remove stale low-confidence non-witnessed beliefs.
+  return kept.filter(b => {
+    if (b.source === 'witnessed') return true;
+    const age = currentTurn - (b.acquired_at ?? 0);
+    return !(b.confidence < 0.2 && age > 12);
+  });
+}
+
 // Ranks beliefs by retrieval score against the current scene and returns the
 // top `limit`. `contextText` should be the recent conversation transcript so
 // beliefs relevant to what is being discussed surface first.

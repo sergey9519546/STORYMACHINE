@@ -36,6 +36,11 @@ export class Stage {
 
   constructor(dbPath: string = ':memory:') {
     this.db = new Database(dbPath);
+    // WAL mode: better concurrent read performance, no "database is locked" errors.
+    // NORMAL synchronous: safe for single-process use and avoids full fsync overhead.
+    // Skip for :memory: — pragmas don't persist there but the calls are harmless.
+    this.db.pragma('journal_mode = WAL');
+    this.db.pragma('synchronous = NORMAL');
     this.initSchema();
     this.runMigrations();
   }
@@ -394,15 +399,20 @@ export class Stage {
     `).all(...params) as Array<Record<string, unknown>>;
     if (rows.length === 0) return [];
 
-    // One query for every agent's knowledge facts, grouped in memory.
+    // One query for the fetched agents' knowledge facts, grouped in memory.
+    // Filter by char_id IN (...) so we don't load knowledge for agents in other locations.
+    const charIds = rows.map(r => r.char_id as string);
     const knowledgeByAgent = new Map<string, string[]>();
-    const knowledgeRows = this.db.prepare(
-      'SELECT char_id, fact_description FROM Knowledge_Ledger'
-    ).all() as Array<{ char_id: string; fact_description: string }>;
-    for (const k of knowledgeRows) {
-      const list = knowledgeByAgent.get(k.char_id);
-      if (list) list.push(k.fact_description);
-      else knowledgeByAgent.set(k.char_id, [k.fact_description]);
+    if (charIds.length > 0) {
+      const placeholders = charIds.map(() => '?').join(',');
+      const knowledgeRows = this.db.prepare(
+        `SELECT char_id, fact_description FROM Knowledge_Ledger WHERE char_id IN (${placeholders})`
+      ).all(...charIds) as Array<{ char_id: string; fact_description: string }>;
+      for (const k of knowledgeRows) {
+        const list = knowledgeByAgent.get(k.char_id);
+        if (list) list.push(k.fact_description);
+        else knowledgeByAgent.set(k.char_id, [k.fact_description]);
+      }
     }
 
     return rows.map(r => this._rowToSheet(r, knowledgeByAgent.get(r.char_id as string) ?? []));

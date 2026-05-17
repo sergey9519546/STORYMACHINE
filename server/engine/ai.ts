@@ -116,8 +116,9 @@ export async function generateContent(
   const { label, timeoutMs = 30_000, maxAttempts = 3 } = opts;
   const started = Date.now();
   let ok = false;
+  let res: GenerateContentResponse | undefined;
   try {
-    const res = await withRetry(
+    res = await withRetry(
       () => withTimeout(_provider.generate(params), timeoutMs, label),
       label,
       maxAttempts,
@@ -125,6 +126,11 @@ export async function generateContent(
     ok = true;
     return res;
   } finally {
-    metrics.recordAiCall(label, Date.now() - started, ok);
+    metrics.recordAiCall(
+      label,
+      Date.now() - started,
+      ok,
+      res ? (res as GenerateContentResponse & { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }).usageMetadata : undefined,
+    );
   }
 }

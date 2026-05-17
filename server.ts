@@ -88,7 +88,7 @@ async function generateImageServer(ai: GoogleGenAI, prompt: string): Promise<str
       }
     }
   } catch (e) {
-    console.error('Image generation failed:', (e as Error).message);
+    logger.error('image_generation_failed', { message: (e as Error).message });
   }
   return undefined;
 }
@@ -123,7 +123,7 @@ async function generateAudioServer(ai: GoogleGenAI, text: string): Promise<strin
     }
     return `data:${mimeType};base64,${base64Data}`;
   } catch (e) {
-    console.error('Audio generation failed:', (e as Error).message);
+    logger.error('audio_generation_failed', { message: (e as Error).message });
   }
   return undefined;
 }
@@ -1288,9 +1288,25 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     console.error(`FATAL: Invalid PORT value "${process.env.PORT}". Must be 1–65535.`);
     process.exit(1);
   }
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
+
+  // ── Graceful shutdown ────────────────────────────────────────────────────────
+  const shutdown = (signal: string) => {
+    logger.info('server_shutdown', { signal });
+    server.close(() => {
+      // Close all SQLite handles before exiting so WAL files are flushed cleanly.
+      for (const { stage } of sessions.values()) {
+        try { stage.close(); } catch { /* already closed */ }
+      }
+      process.exit(0);
+    });
+    // Hard-kill after 10s if in-flight requests haven't drained.
+    setTimeout(() => process.exit(1), 10_000).unref();
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT',  () => shutdown('SIGINT'));
 }
 
 startServer();
