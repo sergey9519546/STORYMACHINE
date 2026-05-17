@@ -391,6 +391,16 @@ export class CausalSpine {
       revelation:              'parity',
       turning_point:           'parity',
     };
+
+    // Compute audience information position dynamically: if the causal chain
+    // contains an unexposed lie (is_lie=true, perceived_truth=true), the
+    // audience has superior knowledge — they know a deception the characters don't.
+    let audiencePosition = params.informationPosition ?? defaultPosition[params.beatType];
+    if (!params.informationPosition && params.causalChain.length > 0) {
+      const hasHiddenLie = this.stage.hasUnexposedLiesInChain(params.causalChain);
+      if (hasHiddenLie) audiencePosition = 'superior';
+    }
+
     const trace: BeatTrace = {
       beat_id: randomUUID(),
       turn_index: this.stage.getTurnCount(),
@@ -401,7 +411,7 @@ export class CausalSpine {
       causal_chain: params.causalChain,
       narrative_summary: params.narrativeSummary,
       fountain_hint: params.fountainHint,
-      information_position: params.informationPosition ?? defaultPosition[params.beatType],
+      information_position: audiencePosition,
     };
     this.stage.addBeatTrace(trace);
     return trace;

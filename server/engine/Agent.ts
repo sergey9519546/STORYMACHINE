@@ -15,6 +15,7 @@ import type {
   DefenseMechanism,
   BeliefSource,
   EpistemicUpdate,
+  EmotionState,
   Goal,
   GoalStack,
   GoalMutation,
@@ -85,15 +86,40 @@ function describeActionBias(
   return lines.length > 0 ? lines.join(' ') : 'Choose whichever action best serves your immediate goal.';
 }
 
-function deriveSpeechPattern(bigFive: BigFive | undefined): string {
-  if (!bigFive) return '';
+function deriveSpeechPattern(bigFive: BigFive | undefined, darkTriad?: DarkTriad, emotionState?: EmotionState): string {
   const cues: string[] = [];
-  if (bigFive.openness > 70)           cues.push('Use complex vocabulary and abstract metaphors.');
-  if (bigFive.conscientiousness > 70)  cues.push('Speak precisely; complete your thoughts; cite specific facts and timelines.');
-  if (bigFive.extraversion > 70)       cues.push('Fill silences; speak at length; assert rather than question.');
-  else if (bigFive.extraversion < 30)  cues.push('Speak in short bursts; let silences do work for you.');
-  if (bigFive.agreeableness > 70)      cues.push('Hedge statements; ask clarifying questions; avoid direct confrontation.');
-  if (bigFive.neuroticism > 70)        cues.push('Speech fragments under stress; emotion bleeds into your word choice.');
+
+  // Big Five base patterns
+  if (bigFive) {
+    if (bigFive.openness > 70)           cues.push('Use complex vocabulary and abstract metaphors.');
+    if (bigFive.conscientiousness > 70)  cues.push('Speak precisely; complete your thoughts; cite specific facts and timelines.');
+    if (bigFive.extraversion > 70)       cues.push('Fill silences; speak at length; assert rather than question.');
+    else if (bigFive.extraversion < 30)  cues.push('Speak in short bursts; let silences do work for you.');
+    if (bigFive.agreeableness > 70)      cues.push('Hedge statements; ask clarifying questions; avoid direct confrontation.');
+    if (bigFive.neuroticism > 70)        cues.push('Speech fragments under stress; emotion bleeds into your word choice.');
+  }
+
+  // Dark Triad voice signatures (override / layer on top of Big Five)
+  if (darkTriad) {
+    if (darkTriad.machiavellianism > 65)
+      cues.push('Every sentence has a hidden purpose — probe for information, test reactions, never tip your hand.');
+    if (darkTriad.narcissism > 65)
+      cues.push('Refer back to yourself often; frame events around your own exceptional qualities or suffering.');
+    if (darkTriad.psychopathy > 65)
+      cues.push('Speak flatly and without emotional color; treat others\' distress as data, not feeling.');
+  }
+
+  // Emotion-inflected micropatterns (only when intensity is significant)
+  if (emotionState && emotionState.intensity >= 30) {
+    switch (emotionState.dominant) {
+      case 'fear':     cues.push('Let sentences trail off — incomplete thoughts, rushed qualifications.'); break;
+      case 'anger':    cues.push('Short. Punchy. Monosyllabic. Cut people off.'); break;
+      case 'shame':    cues.push('Avoid eye-contact language; keep redirecting to other topics.'); break;
+      case 'pride':    cues.push('Slow deliberate cadence — savor each word as if performing.'); break;
+      case 'distress': cues.push('Over-explain; repeat yourself; circle back to the same point.'); break;
+    }
+  }
+
   return cues.join(' ');
 }
 
@@ -237,12 +263,17 @@ export class Agent {
     otherAgents: CharacterSheet[],
   ): string {
     // ── History block (numbered so updateEpistemics can reference by index) ──
+    // Older entries are compacted (first 80 chars of content) to reduce token use
+    // while keeping recent events verbatim for accurate epistemic referencing.
+    const VERBATIM_WINDOW = 5;
     const historyStr = history.length === 0
       ? '(Silence. You are the first to speak.)'
       : history.map((e, i) => {
           const name = this.stage.getAgent(e.char_id)?.name ?? 'Unknown';
-          const tag = e.action_type === 'LIE' ? 'SPEAK' : e.action_type; // LIE appears as SPEAK to observers
-          return `[${i}] [${tag}] ${name}: ${e.content}`;
+          const tag = e.action_type === 'LIE' ? 'SPEAK' : e.action_type;
+          const isRecent = i >= history.length - VERBATIM_WINDOW;
+          const content = isRecent ? e.content : e.content.slice(0, 80) + (e.content.length > 80 ? '…' : '');
+          return `[${i}] [${tag}] ${name}: ${content}`;
         }).join('\n');
 
     // ── Beliefs block (top 10 by confidence) ──
@@ -284,7 +315,7 @@ export class Agent {
 
     // ── Psychology block ──
     const actionBias = describeActionBias(this.sheet.darkTriad, this.sheet.attachmentStyle, this.sheet.suspicion_score);
-    const speechPattern = deriveSpeechPattern(this.sheet.bigFive);
+    const speechPattern = deriveSpeechPattern(this.sheet.bigFive, this.sheet.darkTriad, this.sheet.emotionState);
     const defenseLevel = computeDefenseLevel(this.sheet.bigFive?.neuroticism ?? 50, this.sheet.suspicion_score);
 
     const currentTurn = this.stage.getTurnCount();

@@ -5,6 +5,7 @@ import { safeJsonParse } from '../../src/lib/json.ts';
 import { randomUUID } from 'crypto';
 import { getAI, getModel, withTimeout } from './ai.ts';
 import { expectedTensionAt, STYLE_MODIFIERS } from '../lib/structure-presets.ts';
+import { analyzeSubtext } from '../lib/subtext-meter.ts';
 
 export class DirectorNode {
   private stage: Stage;
@@ -136,6 +137,9 @@ export class DirectorNode {
 
     // ── J: Belief-Edge pressure — read high-severity edges, emit canonical pressure ──
     this._checkBeliefEdges(location_id);
+
+    // ── K: Subtext meter — flag on-the-nose dialogue; emit COOL pressure when score is high ──
+    this._checkSubtext(location_id, recentActions);
 
     // Persist tension state so arc-deviation and pivot detection survive restarts.
     this.stage.saveDirectorTensionState(this._tensionAccumulator, this._tensionHistory);
@@ -665,6 +669,46 @@ From ${observer.name}'s perspective only:
       });
 
       console.log(`[Director] High-severity edge (${worst.severity?.toFixed(0)}) → CONFRONT pressure on ${agent.name} [style: ${state.director_style ?? 'none'}]`);
+    }
+  }
+
+  // ── K: Subtext meter ─────────────────────────────────────────────────────────
+  // Scores on-the-nose dialogue in the current round and emits a COOL pressure
+  // when the score exceeds 60, nudging agents toward indirection and subtext.
+  private _checkSubtext(location_id: string, recentActions: ActionLogEntry[]): void {
+    const dialogue = recentActions
+      .filter(a => a.action_type === 'SPEAK' || a.action_type === 'LIE')
+      .map(a => a.content);
+    if (dialogue.length === 0) return;
+
+    const analysis = analyzeSubtext(dialogue);
+    const turnIndex = this.stage.getTurnCount();
+
+    console.log(`[Director] Subtext score: ${analysis.score}/100 (${analysis.onTheNoseCount} otn / ${analysis.subtextCount} subtext across ${analysis.totalLines} lines)`);
+
+    if (analysis.score >= 60) {
+      const agents = this.stage.getAgentsInLocation(location_id).filter(a => a.is_alive);
+      const triggerEventId = recentActions[recentActions.length - 1]?.action_id ?? randomUUID();
+      const hint = analysis.worstLine
+        ? `Dialogue is becoming too direct. The line "${analysis.worstLine.slice(0, 80)}..." is on-the-nose. Displace the real tension onto an object, a memory, or a question. Say less, mean more.`
+        : `Dialogue is becoming too direct. Displace the real tension onto subtext — let what is NOT said do the work.`;
+
+      for (const agent of agents) {
+        // Don't stack COOL pressures already active for this agent
+        const existing = this.stage.getActivePressures(agent.char_id);
+        if (existing.some(p => p.pressure_type === 'COOL')) continue;
+        this.stage.addDramaticPressure({
+          pressure_id: randomUUID(),
+          target_char_id: agent.char_id,
+          trigger_event_id: triggerEventId,
+          pressure_type: 'COOL',
+          intensity: Math.min(100, analysis.score),
+          bias_hint: hint,
+          expires_at_turn: turnIndex + 2,
+          applied: false,
+        });
+      }
+      console.log(`[Director] COOL pressure emitted to ${agents.length} agent(s) — subtext score ${analysis.score}`);
     }
   }
 

@@ -667,6 +667,17 @@ export class Stage {
       .map(r => this._parsePropositionRow(r));
   }
 
+  // Returns true if any proposition tied to one of the given event_ids is an
+  // unexposed lie — audience knows the ground truth, characters do not.
+  public hasUnexposedLiesInChain(eventIds: string[]): boolean {
+    if (eventIds.length === 0) return false;
+    const placeholders = eventIds.map(() => '?').join(',');
+    const row = this.db.prepare(
+      `SELECT 1 FROM Event_Propositions WHERE event_id IN (${placeholders}) AND is_lie = 1 AND perceived_truth = 1 LIMIT 1`
+    ).get(...eventIds as [string, ...string[]]);
+    return row != null;
+  }
+
   public addBeliefEdge(edge: BeliefEdge): void {
     this.db.prepare(`
       INSERT OR IGNORE INTO Belief_Edges (edge_id, from_belief_id, to_belief_id, edge_type, discovered_by, source_event_id, turn_index, severity)
