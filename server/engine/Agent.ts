@@ -301,7 +301,13 @@ export class Agent {
       ? tomEntries.map(tom => {
           const name = this.stage.getAgent(tom.subject_id)?.name ?? tom.subject_id;
           const knowledge = tom.believed_knowledge.slice(0, 3).map(k => `"${k}"`).join(', ');
-          return `  - ${name}: trust=${Math.round(tom.trust_level * 100)}%, motive="${tom.believed_motive}", I think they know: [${knowledge}]`;
+          const relParts: string[] = [`trust=${Math.round(tom.trust_level * 100)}%`];
+          if (tom.affinity !== undefined) relParts.push(`affinity=${Math.round(tom.affinity * 100)}%`);
+          if (tom.power_balance !== undefined) relParts.push(`power=${tom.power_balance < 0.4 ? 'they dominate' : tom.power_balance > 0.6 ? 'I dominate' : 'equal'}`);
+          if (tom.debt !== undefined && tom.debt > 0.1) relParts.push(`debt=${Math.round(tom.debt * 100)}%`);
+          const history = tom.shared_history?.slice(-2).map(e => `"${e}"`).join(', ');
+          if (history) relParts.push(`history=[${history}]`);
+          return `  - ${name}: ${relParts.join(', ')}, motive="${tom.believed_motive}", I think they know: [${knowledge}]`;
         }).join('\n')
       : '  (You have not yet formed models of the others here.)';
 
@@ -532,7 +538,11 @@ Based on what you just witnessed:
                   agent_name: { type: Type.STRING },
                   believed_motive: { type: Type.STRING },
                   trust_level: { type: Type.NUMBER, description: '0.0-1.0' },
+                  affinity: { type: Type.NUMBER, nullable: true, description: '0.0-1.0: emotional warmth/liking' },
+                  power_balance: { type: Type.NUMBER, nullable: true, description: '0=they dominate, 0.5=equal, 1=I dominate' },
+                  debt: { type: Type.NUMBER, nullable: true, description: '0.0-1.0: obligation I feel toward them' },
                   new_believed_knowledge: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  shared_history_event: { type: Type.STRING, nullable: true, description: 'A memorable joint event to add to shared history, or null.' },
                 },
                 required: ['agent_name', 'believed_motive', 'trust_level'],
               },
@@ -580,7 +590,16 @@ Based on what you just witnessed:
     const result = safeJsonParse<{
       newSuspicionScore: number;
       newBeliefs: Array<{ proposition: string; confidence: number; source: string; source_action_index?: number | null }>;
-      updatedTheoryOfMind: Array<{ agent_name: string; believed_motive: string; trust_level: number; new_believed_knowledge?: string[] }>;
+      updatedTheoryOfMind: Array<{
+        agent_name: string;
+        believed_motive: string;
+        trust_level: number;
+        affinity?: number | null;
+        power_balance?: number | null;
+        debt?: number | null;
+        new_believed_knowledge?: string[];
+        shared_history_event?: string | null;
+      }>;
       contradiction_detected: boolean;
       contradicted_propositions: string[];
       goal_stack_update?: { add_subgoal?: string | null; mark_achieved?: string | null } | null;
@@ -639,6 +658,9 @@ Based on what you just witnessed:
         if (!targetAgent) continue;
         observedIds.add(targetAgent.char_id);
         const existing = currentToM[targetAgent.char_id];
+        const clamp01 = (v: number | null | undefined) =>
+          typeof v === 'number' ? Math.max(0, Math.min(1, v)) : undefined;
+        const newHistoryEvent = entry.shared_history_event?.trim() || null;
         currentToM[targetAgent.char_id] = {
           subject_id: targetAgent.char_id,
           believed_motive: entry.believed_motive,
@@ -647,6 +669,12 @@ Based on what you just witnessed:
             ...(existing?.believed_knowledge ?? []),
             ...(entry.new_believed_knowledge ?? []),
           ].slice(0, 20),
+          affinity: clamp01(entry.affinity) ?? existing?.affinity,
+          power_balance: clamp01(entry.power_balance) ?? existing?.power_balance,
+          debt: clamp01(entry.debt) ?? existing?.debt,
+          shared_history: newHistoryEvent
+            ? [...(existing?.shared_history ?? []), newHistoryEvent].slice(-10)
+            : existing?.shared_history,
         } satisfies TheoryOfMind;
       }
 

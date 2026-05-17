@@ -91,7 +91,13 @@ export interface TheoryOfMind {
   subject_id: string;
   believed_knowledge: string[];  // what I think they know
   believed_motive: string;       // my model of their goal
-  trust_level: number;           // 0–1
+  trust_level: number;           // 0–1: general trust/distrust
+
+  // Relationship graph dimensions (all 0–1 unless noted)
+  affinity?: number;          // emotional warmth / liking
+  power_balance?: number;     // 0=they dominate, 0.5=equal, 1=I dominate
+  debt?: number;              // perceived obligation owed to subject (0–1)
+  shared_history?: string[];  // memorable joint events shaping this relationship
 }
 
 // ── Goal system ──────────────────────────────────────────────────────────────
