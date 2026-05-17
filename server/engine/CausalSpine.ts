@@ -66,6 +66,53 @@ export class CausalSpine {
     return card;
   }
 
+  // 1b. EXAMINE action: deterministically reveal any unexposed lies by the target.
+  //     Returns witnessed Belief[] for the examiner (empty if no lies found).
+  //     Also flips perceived_truth on exposed propositions so they are permanently
+  //     marked as discovered — subsequent observers and snapshots reflect this.
+  public processExamine(
+    examinerId: string,
+    targetId: string,
+    locationId: string,
+    actionId: string,
+  ): Belief[] {
+    const lies = this.stage.getUnexposedLiesByAgent(targetId, locationId);
+    if (lies.length === 0) return [];
+
+    const target = this.stage.getAgent(targetId);
+    const targetName = target?.name ?? targetId;
+    const turnIndex = this.stage.getTurnCount();
+
+    const newBeliefs: Belief[] = [];
+    for (const lie of lies) {
+      // Flip the proposition's perceived_truth so it's permanently exposed
+      this.stage.setPropositionPerceivedTruth(lie.proposition_id, false);
+
+      // Create a witnessed belief for the examiner contradicting the original claim
+      newBeliefs.push({
+        id: randomUUID(),
+        proposition: `${targetName}'s statement "${lie.content}" was a deliberate lie`,
+        confidence: 1.0,
+        source: 'witnessed' as const,
+        source_agent_id: targetId,
+        source_event_id: actionId,
+        acquired_at: turnIndex,
+      });
+    }
+
+    // Merge the new beliefs into the examiner's belief set
+    const examiner = this.stage.getAgent(examinerId);
+    if (examiner && newBeliefs.length > 0) {
+      const existingProps = new Set((examiner.beliefs ?? []).map(b => b.proposition.toLowerCase()));
+      const fresh = newBeliefs.filter(b => !existingProps.has(b.proposition.toLowerCase()));
+      if (fresh.length > 0) {
+        this.stage.updateAgentBeliefs(examinerId, [...(examiner.beliefs ?? []), ...fresh]);
+      }
+    }
+
+    return newBeliefs;
+  }
+
   // 2. After a belief update: if contradiction was detected, find existing beliefs
   //    that conflict with the new ones, create BeliefEdge rows, and update
   //    Belief.contradicts[] so the graph has real edges.

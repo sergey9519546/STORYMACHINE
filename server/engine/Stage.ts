@@ -553,6 +553,63 @@ export class Stage {
     ).all(agent_id, limit) as PersuasionRecord[];
   }
 
+  // Most recent persuasion attempt targeting this agent (by ANY agent).
+  public getInboundPersuasion(target_id: string): PersuasionRecord | undefined {
+    return this.db.prepare(
+      'SELECT * FROM Persuasion_Log WHERE target_id = ? ORDER BY turn DESC LIMIT 1',
+    ).get(target_id) as PersuasionRecord | undefined;
+  }
+
+  public getAllPersuasionLog(): PersuasionRecord[] {
+    return this.db.prepare('SELECT * FROM Persuasion_Log ORDER BY turn ASC').all() as PersuasionRecord[];
+  }
+
+  public getAllDramaticPressures(): DramaticPressure[] {
+    const currentTurn = this.getTurnCount();
+    return (this.db.prepare('SELECT * FROM Dramatic_Pressure ORDER BY expires_at_turn ASC').all() as Array<Record<string, unknown>>)
+      .filter(r => (r.expires_at_turn as number) > currentTurn)
+      .map(r => ({
+        pressure_id: r.pressure_id as string,
+        target_char_id: r.target_char_id as string,
+        source_char_id: r.source_char_id as string | undefined,
+        trigger_event_id: r.trigger_event_id as string,
+        pressure_type: r.pressure_type as DramaticPressure['pressure_type'],
+        intensity: r.intensity as number,
+        bias_hint: r.bias_hint as string,
+        expires_at_turn: r.expires_at_turn as number,
+        applied: (r.applied as number) === 1,
+      }));
+  }
+
+  // INSERT OR IGNORE for snapshot import (addDramaticPressure uses INSERT, not safe for re-import).
+  public _insertRawPressure(pressure: DramaticPressure): void {
+    this.db.prepare(`
+      INSERT OR IGNORE INTO Dramatic_Pressure
+        (pressure_id, target_char_id, source_char_id, trigger_event_id,
+         pressure_type, intensity, bias_hint, expires_at_turn, applied)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      pressure.pressure_id, pressure.target_char_id, pressure.source_char_id ?? null,
+      pressure.trigger_event_id, pressure.pressure_type, pressure.intensity,
+      pressure.bias_hint, pressure.expires_at_turn, pressure.applied ? 1 : 0,
+    );
+  }
+
+  public _insertRawPersuasion(record: PersuasionRecord): void {
+    this.db.prepare(`
+      INSERT OR IGNORE INTO Persuasion_Log (id, agent_id, target_id, strategy, turn)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(record.id, record.agent_id, record.target_id, record.strategy, record.turn);
+  }
+
+  public _insertRawEventProposition(p: EventProposition): void {
+    this.db.prepare(`
+      INSERT OR IGNORE INTO Event_Propositions
+        (proposition_id, event_id, content, is_lie, asserted_by, perceived_truth)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(p.proposition_id, p.event_id, p.content, p.is_lie ? 1 : 0, p.asserted_by, p.perceived_truth ? 1 : 0);
+  }
+
   // ── Causal-Epistemic Spine ───────────────────────────────────────────────────
 
   public recordEventCard(card: Omit<EventCard, 'propositions'>): void {
@@ -574,14 +631,40 @@ export class Stage {
 
   public getEventPropositions(event_id: string): EventProposition[] {
     const rows = this.db.prepare('SELECT * FROM Event_Propositions WHERE event_id = ?').all(event_id) as Array<Record<string, unknown>>;
-    return rows.map(r => ({
+    return rows.map(r => this._parsePropositionRow(r));
+  }
+
+  private _parsePropositionRow(r: Record<string, unknown>): EventProposition {
+    return {
       proposition_id: r.proposition_id as string,
       event_id: r.event_id as string,
       content: r.content as string,
       is_lie: (r.is_lie as number) === 1,
       asserted_by: r.asserted_by as string,
       perceived_truth: (r.perceived_truth as number) === 1,
-    }));
+    };
+  }
+
+  // All unexposed lies by a specific agent in a specific location — used by EXAMINE to reveal deception.
+  public getUnexposedLiesByAgent(asserted_by: string, location_id: string): EventProposition[] {
+    const rows = this.db.prepare(`
+      SELECT ep.* FROM Event_Propositions ep
+      JOIN Event_Cards ec ON ep.event_id = ec.event_id
+      WHERE ep.asserted_by = ? AND ec.location_id = ?
+        AND ep.is_lie = 1 AND ep.perceived_truth = 1
+      ORDER BY ec.turn_index DESC LIMIT 5
+    `).all(asserted_by, location_id) as Array<Record<string, unknown>>;
+    return rows.map(r => this._parsePropositionRow(r));
+  }
+
+  public setPropositionPerceivedTruth(proposition_id: string, perceived_truth: boolean): void {
+    this.db.prepare('UPDATE Event_Propositions SET perceived_truth = ? WHERE proposition_id = ?')
+      .run(perceived_truth ? 1 : 0, proposition_id);
+  }
+
+  public getAllEventPropositions(): EventProposition[] {
+    return (this.db.prepare('SELECT * FROM Event_Propositions').all() as Array<Record<string, unknown>>)
+      .map(r => this._parsePropositionRow(r));
   }
 
   public addBeliefEdge(edge: BeliefEdge): void {
@@ -769,6 +852,9 @@ export class Stage {
       locations: this.getAllLocations(),
       agents: this.getAllAgents(),
       action_log: this.getFullLedger(),
+      dramatic_pressures: this.getAllDramaticPressures(),
+      event_propositions: this.getAllEventPropositions(),
+      persuasion_log: this.getAllPersuasionLog(),
       illusion_state: (() => {
         const s = this.getIllusionState();
         return {
@@ -797,9 +883,12 @@ export class Stage {
     for (const agent of snap.agents)   this.addAgent(agent);
     for (const entry of snap.action_log) this._insertRawAction(entry);
     this.updateIllusionState(snap.illusion_state);
-    for (const edge of snap.belief_edges)     this.addBeliefEdge(edge);
-    for (const mut of snap.goal_mutations)    this.recordGoalMutation(mut);
-    for (const beat of snap.beat_traces)      this.addBeatTrace(beat);
+    for (const edge of snap.belief_edges)          this.addBeliefEdge(edge);
+    for (const mut of snap.goal_mutations)         this.recordGoalMutation(mut);
+    for (const beat of snap.beat_traces)           this.addBeatTrace(beat);
+    for (const p of snap.dramatic_pressures ?? []) this._insertRawPressure(p);
+    for (const p of snap.event_propositions ?? []) this._insertRawEventProposition(p);
+    for (const p of snap.persuasion_log ?? [])     this._insertRawPersuasion(p);
   }
 
   private _insertRawAction(entry: ActionLogEntry): void {

@@ -41,19 +41,56 @@ export class Orchestrator {
     this.locationMap.set(node.name.toLowerCase(), node);
   }
 
+  // ── RELOCATE adjacency guard ────────────────────────────────────────────────
+  // Returns the target Location only if it exists AND is adjacent to the agent's
+  // current location. Non-adjacent moves are silently dropped so the action
+  // degrades to a SPEAK rather than teleportation.
+  private _resolveRelocation(agentId: string, targetStr: string): import('./types.ts').Location | null {
+    const targetLoc = this.locationMap.get(targetStr.toLowerCase()) ?? this.locationMap.get(targetStr);
+    if (!targetLoc) return null;
+    const agent = this.stage.getAgent(agentId);
+    if (!agent) return null;
+    const currentLoc = this.locationMap.get(agent.current_location_id);
+    if (!currentLoc) return null;
+    if (!currentLoc.adjacent_locations.includes(targetLoc.location_id)) {
+      console.log(`[Orchestrator] ${agent.name} tried to move to non-adjacent ${targetLoc.name} — blocked.`);
+      return null;
+    }
+    return targetLoc;
+  }
+
+  // ── Climax detection ─────────────────────────────────────────────────────────
+  // Deterministic. True once we are in the Prestige phase AND the scene has
+  // reached a genuine dramatic resolution (terminal goal achieved by any agent,
+  // or enough contradictions have cascaded to constitute a revelation).
+  private _isClimaxReached(location_id: string): boolean {
+    const state = this.stage.getIllusionState();
+    if (state.phase !== 'Prestige') return false;
+    // Any agent achieved their terminal goal
+    const agents = this.stage.getAgentsInLocation(location_id);
+    if (agents.some(a => a.goalStack?.terminal.achieved)) return true;
+    // Three or more contradiction beats in this location signal full unravelling
+    const beats = this.stage.getBeatTracesForLocation(location_id);
+    const contradictions = beats.filter(b => b.beat_type === 'contradiction_discovered').length;
+    return contradictions >= 3;
+  }
+
   public async runTurn(agentId: string) {
     const agent = this.agents.get(agentId);
     if (!agent) throw new Error('Agent not found');
 
+    const currentNodeId = this.stage.getAgent(agentId)!.current_location_id;
     const action = await agent.takeTurn();
 
-    const currentNodeId = this.stage.getAgent(agentId)!.current_location_id;
-
     if (action.action_type === 'RELOCATE' && action.target) {
-      const targetLoc = this.locationMap.get(action.target.toLowerCase()) ?? this.locationMap.get(action.target);
+      const targetLoc = this._resolveRelocation(agentId, action.target);
       if (targetLoc) {
         action.content = `→ ${targetLoc.name}`;
         this.stage.updateAgentLocation(agentId, targetLoc.location_id);
+      } else {
+        action.action_type = 'SPEAK';
+        action.content = action.content || '(decides to stay put)';
+        action.target = null;
       }
     }
 
@@ -72,6 +109,25 @@ export class Orchestrator {
       is_audible: action.action_type !== 'EXAMINE',
     } as import('./types.ts').ActionLogEntry;
     this.spine.processEvent(actionEntry, turnIndex);
+
+    // EXAMINE: deterministically reveal unexposed lies by the target.
+    if (action.action_type === 'EXAMINE' && action.target) {
+      const target = this.stage.getAgent(action.target);
+      if (target) {
+        const revealedBeliefs = this.spine.processExamine(agentId, target.char_id, currentNodeId, action_id);
+        if (revealedBeliefs.length > 0) {
+          const revealUpdate: EpistemicUpdate = {
+            char_id: agentId,
+            new_beliefs: revealedBeliefs,
+            contradiction_detected: true,
+            contradicted_propositions: revealedBeliefs.map(b => b.proposition),
+            source_event_id: action_id,
+          };
+          this._runSpineForUpdate(revealUpdate, action_id, currentNodeId);
+          this.appraiser.appraise(revealUpdate);
+        }
+      }
+    }
 
     // Update the acting agent's epistemic state and run spine
     const recentActions = this.stage.getSensoryFilter(currentNodeId, 3);
@@ -114,6 +170,8 @@ export class Orchestrator {
     });
 
     let turnCount = 0;
+    let incitingActionEmitted = false;  // only one inciting_action per room simulation
+
     while (turnCount < maxTurns) {
       let lastActionId = '';
       let didRelocate = false;
@@ -123,13 +181,15 @@ export class Orchestrator {
         if (!agent) continue;
 
         const currentSheet = this.stage.getAgent(agentSheet.char_id);
+        // Skip agents who left the room or are dead
         if (currentSheet?.current_location_id !== location_id) continue;
+        if (currentSheet?.is_alive === false) continue;
 
         console.log(`[Orchestrator] ${currentSheet.name}'s turn in ${location_id}`);
         const action = await agent.takeTurn();
 
         if (action.action_type === 'RELOCATE' && action.target) {
-          const targetLoc = this.locationMap.get(action.target.toLowerCase()) ?? this.locationMap.get(action.target);
+          const targetLoc = this._resolveRelocation(agentSheet.char_id, action.target);
           if (targetLoc) {
             action.content = `→ ${targetLoc.name}`;
             this.stage.updateAgentLocation(agentSheet.char_id, targetLoc.location_id);
@@ -139,6 +199,11 @@ export class Orchestrator {
             didRelocate = true;
             turnCount++;
             break;
+          } else {
+            // Non-adjacent move — downgrade to SPEAK so the turn isn't wasted
+            action.action_type = 'SPEAK';
+            action.content = action.content || '(decides to stay put)';
+            action.target = null;
           }
         }
 
@@ -158,8 +223,10 @@ export class Orchestrator {
         } as import('./types.ts').ActionLogEntry;
         this.spine.processEvent(actionEntry, turnIndex);
 
-        // ── inciting_action beat: fired immediately when a LIE is recorded ──
-        if (action.action_type === 'LIE') {
+        // ── inciting_action beat: first LIE only (one per simulation — multiple lies
+        //    each emitting this beat corrupts syuzhetSort's flashback reconstruction) ──
+        if (action.action_type === 'LIE' && !incitingActionEmitted) {
+          incitingActionEmitted = true;
           const liar = this.stage.getAgent(agentSheet.char_id);
           const witnesses = this.spine.resolveVisibility(actionEntry,
             this.stage.getAllAgents().map(a => ({ char_id: a.char_id, current_location_id: a.current_location_id })),
@@ -173,6 +240,25 @@ export class Orchestrator {
             narrativeSummary: `${liar?.name ?? agentSheet.char_id} plants a false claim that may detonate later.`,
             fountainHint: `${(liar?.name ?? agentSheet.char_id).toUpperCase()} speaks — but the words cost something. A beat. The room shifts.`,
           });
+        }
+
+        // ── EXAMINE: deterministically reveal unexposed lies by the target ──
+        if (action.action_type === 'EXAMINE' && action.target) {
+          const target = this.stage.getAgent(action.target);
+          if (target) {
+            const revealedBeliefs = this.spine.processExamine(agentSheet.char_id, target.char_id, location_id, action_id);
+            if (revealedBeliefs.length > 0) {
+              const revealUpdate: EpistemicUpdate = {
+                char_id: agentSheet.char_id,
+                new_beliefs: revealedBeliefs,
+                contradiction_detected: true,
+                contradicted_propositions: revealedBeliefs.map(b => b.proposition),
+                source_event_id: action_id,
+              };
+              this._runSpineForUpdate(revealUpdate, action_id, location_id);
+              this.appraiser.appraise(revealUpdate);
+            }
+          }
         }
 
         turnCount++;
@@ -196,13 +282,30 @@ export class Orchestrator {
       }
 
       agentsInRoom = this.stage.getAgentsInLocation(location_id);
-      if (agentsInRoom.length < 2) {
+      const aliveInRoom = agentsInRoom.filter(a => a.is_alive !== false);
+      if (aliveInRoom.length < 2) {
         console.log(`[Orchestrator] Dialogue Lock broken in ${location_id}. Not enough agents.`);
         break;
       }
 
+      // ── Climax detection: emit a revelation beat and stop ──
+      if (this._isClimaxReached(location_id)) {
+        const lastId = lastActionId || agentsInRoom[0]?.char_id || '';
+        this.spine.createBeatTrace({
+          triggerEventId: lastId,
+          beatType: 'revelation',
+          participants: agentsInRoom.map(a => a.char_id),
+          causalChain: [lastId],
+          locationId: location_id,
+          narrativeSummary: 'The illusion has collapsed. Every contradiction has detonated. This is the Prestige.',
+          fountainHint: 'HOLD on the faces. Everything has changed. The audience finally understands.',
+        });
+        console.log(`[Orchestrator] Climax reached in ${location_id} — stopping simulation.`);
+        break;
+      }
+
       // Re-sort by suspicion after each full round (dynamics shift)
-      agentsInRoom.sort((a, b) => {
+      agentsInRoom = aliveInRoom.sort((a, b) => {
         const diff = a.suspicion_score - b.suspicion_score;
         if (Math.abs(diff) < 10) return a.char_id < b.char_id ? -1 : 1;
         return diff;

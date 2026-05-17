@@ -354,6 +354,10 @@ export interface StageSnapshot {
   locations: Location[];
   agents: CharacterSheet[];
   action_log: ActionLogEntry[];
+  // Previously omitted — now included for a lossless round-trip:
+  dramatic_pressures: DramaticPressure[];   // live bias signals survive restart
+  event_propositions: EventProposition[];   // is_lie ground truth survives restart
+  persuasion_log: PersuasionRecord[];       // strategy history survives restart
   illusion_state: Pick<IllusionState,
     | 'phase' | 'planted_elements' | 'pending_recontextualization'
     | 'outline' | 'pacing_target' | 'structure' | 'emotional_arc'

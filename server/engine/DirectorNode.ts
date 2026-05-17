@@ -1,6 +1,6 @@
 import { Type } from '@google/genai';
 import { Stage } from './Stage.ts';
-import type { ActionLogEntry, PerspectiveEvaluation, BeliefSource, EpistemicUpdate, IllusionElement } from './types.ts';
+import type { ActionLogEntry, PerspectiveEvaluation, BeliefSource, EpistemicUpdate, IllusionElement, IllusionState } from './types.ts';
 import { safeJsonParse } from '../../src/lib/json.ts';
 import { randomUUID } from 'crypto';
 import { getAI, getModel, withTimeout } from './ai.ts';
@@ -111,7 +111,7 @@ export class DirectorNode {
     // ── Advance illusion state based on aggregate tension ──
     const avgTensionDelta = evaluations.reduce((s, e) => s + e.tension_delta, 0) / Math.max(1, evaluations.length);
     const contradictionsFound = evaluations.filter(e => e.contradiction_detected).length;
-    this.advanceIllusionState(avgTensionDelta, contradictionsFound);
+    this.advanceIllusionState(avgTensionDelta, contradictionsFound, location_id);
 
     // Log aggregate tension
     console.log(`[Director] Avg tension delta: ${avgTensionDelta.toFixed(1)}, contradictions: ${contradictionsFound}/${evaluations.length} observers`);
@@ -282,6 +282,7 @@ From ${observer.name}'s perspective only:
   private advanceIllusionState(
     avgTensionDelta: number,
     contradictionsFound: number,
+    location_id: string,
   ): void {
     const state = this.stage.getIllusionState();
     const totalTurns = this.stage.getTurnCount();
@@ -309,10 +310,50 @@ From ${observer.name}'s perspective only:
         turn_index: totalTurns,
         is_load_bearing: nextPhase === 'Prestige',
       };
-      this.stage.updateIllusionState({
+
+      const updatedElements = [...state.planted_elements, element];
+      const update: Partial<IllusionState> = {
         phase: nextPhase,
-        planted_elements: [...state.planted_elements, element],
-      });
+        planted_elements: updatedElements,
+      };
+
+      // Prestige payoff: recontextualize every load-bearing planted element
+      // and emit a REVEAL pressure to every agent in the room so they are
+      // prompted to surface the hidden truth they witnessed.
+      if (nextPhase === 'Prestige') {
+        const loadBearing = updatedElements.filter(e => e.is_load_bearing && e.revealed_at == null);
+        const recontexts = loadBearing.map(e => e.description);
+        if (recontexts.length > 0) {
+          update.pending_recontextualization = [
+            ...(state.pending_recontextualization ?? []),
+            ...recontexts,
+          ];
+          // Stamp revealed_at on each load-bearing element in-place
+          for (const e of loadBearing) {
+            e.revealed_at = totalTurns;
+          }
+        }
+
+        // Emit a REVEAL pressure to every living agent in the location
+        const agents = this.stage.getAgentsInLocation(location_id);
+        const triggerEventId = randomUUID();
+        for (const agent of agents) {
+          if (!agent.is_alive) continue;
+          this.stage.addDramaticPressure({
+            pressure_id: randomUUID(),
+            target_char_id: agent.char_id,
+            trigger_event_id: triggerEventId,
+            pressure_type: 'REVEAL',
+            intensity: 85,
+            bias_hint: `The illusion is collapsing. Everything you planted in earlier scenes is now being exposed — what was hidden must now be confronted. ${recontexts[0] ?? ''}`,
+            expires_at_turn: totalTurns + 3,
+            applied: false,
+          });
+        }
+        console.log(`[Director] Prestige payoff: ${recontexts.length} element(s) recontextualized, REVEAL pressure emitted to ${agents.length} agent(s)`);
+      }
+
+      this.stage.updateIllusionState(update);
     }
   }
 

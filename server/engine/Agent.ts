@@ -35,18 +35,35 @@ function describeAttachment(style: AttachmentStyle | undefined): string {
   }
 }
 
-function describeDefenses(mechanisms: DefenseMechanism[] | undefined): string {
-  if (!mechanisms || mechanisms.length === 0) return '';
-  const map: Record<DefenseMechanism, string> = {
-    rationalization:      'You always have a logical explanation ready, even when you are in the wrong.',
-    intellectualization:  'You discuss uncomfortable topics in abstract, detached terms to avoid feeling them.',
-    projection:           'You attribute your own motives to others, accusing them of what you yourself are doing.',
-    displacement:         'When you cannot attack the real threat, you redirect your anger at a safer target.',
-    denial:               'You flatly refuse to acknowledge facts that threaten your self-concept.',
-    dissociation:         'Under extreme stress you can become unnervingly calm and detached.',
-    repression:           'You genuinely do not consciously register information that is too threatening.',
+const DEFENSE_DESCRIPTIONS: Record<DefenseMechanism, string> = {
+  rationalization:      'You always have a logical explanation ready, even when you are in the wrong.',
+  intellectualization:  'You discuss uncomfortable topics in abstract, detached terms to avoid feeling them.',
+  projection:           'You attribute your own motives to others, accusing them of what you yourself are doing.',
+  displacement:         'When you cannot attack the real threat, you redirect your anger at a safer target.',
+  denial:               'You flatly refuse to acknowledge facts that threaten your self-concept.',
+  dissociation:         'Under extreme stress you can become unnervingly calm and detached.',
+  repression:           'You genuinely do not consciously register information that is too threatening.',
+};
+
+// Select the defense mechanism that fires under current emotional pressure.
+// Only returns a value when intensity is high enough to activate — otherwise
+// the agent is composed and no defense is in effect.
+function selectActiveDefense(
+  mechanisms: DefenseMechanism[] | undefined,
+  emotionState: import('./types.ts').EmotionState | undefined,
+): DefenseMechanism | null {
+  if (!mechanisms || mechanisms.length === 0) return null;
+  const es = emotionState;
+  if (!es || es.intensity < 30) return null;
+
+  const preferred: Partial<Record<import('./types.ts').EmotionType, DefenseMechanism[]>> = {
+    shame:    ['denial', 'rationalization', 'repression'],
+    anger:    ['projection', 'displacement'],
+    fear:     ['dissociation', 'intellectualization', 'repression'],
+    distress: ['rationalization', 'intellectualization', 'denial'],
   };
-  return mechanisms.map(m => map[m]).join(' ');
+  const candidates = preferred[es.dominant] ?? [];
+  return mechanisms.find(m => candidates.includes(m)) ?? mechanisms[0];
 }
 
 function describeActionBias(
@@ -270,6 +287,14 @@ export class Agent {
     const speechPattern = deriveSpeechPattern(this.sheet.bigFive);
     const defenseLevel = computeDefenseLevel(this.sheet.bigFive?.neuroticism ?? 50, this.sheet.suspicion_score);
 
+    const currentTurn = this.stage.getTurnCount();
+
+    // Inbound persuasion: someone targeted YOU this turn — let you resist or yield in-character.
+    const inbound = this.stage.getInboundPersuasion(this.sheet.char_id);
+    const inboundBlock = (inbound && inbound.turn >= currentTurn - 1)
+      ? `\nINBOUND INFLUENCE: ${this.stage.getAgent(inbound.agent_id)?.name ?? 'someone'} is using a [${inbound.strategy}] approach on you. You can resist, yield, or co-opt it — but you feel the pressure.\n`
+      : '';
+
     // ── G: OCC Emotional State ──
     const emotionBlock = (() => {
       const es = this.sheet.emotionState;
@@ -288,7 +313,6 @@ export class Agent {
     const styleBlock = illusionState.director_style
       ? `\n${STYLE_MODIFIERS[illusionState.director_style]?.agentInstruction ?? ''}\n`
       : '';
-    const currentTurn = this.stage.getTurnCount();
     const activeBeat = illusionState.outline?.find(b =>
       b.phase === illusionPhase && currentTurn >= b.turn_start && currentTurn <= b.turn_end,
     );
@@ -314,13 +338,20 @@ export class Agent {
       : '';
     for (const p of activePressures) this.stage.markPressureApplied(p.pressure_id);
 
+    // ── Active defense mechanism (conditional on emotional state) ──
+    const activeDefense = selectActiveDefense(this.sheet.defenseMechanisms, this.sheet.emotionState);
+    const defenseStr = activeDefense
+      ? `ACTIVE DEFENSE: ${DEFENSE_DESCRIPTIONS[activeDefense]}`
+      : '';
+
     return `You are ${this.sheet.name}. Your public persona: ${this.sheet.public_mask}
 
 HIDDEN DIRECTIVE: Your true motive is: "${this.sheet.hidden_motive}". Never state this directly. Every action serves it.
+${inboundBlock}
 ${pressureBlock}
 PSYCHOLOGICAL PROFILE:
 ${describeAttachment(this.sheet.attachmentStyle)}
-${describeDefenses(this.sheet.defenseMechanisms)}
+${defenseStr}
 CURRENT DEFENSE LEVEL: ${defenseLevel}
 ${speechPattern ? `SPEECH PATTERN: ${speechPattern}` : ''}
 
