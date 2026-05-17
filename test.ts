@@ -1729,3 +1729,64 @@ describe('Orchestrator — relationship graph fields populated via mock LLM', ()
     }
   });
 });
+
+// ── Stakes modeling ───────────────────────────────────────────────────────────
+describe('Stage — stakes CRUD', () => {
+  it('stores and retrieves active stakes', () => {
+    const stage = new Stage(':memory:');
+    stage.addLocation({ location_id: 'r', name: 'R', description: '', adjacent_locations: [] });
+    stage.addAgent({ char_id: 'c1', name: 'Alice', public_mask: 'x', hidden_motive: 'y', knowledge_vector: [], current_location_id: 'r', suspicion_score: 0, is_alive: true });
+    stage.upsertStakes({ id: 's1', char_id: 'c1', category: 'secret', description: 'Stolen ledger will come out', magnitude: 85, is_active: true });
+    const stakes = stage.getActiveStakes('c1');
+    assert.equal(stakes.length, 1);
+    assert.equal(stakes[0].category, 'secret');
+    assert.equal(stakes[0].magnitude, 85);
+  });
+
+  it('resolveStakes marks outcome and removes from active set', () => {
+    const stage = new Stage(':memory:');
+    stage.addLocation({ location_id: 'r', name: 'R', description: '', adjacent_locations: [] });
+    stage.addAgent({ char_id: 'c2', name: 'Bob', public_mask: 'x', hidden_motive: 'z', knowledge_vector: [], current_location_id: 'r', suspicion_score: 0, is_alive: true });
+    stage.upsertStakes({ id: 's2', char_id: 'c2', category: 'reputation', description: 'Board seat at risk', magnitude: 90, is_active: true });
+    stage.resolveStakes('s2', 'lost', 7);
+    assert.equal(stage.getActiveStakes('c2').length, 0, 'stake should be inactive after resolution');
+    const all = stage.getAllStakes();
+    assert.equal(all[0].outcome, 'lost');
+    assert.equal(all[0].resolved_at, 7);
+  });
+});
+
+describe('Orchestrator — stakes escalation emits pressure', () => {
+  it('high-magnitude stake emits ESCALATE pressure on stakeholder', async () => {
+    setLLMProvider({
+      generate: async (params: GenerateContentParameters) => {
+        const sys = typeof params.config?.systemInstruction === 'string'
+          ? params.config.systemInstruction : '';
+        if (sys.includes('candidate actions')) {
+          return { text: JSON.stringify({ candidates: [{ action_type: 'SPEAK', content: 'Hello.', target: null, reasoning: 'x', goal_score: 70 }] }) } as never;
+        }
+        if (sys.includes('updating the internal state')) {
+          return { text: JSON.stringify({ newSuspicionScore: 10, newBeliefs: [], updatedTheoryOfMind: [], contradiction_detected: false, contradicted_propositions: [] }) } as never;
+        }
+        return { text: JSON.stringify({ tension_delta: 0, contradiction_detected: false, new_beliefs: [], suspicion_updates: [], contradicted_propositions: [] }) } as never;
+      },
+    });
+    try {
+      const stage = new Stage(':memory:');
+      stage.addLocation({ location_id: 'room-1', name: 'Study', description: '', adjacent_locations: [] });
+      const orch = new Orchestrator(stage);
+      orch.registerAgent({ char_id: 'a-alice', name: 'Alice', public_mask: 'x', hidden_motive: 'y', knowledge_vector: [], current_location_id: 'room-1', suspicion_score: 5, is_alive: true });
+      orch.registerAgent({ char_id: 'a-bob', name: 'Bob', public_mask: 'x', hidden_motive: 'z', knowledge_vector: [], current_location_id: 'room-1', suspicion_score: 5, is_alive: true });
+      // Give Alice a high-magnitude active stake
+      stage.upsertStakes({ id: 'sk-1', char_id: 'a-alice', category: 'freedom', description: 'Will be arrested if the truth comes out', magnitude: 75, is_active: true });
+      await orch.runRoomSimulation('room-1', 1);
+      const pressures = stage.getActivePressures('a-alice');
+      // Stakes magnitude 75 → ESCALATE (≥70, <90)
+      const stakesPressure = pressures.find(p => p.bias_hint.includes('sk-1'));
+      assert.ok(stakesPressure, 'expected a pressure entry referencing the stake');
+      assert.equal(stakesPressure!.pressure_type, 'ESCALATE');
+    } finally {
+      resetLLMProvider();
+    }
+  });
+});

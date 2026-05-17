@@ -146,6 +146,9 @@ export class DirectorNode {
     // ── K: Subtext meter — flag on-the-nose dialogue; emit COOL pressure when score is high ──
     this._checkSubtext(location_id, recentActions);
 
+    // ── L: Stakes escalation — high-magnitude active stakes ratchet tension ──
+    this._checkStakesEscalation(location_id, agentsInRoom.map(a => a.char_id));
+
     // Persist tension state so arc-deviation and pivot detection survive restarts.
     this.stage.saveDirectorTensionState(this._tensionAccumulator, this._tensionHistory);
 
@@ -714,6 +717,50 @@ From ${observer.name}'s perspective only:
         });
       }
       logger.info('subtext_cool_pressure', { agents: agents.length, score: analysis.score });
+    }
+  }
+
+  // ── L: Stakes escalation ─────────────────────────────────────────────────────
+  // Active high-magnitude stakes add dramatic pressure on the stakeholder.
+  // Stakes with magnitude ≥ 70 emit a FORESHADOW pressure; ≥ 90 emit CONFRONT.
+  // Terminal goal achievement resolves the matching stake as 'won'.
+  private _checkStakesEscalation(location_id: string, charIds: string[]): void {
+    const currentTurn = this.stage.getTurnCount();
+    for (const charId of charIds) {
+      const agent = this.stage.getAgent(charId);
+      if (!agent) continue;
+
+      // Resolve won stakes — terminal goal achieved
+      if (agent.goalStack?.terminal.achieved) {
+        const activeStakes = this.stage.getActiveStakes(charId);
+        for (const s of activeStakes) {
+          this.stage.resolveStakes(s.id, 'won', currentTurn);
+          logger.info('stakes_resolved', { agent: agent.name, stakes: s.description, outcome: 'won' });
+        }
+        continue;
+      }
+
+      const stakes = this.stage.getActiveStakes(charId);
+      for (const s of stakes) {
+        if (s.magnitude < 70) continue;
+        const pressureType = s.magnitude >= 90 ? 'CONFRONT' : 'ESCALATE';
+        const existingPressures = this.stage.getActivePressures(charId);
+        const alreadyHas = existingPressures.some(
+          p => p.pressure_type === pressureType && p.bias_hint.includes(s.id),
+        );
+        if (alreadyHas) continue;
+        this.stage.addDramaticPressure({
+          pressure_id: randomUUID(),
+          target_char_id: charId,
+          trigger_event_id: `stakes:${s.id}`,
+          pressure_type: pressureType,
+          intensity: s.magnitude,
+          bias_hint: `[stakes:${s.id}] The ${s.category} stake looms: ${s.description}`,
+          expires_at_turn: currentTurn + 3,
+          applied: false,
+        });
+        logger.info('stakes_pressure', { agent: agent.name, stakes: s.description, pressureType, magnitude: s.magnitude });
+      }
     }
   }
 

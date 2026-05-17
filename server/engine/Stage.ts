@@ -23,6 +23,8 @@ import type {
   DramaticPressure,
   BeatTrace,
   StageSnapshot,
+  Stakes,
+  StakeCategory,
 } from './types.ts';
 import { safeJsonParse } from '../lib/json.ts';
 
@@ -71,6 +73,22 @@ export class Stage {
       // v3 → v4: story architecture config (pacing target, structure, emotional arc, director style)
       () => {
         this.db.exec('ALTER TABLE Illusion_State ADD COLUMN config_json TEXT');
+      },
+      // v4 → v5: stakes table
+      () => {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS Stakes (
+            id TEXT PRIMARY KEY,
+            char_id TEXT NOT NULL REFERENCES Characters(char_id),
+            category TEXT NOT NULL,
+            description TEXT NOT NULL,
+            magnitude REAL NOT NULL DEFAULT 50,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            resolved_at INTEGER,
+            outcome TEXT
+          );
+          CREATE INDEX IF NOT EXISTS idx_stakes_char ON Stakes(char_id, is_active);
+        `);
       },
     ];
     for (let i = current; i < MIGRATIONS.length; i++) {
@@ -886,6 +904,46 @@ export class Stage {
       });
     }
     return Array.from(grouped.entries()).map(([char_id, pressures]) => ({ char_id, pressures }));
+  }
+
+  // ── Stakes ───────────────────────────────────────────────────────────────────
+
+  public upsertStakes(s: Stakes): void {
+    this.db.prepare(`
+      INSERT OR REPLACE INTO Stakes (id, char_id, category, description, magnitude, is_active, resolved_at, outcome)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(s.id, s.char_id, s.category, s.description, s.magnitude, s.is_active ? 1 : 0, s.resolved_at ?? null, s.outcome ?? null);
+  }
+
+  public getActiveStakes(char_id: string): Stakes[] {
+    const rows = this.db.prepare('SELECT * FROM Stakes WHERE char_id = ? AND is_active = 1').all(char_id) as Array<Record<string, unknown>>;
+    return rows.map(r => ({
+      id: r.id as string,
+      char_id: r.char_id as string,
+      category: r.category as StakeCategory,
+      description: r.description as string,
+      magnitude: r.magnitude as number,
+      is_active: true,
+    }));
+  }
+
+  public getAllStakes(): Stakes[] {
+    const rows = this.db.prepare('SELECT * FROM Stakes').all() as Array<Record<string, unknown>>;
+    return rows.map(r => ({
+      id: r.id as string,
+      char_id: r.char_id as string,
+      category: r.category as StakeCategory,
+      description: r.description as string,
+      magnitude: r.magnitude as number,
+      is_active: Boolean(r.is_active),
+      resolved_at: r.resolved_at as number | undefined,
+      outcome: r.outcome as Stakes['outcome'] | undefined,
+    }));
+  }
+
+  public resolveStakes(id: string, outcome: 'won' | 'lost', turnIndex: number): void {
+    this.db.prepare('UPDATE Stakes SET is_active = 0, outcome = ?, resolved_at = ? WHERE id = ?')
+      .run(outcome, turnIndex, id);
   }
 
   // ── Session snapshot export / import ─────────────────────────────────────────

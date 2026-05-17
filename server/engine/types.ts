@@ -100,6 +100,24 @@ export interface TheoryOfMind {
   shared_history?: string[];  // memorable joint events shaping this relationship
 }
 
+// ── Stakes ───────────────────────────────────────────────────────────────────
+// What a character stands to win or lose by the end of the scene.
+// Stakes are agent-authored (seeded by the writer or inferred by the Director)
+// and read by DirectorNode to calibrate dramatic pressure escalation.
+
+export type StakeCategory = 'freedom' | 'reputation' | 'relationship' | 'survival' | 'secret' | 'material';
+
+export interface Stakes {
+  id: string;
+  char_id: string;
+  category: StakeCategory;
+  description: string;   // e.g. "Will lose custody of her daughter"
+  magnitude: number;     // 0–100: how much does this matter?
+  is_active: boolean;    // false once resolved (won or lost)
+  resolved_at?: number;  // turn index when resolved
+  outcome?: 'won' | 'lost';
+}
+
 // ── Goal system ──────────────────────────────────────────────────────────────
 
 export interface Goal {
@@ -215,6 +233,9 @@ export interface CharacterSheet {
 
   // OCC Emotional state (populated by AppraisalEngine each turn)
   emotionState?: EmotionState;
+
+  // What this character stands to win or lose (populated by Director / writer)
+  stakes?: Stakes[];
 }
 
 // ── Causal-Epistemic Spine types ─────────────────────────────────────────────
