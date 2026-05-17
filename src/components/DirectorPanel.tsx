@@ -242,6 +242,7 @@ export default function DirectorPanel({
   const filterRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const tensionHistoryRef = useRef<Array<{ tension: number; menace: number }>>([]);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const choicesKey = JSON.stringify(currentScene.choices);
   const qualitiesKey = JSON.stringify(directorState.qbnQualities);
 
@@ -326,6 +327,8 @@ export default function DirectorPanel({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [choicesKey, qualitiesKey]);
 
+  useEffect(() => () => { if (savedTimerRef.current) clearTimeout(savedTimerRef.current); }, []);
+
   // ── Sub-components ────────────────────────────────────────────────────────
 
   const SegmentedMeter = ({
@@ -380,7 +383,8 @@ export default function DirectorPanel({
         body: JSON.stringify({ beats: outlineBeats }),
       });
       setOutlineSaved(res.ok);
-      setTimeout(() => setOutlineSaved(null), 2000);
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      savedTimerRef.current = setTimeout(() => setOutlineSaved(null), 2000);
     } catch { setOutlineSaved(false); }
   }, [outlineBeats]);
 
@@ -393,7 +397,8 @@ export default function DirectorPanel({
         body: JSON.stringify({ target }),
       });
       setPacingSaved(res.ok);
-      setTimeout(() => setPacingSaved(null), 1500);
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      savedTimerRef.current = setTimeout(() => setPacingSaved(null), 1500);
     } catch { setPacingSaved(false); }
   }, []);
 
@@ -413,7 +418,8 @@ export default function DirectorPanel({
       } else { setPresetSaved(false); }
     } catch { setPresetSaved(false); }
     setApplyingPreset(false);
-    setTimeout(() => setPresetSaved(null), 2000);
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    savedTimerRef.current = setTimeout(() => setPresetSaved(null), 2000);
   }, [storyStructure, expectedTurns]);
 
   const saveEmotionalArc = useCallback(async (arc: string) => {

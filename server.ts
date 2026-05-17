@@ -42,7 +42,7 @@ class ValidationError extends Error {
 const requireString = (val: unknown, name: string, maxLen = 20_000): string => {
   if (typeof val !== 'string' || val.trim() === '') throw new Error(`${name} is required`);
   if (val.length > maxLen) throw new Error(`${name} exceeds maximum length`);
-  return val;
+  return val.trim();
 };
 
 function safeJsonParse<T>(text: string, fallback: T): T {
@@ -519,8 +519,11 @@ async function startServer() {
     res.setHeader('X-Accel-Buffering', 'no'); // disable nginx proxy buffering
     res.flushHeaders();
 
+    let disconnected = false;
+    req.on('close', () => { disconnected = true; });
+
     const emit = (event: RoomProgressEvent) => {
-      res.write(`data: ${JSON.stringify(event)}\n\n`);
+      if (!disconnected) res.write(`data: ${JSON.stringify(event)}\n\n`);
     };
 
     let lockKey = '';
@@ -1001,7 +1004,7 @@ ${contextBlock}${wbProfiles}
 INPUT: ${beat}
 OUTPUT: Generate the Scene Heading and Action lines.`,
     }), 30_000, 'world-build');
-    res.json({ result: response.text });
+    res.json({ result: response.text ?? '' });
   }));
 
   app.post('/api/scriptide/refine-dialogue', aiLimiter, asyncHandler(async (req, res) => {
@@ -1050,7 +1053,7 @@ INPUT DIALOGUE: ${dialogue}
 CHARACTER PROFILES: ${JSON.stringify(profiles)}
 OUTPUT: Provide 2 alternative versions of the dialogue exchange, explaining the subtextual strategy used in each.`,
     }), 30_000, 'refine-dialogue');
-    res.json({ result: response.text });
+    res.json({ result: response.text ?? '' });
   }));
 
   app.post('/api/scriptide/analyze-tension', aiLimiter, asyncHandler(async (req, res) => {
@@ -1075,7 +1078,7 @@ ${tnContextBlock}${tnProfiles}
 INPUT SCENE: ${scene}
 OUTPUT: A bulleted diagnostic report with 3 actionable suggestions. Where a character's want, lie, or wound is relevant, ground the suggestion in it.`,
     }), 30_000, 'analyze-tension');
-    res.json({ result: response.text });
+    res.json({ result: response.text ?? '' });
   }));
 
   app.post('/api/scriptide/clean-action', aiLimiter, asyncHandler(async (req, res) => {
@@ -1088,7 +1091,7 @@ OBJECTIVE: Rewrite the following action block — remove all camera directions a
 INPUT: ${text}
 OUTPUT: Just the rewritten action text, nothing else.`,
     }), 30_000, 'clean-action');
-    res.json({ result: response.text });
+    res.json({ result: response.text ?? '' });
   }));
 
   app.post('/api/scriptide/character-profile', aiLimiter, asyncHandler(async (req, res) => {
@@ -1124,7 +1127,7 @@ Need (Internal Truth): ${need}
 
 OUTPUT: A visceral character description.`,
     }), 30_000, 'character-profile');
-    res.json({ result: response.text });
+    res.json({ result: response.text ?? '' });
   }));
 
   // ── Comprehensive script analysis (replaces frontend director.ts AI calls) ──

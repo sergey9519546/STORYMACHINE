@@ -5,6 +5,7 @@ import type { CharacterSheet, Location, EpistemicUpdate, NarrativeAction } from 
 import { DirectorNode } from './DirectorNode.ts';
 import { CausalSpine } from './CausalSpine.ts';
 import { AppraisalEngine } from './AppraisalEngine.ts';
+import { logger } from '../lib/logger.ts';
 
 // Events streamed to clients via SSE during a runRoomSimulation call.
 export type RoomProgressEvent =
@@ -60,7 +61,7 @@ export class Orchestrator {
     const currentLoc = this.locationMap.get(agent.current_location_id);
     if (!currentLoc) return null;
     if (!currentLoc.adjacent_locations.includes(targetLoc.location_id)) {
-      console.log(`[Orchestrator] ${agent.name} tried to move to non-adjacent ${targetLoc.name} — blocked.`);
+      logger.warn('relocation_blocked', { agent: agent.name, target: targetLoc.name });
       return null;
     }
     return targetLoc;
@@ -164,11 +165,11 @@ export class Orchestrator {
   ) {
     let agentsInRoom = this.stage.getAgentsInLocation(location_id);
     if (agentsInRoom.length < 2) {
-      console.log(`[Orchestrator] Not enough agents in ${location_id} for a dialogue lock.`);
+      logger.warn('dialogue_lock_insufficient_agents', { location_id, count: agentsInRoom.length });
       return;
     }
 
-    console.log(`[Orchestrator] Initiating Dialogue Lock in ${location_id} with ${agentsInRoom.length} agents.`);
+    logger.info('dialogue_lock_start', { location_id, agents: agentsInRoom.length });
 
     // ── Initiative order: LOWEST suspicion first ──
     // In realistic social dynamics, guilty parties are reactive, not proactive.
@@ -198,7 +199,7 @@ export class Orchestrator {
         if (currentSheet?.current_location_id !== location_id) continue;
         if (currentSheet?.is_alive === false) continue;
 
-        console.log(`[Orchestrator] ${currentSheet.name}'s turn in ${location_id}`);
+        logger.debug('agent_turn', { agent: currentSheet.name, location_id });
         const action = await agent.takeTurn();
         onProgress?.({ type: 'agent_action', agentId: agentSheet.char_id, agentName: currentSheet.name, action, turnIndex: this.stage.getTurnCount() });
 
@@ -209,7 +210,7 @@ export class Orchestrator {
             this.stage.updateAgentLocation(agentSheet.char_id, targetLoc.location_id);
             const action_id = this.stage.recordAction(agentSheet.char_id, action, location_id);
             lastActionId = action_id;
-            console.log(`[Orchestrator] ${currentSheet.name} relocated to ${targetLoc.name}. Breaking Dialogue Lock.`);
+            logger.info('agent_relocated', { agent: currentSheet.name, to: targetLoc.name });
             didRelocate = true;
             turnCount++;
             break;
@@ -300,7 +301,7 @@ export class Orchestrator {
       agentsInRoom = this.stage.getAgentsInLocation(location_id);
       const aliveInRoom = agentsInRoom.filter(a => a.is_alive !== false);
       if (aliveInRoom.length < 2) {
-        console.log(`[Orchestrator] Dialogue Lock broken in ${location_id}. Not enough agents.`);
+        logger.info('dialogue_lock_broken', { location_id });
         break;
       }
 
@@ -316,7 +317,7 @@ export class Orchestrator {
           narrativeSummary: 'The illusion has collapsed. Every contradiction has detonated. This is the Prestige.',
           fountainHint: 'HOLD on the faces. Everything has changed. The audience finally understands.',
         });
-        console.log(`[Orchestrator] Climax reached in ${location_id} — stopping simulation.`);
+        logger.info('climax_reached', { location_id });
         break;
       }
 
@@ -329,7 +330,7 @@ export class Orchestrator {
     }
 
     // ── Director Node: perspective-bounded room evaluation ──
-    console.log(`[Orchestrator] Running Director Node evaluation for ${location_id}`);
+    logger.info('director_eval_start', { location_id });
     const allActions = this.stage.getSensoryFilter(location_id, turnCount);
     const directorUpdates = await this.director.evaluateRoom(location_id, allActions);
     const lastActionId = allActions[allActions.length - 1]?.action_id ?? '';
@@ -401,7 +402,7 @@ export class Orchestrator {
         fountainHint: `${agentName.toUpperCase()} pauses — something doesn't add up. The air between them changes.`,
       });
 
-      console.log(`[Spine] Contradiction: ${agentName} → ${edges.length} edge(s), ${mutations.length} mutation(s), ${pressures.length} pressure(s)`);
+      logger.info('contradiction_processed', { agent: agentName, edges: edges.length, mutations: mutations.length, pressures: pressures.length });
     }
   }
 }

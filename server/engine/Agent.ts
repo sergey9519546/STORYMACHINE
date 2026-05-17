@@ -251,10 +251,13 @@ export class Agent {
       (raw.candidates ?? [])[0] ?? { action_type: 'SPEAK', content: '', target: null },
     );
 
+    const VALID_ACTIONS = new Set<string>(['SPEAK', 'EXAMINE', 'LIE', 'RELOCATE']);
     return {
-      action_type: best.action_type,
+      action_type: VALID_ACTIONS.has(best.action_type)
+        ? best.action_type as NarrativeAction['action_type']
+        : 'SPEAK',
       target: best.target ?? null,
-      content: best.content,
+      content: best.content || '...',
     };
   }
 
