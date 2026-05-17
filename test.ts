@@ -104,8 +104,10 @@ describe('Fountain script block parsing (regex patterns)', () => {
 
 import { Stage } from './server/engine/Stage.ts';
 import { CausalSpine } from './server/engine/CausalSpine.ts';
+import { Orchestrator } from './server/engine/Orchestrator.ts';
 import { transcriptToFountain } from './server/lib/fountain.ts';
 import type { ActionLogEntry, Belief, CharacterSheet, Location } from './server/engine/types.ts';
+import type { GenerateContentParameters } from '@google/genai';
 
 function makeStage(): Stage {
   const stage = new Stage(':memory:');
@@ -1535,6 +1537,130 @@ describe('ai — LLM provider seam', () => {
         /400/,
       );
       assert.equal(attempts, 1, 'a 400 should fail immediately without retry');
+    } finally {
+      resetLLMProvider();
+    }
+  });
+});
+
+// ── Orchestrator integration: full runRoomSimulation with mock LLM ───────────
+// Verifies the end-to-end orchestration loop (agent actions → spine processing
+// → epistemic updates → Director evaluation) without hitting the real Gemini API.
+describe('Orchestrator — runRoomSimulation with mock LLM', () => {
+  function makeMockProvider() {
+    const calls: string[] = [];
+    const provider = {
+      generate: async (params: GenerateContentParameters) => {
+        const sys = typeof params.config?.systemInstruction === 'string'
+          ? params.config.systemInstruction
+          : '';
+        if (sys.includes('candidate actions')) {
+          calls.push('takeTurn');
+          return { text: JSON.stringify({
+            candidates: [
+              { action_type: 'SPEAK', content: 'I know what you did last summer.', target: null, reasoning: 'test', goal_score: 80 },
+              { action_type: 'LIE', content: 'I was never there.', target: null, reasoning: 'deflect', goal_score: 60 },
+            ],
+          }) } as never;
+        }
+        if (sys.includes('updating the internal state')) {
+          calls.push('updateEpistemics');
+          return { text: JSON.stringify({
+            newSuspicionScore: 35,
+            newBeliefs: [{ proposition: 'Something suspicious happened.', confidence: 0.75, source: 'witnessed' }],
+            updatedTheoryOfMind: [],
+            contradiction_detected: false,
+            contradicted_propositions: [],
+          }) } as never;
+        }
+        // Director evaluatePerspective
+        calls.push('evaluatePerspective');
+        return { text: JSON.stringify({
+          tension_delta: 8,
+          contradiction_detected: false,
+          new_beliefs: [{ proposition: 'The room feels tense.', confidence: 0.6, source: 'inferred' }],
+          suspicion_updates: [],
+          contradicted_propositions: [],
+        }) } as never;
+      },
+      calls,
+    };
+    return provider;
+  }
+
+  function buildSimulation() {
+    const stage = new Stage(':memory:');
+    const loc: Location = { location_id: 'room-1', name: 'Study', description: 'A quiet study.', adjacent_locations: [] };
+    stage.addLocation(loc);
+    const alice: CharacterSheet = {
+      char_id: 'agent-alice', name: 'Alice', public_mask: 'Friendly librarian',
+      hidden_motive: 'Retrieve stolen evidence', knowledge_vector: [],
+      current_location_id: 'room-1', suspicion_score: 10, is_alive: true,
+    };
+    const bob: CharacterSheet = {
+      char_id: 'agent-bob', name: 'Bob', public_mask: 'Nervous accountant',
+      hidden_motive: 'Conceal embezzlement', knowledge_vector: [],
+      current_location_id: 'room-1', suspicion_score: 15, is_alive: true,
+    };
+    const orch = new Orchestrator(stage);
+    orch.registerAgent(alice);
+    orch.registerAgent(bob);
+    return { stage, orch };
+  }
+
+  it('completes a 2-turn simulation without throwing', async () => {
+    const mock = makeMockProvider();
+    setLLMProvider(mock);
+    try {
+      const { orch } = buildSimulation();
+      const events: string[] = [];
+      await orch.runRoomSimulation('room-1', 2, e => events.push(e.type));
+      assert.ok(events.includes('round_complete'), 'should emit round_complete');
+      assert.ok(events.includes('simulation_complete'), 'should emit simulation_complete');
+      assert.ok(events.includes('director_eval'), 'should emit director_eval');
+    } finally {
+      resetLLMProvider();
+    }
+  });
+
+  it('records actions in the stage after the run', async () => {
+    const mock = makeMockProvider();
+    setLLMProvider(mock);
+    try {
+      const { stage, orch } = buildSimulation();
+      await orch.runRoomSimulation('room-1', 2);
+      const actions = stage.getSensoryFilter('room-1', 10);
+      assert.ok(actions.length >= 2, `expected at least 2 recorded actions, got ${actions.length}`);
+    } finally {
+      resetLLMProvider();
+    }
+  });
+
+  it('updates agent suspicion via updateEpistemics', async () => {
+    const mock = makeMockProvider();
+    setLLMProvider(mock);
+    try {
+      const { stage, orch } = buildSimulation();
+      const beforeAlice = stage.getAgent('agent-alice')?.suspicion_score ?? 10;
+      await orch.runRoomSimulation('room-1', 2);
+      const afterAlice = stage.getAgent('agent-alice')?.suspicion_score ?? 10;
+      // Mock returns newSuspicionScore: 35; original was 10
+      assert.ok(afterAlice !== beforeAlice || afterAlice === 35,
+        `suspicion should have been updated by mock (before=${beforeAlice}, after=${afterAlice})`);
+    } finally {
+      resetLLMProvider();
+    }
+  });
+
+  it('calls takeTurn, updateEpistemics, and evaluatePerspective', async () => {
+    const mock = makeMockProvider();
+    setLLMProvider(mock);
+    try {
+      const { orch } = buildSimulation();
+      await orch.runRoomSimulation('room-1', 2);
+      assert.ok(mock.calls.includes('takeTurn'), 'should have called takeTurn');
+      assert.ok(mock.calls.includes('updateEpistemics'), 'should have called updateEpistemics');
+      assert.ok(mock.calls.includes('evaluatePerspective'), 'should have called evaluatePerspective');
     } finally {
       resetLLMProvider();
     }
