@@ -15,6 +15,14 @@ export function getModel(): string {
   return process.env.GEMINI_MODEL ?? 'gemini-2.5-pro';
 }
 
+// Returns the generation temperature to use for all Gemini calls.
+// Set GEMINI_TEMPERATURE=0 in .env to get near-deterministic outputs.
+// Defaults to 1.0 (Gemini default). Values outside 0–2 are clamped.
+export function getTemperature(): number {
+  const raw = parseFloat(process.env.GEMINI_TEMPERATURE ?? '');
+  return isNaN(raw) ? 1.0 : Math.max(0, Math.min(2, raw));
+}
+
 // Wraps a promise with a hard deadline. Clears the timer on settle so Node can exit cleanly.
 export function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {

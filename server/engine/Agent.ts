@@ -1,6 +1,6 @@
 import { Type } from '@google/genai';
 import { randomUUID } from 'crypto';
-import { getAI, getModel, withTimeout } from './ai.ts';
+import { getAI, getModel, getTemperature, withTimeout } from './ai.ts';
 import { STYLE_MODIFIERS } from '../lib/structure-presets.ts';
 import type {
   CharacterSheet,
@@ -199,6 +199,7 @@ export class Agent {
       model: getModel(),
       contents: prompt,
       config: {
+        temperature: getTemperature(),
         systemInstruction: `You are playing the role of ${this.sheet.name}. Generate exactly 3 candidate actions, then score each on how well it serves your goal (0–100). You will take the highest-scoring action.`,
         responseMimeType: 'application/json',
         responseSchema: {
@@ -484,6 +485,7 @@ Based on what you just witnessed:
       model: getModel(),
       contents: prompt,
       config: {
+        temperature: getTemperature(),
         systemInstruction: `You are updating the internal state of ${this.sheet.name} based on recent observations.`,
         responseMimeType: 'application/json',
         responseSchema: {
@@ -759,6 +761,7 @@ Based on what you just witnessed:
       model: getModel(),
       contents: `You are ${this.sheet.name}. Reflect on these recent events and synthesize exactly 3 high-level insights.\n\nEvents:\n${transcript}\n\nExisting beliefs: ${existingBeliefs || 'none'}\n\nOutput 3 reflective insights that go beyond the surface events — patterns, implications, strategic assessments.`,
       config: {
+        temperature: getTemperature(),
         systemInstruction: `You are ${this.sheet.name} in a reflective moment. Synthesize insights, not observations.`,
         responseMimeType: 'application/json',
         responseSchema: {

@@ -1,10 +1,17 @@
 import { randomUUID } from 'crypto';
 import { Stage } from './Stage.ts';
 import { Agent } from './Agent.ts';
-import type { CharacterSheet, Location, EpistemicUpdate } from './types.ts';
+import type { CharacterSheet, Location, EpistemicUpdate, NarrativeAction } from './types.ts';
 import { DirectorNode } from './DirectorNode.ts';
 import { CausalSpine } from './CausalSpine.ts';
 import { AppraisalEngine } from './AppraisalEngine.ts';
+
+// Events streamed to clients via SSE during a runRoomSimulation call.
+export type RoomProgressEvent =
+  | { type: 'agent_action'; agentId: string; agentName: string; action: NarrativeAction; turnIndex: number }
+  | { type: 'round_complete'; round: number; agentCount: number }
+  | { type: 'director_eval'; totalTurns: number }
+  | { type: 'simulation_complete'; totalTurns: number; stoppedBy?: string };
 
 export class Orchestrator {
   private agents: Map<string, Agent> = new Map();
@@ -150,7 +157,11 @@ export class Orchestrator {
     return action;
   }
 
-  public async runRoomSimulation(location_id: string, maxTurns: number = 5) {
+  public async runRoomSimulation(
+    location_id: string,
+    maxTurns: number = 5,
+    onProgress?: (event: RoomProgressEvent) => void,
+  ) {
     let agentsInRoom = this.stage.getAgentsInLocation(location_id);
     if (agentsInRoom.length < 2) {
       console.log(`[Orchestrator] Not enough agents in ${location_id} for a dialogue lock.`);
@@ -170,9 +181,11 @@ export class Orchestrator {
     });
 
     let turnCount = 0;
+    let round = 0;
     let incitingActionEmitted = false;  // only one inciting_action per room simulation
 
     while (turnCount < maxTurns) {
+      round++;
       let lastActionId = '';
       let didRelocate = false;
 
@@ -187,6 +200,7 @@ export class Orchestrator {
 
         console.log(`[Orchestrator] ${currentSheet.name}'s turn in ${location_id}`);
         const action = await agent.takeTurn();
+        onProgress?.({ type: 'agent_action', agentId: agentSheet.char_id, agentName: currentSheet.name, action, turnIndex: this.stage.getTurnCount() });
 
         if (action.action_type === 'RELOCATE' && action.target) {
           const targetLoc = this._resolveRelocation(agentSheet.char_id, action.target);
@@ -281,6 +295,8 @@ export class Orchestrator {
         }
       }
 
+      onProgress?.({ type: 'round_complete', round, agentCount: agentsInRoom.length });
+
       agentsInRoom = this.stage.getAgentsInLocation(location_id);
       const aliveInRoom = agentsInRoom.filter(a => a.is_alive !== false);
       if (aliveInRoom.length < 2) {
@@ -321,9 +337,12 @@ export class Orchestrator {
       this._runSpineForUpdate(update, lastActionId, location_id);
       this.appraiser.appraise(update);
     }
+    onProgress?.({ type: 'director_eval', totalTurns: turnCount });
 
     // ── OCC contagion: emotions diffuse between co-present agents ──
     this.appraiser.applyContagion(location_id);
+
+    onProgress?.({ type: 'simulation_complete', totalTurns: turnCount });
   }
 
   // ── Spine wiring helper ─────────────────────────────────────────────────────

@@ -70,6 +70,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [activePressures, setActivePressures] = useState<Array<{ char_id: string; pressures: DramaticPressure[] }>>([]);
   const ledgerEndRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
+  const [streamLog, setStreamLog] = useState<string[]>([]);
   const [showBuilder, setShowBuilder] = useState(false);
 
   const fetchActivePressures = useCallback(async () => {
@@ -239,17 +240,35 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
 
   const handleRunRoom = async (nodeId: string) => {
     setLoading(true);
+    setStreamLog([]);
     try {
-      await fetch("/api/run-room", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nodeId }),
+      const url = `/api/run-room-stream?nodeId=${encodeURIComponent(nodeId)}`;
+      const evtSource = new EventSource(url);
+      await new Promise<void>((resolve, reject) => {
+        evtSource.onmessage = (e) => {
+          try {
+            const event = JSON.parse(e.data) as {
+              type: string; agentName?: string; action?: { action_type: string; content: string };
+              round?: number; totalTurns?: number; stoppedBy?: string;
+            };
+            if (event.type === 'agent_action' && event.agentName && event.action) {
+              setStreamLog(prev => [...prev, `${event.agentName}: [${event.action!.action_type}] ${event.action!.content.slice(0, 60)}…`]);
+            } else if (event.type === 'round_complete') {
+              setStreamLog(prev => [...prev, `— Round ${event.round} complete —`]);
+            } else if (event.type === 'simulation_complete') {
+              evtSource.close();
+              resolve();
+            }
+          } catch { /* ignore parse errors */ }
+        };
+        evtSource.onerror = () => { evtSource.close(); reject(new Error('SSE connection lost')); };
       });
       await refreshAll();
     } catch (e) {
       console.error("[run-room]", e);
     } finally {
       setLoading(false);
+      setStreamLog([]);
     }
   };
 
@@ -366,8 +385,13 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                       disabled={loading}
                       className="mt-4 w-full bg-black hover:bg-[#FF4444] text-white py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50 brutal-border transition-colors"
                     >
-                      Run Dialogue Lock (5 Turns)
+                      {loading ? "Running…" : "Run Dialogue Lock (5 Turns)"}
                     </button>
+                    {loading && streamLog.length > 0 && (
+                      <div className="mt-2 bg-black text-green-400 font-mono text-xs p-2 max-h-24 overflow-y-auto brutal-border">
+                        {streamLog.map((line, i) => <div key={i}>{line}</div>)}
+                      </div>
+                    )}
                   </div>
                 );
               })}

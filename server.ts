@@ -7,7 +7,7 @@ import { type GoogleGenAI, Type, Modality } from '@google/genai';
 import { getAI, withTimeout } from './server/engine/ai.ts';
 import { rateLimit } from 'express-rate-limit';
 import { Stage } from './server/engine/Stage.ts';
-import { Orchestrator } from './server/engine/Orchestrator.ts';
+import { Orchestrator, type RoomProgressEvent } from './server/engine/Orchestrator.ts';
 import type { CharacterSheet, Location, StageSnapshot } from './server/engine/types.ts';
 import { transcriptToFountain, extractCharactersFromLog, syuzhetSort, wrapSyuzhetFountain } from './server/lib/fountain.ts';
 import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES, STYLE_MODIFIERS } from './server/lib/structure-presets.ts';
@@ -505,6 +505,99 @@ async function startServer() {
     } finally {
       runningRooms.delete(lockKey);
     }
+  }));
+
+  // ── SSE streaming endpoint for run-room ─────────────────────────────────────
+  // Sends newline-delimited Server-Sent Events as each agent acts, so the client
+  // can display real-time progress instead of waiting for the full simulation.
+  // Uses the same runningRooms lock as the batch endpoint to prevent overlap.
+  app.get('/api/run-room-stream', async (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // disable nginx proxy buffering
+    res.flushHeaders();
+
+    const emit = (event: RoomProgressEvent) => {
+      res.write(`data: ${JSON.stringify(event)}\n\n`);
+    };
+
+    let lockKey = '';
+    try {
+      const sid = sessionId(req);
+      const nodeId = requireString(req.query?.nodeId as string | undefined, 'nodeId', 128);
+      lockKey = `${sid}:${nodeId}`;
+
+      if (runningRooms.has(lockKey)) {
+        emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: 'already_running' });
+        res.end();
+        return;
+      }
+
+      const rawMaxTurns = req.query?.maxTurns;
+      const maxTurns = typeof rawMaxTurns === 'string' && rawMaxTurns
+        ? Math.max(2, Math.min(12, parseInt(rawMaxTurns, 10) || 5))
+        : 5;
+
+      const { orchestrator } = getOrCreateSession(sid);
+      runningRooms.add(lockKey);
+      try {
+        await orchestrator.runRoomSimulation(nodeId, maxTurns, emit);
+      } finally {
+        runningRooms.delete(lockKey);
+      }
+    } catch (err) {
+      emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: `error: ${(err as Error).message}` });
+    }
+
+    res.end();
+  });
+
+  // ── Scene grouping endpoint ──────────────────────────────────────────────────
+  // Groups the action log into scenes: contiguous blocks of actions sharing the
+  // same location_id. Useful for screenplay structure analysis and export.
+  app.get('/api/scenes', asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const log = stage.getFullLedger();
+
+    type Scene = {
+      scene_index: number;
+      location_id: string;
+      location_name: string;
+      start_turn: number;
+      end_turn: number;
+      action_count: number;
+      cast: string[];        // unique char_ids who acted
+      cast_names: string[];
+    };
+
+    const scenes: Scene[] = [];
+    let current: Scene | null = null;
+
+    for (const entry of log) {
+      if (!current || current.location_id !== entry.location_id) {
+        current = {
+          scene_index: scenes.length + 1,
+          location_id: entry.location_id,
+          location_name: stage.getLocation(entry.location_id)?.name ?? entry.location_id,
+          start_turn: entry.timestamp,
+          end_turn: entry.timestamp,
+          action_count: 0,
+          cast: [],
+          cast_names: [],
+        };
+        scenes.push(current);
+      }
+      current.end_turn = entry.timestamp;
+      current.action_count++;
+      if (!current.cast.includes(entry.char_id)) {
+        current.cast.push(entry.char_id);
+        const name = stage.getAgent(entry.char_id)?.name ?? entry.char_id;
+        current.cast_names.push(name);
+      }
+    }
+
+    res.json({ scene_count: scenes.length, scenes });
   }));
 
   app.get('/api/ledger', asyncHandler(async (req, res) => {
