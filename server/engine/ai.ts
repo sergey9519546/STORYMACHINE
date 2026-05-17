@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import type { GenerateContentParameters, GenerateContentResponse } from '@google/genai';
 import { logger } from '../lib/logger.ts';
+import { metrics } from '../lib/metrics.ts';
 
 let _shared: GoogleGenAI | null = null;
 
@@ -78,6 +79,7 @@ export async function withRetry<T>(
     } catch (e) {
       lastErr = e;
       if (attempt >= maxAttempts || !isTransient(e)) throw e;
+      metrics.recordAiRetry(label);
       const backoff = Math.min(8000, 500 * 2 ** (attempt - 1));
       const delay = backoff + Math.random() * 250;
       logger.warn('ai_retry', { label, attempt, maxAttempts, delayMs: Math.round(delay), error: (e as Error).message });
@@ -95,9 +97,17 @@ export async function generateContent(
   opts: { label: string; timeoutMs?: number; maxAttempts?: number },
 ): Promise<GenerateContentResponse> {
   const { label, timeoutMs = 30_000, maxAttempts = 3 } = opts;
-  return withRetry(
-    () => withTimeout(getAI().models.generateContent(params), timeoutMs, label),
-    label,
-    maxAttempts,
-  );
+  const started = Date.now();
+  let ok = false;
+  try {
+    const res = await withRetry(
+      () => withTimeout(getAI().models.generateContent(params), timeoutMs, label),
+      label,
+      maxAttempts,
+    );
+    ok = true;
+    return res;
+  } finally {
+    metrics.recordAiCall(label, Date.now() - started, ok);
+  }
 }

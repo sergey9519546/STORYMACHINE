@@ -24,6 +24,7 @@ import type {
 import { Stage } from './Stage.ts';
 import { safeJsonParse } from '../lib/json.ts';
 import { logger } from '../lib/logger.ts';
+import { retrieveBeliefs } from '../lib/memory.ts';
 
 // ── Psychology prompt helpers ────────────────────────────────────────────────
 
@@ -281,10 +282,15 @@ export class Agent {
           return `[${i}] [${tag}] ${name}: ${content}`;
         }).join('\n');
 
-    // ── Beliefs block (top 10 by confidence) ──
-    const beliefs = (this.sheet.beliefs ?? [])
-      .sort((a, b) => b.confidence - a.confidence)
-      .slice(0, 10);
+    // ── Beliefs block (memory retrieval: recency × importance × relevance) ──
+    // Beliefs are ranked against the current conversation so the most pertinent
+    // memories surface, not merely the highest-confidence ones.
+    const beliefs = retrieveBeliefs(
+      this.sheet.beliefs ?? [],
+      this.stage.getTurnCount(),
+      historyStr,
+      10,
+    );
     const beliefsStr = beliefs.length > 0
       ? beliefs.map(b => `  - "${b.proposition}" (confidence: ${Math.round(b.confidence * 100)}%, source: ${b.source})`).join('\n')
       : '  (No established beliefs yet — you are gathering information.)';

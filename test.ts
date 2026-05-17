@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { safeJsonParse } from './src/lib/json.ts';
 import { withTimeout } from './server/engine/ai.ts';
 import { analyzeSubtext } from './server/lib/subtext-meter.ts';
+import { scoreBelief, retrieveBeliefs } from './server/lib/memory.ts';
+import { metrics } from './server/lib/metrics.ts';
 
 describe('safeJsonParse', () => {
   it('returns parsed value for valid JSON object', () => {
@@ -1412,5 +1414,83 @@ describe('CausalSpine — negation-aware contradiction detection', () => {
 
     assert.ok(edges.length >= 1, 'Negation pair should produce at least one contradiction edge');
     assert.equal(edges[0].edge_type, 'contradicts');
+  });
+});
+
+describe('memory — scoreBelief', () => {
+  const ctx = new Set(['knife', 'study', 'evening']);
+
+  it('recent beliefs outscore old beliefs, all else equal', () => {
+    const recent: Belief = { id: 'r', proposition: 'gibberish unrelated tokens', confidence: 0.5, source: 'inferred', acquired_at: 10 };
+    const old:    Belief = { id: 'o', proposition: 'gibberish unrelated tokens', confidence: 0.5, source: 'inferred', acquired_at: 0 };
+    assert.ok(scoreBelief(recent, 10, ctx) > scoreBelief(old, 10, ctx));
+  });
+
+  it('witnessed beliefs outscore inferred beliefs, all else equal', () => {
+    const witnessed: Belief = { id: 'w', proposition: 'zzz qqq vvv', confidence: 0.8, source: 'witnessed', acquired_at: 5 };
+    const inferred:  Belief = { id: 'i', proposition: 'zzz qqq vvv', confidence: 0.8, source: 'inferred', acquired_at: 5 };
+    assert.ok(scoreBelief(witnessed, 5, ctx) > scoreBelief(inferred, 5, ctx));
+  });
+
+  it('context-relevant beliefs outscore irrelevant ones, all else equal', () => {
+    const relevant:   Belief = { id: 'rel', proposition: 'The knife was in the study', confidence: 0.5, source: 'inferred', acquired_at: 5 };
+    const irrelevant: Belief = { id: 'irr', proposition: 'Clouds drifted overhead lazily', confidence: 0.5, source: 'inferred', acquired_at: 5 };
+    assert.ok(scoreBelief(relevant, 5, ctx) > scoreBelief(irrelevant, 5, ctx));
+  });
+
+  it('score is bounded in [0,1]', () => {
+    const b: Belief = { id: 'b', proposition: 'knife study evening', confidence: 1.0, source: 'witnessed', acquired_at: 5 };
+    const s = scoreBelief(b, 5, ctx);
+    assert.ok(s >= 0 && s <= 1, `score ${s} should be in [0,1]`);
+  });
+});
+
+describe('memory — retrieveBeliefs', () => {
+  it('caps results at the requested limit', () => {
+    const beliefs: Belief[] = Array.from({ length: 20 }, (_, i) => ({
+      id: `b${i}`, proposition: `fact number ${i}`, confidence: 0.5, source: 'inferred' as const, acquired_at: i,
+    }));
+    const out = retrieveBeliefs(beliefs, 20, 'fact', 10);
+    assert.equal(out.length, 10);
+  });
+
+  it('surfaces the context-relevant belief first', () => {
+    const beliefs: Belief[] = [
+      { id: 'a', proposition: 'The garden was quiet', confidence: 0.5, source: 'inferred', acquired_at: 0 },
+      { id: 'b', proposition: 'The poison was in the wine glass', confidence: 0.5, source: 'inferred', acquired_at: 0 },
+      { id: 'c', proposition: 'Birds sang in the trees', confidence: 0.5, source: 'inferred', acquired_at: 0 },
+    ];
+    const out = retrieveBeliefs(beliefs, 0, 'who handled the poison wine', 3);
+    assert.equal(out[0].id, 'b');
+  });
+
+  it('returns all beliefs (ranked) when count is under the limit', () => {
+    const beliefs: Belief[] = [
+      { id: 'x', proposition: 'one', confidence: 0.5, source: 'inferred', acquired_at: 0 },
+      { id: 'y', proposition: 'two', confidence: 0.5, source: 'inferred', acquired_at: 0 },
+    ];
+    assert.equal(retrieveBeliefs(beliefs, 0, 'context', 10).length, 2);
+  });
+});
+
+describe('metrics', () => {
+  it('records call counts, failures, and retries per category', () => {
+    metrics.reset();
+    metrics.recordAiCall('takeTurn:Alice', 1000, true);
+    metrics.recordAiCall('takeTurn:Bob', 2000, false);
+    metrics.recordAiRetry('takeTurn:Bob');
+    const snap = metrics.snapshot() as { ai: { total_calls: number; total_failures: number; total_retries: number; by_category: Record<string, { calls: number; avg_ms: number }> } };
+    assert.equal(snap.ai.total_calls, 2);
+    assert.equal(snap.ai.total_failures, 1);
+    assert.equal(snap.ai.total_retries, 1);
+    assert.equal(snap.ai.by_category.takeTurn.calls, 2);
+    assert.equal(snap.ai.by_category.takeTurn.avg_ms, 1500);
+  });
+
+  it('reset clears all recorded stats', () => {
+    metrics.recordAiCall('x:1', 500, true);
+    metrics.reset();
+    const snap = metrics.snapshot() as { ai: { total_calls: number } };
+    assert.equal(snap.ai.total_calls, 0);
   });
 });

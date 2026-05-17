@@ -4,7 +4,7 @@ import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import fs from 'fs';
 import { type GoogleGenAI, Type, Modality } from '@google/genai';
-import { getAI, withTimeout } from './server/engine/ai.ts';
+import { getAI, generateContent } from './server/engine/ai.ts';
 import { rateLimit } from 'express-rate-limit';
 import { Stage } from './server/engine/Stage.ts';
 import { Orchestrator, type RoomProgressEvent } from './server/engine/Orchestrator.ts';
@@ -12,6 +12,7 @@ import type { CharacterSheet, Location, StageSnapshot } from './server/engine/ty
 import { transcriptToFountain, extractCharactersFromLog, syuzhetSort, wrapSyuzhetFountain } from './server/lib/fountain.ts';
 import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES, STYLE_MODIFIERS } from './server/lib/structure-presets.ts';
 import { logger, requestLogger } from './server/lib/logger.ts';
+import { metrics } from './server/lib/metrics.ts';
 
 // ── Startup validation ────────────────────────────────────────────────────────
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -76,11 +77,11 @@ function pcmToWav(pcmData: Buffer, sampleRate: number, numChannels: number): Buf
 
 async function generateImageServer(ai: GoogleGenAI, prompt: string): Promise<string | undefined> {
   try {
-    const response = await withTimeout(ai.models.generateContent({
+    const response = await generateContent({
       model: GEMINI_IMG_MODEL,
       contents: { parts: [{ text: prompt }] },
       config: { imageConfig: { aspectRatio: '16:9' } },
-    }), 25_000, 'generateImage');
+    }, { label: 'generateImage', timeoutMs: 25_000 });
     for (const part of response.candidates?.[0]?.content?.parts ?? []) {
       if (part.inlineData?.data) {
         return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
@@ -95,14 +96,14 @@ async function generateImageServer(ai: GoogleGenAI, prompt: string): Promise<str
 async function generateAudioServer(ai: GoogleGenAI, text: string): Promise<string | undefined> {
   if (!text) return undefined;
   try {
-    const response = await withTimeout(ai.models.generateContent({
+    const response = await generateContent({
       model: GEMINI_TTS_MODEL,
       contents: [{ parts: [{ text }] }],
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } } },
       },
-    }), 20_000, 'generateAudio');
+    }, { label: 'generateAudio', timeoutMs: 20_000 });
     const inlineData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
     if (!inlineData?.data || inlineData.data.length === 0) return undefined;
 
@@ -400,6 +401,11 @@ async function startServer() {
   // Health check — no rate limit, no auth, responds even when Gemini is down.
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', uptime: Math.round(process.uptime()), sessions: sessions.size });
+  });
+
+  // Metrics — Gemini call volume, latency, retries and failures per category.
+  app.get('/metrics', (_req, res) => {
+    res.json({ sessions: sessions.size, ...metrics.snapshot() });
   });
 
   const ai = getAI();
@@ -995,7 +1001,7 @@ async function startServer() {
       ? `\nEXISTING SCRIPT (for continuity — match the established tone, characters, locations, and facts; do not contradict them):\n${scriptContext}\n`
       : '';
     const wbProfiles = profilesBlock(sanitizeProfiles(req.body?.profiles));
-    const response = await withTimeout(ai.models.generateContent({
+    const response = await generateContent({
       model: GEMINI_MODEL,
       contents: `SYSTEM ROLE: You are a master screenwriter and world-builder. Your task is to generate or expand a scene based on the user's beat outline.
 
@@ -1009,7 +1015,7 @@ STRICT CONSTRAINTS:
 ${contextBlock}${wbProfiles}
 INPUT: ${beat}
 OUTPUT: Generate the Scene Heading and Action lines.`,
-    }), 30_000, 'world-build');
+    }, { label: 'world-build', timeoutMs: 30_000 });
     res.json({ result: response.text ?? '' });
   }));
 
@@ -1043,7 +1049,7 @@ OUTPUT: Generate the Scene Heading and Action lines.`,
     const dlgContextBlock = dlgContext
       ? `\nSURROUNDING SCRIPT (preserve each character's established voice and the scene's continuity):\n${dlgContext}\n`
       : '';
-    const response = await withTimeout(ai.models.generateContent({
+    const response = await generateContent({
       model: GEMINI_MODEL,
       contents: `SYSTEM ROLE: You are an expert dialogue doctor, specializing in subtext, character voice, and dramatic irony.
 
@@ -1058,7 +1064,7 @@ ${dlgContextBlock}
 INPUT DIALOGUE: ${dialogue}
 CHARACTER PROFILES: ${JSON.stringify(profiles)}
 OUTPUT: Provide 2 alternative versions of the dialogue exchange, explaining the subtextual strategy used in each.`,
-    }), 30_000, 'refine-dialogue');
+    }, { label: 'refine-dialogue', timeoutMs: 30_000 });
     res.json({ result: response.text ?? '' });
   }));
 
@@ -1069,7 +1075,7 @@ OUTPUT: Provide 2 alternative versions of the dialogue exchange, explaining the 
       ? `\nSURROUNDING SCRIPT (consider how tension carries over from adjacent scenes):\n${tnContext}\n`
       : '';
     const tnProfiles = profilesBlock(sanitizeProfiles(req.body?.profiles));
-    const response = await withTimeout(ai.models.generateContent({
+    const response = await generateContent({
       model: GEMINI_MODEL,
       contents: `SYSTEM ROLE: You are a structural script consultant influenced by Hitchcock's theory of suspense.
 
@@ -1083,20 +1089,20 @@ ANALYSIS CRITERIA:
 ${tnContextBlock}${tnProfiles}
 INPUT SCENE: ${scene}
 OUTPUT: A bulleted diagnostic report with 3 actionable suggestions. Where a character's want, lie, or wound is relevant, ground the suggestion in it.`,
-    }), 30_000, 'analyze-tension');
+    }, { label: 'analyze-tension', timeoutMs: 30_000 });
     res.json({ result: response.text ?? '' });
   }));
 
   app.post('/api/scriptide/clean-action', aiLimiter, asyncHandler(async (req, res) => {
     const text = requireString(req.body?.text, 'text');
-    const response = await withTimeout(ai.models.generateContent({
+    const response = await generateContent({
       model: GEMINI_MODEL,
       contents: `SYSTEM ROLE: You are a strict script editor enforcing a "Semantic Firewall".
 OBJECTIVE: Rewrite the following action block — remove all camera directions and technical jargon. Describe what happens in the world, not what the camera does.
 
 INPUT: ${text}
 OUTPUT: Just the rewritten action text, nothing else.`,
-    }), 30_000, 'clean-action');
+    }, { label: 'clean-action', timeoutMs: 30_000 });
     res.json({ result: response.text ?? '' });
   }));
 
@@ -1112,7 +1118,7 @@ OUTPUT: Just the rewritten action text, nothing else.`,
     const want  = requireString(profile.want,  'profile.want');
     const need  = requireString(profile.need,  'profile.need');
 
-    const response = await withTimeout(ai.models.generateContent({
+    const response = await generateContent({
       model: GEMINI_MODEL,
       contents: `SYSTEM ROLE: You are a character designer specializing in psychological realism and "Show, Don't Tell".
 
@@ -1132,7 +1138,7 @@ Want (External Goal): ${want}
 Need (Internal Truth): ${need}
 
 OUTPUT: A visceral character description.`,
-    }), 30_000, 'character-profile');
+    }, { label: 'character-profile', timeoutMs: 30_000 });
     res.json({ result: response.text ?? '' });
   }));
 
@@ -1192,7 +1198,7 @@ Ensure throughline commentary addresses all active throughlines listed above.
 ${structure ? `structuralNode must name a specific beat from the ${structure} structure (e.g. "Catalyst", "Midpoint", "Ten — Twist").` : ''}
 ${dirStyle ? `Cinematic composition and commentary must be filtered through the ${dirStyle} style.` : ''}`;
 
-    const analysisResponse = await withTimeout(ai.models.generateContent({
+    const analysisResponse = await generateContent({
       model: GEMINI_MODEL,
       contents: prompt,
       config: {
@@ -1200,7 +1206,7 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
         responseMimeType: 'application/json',
         responseSchema: AnalyzeScriptSchema,
       },
-    }), 45_000, 'analyze-script');
+    }, { label: 'analyze-script', timeoutMs: 45_000 });
 
     const rawText = analysisResponse.text ?? '{}';
     const analysisData = safeJsonParse<{ sceneAnalysis: Record<string, unknown>; updatedDirectorState: Record<string, unknown> } | null>(rawText, null);
