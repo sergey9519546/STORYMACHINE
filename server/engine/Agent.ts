@@ -666,8 +666,11 @@ Based on what you just witnessed:
     const gsu = result.goal_stack_update;
     if (gsu) {
       this.refreshSheet();
-      const gs = this.sheet.goalStack;
-      if (gs) {
+      const gsRaw = this.sheet.goalStack;
+      if (gsRaw) {
+        // Work on a shallow copy so this.sheet.goalStack is NOT mutated in-place.
+        // If the DB write below fails, the in-memory sheet stays consistent with the DB.
+        const gs: GoalStack = { ...gsRaw, instrumental: [...gsRaw.instrumental] };
         let changed = false;
         const triggerEventId = observableActions[observableActions.length - 1]?.action_id ?? 'epistemic_update';
         const turnIndex = this.stage.getTurnCount();

@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { safeJsonParse } from './src/lib/json.ts';
 import { withTimeout } from './server/engine/ai.ts';
+import { analyzeSubtext } from './server/lib/subtext-meter.ts';
 
 describe('safeJsonParse', () => {
   it('returns parsed value for valid JSON object', () => {
@@ -1122,5 +1123,294 @@ describe('Stage — exportSnapshot / importSnapshot', () => {
     assert.equal(snap.agents.length, 0);
     assert.equal(snap.action_log.length, 0);
     assert.equal(snap.beat_traces.length, 0);
+  });
+});
+
+// ── Stage — Director tension state persistence ────────────────────────────────
+
+describe('Stage — getDirectorTensionState / saveDirectorTensionState', () => {
+  it('returns default values on a fresh stage', () => {
+    const stage = makeStage();
+    const ts = stage.getDirectorTensionState();
+    assert.equal(ts.accumulator, 50);
+    assert.deepEqual(ts.history, []);
+  });
+
+  it('round-trips accumulator and history through save → get', () => {
+    const stage = makeStage();
+    stage.saveDirectorTensionState(72, [10, 5, -3, 8, 12]);
+    const ts = stage.getDirectorTensionState();
+    assert.equal(ts.accumulator, 72);
+    assert.deepEqual(ts.history, [10, 5, -3, 8, 12]);
+  });
+
+  it('overwrites previous values on second save', () => {
+    const stage = makeStage();
+    stage.saveDirectorTensionState(30, [1, 2, 3]);
+    stage.saveDirectorTensionState(80, [9, 8]);
+    const ts = stage.getDirectorTensionState();
+    assert.equal(ts.accumulator, 80);
+    assert.deepEqual(ts.history, [9, 8]);
+  });
+});
+
+// ── Stage — hasUnexposedLiesInChain ──────────────────────────────────────────
+
+describe('Stage — hasUnexposedLiesInChain', () => {
+  it('returns false for an empty event list', () => {
+    const stage = makeStage();
+    assert.equal(stage.hasUnexposedLiesInChain([]), false);
+  });
+
+  it('returns true when a lie in the chain has perceived_truth=true', () => {
+    const stage = makeStage();
+    const spine = new CausalSpine(stage);
+    const lieEntry: ActionLogEntry = {
+      action_id: 'evt-unexposed',
+      timestamp: 1000,
+      char_id: 'alice',
+      location_id: 'room1',
+      action_type: 'LIE',
+      target_char_id: 'bob',
+      content: 'I was home all night.',
+      is_audible: true,
+    };
+    spine.processEvent(lieEntry, 1);
+    assert.equal(stage.hasUnexposedLiesInChain(['evt-unexposed']), true);
+  });
+
+  it('returns false after perceived_truth is flipped to false (lie exposed)', () => {
+    const stage = makeStage();
+    const spine = new CausalSpine(stage);
+    const lieEntry: ActionLogEntry = {
+      action_id: 'evt-exposed',
+      timestamp: 1001,
+      char_id: 'alice',
+      location_id: 'room1',
+      action_type: 'LIE',
+      target_char_id: 'bob',
+      content: 'The vault was empty.',
+      is_audible: true,
+    };
+    spine.processEvent(lieEntry, 1);
+    const [prop] = stage.getEventPropositions('evt-exposed');
+    stage.setPropositionPerceivedTruth(prop.proposition_id, false);
+    assert.equal(stage.hasUnexposedLiesInChain(['evt-exposed']), false);
+  });
+
+  it('returns false when the chain contains only SPEAK events', () => {
+    const stage = makeStage();
+    const spine = new CausalSpine(stage);
+    const speakEntry: ActionLogEntry = {
+      action_id: 'evt-speak-only',
+      timestamp: 1002,
+      char_id: 'bob',
+      location_id: 'room1',
+      action_type: 'SPEAK',
+      target_char_id: null,
+      content: 'The ledger is missing.',
+      is_audible: true,
+    };
+    spine.processEvent(speakEntry, 2);
+    assert.equal(stage.hasUnexposedLiesInChain(['evt-speak-only']), false);
+  });
+});
+
+// ── CausalSpine — processExamine ─────────────────────────────────────────────
+
+describe('CausalSpine — processExamine', () => {
+  it('flips perceived_truth to false for unexposed lies and returns witness beliefs', () => {
+    const stage = makeStage();
+    const spine = new CausalSpine(stage);
+
+    // Alice lies in room1
+    const lieEntry: ActionLogEntry = {
+      action_id: 'evt-examine-lie',
+      timestamp: 1000,
+      char_id: 'alice',
+      location_id: 'room1',
+      action_type: 'LIE',
+      target_char_id: 'bob',
+      content: 'The safe was never opened.',
+      is_audible: true,
+    };
+    spine.processEvent(lieEntry, 1);
+
+    // Bob examines Alice in the same room
+    const newBeliefs = spine.processExamine('bob', 'alice', 'room1', 'evt-examine-action');
+    assert.ok(newBeliefs.length >= 1, 'Should return at least one new belief');
+    assert.equal(newBeliefs[0].source, 'witnessed');
+    assert.equal(newBeliefs[0].confidence, 1.0);
+    assert.ok(newBeliefs[0].proposition.toLowerCase().includes('lie'), 'Belief should reference a lie');
+
+    // perceived_truth must now be false
+    const [prop] = stage.getEventPropositions('evt-examine-lie');
+    assert.equal(prop.perceived_truth, false, 'perceived_truth should be flipped after examination');
+
+    // Bob's beliefs should contain the new belief
+    const bob = stage.getAgent('bob');
+    assert.ok(bob?.beliefs?.some(b => b.confidence === 1.0 && b.source === 'witnessed'));
+  });
+
+  it('returns empty array when target has no unexposed lies', () => {
+    const stage = makeStage();
+    const spine = new CausalSpine(stage);
+    const result = spine.processExamine('bob', 'alice', 'room1', 'evt-no-lies');
+    assert.equal(result.length, 0);
+  });
+
+  it('does not re-expose an already-exposed lie', () => {
+    const stage = makeStage();
+    const spine = new CausalSpine(stage);
+    const lieEntry: ActionLogEntry = {
+      action_id: 'evt-re-examine',
+      timestamp: 1000,
+      char_id: 'alice',
+      location_id: 'room1',
+      action_type: 'LIE',
+      target_char_id: 'bob',
+      content: 'Nothing happened last night.',
+      is_audible: true,
+    };
+    spine.processEvent(lieEntry, 1);
+
+    // First examine — exposes the lie
+    spine.processExamine('bob', 'alice', 'room1', 'evt-exam-1');
+    // Second examine — lie already exposed, nothing left
+    const second = spine.processExamine('bob', 'alice', 'room1', 'evt-exam-2');
+    assert.equal(second.length, 0, 'Re-examining should find no new unexposed lies');
+  });
+});
+
+// ── Subtext meter ─────────────────────────────────────────────────────────────
+
+describe('analyzeSubtext', () => {
+  it('returns score 0 for an empty line list', () => {
+    const r = analyzeSubtext([]);
+    assert.equal(r.score, 0);
+    assert.equal(r.onTheNoseCount, 0);
+    assert.equal(r.subtextCount, 0);
+  });
+
+  it('detects on-the-nose emotion declaration', () => {
+    const r = analyzeSubtext(["I am furious right now."]);
+    assert.ok(r.onTheNoseCount >= 1, 'Should detect direct emotion declaration');
+    assert.ok(r.score > 50, `Score should be above 50 for on-the-nose dialogue, got ${r.score}`);
+  });
+
+  it('detects subtext indicators (hedging)', () => {
+    const r = analyzeSubtext(["Perhaps it's merely a coincidence."]);
+    assert.ok(r.subtextCount >= 1, 'Should detect hedging/subtext indicators');
+  });
+
+  it('detects motive disclosure as on-the-nose', () => {
+    const r = analyzeSubtext(["My goal is to take the ledger from you."]);
+    assert.ok(r.onTheNoseCount >= 1, 'My goal is... should be detected as on-the-nose');
+  });
+
+  it('low-subtext pure dialogue gets near-zero score', () => {
+    const r = analyzeSubtext(["The window is open.", "Strange weather.", "Funny — I almost forgot my coat."]);
+    assert.ok(r.score < 50, `Pure subtext dialogue should score below 50, got ${r.score}`);
+  });
+
+  it('worstLine is non-empty when score >= 20', () => {
+    const r = analyzeSubtext(["I am angry at you.", "The sky is blue."]);
+    if (r.score >= 20) {
+      assert.ok(r.worstLine.length > 0, 'worstLine should be set when score >= 20');
+    }
+  });
+});
+
+// ── Belief confidence decay on contradiction ──────────────────────────────────
+
+describe('CausalSpine — belief confidence decay on contradiction', () => {
+  it('halves the confidence of the contradicted belief (floor 0.05)', () => {
+    const stage = makeStage();
+    const spine = new CausalSpine(stage);
+
+    const oldBelief: Belief = {
+      id: 'b-decay-from',
+      proposition: 'Alice was home all evening studying',
+      confidence: 0.8,
+      source: 'told',
+      source_agent_id: 'alice',
+      source_event_id: 'evt-decay-1',
+      acquired_at: 1,
+    };
+    const newBelief: Belief = {
+      id: 'b-decay-to',
+      proposition: 'Alice was not at home during the evening',
+      confidence: 0.9,
+      source: 'witnessed',
+      acquired_at: 2,
+    };
+    stage.updateAgentBeliefs('bob', [oldBelief, newBelief]);
+
+    spine.processBeliefUpdate('bob', [newBelief], 'evt-decay-1', true, ['Alice was home all evening studying']);
+
+    const bobAfter = stage.getAgent('bob');
+    const decayed = bobAfter?.beliefs?.find(b => b.id === 'b-decay-from');
+    assert.ok(decayed, 'Contradicted belief should still exist');
+    assert.ok(decayed!.confidence <= 0.4 + 0.01, `Confidence should be ≤ 0.4 (was 0.8 → halved), got ${decayed!.confidence}`);
+    assert.ok(decayed!.confidence >= 0.05, 'Confidence should not go below floor 0.05');
+  });
+
+  it('does not reduce confidence of the new (contradicting) belief', () => {
+    const stage = makeStage();
+    const spine = new CausalSpine(stage);
+
+    const oldBelief: Belief = {
+      id: 'b-nodegrade-from',
+      proposition: 'The key was on the hook',
+      confidence: 0.6,
+      source: 'told',
+      acquired_at: 1,
+    };
+    const newBelief: Belief = {
+      id: 'b-nodegrade-to',
+      proposition: 'The hook was empty — the key was gone',
+      confidence: 0.95,
+      source: 'witnessed',
+      acquired_at: 2,
+    };
+    stage.updateAgentBeliefs('bob', [oldBelief, newBelief]);
+    spine.processBeliefUpdate('bob', [newBelief], 'evt-nd-1', true, ['The key was on the hook']);
+
+    const bobAfter = stage.getAgent('bob');
+    const newBeliefAfter = bobAfter?.beliefs?.find(b => b.id === 'b-nodegrade-to');
+    assert.ok(newBeliefAfter, 'New belief should still be present');
+    assert.equal(newBeliefAfter!.confidence, 0.95, 'New (contradicting) belief confidence should be unchanged');
+  });
+});
+
+// ── CausalSpine — negation-aware overlap ─────────────────────────────────────
+
+describe('CausalSpine — negation-aware contradiction detection', () => {
+  it('detects negation pair via processBeliefUpdate without named contradiction', () => {
+    const stage = makeStage();
+    const spine = new CausalSpine(stage);
+
+    // "X is alive" vs "X is not alive" — should be detected even without Gemini naming it
+    const affirm: Belief = {
+      id: 'b-affirm',
+      proposition: 'Alice is alive and well after the incident',
+      confidence: 0.7,
+      source: 'told',
+      acquired_at: 1,
+    };
+    const negate: Belief = {
+      id: 'b-negate',
+      proposition: 'Alice is not alive — she was found dead this morning',
+      confidence: 0.95,
+      source: 'witnessed',
+      acquired_at: 2,
+    };
+    stage.updateAgentBeliefs('bob', [affirm, negate]);
+
+    // contradictionDetected=true but contradictedPropositions=[] — relies on _overlap heuristic
+    const edges = spine.processBeliefUpdate('bob', [negate], 'evt-neg-1', true, []);
+
+    assert.ok(edges.length >= 1, 'Negation pair should produce at least one contradiction edge');
+    assert.equal(edges[0].edge_type, 'contradicts');
   });
 });

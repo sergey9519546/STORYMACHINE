@@ -162,7 +162,7 @@ export default function ScriptIDE({
   >("production");
   const [showDirectorHUD, setShowDirectorHUD] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => lsGet("theme") === "dark");
-  const [isTypewriterSound] = useState(true);
+  const [isTypewriterSound, setIsTypewriterSound] = useState(() => lsGet("typewriter_sound") !== "off");
   const [snapshots, setSnapshots] = useState<
     { id: string; name: string; text: string; date: string }[]
   >(() => safeJsonParse(lsGet("script_snapshots"), []));
@@ -971,8 +971,15 @@ export default function ScriptIDE({
           showDirectorHUD={showDirectorHUD}
           directorsLayer={directorsLayer}
           wordCount={stats.wordCount}
+          isTypewriterSound={isTypewriterSound}
           onToggleHUD={() => setShowDirectorHUD(!showDirectorHUD)}
           onToggleDirectorsLayer={() => setDirectorsLayer(!directorsLayer)}
+          onToggleTypewriterSound={() => {
+            setIsTypewriterSound(prev => {
+              lsSet("typewriter_sound", prev ? "off" : "on");
+              return !prev;
+            });
+          }}
           onExportFountain={exportFountain}
           onOpenStoryMachine={onOpenStoryMachine}
         />

@@ -406,8 +406,9 @@ async function startServer() {
   app.use('/api/state',    gameLimiter);
 
   app.post('/api/init', asyncHandler(async (req, res) => {
+    const sid = sessionId(req);
     const { nodes, agents } = req.body;
-    const { orchestrator } = getOrCreateSession(sessionId(req));
+    const { orchestrator } = getOrCreateSession(sid);
 
     const truncatedNodes  = Array.isArray(nodes)  && nodes.length  > 50;
     const truncatedAgents = Array.isArray(agents) && agents.length > 50;
@@ -454,7 +455,7 @@ async function startServer() {
 
     res.json({
       status: 'initialized',
-      sessionId: sessionId(req),
+      sessionId: sid,
       ...(truncatedNodes  ? { warning_nodes:  `Only first 50 of ${nodes.length} nodes registered`  } : {}),
       ...(truncatedAgents ? { warning_agents: `Only first 50 of ${agents.length} agents registered` } : {}),
     });

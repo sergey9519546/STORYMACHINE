@@ -483,26 +483,30 @@ export class Stage {
   }
 
   public updateIllusionState(state: Partial<IllusionState>) {
-    const current = this.getIllusionState();
-    const next = { ...current, ...state };
-    const config = {
-      pacing_target: next.pacing_target,
-      structure: next.structure,
-      emotional_arc: next.emotional_arc,
-      director_style: next.director_style,
-      expected_turns: next.expected_turns,
-    };
-    this.db.prepare(`
-      UPDATE Illusion_State
-      SET phase = ?, planted_elements_json = ?, pending_recontextualization_json = ?, outline_json = ?, config_json = ?
-      WHERE id = 1
-    `).run(
-      next.phase,
-      JSON.stringify(next.planted_elements),
-      JSON.stringify(next.pending_recontextualization),
-      next.outline ? JSON.stringify(next.outline) : null,
-      JSON.stringify(config),
-    );
+    // Wrap read-modify-write in a transaction to prevent concurrent callers from
+    // interleaving their reads and writes (e.g. two simultaneous Director evaluations).
+    this.db.transaction(() => {
+      const current = this.getIllusionState();
+      const next = { ...current, ...state };
+      const config = {
+        pacing_target: next.pacing_target,
+        structure: next.structure,
+        emotional_arc: next.emotional_arc,
+        director_style: next.director_style,
+        expected_turns: next.expected_turns,
+      };
+      this.db.prepare(`
+        UPDATE Illusion_State
+        SET phase = ?, planted_elements_json = ?, pending_recontextualization_json = ?, outline_json = ?, config_json = ?
+        WHERE id = 1
+      `).run(
+        next.phase,
+        JSON.stringify(next.planted_elements),
+        JSON.stringify(next.pending_recontextualization),
+        next.outline ? JSON.stringify(next.outline) : null,
+        JSON.stringify(config),
+      );
+    })();
   }
 
   public setOutline(beats: OutlineBeat[]): void {
