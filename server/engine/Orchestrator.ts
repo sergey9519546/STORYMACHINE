@@ -434,7 +434,13 @@ export class Orchestrator {
     triggerEventId: string,
     locationId: string,
   ): void {
-    if (!update.contradiction_detected) return;
+    if (!update.contradiction_detected) {
+      // No conflict — but new beliefs may still corroborate or update existing ones.
+      if (update.new_beliefs.length > 0) {
+        this.spine.processBeliefReinforcement(update.char_id, update.new_beliefs, triggerEventId);
+      }
+      return;
+    }
     if (update.new_beliefs.length === 0) {
       this.stage.addDramaticPressure({
         pressure_id: randomUUID(),

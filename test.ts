@@ -311,6 +311,95 @@ describe('CausalSpine — BeliefEdge on contradiction', () => {
   });
 });
 
+describe('CausalSpine — BeliefEdge reinforcement (supports / supersedes)', () => {
+  it('creates a supports edge when a new belief corroborates an existing one of equal authority', () => {
+    const stage = makeStage();
+    const spine = new CausalSpine(stage);
+
+    const existing: Belief = {
+      id: 'b-old',
+      proposition: 'The ledger was kept inside the locked study cabinet',
+      confidence: 0.6,
+      source: 'told',
+      acquired_at: 1,
+    };
+    const corroborating: Belief = {
+      id: 'b-new',
+      proposition: 'The study cabinet kept the ledger locked away',
+      confidence: 0.6,
+      source: 'told',
+      acquired_at: 2,
+    };
+
+    stage.updateAgentBeliefs('bob', [existing, corroborating]);
+    const edges = spine.processBeliefReinforcement('bob', [corroborating], 'evt-2');
+
+    assert.equal(edges.length, 1);
+    assert.equal(edges[0].edge_type, 'supports');
+    assert.equal(edges[0].from_belief_id, 'b-old');
+    assert.equal(edges[0].to_belief_id, 'b-new');
+
+    // supports bumps the corroborated belief's confidence
+    const after = stage.getAgent('bob')?.beliefs?.find(b => b.id === 'b-old');
+    assert.ok((after?.confidence ?? 0) > 0.6, 'corroborated belief should gain confidence');
+  });
+
+  it('creates a supersedes edge when a witnessed belief updates a told belief on the same claim', () => {
+    const stage = makeStage();
+    const spine = new CausalSpine(stage);
+
+    const told: Belief = {
+      id: 'b-told',
+      proposition: 'The ledger was kept inside the locked study cabinet',
+      confidence: 0.6,
+      source: 'told',
+      acquired_at: 1,
+    };
+    const witnessed: Belief = {
+      id: 'b-witnessed',
+      proposition: 'The ledger was kept inside the locked study cabinet',
+      confidence: 0.9,
+      source: 'witnessed',
+      acquired_at: 2,
+    };
+
+    stage.updateAgentBeliefs('bob', [told, witnessed]);
+    const edges = spine.processBeliefReinforcement('bob', [witnessed], 'evt-3');
+
+    assert.equal(edges.length, 1);
+    assert.equal(edges[0].edge_type, 'supersedes');
+    assert.equal(edges[0].from_belief_id, 'b-told');
+
+    // supersedes decays the stale belief
+    const after = stage.getAgent('bob')?.beliefs?.find(b => b.id === 'b-told');
+    assert.ok((after?.confidence ?? 1) < 0.6, 'superseded belief should lose confidence');
+  });
+
+  it('does not create a reinforcement edge across opposite polarity (that is a contradiction, not support)', () => {
+    const stage = makeStage();
+    const spine = new CausalSpine(stage);
+
+    const affirm: Belief = {
+      id: 'b-affirm',
+      proposition: 'Alice was present in the study during the theft',
+      confidence: 0.7,
+      source: 'told',
+      acquired_at: 1,
+    };
+    const deny: Belief = {
+      id: 'b-deny',
+      proposition: 'Alice was not present in the study during the theft',
+      confidence: 0.7,
+      source: 'told',
+      acquired_at: 2,
+    };
+
+    stage.updateAgentBeliefs('bob', [affirm, deny]);
+    const edges = spine.processBeliefReinforcement('bob', [deny], 'evt-4');
+    assert.equal(edges.length, 0, 'opposite-polarity beliefs must not form supports/supersedes edges');
+  });
+});
+
 describe('CausalSpine — GoalMutation and DramaticPressure', () => {
   it('creates confrontation subgoal for Bob and pressure on both agents', () => {
     const stage = makeStage();
