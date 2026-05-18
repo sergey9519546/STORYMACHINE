@@ -1,6 +1,6 @@
 import React from "react";
 import { EngineState } from "../../types";
-import { parseFountain } from "../../lib/fountain";
+import { FountainBlock } from "../../lib/fountain";
 import {
   Loader2,
   ShieldAlert,
@@ -11,6 +11,7 @@ import {
 interface AnalysisPanelProps {
   engineState: EngineState;
   scriptText: string;
+  parsedBlocks: FountainBlock[];
   isCleaning: number | null;
   onCleanAction: (index: number, text: string) => void;
 }
@@ -18,11 +19,10 @@ interface AnalysisPanelProps {
 export default function AnalysisPanel({
   engineState,
   scriptText,
+  parsedBlocks,
   isCleaning,
   onCleanAction,
 }: AnalysisPanelProps) {
-  const parsedBlocks = parseFountain(scriptText);
-
   return (
     <div
       className="space-y-6"
