@@ -1359,7 +1359,7 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     process.exit(1);
   }
   const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    logger.info('server_started', { port: PORT });
   });
 
   // ── Graceful shutdown ────────────────────────────────────────────────────────

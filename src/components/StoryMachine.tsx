@@ -85,8 +85,10 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [showBuilder, setShowBuilder] = useState(false);
 
   const fetchActivePressures = useCallback(async () => {
-    const res = await fetch("/api/dramatic-pressure-all");
-    if (res.ok) setActivePressures(await res.json() as Array<{ char_id: string; pressures: DramaticPressure[] }>);
+    try {
+      const res = await fetch("/api/dramatic-pressure-all");
+      if (res.ok) setActivePressures(await res.json() as Array<{ char_id: string; pressures: DramaticPressure[] }>);
+    } catch { /* non-critical background fetch */ }
   }, []);
 
   // Close any in-flight SSE connection when the component unmounts
@@ -116,21 +118,25 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   }, [ledger]);
 
   const fetchState = async () => {
-    const res = await fetch("/api/state");
-    if (!res.ok) { console.error("[state]", res.status); return; }
-    const data = await res.json() as { agents: CharacterSheet[]; nodes: Location[] };
-    setAgents(data.agents);
-    setNodes(data.nodes);
-    if (data.agents.length > 0) {
-      fetchPersuasionLog(data.agents.map(a => a.char_id));
-    }
+    try {
+      const res = await fetch("/api/state");
+      if (!res.ok) return;
+      const data = await res.json() as { agents: CharacterSheet[]; nodes: Location[] };
+      setAgents(data.agents);
+      setNodes(data.nodes);
+      if (data.agents.length > 0) {
+        fetchPersuasionLog(data.agents.map(a => a.char_id));
+      }
+    } catch { /* silent — background poll */ }
   };
 
   const fetchLedger = async () => {
-    const res = await fetch("/api/ledger");
-    if (!res.ok) { console.error("[ledger]", res.status); return; }
-    const data = await res.json() as ActionLogEntry[];
-    setLedger(data);
+    try {
+      const res = await fetch("/api/ledger");
+      if (!res.ok) return;
+      const data = await res.json() as ActionLogEntry[];
+      setLedger(data);
+    } catch { /* silent — background poll */ }
   };
 
   const fetchIllusionState = async () => {
@@ -299,7 +305,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       });
       await refreshAll();
     } catch (e) {
-      console.error("[run-room]", e);
+      showError((e as Error).message ?? 'Room simulation failed.');
     } finally {
       setLoading(false);
       setStreamLog([]);

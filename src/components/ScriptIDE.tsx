@@ -194,6 +194,8 @@ export default function ScriptIDE({
   );
   const [directorsLayer, setDirectorsLayer] = useState(false);
   const [isCleaning, setIsCleaning] = useState<number | null>(null);
+  const [cleanError, setCleanError] = useState<string | null>(null);
+  const cleanErrTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // ── Refs ────────────────────────────────────────────────────────────────────
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -203,6 +205,7 @@ export default function ScriptIDE({
   const panelToggleCountRef = useRef(0);
   const keystrokeTimesRef = useRef<number[]>([]);
   const analysisGenerationRef = useRef<number>(0);
+  const analysisAbortRef = useRef<AbortController | null>(null);
   // Always-current ref so async callbacks (triggerAnalysis) see the latest engineState
   // rather than a stale closure from 2 s ago.
   const engineStateRef = useRef<EngineState | null>(null);
@@ -423,20 +426,23 @@ export default function ScriptIDE({
     const currentEngineState = engineStateRef.current;
     if (!text.trim() || !currentEngineState) return;
 
+    // Cancel any in-flight analysis so a stale response can't overwrite newer state.
+    analysisAbortRef.current?.abort();
+    const abort = new AbortController();
+    analysisAbortRef.current = abort;
+
     const currentGeneration = ++analysisGenerationRef.current;
     setEngineState((prev) => (prev ? { ...prev, isAnalyzing: true } : null));
 
     try {
-      const newState = await analyzeScriptBlock(currentEngineState, text, characters);
+      const newState = await analyzeScriptBlock(currentEngineState, text, characters, abort.signal);
       if (currentGeneration === analysisGenerationRef.current) {
         setEngineState(newState);
       }
     } catch (error) {
-      console.error("Analysis failed:", error);
+      if (error instanceof DOMException && error.name === 'AbortError') return;
       if (currentGeneration === analysisGenerationRef.current) {
-        setEngineState((prev) =>
-          prev ? { ...prev, isAnalyzing: false } : null
-        );
+        setEngineState((prev) => prev ? { ...prev, isAnalyzing: false } : null);
       }
     }
   };
@@ -742,7 +748,9 @@ export default function ScriptIDE({
       setScriptText(newScript);
       triggerAnalysis(newScript);
     } catch (err) {
-      console.error("Failed to clean action:", err);
+      if (cleanErrTimerRef.current) clearTimeout(cleanErrTimerRef.current);
+      setCleanError((err as Error).message ?? 'Clean action failed');
+      cleanErrTimerRef.current = setTimeout(() => setCleanError(null), 5000);
     } finally {
       setIsCleaning(null);
     }
@@ -968,6 +976,12 @@ export default function ScriptIDE({
 
       {/* CENTER PANEL: INGEST (Script Editor) */}
       <div className="flex-1 h-full border-r-4 border-black flex flex-col bg-white relative">
+        {cleanError && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white text-xs font-bold px-3 py-1.5 border-2 border-black flex items-center gap-2">
+            {cleanError}
+            <button onClick={() => setCleanError(null)} className="ml-1 leading-none hover:opacity-70">✕</button>
+          </div>
+        )}
         <Toolbar
           isSaving={isSaving}
           isAnalyzing={engineState.isAnalyzing}
