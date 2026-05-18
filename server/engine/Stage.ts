@@ -492,7 +492,7 @@ export class Stage {
       action.action_type,
       action.target ?? null,
       action.content,
-      action.action_type !== 'EXAMINE' ? 1 : 0,
+      (action.action_type !== 'EXAMINE' && action.action_type !== 'WAIT') ? 1 : 0,
     );
     return action_id;
   }

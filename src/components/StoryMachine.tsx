@@ -72,6 +72,16 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const evtSourceRef = useRef<EventSource | null>(null);
   const [loading, setLoading] = useState(false);
   const [streamLog, setStreamLog] = useState<string[]>([]);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showError = useCallback((msg: string) => {
+    setErrorMsg(msg);
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = setTimeout(() => setErrorMsg(null), 6000);
+  }, []);
+
+  useEffect(() => () => { if (errorTimerRef.current) clearTimeout(errorTimerRef.current); }, []);
   const [showBuilder, setShowBuilder] = useState(false);
 
   const fetchActivePressures = useCallback(async () => {
@@ -176,11 +186,11 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       if (!initRes.ok) throw new Error(`Init failed: ${initRes.status}`);
       await refreshAll();
     } catch (e) {
-      console.error("[submitScenario]", e);
+      showError((e as Error).message ?? 'Failed to start scenario. Check the server.');
     } finally {
       setLoading(false);
     }
-  }, [refreshAll]);
+  }, [refreshAll, showError]);
 
   // The original hardcoded scenario, now offered as a one-click preset.
   const loadExample = useCallback(() => {
@@ -249,7 +259,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       });
       await refreshAll();
     } catch (e) {
-      console.error("[turn]", e);
+      showError((e as Error).message ?? 'Turn failed.');
     } finally {
       setLoading(false);
     }
@@ -319,11 +329,11 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
         URL.revokeObjectURL(url);
       }
     } catch (e) {
-      console.error("[handleExport]", e);
+      showError((e as Error).message ?? 'Export failed.');
     } finally {
       setIsExporting(false);
     }
-  }, [ledger.length, onExportToIDE, syuzhetMode]);
+  }, [ledger.length, onExportToIDE, syuzhetMode, showError]);
 
   const illusionColor =
     illusionState?.phase === "Prestige" ? "#FF4444"
@@ -332,6 +342,15 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
 
   return (
     <div className="min-h-screen bg-[#f4f4f0] text-black p-8 font-sans">
+      {errorMsg && (
+        <div
+          role="alert"
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white px-5 py-3 font-mono text-sm border-2 border-black shadow-lg flex items-center gap-3"
+        >
+          <span>{errorMsg}</span>
+          <button onClick={() => setErrorMsg(null)} className="ml-2 font-bold leading-none hover:opacity-70">✕</button>
+        </div>
+      )}
       <header className="mb-8 border-b-4 border-black pb-4 flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold uppercase tracking-widest text-black">

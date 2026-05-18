@@ -105,7 +105,7 @@ export class Orchestrator {
     const action_id = this.stage.recordAction(agentId, action, currentNodeId);
     const turnIndex = this.stage.getTurnCount();
 
-    // Build EventCard for the spine
+    // Build EventCard for the spine (WAIT is silent and has no propositions — skip spine)
     const actionEntry = {
       action_id,
       timestamp: Date.now(),
@@ -114,9 +114,11 @@ export class Orchestrator {
       action_type: action.action_type,
       target_char_id: action.target ?? null,
       content: action.content,
-      is_audible: action.action_type !== 'EXAMINE',
+      is_audible: action.action_type !== 'EXAMINE' && action.action_type !== 'WAIT',
     } as import('./types.ts').ActionLogEntry;
-    this.spine.processEvent(actionEntry, turnIndex);
+    if (action.action_type !== 'WAIT') {
+      this.spine.processEvent(actionEntry, turnIndex);
+    }
 
     // EXAMINE: deterministically reveal unexposed lies by the target.
     if (action.action_type === 'EXAMINE' && action.target) {
@@ -234,9 +236,11 @@ export class Orchestrator {
           action_type: action.action_type,
           target_char_id: action.target ?? null,
           content: action.content,
-          is_audible: action.action_type !== 'EXAMINE',
+          is_audible: action.action_type !== 'EXAMINE' && action.action_type !== 'WAIT',
         } as import('./types.ts').ActionLogEntry;
-        this.spine.processEvent(actionEntry, turnIndex);
+        if (action.action_type !== 'WAIT') {
+          this.spine.processEvent(actionEntry, turnIndex);
+        }
 
         // ── inciting_action beat: first LIE only (one per simulation — multiple lies
         //    each emitting this beat corrupts syuzhetSort's flashback reconstruction) ──

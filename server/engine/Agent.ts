@@ -213,7 +213,7 @@ export class Agent {
               items: {
                 type: Type.OBJECT,
                 properties: {
-                  action_type: { type: Type.STRING, enum: ['SPEAK', 'EXAMINE', 'LIE', 'RELOCATE'] },
+                  action_type: { type: Type.STRING, enum: ['SPEAK', 'EXAMINE', 'LIE', 'RELOCATE', 'WAIT'] },
                   target:      { type: Type.STRING, nullable: true },
                   content:     { type: Type.STRING },
                   reasoning:   { type: Type.STRING, description: 'Why this action serves your goal.' },
@@ -254,7 +254,7 @@ export class Agent {
     const dt = this.sheet.darkTriad ?? { machiavellianism: 50, narcissism: 50, psychopathy: 50 };
     const bf = this.sheet.bigFive ?? { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 };
     const activeDefense = selectActiveDefense(this.sheet.defenseMechanisms, this.sheet.emotionState);
-    const VALID_ACTIONS = new Set<string>(['SPEAK', 'EXAMINE', 'LIE', 'RELOCATE']);
+    const VALID_ACTIONS = new Set<string>(['SPEAK', 'EXAMINE', 'LIE', 'RELOCATE', 'WAIT']);
     const best = (raw.candidates ?? []).reduce<Candidate>(
       (top, c) => {
         const cType = VALID_ACTIONS.has(c.action_type) ? c.action_type as ActionType : 'SPEAK';

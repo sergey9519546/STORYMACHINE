@@ -33,14 +33,14 @@ export interface ActionLogEntry {
   timestamp: number;
   char_id: string;
   location_id: string;
-  action_type: 'SPEAK' | 'EXAMINE' | 'LIE' | 'RELOCATE';
+  action_type: 'SPEAK' | 'EXAMINE' | 'LIE' | 'RELOCATE' | 'WAIT';
   target_char_id: string | null;
   content: string;
   is_audible: boolean;
 }
 
 export interface NarrativeAction {
-  action_type: 'SPEAK' | 'EXAMINE' | 'LIE' | 'RELOCATE';
+  action_type: 'SPEAK' | 'EXAMINE' | 'LIE' | 'RELOCATE' | 'WAIT';
   content: string;
   target: string | null;
 }

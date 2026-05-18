@@ -8,7 +8,7 @@ import type { DarkTriad, BigFive, DefenseMechanism } from '../engine/types.ts';
 // selection in Agent.takeTurn(). Range 0.7–1.3; all traits at 50 → exactly 1.0,
 // so neutral/default characters are completely unaffected.
 
-export type ActionType = 'SPEAK' | 'EXAMINE' | 'LIE' | 'RELOCATE';
+export type ActionType = 'SPEAK' | 'EXAMINE' | 'LIE' | 'RELOCATE' | 'WAIT';
 
 // Normalize a trait value (0–100) to a -1 to +1 deviation from neutral.
 const dev = (v: number) => (v - 50) / 50;
@@ -32,12 +32,15 @@ export function actionBiasWeights(
   const RELOCATE = 1.0 + 0.15 * neur  - 0.10 * extr - 0.05 * narc;
 
   // Clamp each weight to [0.5, 1.6] so LLM signal is nudged, never overridden.
+  // WAIT: introverts and high-neuroticism characters are more likely to pause and observe.
+  const WAIT = 1.0 - 0.10 * extr + 0.10 * neur + 0.05 * cons;
   const clamp = (v: number) => Math.max(0.5, Math.min(1.6, v));
   return {
     SPEAK:    clamp(SPEAK),
     EXAMINE:  clamp(EXAMINE),
     LIE:      clamp(LIE),
     RELOCATE: clamp(RELOCATE),
+    WAIT:     clamp(WAIT),
   };
 }
 

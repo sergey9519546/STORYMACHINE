@@ -2006,3 +2006,74 @@ describe('AppraisalEngine — applySuspicionContagion', () => {
     assert.equal(alice?.suspicion_score, 10, 'low-intensity neighbor should not trigger contagion');
   });
 });
+
+// ── WAIT action type ─────────────────────────────────────────────────────────
+describe('WAIT action — personality bias', () => {
+  it('introvert (extraversion=10) gets higher WAIT weight than extrovert (extraversion=90)', () => {
+    const neutralDT = { machiavellianism: 50, narcissism: 50, psychopathy: 50 };
+    const neutralBF5 = { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 };
+    const introvert = { ...neutralBF5, extraversion: 10 };
+    const extrovert = { ...neutralBF5, extraversion: 90 };
+    const introWeights = actionBiasWeights(neutralDT, introvert);
+    const extrWeights  = actionBiasWeights(neutralDT, extrovert);
+    assert.ok(introWeights.WAIT > extrWeights.WAIT, `introvert WAIT ${introWeights.WAIT} should exceed extrovert WAIT ${extrWeights.WAIT}`);
+  });
+
+  it('high-neuroticism agent gets higher WAIT weight', () => {
+    const neutralDT = { machiavellianism: 50, narcissism: 50, psychopathy: 50 };
+    const neutralBF5 = { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 };
+    const anxious = { ...neutralBF5, neuroticism: 90 };
+    const calm    = { ...neutralBF5, neuroticism: 10 };
+    const anxiousW = actionBiasWeights(neutralDT, anxious);
+    const calmW    = actionBiasWeights(neutralDT, calm);
+    assert.ok(anxiousW.WAIT > calmW.WAIT, `high-neur WAIT ${anxiousW.WAIT} should exceed low-neur WAIT ${calmW.WAIT}`);
+  });
+
+  it('all-neutral traits → WAIT weight exactly 1.0', () => {
+    const neutralDT = { machiavellianism: 50, narcissism: 50, psychopathy: 50 };
+    const neutralBF5 = { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 };
+    const w = actionBiasWeights(neutralDT, neutralBF5);
+    assert.equal(w.WAIT, 1.0, 'neutral traits must produce exactly 1.0 for WAIT');
+  });
+
+  it('WAIT weight is within [0.5, 1.6] for extreme traits', () => {
+    const extremeDT = { machiavellianism: 100, narcissism: 100, psychopathy: 100 };
+    const extremeBF5 = { openness: 0, conscientiousness: 0, extraversion: 0, agreeableness: 0, neuroticism: 100 };
+    const w = actionBiasWeights(extremeDT, extremeBF5);
+    assert.ok(w.WAIT >= 0.5 && w.WAIT <= 1.6, `WAIT ${w.WAIT} out of bounds [0.5, 1.6]`);
+  });
+});
+
+describe('WAIT action — Orchestrator is_audible', () => {
+  it('WAIT action is recorded as non-audible in the action log', async () => {
+    const stage = new Stage(':memory:');
+    stage.addLocation({ location_id: 'room', name: 'Room', description: '', adjacent_locations: [] });
+    const aliceSheet: CharacterSheet = {
+      char_id: 'alice', name: 'Alice', public_mask: '', hidden_motive: '',
+      knowledge_vector: [], current_location_id: 'room', suspicion_score: 0, is_alive: true,
+    };
+    stage.addAgent(aliceSheet);
+
+    const waitProvider = {
+      generate: async (params: GenerateContentParameters) => {
+        const sys = typeof params.config?.systemInstruction === 'string' ? params.config.systemInstruction : '';
+        if (sys.includes('candidate actions')) {
+          return { text: JSON.stringify({ candidates: [{ action_type: 'WAIT', content: '(observes silently)', target: null, goal_score: 50 }] }) } as never;
+        }
+        return { text: JSON.stringify({ newSuspicionScore: 0, newBeliefs: [], updatedTheoryOfMind: [], contradiction_detected: false, contradicted_propositions: [], tension_delta: 0, new_beliefs: [], suspicion_updates: [] }) } as never;
+      },
+    };
+    setLLMProvider(waitProvider);
+    try {
+      const orch = new Orchestrator(stage);
+      orch.registerAgent(aliceSheet);
+      await orch.runTurn('alice');
+      const log = stage.getFullLedger();
+      const waitEntry = log.find((e: ActionLogEntry) => e.action_type === 'WAIT');
+      assert.ok(waitEntry, 'WAIT action should be in the action log');
+      assert.ok(!waitEntry!.is_audible, 'WAIT action must not be audible');
+    } finally {
+      resetLLMProvider();
+    }
+  });
+});
