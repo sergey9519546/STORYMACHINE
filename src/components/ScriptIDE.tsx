@@ -125,15 +125,8 @@ const lsGet = (key: string): string | null => {
 const lsSet = (key: string, val: string): void => {
   try {
     localStorage.setItem(key, val);
-  } catch (e) {
-    if (
-      e instanceof DOMException &&
-      e.name === "QuotaExceededError"
-    ) {
-      console.warn(
-        "[storage] localStorage quota exceeded — changes not persisted"
-      );
-    }
+  } catch {
+    // localStorage quota exceeded — changes not persisted, continue silently
   }
 };
 
