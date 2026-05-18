@@ -1,4 +1,4 @@
-import type { OutlineBeat } from '../engine/types.ts';
+import type { OutlineBeat, IllusionPhase } from '../engine/types.ts';
 
 // ── Structure Preset Beat Templates ───────────────────────────────────────────
 // Each template defines beats as percentages (0–100) of the total expected
@@ -437,7 +437,7 @@ export function instantiatePreset(structure: string, expectedTurns: number): Out
   const n = Math.max(4, expectedTurns);
   return templates.map(t => {
     const pctMid = (t.pct_start + t.pct_end) / 2;
-    const phase: 'Setup' | 'Turn' | 'Prestige' =
+    const phase: IllusionPhase =
       pctMid < 33 ? 'Setup' : pctMid < 66 ? 'Turn' : 'Prestige';
     return {
       phase,

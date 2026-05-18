@@ -28,19 +28,36 @@ export interface Location {
   adjacent_locations: string[];
 }
 
+// ── Narrative action vocabulary ──────────────────────────────────────────────
+// SINGLE SOURCE OF TRUTH for the action types an Agent may take. `ActionType`
+// is derived from this array; Agent.ts derives both its runtime guard set and
+// the LLM response-schema enum from `ACTION_TYPES`.
+//
+// TO ADD A NEW ACTION TYPE:
+//   1. Add the string here — ActionLogEntry / NarrativeAction / EventCard and
+//      the LLM schema enum update automatically.
+//   2. personality.ts: extend the exhaustive `Record<ActionType, number>` in
+//      actionBiasWeights() — the compiler flags the missing key.
+//   3. Orchestrator.runTurn(): handle any side effects (cf. the RELOCATE branch).
+//   4. CausalSpine.processEvent(): decide whether the action emits an
+//      EventProposition (SPEAK / LIE / EXAMINE currently do).
+//   5. Stage.recordAction(): set the is_audible flag for the new type.
+export const ACTION_TYPES = ['SPEAK', 'EXAMINE', 'LIE', 'RELOCATE', 'WAIT'] as const;
+export type ActionType = typeof ACTION_TYPES[number];
+
 export interface ActionLogEntry {
   action_id: string;
   timestamp: number;
   char_id: string;
   location_id: string;
-  action_type: 'SPEAK' | 'EXAMINE' | 'LIE' | 'RELOCATE' | 'WAIT';
+  action_type: ActionType;
   target_char_id: string | null;
   content: string;
   is_audible: boolean;
 }
 
 export interface NarrativeAction {
-  action_type: 'SPEAK' | 'EXAMINE' | 'LIE' | 'RELOCATE' | 'WAIT';
+  action_type: ActionType;
   content: string;
   target: string | null;
 }
@@ -137,6 +154,11 @@ export interface GoalStack {
 
 // ── Cognitive illusion tracking (The Prestige structure) ────────────────────
 
+// The three-act Prestige phase. Drives outline-beat selection and agent prompt
+// conditioning. Adding a phase here also requires handling it in
+// structure-presets.ts (phase derivation) and Agent.buildEnhancedPrompt.
+export type IllusionPhase = 'Setup' | 'Turn' | 'Prestige';
+
 export interface IllusionElement {
   description: string;
   turn_index: number;
@@ -145,7 +167,7 @@ export interface IllusionElement {
 }
 
 export interface IllusionState {
-  phase: 'Setup' | 'Turn' | 'Prestige';
+  phase: IllusionPhase;
   planted_elements: IllusionElement[];
   pending_recontextualization: string[];
   total_turns: number;
@@ -178,7 +200,7 @@ export interface PersuasionRecord {
 // When present, each matching OutlineBeat replaces the generic phase hint in agent prompts.
 
 export interface OutlineBeat {
-  phase: 'Setup' | 'Turn' | 'Prestige';
+  phase: IllusionPhase;
   turn_start: number;
   turn_end: number;
   goal: string;        // narrative goal for this beat
@@ -295,8 +317,13 @@ export interface GoalMutation {
   new_subgoal?: string;
 }
 
-// Director bias signal — biases an agent's next action, never puppets them
+// Director bias signal — biases an agent's next action, never puppets them.
 // Canonical spec types (UPPERCASE) added alongside legacy snake_case for backward compat.
+//
+// TO ADD A NEW PRESSURE TYPE: extend this union, then handle it in
+//   - AppraisalEngine.appraise(): the per-pressure OCC emotion appraisal, and
+//   - CausalSpine / DirectorNode: wherever the pressure is emitted.
+// The agent prompt consumes `bias_hint` generically, so no Agent.ts change is needed.
 export type DramaticPressureType =
   | 'confrontation_imminent'
   | 'evidence_against'
@@ -322,7 +349,10 @@ export interface DramaticPressure {
   applied: boolean;           // true once injected into a prompt
 }
 
-// Causal record of one significant narrative beat
+// Causal record of one significant narrative beat.
+// TO ADD A NEW BEAT TYPE: extend this union — CausalSpine's
+// `Record<BeatType, InformationPosition>` default-position map fails to compile
+// until the new type is assigned an information position, so the seam is enforced.
 export type BeatType =
   | 'inciting_action'
   | 'contradiction_discovered'

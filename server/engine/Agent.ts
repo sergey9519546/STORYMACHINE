@@ -2,8 +2,10 @@ import { Type } from '@google/genai';
 import { randomUUID } from 'crypto';
 import { getModel, getTemperature, generateContent } from './ai.ts';
 import { STYLE_MODIFIERS } from '../lib/structure-presets.ts';
-import { effectiveScore, type ActionType } from '../lib/personality.ts';
+import { effectiveScore } from '../lib/personality.ts';
+import { ACTION_TYPES } from './types.ts';
 import type {
+  ActionType,
   CharacterSheet,
   NarrativeAction,
   ActionLogEntry,
@@ -230,7 +232,7 @@ export class Agent {
               items: {
                 type: Type.OBJECT,
                 properties: {
-                  action_type: { type: Type.STRING, enum: ['SPEAK', 'EXAMINE', 'LIE', 'RELOCATE', 'WAIT'] },
+                  action_type: { type: Type.STRING, enum: [...ACTION_TYPES] },
                   target:      { type: Type.STRING, nullable: true },
                   content:     { type: Type.STRING },
                   reasoning:   { type: Type.STRING, description: 'Why this action serves your goal.' },
@@ -289,7 +291,7 @@ export class Agent {
         fountain_hint: '',
       });
     }
-    const VALID_ACTIONS = new Set<string>(['SPEAK', 'EXAMINE', 'LIE', 'RELOCATE', 'WAIT']);
+    const VALID_ACTIONS = new Set<string>(ACTION_TYPES);
     const best = (raw.candidates ?? []).reduce<Candidate>(
       (top, c) => {
         const cType = VALID_ACTIONS.has(c.action_type) ? c.action_type as ActionType : 'SPEAK';

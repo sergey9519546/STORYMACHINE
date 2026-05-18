@@ -115,6 +115,7 @@ import { CausalSpine } from './server/engine/CausalSpine.ts';
 import { Orchestrator } from './server/engine/Orchestrator.ts';
 import { transcriptToFountain } from './server/lib/fountain.ts';
 import type { ActionLogEntry, Belief, CharacterSheet, Location } from './server/engine/types.ts';
+import { ACTION_TYPES } from './server/engine/types.ts';
 
 function makeStage(): Stage {
   const stage = new Stage(':memory:');
@@ -1891,6 +1892,14 @@ describe('Orchestrator — stakes escalation emits pressure', () => {
 describe('personality — actionBiasWeights', () => {
   const NEUTRAL_DT = { machiavellianism: 50, narcissism: 50, psychopathy: 50 };
   const NEUTRAL_BF = { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 };
+
+  it('action-bias table covers exactly the canonical ACTION_TYPES vocabulary', () => {
+    // Seam guard: the personality weight table must stay in lockstep with the
+    // single source of truth (engine/types.ts ACTION_TYPES). Adding an action
+    // type without a personality weight should fail here (and at compile time).
+    const weightKeys = Object.keys(actionBiasWeights(NEUTRAL_DT, NEUTRAL_BF)).sort();
+    assert.deepEqual(weightKeys, [...ACTION_TYPES].sort());
+  });
 
   it('neutral traits → all weights exactly 1.0', () => {
     const w = actionBiasWeights(NEUTRAL_DT, NEUTRAL_BF);
