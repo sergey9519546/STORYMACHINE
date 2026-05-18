@@ -436,6 +436,11 @@ async function startServer() {
     const session = getOrCreateSession(sessionId(req));
     const agentId = requireString(req.body?.agentId, 'agentId', 128);
 
+    if (!session.stage.getAgent(agentId)) {
+      res.status(404).json({ error: `Agent '${agentId}' does not exist in this session` });
+      return;
+    }
+
     // Per-session serialization: each turn is chained behind the previous so
     // concurrent requests for the same session run sequentially, not in parallel,
     // preventing state corruption in the SQLite-backed engine.
@@ -469,7 +474,11 @@ async function startServer() {
       ? Math.max(2, Math.min(12, Math.round(rawMaxTurns)))
       : 5;
 
-    const { orchestrator } = getOrCreateSession(sid);
+    const { stage, orchestrator } = getOrCreateSession(sid);
+    if (!stage.getLocation(nodeId)) {
+      res.status(404).json({ error: `Location '${nodeId}' does not exist in this session` });
+      return;
+    }
     runningRooms.add(lockKey);
     try {
       await orchestrator.runRoomSimulation(nodeId, maxTurns);
@@ -514,7 +523,12 @@ async function startServer() {
         ? Math.max(2, Math.min(12, parseInt(rawMaxTurns, 10) || 5))
         : 5;
 
-      const { orchestrator } = getOrCreateSession(sid);
+      const { stage, orchestrator } = getOrCreateSession(sid);
+      if (!stage.getLocation(nodeId)) {
+        emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: `error: location '${nodeId}' not found` });
+        res.end();
+        return;
+      }
       runningRooms.add(lockKey);
       try {
         await orchestrator.runRoomSimulation(nodeId, maxTurns, emit);
@@ -897,6 +911,10 @@ async function startServer() {
     const snap = req.body as StageSnapshot;
     if (!snap || typeof snap !== 'object' || !Array.isArray(snap.agents) || !Array.isArray(snap.locations)) {
       res.status(400).json({ error: 'Invalid snapshot: must include agents and locations arrays' });
+      return;
+    }
+    if (snap.agents.length === 0 || snap.locations.length === 0) {
+      res.status(400).json({ error: 'Invalid snapshot: agents and locations arrays must be non-empty' });
       return;
     }
     // Reject snapshots that are newer than the current schema version to prevent

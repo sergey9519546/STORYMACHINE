@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { EngineState, StoryConfig } from "../types";
+import { EngineState, StoryConfig, DirectorState } from "../types";
 import { analyzeScriptBlock } from "../services/director";
 import { parseFountain, FountainBlock } from "../lib/fountain";
 import { safeJsonParse } from "../lib/json";
@@ -263,6 +263,12 @@ export default function ScriptIDE({
 
   // ── Initialize engine state ──────────────────────────────────────────────────
   useEffect(() => {
+    // Restore any DirectorPanel edits (throughlines, player model, QBN qualities)
+    // persisted from a previous session so they survive a page reload.
+    const savedDirector = safeJsonParse<Partial<DirectorState> | null>(
+      lsGet("director_state"),
+      null,
+    );
     setEngineState({
       config: initialConfig,
       protagonist: {
@@ -326,12 +332,20 @@ export default function ScriptIDE({
           activeThroughlines: [],
         },
         qbnQualities: {},
+        ...(savedDirector ?? {}),
       },
       scriptBlocks: [],
       isAnalyzing: false,
       isGeneratingMedia: false,
     });
   }, [initialConfig]);
+
+  // Persist directorState so DirectorPanel edits survive a page reload.
+  useEffect(() => {
+    if (engineState?.directorState) {
+      lsSet("director_state", JSON.stringify(engineState.directorState));
+    }
+  }, [engineState?.directorState]);
 
   // ── Panel toggle biometrics ──────────────────────────────────────────────────
   useEffect(() => {

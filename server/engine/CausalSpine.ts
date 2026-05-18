@@ -3,6 +3,7 @@ import type {
   ActionLogEntry,
   Belief,
   BeliefEdge,
+  BeliefEdgeType,
   BeatTrace,
   BeatType,
   DramaticPressure,
@@ -182,6 +183,82 @@ export class CausalSpine {
     }
 
     return edges;
+  }
+
+  // 2b. After a non-contradicting belief update: form supports / supersedes edges
+  //     so the belief graph records reinforcement, not just conflict.
+  //       supports   — a new belief corroborates an existing one (same claim, same polarity).
+  //       supersedes — a new belief is a higher-authority update of an older one
+  //                    (witnessed > told > inferred, or markedly higher confidence).
+  //     supports edges bump the corroborated belief's confidence; supersedes edges
+  //     decay the stale belief. Returns the created edges (also persisted to Stage).
+  public processBeliefReinforcement(
+    char_id: string,
+    newBeliefs: Belief[],
+    sourceEventId: string,
+  ): BeliefEdge[] {
+    if (newBeliefs.length === 0) return [];
+
+    const allBeliefs = this.stage.getAgent(char_id)?.beliefs ?? [];
+    const existingBeliefs = allBeliefs.filter(b => !newBeliefs.some(nb => nb.id === b.id));
+    if (existingBeliefs.length === 0) return [];
+
+    const turnIndex = this.stage.getTurnCount();
+    const SOURCE_RANK: Record<string, number> = { inferred: 0, told: 1, witnessed: 2 };
+    const edges: BeliefEdge[] = [];
+
+    for (const newBelief of newBeliefs) {
+      for (const existing of existingBeliefs) {
+        if (newBelief.id === existing.id) continue;
+        if (!this._sameClaim(newBelief.proposition, existing.proposition)) continue;
+
+        // supersedes: the new belief carries higher epistemic authority than the old.
+        const rankUp = (SOURCE_RANK[newBelief.source] ?? 0) > (SOURCE_RANK[existing.source] ?? 0);
+        const confUp = newBelief.confidence > existing.confidence + 0.15;
+        const edgeType: BeliefEdgeType = (rankUp || confUp) ? 'supersedes' : 'supports';
+
+        edges.push({
+          edge_id: randomUUID(),
+          from_belief_id: existing.id,
+          to_belief_id: newBelief.id,
+          edge_type: edgeType,
+          discovered_by: char_id,
+          source_event_id: sourceEventId,
+          turn_index: turnIndex,
+          severity: Math.round(Math.max(existing.confidence, newBelief.confidence) * 100),
+        });
+      }
+    }
+    if (edges.length === 0) return [];
+
+    for (const e of edges) this.stage.addBeliefEdge(e);
+
+    // supports → strengthen the corroborated belief; supersedes → decay the stale one.
+    const supportedIds  = new Set(edges.filter(e => e.edge_type === 'supports').map(e => e.from_belief_id));
+    const supersededIds = new Set(edges.filter(e => e.edge_type === 'supersedes').map(e => e.from_belief_id));
+    const updated = allBeliefs.map(b => {
+      let confidence = b.confidence;
+      if (supportedIds.has(b.id))  confidence = Math.min(1, b.confidence + 0.1);
+      if (supersededIds.has(b.id)) confidence = Math.max(0.05, b.confidence * 0.6);
+      return confidence === b.confidence ? b : { ...b, confidence };
+    });
+    this.stage.updateAgentBeliefs(char_id, updated);
+
+    return edges;
+  }
+
+  // Same underlying claim: high word overlap AND identical polarity.
+  // Distinct from _overlap, which also matches negation-pairs (opposite polarity).
+  private _sameClaim(a: string, b: string): boolean {
+    if (!a || !b) return false;
+    const negationRe = /\bisn?'?t\b|\bwasn?'?t\b|\baren?'?t\b|\bweren?'?t\b|\bnot\b|\bnever\b|\bno\b/i;
+    if (negationRe.test(a) !== negationRe.test(b)) return false;
+    const wordsA = new Set((a.toLowerCase().match(/\b\w{4,}\b/g) ?? []));
+    const wordsB = new Set((b.toLowerCase().match(/\b\w{4,}\b/g) ?? []));
+    if (wordsA.size === 0 || wordsB.size === 0) return false;
+    let shared = 0;
+    for (const w of wordsA) if (wordsB.has(w)) shared++;
+    return shared / Math.min(wordsA.size, wordsB.size) >= 0.6;
   }
 
   // 3. From contradiction edges: resolve WHO was lied to and by whom,
