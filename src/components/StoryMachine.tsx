@@ -148,7 +148,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
         const data = await res.json() as IllusionState;
         setIllusionState(data);
       }
-    } catch (e) { console.error("[illusion-state]", e); }
+    } catch { /* silent — background poll */ }
   };
 
   const fetchSpineData = async () => {
@@ -158,19 +158,16 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
         fetch("/api/belief-edges"),
         fetch("/api/goal-mutations"),
       ]);
-      if (beatsRes.ok)          setBeatTraces(await beatsRes.json() as BeatTrace[]);
-      else console.error("[spine] beat-traces", beatsRes.status);
-      if (edgesRes.ok)          setBeliefEdges(await edgesRes.json() as BeliefEdge[]);
-      else console.error("[spine] belief-edges", edgesRes.status);
-      if (mutationsRes.ok)      setGoalMutations(await mutationsRes.json() as GoalMutation[]);
-      else console.error("[spine] goal-mutations", mutationsRes.status);
-    } catch (e) { console.error("[spine]", e); }
+      if (beatsRes.ok)     setBeatTraces(await beatsRes.json() as BeatTrace[]);
+      if (edgesRes.ok)     setBeliefEdges(await edgesRes.json() as BeliefEdge[]);
+      if (mutationsRes.ok) setGoalMutations(await mutationsRes.json() as GoalMutation[]);
+    } catch { /* silent — background poll */ }
   };
 
   const refreshAll = useCallback(async () => {
     await Promise.all([
       fetchState(), fetchLedger(), fetchIllusionState(), fetchSpineData(), fetchActivePressures(),
-    ]).catch(e => console.error("[refreshAll]", e));
+    ]).catch(() => { /* silent — background refresh */ });
   }, [fetchPersuasionLog, fetchActivePressures]);
 
   // Wipes any existing session, posts a fresh scenario, and refreshes all panels.
