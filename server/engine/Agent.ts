@@ -272,6 +272,23 @@ export class Agent {
     const bf = this.sheet.bigFive ?? { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 };
     const activeDefense = selectActiveDefense(this.sheet.defenseMechanisms, this.sheet.emotionState);
     const attachStyle = this.sheet.attachmentStyle;
+
+    // Record defense activation as a beat trace so it's queryable for analysis.
+    if (activeDefense) {
+      const locationId = this.sheet.current_location_id;
+      const lastAction = this.stage.getLastActionForAgent(this.sheet.char_id);
+      this.stage.addBeatTrace({
+        beat_id: randomUUID(),
+        turn_index: this.stage.getTurnCount(),
+        location_id: locationId,
+        trigger_event_id: lastAction?.action_id ?? randomUUID(),
+        beat_type: 'defense_activated',
+        participants: [this.sheet.char_id],
+        causal_chain: lastAction ? [lastAction.action_id] : [],
+        narrative_summary: `${this.sheet.name} activated ${activeDefense} defense (emotion: ${this.sheet.emotionState?.dominant ?? 'unknown'}, intensity: ${this.sheet.emotionState?.intensity ?? 0}).`,
+        fountain_hint: '',
+      });
+    }
     const VALID_ACTIONS = new Set<string>(['SPEAK', 'EXAMINE', 'LIE', 'RELOCATE', 'WAIT']);
     const best = (raw.candidates ?? []).reduce<Candidate>(
       (top, c) => {

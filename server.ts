@@ -956,24 +956,95 @@ async function startServer() {
     res.json({ available, filtered: choices.length - available.length });
   }));
 
-  // NCP Storyform — derive narrative context protocol schema from goals and throughlines
+  // NCP Storyform — synthesize Dramatica-style storyform from live session data
   app.post('/api/ncp-storyform', gameLimiter, asyncHandler(async (req, res) => {
     const { throughlines, characters } = req.body ?? {};
     const tl = typeof throughlines === 'object' && throughlines !== null ? throughlines as Record<string, unknown> : {};
-    const chars = Array.isArray(characters) ? (characters as unknown[]).slice(0, 10) : [];
+    const inputChars = Array.isArray(characters) ? (characters as unknown[]).slice(0, 10) : [];
+
+    // Augment with live session data when available
+    const { stage: sessionStage } = getOrCreateSession(sessionId(req));
+    const liveAgents = sessionStage.getAllAgents();
+    const illusion = sessionStage.getIllusionState();
+
+    // Derive protagonist: agent with highest-value terminal goal or first agent
+    const sorted = [...liveAgents].sort((a, b) => {
+      const aVal = a.goalStack?.terminal.value ?? 0;
+      const bVal = b.goalStack?.terminal.value ?? 0;
+      return bVal - aVal;
+    });
+    const protagonist = sorted[0] ?? null;
+    const influenceChar = sorted[1] ?? null;
+
+    // Objective Story throughline: the over-arching conflict visible to everyone
+    // Infer from the dominant dramatic pressure type across all active agents
+    const objectiveStory = (tl.objectiveStory as string | undefined) ?? (() => {
+      if (!protagonist) return null;
+      const goal = protagonist.goalStack?.terminal.description;
+      if (goal) return `The central conflict concerns who controls ${goal.toLowerCase().replace(/^to /, '')} — every character has a stake.`;
+      return null;
+    })();
+
+    // Main Character throughline: subjective journey (how the protagonist changes internally)
+    const mainCharThroughline = (tl.mainCharacter as string | undefined) ?? (() => {
+      if (!protagonist) return null;
+      const lie = protagonist.public_mask;
+      const want = protagonist.hidden_motive;
+      return `${protagonist.name}'s internal journey: the gap between the mask they wear (${lie}) and what they truly pursue (${want}).`;
+    })();
+
+    // Influence Character: provides the contrasting worldview
+    const influenceThroughline = (tl.influenceCharacter as string | undefined) ?? (() => {
+      if (!influenceChar) return null;
+      return `${influenceChar.name} embodies an alternative approach — their choices force ${protagonist?.name ?? 'the protagonist'} to question their own path.`;
+    })();
+
+    // Relationship Story: how the two leads change each other
+    const relationshipStory = (tl.relationshipStory as string | undefined) ?? (() => {
+      if (!protagonist || !influenceChar) return null;
+      const trustVal = protagonist.theoryOfMind?.[influenceChar.char_id]?.trust_level;
+      const trustDesc = trustVal == null ? 'uncertain'
+        : trustVal > 0.7 ? 'uneasy alliance'
+        : trustVal > 0.4 ? 'wary co-dependence'
+        : 'mutual antagonism';
+      return `${protagonist.name} and ${influenceChar.name}: a ${trustDesc} that neither can walk away from.`;
+    })();
+
+    // Active throughlines: those flagged in the session + inferred from illusion phase
+    const activeThroughlines: string[] = Array.isArray(tl.activeThroughlines) && tl.activeThroughlines.length > 0
+      ? tl.activeThroughlines as string[]
+      : (() => {
+          const tls: string[] = [];
+          if (objectiveStory) tls.push('objectiveStory');
+          if (mainCharThroughline) tls.push('mainCharacter');
+          if (influenceThroughline) tls.push('influenceCharacter');
+          if (relationshipStory) tls.push('relationshipStory');
+          return tls;
+        })();
+
+    // Structural metadata from live session
+    const phase = illusion.phase ?? 'Setup';
+    const tensionState = sessionStage.getDirectorTensionState();
+    const tension = tensionState.accumulator ?? 0;
 
     const storyform: Record<string, unknown> = {
-      objectiveStory: tl.objectiveStory ?? null,
+      objectiveStory,
       mainCharacter: {
-        throughline: tl.mainCharacter ?? null,
-        protagonist: chars[0] ?? null,
+        throughline: mainCharThroughline,
+        protagonist: inputChars[0] ?? (protagonist ? { name: protagonist.name, want: protagonist.hidden_motive, lie: protagonist.public_mask } : null),
       },
       influenceCharacter: {
-        throughline: tl.influenceCharacter ?? null,
-        character: chars[1] ?? null,
+        throughline: influenceThroughline,
+        character: inputChars[1] ?? (influenceChar ? { name: influenceChar.name, want: influenceChar.hidden_motive, lie: influenceChar.public_mask } : null),
       },
-      relationshipStory: tl.relationshipStory ?? null,
-      activeThroughlines: Array.isArray(tl.activeThroughlines) ? tl.activeThroughlines : [],
+      relationshipStory,
+      activeThroughlines,
+      session: {
+        phase,
+        tension,
+        agentCount: liveAgents.length,
+        turnCount: sessionStage.getTurnCount(),
+      },
       computed_at: Date.now(),
     };
 

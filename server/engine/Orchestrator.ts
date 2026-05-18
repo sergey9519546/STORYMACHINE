@@ -389,9 +389,21 @@ export class Orchestrator {
     for (let round = 0; round < maxRounds; round++) {
       if (activeLocations.length === 0) break;
 
-      // Sort rooms by tension (higher = more urgent)
+      // Sort rooms by dramatic tension: rooms with more agents and more accumulated
+      // suspicion run first so pressure cascades naturally between scenes.
       const tensionState = this.stage.getDirectorTensionState();
-      const sorted = [...activeLocations].sort(() => 0); // stable order for now
+      const sorted = [...activeLocations].sort((a, b) => {
+        const agentsA = this.stage.getAgentsInLocation(a).filter(x => x.is_alive !== false);
+        const agentsB = this.stage.getAgentsInLocation(b).filter(x => x.is_alive !== false);
+        // Primary key: accumulated suspicion in the room (higher → more urgent)
+        const suspA = agentsA.reduce((s, ag) => s + (ag.suspicion_score ?? 0), 0);
+        const suspB = agentsB.reduce((s, ag) => s + (ag.suspicion_score ?? 0), 0);
+        if (suspB !== suspA) return suspB - suspA;
+        // Secondary key: number of agents (more agents → more narrative potential)
+        if (agentsB.length !== agentsA.length) return agentsB.length - agentsA.length;
+        // Tertiary: tension accumulator tiebreak (stable across calls)
+        return (tensionState.accumulator > 50 ? a : b) === a ? -1 : 1;
+      });
 
       for (const lid of sorted) {
         const aliveHere = this.stage.getAgentsInLocation(lid).filter(a => a.is_alive !== false);

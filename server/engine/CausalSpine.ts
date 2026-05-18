@@ -390,6 +390,7 @@ export class CausalSpine {
       pressure_applied:        'superior',
       revelation:              'parity',
       turning_point:           'parity',
+      defense_activated:       'superior',
     };
 
     // Compute audience information position dynamically: if the causal chain

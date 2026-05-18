@@ -172,14 +172,12 @@ export default function AIPanel({ script, characters, onApplySuggestion }: AIPan
           <div className="bg-gray-50 p-3 border-2 border-black text-xs font-mono whitespace-pre-wrap text-black max-h-64 overflow-y-auto">
             {result}
           </div>
-          {activeTab === 'world' && (
-            <button
-              onClick={() => onApplySuggestion(result)}
-              className="mt-4 w-full bg-white text-black py-2 text-[10px] font-bold uppercase tracking-wider hover:bg-[#FF4444] hover:text-white transition-colors brutal-border brutal-shadow-hover"
-            >
-              Insert into Script
-            </button>
-          )}
+          <button
+            onClick={() => onApplySuggestion(result)}
+            className="mt-4 w-full bg-white text-black py-2 text-[10px] font-bold uppercase tracking-wider hover:bg-[#FF4444] hover:text-white transition-colors brutal-border brutal-shadow-hover"
+          >
+            Insert into Script
+          </button>
         </div>
       )}
     </motion.div>

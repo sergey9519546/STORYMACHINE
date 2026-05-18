@@ -236,6 +236,7 @@ export default function DirectorPanel({
   const [expectedTurns, setExpectedTurns] = useState<number>(20);
   const [presetSaved, setPresetSaved] = useState<boolean | null>(null);
   const [applyingPreset, setApplyingPreset] = useState(false);
+  const [confirmClearBeats, setConfirmClearBeats] = useState(false);
 
   // ── Refs ──────────────────────────────────────────────────────────────────
 
@@ -591,7 +592,14 @@ export default function DirectorPanel({
                   {currentScene.choices.map((choice, idx) => (
                     <div key={idx} className={`bg-white p-4 brutal-border-thick brutal-shadow relative ${!availableIndices.has(idx) ? "opacity-60" : ""}`}>
                       {!availableIndices.has(idx) && (
-                        <span className="absolute top-2 left-2 bg-[#FF4444] text-white text-[8px] px-2 py-0.5 font-bold uppercase tracking-widest">LOCKED</span>
+                        <span
+                          className="absolute top-2 left-2 bg-[#FF4444] text-white text-[8px] px-2 py-0.5 font-bold uppercase tracking-widest cursor-help"
+                          title={choice.qbnRequirements && Object.keys(choice.qbnRequirements).length > 0
+                            ? `Requires: ${Object.entries(choice.qbnRequirements).map(([k, v]) => `${k} ≥ ${v}`).join(', ')} — current values: ${Object.entries(choice.qbnRequirements).map(([k, v]) => `${k}=${directorState.qbnQualities?.[k] ?? 0}/${v}`).join(', ')}`
+                            : 'Locked by QBN quality requirements — check QBN tab for current values'}
+                        >
+                          LOCKED
+                        </span>
                       )}
                       <button onClick={() => removeChoice(idx)} aria-label={`Remove choice ${idx + 1}`} className="absolute top-2 right-2 text-black hover:text-gray-500 font-bold text-2xl leading-none">×</button>
                       <div className="mb-3 pr-6">
@@ -1328,15 +1336,33 @@ export default function DirectorPanel({
               </div>
 
               {outlineBeats.length > 0 && (
-                <button
-                  onClick={async () => {
-                    await fetch("/api/outline", { method: "DELETE" });
-                    setOutlineBeats([]);
-                  }}
-                  className="w-full py-1.5 bg-white text-gray-400 brutal-border hover:text-[#FF4444] hover:border-[#FF4444] transition-colors uppercase font-bold tracking-widest text-[10px]"
-                >
-                  Clear All Beats
-                </button>
+                confirmClearBeats ? (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={async () => {
+                        await fetch("/api/outline", { method: "DELETE" });
+                        setOutlineBeats([]);
+                        setConfirmClearBeats(false);
+                      }}
+                      className="flex-1 py-1.5 bg-[#FF4444] text-white brutal-border hover:bg-red-700 transition-colors uppercase font-bold tracking-widest text-[10px]"
+                    >
+                      Confirm Clear
+                    </button>
+                    <button
+                      onClick={() => setConfirmClearBeats(false)}
+                      className="flex-1 py-1.5 bg-white text-black brutal-border hover:bg-gray-100 transition-colors uppercase font-bold tracking-widest text-[10px]"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmClearBeats(true)}
+                    className="w-full py-1.5 bg-white text-gray-400 brutal-border hover:text-[#FF4444] hover:border-[#FF4444] transition-colors uppercase font-bold tracking-widest text-[10px]"
+                  >
+                    Clear All Beats
+                  </button>
+                )
               )}
             </div>
           </section>
