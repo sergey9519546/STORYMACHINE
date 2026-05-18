@@ -61,10 +61,37 @@ export async function analyzeScriptBlock(
 
   if (!data.sceneAnalysis) throw new Error('Invalid analysis response from server');
 
+  // Deep-merge throughlines: user-typed values take priority over AI output.
+  // AI only fills in fields the user left blank (empty string); activeThroughlines
+  // always comes from AI since it's a computed list, not a user-editable field.
+  const aiTL   = data.updatedDirectorState.throughlines;
+  const userTL = engineState.directorState.throughlines;
+  const mergedThroughlines = aiTL ? {
+    ...userTL,
+    objectiveStory:     userTL.objectiveStory     || aiTL.objectiveStory     || '',
+    mainCharacter:      userTL.mainCharacter      || aiTL.mainCharacter      || '',
+    influenceCharacter: userTL.influenceCharacter || aiTL.influenceCharacter || '',
+    relationshipStory:  userTL.relationshipStory  || aiTL.relationshipStory  || '',
+    activeThroughlines: aiTL.activeThroughlines?.length
+      ? aiTL.activeThroughlines
+      : userTL.activeThroughlines,
+  } : userTL;
+
+  // Preserve existing codex entries if AI returned an empty array — avoids the
+  // "No Knowledge Ingested Yet" flash when the LLM omits entries mid-session.
+  const mergedCodex = data.updatedDirectorState.activeCodexEntries?.length
+    ? data.updatedDirectorState.activeCodexEntries
+    : engineState.directorState.activeCodexEntries;
+
   return {
     ...engineState,
     scriptBlocks,
-    directorState: { ...engineState.directorState, ...data.updatedDirectorState },
+    directorState: {
+      ...engineState.directorState,
+      ...data.updatedDirectorState,
+      throughlines: mergedThroughlines,
+      activeCodexEntries: mergedCodex,
+    },
     currentAnalysis: data.sceneAnalysis,
     isAnalyzing: false,
     isGeneratingMedia: false,
