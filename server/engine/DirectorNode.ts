@@ -1,18 +1,25 @@
 import { Type } from '@google/genai';
 import { Stage } from './Stage.ts';
-import type { ActionLogEntry, PerspectiveEvaluation, BeliefSource, EpistemicUpdate, IllusionElement } from './types.ts';
-import { safeJsonParse } from '../../src/lib/json.ts';
+import type { ActionLogEntry, PerspectiveEvaluation, BeliefSource, EpistemicUpdate, IllusionElement, IllusionState } from './types.ts';
+import { safeJsonParse } from '../lib/json.ts';
 import { randomUUID } from 'crypto';
-import { getAI, getModel, withTimeout } from './ai.ts';
+import { logger } from '../lib/logger.ts';
+import { getModel, generateContent } from './ai.ts';
 import { expectedTensionAt, STYLE_MODIFIERS } from '../lib/structure-presets.ts';
+import { analyzeSubtext } from '../lib/subtext-meter.ts';
 
 export class DirectorNode {
   private stage: Stage;
-  private _tensionHistory: number[] = [];  // H: track tension deltas for pivot detection
-  private _tensionAccumulator = 50;        // F: cumulative tension estimate (starts at midpoint)
+  private _tensionHistory: number[] = [];
+  private _tensionAccumulator = 50;
 
   constructor(stage: Stage) {
     this.stage = stage;
+    // Restore tension state from the persisted DB so server restarts don't reset
+    // arc-deviation and pivot detection.
+    const ts = stage.getDirectorTensionState();
+    this._tensionAccumulator = ts.accumulator;
+    this._tensionHistory = ts.history;
   }
 
   // ── Perspective-bounded room evaluation ─────────────────────────────────────
@@ -54,7 +61,7 @@ export class DirectorNode {
         if (!target) continue;
         const newScore = Math.max(0, Math.min(100, target.suspicion_score + update.delta));
         this.stage.updateAgentSuspicion(update.char_id, newScore);
-        console.log(`[Director] ${target.name} suspicion ${update.delta > 0 ? '+' : ''}${update.delta} → ${newScore}. Reason: ${update.reason}`);
+        logger.info('suspicion_update', { agent: target.name, delta: update.delta, score: newScore, reason: update.reason });
       }
     }
 
@@ -104,12 +111,16 @@ export class DirectorNode {
     }
 
     // ── Advance illusion state based on aggregate tension ──
+    // Use max (not mean) tension so a single high-tension observer isn't diluted
+    // by observers who detected nothing — one contradiction in 4 agents is still
+    // a real event, not 0.25× an event.
+    const maxTensionDelta = evaluations.reduce((m, e) => Math.max(m, e.tension_delta), 0);
     const avgTensionDelta = evaluations.reduce((s, e) => s + e.tension_delta, 0) / Math.max(1, evaluations.length);
+    const peakTensionDelta = evaluations.some(e => e.contradiction_detected) ? maxTensionDelta : avgTensionDelta;
     const contradictionsFound = evaluations.filter(e => e.contradiction_detected).length;
-    this.advanceIllusionState(avgTensionDelta, contradictionsFound);
+    this.advanceIllusionState(peakTensionDelta, contradictionsFound, location_id);
 
-    // Log aggregate tension
-    console.log(`[Director] Avg tension delta: ${avgTensionDelta.toFixed(1)}, contradictions: ${contradictionsFound}/${evaluations.length} observers`);
+    logger.info('director_eval', { tensionDelta: peakTensionDelta.toFixed(1), contradictions: contradictionsFound, observers: evaluations.length });
 
     // ── A: Pacing Controller ──
     this._checkPacing(location_id, recentActions);
@@ -131,6 +142,21 @@ export class DirectorNode {
 
     // ── J: Belief-Edge pressure — read high-severity edges, emit canonical pressure ──
     this._checkBeliefEdges(location_id);
+
+    // ── K: Subtext meter — flag on-the-nose dialogue; emit COOL pressure when score is high ──
+    this._checkSubtext(location_id, recentActions);
+
+    // ── L: Stakes escalation — high-magnitude active stakes ratchet tension ──
+    this._checkStakesEscalation(location_id, agentsInRoom.map(a => a.char_id));
+
+    // ── M: Dramatic irony — track audience-vs-character information gaps ──
+    this._checkDramaticIrony(location_id);
+
+    // ── N: Outline beat enforcement — police constraint/avoid violations ──
+    this._checkBeatCompliance(location_id, recentActions);
+
+    // Persist tension state so arc-deviation and pivot detection survive restarts.
+    this.stage.saveDirectorTensionState(this._tensionAccumulator, this._tensionHistory);
 
     return epistemicUpdates;
   }
@@ -172,8 +198,8 @@ From ${observer.name}'s perspective only:
 3. What new facts did they derive from what they saw/heard?
 4. How has their suspicion of each other person changed?`;
 
-    const response = await withTimeout(getAI().models.generateContent({
-      model: getModel(),
+    const response = await generateContent({
+      model: getModel('pro'),
       contents: prompt,
       config: {
         systemInstruction: `You are the Director Node. Evaluate this scene from a single bounded perspective. You know who lied but the observer does not — factor this in when evaluating whether contradictions were apparent.`,
@@ -216,8 +242,8 @@ From ${observer.name}'s perspective only:
           required: ['tension_delta', 'contradiction_detected', 'new_beliefs', 'suspicion_updates', 'contradicted_propositions'],
         },
       },
-    }), 30_000, `evaluatePerspective:${observer_id}`).catch(err => {
-      console.error(`[Director] evaluatePerspective fallback: ${(err as Error).message}`);
+    }, { label: `evaluatePerspective:${observer_id}`, timeoutMs: 30_000 }).catch(err => {
+      logger.error('director_eval_error', { observer_id, message: (err as Error).message });
       return null;
     });
 
@@ -274,6 +300,7 @@ From ${observer.name}'s perspective only:
   private advanceIllusionState(
     avgTensionDelta: number,
     contradictionsFound: number,
+    location_id: string,
   ): void {
     const state = this.stage.getIllusionState();
     const totalTurns = this.stage.getTurnCount();
@@ -289,10 +316,10 @@ From ${observer.name}'s perspective only:
 
     if (state.phase === 'Setup' && (totalTurns >= setupEnd || (avgTensionDelta > 10 && totalTurns >= Math.round(setupEnd / 2)))) {
       nextPhase = 'Turn';
-      console.log(`[Director] Illusion phase: Setup → Turn (turn ${totalTurns}/${setupEnd})`);
+      logger.info('illusion_phase', { from: 'Setup', to: 'Turn', turn: totalTurns, setupEnd });
     } else if (state.phase === 'Turn' && (totalTurns >= turnEnd || (contradictionsFound >= 2 && totalTurns >= setupEnd + 2))) {
       nextPhase = 'Prestige';
-      console.log(`[Director] Illusion phase: Turn → Prestige (turn ${totalTurns}/${turnEnd})`);
+      logger.info('illusion_phase', { from: 'Turn', to: 'Prestige', turn: totalTurns, turnEnd });
     }
 
     if (nextPhase !== state.phase) {
@@ -301,10 +328,50 @@ From ${observer.name}'s perspective only:
         turn_index: totalTurns,
         is_load_bearing: nextPhase === 'Prestige',
       };
-      this.stage.updateIllusionState({
+
+      const updatedElements = [...state.planted_elements, element];
+      const update: Partial<IllusionState> = {
         phase: nextPhase,
-        planted_elements: [...state.planted_elements, element],
-      });
+        planted_elements: updatedElements,
+      };
+
+      // Prestige payoff: recontextualize every load-bearing planted element
+      // and emit a REVEAL pressure to every agent in the room so they are
+      // prompted to surface the hidden truth they witnessed.
+      if (nextPhase === 'Prestige') {
+        const loadBearing = updatedElements.filter(e => e.is_load_bearing && e.revealed_at == null);
+        const recontexts = loadBearing.map(e => e.description);
+        if (recontexts.length > 0) {
+          update.pending_recontextualization = [
+            ...(state.pending_recontextualization ?? []),
+            ...recontexts,
+          ];
+          // Stamp revealed_at on each load-bearing element in-place
+          for (const e of loadBearing) {
+            e.revealed_at = totalTurns;
+          }
+        }
+
+        // Emit a REVEAL pressure to every living agent in the location
+        const agents = this.stage.getAgentsInLocation(location_id);
+        const triggerEventId = randomUUID();
+        for (const agent of agents) {
+          if (!agent.is_alive) continue;
+          this.stage.addDramaticPressure({
+            pressure_id: randomUUID(),
+            target_char_id: agent.char_id,
+            trigger_event_id: triggerEventId,
+            pressure_type: 'REVEAL',
+            intensity: 85,
+            bias_hint: `The illusion is collapsing. Everything you planted in earlier scenes is now being exposed — what was hidden must now be confronted. ${recontexts[0] ?? ''}`,
+            expires_at_turn: totalTurns + 3,
+            applied: false,
+          });
+        }
+        logger.info('prestige_payoff', { recontexts: recontexts.length, agents: agents.length });
+      }
+
+      this.stage.updateIllusionState(update);
     }
   }
 
@@ -413,7 +480,7 @@ From ${observer.name}'s perspective only:
         applied: false,
       });
     }
-    console.log(`[Director] Pacing target=${target} style=${directorStyle ?? 'none'} measured=(tempo=${m.tempo}, monotony=${m.monotonyRisk}) at turn ${totalTurns}`);
+    logger.info('pacing_check', { target, style: directorStyle ?? 'none', tempo: m.tempo, monotony: m.monotonyRisk, turn: totalTurns });
   }
 
   // ── H: Auto-Pivot Detection ──
@@ -422,10 +489,14 @@ From ${observer.name}'s perspective only:
     if (this._tensionHistory.length > 5) this._tensionHistory.shift();
     if (this._tensionHistory.length < 3) return;
 
-    // Sign-change twice in 3 consecutive readings = pivot
+    // Sign-change twice in 3 consecutive non-zero readings = pivot.
+    // Skip zero entries: Math.sign(0)===0 would match both positive and negative
+    // neighbors, generating spurious turning points on flat tension sequences.
     let signChanges = 0;
     for (let i = 1; i < this._tensionHistory.length; i++) {
-      if (Math.sign(this._tensionHistory[i]) !== Math.sign(this._tensionHistory[i - 1])) signChanges++;
+      const prev = Math.sign(this._tensionHistory[i - 1]);
+      const curr = Math.sign(this._tensionHistory[i]);
+      if (prev !== 0 && curr !== 0 && prev !== curr) signChanges++;
     }
     if (signChanges < 2) return;
 
@@ -442,7 +513,7 @@ From ${observer.name}'s perspective only:
       narrative_summary: 'Auto-pivot detected: the emotional valence of the scene has reversed twice. A turning point has been reached.',
       fountain_hint: 'The room shifts. What was certain is now in doubt. Someone has crossed a line.',
     });
-    console.log(`[Director] Auto-pivot detected at turn ${this.stage.getTurnCount()}`);
+    logger.info('auto_pivot', { turn: this.stage.getTurnCount() });
     this._tensionHistory = [];  // reset after pivot
   }
 
@@ -487,7 +558,7 @@ From ${observer.name}'s perspective only:
           applied: false,
         });
       }
-      console.log(`[Director] Arc deviation: tension ${this._tensionAccumulator.toFixed(0)} vs expected ${expectedTension} — ESCALATE`);
+      logger.info('arc_deviation', { direction: 'escalate', tension: this._tensionAccumulator, expected: expectedTension });
     } else {
       // Story running ABOVE expected tension — cool down
       const hint = `The scene is more intense than the ${arc.replace(/_/g, ' ')} arc calls for at this stage. Ease the pressure — a moment of apparent calm, false security, or quiet revelation before the next wave.`;
@@ -503,7 +574,7 @@ From ${observer.name}'s perspective only:
           applied: false,
         });
       }
-      console.log(`[Director] Arc deviation: tension ${this._tensionAccumulator.toFixed(0)} vs expected ${expectedTension} — COOL`);
+      logger.info('arc_deviation', { direction: 'cool', tension: this._tensionAccumulator, expected: expectedTension });
     }
   }
 
@@ -531,7 +602,7 @@ From ${observer.name}'s perspective only:
           expires_at_turn: totalTurns + 4,
           applied: false,
         });
-        console.log(`[Director] Consistency: ${agent.name} has ${contradicted.length} belief contradiction(s)`);
+        logger.info('consistency_contradiction', { agent: agent.name, count: contradicted.length });
       }
 
       // ── Goal/personality coherence ──
@@ -552,7 +623,7 @@ From ${observer.name}'s perspective only:
             expires_at_turn: totalTurns + 3,
             applied: false,
           });
-          console.log(`[Director] Consistency: ${agent.name} (low-Mach) has ${deceptionGoals.length} deception subgoals — conscience pressure injected`);
+          logger.info('conscience_pressure', { agent: agent.name, deceptionGoals: deceptionGoals.length });
         }
       }
 
@@ -569,7 +640,7 @@ From ${observer.name}'s perspective only:
           expires_at_turn: totalTurns + 2,
           applied: false,
         });
-        console.log(`[Director] Consistency: ${agent.name} has ${activeCount} active subgoals (overload)`);
+        logger.info('goal_overload', { agent: agent.name, activeCount });
       }
     }
   }
@@ -611,7 +682,206 @@ From ${observer.name}'s perspective only:
         applied: false,
       });
 
-      console.log(`[Director] High-severity edge (${worst.severity?.toFixed(0)}) → CONFRONT pressure on ${agent.name} [style: ${state.director_style ?? 'none'}]`);
+      logger.info('belief_edge_confront', { agent: agent.name, severity: worst.severity, style: state.director_style ?? 'none' });
+    }
+  }
+
+  // ── K: Subtext meter ─────────────────────────────────────────────────────────
+  // Scores on-the-nose dialogue in the current round and emits a COOL pressure
+  // when the score exceeds 60, nudging agents toward indirection and subtext.
+  private _checkSubtext(location_id: string, recentActions: ActionLogEntry[]): void {
+    const dialogue = recentActions
+      .filter(a => a.action_type === 'SPEAK' || a.action_type === 'LIE')
+      .map(a => a.content);
+    if (dialogue.length === 0) return;
+
+    const analysis = analyzeSubtext(dialogue);
+    const turnIndex = this.stage.getTurnCount();
+
+    logger.info('subtext_score', { score: analysis.score, onTheNose: analysis.onTheNoseCount, subtext: analysis.subtextCount, lines: analysis.totalLines });
+
+    if (analysis.score >= 60) {
+      const agents = this.stage.getAgentsInLocation(location_id).filter(a => a.is_alive);
+      const triggerEventId = recentActions[recentActions.length - 1]?.action_id ?? randomUUID();
+      const hint = analysis.worstLine
+        ? `Dialogue is becoming too direct. The line "${analysis.worstLine.slice(0, 80)}..." is on-the-nose. Displace the real tension onto an object, a memory, or a question. Say less, mean more.`
+        : `Dialogue is becoming too direct. Displace the real tension onto subtext — let what is NOT said do the work.`;
+
+      for (const agent of agents) {
+        // Don't stack COOL pressures already active for this agent
+        const existing = this.stage.getActivePressures(agent.char_id);
+        if (existing.some(p => p.pressure_type === 'COOL')) continue;
+        this.stage.addDramaticPressure({
+          pressure_id: randomUUID(),
+          target_char_id: agent.char_id,
+          trigger_event_id: triggerEventId,
+          pressure_type: 'COOL',
+          intensity: Math.min(100, analysis.score),
+          bias_hint: hint,
+          expires_at_turn: turnIndex + 2,
+          applied: false,
+        });
+      }
+      logger.info('subtext_cool_pressure', { agents: agents.length, score: analysis.score });
+    }
+  }
+
+  // ── L: Stakes escalation ─────────────────────────────────────────────────────
+  // Active high-magnitude stakes add dramatic pressure on the stakeholder.
+  // Stakes with magnitude ≥ 70 emit a FORESHADOW pressure; ≥ 90 emit CONFRONT.
+  // Terminal goal achievement resolves the matching stake as 'won'.
+  private _checkStakesEscalation(location_id: string, charIds: string[]): void {
+    const currentTurn = this.stage.getTurnCount();
+    for (const charId of charIds) {
+      const agent = this.stage.getAgent(charId);
+      if (!agent) continue;
+
+      // Resolve won stakes — terminal goal achieved
+      if (agent.goalStack?.terminal.achieved) {
+        const activeStakes = this.stage.getActiveStakes(charId);
+        for (const s of activeStakes) {
+          this.stage.resolveStakes(s.id, 'won', currentTurn);
+          logger.info('stakes_resolved', { agent: agent.name, stakes: s.description, outcome: 'won' });
+        }
+        continue;
+      }
+
+      const stakes = this.stage.getActiveStakes(charId);
+      for (const s of stakes) {
+        if (s.magnitude < 70) continue;
+        const pressureType = s.magnitude >= 90 ? 'CONFRONT' : 'ESCALATE';
+        const existingPressures = this.stage.getActivePressures(charId);
+        const alreadyHas = existingPressures.some(
+          p => p.pressure_type === pressureType && p.bias_hint.includes(s.id),
+        );
+        if (alreadyHas) continue;
+        this.stage.addDramaticPressure({
+          pressure_id: randomUUID(),
+          target_char_id: charId,
+          trigger_event_id: `stakes:${s.id}`,
+          pressure_type: pressureType,
+          intensity: s.magnitude,
+          bias_hint: `[stakes:${s.id}] The ${s.category} stake looms: ${s.description}`,
+          expires_at_turn: currentTurn + 3,
+          applied: false,
+        });
+        logger.info('stakes_pressure', { agent: agent.name, stakes: s.description, pressureType, magnitude: s.magnitude });
+      }
+    }
+  }
+
+  // ── N: Outline beat compliance ───────────────────────────────────────────────
+  // Checks each recent action against the active OutlineBeat's `avoid` field using
+  // keyword tokenization. A match emits a REDIRECT pressure (not a punishment —
+  // a course-correction) nudging agents back to the beat's intent.
+  // Also injects a constraint reminder when the beat has one, so agents are aware
+  // of what must not happen yet.
+  private _checkBeatCompliance(location_id: string, recentActions: ActionLogEntry[]): void {
+    const state = this.stage.getIllusionState();
+    const { outline, phase } = state;
+    if (!outline || outline.length === 0) return;
+
+    const turnIndex = this.stage.getTurnCount();
+    const activeBeat = outline.find(b =>
+      b.phase === phase && turnIndex >= b.turn_start && turnIndex <= b.turn_end,
+    );
+    if (!activeBeat) return;
+
+    // Tokenize the avoid string into keywords
+    const avoidTokens = activeBeat.avoid
+      .toLowerCase()
+      .split(/[\s,;]+/)
+      .filter(w => w.length > 3);
+    if (avoidTokens.length === 0) return;
+
+    const agents = this.stage.getAgentsInLocation(location_id);
+    if (agents.length === 0) return;
+
+    // Check recent speech actions for avoid-keyword matches
+    const violations = recentActions
+      .filter(a => a.action_type === 'SPEAK' || a.action_type === 'LIE')
+      .filter(a => {
+        const lower = a.content.toLowerCase();
+        return avoidTokens.some(tok => lower.includes(tok));
+      });
+
+    if (violations.length === 0) return;
+
+    // Emit a REDIRECT to the violating agent(s) — and everyone in the room
+    const violatingIds = new Set(violations.map(v => v.char_id));
+    for (const agent of agents) {
+      const existing = this.stage.getActivePressures(agent.char_id);
+      if (existing.some(p => p.pressure_type === 'REDIRECT')) continue;
+      this.stage.addDramaticPressure({
+        pressure_id: randomUUID(),
+        target_char_id: agent.char_id,
+        trigger_event_id: violations[violations.length - 1].action_id,
+        pressure_type: 'REDIRECT',
+        intensity: violatingIds.has(agent.char_id) ? 65 : 40,
+        bias_hint: `Beat constraint: ${activeBeat.constraint} — ${violatingIds.has(agent.char_id) ? 'you have started to drift from the scene\'s intended beat. Pull back.' : 'the scene is drifting; steer it back toward: ' + activeBeat.goal}`,
+        expires_at_turn: turnIndex + 2,
+        applied: false,
+      });
+    }
+    logger.info('beat_compliance_redirect', { phase, avoid: activeBeat.avoid.slice(0, 60), violations: violations.length, turn: turnIndex });
+  }
+
+  // ── M: Dramatic irony ────────────────────────────────────────────────────────
+  // Finds unexposed lies in the room (audience knows but characters don't).
+  // Escalates pressure as the lie ages — the longer the bomb sits under the table,
+  // the more the Director pushes toward revelation.
+  private _checkDramaticIrony(location_id: string): void {
+    const agents = this.stage.getAgentsInLocation(location_id);
+    if (agents.length === 0) return;
+    const turnIndex = this.stage.getTurnCount();
+
+    for (const agent of agents) {
+      // Unexposed lies spoken BY other agents that this agent hasn't discovered
+      const unexposed = agents
+        .filter(a => a.char_id !== agent.char_id)
+        .flatMap(a => this.stage.getUnexposedLiesByAgent(a.char_id, location_id));
+      if (unexposed.length === 0) continue;
+
+      // Skip if an ESCALATE or CONFRONT pressure already active for this agent
+      const existing = this.stage.getActivePressures(agent.char_id);
+      if (existing.some(p => p.pressure_type === 'ESCALATE' || p.pressure_type === 'CONFRONT')) continue;
+
+      // Oldest unexposed lie determines urgency
+      const oldest = unexposed.sort((a, b) => a.proposition_id.localeCompare(b.proposition_id))[0];
+      const liarsName = this.stage.getAgent(
+        unexposed.map(p => p.asserted_by).find(id => id !== agent.char_id) ?? ''
+      )?.name ?? 'someone';
+
+      this.stage.addDramaticPressure({
+        pressure_id: randomUUID(),
+        target_char_id: agent.char_id,
+        trigger_event_id: oldest.event_id,
+        pressure_type: 'ESCALATE',
+        intensity: Math.min(75, 30 + unexposed.length * 10),
+        bias_hint: `Dramatic tension: ${liarsName} has told you something that isn't true — you don't know it yet, but the moment of revelation is approaching. Your instincts should be signaling that something is off.`,
+        expires_at_turn: turnIndex + 2,
+        applied: false,
+      });
+
+      // Emit a BeatTrace with information_position = 'inferior' (character doesn't know)
+      // only once per location per active lie set
+      const beatExists = this.stage.getBeatTracesForLocation(location_id)
+        .some(b => b.beat_type === 'pressure_applied' && b.fountain_hint.includes('dramatic_irony'));
+      if (!beatExists) {
+        this.stage.addBeatTrace({
+          beat_id: randomUUID(),
+          turn_index: turnIndex,
+          location_id,
+          trigger_event_id: oldest.event_id,
+          beat_type: 'pressure_applied',
+          participants: agents.map(a => a.char_id),
+          causal_chain: unexposed.map(p => p.event_id),
+          narrative_summary: `Dramatic irony active: ${unexposed.length} unexposed lie(s) in the room. Audience superior.`,
+          fountain_hint: 'dramatic_irony: audience knows; characters do not. Sustain the gap.',
+          information_position: 'inferior',
+        });
+        logger.info('dramatic_irony', { location_id, unexposedLies: unexposed.length, turn: turnIndex });
+      }
     }
   }
 

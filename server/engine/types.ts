@@ -33,14 +33,14 @@ export interface ActionLogEntry {
   timestamp: number;
   char_id: string;
   location_id: string;
-  action_type: 'SPEAK' | 'EXAMINE' | 'LIE' | 'RELOCATE';
+  action_type: 'SPEAK' | 'EXAMINE' | 'LIE' | 'RELOCATE' | 'WAIT';
   target_char_id: string | null;
   content: string;
   is_audible: boolean;
 }
 
 export interface NarrativeAction {
-  action_type: 'SPEAK' | 'EXAMINE' | 'LIE' | 'RELOCATE';
+  action_type: 'SPEAK' | 'EXAMINE' | 'LIE' | 'RELOCATE' | 'WAIT';
   content: string;
   target: string | null;
 }
@@ -91,7 +91,31 @@ export interface TheoryOfMind {
   subject_id: string;
   believed_knowledge: string[];  // what I think they know
   believed_motive: string;       // my model of their goal
-  trust_level: number;           // 0–1
+  trust_level: number;           // 0–1: general trust/distrust
+
+  // Relationship graph dimensions (all 0–1 unless noted)
+  affinity?: number;          // emotional warmth / liking
+  power_balance?: number;     // 0=they dominate, 0.5=equal, 1=I dominate
+  debt?: number;              // perceived obligation owed to subject (0–1)
+  shared_history?: string[];  // memorable joint events shaping this relationship
+}
+
+// ── Stakes ───────────────────────────────────────────────────────────────────
+// What a character stands to win or lose by the end of the scene.
+// Stakes are agent-authored (seeded by the writer or inferred by the Director)
+// and read by DirectorNode to calibrate dramatic pressure escalation.
+
+export type StakeCategory = 'freedom' | 'reputation' | 'relationship' | 'survival' | 'secret' | 'material';
+
+export interface Stakes {
+  id: string;
+  char_id: string;
+  category: StakeCategory;
+  description: string;   // e.g. "Will lose custody of her daughter"
+  magnitude: number;     // 0–100: how much does this matter?
+  is_active: boolean;    // false once resolved (won or lost)
+  resolved_at?: number;  // turn index when resolved
+  outcome?: 'won' | 'lost';
 }
 
 // ── Goal system ──────────────────────────────────────────────────────────────
@@ -146,6 +170,7 @@ export interface PersuasionRecord {
   target_id: string;
   strategy: PersuasionStrategy;
   turn: number;
+  success?: boolean;  // recorded post-turn: did target's suspicion decrease?
 }
 
 // ── Structured story outline ─────────────────────────────────────────────────
@@ -209,6 +234,9 @@ export interface CharacterSheet {
 
   // OCC Emotional state (populated by AppraisalEngine each turn)
   emotionState?: EmotionState;
+
+  // What this character stands to win or lose (populated by Director / writer)
+  stakes?: Stakes[];
 }
 
 // ── Causal-Epistemic Spine types ─────────────────────────────────────────────
@@ -354,6 +382,10 @@ export interface StageSnapshot {
   locations: Location[];
   agents: CharacterSheet[];
   action_log: ActionLogEntry[];
+  // Previously omitted — now included for a lossless round-trip:
+  dramatic_pressures: DramaticPressure[];   // live bias signals survive restart
+  event_propositions: EventProposition[];   // is_lie ground truth survives restart
+  persuasion_log: PersuasionRecord[];       // strategy history survives restart
   illusion_state: Pick<IllusionState,
     | 'phase' | 'planted_elements' | 'pending_recontextualization'
     | 'outline' | 'pacing_target' | 'structure' | 'emotional_arc'

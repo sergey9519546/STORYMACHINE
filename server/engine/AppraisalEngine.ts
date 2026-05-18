@@ -17,14 +17,15 @@ import { Stage } from './Stage.ts';
 // Contagion: emotions diffuse between co-present agents at end of each room
 // simulation round, weighted by mutual trust (theoryOfMind.trust_level).
 
-const DECAY = 0.88;            // per-turn decay factor toward baseline
-const CONTAGION_RATE = 0.08;   // base bleed rate per round × trust
+const DECAY = 0.88;               // per-turn decay factor toward baseline
+const CONTAGION_RATE = 0.08;      // base bleed rate per round × trust
+const SUSPICION_BLEED = 5;        // max suspicion points transferred per contagion pass
 
 const EMOTION_DIMS = ['joy', 'distress', 'anger', 'fear', 'pride', 'shame'] as const;
 type NumericDim = typeof EMOTION_DIMS[number];
 
-function blank(turn: number): EmotionState {
-  return { joy: 0, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'neutral', intensity: 0, last_updated_at: turn };
+function blank(): EmotionState {
+  return { joy: 0, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'neutral', intensity: 0, last_updated_at: -1 };
 }
 
 function setDominant(e: EmotionState): void {
@@ -51,12 +52,18 @@ export class AppraisalEngine {
     if (!agent) return;
 
     const turnIndex = this.stage.getTurnCount();
-    const current = agent.emotionState ?? blank(turnIndex);
+    const current = agent.emotionState ?? blank();
+    // Skip if already appraised this turn (prevents double-counting when the acting
+    // agent also appears as a Director observer for the same turn index).
+    if (current.last_updated_at >= turnIndex) return;
     const next: EmotionState = { ...current };
 
     // ── Decay toward baseline ──
+    // Floor-based decay with forced -1 step for small values ensures strict
+    // monotonic decrease to 0. Math.ceil would freeze emotions at values ≤ 8 forever.
     for (const k of EMOTION_DIMS) {
-      next[k] = Math.round(next[k] * DECAY);
+      const decayed = Math.floor(next[k] * DECAY);
+      next[k] = decayed >= next[k] ? Math.max(0, next[k] - 1) : decayed;
     }
 
     // ── Appraise recent goal mutations ──
@@ -134,7 +141,7 @@ export class AppraisalEngine {
     const turnIndex = this.stage.getTurnCount();
     const snap: Record<string, EmotionState> = {};
     for (const a of agents) {
-      snap[a.char_id] = a.emotionState ?? blank(turnIndex);
+      snap[a.char_id] = a.emotionState ?? blank();
     }
 
     for (const a of agents) {
@@ -156,6 +163,35 @@ export class AppraisalEngine {
       setDominant(me);
       me.last_updated_at = turnIndex;
       this.stage.updateEmotionState(a.char_id, me);
+    }
+  }
+
+  // Suspicion contagion: a visibly distressed/fearful co-present agent raises
+  // others' suspicion, attenuated by the observer's trust in them.
+  // Must run AFTER Director suspicion updates to layer on top correctly.
+  public applySuspicionContagion(location_id: string): void {
+    const agents = this.stage.getAgentsInLocation(location_id);
+    if (agents.length < 2) return;
+
+    // Snapshot suspicion scores so we don't double-apply within this pass.
+    const snap: Record<string, number> = {};
+    for (const a of agents) snap[a.char_id] = a.suspicion_score;
+
+    for (const observer of agents) {
+      const tom = observer.theoryOfMind ?? {};
+      let delta = 0;
+      for (const neighbor of agents) {
+        if (neighbor.char_id === observer.char_id) continue;
+        const es = neighbor.emotionState;
+        if (!es || !['fear', 'distress'].includes(es.dominant) || es.intensity < 30) continue;
+        const trust = tom[neighbor.char_id]?.trust_level ?? 0.3;
+        // Low trust amplifies suspicion; high trust dampens it.
+        delta += SUSPICION_BLEED * (es.intensity / 100) * (1 - trust);
+      }
+      if (delta > 0) {
+        const newScore = Math.min(100, snap[observer.char_id] + Math.round(delta));
+        this.stage.updateAgentSuspicion(observer.char_id, newScore);
+      }
     }
   }
 }

@@ -27,3 +27,8 @@ jobs:
         run: npm test
         env:
           GEMINI_API_KEY: "test-key-ci"
+
+      - name: Build
+        run: npm run build
+        env:
+          GEMINI_API_KEY: "test-key-ci"

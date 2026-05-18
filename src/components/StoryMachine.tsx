@@ -69,13 +69,30 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [persuasionLog, setPersuasionLog] = useState<Record<string, PersuasionRecord[]>>({});
   const [activePressures, setActivePressures] = useState<Array<{ char_id: string; pressures: DramaticPressure[] }>>([]);
   const ledgerEndRef = useRef<HTMLDivElement>(null);
+  const evtSourceRef = useRef<EventSource | null>(null);
   const [loading, setLoading] = useState(false);
+  const [streamLog, setStreamLog] = useState<string[]>([]);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showError = useCallback((msg: string) => {
+    setErrorMsg(msg);
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = setTimeout(() => setErrorMsg(null), 6000);
+  }, []);
+
+  useEffect(() => () => { if (errorTimerRef.current) clearTimeout(errorTimerRef.current); }, []);
   const [showBuilder, setShowBuilder] = useState(false);
 
   const fetchActivePressures = useCallback(async () => {
-    const res = await fetch("/api/dramatic-pressure-all");
-    if (res.ok) setActivePressures(await res.json() as Array<{ char_id: string; pressures: DramaticPressure[] }>);
+    try {
+      const res = await fetch("/api/dramatic-pressure-all");
+      if (res.ok) setActivePressures(await res.json() as Array<{ char_id: string; pressures: DramaticPressure[] }>);
+    } catch { /* non-critical background fetch */ }
   }, []);
+
+  // Close any in-flight SSE connection when the component unmounts
+  useEffect(() => () => { evtSourceRef.current?.close(); }, []);
 
   useEffect(() => {
     fetchState();
@@ -101,66 +118,85 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   }, [ledger]);
 
   const fetchState = async () => {
-    const res = await fetch("/api/state");
-    const data = await res.json() as { agents: CharacterSheet[]; nodes: Location[] };
-    setAgents(data.agents);
-    setNodes(data.nodes);
-    if (data.agents.length > 0) {
-      fetchPersuasionLog(data.agents.map(a => a.char_id));
-    }
+    try {
+      const res = await fetch("/api/state");
+      if (!res.ok) return;
+      const data = await res.json() as { agents: CharacterSheet[]; nodes: Location[] };
+      setAgents(data.agents);
+      setNodes(data.nodes);
+      if (data.agents.length > 0) {
+        fetchPersuasionLog(data.agents.map(a => a.char_id));
+      }
+    } catch { /* silent — background poll */ }
   };
 
   const fetchLedger = async () => {
-    const res = await fetch("/api/ledger");
-    const data = await res.json() as ActionLogEntry[];
-    setLedger(data);
+    try {
+      const res = await fetch("/api/ledger");
+      if (!res.ok) return;
+      const data = await res.json() as ActionLogEntry[];
+      setLedger(data);
+    } catch { /* silent — background poll */ }
   };
 
   const fetchIllusionState = async () => {
-    const res = await fetch("/api/simulation/illusion-state");
-    if (res.ok) {
-      const data = await res.json() as IllusionState;
-      setIllusionState(data);
-    }
+    try {
+      const res = await fetch("/api/simulation/illusion-state");
+      if (res.ok) {
+        const data = await res.json() as IllusionState;
+        setIllusionState(data);
+      }
+    } catch (e) { console.error("[illusion-state]", e); }
   };
 
   const fetchSpineData = async () => {
-    const [beatsRes, edgesRes, mutationsRes] = await Promise.all([
-      fetch("/api/beat-traces"),
-      fetch("/api/belief-edges"),
-      fetch("/api/goal-mutations"),
-    ]);
-    if (beatsRes.ok)          setBeatTraces(await beatsRes.json() as BeatTrace[]);
-    else console.error("[spine] beat-traces", beatsRes.status);
-    if (edgesRes.ok)          setBeliefEdges(await edgesRes.json() as BeliefEdge[]);
-    else console.error("[spine] belief-edges", edgesRes.status);
-    if (mutationsRes.ok)      setGoalMutations(await mutationsRes.json() as GoalMutation[]);
-    else console.error("[spine] goal-mutations", mutationsRes.status);
+    try {
+      const [beatsRes, edgesRes, mutationsRes] = await Promise.all([
+        fetch("/api/beat-traces"),
+        fetch("/api/belief-edges"),
+        fetch("/api/goal-mutations"),
+      ]);
+      if (beatsRes.ok)          setBeatTraces(await beatsRes.json() as BeatTrace[]);
+      else console.error("[spine] beat-traces", beatsRes.status);
+      if (edgesRes.ok)          setBeliefEdges(await edgesRes.json() as BeliefEdge[]);
+      else console.error("[spine] belief-edges", edgesRes.status);
+      if (mutationsRes.ok)      setGoalMutations(await mutationsRes.json() as GoalMutation[]);
+      else console.error("[spine] goal-mutations", mutationsRes.status);
+    } catch (e) { console.error("[spine]", e); }
   };
 
   const refreshAll = useCallback(async () => {
-    await Promise.all([fetchState(), fetchLedger(), fetchIllusionState(), fetchSpineData(), fetchActivePressures()]);
+    await Promise.all([
+      fetchState(), fetchLedger(), fetchIllusionState(), fetchSpineData(), fetchActivePressures(),
+    ]).catch(e => console.error("[refreshAll]", e));
   }, [fetchPersuasionLog, fetchActivePressures]);
 
   // Wipes any existing session, posts a fresh scenario, and refreshes all panels.
   const submitScenario = useCallback(async (payload: { nodes: Location[]; agents: CharacterSheet[] }) => {
     setShowBuilder(false);
     setLoading(true);
-    // Reset first so a new scenario never inherits stale agents/ledger from a
-    // prior session (sessions now persist to disk between server restarts).
-    await fetch("/api/reset", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    await fetch("/api/init", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    await refreshAll();
-    setLoading(false);
-  }, [refreshAll]);
+    try {
+      // Reset first so a new scenario never inherits stale agents/ledger from a
+      // prior session (sessions now persist to disk between server restarts).
+      const resetRes = await fetch("/api/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!resetRes.ok) throw new Error(`Reset failed: ${resetRes.status}`);
+      const initRes = await fetch("/api/init", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!initRes.ok) throw new Error(`Init failed: ${initRes.status}`);
+      await refreshAll();
+    } catch (e) {
+      showError((e as Error).message ?? 'Failed to start scenario. Check the server.');
+    } finally {
+      setLoading(false);
+    }
+  }, [refreshAll, showError]);
 
   // The original hardcoded scenario, now offered as a one-click preset.
   const loadExample = useCallback(() => {
@@ -221,24 +257,59 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
 
   const handleTurn = async (agentId: string) => {
     setLoading(true);
-    await fetch("/api/turn", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ agentId }),
-    });
-    await refreshAll();
-    setLoading(false);
+    try {
+      await fetch("/api/turn", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentId }),
+      });
+      await refreshAll();
+    } catch (e) {
+      showError((e as Error).message ?? 'Turn failed.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRunRoom = async (nodeId: string) => {
+    evtSourceRef.current?.close();
     setLoading(true);
-    await fetch("/api/run-room", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nodeId }),
-    });
-    await refreshAll();
-    setLoading(false);
+    setStreamLog([]);
+    try {
+      const url = `/api/run-room-stream?nodeId=${encodeURIComponent(nodeId)}`;
+      const evtSource = new EventSource(url);
+      evtSourceRef.current = evtSource;
+      await new Promise<void>((resolve, reject) => {
+        evtSource.onmessage = (e) => {
+          try {
+            const event = JSON.parse(e.data) as {
+              type: string; agentName?: string; action?: { action_type: string; content: string };
+              round?: number; totalTurns?: number; stoppedBy?: string;
+            };
+            if (event.type === 'agent_action' && event.agentName && event.action) {
+              setStreamLog(prev => [...prev, `${event.agentName}: [${event.action!.action_type}] ${event.action!.content.slice(0, 60)}…`]);
+            } else if (event.type === 'round_complete') {
+              setStreamLog(prev => [...prev, `— Round ${event.round} complete —`]);
+            } else if (event.type === 'simulation_complete') {
+              evtSource.close();
+              evtSourceRef.current = null;
+              resolve();
+            }
+          } catch { /* ignore parse errors */ }
+        };
+        evtSource.onerror = () => {
+          evtSource.close();
+          evtSourceRef.current = null;
+          reject(new Error('SSE connection lost'));
+        };
+      });
+      await refreshAll();
+    } catch (e) {
+      showError((e as Error).message ?? 'Room simulation failed.');
+    } finally {
+      setLoading(false);
+      setStreamLog([]);
+    }
   };
 
   const handleExport = useCallback(async () => {
@@ -246,6 +317,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
     setIsExporting(true);
     try {
       const res = await fetch(`/api/ledger/fountain?syuzhet=${syuzhetMode}`);
+      if (!res.ok) throw new Error(`Export failed: ${res.status}`);
       const data = await res.json() as {
         fountain: string;
         characters: Array<{ name: string; ghost: string; lie: string; want: string; need: string }>;
@@ -262,10 +334,12 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
         a.click();
         URL.revokeObjectURL(url);
       }
+    } catch (e) {
+      showError((e as Error).message ?? 'Export failed.');
     } finally {
       setIsExporting(false);
     }
-  }, [ledger.length, onExportToIDE, syuzhetMode]);
+  }, [ledger.length, onExportToIDE, syuzhetMode, showError]);
 
   const illusionColor =
     illusionState?.phase === "Prestige" ? "#FF4444"
@@ -274,6 +348,15 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
 
   return (
     <div className="min-h-screen bg-[#f4f4f0] text-black p-8 font-sans">
+      {errorMsg && (
+        <div
+          role="alert"
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white px-5 py-3 font-mono text-sm border-2 border-black shadow-lg flex items-center gap-3"
+        >
+          <span>{errorMsg}</span>
+          <button onClick={() => setErrorMsg(null)} className="ml-2 font-bold leading-none hover:opacity-70">✕</button>
+        </div>
+      )}
       <header className="mb-8 border-b-4 border-black pb-4 flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold uppercase tracking-widest text-black">
@@ -354,8 +437,13 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                       disabled={loading}
                       className="mt-4 w-full bg-black hover:bg-[#FF4444] text-white py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50 brutal-border transition-colors"
                     >
-                      Run Dialogue Lock (5 Turns)
+                      {loading ? "Running…" : "Run Dialogue Lock (5 Turns)"}
                     </button>
+                    {loading && streamLog.length > 0 && (
+                      <div className="mt-2 bg-black text-green-400 font-mono text-xs p-2 max-h-24 overflow-y-auto brutal-border">
+                        {streamLog.map((line, i) => <div key={i}>{line}</div>)}
+                      </div>
+                    )}
                   </div>
                 );
               })}

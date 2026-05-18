@@ -3,7 +3,8 @@ import { EngineState, ScriptBlock, DirectorState, SceneAnalysis } from "../types
 export async function analyzeScriptBlock(
   engineState: EngineState,
   scriptText: string,
-  characters: unknown[] = []
+  characters: unknown[] = [],
+  externalSignal?: AbortSignal,
 ): Promise<EngineState> {
   // Parse scriptText into ScriptBlocks — pure JS, no AI needed here
   const lines = scriptText.split('\n');
@@ -17,9 +18,11 @@ export async function analyzeScriptBlock(
     return { id: `block-${Date.now()}-${index}`, type, text: line };
   }).filter(b => b.text.trim().length > 0);
 
-  // All AI work (Gemini analysis, image generation, audio generation) happens server-side
+  // All AI work (Gemini analysis, image generation, audio generation) happens server-side.
+  // Combine the caller's abort signal (for cancellation) with a 60s timeout guard.
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 60_000); // 60s — image+audio gen takes time
+  const timeoutId = setTimeout(() => controller.abort(), 60_000);
+  externalSignal?.addEventListener('abort', () => controller.abort());
 
   let response: Response;
   try {
@@ -39,6 +42,7 @@ export async function analyzeScriptBlock(
   } catch (e) {
     clearTimeout(timeoutId);
     if (e instanceof DOMException && e.name === 'AbortError') {
+      if (externalSignal?.aborted) throw new DOMException('Cancelled', 'AbortError');
       throw new Error('Analysis request timed out (60s). Try a shorter script.');
     }
     throw e;

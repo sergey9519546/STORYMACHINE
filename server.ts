@@ -4,14 +4,16 @@ import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import fs from 'fs';
 import { type GoogleGenAI, Type, Modality } from '@google/genai';
-import { getAI, withTimeout } from './server/engine/ai.ts';
+import { getAI, generateContent } from './server/engine/ai.ts';
 import { rateLimit } from 'express-rate-limit';
 import { Stage } from './server/engine/Stage.ts';
-import { Orchestrator } from './server/engine/Orchestrator.ts';
+import { Orchestrator, type RoomProgressEvent } from './server/engine/Orchestrator.ts';
 import type { CharacterSheet, Location, StageSnapshot } from './server/engine/types.ts';
 import { transcriptToFountain, extractCharactersFromLog, syuzhetSort, wrapSyuzhetFountain } from './server/lib/fountain.ts';
 import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES, STYLE_MODIFIERS } from './server/lib/structure-presets.ts';
 import { logger, requestLogger } from './server/lib/logger.ts';
+import { metrics } from './server/lib/metrics.ts';
+import { validate, InitBodySchema, TurnBodySchema, RunRoomBodySchema, ImportBodySchema } from './server/lib/validation.ts';
 
 // ── Startup validation ────────────────────────────────────────────────────────
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -32,12 +34,23 @@ const PERSIST_SESSIONS = SESSION_DB_DIR !== ':memory:';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const asyncHandler = (fn: express.RequestHandler): express.RequestHandler =>
-  (req, res, next) => { Promise.resolve(fn(req, res, next)).catch(next); };
+  (req, res, next) => {
+    try {
+      Promise.resolve(fn(req, res, next)).catch(next);
+    } catch (e) {
+      next(e);
+    }
+  };
+
+class ValidationError extends Error {
+  status = 400;
+  constructor(message: string) { super(message); this.name = 'ValidationError'; }
+}
 
 const requireString = (val: unknown, name: string, maxLen = 20_000): string => {
   if (typeof val !== 'string' || val.trim() === '') throw new Error(`${name} is required`);
   if (val.length > maxLen) throw new Error(`${name} exceeds maximum length`);
-  return val;
+  return val.trim();
 };
 
 function safeJsonParse<T>(text: string, fallback: T): T {
@@ -65,18 +78,18 @@ function pcmToWav(pcmData: Buffer, sampleRate: number, numChannels: number): Buf
 
 async function generateImageServer(ai: GoogleGenAI, prompt: string): Promise<string | undefined> {
   try {
-    const response = await withTimeout(ai.models.generateContent({
+    const response = await generateContent({
       model: GEMINI_IMG_MODEL,
       contents: { parts: [{ text: prompt }] },
       config: { imageConfig: { aspectRatio: '16:9' } },
-    }), 25_000, 'generateImage');
+    }, { label: 'generateImage', timeoutMs: 25_000 });
     for (const part of response.candidates?.[0]?.content?.parts ?? []) {
       if (part.inlineData?.data) {
         return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
       }
     }
   } catch (e) {
-    console.error('Image generation failed:', (e as Error).message);
+    logger.error('image_generation_failed', { message: (e as Error).message });
   }
   return undefined;
 }
@@ -84,14 +97,14 @@ async function generateImageServer(ai: GoogleGenAI, prompt: string): Promise<str
 async function generateAudioServer(ai: GoogleGenAI, text: string): Promise<string | undefined> {
   if (!text) return undefined;
   try {
-    const response = await withTimeout(ai.models.generateContent({
+    const response = await generateContent({
       model: GEMINI_TTS_MODEL,
       contents: [{ parts: [{ text }] }],
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } } },
       },
-    }), 20_000, 'generateAudio');
+    }, { label: 'generateAudio', timeoutMs: 20_000 });
     const inlineData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
     if (!inlineData?.data || inlineData.data.length === 0) return undefined;
 
@@ -111,7 +124,7 @@ async function generateAudioServer(ai: GoogleGenAI, text: string): Promise<strin
     }
     return `data:${mimeType};base64,${base64Data}`;
   } catch (e) {
-    console.error('Audio generation failed:', (e as Error).message);
+    logger.error('audio_generation_failed', { message: (e as Error).message });
   }
   return undefined;
 }
@@ -309,9 +322,11 @@ interface Session {
   stage: Stage;
   orchestrator: Orchestrator;
   lastAccess: number;
+  _turnQueue: Promise<void>;  // serializes concurrent /api/turn calls per session
 }
 const sessions = new Map<string, Session>();
 const SESSION_TTL_MS = 30 * 60 * 1000;
+const MAX_SESSIONS   = Number(process.env.MAX_SESSIONS ?? 100);
 
 function dbPathFor(sessionId: string): string {
   return PERSIST_SESSIONS ? path.join(SESSION_DB_DIR, `${sessionId}.db`) : ':memory:';
@@ -320,10 +335,23 @@ function dbPathFor(sessionId: string): string {
 function getOrCreateSession(sessionId: string): Session {
   let session = sessions.get(sessionId);
   if (!session) {
+    if (sessions.size >= MAX_SESSIONS) {
+      // Evict the least-recently-accessed session to stay within the cap.
+      let oldestId = '';
+      let oldestAccess = Infinity;
+      for (const [id, s] of sessions) {
+        if (s.lastAccess < oldestAccess) { oldestAccess = s.lastAccess; oldestId = id; }
+      }
+      if (oldestId) {
+        sessions.get(oldestId)?.stage.close();
+        sessions.delete(oldestId);
+        logger.warn('session_evicted', { evicted: oldestId, cap: MAX_SESSIONS });
+      }
+    }
     // For a persisted session this opens the existing file; the Orchestrator
     // constructor re-hydrates agents + locations, so the session resumes intact.
     const s = new Stage(dbPathFor(sessionId));
-    session = { stage: s, orchestrator: new Orchestrator(s), lastAccess: Date.now() };
+    session = { stage: s, orchestrator: new Orchestrator(s), lastAccess: Date.now(), _turnQueue: Promise.resolve() };
     sessions.set(sessionId, session);
   }
   session.lastAccess = Date.now();
@@ -358,10 +386,16 @@ function sessionId(req: express.Request): string {
   const raw = req.method === 'GET'
     ? req.query.sessionId
     : req.body?.sessionId;
+  // No sessionId provided — fall back to 'default' (acceptable for single-user use)
+  if (raw === undefined || raw === null || raw === '') return 'default';
   if (typeof raw !== 'string' || !raw.trim()) return 'default';
   const cleaned = raw.trim().substring(0, 64);
-  // Accept alphanumeric + hyphens/underscores only — reject injection attempts.
-  return /^[a-zA-Z0-9_-]{1,64}$/.test(cleaned) ? cleaned : 'default';
+  // A sessionId was explicitly supplied but is malformed — reject with 400 rather
+  // than silently falling back to 'default', which could leak another user's session.
+  if (!/^[a-zA-Z0-9_-]{1,64}$/.test(cleaned)) {
+    throw new ValidationError('sessionId must match [a-zA-Z0-9_-]{1,64}');
+  }
+  return cleaned;
 }
 
 // Prevents two concurrent runRoomSimulation() calls for the same session+room from
@@ -378,10 +412,17 @@ async function startServer() {
   const app = express();
   app.use(express.json({ limit: '1mb' }));
   app.use(requestLogger());
+  // Assign a trace ID to every request for correlation across logs.
+  app.use((_req, res, next) => { res.locals.traceId = crypto.randomUUID(); next(); });
 
   // Health check — no rate limit, no auth, responds even when Gemini is down.
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', uptime: Math.round(process.uptime()), sessions: sessions.size });
+  });
+
+  // Metrics — Gemini call volume, latency, retries and failures per category.
+  app.get('/metrics', (_req, res) => {
+    res.json({ sessions: sessions.size, ...metrics.snapshot() });
   });
 
   const ai = getAI();
@@ -393,9 +434,15 @@ async function startServer() {
   app.use('/api/ledger',   gameLimiter);
   app.use('/api/state',    gameLimiter);
 
-  app.post('/api/init', asyncHandler(async (req, res) => {
+  app.post('/api/init', validate(InitBodySchema), asyncHandler(async (req, res) => {
+    const sid = sessionId(req);
     const { nodes, agents } = req.body;
-    const { orchestrator } = getOrCreateSession(sessionId(req));
+    const { orchestrator } = getOrCreateSession(sid);
+
+    const truncatedNodes  = Array.isArray(nodes)  && nodes.length  > 50;
+    const truncatedAgents = Array.isArray(agents) && agents.length > 50;
+    if (truncatedNodes)  logger.warn('init_truncated', { field: 'nodes',  sent: nodes.length,  limit: 50 });
+    if (truncatedAgents) logger.warn('init_truncated', { field: 'agents', sent: agents.length, limit: 50 });
 
     if (nodes && Array.isArray(nodes)) {
       (nodes as unknown[]).slice(0, 50).forEach((raw) => {
@@ -435,17 +482,36 @@ async function startServer() {
       });
     }
 
-    res.json({ status: 'initialized', sessionId: sessionId(req) });
+    res.json({
+      status: 'initialized',
+      sessionId: sid,
+      ...(truncatedNodes  ? { warning_nodes:  `Only first 50 of ${nodes.length} nodes registered`  } : {}),
+      ...(truncatedAgents ? { warning_agents: `Only first 50 of ${agents.length} agents registered` } : {}),
+    });
   }));
 
-  app.post('/api/turn', asyncHandler(async (req, res) => {
-    const { orchestrator } = getOrCreateSession(sessionId(req));
+  app.post('/api/turn', validate(TurnBodySchema), asyncHandler(async (req, res) => {
+    const session = getOrCreateSession(sessionId(req));
     const agentId = requireString(req.body?.agentId, 'agentId', 128);
-    const action = await orchestrator.runTurn(agentId);
-    res.json({ action });
+
+    // Per-session serialization: each turn is chained behind the previous so
+    // concurrent requests for the same session run sequentially, not in parallel,
+    // preventing state corruption in the SQLite-backed engine.
+    let resolveSlot!: () => void;
+    const slot = new Promise<void>(r => { resolveSlot = r; });
+    const prev = session._turnQueue;
+    session._turnQueue = slot;
+
+    try {
+      await prev;
+      const action = await session.orchestrator.runTurn(agentId);
+      res.json({ action });
+    } finally {
+      resolveSlot();
+    }
   }));
 
-  app.post('/api/run-room', asyncHandler(async (req, res) => {
+  app.post('/api/run-room', validate(RunRoomBodySchema), asyncHandler(async (req, res) => {
     const sid = sessionId(req);
     const nodeId = requireString(req.body?.nodeId, 'nodeId', 128);
     const lockKey = `${sid}:${nodeId}`;
@@ -471,8 +537,113 @@ async function startServer() {
     }
   }));
 
+  // ── SSE streaming endpoint for run-room ─────────────────────────────────────
+  // Sends newline-delimited Server-Sent Events as each agent acts, so the client
+  // can display real-time progress instead of waiting for the full simulation.
+  // Uses the same runningRooms lock as the batch endpoint to prevent overlap.
+  app.get('/api/run-room-stream', gameLimiter, async (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // disable nginx proxy buffering
+    res.flushHeaders();
+
+    let disconnected = false;
+    req.on('close', () => { disconnected = true; });
+
+    const emit = (event: RoomProgressEvent) => {
+      if (!disconnected) res.write(`data: ${JSON.stringify(event)}\n\n`);
+    };
+
+    let lockKey = '';
+    try {
+      const sid = sessionId(req);
+      const nodeId = requireString(req.query?.nodeId as string | undefined, 'nodeId', 128);
+      lockKey = `${sid}:${nodeId}`;
+
+      if (runningRooms.has(lockKey)) {
+        emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: 'already_running' });
+        res.end();
+        return;
+      }
+
+      const rawMaxTurns = req.query?.maxTurns;
+      const maxTurns = typeof rawMaxTurns === 'string' && rawMaxTurns
+        ? Math.max(2, Math.min(12, parseInt(rawMaxTurns, 10) || 5))
+        : 5;
+
+      const { orchestrator } = getOrCreateSession(sid);
+      runningRooms.add(lockKey);
+      try {
+        await orchestrator.runRoomSimulation(nodeId, maxTurns, emit);
+      } finally {
+        runningRooms.delete(lockKey);
+      }
+    } catch (err) {
+      emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: `error: ${(err as Error).message}` });
+    }
+
+    res.end();
+  });
+
+  // ── Scene grouping endpoint ──────────────────────────────────────────────────
+  // Groups the action log into scenes: contiguous blocks of actions sharing the
+  // same location_id. Useful for screenplay structure analysis and export.
+  app.get('/api/scenes', asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const log = stage.getFullLedger();
+
+    type Scene = {
+      scene_index: number;
+      location_id: string;
+      location_name: string;
+      start_turn: number;
+      end_turn: number;
+      action_count: number;
+      cast: string[];        // unique char_ids who acted
+      cast_names: string[];
+    };
+
+    const scenes: Scene[] = [];
+    let current: Scene | null = null;
+
+    for (const entry of log) {
+      if (!current || current.location_id !== entry.location_id) {
+        current = {
+          scene_index: scenes.length + 1,
+          location_id: entry.location_id,
+          location_name: stage.getLocation(entry.location_id)?.name ?? entry.location_id,
+          start_turn: entry.timestamp,
+          end_turn: entry.timestamp,
+          action_count: 0,
+          cast: [],
+          cast_names: [],
+        };
+        scenes.push(current);
+      }
+      current.end_turn = entry.timestamp;
+      current.action_count++;
+      if (!current.cast.includes(entry.char_id)) {
+        current.cast.push(entry.char_id);
+        const name = stage.getAgent(entry.char_id)?.name ?? entry.char_id;
+        current.cast_names.push(name);
+      }
+    }
+
+    res.json({ scene_count: scenes.length, scenes });
+  }));
+
   app.get('/api/ledger', asyncHandler(async (req, res) => {
     const { stage } = getOrCreateSession(sessionId(req));
+    const rawLimit  = Number(req.query.limit);
+    const rawOffset = Number(req.query.offset);
+    if (req.query.limit !== undefined || req.query.offset !== undefined) {
+      const limit  = isNaN(rawLimit)  || rawLimit  < 1 ? 50  : Math.min(rawLimit,  500);
+      const offset = isNaN(rawOffset) || rawOffset < 0 ? 0   : rawOffset;
+      const total  = stage.getLedgerCount();
+      res.json({ data: stage.getLedgerPage(limit, offset), total, limit, offset });
+      return;
+    }
     res.json(stage.getFullLedger());
   }));
 
@@ -481,9 +652,17 @@ async function startServer() {
     res.json({ agents: stage.getAllAgents(), nodes: stage.getAllLocations() });
   }));
 
-  // Reset a session (clears all simulation state for this sessionId)
+  // Reset a session (clears all simulation state for this sessionId).
+  // When running with disk persistence a timestamped backup is written first.
   app.post('/api/reset', gameLimiter, asyncHandler(async (req, res) => {
     const sid = sessionId(req);
+    if (PERSIST_SESSIONS) {
+      const src = path.join(SESSION_DB_DIR, `${sid}.db`);
+      if (fs.existsSync(src)) {
+        const dest = path.join(SESSION_DB_DIR, `${sid}.${Date.now()}.bak.db`);
+        try { fs.copyFileSync(src, dest); } catch { /* non-fatal */ }
+      }
+    }
     destroySession(sid);
     res.json({ status: 'reset', sessionId: sid });
   }));
@@ -520,6 +699,7 @@ async function startServer() {
 
     const simStage = new Stage(':memory:');
     const simOrchestrator = new Orchestrator(simStage);
+    try {
 
     (nodesPayload as unknown[]).slice(0, 10).forEach((raw) => {
       if (typeof raw !== 'object' || raw === null) return;
@@ -574,6 +754,9 @@ async function startServer() {
     const characters = extractCharactersFromLog(simAgents);
 
     res.json({ fountain, characters, turnCount: log.length, agents: simAgents, beatTraceCount: simBeatTraces.length });
+    } finally {
+      simStage.close();
+    }
   }));
 
   // Current Setup/Turn/Prestige illusion phase
@@ -587,6 +770,15 @@ async function startServer() {
   // All beat traces (narrative beats with causal chains)
   app.get('/api/beat-traces', gameLimiter, asyncHandler(async (req, res) => {
     const { stage } = getOrCreateSession(sessionId(req));
+    const rawLimit  = Number(req.query.limit);
+    const rawOffset = Number(req.query.offset);
+    if (req.query.limit !== undefined || req.query.offset !== undefined) {
+      const limit  = isNaN(rawLimit)  || rawLimit  < 1 ? 50  : Math.min(rawLimit,  500);
+      const offset = isNaN(rawOffset) || rawOffset < 0 ? 0   : rawOffset;
+      const total  = stage.getBeatTracesCount();
+      res.json({ data: stage.getBeatTracesPage(limit, offset), total, limit, offset });
+      return;
+    }
     res.json(stage.getAllBeatTraces());
   }));
 
@@ -601,6 +793,15 @@ async function startServer() {
   // All belief edges (contradiction graph)
   app.get('/api/belief-edges', gameLimiter, asyncHandler(async (req, res) => {
     const { stage } = getOrCreateSession(sessionId(req));
+    const rawLimit  = Number(req.query.limit);
+    const rawOffset = Number(req.query.offset);
+    if (req.query.limit !== undefined || req.query.offset !== undefined) {
+      const limit  = isNaN(rawLimit)  || rawLimit  < 1 ? 50  : Math.min(rawLimit,  500);
+      const offset = isNaN(rawOffset) || rawOffset < 0 ? 0   : rawOffset;
+      const total  = stage.getBeliefEdgesCount();
+      res.json({ data: stage.getBeliefEdgesPage(limit, offset), total, limit, offset });
+      return;
+    }
     res.json(stage.getAllBeliefEdges());
   }));
 
@@ -615,6 +816,15 @@ async function startServer() {
   // All goal mutations across all agents
   app.get('/api/goal-mutations', gameLimiter, asyncHandler(async (req, res) => {
     const { stage } = getOrCreateSession(sessionId(req));
+    const rawLimit  = Number(req.query.limit);
+    const rawOffset = Number(req.query.offset);
+    if (req.query.limit !== undefined || req.query.offset !== undefined) {
+      const limit  = isNaN(rawLimit)  || rawLimit  < 1 ? 50  : Math.min(rawLimit,  500);
+      const offset = isNaN(rawOffset) || rawOffset < 0 ? 0   : rawOffset;
+      const total  = stage.getGoalMutationsCount();
+      res.json({ data: stage.getGoalMutationsPage(limit, offset), total, limit, offset });
+      return;
+    }
     res.json(stage.getAllGoalMutations());
   }));
 
@@ -741,10 +951,19 @@ async function startServer() {
   }));
 
   // Import: restore a previously exported snapshot into a fresh session.
-  app.post('/api/session/import', gameLimiter, asyncHandler(async (req, res) => {
+  app.post('/api/session/import', gameLimiter, validate(ImportBodySchema), asyncHandler(async (req, res) => {
     const snap = req.body as StageSnapshot;
     if (!snap || typeof snap !== 'object' || !Array.isArray(snap.agents) || !Array.isArray(snap.locations)) {
       res.status(400).json({ error: 'Invalid snapshot: must include agents and locations arrays' });
+      return;
+    }
+    // Reject snapshots that are newer than the current schema version to prevent
+    // silent data loss when an older server tries to import a newer snapshot.
+    const CURRENT_SCHEMA = 6;
+    if (typeof snap.schema_version === 'number' && snap.schema_version > CURRENT_SCHEMA) {
+      res.status(422).json({
+        error: `Snapshot schema v${snap.schema_version} is newer than server schema v${CURRENT_SCHEMA}. Upgrade the server first.`,
+      });
       return;
     }
     const sid = sessionId(req);
@@ -852,7 +1071,7 @@ async function startServer() {
       ? `\nEXISTING SCRIPT (for continuity — match the established tone, characters, locations, and facts; do not contradict them):\n${scriptContext}\n`
       : '';
     const wbProfiles = profilesBlock(sanitizeProfiles(req.body?.profiles));
-    const response = await withTimeout(ai.models.generateContent({
+    const response = await generateContent({
       model: GEMINI_MODEL,
       contents: `SYSTEM ROLE: You are a master screenwriter and world-builder. Your task is to generate or expand a scene based on the user's beat outline.
 
@@ -866,8 +1085,8 @@ STRICT CONSTRAINTS:
 ${contextBlock}${wbProfiles}
 INPUT: ${beat}
 OUTPUT: Generate the Scene Heading and Action lines.`,
-    }), 30_000, 'world-build');
-    res.json({ result: response.text });
+    }, { label: 'world-build', timeoutMs: 30_000 });
+    res.json({ result: response.text ?? '' });
   }));
 
   app.post('/api/scriptide/refine-dialogue', aiLimiter, asyncHandler(async (req, res) => {
@@ -900,7 +1119,7 @@ OUTPUT: Generate the Scene Heading and Action lines.`,
     const dlgContextBlock = dlgContext
       ? `\nSURROUNDING SCRIPT (preserve each character's established voice and the scene's continuity):\n${dlgContext}\n`
       : '';
-    const response = await withTimeout(ai.models.generateContent({
+    const response = await generateContent({
       model: GEMINI_MODEL,
       contents: `SYSTEM ROLE: You are an expert dialogue doctor, specializing in subtext, character voice, and dramatic irony.
 
@@ -915,8 +1134,8 @@ ${dlgContextBlock}
 INPUT DIALOGUE: ${dialogue}
 CHARACTER PROFILES: ${JSON.stringify(profiles)}
 OUTPUT: Provide 2 alternative versions of the dialogue exchange, explaining the subtextual strategy used in each.`,
-    }), 30_000, 'refine-dialogue');
-    res.json({ result: response.text });
+    }, { label: 'refine-dialogue', timeoutMs: 30_000 });
+    res.json({ result: response.text ?? '' });
   }));
 
   app.post('/api/scriptide/analyze-tension', aiLimiter, asyncHandler(async (req, res) => {
@@ -926,7 +1145,7 @@ OUTPUT: Provide 2 alternative versions of the dialogue exchange, explaining the 
       ? `\nSURROUNDING SCRIPT (consider how tension carries over from adjacent scenes):\n${tnContext}\n`
       : '';
     const tnProfiles = profilesBlock(sanitizeProfiles(req.body?.profiles));
-    const response = await withTimeout(ai.models.generateContent({
+    const response = await generateContent({
       model: GEMINI_MODEL,
       contents: `SYSTEM ROLE: You are a structural script consultant influenced by Hitchcock's theory of suspense.
 
@@ -940,21 +1159,21 @@ ANALYSIS CRITERIA:
 ${tnContextBlock}${tnProfiles}
 INPUT SCENE: ${scene}
 OUTPUT: A bulleted diagnostic report with 3 actionable suggestions. Where a character's want, lie, or wound is relevant, ground the suggestion in it.`,
-    }), 30_000, 'analyze-tension');
-    res.json({ result: response.text });
+    }, { label: 'analyze-tension', timeoutMs: 30_000 });
+    res.json({ result: response.text ?? '' });
   }));
 
   app.post('/api/scriptide/clean-action', aiLimiter, asyncHandler(async (req, res) => {
     const text = requireString(req.body?.text, 'text');
-    const response = await withTimeout(ai.models.generateContent({
+    const response = await generateContent({
       model: GEMINI_MODEL,
       contents: `SYSTEM ROLE: You are a strict script editor enforcing a "Semantic Firewall".
 OBJECTIVE: Rewrite the following action block — remove all camera directions and technical jargon. Describe what happens in the world, not what the camera does.
 
 INPUT: ${text}
 OUTPUT: Just the rewritten action text, nothing else.`,
-    }), 30_000, 'clean-action');
-    res.json({ result: response.text });
+    }, { label: 'clean-action', timeoutMs: 30_000 });
+    res.json({ result: response.text ?? '' });
   }));
 
   app.post('/api/scriptide/character-profile', aiLimiter, asyncHandler(async (req, res) => {
@@ -969,7 +1188,7 @@ OUTPUT: Just the rewritten action text, nothing else.`,
     const want  = requireString(profile.want,  'profile.want');
     const need  = requireString(profile.need,  'profile.need');
 
-    const response = await withTimeout(ai.models.generateContent({
+    const response = await generateContent({
       model: GEMINI_MODEL,
       contents: `SYSTEM ROLE: You are a character designer specializing in psychological realism and "Show, Don't Tell".
 
@@ -989,8 +1208,8 @@ Want (External Goal): ${want}
 Need (Internal Truth): ${need}
 
 OUTPUT: A visceral character description.`,
-    }), 30_000, 'character-profile');
-    res.json({ result: response.text });
+    }, { label: 'character-profile', timeoutMs: 30_000 });
+    res.json({ result: response.text ?? '' });
   }));
 
   // ── Comprehensive script analysis (replaces frontend director.ts AI calls) ──
@@ -1049,7 +1268,7 @@ Ensure throughline commentary addresses all active throughlines listed above.
 ${structure ? `structuralNode must name a specific beat from the ${structure} structure (e.g. "Catalyst", "Midpoint", "Ten — Twist").` : ''}
 ${dirStyle ? `Cinematic composition and commentary must be filtered through the ${dirStyle} style.` : ''}`;
 
-    const analysisResponse = await withTimeout(ai.models.generateContent({
+    const analysisResponse = await generateContent({
       model: GEMINI_MODEL,
       contents: prompt,
       config: {
@@ -1057,10 +1276,9 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
         responseMimeType: 'application/json',
         responseSchema: AnalyzeScriptSchema,
       },
-    }), 45_000, 'analyze-script');
+    }, { label: 'analyze-script', timeoutMs: 45_000 });
 
-    const rawText = (analysisResponse.text ?? '{}')
-      .replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const rawText = analysisResponse.text ?? '{}';
     const analysisData = safeJsonParse<{ sceneAnalysis: Record<string, unknown>; updatedDirectorState: Record<string, unknown> } | null>(rawText, null);
     if (!analysisData?.sceneAnalysis) {
       res.status(500).json({ error: 'Failed to parse AI analysis response.' });
@@ -1106,6 +1324,16 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    // Malformed JSON body — Express throws a SyntaxError with a 'body' property.
+    if (err instanceof SyntaxError && 'body' in err) {
+      res.status(400).json({ error: 'Invalid JSON in request body' });
+      return;
+    }
+    // Application-level validation errors (e.g. bad sessionId format).
+    if (err instanceof ValidationError) {
+      res.status(400).json({ error: err.message });
+      return;
+    }
     logger.error('unhandled_error', {
       message: err.message,
       stack: err.stack,
@@ -1130,9 +1358,25 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     console.error(`FATAL: Invalid PORT value "${process.env.PORT}". Must be 1–65535.`);
     process.exit(1);
   }
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    logger.info('server_started', { port: PORT });
   });
+
+  // ── Graceful shutdown ────────────────────────────────────────────────────────
+  const shutdown = (signal: string) => {
+    logger.info('server_shutdown', { signal });
+    server.close(() => {
+      // Close all SQLite handles before exiting so WAL files are flushed cleanly.
+      for (const { stage } of sessions.values()) {
+        try { stage.close(); } catch { /* already closed */ }
+      }
+      process.exit(0);
+    });
+    // Hard-kill after 10s if in-flight requests haven't drained.
+    setTimeout(() => process.exit(1), 10_000).unref();
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT',  () => shutdown('SIGINT'));
 }
 
 startServer();

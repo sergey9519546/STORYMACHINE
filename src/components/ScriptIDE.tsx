@@ -162,7 +162,7 @@ export default function ScriptIDE({
   >("production");
   const [showDirectorHUD, setShowDirectorHUD] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => lsGet("theme") === "dark");
-  const [isTypewriterSound] = useState(true);
+  const [isTypewriterSound, setIsTypewriterSound] = useState(() => lsGet("typewriter_sound") !== "off");
   const [snapshots, setSnapshots] = useState<
     { id: string; name: string; text: string; date: string }[]
   >(() => safeJsonParse(lsGet("script_snapshots"), []));
@@ -194,6 +194,8 @@ export default function ScriptIDE({
   );
   const [directorsLayer, setDirectorsLayer] = useState(false);
   const [isCleaning, setIsCleaning] = useState<number | null>(null);
+  const [cleanError, setCleanError] = useState<string | null>(null);
+  const cleanErrTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // ── Refs ────────────────────────────────────────────────────────────────────
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -203,6 +205,10 @@ export default function ScriptIDE({
   const panelToggleCountRef = useRef(0);
   const keystrokeTimesRef = useRef<number[]>([]);
   const analysisGenerationRef = useRef<number>(0);
+  const analysisAbortRef = useRef<AbortController | null>(null);
+  // Always-current ref so async callbacks (triggerAnalysis) see the latest engineState
+  // rather than a stale closure from 2 s ago.
+  const engineStateRef = useRef<EngineState | null>(null);
 
   // ── Persist to localStorage ──────────────────────────────────────────────────
   useEffect(() => {
@@ -226,6 +232,22 @@ export default function ScriptIDE({
     }
   }, [isDarkMode]);
 
+  // Keep engineStateRef in sync so triggerAnalysis always reads the latest state (F3).
+  useEffect(() => {
+    engineStateRef.current = engineState;
+  }, [engineState]);
+
+  // Cleanup typing timeout and AudioContext on unmount (F2a, F2b).
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      if (audioCtxRef.current) {
+        audioCtxRef.current.close().catch(() => { /* ignore */ });
+        audioCtxRef.current = null;
+      }
+    };
+  }, []);
+
   // ── Consume imported Fountain script ────────────────────────────────────────
   useEffect(() => {
     if (!importedScript) return;
@@ -243,7 +265,9 @@ export default function ScriptIDE({
     }
 
     onImportConsumed?.();
-  }, [importedScript]); // eslint-disable-line react-hooks/exhaustive-deps
+  // importedCharacters is stable (array literal from parent memo) — safe to omit.
+  // onImportConsumed must be in deps so we always call the current prop version.
+  }, [importedScript, onImportConsumed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Initialize engine state ──────────────────────────────────────────────────
   useEffect(() => {
@@ -399,22 +423,26 @@ export default function ScriptIDE({
 
   // ── AI analysis ──────────────────────────────────────────────────────────────
   const triggerAnalysis = async (text: string) => {
-    if (!text.trim() || !engineState) return;
+    const currentEngineState = engineStateRef.current;
+    if (!text.trim() || !currentEngineState) return;
+
+    // Cancel any in-flight analysis so a stale response can't overwrite newer state.
+    analysisAbortRef.current?.abort();
+    const abort = new AbortController();
+    analysisAbortRef.current = abort;
 
     const currentGeneration = ++analysisGenerationRef.current;
     setEngineState((prev) => (prev ? { ...prev, isAnalyzing: true } : null));
 
     try {
-      const newState = await analyzeScriptBlock(engineState, text, characters);
+      const newState = await analyzeScriptBlock(currentEngineState, text, characters, abort.signal);
       if (currentGeneration === analysisGenerationRef.current) {
         setEngineState(newState);
       }
     } catch (error) {
-      console.error("Analysis failed:", error);
+      if (error instanceof DOMException && error.name === 'AbortError') return;
       if (currentGeneration === analysisGenerationRef.current) {
-        setEngineState((prev) =>
-          prev ? { ...prev, isAnalyzing: false } : null
-        );
+        setEngineState((prev) => prev ? { ...prev, isAnalyzing: false } : null);
       }
     }
   };
@@ -708,6 +736,7 @@ export default function ScriptIDE({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
       });
+      if (!response.ok) throw new Error(`Clean action failed: ${response.status}`);
       const data = await response.json();
       if (data.error) throw new Error(data.error);
 
@@ -719,7 +748,9 @@ export default function ScriptIDE({
       setScriptText(newScript);
       triggerAnalysis(newScript);
     } catch (err) {
-      console.error("Failed to clean action:", err);
+      if (cleanErrTimerRef.current) clearTimeout(cleanErrTimerRef.current);
+      setCleanError((err as Error).message ?? 'Clean action failed');
+      cleanErrTimerRef.current = setTimeout(() => setCleanError(null), 5000);
     } finally {
       setIsCleaning(null);
     }
@@ -945,14 +976,27 @@ export default function ScriptIDE({
 
       {/* CENTER PANEL: INGEST (Script Editor) */}
       <div className="flex-1 h-full border-r-4 border-black flex flex-col bg-white relative">
+        {cleanError && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white text-xs font-bold px-3 py-1.5 border-2 border-black flex items-center gap-2">
+            {cleanError}
+            <button onClick={() => setCleanError(null)} className="ml-1 leading-none hover:opacity-70">✕</button>
+          </div>
+        )}
         <Toolbar
           isSaving={isSaving}
           isAnalyzing={engineState.isAnalyzing}
           showDirectorHUD={showDirectorHUD}
           directorsLayer={directorsLayer}
           wordCount={stats.wordCount}
+          isTypewriterSound={isTypewriterSound}
           onToggleHUD={() => setShowDirectorHUD(!showDirectorHUD)}
           onToggleDirectorsLayer={() => setDirectorsLayer(!directorsLayer)}
+          onToggleTypewriterSound={() => {
+            setIsTypewriterSound(prev => {
+              lsSet("typewriter_sound", prev ? "off" : "on");
+              return !prev;
+            });
+          }}
           onExportFountain={exportFountain}
           onOpenStoryMachine={onOpenStoryMachine}
         />

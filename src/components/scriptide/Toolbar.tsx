@@ -7,8 +7,10 @@ interface ToolbarProps {
   showDirectorHUD: boolean;
   directorsLayer: boolean;
   wordCount: number;
+  isTypewriterSound: boolean;
   onToggleHUD: () => void;
   onToggleDirectorsLayer: () => void;
+  onToggleTypewriterSound: () => void;
   onExportFountain: () => void;
   onOpenStoryMachine?: () => void;
 }
@@ -19,8 +21,10 @@ export default function Toolbar({
   showDirectorHUD,
   directorsLayer,
   wordCount,
+  isTypewriterSound,
   onToggleHUD,
   onToggleDirectorsLayer,
+  onToggleTypewriterSound,
   onExportFountain,
   onOpenStoryMachine,
 }: ToolbarProps) {
@@ -48,6 +52,17 @@ export default function Toolbar({
         <div className="text-[10px] font-mono text-gray-400 hidden sm:block">
           {wordCount} words
         </div>
+        <button
+          onClick={onToggleTypewriterSound}
+          aria-label={isTypewriterSound ? "Mute typewriter sound" : "Enable typewriter sound"}
+          aria-pressed={isTypewriterSound}
+          title={isTypewriterSound ? "Typewriter sound ON" : "Typewriter sound OFF"}
+          className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border ${
+            isTypewriterSound ? "bg-white text-black" : "bg-gray-600 text-gray-300"
+          }`}
+        >
+          {isTypewriterSound ? "⌨ SFX" : "⌨ MUTE"}
+        </button>
         <button
           onClick={onToggleHUD}
           aria-label={showDirectorHUD ? "Hide Director HUD" : "Show Director HUD"}

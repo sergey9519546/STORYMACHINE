@@ -23,8 +23,10 @@ import type {
   DramaticPressure,
   BeatTrace,
   StageSnapshot,
+  Stakes,
+  StakeCategory,
 } from './types.ts';
-import { safeJsonParse } from '../../src/lib/json.ts';
+import { safeJsonParse } from '../lib/json.ts';
 
 const DEFAULT_DARK_TRIAD: DarkTriad = { machiavellianism: 50, narcissism: 50, psychopathy: 50 };
 const DEFAULT_BIG_FIVE: BigFive = { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 };
@@ -34,6 +36,11 @@ export class Stage {
 
   constructor(dbPath: string = ':memory:') {
     this.db = new Database(dbPath);
+    // WAL mode: better concurrent read performance, no "database is locked" errors.
+    // NORMAL synchronous: safe for single-process use and avoids full fsync overhead.
+    // Skip for :memory: — pragmas don't persist there but the calls are harmless.
+    this.db.pragma('journal_mode = WAL');
+    this.db.pragma('synchronous = NORMAL');
     this.initSchema();
     this.runMigrations();
   }
@@ -71,6 +78,26 @@ export class Stage {
       // v3 → v4: story architecture config (pacing target, structure, emotional arc, director style)
       () => {
         this.db.exec('ALTER TABLE Illusion_State ADD COLUMN config_json TEXT');
+      },
+      // v4 → v5: stakes table
+      () => {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS Stakes (
+            id TEXT PRIMARY KEY,
+            char_id TEXT NOT NULL REFERENCES Characters(char_id),
+            category TEXT NOT NULL,
+            description TEXT NOT NULL,
+            magnitude REAL NOT NULL DEFAULT 50,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            resolved_at INTEGER,
+            outcome TEXT
+          );
+          CREATE INDEX IF NOT EXISTS idx_stakes_char ON Stakes(char_id, is_active);
+        `);
+      },
+      // v5 → v6: persuasion outcome tracking
+      () => {
+        this.db.exec('ALTER TABLE Persuasion_Log ADD COLUMN success INTEGER');
       },
     ];
     for (let i = current; i < MIGRATIONS.length; i++) {
@@ -248,16 +275,23 @@ export class Stage {
       VALUES (?, ?, ?, ?)
     `).run(agent.char_id, agent.name, agent.public_mask, agent.hidden_motive);
 
-    // Seed belief graph from knowledge_vector (each fact becomes a witnessed belief)
-    const seedBeliefs: Belief[] = agent.knowledge_vector.map(fact => ({
-      id: randomUUID(),
-      proposition: fact,
-      confidence: 1.0,
-      source: 'witnessed' as const,
-      acquired_at: 0,
-    }));
+    // Seed belief graph from knowledge_vector (each fact becomes a witnessed belief).
+    // Skip seeds whose proposition already appears in agent.beliefs (avoids duplication
+    // when re-importing a snapshot that was already seeded on first addAgent call).
+    const existingProps = new Set(
+      (agent.beliefs ?? []).map(b => b.proposition.toLowerCase()),
+    );
+    const seedBeliefs: Belief[] = agent.knowledge_vector
+      .filter(fact => !existingProps.has(fact.toLowerCase()))
+      .map(fact => ({
+        id: randomUUID(),
+        proposition: fact,
+        confidence: 1.0,
+        source: 'witnessed' as const,
+        acquired_at: 0,
+      }));
 
-    // Merge any pre-supplied beliefs with the seeded ones
+    // Merge unique seeds with any pre-supplied beliefs
     const allBeliefs = [...seedBeliefs, ...(agent.beliefs ?? [])];
 
     this.db.prepare(`
@@ -290,55 +324,50 @@ export class Stage {
     }
   }
 
-  public getAgent(char_id: string): CharacterSheet | undefined {
-    const charRow = this.db.prepare('SELECT * FROM Characters WHERE char_id = ?').get(char_id) as Record<string, unknown> | undefined;
-    if (!charRow) return undefined;
-
-    const stateRow = this.db.prepare('SELECT * FROM Character_State WHERE char_id = ?').get(char_id) as Record<string, unknown> | undefined;
-    if (!stateRow) return undefined;
-
-    const knowledgeRows = this.db.prepare('SELECT * FROM Knowledge_Ledger WHERE char_id = ?').all(char_id) as Array<Record<string, unknown>>;
-
+  // Maps a merged Characters + Character_State row (plus the agent's knowledge
+  // facts) into a CharacterSheet. Shared by getAgent and the batched bulk
+  // fetchers so the JSON-column parsing logic lives in exactly one place.
+  private _rowToSheet(row: Record<string, unknown>, knowledgeFacts: string[]): CharacterSheet {
     return {
-      char_id: charRow.char_id as string,
-      name: charRow.name as string,
-      public_mask: charRow.public_mask as string,
-      hidden_motive: charRow.hidden_motive as string,
-      current_location_id: stateRow.current_location_id as string,
-      suspicion_score: stateRow.base_suspicion_score as number,
-      is_alive: (stateRow.is_alive as number) === 1,
-      knowledge_vector: knowledgeRows.map(k => k.fact_description as string),
+      char_id: row.char_id as string,
+      name: row.name as string,
+      public_mask: row.public_mask as string,
+      hidden_motive: row.hidden_motive as string,
+      current_location_id: row.current_location_id as string,
+      suspicion_score: row.base_suspicion_score as number,
+      is_alive: (row.is_alive as number) === 1,
+      knowledge_vector: knowledgeFacts,
       beliefs: (() => {
-        const v = safeJsonParse<unknown>(stateRow.beliefs_json as string, []);
+        const v = safeJsonParse<unknown>(row.beliefs_json as string, []);
         return Array.isArray(v) ? (v as Belief[]) : [];
       })(),
       theoryOfMind: (() => {
-        const v = safeJsonParse<unknown>(stateRow.theory_of_mind_json as string, {});
+        const v = safeJsonParse<unknown>(row.theory_of_mind_json as string, {});
         return (v && typeof v === 'object' && !Array.isArray(v)) ? (v as Record<string, TheoryOfMind>) : {};
       })(),
       goalStack: (() => {
-        if (!stateRow.goal_stack_json) return undefined;
-        const v = safeJsonParse<unknown>(stateRow.goal_stack_json as string, null);
+        if (!row.goal_stack_json) return undefined;
+        const v = safeJsonParse<unknown>(row.goal_stack_json as string, null);
         if (!v || typeof v !== 'object') return undefined;
         const g = v as Record<string, unknown>;
         if (!g.terminal || !Array.isArray(g.instrumental)) return undefined;
         return v as GoalStack;
       })(),
       darkTriad: (() => {
-        const v = safeJsonParse<unknown>(stateRow.dark_triad_json as string, null);
+        const v = safeJsonParse<unknown>(row.dark_triad_json as string, null);
         return (v && typeof v === 'object' && 'machiavellianism' in (v as object)) ? (v as DarkTriad) : DEFAULT_DARK_TRIAD;
       })(),
       bigFive: (() => {
-        const v = safeJsonParse<unknown>(stateRow.big_five_json as string, null);
+        const v = safeJsonParse<unknown>(row.big_five_json as string, null);
         return (v && typeof v === 'object' && 'openness' in (v as object)) ? (v as BigFive) : DEFAULT_BIG_FIVE;
       })(),
-      attachmentStyle: (stateRow.attachment_style as AttachmentStyle) ?? 'secure',
+      attachmentStyle: (row.attachment_style as AttachmentStyle) ?? 'secure',
       defenseMechanisms: (() => {
-        const v = safeJsonParse<unknown>(stateRow.defense_mechanisms_json as string, []);
+        const v = safeJsonParse<unknown>(row.defense_mechanisms_json as string, []);
         return Array.isArray(v) ? (v as DefenseMechanism[]) : [];
       })(),
       emotionState: (() => {
-        const raw = stateRow.emotion_state_json as string | null;
+        const raw = row.emotion_state_json as string | null;
         if (!raw) return undefined;
         const v = safeJsonParse<unknown>(raw, null);
         if (!v || typeof v !== 'object') return undefined;
@@ -349,16 +378,56 @@ export class Stage {
     };
   }
 
+  public getAgent(char_id: string): CharacterSheet | undefined {
+    const row = this.db.prepare(`
+      SELECT c.*, s.* FROM Characters c
+      JOIN Character_State s ON c.char_id = s.char_id
+      WHERE c.char_id = ?
+    `).get(char_id) as Record<string, unknown> | undefined;
+    if (!row) return undefined;
+
+    const knowledgeRows = this.db.prepare(
+      'SELECT fact_description FROM Knowledge_Ledger WHERE char_id = ?'
+    ).all(char_id) as Array<{ fact_description: string }>;
+
+    return this._rowToSheet(row, knowledgeRows.map(k => k.fact_description));
+  }
+
+  // Batched bulk fetch: one JOIN for character+state, one scan for all
+  // knowledge facts — replaces the previous N+1 (3 queries per agent).
+  private _getAgentsBatched(stateFilter: string, params: unknown[]): CharacterSheet[] {
+    const rows = this.db.prepare(`
+      SELECT c.*, s.* FROM Characters c
+      JOIN Character_State s ON c.char_id = s.char_id
+      ${stateFilter}
+    `).all(...params) as Array<Record<string, unknown>>;
+    if (rows.length === 0) return [];
+
+    // One query for the fetched agents' knowledge facts, grouped in memory.
+    // Filter by char_id IN (...) so we don't load knowledge for agents in other locations.
+    const charIds = rows.map(r => r.char_id as string);
+    const knowledgeByAgent = new Map<string, string[]>();
+    if (charIds.length > 0) {
+      const placeholders = charIds.map(() => '?').join(',');
+      const knowledgeRows = this.db.prepare(
+        `SELECT char_id, fact_description FROM Knowledge_Ledger WHERE char_id IN (${placeholders})`
+      ).all(...charIds) as Array<{ char_id: string; fact_description: string }>;
+      for (const k of knowledgeRows) {
+        const list = knowledgeByAgent.get(k.char_id);
+        if (list) list.push(k.fact_description);
+        else knowledgeByAgent.set(k.char_id, [k.fact_description]);
+      }
+    }
+
+    return rows.map(r => this._rowToSheet(r, knowledgeByAgent.get(r.char_id as string) ?? []));
+  }
+
   public getAllAgents(): CharacterSheet[] {
-    const rows = this.db.prepare('SELECT char_id FROM Characters').all() as Array<{ char_id: string }>;
-    return rows.map(r => this.getAgent(r.char_id)).filter((a): a is CharacterSheet => a !== undefined);
+    return this._getAgentsBatched('', []);
   }
 
   public getAgentsInLocation(location_id: string): CharacterSheet[] {
-    const rows = this.db.prepare(
-      'SELECT char_id FROM Character_State WHERE current_location_id = ?'
-    ).all(location_id) as Array<{ char_id: string }>;
-    return rows.map(r => this.getAgent(r.char_id)).filter((a): a is CharacterSheet => a !== undefined);
+    return this._getAgentsBatched('WHERE s.current_location_id = ?', [location_id]);
   }
 
   // ── Agent state mutations ────────────────────────────────────────────────────
@@ -427,25 +496,33 @@ export class Stage {
       action.action_type,
       action.target ?? null,
       action.content,
-      action.action_type !== 'EXAMINE' ? 1 : 0,
+      (action.action_type !== 'EXAMINE' && action.action_type !== 'WAIT') ? 1 : 0,
     );
     return action_id;
   }
 
   public getLastActionForAgent(char_id: string): ActionLogEntry | undefined {
     return this.db.prepare(
-      'SELECT * FROM Action_Log WHERE char_id = ? ORDER BY timestamp DESC LIMIT 1',
+      'SELECT * FROM Action_Log WHERE char_id = ? ORDER BY rowid DESC LIMIT 1',
     ).get(char_id) as ActionLogEntry | undefined;
   }
 
   public getSensoryFilter(location_id: string, limit: number = 10): ActionLogEntry[] {
     return (this.db.prepare(
-      'SELECT * FROM Action_Log WHERE location_id = ? AND is_audible = 1 ORDER BY timestamp DESC LIMIT ?'
+      'SELECT * FROM Action_Log WHERE location_id = ? AND is_audible = 1 ORDER BY rowid DESC LIMIT ?'
     ).all(location_id, limit) as ActionLogEntry[]).reverse();
   }
 
   public getFullLedger(): ActionLogEntry[] {
     return this.db.prepare('SELECT * FROM Action_Log ORDER BY timestamp ASC').all() as ActionLogEntry[];
+  }
+
+  public getLedgerPage(limit: number, offset: number): ActionLogEntry[] {
+    return this.db.prepare('SELECT * FROM Action_Log ORDER BY timestamp ASC LIMIT ? OFFSET ?').all(limit, offset) as ActionLogEntry[];
+  }
+
+  public getLedgerCount(): number {
+    return (this.db.prepare('SELECT COUNT(*) as cnt FROM Action_Log').get() as { cnt: number }).cnt;
   }
 
   public getTurnCount(): number {
@@ -476,26 +553,30 @@ export class Stage {
   }
 
   public updateIllusionState(state: Partial<IllusionState>) {
-    const current = this.getIllusionState();
-    const next = { ...current, ...state };
-    const config = {
-      pacing_target: next.pacing_target,
-      structure: next.structure,
-      emotional_arc: next.emotional_arc,
-      director_style: next.director_style,
-      expected_turns: next.expected_turns,
-    };
-    this.db.prepare(`
-      UPDATE Illusion_State
-      SET phase = ?, planted_elements_json = ?, pending_recontextualization_json = ?, outline_json = ?, config_json = ?
-      WHERE id = 1
-    `).run(
-      next.phase,
-      JSON.stringify(next.planted_elements),
-      JSON.stringify(next.pending_recontextualization),
-      next.outline ? JSON.stringify(next.outline) : null,
-      JSON.stringify(config),
-    );
+    // Wrap read-modify-write in a transaction to prevent concurrent callers from
+    // interleaving their reads and writes (e.g. two simultaneous Director evaluations).
+    this.db.transaction(() => {
+      const current = this.getIllusionState();
+      const next = { ...current, ...state };
+      const config = {
+        pacing_target: next.pacing_target,
+        structure: next.structure,
+        emotional_arc: next.emotional_arc,
+        director_style: next.director_style,
+        expected_turns: next.expected_turns,
+      };
+      this.db.prepare(`
+        UPDATE Illusion_State
+        SET phase = ?, planted_elements_json = ?, pending_recontextualization_json = ?, outline_json = ?, config_json = ?
+        WHERE id = 1
+      `).run(
+        next.phase,
+        JSON.stringify(next.planted_elements),
+        JSON.stringify(next.pending_recontextualization),
+        next.outline ? JSON.stringify(next.outline) : null,
+        JSON.stringify(config),
+      );
+    })();
   }
 
   public setOutline(beats: OutlineBeat[]): void {
@@ -503,12 +584,53 @@ export class Stage {
       .run(JSON.stringify(beats));
   }
 
+  // ── Director tension state persistence (survives server restart) ─────────────
+  // Stored inside config_json alongside the story architecture fields so no new
+  // schema migration is required.
+
+  public getDirectorTensionState(): { accumulator: number; history: number[] } {
+    const row = this.db.prepare('SELECT config_json FROM Illusion_State WHERE id = 1').get() as { config_json: string | null } | undefined;
+    if (!row) return { accumulator: 50, history: [] };
+    const config = safeJsonParse<Record<string, unknown>>(row.config_json ?? '{}', {});
+    return {
+      accumulator: typeof config.tension_accumulator === 'number' ? config.tension_accumulator : 50,
+      history: Array.isArray(config.tension_history) ? config.tension_history as number[] : [],
+    };
+  }
+
+  public saveDirectorTensionState(accumulator: number, history: number[]): void {
+    const row = this.db.prepare('SELECT config_json FROM Illusion_State WHERE id = 1').get() as { config_json: string | null } | undefined;
+    if (!row) return;
+    const config = safeJsonParse<Record<string, unknown>>(row.config_json ?? '{}', {});
+    config.tension_accumulator = accumulator;
+    config.tension_history = history;
+    this.db.prepare('UPDATE Illusion_State SET config_json = ? WHERE id = 1').run(JSON.stringify(config));
+  }
+
   // ── Persuasion log ──────────────────────────────────────────────────────────
 
   public recordPersuasion(record: PersuasionRecord): void {
     this.db.prepare(
-      'INSERT OR REPLACE INTO Persuasion_Log (id, agent_id, target_id, strategy, turn) VALUES (?, ?, ?, ?, ?)',
-    ).run(record.id, record.agent_id, record.target_id, record.strategy, record.turn);
+      'INSERT OR REPLACE INTO Persuasion_Log (id, agent_id, target_id, strategy, turn, success) VALUES (?, ?, ?, ?, ?, ?)',
+    ).run(record.id, record.agent_id, record.target_id, record.strategy, record.turn,
+      record.success === undefined ? null : (record.success ? 1 : 0));
+  }
+
+  public updatePersuasionOutcome(id: string, success: boolean): void {
+    this.db.prepare('UPDATE Persuasion_Log SET success = ? WHERE id = ?').run(success ? 1 : 0, id);
+  }
+
+  public getPersuasionHistory(agent_id: string, target_id: string, limit = 8): PersuasionRecord[] {
+    return (this.db.prepare(
+      'SELECT * FROM Persuasion_Log WHERE agent_id = ? AND target_id = ? ORDER BY turn DESC LIMIT ?',
+    ).all(agent_id, target_id, limit) as Array<Record<string, unknown>>).map(r => ({
+      id: r.id as string,
+      agent_id: r.agent_id as string,
+      target_id: r.target_id as string,
+      strategy: r.strategy as PersuasionRecord['strategy'],
+      turn: r.turn as number,
+      success: r.success === null || r.success === undefined ? undefined : (r.success as number) === 1,
+    }));
   }
 
   public getLastPersuasionForTarget(agent_id: string, target_id: string): PersuasionRecord | undefined {
@@ -521,6 +643,63 @@ export class Stage {
     return this.db.prepare(
       'SELECT * FROM Persuasion_Log WHERE agent_id = ? ORDER BY turn DESC LIMIT ?',
     ).all(agent_id, limit) as PersuasionRecord[];
+  }
+
+  // Most recent persuasion attempt targeting this agent (by ANY agent).
+  public getInboundPersuasion(target_id: string): PersuasionRecord | undefined {
+    return this.db.prepare(
+      'SELECT * FROM Persuasion_Log WHERE target_id = ? ORDER BY turn DESC LIMIT 1',
+    ).get(target_id) as PersuasionRecord | undefined;
+  }
+
+  public getAllPersuasionLog(): PersuasionRecord[] {
+    return this.db.prepare('SELECT * FROM Persuasion_Log ORDER BY turn ASC').all() as PersuasionRecord[];
+  }
+
+  public getAllDramaticPressures(): DramaticPressure[] {
+    const currentTurn = this.getTurnCount();
+    return (this.db.prepare('SELECT * FROM Dramatic_Pressure ORDER BY expires_at_turn ASC').all() as Array<Record<string, unknown>>)
+      .filter(r => (r.expires_at_turn as number) > currentTurn)
+      .map(r => ({
+        pressure_id: r.pressure_id as string,
+        target_char_id: r.target_char_id as string,
+        source_char_id: r.source_char_id as string | undefined,
+        trigger_event_id: r.trigger_event_id as string,
+        pressure_type: r.pressure_type as DramaticPressure['pressure_type'],
+        intensity: r.intensity as number,
+        bias_hint: r.bias_hint as string,
+        expires_at_turn: r.expires_at_turn as number,
+        applied: (r.applied as number) === 1,
+      }));
+  }
+
+  // INSERT OR IGNORE for snapshot import (addDramaticPressure uses INSERT, not safe for re-import).
+  public _insertRawPressure(pressure: DramaticPressure): void {
+    this.db.prepare(`
+      INSERT OR IGNORE INTO Dramatic_Pressure
+        (pressure_id, target_char_id, source_char_id, trigger_event_id,
+         pressure_type, intensity, bias_hint, expires_at_turn, applied)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      pressure.pressure_id, pressure.target_char_id, pressure.source_char_id ?? null,
+      pressure.trigger_event_id, pressure.pressure_type, pressure.intensity,
+      pressure.bias_hint, pressure.expires_at_turn, pressure.applied ? 1 : 0,
+    );
+  }
+
+  public _insertRawPersuasion(record: PersuasionRecord): void {
+    this.db.prepare(`
+      INSERT OR IGNORE INTO Persuasion_Log (id, agent_id, target_id, strategy, turn)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(record.id, record.agent_id, record.target_id, record.strategy, record.turn);
+  }
+
+  public _insertRawEventProposition(p: EventProposition): void {
+    this.db.prepare(`
+      INSERT OR IGNORE INTO Event_Propositions
+        (proposition_id, event_id, content, is_lie, asserted_by, perceived_truth)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(p.proposition_id, p.event_id, p.content, p.is_lie ? 1 : 0, p.asserted_by, p.perceived_truth ? 1 : 0);
   }
 
   // ── Causal-Epistemic Spine ───────────────────────────────────────────────────
@@ -544,14 +723,51 @@ export class Stage {
 
   public getEventPropositions(event_id: string): EventProposition[] {
     const rows = this.db.prepare('SELECT * FROM Event_Propositions WHERE event_id = ?').all(event_id) as Array<Record<string, unknown>>;
-    return rows.map(r => ({
+    return rows.map(r => this._parsePropositionRow(r));
+  }
+
+  private _parsePropositionRow(r: Record<string, unknown>): EventProposition {
+    return {
       proposition_id: r.proposition_id as string,
       event_id: r.event_id as string,
       content: r.content as string,
       is_lie: (r.is_lie as number) === 1,
       asserted_by: r.asserted_by as string,
       perceived_truth: (r.perceived_truth as number) === 1,
-    }));
+    };
+  }
+
+  // All unexposed lies by a specific agent in a specific location — used by EXAMINE to reveal deception.
+  public getUnexposedLiesByAgent(asserted_by: string, location_id: string): EventProposition[] {
+    const rows = this.db.prepare(`
+      SELECT ep.* FROM Event_Propositions ep
+      JOIN Event_Cards ec ON ep.event_id = ec.event_id
+      WHERE ep.asserted_by = ? AND ec.location_id = ?
+        AND ep.is_lie = 1 AND ep.perceived_truth = 1
+      ORDER BY ec.turn_index DESC LIMIT 5
+    `).all(asserted_by, location_id) as Array<Record<string, unknown>>;
+    return rows.map(r => this._parsePropositionRow(r));
+  }
+
+  public setPropositionPerceivedTruth(proposition_id: string, perceived_truth: boolean): void {
+    this.db.prepare('UPDATE Event_Propositions SET perceived_truth = ? WHERE proposition_id = ?')
+      .run(perceived_truth ? 1 : 0, proposition_id);
+  }
+
+  public getAllEventPropositions(): EventProposition[] {
+    return (this.db.prepare('SELECT * FROM Event_Propositions').all() as Array<Record<string, unknown>>)
+      .map(r => this._parsePropositionRow(r));
+  }
+
+  // Returns true if any proposition tied to one of the given event_ids is an
+  // unexposed lie — audience knows the ground truth, characters do not.
+  public hasUnexposedLiesInChain(eventIds: string[]): boolean {
+    if (eventIds.length === 0) return false;
+    const placeholders = eventIds.map(() => '?').join(',');
+    const row = this.db.prepare(
+      `SELECT 1 FROM Event_Propositions WHERE event_id IN (${placeholders}) AND is_lie = 1 AND perceived_truth = 1 LIMIT 1`
+    ).get(...eventIds as [string, ...string[]]);
+    return row != null;
   }
 
   public addBeliefEdge(edge: BeliefEdge): void {
@@ -586,6 +802,15 @@ export class Stage {
     return rows.map(r => this._parseEdgeRow(r));
   }
 
+  public getBeliefEdgesPage(limit: number, offset: number): BeliefEdge[] {
+    const rows = this.db.prepare('SELECT * FROM Belief_Edges ORDER BY turn_index ASC LIMIT ? OFFSET ?').all(limit, offset) as Array<Record<string, unknown>>;
+    return rows.map(r => this._parseEdgeRow(r));
+  }
+
+  public getBeliefEdgesCount(): number {
+    return (this.db.prepare('SELECT COUNT(*) as cnt FROM Belief_Edges').get() as { cnt: number }).cnt;
+  }
+
   // All contradiction edges belonging to a specific agent (by discovered_by).
   public getActiveBeliefEdges(char_id: string): BeliefEdge[] {
     const rows = this.db.prepare(
@@ -614,6 +839,15 @@ export class Stage {
   public getAllGoalMutations(): GoalMutation[] {
     const rows = this.db.prepare('SELECT * FROM Goal_Mutations ORDER BY turn_index ASC').all() as Array<Record<string, unknown>>;
     return rows.map(r => this._parseGoalMutationRow(r));
+  }
+
+  public getGoalMutationsPage(limit: number, offset: number): GoalMutation[] {
+    const rows = this.db.prepare('SELECT * FROM Goal_Mutations ORDER BY turn_index ASC LIMIT ? OFFSET ?').all(limit, offset) as Array<Record<string, unknown>>;
+    return rows.map(r => this._parseGoalMutationRow(r));
+  }
+
+  public getGoalMutationsCount(): number {
+    return (this.db.prepare('SELECT COUNT(*) as cnt FROM Goal_Mutations').get() as { cnt: number }).cnt;
   }
 
   private _parseGoalMutationRow(r: Record<string, unknown>): GoalMutation {
@@ -683,6 +917,15 @@ export class Stage {
     return this._parseBeatRows(rows);
   }
 
+  public getBeatTracesPage(limit: number, offset: number): BeatTrace[] {
+    const rows = this.db.prepare('SELECT * FROM Beat_Traces ORDER BY turn_index ASC LIMIT ? OFFSET ?').all(limit, offset) as Array<Record<string, unknown>>;
+    return this._parseBeatRows(rows);
+  }
+
+  public getBeatTracesCount(): number {
+    return (this.db.prepare('SELECT COUNT(*) as cnt FROM Beat_Traces').get() as { cnt: number }).cnt;
+  }
+
   public getBeatTracesForLocation(location_id: string): BeatTrace[] {
     const rows = this.db.prepare('SELECT * FROM Beat_Traces WHERE location_id = ? ORDER BY turn_index ASC').all(location_id) as Array<Record<string, unknown>>;
     return this._parseBeatRows(rows);
@@ -730,6 +973,46 @@ export class Stage {
     return Array.from(grouped.entries()).map(([char_id, pressures]) => ({ char_id, pressures }));
   }
 
+  // ── Stakes ───────────────────────────────────────────────────────────────────
+
+  public upsertStakes(s: Stakes): void {
+    this.db.prepare(`
+      INSERT OR REPLACE INTO Stakes (id, char_id, category, description, magnitude, is_active, resolved_at, outcome)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(s.id, s.char_id, s.category, s.description, s.magnitude, s.is_active ? 1 : 0, s.resolved_at ?? null, s.outcome ?? null);
+  }
+
+  public getActiveStakes(char_id: string): Stakes[] {
+    const rows = this.db.prepare('SELECT * FROM Stakes WHERE char_id = ? AND is_active = 1').all(char_id) as Array<Record<string, unknown>>;
+    return rows.map(r => ({
+      id: r.id as string,
+      char_id: r.char_id as string,
+      category: r.category as StakeCategory,
+      description: r.description as string,
+      magnitude: r.magnitude as number,
+      is_active: true,
+    }));
+  }
+
+  public getAllStakes(): Stakes[] {
+    const rows = this.db.prepare('SELECT * FROM Stakes').all() as Array<Record<string, unknown>>;
+    return rows.map(r => ({
+      id: r.id as string,
+      char_id: r.char_id as string,
+      category: r.category as StakeCategory,
+      description: r.description as string,
+      magnitude: r.magnitude as number,
+      is_active: Boolean(r.is_active),
+      resolved_at: r.resolved_at as number | undefined,
+      outcome: r.outcome as Stakes['outcome'] | undefined,
+    }));
+  }
+
+  public resolveStakes(id: string, outcome: 'won' | 'lost', turnIndex: number): void {
+    this.db.prepare('UPDATE Stakes SET is_active = 0, outcome = ?, resolved_at = ? WHERE id = ?')
+      .run(outcome, turnIndex, id);
+  }
+
   // ── Session snapshot export / import ─────────────────────────────────────────
 
   public exportSnapshot(): StageSnapshot {
@@ -739,6 +1022,9 @@ export class Stage {
       locations: this.getAllLocations(),
       agents: this.getAllAgents(),
       action_log: this.getFullLedger(),
+      dramatic_pressures: this.getAllDramaticPressures(),
+      event_propositions: this.getAllEventPropositions(),
+      persuasion_log: this.getAllPersuasionLog(),
       illusion_state: (() => {
         const s = this.getIllusionState();
         return {
@@ -767,9 +1053,12 @@ export class Stage {
     for (const agent of snap.agents)   this.addAgent(agent);
     for (const entry of snap.action_log) this._insertRawAction(entry);
     this.updateIllusionState(snap.illusion_state);
-    for (const edge of snap.belief_edges)     this.addBeliefEdge(edge);
-    for (const mut of snap.goal_mutations)    this.recordGoalMutation(mut);
-    for (const beat of snap.beat_traces)      this.addBeatTrace(beat);
+    for (const edge of snap.belief_edges)          this.addBeliefEdge(edge);
+    for (const mut of snap.goal_mutations)         this.recordGoalMutation(mut);
+    for (const beat of snap.beat_traces)           this.addBeatTrace(beat);
+    for (const p of snap.dramatic_pressures ?? []) this._insertRawPressure(p);
+    for (const p of snap.event_propositions ?? []) this._insertRawEventProposition(p);
+    for (const p of snap.persuasion_log ?? [])     this._insertRawPersuasion(p);
   }
 
   private _insertRawAction(entry: ActionLogEntry): void {

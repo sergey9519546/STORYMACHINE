@@ -66,6 +66,53 @@ export class CausalSpine {
     return card;
   }
 
+  // 1b. EXAMINE action: deterministically reveal any unexposed lies by the target.
+  //     Returns witnessed Belief[] for the examiner (empty if no lies found).
+  //     Also flips perceived_truth on exposed propositions so they are permanently
+  //     marked as discovered — subsequent observers and snapshots reflect this.
+  public processExamine(
+    examinerId: string,
+    targetId: string,
+    locationId: string,
+    actionId: string,
+  ): Belief[] {
+    const lies = this.stage.getUnexposedLiesByAgent(targetId, locationId);
+    if (lies.length === 0) return [];
+
+    const target = this.stage.getAgent(targetId);
+    const targetName = target?.name ?? targetId;
+    const turnIndex = this.stage.getTurnCount();
+
+    const newBeliefs: Belief[] = [];
+    for (const lie of lies) {
+      // Flip the proposition's perceived_truth so it's permanently exposed
+      this.stage.setPropositionPerceivedTruth(lie.proposition_id, false);
+
+      // Create a witnessed belief for the examiner contradicting the original claim
+      newBeliefs.push({
+        id: randomUUID(),
+        proposition: `${targetName}'s statement "${lie.content}" was a deliberate lie`,
+        confidence: 1.0,
+        source: 'witnessed' as const,
+        source_agent_id: targetId,
+        source_event_id: actionId,
+        acquired_at: turnIndex,
+      });
+    }
+
+    // Merge the new beliefs into the examiner's belief set
+    const examiner = this.stage.getAgent(examinerId);
+    if (examiner && newBeliefs.length > 0) {
+      const existingProps = new Set((examiner.beliefs ?? []).map(b => b.proposition.toLowerCase()));
+      const fresh = newBeliefs.filter(b => !existingProps.has(b.proposition.toLowerCase()));
+      if (fresh.length > 0) {
+        this.stage.updateAgentBeliefs(examinerId, [...(examiner.beliefs ?? []), ...fresh]);
+      }
+    }
+
+    return newBeliefs;
+  }
+
   // 2. After a belief update: if contradiction was detected, find existing beliefs
   //    that conflict with the new ones, create BeliefEdge rows, and update
   //    Belief.contradicts[] so the graph has real edges.
@@ -106,7 +153,7 @@ export class CausalSpine {
             discovered_by: char_id,
             source_event_id: sourceEventId,
             turn_index: turnIndex,
-            severity: Math.round(existing.confidence * newBelief.confidence * 100),
+            severity: Math.round(Math.max(existing.confidence, newBelief.confidence) * 100),
           };
           this.stage.addBeliefEdge(edge);
           edges.push(edge);
@@ -114,17 +161,22 @@ export class CausalSpine {
       }
     }
 
-    // Rewrite Belief.contradicts[] arrays for affected beliefs
+    // Rewrite Belief.contradicts[] arrays and decay confidence of superseded beliefs
     if (edges.length > 0) {
+      const contradictedIds = new Set(edges.map(e => e.from_belief_id));
       const updatedBeliefs = allBeliefs.map(b => {
         const outgoing = edges.filter(e => e.from_belief_id === b.id).map(e => e.to_belief_id);
         const incoming = edges.filter(e => e.to_belief_id === b.id).map(e => e.from_belief_id);
         const extra = [...outgoing, ...incoming];
-        if (extra.length === 0) return b;
-        return {
-          ...b,
-          contradicts: [...new Set([...(b.contradicts ?? []), ...extra])],
-        };
+        const contradicts = extra.length > 0
+          ? [...new Set([...(b.contradicts ?? []), ...extra])]
+          : b.contradicts;
+        // Contradicted (superseded) beliefs lose half their confidence — they're still
+        // in the graph for traceability but carry reduced epistemic weight.
+        const confidence = contradictedIds.has(b.id)
+          ? Math.max(0.05, b.confidence * 0.5)
+          : b.confidence;
+        return { ...b, contradicts, confidence };
       });
       this.stage.updateAgentBeliefs(char_id, updatedBeliefs);
     }
@@ -190,12 +242,13 @@ export class CausalSpine {
           value: 80,
           achieved: false,
         };
-        const updatedStack = {
+        const updatedStack: GoalStack = {
           ...discoverer.goalStack,
           instrumental: [confrontGoal, ...discoverer.goalStack.instrumental],
           last_planned_at: turnIndex,
         };
         this.stage.updateGoalStack(discoverer_id, updatedStack);
+        discoverer = { ...discoverer, goalStack: updatedStack };
 
         const mutation: GoalMutation = {
           mutation_id: randomUUID(),
@@ -338,6 +391,16 @@ export class CausalSpine {
       revelation:              'parity',
       turning_point:           'parity',
     };
+
+    // Compute audience information position dynamically: if the causal chain
+    // contains an unexposed lie (is_lie=true, perceived_truth=true), the
+    // audience has superior knowledge — they know a deception the characters don't.
+    let audiencePosition = params.informationPosition ?? defaultPosition[params.beatType];
+    if (!params.informationPosition && params.causalChain.length > 0) {
+      const hasHiddenLie = this.stage.hasUnexposedLiesInChain(params.causalChain);
+      if (hasHiddenLie) audiencePosition = 'superior';
+    }
+
     const trace: BeatTrace = {
       beat_id: randomUUID(),
       turn_index: this.stage.getTurnCount(),
@@ -348,7 +411,7 @@ export class CausalSpine {
       causal_chain: params.causalChain,
       narrative_summary: params.narrativeSummary,
       fountain_hint: params.fountainHint,
-      information_position: params.informationPosition ?? defaultPosition[params.beatType],
+      information_position: audiencePosition,
     };
     this.stage.addBeatTrace(trace);
     return trace;
@@ -385,6 +448,22 @@ export class CausalSpine {
   // Used as a fallback when Gemini's contradicted_propositions doesn't match exactly.
   private _overlap(a: string, b: string): boolean {
     if (!a || !b) return false;
+    const negationRe = /\bisn?'?t\b|\bwasn?'?t\b|\baren?'?t\b|\bweren?'?t\b|\bnot\b|\bnever\b|\bno\b/i;
+    const hasNeg = (s: string) => negationRe.test(s);
+    const strip = (s: string) => s.toLowerCase().replace(negationRe, '').replace(/\s+/g, ' ').trim();
+
+    // Negation-pair detection: one belief affirms, the other denies the same claim.
+    // Use a lower overlap threshold because the stripped forms will be nearly identical.
+    if (hasNeg(a) !== hasNeg(b)) {
+      const sA = new Set((strip(a).match(/\b\w{4,}\b/g) ?? []));
+      const sB = new Set((strip(b).match(/\b\w{4,}\b/g) ?? []));
+      if (sA.size > 0 && sB.size > 0) {
+        let shared = 0;
+        for (const w of sA) if (sB.has(w)) shared++;
+        if (shared / Math.min(sA.size, sB.size) >= 0.35) return true;
+      }
+    }
+
     const wordsA = new Set((a.toLowerCase().match(/\b\w{4,}\b/g) ?? []));
     const wordsB = new Set((b.toLowerCase().match(/\b\w{4,}\b/g) ?? []));
     if (wordsA.size === 0 || wordsB.size === 0) return false;
