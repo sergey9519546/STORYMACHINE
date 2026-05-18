@@ -1,4 +1,4 @@
-import type { DarkTriad, BigFive, DefenseMechanism, AttachmentStyle } from '../engine/types.ts';
+import type { DarkTriad, BigFive, DefenseMechanism, AttachmentStyle, ActionType } from '../engine/types.ts';
 
 // ── Personality action-bias ───────────────────────────────────────────────────
 // Pure, deterministic mapping from character psychology to action-type weights.
@@ -8,7 +8,9 @@ import type { DarkTriad, BigFive, DefenseMechanism, AttachmentStyle } from '../e
 // selection in Agent.takeTurn(). Range 0.7–1.3; all traits at 50 → exactly 1.0,
 // so neutral/default characters are completely unaffected.
 
-export type ActionType = 'SPEAK' | 'EXAMINE' | 'LIE' | 'RELOCATE' | 'WAIT';
+// Re-exported for callers that already import ActionType from this module.
+// The canonical definition lives in engine/types.ts (ACTION_TYPES).
+export type { ActionType };
 
 // Normalize a trait value (0–100) to a -1 to +1 deviation from neutral.
 const dev = (v: number) => (v - 50) / 50;
