@@ -8,7 +8,7 @@ import { generateContent, getImageProvider, getTTSProvider, getModel } from './s
 import { rateLimit } from 'express-rate-limit';
 import { Stage } from './server/engine/Stage.ts';
 import { Orchestrator, type RoomProgressEvent } from './server/engine/Orchestrator.ts';
-import type { CharacterSheet, Location, StageSnapshot } from './server/engine/types.ts';
+import type { CharacterSheet, Location, StageSnapshot, StoryStructure, DirectorStyle } from './server/engine/types.ts';
 import { transcriptToFountain, extractCharactersFromLog, syuzhetSort, wrapSyuzhetFountain } from './server/lib/fountain.ts';
 import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES, STYLE_MODIFIERS } from './server/lib/structure-presets.ts';
 import { logger, requestLogger } from './server/lib/logger.ts';
@@ -1346,9 +1346,9 @@ OUTPUT: A visceral character description.`,
     const dirStyle = typeof storyConfig.directorStyle === 'string' ? storyConfig.directorStyle : null;
     const structureBlock = (structure || emotionalArc || dirStyle) ? `
 STORY ARCHITECTURE:
-${structure ? `- Narrative Structure: ${STRUCTURE_NAMES[structure] ?? structure} — ensure the structuralNode field names a beat from this specific structure.` : ''}
+${structure ? `- Narrative Structure: ${STRUCTURE_NAMES[structure as StoryStructure] ?? structure} — ensure the structuralNode field names a beat from this specific structure.` : ''}
 ${emotionalArc ? `- Emotional Arc: ${emotionalArc.replace(/_/g, ' ')} — evaluate whether the current tension level matches this arc's expected trajectory at the scene's story position. ArcMeter and tension scores should reflect alignment with this shape.` : ''}
-${dirStyle ? `- Cinematic Style: ${dirStyle} — ${STYLE_MODIFIERS[dirStyle]?.agentInstruction?.split('.')[0] ?? dirStyle}. Let this style govern composition choices, information position bias, and commentary tone.` : ''}
+${dirStyle ? `- Cinematic Style: ${dirStyle} — ${STYLE_MODIFIERS[dirStyle as DirectorStyle]?.agentInstruction?.split('.')[0] ?? dirStyle}. Let this style govern composition choices, information position bias, and commentary tone.` : ''}
 ` : '';
 
     const prompt = `Analyze the following screenplay script.

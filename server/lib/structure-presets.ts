@@ -1,4 +1,4 @@
-import type { OutlineBeat, IllusionPhase } from '../engine/types.ts';
+import type { OutlineBeat, IllusionPhase, StoryStructure, EmotionalArc, DirectorStyle } from '../engine/types.ts';
 
 // ── Structure Preset Beat Templates ───────────────────────────────────────────
 // Each template defines beats as percentages (0–100) of the total expected
@@ -360,7 +360,7 @@ const STRUCTURE_BEATS: Record<string, BeatTemplate[]> = {
 // Each array is a sequence of waypoints (tension 0–100) at evenly-spaced
 // positions through the story. expectedTensionAt() interpolates between them.
 
-export const ARC_TENSION_CURVES: Record<string, number[]> = {
+export const ARC_TENSION_CURVES: Record<EmotionalArc, number[]> = {
   rags_to_riches:  [10, 20, 30, 45, 58, 68, 78, 88],
   riches_to_rags:  [80, 72, 63, 54, 44, 33, 22, 12],
   man_in_a_hole:   [48, 36, 24, 16, 28, 46, 64, 80],
@@ -370,8 +370,8 @@ export const ARC_TENSION_CURVES: Record<string, number[]> = {
 };
 
 // Linear interpolation of expected tension at story position [0.0–1.0]
-export function expectedTensionAt(arc: string, position: number): number | null {
-  const curve = ARC_TENSION_CURVES[arc];
+export function expectedTensionAt(arc: string | EmotionalArc, position: number): number | null {
+  const curve = ARC_TENSION_CURVES[arc as EmotionalArc];
   if (!curve || curve.length === 0) return null;
   const scaled = Math.max(0, Math.min(1, position)) * (curve.length - 1);
   const lo = Math.floor(scaled);
@@ -389,7 +389,7 @@ export interface StyleModifier {
   confrontationHintOverride?: string; // Replaces generic CONFRONT hint when style is set
 }
 
-export const STYLE_MODIFIERS: Record<string, StyleModifier> = {
+export const STYLE_MODIFIERS: Record<DirectorStyle, StyleModifier> = {
   hitchcock: {
     agentInstruction: 'CINEMATIC STYLE — HITCHCOCK: You are in a Hitchcockian drama. The audience knows more than the characters. Withhold information strategically — the power is in what you DON\'T say. Prefer EXAMINE over SPEAK. Plant objects and details that will matter later. Let others dig their own graves.',
     pacingHintSuffix: ' Let the audience see the bomb under the table. Give them something to know that the others don\'t.',
@@ -431,7 +431,7 @@ export const STYLE_MODIFIERS: Record<string, StyleModifier> = {
 // Converts percentage-based templates to absolute turn numbers.
 // Phase is derived from percentage position within the session.
 
-export function instantiatePreset(structure: string, expectedTurns: number): OutlineBeat[] {
+export function instantiatePreset(structure: string | StoryStructure, expectedTurns: number): OutlineBeat[] {
   const templates = STRUCTURE_BEATS[structure];
   if (!templates) return [];
   const n = Math.max(4, expectedTurns);
@@ -450,7 +450,7 @@ export function instantiatePreset(structure: string, expectedTurns: number): Out
   });
 }
 
-export const STRUCTURE_NAMES: Record<string, string> = {
+export const STRUCTURE_NAMES: Record<StoryStructure, string> = {
   save_the_cat: 'Save the Cat (15 beats)',
   dan_harmon: 'Dan Harmon Story Circle (8)',
   john_yorke: 'John Yorke 5 Acts',
