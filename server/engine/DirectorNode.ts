@@ -852,13 +852,22 @@ From ${observer.name}'s perspective only:
         unexposed.map(p => p.asserted_by).find(id => id !== agent.char_id) ?? ''
       )?.name ?? 'someone';
 
+      // Fresh irony (1-2 unexposed lies, no WITHHOLD yet): emit WITHHOLD — the
+      // information gap is opening. As it accumulates (3+ lies or existing WITHHOLD),
+      // escalate to ESCALATE — the bomb has been under the table long enough.
+      const hasWithhold = existing.some(p => p.pressure_type === 'WITHHOLD');
+      const pressureType = (!hasWithhold && unexposed.length <= 2) ? 'WITHHOLD' : 'ESCALATE';
+      const hint = pressureType === 'WITHHOLD'
+        ? `${liarsName} knows something they haven't told you. You sense a gap — information is being withheld. Probe carefully.`
+        : `Dramatic tension: ${liarsName} has told you something that isn't true — you don't know it yet, but the moment of revelation is approaching. Your instincts should be signaling that something is off.`;
+
       this.stage.addDramaticPressure({
         pressure_id: randomUUID(),
         target_char_id: agent.char_id,
         trigger_event_id: oldest.event_id,
-        pressure_type: 'ESCALATE',
+        pressure_type: pressureType,
         intensity: Math.min(75, 30 + unexposed.length * 10),
-        bias_hint: `Dramatic tension: ${liarsName} has told you something that isn't true — you don't know it yet, but the moment of revelation is approaching. Your instincts should be signaling that something is off.`,
+        bias_hint: hint,
         expires_at_turn: turnIndex + 2,
         applied: false,
       });

@@ -2343,9 +2343,12 @@ describe('DirectorNode — dramatic irony', () => {
     try {
       await director.evaluateRoom('room-1', log);
       const pressures = stage.getActivePressures('alice');
-      // Alice should have received an ESCALATE pressure from dramatic irony
-      const ironyPressure = pressures.find(p => p.pressure_type === 'ESCALATE' && p.bias_hint.includes('told you something'));
-      assert.ok(ironyPressure, 'dramatic irony should emit ESCALATE pressure on deceived agent');
+      // Fresh irony (1 unexposed lie) now emits WITHHOLD; accumulated irony emits ESCALATE.
+      const ironyPressure = pressures.find(p =>
+        (p.pressure_type === 'ESCALATE' || p.pressure_type === 'WITHHOLD') &&
+        (p.bias_hint.includes('told you') || p.bias_hint.includes('hasn\'t told you') || p.bias_hint.includes('being withheld'))
+      );
+      assert.ok(ironyPressure, 'dramatic irony should emit ESCALATE or WITHHOLD pressure on deceived agent');
     } finally {
       resetLLMProvider();
     }
