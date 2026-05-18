@@ -95,6 +95,10 @@ export class Stage {
           CREATE INDEX IF NOT EXISTS idx_stakes_char ON Stakes(char_id, is_active);
         `);
       },
+      // v5 → v6: persuasion outcome tracking
+      () => {
+        this.db.exec('ALTER TABLE Persuasion_Log ADD COLUMN success INTEGER');
+      },
     ];
     for (let i = current; i < MIGRATIONS.length; i++) {
       this.db.transaction(() => {
@@ -599,8 +603,26 @@ export class Stage {
 
   public recordPersuasion(record: PersuasionRecord): void {
     this.db.prepare(
-      'INSERT OR REPLACE INTO Persuasion_Log (id, agent_id, target_id, strategy, turn) VALUES (?, ?, ?, ?, ?)',
-    ).run(record.id, record.agent_id, record.target_id, record.strategy, record.turn);
+      'INSERT OR REPLACE INTO Persuasion_Log (id, agent_id, target_id, strategy, turn, success) VALUES (?, ?, ?, ?, ?, ?)',
+    ).run(record.id, record.agent_id, record.target_id, record.strategy, record.turn,
+      record.success === undefined ? null : (record.success ? 1 : 0));
+  }
+
+  public updatePersuasionOutcome(id: string, success: boolean): void {
+    this.db.prepare('UPDATE Persuasion_Log SET success = ? WHERE id = ?').run(success ? 1 : 0, id);
+  }
+
+  public getPersuasionHistory(agent_id: string, target_id: string, limit = 8): PersuasionRecord[] {
+    return (this.db.prepare(
+      'SELECT * FROM Persuasion_Log WHERE agent_id = ? AND target_id = ? ORDER BY turn DESC LIMIT ?',
+    ).all(agent_id, target_id, limit) as Array<Record<string, unknown>>).map(r => ({
+      id: r.id as string,
+      agent_id: r.agent_id as string,
+      target_id: r.target_id as string,
+      strategy: r.strategy as PersuasionRecord['strategy'],
+      turn: r.turn as number,
+      success: r.success === null || r.success === undefined ? undefined : (r.success as number) === 1,
+    }));
   }
 
   public getLastPersuasionForTarget(agent_id: string, target_id: string): PersuasionRecord | undefined {

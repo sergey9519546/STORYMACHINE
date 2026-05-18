@@ -288,6 +288,10 @@ export class Orchestrator {
       // This prevents O(agents × actions) Gemini calls (fanout explosion).
       if (!didRelocate && lastActionId) {
         const recentActions = this.stage.getSensoryFilter(location_id, maxTurns);
+        // Snapshot suspicion scores before epistemic updates for persuasion outcome tracking
+        const suspicionBefore = new Map<string, number>(
+          agentsInRoom.map(a => [a.char_id, a.suspicion_score]),
+        );
         const epistemicUpdates = await Promise.all(
           agentsInRoom
             .map(a => this.agents.get(a.char_id))
@@ -297,6 +301,18 @@ export class Orchestrator {
         for (const update of epistemicUpdates) {
           this._runSpineForUpdate(update, lastActionId, location_id);
           this.appraiser.appraise(update);
+        }
+        // Record persuasion outcomes: success when target's suspicion decreased
+        const currentTurn = this.stage.getTurnCount();
+        for (const agent of agentsInRoom) {
+          const log = this.stage.getPersuasionLog(agent.char_id, agentsInRoom.length * 2);
+          for (const rec of log.filter(r => r.turn === currentTurn && r.success === undefined)) {
+            const target = this.stage.getAgent(rec.target_id);
+            if (!target) continue;
+            const before = suspicionBefore.get(rec.target_id) ?? target.suspicion_score;
+            const success = target.suspicion_score < before - 2;
+            this.stage.updatePersuasionOutcome(rec.id, success);
+          }
         }
       }
 

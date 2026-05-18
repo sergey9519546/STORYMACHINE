@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { safeJsonParse } from './src/lib/json.ts';
 import { withTimeout, generateContent, setLLMProvider, resetLLMProvider } from './server/engine/ai.ts';
 import { analyzeSubtext } from './server/lib/subtext-meter.ts';
-import { scoreBelief, retrieveBeliefs, consolidateBeliefs } from './server/lib/memory.ts';
+import { scoreBelief, retrieveBeliefs, consolidateBeliefs, decayBeliefConfidence } from './server/lib/memory.ts';
 import { metrics } from './server/lib/metrics.ts';
-import { actionBiasWeights, defenseActionBias, effectiveScore } from './server/lib/personality.ts';
+import { actionBiasWeights, defenseActionBias, effectiveScore, attachmentActionBias } from './server/lib/personality.ts';
 import { AppraisalEngine } from './server/engine/AppraisalEngine.ts';
 
 describe('safeJsonParse', () => {
@@ -2075,5 +2075,83 @@ describe('WAIT action — Orchestrator is_audible', () => {
     } finally {
       resetLLMProvider();
     }
+  });
+});
+
+// ── Tier 1: Attachment style action bias ─────────────────────────────────────
+describe('attachmentActionBias', () => {
+  it('anxious: SPEAK↑, RELOCATE↓', () => {
+    const w = attachmentActionBias('anxious');
+    assert.ok((w.SPEAK ?? 1) > 1, 'anxious SPEAK should be > 1');
+    assert.ok((w.RELOCATE ?? 1) < 1, 'anxious RELOCATE should be < 1');
+  });
+  it('avoidant: RELOCATE↑, SPEAK↓', () => {
+    const w = attachmentActionBias('avoidant');
+    assert.ok((w.RELOCATE ?? 1) > 1, 'avoidant RELOCATE should be > 1');
+    assert.ok((w.SPEAK ?? 1) < 1, 'avoidant SPEAK should be < 1');
+  });
+  it('secure / undefined: empty record (no adjustment)', () => {
+    assert.deepEqual(attachmentActionBias('secure'), {});
+    assert.deepEqual(attachmentActionBias(undefined), {});
+  });
+  it('effectiveScore includes attachment bias — avoidant RELOCATE > secure RELOCATE at same goal_score', () => {
+    const dt = { machiavellianism: 50, narcissism: 50, psychopathy: 50 };
+    const bf = { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 };
+    const avoidant = effectiveScore(50, 'RELOCATE', dt, bf, null, 'avoidant');
+    const secure   = effectiveScore(50, 'RELOCATE', dt, bf, null, 'secure');
+    assert.ok(avoidant > secure, `avoidant RELOCATE score ${avoidant} should exceed secure ${secure}`);
+  });
+});
+
+// ── Tier 1: Belief confidence decay ─────────────────────────────────────────
+describe('decayBeliefConfidence', () => {
+  const makeBelief = (id: string, source: 'witnessed' | 'told' | 'inferred', confidence: number) => ({
+    id, proposition: `belief_${id}`, confidence, source, acquired_at: 0,
+  });
+
+  it('witnessed beliefs do not decay', () => {
+    const b = makeBelief('w', 'witnessed', 0.9);
+    const out = decayBeliefConfidence([b]);
+    assert.equal(out[0].confidence, 0.9, 'witnessed should not change');
+  });
+  it('told beliefs decay by 0.03', () => {
+    const b = makeBelief('t', 'told', 0.8);
+    const out = decayBeliefConfidence([b]);
+    assert.ok(Math.abs(out[0].confidence - 0.77) < 0.001, `told should be ~0.77, got ${out[0].confidence}`);
+  });
+  it('inferred beliefs decay by 0.05', () => {
+    const b = makeBelief('i', 'inferred', 0.6);
+    const out = decayBeliefConfidence([b]);
+    assert.ok(Math.abs(out[0].confidence - 0.55) < 0.001, `inferred should be ~0.55, got ${out[0].confidence}`);
+  });
+  it('confidence never goes below 0', () => {
+    const b = makeBelief('z', 'inferred', 0.02);
+    const out = decayBeliefConfidence([b]);
+    assert.equal(out[0].confidence, 0, 'should floor at 0');
+  });
+});
+
+// ── Tier 1: Persuasion outcome tracking ──────────────────────────────────────
+describe('Persuasion feedback — Stage persistence', () => {
+  it('updatePersuasionOutcome marks success correctly', () => {
+    const stage = new Stage(':memory:');
+    stage.addLocation({ location_id: 'r', name: 'R', description: '', adjacent_locations: [] });
+    stage.addAgent({ char_id: 'alice', name: 'Alice', public_mask: '', hidden_motive: '', knowledge_vector: [], current_location_id: 'r', suspicion_score: 0, is_alive: true });
+    stage.addAgent({ char_id: 'bob',   name: 'Bob',   public_mask: '', hidden_motive: '', knowledge_vector: [], current_location_id: 'r', suspicion_score: 0, is_alive: true });
+    const id = 'ptest-1';
+    stage.recordPersuasion({ id, agent_id: 'alice', target_id: 'bob', strategy: 'logic', turn: 1 });
+    stage.updatePersuasionOutcome(id, true);
+    const hist = stage.getPersuasionHistory('alice', 'bob', 5);
+    assert.equal(hist.length, 1);
+    assert.equal(hist[0].success, true, 'success should be true after update');
+  });
+  it('getPersuasionHistory returns undefined success for unrecorded outcomes', () => {
+    const stage = new Stage(':memory:');
+    stage.addLocation({ location_id: 'r', name: 'R', description: '', adjacent_locations: [] });
+    stage.addAgent({ char_id: 'alice', name: 'Alice', public_mask: '', hidden_motive: '', knowledge_vector: [], current_location_id: 'r', suspicion_score: 0, is_alive: true });
+    stage.addAgent({ char_id: 'bob',   name: 'Bob',   public_mask: '', hidden_motive: '', knowledge_vector: [], current_location_id: 'r', suspicion_score: 0, is_alive: true });
+    stage.recordPersuasion({ id: 'ptest-2', agent_id: 'alice', target_id: 'bob', strategy: 'emotion', turn: 1 });
+    const hist = stage.getPersuasionHistory('alice', 'bob', 5);
+    assert.equal(hist[0].success, undefined, 'unrecorded success should be undefined');
   });
 });

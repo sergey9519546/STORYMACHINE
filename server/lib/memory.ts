@@ -1,4 +1,4 @@
-import type { Belief } from '../engine/types.ts';
+import type { Belief, BeliefSource } from '../engine/types.ts';
 
 // ── Memory retrieval ─────────────────────────────────────────────────────────
 // Replaces naive "top-N by confidence" belief selection with a Generative-Agents
@@ -44,6 +44,24 @@ export function scoreBelief(
   const relevance = bw.size > 0 ? shared / bw.size : 0;
 
   return 0.35 * recency + 0.35 * importance + 0.30 * relevance;
+}
+
+// ── Belief confidence decay ──────────────────────────────────────────────────
+// Applied every 5 turns before consolidation. Witnessed beliefs never decay.
+// Told beliefs lose 3% confidence per cycle; inferred beliefs lose 5%.
+// This models memory degradation for unconfirmed or second-hand knowledge.
+const DECAY_RATE: Record<BeliefSource, number> = {
+  witnessed: 0,
+  told:      0.03,
+  inferred:  0.05,
+};
+
+export function decayBeliefConfidence(beliefs: Belief[]): Belief[] {
+  return beliefs.map(b => {
+    const rate = DECAY_RATE[b.source] ?? 0.03;
+    if (rate === 0) return b;
+    return { ...b, confidence: Math.max(0, b.confidence - rate) };
+  });
 }
 
 // ── Memory consolidation & forgetting ───────────────────────────────────────

@@ -1,4 +1,4 @@
-import type { DarkTriad, BigFive, DefenseMechanism } from '../engine/types.ts';
+import type { DarkTriad, BigFive, DefenseMechanism, AttachmentStyle } from '../engine/types.ts';
 
 // ── Personality action-bias ───────────────────────────────────────────────────
 // Pure, deterministic mapping from character psychology to action-type weights.
@@ -70,8 +70,25 @@ export function defenseActionBias(
   }
 }
 
+// ── Attachment style action bias ─────────────────────────────────────────────
+// Anxious: clings to connection — more SPEAK, less RELOCATE, more WAIT (needs signals).
+// Avoidant: withdraws when stressed — more RELOCATE, less SPEAK.
+// Anxious-avoidant: provokes then recoils — slight SPEAK + RELOCATE + LIE boost.
+// Secure / undefined: neutral — no adjustment.
+
+export function attachmentActionBias(
+  style: AttachmentStyle | undefined,
+): Partial<Record<ActionType, number>> {
+  switch (style) {
+    case 'anxious':          return { SPEAK: 1.15, RELOCATE: 0.80, WAIT: 1.10 };
+    case 'avoidant':         return { RELOCATE: 1.20, SPEAK: 0.85, WAIT: 1.10 };
+    case 'anxious_avoidant': return { SPEAK: 1.05, RELOCATE: 1.10, LIE: 1.10 };
+    default:                 return {};
+  }
+}
+
 // ── Combined effective score ──────────────────────────────────────────────────
-// Multiplies a candidate's goal_score by personality + defense biases.
+// Multiplies a candidate's goal_score by personality + defense + attachment biases.
 // Used by Agent.takeTurn() to replace the bare goal_score comparison.
 
 export function effectiveScore(
@@ -80,9 +97,11 @@ export function effectiveScore(
   dt: DarkTriad,
   bf: BigFive,
   activeDefense: DefenseMechanism | null,
+  attachmentStyle?: AttachmentStyle,
 ): number {
   const pBias = actionBiasWeights(dt, bf)[actionType];
   const dBias = defenseActionBias(activeDefense)[actionType] ?? 1.0;
-  const combined = Math.max(0.5, Math.min(1.6, pBias * dBias));
+  const aBias = attachmentActionBias(attachmentStyle)[actionType] ?? 1.0;
+  const combined = Math.max(0.5, Math.min(1.6, pBias * dBias * aBias));
   return goalScore * combined;
 }

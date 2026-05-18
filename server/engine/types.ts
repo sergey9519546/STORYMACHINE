@@ -170,6 +170,7 @@ export interface PersuasionRecord {
   target_id: string;
   strategy: PersuasionStrategy;
   turn: number;
+  success?: boolean;  // recorded post-turn: did target's suspicion decrease?
 }
 
 // ── Structured story outline ─────────────────────────────────────────────────

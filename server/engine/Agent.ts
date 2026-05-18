@@ -21,11 +21,12 @@ import type {
   GoalStack,
   GoalMutation,
   PersuasionStrategy,
+  PersuasionRecord,
 } from './types.ts';
 import { Stage } from './Stage.ts';
 import { safeJsonParse } from '../lib/json.ts';
 import { logger } from '../lib/logger.ts';
-import { retrieveBeliefs, consolidateBeliefs } from '../lib/memory.ts';
+import { retrieveBeliefs, consolidateBeliefs, decayBeliefConfidence } from '../lib/memory.ts';
 
 // ── Psychology prompt helpers ────────────────────────────────────────────────
 
@@ -143,7 +144,7 @@ const PERSUASION_HINT: Record<PersuasionStrategy, (name: string) => string> = {
   social_proof:(n) => `reference what others believe or have decided. ${n} responds to social consensus.`,
 };
 
-function selectPersuasionStrategy(target: CharacterSheet): PersuasionStrategy {
+function selectBasePersuasionStrategy(target: CharacterSheet): PersuasionStrategy {
   const bf = target.bigFive;
   const emotion = target.emotionState;
   if (!bf) return 'social_proof';
@@ -152,6 +153,21 @@ function selectPersuasionStrategy(target: CharacterSheet): PersuasionStrategy {
   if (bf.agreeableness > 70) return 'reciprocity';
   if (bf.neuroticism > 70) return 'emotion';
   return 'social_proof';
+}
+
+function selectPersuasionStrategy(target: CharacterSheet, history: PersuasionRecord[]): PersuasionStrategy {
+  const base = selectBasePersuasionStrategy(target);
+  // If a strategy has succeeded ≥ 2 times against this target, prefer it
+  const successCounts = new Map<PersuasionStrategy, number>();
+  for (const r of history) {
+    if (r.success) successCounts.set(r.strategy, (successCounts.get(r.strategy) ?? 0) + 1);
+  }
+  let best = base;
+  let bestCount = 0;
+  for (const [s, count] of successCounts) {
+    if (count > bestCount) { best = s; bestCount = count; }
+  }
+  return bestCount >= 2 ? best : base;
 }
 
 // ── Goal DAG helper ──────────────────────────────────────────────────────────
@@ -254,13 +270,14 @@ export class Agent {
     const dt = this.sheet.darkTriad ?? { machiavellianism: 50, narcissism: 50, psychopathy: 50 };
     const bf = this.sheet.bigFive ?? { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 };
     const activeDefense = selectActiveDefense(this.sheet.defenseMechanisms, this.sheet.emotionState);
+    const attachStyle = this.sheet.attachmentStyle;
     const VALID_ACTIONS = new Set<string>(['SPEAK', 'EXAMINE', 'LIE', 'RELOCATE', 'WAIT']);
     const best = (raw.candidates ?? []).reduce<Candidate>(
       (top, c) => {
         const cType = VALID_ACTIONS.has(c.action_type) ? c.action_type as ActionType : 'SPEAK';
         const tType = VALID_ACTIONS.has(top.action_type) ? top.action_type as ActionType : 'SPEAK';
-        const cScore = effectiveScore(c.goal_score ?? 0, cType, dt, bf, activeDefense);
-        const tScore = effectiveScore(top.goal_score ?? 0, tType, dt, bf, activeDefense);
+        const cScore = effectiveScore(c.goal_score ?? 0, cType, dt, bf, activeDefense, attachStyle);
+        const tScore = effectiveScore(top.goal_score ?? 0, tType, dt, bf, activeDefense, attachStyle);
         return cScore > tScore ? c : top;
       },
       (raw.candidates ?? [])[0] ?? { action_type: 'SPEAK', content: '', target: null },
@@ -386,7 +403,8 @@ export class Agent {
 
     // ── D: Dynamic Persuasion — named strategy per target, recorded to Stage ──
     const persuasionHints = otherAgents.map(other => {
-      const strategy = selectPersuasionStrategy(other);
+      const history = this.stage.getPersuasionHistory(this.sheet.char_id, other.char_id, 8);
+      const strategy = selectPersuasionStrategy(other, history);
       this.stage.recordPersuasion({ id: randomUUID(), agent_id: this.sheet.char_id, target_id: other.char_id, strategy, turn: currentTurn });
       return `  - With ${other.name} [${strategy}]: ${PERSUASION_HINT[strategy](other.name)}`;
     }).join('\n');
@@ -395,6 +413,10 @@ export class Agent {
     const activePressures = this.stage.getActivePressures(this.sheet.char_id);
     const pressureBlock = activePressures.length > 0
       ? `\nSITUATIONAL AWARENESS (your read of what is happening right now):\n${activePressures.map(p => `- ${p.bias_hint}`).join('\n')}\n`
+      : '';
+    // Overwhelm: >3 simultaneous pressures → character may freeze or act erratically
+    const overwhelmBlock = activePressures.length > 3
+      ? '\nOVERWHELM STATE: You are simultaneously facing more crises than you can process. Under this load, characters often freeze, make rash decisions, or prioritize self-preservation over strategy. Let that pressure visibly shape your choice.\n'
       : '';
     for (const p of activePressures) this.stage.markPressureApplied(p.pressure_id);
 
@@ -417,7 +439,7 @@ export class Agent {
 
 HIDDEN DIRECTIVE: Your true motive is: "${this.sheet.hidden_motive}". Never state this directly. Every action serves it.
 ${inboundBlock}
-${pressureBlock}
+${pressureBlock}${overwhelmBlock}
 PSYCHOLOGICAL PROFILE:
 ${describeAttachment(this.sheet.attachmentStyle)}
 ${defenseStr}
@@ -656,9 +678,9 @@ Based on what you just witnessed:
     const mergedBeliefs = [...existingBeliefs, ...freshBeliefs];
     const currentTurn = this.stage.getTurnCount();
 
-    // Every 5 turns: consolidate near-duplicates and prune stale low-confidence beliefs.
+    // Every 5 turns: decay confidence on unwitnessed beliefs, then consolidate.
     const finalBeliefs = (currentTurn > 0 && currentTurn % 5 === 0)
-      ? consolidateBeliefs(mergedBeliefs, currentTurn)
+      ? consolidateBeliefs(decayBeliefConfidence(mergedBeliefs), currentTurn)
       : mergedBeliefs;
 
     if (finalBeliefs.length !== existingBeliefs.length || freshBeliefs.length > 0) {
@@ -788,6 +810,16 @@ Based on what you just witnessed:
       }
     }
 
+    // ── Goal-DAG deadlock detection: replan when all paths are blocked ──
+    {
+      this.refreshSheet();
+      const latestGs = this.sheet.goalStack;
+      const trigId = observableActions[observableActions.length - 1]?.action_id ?? 'epistemic_update';
+      if (latestGs && getReadyGoals(latestGs).length === 0 && latestGs.instrumental.some(g => !g.achieved)) {
+        await this.replanGoals(trigId);
+      }
+    }
+
     // ── F: Memory Stream + Reflection (every 5 turns) ──
     const turnCount = this.stage.getTurnCount();
     if (turnCount > 0 && turnCount % 5 === 0 && !this._reflectionInFlight) {
@@ -874,6 +906,94 @@ Based on what you just witnessed:
       this.stage.updateAgentBeliefs(this.sheet.char_id, [...existingBeliefsFull, ...reflectionBeliefs]);
       logger.info('agent_reflection', { agent: this.sheet.name, new_insights: reflectionBeliefs.length });
     }
+  }
+
+  // ── Goal-DAG replanning ───────────────────────────────────────────────────────
+  // Called when getReadyGoals returns empty AND unachieved goals remain —
+  // all subgoals are blocked by unfulfilled dependencies. Emits terminal_threatened
+  // and asks the LLM for two bridging subgoals that can start immediately.
+  private async replanGoals(triggerEventId: string): Promise<void> {
+    this.refreshSheet();
+    const gs = this.sheet.goalStack;
+    if (!gs) return;
+    const ready = getReadyGoals(gs);
+    const active = gs.instrumental.filter(g => !g.achieved);
+    if (ready.length > 0 || active.length === 0) return;
+
+    const turnIndex = this.stage.getTurnCount();
+    this.stage.recordGoalMutation({
+      mutation_id: randomUUID(),
+      char_id: this.sheet.char_id,
+      turn_index: turnIndex,
+      trigger_event_id: triggerEventId,
+      mutation_type: 'terminal_threatened',
+      description: `${this.sheet.name}: all subgoal paths blocked — replanning`,
+    });
+
+    const blockedDescs = active.slice(0, 3).map(g => `- ${g.description}`).join('\n');
+    const response = await generateContent({
+      model: getModel('fast'),
+      contents: `You are ${this.sheet.name}. Your current subgoals are ALL blocked by prerequisites that haven't been met:\n${blockedDescs}\n\nTerminal objective: ${gs.terminal.description}\n\nGenerate exactly 2 new instrumental subgoals you can pursue RIGHT NOW, without prerequisites.`,
+      config: {
+        systemInstruction: `You are replanning as ${this.sheet.name}. Output only JSON.`,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            new_subgoals: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  description: { type: Type.STRING },
+                  value: { type: Type.INTEGER, description: '0-100 importance' },
+                },
+                required: ['description', 'value'],
+              },
+            },
+          },
+          required: ['new_subgoals'],
+        },
+      },
+    }, { label: `replanGoals:${this.sheet.name}`, timeoutMs: 20_000 }).catch(err => {
+      logger.warn('goal_replan_error', { agent: this.sheet.name, message: (err as Error).message });
+      return null;
+    });
+
+    if (!response) return;
+    const raw = safeJsonParse<{ new_subgoals: Array<{ description: string; value: number }> }>(
+      response.text ?? '{}', { new_subgoals: [] },
+    );
+
+    this.refreshSheet();
+    const gsNow = this.sheet.goalStack;
+    if (!gsNow) return;
+    const gsCopy: GoalStack = { ...gsNow, instrumental: [...gsNow.instrumental] };
+
+    for (const sg of (raw.new_subgoals ?? []).slice(0, 2)) {
+      if (!sg.description) continue;
+      const norm = sg.description.trim().toLowerCase();
+      if (gsCopy.instrumental.some(g => g.description.trim().toLowerCase() === norm)) continue;
+      const newGoal: Goal = {
+        id: randomUUID(),
+        description: sg.description,
+        value: Math.max(10, Math.min(100, sg.value ?? 60)),
+        achieved: false,
+      };
+      gsCopy.instrumental = [newGoal, ...gsCopy.instrumental];
+      this.stage.recordGoalMutation({
+        mutation_id: randomUUID(),
+        char_id: this.sheet.char_id,
+        turn_index: turnIndex,
+        trigger_event_id: triggerEventId,
+        mutation_type: 'subgoal_added',
+        description: `${this.sheet.name} replanned: "${sg.description}"`,
+        new_subgoal: sg.description,
+      });
+    }
+    gsCopy.last_planned_at = turnIndex;
+    this.stage.updateGoalStack(this.sheet.char_id, gsCopy);
+    logger.info('goal_replan', { agent: this.sheet.name, newGoals: raw.new_subgoals?.length ?? 0 });
   }
 
   // ── Legacy evaluateState — kept for backward compatibility ──────────────────
