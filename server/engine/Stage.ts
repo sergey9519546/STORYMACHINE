@@ -322,6 +322,12 @@ export class Stage {
     for (const fact of agent.knowledge_vector) {
       stmt.run(randomUUID(), agent.char_id, fact, Date.now());
     }
+
+    // Seed initial stakes from CharacterSheet.stakes[] if provided.
+    // These drive _checkStakesEscalation in DirectorNode from the very first turn.
+    for (const s of (agent.stakes ?? [])) {
+      this.upsertStakes(s);
+    }
   }
 
   // Maps a merged Characters + Character_State row (plus the agent's knowledge
@@ -1042,6 +1048,7 @@ export class Stage {
       beat_traces: this.getAllBeatTraces(),
       belief_edges: this.getAllBeliefEdges(),
       goal_mutations: this.getAllGoalMutations(),
+      stakes: this.getAllStakes(),
     };
   }
 
@@ -1059,6 +1066,7 @@ export class Stage {
     for (const p of snap.dramatic_pressures ?? []) this._insertRawPressure(p);
     for (const p of snap.event_propositions ?? []) this._insertRawEventProposition(p);
     for (const p of snap.persuasion_log ?? [])     this._insertRawPersuasion(p);
+    for (const s of snap.stakes ?? [])              this.upsertStakes(s);
   }
 
   private _insertRawAction(entry: ActionLogEntry): void {

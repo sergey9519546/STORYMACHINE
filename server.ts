@@ -396,6 +396,22 @@ async function startServer() {
     res.json({ ok: true, config: getPublicConfig() });
   }));
 
+  // Connection test — fires a minimal generate call so the Settings UI can verify credentials.
+  // Uses the active LLM provider (whichever was just configured via POST /api/ai-config).
+  app.post('/api/ai-config/test', gameLimiter, asyncHandler(async (_req, res) => {
+    try {
+      const result = await generateContent({
+        model: getModel('fast'),
+        contents: 'Reply with the single word: OK',
+        config: { maxOutputTokens: 8, temperature: 0 },
+      }, { label: 'connection-test', timeoutMs: 10_000 });
+      const text = typeof result.text === 'string' ? result.text.trim() : '';
+      res.json({ ok: true, response: text.substring(0, 64) });
+    } catch (err) {
+      res.status(502).json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    }
+  }));
+
   // ── Story Machine routes (game simulation) ─────────────────────────────────
   app.use('/api/init',     gameLimiter);
   app.use('/api/turn',     gameLimiter);
@@ -446,6 +462,18 @@ async function startServer() {
             suspicion_score: typeof a.suspicion_score === 'number' ? Math.max(0, Math.min(100, a.suspicion_score)) : 0,
             current_location_id: typeof a.current_location_id === 'string' ? a.current_location_id.substring(0, 64) : '',
             is_alive: a.is_alive !== false,
+            stakes: Array.isArray(a.stakes)
+              ? (a.stakes as unknown[]).filter((s): s is Record<string, unknown> => typeof s === 'object' && s !== null)
+                .slice(0, 10)
+                .map(s => ({
+                  id: typeof s.id === 'string' ? s.id : crypto.randomUUID(),
+                  char_id: requireString(a.char_id, 'char_id', 64),
+                  category: typeof s.category === 'string' ? s.category : 'reputation',
+                  description: typeof s.description === 'string' ? s.description.substring(0, 500) : '',
+                  magnitude: typeof s.magnitude === 'number' ? Math.max(0, Math.min(100, s.magnitude)) : 50,
+                  is_active: s.is_active !== false,
+                }))
+              : [],
           } as CharacterSheet);
         } catch { /* skip malformed agent */ }
       });

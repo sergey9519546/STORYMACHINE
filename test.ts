@@ -1851,6 +1851,23 @@ describe('Stage — stakes CRUD', () => {
     assert.equal(all[0].outcome, 'lost');
     assert.equal(all[0].resolved_at, 7);
   });
+
+  it('addAgent seeds stakes from CharacterSheet.stakes[]', () => {
+    const stage = new Stage(':memory:');
+    stage.addLocation({ location_id: 'r', name: 'R', description: '', adjacent_locations: [] });
+    stage.addAgent({
+      char_id: 'seeded', name: 'Seeded', public_mask: '', hidden_motive: '',
+      knowledge_vector: [], current_location_id: 'r', suspicion_score: 0, is_alive: true,
+      stakes: [
+        { id: 'stk-1', char_id: 'seeded', category: 'freedom', description: 'Going to prison', magnitude: 90, is_active: true },
+        { id: 'stk-2', char_id: 'seeded', category: 'reputation', description: 'Career at stake', magnitude: 65, is_active: true },
+      ],
+    });
+    const active = stage.getActiveStakes('seeded');
+    assert.equal(active.length, 2, 'both seeded stakes should be active');
+    assert.ok(active.some(s => s.category === 'freedom' && s.magnitude === 90));
+    assert.ok(active.some(s => s.category === 'reputation' && s.magnitude === 65));
+  });
 });
 
 describe('Orchestrator — stakes escalation emits pressure', () => {

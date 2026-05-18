@@ -257,6 +257,8 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
   const [saving, setSaving]       = useState(false);
   const [saved, setSaved]         = useState(false);
   const [error, setError]         = useState<string | null>(null);
+  const [testing, setTesting]     = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
   // Per-capability key inputs (never pre-filled for security)
   const [apiKey,    setApiKey]    = useState("");
@@ -273,6 +275,20 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
 
   const patchCfg = (patch: Partial<AiConfig>) => {
     setCfg((prev) => prev ? { ...prev, ...patch } : prev);
+  };
+
+  const handleTest = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/ai-config/test", { method: "POST" });
+      const data = await res.json() as { ok: boolean; response?: string; error?: string };
+      setTestResult({ ok: data.ok, msg: data.ok ? `Connected (${data.response ?? "OK"})` : (data.error ?? "Failed") });
+    } catch (e) {
+      setTestResult({ ok: false, msg: (e as Error).message });
+    } finally {
+      setTesting(false);
+    }
   };
 
   const handleSave = async () => {
@@ -425,23 +441,40 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t-4 border-black flex items-center justify-between gap-3">
-              {error && (
-                <span className="text-xs text-red-600 font-mono flex-1 truncate">{error}</span>
-              )}
-              {!error && saved && (
-                <span className="text-xs text-green-700 font-bold uppercase tracking-wider flex-1">
-                  Saved ✓
-                </span>
-              )}
-              {!error && !saved && <span className="flex-1" />}
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="bg-black text-white px-6 py-2 font-bold uppercase tracking-wider text-sm brutal-border brutal-shadow-hover hover:bg-[#FF4444] transition-colors disabled:opacity-50"
-              >
-                {saving ? "Saving…" : "Save"}
-              </button>
+            <div className="px-6 py-4 border-t-4 border-black flex flex-col gap-2">
+              {/* Status messages */}
+              <div className="flex items-center min-h-[20px]">
+                {error && (
+                  <span className="text-xs text-red-600 font-mono truncate">{error}</span>
+                )}
+                {!error && saved && (
+                  <span className="text-xs text-green-700 font-bold uppercase tracking-wider">
+                    Saved ✓
+                  </span>
+                )}
+                {!error && !saved && testResult && (
+                  <span className={`text-xs font-mono truncate ${testResult.ok ? "text-green-700" : "text-red-600"}`}>
+                    {testResult.msg}
+                  </span>
+                )}
+              </div>
+              {/* Buttons */}
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  onClick={handleTest}
+                  disabled={testing || saving}
+                  className="px-4 py-2 font-bold uppercase tracking-wider text-sm border-2 border-black hover:bg-gray-100 transition-colors disabled:opacity-50"
+                >
+                  {testing ? "Testing…" : "Test Connection"}
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="bg-black text-white px-6 py-2 font-bold uppercase tracking-wider text-sm brutal-border brutal-shadow-hover hover:bg-[#FF4444] transition-colors disabled:opacity-50"
+                >
+                  {saving ? "Saving…" : "Save"}
+                </button>
+              </div>
             </div>
           </>
         )}

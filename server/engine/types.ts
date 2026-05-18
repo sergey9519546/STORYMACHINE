@@ -424,5 +424,6 @@ export interface StageSnapshot {
   beat_traces: BeatTrace[];
   belief_edges: BeliefEdge[];
   goal_mutations: GoalMutation[];
+  stakes?: Stakes[];                        // active stakes survive restart
 }
 
