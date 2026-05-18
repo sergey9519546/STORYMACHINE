@@ -1,13 +1,18 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import http from 'node:http';
 import { safeJsonParse } from './src/lib/json.ts';
-import { withTimeout, generateContent, setLLMProvider, resetLLMProvider } from './server/engine/ai.ts';
+import { withTimeout, generateContent, setLLMProvider, resetLLMProvider, setEmbeddingProvider, setImageProvider, setTTSProvider, getEmbeddingProvider, getImageProvider, getTTSProvider, resetAllProviders, noopImageProvider, noopTTSProvider, noopEmbeddingProvider } from './server/engine/ai.ts';
 import { analyzeSubtext } from './server/lib/subtext-meter.ts';
 import { scoreBelief, retrieveBeliefs, consolidateBeliefs, decayBeliefConfidence } from './server/lib/memory.ts';
 import { metrics } from './server/lib/metrics.ts';
 import { actionBiasWeights, defenseActionBias, effectiveScore, attachmentActionBias } from './server/lib/personality.ts';
 import { AppraisalEngine } from './server/engine/AppraisalEngine.ts';
-import { validate, InitBodySchema, TurnBodySchema, RunRoomBodySchema, ImportBodySchema } from './server/lib/validation.ts';
+import { validate, InitBodySchema, TurnBodySchema, RunRoomBodySchema, ImportBodySchema, AiConfigSchema } from './server/lib/validation.ts';
+import { geminiSchemaToJsonSchema } from './server/lib/ai-providers/schema.ts';
+import { makeOpenAICompatLLMProvider, makeOpenAICompatEmbeddingProvider } from './server/lib/ai-providers/openai-compat.ts';
+import { applyConfig, getPublicConfig, initFromEnv } from './server/lib/ai-config.ts';
+import type { GenerateContentParameters, GenerateContentResponse } from '@google/genai';
 
 describe('safeJsonParse', () => {
   it('returns parsed value for valid JSON object', () => {
@@ -110,7 +115,6 @@ import { CausalSpine } from './server/engine/CausalSpine.ts';
 import { Orchestrator } from './server/engine/Orchestrator.ts';
 import { transcriptToFountain } from './server/lib/fountain.ts';
 import type { ActionLogEntry, Belief, CharacterSheet, Location } from './server/engine/types.ts';
-import type { GenerateContentParameters } from '@google/genai';
 
 function makeStage(): Stage {
   const stage = new Stage(':memory:');
@@ -2389,5 +2393,260 @@ describe('Zod validation schemas', () => {
   it('ImportBodySchema rejects missing agents', () => {
     const result = ImportBodySchema.safeParse({ locations: [], action_log: [] });
     assert.ok(!result.success);
+  });
+
+  it('AiConfigSchema accepts valid openai-compat config', () => {
+    const result = AiConfigSchema.safeParse({
+      provider: 'openai-compat',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      model: 'openai/gpt-4o',
+    });
+    assert.ok(result.success, JSON.stringify((result as { error?: unknown }).error));
+  });
+
+  it('AiConfigSchema rejects unknown provider', () => {
+    const result = AiConfigSchema.safeParse({ provider: 'anthropic' });
+    assert.ok(!result.success);
+  });
+});
+
+// ── geminiSchemaToJsonSchema ──────────────────────────────────────────────────
+describe('geminiSchemaToJsonSchema', () => {
+  it('converts OBJECT type with nested properties', () => {
+    const out = geminiSchemaToJsonSchema({
+      type: 'OBJECT' as never,
+      properties: {
+        name: { type: 'STRING' as never },
+        age:  { type: 'INTEGER' as never },
+      },
+      required: ['name'],
+    });
+    assert.equal(out.type, 'object');
+    assert.deepEqual((out.properties as Record<string, { type: string }>).name, { type: 'string' });
+    assert.deepEqual((out.properties as Record<string, { type: string }>).age, { type: 'integer' });
+    assert.deepEqual(out.required, ['name']);
+  });
+
+  it('converts ARRAY type with items', () => {
+    const out = geminiSchemaToJsonSchema({
+      type: 'ARRAY' as never,
+      items: { type: 'STRING' as never },
+    });
+    assert.equal(out.type, 'array');
+    assert.deepEqual(out.items, { type: 'string' });
+  });
+
+  it('converts primitive types to lowercase', () => {
+    assert.equal(geminiSchemaToJsonSchema({ type: 'STRING'  as never }).type, 'string');
+    assert.equal(geminiSchemaToJsonSchema({ type: 'INTEGER' as never }).type, 'integer');
+    assert.equal(geminiSchemaToJsonSchema({ type: 'BOOLEAN' as never }).type, 'boolean');
+    assert.equal(geminiSchemaToJsonSchema({ type: 'NUMBER'  as never }).type, 'number');
+  });
+
+  it('wraps nullable type as union array', () => {
+    const out = geminiSchemaToJsonSchema({ type: 'STRING' as never, nullable: true } as never);
+    assert.deepEqual(out.type, ['string', 'null']);
+  });
+
+  it('passes through enum values unchanged', () => {
+    const out = geminiSchemaToJsonSchema({ type: 'STRING' as never, enum: ['a', 'b', 'c'] } as never);
+    assert.deepEqual(out.enum, ['a', 'b', 'c']);
+  });
+});
+
+// ── OpenAI-compat LLM adapter ─────────────────────────────────────────────────
+describe('makeOpenAICompatLLMProvider', () => {
+  function mockServer(handler: (body: Record<string, unknown>) => unknown): Promise<{ url: string; server: http.Server }> {
+    return new Promise((resolve) => {
+      const server = http.createServer((req, res) => {
+        let data = '';
+        req.on('data', (c: Buffer) => { data += c; });
+        req.on('end', () => {
+          const body = JSON.parse(data) as Record<string, unknown>;
+          const response = handler(body);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(response));
+        });
+      });
+      server.listen(0, '127.0.0.1', () => {
+        const addr = server.address() as { port: number };
+        resolve({ url: `http://127.0.0.1:${addr.port}`, server });
+      });
+    });
+  }
+
+  it('sends POST /chat/completions with messages', async () => {
+    let captured: Record<string, unknown> = {};
+    const { url, server } = await mockServer((body) => {
+      captured = body;
+      return { choices: [{ message: { content: 'hello' } }], usage: { prompt_tokens: 10, completion_tokens: 5 } };
+    });
+    try {
+      const provider = makeOpenAICompatLLMProvider({ baseURL: url, apiKey: 'test-key' });
+      const params: GenerateContentParameters = {
+        model: 'gpt-4o',
+        contents: 'Say hello',
+        config: { systemInstruction: 'You are helpful.', temperature: 0.5 },
+      };
+      await provider.generate(params);
+      assert.equal(captured.model, 'gpt-4o');
+      assert.ok(Array.isArray(captured.messages));
+      const msgs = captured.messages as Array<{ role: string; content: string }>;
+      assert.equal(msgs[0]?.role, 'system');
+      assert.equal(msgs[0]?.content, 'You are helpful.');
+      assert.equal(msgs[1]?.role, 'user');
+      assert.equal(msgs[1]?.content, 'Say hello');
+      assert.equal(captured.temperature, 0.5);
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it('includes response_format when responseSchema is present', async () => {
+    let captured: Record<string, unknown> = {};
+    const { url, server } = await mockServer((body) => {
+      captured = body;
+      return { choices: [{ message: { content: '{"x":1}' } }], usage: {} };
+    });
+    try {
+      const provider = makeOpenAICompatLLMProvider({ baseURL: url, apiKey: 'test-key' });
+      const params: GenerateContentParameters = {
+        model: 'gpt-4o',
+        contents: 'Return JSON',
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: { type: 'OBJECT' as never, properties: { x: { type: 'INTEGER' as never } } },
+        },
+      };
+      await provider.generate(params);
+      const rf = captured.response_format as { type: string; json_schema: { schema: Record<string, unknown> } };
+      assert.equal(rf.type, 'json_schema');
+      assert.equal((rf.json_schema.schema as { type: string }).type, 'object');
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it('returns text and usageMetadata in GenerateContentResponse shape', async () => {
+    const { url, server } = await mockServer(() => ({
+      choices: [{ message: { content: 'the answer' } }],
+      usage: { prompt_tokens: 20, completion_tokens: 8 },
+    }));
+    try {
+      const provider = makeOpenAICompatLLMProvider({ baseURL: url, apiKey: 'key' });
+      const res = await provider.generate({ model: 'x', contents: 'q' } as GenerateContentParameters);
+      assert.equal(res.text, 'the answer');
+      const meta = (res as GenerateContentResponse & { usageMetadata?: { promptTokenCount: number; candidatesTokenCount: number } }).usageMetadata;
+      assert.equal(meta?.promptTokenCount,     20);
+      assert.equal(meta?.candidatesTokenCount, 8);
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it('throws on non-2xx HTTP response', async () => {
+    const { url, server } = await mockServer(() => null);
+    // Replace handler to return 500
+    const server2 = http.createServer((_req, res) => { res.writeHead(500); res.end('error'); });
+    await new Promise<void>((r) => server2.listen(0, '127.0.0.1', r));
+    const addr = server2.address() as { port: number };
+    try {
+      const provider = makeOpenAICompatLLMProvider({ baseURL: `http://127.0.0.1:${addr.port}`, apiKey: 'key' });
+      await assert.rejects(provider.generate({ model: 'x', contents: 'q' } as GenerateContentParameters));
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+      await new Promise<void>((r) => server2.close(() => r()));
+    }
+  });
+
+  it('works without responseSchema (plain text mode)', async () => {
+    let captured: Record<string, unknown> = {};
+    const { url, server } = await mockServer((body) => {
+      captured = body;
+      return { choices: [{ message: { content: 'plain' } }], usage: {} };
+    });
+    try {
+      const provider = makeOpenAICompatLLMProvider({ baseURL: url, apiKey: 'key' });
+      const res = await provider.generate({ model: 'x', contents: 'hi' } as GenerateContentParameters);
+      assert.equal(res.text, 'plain');
+      assert.equal(captured.response_format, undefined);
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+});
+
+// ── Provider seams ────────────────────────────────────────────────────────────
+describe('Provider seams', () => {
+  it('getEmbeddingProvider returns default (Gemini) by default', () => {
+    resetAllProviders();
+    const p = getEmbeddingProvider();
+    assert.ok(p && typeof p.embed === 'function');
+  });
+
+  it('setEmbeddingProvider swaps the provider; resetAllProviders restores default', async () => {
+    const mock = { embed: async () => [1, 2, 3] };
+    setEmbeddingProvider(mock);
+    const result = await getEmbeddingProvider().embed('test');
+    assert.deepEqual(result, [1, 2, 3]);
+    resetAllProviders();
+    // After reset, provider is the Gemini default (not the mock)
+    assert.notStrictEqual(getEmbeddingProvider(), mock);
+  });
+
+  it('noopImageProvider.generate() returns undefined', async () => {
+    const result = await noopImageProvider.generate('a sunny day');
+    assert.equal(result, undefined);
+  });
+
+  it('noopTTSProvider.speak() returns undefined', async () => {
+    const result = await noopTTSProvider.speak('hello');
+    assert.equal(result, undefined);
+  });
+
+  it('noopEmbeddingProvider.embed() returns empty array', async () => {
+    const result = await noopEmbeddingProvider.embed('text');
+    assert.deepEqual(result, []);
+  });
+
+  it('setImageProvider / getTTSProvider hot-swaps work correctly', async () => {
+    const mockImg = { generate: async () => 'data:image/png;base64,abc' as string | undefined };
+    setImageProvider(mockImg);
+    const imgUrl = await getImageProvider().generate('test');
+    assert.equal(imgUrl, 'data:image/png;base64,abc');
+    resetAllProviders();
+    assert.notStrictEqual(getImageProvider(), mockImg);
+  });
+});
+
+// ── applyConfig / getPublicConfig ─────────────────────────────────────────────
+describe('applyConfig + getPublicConfig', () => {
+  it('public config never includes API key values', () => {
+    applyConfig({ provider: 'gemini' }, { apiKey: 'super-secret-key-123' });
+    const cfg = getPublicConfig();
+    const json = JSON.stringify(cfg);
+    assert.ok(!json.includes('super-secret-key-123'), 'key must not appear in public config');
+  });
+
+  it('keySet is true when a key was supplied', () => {
+    applyConfig({ provider: 'gemini' }, { apiKey: 'any-key' });
+    assert.equal(getPublicConfig().keySet, true);
+  });
+
+  it('switching to openai-compat swaps the LLM provider instance', () => {
+    const before = getEmbeddingProvider();
+    applyConfig({
+      provider: 'openai-compat',
+      baseUrl: 'https://openrouter.ai/api/v1',
+    }, { apiKey: 'sk-test' });
+    // LLM provider should now be openai-compat; embedding stays gemini since not changed
+    const cfg = getPublicConfig();
+    assert.equal(cfg.provider, 'openai-compat');
+    resetAllProviders();
+  });
+
+  it('restoring to gemini resets LLM provider', () => {
+    applyConfig({ provider: 'gemini' });
+    assert.equal(getPublicConfig().provider, 'gemini');
   });
 });

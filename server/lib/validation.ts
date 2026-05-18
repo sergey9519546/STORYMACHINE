@@ -64,6 +64,27 @@ export const ImportBodySchema = z
   })
   .passthrough();
 
+export const AiConfigSchema = z.object({
+  provider:    z.enum(['gemini', 'openai-compat']).optional(),
+  baseUrl:     z.string().url().max(512).optional(),
+  apiKey:      z.string().max(512).optional(),
+  model:       z.string().max(256).optional(),
+  fastModel:   z.string().max(256).optional(),
+  imgProvider: z.enum(['gemini', 'openai-compat', 'none']).optional(),
+  imgBaseUrl:  z.string().url().max(512).optional(),
+  imgApiKey:   z.string().max(512).optional(),
+  imgModel:    z.string().max(256).optional(),
+  ttsProvider: z.enum(['gemini', 'openai-compat', 'none']).optional(),
+  ttsBaseUrl:  z.string().url().max(512).optional(),
+  ttsApiKey:   z.string().max(512).optional(),
+  ttsModel:    z.string().max(256).optional(),
+  ttsVoice:    z.string().max(64).optional(),
+  embProvider: z.enum(['gemini', 'openai-compat', 'none']).optional(),
+  embBaseUrl:  z.string().url().max(512).optional(),
+  embApiKey:   z.string().max(512).optional(),
+  embModel:    z.string().max(256).optional(),
+});
+
 // ── Middleware factory ───────────────────────────────────────────────────────
 // Usage:  app.post('/api/foo', validate(FooSchema), handler)
 // On failure returns HTTP 400 with { error: '<first issue message>' }.

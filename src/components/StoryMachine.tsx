@@ -12,8 +12,9 @@ import type {
   PersuasionRecord,
   DramaticPressure,
 } from "../../server/engine/types";
-import { FileDown, Brain, Eye, AlertTriangle, GitBranch, Target, Zap, Smile, Shuffle } from "lucide-react";
+import { FileDown, Brain, Eye, AlertTriangle, GitBranch, Target, Zap, Smile, Shuffle, Settings } from "lucide-react";
 import ScenarioBuilder from "./storymachine/ScenarioBuilder";
+import SettingsPanel from "./SettingsPanel";
 
 // ── Emotion display helpers ───────────────────────────────────────────────────
 
@@ -82,7 +83,8 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   }, []);
 
   useEffect(() => () => { if (errorTimerRef.current) clearTimeout(errorTimerRef.current); }, []);
-  const [showBuilder, setShowBuilder] = useState(false);
+  const [showBuilder, setShowBuilder]   = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const fetchActivePressures = useCallback(async () => {
     try {
@@ -396,6 +398,13 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
               </button>
             </div>
           )}
+          <button
+            onClick={() => setShowSettings(true)}
+            title="AI Provider Settings"
+            className="bg-white text-black px-3 py-2 brutal-border brutal-shadow-hover hover:bg-gray-100 transition-colors flex items-center"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
           <button
             onClick={onClose}
             className="bg-white text-black px-4 py-2 font-bold uppercase tracking-wider brutal-border brutal-shadow-hover hover:bg-gray-100 transition-colors"
@@ -931,6 +940,10 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           onClose={() => setShowBuilder(false)}
           busy={loading}
         />
+      )}
+
+      {showSettings && (
+        <SettingsPanel onClose={() => setShowSettings(false)} />
       )}
     </div>
   );
