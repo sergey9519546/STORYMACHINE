@@ -885,27 +885,50 @@ export default function ScriptIDE({
           </div>
         </div>
 
-        <div className="bg-black text-white p-4 brutal-border-thick">
-          <h3 className="text-xs font-bold uppercase tracking-widest mb-2">
-            Script Health Score
-          </h3>
-          <div className="flex items-center gap-4">
-            <div className="text-4xl font-bold text-[#FF4444]">
-              {Math.min(
-                100,
-                Math.round(
-                  (dialoguePercent > 30 && dialoguePercent < 70 ? 40 : 20) +
-                    (totalLines > 50 ? 30 : 10) +
-                    (charData.length > 2 ? 30 : 10)
-                )
-              )}
+        {(() => {
+          // Real health score: weighted rubric across 5 axes
+          const sceneCount = parsedBlocks.filter(b => b.type === 'scene_heading').length;
+          const uniqueChars = charData.length;
+          // 1. Dialogue balance (0–25): ideal 40-60% dialogue
+          const balanceScore = dialoguePercent >= 40 && dialoguePercent <= 60 ? 25
+            : dialoguePercent >= 30 && dialoguePercent <= 70 ? 18
+            : dialoguePercent > 0 ? 10 : 0;
+          // 2. Script length (0–20): sweet spot ≥ 90 lines for a short; 200+ for feature
+          const lengthScore = totalLines >= 200 ? 20 : totalLines >= 90 ? 15 : totalLines >= 40 ? 10 : totalLines > 0 ? 5 : 0;
+          // 3. Character depth (0–20): ≥3 named characters with ≥2 lines each
+          const depthScore = uniqueChars >= 4 ? 20 : uniqueChars === 3 ? 15 : uniqueChars === 2 ? 10 : uniqueChars === 1 ? 5 : 0;
+          // 4. Scene variety (0–20): ≥3 distinct scene headings signals structure
+          const sceneScore = sceneCount >= 8 ? 20 : sceneCount >= 4 ? 15 : sceneCount >= 2 ? 10 : sceneCount === 1 ? 5 : 0;
+          // 5. Character balance (0–15): top character should not speak >60% of lines
+          const topShare = charData.length > 0 && dialogueLines > 0
+            ? charData[0].value / dialogueLines : 0;
+          const balChar = topShare < 0.4 ? 15 : topShare < 0.6 ? 10 : 5;
+
+          const score = Math.min(100, balanceScore + lengthScore + depthScore + sceneScore + balChar);
+          const grade = score >= 85 ? 'STRONG' : score >= 65 ? 'SOLID' : score >= 45 ? 'DEVELOPING' : score > 0 ? 'EARLY DRAFT' : 'EMPTY';
+          const reasons: string[] = [];
+          if (balanceScore < 18) reasons.push(`dialogue at ${dialoguePercent}% (target 40–60%)`);
+          if (lengthScore < 15) reasons.push(`${totalLines} lines (target ≥ 90)`);
+          if (depthScore < 15) reasons.push(`${uniqueChars} named character${uniqueChars !== 1 ? 's' : ''} (target ≥ 3)`);
+          if (sceneScore < 15) reasons.push(`${sceneCount} scene${sceneCount !== 1 ? 's' : ''} (target ≥ 4)`);
+
+          return (
+            <div className="bg-black text-white p-4 brutal-border-thick">
+              <h3 className="text-xs font-bold uppercase tracking-widest mb-2">
+                Script Health Score
+              </h3>
+              <div className="flex items-center gap-4">
+                <div className="text-4xl font-bold text-[#FF4444]">{score}</div>
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-widest text-[#FF4444]">{grade}</div>
+                  <div className="text-[10px] font-mono opacity-70 mt-1">
+                    {reasons.length > 0 ? `Improve: ${reasons.join(' · ')}` : 'Balance, length, characters, scenes — all looking good.'}
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="text-[10px] font-mono opacity-70">
-              Based on dialogue balance, character depth, and structural
-              complexity.
-            </div>
-          </div>
-        </div>
+          );
+        })()}
       </div>
     );
   };
@@ -1093,6 +1116,8 @@ export default function ScriptIDE({
               { id: "analysis", icon: null, label: "Analysis" },
               { id: "storyEngine", icon: Sparkles, label: "Engine" },
               { id: "codex", icon: BookOpen, label: "Codex" },
+              { id: "research", icon: Layers, label: "Research" },
+              { id: "titlePage", icon: Film, label: "Title" },
             ] as const
           ).map(({ id, label }) => (
             <button

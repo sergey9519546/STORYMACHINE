@@ -87,19 +87,65 @@ export class AppraisalEngine {
     // ── Appraise active pressures ──
     const pressures = this.stage.getActivePressures(update.char_id);
     for (const p of pressures) {
+      const mag = Math.round(p.intensity * 0.25);
       if (p.pressure_type === 'confrontation_imminent' || p.pressure_type === 'CONFRONT') {
-        next.fear = Math.min(100, next.fear + Math.round(p.intensity * 0.25));
+        next.fear = Math.min(100, next.fear + mag);
       }
       if (p.pressure_type === 'evidence_against') {
-        // Being on the receiving end of evidence = shame
         next.shame = Math.min(100, next.shame + Math.round(p.intensity * 0.2));
       }
       if (p.pressure_type === 'confrontation_imminent' && p.source_char_id) {
-        // Discoverer → suspect: anger at source
         next.anger = Math.min(100, next.anger + 20);
         if (!next.anger_target_id || next.anger > 50) {
           next.anger_target_id = p.source_char_id;
         }
+      }
+      if (p.pressure_type === 'ESCALATE') {
+        // Rising stakes → fear + distress
+        next.fear    = Math.min(100, next.fear    + mag);
+        next.distress = Math.min(100, next.distress + Math.round(p.intensity * 0.2));
+      }
+      if (p.pressure_type === 'COOL') {
+        // Deliberate de-escalation → relief (joy dampens distress and fear)
+        next.joy      = Math.min(100, next.joy      + Math.round(p.intensity * 0.15));
+        next.distress = Math.max(0,   next.distress - Math.round(p.intensity * 0.1));
+        next.fear     = Math.max(0,   next.fear     - Math.round(p.intensity * 0.1));
+      }
+      if (p.pressure_type === 'REDIRECT') {
+        // Forced topic change → disorientation (mild distress, confusion ≈ fear)
+        next.distress = Math.min(100, next.distress + Math.round(p.intensity * 0.15));
+        next.fear     = Math.min(100, next.fear     + Math.round(p.intensity * 0.1));
+      }
+      if (p.pressure_type === 'REVEAL') {
+        // Hidden truth exposed → shame + distress
+        next.shame    = Math.min(100, next.shame    + Math.round(p.intensity * 0.3));
+        next.distress = Math.min(100, next.distress + Math.round(p.intensity * 0.2));
+      }
+      if (p.pressure_type === 'WITHHOLD') {
+        // Needed information withheld → frustration ≈ anger
+        next.anger    = Math.min(100, next.anger    + Math.round(p.intensity * 0.2));
+        next.distress = Math.min(100, next.distress + Math.round(p.intensity * 0.1));
+      }
+      if (p.pressure_type === 'goal_blocked') {
+        // Direct goal obstruction → distress + anger at blocker
+        next.distress = Math.min(100, next.distress + Math.round(p.intensity * 0.35));
+        if (p.source_char_id) {
+          next.anger = Math.min(100, next.anger + Math.round(p.intensity * 0.2));
+          if (!next.anger_target_id) next.anger_target_id = p.source_char_id;
+        }
+      }
+      if (p.pressure_type === 'ally_compromised') {
+        // Someone trusted has been revealed as compromised → fear + betrayal anger
+        next.fear  = Math.min(100, next.fear  + Math.round(p.intensity * 0.3));
+        next.anger = Math.min(100, next.anger + Math.round(p.intensity * 0.2));
+        if (p.source_char_id && !next.anger_target_id) {
+          next.anger_target_id = p.source_char_id;
+        }
+      }
+      if (p.pressure_type === 'revelation_due') {
+        // Something is about to be revealed — anticipatory anxiety
+        next.fear    = Math.min(100, next.fear    + Math.round(p.intensity * 0.2));
+        next.distress = Math.min(100, next.distress + Math.round(p.intensity * 0.15));
       }
     }
 

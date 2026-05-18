@@ -216,15 +216,41 @@ export function transcriptToFountain(
   return lines.join('\n');
 }
 
-// Extracts character names from an action log (useful for auto-populating Script IDE characters)
+// Extracts character profiles from agents for Script IDE auto-population.
+// ghost = the wound that drives the character (inferred from hidden_motive if no explicit field)
+// lie   = the false belief they cling to (their public mask — how they present themselves)
+// want  = what they consciously pursue (hidden_motive)
+// need  = what they actually require for growth (terminal goal description when available)
 export function extractCharactersFromLog(
   agents: CharacterSheet[],
 ): Array<{ name: string; ghost: string; lie: string; want: string; need: string }> {
-  return agents.map(a => ({
-    name: a.name,
-    ghost: '',
-    lie: a.public_mask,
-    want: a.hidden_motive,
-    need: '',
-  }));
+  return agents.map(a => {
+    const terminalGoal = a.goalStack?.terminal.description ?? '';
+    // Derive a ghost (psychological wound) from the hidden motive and terminal goal.
+    // Pattern: hidden motives that reference "prove", "protect", "escape", "revenge" etc.
+    // hint at a past wound. Fallback to a generic framing if we can't infer one.
+    const ghost = (() => {
+      const m = (a.hidden_motive ?? '').toLowerCase();
+      const t = terminalGoal.toLowerCase();
+      if (/protect|save|shield|defend/.test(m) || /protect|save|shield|defend/.test(t))
+        return `Fear of losing what matters most — has been hurt by letting people in.`;
+      if (/prove|validate|recognition|credit|deserve/.test(m) || /prove|validate/.test(t))
+        return `Never felt truly seen or valued — still seeking approval from the past.`;
+      if (/revenge|justice|punish|settle/.test(m) || /revenge|justice/.test(t))
+        return `Was wronged and never healed — the wound became the mission.`;
+      if (/escape|flee|leave|run|freedom/.test(m) || /escape|freedom/.test(t))
+        return `Trapped by circumstances of their own making — afraid to face what they're running from.`;
+      if (/control|power|dominate|rule/.test(m) || /control|power/.test(t))
+        return `Felt powerless at a formative moment — control is the armor they never took off.`;
+      return `Carries an old wound that shapes every decision — the past is never truly past.`;
+    })();
+
+    return {
+      name: a.name,
+      ghost,
+      lie: a.public_mask,
+      want: a.hidden_motive,
+      need: terminalGoal || `To confront what they've been avoiding and find peace with it.`,
+    };
+  });
 }

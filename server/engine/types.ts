@@ -329,7 +329,8 @@ export type BeatType =
   | 'goal_mutated'
   | 'pressure_applied'
   | 'revelation'
-  | 'turning_point';
+  | 'turning_point'
+  | 'defense_activated';
 
 export type InformationPosition = 'superior' | 'inferior' | 'parity';
 
