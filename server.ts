@@ -13,6 +13,7 @@ import { transcriptToFountain, extractCharactersFromLog, syuzhetSort, wrapSyuzhe
 import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES, STYLE_MODIFIERS } from './server/lib/structure-presets.ts';
 import { logger, requestLogger } from './server/lib/logger.ts';
 import { metrics } from './server/lib/metrics.ts';
+import { validate, InitBodySchema, TurnBodySchema, RunRoomBodySchema, ImportBodySchema } from './server/lib/validation.ts';
 
 // ── Startup validation ────────────────────────────────────────────────────────
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -325,6 +326,7 @@ interface Session {
 }
 const sessions = new Map<string, Session>();
 const SESSION_TTL_MS = 30 * 60 * 1000;
+const MAX_SESSIONS   = Number(process.env.MAX_SESSIONS ?? 100);
 
 function dbPathFor(sessionId: string): string {
   return PERSIST_SESSIONS ? path.join(SESSION_DB_DIR, `${sessionId}.db`) : ':memory:';
@@ -333,6 +335,19 @@ function dbPathFor(sessionId: string): string {
 function getOrCreateSession(sessionId: string): Session {
   let session = sessions.get(sessionId);
   if (!session) {
+    if (sessions.size >= MAX_SESSIONS) {
+      // Evict the least-recently-accessed session to stay within the cap.
+      let oldestId = '';
+      let oldestAccess = Infinity;
+      for (const [id, s] of sessions) {
+        if (s.lastAccess < oldestAccess) { oldestAccess = s.lastAccess; oldestId = id; }
+      }
+      if (oldestId) {
+        sessions.get(oldestId)?.stage.close();
+        sessions.delete(oldestId);
+        logger.warn('session_evicted', { evicted: oldestId, cap: MAX_SESSIONS });
+      }
+    }
     // For a persisted session this opens the existing file; the Orchestrator
     // constructor re-hydrates agents + locations, so the session resumes intact.
     const s = new Stage(dbPathFor(sessionId));
@@ -397,6 +412,8 @@ async function startServer() {
   const app = express();
   app.use(express.json({ limit: '1mb' }));
   app.use(requestLogger());
+  // Assign a trace ID to every request for correlation across logs.
+  app.use((_req, res, next) => { res.locals.traceId = crypto.randomUUID(); next(); });
 
   // Health check — no rate limit, no auth, responds even when Gemini is down.
   app.get('/health', (_req, res) => {
@@ -417,7 +434,7 @@ async function startServer() {
   app.use('/api/ledger',   gameLimiter);
   app.use('/api/state',    gameLimiter);
 
-  app.post('/api/init', asyncHandler(async (req, res) => {
+  app.post('/api/init', validate(InitBodySchema), asyncHandler(async (req, res) => {
     const sid = sessionId(req);
     const { nodes, agents } = req.body;
     const { orchestrator } = getOrCreateSession(sid);
@@ -473,7 +490,7 @@ async function startServer() {
     });
   }));
 
-  app.post('/api/turn', asyncHandler(async (req, res) => {
+  app.post('/api/turn', validate(TurnBodySchema), asyncHandler(async (req, res) => {
     const session = getOrCreateSession(sessionId(req));
     const agentId = requireString(req.body?.agentId, 'agentId', 128);
 
@@ -494,7 +511,7 @@ async function startServer() {
     }
   }));
 
-  app.post('/api/run-room', asyncHandler(async (req, res) => {
+  app.post('/api/run-room', validate(RunRoomBodySchema), asyncHandler(async (req, res) => {
     const sid = sessionId(req);
     const nodeId = requireString(req.body?.nodeId, 'nodeId', 128);
     const lockKey = `${sid}:${nodeId}`;
@@ -618,6 +635,15 @@ async function startServer() {
 
   app.get('/api/ledger', asyncHandler(async (req, res) => {
     const { stage } = getOrCreateSession(sessionId(req));
+    const rawLimit  = Number(req.query.limit);
+    const rawOffset = Number(req.query.offset);
+    if (req.query.limit !== undefined || req.query.offset !== undefined) {
+      const limit  = isNaN(rawLimit)  || rawLimit  < 1 ? 50  : Math.min(rawLimit,  500);
+      const offset = isNaN(rawOffset) || rawOffset < 0 ? 0   : rawOffset;
+      const total  = stage.getLedgerCount();
+      res.json({ data: stage.getLedgerPage(limit, offset), total, limit, offset });
+      return;
+    }
     res.json(stage.getFullLedger());
   }));
 
@@ -626,9 +652,17 @@ async function startServer() {
     res.json({ agents: stage.getAllAgents(), nodes: stage.getAllLocations() });
   }));
 
-  // Reset a session (clears all simulation state for this sessionId)
+  // Reset a session (clears all simulation state for this sessionId).
+  // When running with disk persistence a timestamped backup is written first.
   app.post('/api/reset', gameLimiter, asyncHandler(async (req, res) => {
     const sid = sessionId(req);
+    if (PERSIST_SESSIONS) {
+      const src = path.join(SESSION_DB_DIR, `${sid}.db`);
+      if (fs.existsSync(src)) {
+        const dest = path.join(SESSION_DB_DIR, `${sid}.${Date.now()}.bak.db`);
+        try { fs.copyFileSync(src, dest); } catch { /* non-fatal */ }
+      }
+    }
     destroySession(sid);
     res.json({ status: 'reset', sessionId: sid });
   }));
@@ -736,6 +770,15 @@ async function startServer() {
   // All beat traces (narrative beats with causal chains)
   app.get('/api/beat-traces', gameLimiter, asyncHandler(async (req, res) => {
     const { stage } = getOrCreateSession(sessionId(req));
+    const rawLimit  = Number(req.query.limit);
+    const rawOffset = Number(req.query.offset);
+    if (req.query.limit !== undefined || req.query.offset !== undefined) {
+      const limit  = isNaN(rawLimit)  || rawLimit  < 1 ? 50  : Math.min(rawLimit,  500);
+      const offset = isNaN(rawOffset) || rawOffset < 0 ? 0   : rawOffset;
+      const total  = stage.getBeatTracesCount();
+      res.json({ data: stage.getBeatTracesPage(limit, offset), total, limit, offset });
+      return;
+    }
     res.json(stage.getAllBeatTraces());
   }));
 
@@ -750,6 +793,15 @@ async function startServer() {
   // All belief edges (contradiction graph)
   app.get('/api/belief-edges', gameLimiter, asyncHandler(async (req, res) => {
     const { stage } = getOrCreateSession(sessionId(req));
+    const rawLimit  = Number(req.query.limit);
+    const rawOffset = Number(req.query.offset);
+    if (req.query.limit !== undefined || req.query.offset !== undefined) {
+      const limit  = isNaN(rawLimit)  || rawLimit  < 1 ? 50  : Math.min(rawLimit,  500);
+      const offset = isNaN(rawOffset) || rawOffset < 0 ? 0   : rawOffset;
+      const total  = stage.getBeliefEdgesCount();
+      res.json({ data: stage.getBeliefEdgesPage(limit, offset), total, limit, offset });
+      return;
+    }
     res.json(stage.getAllBeliefEdges());
   }));
 
@@ -764,6 +816,15 @@ async function startServer() {
   // All goal mutations across all agents
   app.get('/api/goal-mutations', gameLimiter, asyncHandler(async (req, res) => {
     const { stage } = getOrCreateSession(sessionId(req));
+    const rawLimit  = Number(req.query.limit);
+    const rawOffset = Number(req.query.offset);
+    if (req.query.limit !== undefined || req.query.offset !== undefined) {
+      const limit  = isNaN(rawLimit)  || rawLimit  < 1 ? 50  : Math.min(rawLimit,  500);
+      const offset = isNaN(rawOffset) || rawOffset < 0 ? 0   : rawOffset;
+      const total  = stage.getGoalMutationsCount();
+      res.json({ data: stage.getGoalMutationsPage(limit, offset), total, limit, offset });
+      return;
+    }
     res.json(stage.getAllGoalMutations());
   }));
 
@@ -890,10 +951,19 @@ async function startServer() {
   }));
 
   // Import: restore a previously exported snapshot into a fresh session.
-  app.post('/api/session/import', gameLimiter, asyncHandler(async (req, res) => {
+  app.post('/api/session/import', gameLimiter, validate(ImportBodySchema), asyncHandler(async (req, res) => {
     const snap = req.body as StageSnapshot;
     if (!snap || typeof snap !== 'object' || !Array.isArray(snap.agents) || !Array.isArray(snap.locations)) {
       res.status(400).json({ error: 'Invalid snapshot: must include agents and locations arrays' });
+      return;
+    }
+    // Reject snapshots that are newer than the current schema version to prevent
+    // silent data loss when an older server tries to import a newer snapshot.
+    const CURRENT_SCHEMA = 6;
+    if (typeof snap.schema_version === 'number' && snap.schema_version > CURRENT_SCHEMA) {
+      res.status(422).json({
+        error: `Snapshot schema v${snap.schema_version} is newer than server schema v${CURRENT_SCHEMA}. Upgrade the server first.`,
+      });
       return;
     }
     const sid = sessionId(req);

@@ -1,5 +1,9 @@
 // Lightweight in-process metrics. Tracks Gemini call volume, latency, retries,
 // failures, and token usage per call category. Exposed via GET /metrics.
+// Also maintains a rolling window of per-category latency samples to compute
+// P50/P95/P99 without storing the full history.
+
+const LATENCY_WINDOW = 500; // samples kept per category
 
 interface CallStat {
   count: number;
@@ -9,10 +13,17 @@ interface CallStat {
   maxMs: number;
   promptTokens: number;
   candidateTokens: number;
+  latencySamples: number[]; // circular buffer (up to LATENCY_WINDOW newest)
 }
 
 function emptyStat(): CallStat {
-  return { count: 0, failures: 0, retries: 0, totalMs: 0, maxMs: 0, promptTokens: 0, candidateTokens: 0 };
+  return { count: 0, failures: 0, retries: 0, totalMs: 0, maxMs: 0, promptTokens: 0, candidateTokens: 0, latencySamples: [] };
+}
+
+function percentile(sorted: number[], p: number): number {
+  if (sorted.length === 0) return 0;
+  const idx = Math.ceil(p * sorted.length) - 1;
+  return sorted[Math.max(0, Math.min(idx, sorted.length - 1))];
 }
 
 // A call label looks like "takeTurn:Alice" — the category is the part before ':'.
@@ -48,6 +59,8 @@ export const metrics = {
       s.promptTokens    += usage.promptTokenCount    ?? 0;
       s.candidateTokens += usage.candidatesTokenCount ?? 0;
     }
+    if (s.latencySamples.length >= LATENCY_WINDOW) s.latencySamples.shift();
+    s.latencySamples.push(ms);
   },
 
   // Record one retry attempt (a transient failure that triggered a backoff).
@@ -67,12 +80,16 @@ export const metrics = {
       totalMs += s.totalMs;
       totalPromptTokens    += s.promptTokens;
       totalCandidateTokens += s.candidateTokens;
+      const sorted = [...s.latencySamples].sort((a, b) => a - b);
       byCategory[cat] = {
         calls: s.count,
         failures: s.failures,
         retries: s.retries,
         avg_ms: s.count > 0 ? Math.round(s.totalMs / s.count) : 0,
         max_ms: s.maxMs,
+        p50_ms: percentile(sorted, 0.50),
+        p95_ms: percentile(sorted, 0.95),
+        p99_ms: percentile(sorted, 0.99),
         prompt_tokens: s.promptTokens,
         candidate_tokens: s.candidateTokens,
         total_tokens: s.promptTokens + s.candidateTokens,

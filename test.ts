@@ -7,6 +7,7 @@ import { scoreBelief, retrieveBeliefs, consolidateBeliefs, decayBeliefConfidence
 import { metrics } from './server/lib/metrics.ts';
 import { actionBiasWeights, defenseActionBias, effectiveScore, attachmentActionBias } from './server/lib/personality.ts';
 import { AppraisalEngine } from './server/engine/AppraisalEngine.ts';
+import { validate, InitBodySchema, TurnBodySchema, RunRoomBodySchema, ImportBodySchema } from './server/lib/validation.ts';
 
 describe('safeJsonParse', () => {
   it('returns parsed value for valid JSON object', () => {
@@ -2264,5 +2265,129 @@ describe('DirectorNode — outline beat compliance', () => {
     } finally {
       resetLLMProvider();
     }
+  });
+});
+
+// ── Tier 3: API pagination ────────────────────────────────────────────────────
+describe('Stage — pagination', () => {
+  it('getLedgerPage returns correct slice', () => {
+    const stage = new Stage(':memory:');
+    const loc = { location_id: 'x', name: 'X', description: '', adjacent_locations: [] };
+    stage.addLocation(loc);
+    const agent = { char_id: 'a', name: 'A', public_mask: '', hidden_motive: '', knowledge_vector: [], current_location_id: 'x', suspicion_score: 0, is_alive: true };
+    stage.addAgent(agent);
+    for (let i = 0; i < 5; i++) {
+      stage.recordAction('a', { action_type: 'SPEAK', content: `msg ${i}`, target: null }, 'x');
+    }
+    assert.equal(stage.getLedgerCount(), 5);
+    const page = stage.getLedgerPage(2, 2);
+    assert.equal(page.length, 2);
+  });
+
+  it('getBeatTracesPage returns empty when no traces', () => {
+    const stage = new Stage(':memory:');
+    assert.equal(stage.getBeatTracesCount(), 0);
+    assert.deepEqual(stage.getBeatTracesPage(10, 0), []);
+  });
+
+  it('getBeliefEdgesPage returns correct slice', () => {
+    const stage = new Stage(':memory:');
+    const mkEdge = (i: number) => ({
+      edge_id: `e${i}`, from_belief_id: `b${i}a`, to_belief_id: `b${i}b`,
+      edge_type: 'supports' as const, turn_index: i, discovered_by: 'a', source_event_id: `ev${i}`,
+    });
+    for (let i = 0; i < 4; i++) stage.addBeliefEdge(mkEdge(i));
+    assert.equal(stage.getBeliefEdgesCount(), 4);
+    const page = stage.getBeliefEdgesPage(2, 1);
+    assert.equal(page.length, 2);
+    assert.equal(page[0].edge_id, 'e1');
+  });
+
+  it('getGoalMutationsPage returns correct slice', () => {
+    const stage = new Stage(':memory:');
+    const loc = { location_id: 'x', name: 'X', description: '', adjacent_locations: [] };
+    stage.addLocation(loc);
+    const agent = { char_id: 'a', name: 'A', public_mask: '', hidden_motive: '', knowledge_vector: [], current_location_id: 'x', suspicion_score: 0, is_alive: true };
+    stage.addAgent(agent);
+    // Insert a dummy event card first (FK requirement)
+    stage.recordEventCard({ event_id: 'ev0', char_id: 'a', action_type: 'SPEAK', content: 'hi', location_id: 'x', turn_index: 0 });
+    for (let i = 0; i < 3; i++) {
+      stage.recordGoalMutation({
+        mutation_id: `m${i}`, char_id: 'a', turn_index: i,
+        trigger_event_id: 'ev0', mutation_type: 'subgoal_added' as const,
+        description: `mut ${i}`,
+      });
+    }
+    assert.equal(stage.getGoalMutationsCount(), 3);
+    const page = stage.getGoalMutationsPage(2, 1);
+    assert.equal(page.length, 2);
+    assert.equal(page[0].mutation_id, 'm1');
+  });
+});
+
+// ── Tier 3: Metrics percentiles ───────────────────────────────────────────────
+describe('metrics — latency percentiles', () => {
+  it('p50/p95/p99 are present in snapshot after recording calls', () => {
+    metrics.reset();
+    for (let i = 1; i <= 100; i++) {
+      metrics.recordAiCall('ptest', i * 10, true);
+    }
+    const snap = metrics.snapshot() as Record<string, Record<string, Record<string, unknown>>>;
+    const cat = snap.ai.by_category['ptest'] as Record<string, number>;
+    assert.ok(typeof cat.p50_ms === 'number', 'p50_ms should be a number');
+    assert.ok(typeof cat.p95_ms === 'number', 'p95_ms should be a number');
+    assert.ok(typeof cat.p99_ms === 'number', 'p99_ms should be a number');
+    assert.ok(cat.p50_ms <= cat.p95_ms, 'p50 <= p95');
+    assert.ok(cat.p95_ms <= cat.p99_ms, 'p95 <= p99');
+    metrics.reset();
+  });
+
+  it('percentiles are 0 before any calls', () => {
+    metrics.reset();
+    const snap = metrics.snapshot() as Record<string, Record<string, Record<string, unknown>>>;
+    // No categories yet — just verify snapshot doesn't crash.
+    assert.ok(typeof snap.ai.total_calls === 'number');
+    metrics.reset();
+  });
+});
+
+// ── Tier 3: Zod validation ────────────────────────────────────────────────────
+describe('Zod validation schemas', () => {
+  it('InitBodySchema accepts valid init body', () => {
+    const result = InitBodySchema.safeParse({ nodes: [], agents: [] });
+    assert.ok(result.success);
+  });
+
+  it('TurnBodySchema rejects missing agentId', () => {
+    const result = TurnBodySchema.safeParse({});
+    assert.ok(!result.success);
+    assert.ok(result.error.issues.some(i => i.path[0] === 'agentId'));
+  });
+
+  it('TurnBodySchema accepts valid turn body', () => {
+    const result = TurnBodySchema.safeParse({ agentId: 'alice' });
+    assert.ok(result.success);
+  });
+
+  it('RunRoomBodySchema rejects missing nodeId', () => {
+    const result = RunRoomBodySchema.safeParse({ maxTurns: 5 });
+    assert.ok(!result.success);
+  });
+
+  it('RunRoomBodySchema rejects maxTurns > 50', () => {
+    const result = RunRoomBodySchema.safeParse({ nodeId: 'room1', maxTurns: 99 });
+    assert.ok(!result.success);
+  });
+
+  it('ImportBodySchema accepts valid snapshot structure', () => {
+    const result = ImportBodySchema.safeParse({
+      agents: [], locations: [], action_log: [], schema_version: 6,
+    });
+    assert.ok(result.success);
+  });
+
+  it('ImportBodySchema rejects missing agents', () => {
+    const result = ImportBodySchema.safeParse({ locations: [], action_log: [] });
+    assert.ok(!result.success);
   });
 });

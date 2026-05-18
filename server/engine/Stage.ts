@@ -517,6 +517,14 @@ export class Stage {
     return this.db.prepare('SELECT * FROM Action_Log ORDER BY timestamp ASC').all() as ActionLogEntry[];
   }
 
+  public getLedgerPage(limit: number, offset: number): ActionLogEntry[] {
+    return this.db.prepare('SELECT * FROM Action_Log ORDER BY timestamp ASC LIMIT ? OFFSET ?').all(limit, offset) as ActionLogEntry[];
+  }
+
+  public getLedgerCount(): number {
+    return (this.db.prepare('SELECT COUNT(*) as cnt FROM Action_Log').get() as { cnt: number }).cnt;
+  }
+
   public getTurnCount(): number {
     const row = this.db.prepare('SELECT COUNT(*) as cnt FROM Action_Log').get() as { cnt: number };
     return row.cnt;
@@ -794,6 +802,15 @@ export class Stage {
     return rows.map(r => this._parseEdgeRow(r));
   }
 
+  public getBeliefEdgesPage(limit: number, offset: number): BeliefEdge[] {
+    const rows = this.db.prepare('SELECT * FROM Belief_Edges ORDER BY turn_index ASC LIMIT ? OFFSET ?').all(limit, offset) as Array<Record<string, unknown>>;
+    return rows.map(r => this._parseEdgeRow(r));
+  }
+
+  public getBeliefEdgesCount(): number {
+    return (this.db.prepare('SELECT COUNT(*) as cnt FROM Belief_Edges').get() as { cnt: number }).cnt;
+  }
+
   // All contradiction edges belonging to a specific agent (by discovered_by).
   public getActiveBeliefEdges(char_id: string): BeliefEdge[] {
     const rows = this.db.prepare(
@@ -822,6 +839,15 @@ export class Stage {
   public getAllGoalMutations(): GoalMutation[] {
     const rows = this.db.prepare('SELECT * FROM Goal_Mutations ORDER BY turn_index ASC').all() as Array<Record<string, unknown>>;
     return rows.map(r => this._parseGoalMutationRow(r));
+  }
+
+  public getGoalMutationsPage(limit: number, offset: number): GoalMutation[] {
+    const rows = this.db.prepare('SELECT * FROM Goal_Mutations ORDER BY turn_index ASC LIMIT ? OFFSET ?').all(limit, offset) as Array<Record<string, unknown>>;
+    return rows.map(r => this._parseGoalMutationRow(r));
+  }
+
+  public getGoalMutationsCount(): number {
+    return (this.db.prepare('SELECT COUNT(*) as cnt FROM Goal_Mutations').get() as { cnt: number }).cnt;
   }
 
   private _parseGoalMutationRow(r: Record<string, unknown>): GoalMutation {
@@ -889,6 +915,15 @@ export class Stage {
   public getAllBeatTraces(): BeatTrace[] {
     const rows = this.db.prepare('SELECT * FROM Beat_Traces ORDER BY turn_index ASC').all() as Array<Record<string, unknown>>;
     return this._parseBeatRows(rows);
+  }
+
+  public getBeatTracesPage(limit: number, offset: number): BeatTrace[] {
+    const rows = this.db.prepare('SELECT * FROM Beat_Traces ORDER BY turn_index ASC LIMIT ? OFFSET ?').all(limit, offset) as Array<Record<string, unknown>>;
+    return this._parseBeatRows(rows);
+  }
+
+  public getBeatTracesCount(): number {
+    return (this.db.prepare('SELECT COUNT(*) as cnt FROM Beat_Traces').get() as { cnt: number }).cnt;
   }
 
   public getBeatTracesForLocation(location_id: string): BeatTrace[] {
