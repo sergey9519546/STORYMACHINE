@@ -724,7 +724,14 @@ export default function ScriptIDE({
 
   // ── Export ───────────────────────────────────────────────────────────────────
   const exportFountain = () => {
-    const blob = new Blob([scriptText], { type: "text/plain" });
+    // Prepend a Fountain title page if the script doesn't already have one.
+    let content = scriptText;
+    if (!content.trimStart().startsWith('Title:')) {
+      const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      const titlePage = `Title: Untitled Script\nCredit: Written by\nAuthor: Author\nDraft date: ${today}\n\n`;
+      content = titlePage + content;
+    }
+    const blob = new Blob([content], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
