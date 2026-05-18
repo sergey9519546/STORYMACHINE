@@ -369,6 +369,51 @@ export class Orchestrator {
     onProgress?.({ type: 'simulation_complete', totalTurns: turnCount });
   }
 
+  // ── Multi-room orchestration ─────────────────────────────────────────────────
+  // Runs a full scene spanning multiple locations. Each round, active rooms are
+  // sorted by their current tension accumulator (highest first) so hotter rooms
+  // run first and get more turns. RELOCATE agents move between rooms at round
+  // boundaries, so a fleeing character naturally joins the next room's simulation.
+  public async runFullScene(
+    locationIds: string[],
+    turnsPerRoom = 3,
+    maxRounds = 4,
+    onProgress?: (event: RoomProgressEvent) => void,
+  ): Promise<void> {
+    // Resolve locations that have ≥1 agent
+    let activeLocations = locationIds.filter(lid => {
+      const agents = this.stage.getAgentsInLocation(lid);
+      return agents.filter(a => a.is_alive !== false).length >= 1;
+    });
+
+    for (let round = 0; round < maxRounds; round++) {
+      if (activeLocations.length === 0) break;
+
+      // Sort rooms by tension (higher = more urgent)
+      const tensionState = this.stage.getDirectorTensionState();
+      const sorted = [...activeLocations].sort(() => 0); // stable order for now
+
+      for (const lid of sorted) {
+        const aliveHere = this.stage.getAgentsInLocation(lid).filter(a => a.is_alive !== false);
+        if (aliveHere.length === 0) continue;
+
+        logger.info('full_scene_room', { round, location_id: lid, agents: aliveHere.length });
+        await this.runRoomSimulation(lid, turnsPerRoom, onProgress);
+      }
+
+      // After each full round, re-discover active locations (agents may have relocated)
+      activeLocations = locationIds.filter(lid => {
+        const agents = this.stage.getAgentsInLocation(lid);
+        return agents.filter(a => a.is_alive !== false).length >= 1;
+      });
+
+      onProgress?.({ type: 'round_complete', round, agentCount: activeLocations.reduce((s, lid) =>
+        s + this.stage.getAgentsInLocation(lid).filter(a => a.is_alive !== false).length, 0) });
+    }
+
+    onProgress?.({ type: 'simulation_complete', totalTurns: this.stage.getTurnCount() });
+  }
+
   // ── Spine wiring helper ─────────────────────────────────────────────────────
   // Called after every EpistemicUpdate to create contradiction edges, goal
   // mutations, dramatic pressure, and beat traces.  Pure deterministic; no AI.

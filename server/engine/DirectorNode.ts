@@ -149,6 +149,12 @@ export class DirectorNode {
     // ── L: Stakes escalation — high-magnitude active stakes ratchet tension ──
     this._checkStakesEscalation(location_id, agentsInRoom.map(a => a.char_id));
 
+    // ── M: Dramatic irony — track audience-vs-character information gaps ──
+    this._checkDramaticIrony(location_id);
+
+    // ── N: Outline beat enforcement — police constraint/avoid violations ──
+    this._checkBeatCompliance(location_id, recentActions);
+
     // Persist tension state so arc-deviation and pivot detection survive restarts.
     this.stage.saveDirectorTensionState(this._tensionAccumulator, this._tensionHistory);
 
@@ -760,6 +766,121 @@ From ${observer.name}'s perspective only:
           applied: false,
         });
         logger.info('stakes_pressure', { agent: agent.name, stakes: s.description, pressureType, magnitude: s.magnitude });
+      }
+    }
+  }
+
+  // ── N: Outline beat compliance ───────────────────────────────────────────────
+  // Checks each recent action against the active OutlineBeat's `avoid` field using
+  // keyword tokenization. A match emits a REDIRECT pressure (not a punishment —
+  // a course-correction) nudging agents back to the beat's intent.
+  // Also injects a constraint reminder when the beat has one, so agents are aware
+  // of what must not happen yet.
+  private _checkBeatCompliance(location_id: string, recentActions: ActionLogEntry[]): void {
+    const state = this.stage.getIllusionState();
+    const { outline, phase } = state;
+    if (!outline || outline.length === 0) return;
+
+    const turnIndex = this.stage.getTurnCount();
+    const activeBeat = outline.find(b =>
+      b.phase === phase && turnIndex >= b.turn_start && turnIndex <= b.turn_end,
+    );
+    if (!activeBeat) return;
+
+    // Tokenize the avoid string into keywords
+    const avoidTokens = activeBeat.avoid
+      .toLowerCase()
+      .split(/[\s,;]+/)
+      .filter(w => w.length > 3);
+    if (avoidTokens.length === 0) return;
+
+    const agents = this.stage.getAgentsInLocation(location_id);
+    if (agents.length === 0) return;
+
+    // Check recent speech actions for avoid-keyword matches
+    const violations = recentActions
+      .filter(a => a.action_type === 'SPEAK' || a.action_type === 'LIE')
+      .filter(a => {
+        const lower = a.content.toLowerCase();
+        return avoidTokens.some(tok => lower.includes(tok));
+      });
+
+    if (violations.length === 0) return;
+
+    // Emit a REDIRECT to the violating agent(s) — and everyone in the room
+    const violatingIds = new Set(violations.map(v => v.char_id));
+    for (const agent of agents) {
+      const existing = this.stage.getActivePressures(agent.char_id);
+      if (existing.some(p => p.pressure_type === 'REDIRECT')) continue;
+      this.stage.addDramaticPressure({
+        pressure_id: randomUUID(),
+        target_char_id: agent.char_id,
+        trigger_event_id: violations[violations.length - 1].action_id,
+        pressure_type: 'REDIRECT',
+        intensity: violatingIds.has(agent.char_id) ? 65 : 40,
+        bias_hint: `Beat constraint: ${activeBeat.constraint} — ${violatingIds.has(agent.char_id) ? 'you have started to drift from the scene\'s intended beat. Pull back.' : 'the scene is drifting; steer it back toward: ' + activeBeat.goal}`,
+        expires_at_turn: turnIndex + 2,
+        applied: false,
+      });
+    }
+    logger.info('beat_compliance_redirect', { phase, avoid: activeBeat.avoid.slice(0, 60), violations: violations.length, turn: turnIndex });
+  }
+
+  // ── M: Dramatic irony ────────────────────────────────────────────────────────
+  // Finds unexposed lies in the room (audience knows but characters don't).
+  // Escalates pressure as the lie ages — the longer the bomb sits under the table,
+  // the more the Director pushes toward revelation.
+  private _checkDramaticIrony(location_id: string): void {
+    const agents = this.stage.getAgentsInLocation(location_id);
+    if (agents.length === 0) return;
+    const turnIndex = this.stage.getTurnCount();
+
+    for (const agent of agents) {
+      // Unexposed lies spoken BY other agents that this agent hasn't discovered
+      const unexposed = agents
+        .filter(a => a.char_id !== agent.char_id)
+        .flatMap(a => this.stage.getUnexposedLiesByAgent(a.char_id, location_id));
+      if (unexposed.length === 0) continue;
+
+      // Skip if an ESCALATE or CONFRONT pressure already active for this agent
+      const existing = this.stage.getActivePressures(agent.char_id);
+      if (existing.some(p => p.pressure_type === 'ESCALATE' || p.pressure_type === 'CONFRONT')) continue;
+
+      // Oldest unexposed lie determines urgency
+      const oldest = unexposed.sort((a, b) => a.proposition_id.localeCompare(b.proposition_id))[0];
+      const liarsName = this.stage.getAgent(
+        unexposed.map(p => p.asserted_by).find(id => id !== agent.char_id) ?? ''
+      )?.name ?? 'someone';
+
+      this.stage.addDramaticPressure({
+        pressure_id: randomUUID(),
+        target_char_id: agent.char_id,
+        trigger_event_id: oldest.event_id,
+        pressure_type: 'ESCALATE',
+        intensity: Math.min(75, 30 + unexposed.length * 10),
+        bias_hint: `Dramatic tension: ${liarsName} has told you something that isn't true — you don't know it yet, but the moment of revelation is approaching. Your instincts should be signaling that something is off.`,
+        expires_at_turn: turnIndex + 2,
+        applied: false,
+      });
+
+      // Emit a BeatTrace with information_position = 'inferior' (character doesn't know)
+      // only once per location per active lie set
+      const beatExists = this.stage.getBeatTracesForLocation(location_id)
+        .some(b => b.beat_type === 'pressure_applied' && b.fountain_hint.includes('dramatic_irony'));
+      if (!beatExists) {
+        this.stage.addBeatTrace({
+          beat_id: randomUUID(),
+          turn_index: turnIndex,
+          location_id,
+          trigger_event_id: oldest.event_id,
+          beat_type: 'pressure_applied',
+          participants: agents.map(a => a.char_id),
+          causal_chain: unexposed.map(p => p.event_id),
+          narrative_summary: `Dramatic irony active: ${unexposed.length} unexposed lie(s) in the room. Audience superior.`,
+          fountain_hint: 'dramatic_irony: audience knows; characters do not. Sustain the gap.',
+          information_position: 'inferior',
+        });
+        logger.info('dramatic_irony', { location_id, unexposedLies: unexposed.length, turn: turnIndex });
       }
     }
   }

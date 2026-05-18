@@ -2155,3 +2155,114 @@ describe('Persuasion feedback — Stage persistence', () => {
     assert.equal(hist[0].success, undefined, 'unrecorded success should be undefined');
   });
 });
+
+// ── Tier 2: Embeddings module ─────────────────────────────────────────────────
+describe('cosineSimilarity', () => {
+  // Import inline since it's not in the main import block
+  it('identical vectors have similarity 1.0', async () => {
+    const { cosineSimilarity } = await import('./server/lib/embeddings.ts');
+    const v = [1, 2, 3, 4];
+    assert.ok(Math.abs(cosineSimilarity(v, v) - 1.0) < 0.0001);
+  });
+  it('opposite vectors have similarity -1.0', async () => {
+    const { cosineSimilarity } = await import('./server/lib/embeddings.ts');
+    const a = [1, 0];
+    const b = [-1, 0];
+    assert.ok(Math.abs(cosineSimilarity(a, b) + 1.0) < 0.0001);
+  });
+  it('orthogonal vectors have similarity 0.0', async () => {
+    const { cosineSimilarity } = await import('./server/lib/embeddings.ts');
+    assert.ok(Math.abs(cosineSimilarity([1, 0], [0, 1])) < 0.0001);
+  });
+  it('empty vectors return 0', async () => {
+    const { cosineSimilarity } = await import('./server/lib/embeddings.ts');
+    assert.equal(cosineSimilarity([], []), 0);
+  });
+});
+
+// ── Tier 2: Dramatic irony beat trace ─────────────────────────────────────────
+describe('DirectorNode — dramatic irony', () => {
+  it('emits pressure when unexposed lies exist in room', async () => {
+    const stage = new Stage(':memory:');
+    const loc: Location = { location_id: 'room-1', name: 'Study', description: '', adjacent_locations: [] };
+    stage.addLocation(loc);
+    const alice: CharacterSheet = { char_id: 'alice', name: 'Alice', public_mask: '', hidden_motive: '', knowledge_vector: [], current_location_id: 'room-1', suspicion_score: 0, is_alive: true };
+    const bob: CharacterSheet   = { char_id: 'bob',   name: 'Bob',   public_mask: '', hidden_motive: '', knowledge_vector: [], current_location_id: 'room-1', suspicion_score: 0, is_alive: true };
+    stage.addAgent(alice);
+    stage.addAgent(bob);
+
+    // Manually insert an unexposed lie by Bob
+    const action_id = 'lie-action-1';
+    stage.recordAction('bob', { action_type: 'LIE', content: 'I was never there.', target: null }, 'room-1');
+    // Retrieve the action_id we just inserted
+    const log = stage.getFullLedger();
+    const lieEntry = log.find(e => e.action_type === 'LIE');
+    assert.ok(lieEntry, 'LIE should be in action log');
+
+    // Register event card first (FK parent), then the proposition
+    stage.recordEventCard({ event_id: lieEntry!.action_id, char_id: 'bob', action_type: 'LIE', content: 'I was never there.', location_id: 'room-1', turn_index: 0 });
+    stage.addEventPropositions([{
+      proposition_id: 'prop-1',
+      event_id: lieEntry!.action_id,
+      content: 'I was never there.',
+      is_lie: true,
+      asserted_by: 'bob',
+      perceived_truth: true,
+    }]);
+
+    const { DirectorNode } = await import('./server/engine/DirectorNode.ts');
+    const director = new DirectorNode(stage);
+    // Call checkDramaticIrony indirectly — the method is private.
+    // We test via evaluateRoom with a mock LLM that returns benign results.
+    setLLMProvider({
+      generate: async (_p: GenerateContentParameters) => ({ text: JSON.stringify({
+        tension_delta: 0, contradiction_detected: false, new_beliefs: [],
+        suspicion_updates: [], contradicted_propositions: [],
+      }) } as never),
+    });
+    try {
+      await director.evaluateRoom('room-1', log);
+      const pressures = stage.getActivePressures('alice');
+      // Alice should have received an ESCALATE pressure from dramatic irony
+      const ironyPressure = pressures.find(p => p.pressure_type === 'ESCALATE' && p.bias_hint.includes('told you something'));
+      assert.ok(ironyPressure, 'dramatic irony should emit ESCALATE pressure on deceived agent');
+    } finally {
+      resetLLMProvider();
+    }
+  });
+});
+
+// ── Tier 2: Beat compliance ───────────────────────────────────────────────────
+describe('DirectorNode — outline beat compliance', () => {
+  it('emits REDIRECT when recent action matches avoid keywords', async () => {
+    const stage = new Stage(':memory:');
+    const loc: Location = { location_id: 'r', name: 'R', description: '', adjacent_locations: [] };
+    stage.addLocation(loc);
+    const alice: CharacterSheet = { char_id: 'alice', name: 'Alice', public_mask: '', hidden_motive: '', knowledge_vector: [], current_location_id: 'r', suspicion_score: 0, is_alive: true };
+    stage.addAgent(alice);
+
+    // Set an outline beat with an avoid keyword
+    stage.updateIllusionState({ outline: [{ phase: 'Setup', turn_start: 0, turn_end: 20, goal: 'establish tension', constraint: 'do not reveal secret', avoid: 'reveal secret confession' }] });
+
+    // Record a violating action
+    stage.recordAction('alice', { action_type: 'SPEAK', content: 'I must reveal the secret now.', target: null }, 'r');
+    const log = stage.getFullLedger();
+
+    setLLMProvider({
+      generate: async (_p: GenerateContentParameters) => ({ text: JSON.stringify({
+        tension_delta: 0, contradiction_detected: false, new_beliefs: [],
+        suspicion_updates: [], contradicted_propositions: [],
+      }) } as never),
+    });
+    try {
+      const { DirectorNode } = await import('./server/engine/DirectorNode.ts');
+      const director = new DirectorNode(stage);
+      await director.evaluateRoom('r', log);
+      const pressures = stage.getActivePressures('alice');
+      const redirect = pressures.find(p => p.pressure_type === 'REDIRECT');
+      assert.ok(redirect, 'REDIRECT pressure should be emitted for beat violation');
+    } finally {
+      resetLLMProvider();
+    }
+  });
+});

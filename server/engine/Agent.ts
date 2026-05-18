@@ -27,6 +27,7 @@ import { Stage } from './Stage.ts';
 import { safeJsonParse } from '../lib/json.ts';
 import { logger } from '../lib/logger.ts';
 import { retrieveBeliefs, consolidateBeliefs, decayBeliefConfidence } from '../lib/memory.ts';
+import { detectSemanticContradictions } from '../lib/embeddings.ts';
 
 // ── Psychology prompt helpers ────────────────────────────────────────────────
 
@@ -529,7 +530,8 @@ Based on what you just witnessed:
 1. Has your suspicion level changed? (0-100)
 2. What NEW facts did you learn or deduce? (Be specific propositions)
 3. Update your model of each other agent — what do you now think their motive is, and what do THEY now think YOU know?
-4. Did anything you observed contradict what you believed?`;
+4. Did anything you observed contradict what you believed?
+5. Level-3 ToM: What do you think each other agent believes that YOU believe about THEM? (meta-epistemic inference)`;
 
     const response = await generateContent({
       model: getModel('fast'),
@@ -603,6 +605,19 @@ Based on what you just witnessed:
                 required: ['about_agent', 'they_believe_about_you', 'confidence'],
               },
             },
+            level3_tom: {
+              type: Type.ARRAY,
+              description: 'Level-3 Theory of Mind: what you believe each other agent believes ABOUT WHAT YOU BELIEVE about them.',
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  about_agent: { type: Type.STRING },
+                  they_believe_you_believe: { type: Type.STRING, description: 'What they think you think about them.' },
+                  confidence: { type: Type.NUMBER, description: '0.0-1.0' },
+                },
+                required: ['about_agent', 'they_believe_you_believe', 'confidence'],
+              },
+            },
           },
           required: ['newSuspicionScore', 'newBeliefs', 'updatedTheoryOfMind', 'contradiction_detected', 'contradicted_propositions'],
         },
@@ -638,6 +653,7 @@ Based on what you just witnessed:
       contradicted_propositions: string[];
       goal_stack_update?: { add_subgoal?: string | null; mark_achieved?: string | null } | null;
       level2_tom?: Array<{ about_agent: string; they_believe_about_you: string; confidence: number }>;
+      level3_tom?: Array<{ about_agent: string; they_believe_you_believe: string; confidence: number }>;
     }>(epistemicsRawText, {
       newSuspicionScore: this.sheet.suspicion_score,
       newBeliefs: [],
@@ -682,6 +698,21 @@ Based on what you just witnessed:
     const finalBeliefs = (currentTurn > 0 && currentTurn % 5 === 0)
       ? consolidateBeliefs(decayBeliefConfidence(mergedBeliefs), currentTurn)
       : mergedBeliefs;
+
+    // Semantic contradiction detection (every 5 turns): supplement Jaccard with embeddings
+    if (currentTurn > 0 && currentTurn % 5 === 0 && freshBeliefs.length > 0) {
+      const semanticPairs = await detectSemanticContradictions(existingBeliefs, freshBeliefs);
+      for (const { existing_id, new_id, similarity } of semanticPairs) {
+        // Annotate both beliefs in finalBeliefs with the contradicts field
+        const eb = finalBeliefs.find(b => b.id === existing_id);
+        const nb = finalBeliefs.find(b => b.id === new_id);
+        if (eb && nb) {
+          eb.contradicts = [...new Set([...(eb.contradicts ?? []), new_id])];
+          nb.contradicts = [...new Set([...(nb.contradicts ?? []), existing_id])];
+          logger.info('semantic_contradiction', { agent: this.sheet.name, similarity: similarity.toFixed(2), a: eb.proposition.slice(0, 60), b: nb.proposition.slice(0, 60) });
+        }
+      }
+    }
 
     if (finalBeliefs.length !== existingBeliefs.length || freshBeliefs.length > 0) {
       this.stage.updateAgentBeliefs(this.sheet.char_id, finalBeliefs);
@@ -736,6 +767,19 @@ Based on what you just witnessed:
           const l2Fact = `[L2] They believe about you: ${l2.they_believe_about_you}`;
           if (!entry.believed_knowledge.includes(l2Fact)) {
             entry.believed_knowledge = [...entry.believed_knowledge, l2Fact].slice(0, 20);
+          }
+        }
+      }
+
+      // D: Level-3 ToM — what they think you think about them, prefixed "[L3]"
+      for (const l3 of (result.level3_tom ?? [])) {
+        const targetAgent = otherAgentsInRoom.find(a => a.name === l3.about_agent);
+        if (!targetAgent || l3.confidence < 0.4) continue;
+        const entry = currentToM[targetAgent.char_id];
+        if (entry) {
+          const l3Fact = `[L3] They think you believe: ${l3.they_believe_you_believe}`;
+          if (!entry.believed_knowledge.includes(l3Fact)) {
+            entry.believed_knowledge = [...entry.believed_knowledge, l3Fact].slice(0, 20);
           }
         }
       }
