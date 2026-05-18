@@ -315,6 +315,33 @@ setInterval(() => {
   }
 }, 60_000).unref();
 
+// Disk cleanup: remove orphaned session DB files that are older than SESSION_FILE_TTL_MS
+// and are not currently loaded in memory. Runs every 6 hours.
+const SESSION_FILE_TTL_MS = Number(process.env.SESSION_FILE_TTL_HOURS ?? 168) * 60 * 60 * 1000; // default 7 days
+if (PERSIST_SESSIONS) {
+  setInterval(() => {
+    const now = Date.now();
+    let files: string[];
+    try { files = fs.readdirSync(SESSION_DB_DIR); } catch { return; }
+    for (const file of files) {
+      if (!file.endsWith('.db')) continue;
+      const sid = file.slice(0, -3);
+      if (sessions.has(sid)) continue; // actively loaded — skip
+      const filePath = path.join(SESSION_DB_DIR, file);
+      try {
+        const stat = fs.statSync(filePath);
+        if (now - stat.mtimeMs > SESSION_FILE_TTL_MS) {
+          for (const suffix of ['-wal', '-shm', '-journal']) {
+            try { fs.unlinkSync(filePath + suffix); } catch { /* absent */ }
+          }
+          fs.unlinkSync(filePath);
+          logger.info('session_disk_cleanup', { sid, ageDays: Math.round((now - stat.mtimeMs) / 86_400_000) });
+        }
+      } catch { /* file already gone */ }
+    }
+  }, 6 * 60 * 60 * 1000).unref();
+}
+
 function sessionId(req: express.Request): string {
   const raw = req.method === 'GET'
     ? req.query.sessionId

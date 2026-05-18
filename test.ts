@@ -2748,3 +2748,125 @@ describe('applyConfig + getPublicConfig', () => {
     assert.equal(getPublicConfig().provider, 'gemini');
   });
 });
+
+// ── AppraisalEngine — dramatic pressure types ─────────────────────────────────
+// Each test seeds a single pressure, calls appraise(), and verifies that the
+// correct emotion dimension moves in the correct direction.
+describe('AppraisalEngine — pressure-type emotion mapping', () => {
+  function makeStageWithAgent(charId = 'alice') {
+    const stage = new Stage(':memory:');
+    stage.addLocation({ location_id: 'r1', name: 'Room', description: '', adjacent_locations: [] });
+    stage.addAgent({ char_id: charId, name: 'Alice', public_mask: '', hidden_motive: '', knowledge_vector: [], current_location_id: 'r1', suspicion_score: 0, is_alive: true });
+    return stage;
+  }
+
+  function addPressure(stage: Stage, charId: string, type: string, intensity = 80, sourceId?: string) {
+    stage.addDramaticPressure({
+      pressure_id: crypto.randomUUID(),
+      target_char_id: charId,
+      source_char_id: sourceId,
+      trigger_event_id: 'evt-1',
+      pressure_type: type as import('./server/engine/types.ts').DramaticPressureType,
+      intensity,
+      bias_hint: `test ${type}`,
+      expires_at_turn: 999,
+      applied: false,
+    });
+  }
+
+  function appraiseFresh(stage: Stage, charId = 'alice') {
+    const engine = new AppraisalEngine(stage);
+    engine.appraise({ char_id: charId, new_beliefs: [], contradiction_detected: false, contradicted_propositions: [] });
+    return stage.getAgent(charId)!.emotionState!;
+  }
+
+  it('ESCALATE raises fear and distress', () => {
+    const stage = makeStageWithAgent();
+    addPressure(stage, 'alice', 'ESCALATE', 80);
+    const e = appraiseFresh(stage);
+    assert.ok(e.fear > 0,    `ESCALATE should raise fear, got ${e.fear}`);
+    assert.ok(e.distress > 0, `ESCALATE should raise distress, got ${e.distress}`);
+  });
+
+  it('COOL raises joy and reduces distress/fear from elevated baseline', () => {
+    const stage = makeStageWithAgent();
+    // Pre-seed distress/fear at 50 so COOL has something to reduce
+    stage.updateEmotionState('alice', { joy: 0, distress: 50, anger: 0, fear: 50, pride: 0, shame: 0, dominant: 'distress', intensity: 50, last_updated_at: -1 });
+    addPressure(stage, 'alice', 'COOL', 80);
+    const e = appraiseFresh(stage);
+    assert.ok(e.joy > 0, `COOL should raise joy, got ${e.joy}`);
+    // Decay + COOL reduction means distress/fear should be less than raw decay of 50
+    const decayedOnly = Math.floor(50 * 0.88);
+    assert.ok(e.distress <= decayedOnly, `COOL should reduce distress below pure-decay (${decayedOnly}), got ${e.distress}`);
+    assert.ok(e.fear <= decayedOnly,     `COOL should reduce fear below pure-decay (${decayedOnly}), got ${e.fear}`);
+  });
+
+  it('REDIRECT raises distress and fear', () => {
+    const stage = makeStageWithAgent();
+    addPressure(stage, 'alice', 'REDIRECT', 80);
+    const e = appraiseFresh(stage);
+    assert.ok(e.distress > 0, `REDIRECT should raise distress, got ${e.distress}`);
+    assert.ok(e.fear > 0,     `REDIRECT should raise fear, got ${e.fear}`);
+  });
+
+  it('REVEAL raises shame and distress', () => {
+    const stage = makeStageWithAgent();
+    addPressure(stage, 'alice', 'REVEAL', 80);
+    const e = appraiseFresh(stage);
+    assert.ok(e.shame > 0,    `REVEAL should raise shame, got ${e.shame}`);
+    assert.ok(e.distress > 0, `REVEAL should raise distress, got ${e.distress}`);
+  });
+
+  it('WITHHOLD raises anger and distress', () => {
+    const stage = makeStageWithAgent();
+    addPressure(stage, 'alice', 'WITHHOLD', 80);
+    const e = appraiseFresh(stage);
+    assert.ok(e.anger > 0,    `WITHHOLD should raise anger, got ${e.anger}`);
+    assert.ok(e.distress > 0, `WITHHOLD should raise distress, got ${e.distress}`);
+  });
+
+  it('goal_blocked raises distress and anger, targets source character', () => {
+    const stage = makeStageWithAgent();
+    stage.addAgent({ char_id: 'bob', name: 'Bob', public_mask: '', hidden_motive: '', knowledge_vector: [], current_location_id: 'r1', suspicion_score: 0, is_alive: true });
+    addPressure(stage, 'alice', 'goal_blocked', 80, 'bob');
+    const e = appraiseFresh(stage);
+    assert.ok(e.distress > 0,         `goal_blocked should raise distress, got ${e.distress}`);
+    assert.ok(e.anger > 0,            `goal_blocked should raise anger, got ${e.anger}`);
+    assert.equal(e.anger_target_id, 'bob', `anger should target the blocker`);
+  });
+
+  it('ally_compromised raises fear and anger', () => {
+    const stage = makeStageWithAgent();
+    stage.addAgent({ char_id: 'bob', name: 'Bob', public_mask: '', hidden_motive: '', knowledge_vector: [], current_location_id: 'r1', suspicion_score: 0, is_alive: true });
+    addPressure(stage, 'alice', 'ally_compromised', 80, 'bob');
+    const e = appraiseFresh(stage);
+    assert.ok(e.fear > 0,  `ally_compromised should raise fear, got ${e.fear}`);
+    assert.ok(e.anger > 0, `ally_compromised should raise anger, got ${e.anger}`);
+  });
+
+  it('revelation_due raises fear and distress (anticipatory anxiety)', () => {
+    const stage = makeStageWithAgent();
+    addPressure(stage, 'alice', 'revelation_due', 80);
+    const e = appraiseFresh(stage);
+    assert.ok(e.fear > 0,    `revelation_due should raise fear, got ${e.fear}`);
+    assert.ok(e.distress > 0, `revelation_due should raise distress, got ${e.distress}`);
+  });
+
+  it('pressure with expired turn is ignored', () => {
+    const stage = makeStageWithAgent();
+    // expires_at_turn = 0, but getTurnCount() = 0, so 0 > 0 is false → pressure is filtered out
+    stage.addDramaticPressure({
+      pressure_id: crypto.randomUUID(),
+      target_char_id: 'alice',
+      trigger_event_id: 'evt-expired',
+      pressure_type: 'ESCALATE',
+      intensity: 100,
+      bias_hint: 'expired',
+      expires_at_turn: 0,
+      applied: false,
+    });
+    const e = appraiseFresh(stage);
+    assert.equal(e.fear, 0,    'expired pressure should not affect fear');
+    assert.equal(e.distress, 0, 'expired pressure should not affect distress');
+  });
+});
