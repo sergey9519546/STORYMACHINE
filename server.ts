@@ -561,6 +561,17 @@ async function startServer() {
       if (!disconnected) res.write(`data: ${JSON.stringify(event)}\n\n`);
     };
 
+    // Hard wall-clock limit: if the simulation hasn't completed in 5 minutes, close
+    // the SSE stream and release the runningRooms lock so the session isn't stranded.
+    const SSE_MAX_MS = 5 * 60 * 1000;
+    const wallTimer = setTimeout(() => {
+      if (!disconnected) {
+        emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: 'error: stream timeout (5 min)' });
+        res.end();
+      }
+      disconnected = true;
+    }, SSE_MAX_MS);
+
     let lockKey = '';
     try {
       const sid = sessionId(req);
@@ -592,9 +603,11 @@ async function startServer() {
       }
     } catch (err) {
       emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: `error: ${(err as Error).message}` });
+    } finally {
+      clearTimeout(wallTimer);
     }
 
-    res.end();
+    if (!disconnected) res.end();
   });
 
   // ── Scene grouping endpoint ──────────────────────────────────────────────────
