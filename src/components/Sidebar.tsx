@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Ghost, Crosshair, Target, Heart, PlusCircle, List, Users, Search, ChevronRight } from 'lucide-react';
-import { parseFountain } from '../lib/fountain';
+import { FountainBlock } from '../lib/fountain';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -22,6 +22,7 @@ interface SidebarProps {
   onAddCharacter: () => void;
   onUpdateCharacter: (id: string, field: keyof Character, value: string) => void;
   scriptText: string;
+  parsedBlocks: FountainBlock[];
   onNavigate: (lineIndex: number) => void;
 }
 
@@ -116,16 +117,16 @@ function LongTextField({
   );
 }
 
-export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter, scriptText, onNavigate }: SidebarProps) {
+export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter, scriptText, parsedBlocks, onNavigate }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<'scenes' | 'characters'>('scenes');
   const [searchQuery, setSearchQuery] = useState('');
 
   const scenes = useMemo(() => {
-    const blocks = parseFountain(scriptText);
+    const blocks = parsedBlocks;
     return blocks
       .map((b, i) => ({ ...b, index: i }))
       .filter(b => b.type === 'scene_heading');
-  }, [scriptText]);
+  }, [parsedBlocks]);
 
   const filteredScenes = useMemo(() => {
     const query = searchQuery.toLowerCase();
