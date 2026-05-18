@@ -1,4 +1,4 @@
-import { getAI } from '../engine/ai.ts';
+import { getEmbeddingProvider } from '../engine/ai.ts';
 import type { Belief } from '../engine/types.ts';
 import { logger } from './logger.ts';
 
@@ -12,11 +12,7 @@ export async function getEmbedding(text: string): Promise<number[]> {
   const cached = _cache.get(text);
   if (cached) return cached;
 
-  const result = await getAI().models.embedContent({
-    model: 'text-embedding-004',
-    contents: [text],
-  });
-  const values = result.embeddings?.[0]?.values ?? [];
+  const values = await getEmbeddingProvider().embed(text);
   if (values.length > 0) _cache.set(text, values);
   return values;
 }

@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Modality } from '@google/genai';
 import type { GenerateContentParameters, GenerateContentResponse } from '@google/genai';
 import { logger } from '../lib/logger.ts';
 import { metrics } from '../lib/metrics.ts';
@@ -14,29 +14,155 @@ export function getAI(): GoogleGenAI {
   return _shared;
 }
 
-// ── LLM provider seam ────────────────────────────────────────────────────────
-// generateContent() delegates to the active provider rather than calling Gemini
-// directly. This makes the engine's AI paths testable (swap in a mock provider)
-// and leaves room for alternate LLM backends without touching call sites.
+// ── Provider interfaces ───────────────────────────────────────────────────────
+
 export interface LLMProvider {
   generate(params: GenerateContentParameters): Promise<GenerateContentResponse>;
 }
 
-const geminiProvider: LLMProvider = {
+export interface EmbeddingProvider {
+  embed(text: string): Promise<number[]>;
+}
+
+export interface ImageProvider {
+  generate(prompt: string): Promise<string | undefined>;
+}
+
+export interface TTSProvider {
+  speak(text: string): Promise<{ dataUrl: string; mimeType: string } | undefined>;
+}
+
+// ── No-op providers for graceful degradation ─────────────────────────────────
+
+export const noopImageProvider: ImageProvider = { generate: async () => undefined };
+export const noopTTSProvider: TTSProvider     = { speak:    async () => undefined };
+export const noopEmbeddingProvider: EmbeddingProvider = { embed: async () => [] };
+
+// ── PCM → WAV helper (used by default Gemini TTS provider) ───────────────────
+
+function pcmToWav(pcmData: Buffer, sampleRate: number, numChannels: number): Buffer {
+  const header = Buffer.alloc(44);
+  header.write('RIFF', 0);
+  header.writeUInt32LE(36 + pcmData.length, 4);
+  header.write('WAVE', 8);
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(numChannels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * numChannels * 2, 28);
+  header.writeUInt16LE(numChannels * 2, 32);
+  header.writeUInt16LE(16, 34);
+  header.write('data', 36);
+  header.writeUInt32LE(pcmData.length, 40);
+  return Buffer.concat([header, pcmData]);
+}
+
+// ── Default Gemini provider implementations ───────────────────────────────────
+// Exported so ai-config.ts can restore them without circular deps.
+
+export const geminiProvider: LLMProvider = {
   generate: (params) => getAI().models.generateContent(params),
 };
 
-let _provider: LLMProvider = geminiProvider;
+export const geminiEmbeddingProvider: EmbeddingProvider = {
+  embed: async (text: string): Promise<number[]> => {
+    const result = await getAI().models.embedContent({
+      model: 'text-embedding-004',
+      contents: [text],
+    });
+    return result.embeddings?.[0]?.values ?? [];
+  },
+};
 
-export function setLLMProvider(p: LLMProvider): void { _provider = p; }
-export function resetLLMProvider(): void { _provider = geminiProvider; }
+export const geminiImageProvider: ImageProvider = {
+  generate: async (prompt: string): Promise<string | undefined> => {
+    try {
+      const response = await generateContent({
+        model: process.env.GEMINI_IMG_MODEL ?? 'gemini-2.5-flash-preview-image-generation',
+        contents: { parts: [{ text: prompt }] },
+        config: { imageConfig: { aspectRatio: '16:9' } },
+      }, { label: 'generateImage', timeoutMs: 25_000 });
+      for (const part of response.candidates?.[0]?.content?.parts ?? []) {
+        if ((part as { inlineData?: { data?: string; mimeType?: string } }).inlineData?.data) {
+          const d = (part as { inlineData: { data: string; mimeType?: string } }).inlineData;
+          return `data:${d.mimeType};base64,${d.data}`;
+        }
+      }
+    } catch (e) {
+      logger.error('image_generation_failed', { message: (e as Error).message });
+    }
+    return undefined;
+  },
+};
+
+export const geminiTTSProvider: TTSProvider = {
+  speak: async (text: string): Promise<{ dataUrl: string; mimeType: string } | undefined> => {
+    if (!text) return undefined;
+    try {
+      const response = await generateContent({
+        model: process.env.GEMINI_TTS_MODEL ?? 'gemini-2.5-flash-preview-tts',
+        contents: [{ parts: [{ text }] }],
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } } },
+        },
+      }, { label: 'generateAudio', timeoutMs: 20_000 });
+      const inlineData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+      if (!inlineData?.data || inlineData.data.length === 0) return undefined;
+
+      let base64Data = inlineData.data;
+      let mimeType = inlineData.mimeType ?? 'audio/wav';
+      const isWav = base64Data.startsWith('UklGR'); // "RIFF" in base64
+      if (!isWav && (mimeType.includes('audio/pcm') || mimeType === 'audio/wav')) {
+        let pcmBuf = Buffer.from(base64Data, 'base64');
+        if (pcmBuf.length === 0) return undefined;
+        if (pcmBuf.length % 2 !== 0) pcmBuf = pcmBuf.subarray(0, pcmBuf.length - 1);
+        const wavBuf = pcmToWav(pcmBuf, 24000, 1);
+        base64Data = wavBuf.toString('base64');
+        mimeType = 'audio/wav';
+      } else if (isWav) {
+        mimeType = 'audio/wav';
+      }
+      return { dataUrl: `data:${mimeType};base64,${base64Data}`, mimeType };
+    } catch (e) {
+      logger.error('audio_generation_failed', { message: (e as Error).message });
+    }
+    return undefined;
+  },
+};
+
+// ── Provider seam slots ───────────────────────────────────────────────────────
+
+let _provider:          LLMProvider       = geminiProvider;
+let _embeddingProvider: EmbeddingProvider = geminiEmbeddingProvider;
+let _imageProvider:     ImageProvider     = geminiImageProvider;
+let _ttsProvider:       TTSProvider       = geminiTTSProvider;
+
+export function setLLMProvider(p: LLMProvider): void         { _provider = p; }
+export function resetLLMProvider(): void                     { _provider = geminiProvider; }
+export function setEmbeddingProvider(p: EmbeddingProvider): void { _embeddingProvider = p; }
+export function setImageProvider(p: ImageProvider): void         { _imageProvider = p; }
+export function setTTSProvider(p: TTSProvider): void             { _ttsProvider = p; }
+export function getEmbeddingProvider(): EmbeddingProvider        { return _embeddingProvider; }
+export function getImageProvider(): ImageProvider                { return _imageProvider; }
+export function getTTSProvider(): TTSProvider                    { return _ttsProvider; }
+export function resetAllProviders(): void {
+  _provider          = geminiProvider;
+  _embeddingProvider = geminiEmbeddingProvider;
+  _imageProvider     = geminiImageProvider;
+  _ttsProvider       = geminiTTSProvider;
+}
 
 // Model tiering. High-volume per-turn calls (agent actions) can run on the
 // fast tier to cut cost/latency; quality-critical calls stay on the pro tier.
-// Override per tier with GEMINI_FAST_MODEL / GEMINI_MODEL.
+// AI_MODEL / AI_FAST_MODEL take precedence for multi-provider setups;
+// GEMINI_MODEL / GEMINI_FAST_MODEL are Gemini-specific fallbacks.
 export function getModel(tier: 'fast' | 'pro' = 'pro'): string {
-  if (tier === 'fast') return process.env.GEMINI_FAST_MODEL ?? 'gemini-2.5-flash';
-  return process.env.GEMINI_MODEL ?? 'gemini-2.5-pro';
+  if (tier === 'fast') {
+    return process.env.AI_FAST_MODEL ?? process.env.GEMINI_FAST_MODEL ?? 'gemini-2.5-flash';
+  }
+  return process.env.AI_MODEL ?? process.env.GEMINI_MODEL ?? 'gemini-2.5-pro';
 }
 
 // Returns the generation temperature to use for all Gemini calls.

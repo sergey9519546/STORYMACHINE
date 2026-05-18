@@ -3,8 +3,8 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import fs from 'fs';
-import { type GoogleGenAI, Type, Modality } from '@google/genai';
-import { getAI, generateContent } from './server/engine/ai.ts';
+import { Type } from '@google/genai';
+import { generateContent, getImageProvider, getTTSProvider, getModel } from './server/engine/ai.ts';
 import { rateLimit } from 'express-rate-limit';
 import { Stage } from './server/engine/Stage.ts';
 import { Orchestrator, type RoomProgressEvent } from './server/engine/Orchestrator.ts';
@@ -13,19 +13,24 @@ import { transcriptToFountain, extractCharactersFromLog, syuzhetSort, wrapSyuzhe
 import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES, STYLE_MODIFIERS } from './server/lib/structure-presets.ts';
 import { logger, requestLogger } from './server/lib/logger.ts';
 import { metrics } from './server/lib/metrics.ts';
-import { validate, InitBodySchema, TurnBodySchema, RunRoomBodySchema, ImportBodySchema } from './server/lib/validation.ts';
+import { validate, InitBodySchema, TurnBodySchema, RunRoomBodySchema, ImportBodySchema, AiConfigSchema } from './server/lib/validation.ts';
+import { initFromEnv, applyConfig, getPublicConfig } from './server/lib/ai-config.ts';
 
 // ── Startup validation ────────────────────────────────────────────────────────
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-if (!GEMINI_API_KEY) {
+const AI_PROVIDER = process.env.AI_PROVIDER ?? 'gemini';
+if (AI_PROVIDER === 'gemini' && !process.env.GEMINI_API_KEY) {
   console.error('FATAL: GEMINI_API_KEY environment variable is not set. Exiting.');
   process.exit(1);
 }
+if (AI_PROVIDER === 'openai-compat' && (!process.env.AI_BASE_URL || !process.env.AI_API_KEY)) {
+  console.error('FATAL: AI_PROVIDER=openai-compat requires AI_BASE_URL and AI_API_KEY. Exiting.');
+  process.exit(1);
+}
+
+// Initialise multi-provider config from environment variables
+initFromEnv();
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const GEMINI_MODEL     = process.env.GEMINI_MODEL      ?? 'gemini-2.5-pro';
-const GEMINI_IMG_MODEL = process.env.GEMINI_IMG_MODEL  ?? 'gemini-2.5-flash-preview-image-generation';
-const GEMINI_TTS_MODEL = process.env.GEMINI_TTS_MODEL  ?? 'gemini-2.5-flash-preview-tts';
 
 // Directory for per-session SQLite files. Sessions survive a server restart.
 // Set SESSION_DB_DIR=':memory:' to opt out of disk persistence (ephemeral runs).
@@ -55,78 +60,6 @@ const requireString = (val: unknown, name: string, maxLen = 20_000): string => {
 
 function safeJsonParse<T>(text: string, fallback: T): T {
   try { return JSON.parse(text); } catch { return fallback; }
-}
-
-// WAV header helpers (used server-side for PCM→WAV conversion)
-function pcmToWav(pcmData: Buffer, sampleRate: number, numChannels: number): Buffer {
-  const header = Buffer.alloc(44);
-  header.write('RIFF', 0);
-  header.writeUInt32LE(36 + pcmData.length, 4);
-  header.write('WAVE', 8);
-  header.write('fmt ', 12);
-  header.writeUInt32LE(16, 16);
-  header.writeUInt16LE(1, 20);
-  header.writeUInt16LE(numChannels, 22);
-  header.writeUInt32LE(sampleRate, 24);
-  header.writeUInt32LE(sampleRate * numChannels * 2, 28);
-  header.writeUInt16LE(numChannels * 2, 32);
-  header.writeUInt16LE(16, 34);
-  header.write('data', 36);
-  header.writeUInt32LE(pcmData.length, 40);
-  return Buffer.concat([header, pcmData]);
-}
-
-async function generateImageServer(ai: GoogleGenAI, prompt: string): Promise<string | undefined> {
-  try {
-    const response = await generateContent({
-      model: GEMINI_IMG_MODEL,
-      contents: { parts: [{ text: prompt }] },
-      config: { imageConfig: { aspectRatio: '16:9' } },
-    }, { label: 'generateImage', timeoutMs: 25_000 });
-    for (const part of response.candidates?.[0]?.content?.parts ?? []) {
-      if (part.inlineData?.data) {
-        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-      }
-    }
-  } catch (e) {
-    logger.error('image_generation_failed', { message: (e as Error).message });
-  }
-  return undefined;
-}
-
-async function generateAudioServer(ai: GoogleGenAI, text: string): Promise<string | undefined> {
-  if (!text) return undefined;
-  try {
-    const response = await generateContent({
-      model: GEMINI_TTS_MODEL,
-      contents: [{ parts: [{ text }] }],
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } } },
-      },
-    }, { label: 'generateAudio', timeoutMs: 20_000 });
-    const inlineData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-    if (!inlineData?.data || inlineData.data.length === 0) return undefined;
-
-    let base64Data = inlineData.data;
-    let mimeType = inlineData.mimeType ?? 'audio/wav';
-
-    const isWav = base64Data.startsWith('UklGR'); // "RIFF" in base64
-    if (!isWav && (mimeType.includes('audio/pcm') || mimeType === 'audio/wav')) {
-      let pcmBuf = Buffer.from(base64Data, 'base64');
-      if (pcmBuf.length === 0) return undefined;
-      if (pcmBuf.length % 2 !== 0) pcmBuf = pcmBuf.subarray(0, pcmBuf.length - 1);
-      const wavBuf = pcmToWav(pcmBuf, 24000, 1);
-      base64Data = wavBuf.toString('base64');
-      mimeType = 'audio/wav';
-    } else if (isWav) {
-      mimeType = 'audio/wav';
-    }
-    return `data:${mimeType};base64,${base64Data}`;
-  } catch (e) {
-    logger.error('audio_generation_failed', { message: (e as Error).message });
-  }
-  return undefined;
 }
 
 // ── Rate limiters ─────────────────────────────────────────────────────────────
@@ -425,7 +358,16 @@ async function startServer() {
     res.json({ sessions: sessions.size, ...metrics.snapshot() });
   });
 
-  const ai = getAI();
+  // ── AI provider config routes ─────────────────────────────────────────────
+  app.get('/api/ai-config', (_req, res) => {
+    res.json(getPublicConfig());
+  });
+
+  app.post('/api/ai-config', gameLimiter, validate(AiConfigSchema), asyncHandler(async (req, res) => {
+    const { apiKey, imgApiKey, ttsApiKey, embApiKey, ...cfg } = req.body as Record<string, string>;
+    applyConfig(cfg, { apiKey, imgApiKey, ttsApiKey, embApiKey });
+    res.json({ ok: true, config: getPublicConfig() });
+  }));
 
   // ── Story Machine routes (game simulation) ─────────────────────────────────
   app.use('/api/init',     gameLimiter);
@@ -1072,7 +1014,7 @@ async function startServer() {
       : '';
     const wbProfiles = profilesBlock(sanitizeProfiles(req.body?.profiles));
     const response = await generateContent({
-      model: GEMINI_MODEL,
+      model: getModel(),
       contents: `SYSTEM ROLE: You are a master screenwriter and world-builder. Your task is to generate or expand a scene based on the user's beat outline.
 
 OBJECTIVE: Write visceral, evocative action lines and scene descriptions that establish mood, time, and place.
@@ -1120,7 +1062,7 @@ OUTPUT: Generate the Scene Heading and Action lines.`,
       ? `\nSURROUNDING SCRIPT (preserve each character's established voice and the scene's continuity):\n${dlgContext}\n`
       : '';
     const response = await generateContent({
-      model: GEMINI_MODEL,
+      model: getModel(),
       contents: `SYSTEM ROLE: You are an expert dialogue doctor, specializing in subtext, character voice, and dramatic irony.
 
 OBJECTIVE: Analyze the provided dialogue and rewrite it to remove "on-the-nose" exposition.
@@ -1146,7 +1088,7 @@ OUTPUT: Provide 2 alternative versions of the dialogue exchange, explaining the 
       : '';
     const tnProfiles = profilesBlock(sanitizeProfiles(req.body?.profiles));
     const response = await generateContent({
-      model: GEMINI_MODEL,
+      model: getModel(),
       contents: `SYSTEM ROLE: You are a structural script consultant influenced by Hitchcock's theory of suspense.
 
 OBJECTIVE: Analyze the provided scene and identify opportunities to heighten psychological stakes.
@@ -1166,7 +1108,7 @@ OUTPUT: A bulleted diagnostic report with 3 actionable suggestions. Where a char
   app.post('/api/scriptide/clean-action', aiLimiter, asyncHandler(async (req, res) => {
     const text = requireString(req.body?.text, 'text');
     const response = await generateContent({
-      model: GEMINI_MODEL,
+      model: getModel(),
       contents: `SYSTEM ROLE: You are a strict script editor enforcing a "Semantic Firewall".
 OBJECTIVE: Rewrite the following action block — remove all camera directions and technical jargon. Describe what happens in the world, not what the camera does.
 
@@ -1189,7 +1131,7 @@ OUTPUT: Just the rewritten action text, nothing else.`,
     const need  = requireString(profile.need,  'profile.need');
 
     const response = await generateContent({
-      model: GEMINI_MODEL,
+      model: getModel(),
       contents: `SYSTEM ROLE: You are a character designer specializing in psychological realism and "Show, Don't Tell".
 
 OBJECTIVE: Generate a visceral physical description of a character based on their psychological profile. Reflect internal state through external details.
@@ -1269,7 +1211,7 @@ ${structure ? `structuralNode must name a specific beat from the ${structure} st
 ${dirStyle ? `Cinematic composition and commentary must be filtered through the ${dirStyle} style.` : ''}`;
 
     const analysisResponse = await generateContent({
-      model: GEMINI_MODEL,
+      model: getModel(),
       contents: prompt,
       config: {
         systemInstruction: 'You are the AI Director, a strict narrative dungeon master enforcing psychological and structural rules of screenwriting.',
@@ -1300,10 +1242,11 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     const audioText = typeof analysisData.sceneAnalysis.audioDialogue === 'string'
       ? analysisData.sceneAnalysis.audioDialogue : '';
 
-    const [imageUrl, audioUrl] = await Promise.all([
-      generateImageServer(ai, imagePromptText),
-      generateAudioServer(ai, audioText),
+    const [imageUrl, audioResult] = await Promise.all([
+      getImageProvider().generate(imagePromptText),
+      getTTSProvider().speak(audioText),
     ]);
+    const audioUrl = audioResult?.dataUrl;
 
     // ── 5-Evaluator scoring flags ──
     const scores = (analysisData.sceneAnalysis.commentary as Record<string, unknown> | undefined)?.evaluatorScores as Record<string, number> | undefined;
