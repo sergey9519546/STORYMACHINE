@@ -10,6 +10,7 @@
 
 import type { NarrativeState } from '../state/NarrativeState.ts';
 import type { StoryCommit } from '../state/StoryCommit.ts';
+import type { StoryOpKind } from '../ops/StoryOp.ts';
 
 export interface DramaticPosition {
   positionId: string;
@@ -118,6 +119,25 @@ export function deriveTensionLedger(state: NarrativeState, sceneIdx: number): Te
     }
   }
 
+  // 5th tension feature — Unexposed lies: told beliefs with low confidence.
+  // The character suspects deception but hasn't uncovered the truth — a ticking
+  // dramatic irony that pressures confrontation scenes.
+  for (const [charId, beliefs] of Object.entries(state.characterBeliefs)) {
+    for (const belief of beliefs) {
+      if (belief.source === 'told' && belief.confidence >= 0.1 && belief.confidence < 0.4) {
+        const pos = openPosition(
+          `unexposed_lie_${charId}_${belief.id}`,
+          'unexposed_lie',
+          `${charId} half-suspects a lie: "${belief.proposition.slice(0, 60)}" (confidence ${belief.confidence.toFixed(2)})`,
+          sceneIdx,
+          65,
+          charId,
+        );
+        positions.push(markToMarket(pos, sceneIdx, investment));
+      }
+    }
+  }
+
   // Relationship tensions: large negative shift history
   for (const [key, deltas] of Object.entries(state.relationships)) {
     const net = deltas.reduce((s, d) => s + d.amount, 0);
@@ -145,4 +165,24 @@ export function tensionMonotone(ledgers: TensionLedger[]): boolean {
     if (ledgers[i].totalTension < ledgers[i - 1].totalTension * 0.8) return false;
   }
   return true;
+}
+
+// ── Narrative Momentum ────────────────────────────────────────────────────────
+// The rolling rate of high-value story events over the last 3 commits.
+// High momentum = story is advancing rapidly (use as a pacing throttle).
+// Returns 0–100; ~6 high-value ops/scene = 100.
+
+const HIGH_VALUE_OPS: Set<StoryOpKind> = new Set([
+  'UPDATE_BELIEF', 'APPRAISE_EMOTION', 'SHIFT_RELATIONSHIP',
+  'ADVANCE_THEME_ARGUMENT', 'PAYOFF_SETUP', 'SEED_CLUE',
+]);
+
+export function momentumScore(commits: StoryCommit[]): number {
+  const window = commits.slice(-3);
+  if (window.length === 0) return 0;
+  const total = window.reduce(
+    (sum, c) => sum + c.ops.filter(o => HIGH_VALUE_OPS.has(o.op)).length,
+    0,
+  );
+  return Math.min(100, Math.round((total / window.length) * (100 / 6)));
 }

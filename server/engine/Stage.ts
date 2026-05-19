@@ -190,6 +190,25 @@ export class Stage {
           CREATE INDEX IF NOT EXISTS idx_drama_scene ON Drama_Positions(scene_idx, closed);
         `);
       },
+      // v11 → v12: Self_Play_Corpus — stores headless self-play run results.
+      //   Each row is one completed sim: scenario, proof stats, valuation score,
+      //   and the extracted StoryGenome (compressed story essence).
+      () => {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS Self_Play_Corpus (
+            run_id          TEXT PRIMARY KEY,
+            scenario_id     TEXT NOT NULL,
+            score           REAL NOT NULL,
+            proof_pass_rate REAL NOT NULL,
+            mean_valuation  REAL NOT NULL,
+            ops_count       INTEGER NOT NULL DEFAULT 0,
+            genome_json     TEXT NOT NULL DEFAULT '{}',
+            created_at      INTEGER NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS idx_corpus_score ON Self_Play_Corpus(score DESC);
+          CREATE INDEX IF NOT EXISTS idx_corpus_scenario ON Self_Play_Corpus(scenario_id);
+        `);
+      },
     ];
     for (let i = current; i < MIGRATIONS.length; i++) {
       this.db.transaction(() => {

@@ -61,7 +61,12 @@ import { extractGenome, diffGenomes, breedGenomes } from './server/nvm/selfplay/
 import { TACTIC_TYPES, isDeceptive, isEmotional, tacticIronyWeight } from './server/nvm/ops/tactic-types.ts';
 import { buildMetaBelief, getMetaBeliefsAbout, holderBelievesThatTargetBelieves, upsertMetaBelief } from './server/nvm/ops/meta-belief.ts';
 import { contractBelief, reviseBelief, planContraction, initCredence, updateCredence, applyCredence } from './server/nvm/ops/belief-revision.ts';
-import { runQualityEngine, specificityScore, computeArcDebt, revealReady, necessityScore } from './server/nvm/quality/index.ts';
+import {
+  runQualityEngine, specificityScore, computeArcDebt, revealReady, necessityScore,
+  burrowsDelta, relationshipRepairGaps, buildCausalGraph, proppMorphology,
+  dialogueWarnings,
+} from './server/nvm/quality/index.ts';
+import { momentumScore } from './server/nvm/valuation/futures.ts';
 
 describe('safeJsonParse', () => {
   it('returns parsed value for valid JSON object', () => {
@@ -5049,5 +5054,245 @@ describe('NVM — Quality Engines (Wave 11)', () => {
     ]);
     const report = runQualityEngine(ir, emptyState());
     assert.ok(report.warnings.some(w => w.rule === 'DV1_ON_THE_NOSE'), 'should flag on-the-nose confession');
+  });
+
+  it('runQualityEngine report includes burrowsDelta, causalGraph, proppAnalysis, repairGaps', () => {
+    const ir = makeMinimalIR([
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'A', predicate: 'p', object: 'B', addedAtTurn: 0, validFrom: 0, validTo: null } },
+    ]);
+    const report = runQualityEngine(ir, emptyState());
+    assert.ok(typeof report.burrowsDelta === 'number', 'burrowsDelta should be a number');
+    assert.ok(typeof report.causalGraph === 'object', 'causalGraph should exist');
+    assert.ok(Array.isArray(report.proppAnalysis.present), 'proppAnalysis.present should be array');
+    assert.ok(Array.isArray(report.repairGaps), 'repairGaps should be array');
+  });
+});
+
+describe('NVM — Quality Engine Extensions (Wave 12)', () => {
+  function makeMinimalIR(ops: StoryOp[], sceneIdx = 1): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR {
+    return {
+      transitionId: 'q12_test', sceneIdx, sceneFunction: 'build_tension',
+      activeMechanisms: [], beforeStateHash: 'deadbeef', preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: Date.now() },
+      ops,
+    };
+  }
+
+  // ── DV6 ──────────────────────────────────────────────────────────────────────
+  it('DV6_CHARACTER_MONOLOGUE fires when same char has ≥3 consecutive ops', () => {
+    const ops: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'threat is real', confidence: 0.8, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b2', proposition: 'need to act fast', confidence: 0.7, source: 'inferred', source_event_id: 'e1', acquired_at: 1 } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b3', proposition: 'helmer cannot know', confidence: 0.9, source: 'inferred', source_event_id: 'e1', acquired_at: 1 } },
+    ];
+    const warnings = dialogueWarnings(makeMinimalIR(ops), emptyState());
+    assert.ok(warnings.some(w => w.rule === 'DV6_CHARACTER_MONOLOGUE'), 'should flag nora monologue');
+  });
+
+  it('DV6_CHARACTER_MONOLOGUE does not fire for alternating characters', () => {
+    const ops: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'X', confidence: 0.8, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+      { op: 'UPDATE_BELIEF', charId: 'helmer', belief: { id: 'b2', proposition: 'Y', confidence: 0.7, source: 'witnessed', source_event_id: 'e2', acquired_at: 1 } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b3', proposition: 'Z', confidence: 0.9, source: 'witnessed', source_event_id: 'e3', acquired_at: 1 } },
+    ];
+    const warnings = dialogueWarnings(makeMinimalIR(ops), emptyState());
+    assert.ok(!warnings.some(w => w.rule === 'DV6_CHARACTER_MONOLOGUE'), 'alternating chars should not flag');
+  });
+
+  // ── DV8 ──────────────────────────────────────────────────────────────────────
+  it('DV8_ABRUPT_RELATIONSHIP fires for large shift without prior emotion', () => {
+    const ops: StoryOp[] = [
+      { op: 'SHIFT_RELATIONSHIP', pair: ['nora', 'krogstad'], delta: { dimension: 'trust', amount: 0.8, reason: 'suddenly trusted' } },
+    ];
+    const warnings = dialogueWarnings(makeMinimalIR(ops), emptyState());
+    assert.ok(warnings.some(w => w.rule === 'DV8_ABRUPT_RELATIONSHIP'), 'large abrupt shift should warn');
+  });
+
+  it('DV8_ABRUPT_RELATIONSHIP does not fire when emotion precedes shift', () => {
+    const ops: StoryOp[] = [
+      { op: 'APPRAISE_EMOTION', charId: 'nora', emotion: { joy: 80, distress: 0, anger: 0, fear: 0, pride: 60, shame: 0, dominant: 'joy', intensity: 80, last_updated_at: 1 } },
+      { op: 'SHIFT_RELATIONSHIP', pair: ['nora', 'krogstad'], delta: { dimension: 'trust', amount: 0.8, reason: 'grateful for help' } },
+    ];
+    const warnings = dialogueWarnings(makeMinimalIR(ops), emptyState());
+    assert.ok(!warnings.some(w => w.rule === 'DV8_ABRUPT_RELATIONSHIP'), 'grounded shift should not warn');
+  });
+
+  // ── DV10 ─────────────────────────────────────────────────────────────────────
+  it('DV10_STRUCTURAL_UNIFORMITY fires when all ops are same kind', () => {
+    const ops: StoryOp[] = Array.from({ length: 5 }, (_, i) => ({
+      op: 'UPDATE_BELIEF' as const,
+      charId: 'nora',
+      belief: { id: `b${i}`, proposition: `proposition ${i}`, confidence: 0.8, source: 'witnessed' as const, source_event_id: 'e1', acquired_at: 1 },
+    }));
+    const warnings = dialogueWarnings(makeMinimalIR(ops), emptyState());
+    assert.ok(warnings.some(w => w.rule === 'DV10_STRUCTURAL_UNIFORMITY'), 'uniform ops should warn');
+  });
+
+  // ── Burrows's Delta ───────────────────────────────────────────────────────────
+  it('burrowsDelta returns 0 for a single character (no comparison possible)', () => {
+    const ops: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'krogstad threatens her livelihood', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+    ];
+    assert.equal(burrowsDelta(ops), 0);
+  });
+
+  it('burrowsDelta returns high similarity when both chars use identical words', () => {
+    const ops: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'krogstad threatens nora with dark secret', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+      { op: 'UPDATE_BELIEF', charId: 'helmer', belief: { id: 'b2', proposition: 'krogstad threatens nora with dark secret', confidence: 0.7, source: 'told', source_event_id: 'e2', acquired_at: 1 } },
+    ];
+    const delta = burrowsDelta(ops);
+    assert.ok(delta > 0.5, `expected high similarity, got ${delta}`);
+  });
+
+  it('burrowsDelta returns low similarity for distinct vocabularies', () => {
+    const ops: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'dancing tarantella tomorrow evening possible', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+      { op: 'UPDATE_BELIEF', charId: 'krogstad', belief: { id: 'b2', proposition: 'letter mailed poison blackmail demand', confidence: 0.7, source: 'witnessed', source_event_id: 'e2', acquired_at: 1 } },
+    ];
+    const delta = burrowsDelta(ops);
+    assert.ok(delta < 0.3, `expected low similarity, got ${delta}`);
+  });
+
+  // ── Relationship Repair Proof ─────────────────────────────────────────────────
+  it('relationshipRepairGaps returns gaps for unrepaired negative relationships', () => {
+    const state: NarrativeState = {
+      ...emptyState(),
+      relationships: {
+        'nora|helmer': [{ dimension: 'trust', amount: -0.7, reason: 'betrayal' }],
+      },
+    };
+    const ir = makeMinimalIR([
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'X', predicate: 'Y', object: 'Z', addedAtTurn: 0, validFrom: 0, validTo: null } },
+    ]);
+    const gaps = relationshipRepairGaps(state, ir);
+    assert.ok(gaps.length > 0, 'should detect repair gap for negative relationship');
+    assert.ok(gaps[0].includes('nora|helmer') || gaps[0].includes('helmer|nora'), 'gap should mention the relationship');
+  });
+
+  it('relationshipRepairGaps returns empty when IR repairs the relationship', () => {
+    const state: NarrativeState = {
+      ...emptyState(),
+      relationships: {
+        'nora|helmer': [{ dimension: 'trust', amount: -0.7, reason: 'betrayal' }],
+      },
+    };
+    const ir = makeMinimalIR([
+      { op: 'SHIFT_RELATIONSHIP', pair: ['nora', 'helmer'], delta: { dimension: 'trust', amount: 0.5, reason: 'reconciliation' } },
+    ]);
+    const gaps = relationshipRepairGaps(state, ir);
+    assert.equal(gaps.length, 0, 'repair arc should clear the gap');
+  });
+
+  // ── Causal Plot Graph ─────────────────────────────────────────────────────────
+  it('buildCausalGraph returns a graph with nodes for each op', () => {
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'A', predicate: 'p', object: 'B', addedAtTurn: 0, validFrom: 0, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'A p B', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+    ];
+    const ir = { ...makeMinimalIR(ops), causalLinks: [{ opIdx: 1, causedBy: ['f1'] }] };
+    const graph = buildCausalGraph(ir);
+    assert.equal(graph.nodes.length, 2, 'should have 2 nodes');
+    assert.equal(graph.edges.length, 1, 'should have 1 edge');
+    assert.ok(graph.edges[0].from === 'f1' && graph.edges[0].toOpIdx === 1);
+  });
+
+  it('buildCausalGraph with no causalLinks has all ops as roots', () => {
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'A', predicate: 'p', object: 'B', addedAtTurn: 0, validFrom: 0, validTo: null } },
+    ];
+    const graph = buildCausalGraph(makeMinimalIR(ops));
+    assert.equal(graph.edges.length, 0, 'no edges without causal links');
+    assert.ok(graph.rootOps.includes(0), 'op 0 should be a root');
+  });
+
+  // ── Propp's Morphology ────────────────────────────────────────────────────────
+  it('proppMorphology detects preparation from ADD_FACT', () => {
+    const ir = makeMinimalIR([
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'A', predicate: 'p', object: 'B', addedAtTurn: 0, validFrom: 0, validTo: null } },
+    ]);
+    const analysis = proppMorphology(ir);
+    assert.ok(analysis.present.includes('preparation'), 'ADD_FACT should signal preparation');
+    assert.ok(analysis.coverage > 0);
+  });
+
+  it('proppMorphology detects ordeal from negative SHIFT_RELATIONSHIP', () => {
+    const ir = makeMinimalIR([
+      { op: 'SHIFT_RELATIONSHIP', pair: ['nora', 'helmer'], delta: { dimension: 'trust', amount: -0.6, reason: 'betrayal' } },
+    ]);
+    const analysis = proppMorphology(ir);
+    assert.ok(analysis.present.includes('ordeal'), 'negative shift should signal ordeal');
+  });
+
+  it('proppMorphology detects resolution from ADVANCE_THEME_ARGUMENT resolve', () => {
+    const ir = makeMinimalIR([
+      { op: 'ADVANCE_THEME_ARGUMENT', claimId: 'self_identity', move: 'resolve' },
+    ]);
+    const analysis = proppMorphology(ir);
+    assert.ok(analysis.present.includes('resolution'), 'theme resolve should signal resolution');
+  });
+
+  it('proppMorphology full coverage for a rich scene', () => {
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'A', predicate: 'p', object: 'B', addedAtTurn: 0, validFrom: 0, validTo: null } },
+      { op: 'APPRAISE_EMOTION', charId: 'nora', emotion: { joy: 0, distress: 70, anger: 0, fear: 90, pride: 0, shame: 0, dominant: 'fear', intensity: 90, last_updated_at: 1 } },
+      { op: 'UPDATE_BELIEF', charId: 'helmer', belief: { id: 'b2', proposition: 'told by nora', confidence: 0.6, source: 'told', source_event_id: 'e2', acquired_at: 1 } },
+      { op: 'SHIFT_RELATIONSHIP', pair: ['nora', 'helmer'], delta: { dimension: 'resentment', amount: -0.5, reason: 'conflict' } },
+      { op: 'SHIFT_RELATIONSHIP', pair: ['nora', 'linde'], delta: { dimension: 'trust', amount: 0.4, reason: 'alliance' } },
+      { op: 'ADVANCE_THEME_ARGUMENT', claimId: 'freedom', move: 'resolve' },
+    ];
+    const analysis = proppMorphology(makeMinimalIR(ops));
+    assert.ok(analysis.coverage >= 5 / 7, `expected ≥5/7 coverage, got ${analysis.coverage}`);
+  });
+
+  // ── Momentum score ────────────────────────────────────────────────────────────
+  it('momentumScore returns 0 for empty commits', () => {
+    assert.equal(momentumScore([]), 0);
+  });
+
+  it('momentumScore is higher when commits have high-value ops', () => {
+    const makeCommit = (ops: StoryOp[]): StoryCommit => ({
+      commitId: 'c1', parentId: null, sceneIdx: 1, ops,
+      deltaSummary: summarizeOps(ops), reverted: false, createdAt: Date.now(),
+    });
+    const highValue: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'X', confidence: 0.8, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+      { op: 'APPRAISE_EMOTION', charId: 'nora', emotion: { joy: 0, distress: 70, anger: 0, fear: 80, pride: 0, shame: 0, dominant: 'fear', intensity: 80, last_updated_at: 1 } },
+      { op: 'SHIFT_RELATIONSHIP', pair: ['nora', 'helmer'], delta: { dimension: 'trust', amount: -0.4, reason: 'conflict' } },
+    ];
+    const low: StoryOp[] = [
+      { op: 'RECORD_VISUAL_FACT', sceneId: 's1', fact: 'The window is open.' },
+    ];
+    const highScore = momentumScore([makeCommit(highValue), makeCommit(highValue), makeCommit(highValue)]);
+    const lowScore  = momentumScore([makeCommit(low), makeCommit(low), makeCommit(low)]);
+    assert.ok(highScore > lowScore, `high-value (${highScore}) should exceed low (${lowScore})`);
+  });
+
+  // ── 5th tension feature: unexposed lies in deriveTensionLedger ────────────────
+  it('deriveTensionLedger creates unexposed_lie positions for low-confidence told beliefs', () => {
+    const state: NarrativeState = {
+      ...emptyState(),
+      characterBeliefs: {
+        helmer: [{ id: 'b_lie', proposition: 'all is fine at the bank', confidence: 0.25, source: 'told', source_event_id: 'e1', acquired_at: 1 }],
+      },
+      audienceState: { knownFacts: [], suspense: 50, curiosity: 30, investment: 60 },
+    };
+    const ledger = deriveTensionLedger(state, 2);
+    const unexposed = ledger.positions.filter(p => p.kind === 'unexposed_lie');
+    assert.ok(unexposed.length > 0, 'should create an unexposed_lie position for low-confidence told belief');
+    assert.ok(unexposed[0].charId === 'helmer', 'position should be attributed to helmer');
+  });
+
+  it('deriveTensionLedger does not create unexposed_lie for high-confidence told belief', () => {
+    const state: NarrativeState = {
+      ...emptyState(),
+      characterBeliefs: {
+        nora: [{ id: 'b_conf', proposition: 'krogstad will leave', confidence: 0.9, source: 'told', source_event_id: 'e1', acquired_at: 1 }],
+      },
+      audienceState: { knownFacts: [], suspense: 20, curiosity: 10, investment: 30 },
+    };
+    const ledger = deriveTensionLedger(state, 1);
+    const unexposed = ledger.positions.filter(p => p.kind === 'unexposed_lie');
+    assert.equal(unexposed.length, 0, 'high-confidence told belief should not trigger unexposed_lie');
   });
 });

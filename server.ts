@@ -1536,6 +1536,85 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     res.json(redTeamVerdict(plan, state));
   }));
 
+  // ── Godmode API routes ─────────────────────────────────────────────────────
+
+  // GET /api/nvm/quality — run quality engine on a candidate IR
+  // Body: { ir: NarrativeTransitionIR }
+  app.post('/api/nvm/quality', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { runQualityEngine } = await import('./server/nvm/quality/index.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const ir = req.body?.ir;
+    if (!ir || typeof ir !== 'object' || !Array.isArray(ir.ops)) {
+      res.status(400).json({ error: 'body.ir must be a NarrativeTransitionIR' }); return;
+    }
+    const state = buildNarrativeState(stage);
+    res.json(runQualityEngine(ir, state));
+  }));
+
+  // GET /api/nvm/project/:target — project current canon to a format
+  // :target = fountain | novel | stage | comic | interactive | pitch | bible | rewatch | cutting_room
+  app.get('/api/nvm/project/:target', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { project } = await import('./server/nvm/project/index.ts');
+    const target = req.params.target as Parameters<typeof project>[1];
+    const VALID = ['fountain','novel','stage','comic','interactive','pitch','bible','rewatch','cutting_room'];
+    if (!VALID.includes(target)) {
+      res.status(400).json({ error: `Unknown projection target "${target}". Valid: ${VALID.join(', ')}` }); return;
+    }
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const commits = stage.getCommits().filter(c => !c.reverted);
+    const state = buildNarrativeState(stage);
+    const ghosts = stage.ghostLedgerGet();
+    const canon = { commits, state, ghosts };
+    res.json(project(canon, target));
+  }));
+
+  // POST /api/nvm/twin/do — Pearl's do() causal intervention
+  // Body: { opId: string, replacement: StoryOp | null }
+  app.post('/api/nvm/twin/do', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { buildSCM } = await import('./server/nvm/twin/scm.ts');
+    const { doIntervention } = await import('./server/nvm/twin/counterfactual.ts');
+    const opId = req.body?.opId;
+    if (typeof opId !== 'string' || !opId) {
+      res.status(400).json({ error: 'body.opId (string) is required' }); return;
+    }
+    const scm = buildSCM(stage);
+    const intervention = { opId, replacement: req.body?.replacement ?? null };
+    res.json(doIntervention(scm, intervention));
+  }));
+
+  // POST /api/nvm/author/fixed-points — backward-chain toward a narrative attractor
+  // Body: { fixedPoints: FixedPoint[], currentScene?: number }
+  app.post('/api/nvm/author/fixed-points', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { planToward } = await import('./server/nvm/author/fixed-points.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const fps = req.body?.fixedPoints;
+    if (!Array.isArray(fps) || fps.length === 0) {
+      res.status(400).json({ error: 'body.fixedPoints must be a non-empty array' }); return;
+    }
+    const state = buildNarrativeState(stage);
+    const currentScene = typeof req.body?.currentScene === 'number' ? req.body.currentScene : state.turn;
+    res.json(planToward(state, fps, currentScene));
+  }));
+
+  // GET /api/nvm/ghost-commits — list ghost commits (shadow canon for What-If)
+  app.get('/api/nvm/ghost-commits', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const ghosts = stage.ghostLedgerGet();
+    res.json({ count: ghosts.length, ghosts });
+  }));
+
+  // GET /api/nvm/momentum — narrative momentum score (5th tension signal)
+  app.get('/api/nvm/momentum', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { momentumScore } = await import('./server/nvm/valuation/futures.ts');
+    const commits = stage.getCommits().filter(c => !c.reverted);
+    res.json({ momentum: momentumScore(commits), commitCount: commits.length });
+  }));
+
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {

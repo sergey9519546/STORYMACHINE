@@ -15,6 +15,8 @@ import type {
 import { FileDown, Brain, Eye, AlertTriangle, GitBranch, Target, Zap, Smile, Shuffle, Settings } from "lucide-react";
 import ScenarioBuilder from "./storymachine/ScenarioBuilder";
 import SettingsPanel from "./SettingsPanel";
+import WhatIfPanel from "./WhatIfPanel";
+import EpistemicMap from "./EpistemicMap";
 
 // ── Emotion display helpers ───────────────────────────────────────────────────
 
@@ -86,6 +88,8 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   useEffect(() => () => { if (errorTimerRef.current) clearTimeout(errorTimerRef.current); }, []);
   const [showBuilder, setShowBuilder]   = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showWhatIf, setShowWhatIf]     = useState(false);
+  const [showEpistemic, setShowEpistemic] = useState(false);
 
   const fetchActivePressures = useCallback(async () => {
     try {
@@ -400,6 +404,22 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
               </button>
             </div>
           )}
+          <button
+            onClick={() => setShowWhatIf(true)}
+            title="What-If / Ghost Commits"
+            className="bg-purple-900 hover:bg-purple-700 text-purple-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <GitBranch className="w-4 h-4" />
+            <span className="hidden sm:inline">What-If</span>
+          </button>
+          <button
+            onClick={() => setShowEpistemic(true)}
+            title="Epistemic Map"
+            className="bg-cyan-900 hover:bg-cyan-700 text-cyan-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <Brain className="w-4 h-4" />
+            <span className="hidden sm:inline">Beliefs</span>
+          </button>
           <button
             onClick={() => setShowSettings(true)}
             title="AI Provider Settings"
@@ -946,6 +966,14 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
 
       {showSettings && (
         <SettingsPanel onClose={() => setShowSettings(false)} />
+      )}
+
+      {showWhatIf && (
+        <WhatIfPanel onClose={() => setShowWhatIf(false)} />
+      )}
+
+      {showEpistemic && (
+        <EpistemicMap onClose={() => setShowEpistemic(false)} />
       )}
     </div>
   );
