@@ -71,6 +71,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [activePressures, setActivePressures] = useState<Array<{ char_id: string; pressures: DramaticPressure[] }>>([]);
   const ledgerEndRef = useRef<HTMLDivElement>(null);
   const evtSourceRef = useRef<EventSource | null>(null);
+  const mountedRef   = useRef(true);
   const [loading, setLoading] = useState(false);
   const [streamLog, setStreamLog] = useState<string[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -89,12 +90,15 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const fetchActivePressures = useCallback(async () => {
     try {
       const res = await fetch("/api/dramatic-pressure-all");
-      if (res.ok) setActivePressures(await res.json() as Array<{ char_id: string; pressures: DramaticPressure[] }>);
+      if (res.ok && mountedRef.current) setActivePressures(await res.json() as Array<{ char_id: string; pressures: DramaticPressure[] }>);
     } catch { /* non-critical background fetch */ }
   }, []);
 
-  // Close any in-flight SSE connection when the component unmounts
-  useEffect(() => () => { evtSourceRef.current?.close(); }, []);
+  // Close any in-flight SSE connection and mark unmounted
+  useEffect(() => () => {
+    mountedRef.current = false;
+    evtSourceRef.current?.close();
+  }, []);
 
   useEffect(() => {
     fetchState();
@@ -110,6 +114,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
         fetch(`/api/persuasion/${id}`).then(r => r.ok ? r.json() as Promise<PersuasionRecord[]> : [])
       )
     );
+    if (!mountedRef.current) return;
     const map: Record<string, PersuasionRecord[]> = {};
     agentIds.forEach((id, i) => { map[id] = entries[i] ?? []; });
     setPersuasionLog(map);
@@ -122,7 +127,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const fetchState = async () => {
     try {
       const res = await fetch("/api/state");
-      if (!res.ok) return;
+      if (!res.ok || !mountedRef.current) return;
       const data = await res.json() as { agents: CharacterSheet[]; nodes: Location[] };
       setAgents(data.agents);
       setNodes(data.nodes);
@@ -135,7 +140,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const fetchLedger = async () => {
     try {
       const res = await fetch("/api/ledger");
-      if (!res.ok) return;
+      if (!res.ok || !mountedRef.current) return;
       const data = await res.json() as ActionLogEntry[];
       setLedger(data);
     } catch { /* silent — background poll */ }
@@ -144,10 +149,9 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const fetchIllusionState = async () => {
     try {
       const res = await fetch("/api/simulation/illusion-state");
-      if (res.ok) {
-        const data = await res.json() as IllusionState;
-        setIllusionState(data);
-      }
+      if (!res.ok || !mountedRef.current) return;
+      const data = await res.json() as IllusionState;
+      setIllusionState(data);
     } catch { /* silent — background poll */ }
   };
 
@@ -158,6 +162,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
         fetch("/api/belief-edges"),
         fetch("/api/goal-mutations"),
       ]);
+      if (!mountedRef.current) return;
       if (beatsRes.ok)     setBeatTraces(await beatsRes.json() as BeatTrace[]);
       if (edgesRes.ok)     setBeliefEdges(await edgesRes.json() as BeliefEdge[]);
       if (mutationsRes.ok) setGoalMutations(await mutationsRes.json() as GoalMutation[]);

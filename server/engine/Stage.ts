@@ -99,6 +99,17 @@ export class Stage {
       () => {
         this.db.exec('ALTER TABLE Persuasion_Log ADD COLUMN success INTEGER');
       },
+      // v6 → v7: unique constraint on Knowledge_Ledger (char_id, fact_description)
+      //          prevents duplicate facts from per-turn updateAgentKnowledge calls.
+      () => {
+        this.db.exec(`
+          DELETE FROM Knowledge_Ledger WHERE rowid NOT IN (
+            SELECT MIN(rowid) FROM Knowledge_Ledger GROUP BY char_id, fact_description
+          );
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_knowledge_unique
+            ON Knowledge_Ledger(char_id, fact_description);
+        `);
+      },
     ];
     for (let i = current; i < MIGRATIONS.length; i++) {
       this.db.transaction(() => {
@@ -450,7 +461,7 @@ export class Stage {
 
   public updateAgentKnowledge(char_id: string, newFacts: string[]) {
     const stmt = this.db.prepare(`
-      INSERT INTO Knowledge_Ledger (knowledge_id, char_id, fact_description, acquired_at)
+      INSERT OR IGNORE INTO Knowledge_Ledger (knowledge_id, char_id, fact_description, acquired_at)
       VALUES (?, ?, ?, ?)
     `);
     for (const fact of newFacts) {

@@ -408,7 +408,13 @@ async function startServer() {
       const text = typeof result.text === 'string' ? result.text.trim() : '';
       res.json({ ok: true, response: text.substring(0, 64) });
     } catch (err) {
-      res.status(502).json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+      // Sanitize upstream error — don't leak raw API error bodies to the client
+      const raw = err instanceof Error ? err.message : String(err);
+      const safe = raw.length > 200 ? raw.substring(0, 200) + '…' : raw;
+      // Strip any bearer tokens or keys that leaked into the error message
+      const sanitized = safe.replace(/Bearer\s+\S+/gi, 'Bearer [redacted]').replace(/sk-[A-Za-z0-9_-]+/g, 'sk-[redacted]');
+      logger.warn('ai_config_test_failed', { error: raw });
+      res.status(502).json({ ok: false, error: sanitized });
     }
   }));
 
