@@ -1615,6 +1615,67 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     res.json({ momentum: momentumScore(commits), commitCount: commits.length });
   }));
 
+  // POST /api/nvm/inject-ops — Director's Cut: inject custom StoryOps into the canon.
+  // The writer can pause the sim and author ops directly; they become a user_authored commit.
+  // Body: { ops: StoryOp[], sceneIdx?: number, label?: string }
+  app.post('/api/nvm/inject-ops', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+    const { buildNarrativeState, stateHash } = await import('./server/nvm/state/NarrativeState.ts');
+    const { summarizeOps } = await import('./server/nvm/state/StoryCommit.ts');
+    const { randomUUID } = await import('node:crypto');
+    const { STORY_OP_KINDS } = await import('./server/nvm/ops/StoryOp.ts');
+
+    const ops = req.body?.ops;
+    if (!Array.isArray(ops) || ops.length === 0) {
+      res.status(400).json({ error: 'body.ops must be a non-empty StoryOp array' }); return;
+    }
+    // Validate each op has a known op kind
+    for (const op of ops) {
+      if (typeof op?.op !== 'string' || !(op.op in STORY_OP_KINDS)) {
+        res.status(400).json({ error: `Unknown op kind: "${op?.op ?? '?'}"` }); return;
+      }
+    }
+
+    const state = buildNarrativeState(stage);
+    const commits = stage.getCommits().filter(c => !c.reverted);
+    const parentId = commits[commits.length - 1]?.commitId ?? null;
+    const sceneIdx = typeof req.body?.sceneIdx === 'number' ? req.body.sceneIdx : state.turn;
+
+    const newState = applyStoryOps(state, ops);
+    const commitId = randomUUID();
+    stage.appendCommit({
+      commitId,
+      parentId,
+      sceneIdx,
+      ops,
+      deltaSummary: summarizeOps(ops),
+      reverted: false,
+      createdAt: Date.now(),
+    });
+
+    res.json({
+      commitId,
+      sceneIdx,
+      ops: ops.length,
+      newStateHash: stateHash(newState),
+      label: req.body?.label ?? 'director_cut',
+    });
+  }));
+
+  // GET /api/nvm/sidecar — export current session as NVM sidecar JSON
+  app.get('/api/nvm/sidecar', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { buildSidecar } = await import('./server/nvm/project/sidecar.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const commits = stage.getCommits();
+    const state = buildNarrativeState(stage);
+    const ghosts = stage.ghostLedgerGet();
+    const sidecar = buildSidecar({ commits, state, ghosts });
+    res.setHeader('Content-Disposition', 'attachment; filename="story.nvm.json"');
+    res.json(sidecar);
+  }));
+
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {

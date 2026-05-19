@@ -13,6 +13,7 @@ export interface SceneTarget {
   sceneFunction: SceneFunction;
   activeMechanisms: string[];
   tensionTarget: number;   // 0–100 desired tension after this scene
+  qualityTarget?: number;  // 0–100 minimum quality score (default 60)
   themeHint?: string;      // nudge toward a theme argument
 }
 

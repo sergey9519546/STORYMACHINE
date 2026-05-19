@@ -9,6 +9,7 @@ import type { Stage } from '../../engine/Stage.ts';
 export type GhostReason =
   | 'proof_fail'
   | 'valuation_too_low'
+  | 'quality_low'
   | 'editor_reject'
   | 'convergence_evicted';
 

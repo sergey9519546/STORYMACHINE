@@ -4,10 +4,12 @@
 // first-class derivations of the same causal source.
 //
 // Targets: fountain, novel, stage, comic, interactive, pitch, bible,
-//          rewatch (second-viewing annotated), cutting_room (ghost branches).
+//          rewatch (second-viewing annotated), cutting_room (ghost branches),
+//          sidecar (NVM quality JSON for CI/tooling).
 
 import type { NarrativeState } from '../state/NarrativeState.ts';
 import type { StoryCommit } from '../state/StoryCommit.ts';
+import { buildSidecar } from './sidecar.ts';
 
 export type ProjectionTarget =
   | 'fountain'
@@ -18,7 +20,8 @@ export type ProjectionTarget =
   | 'pitch'
   | 'bible'
   | 'rewatch'
-  | 'cutting_room';
+  | 'cutting_room'
+  | 'sidecar';
 
 export interface Canon {
   commits: StoryCommit[];
@@ -45,6 +48,7 @@ export function project(canon: Canon, target: ProjectionTarget): Artifact {
     case 'bible':        return projectBible(canon);
     case 'rewatch':      return projectRewatch(canon);
     case 'cutting_room': return projectCuttingRoom(canon);
+    case 'sidecar':      return projectSidecar(canon);
   }
 }
 
@@ -238,4 +242,18 @@ function projectCuttingRoom(canon: Canon): Artifact {
     }
   }
   return { target: 'cutting_room', content: lines.join('\n'), metadata: { ghosts: ghosts.length } };
+}
+
+function projectSidecar(canon: Canon): Artifact {
+  const sidecar = buildSidecar(canon);
+  return {
+    target: 'sidecar',
+    content: JSON.stringify(sidecar, null, 2),
+    metadata: {
+      qualityScore: sidecar.qualityScore,
+      totalTension: sidecar.totalTension,
+      proppCoverage: sidecar.proppCoverage,
+      momentum: sidecar.momentum,
+    },
+  };
 }

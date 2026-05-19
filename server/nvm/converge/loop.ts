@@ -1,19 +1,25 @@
 // Convergence Loop (G1) — AlphaZero-for-drama.
-// generate → prove → value → mutate → repeat until:
-//   (a) all Tier 1 proofs pass, AND
-//   (b) tension valuation ≥ target.tensionTarget
-// Rejected candidates go to the Ghost Ledger (A2).
+// generate → prove → value → quality → mutate → repeat until:
+//   (a) all Tier 1 proofs pass,
+//   (b) tension valuation ≥ target.tensionTarget, AND
+//   (c) quality score ≥ target.qualityTarget (default 60)
+// Rejected candidates go to the Ghost Ledger (A2) with specific reasons.
 // Budget limits total LLM calls.
+//
+// Composite score = 0.5 * normalizedTension + 0.5 * qualityScore (0–100 each).
+// The convergence criterion is all three gates simultaneously.
 
 import type { NarrativeTransitionIR } from '../ir/NarrativeTransitionIR.ts';
 import type { NarrativeState } from '../state/NarrativeState.ts';
 import type { ProofResult } from '../proof/contract.ts';
 import type { TensionLedger } from '../valuation/futures.ts';
+import type { QualityReport } from '../quality/index.ts';
 import type { MutationOperator } from './operators.ts';
 import type { CandidateGenerator, SceneTarget } from '../generate/proof-spec.ts';
 import type { GhostReason } from '../repro/ghost-ledger.ts';
 import { runTier1, tier1Passes } from '../proof/kernel.ts';
 import { deriveTensionLedger } from '../valuation/futures.ts';
+import { runQualityEngine } from '../quality/index.ts';
 import { buildGenerationSpec } from '../generate/proof-spec.ts';
 import { applyOperator, ALL_OPERATORS } from './operators.ts';
 import { makePrng, randInt } from '../repro/seed.ts';
@@ -25,6 +31,8 @@ export interface ConvergeStep {
   passed: boolean;
   tensionLedger: TensionLedger;
   valuationScore: number;
+  qualityScore: number;
+  compositeScore: number;
   operator?: MutationOperator;
   ghostReason?: GhostReason;
 }
@@ -35,15 +43,24 @@ export interface ConvergeResult {
   iterations: number;
   converged: boolean;
   finalValuation: number;
+  finalQuality: number;
+  finalComposite: number;
   ghosts: Array<{ ir: NarrativeTransitionIR; reason: GhostReason }>;
 }
 
 export interface ConvergeBudget {
   maxIterations: number;
-  candidatesPerIteration: number;  // how many the generator produces per call
+  candidatesPerIteration: number;
 }
 
 const DEFAULT_BUDGET: ConvergeBudget = { maxIterations: 8, candidatesPerIteration: 3 };
+
+// Normalize tension to 0-100 using the target as the reference ceiling.
+// At tensionTarget → 100; above tensionTarget → capped at 100.
+function normalizeTension(tension: number, tensionTarget: number): number {
+  if (tensionTarget <= 0) return 100;
+  return Math.min(100, (tension / tensionTarget) * 100);
+}
 
 export async function convergeScene(
   state: NarrativeState,
@@ -55,35 +72,53 @@ export async function convergeScene(
   const history: ConvergeStep[] = [];
   const ghosts: ConvergeResult['ghosts'] = [];
   const prng = makePrng(seed);
+  const effectiveQualityTarget = target.qualityTarget ?? 60;
 
   let best: NarrativeTransitionIR | null = null;
-  let bestScore = -1;
+  let bestComposite = -1;
   let currentFailures: ProofResult[] = [];
+  let lastCandidates: NarrativeTransitionIR[] = [];
 
   for (let iter = 0; iter < budget.maxIterations; iter++) {
-    // G9: build spec from current failures + target
     const spec = buildGenerationSpec(state, target, currentFailures);
 
-    // Generate N candidates (or mutate the best so far)
     let candidates: NarrativeTransitionIR[];
     if (best && iter > 0) {
-      // After first iteration: mutate the best candidate with a randomly chosen operator
       const op = ALL_OPERATORS[randInt(prng, ALL_OPERATORS.length)];
       const mutation = applyOperator(op, best, state, seed + iter);
-      candidates = [mutation.ir];
-      // Also generate a fresh one to avoid local optima
       const fresh = await generate(spec, 1);
-      candidates = [...candidates, ...fresh];
+      candidates = [mutation.ir, ...fresh];
     } else {
       candidates = await generate(spec, budget.candidatesPerIteration);
     }
+    lastCandidates = candidates;
 
-    // Evaluate each candidate
     for (const candidate of candidates) {
       const tier1Results = runTier1(candidate, state);
       const passed = tier1Passes(tier1Results);
       const ledger = deriveTensionLedger(state, target.sceneIdx);
       const valuationScore = ledger.totalTension;
+
+      // Quality gate — run on all candidates (even failed proofs) so the
+      // quality score informs mutation operator selection.
+      const qualityReport: QualityReport = runQualityEngine(candidate, state);
+      const qualityScore = qualityReport.score;
+
+      const tensionNorm = normalizeTension(valuationScore, target.tensionTarget);
+      const compositeScore = 0.5 * tensionNorm + 0.5 * qualityScore;
+
+      const tensionMet = valuationScore >= target.tensionTarget;
+      const qualityMet = qualityScore >= effectiveQualityTarget;
+
+      // Determine ghost reason for this candidate
+      let ghostReason: GhostReason | undefined;
+      if (!passed) {
+        ghostReason = 'proof_fail';
+      } else if (!tensionMet) {
+        ghostReason = 'valuation_too_low';
+      } else if (!qualityMet) {
+        ghostReason = 'quality_low';
+      }
 
       const step: ConvergeStep = {
         iteration: iter,
@@ -92,45 +127,48 @@ export async function convergeScene(
         passed,
         tensionLedger: ledger,
         valuationScore,
+        qualityScore,
+        compositeScore,
+        ghostReason,
       };
       history.push(step);
 
-      if (passed && valuationScore >= target.tensionTarget) {
-        // Converged
+      // Converged: passes proofs + both targets met
+      if (passed && tensionMet && qualityMet) {
         return {
           ir: candidate,
           history,
           iterations: iter + 1,
           converged: true,
           finalValuation: valuationScore,
+          finalQuality: qualityScore,
+          finalComposite: compositeScore,
           ghosts,
         };
       }
 
-      // Track best valid candidate
-      if (passed && valuationScore > bestScore) {
+      // Track best composite (for mutation and fallback)
+      if (compositeScore > bestComposite) {
         best = candidate;
-        bestScore = valuationScore;
+        bestComposite = compositeScore;
       }
 
-      // Ghost the candidate if it failed proofs
-      const ghostReason: GhostReason = !passed ? 'proof_fail' : 'valuation_too_low';
-      if (!passed || valuationScore < target.tensionTarget * 0.5) {
+      // Ghost if it failed any gate significantly
+      if (ghostReason) {
         ghosts.push({ ir: candidate, reason: ghostReason });
       }
     }
 
-    // Update failures from the best candidate seen so far (for next iteration's spec)
     if (best) {
       currentFailures = runTier1(best, state).filter(r => !r.pass);
     }
   }
 
-  // Budget exhausted — return best we found (may not be fully converged)
-  const finalIR = best ?? (candidates => candidates[candidates.length - 1])(
-    (await generate(buildGenerationSpec(state, target), 1))
-  );
+  // Budget exhausted — return best we found
+  const finalIR = best ?? lastCandidates[lastCandidates.length - 1] ??
+    (await generate(buildGenerationSpec(state, target), 1))[0];
   const finalLedger = deriveTensionLedger(state, target.sceneIdx);
+  const finalQReport = runQualityEngine(finalIR, state);
 
   return {
     ir: finalIR,
@@ -138,6 +176,8 @@ export async function convergeScene(
     iterations: budget.maxIterations,
     converged: false,
     finalValuation: finalLedger.totalTension,
+    finalQuality: finalQReport.score,
+    finalComposite: bestComposite,
     ghosts,
   };
 }

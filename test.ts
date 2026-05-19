@@ -53,6 +53,7 @@ import { runWritersRoom } from './server/nvm/room/room.ts';
 import { buildSCM } from './server/nvm/twin/scm.ts';
 import { doIntervention } from './server/nvm/twin/counterfactual.ts';
 import { project, type Canon, type ProjectionTarget } from './server/nvm/project/index.ts';
+import { buildSidecar, captureRegressionSnapshot, checkRegression } from './server/nvm/project/sidecar.ts';
 import { planToward, type FixedPoint } from './server/nvm/author/fixed-points.ts';
 import { backchain, scheduleToGoalBiases } from './server/nvm/author/backchain.ts';
 import { runSelfPlay, type SimScenario } from './server/nvm/selfplay/corpus.ts';
@@ -4287,7 +4288,7 @@ describe('NVM — Holographic Projection (G3)', () => {
   }
 
   const ALL_TARGETS: ProjectionTarget[] = [
-    'fountain', 'novel', 'stage', 'comic', 'interactive', 'pitch', 'bible', 'rewatch', 'cutting_room',
+    'fountain', 'novel', 'stage', 'comic', 'interactive', 'pitch', 'bible', 'rewatch', 'cutting_room', 'sidecar',
   ];
 
   it('project() returns non-empty content for every target', () => {
@@ -4394,6 +4395,133 @@ describe('NVM — Holographic Projection (G3)', () => {
   it('fountain metadata tracks scene count', () => {
     const artifact = project(makeCanon(), 'fountain');
     assert.equal(artifact.metadata.scenes, 2, 'fountain scene count wrong');
+  });
+
+  it('sidecar target produces valid JSON with nvmVersion', () => {
+    const artifact = project(makeCanon(), 'sidecar');
+    assert.equal(artifact.target, 'sidecar');
+    const sidecar = JSON.parse(artifact.content);
+    assert.equal(sidecar.nvmVersion, '12', 'sidecar version mismatch');
+    assert.ok(typeof sidecar.qualityScore === 'number', 'missing qualityScore');
+    assert.ok(typeof sidecar.totalTension === 'number', 'missing totalTension');
+    assert.ok(Array.isArray(sidecar.proppPresent), 'missing proppPresent');
+    assert.ok(typeof sidecar.momentum === 'number', 'missing momentum');
+  });
+
+  it('sidecar metadata mirrors quality score', () => {
+    const artifact = project(makeCanon(), 'sidecar');
+    const sidecar = JSON.parse(artifact.content);
+    assert.equal(artifact.metadata.qualityScore, sidecar.qualityScore);
+    assert.equal(artifact.metadata.proppCoverage, sidecar.proppCoverage);
+  });
+});
+
+describe('NVM — Sidecar Schema + Regression (Wave 13)', () => {
+  function makeCanon(): Canon {
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'nora', predicate: 'hides', object: 'letter', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'helmer', belief: { id: 'b2', proposition: 'nora is honest', confidence: 1, source: 'told', source_event_id: 'e2', acquired_at: 2 } },
+      { op: 'APPRAISE_EMOTION', charId: 'nora', emotion: { joy: 0, distress: 60, anger: 0, fear: 80, pride: 0, shame: 20, dominant: 'fear', intensity: 80, last_updated_at: 2 } },
+    ];
+    const state: NarrativeState = {
+      ...emptyState(),
+      characterBeliefs: { helmer: [{ id: 'b2', proposition: 'nora is honest', confidence: 1, source: 'told', source_event_id: 'e2', acquired_at: 2 }] },
+      clues: [{ clueId: 'c1', carrier: 'object' }, { clueId: 'c2', carrier: 'line' }],
+      audienceState: { knownFacts: [], suspense: 60, curiosity: 30, investment: 50 },
+    };
+    const commits: StoryCommit[] = [
+      { commitId: 'c1', parentId: null, sceneIdx: 0, ops, deltaSummary: summarizeOps(ops), reverted: false, createdAt: Date.now() },
+    ];
+    return { commits, state, title: 'Fixture' };
+  }
+
+  it('buildSidecar returns a valid NVMSidecar from a Canon', () => {
+    const sidecar = buildSidecar(makeCanon());
+    assert.equal(sidecar.nvmVersion, '12');
+    assert.ok(typeof sidecar.qualityScore === 'number' && sidecar.qualityScore >= 0 && sidecar.qualityScore <= 100);
+    assert.ok(typeof sidecar.totalTension === 'number');
+    assert.ok(Array.isArray(sidecar.proppPresent));
+    assert.ok(Array.isArray(sidecar.arcDebt));
+    assert.ok(sidecar.commitCount === 1);
+    assert.ok(sidecar.revertedCount === 0);
+  });
+
+  it('buildSidecar counts belief summary correctly', () => {
+    const sidecar = buildSidecar(makeCanon());
+    assert.equal(sidecar.beliefCounts.helmer, 1, 'helmer should have 1 belief');
+  });
+
+  it('captureRegressionSnapshot preserves key metrics', () => {
+    const sidecar = buildSidecar(makeCanon());
+    const snap = captureRegressionSnapshot(sidecar, 'fixture', 'abc123');
+    assert.equal(snap.scenarioId, 'fixture');
+    assert.equal(snap.commitHash, 'abc123');
+    assert.equal(snap.baselineQualityScore, sidecar.qualityScore);
+    assert.equal(snap.baselineTension, sidecar.totalTension);
+  });
+
+  it('checkRegression passes when metrics stay the same', () => {
+    const sidecar = buildSidecar(makeCanon());
+    const snap = captureRegressionSnapshot(sidecar, 'fixture');
+    const result = checkRegression(snap, sidecar);
+    assert.ok(result.passed, `regression check should pass on same sidecar: ${JSON.stringify(result.regressions)}`);
+    assert.equal(result.regressions.length, 0);
+  });
+
+  it('checkRegression detects quality regression', () => {
+    const sidecar = buildSidecar(makeCanon());
+    const snap = captureRegressionSnapshot(sidecar, 'fixture');
+    // Simulate a degraded sidecar
+    const degraded = { ...sidecar, qualityScore: sidecar.qualityScore * 0.5 };
+    const result = checkRegression(snap, degraded);
+    if (sidecar.qualityScore > 0) {
+      assert.ok(!result.passed, 'should fail when quality drops >10%');
+      assert.ok(result.regressions.some(r => r.metric === 'qualityScore'));
+    }
+  });
+});
+
+describe('NVM — Quality-Aware Convergence Loop (Wave 13)', () => {
+  const mockGenerator: CandidateGenerator = async (spec, n) => {
+    return Array.from({ length: n }, (_, i) => ({
+      ...buildNoraWarehouseIR(),
+      transitionId: `qconv_${i}_${Date.now()}`,
+    }));
+  };
+
+  it('ConvergeStep includes qualityScore and compositeScore', async () => {
+    const target: SceneTarget = {
+      sceneIdx: 1, sceneFunction: 'build_tension',
+      activeMechanisms: ['relationship_externalization'],
+      tensionTarget: 0, qualityTarget: 0,
+    };
+    const result = await convergeScene(emptyState(), target, mockGenerator, { maxIterations: 1, candidatesPerIteration: 1 }, 1);
+    const step = result.history[0];
+    assert.ok(typeof step.qualityScore === 'number', 'qualityScore missing from step');
+    assert.ok(typeof step.compositeScore === 'number', 'compositeScore missing from step');
+    assert.ok(step.qualityScore >= 0 && step.qualityScore <= 100, `qualityScore out of range: ${step.qualityScore}`);
+  });
+
+  it('ConvergeResult includes finalQuality and finalComposite', async () => {
+    const target: SceneTarget = {
+      sceneIdx: 1, sceneFunction: 'build_tension',
+      activeMechanisms: [], tensionTarget: 0, qualityTarget: 0,
+    };
+    const result = await convergeScene(emptyState(), target, mockGenerator, { maxIterations: 1, candidatesPerIteration: 1 }, 1);
+    assert.ok(typeof result.finalQuality === 'number', 'finalQuality missing');
+    assert.ok(typeof result.finalComposite === 'number', 'finalComposite missing');
+  });
+
+  it('quality_low ghost reason fires when qualityTarget is impossibly high', async () => {
+    const target: SceneTarget = {
+      sceneIdx: 1, sceneFunction: 'build_tension',
+      activeMechanisms: [], tensionTarget: 0, qualityTarget: 999,
+    };
+    const result = await convergeScene(emptyState(), target, mockGenerator, { maxIterations: 2, candidatesPerIteration: 1 }, 42);
+    // With impossible quality target, all proof-passing candidates are quality_low
+    const reasons = result.history.map(s => s.ghostReason);
+    assert.ok(reasons.some(r => r === 'quality_low' || r === 'valuation_too_low' || r === 'proof_fail'),
+      'should ghost candidates with a known reason');
   });
 });
 

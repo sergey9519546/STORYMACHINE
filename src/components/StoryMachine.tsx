@@ -12,11 +12,12 @@ import type {
   PersuasionRecord,
   DramaticPressure,
 } from "../../server/engine/types";
-import { FileDown, Brain, Eye, AlertTriangle, GitBranch, Target, Zap, Smile, Shuffle, Settings } from "lucide-react";
+import { FileDown, Brain, Eye, AlertTriangle, GitBranch, Target, Zap, Smile, Shuffle, Settings, Scissors } from "lucide-react";
 import ScenarioBuilder from "./storymachine/ScenarioBuilder";
 import SettingsPanel from "./SettingsPanel";
 import WhatIfPanel from "./WhatIfPanel";
 import EpistemicMap from "./EpistemicMap";
+import DirectorCutPanel from "./DirectorCutPanel";
 
 // ── Emotion display helpers ───────────────────────────────────────────────────
 
@@ -88,8 +89,9 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   useEffect(() => () => { if (errorTimerRef.current) clearTimeout(errorTimerRef.current); }, []);
   const [showBuilder, setShowBuilder]   = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [showWhatIf, setShowWhatIf]     = useState(false);
-  const [showEpistemic, setShowEpistemic] = useState(false);
+  const [showWhatIf, setShowWhatIf]         = useState(false);
+  const [showEpistemic, setShowEpistemic]   = useState(false);
+  const [showDirectorCut, setShowDirectorCut] = useState(false);
 
   const fetchActivePressures = useCallback(async () => {
     try {
@@ -404,6 +406,14 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
               </button>
             </div>
           )}
+          <button
+            onClick={() => setShowDirectorCut(true)}
+            title="Director's Cut — inject ops mid-sim"
+            className="bg-yellow-900 hover:bg-yellow-700 text-yellow-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <Scissors className="w-4 h-4" />
+            <span className="hidden sm:inline">Cut</span>
+          </button>
           <button
             onClick={() => setShowWhatIf(true)}
             title="What-If / Ghost Commits"
@@ -966,6 +976,10 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
 
       {showSettings && (
         <SettingsPanel onClose={() => setShowSettings(false)} />
+      )}
+
+      {showDirectorCut && (
+        <DirectorCutPanel onClose={() => setShowDirectorCut(false)} />
       )}
 
       {showWhatIf && (
