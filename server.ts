@@ -1485,6 +1485,57 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     res.json({ panels: explainScene(stage, req.params.locationId) });
   }));
 
+  // ── NVM valuation routes (Wave 4) ─────────────────────────────────────────
+
+  // GET /api/nvm/tension — derive tension ledger from current session state
+  app.get('/api/nvm/tension', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { deriveTensionLedger } = await import('./server/nvm/valuation/futures.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const state = buildNarrativeState(stage);
+    const commits = stage.getCommits().filter(c => !c.reverted);
+    const sceneIdx = commits.length > 0 ? commits[commits.length - 1].sceneIdx : 0;
+    res.json(deriveTensionLedger(state, sceneIdx));
+  }));
+
+  // GET /api/nvm/two-reader — first-watch vs rewatch scores
+  app.get('/api/nvm/two-reader', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { deriveTensionLedger } = await import('./server/nvm/valuation/futures.ts');
+    const { twoReaderReport } = await import('./server/nvm/valuation/two-reader.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const state = buildNarrativeState(stage);
+    const commits = stage.getCommits().filter(c => !c.reverted);
+    const sceneIdx = commits.length > 0 ? commits[commits.length - 1].sceneIdx : 0;
+    const ledger = deriveTensionLedger(state, sceneIdx);
+    res.json(twoReaderReport(state, ledger));
+  }));
+
+  // GET /api/nvm/topology — emotional arc topology vs 6 archetypes
+  app.get('/api/nvm/topology', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { deriveTensionLedger } = await import('./server/nvm/valuation/futures.ts');
+    const { computeTopology } = await import('./server/nvm/valuation/topology.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const state = buildNarrativeState(stage);
+    const commits = stage.getCommits().filter(c => !c.reverted);
+    const ledgers = commits.map((c, i) => deriveTensionLedger(state, c.sceneIdx ?? i));
+    res.json(computeTopology(ledgers));
+  }));
+
+  // POST /api/nvm/redteam — red-team a RevealPlan against current audience state
+  app.post('/api/nvm/redteam', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { redTeamVerdict } = await import('./server/nvm/valuation/audience-redteam.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const plan = req.body?.plan;
+    if (!plan || typeof plan.revealId !== 'string') {
+      res.status(400).json({ error: 'body.plan must be a RevealPlan' }); return;
+    }
+    const state = buildNarrativeState(stage);
+    res.json(redTeamVerdict(plan, state));
+  }));
+
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {

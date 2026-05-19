@@ -169,6 +169,27 @@ export class Stage {
           CREATE INDEX IF NOT EXISTS idx_reveal_setup ON Reveal_Plans(payoff_setup_id);
         `);
       },
+      // v10 → v11: Drama_Positions — the Contradiction Futures Market ledger.
+      //   Each row is one open dramatic position (belief conflict, open payoff,
+      //   ticking clock, etc.) with its mark-to-market tension value.
+      () => {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS Drama_Positions (
+            position_id   TEXT PRIMARY KEY,
+            kind          TEXT NOT NULL,
+            char_id       TEXT,
+            description   TEXT NOT NULL,
+            opened_at_scene INTEGER NOT NULL,
+            expected_payoff REAL NOT NULL,
+            time_decay    REAL NOT NULL DEFAULT 0.92,
+            mark_to_market REAL NOT NULL,
+            closed        INTEGER NOT NULL DEFAULT 0,
+            scene_idx     INTEGER NOT NULL,
+            created_at    INTEGER NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS idx_drama_scene ON Drama_Positions(scene_idx, closed);
+        `);
+      },
     ];
     for (let i = current; i < MIGRATIONS.length; i++) {
       this.db.transaction(() => {
@@ -1227,6 +1248,48 @@ export class Stage {
       description: r.description as string,
       requiredClueIds: safeJsonParse<string[]>(r.required_clue_ids_json as string, []),
     }));
+  }
+
+  // ── Drama Positions (v11) ────────────────────────────────────────────────────
+
+  public upsertDramaPosition(p: import('../nvm/valuation/futures.ts').DramaticPosition, sceneIdx: number): void {
+    this.db.prepare(`
+      INSERT OR REPLACE INTO Drama_Positions
+        (position_id, kind, char_id, description, opened_at_scene,
+         expected_payoff, time_decay, mark_to_market, closed, scene_idx, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      p.positionId, p.kind, p.charId ?? null, p.description,
+      p.openedAtScene, p.expectedPayoff, p.timeDecay, p.markToMarket,
+      0, sceneIdx, Date.now(),
+    );
+  }
+
+  public closePosition(positionId: string): void {
+    this.db.prepare('UPDATE Drama_Positions SET closed = 1 WHERE position_id = ?').run(positionId);
+  }
+
+  public getOpenPositions(sceneIdx?: number): import('../nvm/valuation/futures.ts').DramaticPosition[] {
+    const rows = sceneIdx !== undefined
+      ? this.db.prepare('SELECT * FROM Drama_Positions WHERE closed = 0 AND scene_idx = ?').all(sceneIdx)
+      : this.db.prepare('SELECT * FROM Drama_Positions WHERE closed = 0 ORDER BY scene_idx').all();
+    return (rows as Array<Record<string, unknown>>).map(r => ({
+      positionId: r.position_id as string,
+      kind: r.kind as import('../nvm/valuation/futures.ts').DramaticPosition['kind'],
+      charId: r.char_id as string | undefined,
+      description: r.description as string,
+      openedAtScene: r.opened_at_scene as number,
+      expectedPayoff: r.expected_payoff as number,
+      timeDecay: r.time_decay as number,
+      markToMarket: r.mark_to_market as number,
+    }));
+  }
+
+  public getTotalTension(): number {
+    const row = this.db.prepare(
+      'SELECT COALESCE(SUM(mark_to_market), 0) as total FROM Drama_Positions WHERE closed = 0'
+    ).get() as { total: number };
+    return Math.round(row.total * 10) / 10;
   }
 
   // ── LLM call cache (v9) ─────────────────────────────────────────────────────
