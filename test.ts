@@ -53,6 +53,8 @@ import { runWritersRoom } from './server/nvm/room/room.ts';
 import { buildSCM } from './server/nvm/twin/scm.ts';
 import { doIntervention } from './server/nvm/twin/counterfactual.ts';
 import { project, type Canon, type ProjectionTarget } from './server/nvm/project/index.ts';
+import { planToward, type FixedPoint } from './server/nvm/author/fixed-points.ts';
+import { backchain, scheduleToGoalBiases } from './server/nvm/author/backchain.ts';
 
 describe('safeJsonParse', () => {
   it('returns parsed value for valid JSON object', () => {
@@ -4377,5 +4379,201 @@ describe('NVM — Holographic Projection (G3)', () => {
   it('fountain metadata tracks scene count', () => {
     const artifact = project(makeCanon(), 'fountain');
     assert.equal(artifact.metadata.scenes, 2, 'fountain scene count wrong');
+  });
+});
+
+// ── Wave 9: Temporal Authoring (G9) ──────────────────────────────────────────
+
+describe('NVM — Temporal Authoring / Fixed Points (G9)', () => {
+  function baseState(): NarrativeState {
+    return {
+      ...emptyState(),
+      objectiveReality: [
+        { factId: 'piano', subject: 'piano', predicate: 'exists', object: 'true', addedAtTurn: 0, validFrom: 0, validTo: null },
+      ],
+      characterBeliefs: {
+        nora: [{ id: 'b1', proposition: 'nobody knows', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 0 }],
+      },
+      clues: [],
+      payoffs: [],
+      audienceState: { knownFacts: ['piano'], suspense: 20, curiosity: 30, investment: 40 },
+    };
+  }
+
+  it('planToward marks already-satisfied fixed point without emitting biases', () => {
+    const state = baseState();
+    const fp: FixedPoint = {
+      atScene: 6,
+      required: { factIds: ['piano'] },
+      description: 'piano must exist',
+    };
+    const result = planToward(state, [fp], 0);
+    assert.equal(result.alreadySatisfied.length, 1, 'should be satisfied');
+    assert.equal(result.biases.length, 0, 'no biases needed');
+  });
+
+  it('planToward emits SEED_CLUE bias for missing clue', () => {
+    const state = baseState();
+    const fp: FixedPoint = {
+      atScene: 6,
+      required: { clueIds: ['letter_clue'] },
+      description: 'letter clue must be planted',
+    };
+    const result = planToward(state, [fp], 0);
+    assert.equal(result.blocked.length, 0, 'should not be blocked');
+    const clueOp = result.biases.flatMap(b => b.ops).find(op => op.op === 'SEED_CLUE');
+    assert.ok(clueOp, 'SEED_CLUE op expected');
+    assert.equal((clueOp as Extract<typeof clueOp, { op: 'SEED_CLUE' }>)!.clueId, 'letter_clue');
+  });
+
+  it('planToward emits ADD_FACT bias for missing fact', () => {
+    const state = baseState();
+    const fp: FixedPoint = {
+      atScene: 4,
+      required: { factIds: ['krogstad_debt'] },
+      description: 'debt must be established',
+    };
+    const result = planToward(state, [fp], 0);
+    const factOp = result.biases.flatMap(b => b.ops).find(op => op.op === 'ADD_FACT');
+    assert.ok(factOp, 'ADD_FACT op expected');
+  });
+
+  it('planToward blocks a fixed point with a passed deadline', () => {
+    const state = baseState();
+    const fp: FixedPoint = {
+      atScene: 2,
+      required: { clueIds: ['missing_clue'] },
+      description: 'clue at scene 2',
+    };
+    const result = planToward(state, [fp], 5);   // currentScene=5 > deadline=2
+    assert.equal(result.blocked.length, 1, 'should be blocked');
+    assert.ok(result.blocked[0].reason.includes('passed'));
+  });
+
+  it('planToward handles multiple fixed points, sorting by deadline', () => {
+    const state = baseState();
+    const fps: FixedPoint[] = [
+      { atScene: 8, required: { clueIds: ['clue_a'] }, description: 'clue a at 8' },
+      { atScene: 4, required: { clueIds: ['clue_b'] }, description: 'clue b at 4' },
+    ];
+    const result = planToward(state, fps, 0);
+    assert.equal(result.blocked.length, 0);
+    // clue_b (deadline 4) must be biased at an earlier scene than clue_a (deadline 8)
+    const clueA = result.biases.find(b => b.ops.some(op => op.op === 'SEED_CLUE' && (op as any).clueId === 'clue_a'));
+    const clueB = result.biases.find(b => b.ops.some(op => op.op === 'SEED_CLUE' && (op as any).clueId === 'clue_b'));
+    assert.ok(clueA && clueB, 'biases for both clues expected');
+    assert.ok(clueB.atScene <= clueA.atScene, 'earlier deadline should produce earlier scene bias');
+  });
+
+  it('planToward emits UPDATE_READER_STATE for suspense requirement', () => {
+    const state = baseState();   // suspense = 20
+    const fp: FixedPoint = {
+      atScene: 6,
+      required: { minSuspense: 80 },
+      description: 'high tension by scene 6',
+    };
+    const result = planToward(state, [fp], 0);
+    const tensionOp = result.biases.flatMap(b => b.ops).find(op => op.op === 'UPDATE_READER_STATE');
+    assert.ok(tensionOp, 'UPDATE_READER_STATE expected for suspense gap');
+  });
+
+  it('planToward transcript is non-empty', () => {
+    const state = baseState();
+    const fp: FixedPoint = { atScene: 5, required: { clueIds: ['x'] }, description: 'test' };
+    const result = planToward(state, [fp], 0);
+    assert.ok(result.transcript.length > 0, 'transcript should be non-empty');
+  });
+});
+
+describe('NVM — Backchain Reasoner (G9)', () => {
+  function baseState(): NarrativeState {
+    return {
+      ...emptyState(),
+      objectiveReality: [],
+      characterBeliefs: {},
+      clues: [],
+      payoffs: [],
+      audienceState: { knownFacts: [], suspense: 10, curiosity: 10, investment: 10 },
+    };
+  }
+
+  it('backchain schedules SEED_CLUE before deadline for missing clue', () => {
+    const fp: FixedPoint = {
+      atScene: 6,
+      required: { clueIds: ['piano_clue'] },
+      description: 'piano clue at scene 6',
+    };
+    const result = backchain(fp, baseState(), 0);
+    assert.ok(result.complete, 'should be complete');
+    const clueEntry = result.schedule.find(s => s.op.op === 'SEED_CLUE');
+    assert.ok(clueEntry, 'SEED_CLUE expected in schedule');
+    assert.ok(clueEntry.atScene < 6, 'SEED_CLUE must be before deadline');
+  });
+
+  it('backchain returns empty schedule when all requirements satisfied', () => {
+    const state = baseState();
+    state.clues.push({ clueId: 'piano_clue', carrier: 'object' });
+    const fp: FixedPoint = {
+      atScene: 6,
+      required: { clueIds: ['piano_clue'] },
+    };
+    const result = backchain(fp, state, 0);
+    assert.equal(result.schedule.length, 0, 'nothing to schedule');
+    assert.ok(result.complete);
+  });
+
+  it('backchain marks complete=false when deadline passed', () => {
+    const fp: FixedPoint = { atScene: 2, required: { clueIds: ['x'] } };
+    const result = backchain(fp, baseState(), 5);
+    assert.equal(result.complete, false);
+    assert.ok(result.blockingConstraint?.includes('deadline'));
+  });
+
+  it('backchain orders clue before payoff in schedule', () => {
+    const fp: FixedPoint = {
+      atScene: 8,
+      required: { clueIds: ['c1'], payoffSetupIds: ['s1'] },
+    };
+    const result = backchain(fp, baseState(), 0);
+    assert.ok(result.complete);
+    const clueIdx = result.schedule.findIndex(s => s.op.op === 'SEED_CLUE');
+    const payoffIdx = result.schedule.findIndex(s => s.op.op === 'PAYOFF_SETUP');
+    assert.ok(clueIdx >= 0 && payoffIdx >= 0, 'both ops expected');
+    assert.ok(result.schedule[clueIdx].atScene <= result.schedule[payoffIdx].atScene, 'clue must precede payoff');
+  });
+
+  it('backchain schedules ADD_FACT for missing required fact', () => {
+    const fp: FixedPoint = {
+      atScene: 5,
+      required: { factIds: ['debt_fact'] },
+    };
+    const result = backchain(fp, baseState(), 0);
+    const factEntry = result.schedule.find(s => s.op.op === 'ADD_FACT');
+    assert.ok(factEntry, 'ADD_FACT expected');
+    assert.ok(factEntry.atScene < 5, 'must be before deadline');
+  });
+
+  it('scheduleToGoalBiases groups ops by scene', () => {
+    const fp: FixedPoint = {
+      atScene: 6,
+      required: { clueIds: ['c1'], factIds: ['f1'] },
+    };
+    const result = backchain(fp, baseState(), 0);
+    const biases = scheduleToGoalBiases(result, 'test fixed point');
+    assert.ok(biases.length > 0, 'biases expected');
+    for (const b of biases) {
+      assert.ok(b.ops.length > 0, 'each bias must have ops');
+      assert.equal(b.fixedPointDescription, 'test fixed point');
+    }
+  });
+
+  it('backchain trace is non-empty and describes plan', () => {
+    const fp: FixedPoint = {
+      atScene: 6,
+      required: { clueIds: ['trace_clue'] },
+      description: 'trace test',
+    };
+    const result = backchain(fp, baseState(), 0);
+    assert.ok(result.trace.includes('trace test') || result.trace.includes('Backchain'), 'trace should reference the fixed point');
   });
 });
