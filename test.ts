@@ -1967,11 +1967,14 @@ describe('personality — actionBiasWeights', () => {
     assert.deepEqual(weightKeys, [...ACTION_TYPES].sort());
   });
 
-  it('neutral traits → all weights exactly 1.0', () => {
+  it('neutral traits → all weights at or near 1.0 (RELOCATE base is 1.08)', () => {
     const w = actionBiasWeights(NEUTRAL_DT, NEUTRAL_BF);
-    for (const v of Object.values(w)) {
-      assert.ok(Math.abs(v - 1.0) < 1e-9, `expected 1.0, got ${v}`);
-    }
+    // RELOCATE has a 1.08 base to give neutral characters a slight movement impulse.
+    assert.ok(Math.abs(w.SPEAK    - 1.0)  < 1e-9, `SPEAK: expected 1.0, got ${w.SPEAK}`);
+    assert.ok(Math.abs(w.EXAMINE  - 1.0)  < 1e-9, `EXAMINE: expected 1.0, got ${w.EXAMINE}`);
+    assert.ok(Math.abs(w.LIE      - 1.0)  < 1e-9, `LIE: expected 1.0, got ${w.LIE}`);
+    assert.ok(Math.abs(w.WAIT     - 1.0)  < 1e-9, `WAIT: expected 1.0, got ${w.WAIT}`);
+    assert.ok(Math.abs(w.RELOCATE - 1.08) < 1e-9, `RELOCATE: expected 1.08, got ${w.RELOCATE}`);
   });
 
   it('high machiavellianism raises LIE weight above neutral', () => {

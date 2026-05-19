@@ -31,7 +31,10 @@ export function actionBiasWeights(
   const SPEAK    = 1.0 + 0.15 * extr  + 0.10 * narc - 0.05 * neur;
   const EXAMINE  = 1.0 + 0.15 * open  + 0.10 * cons - 0.05 * mach;
   const LIE      = 1.0 + 0.20 * mach  + 0.10 * psyc - 0.15 * agre - 0.10 * cons;
-  const RELOCATE = 1.0 + 0.15 * neur  - 0.10 * extr - 0.05 * narc;
+  // Base of 1.08 gives a slight positive impulse even for neutral characters; cons
+  // drives deliberate execution of planned moves; extr/narc penalties kept mild so
+  // dominant characters still leave rooms when their goal requires it.
+  const RELOCATE = 1.08 + 0.15 * neur + 0.10 * cons - 0.06 * extr - 0.03 * narc;
 
   // Clamp each weight to [0.5, 1.6] so LLM signal is nudged, never overridden.
   // WAIT: introverts and high-neuroticism characters are more likely to pause and observe.

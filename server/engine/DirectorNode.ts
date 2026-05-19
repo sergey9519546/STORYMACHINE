@@ -481,6 +481,47 @@ From ${observer.name}'s perspective only:
       });
     }
     logger.info('pacing_check', { target, style: directorStyle ?? 'none', tempo: m.tempo, monotony: m.monotonyRisk, turn: totalTurns });
+
+    // ── Stuck-character detection: emit REDIRECT when an agent hasn't moved in >4 turns ──
+    this._emitStuckPressure(location_id, recentActions, totalTurns);
+  }
+
+  private _emitStuckPressure(location_id: string, recentActions: ActionLogEntry[], totalTurns: number): void {
+    if (totalTurns < 5) return;
+    const agents = this.stage.getAgentsInLocation(location_id);
+    const loc = this.stage.getLocation(location_id);
+    if (!loc || loc.adjacent_locations.length === 0) return; // no exits — pointless to pressure
+
+    const exitNames = loc.adjacent_locations
+      .map(id => this.stage.getLocation(id)?.name)
+      .filter((n): n is string => Boolean(n));
+    if (exitNames.length === 0) return;
+
+    // Scan last 5 actions in this room — if an agent accounts for ≥4 of them, they're stuck.
+    const last5 = recentActions.slice(-5);
+    const agentActionCount = new Map<string, number>();
+    for (const a of last5) agentActionCount.set(a.char_id, (agentActionCount.get(a.char_id) ?? 0) + 1);
+
+    for (const agent of agents) {
+      if ((agentActionCount.get(agent.char_id) ?? 0) < 4) continue;
+
+      // Don't stack duplicate stuck pressures for this agent
+      const existing = this.stage.getActivePressures(agent.char_id);
+      if (existing.some(p => p.pressure_type === 'REDIRECT' && p.bias_hint.includes('exit'))) continue;
+
+      const exitList = exitNames.map(n => `"${n}"`).join(' or ');
+      this.stage.addDramaticPressure({
+        pressure_id: randomUUID(),
+        target_char_id: agent.char_id,
+        trigger_event_id: 'stuck_detector',
+        pressure_type: 'REDIRECT',
+        intensity: 55,
+        bias_hint: `You have lingered here too long — your objective requires movement. RELOCATE to ${exitList}.`,
+        expires_at_turn: totalTurns + 2,
+        applied: false,
+      });
+      logger.info('stuck_pressure_emitted', { agent: agent.name, location_id, exits: exitNames });
+    }
   }
 
   // ── H: Auto-Pivot Detection ──
