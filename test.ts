@@ -49,6 +49,8 @@ import {
 import { applyOperator, ALL_OPERATORS } from './server/nvm/converge/operators.ts';
 import { convergeScene } from './server/nvm/converge/loop.ts';
 import { runWritersRoom } from './server/nvm/room/room.ts';
+import { buildSCM } from './server/nvm/twin/scm.ts';
+import { doIntervention } from './server/nvm/twin/counterfactual.ts';
 
 describe('safeJsonParse', () => {
   it('returns parsed value for valid JSON object', () => {
@@ -4120,5 +4122,105 @@ describe('NVM — Writers\' Room (G2)', () => {
       assert.ok(ALL_OPERATORS.includes(result.suggestedOperator),
         `invalid operator: ${result.suggestedOperator}`);
     }
+  });
+});
+
+// ── Wave 7: G4 — Causal Twin (Pearl's do()-calculus) ─────────────────────
+
+describe('NVM — Structural Causal Model (G4)', () => {
+  function mkCommitWithOps(id: string, parent: string | null, ops: StoryOp[], sceneIdx = 0): StoryCommit {
+    return { commitId: id, parentId: parent, sceneIdx, ops, deltaSummary: summarizeOps(ops), reverted: false, createdAt: Date.now() };
+  }
+
+  it('buildSCM creates a node for every op in every commit', () => {
+    const stage = new Stage(':memory:');
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 's', predicate: 'p', object: 'o', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'p', confidence: 1, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+    ];
+    stage.appendCommit(mkCommitWithOps('c1', null, ops));
+    const scm = buildSCM(stage);
+    assert.equal(scm.nodes.size, 2);
+    assert.ok(scm.nodes.has('c1:0'));
+    assert.ok(scm.nodes.has('c1:1'));
+  });
+
+  it('intra-commit ADD_FACT → UPDATE_BELIEF edge is wired', () => {
+    const stage = new Stage(':memory:');
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 's', predicate: 'p', object: 'o', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'p', confidence: 1, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+    ];
+    stage.appendCommit(mkCommitWithOps('c1', null, ops));
+    const scm = buildSCM(stage);
+    const factNode = scm.nodes.get('c1:0')!;
+    const beliefNode = scm.nodes.get('c1:1')!;
+    assert.ok(factNode.children.includes('c1:1'));
+    assert.ok(beliefNode.parents.includes('c1:0'));
+  });
+
+  it('topological order is non-empty for non-empty stage', () => {
+    const stage = new Stage(':memory:');
+    stage.appendCommit(mkCommitWithOps('c1', null, [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 's', predicate: 'p', object: 'o', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ]));
+    const scm = buildSCM(stage);
+    assert.ok(scm.order.length > 0);
+  });
+
+  it('buildSCM on empty stage returns empty model', () => {
+    const scm = buildSCM(new Stage(':memory:'));
+    assert.equal(scm.nodes.size, 0);
+    assert.equal(scm.order.length, 0);
+  });
+});
+
+describe('NVM — Counterfactual / do()-calculus (G4)', () => {
+  function mkCommitWithOps(id: string, parent: string | null, ops: StoryOp[], sceneIdx = 0): StoryCommit {
+    return { commitId: id, parentId: parent, sceneIdx, ops, deltaSummary: summarizeOps(ops), reverted: false, createdAt: Date.now() };
+  }
+
+  it('doIntervention returns empty affected list for a leaf node (no children)', () => {
+    const stage = new Stage(':memory:');
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 's', predicate: 'p', object: 'o', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ];
+    stage.appendCommit(mkCommitWithOps('c1', null, ops));
+    const scm = buildSCM(stage);
+    const report = doIntervention(scm, { opId: 'c1:0', replacement: null });
+    // Leaf with no children → no downstream affected
+    assert.equal(report.affectedOps.length, 0);
+  });
+
+  it('removing a fact propagates to downstream belief (direct effect)', () => {
+    const stage = new Stage(':memory:');
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 's', predicate: 'p', object: 'o', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'p', confidence: 1, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+    ];
+    stage.appendCommit(mkCommitWithOps('c1', null, ops));
+    const scm = buildSCM(stage);
+    const report = doIntervention(scm, { opId: 'c1:0', replacement: null });
+    assert.ok(report.affectedOps.length >= 1);
+    assert.ok(report.directlyAffected.some(a => a.opId === 'c1:1'));
+  });
+
+  it('doIntervention for unknown opId returns empty report with message', () => {
+    const scm = buildSCM(new Stage(':memory:'));
+    const report = doIntervention(scm, { opId: 'nonexistent:0', replacement: null });
+    assert.equal(report.affectedOps.length, 0);
+    assert.ok(report.summary.includes('not found'));
+  });
+
+  it('summary string describes the intervention action', () => {
+    const stage = new Stage(':memory:');
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 's', predicate: 'p', object: 'o', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'p', confidence: 1, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+    ];
+    stage.appendCommit(mkCommitWithOps('c1', null, ops));
+    const scm = buildSCM(stage);
+    const report = doIntervention(scm, { opId: 'c1:0', replacement: null });
+    assert.ok(report.summary.includes('removed') || report.summary.includes('Intervention'));
   });
 });
