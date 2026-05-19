@@ -13,6 +13,18 @@ import { geminiSchemaToJsonSchema } from './server/lib/ai-providers/schema.ts';
 import { makeOpenAICompatLLMProvider, makeOpenAICompatEmbeddingProvider } from './server/lib/ai-providers/openai-compat.ts';
 import { applyConfig, getPublicConfig, initFromEnv } from './server/lib/ai-config.ts';
 import type { GenerateContentParameters, GenerateContentResponse } from '@google/genai';
+import { STORY_OP_KINDS } from './server/nvm/ops/StoryOp.ts';
+import type { StoryOp } from './server/nvm/ops/StoryOp.ts';
+import { PROOF_TIERS, passResult, failResult } from './server/nvm/proof/contract.ts';
+import type { ProofName } from './server/nvm/proof/contract.ts';
+import { emptyState, stateHash, relationshipKey } from './server/nvm/state/NarrativeState.ts';
+import { applyStoryOp, applyStoryOps } from './server/nvm/ops/dispatcher.ts';
+import { loadMechanisms, loadMechanismsCached } from './server/nvm/mechanisms/loader.ts';
+import { runTier1, tier1Passes } from './server/nvm/proof/kernel.ts';
+import { runM15Harness, buildNoraWarehouseIR } from './server/nvm/__tests__/m1.5-harness.ts';
+import { whatBreaksIfRemoved } from './server/nvm/query/whatBreaks.ts';
+import { summarizeOps } from './server/nvm/state/StoryCommit.ts';
+import type { StoryCommit } from './server/nvm/state/StoryCommit.ts';
 
 describe('safeJsonParse', () => {
   it('returns parsed value for valid JSON object', () => {
@@ -2888,5 +2900,339 @@ describe('AppraisalEngine — pressure-type emotion mapping', () => {
     const e = appraiseFresh(stage);
     assert.equal(e.fear, 0,    'expired pressure should not affect fear');
     assert.equal(e.distress, 0, 'expired pressure should not affect distress');
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// NVM Wave 1 — substrate: StoryOp vocabulary, proof contract, dispatcher
+// ──────────────────────────────────────────────────────────────────────────────
+
+const sampleBelief = (id: string) => ({
+  id, proposition: `prop-${id}`, confidence: 0.8,
+  source: 'witnessed' as const, acquired_at: 1,
+});
+
+const sampleEmotion = () => ({
+  joy: 0, distress: 50, anger: 0, fear: 0, pride: 0, shame: 0,
+  dominant: 'distress' as const, intensity: 50, last_updated_at: 1,
+});
+
+describe('NVM — StoryOp vocabulary (decision 1)', () => {
+  it('enumerates exactly 14 op kinds', () => {
+    assert.equal(Object.keys(STORY_OP_KINDS).length, 14);
+  });
+  it('every op kind maps to true', () => {
+    for (const v of Object.values(STORY_OP_KINDS)) assert.equal(v, true);
+  });
+});
+
+describe('NVM — 4-tier proof contract (decision 3)', () => {
+  it('PROOF_TIERS covers every ProofName', () => {
+    assert.equal(Object.keys(PROOF_TIERS).length, 24);
+  });
+  it('Tier 1 has exactly 7 proofs', () => {
+    const tier1 = Object.entries(PROOF_TIERS).filter(([, t]) => t === 1);
+    assert.equal(tier1.length, 7);
+  });
+  it('all four tiers are populated', () => {
+    const tiers = new Set(Object.values(PROOF_TIERS));
+    assert.deepEqual([...tiers].sort(), [1, 2, 3, 4]);
+  });
+  it('passResult is the lawful default (pass=true, no findings)', () => {
+    const r = passResult('TemporalProof');
+    assert.equal(r.pass, true);
+    assert.equal(r.tier, 1);
+    assert.equal(r.findings.length, 0);
+  });
+  it('failResult carries findings and the correct tier', () => {
+    const r = failResult('SpecificityProof', 'too generic',
+      [{ proof: 'SpecificityProof' as ProofName, severity: 'flag', message: 'x' }]);
+    assert.equal(r.pass, false);
+    assert.equal(r.tier, 2);
+    assert.equal(r.findings.length, 1);
+  });
+});
+
+describe('NVM — NarrativeState', () => {
+  it('emptyState has all 4 layers and 14-op slots zeroed', () => {
+    const s = emptyState();
+    assert.equal(s.objectiveReality.length, 0);
+    assert.deepEqual(s.characterBeliefs, {});
+    assert.equal(s.audienceState.suspense, 0);
+    assert.deepEqual(s.authorIntent, {});
+    assert.equal(s.turn, 0);
+  });
+  it('stateHash is stable for identical state', () => {
+    assert.equal(stateHash(emptyState()), stateHash(emptyState()));
+  });
+  it('stateHash changes after one ADD_FACT', () => {
+    const before = stateHash(emptyState());
+    const after = stateHash(applyStoryOp(emptyState(), {
+      op: 'ADD_FACT',
+      fact: { factId: 'f1', subject: 'a', predicate: 'is', object: 'b',
+              addedAtTurn: 1, validFrom: 1, validTo: null },
+    }));
+    assert.notEqual(before, after);
+  });
+  it('relationshipKey is order-independent', () => {
+    assert.equal(relationshipKey('alice', 'bob'), relationshipKey('bob', 'alice'));
+  });
+});
+
+describe('NVM — StoryOp dispatcher (14 ops, pure)', () => {
+  it('ADD_FACT appends to objectiveReality', () => {
+    const s = applyStoryOp(emptyState(), {
+      op: 'ADD_FACT',
+      fact: { factId: 'f1', subject: 'a', predicate: 'is', object: 'b',
+              addedAtTurn: 1, validFrom: 1, validTo: null },
+    });
+    assert.equal(s.objectiveReality.length, 1);
+    assert.equal(s.objectiveReality[0].factId, 'f1');
+  });
+  it('EXPIRE_FACT sets validTo on the matching fact', () => {
+    let s = applyStoryOp(emptyState(), {
+      op: 'ADD_FACT',
+      fact: { factId: 'f1', subject: 'a', predicate: 'is', object: 'b',
+              addedAtTurn: 1, validFrom: 1, validTo: null },
+    });
+    s = applyStoryOp(s, { op: 'EXPIRE_FACT', factId: 'f1', atTurn: 5 });
+    assert.equal(s.objectiveReality[0].validTo, 5);
+  });
+  it('UPDATE_BELIEF inserts then updates by belief id', () => {
+    let s = applyStoryOp(emptyState(), { op: 'UPDATE_BELIEF', charId: 'alice', belief: sampleBelief('b1') });
+    assert.equal(s.characterBeliefs.alice.length, 1);
+    s = applyStoryOp(s, { op: 'UPDATE_BELIEF', charId: 'alice', belief: { ...sampleBelief('b1'), confidence: 0.2 } });
+    assert.equal(s.characterBeliefs.alice.length, 1);
+    assert.equal(s.characterBeliefs.alice[0].confidence, 0.2);
+  });
+  it('APPRAISE_EMOTION stores the per-character emotion', () => {
+    const s = applyStoryOp(emptyState(), { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: sampleEmotion() });
+    assert.equal(s.characterEmotions.alice.dominant, 'distress');
+  });
+  it('SHIFT_RELATIONSHIP appends a delta under an order-independent key', () => {
+    const s = applyStoryOp(emptyState(), {
+      op: 'SHIFT_RELATIONSHIP', pair: ['bob', 'alice'],
+      delta: { dimension: 'trust', amount: -0.3, reason: 'lied' },
+    });
+    assert.equal(s.relationships[relationshipKey('alice', 'bob')].length, 1);
+  });
+  it('ADVANCE_OBJECT_ARC sets the object lifecycle state', () => {
+    const s = applyStoryOp(emptyState(), { op: 'ADVANCE_OBJECT_ARC', objectId: 'piano', toState: 'costly' });
+    assert.equal(s.objectArcs.piano, 'costly');
+  });
+  it('TRIGGER_RULE records the rule once (idempotent)', () => {
+    let s = applyStoryOp(emptyState(), { op: 'TRIGGER_RULE', mechanismId: 'm1', ruleId: 'r1' });
+    s = applyStoryOp(s, { op: 'TRIGGER_RULE', mechanismId: 'm1', ruleId: 'r1' });
+    assert.equal(s.firedRules.length, 1);
+    assert.equal(s.firedRules[0], 'm1:r1');
+  });
+  it('SEED_CLUE appends a clue with its carrier', () => {
+    const s = applyStoryOp(emptyState(), { op: 'SEED_CLUE', clueId: 'c1', carrier: 'sound' });
+    assert.equal(s.clues[0].carrier, 'sound');
+  });
+  it('PAYOFF_SETUP records the setup→payoff link', () => {
+    const s = applyStoryOp(emptyState(), { op: 'PAYOFF_SETUP', setupId: 's1', payoffEventId: 'e9' });
+    assert.equal(s.payoffs[0].payoffEventId, 'e9');
+  });
+  it('RAISE_CLOCK accumulates into the named clock', () => {
+    let s = applyStoryOp(emptyState(), { op: 'RAISE_CLOCK', clockId: 'doom', amount: 2 });
+    s = applyStoryOp(s, { op: 'RAISE_CLOCK', clockId: 'doom', amount: 3 });
+    assert.equal(s.clocks.doom, 5);
+  });
+  it('ADVANCE_THEME_ARGUMENT appends a claim move', () => {
+    const s = applyStoryOp(emptyState(), { op: 'ADVANCE_THEME_ARGUMENT', claimId: 'q1', move: 'attack' });
+    assert.equal(s.themeArgument[0].move, 'attack');
+  });
+  it('UPDATE_READER_STATE merges signed deltas and known facts', () => {
+    const s = applyStoryOp(emptyState(), {
+      op: 'UPDATE_READER_STATE', delta: { suspense: 0.4, knownFact: 'kid is granddaughter' },
+    });
+    assert.equal(s.audienceState.suspense, 0.4);
+    assert.equal(s.audienceState.knownFacts.length, 1);
+  });
+  it('RECORD_VISUAL_FACT appends a visual scene fact', () => {
+    const s = applyStoryOp(emptyState(), { op: 'RECORD_VISUAL_FACT', sceneId: 'sc1', fact: 'rain on glass' });
+    assert.equal(s.sceneFacts[0].kind, 'visual');
+  });
+  it('RECORD_SONIC_FACT appends a sonic scene fact', () => {
+    const s = applyStoryOp(emptyState(), { op: 'RECORD_SONIC_FACT', sceneId: 'sc1', fact: 'a single piano note' });
+    assert.equal(s.sceneFacts[0].kind, 'sonic');
+  });
+  it('does not mutate the input state', () => {
+    const before = emptyState();
+    applyStoryOp(before, { op: 'RAISE_CLOCK', clockId: 'doom', amount: 1 });
+    assert.equal(before.clocks.doom, undefined);
+  });
+  it('applyStoryOps replay reproduces an identical stateHash', () => {
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'a', predicate: 'is', object: 'b',
+        addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'alice', belief: sampleBelief('b1') },
+      { op: 'RAISE_CLOCK', clockId: 'doom', amount: 4 },
+    ];
+    assert.equal(stateHash(applyStoryOps(emptyState(), ops)),
+                 stateHash(applyStoryOps(emptyState(), ops)));
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// NVM Wave 1B — mechanisms, proof kernel, StoryCommit ledger, what-breaks, M1.5
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe('NVM — mechanism schema loader', () => {
+  it('auto-discovers exactly 3 MVP mechanisms', () => {
+    assert.equal(loadMechanisms().size, 3);
+  });
+  it('each mechanism validates: lifecycle, rules, invariants present', () => {
+    for (const m of loadMechanisms().values()) {
+      assert.ok(m.lifecycleStates.length > 0, `${m.id} has lifecycle states`);
+      assert.ok(m.invariants.length > 0, `${m.id} has invariants`);
+      assert.ok(m.climaxProofPredicate.length > 0, `${m.id} has climax predicate`);
+    }
+  });
+  it('resolves the 3 MVP ids', () => {
+    const m = loadMechanisms();
+    assert.ok(m.has('object_burden'));
+    assert.ok(m.has('legitimacy_split'));
+    assert.ok(m.has('relationship_externalization'));
+  });
+  it('loadMechanismsCached returns a stable instance', () => {
+    assert.strictEqual(loadMechanismsCached(), loadMechanismsCached());
+  });
+});
+
+describe('NVM — Proof Kernel Tier 1', () => {
+  it('a valid IR passes all 7 Tier 1 proofs', () => {
+    const results = runTier1(buildNoraWarehouseIR(), emptyState());
+    assert.equal(results.length, 7);
+    assert.ok(tier1Passes(results), JSON.stringify(results.filter(r => !r.pass)));
+  });
+
+  const brokenCases: Array<{ name: string; proof: ProofName; mutate: (ir: ReturnType<typeof buildNoraWarehouseIR>) => void }> = [
+    { name: 'expire before add', proof: 'TemporalProof', mutate: ir => {
+        ir.ops.push({ op: 'EXPIRE_FACT', factId: 'fact_crate7', atTurn: 0 }); } },
+    { name: 'no causal predecessor', proof: 'CausalProof', mutate: ir => {
+        ir.preconditions = []; } },
+    { name: 'ungrounded character', proof: 'IntentionalProof', mutate: ir => {
+        ir.ops.push({ op: 'SHIFT_RELATIONSHIP', pair: ['nora', 'ghost'],
+          delta: { dimension: 'fear', amount: 0.2, reason: 'x' } }); } },
+    { name: 'unknown mechanism', proof: 'MechanismProof', mutate: ir => {
+        ir.activeMechanisms = ['nonexistent_mechanism']; } },
+    { name: 'witnessed belief without source event', proof: 'EpistemicProof', mutate: ir => {
+        ir.ops.push({ op: 'UPDATE_BELIEF', charId: 'nora', belief: {
+          id: 'nora_bad', proposition: 'x', confidence: 1,
+          source: 'witnessed', acquired_at: 1 } }); } },
+    { name: 'contradictory facts', proof: 'ContinuityProof', mutate: ir => {
+        ir.ops.push({ op: 'ADD_FACT', fact: {
+          factId: 'fact_crate7b', subject: 'crate_7', predicate: 'location',
+          object: 'warehouse_C', addedAtTurn: 1, validFrom: 1, validTo: null } }); } },
+    { name: 'no provenance timestamp', proof: 'ProvenanceProof', mutate: ir => {
+        ir.provenance.createdAt = 0; } },
+  ];
+
+  for (const c of brokenCases) {
+    it(`broken IR (${c.name}) fails exactly ${c.proof}`, () => {
+      const ir = structuredClone(buildNoraWarehouseIR());
+      c.mutate(ir);
+      const failed = runTier1(ir, emptyState()).filter(r => !r.pass);
+      assert.equal(failed.length, 1, `expected 1 failure, got ${failed.map(f => f.proof).join(',')}`);
+      assert.equal(failed[0].proof, c.proof);
+    });
+  }
+
+  it('kernel runs well under 50ms (no network)', () => {
+    const t0 = performance.now();
+    runTier1(buildNoraWarehouseIR(), emptyState());
+    assert.ok(performance.now() - t0 < 50);
+  });
+});
+
+describe('NVM — M1.5 integration harness', () => {
+  it('expresses the Nora-warehouse scenario as state, no prose', () => {
+    const { state, allPass, tier1 } = runM15Harness();
+    assert.ok(allPass, 'Tier 1 must pass: ' + JSON.stringify(tier1.filter(r => !r.pass)));
+    assert.equal(state.objectiveReality.length, 1);
+    assert.equal(state.objectiveReality[0].factId, 'fact_crate7');
+    assert.equal(state.characterBeliefs.nora.length, 1);
+    assert.equal(state.characterBeliefs.bob.length, 1);
+    assert.equal(state.characterEmotions.nora.dominant, 'pride');
+    assert.equal(state.audienceState.knownFacts.length, 1);
+  });
+  it('dramatic irony: Bob believes the lie, the audience knows the truth', () => {
+    const { state } = runM15Harness();
+    assert.equal(state.characterBeliefs.bob[0].proposition, 'crate_7 is in warehouse_A');
+    assert.equal(state.objectiveReality[0].object, 'warehouse_B');
+  });
+});
+
+describe('NVM — StoryCommit ledger (Stage migration v8)', () => {
+  const mkCommit = (id: string, parent: string | null, idx: number): StoryCommit => {
+    const ops: StoryOp[] = [{ op: 'RAISE_CLOCK', clockId: 'doom', amount: 1 }];
+    return { commitId: id, parentId: parent, sceneIdx: idx, ops,
+      deltaSummary: summarizeOps(ops), reverted: false, createdAt: Date.now() + idx };
+  };
+
+  it('appends and reads commits in order', () => {
+    const stage = new Stage(':memory:');
+    stage.appendCommit(mkCommit('c1', null, 0));
+    stage.appendCommit(mkCommit('c2', 'c1', 1));
+    stage.appendCommit(mkCommit('c3', 'c2', 2));
+    assert.equal(stage.getCommits().length, 3);
+    assert.equal(stage.getCommit('c2')?.sceneIdx, 1);
+  });
+  it('commitsAfter returns only downstream commits', () => {
+    const stage = new Stage(':memory:');
+    stage.appendCommit(mkCommit('c1', null, 0));
+    stage.appendCommit(mkCommit('c2', 'c1', 1));
+    stage.appendCommit(mkCommit('c3', 'c2', 2));
+    assert.deepEqual(stage.commitsAfter('c1').map(c => c.commitId), ['c2', 'c3']);
+  });
+  it('revertCommit marks non-destructively', () => {
+    const stage = new Stage(':memory:');
+    stage.appendCommit(mkCommit('c1', null, 0));
+    stage.revertCommit('c1');
+    assert.equal(stage.getCommit('c1')?.reverted, true);
+    assert.equal(stage.getCommits().length, 1);
+  });
+  it('summarizeOps counts by op family', () => {
+    const s = summarizeOps([
+      { op: 'ADD_FACT', fact: { factId: 'f', subject: 's', predicate: 'p', object: 'o',
+        addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'a', belief: {
+        id: 'b', proposition: 'p', confidence: 1, source: 'inferred', acquired_at: 1 } },
+    ]);
+    assert.equal(s.facts, 1);
+    assert.equal(s.beliefs, 1);
+    assert.equal(s.relationships, 0);
+  });
+});
+
+describe('NVM — What-Breaks-If-Removed', () => {
+  it('flags a downstream commit that references a sole-source character', () => {
+    const stage = new Stage(':memory:');
+    const intro: StoryOp[] = [{ op: 'UPDATE_BELIEF', charId: 'nora', belief: {
+      id: 'b1', proposition: 'p', confidence: 1, source: 'inferred', acquired_at: 1 } }];
+    const usesNora: StoryOp[] = [{ op: 'APPRAISE_EMOTION', charId: 'nora', emotion: {
+      joy: 0, distress: 0, anger: 0, fear: 0, pride: 10, shame: 0,
+      dominant: 'pride', intensity: 10, last_updated_at: 2 } }];
+    stage.appendCommit({ commitId: 'c1', parentId: null, sceneIdx: 0, ops: intro,
+      deltaSummary: summarizeOps(intro), reverted: false, createdAt: 1 });
+    stage.appendCommit({ commitId: 'c2', parentId: 'c1', sceneIdx: 1, ops: usesNora,
+      deltaSummary: summarizeOps(usesNora), reverted: false, createdAt: 2 });
+
+    const report = whatBreaksIfRemoved(stage, 'c1');
+    assert.equal(report.breaks.length, 1);
+    assert.equal(report.breaks[0].downstreamCommit, 'c2');
+    assert.equal(report.breaks[0].proof, 'IntentionalProof');
+  });
+  it('reports no breaks when the character is independently introduced', () => {
+    const stage = new Stage(':memory:');
+    const introNora: StoryOp[] = [{ op: 'UPDATE_BELIEF', charId: 'nora', belief: {
+      id: 'b1', proposition: 'p', confidence: 1, source: 'inferred', acquired_at: 1 } }];
+    stage.appendCommit({ commitId: 'c1', parentId: null, sceneIdx: 0, ops: introNora,
+      deltaSummary: summarizeOps(introNora), reverted: false, createdAt: 1 });
+    stage.appendCommit({ commitId: 'c2', parentId: 'c1', sceneIdx: 1, ops: introNora,
+      deltaSummary: summarizeOps(introNora), reverted: false, createdAt: 2 });
+    assert.equal(whatBreaksIfRemoved(stage, 'c1').breaks.length, 0);
   });
 });

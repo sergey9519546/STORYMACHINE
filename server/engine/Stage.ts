@@ -27,6 +27,8 @@ import type {
   StakeCategory,
 } from './types.ts';
 import { safeJsonParse } from '../lib/json.ts';
+import type { StoryCommit } from '../nvm/state/StoryCommit.ts';
+import type { StoryOp } from '../nvm/ops/StoryOp.ts';
 
 const DEFAULT_DARK_TRIAD: DarkTriad = { machiavellianism: 50, narcissism: 50, psychopathy: 50 };
 const DEFAULT_BIG_FIVE: BigFive = { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 };
@@ -108,6 +110,23 @@ export class Stage {
           );
           CREATE UNIQUE INDEX IF NOT EXISTS idx_knowledge_unique
             ON Knowledge_Ledger(char_id, fact_description);
+        `);
+      },
+      // v7 → v8: NVM StoryCommit ledger — event-sourced canon. Each row is one
+      //          scene-commit holding the StoryOp[] that produced it. Additive:
+      //          Action_Log is untouched.
+      () => {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS Story_Commits (
+            commit_id TEXT PRIMARY KEY,
+            parent_id TEXT,
+            scene_idx INTEGER NOT NULL,
+            ops_json TEXT NOT NULL,
+            delta_summary_json TEXT NOT NULL,
+            reverted INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS idx_commits_scene ON Story_Commits(scene_idx);
         `);
       },
     ];
@@ -1023,6 +1042,60 @@ export class Stage {
       resolved_at: r.resolved_at as number | undefined,
       outcome: r.outcome as Stakes['outcome'] | undefined,
     }));
+  }
+
+  // ── NVM StoryCommit ledger ───────────────────────────────────────────────────
+
+  private _mapCommit(r: Record<string, unknown>): StoryCommit {
+    return {
+      commitId: r.commit_id as string,
+      parentId: (r.parent_id as string | null) ?? null,
+      sceneIdx: r.scene_idx as number,
+      ops: safeJsonParse<StoryOp[]>(r.ops_json as string, []),
+      deltaSummary: safeJsonParse(r.delta_summary_json as string,
+        { facts: 0, beliefs: 0, relationships: 0 }),
+      reverted: Boolean(r.reverted),
+      createdAt: r.created_at as number,
+    };
+  }
+
+  public appendCommit(c: StoryCommit): void {
+    this.db.prepare(`
+      INSERT OR IGNORE INTO Story_Commits
+        (commit_id, parent_id, scene_idx, ops_json, delta_summary_json, reverted, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      c.commitId, c.parentId, c.sceneIdx,
+      JSON.stringify(c.ops), JSON.stringify(c.deltaSummary),
+      c.reverted ? 1 : 0, c.createdAt,
+    );
+  }
+
+  public getCommits(): StoryCommit[] {
+    const rows = this.db.prepare('SELECT * FROM Story_Commits ORDER BY rowid')
+      .all() as Array<Record<string, unknown>>;
+    return rows.map(r => this._mapCommit(r));
+  }
+
+  public getCommit(commitId: string): StoryCommit | undefined {
+    const r = this.db.prepare('SELECT * FROM Story_Commits WHERE commit_id = ?')
+      .get(commitId) as Record<string, unknown> | undefined;
+    return r ? this._mapCommit(r) : undefined;
+  }
+
+  // Downstream commits — everything appended after the given commit.
+  public commitsAfter(commitId: string): StoryCommit[] {
+    const rows = this.db.prepare(`
+      SELECT * FROM Story_Commits
+      WHERE rowid > (SELECT rowid FROM Story_Commits WHERE commit_id = ?)
+      ORDER BY rowid
+    `).all(commitId) as Array<Record<string, unknown>>;
+    return rows.map(r => this._mapCommit(r));
+  }
+
+  // Non-destructive: marks the commit reverted so history is preserved.
+  public revertCommit(commitId: string): void {
+    this.db.prepare('UPDATE Story_Commits SET reverted = 1 WHERE commit_id = ?').run(commitId);
   }
 
   public resolveStakes(id: string, outcome: 'won' | 'lost', turnIndex: number): void {
