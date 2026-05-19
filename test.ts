@@ -25,6 +25,11 @@ import { runM15Harness, buildNoraWarehouseIR } from './server/nvm/__tests__/m1.5
 import { whatBreaksIfRemoved } from './server/nvm/query/whatBreaks.ts';
 import { summarizeOps } from './server/nvm/state/StoryCommit.ts';
 import type { StoryCommit } from './server/nvm/state/StoryCommit.ts';
+import { makePrng, randInt, shuffle, seedFromString } from './server/nvm/repro/seed.ts';
+import { buildManifest, replayManifest } from './server/nvm/repro/manifest.ts';
+import { appendGhost, getGhosts, branchFromGhost } from './server/nvm/repro/ghost-ledger.ts';
+import type { GhostCommit } from './server/nvm/repro/ghost-ledger.ts';
+import { explainAction } from './server/nvm/debug/inspector.ts';
 
 describe('safeJsonParse', () => {
   it('returns parsed value for valid JSON object', () => {
@@ -3234,5 +3239,234 @@ describe('NVM — What-Breaks-If-Removed', () => {
     stage.appendCommit({ commitId: 'c2', parentId: 'c1', sceneIdx: 1, ops: introNora,
       deltaSummary: summarizeOps(introNora), reverted: false, createdAt: 2 });
     assert.equal(whatBreaksIfRemoved(stage, 'c1').breaks.length, 0);
+  });
+});
+
+// ── Wave 2: Bundle A — Reproducible Build ──────────────────────────────────
+
+import { getCached, putCache } from './server/nvm/repro/llm-cache.ts';
+
+describe('NVM — Seed PRNG (A1)', () => {
+  it('makePrng produces deterministic sequence for same seed', () => {
+    const p1 = makePrng(42);
+    const p2 = makePrng(42);
+    const s1 = [p1(), p1(), p1()];
+    const s2 = [p2(), p2(), p2()];
+    assert.deepEqual(s1, s2);
+  });
+  it('different seeds produce different sequences', () => {
+    const p1 = makePrng(1);
+    const p2 = makePrng(2);
+    assert.notEqual(p1(), p2());
+  });
+  it('randInt stays in bounds', () => {
+    const prng = makePrng(99);
+    for (let i = 0; i < 100; i++) {
+      const v = randInt(prng, 10);
+      assert.ok(v >= 0 && v < 10, `randInt out of bounds: ${v}`);
+    }
+  });
+  it('shuffle is deterministic for same seed', () => {
+    const arr = [1, 2, 3, 4, 5];
+    const s1 = shuffle(makePrng(7), arr);
+    const s2 = shuffle(makePrng(7), arr);
+    assert.deepEqual(s1, s2);
+  });
+  it('shuffle does not modify original array', () => {
+    const arr = [1, 2, 3];
+    shuffle(makePrng(1), arr);
+    assert.deepEqual(arr, [1, 2, 3]);
+  });
+  it('seedFromString is stable across calls', () => {
+    assert.equal(seedFromString('hello'), seedFromString('hello'));
+    assert.notEqual(seedFromString('hello'), seedFromString('world'));
+  });
+});
+
+describe('NVM — StoryManifest + replayManifest (A1)', () => {
+  const mkOp = (): StoryOp => ({
+    op: 'ADD_FACT',
+    fact: { factId: 'f1', subject: 's', predicate: 'p', object: 'o', addedAtTurn: 1, validFrom: 1, validTo: null },
+  });
+
+  it('buildManifest records a finalStateHash', () => {
+    const commit: StoryCommit = {
+      commitId: 'c1', parentId: null, sceneIdx: 0, ops: [mkOp()],
+      deltaSummary: summarizeOps([mkOp()]), reverted: false, createdAt: Date.now(),
+    };
+    const manifest = buildManifest('m1', seedFromString('test'), 'test-scenario', [commit]);
+    assert.ok(typeof manifest.finalStateHash === 'string' && manifest.finalStateHash.length > 0);
+    assert.equal(manifest.seed, seedFromString('test'));
+    assert.equal(manifest.scenario, 'test-scenario');
+  });
+
+  it('replayManifest returns match=true for valid manifest', () => {
+    const op = mkOp();
+    const commit: StoryCommit = {
+      commitId: 'c1', parentId: null, sceneIdx: 0, ops: [op],
+      deltaSummary: summarizeOps([op]), reverted: false, createdAt: Date.now(),
+    };
+    const manifest = buildManifest('m1', 0, 'test', [commit]);
+    const result = replayManifest(manifest);
+    assert.equal(result.match, true);
+    assert.equal(result.replayedHash, result.expectedHash);
+  });
+
+  it('replayManifest detects tampering (hash mismatch)', () => {
+    const op = mkOp();
+    const commit: StoryCommit = {
+      commitId: 'c1', parentId: null, sceneIdx: 0, ops: [op],
+      deltaSummary: summarizeOps([op]), reverted: false, createdAt: Date.now(),
+    };
+    const manifest = buildManifest('m1', 0, 'test', [commit]);
+    manifest.finalStateHash = 'deadbeef00000000';
+    const result = replayManifest(manifest);
+    assert.equal(result.match, false);
+  });
+
+  it('skips reverted commits in replay', () => {
+    const op = mkOp();
+    const c1: StoryCommit = {
+      commitId: 'c1', parentId: null, sceneIdx: 0, ops: [op],
+      deltaSummary: summarizeOps([op]), reverted: false, createdAt: Date.now(),
+    };
+    const c2: StoryCommit = { ...c1, commitId: 'c2', reverted: true };
+    const manifest = buildManifest('m1', 0, 'test', [c1, c2]);
+    const result = replayManifest(manifest);
+    assert.equal(result.match, true);
+  });
+});
+
+describe('NVM — LLM cache (A1)', () => {
+  it('returns null on cache miss', () => {
+    const stage = new Stage(':memory:');
+    assert.equal(getCached(stage, 'model-x', 'prompt-x'), null);
+  });
+  it('returns cached response on warm hit', () => {
+    const stage = new Stage(':memory:');
+    putCache(stage, 'gemini-pro', 'hello world', 'response text');
+    const result = getCached(stage, 'gemini-pro', 'hello world');
+    assert.equal(result, 'response text');
+  });
+  it('different models with same prompt do not collide', () => {
+    const stage = new Stage(':memory:');
+    putCache(stage, 'model-a', 'same prompt', 'response A');
+    putCache(stage, 'model-b', 'same prompt', 'response B');
+    assert.equal(getCached(stage, 'model-a', 'same prompt'), 'response A');
+    assert.equal(getCached(stage, 'model-b', 'same prompt'), 'response B');
+  });
+  it('llmCacheSize tracks entries', () => {
+    const stage = new Stage(':memory:');
+    assert.equal(stage.llmCacheSize(), 0);
+    putCache(stage, 'm', 'p1', 'r1');
+    putCache(stage, 'm', 'p2', 'r2');
+    assert.equal(stage.llmCacheSize(), 2);
+  });
+});
+
+describe('NVM — Ghost Ledger (A2)', () => {
+  function mkGhost(id: string, sceneIdx: number): GhostCommit {
+    return {
+      ghostId: id,
+      parentCommitId: null,
+      sceneIdx,
+      ir: buildNoraWarehouseIR(),
+      reason: 'proof_fail',
+      rejectedAt: Date.now(),
+    };
+  }
+
+  it('appendGhost and getGhosts round-trips a ghost commit', () => {
+    const stage = new Stage(':memory:');
+    const g = mkGhost('g1', 2);
+    appendGhost(stage, g);
+    const ghosts = getGhosts(stage);
+    assert.equal(ghosts.length, 1);
+    assert.equal(ghosts[0].ghostId, 'g1');
+    assert.equal(ghosts[0].reason, 'proof_fail');
+  });
+
+  it('getGhosts with sceneIdx filters correctly', () => {
+    const stage = new Stage(':memory:');
+    appendGhost(stage, mkGhost('g1', 1));
+    appendGhost(stage, mkGhost('g2', 2));
+    appendGhost(stage, mkGhost('g3', 1));
+    assert.equal(getGhosts(stage, 1).length, 2);
+    assert.equal(getGhosts(stage, 2).length, 1);
+    assert.equal(getGhosts(stage).length, 3);
+  });
+
+  it('branchFromGhost returns ops from the ghost IR', () => {
+    const stage = new Stage(':memory:');
+    const g = mkGhost('g_branch', 3);
+    appendGhost(stage, g);
+    const result = branchFromGhost(stage, 'g_branch');
+    assert.ok(result !== null);
+    assert.equal(result!.ghostId, 'g_branch');
+    assert.equal(result!.sceneIdx, 3);
+    assert.ok(Array.isArray(result!.branchedOps));
+    assert.ok(result!.branchedOps.length > 0);
+  });
+
+  it('branchFromGhost returns null for unknown ghostId', () => {
+    const stage = new Stage(':memory:');
+    assert.equal(branchFromGhost(stage, 'nonexistent'), null);
+  });
+});
+
+describe('NVM — Cockpit Inspector (A3)', () => {
+  it('returns null for unknown eventId', () => {
+    const stage = new Stage(':memory:');
+    assert.equal(explainAction(stage, 'evt_nonexistent'), null);
+  });
+
+  it('explains a recorded action with at least a line frame', () => {
+    const stage = new Stage(':memory:');
+    stage.addLocation({ location_id: 'loc_1', name: 'Warehouse', description: '', adjacent_locations: [] });
+    stage.addAgent({
+      char_id: 'nora', name: 'Nora', public_mask: 'worker', hidden_motive: 'thief',
+      current_location_id: 'loc_1', suspicion_score: 0, is_alive: true,
+      knowledge_vector: ['knows where crate 7 is'],
+    });
+    const eventId = stage.recordAction('nora', {
+      action_type: 'SPEAK', content: 'The crate is in warehouse A.', target: null,
+    }, 'loc_1');
+    const panel = explainAction(stage, eventId);
+    assert.ok(panel !== null);
+    assert.equal(panel!.eventId, eventId);
+    assert.equal(panel!.charId, 'nora');
+    assert.equal(panel!.actionType, 'SPEAK');
+    assert.ok(panel!.frames.length >= 1);
+    assert.ok(panel!.frames.some(f => f.layer === 'line'));
+    assert.ok(panel!.frames.some(f => f.layer === 'tactic'));
+  });
+
+  it('call stack is ordered goal→pressure→tactic→line', () => {
+    const stage = new Stage(':memory:');
+    stage.addLocation({ location_id: 'loc_1', name: 'Room', description: '', adjacent_locations: [] });
+    const terminalGoal: import('./server/engine/types.ts').Goal = {
+      id: 'g_term', description: 'solve the case', value: 100, achieved: false,
+    };
+    const sub1: import('./server/engine/types.ts').Goal = {
+      id: 'g_sub1', description: 'gather evidence', value: 80, achieved: false,
+    };
+    const sub2: import('./server/engine/types.ts').Goal = {
+      id: 'g_sub2', description: 'interview witnesses', value: 70, achieved: false,
+    };
+    stage.addAgent({
+      char_id: 'bob', name: 'Bob', public_mask: 'detective', hidden_motive: 'obsessive',
+      current_location_id: 'loc_1', suspicion_score: 0, is_alive: true,
+      knowledge_vector: [],
+      goalStack: { terminal: terminalGoal, instrumental: [sub1, sub2], last_planned_at: 0 },
+    });
+    const eventId = stage.recordAction('bob', {
+      action_type: 'EXAMINE', content: 'Bob examines the crate for fingerprints.', target: null,
+    }, 'loc_1');
+    const panel = explainAction(stage, eventId);
+    assert.ok(panel !== null);
+    const layers = panel!.frames.map(f => f.layer);
+    const goalIdx = layers.indexOf('goal');
+    const lineIdx = layers.indexOf('line');
+    assert.ok(goalIdx < lineIdx, `goal (${goalIdx}) should precede line (${lineIdx})`);
   });
 });

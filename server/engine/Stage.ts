@@ -129,6 +129,31 @@ export class Stage {
           CREATE INDEX IF NOT EXISTS idx_commits_scene ON Story_Commits(scene_idx);
         `);
       },
+      // v8 → v9: LLM call cache (reproducible build) + Ghost Commits (shadow canon).
+      //   Llm_Cache: keyed by (model, prompt_hash) — warm hit bypasses network.
+      //   Ghost_Commits: rejected IR candidates stored as shadow canon for What-If.
+      () => {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS Llm_Cache (
+            cache_key   TEXT PRIMARY KEY,
+            model       TEXT NOT NULL,
+            prompt_hash TEXT NOT NULL,
+            response    TEXT NOT NULL,
+            created_at  INTEGER NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS idx_llm_cache_key ON Llm_Cache(cache_key);
+
+          CREATE TABLE IF NOT EXISTS Ghost_Commits (
+            ghost_id        TEXT PRIMARY KEY,
+            parent_commit_id TEXT,
+            scene_idx       INTEGER NOT NULL,
+            ir_json         TEXT NOT NULL,
+            reason          TEXT NOT NULL,
+            rejected_at     INTEGER NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS idx_ghost_scene ON Ghost_Commits(scene_idx);
+        `);
+      },
     ];
     for (let i = current; i < MIGRATIONS.length; i++) {
       this.db.transaction(() => {
@@ -1151,6 +1176,65 @@ export class Stage {
     for (const p of snap.event_propositions ?? []) this._insertRawEventProposition(p);
     for (const p of snap.persuasion_log ?? [])     this._insertRawPersuasion(p);
     for (const s of snap.stakes ?? [])              this.upsertStakes(s);
+  }
+
+  // ── LLM call cache (v9) ─────────────────────────────────────────────────────
+
+  public llmCacheGet(cacheKey: string): string | null {
+    const row = this.db.prepare('SELECT response FROM Llm_Cache WHERE cache_key = ?')
+      .get(cacheKey) as { response: string } | undefined;
+    return row ? row.response : null;
+  }
+
+  public llmCachePut(cacheKey: string, model: string, response: string): void {
+    this.db.prepare(`
+      INSERT OR REPLACE INTO Llm_Cache (cache_key, model, prompt_hash, response, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(cacheKey, model, cacheKey, response, Date.now());
+  }
+
+  public llmCacheSize(): number {
+    return (this.db.prepare('SELECT COUNT(*) as cnt FROM Llm_Cache').get() as { cnt: number }).cnt;
+  }
+
+  // ── Ghost ledger (v9) ────────────────────────────────────────────────────────
+
+  public ghostLedgerAppend(ghost: import('../nvm/repro/ghost-ledger.ts').GhostCommit): void {
+    this.db.prepare(`
+      INSERT OR IGNORE INTO Ghost_Commits
+        (ghost_id, parent_commit_id, scene_idx, ir_json, reason, rejected_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      ghost.ghostId, ghost.parentCommitId ?? null, ghost.sceneIdx,
+      JSON.stringify(ghost.ir), ghost.reason, ghost.rejectedAt,
+    );
+  }
+
+  public ghostLedgerGet(sceneIdx?: number): import('../nvm/repro/ghost-ledger.ts').GhostCommit[] {
+    const rows = sceneIdx !== undefined
+      ? this.db.prepare('SELECT * FROM Ghost_Commits WHERE scene_idx = ? ORDER BY rejected_at ASC').all(sceneIdx)
+      : this.db.prepare('SELECT * FROM Ghost_Commits ORDER BY rejected_at ASC').all();
+    return (rows as Array<Record<string, unknown>>).map(r => ({
+      ghostId: r.ghost_id as string,
+      parentCommitId: (r.parent_commit_id as string | null) ?? null,
+      sceneIdx: r.scene_idx as number,
+      ir: safeJsonParse(r.ir_json as string, {} as import('../nvm/repro/ghost-ledger.ts').GhostCommit['ir']),
+      reason: r.reason as import('../nvm/repro/ghost-ledger.ts').GhostReason,
+      rejectedAt: r.rejected_at as number,
+    }));
+  }
+
+  public ghostLedgerFind(ghostId: string): import('../nvm/repro/ghost-ledger.ts').GhostCommit | undefined {
+    const r = this.db.prepare('SELECT * FROM Ghost_Commits WHERE ghost_id = ?').get(ghostId) as Record<string, unknown> | undefined;
+    if (!r) return undefined;
+    return {
+      ghostId: r.ghost_id as string,
+      parentCommitId: (r.parent_commit_id as string | null) ?? null,
+      sceneIdx: r.scene_idx as number,
+      ir: safeJsonParse(r.ir_json as string, {} as import('../nvm/repro/ghost-ledger.ts').GhostCommit['ir']),
+      reason: r.reason as import('../nvm/repro/ghost-ledger.ts').GhostReason,
+      rejectedAt: r.rejected_at as number,
+    };
   }
 
   private _insertRawAction(entry: ActionLogEntry): void {

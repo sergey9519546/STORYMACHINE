@@ -1427,6 +1427,64 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     });
   }));
 
+  // ── NVM routes (Wave 2) ────────────────────────────────────────────────────
+
+  // GET /api/nvm/commits — list all StoryCommits for this session
+  app.get('/api/nvm/commits', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    res.json({ commits: stage.getCommits() });
+  }));
+
+  // GET /api/nvm/commits/:commitId — single commit
+  app.get('/api/nvm/commits/:commitId', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const commit = stage.getCommit(req.params.commitId);
+    if (!commit) { res.status(404).json({ error: 'commit not found' }); return; }
+    res.json(commit);
+  }));
+
+  // GET /api/nvm/ghost-commits — list ghost (rejected) commits, optional ?sceneIdx=
+  app.get('/api/nvm/ghost-commits', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const sceneIdx = req.query.sceneIdx !== undefined ? Number(req.query.sceneIdx) : undefined;
+    res.json({ ghosts: stage.ghostLedgerGet(sceneIdx) });
+  }));
+
+  // POST /api/nvm/ghost-commits/branch — promote a ghost to a What-If candidate
+  app.post('/api/nvm/ghost-commits/branch', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const ghostId = requireString(req.body?.ghostId, 'ghostId', 128);
+    const ghost = stage.ghostLedgerFind(ghostId);
+    if (!ghost) { res.status(404).json({ error: 'ghost not found' }); return; }
+    res.json({ ghostId, branchedOps: ghost.ir.ops, sceneIdx: ghost.sceneIdx });
+  }));
+
+  // GET /api/nvm/manifest — build a StoryManifest from the current session
+  app.get('/api/nvm/manifest', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { manifestFromStage } = await import('./server/nvm/repro/manifest.ts');
+    const { seedFromString } = await import('./server/nvm/repro/seed.ts');
+    const sid = sessionId(req);
+    const manifest = manifestFromStage(stage, `manifest_${sid}`, seedFromString(sid), sid);
+    res.json(manifest);
+  }));
+
+  // GET /api/debug/explain/:eventId — explain an action as a causal call stack
+  app.get('/api/debug/explain/:eventId', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { explainAction } = await import('./server/nvm/debug/inspector.ts');
+    const panel = explainAction(stage, req.params.eventId);
+    if (!panel) { res.status(404).json({ error: 'event not found' }); return; }
+    res.json(panel);
+  }));
+
+  // GET /api/debug/explain-scene/:locationId — explain all events in a scene
+  app.get('/api/debug/explain-scene/:locationId', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { explainScene } = await import('./server/nvm/debug/inspector.ts');
+    res.json({ panels: explainScene(stage, req.params.locationId) });
+  }));
+
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
