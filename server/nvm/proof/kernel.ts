@@ -12,9 +12,10 @@ import { mechanismProof } from './tier1/mechanism.ts';
 import { epistemicProof } from './tier1/epistemic.ts';
 import { continuityProof } from './tier1/continuity.ts';
 import { provenanceProof } from './tier1/provenance.ts';
+import { earnedRevealProof } from './tier1/earnedReveal.ts';
 
-// The 7 Tier 1 hard-block proofs. A transition that fails any of these must not
-// become a StoryCommit.
+// The 8 Tier 1 hard-block proofs (Wave 1: 7 + Wave 3 B1: EarnedRevealProof).
+// A transition that fails any of these must not become a StoryCommit.
 export function runTier1(ir: NarrativeTransitionIR, state: NarrativeState): ProofResult[] {
   return [
     temporalProof(ir, state),
@@ -24,6 +25,7 @@ export function runTier1(ir: NarrativeTransitionIR, state: NarrativeState): Proo
     epistemicProof(ir, state),
     continuityProof(ir, state),
     provenanceProof(ir, state),
+    earnedRevealProof(ir, state),
   ];
 }
 

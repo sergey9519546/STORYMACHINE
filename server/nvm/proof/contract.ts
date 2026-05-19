@@ -5,9 +5,9 @@
 export type ProofTier = 1 | 2 | 3 | 4;
 
 export type ProofName =
-  // Tier 1 — Hard Blocks (exactly 7)
+  // Tier 1 — Hard Blocks (8: the original 7 + EarnedRevealProof)
   | 'TemporalProof' | 'CausalProof' | 'IntentionalProof' | 'MechanismProof'
-  | 'EpistemicProof' | 'ContinuityProof' | 'ProvenanceProof'
+  | 'EpistemicProof' | 'ContinuityProof' | 'ProvenanceProof' | 'EarnedRevealProof'
   // Tier 2 — Quality Gates
   | 'EmotionProof' | 'RelationshipProof' | 'ThemeProof' | 'ReaderStateProof'
   | 'SpatialProof' | 'DialogueProof' | 'SubtextProof' | 'VoiceProof'
@@ -42,7 +42,7 @@ export interface RepairSuggestion {
 // Exhaustive tier map — adding a ProofName without a tier fails compilation.
 export const PROOF_TIERS: Record<ProofName, ProofTier> = {
   TemporalProof: 1, CausalProof: 1, IntentionalProof: 1, MechanismProof: 1,
-  EpistemicProof: 1, ContinuityProof: 1, ProvenanceProof: 1,
+  EpistemicProof: 1, ContinuityProof: 1, ProvenanceProof: 1, EarnedRevealProof: 1,
   EmotionProof: 2, RelationshipProof: 2, ThemeProof: 2, ReaderStateProof: 2,
   SpatialProof: 2, DialogueProof: 2, SubtextProof: 2, VoiceProof: 2,
   NecessityProof: 2, ReincorporationProof: 2, SpecificityProof: 2,

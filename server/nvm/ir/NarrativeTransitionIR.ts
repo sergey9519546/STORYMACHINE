@@ -4,6 +4,7 @@
 // transition the Proof Kernel validates before it can become a StoryCommit.
 
 import type { StoryOp } from '../ops/StoryOp.ts';
+import type { RevealPlan } from '../reveal/RevealPlan.ts';
 
 export type SceneFunction =
   | 'advance_plot' | 'reveal_character' | 'build_tension'
@@ -11,6 +12,13 @@ export type SceneFunction =
 
 export type ProvenanceOrigin =
   'user_authored' | 'model_generated' | 'model_rewritten' | 'model_edited_by_user';
+
+// B2: causal link — op[opIdx] was caused by the listed fact/belief/char IDs.
+// CausalProof verifies these claims instead of guessing.
+export interface CausalLink {
+  opIdx: number;
+  causedBy: string[];    // factId | beliefId | charId | setupId present in prior state
+}
 
 export interface NarrativeTransitionIR {
   transitionId: string;
@@ -22,4 +30,8 @@ export interface NarrativeTransitionIR {
   preconditions: string[];
   postconditions: string[];
   provenance: { origin: ProvenanceOrigin; createdAt: number; model?: string };
+  // B2: proof-carrying causal links (optional; verified by CausalProof when present)
+  causalLinks?: CausalLink[];
+  // B1: reveal plans (optional; verified by EarnedRevealProof when present)
+  revealPlans?: RevealPlan[];
 }

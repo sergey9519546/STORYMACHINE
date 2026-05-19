@@ -154,6 +154,21 @@ export class Stage {
           CREATE INDEX IF NOT EXISTS idx_ghost_scene ON Ghost_Commits(scene_idx);
         `);
       },
+      // v9 → v10: Reveal_Plans — persists the RevealPlan commitments that govern
+      //           PAYOFF_SETUP ops. The EarnedRevealProof checks these at commit time.
+      () => {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS Reveal_Plans (
+            reveal_id        TEXT PRIMARY KEY,
+            payoff_setup_id  TEXT NOT NULL,
+            description      TEXT NOT NULL,
+            required_clue_ids_json TEXT NOT NULL,
+            committed_scene  INTEGER NOT NULL,
+            created_at       INTEGER NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS idx_reveal_setup ON Reveal_Plans(payoff_setup_id);
+        `);
+      },
     ];
     for (let i = current; i < MIGRATIONS.length; i++) {
       this.db.transaction(() => {
@@ -1176,6 +1191,42 @@ export class Stage {
     for (const p of snap.event_propositions ?? []) this._insertRawEventProposition(p);
     for (const p of snap.persuasion_log ?? [])     this._insertRawPersuasion(p);
     for (const s of snap.stakes ?? [])              this.upsertStakes(s);
+  }
+
+  // ── Reveal Plans (v10) ──────────────────────────────────────────────────────
+
+  public upsertRevealPlan(plan: import('../nvm/reveal/RevealPlan.ts').RevealPlan, committedScene: number): void {
+    this.db.prepare(`
+      INSERT OR REPLACE INTO Reveal_Plans
+        (reveal_id, payoff_setup_id, description, required_clue_ids_json, committed_scene, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      plan.revealId, plan.payoffSetupId, plan.description,
+      JSON.stringify(plan.requiredClueIds), committedScene, Date.now(),
+    );
+  }
+
+  public getRevealPlan(revealId: string): import('../nvm/reveal/RevealPlan.ts').RevealPlan | undefined {
+    const r = this.db.prepare('SELECT * FROM Reveal_Plans WHERE reveal_id = ?')
+      .get(revealId) as Record<string, unknown> | undefined;
+    if (!r) return undefined;
+    return {
+      revealId: r.reveal_id as string,
+      payoffSetupId: r.payoff_setup_id as string,
+      description: r.description as string,
+      requiredClueIds: safeJsonParse<string[]>(r.required_clue_ids_json as string, []),
+    };
+  }
+
+  public getAllRevealPlans(): import('../nvm/reveal/RevealPlan.ts').RevealPlan[] {
+    const rows = this.db.prepare('SELECT * FROM Reveal_Plans ORDER BY committed_scene ASC')
+      .all() as Array<Record<string, unknown>>;
+    return rows.map(r => ({
+      revealId: r.reveal_id as string,
+      payoffSetupId: r.payoff_setup_id as string,
+      description: r.description as string,
+      requiredClueIds: safeJsonParse<string[]>(r.required_clue_ids_json as string, []),
+    }));
   }
 
   // ── LLM call cache (v9) ─────────────────────────────────────────────────────

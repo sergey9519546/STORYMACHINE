@@ -30,6 +30,12 @@ import { buildManifest, replayManifest } from './server/nvm/repro/manifest.ts';
 import { appendGhost, getGhosts, branchFromGhost } from './server/nvm/repro/ghost-ledger.ts';
 import type { GhostCommit } from './server/nvm/repro/ghost-ledger.ts';
 import { explainAction } from './server/nvm/debug/inspector.ts';
+import { earnedRevealProof } from './server/nvm/proof/tier1/earnedReveal.ts';
+import { causalProof as causalProofB2 } from './server/nvm/proof/tier1/causal.ts';
+import { intentionalProof as intentionalProofB3 } from './server/nvm/proof/tier1/intentional.ts';
+import { repair } from './server/nvm/proof/repair.ts';
+import { lint } from './server/nvm/proof/lint.ts';
+import type { RevealPlan } from './server/nvm/reveal/RevealPlan.ts';
 
 describe('safeJsonParse', () => {
   it('returns parsed value for valid JSON object', () => {
@@ -2933,11 +2939,12 @@ describe('NVM — StoryOp vocabulary (decision 1)', () => {
 
 describe('NVM — 4-tier proof contract (decision 3)', () => {
   it('PROOF_TIERS covers every ProofName', () => {
-    assert.equal(Object.keys(PROOF_TIERS).length, 24);
+    // Wave 1: 24. Wave 3 B1 adds EarnedRevealProof → 25.
+    assert.equal(Object.keys(PROOF_TIERS).length, 25);
   });
-  it('Tier 1 has exactly 7 proofs', () => {
+  it('Tier 1 has exactly 8 proofs (7 original + EarnedRevealProof)', () => {
     const tier1 = Object.entries(PROOF_TIERS).filter(([, t]) => t === 1);
-    assert.equal(tier1.length, 7);
+    assert.equal(tier1.length, 8);
   });
   it('all four tiers are populated', () => {
     const tiers = new Set(Object.values(PROOF_TIERS));
@@ -3107,9 +3114,9 @@ describe('NVM — mechanism schema loader', () => {
 });
 
 describe('NVM — Proof Kernel Tier 1', () => {
-  it('a valid IR passes all 7 Tier 1 proofs', () => {
+  it('a valid IR passes all 8 Tier 1 proofs', () => {
     const results = runTier1(buildNoraWarehouseIR(), emptyState());
-    assert.equal(results.length, 7);
+    assert.equal(results.length, 8);
     assert.ok(tier1Passes(results), JSON.stringify(results.filter(r => !r.pass)));
   });
 
@@ -3468,5 +3475,210 @@ describe('NVM — Cockpit Inspector (A3)', () => {
     const goalIdx = layers.indexOf('goal');
     const lineIdx = layers.indexOf('line');
     assert.ok(goalIdx < lineIdx, `goal (${goalIdx}) should precede line (${lineIdx})`);
+  });
+});
+
+// ── Wave 3: Bundle B — Structural Guarantees ───────────────────────────────
+
+describe('NVM — EarnedRevealProof (B1)', () => {
+  const baseIR = buildNoraWarehouseIR();
+
+  it('passes when IR has no revealPlans', () => {
+    const state = emptyState();
+    const result = earnedRevealProof(baseIR, state);
+    assert.equal(result.pass, true);
+    assert.equal(result.proof, 'EarnedRevealProof');
+  });
+
+  it('passes when all required clues are in state', () => {
+    const clueId = 'clue_witness_nora';
+    const state = emptyState();
+    state.clues.push({ clueId, carrier: 'line' });
+
+    const plan: RevealPlan = {
+      revealId: 'reveal_nora_lied',
+      description: 'Reveal that Nora lied',
+      requiredClueIds: [clueId],
+      payoffSetupId: 'setup_nora_lie',
+    };
+    const ir = {
+      ...baseIR,
+      ops: [
+        ...baseIR.ops,
+        { op: 'PAYOFF_SETUP' as const, setupId: 'setup_nora_lie', payoffEventId: 'evt_reveal_1' },
+      ],
+      revealPlans: [plan],
+    };
+    assert.equal(earnedRevealProof(ir, state).pass, true);
+  });
+
+  it('blocks when a required clue is missing from state', () => {
+    const plan: RevealPlan = {
+      revealId: 'reveal_twist',
+      description: 'The big twist',
+      requiredClueIds: ['clue_missing'],
+      payoffSetupId: 'setup_twist',
+    };
+    const ir = {
+      ...baseIR,
+      ops: [
+        ...baseIR.ops,
+        { op: 'PAYOFF_SETUP' as const, setupId: 'setup_twist', payoffEventId: 'evt_twist' },
+      ],
+      revealPlans: [plan],
+    };
+    const result = earnedRevealProof(ir, emptyState());
+    assert.equal(result.pass, false);
+    assert.equal(result.findings.length, 1);
+    assert.equal(result.findings[0].subjectId, 'clue_missing');
+  });
+
+  it('skips plans whose PAYOFF_SETUP op is not in this IR', () => {
+    const plan: RevealPlan = {
+      revealId: 'reveal_other',
+      description: 'Another reveal',
+      requiredClueIds: ['clue_not_needed_yet'],
+      payoffSetupId: 'setup_future',
+    };
+    const ir = { ...baseIR, revealPlans: [plan] }; // no PAYOFF_SETUP in ops
+    assert.equal(earnedRevealProof(ir, emptyState()).pass, true);
+  });
+
+  it('EarnedRevealProof is in PROOF_TIERS as Tier 1', () => {
+    assert.equal(PROOF_TIERS['EarnedRevealProof'], 1);
+  });
+
+  it('runTier1 now returns 8 results (includes EarnedRevealProof)', () => {
+    const results = runTier1(baseIR, emptyState());
+    assert.equal(results.length, 8);
+    assert.ok(results.some(r => r.proof === 'EarnedRevealProof'));
+  });
+});
+
+describe('NVM — CausalProof + causalLinks (B2)', () => {
+  it('passes when causalLinks reference facts in prior state', () => {
+    const state = emptyState();
+    state.objectiveReality.push({
+      factId: 'fact_box', subject: 'box', predicate: 'location',
+      object: 'room_a', addedAtTurn: 1, validFrom: 1, validTo: null,
+    });
+    const ir = {
+      ...buildNoraWarehouseIR(),
+      sceneIdx: 1,
+      preconditions: ['box is in room A'],
+      causalLinks: [{ opIdx: 0, causedBy: ['fact_box'] }],
+    };
+    assert.equal(causalProofB2(ir, state).pass, true);
+  });
+
+  it('blocks when causalLinks reference a non-existent ID', () => {
+    const ir = {
+      ...buildNoraWarehouseIR(),
+      sceneIdx: 1,
+      preconditions: ['something happened'],
+      causalLinks: [{ opIdx: 0, causedBy: ['fact_nonexistent'] }],
+    };
+    const result = causalProofB2(ir, emptyState());
+    assert.equal(result.pass, false);
+    assert.ok(result.findings.some(f => f.subjectId === 'fact_nonexistent'));
+  });
+
+  it('passes when no causalLinks declared (backward-compat)', () => {
+    const ir = { ...buildNoraWarehouseIR() };
+    assert.equal(causalProofB2(ir, emptyState()).pass, true);
+  });
+});
+
+describe('NVM — repair() (B3)', () => {
+  it('returns empty array for all-passing results', () => {
+    const { tier1 } = runM15Harness();
+    const patches = repair(tier1, emptyState());
+    assert.equal(patches.length, 0);
+  });
+
+  it('patches IntentionalProof failure with UPDATE_BELIEF op', () => {
+    const badOp: StoryOp = {
+      op: 'APPRAISE_EMOTION', charId: 'ghost_char',
+      emotion: { joy: 0, distress: 0, anger: 0, fear: 0, pride: 10, shame: 0, dominant: 'pride', intensity: 10, last_updated_at: 1 },
+    };
+    const ir = { ...buildNoraWarehouseIR(), ops: [badOp] };
+    const result = intentionalProofB3(ir, emptyState());
+    const patches = repair([result], emptyState());
+    assert.ok(patches.length > 0);
+    const patch = patches[0];
+    assert.equal(patch.proof, 'IntentionalProof');
+    assert.ok(patch.ops.length > 0);
+    assert.equal(patch.ops[0].op, 'UPDATE_BELIEF');
+  });
+
+  it('patches EarnedRevealProof failure with SEED_CLUE op', () => {
+    const plan: RevealPlan = {
+      revealId: 'rev1', description: 'The twist', requiredClueIds: ['clue_abc'], payoffSetupId: 'setup_abc',
+    };
+    const ir = {
+      ...buildNoraWarehouseIR(),
+      ops: [
+        ...buildNoraWarehouseIR().ops,
+        { op: 'PAYOFF_SETUP' as const, setupId: 'setup_abc', payoffEventId: 'evt_abc' },
+      ],
+      revealPlans: [plan],
+    };
+    const result = earnedRevealProof(ir, emptyState());
+    const patches = repair([result], emptyState());
+    assert.ok(patches.length > 0);
+    assert.equal(patches[0].proof, 'EarnedRevealProof');
+    assert.equal(patches[0].ops[0].op, 'SEED_CLUE');
+  });
+});
+
+describe('NVM — lint() (B3)', () => {
+  it('returns no warnings for a clean IR', () => {
+    const warnings = lint(buildNoraWarehouseIR(), emptyState());
+    assert.equal(warnings.length, 0);
+  });
+
+  it('flags APPRAISE_EMOTION with intensity=0 but non-null dominant', () => {
+    const op: StoryOp = {
+      op: 'APPRAISE_EMOTION', charId: 'nora',
+      emotion: { joy: 0, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'pride', intensity: 0, last_updated_at: 1 },
+    };
+    const ir = { ...buildNoraWarehouseIR(), ops: [op] };
+    const state = emptyState();
+    state.characterBeliefs['nora'] = [];
+    const warnings = lint(ir, state);
+    assert.ok(warnings.some(w => w.rule === 'EMOTION_ZERO_INTENSITY'));
+  });
+
+  it('flags more than 3 UPDATE_BELIEF ops in one IR', () => {
+    const mkBelief = (id: string): StoryOp => ({
+      op: 'UPDATE_BELIEF', charId: 'nora',
+      belief: { id, proposition: id, confidence: 1, source: 'inferred', acquired_at: 1 },
+    });
+    const ir = { ...buildNoraWarehouseIR(), ops: [mkBelief('b1'), mkBelief('b2'), mkBelief('b3'), mkBelief('b4')] };
+    const warnings = lint(ir, emptyState());
+    assert.ok(warnings.some(w => w.rule === 'BELIEF_OVERLOAD'));
+  });
+
+  it('flags SEED_CLUE with no matching RevealPlan as orphan', () => {
+    const op: StoryOp = {
+      op: 'SEED_CLUE', clueId: 'orphan_clue',
+      carrier: 'object',
+    };
+    const ir = { ...buildNoraWarehouseIR(), ops: [op] };
+    const warnings = lint(ir, emptyState());
+    assert.ok(warnings.some(w => w.rule === 'ORPHAN_CLUE'));
+  });
+
+  it('Stage v10: RevealPlan round-trips via upsert + get', () => {
+    const stage = new Stage(':memory:');
+    const plan: RevealPlan = {
+      revealId: 'rev_test', payoffSetupId: 'setup_test',
+      description: 'Test reveal', requiredClueIds: ['clue_a', 'clue_b'],
+    };
+    stage.upsertRevealPlan(plan, 3);
+    const fetched = stage.getRevealPlan('rev_test');
+    assert.ok(fetched !== undefined);
+    assert.deepEqual(fetched!.requiredClueIds, ['clue_a', 'clue_b']);
+    assert.equal(fetched!.payoffSetupId, 'setup_test');
   });
 });
