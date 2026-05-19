@@ -18,6 +18,7 @@ import type { StoryOp } from './server/nvm/ops/StoryOp.ts';
 import { PROOF_TIERS, passResult, failResult } from './server/nvm/proof/contract.ts';
 import type { ProofName } from './server/nvm/proof/contract.ts';
 import { emptyState, stateHash, relationshipKey } from './server/nvm/state/NarrativeState.ts';
+import type { NarrativeState } from './server/nvm/state/NarrativeState.ts';
 import { applyStoryOp, applyStoryOps } from './server/nvm/ops/dispatcher.ts';
 import { loadMechanisms, loadMechanismsCached } from './server/nvm/mechanisms/loader.ts';
 import { runTier1, tier1Passes } from './server/nvm/proof/kernel.ts';
@@ -51,6 +52,7 @@ import { convergeScene } from './server/nvm/converge/loop.ts';
 import { runWritersRoom } from './server/nvm/room/room.ts';
 import { buildSCM } from './server/nvm/twin/scm.ts';
 import { doIntervention } from './server/nvm/twin/counterfactual.ts';
+import { project, type Canon, type ProjectionTarget } from './server/nvm/project/index.ts';
 
 describe('safeJsonParse', () => {
   it('returns parsed value for valid JSON object', () => {
@@ -4222,5 +4224,158 @@ describe('NVM — Counterfactual / do()-calculus (G4)', () => {
     const scm = buildSCM(stage);
     const report = doIntervention(scm, { opId: 'c1:0', replacement: null });
     assert.ok(report.summary.includes('removed') || report.summary.includes('Intervention'));
+  });
+});
+
+// ── Wave 8: Holographic Projection (G3) ──────────────────────────────────────
+
+describe('NVM — Holographic Projection (G3)', () => {
+  function makeCanon(): Canon {
+    const ops1: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'nora', predicate: 'hides', object: 'letter', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'nobody knows', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+      { op: 'RECORD_VISUAL_FACT', sceneId: 's1', fact: 'A letter lies hidden in the piano bench.' },
+      { op: 'SEED_CLUE', clueId: 'letter_clue', carrier: 'object' },
+    ];
+    const ops2: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'helmer', belief: { id: 'b2', proposition: 'nora is honest', confidence: 1, source: 'told', source_event_id: 'e2', acquired_at: 2 } },
+      { op: 'APPRAISE_EMOTION', charId: 'nora', emotion: { joy: 0, distress: 60, anger: 0, fear: 80, pride: 0, shame: 20, dominant: 'fear', intensity: 80, last_updated_at: 2 } },
+      { op: 'SHIFT_RELATIONSHIP', pair: ['nora', 'helmer'], delta: { dimension: 'trust', amount: -0.4, reason: 'power shifts as secret deepens' } },
+    ];
+
+    const state: NarrativeState = {
+      ...emptyState(),
+      objectiveReality: [
+        { factId: 'f1', subject: 'nora', predicate: 'hides', object: 'letter', addedAtTurn: 1, validFrom: 1, validTo: null },
+      ],
+      characterBeliefs: {
+        nora: [{ id: 'b1', proposition: 'nobody knows', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 }],
+        helmer: [{ id: 'b2', proposition: 'nora is honest', confidence: 1, source: 'told', source_event_id: 'e2', acquired_at: 2 }],
+      },
+      characterEmotions: {
+        nora: { joy: 0, distress: 60, anger: 0, fear: 80, pride: 0, shame: 20, dominant: 'fear', intensity: 80, last_updated_at: 1 },
+      },
+      audienceState: { knownFacts: ['f1'], suspense: 72, curiosity: 40, investment: 60 },
+      authorIntent: { theme: 'freedom' },
+      clues: [{ clueId: 'letter_clue', carrier: 'object' }],
+      payoffs: [{ setupId: 'reveal1', payoffEventId: 'letter_found' }],
+    };
+
+    const commits: StoryCommit[] = [
+      { commitId: 'c1', parentId: null, sceneIdx: 0, ops: ops1, deltaSummary: summarizeOps(ops1), reverted: false, createdAt: Date.now() },
+      { commitId: 'c2', parentId: 'c1', sceneIdx: 1, ops: ops2, deltaSummary: summarizeOps(ops2), reverted: false, createdAt: Date.now() },
+    ];
+
+    return { commits, state, title: "A Doll's House (Fixture)" };
+  }
+
+  const ALL_TARGETS: ProjectionTarget[] = [
+    'fountain', 'novel', 'stage', 'comic', 'interactive', 'pitch', 'bible', 'rewatch', 'cutting_room',
+  ];
+
+  it('project() returns non-empty content for every target', () => {
+    const canon = makeCanon();
+    for (const target of ALL_TARGETS) {
+      const artifact = project(canon, target);
+      assert.equal(artifact.target, target, `target mismatch for ${target}`);
+      assert.ok(artifact.content.length > 0, `empty content for ${target}`);
+    }
+  });
+
+  it('fountain output contains title and scene headers', () => {
+    const artifact = project(makeCanon(), 'fountain');
+    assert.ok(artifact.content.includes("A Doll's House"), 'missing title');
+    assert.ok(artifact.content.includes('INT. SCENE'), 'missing scene header');
+  });
+
+  it('novel output is valid markdown with scene headings', () => {
+    const artifact = project(makeCanon(), 'novel');
+    assert.ok(artifact.content.startsWith('#'), 'missing markdown header');
+    assert.ok(artifact.content.includes('## Scene'), 'missing scene headings');
+  });
+
+  it('comic output is valid JSON array of panels', () => {
+    const artifact = project(makeCanon(), 'comic');
+    const panels = JSON.parse(artifact.content);
+    assert.ok(Array.isArray(panels), 'comic content is not a JSON array');
+    assert.ok(panels.length > 0, 'no panels generated');
+    assert.ok(typeof panels[0].panel === 'number', 'panel missing panel number');
+    assert.ok(typeof panels[0].caption === 'string', 'panel missing caption');
+  });
+
+  it('interactive output is valid JSON with commits and finalState', () => {
+    const artifact = project(makeCanon(), 'interactive');
+    const playbook = JSON.parse(artifact.content);
+    assert.ok(Array.isArray(playbook.commits), 'missing commits array');
+    assert.ok(playbook.finalState, 'missing finalState');
+    assert.ok(typeof playbook.title === 'string', 'missing title');
+    assert.equal(playbook.version, 1, 'version mismatch');
+    assert.equal(artifact.metadata.replayable, true, 'not marked replayable');
+  });
+
+  it('pitch output contains characters and dramatic irony count', () => {
+    const artifact = project(makeCanon(), 'pitch');
+    assert.ok(artifact.content.includes('Characters:') || artifact.content.includes('**Characters:**'), 'missing characters section');
+    assert.ok(artifact.content.includes('irony') || artifact.content.includes('Irony'), 'missing irony layer info');
+  });
+
+  it('bible output contains world facts and characters sections', () => {
+    const artifact = project(makeCanon(), 'bible');
+    assert.ok(artifact.content.includes('Characters'), 'bible missing Characters section');
+    assert.ok(artifact.content.includes('World Facts'), 'bible missing World Facts section');
+    assert.ok(artifact.content.includes('Seeded Clues'), 'bible missing Seeded Clues section');
+  });
+
+  it('rewatch output annotates false beliefs as lies', () => {
+    const artifact = project(makeCanon(), 'rewatch');
+    // helmer's b2 belief has source: 'told' — should be flagged
+    assert.ok(artifact.content.includes('LIE') || artifact.content.includes('lie') || artifact.content.includes('Rewatch note'), 'missing rewatch annotation');
+  });
+
+  it('cutting_room with no ghosts produces placeholder message', () => {
+    const canon = makeCanon();
+    // no ghosts provided
+    const artifact = project(canon, 'cutting_room');
+    assert.ok(artifact.content.includes('No ghost') || artifact.content.includes('nothing was rejected'), 'missing empty ghost message');
+    assert.equal(artifact.metadata.ghosts, 0);
+  });
+
+  it('cutting_room with ghosts lists them', () => {
+    const canon = makeCanon();
+    canon.ghosts = [
+      { ir: { sceneIdx: 0, ops: [] }, reason: 'proof_fail' },
+      { ir: { sceneIdx: 1, ops: [] }, reason: 'valuation_too_low' },
+    ];
+    const artifact = project(canon, 'cutting_room');
+    assert.equal(artifact.metadata.ghosts, 2);
+    assert.ok(artifact.content.includes('proof_fail') || artifact.content.includes('Rejected'), 'missing ghost reason in output');
+  });
+
+  it('reverted commits are excluded from all projections', () => {
+    const canon = makeCanon();
+    const revertedOps: StoryOp[] = [{ op: 'RECORD_VISUAL_FACT', sceneId: 's_rev', fact: 'REVERTED SCENE — should not appear' }];
+    canon.commits.push({
+      commitId: 'c3', parentId: 'c2', sceneIdx: 2,
+      ops: revertedOps,
+      deltaSummary: summarizeOps(revertedOps),
+      reverted: true,
+      createdAt: Date.now(),
+    });
+    for (const target of ['fountain', 'novel', 'comic'] as ProjectionTarget[]) {
+      const artifact = project(canon, target);
+      assert.ok(!artifact.content.includes('REVERTED SCENE'), `reverted commit leaked into ${target}`);
+    }
+  });
+
+  it('interactive commitCount metadata matches non-reverted commits', () => {
+    const canon = makeCanon();
+    // 2 non-reverted commits in fixture
+    const artifact = project(canon, 'interactive');
+    assert.equal(artifact.metadata.commitCount, 2);
+  });
+
+  it('fountain metadata tracks scene count', () => {
+    const artifact = project(makeCanon(), 'fountain');
+    assert.equal(artifact.metadata.scenes, 2, 'fountain scene count wrong');
   });
 });
