@@ -18,6 +18,7 @@ import SettingsPanel from "./SettingsPanel";
 import WhatIfPanel from "./WhatIfPanel";
 import EpistemicMap from "./EpistemicMap";
 import DirectorCutPanel from "./DirectorCutPanel";
+import { HarvestPanel } from "./HarvestPanel";
 
 // ── Emotion display helpers ───────────────────────────────────────────────────
 
@@ -92,6 +93,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [showWhatIf, setShowWhatIf]         = useState(false);
   const [showEpistemic, setShowEpistemic]   = useState(false);
   const [showDirectorCut, setShowDirectorCut] = useState(false);
+  const [showHarvest, setShowHarvest]       = useState(false);
 
   const fetchActivePressures = useCallback(async () => {
     try {
@@ -429,6 +431,14 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           >
             <Brain className="w-4 h-4" />
             <span className="hidden sm:inline">Beliefs</span>
+          </button>
+          <button
+            onClick={() => setShowHarvest(true)}
+            title="Harvest — quality metrics + sidecar download"
+            className="bg-emerald-900 hover:bg-emerald-700 text-emerald-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <FileDown className="w-4 h-4" />
+            <span className="hidden sm:inline">Harvest</span>
           </button>
           <button
             onClick={() => setShowSettings(true)}
@@ -988,6 +998,12 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
 
       {showEpistemic && (
         <EpistemicMap onClose={() => setShowEpistemic(false)} />
+      )}
+
+      {showHarvest && (
+        <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 60 }}>
+          <HarvestPanel onClose={() => setShowHarvest(false)} />
+        </div>
       )}
     </div>
   );

@@ -1370,6 +1370,42 @@ export class Stage {
     };
   }
 
+  // ── Self-Play Corpus (v12) ────────────────────────────────────────────────────
+
+  public appendCorpusRun(run: {
+    run_id: string;
+    scenario_id: string;
+    score: number;
+    proof_pass_rate: number;
+    mean_valuation: number;
+    ops_count: number;
+    genome_json: string;
+  }): void {
+    this.db.prepare(`
+      INSERT OR REPLACE INTO Self_Play_Corpus
+        (run_id, scenario_id, score, proof_pass_rate, mean_valuation, ops_count, genome_json, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      run.run_id, run.scenario_id, run.score, run.proof_pass_rate,
+      run.mean_valuation, run.ops_count, run.genome_json, Date.now(),
+    );
+  }
+
+  public getCorpusRuns(limit = 50): Array<{
+    run_id: string; scenario_id: string; score: number;
+    proof_pass_rate: number; mean_valuation: number;
+    ops_count: number; genome_json: string; created_at: number;
+  }> {
+    const rows = this.db.prepare(
+      'SELECT * FROM Self_Play_Corpus ORDER BY score DESC LIMIT ?',
+    ).all(limit);
+    return rows as Array<{
+      run_id: string; scenario_id: string; score: number;
+      proof_pass_rate: number; mean_valuation: number;
+      ops_count: number; genome_json: string; created_at: number;
+    }>;
+  }
+
   private _insertRawAction(entry: ActionLogEntry): void {
     this.db.prepare(`
       INSERT OR IGNORE INTO Action_Log

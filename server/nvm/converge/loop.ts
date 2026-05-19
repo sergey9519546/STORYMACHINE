@@ -17,9 +17,11 @@ import type { QualityReport } from '../quality/index.ts';
 import type { MutationOperator } from './operators.ts';
 import type { CandidateGenerator, SceneTarget } from '../generate/proof-spec.ts';
 import type { GhostReason } from '../repro/ghost-ledger.ts';
+import type { WritersRoomResult } from '../room/room.ts';
 import { runTier1, tier1Passes } from '../proof/kernel.ts';
 import { deriveTensionLedger } from '../valuation/futures.ts';
 import { runQualityEngine } from '../quality/index.ts';
+import { runWritersRoom } from '../room/room.ts';
 import { buildGenerationSpec } from '../generate/proof-spec.ts';
 import { applyOperator, ALL_OPERATORS } from './operators.ts';
 import { makePrng, randInt } from '../repro/seed.ts';
@@ -35,6 +37,8 @@ export interface ConvergeStep {
   compositeScore: number;
   operator?: MutationOperator;
   ghostReason?: GhostReason;
+  /** Abridged writers' room transcript for this candidate. */
+  writersRoomSummary?: string;
 }
 
 export interface ConvergeResult {
@@ -83,8 +87,11 @@ export async function convergeScene(
     const spec = buildGenerationSpec(state, target, currentFailures);
 
     let candidates: NarrativeTransitionIR[];
+    // G2→G1: Writers' Room drives mutation operator selection after iteration 0.
+    let roomResult: WritersRoomResult | null = null;
     if (best && iter > 0) {
-      const op = ALL_OPERATORS[randInt(prng, ALL_OPERATORS.length)];
+      roomResult = runWritersRoom(best, state);
+      const op: MutationOperator = roomResult.suggestedOperator ?? ALL_OPERATORS[randInt(prng, ALL_OPERATORS.length)];
       const mutation = applyOperator(op, best, state, seed + iter);
       const fresh = await generate(spec, 1);
       candidates = [mutation.ir, ...fresh];
@@ -130,6 +137,9 @@ export async function convergeScene(
         qualityScore,
         compositeScore,
         ghostReason,
+        writersRoomSummary: roomResult
+          ? `dominant=${roomResult.dominantCritic} op=${roomResult.suggestedOperator ?? 'none'} consensus=${roomResult.consensus}`
+          : undefined,
       };
       history.push(step);
 

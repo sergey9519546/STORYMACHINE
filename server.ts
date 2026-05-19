@@ -1597,7 +1597,47 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     }
     const state = buildNarrativeState(stage);
     const currentScene = typeof req.body?.currentScene === 'number' ? req.body.currentScene : state.turn;
-    res.json(planToward(state, fps, currentScene));
+    const planResult = planToward(state, fps, currentScene);
+
+    // Convert each GoalBias to DramaticPressure and inject into the Stage.
+    // Character extraction: UPDATE_BELIEF / APPRAISE_EMOTION carry charId;
+    // SHIFT_RELATIONSHIP carries pair[0]; everything else gets 'narrator'.
+    let pressuresInjected = 0;
+    for (let bi = 0; bi < planResult.biases.length; bi++) {
+      const bias = planResult.biases[bi];
+      const charIds = new Set<string>();
+      for (const op of bias.ops) {
+        if (op.op === 'UPDATE_BELIEF' || op.op === 'APPRAISE_EMOTION') charIds.add(op.charId);
+        else if (op.op === 'SHIFT_RELATIONSHIP') charIds.add(op.pair[0]);
+      }
+      if (charIds.size === 0) charIds.add('narrator');
+
+      // Map dominant op kind to a pressure type.
+      const firstOp = bias.ops[0];
+      type PressureType = import('./server/engine/types.ts').DramaticPressureType;
+      let pressureType: PressureType = 'ESCALATE';
+      if (firstOp) {
+        if (firstOp.op === 'PAYOFF_SETUP' || firstOp.op === 'ADVANCE_THEME_ARGUMENT') pressureType = 'revelation_due';
+        else if (firstOp.op === 'SEED_CLUE') pressureType = 'ESCALATE';
+        else if (firstOp.op === 'RAISE_CLOCK') pressureType = 'confrontation_imminent';
+      }
+
+      for (const charId of charIds) {
+        stage.addDramaticPressure({
+          pressure_id: `fp-${bi}-${charId}-${Date.now()}`,
+          target_char_id: charId,
+          trigger_event_id: `goal-bias-${bi}`,
+          pressure_type: pressureType,
+          intensity: 70,
+          bias_hint: `${bias.rationale} [Fixed point: ${bias.fixedPointDescription}]`,
+          expires_at_turn: bias.atScene + 2,
+          applied: false,
+        });
+        pressuresInjected++;
+      }
+    }
+
+    res.json({ ...planResult, pressuresInjected });
   }));
 
   // GET /api/nvm/ghost-commits — list ghost commits (shadow canon for What-If)
