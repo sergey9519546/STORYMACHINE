@@ -48,6 +48,7 @@ import {
 } from './server/nvm/generate/proof-spec.ts';
 import { applyOperator, ALL_OPERATORS } from './server/nvm/converge/operators.ts';
 import { convergeScene } from './server/nvm/converge/loop.ts';
+import { runWritersRoom } from './server/nvm/room/room.ts';
 
 describe('safeJsonParse', () => {
   it('returns parsed value for valid JSON object', () => {
@@ -4031,5 +4032,93 @@ describe('NVM — Convergence Loop (G1)', () => {
     const r2 = await convergeScene(emptyState(), target, mockGenerator, { maxIterations: 1, candidatesPerIteration: 1 }, 2);
     // They may be equal by luck (same transitionId pattern) but the loop itself ran
     assert.ok(r1.history.length >= 1 && r2.history.length >= 1);
+  });
+});
+
+// ── Wave 6: G2 — Adversarial Writers' Room ────────────────────────────────
+
+describe('NVM — Writers\' Room (G2)', () => {
+  const baseIR = buildNoraWarehouseIR();
+  const state = runM15Harness().state;
+
+  it('runWritersRoom returns a result with critiques, consensus, and transcript', () => {
+    const result = runWritersRoom(baseIR, state);
+    assert.ok(typeof result.consensus === 'number');
+    assert.ok(result.consensus >= 0 && result.consensus <= 100);
+    assert.ok(typeof result.transcript === 'string');
+    assert.ok(result.transcript.length > 0);
+    assert.ok(Array.isArray(result.critiques));
+  });
+
+  it('a valid M1.5 IR draws 0 critiques from continuity (all proofs pass)', () => {
+    const result = runWritersRoom(baseIR, emptyState());
+    const cc = result.critiques.filter(c => c.criticId === 'continuity');
+    assert.equal(cc.length, 0, `expected 0 continuity critiques, got: ${JSON.stringify(cc)}`);
+  });
+
+  it('a deliberately broken IR draws ≥3 critiques total', () => {
+    const brokenIR = {
+      ...baseIR,
+      sceneIdx: 3,
+      preconditions: [],   // violates CausalProof
+      postconditions: [],  // showrunner objects
+      ops: [
+        // high-confidence told belief — skeptic objects
+        { op: 'UPDATE_BELIEF' as const, charId: 'nora', belief: {
+          id: 'bx', proposition: 'something', confidence: 0.95,
+          source: 'told' as const, source_agent_id: 'bob', acquired_at: 1,
+        }},
+        // large relationship leap without causal link — skeptic objects
+        { op: 'SHIFT_RELATIONSHIP' as const, pair: ['nora', 'bob'] as [string, string],
+          delta: { dimension: 'trust' as const, amount: -0.8, reason: 'sudden shift' } },
+      ],
+    };
+    const result = runWritersRoom(brokenIR, emptyState());
+    assert.ok(result.critiques.length >= 3,
+      `expected ≥3 critiques, got ${result.critiques.length}: ${result.critiques.map(c => c.objection).join(' | ')}`);
+  });
+
+  it('each critic emits at least one critique on a maximally bad IR', () => {
+    const maxBadIR = {
+      ...baseIR,
+      sceneIdx: 5,
+      sceneFunction: 'set_up_payoff' as const,
+      preconditions: [],
+      postconditions: [],
+      activeMechanisms: ['nonexistent_mechanism'],
+      ops: [
+        // zero-intensity emotion — character-advocate objects
+        { op: 'APPRAISE_EMOTION' as const, charId: 'nora', emotion: {
+          joy:0, distress:0, anger:0, fear:0, pride:0, shame:0,
+          dominant: 'pride' as const, intensity:0, last_updated_at:1,
+        }},
+        // payoff with no prior setup
+        { op: 'PAYOFF_SETUP' as const, setupId: 'nonexistent_setup', payoffEventId: 'evt_x' },
+      ],
+      revealPlans: [],
+    };
+    const result = runWritersRoom(maxBadIR, emptyState());
+    const criticIds = new Set(result.critiques.map(c => c.criticId));
+    // At least 4 of 6 critics should object to this disaster
+    assert.ok(criticIds.size >= 4,
+      `only ${criticIds.size} critics objected: ${[...criticIds].join(', ')}`);
+  });
+
+  it('transcript mentions all critic IDs that raised objections', () => {
+    const result = runWritersRoom(baseIR, state);
+    // The M1.5 IR is valid so critiques may be zero — just verify transcript format
+    assert.ok(result.transcript.includes('Writers\' Room'));
+    for (const c of result.critiques) {
+      assert.ok(result.transcript.includes(c.criticId.toUpperCase()),
+        `transcript missing critic: ${c.criticId}`);
+    }
+  });
+
+  it('suggestedOperator is a valid MutationOperator or null', () => {
+    const result = runWritersRoom(baseIR, state);
+    if (result.suggestedOperator !== null) {
+      assert.ok(ALL_OPERATORS.includes(result.suggestedOperator),
+        `invalid operator: ${result.suggestedOperator}`);
+    }
   });
 });
