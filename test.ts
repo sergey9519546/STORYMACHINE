@@ -58,6 +58,10 @@ import { backchain, scheduleToGoalBiases } from './server/nvm/author/backchain.t
 import { runSelfPlay, type SimScenario } from './server/nvm/selfplay/corpus.ts';
 import { mineCorpus, queryPolicy } from './server/nvm/selfplay/mine.ts';
 import { extractGenome, diffGenomes, breedGenomes } from './server/nvm/selfplay/genome.ts';
+import { TACTIC_TYPES, isDeceptive, isEmotional, tacticIronyWeight } from './server/nvm/ops/tactic-types.ts';
+import { buildMetaBelief, getMetaBeliefsAbout, holderBelievesThatTargetBelieves, upsertMetaBelief } from './server/nvm/ops/meta-belief.ts';
+import { contractBelief, reviseBelief, planContraction, initCredence, updateCredence, applyCredence } from './server/nvm/ops/belief-revision.ts';
+import { runQualityEngine, specificityScore, computeArcDebt, revealReady, necessityScore } from './server/nvm/quality/index.ts';
 
 describe('safeJsonParse', () => {
   it('returns parsed value for valid JSON object', () => {
@@ -4791,5 +4795,256 @@ describe('NVM — StoryGenome (G13)', () => {
     const bred = breedGenomes(g1, g2, 'bred');
     assert.ok(Math.abs(bred.voiceVector.ADD_FACT - 0.4) < 0.001);
     assert.ok(Math.abs(bred.voiceVector.UPDATE_BELIEF - 0.6) < 0.001);
+  });
+});
+
+// ── Wave 11: Closeout — TACTIC_TYPES, ToM², AGM, Quality Engines ─────────────
+
+describe('NVM — 12-Tactic Vocabulary (Wave 11)', () => {
+  it('TACTIC_TYPES has exactly 12 entries', () => {
+    assert.equal(TACTIC_TYPES.length, 12);
+  });
+
+  it('TACTIC_TYPES contains all required core tactics', () => {
+    const required = ['direct_assertion', 'emotional_appeal', 'authority_claim', 'reciprocity_bid', 'social_proof', 'deflection', 'partial_reveal', 'bait_and_switch', 'guilt_induction', 'alliance_bid', 'implicit_threat', 'strategic_silence'];
+    for (const t of required) {
+      assert.ok((TACTIC_TYPES as readonly string[]).includes(t), `missing tactic: ${t}`);
+    }
+  });
+
+  it('isDeceptive returns true for deflection and partial_reveal', () => {
+    assert.ok(isDeceptive('deflection'));
+    assert.ok(isDeceptive('partial_reveal'));
+    assert.equal(isDeceptive('direct_assertion'), false);
+  });
+
+  it('isEmotional returns true for emotional_appeal and guilt_induction', () => {
+    assert.ok(isEmotional('emotional_appeal'));
+    assert.ok(isEmotional('guilt_induction'));
+    assert.equal(isEmotional('authority_claim'), false);
+  });
+
+  it('tacticIronyWeight: deceptive=2, emotional=1, rational=0', () => {
+    assert.equal(tacticIronyWeight('bait_and_switch'), 2);
+    assert.equal(tacticIronyWeight('emotional_appeal'), 1);
+    assert.equal(tacticIronyWeight('direct_assertion'), 0);
+  });
+});
+
+describe('NVM — ToM² Depth-2 MetaBelief (Wave 11)', () => {
+  const noraBelief = { id: 'b_honest', proposition: 'nora is honest', confidence: 1, source: 'told' as const, source_event_id: 'e1', acquired_at: 1 };
+
+  it('buildMetaBelief creates a valid depth-2 meta-belief', () => {
+    const mb = buildMetaBelief('helmer', 'world', noraBelief, 0.9, 2);
+    assert.equal(mb.holderId, 'helmer');
+    assert.equal(mb.targetId, 'world');
+    assert.equal(mb.depth, 2);
+    assert.ok(mb.metaId.includes('helmer'));
+  });
+
+  it('upsertMetaBelief adds to state and is retrievable', () => {
+    const mb = buildMetaBelief('helmer', 'nora', noraBelief, 0.9, 1);
+    const state = upsertMetaBelief({}, mb);
+    const mbs = getMetaBeliefsAbout(state, 'helmer', 'nora');
+    assert.equal(mbs.length, 1);
+    assert.equal(mbs[0].metaId, mb.metaId);
+  });
+
+  it('upsertMetaBelief updates existing by metaId', () => {
+    const mb = buildMetaBelief('helmer', 'nora', noraBelief, 0.9, 1);
+    const state = upsertMetaBelief({}, mb);
+    const updated = { ...mb, confidence: 0.5 };
+    const state2 = upsertMetaBelief(state, updated);
+    const mbs = getMetaBeliefsAbout(state2, 'helmer', 'nora');
+    assert.equal(mbs.length, 1, 'should not duplicate');
+    assert.equal(mbs[0].confidence, 0.5, 'should update confidence');
+  });
+
+  it('holderBelievesThatTargetBelieves returns true for matching meta-belief', () => {
+    const mb = buildMetaBelief('helmer', 'nora', noraBelief, 0.9, 1);
+    const state = upsertMetaBelief({}, mb);
+    assert.ok(holderBelievesThatTargetBelieves(state, 'helmer', 'nora', 'b_honest'));
+  });
+
+  it('holderBelievesThatTargetBelieves returns false when below minConfidence', () => {
+    const mb = buildMetaBelief('helmer', 'nora', noraBelief, 0.3, 1);
+    const state = upsertMetaBelief({}, mb);
+    assert.equal(holderBelievesThatTargetBelieves(state, 'helmer', 'nora', 'b_honest', 0.5), false);
+  });
+});
+
+describe('NVM — AGM Belief Revision + CICERO Trust (Wave 11)', () => {
+  function makeBeliefs(): import('./server/engine/types.ts').Belief[] {
+    return [
+      { id: 'b1', proposition: 'nora borrowed money', confidence: 0.9, source: 'witnessed', source_event_id: 'loan_event', acquired_at: 1 },
+      { id: 'b2', proposition: 'debt is secret', confidence: 0.8, source: 'witnessed', source_event_id: 'loan_event', acquired_at: 1 },
+      { id: 'b3', proposition: 'helmer is forgiving', confidence: 0.6, source: 'told', source_event_id: 'different_event', acquired_at: 2 },
+    ];
+  }
+
+  it('contractBelief removes target belief', () => {
+    const beliefs = makeBeliefs();
+    const result = contractBelief(beliefs, 'b1');
+    assert.ok(!result.some(b => b.id === 'b1'), 'b1 should be removed');
+  });
+
+  it('contractBelief co-contracts beliefs from same event', () => {
+    const beliefs = makeBeliefs();
+    const result = contractBelief(beliefs, 'b1');
+    // b1 and b2 share loan_event + acquired_at=1 → both contracted
+    assert.ok(!result.some(b => b.id === 'b2'), 'b2 co-contracted with b1');
+    assert.ok(result.some(b => b.id === 'b3'), 'b3 from different event should remain');
+  });
+
+  it('contractBelief on missing id returns unchanged set', () => {
+    const beliefs = makeBeliefs();
+    const result = contractBelief(beliefs, 'nonexistent');
+    assert.equal(result.length, beliefs.length);
+  });
+
+  it('planContraction reports co-contracted ids', () => {
+    const beliefs = makeBeliefs();
+    const report = planContraction(beliefs, 'b1');
+    assert.equal(report.targetId, 'b1');
+    assert.ok(report.coContracted.includes('b2'), 'b2 should be co-contracted');
+    assert.equal(report.remaining, 1);
+  });
+
+  it('reviseBelief removes conflicting told-belief when witnessed arrives', () => {
+    const beliefs: import('./server/engine/types.ts').Belief[] = [
+      { id: 'b_lie', proposition: 'nora borrowed money', confidence: 0.9, source: 'told', source_event_id: 'lie_event', acquired_at: 1 },
+    ];
+    const truth: import('./server/engine/types.ts').Belief = {
+      id: 'b_truth', proposition: 'nora borrowed money', confidence: 1, source: 'witnessed', source_event_id: 'truth_event', acquired_at: 2,
+    };
+    const result = reviseBelief(beliefs, truth);
+    assert.ok(!result.some(b => b.id === 'b_lie'), 'conflicting belief should be removed');
+    assert.ok(result.some(b => b.id === 'b_truth'), 'new belief should be added');
+  });
+
+  it('initCredence creates credence with default 0.6', () => {
+    const c = initCredence('krogstad');
+    assert.equal(c.sourceId, 'krogstad');
+    assert.equal(c.credence, 0.6);
+  });
+
+  it('updateCredence raises credence on correct prediction', () => {
+    const c = initCredence('krogstad', 0.5);
+    const updated = updateCredence(c, true, 1);
+    assert.ok(updated.credence > 0.5, 'credence should rise');
+  });
+
+  it('updateCredence lowers credence on incorrect prediction', () => {
+    const c = initCredence('krogstad', 0.8);
+    const updated = updateCredence(c, false, 1);
+    assert.ok(updated.credence < 0.8, 'credence should fall');
+  });
+
+  it('applyCredence modulates belief confidence by source credence', () => {
+    const belief: import('./server/engine/types.ts').Belief = {
+      id: 'b1', proposition: 'X', confidence: 1.0, source: 'told', source_event_id: 'krogstad:e1', acquired_at: 1,
+    };
+    const credMap = { krogstad: initCredence('krogstad', 0.5) };
+    const result = applyCredence(belief, credMap);
+    assert.ok(result.confidence < 1.0, 'confidence should be reduced by low credence');
+  });
+});
+
+describe('NVM — Quality Engines (Wave 11)', () => {
+  function makeMinimalIR(ops: StoryOp[], sceneIdx = 1): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR {
+    return {
+      transitionId: 'q_test', sceneIdx, sceneFunction: 'build_tension',
+      activeMechanisms: [], beforeStateHash: 'deadbeef', preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: Date.now() },
+      ops,
+    };
+  }
+
+  it('specificityScore returns 1.0 for empty op list', () => {
+    assert.equal(specificityScore([]), 1);
+  });
+
+  it('specificityScore penalizes vague propositions', () => {
+    const vague: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'something happened', confidence: 0.5, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+    ];
+    assert.ok(specificityScore(vague) < 1.0, 'vague belief should lower score');
+  });
+
+  it('specificityScore is higher for concrete content', () => {
+    const concrete: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'krogstad', predicate: 'forged', object: 'signature', addedAtTurn: 0, validFrom: 0, validTo: null } },
+    ];
+    assert.ok(specificityScore(concrete) >= 0.7, 'concrete op should score higher');
+  });
+
+  it('computeArcDebt detects unseeded payoff debt', () => {
+    const state: NarrativeState = {
+      ...emptyState(),
+      clues: [{ clueId: 'c1', carrier: 'object' }, { clueId: 'c2', carrier: 'line' }],
+      payoffs: [],
+      audienceState: { knownFacts: [], suspense: 80, curiosity: 0, investment: 0 },
+    };
+    const debts = computeArcDebt(state, 4);
+    assert.ok(debts.some(d => d.includes('reveal') || d.includes('clue')), 'should flag clue-without-payoff debt');
+  });
+
+  it('revealReady returns false when suspense is low', () => {
+    const state: NarrativeState = { ...emptyState(), clues: [{ clueId: 'c1', carrier: 'object' }, { clueId: 'c2', carrier: 'line' }], audienceState: { knownFacts: [], suspense: 20, curiosity: 0, investment: 0 } };
+    const result = revealReady(state);
+    assert.equal(result.ready, false);
+    assert.ok(result.gaps.some(g => g.includes('suspense')));
+  });
+
+  it('revealReady returns true when all conditions met', () => {
+    const state: NarrativeState = {
+      ...emptyState(),
+      clues: [{ clueId: 'c1', carrier: 'object' }, { clueId: 'c2', carrier: 'line' }],
+      audienceState: { knownFacts: ['f1'], suspense: 75, curiosity: 40, investment: 60 },
+      characterBeliefs: {
+        helmer: [{ id: 'b_lie', proposition: 'X', confidence: 1, source: 'told', source_event_id: 'e1', acquired_at: 1 }],
+      },
+    };
+    const result = revealReady(state);
+    assert.ok(result.ready, `should be ready (score=${result.score})`);
+  });
+
+  it('necessityScore returns 1.0 when all ops are distinct and essential', () => {
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'A', predicate: 'p', object: 'B', addedAtTurn: 0, validFrom: 0, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'X', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 0 } },
+    ];
+    // Only one ADD_FACT so it's considered essential even without downstream reference
+    assert.ok(necessityScore(ops) >= 0.5, 'simple IR should not be penalized heavily');
+  });
+
+  it('necessityScore penalizes duplicate emotion appraisals', () => {
+    const emo = { joy: 0, distress: 60, anger: 0, fear: 80, pride: 0, shame: 0, dominant: 'fear' as const, intensity: 80, last_updated_at: 0 };
+    const ops: StoryOp[] = [
+      { op: 'APPRAISE_EMOTION', charId: 'nora', emotion: emo },
+      { op: 'APPRAISE_EMOTION', charId: 'nora', emotion: emo },
+    ];
+    assert.ok(necessityScore(ops) < 1.0, 'duplicate emotion should lower necessity');
+  });
+
+  it('runQualityEngine returns a report with score in [0,100]', () => {
+    const ir = makeMinimalIR([
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'krogstad', predicate: 'threatens', object: 'nora', addedAtTurn: 0, validFrom: 0, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'job at risk', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+      { op: 'APPRAISE_EMOTION', charId: 'nora', emotion: { joy: 0, distress: 70, anger: 0, fear: 90, pride: 0, shame: 10, dominant: 'fear', intensity: 90, last_updated_at: 1 } },
+    ]);
+    const report = runQualityEngine(ir, emptyState());
+    assert.ok(report.score >= 0 && report.score <= 100, `score out of range: ${report.score}`);
+    assert.ok(typeof report.specificity === 'number');
+    assert.ok(Array.isArray(report.arcDebt));
+    assert.ok(typeof report.revealReady === 'boolean');
+  });
+
+  it('runQualityEngine flags DV1_ON_THE_NOSE for full-confidence told belief', () => {
+    const ir = makeMinimalIR([
+      { op: 'UPDATE_BELIEF', charId: 'helmer', belief: { id: 'b_conf', proposition: 'nora confessed everything to helmer', confidence: 1.0, source: 'told', source_event_id: 'e_conf', acquired_at: 1 } },
+    ]);
+    const report = runQualityEngine(ir, emptyState());
+    assert.ok(report.warnings.some(w => w.rule === 'DV1_ON_THE_NOSE'), 'should flag on-the-nose confession');
   });
 });
