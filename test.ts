@@ -55,6 +55,9 @@ import { doIntervention } from './server/nvm/twin/counterfactual.ts';
 import { project, type Canon, type ProjectionTarget } from './server/nvm/project/index.ts';
 import { planToward, type FixedPoint } from './server/nvm/author/fixed-points.ts';
 import { backchain, scheduleToGoalBiases } from './server/nvm/author/backchain.ts';
+import { runSelfPlay, type SimScenario } from './server/nvm/selfplay/corpus.ts';
+import { mineCorpus, queryPolicy } from './server/nvm/selfplay/mine.ts';
+import { extractGenome, diffGenomes, breedGenomes } from './server/nvm/selfplay/genome.ts';
 
 describe('safeJsonParse', () => {
   it('returns parsed value for valid JSON object', () => {
@@ -4575,5 +4578,218 @@ describe('NVM — Backchain Reasoner (G9)', () => {
     };
     const result = backchain(fp, baseState(), 0);
     assert.ok(result.trace.includes('trace test') || result.trace.includes('Backchain'), 'trace should reference the fixed point');
+  });
+});
+
+
+// ── Wave 10: Self-Play Corpus + Learned Director + StoryGenome (G13) ──────────
+
+describe('NVM — Self-Play Corpus (G13)', () => {
+  // Minimal valid NarrativeTransitionIR factory for the mock generator
+  function makeIR(sceneIdx: number): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR {
+    return {
+      transitionId: `t${sceneIdx}`,
+      sceneIdx,
+      sceneFunction: 'build_tension',
+      activeMechanisms: [],
+      beforeStateHash: 'deadbeef00000000',
+      preconditions: [],
+      postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: Date.now() },
+      ops: [
+        { op: 'ADD_FACT', fact: { factId: `f${sceneIdx}`, subject: 'nora', predicate: 'acts', object: `s${sceneIdx}`, addedAtTurn: sceneIdx, validFrom: sceneIdx, validTo: null } },
+        { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: `b${sceneIdx}`, proposition: `scene ${sceneIdx}`, confidence: 0.8, source: 'witnessed', source_event_id: `e${sceneIdx}`, acquired_at: sceneIdx } },
+      ],
+    };
+  }
+
+  const mockGenerate: import('./server/nvm/generate/proof-spec.ts').CandidateGenerator =
+    async (spec, n) => Array.from({ length: n }, () => makeIR(spec.target.sceneIdx));
+
+  function makeScenarios(n: number): SimScenario[] {
+    return Array.from({ length: n }, (_, i) => ({
+      scenarioId: `drama_scenario_${i}`,
+      seed: 42 + i,
+      sceneTargets: [
+        { sceneIdx: 0, sceneFunction: 'establish_world' as const, activeMechanisms: [], tensionTarget: 30 },
+        { sceneIdx: 1, sceneFunction: 'build_tension' as const, activeMechanisms: [], tensionTarget: 60 },
+      ],
+    }));
+  }
+
+  it('runSelfPlay produces a CorpusReport with one result per scenario', async () => {
+    const report = await runSelfPlay(makeScenarios(3), mockGenerate);
+    assert.equal(report.runs.length, 3);
+  });
+
+  it('each SimResult has a score between 0 and 1', async () => {
+    const report = await runSelfPlay(makeScenarios(2), mockGenerate);
+    for (const run of report.runs) {
+      assert.ok(run.score >= 0 && run.score <= 1, `score out of range: ${run.score}`);
+    }
+  });
+
+  it('CorpusReport identifies bestRun with highest score', async () => {
+    const report = await runSelfPlay(makeScenarios(4), mockGenerate);
+    assert.ok(report.bestRun.score >= report.worstRun.score, 'best >= worst');
+    assert.ok(report.meanScore >= 0 && report.meanScore <= 1, 'meanScore in range');
+  });
+
+  it('runSelfPlay on empty scenarios returns zero-score report', async () => {
+    const report = await runSelfPlay([], mockGenerate);
+    assert.equal(report.runs.length, 0);
+    assert.equal(report.meanScore, 0);
+  });
+
+  it('each SimResult has scenes array matching sceneTargets count', async () => {
+    const report = await runSelfPlay(makeScenarios(1), mockGenerate);
+    assert.equal(report.runs[0].scenes.length, 2, '2 scene targets → 2 scenes');
+  });
+});
+
+describe('NVM — Corpus Miner / Director Policy (G13)', () => {
+  function makeFakeReport(): Parameters<typeof mineCorpus>[0] {
+    const baseRun = (id: string, score: number, ops: string[]): Parameters<typeof mineCorpus>[0]['runs'][0] => ({
+      scenarioId: id, seed: 1, proofPassRate: score, meanValuation: score * 100, score,
+      topOperators: ops as any, scenes: [], effectiveOperators: ops.slice(0, 1) as any, totalIterations: 4,
+    });
+    const runs = [
+      baseRun('drama_1', 0.85, ['inject_irony', 'raise_stakes']),
+      baseRun('drama_2', 0.60, ['raise_stakes', 'deepen_wound']),
+      baseRun('mystery_1', 0.70, ['inject_irony', 'weird_but_valid']),
+    ];
+    return {
+      runs,
+      meanScore: 0.717,
+      bestRun: runs[0],
+      worstRun: runs[1],
+      operatorFrequency: { inject_irony: 2, raise_stakes: 2, deepen_wound: 1, weird_but_valid: 1 } as any,
+    };
+  }
+
+  it('mineCorpus returns a Playbook with non-empty summary', () => {
+    const playbook = mineCorpus(makeFakeReport());
+    assert.ok(playbook.summary.length > 0);
+    assert.ok(playbook.summary.includes('Corpus'));
+  });
+
+  it('mineCorpus hallOfFame contains top-N best runs', () => {
+    const playbook = mineCorpus(makeFakeReport(), 2);
+    assert.equal(playbook.hallOfFame.length, 2);
+    assert.equal(playbook.hallOfFame[0].scenarioId, 'drama_1');
+  });
+
+  it('mineCorpus policy has globalTopOperators from highest-frequency ops', () => {
+    const playbook = mineCorpus(makeFakeReport());
+    assert.ok(playbook.policy.globalTopOperators.length > 0);
+    const top = playbook.policy.globalTopOperators.slice(0, 2);
+    assert.ok(top.includes('inject_irony' as any) || top.includes('raise_stakes' as any));
+  });
+
+  it('mineCorpus on empty corpus returns empty playbook', () => {
+    const emptyReport: Parameters<typeof mineCorpus>[0] = {
+      runs: [], meanScore: 0,
+      bestRun: { scenarioId: '', seed: 0, proofPassRate: 0, meanValuation: 0, score: 0, topOperators: [], scenes: [], effectiveOperators: [], totalIterations: 0 },
+      worstRun: { scenarioId: '', seed: 0, proofPassRate: 0, meanValuation: 0, score: 0, topOperators: [], scenes: [], effectiveOperators: [], totalIterations: 0 },
+      operatorFrequency: {} as any,
+    };
+    const playbook = mineCorpus(emptyReport);
+    assert.ok(playbook.summary.includes('empty'));
+  });
+
+  it('queryPolicy falls back to globalTopOperators for unknown arc', () => {
+    const playbook = mineCorpus(makeFakeReport());
+    const ops = queryPolicy(playbook.policy, 'rags_to_riches');
+    assert.ok(ops.length > 0);
+  });
+});
+
+describe('NVM — StoryGenome (G13)', () => {
+  function makeTestCanon(): Canon {
+    const state: NarrativeState = {
+      ...emptyState(),
+      characterBeliefs: {
+        nora: [{ id: 'b1', proposition: 'secret safe', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 0 }],
+        helmer: [{ id: 'b2', proposition: 'nora honest', confidence: 1, source: 'told', source_event_id: 'e2', acquired_at: 1 }],
+      },
+      characterEmotions: {
+        nora: { joy: 0, distress: 60, anger: 0, fear: 80, pride: 0, shame: 20, dominant: 'fear', intensity: 80, last_updated_at: 1 },
+      },
+      audienceState: { knownFacts: ['f1'], suspense: 72, curiosity: 40, investment: 60 },
+      clues: [{ clueId: 'c1', carrier: 'object' }],
+      payoffs: [{ setupId: 's1', payoffEventId: 'e1' }],
+      themeArgument: [{ claimId: 'freedom', move: 'support' }],
+    };
+    const ops1: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'nora', predicate: 'hides', object: 'letter', addedAtTurn: 0, validFrom: 0, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'secret safe', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 0 } },
+    ];
+    return {
+      title: 'Doll House',
+      state,
+      commits: [
+        { commitId: 'c1', parentId: null, sceneIdx: 0, ops: ops1, deltaSummary: summarizeOps(ops1), reverted: false, createdAt: Date.now() },
+      ],
+    };
+  }
+
+  it('extractGenome returns correct genomeId', () => {
+    const genome = extractGenome(makeTestCanon(), 'test_genome');
+    assert.equal(genome.genomeId, 'test_genome');
+    assert.equal(genome.sceneCount, 1);
+  });
+
+  it('extractGenome captures irony density from told-beliefs', () => {
+    const genome = extractGenome(makeTestCanon());
+    assert.ok(genome.ironyDensity > 0, 'should have irony');
+    assert.ok(genome.ironyDensity <= 1);
+  });
+
+  it('extractGenome captures theme claims', () => {
+    const genome = extractGenome(makeTestCanon());
+    assert.ok(genome.themeClaims.includes('freedom'));
+  });
+
+  it('extractGenome identifies dominant wound character', () => {
+    const genome = extractGenome(makeTestCanon());
+    assert.equal(genome.dominantWound, 'nora');
+  });
+
+  it('extractGenome produces valid tensionProfile with 5 entries in [0,1]', () => {
+    const genome = extractGenome(makeTestCanon());
+    assert.equal(genome.tensionProfile.length, 5);
+    for (const v of genome.tensionProfile) assert.ok(v >= 0 && v <= 1);
+  });
+
+  it('diffGenomes returns similarity in [0,1]', () => {
+    const g1 = extractGenome(makeTestCanon(), 'g1');
+    const g2 = extractGenome(makeTestCanon(), 'g2');
+    const diff = diffGenomes(g1, g2);
+    assert.ok(diff.similarity >= 0 && diff.similarity <= 1);
+  });
+
+  it('diffGenomes: identical genome has similarity > 0.95', () => {
+    const g = extractGenome(makeTestCanon(), 'g');
+    const diff = diffGenomes(g, g);
+    assert.ok(diff.similarity > 0.95, `expected ~1.0, got ${diff.similarity}`);
+  });
+
+  it('breedGenomes produces genome with arc from parent B', () => {
+    const g1 = extractGenome(makeTestCanon(), 'g1');
+    const g2 = extractGenome(makeTestCanon(), 'g2');
+    g2.arcArchetype = 'rags_to_riches';
+    const bred = breedGenomes(g1, g2, 'bred');
+    assert.equal(bred.genomeId, 'bred');
+    assert.equal(bred.arcArchetype, 'rags_to_riches');
+  });
+
+  it('breedGenomes voice vector is average of parents', () => {
+    const g1 = extractGenome(makeTestCanon(), 'g1');
+    g1.voiceVector = { ADD_FACT: 0.6, UPDATE_BELIEF: 0.4 };
+    const g2 = extractGenome(makeTestCanon(), 'g2');
+    g2.voiceVector = { ADD_FACT: 0.2, UPDATE_BELIEF: 0.8 };
+    const bred = breedGenomes(g1, g2, 'bred');
+    assert.ok(Math.abs(bred.voiceVector.ADD_FACT - 0.4) < 0.001);
+    assert.ok(Math.abs(bred.voiceVector.UPDATE_BELIEF - 0.6) < 0.001);
   });
 });
