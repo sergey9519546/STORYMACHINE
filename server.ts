@@ -2513,6 +2513,70 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     res.json(runNarrativeRegression(allCommits));
   }));
 
+  // GET /api/nvm/momentum — narrative momentum dashboard (Wave 30).
+  // Replays the full commit history scene by scene, computing quality score,
+  // regression score, tension total, and proof pass rate at each step.
+  // Returns a time-series array for the writer's CI dashboard.
+  app.get('/api/nvm/momentum', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { runQualityEngine } = await import('./server/nvm/quality/index.ts');
+    const { runNarrativeRegression } = await import('./server/nvm/regression/runner.ts');
+    const { emptyState, applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts').then(async d => ({
+      ...(await import('./server/nvm/state/NarrativeState.ts')),
+      applyStoryOps: d.applyStoryOps,
+    }));
+    const { runTier1, tier1Passes } = await import('./server/nvm/proof/kernel.ts');
+    const { deriveTensionLedger } = await import('./server/nvm/valuation/futures.ts');
+    type StoryCommit = import('./server/nvm/state/StoryCommit.ts').StoryCommit;
+    type NarrativeTransitionIR = import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR;
+
+    const allCommits = (stage.getCommits() as StoryCommit[]).filter(c => !c.reverted);
+    const points: Array<{
+      sceneIdx: number; commitId: string; opCount: number;
+      qualityScore: number; qualityWarnings: number;
+      regressionScore: number; regressionGrade: string;
+      tensionTotal: number; proofPassRate: number;
+    }> = [];
+
+    let rollingState = emptyState();
+    for (let i = 0; i < allCommits.length; i++) {
+      const commit = allCommits[i];
+      const ir: NarrativeTransitionIR = {
+        transitionId: commit.commitId, sceneIdx: commit.sceneIdx,
+        sceneFunction: 'advance_plot', activeMechanisms: [],
+        beforeStateHash: 'momentum', ops: commit.ops,
+        preconditions: [], postconditions: [],
+        provenance: { origin: 'model_generated', createdAt: commit.createdAt },
+      };
+
+      const qReport = runQualityEngine(ir, rollingState);
+      const tier1Results = runTier1(ir, rollingState);
+      const passCount = tier1Results.filter((r: import('./server/nvm/proof/contract.ts').ProofResult) => r.pass).length;
+      const proofPassRate = tier1Results.length === 0 ? 1 : passCount / tier1Results.length;
+
+      // Advance state then measure tension (tension depends on full context)
+      rollingState = applyStoryOps(rollingState, commit.ops);
+      const ledger = deriveTensionLedger(rollingState, commit.sceneIdx);
+
+      // Regression runs on all commits up to and including this one
+      const rReport = runNarrativeRegression(allCommits.slice(0, i + 1));
+
+      points.push({
+        sceneIdx: commit.sceneIdx,
+        commitId: commit.commitId,
+        opCount: commit.ops.length,
+        qualityScore: qReport.score,
+        qualityWarnings: qReport.warnings.length,
+        regressionScore: rReport.score,
+        regressionGrade: rReport.grade,
+        tensionTotal: Math.round(ledger.totalTension * 100) / 100,
+        proofPassRate: Math.round(proofPassRate * 100),
+      });
+    }
+
+    res.json({ points, totalScenes: allCommits.length });
+  }));
+
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {

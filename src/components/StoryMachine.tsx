@@ -34,6 +34,7 @@ import { ArcCompletionPanel } from "./ArcCompletionPanel";
 import { StoryHealthPanel } from "./StoryHealthPanel";
 import { CharacterArcPanel } from "./CharacterArcPanel";
 import { RegressionPanel } from "./RegressionPanel";
+import { MomentumPanel } from "./MomentumPanel";
 
 // ── Emotion display helpers ───────────────────────────────────────────────────
 
@@ -124,6 +125,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [showStoryHealth, setShowStoryHealth]   = useState(false);
   const [showCharacterArc, setShowCharacterArc] = useState(false);
   const [showRegression, setShowRegression]     = useState(false);
+  const [showMomentum, setShowMomentum]         = useState(false);
 
   const fetchActivePressures = useCallback(async () => {
     try {
@@ -589,6 +591,14 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           >
             <span style={{ fontSize: 14 }}>✓</span>
             <span className="hidden sm:inline">Tests</span>
+          </button>
+          <button
+            onClick={() => setShowMomentum(true)}
+            title="Narrative Momentum — per-scene CI history of quality, regression, tension, and proofs"
+            className="bg-emerald-950 hover:bg-emerald-800 text-emerald-300 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <span style={{ fontSize: 14 }}>⚡</span>
+            <span className="hidden sm:inline">Momentum</span>
           </button>
           <button
             onClick={() => setShowSettings(true)}
@@ -1243,6 +1253,12 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       {showRegression && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
           <RegressionPanel onClose={() => setShowRegression(false)} />
+        </div>
+      )}
+
+      {showMomentum && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <MomentumPanel onClose={() => setShowMomentum(false)} />
         </div>
       )}
     </div>
