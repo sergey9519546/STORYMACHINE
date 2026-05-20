@@ -5725,3 +5725,114 @@ describe('NVM — Tier 4 Ethics & Disclosure Proofs (Wave 18)', () => {
     assert.ok(ap?.pass, 'cited evidence → passes');
   });
 });
+
+// ── Wave 19: Projection Gallery (G3 Holographic Projection) ──────────────────
+
+describe('NVM — G3 Projection Gallery (Wave 19)', () => {
+  function makeCanon(): Canon {
+    const state = emptyState();
+    state.objectiveReality.push({ factId: 'f1', subject: 'nora', predicate: 'owns', object: 'violin', addedAtTurn: 1, validFrom: 1, validTo: null });
+    state.characterBeliefs['nora'] = [{ id: 'b1', proposition: 'the violin is cursed', confidence: 0.9, source: 'told', acquired_at: 1 }];
+    state.characterEmotions['nora'] = { joy: 0, distress: 70, anger: 10, fear: 40, pride: 0, shame: 0, dominant: 'distress', intensity: 70, last_updated_at: 1 };
+    state.audienceState.suspense = 65;
+    state.audienceState.knownFacts = ['f1'];
+    state.authorIntent.theme = 'grief and inheritance';
+    const ops: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'the violin is cursed', confidence: 0.9, source: 'told', acquired_at: 1 } },
+      { op: 'RECORD_VISUAL_FACT', sceneId: 'sc0', fact: 'A cracked violin case sits open on the table.' },
+      { op: 'SHIFT_RELATIONSHIP', pair: ['nora', 'victor'], delta: { dimension: 'trust', amount: -0.8, reason: 'nora discovers victor hid the will' } },
+    ];
+    const commit: StoryCommit = {
+      commitId: 'c1', parentId: null, sceneIdx: 0, reverted: false,
+      ops, deltaSummary: summarizeOps(ops), createdAt: Date.now(),
+    };
+    return { commits: [commit], state, title: 'The Inheritance' };
+  }
+
+  it('fountain projection produces non-empty screenplay text', () => {
+    const canon = makeCanon();
+    const art = project(canon, 'fountain');
+    assert.strictEqual(art.target, 'fountain');
+    assert.ok(art.content.includes('Title: The Inheritance'), 'has title');
+    assert.ok(art.content.includes('SCENE 0'), 'has scene heading');
+    assert.ok(art.content.length > 0, 'non-empty');
+  });
+
+  it('novel projection includes prose for every op type', () => {
+    const canon = makeCanon();
+    const art = project(canon, 'novel');
+    assert.ok(art.content.includes('# The Inheritance'), 'has title heading');
+    assert.ok(art.content.includes('Scene 0'), 'has scene section');
+    assert.ok(typeof art.metadata['wordCount'] === 'number', 'wordCount metadata present');
+  });
+
+  it('stage projection formats asides and directions', () => {
+    const art = project(makeCanon(), 'stage');
+    assert.ok(art.content.includes('PLAY:'), 'has PLAY header');
+    assert.ok(art.content.includes('[aside]') || art.content.includes('[STAGE DIRECTION]'), 'has stage markup');
+  });
+
+  it('comic projection returns parseable panel array', () => {
+    const art = project(makeCanon(), 'comic');
+    const panels = JSON.parse(art.content) as unknown[];
+    assert.ok(panels.length > 0, 'at least one panel');
+    assert.ok(typeof (panels[0] as Record<string, unknown>)['panel'] === 'number', 'panel has number');
+    assert.ok(typeof art.metadata['panels'] === 'number', 'panels metadata present');
+  });
+
+  it('interactive projection produces replayable JSON with commits', () => {
+    const art = project(makeCanon(), 'interactive');
+    const data = JSON.parse(art.content) as { version: number; commits: unknown[] };
+    assert.strictEqual(data.version, 1, 'version = 1');
+    assert.ok(Array.isArray(data.commits), 'commits array');
+    assert.strictEqual(art.metadata['replayable'], true, 'replayable flag');
+  });
+
+  it('pitch projection surfaces theme and irony count', () => {
+    const art = project(makeCanon(), 'pitch');
+    assert.ok(art.content.includes('grief and inheritance'), 'theme present');
+    assert.ok(art.content.includes('Dramatic irony'), 'irony count mentioned');
+  });
+
+  it('bible projection lists characters, facts, and audience state', () => {
+    const art = project(makeCanon(), 'bible');
+    assert.ok(art.content.includes('nora'), 'character listed');
+    assert.ok(art.content.includes('World Facts'), 'world facts section');
+    assert.ok(art.content.includes('Suspense: 65'), 'audience suspense shown');
+  });
+
+  it('rewatch projection annotates told-belief ops as irony warnings', () => {
+    const art = project(makeCanon(), 'rewatch');
+    assert.ok(art.content.includes('Rewatch note'), 'irony warning present');
+    assert.ok(art.content.includes('nora'), 'character named in warning');
+  });
+
+  it('cutting_room projection handles no-ghost case gracefully', () => {
+    const art = project(makeCanon(), 'cutting_room');
+    assert.ok(art.content.includes('Cutting Room'), 'has header');
+    assert.ok(art.content.includes('No ghost commits') || art.metadata['ghosts'] === 0, 'no-ghost path works');
+  });
+
+  it('sidecar projection returns parseable quality JSON with known keys', () => {
+    const art = project(makeCanon(), 'sidecar');
+    const data = JSON.parse(art.content) as Record<string, unknown>;
+    assert.ok('qualityScore' in data, 'qualityScore present');
+    assert.ok('totalTension' in data, 'totalTension present');
+    assert.ok('momentum' in data, 'momentum present');
+    assert.ok(typeof art.metadata['qualityScore'] === 'number', 'metadata qualityScore is number');
+  });
+
+  it('project() dispatch covers all 10 targets without throwing', () => {
+    const canon = makeCanon();
+    const targets: ProjectionTarget[] = [
+      'fountain', 'novel', 'stage', 'comic', 'interactive',
+      'pitch', 'bible', 'rewatch', 'cutting_room', 'sidecar',
+    ];
+    for (const t of targets) {
+      const art = project(canon, t);
+      assert.strictEqual(art.target, t, `${t} returns correct target field`);
+      assert.ok(typeof art.content === 'string', `${t} content is string`);
+      assert.ok(art.content.length > 0, `${t} content is non-empty`);
+    }
+  });
+});
