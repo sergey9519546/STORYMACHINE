@@ -6300,3 +6300,166 @@ describe('NVM — Proof Inspector endpoint logic (Wave 23)', () => {
     assert.equal(tier3Rank(pass0), 0, 'none pass → rank 0');
   });
 });
+
+describe('NVM — Quality Engines Panel (Wave 24)', () => {
+  const emptyIR = (): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR => ({
+    transitionId: 'test', sceneIdx: 1, sceneFunction: 'advance_plot',
+    activeMechanisms: [], beforeStateHash: 'x', ops: [],
+    preconditions: [], postconditions: [],
+    provenance: { origin: 'model_generated', createdAt: 1735689600 },
+  });
+
+  it('runQualityEngine on empty IR returns score 100 and no warnings', () => {
+    const report = runQualityEngine(emptyIR(), emptyState());
+    assert.equal(report.score, 100, 'empty IR should score 100');
+    assert.equal(report.warnings.length, 0, 'no warnings for empty IR');
+  });
+
+  it('DV1_ON_THE_NOSE fires for told belief at confidence > 0.95', () => {
+    const ir = emptyIR();
+    ir.ops = [{
+      op: 'UPDATE_BELIEF', charId: 'alice',
+      belief: { id: 'b1', proposition: 'Bob is guilty', confidence: 0.99, source: 'told', acquired_at: 1 },
+    }];
+    const warnings = dialogueWarnings(ir, emptyState());
+    assert.ok(warnings.some(w => w.rule === 'DV1_ON_THE_NOSE'), 'DV1 should fire');
+  });
+
+  it('DV5_NO_HUMAN_PRESENCE fires when only world-fact ops and sceneIdx > 0', () => {
+    const ir = emptyIR();
+    ir.ops = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'a', predicate: 'b', object: 'c', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'ADD_FACT', fact: { factId: 'f2', subject: 'x', predicate: 'y', object: 'z', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ];
+    const warnings = dialogueWarnings(ir, emptyState());
+    assert.ok(warnings.some(w => w.rule === 'DV5_NO_HUMAN_PRESENCE'), 'DV5 should fire');
+  });
+
+  it('DV10_STRUCTURAL_UNIFORMITY fires when all 4+ ops have the same kind', () => {
+    const ir = emptyIR();
+    ir.ops = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'a', predicate: 'b', object: 'c', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'ADD_FACT', fact: { factId: 'f2', subject: 'd', predicate: 'e', object: 'f', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'ADD_FACT', fact: { factId: 'f3', subject: 'g', predicate: 'h', object: 'i', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'ADD_FACT', fact: { factId: 'f4', subject: 'j', predicate: 'k', object: 'l', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ];
+    const warnings = dialogueWarnings(ir, emptyState());
+    assert.ok(warnings.some(w => w.rule === 'DV10_STRUCTURAL_UNIFORMITY'), 'DV10 should fire');
+  });
+
+  it('proppMorphology on empty IR → all absent, coverage = 0', () => {
+    const result = proppMorphology(emptyIR());
+    assert.equal(result.present.length, 0);
+    assert.equal(result.absent.length, 7);
+    assert.equal(result.coverage, 0);
+  });
+
+  it('proppMorphology: APPRAISE_EMOTION fear → complication present', () => {
+    const ir = emptyIR();
+    ir.ops = [{ op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { dominant: 'fear', intensity: 60, fear: 60, distress: 0, joy: 0, anger: 0, pride: 0, shame: 0, last_updated_at: 1 } }];
+    const result = proppMorphology(ir);
+    assert.ok(result.present.includes('complication'), 'fear emotion → complication');
+  });
+
+  it('proppMorphology: ADVANCE_THEME_ARGUMENT resolve → resolution present', () => {
+    const ir = emptyIR();
+    ir.ops = [{ op: 'ADVANCE_THEME_ARGUMENT', claimId: 'theme1', move: 'resolve' }];
+    const result = proppMorphology(ir);
+    assert.ok(result.present.includes('resolution'), 'resolve move → resolution');
+  });
+
+  it('specificityScore with vague terms returns < 1', () => {
+    const ops: StoryOp[] = [{
+      op: 'UPDATE_BELIEF', charId: 'a',
+      belief: { id: 'b1', proposition: 'something happened', confidence: 0.5, source: 'inferred', acquired_at: 1 },
+    }];
+    const score = specificityScore(ops);
+    assert.ok(score < 1, `expected < 1, got ${score}`);
+  });
+
+  it('computeArcDebt detects clues-without-payoffs debt at scene >= 3', () => {
+    const state = emptyState();
+    state.clues = [
+      { clueId: 'c1', carrier: 'object' },
+      { clueId: 'c2', carrier: 'line' },
+    ];
+    state.payoffs = [];
+    const debt = computeArcDebt(state, 4);
+    assert.ok(debt.some(d => d.includes('clue')), `expected clue debt, got: ${JSON.stringify(debt)}`);
+  });
+
+  it('revealReady returns false when suspense < 50', () => {
+    const state = emptyState();
+    state.clues = [{ clueId: 'c1', carrier: 'object' }, { clueId: 'c2', carrier: 'line' }];
+    state.audienceState.suspense = 30;
+    const { ready, score } = revealReady(state);
+    assert.equal(ready, false, 'suspense < 50 should not be ready');
+    assert.ok(score < 80, `expected score < 80, got ${score}`);
+  });
+});
+
+describe('NVM — Epistemic Map route logic (Wave 24)', () => {
+  it('beliefs with source=told and matching cross-char proposition produce meta-layers', () => {
+    // Simulate the server's meta-layer inference logic directly
+    const beliefs = [
+      { charId: 'alice', beliefId: 'b1', proposition: 'Bob is guilty', confidence: 0.9, source: 'told' },
+      { charId: 'bob',   beliefId: 'b2', proposition: 'Bob is guilty', confidence: 0.3, source: 'inferred' },
+    ];
+    const metaLayers: Array<{ holderId: string; targetId: string }> = [];
+    for (const { charId, proposition, confidence } of beliefs.filter(b => b.source === 'told')) {
+      const sharers = beliefs.filter(b => b.charId !== charId && b.proposition === proposition);
+      for (const sharer of sharers) {
+        metaLayers.push({ holderId: charId, targetId: sharer.charId });
+        void confidence; // referenced to satisfy linter
+      }
+    }
+    assert.equal(metaLayers.length, 1, 'one meta-layer should be inferred');
+    assert.equal(metaLayers[0].holderId, 'alice');
+    assert.equal(metaLayers[0].targetId, 'bob');
+  });
+
+  it('irony pairs detected when confidence diff >= 0.4', () => {
+    const beliefs = [
+      { charId: 'alice', proposition: 'treasure is real', confidence: 0.9, source: 'inferred' },
+      { charId: 'bob',   proposition: 'treasure is real', confidence: 0.4, source: 'inferred' },
+    ];
+    const propMap = new Map<string, Array<{ charId: string; confidence: number }>>();
+    for (const { charId, proposition, confidence } of beliefs) {
+      const list = propMap.get(proposition) ?? [];
+      list.push({ charId, confidence });
+      propMap.set(proposition, list);
+    }
+    const ironyPairs: string[] = [];
+    for (const [prop, holders] of propMap) {
+      for (let i = 0; i < holders.length; i++) {
+        for (let j = i + 1; j < holders.length; j++) {
+          const diff = Math.abs(holders[i].confidence - holders[j].confidence);
+          if (diff >= 0.4) ironyPairs.push(prop);
+        }
+      }
+    }
+    assert.ok(ironyPairs.includes('treasure is real'), 'irony pair should be detected');
+  });
+
+  it('no irony pair when confidence diff < 0.4', () => {
+    const beliefs = [
+      { charId: 'alice', proposition: 'sky is blue', confidence: 0.8, source: 'inferred' },
+      { charId: 'bob',   proposition: 'sky is blue', confidence: 0.65, source: 'inferred' },
+    ];
+    const propMap = new Map<string, Array<{ charId: string; confidence: number }>>();
+    for (const { charId, proposition, confidence } of beliefs) {
+      const list = propMap.get(proposition) ?? [];
+      list.push({ charId, confidence });
+      propMap.set(proposition, list);
+    }
+    let ironyCount = 0;
+    for (const [, holders] of propMap) {
+      for (let i = 0; i < holders.length; i++) {
+        for (let j = i + 1; j < holders.length; j++) {
+          if (Math.abs(holders[i].confidence - holders[j].confidence) >= 0.4) ironyCount++;
+        }
+      }
+    }
+    assert.equal(ironyCount, 0, 'diff < 0.4 should not produce an irony pair');
+  });
+});

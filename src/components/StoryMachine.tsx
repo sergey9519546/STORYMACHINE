@@ -28,6 +28,8 @@ import { CausalTwinPanel } from "./CausalTwinPanel";
 import { FixedPointsPanel } from "./FixedPointsPanel";
 import { SelfPlayPanel } from "./SelfPlayPanel";
 import { ProofInspectorPanel } from "./ProofInspectorPanel";
+import { QualityEnginesPanel } from "./QualityEnginesPanel";
+import { EpistemicMapPanel } from "./EpistemicMapPanel";
 
 // ── Emotion display helpers ───────────────────────────────────────────────────
 
@@ -112,6 +114,8 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [showFixedPoints, setShowFixedPoints] = useState(false);
   const [showSelfPlay, setShowSelfPlay]         = useState(false);
   const [showProofInspector, setShowProofInspector] = useState(false);
+  const [showQualityEngines, setShowQualityEngines] = useState(false);
+  const [showEpistemicMap, setShowEpistemicMap]   = useState(false);
 
   const fetchActivePressures = useCallback(async () => {
     try {
@@ -529,6 +533,22 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           >
             <Target className="w-4 h-4" />
             <span className="hidden sm:inline">Prove</span>
+          </button>
+          <button
+            onClick={() => setShowQualityEngines(true)}
+            title="Quality Engines — 9 narrative quality signals per committed scene"
+            className="bg-emerald-900 hover:bg-emerald-700 text-emerald-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <span style={{ fontSize: 14 }}>◈</span>
+            <span className="hidden sm:inline">Quality</span>
+          </button>
+          <button
+            onClick={() => setShowEpistemicMap(true)}
+            title="Epistemic Map — who believes what about whom, ToM² meta-layers, dramatic irony"
+            className="bg-violet-900 hover:bg-violet-700 text-violet-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <span style={{ fontSize: 14 }}>◎</span>
+            <span className="hidden sm:inline">Epistemic</span>
           </button>
           <button
             onClick={() => setShowSettings(true)}
@@ -1147,6 +1167,18 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       {showProofInspector && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
           <ProofInspectorPanel onClose={() => setShowProofInspector(false)} />
+        </div>
+      )}
+
+      {showQualityEngines && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <QualityEnginesPanel onClose={() => setShowQualityEngines(false)} />
+        </div>
+      )}
+
+      {showEpistemicMap && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <EpistemicMapPanel onClose={() => setShowEpistemicMap(false)} />
         </div>
       )}
     </div>

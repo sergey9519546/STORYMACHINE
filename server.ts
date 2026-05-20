@@ -2183,6 +2183,121 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     res.json(sidecar);
   }));
 
+  // GET /api/nvm/quality/scene/:commitId — run quality engine on a committed scene.
+  // Replays state up to (not including) that commit, builds a minimal IR shell,
+  // runs runQualityEngine, and returns the full QualityReport.
+  app.get('/api/nvm/quality/scene/:commitId', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { runQualityEngine } = await import('./server/nvm/quality/index.ts');
+    const { emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+
+    const targetId = req.params.commitId;
+    const allCommits = stage.getCommits().filter(
+      (c: import('./server/nvm/state/StoryCommit.ts').StoryCommit) => !c.reverted,
+    );
+    const targetIdx = allCommits.findIndex(
+      (c: import('./server/nvm/state/StoryCommit.ts').StoryCommit) => c.commitId === targetId,
+    );
+    if (targetIdx === -1) {
+      res.status(404).json({ error: `Commit "${targetId}" not found` }); return;
+    }
+    const commit = allCommits[targetIdx];
+
+    let rollingState = emptyState();
+    for (let i = 0; i < targetIdx; i++) {
+      rollingState = applyStoryOps(rollingState, allCommits[i].ops);
+    }
+
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: commit.commitId,
+      sceneIdx: commit.sceneIdx,
+      sceneFunction: 'advance_plot',
+      activeMechanisms: [],
+      beforeStateHash: 'quality-inspector',
+      ops: commit.ops,
+      preconditions: [],
+      postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: commit.createdAt },
+    };
+
+    const report = runQualityEngine(ir, rollingState);
+    res.json({ commitId: commit.commitId, sceneIdx: commit.sceneIdx, opCount: commit.ops.length, ...report });
+  }));
+
+  // GET /api/nvm/epistemic — current epistemic state: per-character beliefs,
+  // inferred meta-layers (who believes what about whom based on 'told' sources),
+  // and dramatic irony pairs where characters hold divergent beliefs about the
+  // same proposition.
+  app.get('/api/nvm/epistemic', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const state = buildNarrativeState(stage);
+
+    // Flatten all character beliefs into a unified belief map
+    const beliefs: Array<{ charId: string; beliefId: string; proposition: string; confidence: number; source: string }> = [];
+    for (const [charId, blist] of Object.entries(state.characterBeliefs)) {
+      for (const b of blist) {
+        beliefs.push({ charId, beliefId: b.id, proposition: b.proposition, confidence: b.confidence, source: b.source });
+      }
+    }
+
+    // Infer meta-layers: beliefs with source='told' imply holderId has a meta-belief
+    // that some other party also holds the same proposition (they were told it).
+    // Cross-reference: for each 'told' belief of charA, find any charB who also holds
+    // the same proposition — this constitutes a shared-knowledge irony opportunity.
+    const metaLayers: Array<{ holderId: string; targetId: string; proposition: string; confidence: number; depth: number; basis: string }> = [];
+    for (const { charId, proposition, confidence } of beliefs.filter(b => b.source === 'told')) {
+      const sharers = beliefs.filter(b => b.charId !== charId && b.proposition === proposition);
+      for (const sharer of sharers) {
+        metaLayers.push({
+          holderId: charId,
+          targetId: sharer.charId,
+          proposition,
+          confidence: Math.round(confidence * 0.8 * 100) / 100,
+          depth: 2,
+          basis: 'told-cross-reference',
+        });
+      }
+    }
+
+    // Dramatic irony: propositions where chars hold divergent beliefs (confidence diff > 0.4)
+    const ironyPairs: Array<{ charA: string; charB: string; proposition: string; confA: number; confB: number }> = [];
+    const propMap = new Map<string, Array<{ charId: string; confidence: number }>>();
+    for (const { charId, proposition, confidence } of beliefs) {
+      const list = propMap.get(proposition) ?? [];
+      list.push({ charId, confidence });
+      propMap.set(proposition, list);
+    }
+    for (const [proposition, holders] of propMap) {
+      for (let i = 0; i < holders.length; i++) {
+        for (let j = i + 1; j < holders.length; j++) {
+          const diff = Math.abs(holders[i].confidence - holders[j].confidence);
+          if (diff >= 0.4) {
+            ironyPairs.push({
+              charA: holders[i].charId,
+              charB: holders[j].charId,
+              proposition,
+              confA: holders[i].confidence,
+              confB: holders[j].confidence,
+            });
+          }
+        }
+      }
+    }
+
+    res.json({
+      characters: Object.keys(state.characterBeliefs),
+      totalBeliefs: beliefs.length,
+      beliefs,
+      metaLayers,
+      ironyPairs,
+      clueCount: state.clues.length,
+      payoffCount: state.payoffs.length,
+      suspense: state.audienceState.suspense,
+    });
+  }));
+
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
