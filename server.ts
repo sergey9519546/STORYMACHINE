@@ -2386,6 +2386,107 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     });
   }));
 
+  // GET /api/nvm/character-arc — per-character per-scene breakdown.
+  // Replays all committed scenes and tracks, for each character that appears in
+  // any op: belief count, avg confidence, dominant emotion+intensity, net
+  // relationship scores (summed across all pairs), and scene-level agency (op count).
+  // Returns an arc object keyed by charId → per-scene snapshots.
+  app.get('/api/nvm/character-arc', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { emptyState, relationshipKey } = await import('./server/nvm/state/NarrativeState.ts');
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+
+    const allCommits = stage.getCommits().filter(
+      (c: import('./server/nvm/state/StoryCommit.ts').StoryCommit) => !c.reverted,
+    );
+
+    // Per-character timeline
+    const arcs: Record<string, Array<{
+      sceneIdx: number;
+      beliefCount: number;
+      avgConfidence: number;
+      dominantEmotion: string;
+      emotionIntensity: number;
+      netRelationshipScore: number;
+      agencyCount: number;    // ops in this scene that reference this char
+    }>> = {};
+
+    let rollingState = emptyState();
+
+    for (const commit of allCommits) {
+      // Apply this commit's ops to get post-scene state
+      const afterState = applyStoryOps(rollingState, commit.ops);
+
+      // Find all chars referenced in this commit's ops
+      const charsInScene = new Set<string>();
+      for (const op of commit.ops) {
+        if ('charId' in op) charsInScene.add((op as { charId: string }).charId);
+        if ('pair' in op) {
+          const pair = (op as { pair: [string, string] }).pair;
+          charsInScene.add(pair[0]);
+          charsInScene.add(pair[1]);
+        }
+      }
+
+      // Also include any char already tracked in prior arcs
+      for (const charId of Object.keys(arcs)) charsInScene.add(charId);
+
+      for (const charId of charsInScene) {
+        const beliefs = afterState.characterBeliefs[charId] ?? [];
+        const emotion = afterState.characterEmotions[charId];
+        const avgConf = beliefs.length > 0
+          ? Math.round(beliefs.reduce((s, b) => s + b.confidence, 0) / beliefs.length * 100) / 100
+          : 0;
+
+        // Net relationship score: sum of all relationship deltas for this char
+        let netRel = 0;
+        for (const [key, deltas] of Object.entries(afterState.relationships)) {
+          if (key.includes(charId)) {
+            netRel += deltas.reduce((s, d) => s + d.amount, 0);
+          }
+        }
+
+        // Agency: ops in this commit that reference this char
+        const agencyCount = commit.ops.filter(op => {
+          if ('charId' in op && (op as { charId: string }).charId === charId) return true;
+          if ('pair' in op) {
+            const pair = (op as { pair: [string, string] }).pair;
+            return pair[0] === charId || pair[1] === charId;
+          }
+          return false;
+        }).length;
+
+        if (!arcs[charId]) arcs[charId] = [];
+        arcs[charId].push({
+          sceneIdx: commit.sceneIdx,
+          beliefCount: beliefs.length,
+          avgConfidence: avgConf,
+          dominantEmotion: emotion?.dominant ?? 'none',
+          emotionIntensity: emotion?.intensity ?? 0,
+          netRelationshipScore: Math.round(netRel * 100) / 100,
+          agencyCount,
+        });
+      }
+
+      rollingState = afterState;
+    }
+
+    // Summarize across all scenes: belief trajectory, emotional range, peak agency
+    const characters = Object.entries(arcs).map(([charId, scenes]) => ({
+      charId,
+      scenes,
+      totalScenes: scenes.length,
+      peakBeliefs: Math.max(...scenes.map(s => s.beliefCount), 0),
+      peakIntensity: Math.max(...scenes.map(s => s.emotionIntensity), 0),
+      dominantEmotions: [...new Set(scenes.map(s => s.dominantEmotion).filter(e => e !== 'none'))],
+      totalAgency: scenes.reduce((s, sc) => s + sc.agencyCount, 0),
+    }));
+
+    // Sort by total agency descending (most active characters first)
+    characters.sort((a, b) => b.totalAgency - a.totalAgency);
+    res.json({ characters, totalScenes: allCommits.length });
+  }));
+
   // GET /api/nvm/arc-completion — open narrative promise tracker.
   // Replays all committed scenes and returns every unresolved story beat
   // (clues, clocks, negative relationships, theme claims, object arcs)

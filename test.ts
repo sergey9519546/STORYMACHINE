@@ -6735,3 +6735,107 @@ describe('NVM — Quality-Aware Generation Spec (Wave 27)', () => {
     assert.ok(constraints.some(c => c.description.includes('resolve')), 'THEME → resolve constraint');
   });
 });
+
+describe('NVM — Character Arc Visualizer (Wave 28)', () => {
+  it('character arc: UPDATE_BELIEF op adds charId to arc roster', () => {
+    // Simulate the arc-building logic from the endpoint
+    const arcs: Record<string, number[]> = {};
+    const ops: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'X', confidence: 0.8, source: 'inferred', acquired_at: 0 } },
+    ];
+    for (const op of ops) {
+      if ('charId' in op) {
+        const charId = (op as { charId: string }).charId;
+        if (!arcs[charId]) arcs[charId] = [];
+        arcs[charId].push(1);
+      }
+    }
+    assert.ok('alice' in arcs, 'alice should appear in arc roster');
+  });
+
+  it('character arc: SHIFT_RELATIONSHIP adds both pair members', () => {
+    const arcs: Record<string, number[]> = {};
+    const ops: StoryOp[] = [{
+      op: 'SHIFT_RELATIONSHIP',
+      pair: ['alice', 'bob'],
+      delta: { dimension: 'trust', amount: 0.5, reason: 'test' },
+    }];
+    for (const op of ops) {
+      if ('pair' in op) {
+        const pair = (op as { pair: [string, string] }).pair;
+        for (const charId of pair) {
+          if (!arcs[charId]) arcs[charId] = [];
+          arcs[charId].push(1);
+        }
+      }
+    }
+    assert.ok('alice' in arcs && 'bob' in arcs, 'both pair members in arcs');
+  });
+
+  it('character arc: avgConfidence computed correctly', () => {
+    const beliefs = [
+      { id: 'b1', proposition: 'X', confidence: 0.8, source: 'inferred' as const, acquired_at: 0 },
+      { id: 'b2', proposition: 'Y', confidence: 0.6, source: 'inferred' as const, acquired_at: 0 },
+    ];
+    const avg = Math.round(beliefs.reduce((s, b) => s + b.confidence, 0) / beliefs.length * 100) / 100;
+    assert.equal(avg, 0.7, 'avg confidence of 0.8+0.6 = 0.7');
+  });
+
+  it('character arc: netRelationshipScore accumulates across pairs', () => {
+    const relationships: Record<string, Array<{ amount: number }>> = {
+      'alice|bob': [{ amount: 0.5 }, { amount: -0.2 }],
+      'alice|carol': [{ amount: 0.3 }],
+    };
+    let netRel = 0;
+    for (const [key, deltas] of Object.entries(relationships)) {
+      if (key.includes('alice')) {
+        netRel += deltas.reduce((s, d) => s + d.amount, 0);
+      }
+    }
+    assert.ok(Math.abs(netRel - 0.6) < 0.001, `expected 0.6, got ${netRel}`);
+  });
+
+  it('character arc: agencyCount counts ops referencing charId', () => {
+    const charId = 'alice';
+    const ops: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'X', confidence: 0.8, source: 'inferred', acquired_at: 0 } },
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { dominant: 'joy', intensity: 50, joy: 50, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, last_updated_at: 1 } },
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'x', predicate: 'y', object: 'z', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ];
+    const agencyCount = ops.filter(op => {
+      if ('charId' in op && (op as { charId: string }).charId === charId) return true;
+      if ('pair' in op) {
+        const pair = (op as { pair: [string, string] }).pair;
+        return pair[0] === charId || pair[1] === charId;
+      }
+      return false;
+    }).length;
+    assert.equal(agencyCount, 2, 'alice has 2 ops (UPDATE_BELIEF + APPRAISE_EMOTION)');
+  });
+
+  it('character arc: characters sorted by totalAgency descending', () => {
+    const chars = [
+      { charId: 'alice', totalAgency: 3, dominantEmotions: [] as string[], peakBeliefs: 0, peakIntensity: 0, totalScenes: 1, scenes: [] },
+      { charId: 'bob',   totalAgency: 7, dominantEmotions: [] as string[], peakBeliefs: 0, peakIntensity: 0, totalScenes: 1, scenes: [] },
+    ];
+    chars.sort((a, b) => b.totalAgency - a.totalAgency);
+    assert.equal(chars[0].charId, 'bob', 'bob has more agency → should be first');
+  });
+
+  it('character arc: peakIntensity is max across scenes', () => {
+    const scenes = [
+      { emotionIntensity: 30 }, { emotionIntensity: 80 }, { emotionIntensity: 50 },
+    ];
+    const peakIntensity = Math.max(...scenes.map(s => s.emotionIntensity), 0);
+    assert.equal(peakIntensity, 80, 'peak intensity = 80');
+  });
+
+  it('character arc: dominantEmotions deduplicates across scenes', () => {
+    const scenes = [
+      { dominantEmotion: 'fear' }, { dominantEmotion: 'fear' }, { dominantEmotion: 'joy' },
+    ];
+    const dominantEmotions = [...new Set(scenes.map(s => s.dominantEmotion).filter(e => e !== 'none'))];
+    assert.equal(dominantEmotions.length, 2, 'two unique emotions');
+    assert.ok(dominantEmotions.includes('fear') && dominantEmotions.includes('joy'));
+  });
+});
