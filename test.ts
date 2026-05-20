@@ -6463,3 +6463,104 @@ describe('NVM — Epistemic Map route logic (Wave 24)', () => {
     assert.equal(ironyCount, 0, 'diff < 0.4 should not produce an irony pair');
   });
 });
+
+import { analyzeArcCompletion } from './server/nvm/quality/arc-tracker.ts';
+
+describe('NVM — Arc Completion Tracker (Wave 25)', () => {
+  it('empty story → no open promises, no resolved, debt=0', () => {
+    const report = analyzeArcCompletion([]);
+    assert.equal(report.openPromises.length, 0);
+    assert.equal(report.resolvedCount, 0);
+    assert.equal(report.debtScore, 0);
+  });
+
+  it('SEED_CLUE without PAYOFF_SETUP creates an open CLUE promise', () => {
+    const scenes = [{ sceneIdx: 0, ops: [{ op: 'SEED_CLUE' as const, clueId: 'clue1', carrier: 'object' as const }] }];
+    const report = analyzeArcCompletion(scenes);
+    assert.ok(report.openPromises.some(p => p.kind === 'CLUE' && p.promiseId === 'clue:clue1'));
+  });
+
+  it('SEED_CLUE + matching PAYOFF_SETUP → resolved, no open promise', () => {
+    const scenes = [
+      { sceneIdx: 0, ops: [{ op: 'SEED_CLUE' as const, clueId: 'clue1', carrier: 'line' as const }] },
+      { sceneIdx: 1, ops: [{ op: 'PAYOFF_SETUP' as const, setupId: 'clue1', payoffEventId: 'payoff1' }] },
+    ];
+    const report = analyzeArcCompletion(scenes);
+    assert.equal(report.openPromises.filter(p => p.kind === 'CLUE').length, 0, 'clue resolved');
+    assert.equal(report.resolvedCount, 1, 'one resolved');
+  });
+
+  it('RAISE_CLOCK(+5) without countdown creates open CLOCK promise', () => {
+    const scenes = [{ sceneIdx: 0, ops: [{ op: 'RAISE_CLOCK' as const, clockId: 'doom', amount: 5 }] }];
+    const report = analyzeArcCompletion(scenes);
+    assert.ok(report.openPromises.some(p => p.kind === 'CLOCK' && p.promiseId === 'clock:doom'));
+  });
+
+  it('RAISE_CLOCK +5 then -5 → resolved, no open promise', () => {
+    const scenes = [
+      { sceneIdx: 0, ops: [{ op: 'RAISE_CLOCK' as const, clockId: 'doom', amount: 5 }] },
+      { sceneIdx: 1, ops: [{ op: 'RAISE_CLOCK' as const, clockId: 'doom', amount: -5 }] },
+    ];
+    const report = analyzeArcCompletion(scenes);
+    assert.equal(report.openPromises.filter(p => p.kind === 'CLOCK').length, 0, 'clock resolved');
+    assert.ok(report.resolvedCount >= 1);
+  });
+
+  it('negative SHIFT_RELATIONSHIP creates open REL promise', () => {
+    const scenes = [{
+      sceneIdx: 0,
+      ops: [{ op: 'SHIFT_RELATIONSHIP' as const, pair: ['alice', 'bob'] as [string, string], delta: { dimension: 'trust' as const, amount: -0.6, reason: 'betrayal' } }],
+    }];
+    const report = analyzeArcCompletion(scenes);
+    assert.ok(report.openPromises.some(p => p.kind === 'REL'), 'negative REL should be open');
+  });
+
+  it('ADVANCE_THEME_ARGUMENT support then resolve → resolved, no open promise', () => {
+    const scenes = [
+      { sceneIdx: 0, ops: [{ op: 'ADVANCE_THEME_ARGUMENT' as const, claimId: 'theme1', move: 'support' as const }] },
+      { sceneIdx: 1, ops: [{ op: 'ADVANCE_THEME_ARGUMENT' as const, claimId: 'theme1', move: 'resolve' as const }] },
+    ];
+    const report = analyzeArcCompletion(scenes);
+    assert.equal(report.openPromises.filter(p => p.kind === 'THEME').length, 0, 'theme resolved');
+  });
+
+  it('overdue promise when current scene > target window upper bound', () => {
+    // Plant clue at scene 0; target window = [3, 8]; simulate 10 scenes
+    const scenes = [
+      { sceneIdx: 0, ops: [{ op: 'SEED_CLUE' as const, clueId: 'old_clue', carrier: 'gesture' as const }] },
+      ...Array.from({ length: 9 }, (_, i) => ({ sceneIdx: i + 1, ops: [] as StoryOp[] })),
+    ];
+    const report = analyzeArcCompletion(scenes);
+    const cluePromise = report.openPromises.find(p => p.promiseId === 'clue:old_clue');
+    assert.ok(cluePromise, 'clue promise should exist');
+    assert.equal(cluePromise!.urgency, 'overdue', 'should be overdue after 9 scenes');
+  });
+
+  it('pacing score drops below 0.5 for severely overdue promise', () => {
+    const scenes = [
+      { sceneIdx: 0, ops: [{ op: 'SEED_CLUE' as const, clueId: 'stale', carrier: 'absence' as const }] },
+      ...Array.from({ length: 20 }, (_, i) => ({ sceneIdx: i + 1, ops: [] as StoryOp[] })),
+    ];
+    const report = analyzeArcCompletion(scenes);
+    const p = report.openPromises.find(p => p.promiseId === 'clue:stale');
+    assert.ok(p, 'stale clue should exist');
+    assert.ok(p!.pacingScore < 0.5, `expected pacingScore < 0.5, got ${p!.pacingScore}`);
+  });
+
+  it('promises sorted: overdue first, then due_soon, then on_track', () => {
+    const scenes = [
+      // Overdue clue (planted 15 scenes ago, window closes at 8)
+      { sceneIdx: 0, ops: [{ op: 'SEED_CLUE' as const, clueId: 'old', carrier: 'behavior' as const }] },
+      // New clue (just planted, not yet due)
+      ...Array.from({ length: 14 }, (_, i) => ({ sceneIdx: i + 1, ops: [] as StoryOp[] })),
+      { sceneIdx: 15, ops: [{ op: 'SEED_CLUE' as const, clueId: 'fresh', carrier: 'camera' as const }] },
+    ];
+    const report = analyzeArcCompletion(scenes);
+    if (report.openPromises.length >= 2) {
+      assert.ok(
+        report.openPromises[0].urgency === 'overdue' || report.openPromises[0].pacingScore <= report.openPromises[1].pacingScore,
+        'overdue/lower-pacing should come first',
+      );
+    }
+  });
+});

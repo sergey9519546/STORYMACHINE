@@ -30,6 +30,7 @@ import { SelfPlayPanel } from "./SelfPlayPanel";
 import { ProofInspectorPanel } from "./ProofInspectorPanel";
 import { QualityEnginesPanel } from "./QualityEnginesPanel";
 import { EpistemicMapPanel } from "./EpistemicMapPanel";
+import { ArcCompletionPanel } from "./ArcCompletionPanel";
 
 // ── Emotion display helpers ───────────────────────────────────────────────────
 
@@ -116,6 +117,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [showProofInspector, setShowProofInspector] = useState(false);
   const [showQualityEngines, setShowQualityEngines] = useState(false);
   const [showEpistemicMap, setShowEpistemicMap]   = useState(false);
+  const [showArcCompletion, setShowArcCompletion] = useState(false);
 
   const fetchActivePressures = useCallback(async () => {
     try {
@@ -549,6 +551,14 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           >
             <span style={{ fontSize: 14 }}>◎</span>
             <span className="hidden sm:inline">Epistemic</span>
+          </button>
+          <button
+            onClick={() => setShowArcCompletion(true)}
+            title="Arc Completion — track open narrative promises with pacing scores"
+            className="bg-amber-900 hover:bg-amber-700 text-amber-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <span style={{ fontSize: 14 }}>◷</span>
+            <span className="hidden sm:inline">Arcs</span>
           </button>
           <button
             onClick={() => setShowSettings(true)}
@@ -1179,6 +1189,12 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       {showEpistemicMap && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
           <EpistemicMapPanel onClose={() => setShowEpistemicMap(false)} />
+        </div>
+      )}
+
+      {showArcCompletion && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <ArcCompletionPanel onClose={() => setShowArcCompletion(false)} />
         </div>
       )}
     </div>

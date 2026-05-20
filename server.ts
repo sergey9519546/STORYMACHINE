@@ -2298,6 +2298,22 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     });
   }));
 
+  // GET /api/nvm/arc-completion — open narrative promise tracker.
+  // Replays all committed scenes and returns every unresolved story beat
+  // (clues, clocks, negative relationships, theme claims, object arcs)
+  // with pacing scores and completion window recommendations.
+  app.get('/api/nvm/arc-completion', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { analyzeArcCompletion } = await import('./server/nvm/quality/arc-tracker.ts');
+    const allCommits = stage.getCommits().filter(
+      (c: import('./server/nvm/state/StoryCommit.ts').StoryCommit) => !c.reverted,
+    );
+    const scenes = allCommits.map(
+      (c: import('./server/nvm/state/StoryCommit.ts').StoryCommit) => ({ sceneIdx: c.sceneIdx, ops: c.ops }),
+    );
+    res.json(analyzeArcCompletion(scenes));
+  }));
+
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
