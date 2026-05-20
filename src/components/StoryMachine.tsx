@@ -24,6 +24,7 @@ import { CorpusPanel } from "./CorpusPanel";
 import { ArcTimelinePanel } from "./ArcTimelinePanel";
 import { ArcPlannerPanel } from "./ArcPlannerPanel";
 import { ProjectionGalleryPanel } from "./ProjectionGalleryPanel";
+import { CausalTwinPanel } from "./CausalTwinPanel";
 
 // ── Emotion display helpers ───────────────────────────────────────────────────
 
@@ -104,6 +105,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [showTimeline, setShowTimeline]     = useState(false);
   const [showArcPlanner, setShowArcPlanner] = useState(false);
   const [showProjection, setShowProjection] = useState(false);
+  const [showCausalTwin, setShowCausalTwin] = useState(false);
 
   const fetchActivePressures = useCallback(async () => {
     try {
@@ -489,6 +491,14 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           >
             <Target className="w-4 h-4" />
             <span className="hidden sm:inline">Project</span>
+          </button>
+          <button
+            onClick={() => setShowCausalTwin(true)}
+            title="Causal Twin — Pearl's do()-calculus intervention (G4)"
+            className="bg-orange-900 hover:bg-orange-700 text-orange-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <Zap className="w-4 h-4" />
+            <span className="hidden sm:inline">Twin</span>
           </button>
           <button
             onClick={() => setShowSettings(true)}
@@ -1083,6 +1093,12 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       {showProjection && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
           <ProjectionGalleryPanel onClose={() => setShowProjection(false)} />
+        </div>
+      )}
+
+      {showCausalTwin && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <CausalTwinPanel onClose={() => setShowCausalTwin(false)} />
         </div>
       )}
     </div>

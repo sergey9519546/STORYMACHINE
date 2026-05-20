@@ -5836,3 +5836,91 @@ describe('NVM — G3 Projection Gallery (Wave 19)', () => {
     }
   });
 });
+
+// ── Wave 20: Causal Twin Panel — SCM serialisation + do() UI contract ─────────
+
+describe('NVM — Causal Twin Panel SCM serialisation (Wave 20)', () => {
+  function mkC(id: string, parent: string | null, ops: StoryOp[], sceneIdx = 0): StoryCommit {
+    return { commitId: id, parentId: parent, sceneIdx, ops, deltaSummary: summarizeOps(ops), reverted: false, createdAt: Date.now() };
+  }
+
+  const factOp: StoryOp = { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'nora', predicate: 'holds', object: 'gun', addedAtTurn: 1, validFrom: 1, validTo: null } };
+  const beliefOp: StoryOp = { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'I must flee', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } };
+  const clockOp: StoryOp = { op: 'RAISE_CLOCK', clockId: 'danger', amount: 2 };
+
+  it('buildSCM serialises to plain array with correct fields', () => {
+    const stage = new Stage(':memory:');
+    stage.appendCommit(mkC('c1', null, [factOp, beliefOp]));
+    const scm = buildSCM(stage);
+    // Simulate what the /api/nvm/twin/scm endpoint does
+    const nodes = [...scm.nodes.values()].map(n => ({
+      opId: n.opId, commitId: n.commitId, opIdx: n.opIdx,
+      op: n.op, parents: n.parents, children: n.children,
+    }));
+    assert.equal(nodes.length, 2, '2 nodes');
+    assert.ok(nodes.every(n => typeof n.opId === 'string'), 'opId is string');
+    assert.ok(nodes.every(n => Array.isArray(n.parents)), 'parents is array');
+    assert.ok(nodes.every(n => Array.isArray(n.children)), 'children is array');
+    // JSON round-trip (the endpoint needs to serialise Maps)
+    const json = JSON.stringify({ nodes, order: scm.order, nodeCount: nodes.length });
+    const parsed = JSON.parse(json) as { nodes: unknown[]; order: string[]; nodeCount: number };
+    assert.equal(parsed.nodeCount, 2);
+    assert.equal(parsed.order.length, 2);
+  });
+
+  it('SCM node opIds follow the commitId:opIdx convention', () => {
+    const stage = new Stage(':memory:');
+    stage.appendCommit(mkC('abc123', null, [factOp, clockOp]));
+    const scm = buildSCM(stage);
+    assert.ok(scm.nodes.has('abc123:0'), 'first op has expected opId');
+    assert.ok(scm.nodes.has('abc123:1'), 'second op has expected opId');
+  });
+
+  it('do(remove) on a fact with a downstream belief returns at least one affected op', () => {
+    const stage = new Stage(':memory:');
+    stage.appendCommit(mkC('c1', null, [factOp, beliefOp]));
+    const scm = buildSCM(stage);
+    const report = doIntervention(scm, { opId: 'c1:0', replacement: null });
+    assert.ok(report.affectedOps.length >= 1, 'downstream belief is affected');
+    assert.strictEqual(report.directlyAffected[0].opId, 'c1:1', 'direct child is the belief');
+    assert.strictEqual(report.directlyAffected[0].distance, 1, 'distance = 1');
+  });
+
+  it('do(remove) on a leaf op with no children returns empty affected list', () => {
+    const stage = new Stage(':memory:');
+    stage.appendCommit(mkC('c1', null, [clockOp]));
+    const scm = buildSCM(stage);
+    const report = doIntervention(scm, { opId: 'c1:0', replacement: null });
+    assert.equal(report.affectedOps.length, 0, 'leaf → nothing downstream');
+  });
+
+  it('summary string is non-empty and mentions the intervened opId', () => {
+    const stage = new Stage(':memory:');
+    stage.appendCommit(mkC('cx', null, [factOp, beliefOp]));
+    const scm = buildSCM(stage);
+    const report = doIntervention(scm, { opId: 'cx:0', replacement: null });
+    assert.ok(report.summary.length > 0, 'summary is non-empty');
+    assert.ok(report.summary.includes('cx:0'), 'summary references the opId');
+  });
+
+  it('do() on an unknown opId returns empty affected list with error summary', () => {
+    const stage = new Stage(':memory:');
+    const scm = buildSCM(stage);
+    const report = doIntervention(scm, { opId: 'nonexistent:99', replacement: null });
+    assert.equal(report.affectedOps.length, 0, 'unknown op → no affected');
+    assert.ok(report.summary.includes('not found'), 'summary says not found');
+  });
+
+  it('multi-commit SCM: inter-commit causality is captured in node counts', () => {
+    const stage = new Stage(':memory:');
+    // Scene 0: establish a fact; scene 1: belief depending on it
+    stage.appendCommit(mkC('s0', null, [factOp], 0));
+    stage.appendCommit(mkC('s1', 's0', [beliefOp, clockOp], 1));
+    const scm = buildSCM(stage);
+    // Should have 3 nodes total
+    assert.equal(scm.nodes.size, 3, '3 ops across 2 commits');
+    assert.ok(scm.nodes.has('s0:0'), 'fact from scene 0');
+    assert.ok(scm.nodes.has('s1:0'), 'belief from scene 1');
+    assert.ok(scm.nodes.has('s1:1'), 'clock from scene 1');
+  });
+});

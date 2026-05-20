@@ -1570,6 +1570,23 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     res.json(project(canon, target));
   }));
 
+  // GET /api/nvm/twin/scm — return the current structural causal model as a
+  // serialisable node list (Map → array) so the UI can render the op DAG.
+  app.get('/api/nvm/twin/scm', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { buildSCM } = await import('./server/nvm/twin/scm.ts');
+    const scm = buildSCM(stage);
+    const nodes = [...scm.nodes.values()].map(n => ({
+      opId: n.opId,
+      commitId: n.commitId,
+      opIdx: n.opIdx,
+      op: n.op,
+      parents: n.parents,
+      children: n.children,
+    }));
+    res.json({ nodes, order: scm.order, nodeCount: nodes.length });
+  }));
+
   // POST /api/nvm/twin/do — Pearl's do() causal intervention
   // Body: { opId: string, replacement: StoryOp | null }
   app.post('/api/nvm/twin/do', gameLimiter, asyncHandler(async (req, res) => {
