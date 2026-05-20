@@ -6016,3 +6016,101 @@ describe('NVM — G9 Fixed Points Panel (Wave 21)', () => {
     assert.ok(opKinds.has('UPDATE_READER_STATE'), 'suspense bias present');
   });
 });
+
+// ── Wave 22: Self-Play Panel — genome routes + diff/breed ─────────────────────
+
+describe('NVM — G13 Self-Play Panel (Wave 22)', () => {
+  // Reuse the test canon helper from the StoryGenome suite above
+  function makeCanon2(title: string): Canon {
+    const state: NarrativeState = {
+      ...emptyState(),
+      characterBeliefs: {
+        nora: [{ id: 'b1', proposition: 'the deed is forged', confidence: 0.9, source: 'told', source_event_id: 'e1', acquired_at: 0 }],
+        victor: [{ id: 'b2', proposition: 'nora is unaware', confidence: 0.7, source: 'inferred', source_event_id: 'e2', acquired_at: 1 }],
+      },
+      characterEmotions: {
+        nora: { joy: 0, distress: 80, anger: 30, fear: 60, pride: 0, shame: 10, dominant: 'distress', intensity: 80, last_updated_at: 1 },
+        victor: { joy: 20, distress: 10, anger: 50, fear: 5, pride: 40, shame: 0, dominant: 'anger', intensity: 50, last_updated_at: 1 },
+      },
+      audienceState: { knownFacts: ['f1'], suspense: 70, curiosity: 50, investment: 60 },
+      themeArgument: [{ claimId: 'inheritance', move: 'support' }],
+      clues: [{ clueId: 'clue-deed', carrier: 'object' }],
+      payoffs: [{ setupId: 'setup-deed', payoffEventId: 'payoff-deed' }],
+    };
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'nora', predicate: 'found', object: 'forged_deed', addedAtTurn: 0, validFrom: 0, validTo: null } },
+      { op: 'SHIFT_RELATIONSHIP', pair: ['nora', 'victor'], delta: { dimension: 'trust', amount: -0.9, reason: 'betrayal revealed' } },
+    ];
+    return {
+      title,
+      state,
+      commits: [
+        { commitId: 'c1', parentId: null, sceneIdx: 0, ops, deltaSummary: summarizeOps(ops), reverted: false, createdAt: Date.now() },
+      ],
+    };
+  }
+
+  it('extractGenome from distinct canons produces different genomeIds', () => {
+    const g1 = extractGenome(makeCanon2('StoryA'), 'genome-A');
+    const g2 = extractGenome(makeCanon2('StoryB'), 'genome-B');
+    assert.equal(g1.genomeId, 'genome-A');
+    assert.equal(g2.genomeId, 'genome-B');
+  });
+
+  it('diffGenomes returns similarity ≈ 1 for identical genomes', () => {
+    const g = extractGenome(makeCanon2('Clone'));
+    const diff = diffGenomes(g, g);
+    assert.ok(diff.similarity >= 0 && diff.similarity <= 1, 'similarity in [0,1]');
+    assert.ok(diff.similarity > 0.99, `identical genome → similarity ≈ 1 (got ${diff.similarity})`);
+  });
+
+  it('diffGenomes.arcMatch is 1 when both genomes have same arcArchetype', () => {
+    const g1 = extractGenome(makeCanon2('A'));
+    const g2 = extractGenome(makeCanon2('B'));
+    // Same canon structure → same arcArchetype
+    const diff = diffGenomes(g1, g2);
+    assert.equal(diff.arcMatch, 1, 'same arc → arcMatch = 1');
+  });
+
+  it('diffGenomes on divergent genomes returns similarity < 1', () => {
+    const g1 = extractGenome(makeCanon2('A'), 'g1');
+    // Manually perturb g2's tension profile to create divergence
+    const g2 = { ...extractGenome(makeCanon2('B'), 'g2'), tensionProfile: [0, 0, 0, 100, 100] as [number, number, number, number, number] };
+    const diff = diffGenomes(g1, g2);
+    assert.ok(diff.similarity < 1, 'divergent tension → similarity < 1');
+    assert.ok(diff.tensionSim < 1, 'tensionSim < 1 when profiles differ');
+  });
+
+  it('breedGenomes produces a genome with arcArchetype from genome B', () => {
+    const g1 = extractGenome(makeCanon2('A'), 'g1');
+    const g2 = { ...extractGenome(makeCanon2('B'), 'g2'), arcArchetype: 'rags_to_riches' as const };
+    const bred = breedGenomes(g1, g2, 'hybrid-1');
+    assert.equal(bred.genomeId, 'hybrid-1', 'newId assigned');
+    assert.equal(bred.arcArchetype, 'rags_to_riches', 'arc from genome B');
+  });
+
+  it('breedGenomes merges voice vectors from both parents', () => {
+    const g1 = { ...extractGenome(makeCanon2('A'), 'g1'), voiceVector: { ADD_FACT: 0.8, UPDATE_BELIEF: 0.2 } };
+    const g2 = { ...extractGenome(makeCanon2('B'), 'g2'), voiceVector: { SHIFT_RELATIONSHIP: 0.9, APPRAISE_EMOTION: 0.1 } };
+    const bred = breedGenomes(g1, g2, 'hybrid-2');
+    // Hybrid should carry keys from both parents
+    assert.ok('ADD_FACT' in bred.voiceVector, 'ADD_FACT key inherited from A');
+    assert.ok('SHIFT_RELATIONSHIP' in bred.voiceVector, 'SHIFT_RELATIONSHIP key inherited from B');
+  });
+
+  it('breedGenomes tensionProfile has 5 entries in [0,1] scale (raw values)', () => {
+    const g1 = extractGenome(makeCanon2('A'), 'g1');
+    const g2 = extractGenome(makeCanon2('B'), 'g2');
+    const bred = breedGenomes(g1, g2, 'hybrid-3');
+    assert.equal(bred.tensionProfile.length, 5, '5-point profile');
+    assert.ok(bred.tensionProfile.every(v => typeof v === 'number'), 'all entries are numbers');
+  });
+
+  it('diffGenomes.differences lists irony gap when genomes diverge significantly', () => {
+    const g1 = { ...extractGenome(makeCanon2('A'), 'g1'), ironyDensity: 0.9 };
+    const g2 = { ...extractGenome(makeCanon2('B'), 'g2'), ironyDensity: 0.1 };
+    const diff = diffGenomes(g1, g2);
+    const mentionsIrony = diff.differences.some(d => d.includes('irony'));
+    assert.ok(mentionsIrony, 'large irony gap surfaced in differences');
+  });
+});

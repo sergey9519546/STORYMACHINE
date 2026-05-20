@@ -1869,6 +1869,60 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     });
   }));
 
+  // GET /api/nvm/genome/current — extract StoryGenome from the active canon.
+  app.get('/api/nvm/genome/current', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { extractGenome } = await import('./server/nvm/selfplay/genome.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const commits = stage.getCommits();
+    const state = buildNarrativeState(stage);
+    const ghosts = stage.ghostLedgerGet();
+    const genome = extractGenome({ commits, state, ghosts }, 'current');
+    res.json(genome);
+  }));
+
+  // POST /api/nvm/genome/diff — diff two corpus run genomes.
+  // Body: { runIdA: string, runIdB: string }
+  app.post('/api/nvm/genome/diff', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { diffGenomes } = await import('./server/nvm/selfplay/genome.ts');
+    const { runIdA, runIdB } = req.body ?? {};
+    if (typeof runIdA !== 'string' || typeof runIdB !== 'string') {
+      res.status(400).json({ error: 'body.runIdA and body.runIdB (strings) are required' }); return;
+    }
+    const runs = stage.getCorpusRuns(200);
+    const runA = runs.find((r: { run_id: string }) => r.run_id === runIdA);
+    const runB = runs.find((r: { run_id: string }) => r.run_id === runIdB);
+    if (!runA || !runB) {
+      res.status(404).json({ error: `Run(s) not found: ${!runA ? runIdA : ''} ${!runB ? runIdB : ''}`.trim() }); return;
+    }
+    const genomeA = JSON.parse(runA.genome_json);
+    const genomeB = JSON.parse(runB.genome_json);
+    const diff = diffGenomes(genomeA, genomeB);
+    res.json({ diff, genomeA, genomeB });
+  }));
+
+  // POST /api/nvm/genome/breed — breed two corpus run genomes into a seed genome.
+  // Body: { runIdA: string, runIdB: string, newId?: string }
+  app.post('/api/nvm/genome/breed', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { breedGenomes } = await import('./server/nvm/selfplay/genome.ts');
+    const { runIdA, runIdB, newId } = req.body ?? {};
+    if (typeof runIdA !== 'string' || typeof runIdB !== 'string') {
+      res.status(400).json({ error: 'body.runIdA and body.runIdB (strings) are required' }); return;
+    }
+    const runs = stage.getCorpusRuns(200);
+    const runA = runs.find((r: { run_id: string }) => r.run_id === runIdA);
+    const runB = runs.find((r: { run_id: string }) => r.run_id === runIdB);
+    if (!runA || !runB) {
+      res.status(404).json({ error: 'Run(s) not found' }); return;
+    }
+    const genomeA = JSON.parse(runA.genome_json);
+    const genomeB = JSON.parse(runB.genome_json);
+    const bred = breedGenomes(genomeA, genomeB, typeof newId === 'string' ? newId : `bred-${Date.now()}`);
+    res.json(bred);
+  }));
+
   // POST /api/nvm/repair — run all proof tiers on an IR, return repair patches.
   // Body: { ir: NarrativeTransitionIR }
   app.post('/api/nvm/repair', gameLimiter, asyncHandler(async (req, res) => {

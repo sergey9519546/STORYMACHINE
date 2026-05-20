@@ -26,6 +26,7 @@ import { ArcPlannerPanel } from "./ArcPlannerPanel";
 import { ProjectionGalleryPanel } from "./ProjectionGalleryPanel";
 import { CausalTwinPanel } from "./CausalTwinPanel";
 import { FixedPointsPanel } from "./FixedPointsPanel";
+import { SelfPlayPanel } from "./SelfPlayPanel";
 
 // ── Emotion display helpers ───────────────────────────────────────────────────
 
@@ -108,6 +109,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [showProjection, setShowProjection] = useState(false);
   const [showCausalTwin, setShowCausalTwin] = useState(false);
   const [showFixedPoints, setShowFixedPoints] = useState(false);
+  const [showSelfPlay, setShowSelfPlay]       = useState(false);
 
   const fetchActivePressures = useCallback(async () => {
     try {
@@ -509,6 +511,14 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           >
             <Target className="w-4 h-4" />
             <span className="hidden sm:inline">Destiny</span>
+          </button>
+          <button
+            onClick={() => setShowSelfPlay(true)}
+            title="Self-Play — G13 corpus launcher, genome diff/breed"
+            className="bg-emerald-900 hover:bg-emerald-700 text-emerald-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <Zap className="w-4 h-4" />
+            <span className="hidden sm:inline">Corpus</span>
           </button>
           <button
             onClick={() => setShowSettings(true)}
@@ -1115,6 +1125,12 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       {showFixedPoints && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
           <FixedPointsPanel onClose={() => setShowFixedPoints(false)} />
+        </div>
+      )}
+
+      {showSelfPlay && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <SelfPlayPanel onClose={() => setShowSelfPlay(false)} />
         </div>
       )}
     </div>
