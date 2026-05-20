@@ -2577,6 +2577,109 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     res.json({ points, totalScenes: allCommits.length });
   }));
 
+  // GET /api/nvm/voice-dna — Voice DNA Analyzer (Wave 31).
+  // Aggregates UPDATE_BELIEF propositions across all commits, builds per-character
+  // vocabulary fingerprints, computes pairwise Jaccard similarity, identifies
+  // signature words (unique to each character), and returns an "acoustic twins"
+  // alert for pairs whose voices overlap too much.
+  app.get('/api/nvm/voice-dna', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    type StoryCommit = import('./server/nvm/state/StoryCommit.ts').StoryCommit;
+    const allCommits = (stage.getCommits() as StoryCommit[]).filter(c => !c.reverted);
+
+    // Build per-character word frequency maps from proposition vocabulary
+    const charWords = new Map<string, Map<string, number>>(); // charId → word → count
+    const charEmotions = new Map<string, Map<string, number>>(); // charId → emotion → count
+    let beliefOpCount = 0;
+
+    for (const commit of allCommits) {
+      for (const op of commit.ops) {
+        if (op.op === 'UPDATE_BELIEF') {
+          beliefOpCount++;
+          const words = op.belief.proposition.toLowerCase().split(/\W+/).filter((w: string) => w.length > 3);
+          const existing = charWords.get(op.charId) ?? new Map<string, number>();
+          for (const w of words) existing.set(w, (existing.get(w) ?? 0) + 1);
+          charWords.set(op.charId, existing);
+        }
+        if (op.op === 'APPRAISE_EMOTION') {
+          const existing = charEmotions.get(op.charId) ?? new Map<string, number>();
+          const dom = op.emotion.dominant ?? 'none';
+          existing.set(dom, (existing.get(dom) ?? 0) + 1);
+          charEmotions.set(op.charId, existing);
+        }
+      }
+    }
+
+    const characters = [...charWords.keys()];
+
+    // Pairwise Jaccard similarity
+    type SimPair = { a: string; b: string; similarity: number; sharedWords: string[] };
+    const pairs: SimPair[] = [];
+    for (let i = 0; i < characters.length; i++) {
+      for (let j = i + 1; j < characters.length; j++) {
+        const a = characters[i], b = characters[j];
+        const setA = new Set(charWords.get(a)!.keys());
+        const setB = new Set(charWords.get(b)!.keys());
+        const shared = [...setA].filter(w => setB.has(w));
+        const union = new Set([...setA, ...setB]).size;
+        const sim = union > 0 ? shared.length / union : 0;
+        pairs.push({ a, b, similarity: Math.round(sim * 100) / 100, sharedWords: shared.slice(0, 8) });
+      }
+    }
+    pairs.sort((a, b) => b.similarity - a.similarity);
+
+    // Signature words: words unique to this character (not in any other char's vocab)
+    const allOtherWords = (charId: string): Set<string> => {
+      const s = new Set<string>();
+      for (const [id, words] of charWords) {
+        if (id !== charId) for (const w of words.keys()) s.add(w);
+      }
+      return s;
+    };
+
+    type CharFingerprint = {
+      charId: string;
+      vocabSize: number;
+      signatureWords: string[];
+      dominantEmotion: string;
+      emotionRange: number;
+      beliefCount: number;
+    };
+    const fingerprints: CharFingerprint[] = characters.map(charId => {
+      const words = charWords.get(charId)!;
+      const others = allOtherWords(charId);
+      const sigs = [...words.entries()]
+        .filter(([w]) => !others.has(w))
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8)
+        .map(([w]) => w);
+      const emos = charEmotions.get(charId);
+      let domEmo = 'none', maxCount = 0;
+      if (emos) for (const [e, c] of emos) { if (c > maxCount) { maxCount = c; domEmo = e; } }
+      const emoRange = emos ? emos.size : 0;
+      const beliefCount = [...words.values()].reduce((s, c) => s + c, 0);
+      return { charId, vocabSize: words.size, signatureWords: sigs, dominantEmotion: domEmo, emotionRange: emoRange, beliefCount };
+    });
+    fingerprints.sort((a, b) => b.vocabSize - a.vocabSize);
+
+    // Global diversity score (avg pairwise Jaccard distance, 0=all same, 100=all distinct)
+    const avgSim = pairs.length > 0 ? pairs.reduce((s, p) => s + p.similarity, 0) / pairs.length : 0;
+    const diversityScore = Math.round((1 - avgSim) * 100);
+
+    // "Acoustic twins" = pairs with similarity >= 0.35
+    const acousticTwins = pairs.filter(p => p.similarity >= 0.35);
+
+    res.json({
+      characters,
+      fingerprints,
+      pairs,
+      acousticTwins,
+      diversityScore,
+      totalBeliefOps: beliefOpCount,
+      totalScenes: allCommits.length,
+    });
+  }));
+
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {

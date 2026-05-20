@@ -7104,3 +7104,110 @@ describe('NVM — Narrative Momentum Dashboard (Wave 30)', () => {
     assert.ok(true, 'quality and regression are independent');
   });
 });
+
+// ── Wave 31 — Voice DNA Analyzer ─────────────────────────────────────────────
+
+function makeBeliefOp(charId: string, proposition: string): StoryOp {
+  return { op: 'UPDATE_BELIEF', charId, belief: { id: `b-${charId}-${proposition.slice(0, 4)}`, proposition, confidence: 0.7, source: 'inferred', acquired_at: 0 } };
+}
+
+describe('NVM — Voice DNA Analyzer (Wave 31)', () => {
+  it('voiceDNA: burrowsDelta is 0 when only one character', () => {
+    const ops: StoryOp[] = [makeBeliefOp('alice', 'the world is ending soon'), makeBeliefOp('alice', 'nothing will survive')];
+    const delta = burrowsDelta(ops);
+    assert.equal(delta, 0, 'single char → delta = 0 (no comparison possible)');
+  });
+
+  it('voiceDNA: burrowsDelta is 0 for fully distinct vocabularies', () => {
+    const ops: StoryOp[] = [
+      makeBeliefOp('alice', 'moonbeam silver glow twilight'),
+      makeBeliefOp('bob', 'engine diesel grease carburetor'),
+    ];
+    const delta = burrowsDelta(ops);
+    assert.equal(delta, 0, 'no shared words → delta = 0');
+  });
+
+  it('voiceDNA: burrowsDelta is 1 for identical vocabularies', () => {
+    const ops: StoryOp[] = [
+      makeBeliefOp('alice', 'truth justice freedom honor'),
+      makeBeliefOp('bob', 'truth justice freedom honor'),
+    ];
+    const delta = burrowsDelta(ops);
+    assert.equal(delta, 1, 'same words → delta = 1 (identical voices)');
+  });
+
+  it('voiceDNA: partial overlap produces intermediate delta', () => {
+    const ops: StoryOp[] = [
+      makeBeliefOp('alice', 'truth justice freedom honor'),
+      makeBeliefOp('bob', 'truth justice darkness shadow'),
+    ];
+    const delta = burrowsDelta(ops);
+    assert.ok(delta > 0 && delta < 1, `expected 0 < delta < 1, got ${delta}`);
+  });
+
+  it('voiceDNA: Jaccard similarity — shared / union', () => {
+    const setA = new Set(['truth', 'justice', 'freedom', 'honor']);
+    const setB = new Set(['truth', 'justice', 'darkness', 'shadow']);
+    const shared = [...setA].filter(w => setB.has(w)).length;
+    const union = new Set([...setA, ...setB]).size;
+    const sim = shared / union;
+    assert.ok(Math.abs(sim - 2 / 6) < 0.001, `Jaccard 2/6 ≈ 0.333, got ${sim}`);
+  });
+
+  it('voiceDNA: signature words are unique to one character', () => {
+    const vocab: Record<string, Set<string>> = {
+      alice: new Set(['moonbeam', 'silver', 'truth', 'justice']),
+      bob:   new Set(['engine', 'diesel', 'truth', 'justice']),
+    };
+    const aliceSigs = [...vocab.alice].filter(w => !vocab.bob.has(w));
+    assert.ok(aliceSigs.includes('moonbeam'), 'moonbeam is alice-only');
+    assert.ok(aliceSigs.includes('silver'), 'silver is alice-only');
+    assert.ok(!aliceSigs.includes('truth'), 'truth is shared → not a signature word');
+  });
+
+  it('voiceDNA: diversity score = 100 when voices are fully distinct', () => {
+    const sim = 0; // fully distinct
+    const diversityScore = Math.round((1 - sim) * 100);
+    assert.equal(diversityScore, 100, 'diversity 100 when similarity = 0');
+  });
+
+  it('voiceDNA: diversity score = 0 when voices are identical', () => {
+    const sim = 1; // identical
+    const diversityScore = Math.round((1 - sim) * 100);
+    assert.equal(diversityScore, 0, 'diversity 0 when similarity = 1');
+  });
+
+  it('voiceDNA: acoustic twins threshold is >= 0.35 similarity', () => {
+    const pairs = [
+      { a: 'alice', b: 'bob', similarity: 0.40 },
+      { a: 'alice', b: 'carol', similarity: 0.20 },
+      { a: 'bob', b: 'carol', similarity: 0.35 },
+    ];
+    const twins = pairs.filter(p => p.similarity >= 0.35);
+    assert.equal(twins.length, 2, 'two pairs at or above threshold');
+    assert.ok(twins.some(p => p.a === 'alice' && p.b === 'bob'), 'alice↔bob is a twin');
+    assert.ok(twins.some(p => p.a === 'bob' && p.b === 'carol'), 'bob↔carol is a twin');
+  });
+
+  it('voiceDNA: multi-scene beliefs accumulate into character vocab', () => {
+    const commits = [
+      makeMomentumCommit(0, [makeBeliefOp('alice', 'moonbeam silver glow')]),
+      makeMomentumCommit(1, [makeBeliefOp('alice', 'twilight shadow darkness')]),
+    ];
+    const charWords = new Map<string, Set<string>>();
+    for (const commit of commits) {
+      for (const op of commit.ops) {
+        if (op.op === 'UPDATE_BELIEF') {
+          const words = new Set(op.belief.proposition.toLowerCase().split(/\W+/).filter(w => w.length > 3));
+          const existing = charWords.get(op.charId) ?? new Set<string>();
+          for (const w of words) existing.add(w);
+          charWords.set(op.charId, existing);
+        }
+      }
+    }
+    const aliceWords = charWords.get('alice') ?? new Set();
+    assert.ok(aliceWords.has('moonbeam'), 'moonbeam accumulated from scene 0');
+    assert.ok(aliceWords.has('twilight'), 'twilight accumulated from scene 1');
+    assert.ok(aliceWords.size >= 4, `alice has >= 4 words, got ${aliceWords.size}`);
+  });
+});

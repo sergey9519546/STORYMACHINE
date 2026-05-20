@@ -35,6 +35,7 @@ import { StoryHealthPanel } from "./StoryHealthPanel";
 import { CharacterArcPanel } from "./CharacterArcPanel";
 import { RegressionPanel } from "./RegressionPanel";
 import { MomentumPanel } from "./MomentumPanel";
+import { VoiceDNAPanel } from "./VoiceDNAPanel";
 
 // ── Emotion display helpers ───────────────────────────────────────────────────
 
@@ -126,6 +127,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [showCharacterArc, setShowCharacterArc] = useState(false);
   const [showRegression, setShowRegression]     = useState(false);
   const [showMomentum, setShowMomentum]         = useState(false);
+  const [showVoiceDNA, setShowVoiceDNA]         = useState(false);
 
   const fetchActivePressures = useCallback(async () => {
     try {
@@ -599,6 +601,14 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           >
             <span style={{ fontSize: 14 }}>⚡</span>
             <span className="hidden sm:inline">Momentum</span>
+          </button>
+          <button
+            onClick={() => setShowVoiceDNA(true)}
+            title="Voice DNA — stylometric fingerprints, pairwise voice similarity matrix, acoustic twins"
+            className="bg-indigo-950 hover:bg-indigo-800 text-indigo-300 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <span style={{ fontSize: 14 }}>🧬</span>
+            <span className="hidden sm:inline">Voice</span>
           </button>
           <button
             onClick={() => setShowSettings(true)}
@@ -1259,6 +1269,12 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       {showMomentum && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
           <MomentumPanel onClose={() => setShowMomentum(false)} />
+        </div>
+      )}
+
+      {showVoiceDNA && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <VoiceDNAPanel onClose={() => setShowVoiceDNA(false)} />
         </div>
       )}
     </div>
