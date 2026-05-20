@@ -23,7 +23,9 @@ import { runTier1, tier1Passes, runTier2, runTier3, tier3Rank, failedProofs } fr
 import { deriveTensionLedger } from '../valuation/futures.ts';
 import { runQualityEngine } from '../quality/index.ts';
 import { runWritersRoom } from '../room/room.ts';
-import { buildGenerationSpec } from '../generate/proof-spec.ts';
+import { buildGenerationSpec, buildSystemPreamble } from '../generate/proof-spec.ts';
+import { buildQualityAwareConstraints } from '../generate/quality-spec.ts';
+import { proppMorphology } from '../quality/index.ts';
 import { applyOperator, ALL_OPERATORS } from './operators.ts';
 import { queryPolicy } from '../selfplay/mine.ts';
 import { computeTopology } from '../valuation/topology.ts';
@@ -88,10 +90,27 @@ export async function convergeScene(
   let best: NarrativeTransitionIR | null = null;
   let bestComposite = -1;
   let currentFailures: ProofResult[] = [];
+  let currentQualityWarnings: import('../quality/index.ts').QualityWarning[] = [];
   let lastCandidates: NarrativeTransitionIR[] = [];
 
   for (let iter = 0; iter < budget.maxIterations; iter++) {
-    const spec = buildGenerationSpec(state, target, currentFailures);
+    // Quality-aware spec (Wave 27): quality warnings + Propp gaps feed back as constraints.
+    const baseSpec = buildGenerationSpec(state, target, currentFailures);
+    let specConstraints = baseSpec.constraints;
+    if (iter > 0 && (currentQualityWarnings.length > 0 || best)) {
+      const proppGaps = best ? proppMorphology(best) : { present: [], absent: [], coverage: 0 };
+      specConstraints = buildQualityAwareConstraints(
+        baseSpec.constraints,
+        currentQualityWarnings,
+        [],   // arc-completion promises not available without commit history; uses [] here
+        proppGaps,
+      );
+    }
+    const spec = {
+      ...baseSpec,
+      constraints: specConstraints,
+      systemPreamble: buildSystemPreamble(specConstraints, state),
+    };
 
     let candidates: NarrativeTransitionIR[];
     // G2→G1: Writers' Room drives mutation operator selection after iteration 0.
@@ -211,6 +230,10 @@ export async function convergeScene(
       const t1Failures = failedProofs(runTier1(best, state));
       const t2Failures = failedProofs(runTier2(best, state));
       currentFailures = [...t1Failures, ...t2Failures];
+      // Quality-aware (Wave 27): capture quality warnings from best candidate
+      // so they feed back as constraints in the next iteration.
+      const bestQuality = runQualityEngine(best, state);
+      currentQualityWarnings = bestQuality.warnings;
     }
   }
 

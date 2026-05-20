@@ -6626,3 +6626,112 @@ describe('NVM — Story Health Dashboard (Wave 26)', () => {
     assert.equal(proofPassRate, 75, '3/4 pass → 75%');
   });
 });
+
+import {
+  qualityConstraintsFromWarnings, arcConstraintsFromTracker,
+  proppConstraintsFromAnalysis, buildQualityAwareConstraints,
+} from './server/nvm/generate/quality-spec.ts';
+
+describe('NVM — Quality-Aware Generation Spec (Wave 27)', () => {
+  it('qualityConstraintsFromWarnings: DV1 → free_form constraint', () => {
+    const warnings: import('./server/nvm/quality/index.ts').QualityWarning[] = [{
+      engine: 'dialogue_validator', opIdx: 0, rule: 'DV1_ON_THE_NOSE',
+      message: 'told at full confidence', penalty: 20,
+    }];
+    const constraints = qualityConstraintsFromWarnings(warnings);
+    assert.ok(constraints.some(c => c.kind === 'free_form' && c.description.includes('subtext')), 'DV1 → subtext constraint');
+  });
+
+  it('qualityConstraintsFromWarnings: deduplicates same rule', () => {
+    const warnings: import('./server/nvm/quality/index.ts').QualityWarning[] = [
+      { engine: 'dv', opIdx: 0, rule: 'DV5_NO_HUMAN_PRESENCE', message: 'x', penalty: 30 },
+      { engine: 'dv', opIdx: 1, rule: 'DV5_NO_HUMAN_PRESENCE', message: 'y', penalty: 30 },
+    ];
+    const constraints = qualityConstraintsFromWarnings(warnings);
+    const dv5 = constraints.filter(c => c.description.includes('character-level op'));
+    assert.equal(dv5.length, 1, 'DV5 should appear only once despite two warnings');
+  });
+
+  it('qualityConstraintsFromWarnings: LOW_SPECIFICITY → concrete specifics constraint', () => {
+    const warnings: import('./server/nvm/quality/index.ts').QualityWarning[] = [{
+      engine: 'specificity', opIdx: null, rule: 'LOW_SPECIFICITY', message: '', penalty: 30,
+    }];
+    const constraints = qualityConstraintsFromWarnings(warnings);
+    assert.ok(constraints.some(c => c.description.includes('concrete')), 'specificity → concrete constraint');
+  });
+
+  it('arcConstraintsFromTracker: overdue CLUE → must_seed_clue constraint', () => {
+    const promises: import('./server/nvm/quality/arc-tracker.ts').OpenPromise[] = [{
+      promiseId: 'clue:mystery1', kind: 'CLUE', description: 'Clue mystery1 needs payoff',
+      openedAtScene: 0, targetWindow: [3, 8], urgency: 'overdue',
+      suggestedOp: 'PAYOFF_SETUP', pacingScore: 0.2,
+    }];
+    const constraints = arcConstraintsFromTracker(promises, 3);
+    assert.ok(constraints.some(c => c.kind === 'must_seed_clue'), 'overdue CLUE → must_seed_clue');
+  });
+
+  it('arcConstraintsFromTracker: on_track promises are not included', () => {
+    const promises: import('./server/nvm/quality/arc-tracker.ts').OpenPromise[] = [{
+      promiseId: 'clock:doom', kind: 'CLOCK', description: 'Clock doom counting',
+      openedAtScene: 0, targetWindow: [2, 6], urgency: 'on_track',
+      suggestedOp: 'RAISE_CLOCK', pacingScore: 0.9,
+    }];
+    const constraints = arcConstraintsFromTracker(promises, 3);
+    assert.equal(constraints.length, 0, 'on_track promises should not generate constraints');
+  });
+
+  it('proppConstraintsFromAnalysis: absent complication → RAISE_CLOCK guidance', () => {
+    const analysis: import('./server/nvm/quality/index.ts').ProppAnalysis = {
+      present: [], absent: ['complication', 'mediation', 'departure', 'ordeal', 'consequence', 'resolution', 'preparation'],
+      coverage: 0,
+    };
+    const constraints = proppConstraintsFromAnalysis(analysis);
+    assert.ok(constraints.some(c => c.description.includes('complication')), 'missing complication → guidance');
+    assert.ok(constraints.length <= 2, 'at most 2 Propp constraints generated');
+  });
+
+  it('proppConstraintsFromAnalysis: all present → no constraints', () => {
+    const analysis: import('./server/nvm/quality/index.ts').ProppAnalysis = {
+      present: ['preparation', 'complication', 'mediation', 'departure', 'ordeal', 'consequence', 'resolution'],
+      absent: [],
+      coverage: 1,
+    };
+    const constraints = proppConstraintsFromAnalysis(analysis);
+    assert.equal(constraints.length, 0, 'all stages present → no constraints');
+  });
+
+  it('buildQualityAwareConstraints combines all constraint sources', () => {
+    const proofConstraints: import('./server/nvm/generate/proof-spec.ts').GenerationConstraint[] = [
+      { kind: 'must_add_fact', description: 'add a fact' },
+    ];
+    const warnings: import('./server/nvm/quality/index.ts').QualityWarning[] = [
+      { engine: 'dv', opIdx: null, rule: 'DV10_STRUCTURAL_UNIFORMITY', message: 'all same', penalty: 25 },
+    ];
+    const promises: import('./server/nvm/quality/arc-tracker.ts').OpenPromise[] = [];
+    const proppAnalysis: import('./server/nvm/quality/index.ts').ProppAnalysis = {
+      present: [], absent: ['complication'], coverage: 0,
+    };
+    const all = buildQualityAwareConstraints(proofConstraints, warnings, promises, proppAnalysis);
+    assert.ok(all.some(c => c.kind === 'must_add_fact'), 'proof constraint preserved');
+    assert.ok(all.some(c => c.description.includes('variety')), 'DV10 → variety constraint');
+    assert.ok(all.some(c => c.description.includes('complication')), 'Propp gap → complication');
+  });
+
+  it('qualityConstraintsFromWarnings: low-penalty warnings (<15) without matching rule → ignored', () => {
+    const warnings: import('./server/nvm/quality/index.ts').QualityWarning[] = [{
+      engine: 'custom', opIdx: null, rule: 'UNKNOWN_RULE_XYZ', message: 'minor thing', penalty: 5,
+    }];
+    const constraints = qualityConstraintsFromWarnings(warnings);
+    assert.equal(constraints.length, 0, 'penalty < 15 + unknown rule → no constraint');
+  });
+
+  it('arcConstraintsFromTracker: THEME urgency → resolve theme constraint', () => {
+    const promises: import('./server/nvm/quality/arc-tracker.ts').OpenPromise[] = [{
+      promiseId: 'theme:honor', kind: 'THEME', description: 'Theme honor needs resolve',
+      openedAtScene: 0, targetWindow: [5, 15], urgency: 'due_soon',
+      suggestedOp: 'ADVANCE_THEME_ARGUMENT', pacingScore: 0.6,
+    }];
+    const constraints = arcConstraintsFromTracker(promises, 3);
+    assert.ok(constraints.some(c => c.description.includes('resolve')), 'THEME → resolve constraint');
+  });
+});
