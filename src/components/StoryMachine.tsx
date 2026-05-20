@@ -27,6 +27,7 @@ import { ProjectionGalleryPanel } from "./ProjectionGalleryPanel";
 import { CausalTwinPanel } from "./CausalTwinPanel";
 import { FixedPointsPanel } from "./FixedPointsPanel";
 import { SelfPlayPanel } from "./SelfPlayPanel";
+import { ProofInspectorPanel } from "./ProofInspectorPanel";
 
 // ── Emotion display helpers ───────────────────────────────────────────────────
 
@@ -109,7 +110,8 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [showProjection, setShowProjection] = useState(false);
   const [showCausalTwin, setShowCausalTwin] = useState(false);
   const [showFixedPoints, setShowFixedPoints] = useState(false);
-  const [showSelfPlay, setShowSelfPlay]       = useState(false);
+  const [showSelfPlay, setShowSelfPlay]         = useState(false);
+  const [showProofInspector, setShowProofInspector] = useState(false);
 
   const fetchActivePressures = useCallback(async () => {
     try {
@@ -519,6 +521,14 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           >
             <Zap className="w-4 h-4" />
             <span className="hidden sm:inline">Corpus</span>
+          </button>
+          <button
+            onClick={() => setShowProofInspector(true)}
+            title="Proof Inspector — 4-tier scene analysis + repair patches"
+            className="bg-rose-900 hover:bg-rose-700 text-rose-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <Target className="w-4 h-4" />
+            <span className="hidden sm:inline">Prove</span>
           </button>
           <button
             onClick={() => setShowSettings(true)}
@@ -1131,6 +1141,12 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       {showSelfPlay && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
           <SelfPlayPanel onClose={() => setShowSelfPlay(false)} />
+        </div>
+      )}
+
+      {showProofInspector && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <ProofInspectorPanel onClose={() => setShowProofInspector(false)} />
         </div>
       )}
     </div>

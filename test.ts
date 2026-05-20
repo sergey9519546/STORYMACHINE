@@ -6114,3 +6114,189 @@ describe('NVM — G13 Self-Play Panel (Wave 22)', () => {
     assert.ok(mentionsIrony, 'large irony gap surfaced in differences');
   });
 });
+
+// ── Wave 23: Genre Arc Templates + Proof Inspector ────────────────────────────
+
+describe('NVM — Genre Arc Templates (Wave 23)', () => {
+  // Genre presets are pure data — test their structural invariants
+  // (mirrors the GENRE_PRESETS constant in ArcPlannerPanel.tsx)
+
+  interface SceneConfig { sceneIdx: number; sceneFunction: string; tensionTarget: number; qualityTarget: number; }
+  interface GenrePreset { label: string; archetype: string; scenes: SceneConfig[]; }
+
+  const PRESETS: GenrePreset[] = [
+    {
+      label: 'Tragedy', archetype: 'icarus',
+      scenes: [
+        { sceneIdx: 0, sceneFunction: 'establish_world',  tensionTarget: 25, qualityTarget: 60 },
+        { sceneIdx: 1, sceneFunction: 'advance_plot',     tensionTarget: 40, qualityTarget: 65 },
+        { sceneIdx: 2, sceneFunction: 'reveal_character', tensionTarget: 55, qualityTarget: 65 },
+        { sceneIdx: 3, sceneFunction: 'build_tension',    tensionTarget: 80, qualityTarget: 70 },
+        { sceneIdx: 4, sceneFunction: 'set_up_payoff',    tensionTarget: 95, qualityTarget: 70 },
+        { sceneIdx: 5, sceneFunction: 'provide_relief',   tensionTarget: 30, qualityTarget: 60 },
+      ],
+    },
+    {
+      label: 'Rags → Riches', archetype: 'rags_to_riches',
+      scenes: [
+        { sceneIdx: 0, sceneFunction: 'establish_world',  tensionTarget: 15, qualityTarget: 55 },
+        { sceneIdx: 1, sceneFunction: 'advance_plot',     tensionTarget: 30, qualityTarget: 60 },
+        { sceneIdx: 2, sceneFunction: 'reveal_character', tensionTarget: 45, qualityTarget: 65 },
+        { sceneIdx: 3, sceneFunction: 'set_up_payoff',    tensionTarget: 60, qualityTarget: 65 },
+        { sceneIdx: 4, sceneFunction: 'build_tension',    tensionTarget: 75, qualityTarget: 70 },
+      ],
+    },
+    {
+      label: 'Man in a Hole', archetype: 'man_in_hole',
+      scenes: [
+        { sceneIdx: 0, sceneFunction: 'establish_world',  tensionTarget: 30, qualityTarget: 60 },
+        { sceneIdx: 1, sceneFunction: 'build_tension',    tensionTarget: 75, qualityTarget: 65 },
+        { sceneIdx: 2, sceneFunction: 'advance_plot',     tensionTarget: 90, qualityTarget: 65 },
+        { sceneIdx: 3, sceneFunction: 'reveal_character', tensionTarget: 60, qualityTarget: 70 },
+        { sceneIdx: 4, sceneFunction: 'set_up_payoff',    tensionTarget: 35, qualityTarget: 65 },
+      ],
+    },
+  ];
+
+  it('all presets have at least 5 scenes', () => {
+    for (const p of PRESETS) {
+      assert.ok(p.scenes.length >= 5, `${p.label} has ≥5 scenes (got ${p.scenes.length})`);
+    }
+  });
+
+  it('all preset scene indices are sequential from 0', () => {
+    for (const p of PRESETS) {
+      p.scenes.forEach((sc, i) => {
+        assert.equal(sc.sceneIdx, i, `${p.label} scene ${i}: sceneIdx should be ${i}`);
+      });
+    }
+  });
+
+  it('all preset tensionTargets are in [0, 100]', () => {
+    for (const p of PRESETS) {
+      for (const sc of p.scenes) {
+        assert.ok(sc.tensionTarget >= 0 && sc.tensionTarget <= 100,
+          `${p.label} tension ${sc.tensionTarget} in range`);
+      }
+    }
+  });
+
+  it('Tragedy preset peaks tension in middle-to-late then drops', () => {
+    const tragedy = PRESETS.find(p => p.label === 'Tragedy')!;
+    const tensions = tragedy.scenes.map(s => s.tensionTarget);
+    const peak = Math.max(...tensions);
+    const peakIdx = tensions.indexOf(peak);
+    const last = tensions[tensions.length - 1];
+    assert.ok(peakIdx > 1, 'peak not at start');
+    assert.ok(last < peak, 'tension drops after peak');
+  });
+
+  it('Rags → Riches preset has monotonically non-decreasing tension', () => {
+    const rags = PRESETS.find(p => p.label === 'Rags → Riches')!;
+    const tensions = rags.scenes.map(s => s.tensionTarget);
+    for (let i = 1; i < tensions.length; i++) {
+      assert.ok(tensions[i] >= tensions[i - 1], `tension non-decreasing at scene ${i}`);
+    }
+  });
+
+  it('Man in a Hole preset has a high-tension middle scene', () => {
+    const hole = PRESETS.find(p => p.label === 'Man in a Hole')!;
+    const tensions = hole.scenes.map(s => s.tensionTarget);
+    const midTension = tensions[Math.floor(tensions.length / 2)];
+    assert.ok(midTension >= 80, `mid tension ${midTension} ≥ 80`);
+  });
+});
+
+describe('NVM — Proof Inspector endpoint logic (Wave 23)', () => {
+  // Test the per-tier proof structure returned by GET /api/nvm/proof/:commitId
+  // by exercising the kernel functions directly in the same pattern the endpoint uses.
+
+  function mkCommit(id: string, parent: string | null, ops: StoryOp[], sceneIdx = 0): StoryCommit {
+    return { commitId: id, parentId: parent, sceneIdx, ops, deltaSummary: summarizeOps(ops), reverted: false, createdAt: Date.now() };
+  }
+
+  it('running all 4 tiers on a minimal IR returns correct tier structure', () => {
+    const stage = new Stage(':memory:');
+    const ops: StoryOp[] = [
+      { op: 'RAISE_CLOCK', clockId: 'test', amount: 1 },
+    ];
+    stage.appendCommit(mkCommit('c1', null, ops));
+
+    // Simulate what the endpoint does: build minimal IR, run all tiers
+    const ir = {
+      transitionId: 'c1',
+      sceneIdx: 0,
+      sceneFunction: 'advance_plot' as const,
+      activeMechanisms: [] as string[],
+      beforeStateHash: 'inspector',
+      ops,
+      preconditions: [] as string[],
+      postconditions: [] as string[],
+      provenance: { origin: 'model_generated' as const, createdAt: Date.now() },
+    };
+    const state = emptyState();
+    const t1 = runTier1(ir, state);
+    const t2 = runTier2(ir, state);
+    const t3 = runTier3(ir, state);
+    const t4 = runTier4(ir, state);
+
+    assert.equal(t1.length, 8, '8 Tier 1 proofs');
+    assert.equal(t2.length, 3, '3 Tier 2 proofs');
+    assert.equal(t3.length, 2, '2 Tier 3 proofs');
+    assert.equal(t4.length, 2, '2 Tier 4 proofs');
+    assert.ok(typeof tier2Score(t2) === 'number', 'tier2Score is number');
+    assert.ok(typeof tier3Rank(t3) === 'number', 'tier3Rank is number');
+  });
+
+  it('proof inspector replays state before target commit correctly', () => {
+    const ops1: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'a', predicate: 'b', object: 'c', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ];
+    const ops2: StoryOp[] = [
+      { op: 'RAISE_CLOCK', clockId: 'doom', amount: 1 },
+    ];
+
+    // Simulate the endpoint's replay loop
+    const allCommits = [
+      { commitId: 'c1', ops: ops1 },
+      { commitId: 'c2', ops: ops2 },
+    ];
+    const targetIdx = allCommits.findIndex(c => c.commitId === 'c2');
+    let rollingState = emptyState();
+    for (let i = 0; i < targetIdx; i++) {
+      rollingState = applyStoryOps(rollingState, allCommits[i].ops);
+    }
+    // After replay, rolling state should have c1's fact but not c2's clock
+    assert.ok(rollingState.objectiveReality.some(f => f.factId === 'f1'), 'c1 fact present');
+    assert.ok(!('doom' in rollingState.clocks), 'c2 clock not yet applied');
+  });
+
+  it('tier2Score formula: 100 - ceil(100/3) per failure', () => {
+    const allPass = [
+      { proof: 'NecessityProof' as const, pass: true, tier: 2 as const, reason: '', findings: [] },
+      { proof: 'SpecificityProof' as const, pass: true, tier: 2 as const, reason: '', findings: [] },
+      { proof: 'DialogueProof' as const, pass: true, tier: 2 as const, reason: '', findings: [] },
+    ];
+    assert.equal(tier2Score(allPass), 100, 'all pass → 100');
+
+    const oneFailure = allPass.map((r, i) => i === 0 ? { ...r, pass: false } : r);
+    assert.ok(tier2Score(oneFailure) > 0 && tier2Score(oneFailure) < 100, 'one failure → partial score');
+
+    const allFail = allPass.map(r => ({ ...r, pass: false }));
+    assert.equal(tier2Score(allFail), 0, 'all fail → 0');
+  });
+
+  it('tier3Rank: 100 when both pass, 50 when one fails, 0 when both fail', () => {
+    const pass2 = [
+      { proof: 'GenericnessProof' as const, pass: true, tier: 3 as const, reason: '', findings: [] },
+      { proof: 'OriginalityProof' as const, pass: true, tier: 3 as const, reason: '', findings: [] },
+    ];
+    assert.equal(tier3Rank(pass2), 100, 'both pass → rank 100');
+
+    const pass1 = [pass2[0], { ...pass2[1], pass: false }];
+    assert.equal(tier3Rank(pass1), 50, 'one pass → rank 50');
+
+    const pass0 = pass2.map(r => ({ ...r, pass: false }));
+    assert.equal(tier3Rank(pass0), 0, 'none pass → rank 0');
+  });
+});

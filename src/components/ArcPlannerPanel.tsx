@@ -51,6 +51,92 @@ const DEFAULT_ARC: SceneConfig[] = [
   { sceneIdx: 4, sceneFunction: 'set_up_payoff',     tensionTarget: 75, qualityTarget: 70 },
 ];
 
+// Genre arc presets — tension shapes grounded in the 6 emotional arc archetypes
+// (Reagan et al. 2016 / Vonnegut's story shapes).
+interface GenrePreset {
+  label: string;
+  archetype: string;   // matching ArcArchetype from topology.ts
+  description: string;
+  scenes: SceneConfig[];
+}
+
+const GENRE_PRESETS: GenrePreset[] = [
+  {
+    label: 'Tragedy',
+    archetype: 'icarus',
+    description: 'Rise then catastrophic fall — Hamlet, Macbeth',
+    scenes: [
+      { sceneIdx: 0, sceneFunction: 'establish_world',  tensionTarget: 25, qualityTarget: 60 },
+      { sceneIdx: 1, sceneFunction: 'advance_plot',     tensionTarget: 40, qualityTarget: 65 },
+      { sceneIdx: 2, sceneFunction: 'reveal_character', tensionTarget: 55, qualityTarget: 65 },
+      { sceneIdx: 3, sceneFunction: 'build_tension',    tensionTarget: 80, qualityTarget: 70 },
+      { sceneIdx: 4, sceneFunction: 'set_up_payoff',    tensionTarget: 95, qualityTarget: 70 },
+      { sceneIdx: 5, sceneFunction: 'provide_relief',   tensionTarget: 30, qualityTarget: 60 },
+    ],
+  },
+  {
+    label: 'Rags → Riches',
+    archetype: 'rags_to_riches',
+    description: 'Steady climb — Cinderella, Great Expectations',
+    scenes: [
+      { sceneIdx: 0, sceneFunction: 'establish_world',  tensionTarget: 15, qualityTarget: 55 },
+      { sceneIdx: 1, sceneFunction: 'advance_plot',     tensionTarget: 30, qualityTarget: 60 },
+      { sceneIdx: 2, sceneFunction: 'reveal_character', tensionTarget: 45, qualityTarget: 65 },
+      { sceneIdx: 3, sceneFunction: 'set_up_payoff',    tensionTarget: 60, qualityTarget: 65 },
+      { sceneIdx: 4, sceneFunction: 'build_tension',    tensionTarget: 75, qualityTarget: 70 },
+    ],
+  },
+  {
+    label: 'Man in a Hole',
+    archetype: 'man_in_hole',
+    description: 'Fall into trouble then recovery — most thriller plots',
+    scenes: [
+      { sceneIdx: 0, sceneFunction: 'establish_world',  tensionTarget: 30, qualityTarget: 60 },
+      { sceneIdx: 1, sceneFunction: 'build_tension',    tensionTarget: 75, qualityTarget: 65 },
+      { sceneIdx: 2, sceneFunction: 'advance_plot',     tensionTarget: 90, qualityTarget: 65 },
+      { sceneIdx: 3, sceneFunction: 'reveal_character', tensionTarget: 60, qualityTarget: 70 },
+      { sceneIdx: 4, sceneFunction: 'set_up_payoff',    tensionTarget: 35, qualityTarget: 65 },
+    ],
+  },
+  {
+    label: 'Cinderella',
+    archetype: 'cinderella',
+    description: 'Rise, fall, rise again — most romantic arcs',
+    scenes: [
+      { sceneIdx: 0, sceneFunction: 'establish_world',  tensionTarget: 20, qualityTarget: 55 },
+      { sceneIdx: 1, sceneFunction: 'advance_plot',     tensionTarget: 55, qualityTarget: 65 },
+      { sceneIdx: 2, sceneFunction: 'build_tension',    tensionTarget: 85, qualityTarget: 65 },
+      { sceneIdx: 3, sceneFunction: 'provide_relief',   tensionTarget: 40, qualityTarget: 60 },
+      { sceneIdx: 4, sceneFunction: 'set_up_payoff',    tensionTarget: 80, qualityTarget: 70 },
+    ],
+  },
+  {
+    label: 'Oedipus',
+    archetype: 'oedipus',
+    description: 'Fall, recovery, catastrophic fall — Greek tragedy, noir',
+    scenes: [
+      { sceneIdx: 0, sceneFunction: 'establish_world',  tensionTarget: 50, qualityTarget: 60 },
+      { sceneIdx: 1, sceneFunction: 'build_tension',    tensionTarget: 80, qualityTarget: 65 },
+      { sceneIdx: 2, sceneFunction: 'reveal_character', tensionTarget: 35, qualityTarget: 65 },
+      { sceneIdx: 3, sceneFunction: 'advance_plot',     tensionTarget: 55, qualityTarget: 65 },
+      { sceneIdx: 4, sceneFunction: 'set_up_payoff',    tensionTarget: 90, qualityTarget: 70 },
+    ],
+  },
+  {
+    label: 'Hero\'s Journey',
+    archetype: 'man_in_hole',
+    description: 'Call → ordeal → return transformed',
+    scenes: [
+      { sceneIdx: 0, sceneFunction: 'establish_world',  tensionTarget: 20, qualityTarget: 55 },
+      { sceneIdx: 1, sceneFunction: 'advance_plot',     tensionTarget: 45, qualityTarget: 60 },
+      { sceneIdx: 2, sceneFunction: 'build_tension',    tensionTarget: 80, qualityTarget: 65 },
+      { sceneIdx: 3, sceneFunction: 'reveal_character', tensionTarget: 90, qualityTarget: 70 },
+      { sceneIdx: 4, sceneFunction: 'provide_relief',   tensionTarget: 65, qualityTarget: 65 },
+      { sceneIdx: 5, sceneFunction: 'set_up_payoff',    tensionTarget: 40, qualityTarget: 60 },
+    ],
+  },
+];
+
 interface Props { onClose: () => void; }
 
 export function ArcPlannerPanel({ onClose }: Props) {
@@ -120,6 +206,41 @@ export function ArcPlannerPanel({ onClose }: Props) {
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14 }}>
         <strong style={{ fontSize: 15 }}>Arc Compiler — multi-scene convergence</strong>
         <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16 }}>x</button>
+      </div>
+
+      {/* Genre presets */}
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ color: '#64748b', fontSize: 10, marginBottom: 6, letterSpacing: '0.05em' }}>GENRE ARC PRESETS</div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {GENRE_PRESETS.map(preset => (
+            <button
+              key={preset.label}
+              onClick={() => setScenes(preset.scenes)}
+              title={`${preset.description} · archetype: ${preset.archetype}`}
+              style={{
+                background: '#1e293b', border: '1px solid #334155', borderRadius: 4,
+                color: '#94a3b8', padding: '4px 10px', cursor: 'pointer',
+                fontFamily: 'monospace', fontSize: 11,
+                transition: 'border-color 0.15s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = '#7c3aed')}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = '#334155')}
+            >
+              {preset.label}
+            </button>
+          ))}
+          <button
+            onClick={() => setScenes(DEFAULT_ARC)}
+            title="Default 5-scene balanced arc"
+            style={{
+              background: 'transparent', border: '1px solid #1e293b', borderRadius: 4,
+              color: '#475569', padding: '4px 10px', cursor: 'pointer',
+              fontFamily: 'monospace', fontSize: 11,
+            }}
+          >
+            Reset
+          </button>
+        </div>
       </div>
 
       {/* Scene list */}

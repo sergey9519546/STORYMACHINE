@@ -1923,6 +1923,69 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     res.json(bred);
   }));
 
+  // GET /api/nvm/proof/:commitId — run all 4 proof tiers on a single commit.
+  // Replays state up to (but not including) that commit, then runs the full
+  // proof kernel + lint + repair on its IR. No body required.
+  app.get('/api/nvm/proof/:commitId', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { runTier1, runTier2, tier2Score, runTier3, tier3Rank, runTier4 } = await import('./server/nvm/proof/kernel.ts');
+    const { repair } = await import('./server/nvm/proof/repair.ts');
+    const { lint } = await import('./server/nvm/proof/lint.ts');
+    const { emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+
+    const targetId = req.params.commitId;
+    const allCommits = stage.getCommits().filter((c: import('./server/nvm/state/StoryCommit.ts').StoryCommit) => !c.reverted);
+    const targetIdx = allCommits.findIndex((c: import('./server/nvm/state/StoryCommit.ts').StoryCommit) => c.commitId === targetId);
+    if (targetIdx === -1) {
+      res.status(404).json({ error: `Commit "${targetId}" not found` }); return;
+    }
+    const commit = allCommits[targetIdx];
+
+    // Replay state up to (not including) this commit
+    let rollingState = emptyState();
+    for (let i = 0; i < targetIdx; i++) {
+      rollingState = applyStoryOps(rollingState, allCommits[i].ops);
+    }
+
+    // Build minimal IR shell from commit
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: commit.commitId,
+      sceneIdx: commit.sceneIdx,
+      sceneFunction: 'advance_plot',
+      activeMechanisms: [],
+      beforeStateHash: 'inspector',
+      ops: commit.ops,
+      preconditions: [],
+      postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: commit.createdAt },
+    };
+
+    const t1 = runTier1(ir, rollingState);
+    const t2 = runTier2(ir, rollingState);
+    const t3 = runTier3(ir, rollingState);
+    const t4 = runTier4(ir, rollingState);
+    const allFailures = [...t1, ...t2].filter(r => !r.pass);
+    const patches = repair(allFailures, rollingState);
+    const lintWarnings = lint(ir, rollingState);
+
+    res.json({
+      commitId: commit.commitId,
+      sceneIdx: commit.sceneIdx,
+      opCount: commit.ops.length,
+      tier1: t1.map(r => ({ proof: r.proof, pass: r.pass, reason: r.reason, findings: r.findings })),
+      tier1Pass: t1.every(r => r.pass),
+      tier2: t2.map(r => ({ proof: r.proof, pass: r.pass, reason: r.reason, findings: r.findings })),
+      tier2Score: tier2Score(t2),
+      tier3: t3.map(r => ({ proof: r.proof, pass: r.pass, reason: r.reason })),
+      tier3Rank: tier3Rank(t3),
+      tier4: t4.map(r => ({ proof: r.proof, pass: r.pass, reason: r.reason, findings: r.findings })),
+      patches,
+      lintWarnings,
+      patchCount: patches.length,
+    });
+  }));
+
   // POST /api/nvm/repair — run all proof tiers on an IR, return repair patches.
   // Body: { ir: NarrativeTransitionIR }
   app.post('/api/nvm/repair', gameLimiter, asyncHandler(async (req, res) => {
