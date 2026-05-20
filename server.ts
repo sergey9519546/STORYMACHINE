@@ -1835,6 +1835,87 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     });
   }));
 
+  // POST /api/nvm/repair — run all proof tiers on an IR, return repair patches.
+  // Body: { ir: NarrativeTransitionIR }
+  app.post('/api/nvm/repair', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { runTier1, runTier2 } = await import('./server/nvm/proof/kernel.ts');
+    const { repair } = await import('./server/nvm/proof/repair.ts');
+    const { lint } = await import('./server/nvm/proof/lint.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const ir = req.body?.ir;
+    if (!ir || typeof ir !== 'object' || !Array.isArray(ir.ops)) {
+      res.status(400).json({ error: 'body.ir must be a NarrativeTransitionIR with ops[]' }); return;
+    }
+    const state = buildNarrativeState(stage);
+    const t1 = runTier1(ir, state);
+    const t2 = runTier2(ir, state);
+    const allFailures = [...t1, ...t2].filter(r => !r.pass);
+    const patches = repair(allFailures, state);
+    const lintWarnings = lint(ir, state);
+    res.json({
+      tier1Pass: t1.every(r => r.pass),
+      tier1Failures: t1.filter(r => !r.pass).map(r => ({ proof: r.proof, reason: r.reason })),
+      tier2Failures: t2.filter(r => !r.pass).map(r => ({ proof: r.proof, reason: r.reason })),
+      patches,
+      lintWarnings,
+      patchCount: patches.length,
+    });
+  }));
+
+  // GET /api/nvm/arc-timeline — per-scene stats for all active commits.
+  // Returns proof summary, quality score, tension, and top ops per scene.
+  app.get('/api/nvm/arc-timeline', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { runTier1, runTier2, tier2Score } = await import('./server/nvm/proof/kernel.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+    const { deriveTensionLedger } = await import('./server/nvm/valuation/futures.ts');
+    const { runQualityEngine } = await import('./server/nvm/quality/index.ts');
+    const commits = stage.getCommits().filter((c: import('./server/nvm/state/StoryCommit.ts').StoryCommit) => !c.reverted);
+    let rollingState = buildNarrativeState(stage);
+    // Reset to empty and replay for accurate per-scene state
+    const { emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+    rollingState = emptyState();
+
+    const scenes = [];
+    for (const commit of commits) {
+      // Build a minimal IR shell from the StoryCommit (commits store ops, not full IR)
+      const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+        transitionId: commit.commitId,
+        sceneIdx: commit.sceneIdx,
+        sceneFunction: 'advance_plot',
+        activeMechanisms: [],
+        beforeStateHash: 'timeline',
+        ops: commit.ops,
+        preconditions: [],
+        postconditions: [],
+        provenance: { origin: 'model_generated', createdAt: commit.createdAt },
+      };
+      const t1 = runTier1(ir, rollingState);
+      const t2 = runTier2(ir, rollingState);
+      const ledger = deriveTensionLedger(rollingState, commit.sceneIdx);
+      const qualityReport = runQualityEngine(ir, rollingState);
+      scenes.push({
+        sceneIdx: commit.sceneIdx,
+        commitId: commit.commitId,
+        sceneFunction: ir.sceneFunction,
+        t1Pass: t1.every(r => r.pass),
+        t1FailCount: t1.filter(r => !r.pass).length,
+        t2Score: tier2Score(t2),
+        t2FailCount: t2.filter(r => !r.pass).length,
+        qualityScore: qualityReport.score,
+        tension: ledger.totalTension,
+        opCount: commit.ops.length,
+        topOps: commit.ops.slice(0, 3).map((o: import('./server/nvm/ops/StoryOp.ts').StoryOp) => o.op),
+        mechanisms: ir.activeMechanisms,
+      });
+      rollingState = applyStoryOps(rollingState, commit.ops);
+    }
+
+    res.json({ scenes, sceneCount: scenes.length });
+  }));
+
   // GET /api/nvm/sidecar — export current session as NVM sidecar JSON
   app.get('/api/nvm/sidecar', gameLimiter, asyncHandler(async (req, res) => {
     const { stage } = getOrCreateSession(sessionId(req));

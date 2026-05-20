@@ -16,6 +16,8 @@ import { earnedRevealProof } from './tier1/earnedReveal.ts';
 import { necessityProof } from './tier2/necessity.ts';
 import { specificityProof } from './tier2/specificity.ts';
 import { dialogueProof } from './tier2/dialogue.ts';
+import { genericnessProof } from './tier3/genericness.ts';
+import { originalityProof } from './tier3/originality.ts';
 
 // The 8 Tier 1 hard-block proofs (Wave 1: 7 + Wave 3 B1: EarnedRevealProof).
 // A transition that fails any of these must not become a StoryCommit.
@@ -54,4 +56,20 @@ export function runTier2(ir: NarrativeTransitionIR, state: NarrativeState): Proo
 export function tier2Score(results: ProofResult[]): number {
   const failures = results.filter(r => !r.pass).length;
   return Math.max(0, 100 - failures * Math.ceil(100 / results.length));
+}
+
+// Tier 3 ranking-signal proofs — do not block or flag; only influence candidate
+// ranking inside the convergence loop. More passes = higher rank.
+export function runTier3(ir: NarrativeTransitionIR, state: NarrativeState): ProofResult[] {
+  return [
+    genericnessProof(ir, state),
+    originalityProof(ir, state),
+  ];
+}
+
+// Summarize Tier 3 as a 0–100 ranking score: 100 = both signals pass.
+export function tier3Rank(results: ProofResult[]): number {
+  if (results.length === 0) return 100;
+  const passes = results.filter(r => r.pass).length;
+  return Math.round((passes / results.length) * 100);
 }

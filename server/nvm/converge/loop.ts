@@ -19,7 +19,7 @@ import type { CandidateGenerator, SceneTarget } from '../generate/proof-spec.ts'
 import type { GhostReason } from '../repro/ghost-ledger.ts';
 import type { WritersRoomResult } from '../room/room.ts';
 import type { DirectorPolicy } from '../selfplay/mine.ts';
-import { runTier1, tier1Passes, runTier2, failedProofs } from '../proof/kernel.ts';
+import { runTier1, tier1Passes, runTier2, runTier3, tier3Rank, failedProofs } from '../proof/kernel.ts';
 import { deriveTensionLedger } from '../valuation/futures.ts';
 import { runQualityEngine } from '../quality/index.ts';
 import { runWritersRoom } from '../room/room.ts';
@@ -38,6 +38,8 @@ export interface ConvergeStep {
   valuationScore: number;
   qualityScore: number;
   compositeScore: number;
+  /** Tier 3 ranking score (0–100): originality + non-genericness. */
+  tier3Rank: number;
   operator?: MutationOperator;
   ghostReason?: GhostReason;
   /** Abridged writers' room transcript for this candidate. */
@@ -116,6 +118,11 @@ export async function convergeScene(
     }
     lastCandidates = candidates;
 
+    // Buffer of fully-converged candidates this iteration (for Tier 3 ranking)
+    const convergedThisIter: Array<{
+      ir: NarrativeTransitionIR; valuation: number; quality: number; composite: number; t3: number;
+    }> = [];
+
     for (const candidate of candidates) {
       const tier1Results = runTier1(candidate, state);
       const passed = tier1Passes(tier1Results);
@@ -126,6 +133,10 @@ export async function convergeScene(
       // quality score informs mutation operator selection.
       const qualityReport: QualityReport = runQualityEngine(candidate, state);
       const qualityScore = qualityReport.score;
+
+      // Tier 3 ranking — non-blocking; influences candidate preference.
+      const t3Results = runTier3(candidate, state);
+      const t3 = tier3Rank(t3Results);
 
       const tensionNorm = normalizeTension(valuationScore, target.tensionTarget);
       const compositeScore = 0.5 * tensionNorm + 0.5 * qualityScore;
@@ -152,6 +163,7 @@ export async function convergeScene(
         valuationScore,
         qualityScore,
         compositeScore,
+        tier3Rank: t3,
         ghostReason,
         writersRoomSummary: roomResult
           ? `dominant=${roomResult.dominantCritic} op=${roomResult.suggestedOperator ?? 'none'} consensus=${roomResult.consensus}`
@@ -159,18 +171,9 @@ export async function convergeScene(
       };
       history.push(step);
 
-      // Converged: passes proofs + both targets met
+      // Buffer fully-converged candidates for Tier 3 ranking
       if (passed && tensionMet && qualityMet) {
-        return {
-          ir: candidate,
-          history,
-          iterations: iter + 1,
-          converged: true,
-          finalValuation: valuationScore,
-          finalQuality: qualityScore,
-          finalComposite: compositeScore,
-          ghosts,
-        };
+        convergedThisIter.push({ ir: candidate, valuation: valuationScore, quality: qualityScore, composite: compositeScore, t3 });
       }
 
       // Track best composite (for mutation and fallback)
@@ -183,6 +186,23 @@ export async function convergeScene(
       if (ghostReason) {
         ghosts.push({ ir: candidate, reason: ghostReason });
       }
+    }
+
+    // Tier 3 ranking: if any candidates converged this iteration, pick the
+    // most original/non-generic one (highest tier3Rank, then composite).
+    if (convergedThisIter.length > 0) {
+      convergedThisIter.sort((a, b) => b.t3 - a.t3 || b.composite - a.composite);
+      const winner = convergedThisIter[0];
+      return {
+        ir: winner.ir,
+        history,
+        iterations: iter + 1,
+        converged: true,
+        finalValuation: winner.valuation,
+        finalQuality: winner.quality,
+        finalComposite: winner.composite,
+        ghosts,
+      };
     }
 
     if (best) {

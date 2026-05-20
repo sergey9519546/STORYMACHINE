@@ -21,6 +21,7 @@ import DirectorCutPanel from "./DirectorCutPanel";
 import { HarvestPanel } from "./HarvestPanel";
 import { ConvergePanel } from "./ConvergePanel";
 import { CorpusPanel } from "./CorpusPanel";
+import { ArcTimelinePanel } from "./ArcTimelinePanel";
 
 // ── Emotion display helpers ───────────────────────────────────────────────────
 
@@ -98,6 +99,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [showHarvest, setShowHarvest]       = useState(false);
   const [showConverge, setShowConverge]     = useState(false);
   const [showCorpus, setShowCorpus]         = useState(false);
+  const [showTimeline, setShowTimeline]     = useState(false);
 
   const fetchActivePressures = useCallback(async () => {
     try {
@@ -459,6 +461,14 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           >
             <Shuffle className="w-4 h-4" />
             <span className="hidden sm:inline">Policy</span>
+          </button>
+          <button
+            onClick={() => setShowTimeline(true)}
+            title="Arc Timeline — scene-by-scene proof/quality/tension view"
+            className="bg-slate-700 hover:bg-slate-500 text-slate-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <Target className="w-4 h-4" />
+            <span className="hidden sm:inline">Arc</span>
           </button>
           <button
             onClick={() => setShowSettings(true)}
@@ -1035,6 +1045,12 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       {showCorpus && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
           <CorpusPanel onClose={() => setShowCorpus(false)} />
+        </div>
+      )}
+
+      {showTimeline && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <ArcTimelinePanel onClose={() => setShowTimeline(false)} />
         </div>
       )}
     </div>

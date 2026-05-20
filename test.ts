@@ -21,7 +21,7 @@ import { emptyState, stateHash, relationshipKey } from './server/nvm/state/Narra
 import type { NarrativeState } from './server/nvm/state/NarrativeState.ts';
 import { applyStoryOp, applyStoryOps } from './server/nvm/ops/dispatcher.ts';
 import { loadMechanisms, loadMechanismsCached } from './server/nvm/mechanisms/loader.ts';
-import { runTier1, tier1Passes, runTier2, tier2Score } from './server/nvm/proof/kernel.ts';
+import { runTier1, tier1Passes, runTier2, tier2Score, runTier3, tier3Rank } from './server/nvm/proof/kernel.ts';
 import { runM15Harness, buildNoraWarehouseIR } from './server/nvm/__tests__/m1.5-harness.ts';
 import { whatBreaksIfRemoved } from './server/nvm/query/whatBreaks.ts';
 import { summarizeOps } from './server/nvm/state/StoryCommit.ts';
@@ -5550,5 +5550,82 @@ describe('NVM — Tier 2 Proof Kernel (Wave 16)', () => {
     ]);
     const results = runTier2(ir, emptyState());
     assert.ok(results.every(r => ['NecessityProof','SpecificityProof','DialogueProof'].includes(r.proof)));
+  });
+});
+
+// ── Wave 17: Tier 3 Ranking Proofs ───────────────────────────────────────────
+
+describe('NVM — Tier 3 Ranking Proofs (Wave 17)', () => {
+  function makeIR(ops: StoryOp[], sceneIdx = 1): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR {
+    return {
+      transitionId: `t3-${Date.now()}-${Math.random()}`,
+      sceneIdx,
+      sceneFunction: 'build_tension' as const,
+      activeMechanisms: [],
+      beforeStateHash: 'x',
+      ops,
+      preconditions: [],
+      postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: Date.now() },
+    };
+  }
+
+  it('runTier3 returns 2 results (GenericnessProof + OriginalityProof)', () => {
+    const ir = makeIR([
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'nora', predicate: 'hides', object: 'loan', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ]);
+    const results = runTier3(ir, emptyState());
+    assert.equal(results.length, 2);
+    assert.ok(results.some(r => r.proof === 'GenericnessProof'));
+    assert.ok(results.some(r => r.proof === 'OriginalityProof'));
+  });
+
+  it('tier3Rank is 100 when both proofs pass', () => {
+    const results = [
+      { proof: 'GenericnessProof' as const, tier: 3 as const, pass: true, reason: 'ok', findings: [] },
+      { proof: 'OriginalityProof' as const, tier: 3 as const, pass: true, reason: 'ok', findings: [] },
+    ];
+    assert.equal(tier3Rank(results), 100);
+  });
+
+  it('tier3Rank is 50 when one of two proofs fails', () => {
+    const results = [
+      { proof: 'GenericnessProof' as const, tier: 3 as const, pass: true, reason: 'ok', findings: [] },
+      { proof: 'OriginalityProof' as const, tier: 3 as const, pass: false, reason: 'x', findings: [] },
+    ];
+    assert.equal(tier3Rank(results), 50);
+  });
+
+  it('OriginalityProof fails when one op kind is ≥70% of ops', () => {
+    const ir = makeIR([
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'a', predicate: 'b', object: 'c', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'ADD_FACT', fact: { factId: 'f2', subject: 'd', predicate: 'e', object: 'f', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'ADD_FACT', fact: { factId: 'f3', subject: 'g', predicate: 'h', object: 'i', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'ADD_FACT', fact: { factId: 'f4', subject: 'j', predicate: 'k', object: 'l', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ]);  // 100% ADD_FACT → dominance=1.0
+    const results = runTier3(ir, emptyState());
+    const orig = results.find(r => r.proof === 'OriginalityProof');
+    assert.ok(orig && !orig.pass, 'OriginalityProof should fail for uniform op kind');
+  });
+
+  it('OriginalityProof passes when op kinds are varied', () => {
+    const ir = makeIR([
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'a', predicate: 'b', object: 'c', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'p', confidence: 0.8, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+      { op: 'SEED_CLUE', clueId: 'c1', carrier: 'object' },
+      { op: 'RAISE_CLOCK', clockId: 'clock1', amount: 1 },
+    ]);
+    const results = runTier3(ir, emptyState());
+    const orig = results.find(r => r.proof === 'OriginalityProof');
+    assert.ok(orig && orig.pass, `OriginalityProof should pass for varied ops; got: ${orig?.reason}`);
+  });
+
+  it('GenericnessProof passes when state has no known chars (no char ops to evaluate)', () => {
+    const ir = makeIR([
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'x', predicate: 'y', object: 'z', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ]);
+    const results = runTier3(ir, emptyState());
+    const gen = results.find(r => r.proof === 'GenericnessProof');
+    assert.ok(gen && gen.pass, 'no char ops → genericness passes');
   });
 });
