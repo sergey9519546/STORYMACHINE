@@ -166,6 +166,36 @@ export interface IllusionElement {
   revealed_at?: number;
 }
 
+// TO ADD A NEW STORY STRUCTURE: extend this union, then add an entry in
+//   server/lib/structure-presets.ts STRUCTURE_NAMES and STRUCTURE_BEATS.
+export type StoryStructure =
+  | 'save_the_cat'
+  | 'dan_harmon'
+  | 'john_yorke'
+  | 'freytag'
+  | 'sequence'
+  | 'kishotenketsu';
+
+// TO ADD A NEW EMOTIONAL ARC: extend this union, then add an entry in
+//   server/lib/structure-presets.ts ARC_TENSION_CURVES.
+export type EmotionalArc =
+  | 'rags_to_riches'
+  | 'riches_to_rags'
+  | 'man_in_a_hole'
+  | 'icarus'
+  | 'cinderella'
+  | 'oedipus';
+
+// TO ADD A NEW DIRECTOR STYLE: extend this union, then add an entry in
+//   server/lib/structure-presets.ts STYLE_MODIFIERS.
+export type DirectorStyle =
+  | 'hitchcock'
+  | 'fincher'
+  | 'nolan'
+  | 'villeneuve'
+  | 'aster'
+  | 'lynch';
+
 export interface IllusionState {
   phase: IllusionPhase;
   planted_elements: IllusionElement[];
@@ -174,9 +204,9 @@ export interface IllusionState {
   outline?: OutlineBeat[];      // optional writer-authored beat sheet
   pacing_target?: 'slow' | 'medium' | 'fast';  // writer-set pacing intent
   // Story architecture config (persisted in engine so Director + Agents can read them)
-  structure?: 'save_the_cat' | 'dan_harmon' | 'john_yorke' | 'freytag' | 'sequence' | 'kishotenketsu';
-  emotional_arc?: 'rags_to_riches' | 'riches_to_rags' | 'man_in_a_hole' | 'icarus' | 'cinderella' | 'oedipus';
-  director_style?: 'hitchcock' | 'fincher' | 'nolan' | 'villeneuve' | 'aster' | 'lynch';
+  structure?: StoryStructure;
+  emotional_arc?: EmotionalArc;
+  director_style?: DirectorStyle;
   expected_turns?: number;      // writer's estimate of total session length for arc curve
 }
 
@@ -424,5 +454,6 @@ export interface StageSnapshot {
   beat_traces: BeatTrace[];
   belief_edges: BeliefEdge[];
   goal_mutations: GoalMutation[];
+  stakes?: Stakes[];                        // active stakes survive restart
 }
 

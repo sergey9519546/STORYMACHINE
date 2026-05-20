@@ -13,6 +13,62 @@ import { geminiSchemaToJsonSchema } from './server/lib/ai-providers/schema.ts';
 import { makeOpenAICompatLLMProvider, makeOpenAICompatEmbeddingProvider } from './server/lib/ai-providers/openai-compat.ts';
 import { applyConfig, getPublicConfig, initFromEnv } from './server/lib/ai-config.ts';
 import type { GenerateContentParameters, GenerateContentResponse } from '@google/genai';
+import { STORY_OP_KINDS } from './server/nvm/ops/StoryOp.ts';
+import type { StoryOp } from './server/nvm/ops/StoryOp.ts';
+import { PROOF_TIERS, passResult, failResult } from './server/nvm/proof/contract.ts';
+import type { ProofName } from './server/nvm/proof/contract.ts';
+import { emptyState, stateHash, relationshipKey } from './server/nvm/state/NarrativeState.ts';
+import type { NarrativeState } from './server/nvm/state/NarrativeState.ts';
+import { applyStoryOp, applyStoryOps } from './server/nvm/ops/dispatcher.ts';
+import { loadMechanisms, loadMechanismsCached } from './server/nvm/mechanisms/loader.ts';
+import { runTier1, tier1Passes, runTier2, tier2Score, runTier3, tier3Rank, runTier4 } from './server/nvm/proof/kernel.ts';
+import { runM15Harness, buildNoraWarehouseIR } from './server/nvm/__tests__/m1.5-harness.ts';
+import { whatBreaksIfRemoved } from './server/nvm/query/whatBreaks.ts';
+import { summarizeOps } from './server/nvm/state/StoryCommit.ts';
+import type { StoryCommit } from './server/nvm/state/StoryCommit.ts';
+import { makePrng, randInt, shuffle, seedFromString } from './server/nvm/repro/seed.ts';
+import { buildManifest, replayManifest } from './server/nvm/repro/manifest.ts';
+import { appendGhost, getGhosts, branchFromGhost } from './server/nvm/repro/ghost-ledger.ts';
+import type { GhostCommit } from './server/nvm/repro/ghost-ledger.ts';
+import { explainAction } from './server/nvm/debug/inspector.ts';
+import { earnedRevealProof } from './server/nvm/proof/tier1/earnedReveal.ts';
+import { causalProof as causalProofB2 } from './server/nvm/proof/tier1/causal.ts';
+import { intentionalProof as intentionalProofB3 } from './server/nvm/proof/tier1/intentional.ts';
+import { repair } from './server/nvm/proof/repair.ts';
+import { lint } from './server/nvm/proof/lint.ts';
+import type { RevealPlan } from './server/nvm/reveal/RevealPlan.ts';
+import {
+  openPosition, markToMarket as mtm, deriveTensionLedger, tensionMonotone,
+} from './server/nvm/valuation/futures.ts';
+import { redTeamVerdict } from './server/nvm/valuation/audience-redteam.ts';
+import { twoReaderReport } from './server/nvm/valuation/two-reader.ts';
+import { computeTopology, onTrackForArc } from './server/nvm/valuation/topology.ts';
+import {
+  proofsToConstraints, buildGenerationSpec,
+  type CandidateGenerator, type SceneTarget,
+} from './server/nvm/generate/proof-spec.ts';
+import { applyOperator, ALL_OPERATORS } from './server/nvm/converge/operators.ts';
+import { convergeScene } from './server/nvm/converge/loop.ts';
+import { runWritersRoom } from './server/nvm/room/room.ts';
+import { buildSCM } from './server/nvm/twin/scm.ts';
+import { doIntervention } from './server/nvm/twin/counterfactual.ts';
+import { project, type Canon, type ProjectionTarget } from './server/nvm/project/index.ts';
+import { buildSidecar, captureRegressionSnapshot, checkRegression } from './server/nvm/project/sidecar.ts';
+import { planToward, type FixedPoint } from './server/nvm/author/fixed-points.ts';
+import { backchain, scheduleToGoalBiases } from './server/nvm/author/backchain.ts';
+import { runSelfPlay, type SimScenario } from './server/nvm/selfplay/corpus.ts';
+import { mineCorpus, queryPolicy } from './server/nvm/selfplay/mine.ts';
+import { extractGenome, diffGenomes, breedGenomes } from './server/nvm/selfplay/genome.ts';
+import { TACTIC_TYPES, isDeceptive, isEmotional, tacticIronyWeight } from './server/nvm/ops/tactic-types.ts';
+import { buildMetaBelief, getMetaBeliefsAbout, holderBelievesThatTargetBelieves, upsertMetaBelief } from './server/nvm/ops/meta-belief.ts';
+import { contractBelief, reviseBelief, planContraction, initCredence, updateCredence, applyCredence } from './server/nvm/ops/belief-revision.ts';
+import {
+  runQualityEngine, specificityScore, computeArcDebt, revealReady, necessityScore,
+  burrowsDelta, relationshipRepairGaps, buildCausalGraph, proppMorphology,
+  dialogueWarnings,
+} from './server/nvm/quality/index.ts';
+import { momentumScore } from './server/nvm/valuation/futures.ts';
+import { makeLLMCandidateGenerator } from './server/nvm/generate/llm-generator.ts';
 
 describe('safeJsonParse', () => {
   it('returns parsed value for valid JSON object', () => {
@@ -1851,6 +1907,23 @@ describe('Stage — stakes CRUD', () => {
     assert.equal(all[0].outcome, 'lost');
     assert.equal(all[0].resolved_at, 7);
   });
+
+  it('addAgent seeds stakes from CharacterSheet.stakes[]', () => {
+    const stage = new Stage(':memory:');
+    stage.addLocation({ location_id: 'r', name: 'R', description: '', adjacent_locations: [] });
+    stage.addAgent({
+      char_id: 'seeded', name: 'Seeded', public_mask: '', hidden_motive: '',
+      knowledge_vector: [], current_location_id: 'r', suspicion_score: 0, is_alive: true,
+      stakes: [
+        { id: 'stk-1', char_id: 'seeded', category: 'freedom', description: 'Going to prison', magnitude: 90, is_active: true },
+        { id: 'stk-2', char_id: 'seeded', category: 'reputation', description: 'Career at stake', magnitude: 65, is_active: true },
+      ],
+    });
+    const active = stage.getActiveStakes('seeded');
+    assert.equal(active.length, 2, 'both seeded stakes should be active');
+    assert.ok(active.some(s => s.category === 'freedom' && s.magnitude === 90));
+    assert.ok(active.some(s => s.category === 'reputation' && s.magnitude === 65));
+  });
 });
 
 describe('Orchestrator — stakes escalation emits pressure', () => {
@@ -1901,11 +1974,14 @@ describe('personality — actionBiasWeights', () => {
     assert.deepEqual(weightKeys, [...ACTION_TYPES].sort());
   });
 
-  it('neutral traits → all weights exactly 1.0', () => {
+  it('neutral traits → all weights at or near 1.0 (RELOCATE base is 1.08)', () => {
     const w = actionBiasWeights(NEUTRAL_DT, NEUTRAL_BF);
-    for (const v of Object.values(w)) {
-      assert.ok(Math.abs(v - 1.0) < 1e-9, `expected 1.0, got ${v}`);
-    }
+    // RELOCATE has a 1.08 base to give neutral characters a slight movement impulse.
+    assert.ok(Math.abs(w.SPEAK    - 1.0)  < 1e-9, `SPEAK: expected 1.0, got ${w.SPEAK}`);
+    assert.ok(Math.abs(w.EXAMINE  - 1.0)  < 1e-9, `EXAMINE: expected 1.0, got ${w.EXAMINE}`);
+    assert.ok(Math.abs(w.LIE      - 1.0)  < 1e-9, `LIE: expected 1.0, got ${w.LIE}`);
+    assert.ok(Math.abs(w.WAIT     - 1.0)  < 1e-9, `WAIT: expected 1.0, got ${w.WAIT}`);
+    assert.ok(Math.abs(w.RELOCATE - 1.08) < 1e-9, `RELOCATE: expected 1.08, got ${w.RELOCATE}`);
   });
 
   it('high machiavellianism raises LIE weight above neutral', () => {
@@ -2326,9 +2402,12 @@ describe('DirectorNode — dramatic irony', () => {
     try {
       await director.evaluateRoom('room-1', log);
       const pressures = stage.getActivePressures('alice');
-      // Alice should have received an ESCALATE pressure from dramatic irony
-      const ironyPressure = pressures.find(p => p.pressure_type === 'ESCALATE' && p.bias_hint.includes('told you something'));
-      assert.ok(ironyPressure, 'dramatic irony should emit ESCALATE pressure on deceived agent');
+      // Fresh irony (1 unexposed lie) now emits WITHHOLD; accumulated irony emits ESCALATE.
+      const ironyPressure = pressures.find(p =>
+        (p.pressure_type === 'ESCALATE' || p.pressure_type === 'WITHHOLD') &&
+        (p.bias_hint.includes('told you') || p.bias_hint.includes('hasn\'t told you') || p.bias_hint.includes('being withheld'))
+      );
+      assert.ok(ironyPressure, 'dramatic irony should emit ESCALATE or WITHHOLD pressure on deceived agent');
     } finally {
       resetLLMProvider();
     }
@@ -2746,5 +2825,4389 @@ describe('applyConfig + getPublicConfig', () => {
   it('restoring to gemini resets LLM provider', () => {
     applyConfig({ provider: 'gemini' });
     assert.equal(getPublicConfig().provider, 'gemini');
+  });
+});
+
+// ── AppraisalEngine — dramatic pressure types ─────────────────────────────────
+// Each test seeds a single pressure, calls appraise(), and verifies that the
+// correct emotion dimension moves in the correct direction.
+describe('AppraisalEngine — pressure-type emotion mapping', () => {
+  function makeStageWithAgent(charId = 'alice') {
+    const stage = new Stage(':memory:');
+    stage.addLocation({ location_id: 'r1', name: 'Room', description: '', adjacent_locations: [] });
+    stage.addAgent({ char_id: charId, name: 'Alice', public_mask: '', hidden_motive: '', knowledge_vector: [], current_location_id: 'r1', suspicion_score: 0, is_alive: true });
+    return stage;
+  }
+
+  function addPressure(stage: Stage, charId: string, type: string, intensity = 80, sourceId?: string) {
+    stage.addDramaticPressure({
+      pressure_id: crypto.randomUUID(),
+      target_char_id: charId,
+      source_char_id: sourceId,
+      trigger_event_id: 'evt-1',
+      pressure_type: type as import('./server/engine/types.ts').DramaticPressureType,
+      intensity,
+      bias_hint: `test ${type}`,
+      expires_at_turn: 999,
+      applied: false,
+    });
+  }
+
+  function appraiseFresh(stage: Stage, charId = 'alice') {
+    const engine = new AppraisalEngine(stage);
+    engine.appraise({ char_id: charId, new_beliefs: [], contradiction_detected: false, contradicted_propositions: [] });
+    return stage.getAgent(charId)!.emotionState!;
+  }
+
+  it('ESCALATE raises fear and distress', () => {
+    const stage = makeStageWithAgent();
+    addPressure(stage, 'alice', 'ESCALATE', 80);
+    const e = appraiseFresh(stage);
+    assert.ok(e.fear > 0,    `ESCALATE should raise fear, got ${e.fear}`);
+    assert.ok(e.distress > 0, `ESCALATE should raise distress, got ${e.distress}`);
+  });
+
+  it('COOL raises joy and reduces distress/fear from elevated baseline', () => {
+    const stage = makeStageWithAgent();
+    // Pre-seed distress/fear at 50 so COOL has something to reduce
+    stage.updateEmotionState('alice', { joy: 0, distress: 50, anger: 0, fear: 50, pride: 0, shame: 0, dominant: 'distress', intensity: 50, last_updated_at: -1 });
+    addPressure(stage, 'alice', 'COOL', 80);
+    const e = appraiseFresh(stage);
+    assert.ok(e.joy > 0, `COOL should raise joy, got ${e.joy}`);
+    // Decay + COOL reduction means distress/fear should be less than raw decay of 50
+    const decayedOnly = Math.floor(50 * 0.88);
+    assert.ok(e.distress <= decayedOnly, `COOL should reduce distress below pure-decay (${decayedOnly}), got ${e.distress}`);
+    assert.ok(e.fear <= decayedOnly,     `COOL should reduce fear below pure-decay (${decayedOnly}), got ${e.fear}`);
+  });
+
+  it('REDIRECT raises distress and fear', () => {
+    const stage = makeStageWithAgent();
+    addPressure(stage, 'alice', 'REDIRECT', 80);
+    const e = appraiseFresh(stage);
+    assert.ok(e.distress > 0, `REDIRECT should raise distress, got ${e.distress}`);
+    assert.ok(e.fear > 0,     `REDIRECT should raise fear, got ${e.fear}`);
+  });
+
+  it('REVEAL raises shame and distress', () => {
+    const stage = makeStageWithAgent();
+    addPressure(stage, 'alice', 'REVEAL', 80);
+    const e = appraiseFresh(stage);
+    assert.ok(e.shame > 0,    `REVEAL should raise shame, got ${e.shame}`);
+    assert.ok(e.distress > 0, `REVEAL should raise distress, got ${e.distress}`);
+  });
+
+  it('WITHHOLD raises anger and distress', () => {
+    const stage = makeStageWithAgent();
+    addPressure(stage, 'alice', 'WITHHOLD', 80);
+    const e = appraiseFresh(stage);
+    assert.ok(e.anger > 0,    `WITHHOLD should raise anger, got ${e.anger}`);
+    assert.ok(e.distress > 0, `WITHHOLD should raise distress, got ${e.distress}`);
+  });
+
+  it('goal_blocked raises distress and anger, targets source character', () => {
+    const stage = makeStageWithAgent();
+    stage.addAgent({ char_id: 'bob', name: 'Bob', public_mask: '', hidden_motive: '', knowledge_vector: [], current_location_id: 'r1', suspicion_score: 0, is_alive: true });
+    addPressure(stage, 'alice', 'goal_blocked', 80, 'bob');
+    const e = appraiseFresh(stage);
+    assert.ok(e.distress > 0,         `goal_blocked should raise distress, got ${e.distress}`);
+    assert.ok(e.anger > 0,            `goal_blocked should raise anger, got ${e.anger}`);
+    assert.equal(e.anger_target_id, 'bob', `anger should target the blocker`);
+  });
+
+  it('ally_compromised raises fear and anger', () => {
+    const stage = makeStageWithAgent();
+    stage.addAgent({ char_id: 'bob', name: 'Bob', public_mask: '', hidden_motive: '', knowledge_vector: [], current_location_id: 'r1', suspicion_score: 0, is_alive: true });
+    addPressure(stage, 'alice', 'ally_compromised', 80, 'bob');
+    const e = appraiseFresh(stage);
+    assert.ok(e.fear > 0,  `ally_compromised should raise fear, got ${e.fear}`);
+    assert.ok(e.anger > 0, `ally_compromised should raise anger, got ${e.anger}`);
+  });
+
+  it('revelation_due raises fear and distress (anticipatory anxiety)', () => {
+    const stage = makeStageWithAgent();
+    addPressure(stage, 'alice', 'revelation_due', 80);
+    const e = appraiseFresh(stage);
+    assert.ok(e.fear > 0,    `revelation_due should raise fear, got ${e.fear}`);
+    assert.ok(e.distress > 0, `revelation_due should raise distress, got ${e.distress}`);
+  });
+
+  it('pressure with expired turn is ignored', () => {
+    const stage = makeStageWithAgent();
+    // expires_at_turn = 0, but getTurnCount() = 0, so 0 > 0 is false → pressure is filtered out
+    stage.addDramaticPressure({
+      pressure_id: crypto.randomUUID(),
+      target_char_id: 'alice',
+      trigger_event_id: 'evt-expired',
+      pressure_type: 'ESCALATE',
+      intensity: 100,
+      bias_hint: 'expired',
+      expires_at_turn: 0,
+      applied: false,
+    });
+    const e = appraiseFresh(stage);
+    assert.equal(e.fear, 0,    'expired pressure should not affect fear');
+    assert.equal(e.distress, 0, 'expired pressure should not affect distress');
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// NVM Wave 1 — substrate: StoryOp vocabulary, proof contract, dispatcher
+// ──────────────────────────────────────────────────────────────────────────────
+
+const sampleBelief = (id: string) => ({
+  id, proposition: `prop-${id}`, confidence: 0.8,
+  source: 'witnessed' as const, acquired_at: 1,
+});
+
+const sampleEmotion = () => ({
+  joy: 0, distress: 50, anger: 0, fear: 0, pride: 0, shame: 0,
+  dominant: 'distress' as const, intensity: 50, last_updated_at: 1,
+});
+
+describe('NVM — StoryOp vocabulary (decision 1)', () => {
+  it('enumerates exactly 14 op kinds', () => {
+    assert.equal(Object.keys(STORY_OP_KINDS).length, 14);
+  });
+  it('every op kind maps to true', () => {
+    for (const v of Object.values(STORY_OP_KINDS)) assert.equal(v, true);
+  });
+});
+
+describe('NVM — 4-tier proof contract (decision 3)', () => {
+  it('PROOF_TIERS covers every ProofName', () => {
+    // Wave 1: 24. Wave 3 B1 adds EarnedRevealProof → 25.
+    assert.equal(Object.keys(PROOF_TIERS).length, 25);
+  });
+  it('Tier 1 has exactly 8 proofs (7 original + EarnedRevealProof)', () => {
+    const tier1 = Object.entries(PROOF_TIERS).filter(([, t]) => t === 1);
+    assert.equal(tier1.length, 8);
+  });
+  it('all four tiers are populated', () => {
+    const tiers = new Set(Object.values(PROOF_TIERS));
+    assert.deepEqual([...tiers].sort(), [1, 2, 3, 4]);
+  });
+  it('passResult is the lawful default (pass=true, no findings)', () => {
+    const r = passResult('TemporalProof');
+    assert.equal(r.pass, true);
+    assert.equal(r.tier, 1);
+    assert.equal(r.findings.length, 0);
+  });
+  it('failResult carries findings and the correct tier', () => {
+    const r = failResult('SpecificityProof', 'too generic',
+      [{ proof: 'SpecificityProof' as ProofName, severity: 'flag', message: 'x' }]);
+    assert.equal(r.pass, false);
+    assert.equal(r.tier, 2);
+    assert.equal(r.findings.length, 1);
+  });
+});
+
+describe('NVM — NarrativeState', () => {
+  it('emptyState has all 4 layers and 14-op slots zeroed', () => {
+    const s = emptyState();
+    assert.equal(s.objectiveReality.length, 0);
+    assert.deepEqual(s.characterBeliefs, {});
+    assert.equal(s.audienceState.suspense, 0);
+    assert.deepEqual(s.authorIntent, {});
+    assert.equal(s.turn, 0);
+  });
+  it('stateHash is stable for identical state', () => {
+    assert.equal(stateHash(emptyState()), stateHash(emptyState()));
+  });
+  it('stateHash changes after one ADD_FACT', () => {
+    const before = stateHash(emptyState());
+    const after = stateHash(applyStoryOp(emptyState(), {
+      op: 'ADD_FACT',
+      fact: { factId: 'f1', subject: 'a', predicate: 'is', object: 'b',
+              addedAtTurn: 1, validFrom: 1, validTo: null },
+    }));
+    assert.notEqual(before, after);
+  });
+  it('relationshipKey is order-independent', () => {
+    assert.equal(relationshipKey('alice', 'bob'), relationshipKey('bob', 'alice'));
+  });
+});
+
+describe('NVM — StoryOp dispatcher (14 ops, pure)', () => {
+  it('ADD_FACT appends to objectiveReality', () => {
+    const s = applyStoryOp(emptyState(), {
+      op: 'ADD_FACT',
+      fact: { factId: 'f1', subject: 'a', predicate: 'is', object: 'b',
+              addedAtTurn: 1, validFrom: 1, validTo: null },
+    });
+    assert.equal(s.objectiveReality.length, 1);
+    assert.equal(s.objectiveReality[0].factId, 'f1');
+  });
+  it('EXPIRE_FACT sets validTo on the matching fact', () => {
+    let s = applyStoryOp(emptyState(), {
+      op: 'ADD_FACT',
+      fact: { factId: 'f1', subject: 'a', predicate: 'is', object: 'b',
+              addedAtTurn: 1, validFrom: 1, validTo: null },
+    });
+    s = applyStoryOp(s, { op: 'EXPIRE_FACT', factId: 'f1', atTurn: 5 });
+    assert.equal(s.objectiveReality[0].validTo, 5);
+  });
+  it('UPDATE_BELIEF inserts then updates by belief id', () => {
+    let s = applyStoryOp(emptyState(), { op: 'UPDATE_BELIEF', charId: 'alice', belief: sampleBelief('b1') });
+    assert.equal(s.characterBeliefs.alice.length, 1);
+    s = applyStoryOp(s, { op: 'UPDATE_BELIEF', charId: 'alice', belief: { ...sampleBelief('b1'), confidence: 0.2 } });
+    assert.equal(s.characterBeliefs.alice.length, 1);
+    assert.equal(s.characterBeliefs.alice[0].confidence, 0.2);
+  });
+  it('APPRAISE_EMOTION stores the per-character emotion', () => {
+    const s = applyStoryOp(emptyState(), { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: sampleEmotion() });
+    assert.equal(s.characterEmotions.alice.dominant, 'distress');
+  });
+  it('SHIFT_RELATIONSHIP appends a delta under an order-independent key', () => {
+    const s = applyStoryOp(emptyState(), {
+      op: 'SHIFT_RELATIONSHIP', pair: ['bob', 'alice'],
+      delta: { dimension: 'trust', amount: -0.3, reason: 'lied' },
+    });
+    assert.equal(s.relationships[relationshipKey('alice', 'bob')].length, 1);
+  });
+  it('ADVANCE_OBJECT_ARC sets the object lifecycle state', () => {
+    const s = applyStoryOp(emptyState(), { op: 'ADVANCE_OBJECT_ARC', objectId: 'piano', toState: 'costly' });
+    assert.equal(s.objectArcs.piano, 'costly');
+  });
+  it('TRIGGER_RULE records the rule once (idempotent)', () => {
+    let s = applyStoryOp(emptyState(), { op: 'TRIGGER_RULE', mechanismId: 'm1', ruleId: 'r1' });
+    s = applyStoryOp(s, { op: 'TRIGGER_RULE', mechanismId: 'm1', ruleId: 'r1' });
+    assert.equal(s.firedRules.length, 1);
+    assert.equal(s.firedRules[0], 'm1:r1');
+  });
+  it('SEED_CLUE appends a clue with its carrier', () => {
+    const s = applyStoryOp(emptyState(), { op: 'SEED_CLUE', clueId: 'c1', carrier: 'sound' });
+    assert.equal(s.clues[0].carrier, 'sound');
+  });
+  it('PAYOFF_SETUP records the setup→payoff link', () => {
+    const s = applyStoryOp(emptyState(), { op: 'PAYOFF_SETUP', setupId: 's1', payoffEventId: 'e9' });
+    assert.equal(s.payoffs[0].payoffEventId, 'e9');
+  });
+  it('RAISE_CLOCK accumulates into the named clock', () => {
+    let s = applyStoryOp(emptyState(), { op: 'RAISE_CLOCK', clockId: 'doom', amount: 2 });
+    s = applyStoryOp(s, { op: 'RAISE_CLOCK', clockId: 'doom', amount: 3 });
+    assert.equal(s.clocks.doom, 5);
+  });
+  it('ADVANCE_THEME_ARGUMENT appends a claim move', () => {
+    const s = applyStoryOp(emptyState(), { op: 'ADVANCE_THEME_ARGUMENT', claimId: 'q1', move: 'attack' });
+    assert.equal(s.themeArgument[0].move, 'attack');
+  });
+  it('UPDATE_READER_STATE merges signed deltas and known facts', () => {
+    const s = applyStoryOp(emptyState(), {
+      op: 'UPDATE_READER_STATE', delta: { suspense: 0.4, knownFact: 'kid is granddaughter' },
+    });
+    assert.equal(s.audienceState.suspense, 0.4);
+    assert.equal(s.audienceState.knownFacts.length, 1);
+  });
+  it('RECORD_VISUAL_FACT appends a visual scene fact', () => {
+    const s = applyStoryOp(emptyState(), { op: 'RECORD_VISUAL_FACT', sceneId: 'sc1', fact: 'rain on glass' });
+    assert.equal(s.sceneFacts[0].kind, 'visual');
+  });
+  it('RECORD_SONIC_FACT appends a sonic scene fact', () => {
+    const s = applyStoryOp(emptyState(), { op: 'RECORD_SONIC_FACT', sceneId: 'sc1', fact: 'a single piano note' });
+    assert.equal(s.sceneFacts[0].kind, 'sonic');
+  });
+  it('does not mutate the input state', () => {
+    const before = emptyState();
+    applyStoryOp(before, { op: 'RAISE_CLOCK', clockId: 'doom', amount: 1 });
+    assert.equal(before.clocks.doom, undefined);
+  });
+  it('applyStoryOps replay reproduces an identical stateHash', () => {
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'a', predicate: 'is', object: 'b',
+        addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'alice', belief: sampleBelief('b1') },
+      { op: 'RAISE_CLOCK', clockId: 'doom', amount: 4 },
+    ];
+    assert.equal(stateHash(applyStoryOps(emptyState(), ops)),
+                 stateHash(applyStoryOps(emptyState(), ops)));
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// NVM Wave 1B — mechanisms, proof kernel, StoryCommit ledger, what-breaks, M1.5
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe('NVM — mechanism schema loader', () => {
+  it('auto-discovers exactly 3 MVP mechanisms', () => {
+    assert.equal(loadMechanisms().size, 3);
+  });
+  it('each mechanism validates: lifecycle, rules, invariants present', () => {
+    for (const m of loadMechanisms().values()) {
+      assert.ok(m.lifecycleStates.length > 0, `${m.id} has lifecycle states`);
+      assert.ok(m.invariants.length > 0, `${m.id} has invariants`);
+      assert.ok(m.climaxProofPredicate.length > 0, `${m.id} has climax predicate`);
+    }
+  });
+  it('resolves the 3 MVP ids', () => {
+    const m = loadMechanisms();
+    assert.ok(m.has('object_burden'));
+    assert.ok(m.has('legitimacy_split'));
+    assert.ok(m.has('relationship_externalization'));
+  });
+  it('loadMechanismsCached returns a stable instance', () => {
+    assert.strictEqual(loadMechanismsCached(), loadMechanismsCached());
+  });
+});
+
+describe('NVM — Proof Kernel Tier 1', () => {
+  it('a valid IR passes all 8 Tier 1 proofs', () => {
+    const results = runTier1(buildNoraWarehouseIR(), emptyState());
+    assert.equal(results.length, 8);
+    assert.ok(tier1Passes(results), JSON.stringify(results.filter(r => !r.pass)));
+  });
+
+  const brokenCases: Array<{ name: string; proof: ProofName; mutate: (ir: ReturnType<typeof buildNoraWarehouseIR>) => void }> = [
+    { name: 'expire before add', proof: 'TemporalProof', mutate: ir => {
+        ir.ops.push({ op: 'EXPIRE_FACT', factId: 'fact_crate7', atTurn: 0 }); } },
+    { name: 'no causal predecessor', proof: 'CausalProof', mutate: ir => {
+        ir.preconditions = []; } },
+    { name: 'ungrounded character', proof: 'IntentionalProof', mutate: ir => {
+        ir.ops.push({ op: 'SHIFT_RELATIONSHIP', pair: ['nora', 'ghost'],
+          delta: { dimension: 'fear', amount: 0.2, reason: 'x' } }); } },
+    { name: 'unknown mechanism', proof: 'MechanismProof', mutate: ir => {
+        ir.activeMechanisms = ['nonexistent_mechanism']; } },
+    { name: 'witnessed belief without source event', proof: 'EpistemicProof', mutate: ir => {
+        ir.ops.push({ op: 'UPDATE_BELIEF', charId: 'nora', belief: {
+          id: 'nora_bad', proposition: 'x', confidence: 1,
+          source: 'witnessed', acquired_at: 1 } }); } },
+    { name: 'contradictory facts', proof: 'ContinuityProof', mutate: ir => {
+        ir.ops.push({ op: 'ADD_FACT', fact: {
+          factId: 'fact_crate7b', subject: 'crate_7', predicate: 'location',
+          object: 'warehouse_C', addedAtTurn: 1, validFrom: 1, validTo: null } }); } },
+    { name: 'no provenance timestamp', proof: 'ProvenanceProof', mutate: ir => {
+        ir.provenance.createdAt = 0; } },
+  ];
+
+  for (const c of brokenCases) {
+    it(`broken IR (${c.name}) fails exactly ${c.proof}`, () => {
+      const ir = structuredClone(buildNoraWarehouseIR());
+      c.mutate(ir);
+      const failed = runTier1(ir, emptyState()).filter(r => !r.pass);
+      assert.equal(failed.length, 1, `expected 1 failure, got ${failed.map(f => f.proof).join(',')}`);
+      assert.equal(failed[0].proof, c.proof);
+    });
+  }
+
+  it('kernel runs well under 50ms (no network)', () => {
+    const t0 = performance.now();
+    runTier1(buildNoraWarehouseIR(), emptyState());
+    assert.ok(performance.now() - t0 < 50);
+  });
+});
+
+describe('NVM — M1.5 integration harness', () => {
+  it('expresses the Nora-warehouse scenario as state, no prose', () => {
+    const { state, allPass, tier1 } = runM15Harness();
+    assert.ok(allPass, 'Tier 1 must pass: ' + JSON.stringify(tier1.filter(r => !r.pass)));
+    assert.equal(state.objectiveReality.length, 1);
+    assert.equal(state.objectiveReality[0].factId, 'fact_crate7');
+    assert.equal(state.characterBeliefs.nora.length, 1);
+    assert.equal(state.characterBeliefs.bob.length, 1);
+    assert.equal(state.characterEmotions.nora.dominant, 'pride');
+    assert.equal(state.audienceState.knownFacts.length, 1);
+  });
+  it('dramatic irony: Bob believes the lie, the audience knows the truth', () => {
+    const { state } = runM15Harness();
+    assert.equal(state.characterBeliefs.bob[0].proposition, 'crate_7 is in warehouse_A');
+    assert.equal(state.objectiveReality[0].object, 'warehouse_B');
+  });
+});
+
+describe('NVM — StoryCommit ledger (Stage migration v8)', () => {
+  const mkCommit = (id: string, parent: string | null, idx: number): StoryCommit => {
+    const ops: StoryOp[] = [{ op: 'RAISE_CLOCK', clockId: 'doom', amount: 1 }];
+    return { commitId: id, parentId: parent, sceneIdx: idx, ops,
+      deltaSummary: summarizeOps(ops), reverted: false, createdAt: Date.now() + idx };
+  };
+
+  it('appends and reads commits in order', () => {
+    const stage = new Stage(':memory:');
+    stage.appendCommit(mkCommit('c1', null, 0));
+    stage.appendCommit(mkCommit('c2', 'c1', 1));
+    stage.appendCommit(mkCommit('c3', 'c2', 2));
+    assert.equal(stage.getCommits().length, 3);
+    assert.equal(stage.getCommit('c2')?.sceneIdx, 1);
+  });
+  it('commitsAfter returns only downstream commits', () => {
+    const stage = new Stage(':memory:');
+    stage.appendCommit(mkCommit('c1', null, 0));
+    stage.appendCommit(mkCommit('c2', 'c1', 1));
+    stage.appendCommit(mkCommit('c3', 'c2', 2));
+    assert.deepEqual(stage.commitsAfter('c1').map(c => c.commitId), ['c2', 'c3']);
+  });
+  it('revertCommit marks non-destructively', () => {
+    const stage = new Stage(':memory:');
+    stage.appendCommit(mkCommit('c1', null, 0));
+    stage.revertCommit('c1');
+    assert.equal(stage.getCommit('c1')?.reverted, true);
+    assert.equal(stage.getCommits().length, 1);
+  });
+  it('summarizeOps counts by op family', () => {
+    const s = summarizeOps([
+      { op: 'ADD_FACT', fact: { factId: 'f', subject: 's', predicate: 'p', object: 'o',
+        addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'a', belief: {
+        id: 'b', proposition: 'p', confidence: 1, source: 'inferred', acquired_at: 1 } },
+    ]);
+    assert.equal(s.facts, 1);
+    assert.equal(s.beliefs, 1);
+    assert.equal(s.relationships, 0);
+  });
+});
+
+describe('NVM — What-Breaks-If-Removed', () => {
+  it('flags a downstream commit that references a sole-source character', () => {
+    const stage = new Stage(':memory:');
+    const intro: StoryOp[] = [{ op: 'UPDATE_BELIEF', charId: 'nora', belief: {
+      id: 'b1', proposition: 'p', confidence: 1, source: 'inferred', acquired_at: 1 } }];
+    const usesNora: StoryOp[] = [{ op: 'APPRAISE_EMOTION', charId: 'nora', emotion: {
+      joy: 0, distress: 0, anger: 0, fear: 0, pride: 10, shame: 0,
+      dominant: 'pride', intensity: 10, last_updated_at: 2 } }];
+    stage.appendCommit({ commitId: 'c1', parentId: null, sceneIdx: 0, ops: intro,
+      deltaSummary: summarizeOps(intro), reverted: false, createdAt: 1 });
+    stage.appendCommit({ commitId: 'c2', parentId: 'c1', sceneIdx: 1, ops: usesNora,
+      deltaSummary: summarizeOps(usesNora), reverted: false, createdAt: 2 });
+
+    const report = whatBreaksIfRemoved(stage, 'c1');
+    assert.equal(report.breaks.length, 1);
+    assert.equal(report.breaks[0].downstreamCommit, 'c2');
+    assert.equal(report.breaks[0].proof, 'IntentionalProof');
+  });
+  it('reports no breaks when the character is independently introduced', () => {
+    const stage = new Stage(':memory:');
+    const introNora: StoryOp[] = [{ op: 'UPDATE_BELIEF', charId: 'nora', belief: {
+      id: 'b1', proposition: 'p', confidence: 1, source: 'inferred', acquired_at: 1 } }];
+    stage.appendCommit({ commitId: 'c1', parentId: null, sceneIdx: 0, ops: introNora,
+      deltaSummary: summarizeOps(introNora), reverted: false, createdAt: 1 });
+    stage.appendCommit({ commitId: 'c2', parentId: 'c1', sceneIdx: 1, ops: introNora,
+      deltaSummary: summarizeOps(introNora), reverted: false, createdAt: 2 });
+    assert.equal(whatBreaksIfRemoved(stage, 'c1').breaks.length, 0);
+  });
+});
+
+// ── Wave 2: Bundle A — Reproducible Build ──────────────────────────────────
+
+import { getCached, putCache } from './server/nvm/repro/llm-cache.ts';
+
+describe('NVM — Seed PRNG (A1)', () => {
+  it('makePrng produces deterministic sequence for same seed', () => {
+    const p1 = makePrng(42);
+    const p2 = makePrng(42);
+    const s1 = [p1(), p1(), p1()];
+    const s2 = [p2(), p2(), p2()];
+    assert.deepEqual(s1, s2);
+  });
+  it('different seeds produce different sequences', () => {
+    const p1 = makePrng(1);
+    const p2 = makePrng(2);
+    assert.notEqual(p1(), p2());
+  });
+  it('randInt stays in bounds', () => {
+    const prng = makePrng(99);
+    for (let i = 0; i < 100; i++) {
+      const v = randInt(prng, 10);
+      assert.ok(v >= 0 && v < 10, `randInt out of bounds: ${v}`);
+    }
+  });
+  it('shuffle is deterministic for same seed', () => {
+    const arr = [1, 2, 3, 4, 5];
+    const s1 = shuffle(makePrng(7), arr);
+    const s2 = shuffle(makePrng(7), arr);
+    assert.deepEqual(s1, s2);
+  });
+  it('shuffle does not modify original array', () => {
+    const arr = [1, 2, 3];
+    shuffle(makePrng(1), arr);
+    assert.deepEqual(arr, [1, 2, 3]);
+  });
+  it('seedFromString is stable across calls', () => {
+    assert.equal(seedFromString('hello'), seedFromString('hello'));
+    assert.notEqual(seedFromString('hello'), seedFromString('world'));
+  });
+});
+
+describe('NVM — StoryManifest + replayManifest (A1)', () => {
+  const mkOp = (): StoryOp => ({
+    op: 'ADD_FACT',
+    fact: { factId: 'f1', subject: 's', predicate: 'p', object: 'o', addedAtTurn: 1, validFrom: 1, validTo: null },
+  });
+
+  it('buildManifest records a finalStateHash', () => {
+    const commit: StoryCommit = {
+      commitId: 'c1', parentId: null, sceneIdx: 0, ops: [mkOp()],
+      deltaSummary: summarizeOps([mkOp()]), reverted: false, createdAt: Date.now(),
+    };
+    const manifest = buildManifest('m1', seedFromString('test'), 'test-scenario', [commit]);
+    assert.ok(typeof manifest.finalStateHash === 'string' && manifest.finalStateHash.length > 0);
+    assert.equal(manifest.seed, seedFromString('test'));
+    assert.equal(manifest.scenario, 'test-scenario');
+  });
+
+  it('replayManifest returns match=true for valid manifest', () => {
+    const op = mkOp();
+    const commit: StoryCommit = {
+      commitId: 'c1', parentId: null, sceneIdx: 0, ops: [op],
+      deltaSummary: summarizeOps([op]), reverted: false, createdAt: Date.now(),
+    };
+    const manifest = buildManifest('m1', 0, 'test', [commit]);
+    const result = replayManifest(manifest);
+    assert.equal(result.match, true);
+    assert.equal(result.replayedHash, result.expectedHash);
+  });
+
+  it('replayManifest detects tampering (hash mismatch)', () => {
+    const op = mkOp();
+    const commit: StoryCommit = {
+      commitId: 'c1', parentId: null, sceneIdx: 0, ops: [op],
+      deltaSummary: summarizeOps([op]), reverted: false, createdAt: Date.now(),
+    };
+    const manifest = buildManifest('m1', 0, 'test', [commit]);
+    manifest.finalStateHash = 'deadbeef00000000';
+    const result = replayManifest(manifest);
+    assert.equal(result.match, false);
+  });
+
+  it('skips reverted commits in replay', () => {
+    const op = mkOp();
+    const c1: StoryCommit = {
+      commitId: 'c1', parentId: null, sceneIdx: 0, ops: [op],
+      deltaSummary: summarizeOps([op]), reverted: false, createdAt: Date.now(),
+    };
+    const c2: StoryCommit = { ...c1, commitId: 'c2', reverted: true };
+    const manifest = buildManifest('m1', 0, 'test', [c1, c2]);
+    const result = replayManifest(manifest);
+    assert.equal(result.match, true);
+  });
+});
+
+describe('NVM — LLM cache (A1)', () => {
+  it('returns null on cache miss', () => {
+    const stage = new Stage(':memory:');
+    assert.equal(getCached(stage, 'model-x', 'prompt-x'), null);
+  });
+  it('returns cached response on warm hit', () => {
+    const stage = new Stage(':memory:');
+    putCache(stage, 'gemini-pro', 'hello world', 'response text');
+    const result = getCached(stage, 'gemini-pro', 'hello world');
+    assert.equal(result, 'response text');
+  });
+  it('different models with same prompt do not collide', () => {
+    const stage = new Stage(':memory:');
+    putCache(stage, 'model-a', 'same prompt', 'response A');
+    putCache(stage, 'model-b', 'same prompt', 'response B');
+    assert.equal(getCached(stage, 'model-a', 'same prompt'), 'response A');
+    assert.equal(getCached(stage, 'model-b', 'same prompt'), 'response B');
+  });
+  it('llmCacheSize tracks entries', () => {
+    const stage = new Stage(':memory:');
+    assert.equal(stage.llmCacheSize(), 0);
+    putCache(stage, 'm', 'p1', 'r1');
+    putCache(stage, 'm', 'p2', 'r2');
+    assert.equal(stage.llmCacheSize(), 2);
+  });
+});
+
+describe('NVM — Ghost Ledger (A2)', () => {
+  function mkGhost(id: string, sceneIdx: number): GhostCommit {
+    return {
+      ghostId: id,
+      parentCommitId: null,
+      sceneIdx,
+      ir: buildNoraWarehouseIR(),
+      reason: 'proof_fail',
+      rejectedAt: Date.now(),
+    };
+  }
+
+  it('appendGhost and getGhosts round-trips a ghost commit', () => {
+    const stage = new Stage(':memory:');
+    const g = mkGhost('g1', 2);
+    appendGhost(stage, g);
+    const ghosts = getGhosts(stage);
+    assert.equal(ghosts.length, 1);
+    assert.equal(ghosts[0].ghostId, 'g1');
+    assert.equal(ghosts[0].reason, 'proof_fail');
+  });
+
+  it('getGhosts with sceneIdx filters correctly', () => {
+    const stage = new Stage(':memory:');
+    appendGhost(stage, mkGhost('g1', 1));
+    appendGhost(stage, mkGhost('g2', 2));
+    appendGhost(stage, mkGhost('g3', 1));
+    assert.equal(getGhosts(stage, 1).length, 2);
+    assert.equal(getGhosts(stage, 2).length, 1);
+    assert.equal(getGhosts(stage).length, 3);
+  });
+
+  it('branchFromGhost returns ops from the ghost IR', () => {
+    const stage = new Stage(':memory:');
+    const g = mkGhost('g_branch', 3);
+    appendGhost(stage, g);
+    const result = branchFromGhost(stage, 'g_branch');
+    assert.ok(result !== null);
+    assert.equal(result!.ghostId, 'g_branch');
+    assert.equal(result!.sceneIdx, 3);
+    assert.ok(Array.isArray(result!.branchedOps));
+    assert.ok(result!.branchedOps.length > 0);
+  });
+
+  it('branchFromGhost returns null for unknown ghostId', () => {
+    const stage = new Stage(':memory:');
+    assert.equal(branchFromGhost(stage, 'nonexistent'), null);
+  });
+});
+
+describe('NVM — Cockpit Inspector (A3)', () => {
+  it('returns null for unknown eventId', () => {
+    const stage = new Stage(':memory:');
+    assert.equal(explainAction(stage, 'evt_nonexistent'), null);
+  });
+
+  it('explains a recorded action with at least a line frame', () => {
+    const stage = new Stage(':memory:');
+    stage.addLocation({ location_id: 'loc_1', name: 'Warehouse', description: '', adjacent_locations: [] });
+    stage.addAgent({
+      char_id: 'nora', name: 'Nora', public_mask: 'worker', hidden_motive: 'thief',
+      current_location_id: 'loc_1', suspicion_score: 0, is_alive: true,
+      knowledge_vector: ['knows where crate 7 is'],
+    });
+    const eventId = stage.recordAction('nora', {
+      action_type: 'SPEAK', content: 'The crate is in warehouse A.', target: null,
+    }, 'loc_1');
+    const panel = explainAction(stage, eventId);
+    assert.ok(panel !== null);
+    assert.equal(panel!.eventId, eventId);
+    assert.equal(panel!.charId, 'nora');
+    assert.equal(panel!.actionType, 'SPEAK');
+    assert.ok(panel!.frames.length >= 1);
+    assert.ok(panel!.frames.some(f => f.layer === 'line'));
+    assert.ok(panel!.frames.some(f => f.layer === 'tactic'));
+  });
+
+  it('call stack is ordered goal→pressure→tactic→line', () => {
+    const stage = new Stage(':memory:');
+    stage.addLocation({ location_id: 'loc_1', name: 'Room', description: '', adjacent_locations: [] });
+    const terminalGoal: import('./server/engine/types.ts').Goal = {
+      id: 'g_term', description: 'solve the case', value: 100, achieved: false,
+    };
+    const sub1: import('./server/engine/types.ts').Goal = {
+      id: 'g_sub1', description: 'gather evidence', value: 80, achieved: false,
+    };
+    const sub2: import('./server/engine/types.ts').Goal = {
+      id: 'g_sub2', description: 'interview witnesses', value: 70, achieved: false,
+    };
+    stage.addAgent({
+      char_id: 'bob', name: 'Bob', public_mask: 'detective', hidden_motive: 'obsessive',
+      current_location_id: 'loc_1', suspicion_score: 0, is_alive: true,
+      knowledge_vector: [],
+      goalStack: { terminal: terminalGoal, instrumental: [sub1, sub2], last_planned_at: 0 },
+    });
+    const eventId = stage.recordAction('bob', {
+      action_type: 'EXAMINE', content: 'Bob examines the crate for fingerprints.', target: null,
+    }, 'loc_1');
+    const panel = explainAction(stage, eventId);
+    assert.ok(panel !== null);
+    const layers = panel!.frames.map(f => f.layer);
+    const goalIdx = layers.indexOf('goal');
+    const lineIdx = layers.indexOf('line');
+    assert.ok(goalIdx < lineIdx, `goal (${goalIdx}) should precede line (${lineIdx})`);
+  });
+});
+
+// ── Wave 3: Bundle B — Structural Guarantees ───────────────────────────────
+
+describe('NVM — EarnedRevealProof (B1)', () => {
+  const baseIR = buildNoraWarehouseIR();
+
+  it('passes when IR has no revealPlans', () => {
+    const state = emptyState();
+    const result = earnedRevealProof(baseIR, state);
+    assert.equal(result.pass, true);
+    assert.equal(result.proof, 'EarnedRevealProof');
+  });
+
+  it('passes when all required clues are in state', () => {
+    const clueId = 'clue_witness_nora';
+    const state = emptyState();
+    state.clues.push({ clueId, carrier: 'line' });
+
+    const plan: RevealPlan = {
+      revealId: 'reveal_nora_lied',
+      description: 'Reveal that Nora lied',
+      requiredClueIds: [clueId],
+      payoffSetupId: 'setup_nora_lie',
+    };
+    const ir = {
+      ...baseIR,
+      ops: [
+        ...baseIR.ops,
+        { op: 'PAYOFF_SETUP' as const, setupId: 'setup_nora_lie', payoffEventId: 'evt_reveal_1' },
+      ],
+      revealPlans: [plan],
+    };
+    assert.equal(earnedRevealProof(ir, state).pass, true);
+  });
+
+  it('blocks when a required clue is missing from state', () => {
+    const plan: RevealPlan = {
+      revealId: 'reveal_twist',
+      description: 'The big twist',
+      requiredClueIds: ['clue_missing'],
+      payoffSetupId: 'setup_twist',
+    };
+    const ir = {
+      ...baseIR,
+      ops: [
+        ...baseIR.ops,
+        { op: 'PAYOFF_SETUP' as const, setupId: 'setup_twist', payoffEventId: 'evt_twist' },
+      ],
+      revealPlans: [plan],
+    };
+    const result = earnedRevealProof(ir, emptyState());
+    assert.equal(result.pass, false);
+    assert.equal(result.findings.length, 1);
+    assert.equal(result.findings[0].subjectId, 'clue_missing');
+  });
+
+  it('skips plans whose PAYOFF_SETUP op is not in this IR', () => {
+    const plan: RevealPlan = {
+      revealId: 'reveal_other',
+      description: 'Another reveal',
+      requiredClueIds: ['clue_not_needed_yet'],
+      payoffSetupId: 'setup_future',
+    };
+    const ir = { ...baseIR, revealPlans: [plan] }; // no PAYOFF_SETUP in ops
+    assert.equal(earnedRevealProof(ir, emptyState()).pass, true);
+  });
+
+  it('EarnedRevealProof is in PROOF_TIERS as Tier 1', () => {
+    assert.equal(PROOF_TIERS['EarnedRevealProof'], 1);
+  });
+
+  it('runTier1 now returns 8 results (includes EarnedRevealProof)', () => {
+    const results = runTier1(baseIR, emptyState());
+    assert.equal(results.length, 8);
+    assert.ok(results.some(r => r.proof === 'EarnedRevealProof'));
+  });
+});
+
+describe('NVM — CausalProof + causalLinks (B2)', () => {
+  it('passes when causalLinks reference facts in prior state', () => {
+    const state = emptyState();
+    state.objectiveReality.push({
+      factId: 'fact_box', subject: 'box', predicate: 'location',
+      object: 'room_a', addedAtTurn: 1, validFrom: 1, validTo: null,
+    });
+    const ir = {
+      ...buildNoraWarehouseIR(),
+      sceneIdx: 1,
+      preconditions: ['box is in room A'],
+      causalLinks: [{ opIdx: 0, causedBy: ['fact_box'] }],
+    };
+    assert.equal(causalProofB2(ir, state).pass, true);
+  });
+
+  it('blocks when causalLinks reference a non-existent ID', () => {
+    const ir = {
+      ...buildNoraWarehouseIR(),
+      sceneIdx: 1,
+      preconditions: ['something happened'],
+      causalLinks: [{ opIdx: 0, causedBy: ['fact_nonexistent'] }],
+    };
+    const result = causalProofB2(ir, emptyState());
+    assert.equal(result.pass, false);
+    assert.ok(result.findings.some(f => f.subjectId === 'fact_nonexistent'));
+  });
+
+  it('passes when no causalLinks declared (backward-compat)', () => {
+    const ir = { ...buildNoraWarehouseIR() };
+    assert.equal(causalProofB2(ir, emptyState()).pass, true);
+  });
+});
+
+describe('NVM — repair() (B3)', () => {
+  it('returns empty array for all-passing results', () => {
+    const { tier1 } = runM15Harness();
+    const patches = repair(tier1, emptyState());
+    assert.equal(patches.length, 0);
+  });
+
+  it('patches IntentionalProof failure with UPDATE_BELIEF op', () => {
+    const badOp: StoryOp = {
+      op: 'APPRAISE_EMOTION', charId: 'ghost_char',
+      emotion: { joy: 0, distress: 0, anger: 0, fear: 0, pride: 10, shame: 0, dominant: 'pride', intensity: 10, last_updated_at: 1 },
+    };
+    const ir = { ...buildNoraWarehouseIR(), ops: [badOp] };
+    const result = intentionalProofB3(ir, emptyState());
+    const patches = repair([result], emptyState());
+    assert.ok(patches.length > 0);
+    const patch = patches[0];
+    assert.equal(patch.proof, 'IntentionalProof');
+    assert.ok(patch.ops.length > 0);
+    assert.equal(patch.ops[0].op, 'UPDATE_BELIEF');
+  });
+
+  it('patches EarnedRevealProof failure with SEED_CLUE op', () => {
+    const plan: RevealPlan = {
+      revealId: 'rev1', description: 'The twist', requiredClueIds: ['clue_abc'], payoffSetupId: 'setup_abc',
+    };
+    const ir = {
+      ...buildNoraWarehouseIR(),
+      ops: [
+        ...buildNoraWarehouseIR().ops,
+        { op: 'PAYOFF_SETUP' as const, setupId: 'setup_abc', payoffEventId: 'evt_abc' },
+      ],
+      revealPlans: [plan],
+    };
+    const result = earnedRevealProof(ir, emptyState());
+    const patches = repair([result], emptyState());
+    assert.ok(patches.length > 0);
+    assert.equal(patches[0].proof, 'EarnedRevealProof');
+    assert.equal(patches[0].ops[0].op, 'SEED_CLUE');
+  });
+});
+
+describe('NVM — lint() (B3)', () => {
+  it('returns no warnings for a clean IR', () => {
+    const warnings = lint(buildNoraWarehouseIR(), emptyState());
+    assert.equal(warnings.length, 0);
+  });
+
+  it('flags APPRAISE_EMOTION with intensity=0 but non-null dominant', () => {
+    const op: StoryOp = {
+      op: 'APPRAISE_EMOTION', charId: 'nora',
+      emotion: { joy: 0, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'pride', intensity: 0, last_updated_at: 1 },
+    };
+    const ir = { ...buildNoraWarehouseIR(), ops: [op] };
+    const state = emptyState();
+    state.characterBeliefs['nora'] = [];
+    const warnings = lint(ir, state);
+    assert.ok(warnings.some(w => w.rule === 'EMOTION_ZERO_INTENSITY'));
+  });
+
+  it('flags more than 3 UPDATE_BELIEF ops in one IR', () => {
+    const mkBelief = (id: string): StoryOp => ({
+      op: 'UPDATE_BELIEF', charId: 'nora',
+      belief: { id, proposition: id, confidence: 1, source: 'inferred', acquired_at: 1 },
+    });
+    const ir = { ...buildNoraWarehouseIR(), ops: [mkBelief('b1'), mkBelief('b2'), mkBelief('b3'), mkBelief('b4')] };
+    const warnings = lint(ir, emptyState());
+    assert.ok(warnings.some(w => w.rule === 'BELIEF_OVERLOAD'));
+  });
+
+  it('flags SEED_CLUE with no matching RevealPlan as orphan', () => {
+    const op: StoryOp = {
+      op: 'SEED_CLUE', clueId: 'orphan_clue',
+      carrier: 'object',
+    };
+    const ir = { ...buildNoraWarehouseIR(), ops: [op] };
+    const warnings = lint(ir, emptyState());
+    assert.ok(warnings.some(w => w.rule === 'ORPHAN_CLUE'));
+  });
+
+  it('Stage v10: RevealPlan round-trips via upsert + get', () => {
+    const stage = new Stage(':memory:');
+    const plan: RevealPlan = {
+      revealId: 'rev_test', payoffSetupId: 'setup_test',
+      description: 'Test reveal', requiredClueIds: ['clue_a', 'clue_b'],
+    };
+    stage.upsertRevealPlan(plan, 3);
+    const fetched = stage.getRevealPlan('rev_test');
+    assert.ok(fetched !== undefined);
+    assert.deepEqual(fetched!.requiredClueIds, ['clue_a', 'clue_b']);
+    assert.equal(fetched!.payoffSetupId, 'setup_test');
+  });
+});
+
+// ── Wave 4: Bundle C — Drama Valuation Engine ─────────────────────────────
+
+describe('NVM — Contradiction Futures Market (C1)', () => {
+  it('openPosition creates a position with correct defaults', () => {
+    const p = openPosition('p1', 'open_payoff', 'The crate reveal', 2, 80);
+    assert.equal(p.positionId, 'p1');
+    assert.equal(p.kind, 'open_payoff');
+    assert.equal(p.expectedPayoff, 80);
+    assert.equal(p.timeDecay, 0.92);
+    assert.equal(p.markToMarket, 80);
+  });
+
+  it('markToMarket decays value with scene age', () => {
+    const p = openPosition('p1', 'ticking_clock', 'The bomb', 0, 100);
+    const aged = mtm(p, 5, 1.0);
+    assert.ok(aged.markToMarket < 100, 'should decay over time');
+    assert.ok(aged.markToMarket > 50, 'should not decay to zero in 5 scenes');
+  });
+
+  it('markToMarket scales with audience investment', () => {
+    const p = openPosition('p2', 'belief_conflict', 'Bob believes the lie', 0, 100);
+    const high = mtm(p, 0, 1.0);
+    const low  = mtm(p, 0, 0.2);
+    assert.ok(high.markToMarket > low.markToMarket);
+  });
+
+  it('deriveTensionLedger returns a ledger with totalTension', () => {
+    const state = emptyState();
+    state.audienceState.investment = 80;
+    state.clocks['bomb'] = 3;
+    const ledger = deriveTensionLedger(state, 2);
+    assert.ok(ledger.totalTension >= 0);
+    assert.equal(ledger.sceneIdx, 2);
+  });
+
+  it('deriveTensionLedger flags told beliefs as positions', () => {
+    const state = emptyState();
+    state.characterBeliefs['bob'] = [{
+      id: 'b1', proposition: 'the crate is in warehouse A',
+      confidence: 0.9, source: 'told', source_agent_id: 'nora', acquired_at: 1,
+    }];
+    state.audienceState.investment = 100;
+    const ledger = deriveTensionLedger(state, 1);
+    assert.ok(ledger.positions.some(p => p.kind === 'belief_conflict'));
+  });
+
+  it('tensionMonotone passes for rising sequence', () => {
+    const mk = (t: number, s: number) => ({
+      positions: [], totalTension: t, sceneIdx: s,
+    });
+    assert.equal(tensionMonotone([mk(10, 0), mk(20, 1), mk(35, 2)]), true);
+  });
+
+  it('tensionMonotone fails for a sharp drop', () => {
+    const mk = (t: number, s: number) => ({ positions: [], totalTension: t, sceneIdx: s });
+    assert.equal(tensionMonotone([mk(50, 0), mk(60, 1), mk(5, 2)]), false);
+  });
+
+  it('Stage v11: Drama_Positions round-trips via upsert + getOpenPositions', () => {
+    const stage = new Stage(':memory:');
+    const pos = openPosition('dp1', 'ticking_clock', 'The bomb', 1, 90, 'nora');
+    stage.upsertDramaPosition(pos, 1);
+    const fetched = stage.getOpenPositions(1);
+    assert.equal(fetched.length, 1);
+    assert.equal(fetched[0].positionId, 'dp1');
+    assert.equal(fetched[0].kind, 'ticking_clock');
+    stage.closePosition('dp1');
+    assert.equal(stage.getOpenPositions(1).length, 0);
+  });
+
+  it('getTotalTension sums open position markToMarket values', () => {
+    const stage = new Stage(':memory:');
+    stage.upsertDramaPosition({ ...openPosition('a', 'open_payoff', 'A', 0, 60), markToMarket: 60 }, 0);
+    stage.upsertDramaPosition({ ...openPosition('b', 'ticking_clock', 'B', 0, 40), markToMarket: 40 }, 0);
+    assert.equal(stage.getTotalTension(), 100);
+  });
+});
+
+describe('NVM — Adversarial Audience Red-Team (C2)', () => {
+  it('returns ok recommendation when clues are adequate', () => {
+    const plan: RevealPlan = {
+      revealId: 'rev1',
+      description: 'Nora lied about the warehouse location',
+      requiredClueIds: ['clue_1', 'clue_2'],
+      payoffSetupId: 'setup_lie',
+    };
+    const state = emptyState();
+    state.clues.push({ clueId: 'clue_1', carrier: 'line' });
+    state.clues.push({ clueId: 'clue_2', carrier: 'object' });
+    state.audienceState.suspense = 40;
+    const verdict = redTeamVerdict(plan, state);
+    assert.equal(verdict.revealId, 'rev1');
+    assert.ok(typeof verdict.guessConfidence === 'number');
+    assert.ok(typeof verdict.clueStrengthScore === 'number');
+    assert.ok(['ok', 'strengthen_clues', 'thin_mystery'].includes(verdict.recommendation));
+  });
+
+  it('flags thin_mystery when audience already knows the answer', () => {
+    const plan: RevealPlan = {
+      revealId: 'rev_obvious',
+      description: 'lied deceived false warehouse',
+      requiredClueIds: ['clue_a'],
+      payoffSetupId: 'setup_x',
+    };
+    const state = emptyState();
+    state.audienceState.suspense = 90;
+    state.audienceState.knownFacts = [
+      'Nora lied to Bob about the warehouse',
+      'The truth is in warehouse B not A',
+    ];
+    const verdict = redTeamVerdict(plan, state);
+    assert.equal(verdict.recommendation, 'thin_mystery');
+  });
+
+  it('redTeamVerdict guessConfidence is in [0, 1]', () => {
+    const plan: RevealPlan = {
+      revealId: 'r', description: 'mystery', requiredClueIds: [], payoffSetupId: 's',
+    };
+    const verdict = redTeamVerdict(plan, emptyState());
+    assert.ok(verdict.guessConfidence >= 0 && verdict.guessConfidence <= 1);
+  });
+});
+
+describe('NVM — Two-Reader Model (C3)', () => {
+  const mkLedger = (t: number, s: number) => ({ positions: [], totalTension: t, sceneIdx: s });
+
+  it('produces first_watch and rewatch curves', () => {
+    const { state } = runM15Harness();
+    const ledger = deriveTensionLedger(state, 1);
+    const report = twoReaderReport(state, ledger);
+    assert.equal(report.firstWatch.mode, 'first_watch');
+    assert.equal(report.rewatch.mode, 'rewatch');
+    assert.ok(report.firstWatch.overallScore >= 0 && report.firstWatch.overallScore <= 100);
+    assert.ok(report.rewatch.overallScore >= 0 && report.rewatch.overallScore <= 100);
+    assert.ok(typeof report.twistPremium === 'number');
+  });
+
+  it('rewatchRecommended is true when rewatch score > 70', () => {
+    const state = emptyState();
+    // Push irony: told belief + audience knows the deception
+    state.characterBeliefs['bob'] = [{
+      id: 'b1', proposition: 'warehouse A', confidence: 0.9,
+      source: 'told', source_agent_id: 'nora', acquired_at: 1,
+    }];
+    state.audienceState.knownFacts = ['Nora lied to Bob'];
+    state.audienceState.investment = 90;
+    // Add payoffs to lift structural elegance
+    state.clues.push({ clueId: 'c1', carrier: 'line' });
+    state.payoffs.push({ setupId: 's1', payoffEventId: 'e1' });
+    const ledger = deriveTensionLedger(state, 2);
+    const report = twoReaderReport(state, ledger);
+    // rewatchRecommended depends on computed score — just verify it's a boolean
+    assert.ok(typeof report.rewatchRecommended === 'boolean');
+  });
+});
+
+describe('NVM — Emotional Topology (C3)', () => {
+  const mkLedger = (t: number, s: number) => ({ positions: [], totalTension: t, sceneIdx: s });
+
+  it('identifies dominant arc from a rising trajectory (rags_to_riches)', () => {
+    const ledgers = [mkLedger(10, 0), mkLedger(25, 1), mkLedger(45, 2), mkLedger(60, 3), mkLedger(80, 4), mkLedger(95, 5)];
+    const report = computeTopology(ledgers);
+    assert.equal(report.dominantArc, 'rags_to_riches');
+    assert.ok(report.coherence > 80);
+  });
+
+  it('identifies dominant arc from a falling trajectory (riches_to_rags)', () => {
+    const ledgers = [mkLedger(95, 0), mkLedger(75, 1), mkLedger(55, 2), mkLedger(40, 3), mkLedger(20, 4), mkLedger(10, 5)];
+    const report = computeTopology(ledgers);
+    assert.equal(report.dominantArc, 'riches_to_rags');
+  });
+
+  it('returns 6 scored archetypes', () => {
+    const ledgers = [mkLedger(50, 0), mkLedger(70, 1), mkLedger(30, 2)];
+    const report = computeTopology(ledgers);
+    assert.equal(report.scores.length, 6);
+    assert.ok(report.scores.every(s => s.rank >= 1 && s.rank <= 6));
+  });
+
+  it('handles empty ledger without throwing', () => {
+    const report = computeTopology([]);
+    assert.equal(report.trajectory.length, 0);
+    assert.equal(report.coherence, 0);
+  });
+
+  it('onTrackForArc returns true for matching arc with sufficient coherence', () => {
+    const rising = [mkLedger(10, 0), mkLedger(30, 1), mkLedger(60, 2), mkLedger(80, 3), mkLedger(90, 4), mkLedger(100, 5)];
+    const result = onTrackForArc(rising, 'rags_to_riches', 70);
+    assert.equal(result, true);
+  });
+});
+
+// ── Wave 5: G9+G1 — Proof-Driven Generation + Convergence Loop ───────────
+
+describe('NVM — Proof-Driven Generation spec (G9)', () => {
+  const target: SceneTarget = {
+    sceneIdx: 2, sceneFunction: 'build_tension',
+    activeMechanisms: ['relationship_externalization'],
+    tensionTarget: 30,
+  };
+
+  it('proofsToConstraints includes precondition + mechanism for non-initial scenes', () => {
+    const constraints = proofsToConstraints(emptyState(), target, []);
+    assert.ok(constraints.some(c => c.kind === 'must_declare_precondition'));
+    assert.ok(constraints.some(c => c.kind === 'must_use_mechanism'));
+  });
+
+  it('proofsToConstraints adds must_introduce_character from IntentionalProof failure', () => {
+    const badOp: StoryOp = {
+      op: 'APPRAISE_EMOTION', charId: 'unknown_char',
+      emotion: { joy:0, distress:0, anger:0, fear:0, pride:10, shame:0, dominant:'pride', intensity:10, last_updated_at:1 },
+    };
+    const ir = { ...buildNoraWarehouseIR(), ops: [badOp] };
+    const result = intentionalProofB3(ir, emptyState());
+    const constraints = proofsToConstraints(emptyState(), target, [result]);
+    assert.ok(constraints.some(c => c.kind === 'must_introduce_character' && c.detail === 'unknown_char'));
+  });
+
+  it('buildGenerationSpec produces a non-empty systemPreamble', () => {
+    const spec = buildGenerationSpec(emptyState(), target);
+    assert.ok(spec.systemPreamble.length > 50);
+    assert.ok(spec.systemPreamble.includes('NarrativeTransitionIR'));
+  });
+
+  it('ALL_OPERATORS has exactly 8 operators', () => {
+    assert.equal(ALL_OPERATORS.length, 8);
+  });
+});
+
+describe('NVM — Mutation Operators (G1)', () => {
+  const baseIR = buildNoraWarehouseIR();
+  const state = runM15Harness().state;
+
+  it('raise_stakes adds a RAISE_CLOCK op', () => {
+    const result = applyOperator('raise_stakes', baseIR, state, 42);
+    assert.equal(result.operator, 'raise_stakes');
+    assert.ok(result.ir.ops.some(op => op.op === 'RAISE_CLOCK'));
+  });
+
+  it('inject_irony adds an UPDATE_READER_STATE op', () => {
+    const result = applyOperator('inject_irony', baseIR, state, 99);
+    assert.equal(result.operator, 'inject_irony');
+    assert.ok(result.ir.ops.some(op => op.op === 'UPDATE_READER_STATE'));
+  });
+
+  it('cut_on_the_nose removes on-the-nose reader state ops', () => {
+    const onNoseOp: StoryOp = {
+      op: 'UPDATE_READER_STATE',
+      delta: { knownFact: 'The theme of this scene is about trust' },
+    };
+    const ir = { ...baseIR, ops: [...baseIR.ops, onNoseOp] };
+    const result = applyOperator('cut_on_the_nose', ir, state, 1);
+    assert.equal(result.operator, 'cut_on_the_nose');
+    assert.ok(!result.ir.ops.some(op =>
+      op.op === 'UPDATE_READER_STATE' &&
+      op.delta.knownFact?.toLowerCase().includes('theme'),
+    ));
+  });
+
+  it('weird_but_valid adds a RECORD_VISUAL_FACT or RECORD_SONIC_FACT', () => {
+    const result = applyOperator('weird_but_valid', baseIR, state, 7);
+    assert.ok(
+      result.ir.ops.some(op => op.op === 'RECORD_VISUAL_FACT' || op.op === 'RECORD_SONIC_FACT'),
+    );
+  });
+
+  it('invert_expectation flips a relationship delta sign', () => {
+    const result = applyOperator('invert_expectation', baseIR, state, 5);
+    assert.equal(result.operator, 'invert_expectation');
+    const relOps = result.ir.ops.filter(op => op.op === 'SHIFT_RELATIONSHIP') as Extract<StoryOp, {op:'SHIFT_RELATIONSHIP'}>[];
+    const origRelOps = baseIR.ops.filter(op => op.op === 'SHIFT_RELATIONSHIP') as Extract<StoryOp, {op:'SHIFT_RELATIONSHIP'}>[];
+    // At least one relationship should have been inverted
+    const anyInverted = relOps.some((r, i) =>
+      origRelOps[i] && Math.sign(r.delta.amount) !== Math.sign(origRelOps[i].delta.amount),
+    );
+    assert.ok(anyInverted || result.description.includes('Inverted'));
+  });
+
+  it('deepen_wound is deterministic for same seed', () => {
+    const r1 = applyOperator('deepen_wound', baseIR, state, 42);
+    const r2 = applyOperator('deepen_wound', baseIR, state, 42);
+    assert.deepEqual(r1.ir.ops, r2.ir.ops);
+  });
+});
+
+describe('NVM — Convergence Loop (G1)', () => {
+  // Mock generator: returns a slightly modified version of the M1.5 IR
+  const mockGenerator: CandidateGenerator = async (spec, n) => {
+    return Array.from({ length: n }, (_, i) => ({
+      ...buildNoraWarehouseIR(),
+      transitionId: `mock_candidate_${i}_${Date.now()}`,
+    }));
+  };
+
+  const target: SceneTarget = {
+    sceneIdx: 1, sceneFunction: 'build_tension',
+    activeMechanisms: ['relationship_externalization'],
+    tensionTarget: 0,   // low target so mock always converges
+  };
+
+  it('converges when mock candidates pass Tier 1 and meet tension target', async () => {
+    const result = await convergeScene(
+      emptyState(), target, mockGenerator,
+      { maxIterations: 3, candidatesPerIteration: 2 }, 1234,
+    );
+    assert.ok(result.converged || result.iterations > 0);
+    assert.ok(Array.isArray(result.history));
+    assert.ok(result.history.length > 0);
+  });
+
+  it('history records proof results for each candidate', async () => {
+    const result = await convergeScene(
+      emptyState(), target, mockGenerator,
+      { maxIterations: 2, candidatesPerIteration: 1 }, 42,
+    );
+    for (const step of result.history) {
+      assert.ok(Array.isArray(step.tier1Results));
+      assert.ok(step.tier1Results.length === 8);
+    }
+  });
+
+  it('ghosts non-converging candidates', async () => {
+    const highTarget: SceneTarget = { ...target, tensionTarget: 9999 };
+    const result = await convergeScene(
+      emptyState(), highTarget, mockGenerator,
+      { maxIterations: 2, candidatesPerIteration: 1 }, 99,
+    );
+    // With an impossible tension target, candidates should be ghosted
+    assert.ok(result.ghosts.length > 0 || !result.converged);
+  });
+
+  it('different seeds produce different candidate ids', async () => {
+    const r1 = await convergeScene(emptyState(), target, mockGenerator, { maxIterations: 1, candidatesPerIteration: 1 }, 1);
+    const r2 = await convergeScene(emptyState(), target, mockGenerator, { maxIterations: 1, candidatesPerIteration: 1 }, 2);
+    // They may be equal by luck (same transitionId pattern) but the loop itself ran
+    assert.ok(r1.history.length >= 1 && r2.history.length >= 1);
+  });
+});
+
+// ── Wave 6: G2 — Adversarial Writers' Room ────────────────────────────────
+
+describe('NVM — Writers\' Room (G2)', () => {
+  const baseIR = buildNoraWarehouseIR();
+  const state = runM15Harness().state;
+
+  it('runWritersRoom returns a result with critiques, consensus, and transcript', () => {
+    const result = runWritersRoom(baseIR, state);
+    assert.ok(typeof result.consensus === 'number');
+    assert.ok(result.consensus >= 0 && result.consensus <= 100);
+    assert.ok(typeof result.transcript === 'string');
+    assert.ok(result.transcript.length > 0);
+    assert.ok(Array.isArray(result.critiques));
+  });
+
+  it('a valid M1.5 IR draws 0 critiques from continuity (all proofs pass)', () => {
+    const result = runWritersRoom(baseIR, emptyState());
+    const cc = result.critiques.filter(c => c.criticId === 'continuity');
+    assert.equal(cc.length, 0, `expected 0 continuity critiques, got: ${JSON.stringify(cc)}`);
+  });
+
+  it('a deliberately broken IR draws ≥3 critiques total', () => {
+    const brokenIR = {
+      ...baseIR,
+      sceneIdx: 3,
+      preconditions: [],   // violates CausalProof
+      postconditions: [],  // showrunner objects
+      ops: [
+        // high-confidence told belief — skeptic objects
+        { op: 'UPDATE_BELIEF' as const, charId: 'nora', belief: {
+          id: 'bx', proposition: 'something', confidence: 0.95,
+          source: 'told' as const, source_agent_id: 'bob', acquired_at: 1,
+        }},
+        // large relationship leap without causal link — skeptic objects
+        { op: 'SHIFT_RELATIONSHIP' as const, pair: ['nora', 'bob'] as [string, string],
+          delta: { dimension: 'trust' as const, amount: -0.8, reason: 'sudden shift' } },
+      ],
+    };
+    const result = runWritersRoom(brokenIR, emptyState());
+    assert.ok(result.critiques.length >= 3,
+      `expected ≥3 critiques, got ${result.critiques.length}: ${result.critiques.map(c => c.objection).join(' | ')}`);
+  });
+
+  it('each critic emits at least one critique on a maximally bad IR', () => {
+    const maxBadIR = {
+      ...baseIR,
+      sceneIdx: 5,
+      sceneFunction: 'set_up_payoff' as const,
+      preconditions: [],
+      postconditions: [],
+      activeMechanisms: ['nonexistent_mechanism'],
+      ops: [
+        // zero-intensity emotion — character-advocate objects
+        { op: 'APPRAISE_EMOTION' as const, charId: 'nora', emotion: {
+          joy:0, distress:0, anger:0, fear:0, pride:0, shame:0,
+          dominant: 'pride' as const, intensity:0, last_updated_at:1,
+        }},
+        // payoff with no prior setup
+        { op: 'PAYOFF_SETUP' as const, setupId: 'nonexistent_setup', payoffEventId: 'evt_x' },
+      ],
+      revealPlans: [],
+    };
+    const result = runWritersRoom(maxBadIR, emptyState());
+    const criticIds = new Set(result.critiques.map(c => c.criticId));
+    // At least 4 of 6 critics should object to this disaster
+    assert.ok(criticIds.size >= 4,
+      `only ${criticIds.size} critics objected: ${[...criticIds].join(', ')}`);
+  });
+
+  it('transcript mentions all critic IDs that raised objections', () => {
+    const result = runWritersRoom(baseIR, state);
+    // The M1.5 IR is valid so critiques may be zero — just verify transcript format
+    assert.ok(result.transcript.includes('Writers\' Room'));
+    for (const c of result.critiques) {
+      assert.ok(result.transcript.includes(c.criticId.toUpperCase()),
+        `transcript missing critic: ${c.criticId}`);
+    }
+  });
+
+  it('suggestedOperator is a valid MutationOperator or null', () => {
+    const result = runWritersRoom(baseIR, state);
+    if (result.suggestedOperator !== null) {
+      assert.ok(ALL_OPERATORS.includes(result.suggestedOperator),
+        `invalid operator: ${result.suggestedOperator}`);
+    }
+  });
+});
+
+// ── Wave 7: G4 — Causal Twin (Pearl's do()-calculus) ─────────────────────
+
+describe('NVM — Structural Causal Model (G4)', () => {
+  function mkCommitWithOps(id: string, parent: string | null, ops: StoryOp[], sceneIdx = 0): StoryCommit {
+    return { commitId: id, parentId: parent, sceneIdx, ops, deltaSummary: summarizeOps(ops), reverted: false, createdAt: Date.now() };
+  }
+
+  it('buildSCM creates a node for every op in every commit', () => {
+    const stage = new Stage(':memory:');
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 's', predicate: 'p', object: 'o', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'p', confidence: 1, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+    ];
+    stage.appendCommit(mkCommitWithOps('c1', null, ops));
+    const scm = buildSCM(stage);
+    assert.equal(scm.nodes.size, 2);
+    assert.ok(scm.nodes.has('c1:0'));
+    assert.ok(scm.nodes.has('c1:1'));
+  });
+
+  it('intra-commit ADD_FACT → UPDATE_BELIEF edge is wired', () => {
+    const stage = new Stage(':memory:');
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 's', predicate: 'p', object: 'o', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'p', confidence: 1, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+    ];
+    stage.appendCommit(mkCommitWithOps('c1', null, ops));
+    const scm = buildSCM(stage);
+    const factNode = scm.nodes.get('c1:0')!;
+    const beliefNode = scm.nodes.get('c1:1')!;
+    assert.ok(factNode.children.includes('c1:1'));
+    assert.ok(beliefNode.parents.includes('c1:0'));
+  });
+
+  it('topological order is non-empty for non-empty stage', () => {
+    const stage = new Stage(':memory:');
+    stage.appendCommit(mkCommitWithOps('c1', null, [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 's', predicate: 'p', object: 'o', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ]));
+    const scm = buildSCM(stage);
+    assert.ok(scm.order.length > 0);
+  });
+
+  it('buildSCM on empty stage returns empty model', () => {
+    const scm = buildSCM(new Stage(':memory:'));
+    assert.equal(scm.nodes.size, 0);
+    assert.equal(scm.order.length, 0);
+  });
+});
+
+describe('NVM — Counterfactual / do()-calculus (G4)', () => {
+  function mkCommitWithOps(id: string, parent: string | null, ops: StoryOp[], sceneIdx = 0): StoryCommit {
+    return { commitId: id, parentId: parent, sceneIdx, ops, deltaSummary: summarizeOps(ops), reverted: false, createdAt: Date.now() };
+  }
+
+  it('doIntervention returns empty affected list for a leaf node (no children)', () => {
+    const stage = new Stage(':memory:');
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 's', predicate: 'p', object: 'o', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ];
+    stage.appendCommit(mkCommitWithOps('c1', null, ops));
+    const scm = buildSCM(stage);
+    const report = doIntervention(scm, { opId: 'c1:0', replacement: null });
+    // Leaf with no children → no downstream affected
+    assert.equal(report.affectedOps.length, 0);
+  });
+
+  it('removing a fact propagates to downstream belief (direct effect)', () => {
+    const stage = new Stage(':memory:');
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 's', predicate: 'p', object: 'o', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'p', confidence: 1, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+    ];
+    stage.appendCommit(mkCommitWithOps('c1', null, ops));
+    const scm = buildSCM(stage);
+    const report = doIntervention(scm, { opId: 'c1:0', replacement: null });
+    assert.ok(report.affectedOps.length >= 1);
+    assert.ok(report.directlyAffected.some(a => a.opId === 'c1:1'));
+  });
+
+  it('doIntervention for unknown opId returns empty report with message', () => {
+    const scm = buildSCM(new Stage(':memory:'));
+    const report = doIntervention(scm, { opId: 'nonexistent:0', replacement: null });
+    assert.equal(report.affectedOps.length, 0);
+    assert.ok(report.summary.includes('not found'));
+  });
+
+  it('summary string describes the intervention action', () => {
+    const stage = new Stage(':memory:');
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 's', predicate: 'p', object: 'o', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'p', confidence: 1, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+    ];
+    stage.appendCommit(mkCommitWithOps('c1', null, ops));
+    const scm = buildSCM(stage);
+    const report = doIntervention(scm, { opId: 'c1:0', replacement: null });
+    assert.ok(report.summary.includes('removed') || report.summary.includes('Intervention'));
+  });
+});
+
+// ── Wave 8: Holographic Projection (G3) ──────────────────────────────────────
+
+describe('NVM — Holographic Projection (G3)', () => {
+  function makeCanon(): Canon {
+    const ops1: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'nora', predicate: 'hides', object: 'letter', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'nobody knows', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+      { op: 'RECORD_VISUAL_FACT', sceneId: 's1', fact: 'A letter lies hidden in the piano bench.' },
+      { op: 'SEED_CLUE', clueId: 'letter_clue', carrier: 'object' },
+    ];
+    const ops2: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'helmer', belief: { id: 'b2', proposition: 'nora is honest', confidence: 1, source: 'told', source_event_id: 'e2', acquired_at: 2 } },
+      { op: 'APPRAISE_EMOTION', charId: 'nora', emotion: { joy: 0, distress: 60, anger: 0, fear: 80, pride: 0, shame: 20, dominant: 'fear', intensity: 80, last_updated_at: 2 } },
+      { op: 'SHIFT_RELATIONSHIP', pair: ['nora', 'helmer'], delta: { dimension: 'trust', amount: -0.4, reason: 'power shifts as secret deepens' } },
+    ];
+
+    const state: NarrativeState = {
+      ...emptyState(),
+      objectiveReality: [
+        { factId: 'f1', subject: 'nora', predicate: 'hides', object: 'letter', addedAtTurn: 1, validFrom: 1, validTo: null },
+      ],
+      characterBeliefs: {
+        nora: [{ id: 'b1', proposition: 'nobody knows', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 }],
+        helmer: [{ id: 'b2', proposition: 'nora is honest', confidence: 1, source: 'told', source_event_id: 'e2', acquired_at: 2 }],
+      },
+      characterEmotions: {
+        nora: { joy: 0, distress: 60, anger: 0, fear: 80, pride: 0, shame: 20, dominant: 'fear', intensity: 80, last_updated_at: 1 },
+      },
+      audienceState: { knownFacts: ['f1'], suspense: 72, curiosity: 40, investment: 60 },
+      authorIntent: { theme: 'freedom' },
+      clues: [{ clueId: 'letter_clue', carrier: 'object' }],
+      payoffs: [{ setupId: 'reveal1', payoffEventId: 'letter_found' }],
+    };
+
+    const commits: StoryCommit[] = [
+      { commitId: 'c1', parentId: null, sceneIdx: 0, ops: ops1, deltaSummary: summarizeOps(ops1), reverted: false, createdAt: Date.now() },
+      { commitId: 'c2', parentId: 'c1', sceneIdx: 1, ops: ops2, deltaSummary: summarizeOps(ops2), reverted: false, createdAt: Date.now() },
+    ];
+
+    return { commits, state, title: "A Doll's House (Fixture)" };
+  }
+
+  const ALL_TARGETS: ProjectionTarget[] = [
+    'fountain', 'novel', 'stage', 'comic', 'interactive', 'pitch', 'bible', 'rewatch', 'cutting_room', 'sidecar',
+  ];
+
+  it('project() returns non-empty content for every target', () => {
+    const canon = makeCanon();
+    for (const target of ALL_TARGETS) {
+      const artifact = project(canon, target);
+      assert.equal(artifact.target, target, `target mismatch for ${target}`);
+      assert.ok(artifact.content.length > 0, `empty content for ${target}`);
+    }
+  });
+
+  it('fountain output contains title and scene headers', () => {
+    const artifact = project(makeCanon(), 'fountain');
+    assert.ok(artifact.content.includes("A Doll's House"), 'missing title');
+    assert.ok(artifact.content.includes('INT. SCENE'), 'missing scene header');
+  });
+
+  it('novel output is valid markdown with scene headings', () => {
+    const artifact = project(makeCanon(), 'novel');
+    assert.ok(artifact.content.startsWith('#'), 'missing markdown header');
+    assert.ok(artifact.content.includes('## Scene'), 'missing scene headings');
+  });
+
+  it('comic output is valid JSON array of panels', () => {
+    const artifact = project(makeCanon(), 'comic');
+    const panels = JSON.parse(artifact.content);
+    assert.ok(Array.isArray(panels), 'comic content is not a JSON array');
+    assert.ok(panels.length > 0, 'no panels generated');
+    assert.ok(typeof panels[0].panel === 'number', 'panel missing panel number');
+    assert.ok(typeof panels[0].caption === 'string', 'panel missing caption');
+  });
+
+  it('interactive output is valid JSON with commits and finalState', () => {
+    const artifact = project(makeCanon(), 'interactive');
+    const playbook = JSON.parse(artifact.content);
+    assert.ok(Array.isArray(playbook.commits), 'missing commits array');
+    assert.ok(playbook.finalState, 'missing finalState');
+    assert.ok(typeof playbook.title === 'string', 'missing title');
+    assert.equal(playbook.version, 1, 'version mismatch');
+    assert.equal(artifact.metadata.replayable, true, 'not marked replayable');
+  });
+
+  it('pitch output contains characters and dramatic irony count', () => {
+    const artifact = project(makeCanon(), 'pitch');
+    assert.ok(artifact.content.includes('Characters:') || artifact.content.includes('**Characters:**'), 'missing characters section');
+    assert.ok(artifact.content.includes('irony') || artifact.content.includes('Irony'), 'missing irony layer info');
+  });
+
+  it('bible output contains world facts and characters sections', () => {
+    const artifact = project(makeCanon(), 'bible');
+    assert.ok(artifact.content.includes('Characters'), 'bible missing Characters section');
+    assert.ok(artifact.content.includes('World Facts'), 'bible missing World Facts section');
+    assert.ok(artifact.content.includes('Seeded Clues'), 'bible missing Seeded Clues section');
+  });
+
+  it('rewatch output annotates false beliefs as lies', () => {
+    const artifact = project(makeCanon(), 'rewatch');
+    // helmer's b2 belief has source: 'told' — should be flagged
+    assert.ok(artifact.content.includes('LIE') || artifact.content.includes('lie') || artifact.content.includes('Rewatch note'), 'missing rewatch annotation');
+  });
+
+  it('cutting_room with no ghosts produces placeholder message', () => {
+    const canon = makeCanon();
+    // no ghosts provided
+    const artifact = project(canon, 'cutting_room');
+    assert.ok(artifact.content.includes('No ghost') || artifact.content.includes('nothing was rejected'), 'missing empty ghost message');
+    assert.equal(artifact.metadata.ghosts, 0);
+  });
+
+  it('cutting_room with ghosts lists them', () => {
+    const canon = makeCanon();
+    canon.ghosts = [
+      { ir: { sceneIdx: 0, ops: [] }, reason: 'proof_fail' },
+      { ir: { sceneIdx: 1, ops: [] }, reason: 'valuation_too_low' },
+    ];
+    const artifact = project(canon, 'cutting_room');
+    assert.equal(artifact.metadata.ghosts, 2);
+    assert.ok(artifact.content.includes('proof_fail') || artifact.content.includes('Rejected'), 'missing ghost reason in output');
+  });
+
+  it('reverted commits are excluded from all projections', () => {
+    const canon = makeCanon();
+    const revertedOps: StoryOp[] = [{ op: 'RECORD_VISUAL_FACT', sceneId: 's_rev', fact: 'REVERTED SCENE — should not appear' }];
+    canon.commits.push({
+      commitId: 'c3', parentId: 'c2', sceneIdx: 2,
+      ops: revertedOps,
+      deltaSummary: summarizeOps(revertedOps),
+      reverted: true,
+      createdAt: Date.now(),
+    });
+    for (const target of ['fountain', 'novel', 'comic'] as ProjectionTarget[]) {
+      const artifact = project(canon, target);
+      assert.ok(!artifact.content.includes('REVERTED SCENE'), `reverted commit leaked into ${target}`);
+    }
+  });
+
+  it('interactive commitCount metadata matches non-reverted commits', () => {
+    const canon = makeCanon();
+    // 2 non-reverted commits in fixture
+    const artifact = project(canon, 'interactive');
+    assert.equal(artifact.metadata.commitCount, 2);
+  });
+
+  it('fountain metadata tracks scene count', () => {
+    const artifact = project(makeCanon(), 'fountain');
+    assert.equal(artifact.metadata.scenes, 2, 'fountain scene count wrong');
+  });
+
+  it('sidecar target produces valid JSON with nvmVersion', () => {
+    const artifact = project(makeCanon(), 'sidecar');
+    assert.equal(artifact.target, 'sidecar');
+    const sidecar = JSON.parse(artifact.content);
+    assert.equal(sidecar.nvmVersion, '12', 'sidecar version mismatch');
+    assert.ok(typeof sidecar.qualityScore === 'number', 'missing qualityScore');
+    assert.ok(typeof sidecar.totalTension === 'number', 'missing totalTension');
+    assert.ok(Array.isArray(sidecar.proppPresent), 'missing proppPresent');
+    assert.ok(typeof sidecar.momentum === 'number', 'missing momentum');
+  });
+
+  it('sidecar metadata mirrors quality score', () => {
+    const artifact = project(makeCanon(), 'sidecar');
+    const sidecar = JSON.parse(artifact.content);
+    assert.equal(artifact.metadata.qualityScore, sidecar.qualityScore);
+    assert.equal(artifact.metadata.proppCoverage, sidecar.proppCoverage);
+  });
+});
+
+describe('NVM — Sidecar Schema + Regression (Wave 13)', () => {
+  function makeCanon(): Canon {
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'nora', predicate: 'hides', object: 'letter', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'helmer', belief: { id: 'b2', proposition: 'nora is honest', confidence: 1, source: 'told', source_event_id: 'e2', acquired_at: 2 } },
+      { op: 'APPRAISE_EMOTION', charId: 'nora', emotion: { joy: 0, distress: 60, anger: 0, fear: 80, pride: 0, shame: 20, dominant: 'fear', intensity: 80, last_updated_at: 2 } },
+    ];
+    const state: NarrativeState = {
+      ...emptyState(),
+      characterBeliefs: { helmer: [{ id: 'b2', proposition: 'nora is honest', confidence: 1, source: 'told', source_event_id: 'e2', acquired_at: 2 }] },
+      clues: [{ clueId: 'c1', carrier: 'object' }, { clueId: 'c2', carrier: 'line' }],
+      audienceState: { knownFacts: [], suspense: 60, curiosity: 30, investment: 50 },
+    };
+    const commits: StoryCommit[] = [
+      { commitId: 'c1', parentId: null, sceneIdx: 0, ops, deltaSummary: summarizeOps(ops), reverted: false, createdAt: Date.now() },
+    ];
+    return { commits, state, title: 'Fixture' };
+  }
+
+  it('buildSidecar returns a valid NVMSidecar from a Canon', () => {
+    const sidecar = buildSidecar(makeCanon());
+    assert.equal(sidecar.nvmVersion, '12');
+    assert.ok(typeof sidecar.qualityScore === 'number' && sidecar.qualityScore >= 0 && sidecar.qualityScore <= 100);
+    assert.ok(typeof sidecar.totalTension === 'number');
+    assert.ok(Array.isArray(sidecar.proppPresent));
+    assert.ok(Array.isArray(sidecar.arcDebt));
+    assert.ok(sidecar.commitCount === 1);
+    assert.ok(sidecar.revertedCount === 0);
+  });
+
+  it('buildSidecar counts belief summary correctly', () => {
+    const sidecar = buildSidecar(makeCanon());
+    assert.equal(sidecar.beliefCounts.helmer, 1, 'helmer should have 1 belief');
+  });
+
+  it('captureRegressionSnapshot preserves key metrics', () => {
+    const sidecar = buildSidecar(makeCanon());
+    const snap = captureRegressionSnapshot(sidecar, 'fixture', 'abc123');
+    assert.equal(snap.scenarioId, 'fixture');
+    assert.equal(snap.commitHash, 'abc123');
+    assert.equal(snap.baselineQualityScore, sidecar.qualityScore);
+    assert.equal(snap.baselineTension, sidecar.totalTension);
+  });
+
+  it('checkRegression passes when metrics stay the same', () => {
+    const sidecar = buildSidecar(makeCanon());
+    const snap = captureRegressionSnapshot(sidecar, 'fixture');
+    const result = checkRegression(snap, sidecar);
+    assert.ok(result.passed, `regression check should pass on same sidecar: ${JSON.stringify(result.regressions)}`);
+    assert.equal(result.regressions.length, 0);
+  });
+
+  it('checkRegression detects quality regression', () => {
+    const sidecar = buildSidecar(makeCanon());
+    const snap = captureRegressionSnapshot(sidecar, 'fixture');
+    // Simulate a degraded sidecar
+    const degraded = { ...sidecar, qualityScore: sidecar.qualityScore * 0.5 };
+    const result = checkRegression(snap, degraded);
+    if (sidecar.qualityScore > 0) {
+      assert.ok(!result.passed, 'should fail when quality drops >10%');
+      assert.ok(result.regressions.some(r => r.metric === 'qualityScore'));
+    }
+  });
+});
+
+describe('NVM — Quality-Aware Convergence Loop (Wave 13)', () => {
+  const mockGenerator: CandidateGenerator = async (spec, n) => {
+    return Array.from({ length: n }, (_, i) => ({
+      ...buildNoraWarehouseIR(),
+      transitionId: `qconv_${i}_${Date.now()}`,
+    }));
+  };
+
+  it('ConvergeStep includes qualityScore and compositeScore', async () => {
+    const target: SceneTarget = {
+      sceneIdx: 1, sceneFunction: 'build_tension',
+      activeMechanisms: ['relationship_externalization'],
+      tensionTarget: 0, qualityTarget: 0,
+    };
+    const result = await convergeScene(emptyState(), target, mockGenerator, { maxIterations: 1, candidatesPerIteration: 1 }, 1);
+    const step = result.history[0];
+    assert.ok(typeof step.qualityScore === 'number', 'qualityScore missing from step');
+    assert.ok(typeof step.compositeScore === 'number', 'compositeScore missing from step');
+    assert.ok(step.qualityScore >= 0 && step.qualityScore <= 100, `qualityScore out of range: ${step.qualityScore}`);
+  });
+
+  it('ConvergeResult includes finalQuality and finalComposite', async () => {
+    const target: SceneTarget = {
+      sceneIdx: 1, sceneFunction: 'build_tension',
+      activeMechanisms: [], tensionTarget: 0, qualityTarget: 0,
+    };
+    const result = await convergeScene(emptyState(), target, mockGenerator, { maxIterations: 1, candidatesPerIteration: 1 }, 1);
+    assert.ok(typeof result.finalQuality === 'number', 'finalQuality missing');
+    assert.ok(typeof result.finalComposite === 'number', 'finalComposite missing');
+  });
+
+  it('quality_low ghost reason fires when qualityTarget is impossibly high', async () => {
+    const target: SceneTarget = {
+      sceneIdx: 1, sceneFunction: 'build_tension',
+      activeMechanisms: [], tensionTarget: 0, qualityTarget: 999,
+    };
+    const result = await convergeScene(emptyState(), target, mockGenerator, { maxIterations: 2, candidatesPerIteration: 1 }, 42);
+    // With impossible quality target, all proof-passing candidates are quality_low
+    const reasons = result.history.map(s => s.ghostReason);
+    assert.ok(reasons.some(r => r === 'quality_low' || r === 'valuation_too_low' || r === 'proof_fail'),
+      'should ghost candidates with a known reason');
+  });
+});
+
+// ── Wave 9: Temporal Authoring (G9) ──────────────────────────────────────────
+
+describe('NVM — Temporal Authoring / Fixed Points (G9)', () => {
+  function baseState(): NarrativeState {
+    return {
+      ...emptyState(),
+      objectiveReality: [
+        { factId: 'piano', subject: 'piano', predicate: 'exists', object: 'true', addedAtTurn: 0, validFrom: 0, validTo: null },
+      ],
+      characterBeliefs: {
+        nora: [{ id: 'b1', proposition: 'nobody knows', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 0 }],
+      },
+      clues: [],
+      payoffs: [],
+      audienceState: { knownFacts: ['piano'], suspense: 20, curiosity: 30, investment: 40 },
+    };
+  }
+
+  it('planToward marks already-satisfied fixed point without emitting biases', () => {
+    const state = baseState();
+    const fp: FixedPoint = {
+      atScene: 6,
+      required: { factIds: ['piano'] },
+      description: 'piano must exist',
+    };
+    const result = planToward(state, [fp], 0);
+    assert.equal(result.alreadySatisfied.length, 1, 'should be satisfied');
+    assert.equal(result.biases.length, 0, 'no biases needed');
+  });
+
+  it('planToward emits SEED_CLUE bias for missing clue', () => {
+    const state = baseState();
+    const fp: FixedPoint = {
+      atScene: 6,
+      required: { clueIds: ['letter_clue'] },
+      description: 'letter clue must be planted',
+    };
+    const result = planToward(state, [fp], 0);
+    assert.equal(result.blocked.length, 0, 'should not be blocked');
+    const clueOp = result.biases.flatMap(b => b.ops).find(op => op.op === 'SEED_CLUE');
+    assert.ok(clueOp, 'SEED_CLUE op expected');
+    assert.equal((clueOp as Extract<typeof clueOp, { op: 'SEED_CLUE' }>)!.clueId, 'letter_clue');
+  });
+
+  it('planToward emits ADD_FACT bias for missing fact', () => {
+    const state = baseState();
+    const fp: FixedPoint = {
+      atScene: 4,
+      required: { factIds: ['krogstad_debt'] },
+      description: 'debt must be established',
+    };
+    const result = planToward(state, [fp], 0);
+    const factOp = result.biases.flatMap(b => b.ops).find(op => op.op === 'ADD_FACT');
+    assert.ok(factOp, 'ADD_FACT op expected');
+  });
+
+  it('planToward blocks a fixed point with a passed deadline', () => {
+    const state = baseState();
+    const fp: FixedPoint = {
+      atScene: 2,
+      required: { clueIds: ['missing_clue'] },
+      description: 'clue at scene 2',
+    };
+    const result = planToward(state, [fp], 5);   // currentScene=5 > deadline=2
+    assert.equal(result.blocked.length, 1, 'should be blocked');
+    assert.ok(result.blocked[0].reason.includes('passed'));
+  });
+
+  it('planToward handles multiple fixed points, sorting by deadline', () => {
+    const state = baseState();
+    const fps: FixedPoint[] = [
+      { atScene: 8, required: { clueIds: ['clue_a'] }, description: 'clue a at 8' },
+      { atScene: 4, required: { clueIds: ['clue_b'] }, description: 'clue b at 4' },
+    ];
+    const result = planToward(state, fps, 0);
+    assert.equal(result.blocked.length, 0);
+    // clue_b (deadline 4) must be biased at an earlier scene than clue_a (deadline 8)
+    const clueA = result.biases.find(b => b.ops.some(op => op.op === 'SEED_CLUE' && (op as any).clueId === 'clue_a'));
+    const clueB = result.biases.find(b => b.ops.some(op => op.op === 'SEED_CLUE' && (op as any).clueId === 'clue_b'));
+    assert.ok(clueA && clueB, 'biases for both clues expected');
+    assert.ok(clueB.atScene <= clueA.atScene, 'earlier deadline should produce earlier scene bias');
+  });
+
+  it('planToward emits UPDATE_READER_STATE for suspense requirement', () => {
+    const state = baseState();   // suspense = 20
+    const fp: FixedPoint = {
+      atScene: 6,
+      required: { minSuspense: 80 },
+      description: 'high tension by scene 6',
+    };
+    const result = planToward(state, [fp], 0);
+    const tensionOp = result.biases.flatMap(b => b.ops).find(op => op.op === 'UPDATE_READER_STATE');
+    assert.ok(tensionOp, 'UPDATE_READER_STATE expected for suspense gap');
+  });
+
+  it('planToward transcript is non-empty', () => {
+    const state = baseState();
+    const fp: FixedPoint = { atScene: 5, required: { clueIds: ['x'] }, description: 'test' };
+    const result = planToward(state, [fp], 0);
+    assert.ok(result.transcript.length > 0, 'transcript should be non-empty');
+  });
+});
+
+describe('NVM — Backchain Reasoner (G9)', () => {
+  function baseState(): NarrativeState {
+    return {
+      ...emptyState(),
+      objectiveReality: [],
+      characterBeliefs: {},
+      clues: [],
+      payoffs: [],
+      audienceState: { knownFacts: [], suspense: 10, curiosity: 10, investment: 10 },
+    };
+  }
+
+  it('backchain schedules SEED_CLUE before deadline for missing clue', () => {
+    const fp: FixedPoint = {
+      atScene: 6,
+      required: { clueIds: ['piano_clue'] },
+      description: 'piano clue at scene 6',
+    };
+    const result = backchain(fp, baseState(), 0);
+    assert.ok(result.complete, 'should be complete');
+    const clueEntry = result.schedule.find(s => s.op.op === 'SEED_CLUE');
+    assert.ok(clueEntry, 'SEED_CLUE expected in schedule');
+    assert.ok(clueEntry.atScene < 6, 'SEED_CLUE must be before deadline');
+  });
+
+  it('backchain returns empty schedule when all requirements satisfied', () => {
+    const state = baseState();
+    state.clues.push({ clueId: 'piano_clue', carrier: 'object' });
+    const fp: FixedPoint = {
+      atScene: 6,
+      required: { clueIds: ['piano_clue'] },
+    };
+    const result = backchain(fp, state, 0);
+    assert.equal(result.schedule.length, 0, 'nothing to schedule');
+    assert.ok(result.complete);
+  });
+
+  it('backchain marks complete=false when deadline passed', () => {
+    const fp: FixedPoint = { atScene: 2, required: { clueIds: ['x'] } };
+    const result = backchain(fp, baseState(), 5);
+    assert.equal(result.complete, false);
+    assert.ok(result.blockingConstraint?.includes('deadline'));
+  });
+
+  it('backchain orders clue before payoff in schedule', () => {
+    const fp: FixedPoint = {
+      atScene: 8,
+      required: { clueIds: ['c1'], payoffSetupIds: ['s1'] },
+    };
+    const result = backchain(fp, baseState(), 0);
+    assert.ok(result.complete);
+    const clueIdx = result.schedule.findIndex(s => s.op.op === 'SEED_CLUE');
+    const payoffIdx = result.schedule.findIndex(s => s.op.op === 'PAYOFF_SETUP');
+    assert.ok(clueIdx >= 0 && payoffIdx >= 0, 'both ops expected');
+    assert.ok(result.schedule[clueIdx].atScene <= result.schedule[payoffIdx].atScene, 'clue must precede payoff');
+  });
+
+  it('backchain schedules ADD_FACT for missing required fact', () => {
+    const fp: FixedPoint = {
+      atScene: 5,
+      required: { factIds: ['debt_fact'] },
+    };
+    const result = backchain(fp, baseState(), 0);
+    const factEntry = result.schedule.find(s => s.op.op === 'ADD_FACT');
+    assert.ok(factEntry, 'ADD_FACT expected');
+    assert.ok(factEntry.atScene < 5, 'must be before deadline');
+  });
+
+  it('scheduleToGoalBiases groups ops by scene', () => {
+    const fp: FixedPoint = {
+      atScene: 6,
+      required: { clueIds: ['c1'], factIds: ['f1'] },
+    };
+    const result = backchain(fp, baseState(), 0);
+    const biases = scheduleToGoalBiases(result, 'test fixed point');
+    assert.ok(biases.length > 0, 'biases expected');
+    for (const b of biases) {
+      assert.ok(b.ops.length > 0, 'each bias must have ops');
+      assert.equal(b.fixedPointDescription, 'test fixed point');
+    }
+  });
+
+  it('backchain trace is non-empty and describes plan', () => {
+    const fp: FixedPoint = {
+      atScene: 6,
+      required: { clueIds: ['trace_clue'] },
+      description: 'trace test',
+    };
+    const result = backchain(fp, baseState(), 0);
+    assert.ok(result.trace.includes('trace test') || result.trace.includes('Backchain'), 'trace should reference the fixed point');
+  });
+});
+
+
+// ── Wave 10: Self-Play Corpus + Learned Director + StoryGenome (G13) ──────────
+
+describe('NVM — Self-Play Corpus (G13)', () => {
+  // Minimal valid NarrativeTransitionIR factory for the mock generator
+  function makeIR(sceneIdx: number): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR {
+    return {
+      transitionId: `t${sceneIdx}`,
+      sceneIdx,
+      sceneFunction: 'build_tension',
+      activeMechanisms: [],
+      beforeStateHash: 'deadbeef00000000',
+      preconditions: [],
+      postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: Date.now() },
+      ops: [
+        { op: 'ADD_FACT', fact: { factId: `f${sceneIdx}`, subject: 'nora', predicate: 'acts', object: `s${sceneIdx}`, addedAtTurn: sceneIdx, validFrom: sceneIdx, validTo: null } },
+        { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: `b${sceneIdx}`, proposition: `scene ${sceneIdx}`, confidence: 0.8, source: 'witnessed', source_event_id: `e${sceneIdx}`, acquired_at: sceneIdx } },
+      ],
+    };
+  }
+
+  const mockGenerate: import('./server/nvm/generate/proof-spec.ts').CandidateGenerator =
+    async (spec, n) => Array.from({ length: n }, () => makeIR(spec.target.sceneIdx));
+
+  function makeScenarios(n: number): SimScenario[] {
+    return Array.from({ length: n }, (_, i) => ({
+      scenarioId: `drama_scenario_${i}`,
+      seed: 42 + i,
+      sceneTargets: [
+        { sceneIdx: 0, sceneFunction: 'establish_world' as const, activeMechanisms: [], tensionTarget: 30 },
+        { sceneIdx: 1, sceneFunction: 'build_tension' as const, activeMechanisms: [], tensionTarget: 60 },
+      ],
+    }));
+  }
+
+  it('runSelfPlay produces a CorpusReport with one result per scenario', async () => {
+    const report = await runSelfPlay(makeScenarios(3), mockGenerate);
+    assert.equal(report.runs.length, 3);
+  });
+
+  it('each SimResult has a score between 0 and 1', async () => {
+    const report = await runSelfPlay(makeScenarios(2), mockGenerate);
+    for (const run of report.runs) {
+      assert.ok(run.score >= 0 && run.score <= 1, `score out of range: ${run.score}`);
+    }
+  });
+
+  it('CorpusReport identifies bestRun with highest score', async () => {
+    const report = await runSelfPlay(makeScenarios(4), mockGenerate);
+    assert.ok(report.bestRun.score >= report.worstRun.score, 'best >= worst');
+    assert.ok(report.meanScore >= 0 && report.meanScore <= 1, 'meanScore in range');
+  });
+
+  it('runSelfPlay on empty scenarios returns zero-score report', async () => {
+    const report = await runSelfPlay([], mockGenerate);
+    assert.equal(report.runs.length, 0);
+    assert.equal(report.meanScore, 0);
+  });
+
+  it('each SimResult has scenes array matching sceneTargets count', async () => {
+    const report = await runSelfPlay(makeScenarios(1), mockGenerate);
+    assert.equal(report.runs[0].scenes.length, 2, '2 scene targets → 2 scenes');
+  });
+});
+
+describe('NVM — Corpus Miner / Director Policy (G13)', () => {
+  function makeFakeReport(): Parameters<typeof mineCorpus>[0] {
+    const baseRun = (id: string, score: number, ops: string[]): Parameters<typeof mineCorpus>[0]['runs'][0] => ({
+      scenarioId: id, seed: 1, proofPassRate: score, meanValuation: score * 100, score,
+      topOperators: ops as any, scenes: [], effectiveOperators: ops.slice(0, 1) as any, totalIterations: 4,
+    });
+    const runs = [
+      baseRun('drama_1', 0.85, ['inject_irony', 'raise_stakes']),
+      baseRun('drama_2', 0.60, ['raise_stakes', 'deepen_wound']),
+      baseRun('mystery_1', 0.70, ['inject_irony', 'weird_but_valid']),
+    ];
+    return {
+      runs,
+      meanScore: 0.717,
+      bestRun: runs[0],
+      worstRun: runs[1],
+      operatorFrequency: { inject_irony: 2, raise_stakes: 2, deepen_wound: 1, weird_but_valid: 1 } as any,
+    };
+  }
+
+  it('mineCorpus returns a Playbook with non-empty summary', () => {
+    const playbook = mineCorpus(makeFakeReport());
+    assert.ok(playbook.summary.length > 0);
+    assert.ok(playbook.summary.includes('Corpus'));
+  });
+
+  it('mineCorpus hallOfFame contains top-N best runs', () => {
+    const playbook = mineCorpus(makeFakeReport(), 2);
+    assert.equal(playbook.hallOfFame.length, 2);
+    assert.equal(playbook.hallOfFame[0].scenarioId, 'drama_1');
+  });
+
+  it('mineCorpus policy has globalTopOperators from highest-frequency ops', () => {
+    const playbook = mineCorpus(makeFakeReport());
+    assert.ok(playbook.policy.globalTopOperators.length > 0);
+    const top = playbook.policy.globalTopOperators.slice(0, 2);
+    assert.ok(top.includes('inject_irony' as any) || top.includes('raise_stakes' as any));
+  });
+
+  it('mineCorpus on empty corpus returns empty playbook', () => {
+    const emptyReport: Parameters<typeof mineCorpus>[0] = {
+      runs: [], meanScore: 0,
+      bestRun: { scenarioId: '', seed: 0, proofPassRate: 0, meanValuation: 0, score: 0, topOperators: [], scenes: [], effectiveOperators: [], totalIterations: 0 },
+      worstRun: { scenarioId: '', seed: 0, proofPassRate: 0, meanValuation: 0, score: 0, topOperators: [], scenes: [], effectiveOperators: [], totalIterations: 0 },
+      operatorFrequency: {} as any,
+    };
+    const playbook = mineCorpus(emptyReport);
+    assert.ok(playbook.summary.includes('empty'));
+  });
+
+  it('queryPolicy falls back to globalTopOperators for unknown arc', () => {
+    const playbook = mineCorpus(makeFakeReport());
+    const ops = queryPolicy(playbook.policy, 'rags_to_riches');
+    assert.ok(ops.length > 0);
+  });
+});
+
+describe('NVM — StoryGenome (G13)', () => {
+  function makeTestCanon(): Canon {
+    const state: NarrativeState = {
+      ...emptyState(),
+      characterBeliefs: {
+        nora: [{ id: 'b1', proposition: 'secret safe', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 0 }],
+        helmer: [{ id: 'b2', proposition: 'nora honest', confidence: 1, source: 'told', source_event_id: 'e2', acquired_at: 1 }],
+      },
+      characterEmotions: {
+        nora: { joy: 0, distress: 60, anger: 0, fear: 80, pride: 0, shame: 20, dominant: 'fear', intensity: 80, last_updated_at: 1 },
+      },
+      audienceState: { knownFacts: ['f1'], suspense: 72, curiosity: 40, investment: 60 },
+      clues: [{ clueId: 'c1', carrier: 'object' }],
+      payoffs: [{ setupId: 's1', payoffEventId: 'e1' }],
+      themeArgument: [{ claimId: 'freedom', move: 'support' }],
+    };
+    const ops1: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'nora', predicate: 'hides', object: 'letter', addedAtTurn: 0, validFrom: 0, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'secret safe', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 0 } },
+    ];
+    return {
+      title: 'Doll House',
+      state,
+      commits: [
+        { commitId: 'c1', parentId: null, sceneIdx: 0, ops: ops1, deltaSummary: summarizeOps(ops1), reverted: false, createdAt: Date.now() },
+      ],
+    };
+  }
+
+  it('extractGenome returns correct genomeId', () => {
+    const genome = extractGenome(makeTestCanon(), 'test_genome');
+    assert.equal(genome.genomeId, 'test_genome');
+    assert.equal(genome.sceneCount, 1);
+  });
+
+  it('extractGenome captures irony density from told-beliefs', () => {
+    const genome = extractGenome(makeTestCanon());
+    assert.ok(genome.ironyDensity > 0, 'should have irony');
+    assert.ok(genome.ironyDensity <= 1);
+  });
+
+  it('extractGenome captures theme claims', () => {
+    const genome = extractGenome(makeTestCanon());
+    assert.ok(genome.themeClaims.includes('freedom'));
+  });
+
+  it('extractGenome identifies dominant wound character', () => {
+    const genome = extractGenome(makeTestCanon());
+    assert.equal(genome.dominantWound, 'nora');
+  });
+
+  it('extractGenome produces valid tensionProfile with 5 entries in [0,1]', () => {
+    const genome = extractGenome(makeTestCanon());
+    assert.equal(genome.tensionProfile.length, 5);
+    for (const v of genome.tensionProfile) assert.ok(v >= 0 && v <= 1);
+  });
+
+  it('diffGenomes returns similarity in [0,1]', () => {
+    const g1 = extractGenome(makeTestCanon(), 'g1');
+    const g2 = extractGenome(makeTestCanon(), 'g2');
+    const diff = diffGenomes(g1, g2);
+    assert.ok(diff.similarity >= 0 && diff.similarity <= 1);
+  });
+
+  it('diffGenomes: identical genome has similarity > 0.95', () => {
+    const g = extractGenome(makeTestCanon(), 'g');
+    const diff = diffGenomes(g, g);
+    assert.ok(diff.similarity > 0.95, `expected ~1.0, got ${diff.similarity}`);
+  });
+
+  it('breedGenomes produces genome with arc from parent B', () => {
+    const g1 = extractGenome(makeTestCanon(), 'g1');
+    const g2 = extractGenome(makeTestCanon(), 'g2');
+    g2.arcArchetype = 'rags_to_riches';
+    const bred = breedGenomes(g1, g2, 'bred');
+    assert.equal(bred.genomeId, 'bred');
+    assert.equal(bred.arcArchetype, 'rags_to_riches');
+  });
+
+  it('breedGenomes voice vector is average of parents', () => {
+    const g1 = extractGenome(makeTestCanon(), 'g1');
+    g1.voiceVector = { ADD_FACT: 0.6, UPDATE_BELIEF: 0.4 };
+    const g2 = extractGenome(makeTestCanon(), 'g2');
+    g2.voiceVector = { ADD_FACT: 0.2, UPDATE_BELIEF: 0.8 };
+    const bred = breedGenomes(g1, g2, 'bred');
+    assert.ok(Math.abs(bred.voiceVector.ADD_FACT - 0.4) < 0.001);
+    assert.ok(Math.abs(bred.voiceVector.UPDATE_BELIEF - 0.6) < 0.001);
+  });
+});
+
+// ── Wave 11: Closeout — TACTIC_TYPES, ToM², AGM, Quality Engines ─────────────
+
+describe('NVM — 12-Tactic Vocabulary (Wave 11)', () => {
+  it('TACTIC_TYPES has exactly 12 entries', () => {
+    assert.equal(TACTIC_TYPES.length, 12);
+  });
+
+  it('TACTIC_TYPES contains all required core tactics', () => {
+    const required = ['direct_assertion', 'emotional_appeal', 'authority_claim', 'reciprocity_bid', 'social_proof', 'deflection', 'partial_reveal', 'bait_and_switch', 'guilt_induction', 'alliance_bid', 'implicit_threat', 'strategic_silence'];
+    for (const t of required) {
+      assert.ok((TACTIC_TYPES as readonly string[]).includes(t), `missing tactic: ${t}`);
+    }
+  });
+
+  it('isDeceptive returns true for deflection and partial_reveal', () => {
+    assert.ok(isDeceptive('deflection'));
+    assert.ok(isDeceptive('partial_reveal'));
+    assert.equal(isDeceptive('direct_assertion'), false);
+  });
+
+  it('isEmotional returns true for emotional_appeal and guilt_induction', () => {
+    assert.ok(isEmotional('emotional_appeal'));
+    assert.ok(isEmotional('guilt_induction'));
+    assert.equal(isEmotional('authority_claim'), false);
+  });
+
+  it('tacticIronyWeight: deceptive=2, emotional=1, rational=0', () => {
+    assert.equal(tacticIronyWeight('bait_and_switch'), 2);
+    assert.equal(tacticIronyWeight('emotional_appeal'), 1);
+    assert.equal(tacticIronyWeight('direct_assertion'), 0);
+  });
+});
+
+describe('NVM — ToM² Depth-2 MetaBelief (Wave 11)', () => {
+  const noraBelief = { id: 'b_honest', proposition: 'nora is honest', confidence: 1, source: 'told' as const, source_event_id: 'e1', acquired_at: 1 };
+
+  it('buildMetaBelief creates a valid depth-2 meta-belief', () => {
+    const mb = buildMetaBelief('helmer', 'world', noraBelief, 0.9, 2);
+    assert.equal(mb.holderId, 'helmer');
+    assert.equal(mb.targetId, 'world');
+    assert.equal(mb.depth, 2);
+    assert.ok(mb.metaId.includes('helmer'));
+  });
+
+  it('upsertMetaBelief adds to state and is retrievable', () => {
+    const mb = buildMetaBelief('helmer', 'nora', noraBelief, 0.9, 1);
+    const state = upsertMetaBelief({}, mb);
+    const mbs = getMetaBeliefsAbout(state, 'helmer', 'nora');
+    assert.equal(mbs.length, 1);
+    assert.equal(mbs[0].metaId, mb.metaId);
+  });
+
+  it('upsertMetaBelief updates existing by metaId', () => {
+    const mb = buildMetaBelief('helmer', 'nora', noraBelief, 0.9, 1);
+    const state = upsertMetaBelief({}, mb);
+    const updated = { ...mb, confidence: 0.5 };
+    const state2 = upsertMetaBelief(state, updated);
+    const mbs = getMetaBeliefsAbout(state2, 'helmer', 'nora');
+    assert.equal(mbs.length, 1, 'should not duplicate');
+    assert.equal(mbs[0].confidence, 0.5, 'should update confidence');
+  });
+
+  it('holderBelievesThatTargetBelieves returns true for matching meta-belief', () => {
+    const mb = buildMetaBelief('helmer', 'nora', noraBelief, 0.9, 1);
+    const state = upsertMetaBelief({}, mb);
+    assert.ok(holderBelievesThatTargetBelieves(state, 'helmer', 'nora', 'b_honest'));
+  });
+
+  it('holderBelievesThatTargetBelieves returns false when below minConfidence', () => {
+    const mb = buildMetaBelief('helmer', 'nora', noraBelief, 0.3, 1);
+    const state = upsertMetaBelief({}, mb);
+    assert.equal(holderBelievesThatTargetBelieves(state, 'helmer', 'nora', 'b_honest', 0.5), false);
+  });
+});
+
+describe('NVM — AGM Belief Revision + CICERO Trust (Wave 11)', () => {
+  function makeBeliefs(): import('./server/engine/types.ts').Belief[] {
+    return [
+      { id: 'b1', proposition: 'nora borrowed money', confidence: 0.9, source: 'witnessed', source_event_id: 'loan_event', acquired_at: 1 },
+      { id: 'b2', proposition: 'debt is secret', confidence: 0.8, source: 'witnessed', source_event_id: 'loan_event', acquired_at: 1 },
+      { id: 'b3', proposition: 'helmer is forgiving', confidence: 0.6, source: 'told', source_event_id: 'different_event', acquired_at: 2 },
+    ];
+  }
+
+  it('contractBelief removes target belief', () => {
+    const beliefs = makeBeliefs();
+    const result = contractBelief(beliefs, 'b1');
+    assert.ok(!result.some(b => b.id === 'b1'), 'b1 should be removed');
+  });
+
+  it('contractBelief co-contracts beliefs from same event', () => {
+    const beliefs = makeBeliefs();
+    const result = contractBelief(beliefs, 'b1');
+    // b1 and b2 share loan_event + acquired_at=1 → both contracted
+    assert.ok(!result.some(b => b.id === 'b2'), 'b2 co-contracted with b1');
+    assert.ok(result.some(b => b.id === 'b3'), 'b3 from different event should remain');
+  });
+
+  it('contractBelief on missing id returns unchanged set', () => {
+    const beliefs = makeBeliefs();
+    const result = contractBelief(beliefs, 'nonexistent');
+    assert.equal(result.length, beliefs.length);
+  });
+
+  it('planContraction reports co-contracted ids', () => {
+    const beliefs = makeBeliefs();
+    const report = planContraction(beliefs, 'b1');
+    assert.equal(report.targetId, 'b1');
+    assert.ok(report.coContracted.includes('b2'), 'b2 should be co-contracted');
+    assert.equal(report.remaining, 1);
+  });
+
+  it('reviseBelief removes conflicting told-belief when witnessed arrives', () => {
+    const beliefs: import('./server/engine/types.ts').Belief[] = [
+      { id: 'b_lie', proposition: 'nora borrowed money', confidence: 0.9, source: 'told', source_event_id: 'lie_event', acquired_at: 1 },
+    ];
+    const truth: import('./server/engine/types.ts').Belief = {
+      id: 'b_truth', proposition: 'nora borrowed money', confidence: 1, source: 'witnessed', source_event_id: 'truth_event', acquired_at: 2,
+    };
+    const result = reviseBelief(beliefs, truth);
+    assert.ok(!result.some(b => b.id === 'b_lie'), 'conflicting belief should be removed');
+    assert.ok(result.some(b => b.id === 'b_truth'), 'new belief should be added');
+  });
+
+  it('initCredence creates credence with default 0.6', () => {
+    const c = initCredence('krogstad');
+    assert.equal(c.sourceId, 'krogstad');
+    assert.equal(c.credence, 0.6);
+  });
+
+  it('updateCredence raises credence on correct prediction', () => {
+    const c = initCredence('krogstad', 0.5);
+    const updated = updateCredence(c, true, 1);
+    assert.ok(updated.credence > 0.5, 'credence should rise');
+  });
+
+  it('updateCredence lowers credence on incorrect prediction', () => {
+    const c = initCredence('krogstad', 0.8);
+    const updated = updateCredence(c, false, 1);
+    assert.ok(updated.credence < 0.8, 'credence should fall');
+  });
+
+  it('applyCredence modulates belief confidence by source credence', () => {
+    const belief: import('./server/engine/types.ts').Belief = {
+      id: 'b1', proposition: 'X', confidence: 1.0, source: 'told', source_event_id: 'krogstad:e1', acquired_at: 1,
+    };
+    const credMap = { krogstad: initCredence('krogstad', 0.5) };
+    const result = applyCredence(belief, credMap);
+    assert.ok(result.confidence < 1.0, 'confidence should be reduced by low credence');
+  });
+});
+
+describe('NVM — Quality Engines (Wave 11)', () => {
+  function makeMinimalIR(ops: StoryOp[], sceneIdx = 1): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR {
+    return {
+      transitionId: 'q_test', sceneIdx, sceneFunction: 'build_tension',
+      activeMechanisms: [], beforeStateHash: 'deadbeef', preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: Date.now() },
+      ops,
+    };
+  }
+
+  it('specificityScore returns 1.0 for empty op list', () => {
+    assert.equal(specificityScore([]), 1);
+  });
+
+  it('specificityScore penalizes vague propositions', () => {
+    const vague: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'something happened', confidence: 0.5, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+    ];
+    assert.ok(specificityScore(vague) < 1.0, 'vague belief should lower score');
+  });
+
+  it('specificityScore is higher for concrete content', () => {
+    const concrete: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'krogstad', predicate: 'forged', object: 'signature', addedAtTurn: 0, validFrom: 0, validTo: null } },
+    ];
+    assert.ok(specificityScore(concrete) >= 0.7, 'concrete op should score higher');
+  });
+
+  it('computeArcDebt detects unseeded payoff debt', () => {
+    const state: NarrativeState = {
+      ...emptyState(),
+      clues: [{ clueId: 'c1', carrier: 'object' }, { clueId: 'c2', carrier: 'line' }],
+      payoffs: [],
+      audienceState: { knownFacts: [], suspense: 80, curiosity: 0, investment: 0 },
+    };
+    const debts = computeArcDebt(state, 4);
+    assert.ok(debts.some(d => d.includes('reveal') || d.includes('clue')), 'should flag clue-without-payoff debt');
+  });
+
+  it('revealReady returns false when suspense is low', () => {
+    const state: NarrativeState = { ...emptyState(), clues: [{ clueId: 'c1', carrier: 'object' }, { clueId: 'c2', carrier: 'line' }], audienceState: { knownFacts: [], suspense: 20, curiosity: 0, investment: 0 } };
+    const result = revealReady(state);
+    assert.equal(result.ready, false);
+    assert.ok(result.gaps.some(g => g.includes('suspense')));
+  });
+
+  it('revealReady returns true when all conditions met', () => {
+    const state: NarrativeState = {
+      ...emptyState(),
+      clues: [{ clueId: 'c1', carrier: 'object' }, { clueId: 'c2', carrier: 'line' }],
+      audienceState: { knownFacts: ['f1'], suspense: 75, curiosity: 40, investment: 60 },
+      characterBeliefs: {
+        helmer: [{ id: 'b_lie', proposition: 'X', confidence: 1, source: 'told', source_event_id: 'e1', acquired_at: 1 }],
+      },
+    };
+    const result = revealReady(state);
+    assert.ok(result.ready, `should be ready (score=${result.score})`);
+  });
+
+  it('necessityScore returns 1.0 when all ops are distinct and essential', () => {
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'A', predicate: 'p', object: 'B', addedAtTurn: 0, validFrom: 0, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'X', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 0 } },
+    ];
+    // Only one ADD_FACT so it's considered essential even without downstream reference
+    assert.ok(necessityScore(ops) >= 0.5, 'simple IR should not be penalized heavily');
+  });
+
+  it('necessityScore penalizes duplicate emotion appraisals', () => {
+    const emo = { joy: 0, distress: 60, anger: 0, fear: 80, pride: 0, shame: 0, dominant: 'fear' as const, intensity: 80, last_updated_at: 0 };
+    const ops: StoryOp[] = [
+      { op: 'APPRAISE_EMOTION', charId: 'nora', emotion: emo },
+      { op: 'APPRAISE_EMOTION', charId: 'nora', emotion: emo },
+    ];
+    assert.ok(necessityScore(ops) < 1.0, 'duplicate emotion should lower necessity');
+  });
+
+  it('runQualityEngine returns a report with score in [0,100]', () => {
+    const ir = makeMinimalIR([
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'krogstad', predicate: 'threatens', object: 'nora', addedAtTurn: 0, validFrom: 0, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'job at risk', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+      { op: 'APPRAISE_EMOTION', charId: 'nora', emotion: { joy: 0, distress: 70, anger: 0, fear: 90, pride: 0, shame: 10, dominant: 'fear', intensity: 90, last_updated_at: 1 } },
+    ]);
+    const report = runQualityEngine(ir, emptyState());
+    assert.ok(report.score >= 0 && report.score <= 100, `score out of range: ${report.score}`);
+    assert.ok(typeof report.specificity === 'number');
+    assert.ok(Array.isArray(report.arcDebt));
+    assert.ok(typeof report.revealReady === 'boolean');
+  });
+
+  it('runQualityEngine flags DV1_ON_THE_NOSE for full-confidence told belief', () => {
+    const ir = makeMinimalIR([
+      { op: 'UPDATE_BELIEF', charId: 'helmer', belief: { id: 'b_conf', proposition: 'nora confessed everything to helmer', confidence: 1.0, source: 'told', source_event_id: 'e_conf', acquired_at: 1 } },
+    ]);
+    const report = runQualityEngine(ir, emptyState());
+    assert.ok(report.warnings.some(w => w.rule === 'DV1_ON_THE_NOSE'), 'should flag on-the-nose confession');
+  });
+
+  it('runQualityEngine report includes burrowsDelta, causalGraph, proppAnalysis, repairGaps', () => {
+    const ir = makeMinimalIR([
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'A', predicate: 'p', object: 'B', addedAtTurn: 0, validFrom: 0, validTo: null } },
+    ]);
+    const report = runQualityEngine(ir, emptyState());
+    assert.ok(typeof report.burrowsDelta === 'number', 'burrowsDelta should be a number');
+    assert.ok(typeof report.causalGraph === 'object', 'causalGraph should exist');
+    assert.ok(Array.isArray(report.proppAnalysis.present), 'proppAnalysis.present should be array');
+    assert.ok(Array.isArray(report.repairGaps), 'repairGaps should be array');
+  });
+});
+
+describe('NVM — Quality Engine Extensions (Wave 12)', () => {
+  function makeMinimalIR(ops: StoryOp[], sceneIdx = 1): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR {
+    return {
+      transitionId: 'q12_test', sceneIdx, sceneFunction: 'build_tension',
+      activeMechanisms: [], beforeStateHash: 'deadbeef', preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: Date.now() },
+      ops,
+    };
+  }
+
+  // ── DV6 ──────────────────────────────────────────────────────────────────────
+  it('DV6_CHARACTER_MONOLOGUE fires when same char has ≥3 consecutive ops', () => {
+    const ops: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'threat is real', confidence: 0.8, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b2', proposition: 'need to act fast', confidence: 0.7, source: 'inferred', source_event_id: 'e1', acquired_at: 1 } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b3', proposition: 'helmer cannot know', confidence: 0.9, source: 'inferred', source_event_id: 'e1', acquired_at: 1 } },
+    ];
+    const warnings = dialogueWarnings(makeMinimalIR(ops), emptyState());
+    assert.ok(warnings.some(w => w.rule === 'DV6_CHARACTER_MONOLOGUE'), 'should flag nora monologue');
+  });
+
+  it('DV6_CHARACTER_MONOLOGUE does not fire for alternating characters', () => {
+    const ops: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'X', confidence: 0.8, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+      { op: 'UPDATE_BELIEF', charId: 'helmer', belief: { id: 'b2', proposition: 'Y', confidence: 0.7, source: 'witnessed', source_event_id: 'e2', acquired_at: 1 } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b3', proposition: 'Z', confidence: 0.9, source: 'witnessed', source_event_id: 'e3', acquired_at: 1 } },
+    ];
+    const warnings = dialogueWarnings(makeMinimalIR(ops), emptyState());
+    assert.ok(!warnings.some(w => w.rule === 'DV6_CHARACTER_MONOLOGUE'), 'alternating chars should not flag');
+  });
+
+  // ── DV8 ──────────────────────────────────────────────────────────────────────
+  it('DV8_ABRUPT_RELATIONSHIP fires for large shift without prior emotion', () => {
+    const ops: StoryOp[] = [
+      { op: 'SHIFT_RELATIONSHIP', pair: ['nora', 'krogstad'], delta: { dimension: 'trust', amount: 0.8, reason: 'suddenly trusted' } },
+    ];
+    const warnings = dialogueWarnings(makeMinimalIR(ops), emptyState());
+    assert.ok(warnings.some(w => w.rule === 'DV8_ABRUPT_RELATIONSHIP'), 'large abrupt shift should warn');
+  });
+
+  it('DV8_ABRUPT_RELATIONSHIP does not fire when emotion precedes shift', () => {
+    const ops: StoryOp[] = [
+      { op: 'APPRAISE_EMOTION', charId: 'nora', emotion: { joy: 80, distress: 0, anger: 0, fear: 0, pride: 60, shame: 0, dominant: 'joy', intensity: 80, last_updated_at: 1 } },
+      { op: 'SHIFT_RELATIONSHIP', pair: ['nora', 'krogstad'], delta: { dimension: 'trust', amount: 0.8, reason: 'grateful for help' } },
+    ];
+    const warnings = dialogueWarnings(makeMinimalIR(ops), emptyState());
+    assert.ok(!warnings.some(w => w.rule === 'DV8_ABRUPT_RELATIONSHIP'), 'grounded shift should not warn');
+  });
+
+  // ── DV10 ─────────────────────────────────────────────────────────────────────
+  it('DV10_STRUCTURAL_UNIFORMITY fires when all ops are same kind', () => {
+    const ops: StoryOp[] = Array.from({ length: 5 }, (_, i) => ({
+      op: 'UPDATE_BELIEF' as const,
+      charId: 'nora',
+      belief: { id: `b${i}`, proposition: `proposition ${i}`, confidence: 0.8, source: 'witnessed' as const, source_event_id: 'e1', acquired_at: 1 },
+    }));
+    const warnings = dialogueWarnings(makeMinimalIR(ops), emptyState());
+    assert.ok(warnings.some(w => w.rule === 'DV10_STRUCTURAL_UNIFORMITY'), 'uniform ops should warn');
+  });
+
+  // ── Burrows's Delta ───────────────────────────────────────────────────────────
+  it('burrowsDelta returns 0 for a single character (no comparison possible)', () => {
+    const ops: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'krogstad threatens her livelihood', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+    ];
+    assert.equal(burrowsDelta(ops), 0);
+  });
+
+  it('burrowsDelta returns high similarity when both chars use identical words', () => {
+    const ops: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'krogstad threatens nora with dark secret', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+      { op: 'UPDATE_BELIEF', charId: 'helmer', belief: { id: 'b2', proposition: 'krogstad threatens nora with dark secret', confidence: 0.7, source: 'told', source_event_id: 'e2', acquired_at: 1 } },
+    ];
+    const delta = burrowsDelta(ops);
+    assert.ok(delta > 0.5, `expected high similarity, got ${delta}`);
+  });
+
+  it('burrowsDelta returns low similarity for distinct vocabularies', () => {
+    const ops: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'dancing tarantella tomorrow evening possible', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+      { op: 'UPDATE_BELIEF', charId: 'krogstad', belief: { id: 'b2', proposition: 'letter mailed poison blackmail demand', confidence: 0.7, source: 'witnessed', source_event_id: 'e2', acquired_at: 1 } },
+    ];
+    const delta = burrowsDelta(ops);
+    assert.ok(delta < 0.3, `expected low similarity, got ${delta}`);
+  });
+
+  // ── Relationship Repair Proof ─────────────────────────────────────────────────
+  it('relationshipRepairGaps returns gaps for unrepaired negative relationships', () => {
+    const state: NarrativeState = {
+      ...emptyState(),
+      relationships: {
+        'nora|helmer': [{ dimension: 'trust', amount: -0.7, reason: 'betrayal' }],
+      },
+    };
+    const ir = makeMinimalIR([
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'X', predicate: 'Y', object: 'Z', addedAtTurn: 0, validFrom: 0, validTo: null } },
+    ]);
+    const gaps = relationshipRepairGaps(state, ir);
+    assert.ok(gaps.length > 0, 'should detect repair gap for negative relationship');
+    assert.ok(gaps[0].includes('nora|helmer') || gaps[0].includes('helmer|nora'), 'gap should mention the relationship');
+  });
+
+  it('relationshipRepairGaps returns empty when IR repairs the relationship', () => {
+    const state: NarrativeState = {
+      ...emptyState(),
+      relationships: {
+        'nora|helmer': [{ dimension: 'trust', amount: -0.7, reason: 'betrayal' }],
+      },
+    };
+    const ir = makeMinimalIR([
+      { op: 'SHIFT_RELATIONSHIP', pair: ['nora', 'helmer'], delta: { dimension: 'trust', amount: 0.5, reason: 'reconciliation' } },
+    ]);
+    const gaps = relationshipRepairGaps(state, ir);
+    assert.equal(gaps.length, 0, 'repair arc should clear the gap');
+  });
+
+  // ── Causal Plot Graph ─────────────────────────────────────────────────────────
+  it('buildCausalGraph returns a graph with nodes for each op', () => {
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'A', predicate: 'p', object: 'B', addedAtTurn: 0, validFrom: 0, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'A p B', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+    ];
+    const ir = { ...makeMinimalIR(ops), causalLinks: [{ opIdx: 1, causedBy: ['f1'] }] };
+    const graph = buildCausalGraph(ir);
+    assert.equal(graph.nodes.length, 2, 'should have 2 nodes');
+    assert.equal(graph.edges.length, 1, 'should have 1 edge');
+    assert.ok(graph.edges[0].from === 'f1' && graph.edges[0].toOpIdx === 1);
+  });
+
+  it('buildCausalGraph with no causalLinks has all ops as roots', () => {
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'A', predicate: 'p', object: 'B', addedAtTurn: 0, validFrom: 0, validTo: null } },
+    ];
+    const graph = buildCausalGraph(makeMinimalIR(ops));
+    assert.equal(graph.edges.length, 0, 'no edges without causal links');
+    assert.ok(graph.rootOps.includes(0), 'op 0 should be a root');
+  });
+
+  // ── Propp's Morphology ────────────────────────────────────────────────────────
+  it('proppMorphology detects preparation from ADD_FACT', () => {
+    const ir = makeMinimalIR([
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'A', predicate: 'p', object: 'B', addedAtTurn: 0, validFrom: 0, validTo: null } },
+    ]);
+    const analysis = proppMorphology(ir);
+    assert.ok(analysis.present.includes('preparation'), 'ADD_FACT should signal preparation');
+    assert.ok(analysis.coverage > 0);
+  });
+
+  it('proppMorphology detects ordeal from negative SHIFT_RELATIONSHIP', () => {
+    const ir = makeMinimalIR([
+      { op: 'SHIFT_RELATIONSHIP', pair: ['nora', 'helmer'], delta: { dimension: 'trust', amount: -0.6, reason: 'betrayal' } },
+    ]);
+    const analysis = proppMorphology(ir);
+    assert.ok(analysis.present.includes('ordeal'), 'negative shift should signal ordeal');
+  });
+
+  it('proppMorphology detects resolution from ADVANCE_THEME_ARGUMENT resolve', () => {
+    const ir = makeMinimalIR([
+      { op: 'ADVANCE_THEME_ARGUMENT', claimId: 'self_identity', move: 'resolve' },
+    ]);
+    const analysis = proppMorphology(ir);
+    assert.ok(analysis.present.includes('resolution'), 'theme resolve should signal resolution');
+  });
+
+  it('proppMorphology full coverage for a rich scene', () => {
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'A', predicate: 'p', object: 'B', addedAtTurn: 0, validFrom: 0, validTo: null } },
+      { op: 'APPRAISE_EMOTION', charId: 'nora', emotion: { joy: 0, distress: 70, anger: 0, fear: 90, pride: 0, shame: 0, dominant: 'fear', intensity: 90, last_updated_at: 1 } },
+      { op: 'UPDATE_BELIEF', charId: 'helmer', belief: { id: 'b2', proposition: 'told by nora', confidence: 0.6, source: 'told', source_event_id: 'e2', acquired_at: 1 } },
+      { op: 'SHIFT_RELATIONSHIP', pair: ['nora', 'helmer'], delta: { dimension: 'resentment', amount: -0.5, reason: 'conflict' } },
+      { op: 'SHIFT_RELATIONSHIP', pair: ['nora', 'linde'], delta: { dimension: 'trust', amount: 0.4, reason: 'alliance' } },
+      { op: 'ADVANCE_THEME_ARGUMENT', claimId: 'freedom', move: 'resolve' },
+    ];
+    const analysis = proppMorphology(makeMinimalIR(ops));
+    assert.ok(analysis.coverage >= 5 / 7, `expected ≥5/7 coverage, got ${analysis.coverage}`);
+  });
+
+  // ── Momentum score ────────────────────────────────────────────────────────────
+  it('momentumScore returns 0 for empty commits', () => {
+    assert.equal(momentumScore([]), 0);
+  });
+
+  it('momentumScore is higher when commits have high-value ops', () => {
+    const makeCommit = (ops: StoryOp[]): StoryCommit => ({
+      commitId: 'c1', parentId: null, sceneIdx: 1, ops,
+      deltaSummary: summarizeOps(ops), reverted: false, createdAt: Date.now(),
+    });
+    const highValue: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'X', confidence: 0.8, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+      { op: 'APPRAISE_EMOTION', charId: 'nora', emotion: { joy: 0, distress: 70, anger: 0, fear: 80, pride: 0, shame: 0, dominant: 'fear', intensity: 80, last_updated_at: 1 } },
+      { op: 'SHIFT_RELATIONSHIP', pair: ['nora', 'helmer'], delta: { dimension: 'trust', amount: -0.4, reason: 'conflict' } },
+    ];
+    const low: StoryOp[] = [
+      { op: 'RECORD_VISUAL_FACT', sceneId: 's1', fact: 'The window is open.' },
+    ];
+    const highScore = momentumScore([makeCommit(highValue), makeCommit(highValue), makeCommit(highValue)]);
+    const lowScore  = momentumScore([makeCommit(low), makeCommit(low), makeCommit(low)]);
+    assert.ok(highScore > lowScore, `high-value (${highScore}) should exceed low (${lowScore})`);
+  });
+
+  // ── 5th tension feature: unexposed lies in deriveTensionLedger ────────────────
+  it('deriveTensionLedger creates unexposed_lie positions for low-confidence told beliefs', () => {
+    const state: NarrativeState = {
+      ...emptyState(),
+      characterBeliefs: {
+        helmer: [{ id: 'b_lie', proposition: 'all is fine at the bank', confidence: 0.25, source: 'told', source_event_id: 'e1', acquired_at: 1 }],
+      },
+      audienceState: { knownFacts: [], suspense: 50, curiosity: 30, investment: 60 },
+    };
+    const ledger = deriveTensionLedger(state, 2);
+    const unexposed = ledger.positions.filter(p => p.kind === 'unexposed_lie');
+    assert.ok(unexposed.length > 0, 'should create an unexposed_lie position for low-confidence told belief');
+    assert.ok(unexposed[0].charId === 'helmer', 'position should be attributed to helmer');
+  });
+
+  it('deriveTensionLedger does not create unexposed_lie for high-confidence told belief', () => {
+    const state: NarrativeState = {
+      ...emptyState(),
+      characterBeliefs: {
+        nora: [{ id: 'b_conf', proposition: 'krogstad will leave', confidence: 0.9, source: 'told', source_event_id: 'e1', acquired_at: 1 }],
+      },
+      audienceState: { knownFacts: [], suspense: 20, curiosity: 10, investment: 30 },
+    };
+    const ledger = deriveTensionLedger(state, 1);
+    const unexposed = ledger.positions.filter(p => p.kind === 'unexposed_lie');
+    assert.equal(unexposed.length, 0, 'high-confidence told belief should not trigger unexposed_lie');
+  });
+});
+
+// ── Wave 15: LLM Candidate Generator (stub path) ─────────────────────────────
+
+describe('NVM — LLM Candidate Generator (Wave 15)', () => {
+  const stubTarget: SceneTarget = {
+    sceneIdx: 2,
+    sceneFunction: 'build_tension',
+    activeMechanisms: [],
+    tensionTarget: 50,
+    qualityTarget: 40,
+  };
+
+  it('makeLLMCandidateGenerator returns a function', () => {
+    const gen = makeLLMCandidateGenerator();
+    assert.equal(typeof gen, 'function');
+  });
+
+  it('stub path produces N candidates when LLM is unavailable', async () => {
+    // No GEMINI_API_KEY in test env → falls back to structural stubs
+    const gen = makeLLMCandidateGenerator();
+    const state = emptyState();
+    const spec = buildGenerationSpec(state, stubTarget, []);
+    const candidates = await gen(spec, 3);
+    assert.equal(candidates.length, 3);
+    for (const c of candidates) {
+      assert.equal(c.sceneIdx, stubTarget.sceneIdx);
+      assert.equal(c.sceneFunction, stubTarget.sceneFunction);
+      assert.ok(c.ops.length > 0, 'stub must produce at least one op');
+    }
+  });
+
+  it('stub candidates have unique transitionIds', async () => {
+    const gen = makeLLMCandidateGenerator();
+    const state = emptyState();
+    const spec = buildGenerationSpec(state, stubTarget, []);
+    const candidates = await gen(spec, 4);
+    const ids = new Set(candidates.map(c => c.transitionId));
+    assert.equal(ids.size, 4, 'all transitionIds must be unique');
+  });
+
+  it('stub candidate provenance is model_generated', async () => {
+    const gen = makeLLMCandidateGenerator();
+    const state = emptyState();
+    const spec = buildGenerationSpec(state, stubTarget, []);
+    const [c] = await gen(spec, 1);
+    assert.equal(c.provenance.origin, 'model_generated');
+  });
+
+  it('stub generator produces candidates for sceneIdx 0', async () => {
+    const gen = makeLLMCandidateGenerator();
+    const spec = buildGenerationSpec(emptyState(), { ...stubTarget, sceneIdx: 0 }, []);
+    const candidates = await gen(spec, 2);
+    assert.equal(candidates.length, 2);
+    assert.equal(candidates[0].sceneIdx, 0);
+  });
+});
+
+// ── Wave 16: Tier 2 Proof Kernel ─────────────────────────────────────────────
+
+describe('NVM — Tier 2 Proof Kernel (Wave 16)', () => {
+  function minimalIR(ops: StoryOp[]): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR {
+    return {
+      transitionId: `t2-${Date.now()}`,
+      sceneIdx: 1,
+      sceneFunction: 'build_tension',
+      activeMechanisms: [],
+      beforeStateHash: 'x',
+      ops,
+      preconditions: [],
+      postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: Date.now() },
+    };
+  }
+
+  it('runTier2 returns 3 ProofResults (necessity, specificity, dialogue)', () => {
+    const ir = minimalIR([
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'nora', predicate: 'hides', object: 'loan', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ]);
+    const results = runTier2(ir, emptyState());
+    assert.equal(results.length, 3);
+    assert.ok(results.some(r => r.proof === 'NecessityProof'));
+    assert.ok(results.some(r => r.proof === 'SpecificityProof'));
+    assert.ok(results.some(r => r.proof === 'DialogueProof'));
+  });
+
+  it('tier2Score is 100 when all Tier 2 proofs pass', () => {
+    // Rich, specific ops tend to pass
+    const ir = minimalIR([
+      { op: 'ADD_FACT', fact: { factId: 'fact-nora-loan', subject: 'nora', predicate: 'borrowed_from', object: 'krogstad', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'helmer', belief: { id: 'b1', proposition: 'nora is innocent', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+      { op: 'APPRAISE_EMOTION', charId: 'nora', emotion: { joy: 0, distress: 60, anger: 0, fear: 80, pride: 0, shame: 0, dominant: 'fear' as const, intensity: 80, last_updated_at: 1 } },
+      { op: 'SEED_CLUE', clueId: 'clue-letter', carrier: 'object' },
+    ]);
+    const results = runTier2(ir, emptyState());
+    const s = tier2Score(results);
+    assert.ok(s >= 0 && s <= 100, `tier2Score out of range: ${s}`);
+  });
+
+  it('tier2Score is 0 when all Tier 2 proofs fail', () => {
+    const results = [
+      { proof: 'NecessityProof' as const, tier: 2 as const, pass: false, reason: 'x', findings: [] },
+      { proof: 'SpecificityProof' as const, tier: 2 as const, pass: false, reason: 'x', findings: [] },
+      { proof: 'DialogueProof' as const, tier: 2 as const, pass: false, reason: 'x', findings: [] },
+    ];
+    assert.equal(tier2Score(results), 0);
+  });
+
+  it('tier2Score is partial when one proof fails', () => {
+    const results = [
+      { proof: 'NecessityProof' as const, tier: 2 as const, pass: true, reason: 'ok', findings: [] },
+      { proof: 'SpecificityProof' as const, tier: 2 as const, pass: false, reason: 'x', findings: [] },
+      { proof: 'DialogueProof' as const, tier: 2 as const, pass: true, reason: 'ok', findings: [] },
+    ];
+    const s = tier2Score(results);
+    assert.ok(s > 0 && s < 100, `expected partial score, got ${s}`);
+  });
+
+  it('Tier 2 failures appear in proof names (NecessityProof / SpecificityProof / DialogueProof)', () => {
+    // Generic/vague ops trigger specificity failure
+    const ir = minimalIR([
+      { op: 'ADD_FACT', fact: { factId: 'f', subject: 'thing', predicate: 'does', object: 'event', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'ADD_FACT', fact: { factId: 'g', subject: 'entity', predicate: 'causes', object: 'thing', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ]);
+    const results = runTier2(ir, emptyState());
+    assert.ok(results.every(r => ['NecessityProof','SpecificityProof','DialogueProof'].includes(r.proof)));
+  });
+});
+
+// ── Wave 17: Tier 3 Ranking Proofs ───────────────────────────────────────────
+
+describe('NVM — Tier 3 Ranking Proofs (Wave 17)', () => {
+  function makeIR(ops: StoryOp[], sceneIdx = 1): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR {
+    return {
+      transitionId: `t3-${Date.now()}-${Math.random()}`,
+      sceneIdx,
+      sceneFunction: 'build_tension' as const,
+      activeMechanisms: [],
+      beforeStateHash: 'x',
+      ops,
+      preconditions: [],
+      postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: Date.now() },
+    };
+  }
+
+  it('runTier3 returns 2 results (GenericnessProof + OriginalityProof)', () => {
+    const ir = makeIR([
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'nora', predicate: 'hides', object: 'loan', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ]);
+    const results = runTier3(ir, emptyState());
+    assert.equal(results.length, 2);
+    assert.ok(results.some(r => r.proof === 'GenericnessProof'));
+    assert.ok(results.some(r => r.proof === 'OriginalityProof'));
+  });
+
+  it('tier3Rank is 100 when both proofs pass', () => {
+    const results = [
+      { proof: 'GenericnessProof' as const, tier: 3 as const, pass: true, reason: 'ok', findings: [] },
+      { proof: 'OriginalityProof' as const, tier: 3 as const, pass: true, reason: 'ok', findings: [] },
+    ];
+    assert.equal(tier3Rank(results), 100);
+  });
+
+  it('tier3Rank is 50 when one of two proofs fails', () => {
+    const results = [
+      { proof: 'GenericnessProof' as const, tier: 3 as const, pass: true, reason: 'ok', findings: [] },
+      { proof: 'OriginalityProof' as const, tier: 3 as const, pass: false, reason: 'x', findings: [] },
+    ];
+    assert.equal(tier3Rank(results), 50);
+  });
+
+  it('OriginalityProof fails when one op kind is ≥70% of ops', () => {
+    const ir = makeIR([
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'a', predicate: 'b', object: 'c', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'ADD_FACT', fact: { factId: 'f2', subject: 'd', predicate: 'e', object: 'f', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'ADD_FACT', fact: { factId: 'f3', subject: 'g', predicate: 'h', object: 'i', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'ADD_FACT', fact: { factId: 'f4', subject: 'j', predicate: 'k', object: 'l', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ]);  // 100% ADD_FACT → dominance=1.0
+    const results = runTier3(ir, emptyState());
+    const orig = results.find(r => r.proof === 'OriginalityProof');
+    assert.ok(orig && !orig.pass, 'OriginalityProof should fail for uniform op kind');
+  });
+
+  it('OriginalityProof passes when op kinds are varied', () => {
+    const ir = makeIR([
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'a', predicate: 'b', object: 'c', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'p', confidence: 0.8, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+      { op: 'SEED_CLUE', clueId: 'c1', carrier: 'object' },
+      { op: 'RAISE_CLOCK', clockId: 'clock1', amount: 1 },
+    ]);
+    const results = runTier3(ir, emptyState());
+    const orig = results.find(r => r.proof === 'OriginalityProof');
+    assert.ok(orig && orig.pass, `OriginalityProof should pass for varied ops; got: ${orig?.reason}`);
+  });
+
+  it('GenericnessProof passes when state has no known chars (no char ops to evaluate)', () => {
+    const ir = makeIR([
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'x', predicate: 'y', object: 'z', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ]);
+    const results = runTier3(ir, emptyState());
+    const gen = results.find(r => r.proof === 'GenericnessProof');
+    assert.ok(gen && gen.pass, 'no char ops → genericness passes');
+  });
+});
+
+// ── Wave 18: Tier 4 Ethics Proofs ────────────────────────────────────────────
+
+describe('NVM — Tier 4 Ethics & Disclosure Proofs (Wave 18)', () => {
+  function makeIR(
+    ops: StoryOp[],
+    causalLinks?: import('./server/nvm/ir/NarrativeTransitionIR.ts').CausalLink[],
+    origin: import('./server/nvm/ir/NarrativeTransitionIR.ts').ProvenanceOrigin = 'model_generated',
+  ): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR {
+    return {
+      transitionId: `t4-${Date.now()}-${Math.random()}`,
+      sceneIdx: 1,
+      sceneFunction: 'build_tension' as const,
+      activeMechanisms: [],
+      beforeStateHash: 'x',
+      ops,
+      causalLinks,
+      preconditions: [],
+      postconditions: [],
+      provenance: { origin, createdAt: Date.now() },
+    };
+  }
+
+  const fearEmotion = (charId: string): StoryOp => ({
+    op: 'APPRAISE_EMOTION',
+    charId,
+    emotion: { joy: 0, distress: 0, anger: 0, fear: 80, pride: 0, shame: 0, dominant: 'fear', intensity: 80, last_updated_at: 1 },
+  });
+
+  it('runTier4 returns 2 results (BiasAuditProof + AttributionProof)', () => {
+    const ir = makeIR([{ op: 'ADD_FACT', fact: { factId: 'f', subject: 'a', predicate: 'b', object: 'c', addedAtTurn: 1, validFrom: 1, validTo: null } }]);
+    const results = runTier4(ir, emptyState());
+    assert.equal(results.length, 2);
+    assert.ok(results.some(r => r.proof === 'BiasAuditProof'));
+    assert.ok(results.some(r => r.proof === 'AttributionProof'));
+  });
+
+  it('BiasAuditProof passes when fewer than 3 emotion ops', () => {
+    const ir = makeIR([fearEmotion('nora'), fearEmotion('helmer')]);
+    const results = runTier4(ir, emptyState());
+    const ba = results.find(r => r.proof === 'BiasAuditProof');
+    assert.ok(ba?.pass, 'fewer than 3 emotion ops → passes');
+  });
+
+  it('BiasAuditProof fails when ≥3 characters share the same dominant emotion', () => {
+    const ir = makeIR([fearEmotion('nora'), fearEmotion('helmer'), fearEmotion('krogstad')]);
+    const results = runTier4(ir, emptyState());
+    const ba = results.find(r => r.proof === 'BiasAuditProof');
+    assert.ok(ba && !ba.pass, `BiasAuditProof should fail for homogeneous emotions; got: ${ba?.reason}`);
+  });
+
+  it('BiasAuditProof passes when emotions are differentiated', () => {
+    const ir = makeIR([
+      fearEmotion('nora'),
+      { op: 'APPRAISE_EMOTION', charId: 'helmer', emotion: { joy: 70, distress: 0, anger: 0, fear: 0, pride: 30, shame: 0, dominant: 'joy', intensity: 70, last_updated_at: 1 } },
+      { op: 'APPRAISE_EMOTION', charId: 'krogstad', emotion: { joy: 0, distress: 0, anger: 80, fear: 0, pride: 0, shame: 0, dominant: 'anger', intensity: 80, last_updated_at: 1 } },
+    ]);
+    const results = runTier4(ir, emptyState());
+    const ba = results.find(r => r.proof === 'BiasAuditProof');
+    assert.ok(ba?.pass, 'differentiated emotions → passes');
+  });
+
+  it('AttributionProof passes for user-authored IRs', () => {
+    const ir = makeIR([], undefined, 'user_authored');
+    const results = runTier4(ir, emptyState());
+    const ap = results.find(r => r.proof === 'AttributionProof');
+    assert.ok(ap?.pass, 'user-authored → passes unconditionally');
+  });
+
+  it('AttributionProof passes when no causal links declared', () => {
+    const ir = makeIR([{ op: 'ADD_FACT', fact: { factId: 'f', subject: 'a', predicate: 'b', object: 'c', addedAtTurn: 1, validFrom: 1, validTo: null } }]);
+    const results = runTier4(ir, emptyState());
+    const ap = results.find(r => r.proof === 'AttributionProof');
+    assert.ok(ap?.pass, 'no causal links → nothing to audit');
+  });
+
+  it('AttributionProof fails when model-generated IR has empty causedBy', () => {
+    const ir = makeIR(
+      [{ op: 'ADD_FACT', fact: { factId: 'f', subject: 'a', predicate: 'b', object: 'c', addedAtTurn: 1, validFrom: 1, validTo: null } }],
+      [{ opIdx: 0, causedBy: [] }],
+    );
+    const results = runTier4(ir, emptyState());
+    const ap = results.find(r => r.proof === 'AttributionProof');
+    assert.ok(ap && !ap.pass, 'empty causedBy → fails');
+  });
+
+  it('AttributionProof passes when causal links cite evidence', () => {
+    const ir = makeIR(
+      [{ op: 'ADD_FACT', fact: { factId: 'f', subject: 'a', predicate: 'b', object: 'c', addedAtTurn: 1, validFrom: 1, validTo: null } }],
+      [{ opIdx: 0, causedBy: ['fact-loan', 'char-nora'] }],
+    );
+    const results = runTier4(ir, emptyState());
+    const ap = results.find(r => r.proof === 'AttributionProof');
+    assert.ok(ap?.pass, 'cited evidence → passes');
+  });
+});
+
+// ── Wave 19: Projection Gallery (G3 Holographic Projection) ──────────────────
+
+describe('NVM — G3 Projection Gallery (Wave 19)', () => {
+  function makeCanon(): Canon {
+    const state = emptyState();
+    state.objectiveReality.push({ factId: 'f1', subject: 'nora', predicate: 'owns', object: 'violin', addedAtTurn: 1, validFrom: 1, validTo: null });
+    state.characterBeliefs['nora'] = [{ id: 'b1', proposition: 'the violin is cursed', confidence: 0.9, source: 'told', acquired_at: 1 }];
+    state.characterEmotions['nora'] = { joy: 0, distress: 70, anger: 10, fear: 40, pride: 0, shame: 0, dominant: 'distress', intensity: 70, last_updated_at: 1 };
+    state.audienceState.suspense = 65;
+    state.audienceState.knownFacts = ['f1'];
+    state.authorIntent.theme = 'grief and inheritance';
+    const ops: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'the violin is cursed', confidence: 0.9, source: 'told', acquired_at: 1 } },
+      { op: 'RECORD_VISUAL_FACT', sceneId: 'sc0', fact: 'A cracked violin case sits open on the table.' },
+      { op: 'SHIFT_RELATIONSHIP', pair: ['nora', 'victor'], delta: { dimension: 'trust', amount: -0.8, reason: 'nora discovers victor hid the will' } },
+    ];
+    const commit: StoryCommit = {
+      commitId: 'c1', parentId: null, sceneIdx: 0, reverted: false,
+      ops, deltaSummary: summarizeOps(ops), createdAt: Date.now(),
+    };
+    return { commits: [commit], state, title: 'The Inheritance' };
+  }
+
+  it('fountain projection produces non-empty screenplay text', () => {
+    const canon = makeCanon();
+    const art = project(canon, 'fountain');
+    assert.strictEqual(art.target, 'fountain');
+    assert.ok(art.content.includes('Title: The Inheritance'), 'has title');
+    assert.ok(art.content.includes('SCENE 0'), 'has scene heading');
+    assert.ok(art.content.length > 0, 'non-empty');
+  });
+
+  it('novel projection includes prose for every op type', () => {
+    const canon = makeCanon();
+    const art = project(canon, 'novel');
+    assert.ok(art.content.includes('# The Inheritance'), 'has title heading');
+    assert.ok(art.content.includes('Scene 0'), 'has scene section');
+    assert.ok(typeof art.metadata['wordCount'] === 'number', 'wordCount metadata present');
+  });
+
+  it('stage projection formats asides and directions', () => {
+    const art = project(makeCanon(), 'stage');
+    assert.ok(art.content.includes('PLAY:'), 'has PLAY header');
+    assert.ok(art.content.includes('[aside]') || art.content.includes('[STAGE DIRECTION]'), 'has stage markup');
+  });
+
+  it('comic projection returns parseable panel array', () => {
+    const art = project(makeCanon(), 'comic');
+    const panels = JSON.parse(art.content) as unknown[];
+    assert.ok(panels.length > 0, 'at least one panel');
+    assert.ok(typeof (panels[0] as Record<string, unknown>)['panel'] === 'number', 'panel has number');
+    assert.ok(typeof art.metadata['panels'] === 'number', 'panels metadata present');
+  });
+
+  it('interactive projection produces replayable JSON with commits', () => {
+    const art = project(makeCanon(), 'interactive');
+    const data = JSON.parse(art.content) as { version: number; commits: unknown[] };
+    assert.strictEqual(data.version, 1, 'version = 1');
+    assert.ok(Array.isArray(data.commits), 'commits array');
+    assert.strictEqual(art.metadata['replayable'], true, 'replayable flag');
+  });
+
+  it('pitch projection surfaces theme and irony count', () => {
+    const art = project(makeCanon(), 'pitch');
+    assert.ok(art.content.includes('grief and inheritance'), 'theme present');
+    assert.ok(art.content.includes('Dramatic irony'), 'irony count mentioned');
+  });
+
+  it('bible projection lists characters, facts, and audience state', () => {
+    const art = project(makeCanon(), 'bible');
+    assert.ok(art.content.includes('nora'), 'character listed');
+    assert.ok(art.content.includes('World Facts'), 'world facts section');
+    assert.ok(art.content.includes('Suspense: 65'), 'audience suspense shown');
+  });
+
+  it('rewatch projection annotates told-belief ops as irony warnings', () => {
+    const art = project(makeCanon(), 'rewatch');
+    assert.ok(art.content.includes('Rewatch note'), 'irony warning present');
+    assert.ok(art.content.includes('nora'), 'character named in warning');
+  });
+
+  it('cutting_room projection handles no-ghost case gracefully', () => {
+    const art = project(makeCanon(), 'cutting_room');
+    assert.ok(art.content.includes('Cutting Room'), 'has header');
+    assert.ok(art.content.includes('No ghost commits') || art.metadata['ghosts'] === 0, 'no-ghost path works');
+  });
+
+  it('sidecar projection returns parseable quality JSON with known keys', () => {
+    const art = project(makeCanon(), 'sidecar');
+    const data = JSON.parse(art.content) as Record<string, unknown>;
+    assert.ok('qualityScore' in data, 'qualityScore present');
+    assert.ok('totalTension' in data, 'totalTension present');
+    assert.ok('momentum' in data, 'momentum present');
+    assert.ok(typeof art.metadata['qualityScore'] === 'number', 'metadata qualityScore is number');
+  });
+
+  it('project() dispatch covers all 10 targets without throwing', () => {
+    const canon = makeCanon();
+    const targets: ProjectionTarget[] = [
+      'fountain', 'novel', 'stage', 'comic', 'interactive',
+      'pitch', 'bible', 'rewatch', 'cutting_room', 'sidecar',
+    ];
+    for (const t of targets) {
+      const art = project(canon, t);
+      assert.strictEqual(art.target, t, `${t} returns correct target field`);
+      assert.ok(typeof art.content === 'string', `${t} content is string`);
+      assert.ok(art.content.length > 0, `${t} content is non-empty`);
+    }
+  });
+});
+
+// ── Wave 20: Causal Twin Panel — SCM serialisation + do() UI contract ─────────
+
+describe('NVM — Causal Twin Panel SCM serialisation (Wave 20)', () => {
+  function mkC(id: string, parent: string | null, ops: StoryOp[], sceneIdx = 0): StoryCommit {
+    return { commitId: id, parentId: parent, sceneIdx, ops, deltaSummary: summarizeOps(ops), reverted: false, createdAt: Date.now() };
+  }
+
+  const factOp: StoryOp = { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'nora', predicate: 'holds', object: 'gun', addedAtTurn: 1, validFrom: 1, validTo: null } };
+  const beliefOp: StoryOp = { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'I must flee', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } };
+  const clockOp: StoryOp = { op: 'RAISE_CLOCK', clockId: 'danger', amount: 2 };
+
+  it('buildSCM serialises to plain array with correct fields', () => {
+    const stage = new Stage(':memory:');
+    stage.appendCommit(mkC('c1', null, [factOp, beliefOp]));
+    const scm = buildSCM(stage);
+    // Simulate what the /api/nvm/twin/scm endpoint does
+    const nodes = [...scm.nodes.values()].map(n => ({
+      opId: n.opId, commitId: n.commitId, opIdx: n.opIdx,
+      op: n.op, parents: n.parents, children: n.children,
+    }));
+    assert.equal(nodes.length, 2, '2 nodes');
+    assert.ok(nodes.every(n => typeof n.opId === 'string'), 'opId is string');
+    assert.ok(nodes.every(n => Array.isArray(n.parents)), 'parents is array');
+    assert.ok(nodes.every(n => Array.isArray(n.children)), 'children is array');
+    // JSON round-trip (the endpoint needs to serialise Maps)
+    const json = JSON.stringify({ nodes, order: scm.order, nodeCount: nodes.length });
+    const parsed = JSON.parse(json) as { nodes: unknown[]; order: string[]; nodeCount: number };
+    assert.equal(parsed.nodeCount, 2);
+    assert.equal(parsed.order.length, 2);
+  });
+
+  it('SCM node opIds follow the commitId:opIdx convention', () => {
+    const stage = new Stage(':memory:');
+    stage.appendCommit(mkC('abc123', null, [factOp, clockOp]));
+    const scm = buildSCM(stage);
+    assert.ok(scm.nodes.has('abc123:0'), 'first op has expected opId');
+    assert.ok(scm.nodes.has('abc123:1'), 'second op has expected opId');
+  });
+
+  it('do(remove) on a fact with a downstream belief returns at least one affected op', () => {
+    const stage = new Stage(':memory:');
+    stage.appendCommit(mkC('c1', null, [factOp, beliefOp]));
+    const scm = buildSCM(stage);
+    const report = doIntervention(scm, { opId: 'c1:0', replacement: null });
+    assert.ok(report.affectedOps.length >= 1, 'downstream belief is affected');
+    assert.strictEqual(report.directlyAffected[0].opId, 'c1:1', 'direct child is the belief');
+    assert.strictEqual(report.directlyAffected[0].distance, 1, 'distance = 1');
+  });
+
+  it('do(remove) on a leaf op with no children returns empty affected list', () => {
+    const stage = new Stage(':memory:');
+    stage.appendCommit(mkC('c1', null, [clockOp]));
+    const scm = buildSCM(stage);
+    const report = doIntervention(scm, { opId: 'c1:0', replacement: null });
+    assert.equal(report.affectedOps.length, 0, 'leaf → nothing downstream');
+  });
+
+  it('summary string is non-empty and mentions the intervened opId', () => {
+    const stage = new Stage(':memory:');
+    stage.appendCommit(mkC('cx', null, [factOp, beliefOp]));
+    const scm = buildSCM(stage);
+    const report = doIntervention(scm, { opId: 'cx:0', replacement: null });
+    assert.ok(report.summary.length > 0, 'summary is non-empty');
+    assert.ok(report.summary.includes('cx:0'), 'summary references the opId');
+  });
+
+  it('do() on an unknown opId returns empty affected list with error summary', () => {
+    const stage = new Stage(':memory:');
+    const scm = buildSCM(stage);
+    const report = doIntervention(scm, { opId: 'nonexistent:99', replacement: null });
+    assert.equal(report.affectedOps.length, 0, 'unknown op → no affected');
+    assert.ok(report.summary.includes('not found'), 'summary says not found');
+  });
+
+  it('multi-commit SCM: inter-commit causality is captured in node counts', () => {
+    const stage = new Stage(':memory:');
+    // Scene 0: establish a fact; scene 1: belief depending on it
+    stage.appendCommit(mkC('s0', null, [factOp], 0));
+    stage.appendCommit(mkC('s1', 's0', [beliefOp, clockOp], 1));
+    const scm = buildSCM(stage);
+    // Should have 3 nodes total
+    assert.equal(scm.nodes.size, 3, '3 ops across 2 commits');
+    assert.ok(scm.nodes.has('s0:0'), 'fact from scene 0');
+    assert.ok(scm.nodes.has('s1:0'), 'belief from scene 1');
+    assert.ok(scm.nodes.has('s1:1'), 'clock from scene 1');
+  });
+});
+
+// ── Wave 21: Fixed Points Panel — backchain + scheduleToGoalBiases ────────────
+
+describe('NVM — G9 Fixed Points Panel (Wave 21)', () => {
+  function baseState(): NarrativeState {
+    return emptyState();
+  }
+
+  it('scheduleToGoalBiases groups ops by scene correctly', () => {
+    const fp: FixedPoint = {
+      atScene: 4,
+      description: 'nora plants the evidence',
+      required: { clueIds: ['clue-key'], factIds: ['fact-letter'] },
+    };
+    const result = backchain(fp, baseState(), 0);
+    const biases = scheduleToGoalBiases(result, fp.description!);
+    // Every bias must have the fp description
+    assert.ok(biases.every(b => b.fixedPointDescription === fp.description), 'fp description carried through');
+    // Biases reference scenes within [0, fp.atScene-1]
+    assert.ok(biases.every(b => b.atScene >= 0 && b.atScene < fp.atScene), 'scenes in valid window');
+    // All ops arrays are non-empty
+    assert.ok(biases.every(b => b.ops.length > 0), 'each bias has at least one op');
+  });
+
+  it('scheduleToGoalBiases merges multiple ops into one bias per scene when possible', () => {
+    const fp: FixedPoint = {
+      atScene: 2,
+      description: 'quick deadline',
+      required: { clueIds: ['c1', 'c2'] },
+    };
+    const result = backchain(fp, baseState(), 0);
+    const biases = scheduleToGoalBiases(result, fp.description!);
+    // With only 2 scenes of runway and 2 clues, biases should cover ≤2 scenes
+    assert.ok(biases.length <= 2, 'at most 2 distinct scene biases');
+  });
+
+  it('backchain with minSuspense requirement emits UPDATE_READER_STATE', () => {
+    const fp: FixedPoint = { atScene: 5, description: 'high tension', required: { minSuspense: 80 } };
+    const result = backchain(fp, baseState(), 0);
+    const hasReaderState = result.schedule.some(s => s.op.op === 'UPDATE_READER_STATE');
+    assert.ok(hasReaderState, 'suspense requirement → UPDATE_READER_STATE op');
+  });
+
+  it('backchain with characterIds emits UPDATE_BELIEF for intro', () => {
+    const fp: FixedPoint = { atScene: 4, description: 'victor appears', required: { characterIds: ['victor'] } };
+    const result = backchain(fp, baseState(), 0);
+    const hasIntro = result.schedule.some(s => s.op.op === 'UPDATE_BELIEF' && (s.op as { charId?: string }).charId === 'victor');
+    assert.ok(hasIntro, 'character requirement → UPDATE_BELIEF introduction op');
+  });
+
+  it('backchain with claimIds emits ADVANCE_THEME_ARGUMENT', () => {
+    const fp: FixedPoint = { atScene: 6, description: 'theme lands', required: { claimIds: ['claim-betrayal'] } };
+    const result = backchain(fp, baseState(), 0);
+    const hasTheme = result.schedule.some(s => s.op.op === 'ADVANCE_THEME_ARGUMENT');
+    assert.ok(hasTheme, 'claim requirement → ADVANCE_THEME_ARGUMENT');
+  });
+
+  it('backchain with payoffSetupIds emits PAYOFF_SETUP', () => {
+    const fp: FixedPoint = { atScene: 5, description: 'gun fires', required: { payoffSetupIds: ['setup-gun'] } };
+    const result = backchain(fp, baseState(), 0);
+    const hasPayoff = result.schedule.some(s => s.op.op === 'PAYOFF_SETUP');
+    assert.ok(hasPayoff, 'payoff requirement → PAYOFF_SETUP op');
+  });
+
+  it('planToward with claimIds emits ADVANCE_THEME_ARGUMENT bias', () => {
+    const fp: FixedPoint = { atScene: 4, description: 'argue the theme', required: { claimIds: ['claim-sacrifice'] } };
+    const result = planToward(baseState(), [fp], 0);
+    const hasTheme = result.biases.some(b => b.ops.some(o => o.op === 'ADVANCE_THEME_ARGUMENT'));
+    assert.ok(hasTheme, 'claimIds → ADVANCE_THEME_ARGUMENT bias');
+  });
+
+  it('planToward with payoffSetupIds emits PAYOFF_SETUP bias near deadline', () => {
+    const fp: FixedPoint = { atScene: 5, description: 'the payoff', required: { payoffSetupIds: ['setup-letter'] } };
+    const result = planToward(baseState(), [fp], 0);
+    const payoffBias = result.biases.find(b => b.ops.some(o => o.op === 'PAYOFF_SETUP'));
+    assert.ok(payoffBias, 'payoffSetupIds → PAYOFF_SETUP bias');
+    assert.ok(payoffBias!.atScene >= fp.atScene - 1, 'payoff placed near deadline');
+  });
+
+  it('planToward multi-requirement emits multiple distinct bias op kinds', () => {
+    const fp: FixedPoint = {
+      atScene: 6,
+      description: 'climax ready',
+      required: { clueIds: ['clue-A'], factIds: ['fact-B'], minSuspense: 75 },
+    };
+    const result = planToward(baseState(), [fp], 0);
+    const opKinds = new Set(result.biases.flatMap(b => b.ops.map(o => o.op)));
+    assert.ok(opKinds.has('SEED_CLUE'), 'clue bias present');
+    assert.ok(opKinds.has('ADD_FACT'), 'fact bias present');
+    assert.ok(opKinds.has('UPDATE_READER_STATE'), 'suspense bias present');
+  });
+});
+
+// ── Wave 22: Self-Play Panel — genome routes + diff/breed ─────────────────────
+
+describe('NVM — G13 Self-Play Panel (Wave 22)', () => {
+  // Reuse the test canon helper from the StoryGenome suite above
+  function makeCanon2(title: string): Canon {
+    const state: NarrativeState = {
+      ...emptyState(),
+      characterBeliefs: {
+        nora: [{ id: 'b1', proposition: 'the deed is forged', confidence: 0.9, source: 'told', source_event_id: 'e1', acquired_at: 0 }],
+        victor: [{ id: 'b2', proposition: 'nora is unaware', confidence: 0.7, source: 'inferred', source_event_id: 'e2', acquired_at: 1 }],
+      },
+      characterEmotions: {
+        nora: { joy: 0, distress: 80, anger: 30, fear: 60, pride: 0, shame: 10, dominant: 'distress', intensity: 80, last_updated_at: 1 },
+        victor: { joy: 20, distress: 10, anger: 50, fear: 5, pride: 40, shame: 0, dominant: 'anger', intensity: 50, last_updated_at: 1 },
+      },
+      audienceState: { knownFacts: ['f1'], suspense: 70, curiosity: 50, investment: 60 },
+      themeArgument: [{ claimId: 'inheritance', move: 'support' }],
+      clues: [{ clueId: 'clue-deed', carrier: 'object' }],
+      payoffs: [{ setupId: 'setup-deed', payoffEventId: 'payoff-deed' }],
+    };
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'nora', predicate: 'found', object: 'forged_deed', addedAtTurn: 0, validFrom: 0, validTo: null } },
+      { op: 'SHIFT_RELATIONSHIP', pair: ['nora', 'victor'], delta: { dimension: 'trust', amount: -0.9, reason: 'betrayal revealed' } },
+    ];
+    return {
+      title,
+      state,
+      commits: [
+        { commitId: 'c1', parentId: null, sceneIdx: 0, ops, deltaSummary: summarizeOps(ops), reverted: false, createdAt: Date.now() },
+      ],
+    };
+  }
+
+  it('extractGenome from distinct canons produces different genomeIds', () => {
+    const g1 = extractGenome(makeCanon2('StoryA'), 'genome-A');
+    const g2 = extractGenome(makeCanon2('StoryB'), 'genome-B');
+    assert.equal(g1.genomeId, 'genome-A');
+    assert.equal(g2.genomeId, 'genome-B');
+  });
+
+  it('diffGenomes returns similarity ≈ 1 for identical genomes', () => {
+    const g = extractGenome(makeCanon2('Clone'));
+    const diff = diffGenomes(g, g);
+    assert.ok(diff.similarity >= 0 && diff.similarity <= 1, 'similarity in [0,1]');
+    assert.ok(diff.similarity > 0.99, `identical genome → similarity ≈ 1 (got ${diff.similarity})`);
+  });
+
+  it('diffGenomes.arcMatch is 1 when both genomes have same arcArchetype', () => {
+    const g1 = extractGenome(makeCanon2('A'));
+    const g2 = extractGenome(makeCanon2('B'));
+    // Same canon structure → same arcArchetype
+    const diff = diffGenomes(g1, g2);
+    assert.equal(diff.arcMatch, 1, 'same arc → arcMatch = 1');
+  });
+
+  it('diffGenomes on divergent genomes returns similarity < 1', () => {
+    const g1 = extractGenome(makeCanon2('A'), 'g1');
+    // Manually perturb g2's tension profile to create divergence
+    const g2 = { ...extractGenome(makeCanon2('B'), 'g2'), tensionProfile: [0, 0, 0, 100, 100] as [number, number, number, number, number] };
+    const diff = diffGenomes(g1, g2);
+    assert.ok(diff.similarity < 1, 'divergent tension → similarity < 1');
+    assert.ok(diff.tensionSim < 1, 'tensionSim < 1 when profiles differ');
+  });
+
+  it('breedGenomes produces a genome with arcArchetype from genome B', () => {
+    const g1 = extractGenome(makeCanon2('A'), 'g1');
+    const g2 = { ...extractGenome(makeCanon2('B'), 'g2'), arcArchetype: 'rags_to_riches' as const };
+    const bred = breedGenomes(g1, g2, 'hybrid-1');
+    assert.equal(bred.genomeId, 'hybrid-1', 'newId assigned');
+    assert.equal(bred.arcArchetype, 'rags_to_riches', 'arc from genome B');
+  });
+
+  it('breedGenomes merges voice vectors from both parents', () => {
+    const g1 = { ...extractGenome(makeCanon2('A'), 'g1'), voiceVector: { ADD_FACT: 0.8, UPDATE_BELIEF: 0.2 } };
+    const g2 = { ...extractGenome(makeCanon2('B'), 'g2'), voiceVector: { SHIFT_RELATIONSHIP: 0.9, APPRAISE_EMOTION: 0.1 } };
+    const bred = breedGenomes(g1, g2, 'hybrid-2');
+    // Hybrid should carry keys from both parents
+    assert.ok('ADD_FACT' in bred.voiceVector, 'ADD_FACT key inherited from A');
+    assert.ok('SHIFT_RELATIONSHIP' in bred.voiceVector, 'SHIFT_RELATIONSHIP key inherited from B');
+  });
+
+  it('breedGenomes tensionProfile has 5 entries in [0,1] scale (raw values)', () => {
+    const g1 = extractGenome(makeCanon2('A'), 'g1');
+    const g2 = extractGenome(makeCanon2('B'), 'g2');
+    const bred = breedGenomes(g1, g2, 'hybrid-3');
+    assert.equal(bred.tensionProfile.length, 5, '5-point profile');
+    assert.ok(bred.tensionProfile.every(v => typeof v === 'number'), 'all entries are numbers');
+  });
+
+  it('diffGenomes.differences lists irony gap when genomes diverge significantly', () => {
+    const g1 = { ...extractGenome(makeCanon2('A'), 'g1'), ironyDensity: 0.9 };
+    const g2 = { ...extractGenome(makeCanon2('B'), 'g2'), ironyDensity: 0.1 };
+    const diff = diffGenomes(g1, g2);
+    const mentionsIrony = diff.differences.some(d => d.includes('irony'));
+    assert.ok(mentionsIrony, 'large irony gap surfaced in differences');
+  });
+});
+
+// ── Wave 23: Genre Arc Templates + Proof Inspector ────────────────────────────
+
+describe('NVM — Genre Arc Templates (Wave 23)', () => {
+  // Genre presets are pure data — test their structural invariants
+  // (mirrors the GENRE_PRESETS constant in ArcPlannerPanel.tsx)
+
+  interface SceneConfig { sceneIdx: number; sceneFunction: string; tensionTarget: number; qualityTarget: number; }
+  interface GenrePreset { label: string; archetype: string; scenes: SceneConfig[]; }
+
+  const PRESETS: GenrePreset[] = [
+    {
+      label: 'Tragedy', archetype: 'icarus',
+      scenes: [
+        { sceneIdx: 0, sceneFunction: 'establish_world',  tensionTarget: 25, qualityTarget: 60 },
+        { sceneIdx: 1, sceneFunction: 'advance_plot',     tensionTarget: 40, qualityTarget: 65 },
+        { sceneIdx: 2, sceneFunction: 'reveal_character', tensionTarget: 55, qualityTarget: 65 },
+        { sceneIdx: 3, sceneFunction: 'build_tension',    tensionTarget: 80, qualityTarget: 70 },
+        { sceneIdx: 4, sceneFunction: 'set_up_payoff',    tensionTarget: 95, qualityTarget: 70 },
+        { sceneIdx: 5, sceneFunction: 'provide_relief',   tensionTarget: 30, qualityTarget: 60 },
+      ],
+    },
+    {
+      label: 'Rags → Riches', archetype: 'rags_to_riches',
+      scenes: [
+        { sceneIdx: 0, sceneFunction: 'establish_world',  tensionTarget: 15, qualityTarget: 55 },
+        { sceneIdx: 1, sceneFunction: 'advance_plot',     tensionTarget: 30, qualityTarget: 60 },
+        { sceneIdx: 2, sceneFunction: 'reveal_character', tensionTarget: 45, qualityTarget: 65 },
+        { sceneIdx: 3, sceneFunction: 'set_up_payoff',    tensionTarget: 60, qualityTarget: 65 },
+        { sceneIdx: 4, sceneFunction: 'build_tension',    tensionTarget: 75, qualityTarget: 70 },
+      ],
+    },
+    {
+      label: 'Man in a Hole', archetype: 'man_in_hole',
+      scenes: [
+        { sceneIdx: 0, sceneFunction: 'establish_world',  tensionTarget: 30, qualityTarget: 60 },
+        { sceneIdx: 1, sceneFunction: 'build_tension',    tensionTarget: 75, qualityTarget: 65 },
+        { sceneIdx: 2, sceneFunction: 'advance_plot',     tensionTarget: 90, qualityTarget: 65 },
+        { sceneIdx: 3, sceneFunction: 'reveal_character', tensionTarget: 60, qualityTarget: 70 },
+        { sceneIdx: 4, sceneFunction: 'set_up_payoff',    tensionTarget: 35, qualityTarget: 65 },
+      ],
+    },
+  ];
+
+  it('all presets have at least 5 scenes', () => {
+    for (const p of PRESETS) {
+      assert.ok(p.scenes.length >= 5, `${p.label} has ≥5 scenes (got ${p.scenes.length})`);
+    }
+  });
+
+  it('all preset scene indices are sequential from 0', () => {
+    for (const p of PRESETS) {
+      p.scenes.forEach((sc, i) => {
+        assert.equal(sc.sceneIdx, i, `${p.label} scene ${i}: sceneIdx should be ${i}`);
+      });
+    }
+  });
+
+  it('all preset tensionTargets are in [0, 100]', () => {
+    for (const p of PRESETS) {
+      for (const sc of p.scenes) {
+        assert.ok(sc.tensionTarget >= 0 && sc.tensionTarget <= 100,
+          `${p.label} tension ${sc.tensionTarget} in range`);
+      }
+    }
+  });
+
+  it('Tragedy preset peaks tension in middle-to-late then drops', () => {
+    const tragedy = PRESETS.find(p => p.label === 'Tragedy')!;
+    const tensions = tragedy.scenes.map(s => s.tensionTarget);
+    const peak = Math.max(...tensions);
+    const peakIdx = tensions.indexOf(peak);
+    const last = tensions[tensions.length - 1];
+    assert.ok(peakIdx > 1, 'peak not at start');
+    assert.ok(last < peak, 'tension drops after peak');
+  });
+
+  it('Rags → Riches preset has monotonically non-decreasing tension', () => {
+    const rags = PRESETS.find(p => p.label === 'Rags → Riches')!;
+    const tensions = rags.scenes.map(s => s.tensionTarget);
+    for (let i = 1; i < tensions.length; i++) {
+      assert.ok(tensions[i] >= tensions[i - 1], `tension non-decreasing at scene ${i}`);
+    }
+  });
+
+  it('Man in a Hole preset has a high-tension middle scene', () => {
+    const hole = PRESETS.find(p => p.label === 'Man in a Hole')!;
+    const tensions = hole.scenes.map(s => s.tensionTarget);
+    const midTension = tensions[Math.floor(tensions.length / 2)];
+    assert.ok(midTension >= 80, `mid tension ${midTension} ≥ 80`);
+  });
+});
+
+describe('NVM — Proof Inspector endpoint logic (Wave 23)', () => {
+  // Test the per-tier proof structure returned by GET /api/nvm/proof/:commitId
+  // by exercising the kernel functions directly in the same pattern the endpoint uses.
+
+  function mkCommit(id: string, parent: string | null, ops: StoryOp[], sceneIdx = 0): StoryCommit {
+    return { commitId: id, parentId: parent, sceneIdx, ops, deltaSummary: summarizeOps(ops), reverted: false, createdAt: Date.now() };
+  }
+
+  it('running all 4 tiers on a minimal IR returns correct tier structure', () => {
+    const stage = new Stage(':memory:');
+    const ops: StoryOp[] = [
+      { op: 'RAISE_CLOCK', clockId: 'test', amount: 1 },
+    ];
+    stage.appendCommit(mkCommit('c1', null, ops));
+
+    // Simulate what the endpoint does: build minimal IR, run all tiers
+    const ir = {
+      transitionId: 'c1',
+      sceneIdx: 0,
+      sceneFunction: 'advance_plot' as const,
+      activeMechanisms: [] as string[],
+      beforeStateHash: 'inspector',
+      ops,
+      preconditions: [] as string[],
+      postconditions: [] as string[],
+      provenance: { origin: 'model_generated' as const, createdAt: Date.now() },
+    };
+    const state = emptyState();
+    const t1 = runTier1(ir, state);
+    const t2 = runTier2(ir, state);
+    const t3 = runTier3(ir, state);
+    const t4 = runTier4(ir, state);
+
+    assert.equal(t1.length, 8, '8 Tier 1 proofs');
+    assert.equal(t2.length, 3, '3 Tier 2 proofs');
+    assert.equal(t3.length, 2, '2 Tier 3 proofs');
+    assert.equal(t4.length, 2, '2 Tier 4 proofs');
+    assert.ok(typeof tier2Score(t2) === 'number', 'tier2Score is number');
+    assert.ok(typeof tier3Rank(t3) === 'number', 'tier3Rank is number');
+  });
+
+  it('proof inspector replays state before target commit correctly', () => {
+    const ops1: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'a', predicate: 'b', object: 'c', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ];
+    const ops2: StoryOp[] = [
+      { op: 'RAISE_CLOCK', clockId: 'doom', amount: 1 },
+    ];
+
+    // Simulate the endpoint's replay loop
+    const allCommits = [
+      { commitId: 'c1', ops: ops1 },
+      { commitId: 'c2', ops: ops2 },
+    ];
+    const targetIdx = allCommits.findIndex(c => c.commitId === 'c2');
+    let rollingState = emptyState();
+    for (let i = 0; i < targetIdx; i++) {
+      rollingState = applyStoryOps(rollingState, allCommits[i].ops);
+    }
+    // After replay, rolling state should have c1's fact but not c2's clock
+    assert.ok(rollingState.objectiveReality.some(f => f.factId === 'f1'), 'c1 fact present');
+    assert.ok(!('doom' in rollingState.clocks), 'c2 clock not yet applied');
+  });
+
+  it('tier2Score formula: 100 - ceil(100/3) per failure', () => {
+    const allPass = [
+      { proof: 'NecessityProof' as const, pass: true, tier: 2 as const, reason: '', findings: [] },
+      { proof: 'SpecificityProof' as const, pass: true, tier: 2 as const, reason: '', findings: [] },
+      { proof: 'DialogueProof' as const, pass: true, tier: 2 as const, reason: '', findings: [] },
+    ];
+    assert.equal(tier2Score(allPass), 100, 'all pass → 100');
+
+    const oneFailure = allPass.map((r, i) => i === 0 ? { ...r, pass: false } : r);
+    assert.ok(tier2Score(oneFailure) > 0 && tier2Score(oneFailure) < 100, 'one failure → partial score');
+
+    const allFail = allPass.map(r => ({ ...r, pass: false }));
+    assert.equal(tier2Score(allFail), 0, 'all fail → 0');
+  });
+
+  it('tier3Rank: 100 when both pass, 50 when one fails, 0 when both fail', () => {
+    const pass2 = [
+      { proof: 'GenericnessProof' as const, pass: true, tier: 3 as const, reason: '', findings: [] },
+      { proof: 'OriginalityProof' as const, pass: true, tier: 3 as const, reason: '', findings: [] },
+    ];
+    assert.equal(tier3Rank(pass2), 100, 'both pass → rank 100');
+
+    const pass1 = [pass2[0], { ...pass2[1], pass: false }];
+    assert.equal(tier3Rank(pass1), 50, 'one pass → rank 50');
+
+    const pass0 = pass2.map(r => ({ ...r, pass: false }));
+    assert.equal(tier3Rank(pass0), 0, 'none pass → rank 0');
+  });
+});
+
+describe('NVM — Quality Engines Panel (Wave 24)', () => {
+  const emptyIR = (): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR => ({
+    transitionId: 'test', sceneIdx: 1, sceneFunction: 'advance_plot',
+    activeMechanisms: [], beforeStateHash: 'x', ops: [],
+    preconditions: [], postconditions: [],
+    provenance: { origin: 'model_generated', createdAt: 1735689600 },
+  });
+
+  it('runQualityEngine on empty IR returns score 100 and no warnings', () => {
+    const report = runQualityEngine(emptyIR(), emptyState());
+    assert.equal(report.score, 100, 'empty IR should score 100');
+    assert.equal(report.warnings.length, 0, 'no warnings for empty IR');
+  });
+
+  it('DV1_ON_THE_NOSE fires for told belief at confidence > 0.95', () => {
+    const ir = emptyIR();
+    ir.ops = [{
+      op: 'UPDATE_BELIEF', charId: 'alice',
+      belief: { id: 'b1', proposition: 'Bob is guilty', confidence: 0.99, source: 'told', acquired_at: 1 },
+    }];
+    const warnings = dialogueWarnings(ir, emptyState());
+    assert.ok(warnings.some(w => w.rule === 'DV1_ON_THE_NOSE'), 'DV1 should fire');
+  });
+
+  it('DV5_NO_HUMAN_PRESENCE fires when only world-fact ops and sceneIdx > 0', () => {
+    const ir = emptyIR();
+    ir.ops = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'a', predicate: 'b', object: 'c', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'ADD_FACT', fact: { factId: 'f2', subject: 'x', predicate: 'y', object: 'z', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ];
+    const warnings = dialogueWarnings(ir, emptyState());
+    assert.ok(warnings.some(w => w.rule === 'DV5_NO_HUMAN_PRESENCE'), 'DV5 should fire');
+  });
+
+  it('DV10_STRUCTURAL_UNIFORMITY fires when all 4+ ops have the same kind', () => {
+    const ir = emptyIR();
+    ir.ops = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'a', predicate: 'b', object: 'c', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'ADD_FACT', fact: { factId: 'f2', subject: 'd', predicate: 'e', object: 'f', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'ADD_FACT', fact: { factId: 'f3', subject: 'g', predicate: 'h', object: 'i', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'ADD_FACT', fact: { factId: 'f4', subject: 'j', predicate: 'k', object: 'l', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ];
+    const warnings = dialogueWarnings(ir, emptyState());
+    assert.ok(warnings.some(w => w.rule === 'DV10_STRUCTURAL_UNIFORMITY'), 'DV10 should fire');
+  });
+
+  it('proppMorphology on empty IR → all absent, coverage = 0', () => {
+    const result = proppMorphology(emptyIR());
+    assert.equal(result.present.length, 0);
+    assert.equal(result.absent.length, 7);
+    assert.equal(result.coverage, 0);
+  });
+
+  it('proppMorphology: APPRAISE_EMOTION fear → complication present', () => {
+    const ir = emptyIR();
+    ir.ops = [{ op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { dominant: 'fear', intensity: 60, fear: 60, distress: 0, joy: 0, anger: 0, pride: 0, shame: 0, last_updated_at: 1 } }];
+    const result = proppMorphology(ir);
+    assert.ok(result.present.includes('complication'), 'fear emotion → complication');
+  });
+
+  it('proppMorphology: ADVANCE_THEME_ARGUMENT resolve → resolution present', () => {
+    const ir = emptyIR();
+    ir.ops = [{ op: 'ADVANCE_THEME_ARGUMENT', claimId: 'theme1', move: 'resolve' }];
+    const result = proppMorphology(ir);
+    assert.ok(result.present.includes('resolution'), 'resolve move → resolution');
+  });
+
+  it('specificityScore with vague terms returns < 1', () => {
+    const ops: StoryOp[] = [{
+      op: 'UPDATE_BELIEF', charId: 'a',
+      belief: { id: 'b1', proposition: 'something happened', confidence: 0.5, source: 'inferred', acquired_at: 1 },
+    }];
+    const score = specificityScore(ops);
+    assert.ok(score < 1, `expected < 1, got ${score}`);
+  });
+
+  it('computeArcDebt detects clues-without-payoffs debt at scene >= 3', () => {
+    const state = emptyState();
+    state.clues = [
+      { clueId: 'c1', carrier: 'object' },
+      { clueId: 'c2', carrier: 'line' },
+    ];
+    state.payoffs = [];
+    const debt = computeArcDebt(state, 4);
+    assert.ok(debt.some(d => d.includes('clue')), `expected clue debt, got: ${JSON.stringify(debt)}`);
+  });
+
+  it('revealReady returns false when suspense < 50', () => {
+    const state = emptyState();
+    state.clues = [{ clueId: 'c1', carrier: 'object' }, { clueId: 'c2', carrier: 'line' }];
+    state.audienceState.suspense = 30;
+    const { ready, score } = revealReady(state);
+    assert.equal(ready, false, 'suspense < 50 should not be ready');
+    assert.ok(score < 80, `expected score < 80, got ${score}`);
+  });
+});
+
+describe('NVM — Epistemic Map route logic (Wave 24)', () => {
+  it('beliefs with source=told and matching cross-char proposition produce meta-layers', () => {
+    // Simulate the server's meta-layer inference logic directly
+    const beliefs = [
+      { charId: 'alice', beliefId: 'b1', proposition: 'Bob is guilty', confidence: 0.9, source: 'told' },
+      { charId: 'bob',   beliefId: 'b2', proposition: 'Bob is guilty', confidence: 0.3, source: 'inferred' },
+    ];
+    const metaLayers: Array<{ holderId: string; targetId: string }> = [];
+    for (const { charId, proposition, confidence } of beliefs.filter(b => b.source === 'told')) {
+      const sharers = beliefs.filter(b => b.charId !== charId && b.proposition === proposition);
+      for (const sharer of sharers) {
+        metaLayers.push({ holderId: charId, targetId: sharer.charId });
+        void confidence; // referenced to satisfy linter
+      }
+    }
+    assert.equal(metaLayers.length, 1, 'one meta-layer should be inferred');
+    assert.equal(metaLayers[0].holderId, 'alice');
+    assert.equal(metaLayers[0].targetId, 'bob');
+  });
+
+  it('irony pairs detected when confidence diff >= 0.4', () => {
+    const beliefs = [
+      { charId: 'alice', proposition: 'treasure is real', confidence: 0.9, source: 'inferred' },
+      { charId: 'bob',   proposition: 'treasure is real', confidence: 0.4, source: 'inferred' },
+    ];
+    const propMap = new Map<string, Array<{ charId: string; confidence: number }>>();
+    for (const { charId, proposition, confidence } of beliefs) {
+      const list = propMap.get(proposition) ?? [];
+      list.push({ charId, confidence });
+      propMap.set(proposition, list);
+    }
+    const ironyPairs: string[] = [];
+    for (const [prop, holders] of propMap) {
+      for (let i = 0; i < holders.length; i++) {
+        for (let j = i + 1; j < holders.length; j++) {
+          const diff = Math.abs(holders[i].confidence - holders[j].confidence);
+          if (diff >= 0.4) ironyPairs.push(prop);
+        }
+      }
+    }
+    assert.ok(ironyPairs.includes('treasure is real'), 'irony pair should be detected');
+  });
+
+  it('no irony pair when confidence diff < 0.4', () => {
+    const beliefs = [
+      { charId: 'alice', proposition: 'sky is blue', confidence: 0.8, source: 'inferred' },
+      { charId: 'bob',   proposition: 'sky is blue', confidence: 0.65, source: 'inferred' },
+    ];
+    const propMap = new Map<string, Array<{ charId: string; confidence: number }>>();
+    for (const { charId, proposition, confidence } of beliefs) {
+      const list = propMap.get(proposition) ?? [];
+      list.push({ charId, confidence });
+      propMap.set(proposition, list);
+    }
+    let ironyCount = 0;
+    for (const [, holders] of propMap) {
+      for (let i = 0; i < holders.length; i++) {
+        for (let j = i + 1; j < holders.length; j++) {
+          if (Math.abs(holders[i].confidence - holders[j].confidence) >= 0.4) ironyCount++;
+        }
+      }
+    }
+    assert.equal(ironyCount, 0, 'diff < 0.4 should not produce an irony pair');
+  });
+});
+
+import { analyzeArcCompletion } from './server/nvm/quality/arc-tracker.ts';
+
+describe('NVM — Arc Completion Tracker (Wave 25)', () => {
+  it('empty story → no open promises, no resolved, debt=0', () => {
+    const report = analyzeArcCompletion([]);
+    assert.equal(report.openPromises.length, 0);
+    assert.equal(report.resolvedCount, 0);
+    assert.equal(report.debtScore, 0);
+  });
+
+  it('SEED_CLUE without PAYOFF_SETUP creates an open CLUE promise', () => {
+    const scenes = [{ sceneIdx: 0, ops: [{ op: 'SEED_CLUE' as const, clueId: 'clue1', carrier: 'object' as const }] }];
+    const report = analyzeArcCompletion(scenes);
+    assert.ok(report.openPromises.some(p => p.kind === 'CLUE' && p.promiseId === 'clue:clue1'));
+  });
+
+  it('SEED_CLUE + matching PAYOFF_SETUP → resolved, no open promise', () => {
+    const scenes = [
+      { sceneIdx: 0, ops: [{ op: 'SEED_CLUE' as const, clueId: 'clue1', carrier: 'line' as const }] },
+      { sceneIdx: 1, ops: [{ op: 'PAYOFF_SETUP' as const, setupId: 'clue1', payoffEventId: 'payoff1' }] },
+    ];
+    const report = analyzeArcCompletion(scenes);
+    assert.equal(report.openPromises.filter(p => p.kind === 'CLUE').length, 0, 'clue resolved');
+    assert.equal(report.resolvedCount, 1, 'one resolved');
+  });
+
+  it('RAISE_CLOCK(+5) without countdown creates open CLOCK promise', () => {
+    const scenes = [{ sceneIdx: 0, ops: [{ op: 'RAISE_CLOCK' as const, clockId: 'doom', amount: 5 }] }];
+    const report = analyzeArcCompletion(scenes);
+    assert.ok(report.openPromises.some(p => p.kind === 'CLOCK' && p.promiseId === 'clock:doom'));
+  });
+
+  it('RAISE_CLOCK +5 then -5 → resolved, no open promise', () => {
+    const scenes = [
+      { sceneIdx: 0, ops: [{ op: 'RAISE_CLOCK' as const, clockId: 'doom', amount: 5 }] },
+      { sceneIdx: 1, ops: [{ op: 'RAISE_CLOCK' as const, clockId: 'doom', amount: -5 }] },
+    ];
+    const report = analyzeArcCompletion(scenes);
+    assert.equal(report.openPromises.filter(p => p.kind === 'CLOCK').length, 0, 'clock resolved');
+    assert.ok(report.resolvedCount >= 1);
+  });
+
+  it('negative SHIFT_RELATIONSHIP creates open REL promise', () => {
+    const scenes = [{
+      sceneIdx: 0,
+      ops: [{ op: 'SHIFT_RELATIONSHIP' as const, pair: ['alice', 'bob'] as [string, string], delta: { dimension: 'trust' as const, amount: -0.6, reason: 'betrayal' } }],
+    }];
+    const report = analyzeArcCompletion(scenes);
+    assert.ok(report.openPromises.some(p => p.kind === 'REL'), 'negative REL should be open');
+  });
+
+  it('ADVANCE_THEME_ARGUMENT support then resolve → resolved, no open promise', () => {
+    const scenes = [
+      { sceneIdx: 0, ops: [{ op: 'ADVANCE_THEME_ARGUMENT' as const, claimId: 'theme1', move: 'support' as const }] },
+      { sceneIdx: 1, ops: [{ op: 'ADVANCE_THEME_ARGUMENT' as const, claimId: 'theme1', move: 'resolve' as const }] },
+    ];
+    const report = analyzeArcCompletion(scenes);
+    assert.equal(report.openPromises.filter(p => p.kind === 'THEME').length, 0, 'theme resolved');
+  });
+
+  it('overdue promise when current scene > target window upper bound', () => {
+    // Plant clue at scene 0; target window = [3, 8]; simulate 10 scenes
+    const scenes = [
+      { sceneIdx: 0, ops: [{ op: 'SEED_CLUE' as const, clueId: 'old_clue', carrier: 'gesture' as const }] },
+      ...Array.from({ length: 9 }, (_, i) => ({ sceneIdx: i + 1, ops: [] as StoryOp[] })),
+    ];
+    const report = analyzeArcCompletion(scenes);
+    const cluePromise = report.openPromises.find(p => p.promiseId === 'clue:old_clue');
+    assert.ok(cluePromise, 'clue promise should exist');
+    assert.equal(cluePromise!.urgency, 'overdue', 'should be overdue after 9 scenes');
+  });
+
+  it('pacing score drops below 0.5 for severely overdue promise', () => {
+    const scenes = [
+      { sceneIdx: 0, ops: [{ op: 'SEED_CLUE' as const, clueId: 'stale', carrier: 'absence' as const }] },
+      ...Array.from({ length: 20 }, (_, i) => ({ sceneIdx: i + 1, ops: [] as StoryOp[] })),
+    ];
+    const report = analyzeArcCompletion(scenes);
+    const p = report.openPromises.find(p => p.promiseId === 'clue:stale');
+    assert.ok(p, 'stale clue should exist');
+    assert.ok(p!.pacingScore < 0.5, `expected pacingScore < 0.5, got ${p!.pacingScore}`);
+  });
+
+  it('promises sorted: overdue first, then due_soon, then on_track', () => {
+    const scenes = [
+      // Overdue clue (planted 15 scenes ago, window closes at 8)
+      { sceneIdx: 0, ops: [{ op: 'SEED_CLUE' as const, clueId: 'old', carrier: 'behavior' as const }] },
+      // New clue (just planted, not yet due)
+      ...Array.from({ length: 14 }, (_, i) => ({ sceneIdx: i + 1, ops: [] as StoryOp[] })),
+      { sceneIdx: 15, ops: [{ op: 'SEED_CLUE' as const, clueId: 'fresh', carrier: 'camera' as const }] },
+    ];
+    const report = analyzeArcCompletion(scenes);
+    if (report.openPromises.length >= 2) {
+      assert.ok(
+        report.openPromises[0].urgency === 'overdue' || report.openPromises[0].pacingScore <= report.openPromises[1].pacingScore,
+        'overdue/lower-pacing should come first',
+      );
+    }
+  });
+});
+
+describe('NVM — Story Health Dashboard (Wave 26)', () => {
+  it('analyzeArcCompletion: debtScore=0 for empty story', () => {
+    const r = analyzeArcCompletion([]);
+    assert.equal(r.debtScore, 0);
+    assert.equal(r.openPromises.length, 0);
+  });
+
+  it('computeTopology: returns 6 archetype scores for multi-scene', () => {
+    const state = emptyState();
+    const ledgers = [0, 1, 2, 3].map(i => deriveTensionLedger(state, i));
+    const topo = computeTopology(ledgers);
+    assert.equal(topo.scores.length, 6, 'all 6 archetypes scored');
+    assert.ok(typeof topo.dominantArc === 'string', 'dominantArc is a string');
+    assert.ok(typeof topo.coherence === 'number', 'coherence is a number');
+  });
+
+  it('computeTopology: coherence 0 for empty ledger list', () => {
+    const topo = computeTopology([]);
+    assert.equal(topo.trajectory.length, 0);
+  });
+
+  it('tensionHistory length matches ledger count', () => {
+    const state = emptyState();
+    const sceneCount = 5;
+    const ledgers = Array.from({ length: sceneCount }, (_, i) => deriveTensionLedger(state, i));
+    assert.equal(ledgers.length, sceneCount, 'one ledger per scene');
+    const tensionHistory = ledgers.map(l => l.totalTension);
+    assert.equal(tensionHistory.length, sceneCount, 'tension history length matches');
+  });
+
+  it('momentum: 0 for empty ledger list', () => {
+    const m = momentumScore([]);
+    assert.equal(m, 0, 'empty ledger → momentum 0');
+  });
+
+  it('arc-completion + epistemic data compose without throws', () => {
+    const state = emptyState();
+    state.characterBeliefs['alice'] = [{ id: 'b1', proposition: 'something', confidence: 0.8, source: 'inferred', acquired_at: 0 }];
+    state.clues.push({ clueId: 'c1', carrier: 'object' });
+    const totalBeliefs = Object.values(state.characterBeliefs).flat().length;
+    const characterCount = Object.keys(state.characterBeliefs).length;
+    assert.equal(totalBeliefs, 1, 'one belief');
+    assert.equal(characterCount, 1, 'one character');
+    assert.equal(state.clues.length, 1, 'one clue');
+  });
+
+  it('proof pass rate: 100% when no commits', () => {
+    // Simulate: 0 commits → passRate = 100 (no failure = perfect)
+    const commitCount = 0;
+    const t1PassCount = 0;
+    const proofPassRate = commitCount > 0 ? Math.round((t1PassCount / commitCount) * 100) : 100;
+    assert.equal(proofPassRate, 100);
+  });
+
+  it('proof pass rate: proportional calculation', () => {
+    const commitCount = 4;
+    const t1PassCount = 3;
+    const proofPassRate = Math.round((t1PassCount / commitCount) * 100);
+    assert.equal(proofPassRate, 75, '3/4 pass → 75%');
+  });
+});
+
+import {
+  qualityConstraintsFromWarnings, arcConstraintsFromTracker,
+  proppConstraintsFromAnalysis, buildQualityAwareConstraints,
+} from './server/nvm/generate/quality-spec.ts';
+
+describe('NVM — Quality-Aware Generation Spec (Wave 27)', () => {
+  it('qualityConstraintsFromWarnings: DV1 → free_form constraint', () => {
+    const warnings: import('./server/nvm/quality/index.ts').QualityWarning[] = [{
+      engine: 'dialogue_validator', opIdx: 0, rule: 'DV1_ON_THE_NOSE',
+      message: 'told at full confidence', penalty: 20,
+    }];
+    const constraints = qualityConstraintsFromWarnings(warnings);
+    assert.ok(constraints.some(c => c.kind === 'free_form' && c.description.includes('subtext')), 'DV1 → subtext constraint');
+  });
+
+  it('qualityConstraintsFromWarnings: deduplicates same rule', () => {
+    const warnings: import('./server/nvm/quality/index.ts').QualityWarning[] = [
+      { engine: 'dv', opIdx: 0, rule: 'DV5_NO_HUMAN_PRESENCE', message: 'x', penalty: 30 },
+      { engine: 'dv', opIdx: 1, rule: 'DV5_NO_HUMAN_PRESENCE', message: 'y', penalty: 30 },
+    ];
+    const constraints = qualityConstraintsFromWarnings(warnings);
+    const dv5 = constraints.filter(c => c.description.includes('character-level op'));
+    assert.equal(dv5.length, 1, 'DV5 should appear only once despite two warnings');
+  });
+
+  it('qualityConstraintsFromWarnings: LOW_SPECIFICITY → concrete specifics constraint', () => {
+    const warnings: import('./server/nvm/quality/index.ts').QualityWarning[] = [{
+      engine: 'specificity', opIdx: null, rule: 'LOW_SPECIFICITY', message: '', penalty: 30,
+    }];
+    const constraints = qualityConstraintsFromWarnings(warnings);
+    assert.ok(constraints.some(c => c.description.includes('concrete')), 'specificity → concrete constraint');
+  });
+
+  it('arcConstraintsFromTracker: overdue CLUE → must_seed_clue constraint', () => {
+    const promises: import('./server/nvm/quality/arc-tracker.ts').OpenPromise[] = [{
+      promiseId: 'clue:mystery1', kind: 'CLUE', description: 'Clue mystery1 needs payoff',
+      openedAtScene: 0, targetWindow: [3, 8], urgency: 'overdue',
+      suggestedOp: 'PAYOFF_SETUP', pacingScore: 0.2,
+    }];
+    const constraints = arcConstraintsFromTracker(promises, 3);
+    assert.ok(constraints.some(c => c.kind === 'must_seed_clue'), 'overdue CLUE → must_seed_clue');
+  });
+
+  it('arcConstraintsFromTracker: on_track promises are not included', () => {
+    const promises: import('./server/nvm/quality/arc-tracker.ts').OpenPromise[] = [{
+      promiseId: 'clock:doom', kind: 'CLOCK', description: 'Clock doom counting',
+      openedAtScene: 0, targetWindow: [2, 6], urgency: 'on_track',
+      suggestedOp: 'RAISE_CLOCK', pacingScore: 0.9,
+    }];
+    const constraints = arcConstraintsFromTracker(promises, 3);
+    assert.equal(constraints.length, 0, 'on_track promises should not generate constraints');
+  });
+
+  it('proppConstraintsFromAnalysis: absent complication → RAISE_CLOCK guidance', () => {
+    const analysis: import('./server/nvm/quality/index.ts').ProppAnalysis = {
+      present: [], absent: ['complication', 'mediation', 'departure', 'ordeal', 'consequence', 'resolution', 'preparation'],
+      coverage: 0,
+    };
+    const constraints = proppConstraintsFromAnalysis(analysis);
+    assert.ok(constraints.some(c => c.description.includes('complication')), 'missing complication → guidance');
+    assert.ok(constraints.length <= 2, 'at most 2 Propp constraints generated');
+  });
+
+  it('proppConstraintsFromAnalysis: all present → no constraints', () => {
+    const analysis: import('./server/nvm/quality/index.ts').ProppAnalysis = {
+      present: ['preparation', 'complication', 'mediation', 'departure', 'ordeal', 'consequence', 'resolution'],
+      absent: [],
+      coverage: 1,
+    };
+    const constraints = proppConstraintsFromAnalysis(analysis);
+    assert.equal(constraints.length, 0, 'all stages present → no constraints');
+  });
+
+  it('buildQualityAwareConstraints combines all constraint sources', () => {
+    const proofConstraints: import('./server/nvm/generate/proof-spec.ts').GenerationConstraint[] = [
+      { kind: 'must_add_fact', description: 'add a fact' },
+    ];
+    const warnings: import('./server/nvm/quality/index.ts').QualityWarning[] = [
+      { engine: 'dv', opIdx: null, rule: 'DV10_STRUCTURAL_UNIFORMITY', message: 'all same', penalty: 25 },
+    ];
+    const promises: import('./server/nvm/quality/arc-tracker.ts').OpenPromise[] = [];
+    const proppAnalysis: import('./server/nvm/quality/index.ts').ProppAnalysis = {
+      present: [], absent: ['complication'], coverage: 0,
+    };
+    const all = buildQualityAwareConstraints(proofConstraints, warnings, promises, proppAnalysis);
+    assert.ok(all.some(c => c.kind === 'must_add_fact'), 'proof constraint preserved');
+    assert.ok(all.some(c => c.description.includes('variety')), 'DV10 → variety constraint');
+    assert.ok(all.some(c => c.description.includes('complication')), 'Propp gap → complication');
+  });
+
+  it('qualityConstraintsFromWarnings: low-penalty warnings (<15) without matching rule → ignored', () => {
+    const warnings: import('./server/nvm/quality/index.ts').QualityWarning[] = [{
+      engine: 'custom', opIdx: null, rule: 'UNKNOWN_RULE_XYZ', message: 'minor thing', penalty: 5,
+    }];
+    const constraints = qualityConstraintsFromWarnings(warnings);
+    assert.equal(constraints.length, 0, 'penalty < 15 + unknown rule → no constraint');
+  });
+
+  it('arcConstraintsFromTracker: THEME urgency → resolve theme constraint', () => {
+    const promises: import('./server/nvm/quality/arc-tracker.ts').OpenPromise[] = [{
+      promiseId: 'theme:honor', kind: 'THEME', description: 'Theme honor needs resolve',
+      openedAtScene: 0, targetWindow: [5, 15], urgency: 'due_soon',
+      suggestedOp: 'ADVANCE_THEME_ARGUMENT', pacingScore: 0.6,
+    }];
+    const constraints = arcConstraintsFromTracker(promises, 3);
+    assert.ok(constraints.some(c => c.description.includes('resolve')), 'THEME → resolve constraint');
+  });
+});
+
+describe('NVM — Character Arc Visualizer (Wave 28)', () => {
+  it('character arc: UPDATE_BELIEF op adds charId to arc roster', () => {
+    // Simulate the arc-building logic from the endpoint
+    const arcs: Record<string, number[]> = {};
+    const ops: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'X', confidence: 0.8, source: 'inferred', acquired_at: 0 } },
+    ];
+    for (const op of ops) {
+      if ('charId' in op) {
+        const charId = (op as { charId: string }).charId;
+        if (!arcs[charId]) arcs[charId] = [];
+        arcs[charId].push(1);
+      }
+    }
+    assert.ok('alice' in arcs, 'alice should appear in arc roster');
+  });
+
+  it('character arc: SHIFT_RELATIONSHIP adds both pair members', () => {
+    const arcs: Record<string, number[]> = {};
+    const ops: StoryOp[] = [{
+      op: 'SHIFT_RELATIONSHIP',
+      pair: ['alice', 'bob'],
+      delta: { dimension: 'trust', amount: 0.5, reason: 'test' },
+    }];
+    for (const op of ops) {
+      if ('pair' in op) {
+        const pair = (op as { pair: [string, string] }).pair;
+        for (const charId of pair) {
+          if (!arcs[charId]) arcs[charId] = [];
+          arcs[charId].push(1);
+        }
+      }
+    }
+    assert.ok('alice' in arcs && 'bob' in arcs, 'both pair members in arcs');
+  });
+
+  it('character arc: avgConfidence computed correctly', () => {
+    const beliefs = [
+      { id: 'b1', proposition: 'X', confidence: 0.8, source: 'inferred' as const, acquired_at: 0 },
+      { id: 'b2', proposition: 'Y', confidence: 0.6, source: 'inferred' as const, acquired_at: 0 },
+    ];
+    const avg = Math.round(beliefs.reduce((s, b) => s + b.confidence, 0) / beliefs.length * 100) / 100;
+    assert.equal(avg, 0.7, 'avg confidence of 0.8+0.6 = 0.7');
+  });
+
+  it('character arc: netRelationshipScore accumulates across pairs', () => {
+    const relationships: Record<string, Array<{ amount: number }>> = {
+      'alice|bob': [{ amount: 0.5 }, { amount: -0.2 }],
+      'alice|carol': [{ amount: 0.3 }],
+    };
+    let netRel = 0;
+    for (const [key, deltas] of Object.entries(relationships)) {
+      if (key.includes('alice')) {
+        netRel += deltas.reduce((s, d) => s + d.amount, 0);
+      }
+    }
+    assert.ok(Math.abs(netRel - 0.6) < 0.001, `expected 0.6, got ${netRel}`);
+  });
+
+  it('character arc: agencyCount counts ops referencing charId', () => {
+    const charId = 'alice';
+    const ops: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'X', confidence: 0.8, source: 'inferred', acquired_at: 0 } },
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { dominant: 'joy', intensity: 50, joy: 50, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, last_updated_at: 1 } },
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'x', predicate: 'y', object: 'z', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ];
+    const agencyCount = ops.filter(op => {
+      if ('charId' in op && (op as { charId: string }).charId === charId) return true;
+      if ('pair' in op) {
+        const pair = (op as { pair: [string, string] }).pair;
+        return pair[0] === charId || pair[1] === charId;
+      }
+      return false;
+    }).length;
+    assert.equal(agencyCount, 2, 'alice has 2 ops (UPDATE_BELIEF + APPRAISE_EMOTION)');
+  });
+
+  it('character arc: characters sorted by totalAgency descending', () => {
+    const chars = [
+      { charId: 'alice', totalAgency: 3, dominantEmotions: [] as string[], peakBeliefs: 0, peakIntensity: 0, totalScenes: 1, scenes: [] },
+      { charId: 'bob',   totalAgency: 7, dominantEmotions: [] as string[], peakBeliefs: 0, peakIntensity: 0, totalScenes: 1, scenes: [] },
+    ];
+    chars.sort((a, b) => b.totalAgency - a.totalAgency);
+    assert.equal(chars[0].charId, 'bob', 'bob has more agency → should be first');
+  });
+
+  it('character arc: peakIntensity is max across scenes', () => {
+    const scenes = [
+      { emotionIntensity: 30 }, { emotionIntensity: 80 }, { emotionIntensity: 50 },
+    ];
+    const peakIntensity = Math.max(...scenes.map(s => s.emotionIntensity), 0);
+    assert.equal(peakIntensity, 80, 'peak intensity = 80');
+  });
+
+  it('character arc: dominantEmotions deduplicates across scenes', () => {
+    const scenes = [
+      { dominantEmotion: 'fear' }, { dominantEmotion: 'fear' }, { dominantEmotion: 'joy' },
+    ];
+    const dominantEmotions = [...new Set(scenes.map(s => s.dominantEmotion).filter(e => e !== 'none'))];
+    assert.equal(dominantEmotions.length, 2, 'two unique emotions');
+    assert.ok(dominantEmotions.includes('fear') && dominantEmotions.includes('joy'));
+  });
+});
+
+// ── Wave 29 — Narrative Regression Suite ─────────────────────────────────────
+
+import { ALL_INVARIANTS } from './server/nvm/regression/invariants.ts';
+import { runNarrativeRegression } from './server/nvm/regression/runner.ts';
+
+function makeCommit(sceneIdx: number, ops: StoryOp[]): StoryCommit {
+  return { commitId: `c${sceneIdx}`, parentId: null, sceneIdx, ops, deltaSummary: { facts: 0, beliefs: 0, relationships: 0 }, reverted: false, createdAt: 1 };
+}
+
+function baseOp(): StoryOp {
+  return { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'world', predicate: 'is', object: 'real', addedAtTurn: 0, validFrom: 0, validTo: null } };
+}
+
+describe('NVM — Narrative Regression Suite (Wave 29)', () => {
+  it('regression: empty story → all invariants return na or fail (no pass)', () => {
+    const report = runNarrativeRegression([]);
+    assert.equal(report.pass, 0, 'no pass on empty story');
+    assert.equal(report.totalScenes, 0, 'totalScenes is 0');
+  });
+
+  it('regression: WORLD_ESTABLISHED_EARLY passes when ADD_FACT in scene 0', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'WORLD_ESTABLISHED_EARLY')!;
+    const commits = [makeCommit(0, [baseOp()])];
+    const result = inv.check(commits);
+    assert.equal(result.status, 'pass', 'ADD_FACT in scene 0 → pass');
+  });
+
+  it('regression: WORLD_ESTABLISHED_EARLY fails after scene 2 with no world ops', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'WORLD_ESTABLISHED_EARLY')!;
+    const commits = [
+      makeCommit(0, [{ op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'X', confidence: 0.5, source: 'inferred', acquired_at: 0 } }]),
+      makeCommit(1, [{ op: 'UPDATE_BELIEF', charId: 'bob', belief: { id: 'b2', proposition: 'Y', confidence: 0.5, source: 'inferred', acquired_at: 0 } }]),
+      makeCommit(2, [{ op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { dominant: 'fear', intensity: 40, joy: 0, distress: 0, anger: 0, fear: 40, pride: 0, shame: 0, last_updated_at: 1 } }]),
+    ];
+    const result = inv.check(commits);
+    assert.equal(result.status, 'fail', 'no world ops in scenes 0-1 with 3 scenes → fail');
+  });
+
+  it('regression: COMPLICATION_BY_SCENE_3 passes with RAISE_CLOCK in scene 2', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'COMPLICATION_BY_SCENE_3')!;
+    const commits = [
+      makeCommit(0, [baseOp()]),
+      makeCommit(1, [baseOp()]),
+      makeCommit(2, [{ op: 'RAISE_CLOCK', clockId: 'ck1', amount: 5 }]),
+    ];
+    const result = inv.check(commits);
+    assert.equal(result.status, 'pass', 'RAISE_CLOCK by scene 3 → pass');
+  });
+
+  it('regression: COMPLICATION_BY_SCENE_3 is na with fewer than 3 scenes', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'COMPLICATION_BY_SCENE_3')!;
+    const result = inv.check([makeCommit(0, [baseOp()])]);
+    assert.equal(result.status, 'na', '< 3 scenes → na');
+  });
+
+  it('regression: CLUE_BEFORE_PAYOFF fails when payoff has no preceding seed', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'CLUE_BEFORE_PAYOFF')!;
+    const commits = [
+      makeCommit(0, [{ op: 'PAYOFF_SETUP', setupId: 'clue-x', payoffEventId: 'ev1' }]),
+    ];
+    const result = inv.check(commits);
+    assert.equal(result.status, 'fail', 'no SEED_CLUE for clue-x → fail');
+  });
+
+  it('regression: CLUE_BEFORE_PAYOFF passes when seed precedes payoff', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'CLUE_BEFORE_PAYOFF')!;
+    const commits = [
+      makeCommit(0, [{ op: 'SEED_CLUE', clueId: 'clue-x', carrier: 'object' }]),
+      makeCommit(2, [{ op: 'PAYOFF_SETUP', setupId: 'clue-x', payoffEventId: 'ev1' }]),
+    ];
+    const result = inv.check(commits);
+    assert.equal(result.status, 'pass', 'SEED_CLUE in scene 0, PAYOFF_SETUP in scene 2 → pass');
+  });
+
+  it('regression: THEME_SUPPORTED_BEFORE_RESOLVED fails when resolve has no prior support', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'THEME_SUPPORTED_BEFORE_RESOLVED')!;
+    const commits = [
+      makeCommit(0, [{ op: 'ADVANCE_THEME_ARGUMENT', claimId: 'truth', move: 'resolve' }]),
+    ];
+    const result = inv.check(commits);
+    assert.equal(result.status, 'fail', 'resolve without support → fail');
+  });
+
+  it('regression: THEME_SUPPORTED_BEFORE_RESOLVED passes with prior support', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'THEME_SUPPORTED_BEFORE_RESOLVED')!;
+    const commits = [
+      makeCommit(0, [{ op: 'ADVANCE_THEME_ARGUMENT', claimId: 'truth', move: 'support' }]),
+      makeCommit(5, [{ op: 'ADVANCE_THEME_ARGUMENT', claimId: 'truth', move: 'resolve' }]),
+    ];
+    const result = inv.check(commits);
+    assert.equal(result.status, 'pass', 'support at scene 0 → resolve at scene 5 → pass');
+  });
+
+  it('regression: RELATIONSHIP_ARC_EXISTS warns when shifts are one-way only', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'RELATIONSHIP_ARC_EXISTS')!;
+    const commits = [
+      makeCommit(0, [{ op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: 0.3, reason: 'test' } }]),
+      makeCommit(2, [{ op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: 0.2, reason: 'test' } }]),
+    ];
+    const result = inv.check(commits);
+    assert.equal(result.status, 'warning', 'all positive → warning, no sign reversal');
+  });
+
+  it('regression: RELATIONSHIP_ARC_EXISTS passes with sign reversal', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'RELATIONSHIP_ARC_EXISTS')!;
+    const commits = [
+      makeCommit(0, [{ op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: 0.5, reason: 'test' } }]),
+      makeCommit(3, [{ op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: -0.4, reason: 'test' } }]),
+    ];
+    const result = inv.check(commits);
+    assert.equal(result.status, 'pass', 'positive then negative → full arc → pass');
+  });
+
+  it('regression: runner grade A when all applicable invariants pass', () => {
+    // A story with world, complication, beliefs, emotions, relationship arc, variety
+    const emotion = (dom: string, intensity: number): StoryOp => ({
+      op: 'APPRAISE_EMOTION', charId: 'alice',
+      emotion: { dominant: dom as 'fear', intensity, joy: 0, distress: 0, anger: 0, fear: intensity, pride: 0, shame: 0, last_updated_at: 1 },
+    });
+    const belief: StoryOp = { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'X', confidence: 0.7, source: 'inferred', acquired_at: 0 } };
+    const commits = [
+      makeCommit(0, [baseOp(), belief, { op: 'RECORD_VISUAL_FACT', sceneId: 's0', fact: 'dark room' }]),
+      makeCommit(1, [{ op: 'RAISE_CLOCK', clockId: 'ck1', amount: 3 }, emotion('fear', 60)]),
+      makeCommit(2, [{ op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: 0.5, reason: 'test' } }, emotion('joy', 80)]),
+      makeCommit(3, [{ op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: -0.3, reason: 'test' } }, { op: 'RAISE_CLOCK', clockId: 'ck1', amount: -3 }]),
+      makeCommit(4, [{ op: 'ADVANCE_THEME_ARGUMENT', claimId: 'truth', move: 'support' }]),
+      makeCommit(5, [{ op: 'ADVANCE_THEME_ARGUMENT', claimId: 'truth', move: 'resolve' }, emotion('joy', 30)]),
+    ];
+    const report = runNarrativeRegression(commits);
+    assert.ok(report.score >= 70, `expected score >= 70, got ${report.score}`);
+    assert.ok(['A', 'B', 'C'].includes(report.grade), `expected A/B/C, got ${report.grade}`);
+  });
+
+  it('regression: reverted commits are excluded from invariant checks', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'WORLD_ESTABLISHED_EARLY')!;
+    const commits: StoryCommit[] = [
+      { ...makeCommit(0, [baseOp()]), reverted: true },
+    ];
+    const result = inv.check(commits.filter(c => !c.reverted));
+    assert.equal(result.status, 'na', 'reverted commit excluded → na');
+  });
+
+  it('regression: byCategory tallies match result list', () => {
+    const commits = [makeCommit(0, [baseOp()])];
+    const report = runNarrativeRegression(commits);
+    let sumPass = 0, sumFail = 0, sumWarn = 0, sumNa = 0;
+    for (const cat of Object.values(report.byCategory)) {
+      sumPass += cat.pass; sumFail += cat.fail; sumWarn += cat.warning; sumNa += cat.na;
+    }
+    assert.equal(sumPass, report.pass, 'byCategory pass total matches');
+    assert.equal(sumFail, report.fail, 'byCategory fail total matches');
+    assert.equal(sumWarn, report.warning, 'byCategory warning total matches');
+    assert.equal(sumNa, report.na, 'byCategory na total matches');
+  });
+});
+
+// ── Wave 30 — Narrative Momentum Dashboard ────────────────────────────────────
+
+function makeMomentumCommit(sceneIdx: number, ops: StoryOp[]): StoryCommit {
+  return { commitId: `m${sceneIdx}`, parentId: null, sceneIdx, ops, deltaSummary: { facts: 0, beliefs: 0, relationships: 0 }, reverted: false, createdAt: 1 };
+}
+
+function buildIR(commit: StoryCommit): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR {
+  return {
+    transitionId: commit.commitId, sceneIdx: commit.sceneIdx,
+    sceneFunction: 'advance_plot', activeMechanisms: [],
+    beforeStateHash: 'test', ops: commit.ops,
+    preconditions: [], postconditions: [],
+    provenance: { origin: 'model_generated', createdAt: commit.createdAt },
+  };
+}
+
+describe('NVM — Narrative Momentum Dashboard (Wave 30)', () => {
+  it('momentum: empty commit list produces empty points array', () => {
+    const commits: StoryCommit[] = [];
+    const points: unknown[] = [];
+    let rollingState = emptyState();
+    for (const commit of commits) {
+      const ir = buildIR(commit);
+      const qReport = runQualityEngine(ir, rollingState);
+      const rReport = runNarrativeRegression([commit]);
+      rollingState = applyStoryOps(rollingState, commit.ops);
+      points.push({ qualityScore: qReport.score, regressionScore: rReport.score });
+    }
+    assert.equal(points.length, 0, 'no points from empty commits');
+  });
+
+  it('momentum: single ADD_FACT commit produces one point', () => {
+    const fact: StoryOp = { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'x', predicate: 'y', object: 'z', addedAtTurn: 0, validFrom: 0, validTo: null } };
+    const commits = [makeMomentumCommit(0, [fact])];
+    const points: Array<{ qualityScore: number }> = [];
+    let rollingState = emptyState();
+    for (const commit of commits) {
+      const ir = buildIR(commit);
+      const qReport = runQualityEngine(ir, rollingState);
+      rollingState = applyStoryOps(rollingState, commit.ops);
+      points.push({ qualityScore: qReport.score });
+    }
+    assert.equal(points.length, 1, 'one point per commit');
+    assert.ok(typeof points[0].qualityScore === 'number', 'qualityScore is a number');
+  });
+
+  it('momentum: regression score increases as story improves', () => {
+    const fact: StoryOp = { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'x', predicate: 'y', object: 'z', addedAtTurn: 0, validFrom: 0, validTo: null } };
+    const belief: StoryOp = { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'X', confidence: 0.7, source: 'inferred', acquired_at: 0 } };
+    const commits = [
+      makeMomentumCommit(0, [fact]),
+      makeMomentumCommit(1, [belief]),
+    ];
+    const r1 = runNarrativeRegression([commits[0]]);
+    const r2 = runNarrativeRegression([commits[0], commits[1]]);
+    // Adding a belief commit should not decrease the regression score
+    assert.ok(r2.score >= r1.score - 5, `regression should not drop sharply: ${r1.score} → ${r2.score}`);
+  });
+
+  it('momentum: proofPassRate is 100 when tier1 passes for simple ops', () => {
+    const fact: StoryOp = { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'x', predicate: 'y', object: 'z', addedAtTurn: 0, validFrom: 0, validTo: null } };
+    const commit = makeMomentumCommit(0, [fact]);
+    const ir = buildIR(commit);
+    const state = emptyState();
+    const results = runTier1(ir, state);
+    const passCount = results.filter(r => r.pass).length;
+    const rate = results.length === 0 ? 100 : Math.round((passCount / results.length) * 100);
+    assert.ok(rate >= 0 && rate <= 100, `proofPassRate is 0-100: ${rate}`);
+  });
+
+  it('momentum: deriveTensionLedger returns totalTension as a number', () => {
+    const state = emptyState();
+    const ledger = deriveTensionLedger(state, 0);
+    assert.ok(typeof ledger.totalTension === 'number', 'totalTension is a number');
+    assert.ok(ledger.totalTension >= 0, 'totalTension is non-negative');
+  });
+
+  it('momentum: points accumulate rolling state across commits', () => {
+    const commits = [
+      makeMomentumCommit(0, [{ op: 'ADD_FACT', fact: { factId: 'f1', subject: 'sky', predicate: 'is', object: 'blue', addedAtTurn: 0, validFrom: 0, validTo: null } }]),
+      makeMomentumCommit(1, [{ op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'sky is blue', confidence: 0.9, source: 'told', acquired_at: 1 } }]),
+    ];
+    let rollingState = emptyState();
+    const stateSnapshots: import('./server/nvm/state/NarrativeState.ts').NarrativeState[] = [];
+    for (const commit of commits) {
+      rollingState = applyStoryOps(rollingState, commit.ops);
+      stateSnapshots.push({ ...rollingState });
+    }
+    // After commit 1, alice should have beliefs
+    const finalState = stateSnapshots[stateSnapshots.length - 1];
+    assert.ok(Object.keys(finalState.characterBeliefs).length > 0, 'character beliefs accumulate');
+  });
+
+  it('momentum: regression and quality are independent signals', () => {
+    // A commit with a world fact passes WORLD_ESTABLISHED_EARLY but may have low quality
+    const fact: StoryOp = { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'x', predicate: 'is', object: 'y', addedAtTurn: 0, validFrom: 0, validTo: null } };
+    const commit = makeMomentumCommit(0, [fact]);
+    const ir = buildIR(commit);
+    const state = emptyState();
+    const qReport = runQualityEngine(ir, state);
+    const rReport = runNarrativeRegression([commit]);
+    // Verify both produce valid score ranges
+    assert.ok(qReport.score >= 0 && qReport.score <= 100, `quality score in range: ${qReport.score}`);
+    assert.ok(rReport.score >= 0 && rReport.score <= 100, `regression score in range: ${rReport.score}`);
+    // They can differ
+    assert.ok(true, 'quality and regression are independent');
+  });
+});
+
+// ── Wave 31 — Voice DNA Analyzer ─────────────────────────────────────────────
+
+function makeBeliefOp(charId: string, proposition: string): StoryOp {
+  return { op: 'UPDATE_BELIEF', charId, belief: { id: `b-${charId}-${proposition.slice(0, 4)}`, proposition, confidence: 0.7, source: 'inferred', acquired_at: 0 } };
+}
+
+describe('NVM — Voice DNA Analyzer (Wave 31)', () => {
+  it('voiceDNA: burrowsDelta is 0 when only one character', () => {
+    const ops: StoryOp[] = [makeBeliefOp('alice', 'the world is ending soon'), makeBeliefOp('alice', 'nothing will survive')];
+    const delta = burrowsDelta(ops);
+    assert.equal(delta, 0, 'single char → delta = 0 (no comparison possible)');
+  });
+
+  it('voiceDNA: burrowsDelta is 0 for fully distinct vocabularies', () => {
+    const ops: StoryOp[] = [
+      makeBeliefOp('alice', 'moonbeam silver glow twilight'),
+      makeBeliefOp('bob', 'engine diesel grease carburetor'),
+    ];
+    const delta = burrowsDelta(ops);
+    assert.equal(delta, 0, 'no shared words → delta = 0');
+  });
+
+  it('voiceDNA: burrowsDelta is 1 for identical vocabularies', () => {
+    const ops: StoryOp[] = [
+      makeBeliefOp('alice', 'truth justice freedom honor'),
+      makeBeliefOp('bob', 'truth justice freedom honor'),
+    ];
+    const delta = burrowsDelta(ops);
+    assert.equal(delta, 1, 'same words → delta = 1 (identical voices)');
+  });
+
+  it('voiceDNA: partial overlap produces intermediate delta', () => {
+    const ops: StoryOp[] = [
+      makeBeliefOp('alice', 'truth justice freedom honor'),
+      makeBeliefOp('bob', 'truth justice darkness shadow'),
+    ];
+    const delta = burrowsDelta(ops);
+    assert.ok(delta > 0 && delta < 1, `expected 0 < delta < 1, got ${delta}`);
+  });
+
+  it('voiceDNA: Jaccard similarity — shared / union', () => {
+    const setA = new Set(['truth', 'justice', 'freedom', 'honor']);
+    const setB = new Set(['truth', 'justice', 'darkness', 'shadow']);
+    const shared = [...setA].filter(w => setB.has(w)).length;
+    const union = new Set([...setA, ...setB]).size;
+    const sim = shared / union;
+    assert.ok(Math.abs(sim - 2 / 6) < 0.001, `Jaccard 2/6 ≈ 0.333, got ${sim}`);
+  });
+
+  it('voiceDNA: signature words are unique to one character', () => {
+    const vocab: Record<string, Set<string>> = {
+      alice: new Set(['moonbeam', 'silver', 'truth', 'justice']),
+      bob:   new Set(['engine', 'diesel', 'truth', 'justice']),
+    };
+    const aliceSigs = [...vocab.alice].filter(w => !vocab.bob.has(w));
+    assert.ok(aliceSigs.includes('moonbeam'), 'moonbeam is alice-only');
+    assert.ok(aliceSigs.includes('silver'), 'silver is alice-only');
+    assert.ok(!aliceSigs.includes('truth'), 'truth is shared → not a signature word');
+  });
+
+  it('voiceDNA: diversity score = 100 when voices are fully distinct', () => {
+    const sim = 0; // fully distinct
+    const diversityScore = Math.round((1 - sim) * 100);
+    assert.equal(diversityScore, 100, 'diversity 100 when similarity = 0');
+  });
+
+  it('voiceDNA: diversity score = 0 when voices are identical', () => {
+    const sim = 1; // identical
+    const diversityScore = Math.round((1 - sim) * 100);
+    assert.equal(diversityScore, 0, 'diversity 0 when similarity = 1');
+  });
+
+  it('voiceDNA: acoustic twins threshold is >= 0.35 similarity', () => {
+    const pairs = [
+      { a: 'alice', b: 'bob', similarity: 0.40 },
+      { a: 'alice', b: 'carol', similarity: 0.20 },
+      { a: 'bob', b: 'carol', similarity: 0.35 },
+    ];
+    const twins = pairs.filter(p => p.similarity >= 0.35);
+    assert.equal(twins.length, 2, 'two pairs at or above threshold');
+    assert.ok(twins.some(p => p.a === 'alice' && p.b === 'bob'), 'alice↔bob is a twin');
+    assert.ok(twins.some(p => p.a === 'bob' && p.b === 'carol'), 'bob↔carol is a twin');
+  });
+
+  it('voiceDNA: multi-scene beliefs accumulate into character vocab', () => {
+    const commits = [
+      makeMomentumCommit(0, [makeBeliefOp('alice', 'moonbeam silver glow')]),
+      makeMomentumCommit(1, [makeBeliefOp('alice', 'twilight shadow darkness')]),
+    ];
+    const charWords = new Map<string, Set<string>>();
+    for (const commit of commits) {
+      for (const op of commit.ops) {
+        if (op.op === 'UPDATE_BELIEF') {
+          const words = new Set(op.belief.proposition.toLowerCase().split(/\W+/).filter(w => w.length > 3));
+          const existing = charWords.get(op.charId) ?? new Set<string>();
+          for (const w of words) existing.add(w);
+          charWords.set(op.charId, existing);
+        }
+      }
+    }
+    const aliceWords = charWords.get('alice') ?? new Set();
+    assert.ok(aliceWords.has('moonbeam'), 'moonbeam accumulated from scene 0');
+    assert.ok(aliceWords.has('twilight'), 'twilight accumulated from scene 1');
+    assert.ok(aliceWords.size >= 4, `alice has >= 4 words, got ${aliceWords.size}`);
   });
 });

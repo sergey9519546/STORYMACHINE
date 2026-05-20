@@ -264,7 +264,11 @@ export class Agent {
       rawText,
       { candidates: [{ action_type: 'SPEAK', content: '', target: null }] },
     );
-    if (!raw.candidates?.length || !raw.candidates[0]?.content) {
+    if (!raw.candidates?.length) {
+      logger.error('agent_empty_candidates', { agent: this.sheet.name, method: 'takeTurn', preview: rawText.substring(0, 120) });
+      return { action_type: 'SPEAK' as const, content: '...', target: null };
+    }
+    if (!raw.candidates[0]?.content) {
       logger.warn('agent_parse_fallback', { agent: this.sheet.name, method: 'takeTurn', preview: rawText.substring(0, 120) });
     }
 
@@ -478,6 +482,16 @@ ${tomStr}
 LOCATION: ${node.name}
 ${node.description}
 OTHERS PRESENT: ${otherAgents.map(a => a.name).join(', ') || 'no one else'}
+AVAILABLE EXITS: ${
+  (() => {
+    const exits = node.adjacent_locations
+      .map(id => this.stage.getLocation(id)?.name)
+      .filter((n): n is string => Boolean(n));
+    return exits.length > 0
+      ? exits.map(n => `"${n}"`).join(', ') + ' — use RELOCATE with the exact name shown here.'
+      : '(none — you cannot leave this location)';
+  })()
+}
 
 RECENT EVENTS:
 ${historyStr}

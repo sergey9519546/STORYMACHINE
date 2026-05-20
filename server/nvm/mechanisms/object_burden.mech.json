@@ -1,0 +1,19 @@
+{
+  "id": "object_burden",
+  "kind": "object_burden",
+  "themeClaimTemplate": "What we hold preserves us / What we hold imprisons us",
+  "physicalCarrier": { "type": "object", "required": true },
+  "lifecycleStates": ["seeded", "activated", "helpful", "costly", "dangerous", "crisis", "transformed", "resolved"],
+  "transitionRules": [
+    { "from": "seeded", "to": "activated", "condition": "object_touched_by_non_owner" },
+    { "from": "activated", "to": "helpful", "condition": "object_provides_unexpected_benefit" },
+    { "from": "helpful", "to": "costly", "condition": "object_requires_owner_to_sacrifice" },
+    { "from": "costly", "to": "dangerous", "condition": "object_threatens_a_relationship" },
+    { "from": "dangerous", "to": "crisis", "condition": "object_forces_a_choice" },
+    { "from": "crisis", "to": "transformed", "condition": "owner_reframes_the_object" },
+    { "from": "transformed", "to": "resolved", "condition": "object_meaning_is_shared" }
+  ],
+  "climaxProofPredicate": "owner_must_choose: keep | release | reframe | transfer",
+  "endingProofPredicate": "object_meaning_changed_across_acts",
+  "invariants": ["central_object_changes_meaning_across_acts", "climax_forces_choice"]
+}

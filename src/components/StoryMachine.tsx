@@ -12,9 +12,30 @@ import type {
   PersuasionRecord,
   DramaticPressure,
 } from "../../server/engine/types";
-import { FileDown, Brain, Eye, AlertTriangle, GitBranch, Target, Zap, Smile, Shuffle, Settings } from "lucide-react";
+import { FileDown, Brain, Eye, AlertTriangle, GitBranch, Target, Zap, Smile, Shuffle, Settings, Scissors } from "lucide-react";
 import ScenarioBuilder from "./storymachine/ScenarioBuilder";
 import SettingsPanel from "./SettingsPanel";
+import WhatIfPanel from "./WhatIfPanel";
+import EpistemicMap from "./EpistemicMap";
+import DirectorCutPanel from "./DirectorCutPanel";
+import { HarvestPanel } from "./HarvestPanel";
+import { ConvergePanel } from "./ConvergePanel";
+import { CorpusPanel } from "./CorpusPanel";
+import { ArcTimelinePanel } from "./ArcTimelinePanel";
+import { ArcPlannerPanel } from "./ArcPlannerPanel";
+import { ProjectionGalleryPanel } from "./ProjectionGalleryPanel";
+import { CausalTwinPanel } from "./CausalTwinPanel";
+import { FixedPointsPanel } from "./FixedPointsPanel";
+import { SelfPlayPanel } from "./SelfPlayPanel";
+import { ProofInspectorPanel } from "./ProofInspectorPanel";
+import { QualityEnginesPanel } from "./QualityEnginesPanel";
+import { EpistemicMapPanel } from "./EpistemicMapPanel";
+import { ArcCompletionPanel } from "./ArcCompletionPanel";
+import { StoryHealthPanel } from "./StoryHealthPanel";
+import { CharacterArcPanel } from "./CharacterArcPanel";
+import { RegressionPanel } from "./RegressionPanel";
+import { MomentumPanel } from "./MomentumPanel";
+import { VoiceDNAPanel } from "./VoiceDNAPanel";
 
 // ── Emotion display helpers ───────────────────────────────────────────────────
 
@@ -71,6 +92,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [activePressures, setActivePressures] = useState<Array<{ char_id: string; pressures: DramaticPressure[] }>>([]);
   const ledgerEndRef = useRef<HTMLDivElement>(null);
   const evtSourceRef = useRef<EventSource | null>(null);
+  const mountedRef   = useRef(true);
   const [loading, setLoading] = useState(false);
   const [streamLog, setStreamLog] = useState<string[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -85,16 +107,40 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   useEffect(() => () => { if (errorTimerRef.current) clearTimeout(errorTimerRef.current); }, []);
   const [showBuilder, setShowBuilder]   = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showWhatIf, setShowWhatIf]         = useState(false);
+  const [showEpistemic, setShowEpistemic]   = useState(false);
+  const [showDirectorCut, setShowDirectorCut] = useState(false);
+  const [showHarvest, setShowHarvest]       = useState(false);
+  const [showConverge, setShowConverge]     = useState(false);
+  const [showCorpus, setShowCorpus]         = useState(false);
+  const [showTimeline, setShowTimeline]     = useState(false);
+  const [showArcPlanner, setShowArcPlanner] = useState(false);
+  const [showProjection, setShowProjection] = useState(false);
+  const [showCausalTwin, setShowCausalTwin] = useState(false);
+  const [showFixedPoints, setShowFixedPoints] = useState(false);
+  const [showSelfPlay, setShowSelfPlay]         = useState(false);
+  const [showProofInspector, setShowProofInspector] = useState(false);
+  const [showQualityEngines, setShowQualityEngines] = useState(false);
+  const [showEpistemicMap, setShowEpistemicMap]   = useState(false);
+  const [showArcCompletion, setShowArcCompletion] = useState(false);
+  const [showStoryHealth, setShowStoryHealth]   = useState(false);
+  const [showCharacterArc, setShowCharacterArc] = useState(false);
+  const [showRegression, setShowRegression]     = useState(false);
+  const [showMomentum, setShowMomentum]         = useState(false);
+  const [showVoiceDNA, setShowVoiceDNA]         = useState(false);
 
   const fetchActivePressures = useCallback(async () => {
     try {
       const res = await fetch("/api/dramatic-pressure-all");
-      if (res.ok) setActivePressures(await res.json() as Array<{ char_id: string; pressures: DramaticPressure[] }>);
+      if (res.ok && mountedRef.current) setActivePressures(await res.json() as Array<{ char_id: string; pressures: DramaticPressure[] }>);
     } catch { /* non-critical background fetch */ }
   }, []);
 
-  // Close any in-flight SSE connection when the component unmounts
-  useEffect(() => () => { evtSourceRef.current?.close(); }, []);
+  // Close any in-flight SSE connection and mark unmounted
+  useEffect(() => () => {
+    mountedRef.current = false;
+    evtSourceRef.current?.close();
+  }, []);
 
   useEffect(() => {
     fetchState();
@@ -110,6 +156,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
         fetch(`/api/persuasion/${id}`).then(r => r.ok ? r.json() as Promise<PersuasionRecord[]> : [])
       )
     );
+    if (!mountedRef.current) return;
     const map: Record<string, PersuasionRecord[]> = {};
     agentIds.forEach((id, i) => { map[id] = entries[i] ?? []; });
     setPersuasionLog(map);
@@ -122,7 +169,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const fetchState = async () => {
     try {
       const res = await fetch("/api/state");
-      if (!res.ok) return;
+      if (!res.ok || !mountedRef.current) return;
       const data = await res.json() as { agents: CharacterSheet[]; nodes: Location[] };
       setAgents(data.agents);
       setNodes(data.nodes);
@@ -135,7 +182,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const fetchLedger = async () => {
     try {
       const res = await fetch("/api/ledger");
-      if (!res.ok) return;
+      if (!res.ok || !mountedRef.current) return;
       const data = await res.json() as ActionLogEntry[];
       setLedger(data);
     } catch { /* silent — background poll */ }
@@ -144,10 +191,9 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const fetchIllusionState = async () => {
     try {
       const res = await fetch("/api/simulation/illusion-state");
-      if (res.ok) {
-        const data = await res.json() as IllusionState;
-        setIllusionState(data);
-      }
+      if (!res.ok || !mountedRef.current) return;
+      const data = await res.json() as IllusionState;
+      setIllusionState(data);
     } catch { /* silent — background poll */ }
   };
 
@@ -158,6 +204,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
         fetch("/api/belief-edges"),
         fetch("/api/goal-mutations"),
       ]);
+      if (!mountedRef.current) return;
       if (beatsRes.ok)     setBeatTraces(await beatsRes.json() as BeatTrace[]);
       if (edgesRes.ok)     setBeliefEdges(await edgesRes.json() as BeliefEdge[]);
       if (mutationsRes.ok) setGoalMutations(await mutationsRes.json() as GoalMutation[]);
@@ -395,6 +442,174 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
               </button>
             </div>
           )}
+          <button
+            onClick={() => setShowDirectorCut(true)}
+            title="Director's Cut — inject ops mid-sim"
+            className="bg-yellow-900 hover:bg-yellow-700 text-yellow-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <Scissors className="w-4 h-4" />
+            <span className="hidden sm:inline">Cut</span>
+          </button>
+          <button
+            onClick={() => setShowWhatIf(true)}
+            title="What-If / Ghost Commits"
+            className="bg-purple-900 hover:bg-purple-700 text-purple-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <GitBranch className="w-4 h-4" />
+            <span className="hidden sm:inline">What-If</span>
+          </button>
+          <button
+            onClick={() => setShowEpistemic(true)}
+            title="Epistemic Map"
+            className="bg-cyan-900 hover:bg-cyan-700 text-cyan-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <Brain className="w-4 h-4" />
+            <span className="hidden sm:inline">Beliefs</span>
+          </button>
+          <button
+            onClick={() => setShowHarvest(true)}
+            title="Harvest — quality metrics + sidecar download"
+            className="bg-emerald-900 hover:bg-emerald-700 text-emerald-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <FileDown className="w-4 h-4" />
+            <span className="hidden sm:inline">Harvest</span>
+          </button>
+          <button
+            onClick={() => setShowConverge(true)}
+            title="Convergence Search — AlphaZero-for-drama"
+            className="bg-rose-900 hover:bg-rose-700 text-rose-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <Zap className="w-4 h-4" />
+            <span className="hidden sm:inline">Converge</span>
+          </button>
+          <button
+            onClick={() => setShowCorpus(true)}
+            title="Director Policy — learned from self-play corpus"
+            className="bg-violet-900 hover:bg-violet-700 text-violet-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <Shuffle className="w-4 h-4" />
+            <span className="hidden sm:inline">Policy</span>
+          </button>
+          <button
+            onClick={() => setShowTimeline(true)}
+            title="Arc Timeline — scene-by-scene proof/quality/tension view"
+            className="bg-slate-700 hover:bg-slate-500 text-slate-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <Target className="w-4 h-4" />
+            <span className="hidden sm:inline">Arc</span>
+          </button>
+          <button
+            onClick={() => setShowArcPlanner(true)}
+            title="Arc Compiler — multi-scene convergence planning"
+            className="bg-fuchsia-900 hover:bg-fuchsia-700 text-fuchsia-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <Zap className="w-4 h-4" />
+            <span className="hidden sm:inline">Compile</span>
+          </button>
+          <button
+            onClick={() => setShowProjection(true)}
+            title="Projection Gallery — one canon, every format (G3)"
+            className="bg-teal-900 hover:bg-teal-700 text-teal-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <Target className="w-4 h-4" />
+            <span className="hidden sm:inline">Project</span>
+          </button>
+          <button
+            onClick={() => setShowCausalTwin(true)}
+            title="Causal Twin — Pearl's do()-calculus intervention (G4)"
+            className="bg-orange-900 hover:bg-orange-700 text-orange-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <Zap className="w-4 h-4" />
+            <span className="hidden sm:inline">Twin</span>
+          </button>
+          <button
+            onClick={() => setShowFixedPoints(true)}
+            title="Fixed Points — temporal authoring, author destiny (G9)"
+            className="bg-purple-900 hover:bg-purple-700 text-purple-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <Target className="w-4 h-4" />
+            <span className="hidden sm:inline">Destiny</span>
+          </button>
+          <button
+            onClick={() => setShowSelfPlay(true)}
+            title="Self-Play — G13 corpus launcher, genome diff/breed"
+            className="bg-emerald-900 hover:bg-emerald-700 text-emerald-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <Zap className="w-4 h-4" />
+            <span className="hidden sm:inline">Corpus</span>
+          </button>
+          <button
+            onClick={() => setShowProofInspector(true)}
+            title="Proof Inspector — 4-tier scene analysis + repair patches"
+            className="bg-rose-900 hover:bg-rose-700 text-rose-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <Target className="w-4 h-4" />
+            <span className="hidden sm:inline">Prove</span>
+          </button>
+          <button
+            onClick={() => setShowQualityEngines(true)}
+            title="Quality Engines — 9 narrative quality signals per committed scene"
+            className="bg-emerald-900 hover:bg-emerald-700 text-emerald-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <span style={{ fontSize: 14 }}>◈</span>
+            <span className="hidden sm:inline">Quality</span>
+          </button>
+          <button
+            onClick={() => setShowEpistemicMap(true)}
+            title="Epistemic Map — who believes what about whom, ToM² meta-layers, dramatic irony"
+            className="bg-violet-900 hover:bg-violet-700 text-violet-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <span style={{ fontSize: 14 }}>◎</span>
+            <span className="hidden sm:inline">Epistemic</span>
+          </button>
+          <button
+            onClick={() => setShowArcCompletion(true)}
+            title="Arc Completion — track open narrative promises with pacing scores"
+            className="bg-amber-900 hover:bg-amber-700 text-amber-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <span style={{ fontSize: 14 }}>◷</span>
+            <span className="hidden sm:inline">Arcs</span>
+          </button>
+          <button
+            onClick={() => setShowStoryHealth(true)}
+            title="Story Health — unified vitals: tension, quality, arcs, epistemic depth"
+            className="bg-sky-900 hover:bg-sky-700 text-sky-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <span style={{ fontSize: 14 }}>♥</span>
+            <span className="hidden sm:inline">Health</span>
+          </button>
+          <button
+            onClick={() => setShowCharacterArc(true)}
+            title="Character Arc — per-character belief, emotion, relationship, and agency trajectories"
+            className="bg-pink-900 hover:bg-pink-700 text-pink-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <span style={{ fontSize: 14 }}>⟳</span>
+            <span className="hidden sm:inline">Chars</span>
+          </button>
+          <button
+            onClick={() => setShowRegression(true)}
+            title="Narrative Regression Suite — 14 structural invariants graded like a CI test run"
+            className="bg-violet-950 hover:bg-violet-800 text-violet-300 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <span style={{ fontSize: 14 }}>✓</span>
+            <span className="hidden sm:inline">Tests</span>
+          </button>
+          <button
+            onClick={() => setShowMomentum(true)}
+            title="Narrative Momentum — per-scene CI history of quality, regression, tension, and proofs"
+            className="bg-emerald-950 hover:bg-emerald-800 text-emerald-300 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <span style={{ fontSize: 14 }}>⚡</span>
+            <span className="hidden sm:inline">Momentum</span>
+          </button>
+          <button
+            onClick={() => setShowVoiceDNA(true)}
+            title="Voice DNA — stylometric fingerprints, pairwise voice similarity matrix, acoustic twins"
+            className="bg-indigo-950 hover:bg-indigo-800 text-indigo-300 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <span style={{ fontSize: 14 }}>🧬</span>
+            <span className="hidden sm:inline">Voice</span>
+          </button>
           <button
             onClick={() => setShowSettings(true)}
             title="AI Provider Settings"
@@ -941,6 +1156,126 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
 
       {showSettings && (
         <SettingsPanel onClose={() => setShowSettings(false)} />
+      )}
+
+      {showDirectorCut && (
+        <DirectorCutPanel onClose={() => setShowDirectorCut(false)} />
+      )}
+
+      {showWhatIf && (
+        <WhatIfPanel onClose={() => setShowWhatIf(false)} />
+      )}
+
+      {showEpistemic && (
+        <EpistemicMap onClose={() => setShowEpistemic(false)} />
+      )}
+
+      {showHarvest && (
+        <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 60 }}>
+          <HarvestPanel onClose={() => setShowHarvest(false)} />
+        </div>
+      )}
+
+      {showConverge && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <ConvergePanel onClose={() => setShowConverge(false)} />
+        </div>
+      )}
+
+      {showCorpus && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <CorpusPanel onClose={() => setShowCorpus(false)} />
+        </div>
+      )}
+
+      {showTimeline && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <ArcTimelinePanel onClose={() => setShowTimeline(false)} />
+        </div>
+      )}
+
+      {showArcPlanner && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <ArcPlannerPanel onClose={() => setShowArcPlanner(false)} />
+        </div>
+      )}
+
+      {showProjection && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <ProjectionGalleryPanel onClose={() => setShowProjection(false)} />
+        </div>
+      )}
+
+      {showCausalTwin && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <CausalTwinPanel onClose={() => setShowCausalTwin(false)} />
+        </div>
+      )}
+
+      {showFixedPoints && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <FixedPointsPanel onClose={() => setShowFixedPoints(false)} />
+        </div>
+      )}
+
+      {showSelfPlay && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <SelfPlayPanel onClose={() => setShowSelfPlay(false)} />
+        </div>
+      )}
+
+      {showProofInspector && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <ProofInspectorPanel onClose={() => setShowProofInspector(false)} />
+        </div>
+      )}
+
+      {showQualityEngines && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <QualityEnginesPanel onClose={() => setShowQualityEngines(false)} />
+        </div>
+      )}
+
+      {showEpistemicMap && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <EpistemicMapPanel onClose={() => setShowEpistemicMap(false)} />
+        </div>
+      )}
+
+      {showArcCompletion && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <ArcCompletionPanel onClose={() => setShowArcCompletion(false)} />
+        </div>
+      )}
+
+      {showStoryHealth && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <StoryHealthPanel onClose={() => setShowStoryHealth(false)} />
+        </div>
+      )}
+
+      {showCharacterArc && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <CharacterArcPanel onClose={() => setShowCharacterArc(false)} />
+        </div>
+      )}
+
+      {showRegression && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <RegressionPanel onClose={() => setShowRegression(false)} />
+        </div>
+      )}
+
+      {showMomentum && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <MomentumPanel onClose={() => setShowMomentum(false)} />
+        </div>
+      )}
+
+      {showVoiceDNA && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <VoiceDNAPanel onClose={() => setShowVoiceDNA(false)} />
+        </div>
       )}
     </div>
   );

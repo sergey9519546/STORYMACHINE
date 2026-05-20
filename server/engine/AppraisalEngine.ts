@@ -1,5 +1,25 @@
-import type { EmotionState, EmotionType, EpistemicUpdate } from './types.ts';
+import type { EmotionState, EmotionType, EpistemicUpdate, DramaticPressureType } from './types.ts';
 import { Stage } from './Stage.ts';
+
+// Exhaustiveness guard: add every DramaticPressureType value here or this file
+// fails to compile. When you add a new type in types.ts, TypeScript will error
+// here until you also add an if-block in appraise() and list it below.
+// TO ADD A NEW DramaticPressureType: (1) add the union member in types.ts,
+// (2) add an if-block in appraise() below, (3) add the key here.
+const _PRESSURE_TYPES_HANDLED: Record<DramaticPressureType, true> = {
+  confrontation_imminent: true,
+  evidence_against:       true,
+  ally_compromised:       true,
+  goal_blocked:           true,
+  revelation_due:         true,
+  CONFRONT:               true,
+  WITHHOLD:               true,
+  ESCALATE:               true,
+  COOL:                   true,
+  REDIRECT:               true,
+  REVEAL:                 true,
+};
+void _PRESSURE_TYPES_HANDLED; // prevent unused-var warnings
 
 // ── AppraisalEngine ──────────────────────────────────────────────────────────
 // Pure deterministic OCC (Ortony-Clore-Collins 1988) appraisal layer.

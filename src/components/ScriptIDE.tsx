@@ -197,7 +197,8 @@ export default function ScriptIDE({
   const panelToggleCountRef = useRef(0);
   const keystrokeTimesRef = useRef<number[]>([]);
   const analysisGenerationRef = useRef<number>(0);
-  const analysisAbortRef = useRef<AbortController | null>(null);
+  const analysisAbortRef  = useRef<AbortController | null>(null);
+  const cleanActionAbortRef = useRef<AbortController | null>(null);
   // Always-current ref so async callbacks (triggerAnalysis) see the latest engineState
   // rather than a stale closure from 2 s ago.
   const engineStateRef = useRef<EngineState | null>(null);
@@ -233,6 +234,8 @@ export default function ScriptIDE({
   useEffect(() => {
     return () => {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      analysisAbortRef.current?.abort();
+      cleanActionAbortRef.current?.abort();
       if (audioCtxRef.current) {
         audioCtxRef.current.close().catch(() => { /* ignore */ });
         audioCtxRef.current = null;
@@ -724,7 +727,14 @@ export default function ScriptIDE({
 
   // ── Export ───────────────────────────────────────────────────────────────────
   const exportFountain = () => {
-    const blob = new Blob([scriptText], { type: "text/plain" });
+    // Prepend a Fountain title page if the script doesn't already have one.
+    let content = scriptText;
+    if (!content.trimStart().startsWith('Title:')) {
+      const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      const titlePage = `Title: Untitled Script\nCredit: Written by\nAuthor: Author\nDraft date: ${today}\n\n`;
+      content = titlePage + content;
+    }
+    const blob = new Blob([content], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -735,12 +745,16 @@ export default function ScriptIDE({
 
   // ── Clean action AI ──────────────────────────────────────────────────────────
   const handleCleanAction = async (index: number, text: string) => {
+    cleanActionAbortRef.current?.abort();
+    const abort = new AbortController();
+    cleanActionAbortRef.current = abort;
     setIsCleaning(index);
     try {
       const response = await fetch("/api/scriptide/clean-action", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
+        signal: abort.signal,
       });
       if (!response.ok) throw new Error(`Clean action failed: ${response.status}`);
       const data = await response.json();
@@ -754,6 +768,7 @@ export default function ScriptIDE({
       setScriptText(newScript);
       triggerAnalysis(newScript);
     } catch (err) {
+      if ((err as Error).name === 'AbortError') return;
       if (cleanErrTimerRef.current) clearTimeout(cleanErrTimerRef.current);
       setCleanError((err as Error).message ?? 'Clean action failed');
       cleanErrTimerRef.current = setTimeout(() => setCleanError(null), 5000);

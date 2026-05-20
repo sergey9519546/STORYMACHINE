@@ -1,0 +1,17 @@
+{
+  "id": "legitimacy_split",
+  "kind": "legitimacy_split",
+  "themeClaimTemplate": "The role we are given / The role we have earned",
+  "physicalCarrier": { "type": "institution", "required": true },
+  "lifecycleStates": ["seeded", "claimed", "contested", "exposed", "crisis", "resolved"],
+  "transitionRules": [
+    { "from": "seeded", "to": "claimed", "condition": "character_assumes_a_public_role" },
+    { "from": "claimed", "to": "contested", "condition": "another_party_disputes_the_claim" },
+    { "from": "contested", "to": "exposed", "condition": "gap_between_public_and_earned_is_revealed" },
+    { "from": "exposed", "to": "crisis", "condition": "the_institution_must_rule" },
+    { "from": "crisis", "to": "resolved", "condition": "legitimacy_is_re_grounded_or_surrendered" }
+  ],
+  "climaxProofPredicate": "claimant_must_choose: defend_the_title | earn_it | surrender_it",
+  "endingProofPredicate": "legitimacy_source_changed_from_granted_to_earned_or_lost",
+  "invariants": ["public_role_diverges_from_earned_role", "climax_tests_the_basis_of_authority"]
+}

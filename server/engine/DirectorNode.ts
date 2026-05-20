@@ -481,6 +481,47 @@ From ${observer.name}'s perspective only:
       });
     }
     logger.info('pacing_check', { target, style: directorStyle ?? 'none', tempo: m.tempo, monotony: m.monotonyRisk, turn: totalTurns });
+
+    // ── Stuck-character detection: emit REDIRECT when an agent hasn't moved in >4 turns ──
+    this._emitStuckPressure(location_id, recentActions, totalTurns);
+  }
+
+  private _emitStuckPressure(location_id: string, recentActions: ActionLogEntry[], totalTurns: number): void {
+    if (totalTurns < 5) return;
+    const agents = this.stage.getAgentsInLocation(location_id);
+    const loc = this.stage.getLocation(location_id);
+    if (!loc || loc.adjacent_locations.length === 0) return; // no exits — pointless to pressure
+
+    const exitNames = loc.adjacent_locations
+      .map(id => this.stage.getLocation(id)?.name)
+      .filter((n): n is string => Boolean(n));
+    if (exitNames.length === 0) return;
+
+    // Scan last 5 actions in this room — if an agent accounts for ≥4 of them, they're stuck.
+    const last5 = recentActions.slice(-5);
+    const agentActionCount = new Map<string, number>();
+    for (const a of last5) agentActionCount.set(a.char_id, (agentActionCount.get(a.char_id) ?? 0) + 1);
+
+    for (const agent of agents) {
+      if ((agentActionCount.get(agent.char_id) ?? 0) < 4) continue;
+
+      // Don't stack duplicate stuck pressures for this agent
+      const existing = this.stage.getActivePressures(agent.char_id);
+      if (existing.some(p => p.pressure_type === 'REDIRECT' && p.bias_hint.includes('exit'))) continue;
+
+      const exitList = exitNames.map(n => `"${n}"`).join(' or ');
+      this.stage.addDramaticPressure({
+        pressure_id: randomUUID(),
+        target_char_id: agent.char_id,
+        trigger_event_id: 'stuck_detector',
+        pressure_type: 'REDIRECT',
+        intensity: 55,
+        bias_hint: `You have lingered here too long — your objective requires movement. RELOCATE to ${exitList}.`,
+        expires_at_turn: totalTurns + 2,
+        applied: false,
+      });
+      logger.info('stuck_pressure_emitted', { agent: agent.name, location_id, exits: exitNames });
+    }
   }
 
   // ── H: Auto-Pivot Detection ──
@@ -852,13 +893,22 @@ From ${observer.name}'s perspective only:
         unexposed.map(p => p.asserted_by).find(id => id !== agent.char_id) ?? ''
       )?.name ?? 'someone';
 
+      // Fresh irony (1-2 unexposed lies, no WITHHOLD yet): emit WITHHOLD — the
+      // information gap is opening. As it accumulates (3+ lies or existing WITHHOLD),
+      // escalate to ESCALATE — the bomb has been under the table long enough.
+      const hasWithhold = existing.some(p => p.pressure_type === 'WITHHOLD');
+      const pressureType = (!hasWithhold && unexposed.length <= 2) ? 'WITHHOLD' : 'ESCALATE';
+      const hint = pressureType === 'WITHHOLD'
+        ? `${liarsName} knows something they haven't told you. You sense a gap — information is being withheld. Probe carefully.`
+        : `Dramatic tension: ${liarsName} has told you something that isn't true — you don't know it yet, but the moment of revelation is approaching. Your instincts should be signaling that something is off.`;
+
       this.stage.addDramaticPressure({
         pressure_id: randomUUID(),
         target_char_id: agent.char_id,
         trigger_event_id: oldest.event_id,
-        pressure_type: 'ESCALATE',
+        pressure_type: pressureType,
         intensity: Math.min(75, 30 + unexposed.length * 10),
-        bias_hint: `Dramatic tension: ${liarsName} has told you something that isn't true — you don't know it yet, but the moment of revelation is approaching. Your instincts should be signaling that something is off.`,
+        bias_hint: hint,
         expires_at_turn: turnIndex + 2,
         applied: false,
       });

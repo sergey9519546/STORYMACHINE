@@ -8,7 +8,7 @@ import { generateContent, getImageProvider, getTTSProvider, getModel } from './s
 import { rateLimit } from 'express-rate-limit';
 import { Stage } from './server/engine/Stage.ts';
 import { Orchestrator, type RoomProgressEvent } from './server/engine/Orchestrator.ts';
-import type { CharacterSheet, Location, StageSnapshot } from './server/engine/types.ts';
+import type { CharacterSheet, Location, StageSnapshot, StoryStructure, DirectorStyle } from './server/engine/types.ts';
 import { transcriptToFountain, extractCharactersFromLog, syuzhetSort, wrapSyuzhetFountain } from './server/lib/fountain.ts';
 import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES, STYLE_MODIFIERS } from './server/lib/structure-presets.ts';
 import { logger, requestLogger } from './server/lib/logger.ts';
@@ -315,6 +315,33 @@ setInterval(() => {
   }
 }, 60_000).unref();
 
+// Disk cleanup: remove orphaned session DB files that are older than SESSION_FILE_TTL_MS
+// and are not currently loaded in memory. Runs every 6 hours.
+const SESSION_FILE_TTL_MS = Number(process.env.SESSION_FILE_TTL_HOURS ?? 168) * 60 * 60 * 1000; // default 7 days
+if (PERSIST_SESSIONS) {
+  setInterval(() => {
+    const now = Date.now();
+    let files: string[];
+    try { files = fs.readdirSync(SESSION_DB_DIR); } catch { return; }
+    for (const file of files) {
+      if (!file.endsWith('.db')) continue;
+      const sid = file.slice(0, -3);
+      if (sessions.has(sid)) continue; // actively loaded — skip
+      const filePath = path.join(SESSION_DB_DIR, file);
+      try {
+        const stat = fs.statSync(filePath);
+        if (now - stat.mtimeMs > SESSION_FILE_TTL_MS) {
+          for (const suffix of ['-wal', '-shm', '-journal']) {
+            try { fs.unlinkSync(filePath + suffix); } catch { /* absent */ }
+          }
+          fs.unlinkSync(filePath);
+          logger.info('session_disk_cleanup', { sid, ageDays: Math.round((now - stat.mtimeMs) / 86_400_000) });
+        }
+      } catch { /* file already gone */ }
+    }
+  }, 6 * 60 * 60 * 1000).unref();
+}
+
 function sessionId(req: express.Request): string {
   const raw = req.method === 'GET'
     ? req.query.sessionId
@@ -369,6 +396,28 @@ async function startServer() {
     res.json({ ok: true, config: getPublicConfig() });
   }));
 
+  // Connection test — fires a minimal generate call so the Settings UI can verify credentials.
+  // Uses the active LLM provider (whichever was just configured via POST /api/ai-config).
+  app.post('/api/ai-config/test', gameLimiter, asyncHandler(async (_req, res) => {
+    try {
+      const result = await generateContent({
+        model: getModel('fast'),
+        contents: 'Reply with the single word: OK',
+        config: { maxOutputTokens: 8, temperature: 0 },
+      }, { label: 'connection-test', timeoutMs: 10_000 });
+      const text = typeof result.text === 'string' ? result.text.trim() : '';
+      res.json({ ok: true, response: text.substring(0, 64) });
+    } catch (err) {
+      // Sanitize upstream error — don't leak raw API error bodies to the client
+      const raw = err instanceof Error ? err.message : String(err);
+      const safe = raw.length > 200 ? raw.substring(0, 200) + '…' : raw;
+      // Strip any bearer tokens or keys that leaked into the error message
+      const sanitized = safe.replace(/Bearer\s+\S+/gi, 'Bearer [redacted]').replace(/sk-[A-Za-z0-9_-]+/g, 'sk-[redacted]');
+      logger.warn('ai_config_test_failed', { error: raw });
+      res.status(502).json({ ok: false, error: sanitized });
+    }
+  }));
+
   // ── Story Machine routes (game simulation) ─────────────────────────────────
   app.use('/api/init',     gameLimiter);
   app.use('/api/turn',     gameLimiter);
@@ -419,6 +468,18 @@ async function startServer() {
             suspicion_score: typeof a.suspicion_score === 'number' ? Math.max(0, Math.min(100, a.suspicion_score)) : 0,
             current_location_id: typeof a.current_location_id === 'string' ? a.current_location_id.substring(0, 64) : '',
             is_alive: a.is_alive !== false,
+            stakes: Array.isArray(a.stakes)
+              ? (a.stakes as unknown[]).filter((s): s is Record<string, unknown> => typeof s === 'object' && s !== null)
+                .slice(0, 10)
+                .map(s => ({
+                  id: typeof s.id === 'string' ? s.id : crypto.randomUUID(),
+                  char_id: requireString(a.char_id, 'char_id', 64),
+                  category: typeof s.category === 'string' ? s.category : 'reputation',
+                  description: typeof s.description === 'string' ? s.description.substring(0, 500) : '',
+                  magnitude: typeof s.magnitude === 'number' ? Math.max(0, Math.min(100, s.magnitude)) : 50,
+                  is_active: s.is_active !== false,
+                }))
+              : [],
           } as CharacterSheet);
         } catch { /* skip malformed agent */ }
       });
@@ -506,6 +567,17 @@ async function startServer() {
       if (!disconnected) res.write(`data: ${JSON.stringify(event)}\n\n`);
     };
 
+    // Hard wall-clock limit: if the simulation hasn't completed in 5 minutes, close
+    // the SSE stream and release the runningRooms lock so the session isn't stranded.
+    const SSE_MAX_MS = 5 * 60 * 1000;
+    const wallTimer = setTimeout(() => {
+      if (!disconnected) {
+        emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: 'error: stream timeout (5 min)' });
+        res.end();
+      }
+      disconnected = true;
+    }, SSE_MAX_MS);
+
     let lockKey = '';
     try {
       const sid = sessionId(req);
@@ -537,9 +609,11 @@ async function startServer() {
       }
     } catch (err) {
       emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: `error: ${(err as Error).message}` });
+    } finally {
+      clearTimeout(wallTimer);
     }
 
-    res.end();
+    if (!disconnected) res.end();
   });
 
   // ── Scene grouping endpoint ──────────────────────────────────────────────────
@@ -1278,9 +1352,9 @@ OUTPUT: A visceral character description.`,
     const dirStyle = typeof storyConfig.directorStyle === 'string' ? storyConfig.directorStyle : null;
     const structureBlock = (structure || emotionalArc || dirStyle) ? `
 STORY ARCHITECTURE:
-${structure ? `- Narrative Structure: ${STRUCTURE_NAMES[structure] ?? structure} — ensure the structuralNode field names a beat from this specific structure.` : ''}
+${structure ? `- Narrative Structure: ${STRUCTURE_NAMES[structure as StoryStructure] ?? structure} — ensure the structuralNode field names a beat from this specific structure.` : ''}
 ${emotionalArc ? `- Emotional Arc: ${emotionalArc.replace(/_/g, ' ')} — evaluate whether the current tension level matches this arc's expected trajectory at the scene's story position. ArcMeter and tension scores should reflect alignment with this shape.` : ''}
-${dirStyle ? `- Cinematic Style: ${dirStyle} — ${STYLE_MODIFIERS[dirStyle]?.agentInstruction?.split('.')[0] ?? dirStyle}. Let this style govern composition choices, information position bias, and commentary tone.` : ''}
+${dirStyle ? `- Cinematic Style: ${dirStyle} — ${STYLE_MODIFIERS[dirStyle as DirectorStyle]?.agentInstruction?.split('.')[0] ?? dirStyle}. Let this style govern composition choices, information position bias, and commentary tone.` : ''}
 ` : '';
 
     const prompt = `Analyze the following screenplay script.
@@ -1350,6 +1424,1259 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
       sceneAnalysis: { ...analysisData.sceneAnalysis, imageUrl, audioUrl },
       updatedDirectorState: analysisData.updatedDirectorState,
       evaluatorWarnings,
+    });
+  }));
+
+  // ── NVM routes (Wave 2) ────────────────────────────────────────────────────
+
+  // GET /api/nvm/commits — list all StoryCommits for this session
+  app.get('/api/nvm/commits', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    res.json({ commits: stage.getCommits() });
+  }));
+
+  // GET /api/nvm/commits/:commitId — single commit
+  app.get('/api/nvm/commits/:commitId', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const commit = stage.getCommit(req.params.commitId);
+    if (!commit) { res.status(404).json({ error: 'commit not found' }); return; }
+    res.json(commit);
+  }));
+
+  // GET /api/nvm/ghost-commits — list ghost (rejected) commits, optional ?sceneIdx=
+  app.get('/api/nvm/ghost-commits', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const sceneIdx = req.query.sceneIdx !== undefined ? Number(req.query.sceneIdx) : undefined;
+    res.json({ ghosts: stage.ghostLedgerGet(sceneIdx) });
+  }));
+
+  // POST /api/nvm/ghost-commits/branch — promote a ghost to a What-If candidate
+  app.post('/api/nvm/ghost-commits/branch', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const ghostId = requireString(req.body?.ghostId, 'ghostId', 128);
+    const ghost = stage.ghostLedgerFind(ghostId);
+    if (!ghost) { res.status(404).json({ error: 'ghost not found' }); return; }
+    res.json({ ghostId, branchedOps: ghost.ir.ops, sceneIdx: ghost.sceneIdx });
+  }));
+
+  // GET /api/nvm/manifest — build a StoryManifest from the current session
+  app.get('/api/nvm/manifest', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { manifestFromStage } = await import('./server/nvm/repro/manifest.ts');
+    const { seedFromString } = await import('./server/nvm/repro/seed.ts');
+    const sid = sessionId(req);
+    const manifest = manifestFromStage(stage, `manifest_${sid}`, seedFromString(sid), sid);
+    res.json(manifest);
+  }));
+
+  // GET /api/debug/explain/:eventId — explain an action as a causal call stack
+  app.get('/api/debug/explain/:eventId', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { explainAction } = await import('./server/nvm/debug/inspector.ts');
+    const panel = explainAction(stage, req.params.eventId);
+    if (!panel) { res.status(404).json({ error: 'event not found' }); return; }
+    res.json(panel);
+  }));
+
+  // GET /api/debug/explain-scene/:locationId — explain all events in a scene
+  app.get('/api/debug/explain-scene/:locationId', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { explainScene } = await import('./server/nvm/debug/inspector.ts');
+    res.json({ panels: explainScene(stage, req.params.locationId) });
+  }));
+
+  // ── NVM valuation routes (Wave 4) ─────────────────────────────────────────
+
+  // GET /api/nvm/tension — derive tension ledger from current session state
+  app.get('/api/nvm/tension', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { deriveTensionLedger } = await import('./server/nvm/valuation/futures.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const state = buildNarrativeState(stage);
+    const commits = stage.getCommits().filter(c => !c.reverted);
+    const sceneIdx = commits.length > 0 ? commits[commits.length - 1].sceneIdx : 0;
+    res.json(deriveTensionLedger(state, sceneIdx));
+  }));
+
+  // GET /api/nvm/two-reader — first-watch vs rewatch scores
+  app.get('/api/nvm/two-reader', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { deriveTensionLedger } = await import('./server/nvm/valuation/futures.ts');
+    const { twoReaderReport } = await import('./server/nvm/valuation/two-reader.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const state = buildNarrativeState(stage);
+    const commits = stage.getCommits().filter(c => !c.reverted);
+    const sceneIdx = commits.length > 0 ? commits[commits.length - 1].sceneIdx : 0;
+    const ledger = deriveTensionLedger(state, sceneIdx);
+    res.json(twoReaderReport(state, ledger));
+  }));
+
+  // GET /api/nvm/topology — emotional arc topology vs 6 archetypes
+  app.get('/api/nvm/topology', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { deriveTensionLedger } = await import('./server/nvm/valuation/futures.ts');
+    const { computeTopology } = await import('./server/nvm/valuation/topology.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const state = buildNarrativeState(stage);
+    const commits = stage.getCommits().filter(c => !c.reverted);
+    const ledgers = commits.map((c, i) => deriveTensionLedger(state, c.sceneIdx ?? i));
+    res.json(computeTopology(ledgers));
+  }));
+
+  // POST /api/nvm/redteam — red-team a RevealPlan against current audience state
+  app.post('/api/nvm/redteam', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { redTeamVerdict } = await import('./server/nvm/valuation/audience-redteam.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const plan = req.body?.plan;
+    if (!plan || typeof plan.revealId !== 'string') {
+      res.status(400).json({ error: 'body.plan must be a RevealPlan' }); return;
+    }
+    const state = buildNarrativeState(stage);
+    res.json(redTeamVerdict(plan, state));
+  }));
+
+  // ── Godmode API routes ─────────────────────────────────────────────────────
+
+  // GET /api/nvm/quality — run quality engine on a candidate IR
+  // Body: { ir: NarrativeTransitionIR }
+  app.post('/api/nvm/quality', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { runQualityEngine } = await import('./server/nvm/quality/index.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const ir = req.body?.ir;
+    if (!ir || typeof ir !== 'object' || !Array.isArray(ir.ops)) {
+      res.status(400).json({ error: 'body.ir must be a NarrativeTransitionIR' }); return;
+    }
+    const state = buildNarrativeState(stage);
+    res.json(runQualityEngine(ir, state));
+  }));
+
+  // GET /api/nvm/project/:target — project current canon to a format
+  // :target = fountain | novel | stage | comic | interactive | pitch | bible | rewatch | cutting_room
+  app.get('/api/nvm/project/:target', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { project } = await import('./server/nvm/project/index.ts');
+    const target = req.params.target as Parameters<typeof project>[1];
+    const VALID = ['fountain','novel','stage','comic','interactive','pitch','bible','rewatch','cutting_room'];
+    if (!VALID.includes(target)) {
+      res.status(400).json({ error: `Unknown projection target "${target}". Valid: ${VALID.join(', ')}` }); return;
+    }
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const commits = stage.getCommits().filter(c => !c.reverted);
+    const state = buildNarrativeState(stage);
+    const ghosts = stage.ghostLedgerGet();
+    const canon = { commits, state, ghosts };
+    res.json(project(canon, target));
+  }));
+
+  // GET /api/nvm/twin/scm — return the current structural causal model as a
+  // serialisable node list (Map → array) so the UI can render the op DAG.
+  app.get('/api/nvm/twin/scm', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { buildSCM } = await import('./server/nvm/twin/scm.ts');
+    const scm = buildSCM(stage);
+    const nodes = [...scm.nodes.values()].map(n => ({
+      opId: n.opId,
+      commitId: n.commitId,
+      opIdx: n.opIdx,
+      op: n.op,
+      parents: n.parents,
+      children: n.children,
+    }));
+    res.json({ nodes, order: scm.order, nodeCount: nodes.length });
+  }));
+
+  // POST /api/nvm/twin/do — Pearl's do() causal intervention
+  // Body: { opId: string, replacement: StoryOp | null }
+  app.post('/api/nvm/twin/do', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { buildSCM } = await import('./server/nvm/twin/scm.ts');
+    const { doIntervention } = await import('./server/nvm/twin/counterfactual.ts');
+    const opId = req.body?.opId;
+    if (typeof opId !== 'string' || !opId) {
+      res.status(400).json({ error: 'body.opId (string) is required' }); return;
+    }
+    const scm = buildSCM(stage);
+    const intervention = { opId, replacement: req.body?.replacement ?? null };
+    res.json(doIntervention(scm, intervention));
+  }));
+
+  // POST /api/nvm/author/fixed-points — backward-chain toward a narrative attractor
+  // Body: { fixedPoints: FixedPoint[], currentScene?: number }
+  app.post('/api/nvm/author/fixed-points', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { planToward } = await import('./server/nvm/author/fixed-points.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const fps = req.body?.fixedPoints;
+    if (!Array.isArray(fps) || fps.length === 0) {
+      res.status(400).json({ error: 'body.fixedPoints must be a non-empty array' }); return;
+    }
+    const state = buildNarrativeState(stage);
+    const currentScene = typeof req.body?.currentScene === 'number' ? req.body.currentScene : state.turn;
+    const planResult = planToward(state, fps, currentScene);
+
+    // Convert each GoalBias to DramaticPressure and inject into the Stage.
+    // Character extraction: UPDATE_BELIEF / APPRAISE_EMOTION carry charId;
+    // SHIFT_RELATIONSHIP carries pair[0]; everything else gets 'narrator'.
+    let pressuresInjected = 0;
+    for (let bi = 0; bi < planResult.biases.length; bi++) {
+      const bias = planResult.biases[bi];
+      const charIds = new Set<string>();
+      for (const op of bias.ops) {
+        if (op.op === 'UPDATE_BELIEF' || op.op === 'APPRAISE_EMOTION') charIds.add(op.charId);
+        else if (op.op === 'SHIFT_RELATIONSHIP') charIds.add(op.pair[0]);
+      }
+      if (charIds.size === 0) charIds.add('narrator');
+
+      // Map dominant op kind to a pressure type.
+      const firstOp = bias.ops[0];
+      type PressureType = import('./server/engine/types.ts').DramaticPressureType;
+      let pressureType: PressureType = 'ESCALATE';
+      if (firstOp) {
+        if (firstOp.op === 'PAYOFF_SETUP' || firstOp.op === 'ADVANCE_THEME_ARGUMENT') pressureType = 'revelation_due';
+        else if (firstOp.op === 'SEED_CLUE') pressureType = 'ESCALATE';
+        else if (firstOp.op === 'RAISE_CLOCK') pressureType = 'confrontation_imminent';
+      }
+
+      for (const charId of charIds) {
+        stage.addDramaticPressure({
+          pressure_id: `fp-${bi}-${charId}-${Date.now()}`,
+          target_char_id: charId,
+          trigger_event_id: `goal-bias-${bi}`,
+          pressure_type: pressureType,
+          intensity: 70,
+          bias_hint: `${bias.rationale} [Fixed point: ${bias.fixedPointDescription}]`,
+          expires_at_turn: bias.atScene + 2,
+          applied: false,
+        });
+        pressuresInjected++;
+      }
+    }
+
+    res.json({ ...planResult, pressuresInjected });
+  }));
+
+  // POST /api/nvm/author/backchain — backward-chain a single FixedPoint to a schedule.
+  // Body: { fixedPoint: FixedPoint, currentScene?: number }
+  app.post('/api/nvm/author/backchain', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { backchain, scheduleToGoalBiases } = await import('./server/nvm/author/backchain.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const fp = req.body?.fixedPoint;
+    if (!fp || typeof fp.atScene !== 'number') {
+      res.status(400).json({ error: 'body.fixedPoint with atScene (number) is required' }); return;
+    }
+    const state = buildNarrativeState(stage);
+    const currentScene = typeof req.body?.currentScene === 'number' ? req.body.currentScene : state.turn;
+    const result = backchain(fp, state, currentScene);
+    const biases = scheduleToGoalBiases(result, fp.description ?? `fixed point @ scene ${fp.atScene}`);
+    res.json({ ...result, biases });
+  }));
+
+  // GET /api/nvm/momentum — narrative momentum score (5th tension signal)
+  app.get('/api/nvm/momentum', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { momentumScore } = await import('./server/nvm/valuation/futures.ts');
+    const commits = stage.getCommits().filter(c => !c.reverted);
+    res.json({ momentumScore: momentumScore(commits), commitCount: commits.length });
+  }));
+
+  // POST /api/nvm/inject-ops — Director's Cut: inject custom StoryOps into the canon.
+  // The writer can pause the sim and author ops directly; they become a user_authored commit.
+  // Body: { ops: StoryOp[], sceneIdx?: number, label?: string }
+  app.post('/api/nvm/inject-ops', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+    const { buildNarrativeState, stateHash } = await import('./server/nvm/state/NarrativeState.ts');
+    const { summarizeOps } = await import('./server/nvm/state/StoryCommit.ts');
+    const { randomUUID } = await import('node:crypto');
+    const { STORY_OP_KINDS } = await import('./server/nvm/ops/StoryOp.ts');
+
+    const ops = req.body?.ops;
+    if (!Array.isArray(ops) || ops.length === 0) {
+      res.status(400).json({ error: 'body.ops must be a non-empty StoryOp array' }); return;
+    }
+    // Validate each op has a known op kind
+    for (const op of ops) {
+      if (typeof op?.op !== 'string' || !(op.op in STORY_OP_KINDS)) {
+        res.status(400).json({ error: `Unknown op kind: "${op?.op ?? '?'}"` }); return;
+      }
+    }
+
+    const state = buildNarrativeState(stage);
+    const commits = stage.getCommits().filter(c => !c.reverted);
+    const parentId = commits[commits.length - 1]?.commitId ?? null;
+    const sceneIdx = typeof req.body?.sceneIdx === 'number' ? req.body.sceneIdx : state.turn;
+
+    const newState = applyStoryOps(state, ops);
+    const commitId = randomUUID();
+    stage.appendCommit({
+      commitId,
+      parentId,
+      sceneIdx,
+      ops,
+      deltaSummary: summarizeOps(ops),
+      reverted: false,
+      createdAt: Date.now(),
+    });
+
+    res.json({
+      commitId,
+      sceneIdx,
+      ops: ops.length,
+      newStateHash: stateHash(newState),
+      label: req.body?.label ?? 'director_cut',
+    });
+  }));
+
+  // POST /api/nvm/converge — run the G1 convergence loop on a scene target.
+  // Body: { target: SceneTarget, budget?: { maxIterations, candidatesPerIteration }, seed?: number }
+  // Returns: ConvergeResult (history, converged, finalValuation, finalQuality, ghosts[])
+  app.post('/api/nvm/converge', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { convergeScene } = await import('./server/nvm/converge/loop.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const { makeLLMCandidateGenerator } = await import('./server/nvm/generate/llm-generator.ts');
+    const target = req.body?.target;
+    if (!target || typeof target !== 'object' || typeof target.sceneIdx !== 'number') {
+      res.status(400).json({ error: 'body.target must be a SceneTarget with sceneIdx' }); return;
+    }
+    const state = buildNarrativeState(stage);
+    const seed = typeof req.body?.seed === 'number' ? req.body.seed : Date.now();
+    const generate = makeLLMCandidateGenerator();
+
+    // G13→G1: if corpus has runs, mine the Director Policy and pass it to the budget.
+    let directorPolicy: import('./server/nvm/selfplay/mine.ts').DirectorPolicy | undefined;
+    const corpusRuns = stage.getCorpusRuns(30);
+    if (corpusRuns.length > 0) {
+      const { mineCorpus } = await import('./server/nvm/selfplay/mine.ts');
+      const fakeReport = {
+        runs: corpusRuns.map(r => ({
+          scenarioId: r.scenario_id, seed: 0, proofPassRate: r.proof_pass_rate,
+          meanValuation: r.mean_valuation, score: r.score,
+          topOperators: [] as import('./server/nvm/converge/operators.ts').MutationOperator[],
+          scenes: [], effectiveOperators: [], totalIterations: 0,
+        })),
+        meanScore: corpusRuns.reduce((s, r) => s + r.score, 0) / corpusRuns.length,
+        bestRun: { scenarioId: '', seed: 0, proofPassRate: 0, meanValuation: 0, score: 0, topOperators: [], scenes: [], effectiveOperators: [], totalIterations: 0 },
+        worstRun: { scenarioId: '', seed: 0, proofPassRate: 0, meanValuation: 0, score: 0, topOperators: [], scenes: [], effectiveOperators: [], totalIterations: 0 },
+        operatorFrequency: {} as Record<import('./server/nvm/converge/operators.ts').MutationOperator, number>,
+      };
+      directorPolicy = mineCorpus(fakeReport).policy;
+    }
+
+    const budget = { ...(req.body?.budget ?? { maxIterations: 4, candidatesPerIteration: 2 }), directorPolicy };
+    const result = await convergeScene(state, target, generate, budget, seed);
+
+    // Persist any new ghost commits from convergence into Stage ghost ledger
+    const { appendGhost } = await import('./server/nvm/repro/ghost-ledger.ts');
+    for (const ghost of result.ghosts) {
+      appendGhost(stage, {
+        ghostId: ghost.ir.transitionId,
+        parentCommitId: null,
+        sceneIdx: ghost.ir.sceneIdx,
+        ir: ghost.ir,
+        reason: ghost.reason,
+        rejectedAt: Date.now(),
+      });
+    }
+
+    res.json({
+      converged: result.converged,
+      iterations: result.iterations,
+      finalValuation: result.finalValuation,
+      finalQuality: result.finalQuality,
+      finalComposite: result.finalComposite,
+      history: result.history,
+      ghostCount: result.ghosts.length,
+      ir: result.ir,
+    });
+  }));
+
+  // GET /api/nvm/corpus — top corpus runs + Director policy
+  app.get('/api/nvm/corpus', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { mineCorpus } = await import('./server/nvm/selfplay/mine.ts');
+    const limit = typeof req.query['limit'] === 'string' ? parseInt(req.query['limit'], 10) : 20;
+    const runs = stage.getCorpusRuns(isNaN(limit) ? 20 : Math.min(limit, 100));
+    if (runs.length === 0) {
+      res.json({ playbook: null, runs: [], message: 'No corpus runs yet. POST /api/nvm/selfplay to generate.' });
+      return;
+    }
+    // Build a minimal CorpusReport shape for mineCorpus
+    const fakeReport = {
+      runs: runs.map(r => ({
+        scenarioId: r.scenario_id,
+        seed: 0,
+        proofPassRate: r.proof_pass_rate,
+        meanValuation: r.mean_valuation,
+        score: r.score,
+        topOperators: [] as import('./server/nvm/converge/operators.ts').MutationOperator[],
+        scenes: [],
+        effectiveOperators: [],
+        totalIterations: 0,
+      })),
+      meanScore: runs.reduce((s, r) => s + r.score, 0) / runs.length,
+      bestRun: runs[0] ? { scenarioId: runs[0].scenario_id, seed: 0, proofPassRate: runs[0].proof_pass_rate, meanValuation: runs[0].mean_valuation, score: runs[0].score, topOperators: [], scenes: [], effectiveOperators: [], totalIterations: 0 } : { scenarioId: '', seed: 0, proofPassRate: 0, meanValuation: 0, score: 0, topOperators: [], scenes: [], effectiveOperators: [], totalIterations: 0 },
+      worstRun: runs[runs.length - 1] ? { scenarioId: runs[runs.length - 1].scenario_id, seed: 0, proofPassRate: runs[runs.length - 1].proof_pass_rate, meanValuation: runs[runs.length - 1].mean_valuation, score: runs[runs.length - 1].score, topOperators: [], scenes: [], effectiveOperators: [], totalIterations: 0 } : { scenarioId: '', seed: 0, proofPassRate: 0, meanValuation: 0, score: 0, topOperators: [], scenes: [], effectiveOperators: [], totalIterations: 0 },
+      operatorFrequency: {} as Record<import('./server/nvm/converge/operators.ts').MutationOperator, number>,
+    };
+    const playbook = mineCorpus(fakeReport);
+    res.json({ playbook, runs, runCount: runs.length });
+  }));
+
+  // POST /api/nvm/selfplay — run N headless sims and persist corpus results.
+  // Body: { scenarios: SimScenario[] }  (max 5 for HTTP budget)
+  app.post('/api/nvm/selfplay', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { runSelfPlay } = await import('./server/nvm/selfplay/corpus.ts');
+    const { makeLLMCandidateGenerator } = await import('./server/nvm/generate/llm-generator.ts');
+    const { extractGenome } = await import('./server/nvm/selfplay/genome.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const scenarios = req.body?.scenarios;
+    if (!Array.isArray(scenarios) || scenarios.length === 0) {
+      res.status(400).json({ error: 'body.scenarios must be a non-empty array' }); return;
+    }
+    if (scenarios.length > 5) {
+      res.status(400).json({ error: 'Maximum 5 scenarios per HTTP self-play request' }); return;
+    }
+    const generate = makeLLMCandidateGenerator();
+    const report = await runSelfPlay(scenarios, generate);
+
+    // Persist each run to Stage corpus
+    const state = buildNarrativeState(stage);
+    const commits = stage.getCommits();
+    const ghosts = stage.ghostLedgerGet();
+    for (const run of report.runs) {
+      const genome = extractGenome({ commits, state, ghosts }, run.scenarioId);
+      stage.appendCorpusRun({
+        run_id: `${run.scenarioId}-${run.seed}-${Date.now()}`,
+        scenario_id: run.scenarioId,
+        score: run.score,
+        proof_pass_rate: run.proofPassRate,
+        mean_valuation: run.meanValuation,
+        ops_count: run.scenes.reduce((s, ir) => s + ir.ops.length, 0),
+        genome_json: JSON.stringify(genome),
+      });
+    }
+
+    res.json({
+      runs: report.runs.length,
+      meanScore: report.meanScore,
+      bestScenario: report.bestRun.scenarioId,
+      operatorFrequency: report.operatorFrequency,
+    });
+  }));
+
+  // GET /api/nvm/genome/current — extract StoryGenome from the active canon.
+  app.get('/api/nvm/genome/current', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { extractGenome } = await import('./server/nvm/selfplay/genome.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const commits = stage.getCommits();
+    const state = buildNarrativeState(stage);
+    const ghosts = stage.ghostLedgerGet();
+    const genome = extractGenome({ commits, state, ghosts }, 'current');
+    res.json(genome);
+  }));
+
+  // POST /api/nvm/genome/diff — diff two corpus run genomes.
+  // Body: { runIdA: string, runIdB: string }
+  app.post('/api/nvm/genome/diff', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { diffGenomes } = await import('./server/nvm/selfplay/genome.ts');
+    const { runIdA, runIdB } = req.body ?? {};
+    if (typeof runIdA !== 'string' || typeof runIdB !== 'string') {
+      res.status(400).json({ error: 'body.runIdA and body.runIdB (strings) are required' }); return;
+    }
+    const runs = stage.getCorpusRuns(200);
+    const runA = runs.find((r: { run_id: string }) => r.run_id === runIdA);
+    const runB = runs.find((r: { run_id: string }) => r.run_id === runIdB);
+    if (!runA || !runB) {
+      res.status(404).json({ error: `Run(s) not found: ${!runA ? runIdA : ''} ${!runB ? runIdB : ''}`.trim() }); return;
+    }
+    const genomeA = JSON.parse(runA.genome_json);
+    const genomeB = JSON.parse(runB.genome_json);
+    const diff = diffGenomes(genomeA, genomeB);
+    res.json({ diff, genomeA, genomeB });
+  }));
+
+  // POST /api/nvm/genome/breed — breed two corpus run genomes into a seed genome.
+  // Body: { runIdA: string, runIdB: string, newId?: string }
+  app.post('/api/nvm/genome/breed', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { breedGenomes } = await import('./server/nvm/selfplay/genome.ts');
+    const { runIdA, runIdB, newId } = req.body ?? {};
+    if (typeof runIdA !== 'string' || typeof runIdB !== 'string') {
+      res.status(400).json({ error: 'body.runIdA and body.runIdB (strings) are required' }); return;
+    }
+    const runs = stage.getCorpusRuns(200);
+    const runA = runs.find((r: { run_id: string }) => r.run_id === runIdA);
+    const runB = runs.find((r: { run_id: string }) => r.run_id === runIdB);
+    if (!runA || !runB) {
+      res.status(404).json({ error: 'Run(s) not found' }); return;
+    }
+    const genomeA = JSON.parse(runA.genome_json);
+    const genomeB = JSON.parse(runB.genome_json);
+    const bred = breedGenomes(genomeA, genomeB, typeof newId === 'string' ? newId : `bred-${Date.now()}`);
+    res.json(bred);
+  }));
+
+  // GET /api/nvm/proof/:commitId — run all 4 proof tiers on a single commit.
+  // Replays state up to (but not including) that commit, then runs the full
+  // proof kernel + lint + repair on its IR. No body required.
+  app.get('/api/nvm/proof/:commitId', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { runTier1, runTier2, tier2Score, runTier3, tier3Rank, runTier4 } = await import('./server/nvm/proof/kernel.ts');
+    const { repair } = await import('./server/nvm/proof/repair.ts');
+    const { lint } = await import('./server/nvm/proof/lint.ts');
+    const { emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+
+    const targetId = req.params.commitId;
+    const allCommits = stage.getCommits().filter((c: import('./server/nvm/state/StoryCommit.ts').StoryCommit) => !c.reverted);
+    const targetIdx = allCommits.findIndex((c: import('./server/nvm/state/StoryCommit.ts').StoryCommit) => c.commitId === targetId);
+    if (targetIdx === -1) {
+      res.status(404).json({ error: `Commit "${targetId}" not found` }); return;
+    }
+    const commit = allCommits[targetIdx];
+
+    // Replay state up to (not including) this commit
+    let rollingState = emptyState();
+    for (let i = 0; i < targetIdx; i++) {
+      rollingState = applyStoryOps(rollingState, allCommits[i].ops);
+    }
+
+    // Build minimal IR shell from commit
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: commit.commitId,
+      sceneIdx: commit.sceneIdx,
+      sceneFunction: 'advance_plot',
+      activeMechanisms: [],
+      beforeStateHash: 'inspector',
+      ops: commit.ops,
+      preconditions: [],
+      postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: commit.createdAt },
+    };
+
+    const t1 = runTier1(ir, rollingState);
+    const t2 = runTier2(ir, rollingState);
+    const t3 = runTier3(ir, rollingState);
+    const t4 = runTier4(ir, rollingState);
+    const allFailures = [...t1, ...t2].filter(r => !r.pass);
+    const patches = repair(allFailures, rollingState);
+    const lintWarnings = lint(ir, rollingState);
+
+    res.json({
+      commitId: commit.commitId,
+      sceneIdx: commit.sceneIdx,
+      opCount: commit.ops.length,
+      tier1: t1.map(r => ({ proof: r.proof, pass: r.pass, reason: r.reason, findings: r.findings })),
+      tier1Pass: t1.every(r => r.pass),
+      tier2: t2.map(r => ({ proof: r.proof, pass: r.pass, reason: r.reason, findings: r.findings })),
+      tier2Score: tier2Score(t2),
+      tier3: t3.map(r => ({ proof: r.proof, pass: r.pass, reason: r.reason })),
+      tier3Rank: tier3Rank(t3),
+      tier4: t4.map(r => ({ proof: r.proof, pass: r.pass, reason: r.reason, findings: r.findings })),
+      patches,
+      lintWarnings,
+      patchCount: patches.length,
+    });
+  }));
+
+  // POST /api/nvm/repair — run all proof tiers on an IR, return repair patches.
+  // Body: { ir: NarrativeTransitionIR }
+  app.post('/api/nvm/repair', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { runTier1, runTier2, runTier4 } = await import('./server/nvm/proof/kernel.ts');
+    const { repair } = await import('./server/nvm/proof/repair.ts');
+    const { lint } = await import('./server/nvm/proof/lint.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const ir = req.body?.ir;
+    if (!ir || typeof ir !== 'object' || !Array.isArray(ir.ops)) {
+      res.status(400).json({ error: 'body.ir must be a NarrativeTransitionIR with ops[]' }); return;
+    }
+    const state = buildNarrativeState(stage);
+    const t1 = runTier1(ir, state);
+    const t2 = runTier2(ir, state);
+    const t4 = runTier4(ir, state);
+    const allFailures = [...t1, ...t2].filter(r => !r.pass);
+    const patches = repair(allFailures, state);
+    const lintWarnings = lint(ir, state);
+    res.json({
+      tier1Pass: t1.every(r => r.pass),
+      tier1Failures: t1.filter(r => !r.pass).map(r => ({ proof: r.proof, reason: r.reason })),
+      tier2Failures: t2.filter(r => !r.pass).map(r => ({ proof: r.proof, reason: r.reason })),
+      tier4Advisories: t4.filter(r => !r.pass).map(r => ({ proof: r.proof, reason: r.reason })),
+      patches,
+      lintWarnings,
+      patchCount: patches.length,
+    });
+  }));
+
+  // GET /api/nvm/arc-timeline — per-scene stats for all active commits.
+  // Returns proof summary, quality score, tension, and top ops per scene.
+  app.get('/api/nvm/arc-timeline', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { runTier1, runTier2, tier2Score } = await import('./server/nvm/proof/kernel.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+    const { deriveTensionLedger } = await import('./server/nvm/valuation/futures.ts');
+    const { runQualityEngine } = await import('./server/nvm/quality/index.ts');
+    const commits = stage.getCommits().filter((c: import('./server/nvm/state/StoryCommit.ts').StoryCommit) => !c.reverted);
+    let rollingState = buildNarrativeState(stage);
+    // Reset to empty and replay for accurate per-scene state
+    const { emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+    rollingState = emptyState();
+
+    const scenes = [];
+    for (const commit of commits) {
+      // Build a minimal IR shell from the StoryCommit (commits store ops, not full IR)
+      const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+        transitionId: commit.commitId,
+        sceneIdx: commit.sceneIdx,
+        sceneFunction: 'advance_plot',
+        activeMechanisms: [],
+        beforeStateHash: 'timeline',
+        ops: commit.ops,
+        preconditions: [],
+        postconditions: [],
+        provenance: { origin: 'model_generated', createdAt: commit.createdAt },
+      };
+      const t1 = runTier1(ir, rollingState);
+      const t2 = runTier2(ir, rollingState);
+      const ledger = deriveTensionLedger(rollingState, commit.sceneIdx);
+      const qualityReport = runQualityEngine(ir, rollingState);
+      scenes.push({
+        sceneIdx: commit.sceneIdx,
+        commitId: commit.commitId,
+        sceneFunction: ir.sceneFunction,
+        t1Pass: t1.every(r => r.pass),
+        t1FailCount: t1.filter(r => !r.pass).length,
+        t2Score: tier2Score(t2),
+        t2FailCount: t2.filter(r => !r.pass).length,
+        qualityScore: qualityReport.score,
+        tension: ledger.totalTension,
+        opCount: commit.ops.length,
+        topOps: commit.ops.slice(0, 3).map((o: import('./server/nvm/ops/StoryOp.ts').StoryOp) => o.op),
+        mechanisms: ir.activeMechanisms,
+      });
+      rollingState = applyStoryOps(rollingState, commit.ops);
+    }
+
+    res.json({ scenes, sceneCount: scenes.length });
+  }));
+
+  // POST /api/nvm/converge-arc — multi-scene arc compiler.
+  // Runs convergeScene for each scene target in sequence, accumulating state.
+  // Body: { scenes: SceneTarget[], budget?: ConvergeBudget, seed?: number }
+  // Returns: per-scene results + arc-level score.
+  app.post('/api/nvm/converge-arc', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { convergeScene } = await import('./server/nvm/converge/loop.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+    const { makeLLMCandidateGenerator } = await import('./server/nvm/generate/llm-generator.ts');
+    const { mineCorpus } = await import('./server/nvm/selfplay/mine.ts');
+    const { appendGhost } = await import('./server/nvm/repro/ghost-ledger.ts');
+
+    const sceneTargets = req.body?.scenes;
+    if (!Array.isArray(sceneTargets) || sceneTargets.length === 0) {
+      res.status(400).json({ error: 'body.scenes must be a non-empty array of SceneTarget' }); return;
+    }
+    if (sceneTargets.length > 8) {
+      res.status(400).json({ error: 'Maximum 8 scenes per arc compilation' }); return;
+    }
+
+    // Mine Director Policy from corpus if available
+    let directorPolicy: import('./server/nvm/selfplay/mine.ts').DirectorPolicy | undefined;
+    const corpusRuns = stage.getCorpusRuns(30);
+    if (corpusRuns.length > 0) {
+      const fakeReport = {
+        runs: corpusRuns.map(r => ({
+          scenarioId: r.scenario_id, seed: 0, proofPassRate: r.proof_pass_rate,
+          meanValuation: r.mean_valuation, score: r.score,
+          topOperators: [] as import('./server/nvm/converge/operators.ts').MutationOperator[],
+          scenes: [], effectiveOperators: [], totalIterations: 0,
+        })),
+        meanScore: corpusRuns.reduce((s, r) => s + r.score, 0) / corpusRuns.length,
+        bestRun: { scenarioId: '', seed: 0, proofPassRate: 0, meanValuation: 0, score: 0, topOperators: [], scenes: [], effectiveOperators: [], totalIterations: 0 },
+        worstRun: { scenarioId: '', seed: 0, proofPassRate: 0, meanValuation: 0, score: 0, topOperators: [], scenes: [], effectiveOperators: [], totalIterations: 0 },
+        operatorFrequency: {} as Record<import('./server/nvm/converge/operators.ts').MutationOperator, number>,
+      };
+      directorPolicy = mineCorpus(fakeReport).policy;
+    }
+
+    const baseBudget = req.body?.budget ?? { maxIterations: 3, candidatesPerIteration: 2 };
+    const budget = { ...baseBudget, directorPolicy };
+    const baseSeed = typeof req.body?.seed === 'number' ? req.body.seed : Date.now();
+    const generate = makeLLMCandidateGenerator();
+
+    let rollingState = buildNarrativeState(stage);
+    const sceneResults = [];
+    let totalComposite = 0;
+    let convergedCount = 0;
+
+    for (let i = 0; i < sceneTargets.length; i++) {
+      const target = sceneTargets[i];
+      const result = await convergeScene(rollingState, target, generate, budget, baseSeed + i * 1000);
+
+      // Persist ghosts
+      for (const ghost of result.ghosts) {
+        appendGhost(stage, {
+          ghostId: ghost.ir.transitionId,
+          parentCommitId: null,
+          sceneIdx: ghost.ir.sceneIdx,
+          ir: ghost.ir,
+          reason: ghost.reason,
+          rejectedAt: Date.now(),
+        });
+      }
+
+      sceneResults.push({
+        sceneIdx: target.sceneIdx,
+        converged: result.converged,
+        iterations: result.iterations,
+        finalValuation: result.finalValuation,
+        finalQuality: result.finalQuality,
+        finalComposite: result.finalComposite,
+        tier3Rank: result.history.length > 0
+          ? result.history[result.history.length - 1].tier3Rank
+          : 0,
+        ghostCount: result.ghosts.length,
+        opCount: result.ir.ops.length,
+        sceneFunction: result.ir.sceneFunction,
+      });
+
+      totalComposite += result.finalComposite;
+      if (result.converged) convergedCount++;
+
+      // Advance rolling state with the winning IR
+      rollingState = applyStoryOps(rollingState, result.ir.ops);
+    }
+
+    const meanComposite = sceneTargets.length > 0 ? totalComposite / sceneTargets.length : 0;
+    const arcScore = 0.5 * (convergedCount / sceneTargets.length) + 0.5 * (meanComposite / 100);
+
+    res.json({
+      scenes: sceneResults,
+      totalScenes: sceneTargets.length,
+      convergedCount,
+      meanComposite: Math.round(meanComposite * 10) / 10,
+      arcScore: Math.round(arcScore * 1000) / 1000,
+      usedDirectorPolicy: !!directorPolicy,
+    });
+  }));
+
+  // GET /api/nvm/sidecar — export current session as NVM sidecar JSON
+  app.get('/api/nvm/sidecar', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { buildSidecar } = await import('./server/nvm/project/sidecar.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const commits = stage.getCommits();
+    const state = buildNarrativeState(stage);
+    const ghosts = stage.ghostLedgerGet();
+    const sidecar = buildSidecar({ commits, state, ghosts });
+    res.setHeader('Content-Disposition', 'attachment; filename="story.nvm.json"');
+    res.json(sidecar);
+  }));
+
+  // GET /api/nvm/quality/scene/:commitId — run quality engine on a committed scene.
+  // Replays state up to (not including) that commit, builds a minimal IR shell,
+  // runs runQualityEngine, and returns the full QualityReport.
+  app.get('/api/nvm/quality/scene/:commitId', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { runQualityEngine } = await import('./server/nvm/quality/index.ts');
+    const { emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+
+    const targetId = req.params.commitId;
+    const allCommits = stage.getCommits().filter(
+      (c: import('./server/nvm/state/StoryCommit.ts').StoryCommit) => !c.reverted,
+    );
+    const targetIdx = allCommits.findIndex(
+      (c: import('./server/nvm/state/StoryCommit.ts').StoryCommit) => c.commitId === targetId,
+    );
+    if (targetIdx === -1) {
+      res.status(404).json({ error: `Commit "${targetId}" not found` }); return;
+    }
+    const commit = allCommits[targetIdx];
+
+    let rollingState = emptyState();
+    for (let i = 0; i < targetIdx; i++) {
+      rollingState = applyStoryOps(rollingState, allCommits[i].ops);
+    }
+
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: commit.commitId,
+      sceneIdx: commit.sceneIdx,
+      sceneFunction: 'advance_plot',
+      activeMechanisms: [],
+      beforeStateHash: 'quality-inspector',
+      ops: commit.ops,
+      preconditions: [],
+      postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: commit.createdAt },
+    };
+
+    const report = runQualityEngine(ir, rollingState);
+    res.json({ commitId: commit.commitId, sceneIdx: commit.sceneIdx, opCount: commit.ops.length, ...report });
+  }));
+
+  // GET /api/nvm/epistemic — current epistemic state: per-character beliefs,
+  // inferred meta-layers (who believes what about whom based on 'told' sources),
+  // and dramatic irony pairs where characters hold divergent beliefs about the
+  // same proposition.
+  app.get('/api/nvm/epistemic', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const state = buildNarrativeState(stage);
+
+    // Flatten all character beliefs into a unified belief map
+    const beliefs: Array<{ charId: string; beliefId: string; proposition: string; confidence: number; source: string }> = [];
+    for (const [charId, blist] of Object.entries(state.characterBeliefs)) {
+      for (const b of blist) {
+        beliefs.push({ charId, beliefId: b.id, proposition: b.proposition, confidence: b.confidence, source: b.source });
+      }
+    }
+
+    // Infer meta-layers: beliefs with source='told' imply holderId has a meta-belief
+    // that some other party also holds the same proposition (they were told it).
+    // Cross-reference: for each 'told' belief of charA, find any charB who also holds
+    // the same proposition — this constitutes a shared-knowledge irony opportunity.
+    const metaLayers: Array<{ holderId: string; targetId: string; proposition: string; confidence: number; depth: number; basis: string }> = [];
+    for (const { charId, proposition, confidence } of beliefs.filter(b => b.source === 'told')) {
+      const sharers = beliefs.filter(b => b.charId !== charId && b.proposition === proposition);
+      for (const sharer of sharers) {
+        metaLayers.push({
+          holderId: charId,
+          targetId: sharer.charId,
+          proposition,
+          confidence: Math.round(confidence * 0.8 * 100) / 100,
+          depth: 2,
+          basis: 'told-cross-reference',
+        });
+      }
+    }
+
+    // Dramatic irony: propositions where chars hold divergent beliefs (confidence diff > 0.4)
+    const ironyPairs: Array<{ charA: string; charB: string; proposition: string; confA: number; confB: number }> = [];
+    const propMap = new Map<string, Array<{ charId: string; confidence: number }>>();
+    for (const { charId, proposition, confidence } of beliefs) {
+      const list = propMap.get(proposition) ?? [];
+      list.push({ charId, confidence });
+      propMap.set(proposition, list);
+    }
+    for (const [proposition, holders] of propMap) {
+      for (let i = 0; i < holders.length; i++) {
+        for (let j = i + 1; j < holders.length; j++) {
+          const diff = Math.abs(holders[i].confidence - holders[j].confidence);
+          if (diff >= 0.4) {
+            ironyPairs.push({
+              charA: holders[i].charId,
+              charB: holders[j].charId,
+              proposition,
+              confA: holders[i].confidence,
+              confB: holders[j].confidence,
+            });
+          }
+        }
+      }
+    }
+
+    res.json({
+      characters: Object.keys(state.characterBeliefs),
+      totalBeliefs: beliefs.length,
+      beliefs,
+      metaLayers,
+      ironyPairs,
+      clueCount: state.clues.length,
+      payoffCount: state.payoffs.length,
+      suspense: state.audienceState.suspense,
+    });
+  }));
+
+  // GET /api/nvm/health — unified story health dashboard.
+  // Aggregates tension, topology, arc-completion, epistemic state, quality,
+  // proof pass-rate, and momentum into a single health report. One round-trip
+  // for the health panel — no client-side fan-out needed.
+  app.get('/api/nvm/health', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { buildNarrativeState, emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+    const { deriveTensionLedger, momentumScore } = await import('./server/nvm/valuation/futures.ts');
+    const { computeTopology } = await import('./server/nvm/valuation/topology.ts');
+    const { analyzeArcCompletion } = await import('./server/nvm/quality/arc-tracker.ts');
+    const { runTier1, runTier2, tier2Score } = await import('./server/nvm/proof/kernel.ts');
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+
+    const state = buildNarrativeState(stage);
+    const allCommits = stage.getCommits().filter((c: import('./server/nvm/state/StoryCommit.ts').StoryCommit) => !c.reverted);
+    const commitCount = allCommits.length;
+    const sceneIdx = commitCount > 0 ? allCommits[commitCount - 1].sceneIdx : 0;
+
+    // Tension
+    const currentLedger = deriveTensionLedger(state, sceneIdx);
+    const ledgers = allCommits.map((c: import('./server/nvm/state/StoryCommit.ts').StoryCommit, i: number) => deriveTensionLedger(state, c.sceneIdx ?? i));
+    const tensionHistory = ledgers.map(l => l.totalTension);
+
+    // Topology
+    const topology = computeTopology(ledgers);
+
+    // Arc completion
+    const arcReport = analyzeArcCompletion(allCommits.map((c: import('./server/nvm/state/StoryCommit.ts').StoryCommit) => ({ sceneIdx: c.sceneIdx, ops: c.ops })));
+
+    // Epistemic summary
+    const totalBeliefs = Object.values(state.characterBeliefs).flat().length;
+    const characterCount = Object.keys(state.characterBeliefs).length;
+
+    // Proof pass rate over all committed scenes (using rolling state)
+    let t1PassCount = 0;
+    let totalQuality = 0;
+    let rollingState = emptyState();
+    for (const commit of allCommits) {
+      const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+        transitionId: commit.commitId, sceneIdx: commit.sceneIdx, sceneFunction: 'advance_plot',
+        activeMechanisms: [], beforeStateHash: 'health', ops: commit.ops,
+        preconditions: [], postconditions: [],
+        provenance: { origin: 'model_generated', createdAt: commit.createdAt },
+      };
+      const t1 = runTier1(ir, rollingState);
+      const t2 = runTier2(ir, rollingState);
+      if (t1.every(r => r.pass)) t1PassCount++;
+      totalQuality += tier2Score(t2);
+      rollingState = applyStoryOps(rollingState, commit.ops);
+    }
+    const proofPassRate = commitCount > 0 ? Math.round((t1PassCount / commitCount) * 100) : 100;
+    const avgQuality = commitCount > 0 ? Math.round(totalQuality / commitCount) : 0;
+
+    // Momentum (momentumScore expects StoryCommit[], not TensionLedger[])
+    const momentum = momentumScore(allCommits);
+
+    res.json({
+      commitCount,
+      sceneCount: sceneIdx + (commitCount > 0 ? 1 : 0),
+      currentTension: currentLedger.totalTension,
+      tensionHistory,
+      momentum,
+      topology: {
+        dominantArc: topology.dominantArc,
+        coherence: topology.coherence,
+        scores: topology.scores.slice(0, 3),
+      },
+      arcCompletion: {
+        openCount: arcReport.openPromises.length,
+        overdueCount: arcReport.overdueCount,
+        resolvedCount: arcReport.resolvedCount,
+        debtScore: arcReport.debtScore,
+        mostUrgent: arcReport.openPromises.slice(0, 3).map(p => ({ kind: p.kind, description: p.description, urgency: p.urgency })),
+      },
+      epistemic: {
+        characterCount,
+        totalBeliefs,
+        suspense: state.audienceState.suspense,
+        clueCount: state.clues.length,
+        payoffCount: state.payoffs.length,
+      },
+      proof: {
+        passRate: proofPassRate,
+        avgQualityScore: avgQuality,
+      },
+    });
+  }));
+
+  // GET /api/nvm/character-arc — per-character per-scene breakdown.
+  // Replays all committed scenes and tracks, for each character that appears in
+  // any op: belief count, avg confidence, dominant emotion+intensity, net
+  // relationship scores (summed across all pairs), and scene-level agency (op count).
+  // Returns an arc object keyed by charId → per-scene snapshots.
+  app.get('/api/nvm/character-arc', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { emptyState, relationshipKey } = await import('./server/nvm/state/NarrativeState.ts');
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+
+    const allCommits = stage.getCommits().filter(
+      (c: import('./server/nvm/state/StoryCommit.ts').StoryCommit) => !c.reverted,
+    );
+
+    // Per-character timeline
+    const arcs: Record<string, Array<{
+      sceneIdx: number;
+      beliefCount: number;
+      avgConfidence: number;
+      dominantEmotion: string;
+      emotionIntensity: number;
+      netRelationshipScore: number;
+      agencyCount: number;    // ops in this scene that reference this char
+    }>> = {};
+
+    let rollingState = emptyState();
+
+    for (const commit of allCommits) {
+      // Apply this commit's ops to get post-scene state
+      const afterState = applyStoryOps(rollingState, commit.ops);
+
+      // Find all chars referenced in this commit's ops
+      const charsInScene = new Set<string>();
+      for (const op of commit.ops) {
+        if ('charId' in op) charsInScene.add((op as { charId: string }).charId);
+        if ('pair' in op) {
+          const pair = (op as { pair: [string, string] }).pair;
+          charsInScene.add(pair[0]);
+          charsInScene.add(pair[1]);
+        }
+      }
+
+      // Also include any char already tracked in prior arcs
+      for (const charId of Object.keys(arcs)) charsInScene.add(charId);
+
+      for (const charId of charsInScene) {
+        const beliefs = afterState.characterBeliefs[charId] ?? [];
+        const emotion = afterState.characterEmotions[charId];
+        const avgConf = beliefs.length > 0
+          ? Math.round(beliefs.reduce((s, b) => s + b.confidence, 0) / beliefs.length * 100) / 100
+          : 0;
+
+        // Net relationship score: sum of all relationship deltas for this char
+        let netRel = 0;
+        for (const [key, deltas] of Object.entries(afterState.relationships)) {
+          if (key.includes(charId)) {
+            netRel += deltas.reduce((s, d) => s + d.amount, 0);
+          }
+        }
+
+        // Agency: ops in this commit that reference this char
+        const agencyCount = commit.ops.filter(op => {
+          if ('charId' in op && (op as { charId: string }).charId === charId) return true;
+          if ('pair' in op) {
+            const pair = (op as { pair: [string, string] }).pair;
+            return pair[0] === charId || pair[1] === charId;
+          }
+          return false;
+        }).length;
+
+        if (!arcs[charId]) arcs[charId] = [];
+        arcs[charId].push({
+          sceneIdx: commit.sceneIdx,
+          beliefCount: beliefs.length,
+          avgConfidence: avgConf,
+          dominantEmotion: emotion?.dominant ?? 'none',
+          emotionIntensity: emotion?.intensity ?? 0,
+          netRelationshipScore: Math.round(netRel * 100) / 100,
+          agencyCount,
+        });
+      }
+
+      rollingState = afterState;
+    }
+
+    // Summarize across all scenes: belief trajectory, emotional range, peak agency
+    const characters = Object.entries(arcs).map(([charId, scenes]) => ({
+      charId,
+      scenes,
+      totalScenes: scenes.length,
+      peakBeliefs: Math.max(...scenes.map(s => s.beliefCount), 0),
+      peakIntensity: Math.max(...scenes.map(s => s.emotionIntensity), 0),
+      dominantEmotions: [...new Set(scenes.map(s => s.dominantEmotion).filter(e => e !== 'none'))],
+      totalAgency: scenes.reduce((s, sc) => s + sc.agencyCount, 0),
+    }));
+
+    // Sort by total agency descending (most active characters first)
+    characters.sort((a, b) => b.totalAgency - a.totalAgency);
+    res.json({ characters, totalScenes: allCommits.length });
+  }));
+
+  // GET /api/nvm/arc-completion — open narrative promise tracker.
+  // Replays all committed scenes and returns every unresolved story beat
+  // (clues, clocks, negative relationships, theme claims, object arcs)
+  // with pacing scores and completion window recommendations.
+  app.get('/api/nvm/arc-completion', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { analyzeArcCompletion } = await import('./server/nvm/quality/arc-tracker.ts');
+    const allCommits = stage.getCommits().filter(
+      (c: import('./server/nvm/state/StoryCommit.ts').StoryCommit) => !c.reverted,
+    );
+    const scenes = allCommits.map(
+      (c: import('./server/nvm/state/StoryCommit.ts').StoryCommit) => ({ sceneIdx: c.sceneIdx, ops: c.ops }),
+    );
+    res.json(analyzeArcCompletion(scenes));
+  }));
+
+  // GET /api/nvm/regression — narrative regression suite (Wave 29).
+  // Runs 14 named structural invariants over the full StoryCommit ledger and
+  // returns a graded report: pass/fail/warning/na per invariant + overall score.
+  app.get('/api/nvm/regression', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { runNarrativeRegression } = await import('./server/nvm/regression/runner.ts');
+    const allCommits = stage.getCommits();
+    res.json(runNarrativeRegression(allCommits));
+  }));
+
+  // GET /api/nvm/momentum — narrative momentum dashboard (Wave 30).
+  // Replays the full commit history scene by scene, computing quality score,
+  // regression score, tension total, and proof pass rate at each step.
+  // Returns a time-series array for the writer's CI dashboard.
+  app.get('/api/nvm/momentum', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { runQualityEngine } = await import('./server/nvm/quality/index.ts');
+    const { runNarrativeRegression } = await import('./server/nvm/regression/runner.ts');
+    const { emptyState, applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts').then(async d => ({
+      ...(await import('./server/nvm/state/NarrativeState.ts')),
+      applyStoryOps: d.applyStoryOps,
+    }));
+    const { runTier1, tier1Passes } = await import('./server/nvm/proof/kernel.ts');
+    const { deriveTensionLedger } = await import('./server/nvm/valuation/futures.ts');
+    type StoryCommit = import('./server/nvm/state/StoryCommit.ts').StoryCommit;
+    type NarrativeTransitionIR = import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR;
+
+    const allCommits = (stage.getCommits() as StoryCommit[]).filter(c => !c.reverted);
+    const points: Array<{
+      sceneIdx: number; commitId: string; opCount: number;
+      qualityScore: number; qualityWarnings: number;
+      regressionScore: number; regressionGrade: string;
+      tensionTotal: number; proofPassRate: number;
+    }> = [];
+
+    let rollingState = emptyState();
+    for (let i = 0; i < allCommits.length; i++) {
+      const commit = allCommits[i];
+      const ir: NarrativeTransitionIR = {
+        transitionId: commit.commitId, sceneIdx: commit.sceneIdx,
+        sceneFunction: 'advance_plot', activeMechanisms: [],
+        beforeStateHash: 'momentum', ops: commit.ops,
+        preconditions: [], postconditions: [],
+        provenance: { origin: 'model_generated', createdAt: commit.createdAt },
+      };
+
+      const qReport = runQualityEngine(ir, rollingState);
+      const tier1Results = runTier1(ir, rollingState);
+      const passCount = tier1Results.filter((r: import('./server/nvm/proof/contract.ts').ProofResult) => r.pass).length;
+      const proofPassRate = tier1Results.length === 0 ? 1 : passCount / tier1Results.length;
+
+      // Advance state then measure tension (tension depends on full context)
+      rollingState = applyStoryOps(rollingState, commit.ops);
+      const ledger = deriveTensionLedger(rollingState, commit.sceneIdx);
+
+      // Regression runs on all commits up to and including this one
+      const rReport = runNarrativeRegression(allCommits.slice(0, i + 1));
+
+      points.push({
+        sceneIdx: commit.sceneIdx,
+        commitId: commit.commitId,
+        opCount: commit.ops.length,
+        qualityScore: qReport.score,
+        qualityWarnings: qReport.warnings.length,
+        regressionScore: rReport.score,
+        regressionGrade: rReport.grade,
+        tensionTotal: Math.round(ledger.totalTension * 100) / 100,
+        proofPassRate: Math.round(proofPassRate * 100),
+      });
+    }
+
+    res.json({ points, totalScenes: allCommits.length });
+  }));
+
+  // GET /api/nvm/voice-dna — Voice DNA Analyzer (Wave 31).
+  // Aggregates UPDATE_BELIEF propositions across all commits, builds per-character
+  // vocabulary fingerprints, computes pairwise Jaccard similarity, identifies
+  // signature words (unique to each character), and returns an "acoustic twins"
+  // alert for pairs whose voices overlap too much.
+  app.get('/api/nvm/voice-dna', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    type StoryCommit = import('./server/nvm/state/StoryCommit.ts').StoryCommit;
+    const allCommits = (stage.getCommits() as StoryCommit[]).filter(c => !c.reverted);
+
+    // Build per-character word frequency maps from proposition vocabulary
+    const charWords = new Map<string, Map<string, number>>(); // charId → word → count
+    const charEmotions = new Map<string, Map<string, number>>(); // charId → emotion → count
+    let beliefOpCount = 0;
+
+    for (const commit of allCommits) {
+      for (const op of commit.ops) {
+        if (op.op === 'UPDATE_BELIEF') {
+          beliefOpCount++;
+          const words = op.belief.proposition.toLowerCase().split(/\W+/).filter((w: string) => w.length > 3);
+          const existing = charWords.get(op.charId) ?? new Map<string, number>();
+          for (const w of words) existing.set(w, (existing.get(w) ?? 0) + 1);
+          charWords.set(op.charId, existing);
+        }
+        if (op.op === 'APPRAISE_EMOTION') {
+          const existing = charEmotions.get(op.charId) ?? new Map<string, number>();
+          const dom = op.emotion.dominant ?? 'none';
+          existing.set(dom, (existing.get(dom) ?? 0) + 1);
+          charEmotions.set(op.charId, existing);
+        }
+      }
+    }
+
+    const characters = [...charWords.keys()];
+
+    // Pairwise Jaccard similarity
+    type SimPair = { a: string; b: string; similarity: number; sharedWords: string[] };
+    const pairs: SimPair[] = [];
+    for (let i = 0; i < characters.length; i++) {
+      for (let j = i + 1; j < characters.length; j++) {
+        const a = characters[i], b = characters[j];
+        const setA = new Set(charWords.get(a)!.keys());
+        const setB = new Set(charWords.get(b)!.keys());
+        const shared = [...setA].filter(w => setB.has(w));
+        const union = new Set([...setA, ...setB]).size;
+        const sim = union > 0 ? shared.length / union : 0;
+        pairs.push({ a, b, similarity: Math.round(sim * 100) / 100, sharedWords: shared.slice(0, 8) });
+      }
+    }
+    pairs.sort((a, b) => b.similarity - a.similarity);
+
+    // Signature words: words unique to this character (not in any other char's vocab)
+    const allOtherWords = (charId: string): Set<string> => {
+      const s = new Set<string>();
+      for (const [id, words] of charWords) {
+        if (id !== charId) for (const w of words.keys()) s.add(w);
+      }
+      return s;
+    };
+
+    type CharFingerprint = {
+      charId: string;
+      vocabSize: number;
+      signatureWords: string[];
+      dominantEmotion: string;
+      emotionRange: number;
+      beliefCount: number;
+    };
+    const fingerprints: CharFingerprint[] = characters.map(charId => {
+      const words = charWords.get(charId)!;
+      const others = allOtherWords(charId);
+      const sigs = [...words.entries()]
+        .filter(([w]) => !others.has(w))
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8)
+        .map(([w]) => w);
+      const emos = charEmotions.get(charId);
+      let domEmo = 'none', maxCount = 0;
+      if (emos) for (const [e, c] of emos) { if (c > maxCount) { maxCount = c; domEmo = e; } }
+      const emoRange = emos ? emos.size : 0;
+      const beliefCount = [...words.values()].reduce((s, c) => s + c, 0);
+      return { charId, vocabSize: words.size, signatureWords: sigs, dominantEmotion: domEmo, emotionRange: emoRange, beliefCount };
+    });
+    fingerprints.sort((a, b) => b.vocabSize - a.vocabSize);
+
+    // Global diversity score (avg pairwise Jaccard distance, 0=all same, 100=all distinct)
+    const avgSim = pairs.length > 0 ? pairs.reduce((s, p) => s + p.similarity, 0) / pairs.length : 0;
+    const diversityScore = Math.round((1 - avgSim) * 100);
+
+    // "Acoustic twins" = pairs with similarity >= 0.35
+    const acousticTwins = pairs.filter(p => p.similarity >= 0.35);
+
+    res.json({
+      characters,
+      fingerprints,
+      pairs,
+      acousticTwins,
+      diversityScore,
+      totalBeliefOps: beliefOpCount,
+      totalScenes: allCommits.length,
     });
   }));
 

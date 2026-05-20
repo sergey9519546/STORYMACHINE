@@ -1,0 +1,17 @@
+{
+  "id": "relationship_externalization",
+  "kind": "relationship_externalization",
+  "themeClaimTemplate": "What we cannot say to each other / What the object says for us",
+  "physicalCarrier": { "type": "object", "required": true },
+  "lifecycleStates": ["seeded", "proxy", "contested", "broken", "repaired", "resolved"],
+  "transitionRules": [
+    { "from": "seeded", "to": "proxy", "condition": "object_carries_unspoken_relationship_state" },
+    { "from": "proxy", "to": "contested", "condition": "parties_fight_over_the_object_not_the_feeling" },
+    { "from": "contested", "to": "broken", "condition": "object_is_damaged_or_withheld" },
+    { "from": "broken", "to": "repaired", "condition": "a_party_pays_a_cost_and_names_the_real_feeling" },
+    { "from": "repaired", "to": "resolved", "condition": "relationship_is_addressed_directly" }
+  ],
+  "climaxProofPredicate": "parties_must_choose: keep_using_the_proxy | speak_directly",
+  "endingProofPredicate": "relationship_conflict_moved_from_object_to_words",
+  "invariants": ["object_stands_in_for_an_unspoken_relationship", "climax_forces_direct_address"]
+}

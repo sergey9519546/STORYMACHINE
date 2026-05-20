@@ -1,0 +1,47 @@
+// Character-Advocate critic — protects psychological consistency.
+// Objects to emotion states that contradict established character psychology,
+// or belief updates that don't flow from the character's known epistemics.
+
+import type { NarrativeTransitionIR } from '../../ir/NarrativeTransitionIR.ts';
+import type { NarrativeState } from '../../state/NarrativeState.ts';
+import type { Critique } from '../room.ts';
+
+export function characterAdvocateCritic(ir: NarrativeTransitionIR, state: NarrativeState): Critique[] {
+  const critiques: Critique[] = [];
+
+  ir.ops.forEach((op, i) => {
+    if (op.op === 'APPRAISE_EMOTION') {
+      const prev = state.characterEmotions[op.charId];
+      // Sudden full emotional reversal (e.g. pride → shame with no story event between)
+      if (prev && prev.dominant !== op.emotion.dominant && op.emotion.intensity > 70) {
+        critiques.push({
+          criticId: 'character_advocate', severity: 50, targetOpIdx: i,
+          objection: `${op.charId} shifts from ${prev.dominant} to ${op.emotion.dominant} at intensity ${op.emotion.intensity} with no bridging beat`,
+          suggestedOperator: 'deepen_wound',
+          attentionBid: 55,
+        });
+      }
+      // Zero-intensity dominant is incoherent (also caught by lint, but critic flags it too)
+      if (op.emotion.intensity === 0) {
+        critiques.push({
+          criticId: 'character_advocate', severity: 40, targetOpIdx: i,
+          objection: `${op.charId} has dominant="${op.emotion.dominant}" but intensity=0 — emotion is empty`,
+          suggestedOperator: 'deepen_wound',
+          attentionBid: 35,
+        });
+      }
+    }
+
+    // Belief update: witnessed belief with no source_event_id
+    if (op.op === 'UPDATE_BELIEF' && op.belief.source === 'witnessed' && !op.belief.source_event_id) {
+      critiques.push({
+        criticId: 'character_advocate', severity: 35, targetOpIdx: i,
+        objection: `${op.charId} acquires a witnessed belief with no source_event_id — who witnessed what?`,
+        suggestedOperator: 'inject_irony',
+        attentionBid: 30,
+      });
+    }
+  });
+
+  return critiques;
+}

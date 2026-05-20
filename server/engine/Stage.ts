@@ -27,6 +27,8 @@ import type {
   StakeCategory,
 } from './types.ts';
 import { safeJsonParse } from '../lib/json.ts';
+import type { StoryCommit } from '../nvm/state/StoryCommit.ts';
+import type { StoryOp } from '../nvm/ops/StoryOp.ts';
 
 const DEFAULT_DARK_TRIAD: DarkTriad = { machiavellianism: 50, narcissism: 50, psychopathy: 50 };
 const DEFAULT_BIG_FIVE: BigFive = { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 };
@@ -98,6 +100,114 @@ export class Stage {
       // v5 → v6: persuasion outcome tracking
       () => {
         this.db.exec('ALTER TABLE Persuasion_Log ADD COLUMN success INTEGER');
+      },
+      // v6 → v7: unique constraint on Knowledge_Ledger (char_id, fact_description)
+      //          prevents duplicate facts from per-turn updateAgentKnowledge calls.
+      () => {
+        this.db.exec(`
+          DELETE FROM Knowledge_Ledger WHERE rowid NOT IN (
+            SELECT MIN(rowid) FROM Knowledge_Ledger GROUP BY char_id, fact_description
+          );
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_knowledge_unique
+            ON Knowledge_Ledger(char_id, fact_description);
+        `);
+      },
+      // v7 → v8: NVM StoryCommit ledger — event-sourced canon. Each row is one
+      //          scene-commit holding the StoryOp[] that produced it. Additive:
+      //          Action_Log is untouched.
+      () => {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS Story_Commits (
+            commit_id TEXT PRIMARY KEY,
+            parent_id TEXT,
+            scene_idx INTEGER NOT NULL,
+            ops_json TEXT NOT NULL,
+            delta_summary_json TEXT NOT NULL,
+            reverted INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS idx_commits_scene ON Story_Commits(scene_idx);
+        `);
+      },
+      // v8 → v9: LLM call cache (reproducible build) + Ghost Commits (shadow canon).
+      //   Llm_Cache: keyed by (model, prompt_hash) — warm hit bypasses network.
+      //   Ghost_Commits: rejected IR candidates stored as shadow canon for What-If.
+      () => {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS Llm_Cache (
+            cache_key   TEXT PRIMARY KEY,
+            model       TEXT NOT NULL,
+            prompt_hash TEXT NOT NULL,
+            response    TEXT NOT NULL,
+            created_at  INTEGER NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS idx_llm_cache_key ON Llm_Cache(cache_key);
+
+          CREATE TABLE IF NOT EXISTS Ghost_Commits (
+            ghost_id        TEXT PRIMARY KEY,
+            parent_commit_id TEXT,
+            scene_idx       INTEGER NOT NULL,
+            ir_json         TEXT NOT NULL,
+            reason          TEXT NOT NULL,
+            rejected_at     INTEGER NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS idx_ghost_scene ON Ghost_Commits(scene_idx);
+        `);
+      },
+      // v9 → v10: Reveal_Plans — persists the RevealPlan commitments that govern
+      //           PAYOFF_SETUP ops. The EarnedRevealProof checks these at commit time.
+      () => {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS Reveal_Plans (
+            reveal_id        TEXT PRIMARY KEY,
+            payoff_setup_id  TEXT NOT NULL,
+            description      TEXT NOT NULL,
+            required_clue_ids_json TEXT NOT NULL,
+            committed_scene  INTEGER NOT NULL,
+            created_at       INTEGER NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS idx_reveal_setup ON Reveal_Plans(payoff_setup_id);
+        `);
+      },
+      // v10 → v11: Drama_Positions — the Contradiction Futures Market ledger.
+      //   Each row is one open dramatic position (belief conflict, open payoff,
+      //   ticking clock, etc.) with its mark-to-market tension value.
+      () => {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS Drama_Positions (
+            position_id   TEXT PRIMARY KEY,
+            kind          TEXT NOT NULL,
+            char_id       TEXT,
+            description   TEXT NOT NULL,
+            opened_at_scene INTEGER NOT NULL,
+            expected_payoff REAL NOT NULL,
+            time_decay    REAL NOT NULL DEFAULT 0.92,
+            mark_to_market REAL NOT NULL,
+            closed        INTEGER NOT NULL DEFAULT 0,
+            scene_idx     INTEGER NOT NULL,
+            created_at    INTEGER NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS idx_drama_scene ON Drama_Positions(scene_idx, closed);
+        `);
+      },
+      // v11 → v12: Self_Play_Corpus — stores headless self-play run results.
+      //   Each row is one completed sim: scenario, proof stats, valuation score,
+      //   and the extracted StoryGenome (compressed story essence).
+      () => {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS Self_Play_Corpus (
+            run_id          TEXT PRIMARY KEY,
+            scenario_id     TEXT NOT NULL,
+            score           REAL NOT NULL,
+            proof_pass_rate REAL NOT NULL,
+            mean_valuation  REAL NOT NULL,
+            ops_count       INTEGER NOT NULL DEFAULT 0,
+            genome_json     TEXT NOT NULL DEFAULT '{}',
+            created_at      INTEGER NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS idx_corpus_score ON Self_Play_Corpus(score DESC);
+          CREATE INDEX IF NOT EXISTS idx_corpus_scenario ON Self_Play_Corpus(scenario_id);
+        `);
       },
     ];
     for (let i = current; i < MIGRATIONS.length; i++) {
@@ -322,6 +432,12 @@ export class Stage {
     for (const fact of agent.knowledge_vector) {
       stmt.run(randomUUID(), agent.char_id, fact, Date.now());
     }
+
+    // Seed initial stakes from CharacterSheet.stakes[] if provided.
+    // These drive _checkStakesEscalation in DirectorNode from the very first turn.
+    for (const s of (agent.stakes ?? [])) {
+      this.upsertStakes(s);
+    }
   }
 
   // Maps a merged Characters + Character_State row (plus the agent's knowledge
@@ -444,7 +560,7 @@ export class Stage {
 
   public updateAgentKnowledge(char_id: string, newFacts: string[]) {
     const stmt = this.db.prepare(`
-      INSERT INTO Knowledge_Ledger (knowledge_id, char_id, fact_description, acquired_at)
+      INSERT OR IGNORE INTO Knowledge_Ledger (knowledge_id, char_id, fact_description, acquired_at)
       VALUES (?, ?, ?, ?)
     `);
     for (const fact of newFacts) {
@@ -1008,6 +1124,60 @@ export class Stage {
     }));
   }
 
+  // ── NVM StoryCommit ledger ───────────────────────────────────────────────────
+
+  private _mapCommit(r: Record<string, unknown>): StoryCommit {
+    return {
+      commitId: r.commit_id as string,
+      parentId: (r.parent_id as string | null) ?? null,
+      sceneIdx: r.scene_idx as number,
+      ops: safeJsonParse<StoryOp[]>(r.ops_json as string, []),
+      deltaSummary: safeJsonParse(r.delta_summary_json as string,
+        { facts: 0, beliefs: 0, relationships: 0 }),
+      reverted: Boolean(r.reverted),
+      createdAt: r.created_at as number,
+    };
+  }
+
+  public appendCommit(c: StoryCommit): void {
+    this.db.prepare(`
+      INSERT OR IGNORE INTO Story_Commits
+        (commit_id, parent_id, scene_idx, ops_json, delta_summary_json, reverted, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      c.commitId, c.parentId, c.sceneIdx,
+      JSON.stringify(c.ops), JSON.stringify(c.deltaSummary),
+      c.reverted ? 1 : 0, c.createdAt,
+    );
+  }
+
+  public getCommits(): StoryCommit[] {
+    const rows = this.db.prepare('SELECT * FROM Story_Commits ORDER BY rowid')
+      .all() as Array<Record<string, unknown>>;
+    return rows.map(r => this._mapCommit(r));
+  }
+
+  public getCommit(commitId: string): StoryCommit | undefined {
+    const r = this.db.prepare('SELECT * FROM Story_Commits WHERE commit_id = ?')
+      .get(commitId) as Record<string, unknown> | undefined;
+    return r ? this._mapCommit(r) : undefined;
+  }
+
+  // Downstream commits — everything appended after the given commit.
+  public commitsAfter(commitId: string): StoryCommit[] {
+    const rows = this.db.prepare(`
+      SELECT * FROM Story_Commits
+      WHERE rowid > (SELECT rowid FROM Story_Commits WHERE commit_id = ?)
+      ORDER BY rowid
+    `).all(commitId) as Array<Record<string, unknown>>;
+    return rows.map(r => this._mapCommit(r));
+  }
+
+  // Non-destructive: marks the commit reverted so history is preserved.
+  public revertCommit(commitId: string): void {
+    this.db.prepare('UPDATE Story_Commits SET reverted = 1 WHERE commit_id = ?').run(commitId);
+  }
+
   public resolveStakes(id: string, outcome: 'won' | 'lost', turnIndex: number): void {
     this.db.prepare('UPDATE Stakes SET is_active = 0, outcome = ?, resolved_at = ? WHERE id = ?')
       .run(outcome, turnIndex, id);
@@ -1042,6 +1212,7 @@ export class Stage {
       beat_traces: this.getAllBeatTraces(),
       belief_edges: this.getAllBeliefEdges(),
       goal_mutations: this.getAllGoalMutations(),
+      stakes: this.getAllStakes(),
     };
   }
 
@@ -1059,6 +1230,180 @@ export class Stage {
     for (const p of snap.dramatic_pressures ?? []) this._insertRawPressure(p);
     for (const p of snap.event_propositions ?? []) this._insertRawEventProposition(p);
     for (const p of snap.persuasion_log ?? [])     this._insertRawPersuasion(p);
+    for (const s of snap.stakes ?? [])              this.upsertStakes(s);
+  }
+
+  // ── Reveal Plans (v10) ──────────────────────────────────────────────────────
+
+  public upsertRevealPlan(plan: import('../nvm/reveal/RevealPlan.ts').RevealPlan, committedScene: number): void {
+    this.db.prepare(`
+      INSERT OR REPLACE INTO Reveal_Plans
+        (reveal_id, payoff_setup_id, description, required_clue_ids_json, committed_scene, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      plan.revealId, plan.payoffSetupId, plan.description,
+      JSON.stringify(plan.requiredClueIds), committedScene, Date.now(),
+    );
+  }
+
+  public getRevealPlan(revealId: string): import('../nvm/reveal/RevealPlan.ts').RevealPlan | undefined {
+    const r = this.db.prepare('SELECT * FROM Reveal_Plans WHERE reveal_id = ?')
+      .get(revealId) as Record<string, unknown> | undefined;
+    if (!r) return undefined;
+    return {
+      revealId: r.reveal_id as string,
+      payoffSetupId: r.payoff_setup_id as string,
+      description: r.description as string,
+      requiredClueIds: safeJsonParse<string[]>(r.required_clue_ids_json as string, []),
+    };
+  }
+
+  public getAllRevealPlans(): import('../nvm/reveal/RevealPlan.ts').RevealPlan[] {
+    const rows = this.db.prepare('SELECT * FROM Reveal_Plans ORDER BY committed_scene ASC')
+      .all() as Array<Record<string, unknown>>;
+    return rows.map(r => ({
+      revealId: r.reveal_id as string,
+      payoffSetupId: r.payoff_setup_id as string,
+      description: r.description as string,
+      requiredClueIds: safeJsonParse<string[]>(r.required_clue_ids_json as string, []),
+    }));
+  }
+
+  // ── Drama Positions (v11) ────────────────────────────────────────────────────
+
+  public upsertDramaPosition(p: import('../nvm/valuation/futures.ts').DramaticPosition, sceneIdx: number): void {
+    this.db.prepare(`
+      INSERT OR REPLACE INTO Drama_Positions
+        (position_id, kind, char_id, description, opened_at_scene,
+         expected_payoff, time_decay, mark_to_market, closed, scene_idx, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      p.positionId, p.kind, p.charId ?? null, p.description,
+      p.openedAtScene, p.expectedPayoff, p.timeDecay, p.markToMarket,
+      0, sceneIdx, Date.now(),
+    );
+  }
+
+  public closePosition(positionId: string): void {
+    this.db.prepare('UPDATE Drama_Positions SET closed = 1 WHERE position_id = ?').run(positionId);
+  }
+
+  public getOpenPositions(sceneIdx?: number): import('../nvm/valuation/futures.ts').DramaticPosition[] {
+    const rows = sceneIdx !== undefined
+      ? this.db.prepare('SELECT * FROM Drama_Positions WHERE closed = 0 AND scene_idx = ?').all(sceneIdx)
+      : this.db.prepare('SELECT * FROM Drama_Positions WHERE closed = 0 ORDER BY scene_idx').all();
+    return (rows as Array<Record<string, unknown>>).map(r => ({
+      positionId: r.position_id as string,
+      kind: r.kind as import('../nvm/valuation/futures.ts').DramaticPosition['kind'],
+      charId: r.char_id as string | undefined,
+      description: r.description as string,
+      openedAtScene: r.opened_at_scene as number,
+      expectedPayoff: r.expected_payoff as number,
+      timeDecay: r.time_decay as number,
+      markToMarket: r.mark_to_market as number,
+    }));
+  }
+
+  public getTotalTension(): number {
+    const row = this.db.prepare(
+      'SELECT COALESCE(SUM(mark_to_market), 0) as total FROM Drama_Positions WHERE closed = 0'
+    ).get() as { total: number };
+    return Math.round(row.total * 10) / 10;
+  }
+
+  // ── LLM call cache (v9) ─────────────────────────────────────────────────────
+
+  public llmCacheGet(cacheKey: string): string | null {
+    const row = this.db.prepare('SELECT response FROM Llm_Cache WHERE cache_key = ?')
+      .get(cacheKey) as { response: string } | undefined;
+    return row ? row.response : null;
+  }
+
+  public llmCachePut(cacheKey: string, model: string, response: string): void {
+    this.db.prepare(`
+      INSERT OR REPLACE INTO Llm_Cache (cache_key, model, prompt_hash, response, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(cacheKey, model, cacheKey, response, Date.now());
+  }
+
+  public llmCacheSize(): number {
+    return (this.db.prepare('SELECT COUNT(*) as cnt FROM Llm_Cache').get() as { cnt: number }).cnt;
+  }
+
+  // ── Ghost ledger (v9) ────────────────────────────────────────────────────────
+
+  public ghostLedgerAppend(ghost: import('../nvm/repro/ghost-ledger.ts').GhostCommit): void {
+    this.db.prepare(`
+      INSERT OR IGNORE INTO Ghost_Commits
+        (ghost_id, parent_commit_id, scene_idx, ir_json, reason, rejected_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      ghost.ghostId, ghost.parentCommitId ?? null, ghost.sceneIdx,
+      JSON.stringify(ghost.ir), ghost.reason, ghost.rejectedAt,
+    );
+  }
+
+  public ghostLedgerGet(sceneIdx?: number): import('../nvm/repro/ghost-ledger.ts').GhostCommit[] {
+    const rows = sceneIdx !== undefined
+      ? this.db.prepare('SELECT * FROM Ghost_Commits WHERE scene_idx = ? ORDER BY rejected_at ASC').all(sceneIdx)
+      : this.db.prepare('SELECT * FROM Ghost_Commits ORDER BY rejected_at ASC').all();
+    return (rows as Array<Record<string, unknown>>).map(r => ({
+      ghostId: r.ghost_id as string,
+      parentCommitId: (r.parent_commit_id as string | null) ?? null,
+      sceneIdx: r.scene_idx as number,
+      ir: safeJsonParse(r.ir_json as string, {} as import('../nvm/repro/ghost-ledger.ts').GhostCommit['ir']),
+      reason: r.reason as import('../nvm/repro/ghost-ledger.ts').GhostReason,
+      rejectedAt: r.rejected_at as number,
+    }));
+  }
+
+  public ghostLedgerFind(ghostId: string): import('../nvm/repro/ghost-ledger.ts').GhostCommit | undefined {
+    const r = this.db.prepare('SELECT * FROM Ghost_Commits WHERE ghost_id = ?').get(ghostId) as Record<string, unknown> | undefined;
+    if (!r) return undefined;
+    return {
+      ghostId: r.ghost_id as string,
+      parentCommitId: (r.parent_commit_id as string | null) ?? null,
+      sceneIdx: r.scene_idx as number,
+      ir: safeJsonParse(r.ir_json as string, {} as import('../nvm/repro/ghost-ledger.ts').GhostCommit['ir']),
+      reason: r.reason as import('../nvm/repro/ghost-ledger.ts').GhostReason,
+      rejectedAt: r.rejected_at as number,
+    };
+  }
+
+  // ── Self-Play Corpus (v12) ────────────────────────────────────────────────────
+
+  public appendCorpusRun(run: {
+    run_id: string;
+    scenario_id: string;
+    score: number;
+    proof_pass_rate: number;
+    mean_valuation: number;
+    ops_count: number;
+    genome_json: string;
+  }): void {
+    this.db.prepare(`
+      INSERT OR REPLACE INTO Self_Play_Corpus
+        (run_id, scenario_id, score, proof_pass_rate, mean_valuation, ops_count, genome_json, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      run.run_id, run.scenario_id, run.score, run.proof_pass_rate,
+      run.mean_valuation, run.ops_count, run.genome_json, Date.now(),
+    );
+  }
+
+  public getCorpusRuns(limit = 50): Array<{
+    run_id: string; scenario_id: string; score: number;
+    proof_pass_rate: number; mean_valuation: number;
+    ops_count: number; genome_json: string; created_at: number;
+  }> {
+    const rows = this.db.prepare(
+      'SELECT * FROM Self_Play_Corpus ORDER BY score DESC LIMIT ?',
+    ).all(limit);
+    return rows as Array<{
+      run_id: string; scenario_id: string; score: number;
+      proof_pass_rate: number; mean_valuation: number;
+      ops_count: number; genome_json: string; created_at: number;
+    }>;
   }
 
   private _insertRawAction(entry: ActionLogEntry): void {

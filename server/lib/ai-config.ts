@@ -137,8 +137,31 @@ export function getPublicConfig(): AiRuntimeConfig & {
   };
 }
 
+const VALID_PROVIDERS: readonly string[]      = ['gemini', 'openai-compat'];
+const VALID_MEDIA_PROVIDERS: readonly string[] = ['gemini', 'openai-compat', 'none'];
+
+function warnInvalidProvider(envVar: string, value: string | undefined, valid: readonly string[]): void {
+  if (value !== undefined && !valid.includes(value)) {
+    console.warn(`[ai-config] Unknown ${envVar}="${value}" — falling back to "gemini". Valid values: ${valid.join(', ')}`);
+  }
+}
+
 export function initFromEnv(): void {
-  const provider = (process.env.AI_PROVIDER ?? 'gemini') as AiProviderName;
+  const rawProvider = process.env.AI_PROVIDER;
+  warnInvalidProvider('AI_PROVIDER', rawProvider, VALID_PROVIDERS);
+  const provider = (VALID_PROVIDERS.includes(rawProvider ?? '') ? rawProvider : 'gemini') as AiProviderName;
+
+  const rawImg = process.env.AI_IMG_PROVIDER;
+  warnInvalidProvider('AI_IMG_PROVIDER', rawImg, VALID_MEDIA_PROVIDERS);
+  const imgProvider = (VALID_MEDIA_PROVIDERS.includes(rawImg ?? '') ? rawImg : provider) as AiMediaProvider;
+
+  const rawTts = process.env.AI_TTS_PROVIDER;
+  warnInvalidProvider('AI_TTS_PROVIDER', rawTts, VALID_MEDIA_PROVIDERS);
+  const ttsProvider = (VALID_MEDIA_PROVIDERS.includes(rawTts ?? '') ? rawTts : provider) as AiMediaProvider;
+
+  const rawEmb = process.env.AI_EMBEDDING_PROVIDER;
+  warnInvalidProvider('AI_EMBEDDING_PROVIDER', rawEmb, VALID_MEDIA_PROVIDERS);
+  const embProvider = (VALID_MEDIA_PROVIDERS.includes(rawEmb ?? '') ? rawEmb : 'gemini') as AiMediaProvider;
 
   applyConfig(
     {
@@ -146,14 +169,14 @@ export function initFromEnv(): void {
       baseUrl:     process.env.AI_BASE_URL,
       model:       process.env.AI_MODEL,
       fastModel:   process.env.AI_FAST_MODEL,
-      imgProvider: (process.env.AI_IMG_PROVIDER ?? provider) as AiMediaProvider,
+      imgProvider,
       imgBaseUrl:  process.env.AI_IMG_BASE_URL,
       imgModel:    process.env.AI_IMG_MODEL,
-      ttsProvider: (process.env.AI_TTS_PROVIDER ?? provider) as AiMediaProvider,
+      ttsProvider,
       ttsBaseUrl:  process.env.AI_TTS_BASE_URL,
       ttsModel:    process.env.AI_TTS_MODEL,
       ttsVoice:    process.env.AI_TTS_VOICE,
-      embProvider: (process.env.AI_EMBEDDING_PROVIDER ?? 'gemini') as AiMediaProvider,
+      embProvider,
       embBaseUrl:  process.env.AI_EMBEDDING_BASE_URL,
       embModel:    process.env.AI_EMBEDDING_MODEL,
     },
