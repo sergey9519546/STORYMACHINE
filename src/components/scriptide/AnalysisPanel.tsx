@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { EngineState } from "../../types";
 import { FountainBlock } from "../../lib/fountain";
 import {
@@ -23,6 +23,12 @@ export default function AnalysisPanel({
   isCleaning,
   onCleanAction,
 }: AnalysisPanelProps) {
+  const lintedBlocks = useMemo(() => {
+    return parsedBlocks
+      .map((b, i) => ({ ...b, index: i }))
+      .filter((b) => b.lintErrors && b.lintErrors.length > 0);
+  }, [parsedBlocks]);
+
   return (
     <div
       className="space-y-6"
@@ -33,21 +39,12 @@ export default function AnalysisPanel({
         <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-black pb-2 flex items-center gap-2 text-red-600">
           <ShieldAlert className="w-4 h-4" /> Semantic Firewall
         </h2>
-        {(() => {
-          const lintedBlocks = parsedBlocks
-            .map((b, i) => ({ ...b, index: i }))
-            .filter((b) => b.lintErrors && b.lintErrors.length > 0);
-
-          if (lintedBlocks.length === 0) {
-            return (
-              <p className="text-[10px] font-mono text-green-600 uppercase font-bold">
-                No camera bleed detected. Action is pure.
-              </p>
-            );
-          }
-
-          return (
-            <div className="space-y-4">
+        {lintedBlocks.length === 0 ? (
+          <p className="text-[10px] font-mono text-green-600 uppercase font-bold">
+            No camera bleed detected. Action is pure.
+          </p>
+        ) : (
+          <div className="space-y-4">
               {lintedBlocks.map((block) => (
                 <div
                   key={block.id}
@@ -77,8 +74,7 @@ export default function AnalysisPanel({
                 </div>
               ))}
             </div>
-          );
-        })()}
+        )}
       </div>
 
       {/* DIALOGUE INCONSISTENCIES */}
