@@ -1839,7 +1839,7 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
   // Body: { ir: NarrativeTransitionIR }
   app.post('/api/nvm/repair', gameLimiter, asyncHandler(async (req, res) => {
     const { stage } = getOrCreateSession(sessionId(req));
-    const { runTier1, runTier2 } = await import('./server/nvm/proof/kernel.ts');
+    const { runTier1, runTier2, runTier4 } = await import('./server/nvm/proof/kernel.ts');
     const { repair } = await import('./server/nvm/proof/repair.ts');
     const { lint } = await import('./server/nvm/proof/lint.ts');
     const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
@@ -1850,6 +1850,7 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     const state = buildNarrativeState(stage);
     const t1 = runTier1(ir, state);
     const t2 = runTier2(ir, state);
+    const t4 = runTier4(ir, state);
     const allFailures = [...t1, ...t2].filter(r => !r.pass);
     const patches = repair(allFailures, state);
     const lintWarnings = lint(ir, state);
@@ -1857,6 +1858,7 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
       tier1Pass: t1.every(r => r.pass),
       tier1Failures: t1.filter(r => !r.pass).map(r => ({ proof: r.proof, reason: r.reason })),
       tier2Failures: t2.filter(r => !r.pass).map(r => ({ proof: r.proof, reason: r.reason })),
+      tier4Advisories: t4.filter(r => !r.pass).map(r => ({ proof: r.proof, reason: r.reason })),
       patches,
       lintWarnings,
       patchCount: patches.length,
@@ -1914,6 +1916,107 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     }
 
     res.json({ scenes, sceneCount: scenes.length });
+  }));
+
+  // POST /api/nvm/converge-arc — multi-scene arc compiler.
+  // Runs convergeScene for each scene target in sequence, accumulating state.
+  // Body: { scenes: SceneTarget[], budget?: ConvergeBudget, seed?: number }
+  // Returns: per-scene results + arc-level score.
+  app.post('/api/nvm/converge-arc', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { convergeScene } = await import('./server/nvm/converge/loop.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+    const { makeLLMCandidateGenerator } = await import('./server/nvm/generate/llm-generator.ts');
+    const { mineCorpus } = await import('./server/nvm/selfplay/mine.ts');
+    const { appendGhost } = await import('./server/nvm/repro/ghost-ledger.ts');
+
+    const sceneTargets = req.body?.scenes;
+    if (!Array.isArray(sceneTargets) || sceneTargets.length === 0) {
+      res.status(400).json({ error: 'body.scenes must be a non-empty array of SceneTarget' }); return;
+    }
+    if (sceneTargets.length > 8) {
+      res.status(400).json({ error: 'Maximum 8 scenes per arc compilation' }); return;
+    }
+
+    // Mine Director Policy from corpus if available
+    let directorPolicy: import('./server/nvm/selfplay/mine.ts').DirectorPolicy | undefined;
+    const corpusRuns = stage.getCorpusRuns(30);
+    if (corpusRuns.length > 0) {
+      const fakeReport = {
+        runs: corpusRuns.map(r => ({
+          scenarioId: r.scenario_id, seed: 0, proofPassRate: r.proof_pass_rate,
+          meanValuation: r.mean_valuation, score: r.score,
+          topOperators: [] as import('./server/nvm/converge/operators.ts').MutationOperator[],
+          scenes: [], effectiveOperators: [], totalIterations: 0,
+        })),
+        meanScore: corpusRuns.reduce((s, r) => s + r.score, 0) / corpusRuns.length,
+        bestRun: { scenarioId: '', seed: 0, proofPassRate: 0, meanValuation: 0, score: 0, topOperators: [], scenes: [], effectiveOperators: [], totalIterations: 0 },
+        worstRun: { scenarioId: '', seed: 0, proofPassRate: 0, meanValuation: 0, score: 0, topOperators: [], scenes: [], effectiveOperators: [], totalIterations: 0 },
+        operatorFrequency: {} as Record<import('./server/nvm/converge/operators.ts').MutationOperator, number>,
+      };
+      directorPolicy = mineCorpus(fakeReport).policy;
+    }
+
+    const baseBudget = req.body?.budget ?? { maxIterations: 3, candidatesPerIteration: 2 };
+    const budget = { ...baseBudget, directorPolicy };
+    const baseSeed = typeof req.body?.seed === 'number' ? req.body.seed : Date.now();
+    const generate = makeLLMCandidateGenerator();
+
+    let rollingState = buildNarrativeState(stage);
+    const sceneResults = [];
+    let totalComposite = 0;
+    let convergedCount = 0;
+
+    for (let i = 0; i < sceneTargets.length; i++) {
+      const target = sceneTargets[i];
+      const result = await convergeScene(rollingState, target, generate, budget, baseSeed + i * 1000);
+
+      // Persist ghosts
+      for (const ghost of result.ghosts) {
+        appendGhost(stage, {
+          ghostId: ghost.ir.transitionId,
+          parentCommitId: null,
+          sceneIdx: ghost.ir.sceneIdx,
+          ir: ghost.ir,
+          reason: ghost.reason,
+          rejectedAt: Date.now(),
+        });
+      }
+
+      sceneResults.push({
+        sceneIdx: target.sceneIdx,
+        converged: result.converged,
+        iterations: result.iterations,
+        finalValuation: result.finalValuation,
+        finalQuality: result.finalQuality,
+        finalComposite: result.finalComposite,
+        tier3Rank: result.history.length > 0
+          ? result.history[result.history.length - 1].tier3Rank
+          : 0,
+        ghostCount: result.ghosts.length,
+        opCount: result.ir.ops.length,
+        sceneFunction: result.ir.sceneFunction,
+      });
+
+      totalComposite += result.finalComposite;
+      if (result.converged) convergedCount++;
+
+      // Advance rolling state with the winning IR
+      rollingState = applyStoryOps(rollingState, result.ir.ops);
+    }
+
+    const meanComposite = sceneTargets.length > 0 ? totalComposite / sceneTargets.length : 0;
+    const arcScore = 0.5 * (convergedCount / sceneTargets.length) + 0.5 * (meanComposite / 100);
+
+    res.json({
+      scenes: sceneResults,
+      totalScenes: sceneTargets.length,
+      convergedCount,
+      meanComposite: Math.round(meanComposite * 10) / 10,
+      arcScore: Math.round(arcScore * 1000) / 1000,
+      usedDirectorPolicy: !!directorPolicy,
+    });
   }));
 
   // GET /api/nvm/sidecar — export current session as NVM sidecar JSON

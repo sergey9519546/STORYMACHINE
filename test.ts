@@ -21,7 +21,7 @@ import { emptyState, stateHash, relationshipKey } from './server/nvm/state/Narra
 import type { NarrativeState } from './server/nvm/state/NarrativeState.ts';
 import { applyStoryOp, applyStoryOps } from './server/nvm/ops/dispatcher.ts';
 import { loadMechanisms, loadMechanismsCached } from './server/nvm/mechanisms/loader.ts';
-import { runTier1, tier1Passes, runTier2, tier2Score, runTier3, tier3Rank } from './server/nvm/proof/kernel.ts';
+import { runTier1, tier1Passes, runTier2, tier2Score, runTier3, tier3Rank, runTier4 } from './server/nvm/proof/kernel.ts';
 import { runM15Harness, buildNoraWarehouseIR } from './server/nvm/__tests__/m1.5-harness.ts';
 import { whatBreaksIfRemoved } from './server/nvm/query/whatBreaks.ts';
 import { summarizeOps } from './server/nvm/state/StoryCommit.ts';
@@ -5627,5 +5627,101 @@ describe('NVM — Tier 3 Ranking Proofs (Wave 17)', () => {
     const results = runTier3(ir, emptyState());
     const gen = results.find(r => r.proof === 'GenericnessProof');
     assert.ok(gen && gen.pass, 'no char ops → genericness passes');
+  });
+});
+
+// ── Wave 18: Tier 4 Ethics Proofs ────────────────────────────────────────────
+
+describe('NVM — Tier 4 Ethics & Disclosure Proofs (Wave 18)', () => {
+  function makeIR(
+    ops: StoryOp[],
+    causalLinks?: import('./server/nvm/ir/NarrativeTransitionIR.ts').CausalLink[],
+    origin: import('./server/nvm/ir/NarrativeTransitionIR.ts').ProvenanceOrigin = 'model_generated',
+  ): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR {
+    return {
+      transitionId: `t4-${Date.now()}-${Math.random()}`,
+      sceneIdx: 1,
+      sceneFunction: 'build_tension' as const,
+      activeMechanisms: [],
+      beforeStateHash: 'x',
+      ops,
+      causalLinks,
+      preconditions: [],
+      postconditions: [],
+      provenance: { origin, createdAt: Date.now() },
+    };
+  }
+
+  const fearEmotion = (charId: string): StoryOp => ({
+    op: 'APPRAISE_EMOTION',
+    charId,
+    emotion: { joy: 0, distress: 0, anger: 0, fear: 80, pride: 0, shame: 0, dominant: 'fear', intensity: 80, last_updated_at: 1 },
+  });
+
+  it('runTier4 returns 2 results (BiasAuditProof + AttributionProof)', () => {
+    const ir = makeIR([{ op: 'ADD_FACT', fact: { factId: 'f', subject: 'a', predicate: 'b', object: 'c', addedAtTurn: 1, validFrom: 1, validTo: null } }]);
+    const results = runTier4(ir, emptyState());
+    assert.equal(results.length, 2);
+    assert.ok(results.some(r => r.proof === 'BiasAuditProof'));
+    assert.ok(results.some(r => r.proof === 'AttributionProof'));
+  });
+
+  it('BiasAuditProof passes when fewer than 3 emotion ops', () => {
+    const ir = makeIR([fearEmotion('nora'), fearEmotion('helmer')]);
+    const results = runTier4(ir, emptyState());
+    const ba = results.find(r => r.proof === 'BiasAuditProof');
+    assert.ok(ba?.pass, 'fewer than 3 emotion ops → passes');
+  });
+
+  it('BiasAuditProof fails when ≥3 characters share the same dominant emotion', () => {
+    const ir = makeIR([fearEmotion('nora'), fearEmotion('helmer'), fearEmotion('krogstad')]);
+    const results = runTier4(ir, emptyState());
+    const ba = results.find(r => r.proof === 'BiasAuditProof');
+    assert.ok(ba && !ba.pass, `BiasAuditProof should fail for homogeneous emotions; got: ${ba?.reason}`);
+  });
+
+  it('BiasAuditProof passes when emotions are differentiated', () => {
+    const ir = makeIR([
+      fearEmotion('nora'),
+      { op: 'APPRAISE_EMOTION', charId: 'helmer', emotion: { joy: 70, distress: 0, anger: 0, fear: 0, pride: 30, shame: 0, dominant: 'joy', intensity: 70, last_updated_at: 1 } },
+      { op: 'APPRAISE_EMOTION', charId: 'krogstad', emotion: { joy: 0, distress: 0, anger: 80, fear: 0, pride: 0, shame: 0, dominant: 'anger', intensity: 80, last_updated_at: 1 } },
+    ]);
+    const results = runTier4(ir, emptyState());
+    const ba = results.find(r => r.proof === 'BiasAuditProof');
+    assert.ok(ba?.pass, 'differentiated emotions → passes');
+  });
+
+  it('AttributionProof passes for user-authored IRs', () => {
+    const ir = makeIR([], undefined, 'user_authored');
+    const results = runTier4(ir, emptyState());
+    const ap = results.find(r => r.proof === 'AttributionProof');
+    assert.ok(ap?.pass, 'user-authored → passes unconditionally');
+  });
+
+  it('AttributionProof passes when no causal links declared', () => {
+    const ir = makeIR([{ op: 'ADD_FACT', fact: { factId: 'f', subject: 'a', predicate: 'b', object: 'c', addedAtTurn: 1, validFrom: 1, validTo: null } }]);
+    const results = runTier4(ir, emptyState());
+    const ap = results.find(r => r.proof === 'AttributionProof');
+    assert.ok(ap?.pass, 'no causal links → nothing to audit');
+  });
+
+  it('AttributionProof fails when model-generated IR has empty causedBy', () => {
+    const ir = makeIR(
+      [{ op: 'ADD_FACT', fact: { factId: 'f', subject: 'a', predicate: 'b', object: 'c', addedAtTurn: 1, validFrom: 1, validTo: null } }],
+      [{ opIdx: 0, causedBy: [] }],
+    );
+    const results = runTier4(ir, emptyState());
+    const ap = results.find(r => r.proof === 'AttributionProof');
+    assert.ok(ap && !ap.pass, 'empty causedBy → fails');
+  });
+
+  it('AttributionProof passes when causal links cite evidence', () => {
+    const ir = makeIR(
+      [{ op: 'ADD_FACT', fact: { factId: 'f', subject: 'a', predicate: 'b', object: 'c', addedAtTurn: 1, validFrom: 1, validTo: null } }],
+      [{ opIdx: 0, causedBy: ['fact-loan', 'char-nora'] }],
+    );
+    const results = runTier4(ir, emptyState());
+    const ap = results.find(r => r.proof === 'AttributionProof');
+    assert.ok(ap?.pass, 'cited evidence → passes');
   });
 });

@@ -18,6 +18,8 @@ import { specificityProof } from './tier2/specificity.ts';
 import { dialogueProof } from './tier2/dialogue.ts';
 import { genericnessProof } from './tier3/genericness.ts';
 import { originalityProof } from './tier3/originality.ts';
+import { biasAuditProof } from './tier4/bias-audit.ts';
+import { attributionProof } from './tier4/attribution.ts';
 
 // The 8 Tier 1 hard-block proofs (Wave 1: 7 + Wave 3 B1: EarnedRevealProof).
 // A transition that fails any of these must not become a StoryCommit.
@@ -72,4 +74,13 @@ export function tier3Rank(results: ProofResult[]): number {
   if (results.length === 0) return 100;
   const passes = results.filter(r => r.pass).length;
   return Math.round((passes / results.length) * 100);
+}
+
+// Tier 4 ethics & disclosure proofs — monitor only; surface as advisory info.
+// Results are returned to the writer but never affect convergence or commit.
+export function runTier4(ir: NarrativeTransitionIR, state: NarrativeState): ProofResult[] {
+  return [
+    biasAuditProof(ir, state),
+    attributionProof(ir, state),
+  ];
 }
