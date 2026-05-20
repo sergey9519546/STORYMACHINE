@@ -2298,6 +2298,94 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     });
   }));
 
+  // GET /api/nvm/health — unified story health dashboard.
+  // Aggregates tension, topology, arc-completion, epistemic state, quality,
+  // proof pass-rate, and momentum into a single health report. One round-trip
+  // for the health panel — no client-side fan-out needed.
+  app.get('/api/nvm/health', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { buildNarrativeState, emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+    const { deriveTensionLedger, momentumScore } = await import('./server/nvm/valuation/futures.ts');
+    const { computeTopology } = await import('./server/nvm/valuation/topology.ts');
+    const { analyzeArcCompletion } = await import('./server/nvm/quality/arc-tracker.ts');
+    const { runTier1, runTier2, tier2Score } = await import('./server/nvm/proof/kernel.ts');
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+
+    const state = buildNarrativeState(stage);
+    const allCommits = stage.getCommits().filter((c: import('./server/nvm/state/StoryCommit.ts').StoryCommit) => !c.reverted);
+    const commitCount = allCommits.length;
+    const sceneIdx = commitCount > 0 ? allCommits[commitCount - 1].sceneIdx : 0;
+
+    // Tension
+    const currentLedger = deriveTensionLedger(state, sceneIdx);
+    const ledgers = allCommits.map((c: import('./server/nvm/state/StoryCommit.ts').StoryCommit, i: number) => deriveTensionLedger(state, c.sceneIdx ?? i));
+    const tensionHistory = ledgers.map(l => l.totalTension);
+
+    // Topology
+    const topology = computeTopology(ledgers);
+
+    // Arc completion
+    const arcReport = analyzeArcCompletion(allCommits.map((c: import('./server/nvm/state/StoryCommit.ts').StoryCommit) => ({ sceneIdx: c.sceneIdx, ops: c.ops })));
+
+    // Epistemic summary
+    const totalBeliefs = Object.values(state.characterBeliefs).flat().length;
+    const characterCount = Object.keys(state.characterBeliefs).length;
+
+    // Proof pass rate over all committed scenes (using rolling state)
+    let t1PassCount = 0;
+    let totalQuality = 0;
+    let rollingState = emptyState();
+    for (const commit of allCommits) {
+      const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+        transitionId: commit.commitId, sceneIdx: commit.sceneIdx, sceneFunction: 'advance_plot',
+        activeMechanisms: [], beforeStateHash: 'health', ops: commit.ops,
+        preconditions: [], postconditions: [],
+        provenance: { origin: 'model_generated', createdAt: commit.createdAt },
+      };
+      const t1 = runTier1(ir, rollingState);
+      const t2 = runTier2(ir, rollingState);
+      if (t1.every(r => r.pass)) t1PassCount++;
+      totalQuality += tier2Score(t2);
+      rollingState = applyStoryOps(rollingState, commit.ops);
+    }
+    const proofPassRate = commitCount > 0 ? Math.round((t1PassCount / commitCount) * 100) : 100;
+    const avgQuality = commitCount > 0 ? Math.round(totalQuality / commitCount) : 0;
+
+    // Momentum (momentumScore expects StoryCommit[], not TensionLedger[])
+    const momentum = momentumScore(allCommits);
+
+    res.json({
+      commitCount,
+      sceneCount: sceneIdx + (commitCount > 0 ? 1 : 0),
+      currentTension: currentLedger.totalTension,
+      tensionHistory,
+      momentum,
+      topology: {
+        dominantArc: topology.dominantArc,
+        coherence: topology.coherence,
+        scores: topology.scores.slice(0, 3),
+      },
+      arcCompletion: {
+        openCount: arcReport.openPromises.length,
+        overdueCount: arcReport.overdueCount,
+        resolvedCount: arcReport.resolvedCount,
+        debtScore: arcReport.debtScore,
+        mostUrgent: arcReport.openPromises.slice(0, 3).map(p => ({ kind: p.kind, description: p.description, urgency: p.urgency })),
+      },
+      epistemic: {
+        characterCount,
+        totalBeliefs,
+        suspense: state.audienceState.suspense,
+        clueCount: state.clues.length,
+        payoffCount: state.payoffs.length,
+      },
+      proof: {
+        passRate: proofPassRate,
+        avgQualityScore: avgQuality,
+      },
+    });
+  }));
+
   // GET /api/nvm/arc-completion — open narrative promise tracker.
   // Replays all committed scenes and returns every unresolved story beat
   // (clues, clocks, negative relationships, theme claims, object arcs)

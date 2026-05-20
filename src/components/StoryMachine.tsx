@@ -31,6 +31,7 @@ import { ProofInspectorPanel } from "./ProofInspectorPanel";
 import { QualityEnginesPanel } from "./QualityEnginesPanel";
 import { EpistemicMapPanel } from "./EpistemicMapPanel";
 import { ArcCompletionPanel } from "./ArcCompletionPanel";
+import { StoryHealthPanel } from "./StoryHealthPanel";
 
 // ── Emotion display helpers ───────────────────────────────────────────────────
 
@@ -118,6 +119,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [showQualityEngines, setShowQualityEngines] = useState(false);
   const [showEpistemicMap, setShowEpistemicMap]   = useState(false);
   const [showArcCompletion, setShowArcCompletion] = useState(false);
+  const [showStoryHealth, setShowStoryHealth]   = useState(false);
 
   const fetchActivePressures = useCallback(async () => {
     try {
@@ -559,6 +561,14 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           >
             <span style={{ fontSize: 14 }}>◷</span>
             <span className="hidden sm:inline">Arcs</span>
+          </button>
+          <button
+            onClick={() => setShowStoryHealth(true)}
+            title="Story Health — unified vitals: tension, quality, arcs, epistemic depth"
+            className="bg-sky-900 hover:bg-sky-700 text-sky-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <span style={{ fontSize: 14 }}>♥</span>
+            <span className="hidden sm:inline">Health</span>
           </button>
           <button
             onClick={() => setShowSettings(true)}
@@ -1195,6 +1205,12 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       {showArcCompletion && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
           <ArcCompletionPanel onClose={() => setShowArcCompletion(false)} />
+        </div>
+      )}
+
+      {showStoryHealth && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <StoryHealthPanel onClose={() => setShowStoryHealth(false)} />
         </div>
       )}
     </div>

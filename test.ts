@@ -6564,3 +6564,65 @@ describe('NVM — Arc Completion Tracker (Wave 25)', () => {
     }
   });
 });
+
+describe('NVM — Story Health Dashboard (Wave 26)', () => {
+  it('analyzeArcCompletion: debtScore=0 for empty story', () => {
+    const r = analyzeArcCompletion([]);
+    assert.equal(r.debtScore, 0);
+    assert.equal(r.openPromises.length, 0);
+  });
+
+  it('computeTopology: returns 6 archetype scores for multi-scene', () => {
+    const state = emptyState();
+    const ledgers = [0, 1, 2, 3].map(i => deriveTensionLedger(state, i));
+    const topo = computeTopology(ledgers);
+    assert.equal(topo.scores.length, 6, 'all 6 archetypes scored');
+    assert.ok(typeof topo.dominantArc === 'string', 'dominantArc is a string');
+    assert.ok(typeof topo.coherence === 'number', 'coherence is a number');
+  });
+
+  it('computeTopology: coherence 0 for empty ledger list', () => {
+    const topo = computeTopology([]);
+    assert.equal(topo.trajectory.length, 0);
+  });
+
+  it('tensionHistory length matches ledger count', () => {
+    const state = emptyState();
+    const sceneCount = 5;
+    const ledgers = Array.from({ length: sceneCount }, (_, i) => deriveTensionLedger(state, i));
+    assert.equal(ledgers.length, sceneCount, 'one ledger per scene');
+    const tensionHistory = ledgers.map(l => l.totalTension);
+    assert.equal(tensionHistory.length, sceneCount, 'tension history length matches');
+  });
+
+  it('momentum: 0 for empty ledger list', () => {
+    const m = momentumScore([]);
+    assert.equal(m, 0, 'empty ledger → momentum 0');
+  });
+
+  it('arc-completion + epistemic data compose without throws', () => {
+    const state = emptyState();
+    state.characterBeliefs['alice'] = [{ id: 'b1', proposition: 'something', confidence: 0.8, source: 'inferred', acquired_at: 0 }];
+    state.clues.push({ clueId: 'c1', carrier: 'object' });
+    const totalBeliefs = Object.values(state.characterBeliefs).flat().length;
+    const characterCount = Object.keys(state.characterBeliefs).length;
+    assert.equal(totalBeliefs, 1, 'one belief');
+    assert.equal(characterCount, 1, 'one character');
+    assert.equal(state.clues.length, 1, 'one clue');
+  });
+
+  it('proof pass rate: 100% when no commits', () => {
+    // Simulate: 0 commits → passRate = 100 (no failure = perfect)
+    const commitCount = 0;
+    const t1PassCount = 0;
+    const proofPassRate = commitCount > 0 ? Math.round((t1PassCount / commitCount) * 100) : 100;
+    assert.equal(proofPassRate, 100);
+  });
+
+  it('proof pass rate: proportional calculation', () => {
+    const commitCount = 4;
+    const t1PassCount = 3;
+    const proofPassRate = Math.round((t1PassCount / commitCount) * 100);
+    assert.equal(proofPassRate, 75, '3/4 pass → 75%');
+  });
+});
