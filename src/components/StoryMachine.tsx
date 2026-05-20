@@ -33,6 +33,7 @@ import { EpistemicMapPanel } from "./EpistemicMapPanel";
 import { ArcCompletionPanel } from "./ArcCompletionPanel";
 import { StoryHealthPanel } from "./StoryHealthPanel";
 import { CharacterArcPanel } from "./CharacterArcPanel";
+import { RegressionPanel } from "./RegressionPanel";
 
 // ── Emotion display helpers ───────────────────────────────────────────────────
 
@@ -122,6 +123,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [showArcCompletion, setShowArcCompletion] = useState(false);
   const [showStoryHealth, setShowStoryHealth]   = useState(false);
   const [showCharacterArc, setShowCharacterArc] = useState(false);
+  const [showRegression, setShowRegression]     = useState(false);
 
   const fetchActivePressures = useCallback(async () => {
     try {
@@ -579,6 +581,14 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           >
             <span style={{ fontSize: 14 }}>⟳</span>
             <span className="hidden sm:inline">Chars</span>
+          </button>
+          <button
+            onClick={() => setShowRegression(true)}
+            title="Narrative Regression Suite — 14 structural invariants graded like a CI test run"
+            className="bg-violet-950 hover:bg-violet-800 text-violet-300 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <span style={{ fontSize: 14 }}>✓</span>
+            <span className="hidden sm:inline">Tests</span>
           </button>
           <button
             onClick={() => setShowSettings(true)}
@@ -1227,6 +1237,12 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       {showCharacterArc && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
           <CharacterArcPanel onClose={() => setShowCharacterArc(false)} />
+        </div>
+      )}
+
+      {showRegression && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <RegressionPanel onClose={() => setShowRegression(false)} />
         </div>
       )}
     </div>

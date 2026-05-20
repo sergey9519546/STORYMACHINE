@@ -2503,6 +2503,16 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     res.json(analyzeArcCompletion(scenes));
   }));
 
+  // GET /api/nvm/regression — narrative regression suite (Wave 29).
+  // Runs 14 named structural invariants over the full StoryCommit ledger and
+  // returns a graded report: pass/fail/warning/na per invariant + overall score.
+  app.get('/api/nvm/regression', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { runNarrativeRegression } = await import('./server/nvm/regression/runner.ts');
+    const allCommits = stage.getCommits();
+    res.json(runNarrativeRegression(allCommits));
+  }));
+
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {

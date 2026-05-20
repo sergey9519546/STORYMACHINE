@@ -6839,3 +6839,159 @@ describe('NVM — Character Arc Visualizer (Wave 28)', () => {
     assert.ok(dominantEmotions.includes('fear') && dominantEmotions.includes('joy'));
   });
 });
+
+// ── Wave 29 — Narrative Regression Suite ─────────────────────────────────────
+
+import { ALL_INVARIANTS } from './server/nvm/regression/invariants.ts';
+import { runNarrativeRegression } from './server/nvm/regression/runner.ts';
+
+function makeCommit(sceneIdx: number, ops: StoryOp[]): StoryCommit {
+  return { commitId: `c${sceneIdx}`, parentId: null, sceneIdx, ops, deltaSummary: { facts: 0, beliefs: 0, relationships: 0 }, reverted: false, createdAt: 1 };
+}
+
+function baseOp(): StoryOp {
+  return { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'world', predicate: 'is', object: 'real', addedAtTurn: 0, validFrom: 0, validTo: null } };
+}
+
+describe('NVM — Narrative Regression Suite (Wave 29)', () => {
+  it('regression: empty story → all invariants return na or fail (no pass)', () => {
+    const report = runNarrativeRegression([]);
+    assert.equal(report.pass, 0, 'no pass on empty story');
+    assert.equal(report.totalScenes, 0, 'totalScenes is 0');
+  });
+
+  it('regression: WORLD_ESTABLISHED_EARLY passes when ADD_FACT in scene 0', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'WORLD_ESTABLISHED_EARLY')!;
+    const commits = [makeCommit(0, [baseOp()])];
+    const result = inv.check(commits);
+    assert.equal(result.status, 'pass', 'ADD_FACT in scene 0 → pass');
+  });
+
+  it('regression: WORLD_ESTABLISHED_EARLY fails after scene 2 with no world ops', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'WORLD_ESTABLISHED_EARLY')!;
+    const commits = [
+      makeCommit(0, [{ op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'X', confidence: 0.5, source: 'inferred', acquired_at: 0 } }]),
+      makeCommit(1, [{ op: 'UPDATE_BELIEF', charId: 'bob', belief: { id: 'b2', proposition: 'Y', confidence: 0.5, source: 'inferred', acquired_at: 0 } }]),
+      makeCommit(2, [{ op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { dominant: 'fear', intensity: 40, joy: 0, distress: 0, anger: 0, fear: 40, pride: 0, shame: 0, last_updated_at: 1 } }]),
+    ];
+    const result = inv.check(commits);
+    assert.equal(result.status, 'fail', 'no world ops in scenes 0-1 with 3 scenes → fail');
+  });
+
+  it('regression: COMPLICATION_BY_SCENE_3 passes with RAISE_CLOCK in scene 2', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'COMPLICATION_BY_SCENE_3')!;
+    const commits = [
+      makeCommit(0, [baseOp()]),
+      makeCommit(1, [baseOp()]),
+      makeCommit(2, [{ op: 'RAISE_CLOCK', clockId: 'ck1', amount: 5 }]),
+    ];
+    const result = inv.check(commits);
+    assert.equal(result.status, 'pass', 'RAISE_CLOCK by scene 3 → pass');
+  });
+
+  it('regression: COMPLICATION_BY_SCENE_3 is na with fewer than 3 scenes', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'COMPLICATION_BY_SCENE_3')!;
+    const result = inv.check([makeCommit(0, [baseOp()])]);
+    assert.equal(result.status, 'na', '< 3 scenes → na');
+  });
+
+  it('regression: CLUE_BEFORE_PAYOFF fails when payoff has no preceding seed', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'CLUE_BEFORE_PAYOFF')!;
+    const commits = [
+      makeCommit(0, [{ op: 'PAYOFF_SETUP', setupId: 'clue-x', payoffEventId: 'ev1' }]),
+    ];
+    const result = inv.check(commits);
+    assert.equal(result.status, 'fail', 'no SEED_CLUE for clue-x → fail');
+  });
+
+  it('regression: CLUE_BEFORE_PAYOFF passes when seed precedes payoff', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'CLUE_BEFORE_PAYOFF')!;
+    const commits = [
+      makeCommit(0, [{ op: 'SEED_CLUE', clueId: 'clue-x', carrier: 'object' }]),
+      makeCommit(2, [{ op: 'PAYOFF_SETUP', setupId: 'clue-x', payoffEventId: 'ev1' }]),
+    ];
+    const result = inv.check(commits);
+    assert.equal(result.status, 'pass', 'SEED_CLUE in scene 0, PAYOFF_SETUP in scene 2 → pass');
+  });
+
+  it('regression: THEME_SUPPORTED_BEFORE_RESOLVED fails when resolve has no prior support', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'THEME_SUPPORTED_BEFORE_RESOLVED')!;
+    const commits = [
+      makeCommit(0, [{ op: 'ADVANCE_THEME_ARGUMENT', claimId: 'truth', move: 'resolve' }]),
+    ];
+    const result = inv.check(commits);
+    assert.equal(result.status, 'fail', 'resolve without support → fail');
+  });
+
+  it('regression: THEME_SUPPORTED_BEFORE_RESOLVED passes with prior support', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'THEME_SUPPORTED_BEFORE_RESOLVED')!;
+    const commits = [
+      makeCommit(0, [{ op: 'ADVANCE_THEME_ARGUMENT', claimId: 'truth', move: 'support' }]),
+      makeCommit(5, [{ op: 'ADVANCE_THEME_ARGUMENT', claimId: 'truth', move: 'resolve' }]),
+    ];
+    const result = inv.check(commits);
+    assert.equal(result.status, 'pass', 'support at scene 0 → resolve at scene 5 → pass');
+  });
+
+  it('regression: RELATIONSHIP_ARC_EXISTS warns when shifts are one-way only', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'RELATIONSHIP_ARC_EXISTS')!;
+    const commits = [
+      makeCommit(0, [{ op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: 0.3, reason: 'test' } }]),
+      makeCommit(2, [{ op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: 0.2, reason: 'test' } }]),
+    ];
+    const result = inv.check(commits);
+    assert.equal(result.status, 'warning', 'all positive → warning, no sign reversal');
+  });
+
+  it('regression: RELATIONSHIP_ARC_EXISTS passes with sign reversal', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'RELATIONSHIP_ARC_EXISTS')!;
+    const commits = [
+      makeCommit(0, [{ op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: 0.5, reason: 'test' } }]),
+      makeCommit(3, [{ op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: -0.4, reason: 'test' } }]),
+    ];
+    const result = inv.check(commits);
+    assert.equal(result.status, 'pass', 'positive then negative → full arc → pass');
+  });
+
+  it('regression: runner grade A when all applicable invariants pass', () => {
+    // A story with world, complication, beliefs, emotions, relationship arc, variety
+    const emotion = (dom: string, intensity: number): StoryOp => ({
+      op: 'APPRAISE_EMOTION', charId: 'alice',
+      emotion: { dominant: dom as 'fear', intensity, joy: 0, distress: 0, anger: 0, fear: intensity, pride: 0, shame: 0, last_updated_at: 1 },
+    });
+    const belief: StoryOp = { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'X', confidence: 0.7, source: 'inferred', acquired_at: 0 } };
+    const commits = [
+      makeCommit(0, [baseOp(), belief, { op: 'RECORD_VISUAL_FACT', sceneId: 's0', fact: 'dark room' }]),
+      makeCommit(1, [{ op: 'RAISE_CLOCK', clockId: 'ck1', amount: 3 }, emotion('fear', 60)]),
+      makeCommit(2, [{ op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: 0.5, reason: 'test' } }, emotion('joy', 80)]),
+      makeCommit(3, [{ op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: -0.3, reason: 'test' } }, { op: 'RAISE_CLOCK', clockId: 'ck1', amount: -3 }]),
+      makeCommit(4, [{ op: 'ADVANCE_THEME_ARGUMENT', claimId: 'truth', move: 'support' }]),
+      makeCommit(5, [{ op: 'ADVANCE_THEME_ARGUMENT', claimId: 'truth', move: 'resolve' }, emotion('joy', 30)]),
+    ];
+    const report = runNarrativeRegression(commits);
+    assert.ok(report.score >= 70, `expected score >= 70, got ${report.score}`);
+    assert.ok(['A', 'B', 'C'].includes(report.grade), `expected A/B/C, got ${report.grade}`);
+  });
+
+  it('regression: reverted commits are excluded from invariant checks', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'WORLD_ESTABLISHED_EARLY')!;
+    const commits: StoryCommit[] = [
+      { ...makeCommit(0, [baseOp()]), reverted: true },
+    ];
+    const result = inv.check(commits.filter(c => !c.reverted));
+    assert.equal(result.status, 'na', 'reverted commit excluded → na');
+  });
+
+  it('regression: byCategory tallies match result list', () => {
+    const commits = [makeCommit(0, [baseOp()])];
+    const report = runNarrativeRegression(commits);
+    let sumPass = 0, sumFail = 0, sumWarn = 0, sumNa = 0;
+    for (const cat of Object.values(report.byCategory)) {
+      sumPass += cat.pass; sumFail += cat.fail; sumWarn += cat.warning; sumNa += cat.na;
+    }
+    assert.equal(sumPass, report.pass, 'byCategory pass total matches');
+    assert.equal(sumFail, report.fail, 'byCategory fail total matches');
+    assert.equal(sumWarn, report.warning, 'byCategory warning total matches');
+    assert.equal(sumNa, report.na, 'byCategory na total matches');
+  });
+});

@@ -1,0 +1,241 @@
+// RegressionPanel — Narrative Regression Suite (Wave 29).
+// Fetches GET /api/nvm/regression and shows the 14-invariant test report:
+//   pass (green) / fail (red) / warning (amber) / na (gray)
+// with an overall grade and per-category breakdown.
+
+import React, { useState, useEffect, useCallback } from 'react';
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type Status = 'pass' | 'fail' | 'warning' | 'na';
+type Category = 'structure' | 'character' | 'clues' | 'tension' | 'theme';
+type Grade = 'A' | 'B' | 'C' | 'D' | 'F';
+
+interface InvariantResult {
+  id: string;
+  name: string;
+  category: Category;
+  status: Status;
+  message: string;
+  sceneRef?: number;
+}
+
+interface CategoryStats { pass: number; fail: number; warning: number; na: number; }
+
+interface RegressionReport {
+  results: InvariantResult[];
+  totalScenes: number;
+  pass: number;
+  fail: number;
+  warning: number;
+  na: number;
+  score: number;
+  grade: Grade;
+  byCategory: Record<Category, CategoryStats>;
+}
+
+interface Props { onClose: () => void; }
+
+// ── Config ────────────────────────────────────────────────────────────────────
+
+const STATUS_META: Record<Status, { label: string; color: string; bg: string }> = {
+  pass:    { label: 'PASS',    color: '#4ade80', bg: '#052e16' },
+  fail:    { label: 'FAIL',    color: '#f87171', bg: '#450a0a' },
+  warning: { label: 'WARN',    color: '#fbbf24', bg: '#422006' },
+  na:      { label: 'N/A',     color: '#64748b', bg: '#1e293b' },
+};
+
+const CATEGORY_META: Record<Category, { label: string; color: string }> = {
+  structure: { label: 'Structure', color: '#60a5fa' },
+  character: { label: 'Character', color: '#a78bfa' },
+  clues:     { label: 'Clues',     color: '#fb923c' },
+  tension:   { label: 'Tension',   color: '#f87171' },
+  theme:     { label: 'Theme',     color: '#4ade80' },
+};
+
+const GRADE_COLOR: Record<Grade, string> = {
+  A: '#4ade80', B: '#86efac', C: '#fbbf24', D: '#fb923c', F: '#f87171',
+};
+
+const CATEGORIES: Category[] = ['structure', 'character', 'clues', 'tension', 'theme'];
+
+// ── Panel ─────────────────────────────────────────────────────────────────────
+
+export function RegressionPanel({ onClose }: Props) {
+  const [data, setData]       = useState<RegressionReport | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState<string | null>(null);
+  const [filter, setFilter]   = useState<Status | 'all'>('all');
+  const [catFilter, setCatFilter] = useState<Category | 'all'>('all');
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const res = await fetch('/api/nvm/regression');
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Server error');
+      setData(await res.json());
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const visible = data?.results.filter(r =>
+    (filter === 'all' || r.status === filter) &&
+    (catFilter === 'all' || r.category === catFilter),
+  ) ?? [];
+
+  return (
+    <div style={{
+      background: '#0f172a', color: '#e2e8f0', borderRadius: 8,
+      border: '1px solid #334155', width: 820, maxWidth: '98vw',
+      maxHeight: '90vh', display: 'flex', flexDirection: 'column',
+      fontFamily: 'monospace', fontSize: 13,
+    }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 18px', borderBottom: '1px solid #334155', flexShrink: 0 }}>
+        <div>
+          <strong style={{ fontSize: 15 }}>Narrative Regression Suite</strong>
+          <div style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>
+            14 structural invariants — story correctness by construction
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {data && <GradeBadge grade={data.grade} score={data.score} />}
+          <button onClick={load} style={chipBtn('#1e293b')}>↺</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16 }}>✕</button>
+        </div>
+      </div>
+
+      {loading && <div style={{ color: '#64748b', textAlign: 'center', padding: 40 }}>Running invariants…</div>}
+      {error && <div style={{ color: '#f87171', background: '#1e293b', padding: 12, margin: 12, borderRadius: 5 }}>{error}</div>}
+
+      {data && (
+        <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+          {/* Left sidebar: summary + category breakdown */}
+          <div style={{ width: 200, flexShrink: 0, borderRight: '1px solid #334155', overflowY: 'auto', padding: 12 }}>
+            {/* Counts */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 14 }}>
+              {(['pass', 'fail', 'warning', 'na'] as Status[]).map(s => {
+                const m = STATUS_META[s];
+                return (
+                  <div key={s} onClick={() => setFilter(filter === s ? 'all' : s)}
+                    style={{ background: filter === s ? m.bg : '#1e293b', border: `1px solid ${filter === s ? m.color : '#334155'}`, borderRadius: 5, padding: '6px 8px', cursor: 'pointer', textAlign: 'center' }}>
+                    <div style={{ color: m.color, fontWeight: 700, fontSize: 16 }}>{data[s]}</div>
+                    <div style={{ color: '#64748b', fontSize: 9 }}>{m.label}</div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{ color: '#64748b', fontSize: 10, marginBottom: 6 }}>BY CATEGORY</div>
+            {CATEGORIES.map(cat => {
+              const m = CATEGORY_META[cat];
+              const stats = data.byCategory[cat];
+              const sel = catFilter === cat;
+              return (
+                <div key={cat} onClick={() => setCatFilter(sel ? 'all' : cat)} style={{
+                  background: sel ? '#1e293b' : 'transparent',
+                  border: `1px solid ${sel ? '#334155' : 'transparent'}`,
+                  borderRadius: 5, padding: '6px 8px', marginBottom: 3, cursor: 'pointer',
+                }}>
+                  <div style={{ color: m.color, fontSize: 11, fontWeight: 700 }}>{m.label}</div>
+                  <div style={{ display: 'flex', gap: 5, marginTop: 2 }}>
+                    <span style={{ color: '#4ade80', fontSize: 9 }}>{stats.pass}P</span>
+                    <span style={{ color: '#f87171', fontSize: 9 }}>{stats.fail}F</span>
+                    <span style={{ color: '#fbbf24', fontSize: 9 }}>{stats.warning}W</span>
+                    {stats.na > 0 && <span style={{ color: '#475569', fontSize: 9 }}>{stats.na}—</span>}
+                  </div>
+                </div>
+              );
+            })}
+
+            <div style={{ marginTop: 14, color: '#64748b', fontSize: 10 }}>
+              {data.totalScenes} scene{data.totalScenes !== 1 ? 's' : ''} · {data.results.length} invariants
+            </div>
+          </div>
+
+          {/* Right: invariant list */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
+            {/* Filter chips */}
+            <div style={{ display: 'flex', gap: 5, marginBottom: 12, flexWrap: 'wrap' }}>
+              {(['all', 'pass', 'fail', 'warning', 'na'] as const).map(s => (
+                <button key={s} onClick={() => setFilter(s)} style={{
+                  background: filter === s ? (s === 'all' ? '#334155' : STATUS_META[s as Status].bg) : '#1e293b',
+                  border: `1px solid ${filter === s ? (s === 'all' ? '#64748b' : STATUS_META[s as Status].color) : '#334155'}`,
+                  color: s === 'all' ? '#e2e8f0' : STATUS_META[s as Status].color,
+                  borderRadius: 4, padding: '2px 8px', cursor: 'pointer',
+                  fontFamily: 'monospace', fontSize: 10,
+                }}>
+                  {s === 'all' ? 'All' : STATUS_META[s as Status].label}
+                </button>
+              ))}
+            </div>
+
+            {visible.length === 0 && (
+              <div style={{ color: '#475569', textAlign: 'center', padding: 40 }}>No invariants match this filter.</div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {visible.map(r => <InvariantRow key={r.id} result={r} />)}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Sub-components ─────────────────────────────────────────────────────────────
+
+function InvariantRow({ result: r }: { result: InvariantResult }) {
+  const m = STATUS_META[r.status];
+  const cat = CATEGORY_META[r.category];
+  return (
+    <div style={{
+      background: '#1e293b', border: `1px solid ${r.status === 'fail' ? '#7f1d1d' : r.status === 'warning' ? '#78350f' : '#334155'}`,
+      borderLeft: `3px solid ${m.color}`,
+      borderRadius: 5, padding: '8px 12px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <StatusBadge status={r.status} />
+        <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: 12 }}>{r.name}</span>
+        <span style={{ color: cat.color, fontSize: 9, border: `1px solid ${cat.color}33`, borderRadius: 3, padding: '0 4px' }}>{r.category}</span>
+        {r.sceneRef !== undefined && (
+          <span style={{ color: '#64748b', fontSize: 9 }}>scene {r.sceneRef}</span>
+        )}
+      </div>
+      <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 4, lineHeight: 1.5 }}>{r.message}</div>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: Status }) {
+  const m = STATUS_META[status];
+  const icon = status === 'pass' ? '✓' : status === 'fail' ? '✗' : status === 'warning' ? '!' : '—';
+  return (
+    <span style={{
+      background: m.bg, color: m.color,
+      border: `1px solid ${m.color}66`,
+      borderRadius: 3, padding: '1px 5px', fontSize: 9, fontWeight: 700,
+      minWidth: 34, textAlign: 'center', display: 'inline-block',
+    }}>{icon} {m.label}</span>
+  );
+}
+
+function GradeBadge({ grade, score }: { grade: Grade; score: number }) {
+  return (
+    <div style={{ textAlign: 'center', lineHeight: 1 }}>
+      <div style={{ color: GRADE_COLOR[grade], fontSize: 22, fontWeight: 700, lineHeight: 1 }}>{grade}</div>
+      <div style={{ color: '#64748b', fontSize: 10 }}>{score}/100</div>
+    </div>
+  );
+}
+
+function chipBtn(bg: string): React.CSSProperties {
+  return {
+    background: bg, border: '1px solid #334155', borderRadius: 4,
+    color: '#e2e8f0', padding: '3px 8px', cursor: 'pointer',
+    fontFamily: 'monospace', fontSize: 11,
+  };
+}
