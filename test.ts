@@ -5924,3 +5924,95 @@ describe('NVM — Causal Twin Panel SCM serialisation (Wave 20)', () => {
     assert.ok(scm.nodes.has('s1:1'), 'clock from scene 1');
   });
 });
+
+// ── Wave 21: Fixed Points Panel — backchain + scheduleToGoalBiases ────────────
+
+describe('NVM — G9 Fixed Points Panel (Wave 21)', () => {
+  function baseState(): NarrativeState {
+    return emptyState();
+  }
+
+  it('scheduleToGoalBiases groups ops by scene correctly', () => {
+    const fp: FixedPoint = {
+      atScene: 4,
+      description: 'nora plants the evidence',
+      required: { clueIds: ['clue-key'], factIds: ['fact-letter'] },
+    };
+    const result = backchain(fp, baseState(), 0);
+    const biases = scheduleToGoalBiases(result, fp.description!);
+    // Every bias must have the fp description
+    assert.ok(biases.every(b => b.fixedPointDescription === fp.description), 'fp description carried through');
+    // Biases reference scenes within [0, fp.atScene-1]
+    assert.ok(biases.every(b => b.atScene >= 0 && b.atScene < fp.atScene), 'scenes in valid window');
+    // All ops arrays are non-empty
+    assert.ok(biases.every(b => b.ops.length > 0), 'each bias has at least one op');
+  });
+
+  it('scheduleToGoalBiases merges multiple ops into one bias per scene when possible', () => {
+    const fp: FixedPoint = {
+      atScene: 2,
+      description: 'quick deadline',
+      required: { clueIds: ['c1', 'c2'] },
+    };
+    const result = backchain(fp, baseState(), 0);
+    const biases = scheduleToGoalBiases(result, fp.description!);
+    // With only 2 scenes of runway and 2 clues, biases should cover ≤2 scenes
+    assert.ok(biases.length <= 2, 'at most 2 distinct scene biases');
+  });
+
+  it('backchain with minSuspense requirement emits UPDATE_READER_STATE', () => {
+    const fp: FixedPoint = { atScene: 5, description: 'high tension', required: { minSuspense: 80 } };
+    const result = backchain(fp, baseState(), 0);
+    const hasReaderState = result.schedule.some(s => s.op.op === 'UPDATE_READER_STATE');
+    assert.ok(hasReaderState, 'suspense requirement → UPDATE_READER_STATE op');
+  });
+
+  it('backchain with characterIds emits UPDATE_BELIEF for intro', () => {
+    const fp: FixedPoint = { atScene: 4, description: 'victor appears', required: { characterIds: ['victor'] } };
+    const result = backchain(fp, baseState(), 0);
+    const hasIntro = result.schedule.some(s => s.op.op === 'UPDATE_BELIEF' && (s.op as { charId?: string }).charId === 'victor');
+    assert.ok(hasIntro, 'character requirement → UPDATE_BELIEF introduction op');
+  });
+
+  it('backchain with claimIds emits ADVANCE_THEME_ARGUMENT', () => {
+    const fp: FixedPoint = { atScene: 6, description: 'theme lands', required: { claimIds: ['claim-betrayal'] } };
+    const result = backchain(fp, baseState(), 0);
+    const hasTheme = result.schedule.some(s => s.op.op === 'ADVANCE_THEME_ARGUMENT');
+    assert.ok(hasTheme, 'claim requirement → ADVANCE_THEME_ARGUMENT');
+  });
+
+  it('backchain with payoffSetupIds emits PAYOFF_SETUP', () => {
+    const fp: FixedPoint = { atScene: 5, description: 'gun fires', required: { payoffSetupIds: ['setup-gun'] } };
+    const result = backchain(fp, baseState(), 0);
+    const hasPayoff = result.schedule.some(s => s.op.op === 'PAYOFF_SETUP');
+    assert.ok(hasPayoff, 'payoff requirement → PAYOFF_SETUP op');
+  });
+
+  it('planToward with claimIds emits ADVANCE_THEME_ARGUMENT bias', () => {
+    const fp: FixedPoint = { atScene: 4, description: 'argue the theme', required: { claimIds: ['claim-sacrifice'] } };
+    const result = planToward(baseState(), [fp], 0);
+    const hasTheme = result.biases.some(b => b.ops.some(o => o.op === 'ADVANCE_THEME_ARGUMENT'));
+    assert.ok(hasTheme, 'claimIds → ADVANCE_THEME_ARGUMENT bias');
+  });
+
+  it('planToward with payoffSetupIds emits PAYOFF_SETUP bias near deadline', () => {
+    const fp: FixedPoint = { atScene: 5, description: 'the payoff', required: { payoffSetupIds: ['setup-letter'] } };
+    const result = planToward(baseState(), [fp], 0);
+    const payoffBias = result.biases.find(b => b.ops.some(o => o.op === 'PAYOFF_SETUP'));
+    assert.ok(payoffBias, 'payoffSetupIds → PAYOFF_SETUP bias');
+    assert.ok(payoffBias!.atScene >= fp.atScene - 1, 'payoff placed near deadline');
+  });
+
+  it('planToward multi-requirement emits multiple distinct bias op kinds', () => {
+    const fp: FixedPoint = {
+      atScene: 6,
+      description: 'climax ready',
+      required: { clueIds: ['clue-A'], factIds: ['fact-B'], minSuspense: 75 },
+    };
+    const result = planToward(baseState(), [fp], 0);
+    const opKinds = new Set(result.biases.flatMap(b => b.ops.map(o => o.op)));
+    assert.ok(opKinds.has('SEED_CLUE'), 'clue bias present');
+    assert.ok(opKinds.has('ADD_FACT'), 'fact bias present');
+    assert.ok(opKinds.has('UPDATE_READER_STATE'), 'suspense bias present');
+  });
+});

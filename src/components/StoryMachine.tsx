@@ -25,6 +25,7 @@ import { ArcTimelinePanel } from "./ArcTimelinePanel";
 import { ArcPlannerPanel } from "./ArcPlannerPanel";
 import { ProjectionGalleryPanel } from "./ProjectionGalleryPanel";
 import { CausalTwinPanel } from "./CausalTwinPanel";
+import { FixedPointsPanel } from "./FixedPointsPanel";
 
 // ── Emotion display helpers ───────────────────────────────────────────────────
 
@@ -106,6 +107,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [showArcPlanner, setShowArcPlanner] = useState(false);
   const [showProjection, setShowProjection] = useState(false);
   const [showCausalTwin, setShowCausalTwin] = useState(false);
+  const [showFixedPoints, setShowFixedPoints] = useState(false);
 
   const fetchActivePressures = useCallback(async () => {
     try {
@@ -499,6 +501,14 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           >
             <Zap className="w-4 h-4" />
             <span className="hidden sm:inline">Twin</span>
+          </button>
+          <button
+            onClick={() => setShowFixedPoints(true)}
+            title="Fixed Points — temporal authoring, author destiny (G9)"
+            className="bg-purple-900 hover:bg-purple-700 text-purple-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <Target className="w-4 h-4" />
+            <span className="hidden sm:inline">Destiny</span>
           </button>
           <button
             onClick={() => setShowSettings(true)}
@@ -1099,6 +1109,12 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       {showCausalTwin && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
           <CausalTwinPanel onClose={() => setShowCausalTwin(false)} />
+        </div>
+      )}
+
+      {showFixedPoints && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <FixedPointsPanel onClose={() => setShowFixedPoints(false)} />
         </div>
       )}
     </div>

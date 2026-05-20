@@ -1657,6 +1657,23 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     res.json({ ...planResult, pressuresInjected });
   }));
 
+  // POST /api/nvm/author/backchain — backward-chain a single FixedPoint to a schedule.
+  // Body: { fixedPoint: FixedPoint, currentScene?: number }
+  app.post('/api/nvm/author/backchain', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { backchain, scheduleToGoalBiases } = await import('./server/nvm/author/backchain.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const fp = req.body?.fixedPoint;
+    if (!fp || typeof fp.atScene !== 'number') {
+      res.status(400).json({ error: 'body.fixedPoint with atScene (number) is required' }); return;
+    }
+    const state = buildNarrativeState(stage);
+    const currentScene = typeof req.body?.currentScene === 'number' ? req.body.currentScene : state.turn;
+    const result = backchain(fp, state, currentScene);
+    const biases = scheduleToGoalBiases(result, fp.description ?? `fixed point @ scene ${fp.atScene}`);
+    res.json({ ...result, biases });
+  }));
+
   // GET /api/nvm/momentum — narrative momentum score (5th tension signal)
   app.get('/api/nvm/momentum', gameLimiter, asyncHandler(async (req, res) => {
     const { stage } = getOrCreateSession(sessionId(req));
