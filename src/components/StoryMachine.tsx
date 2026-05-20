@@ -20,6 +20,7 @@ import EpistemicMap from "./EpistemicMap";
 import DirectorCutPanel from "./DirectorCutPanel";
 import { HarvestPanel } from "./HarvestPanel";
 import { ConvergePanel } from "./ConvergePanel";
+import { CorpusPanel } from "./CorpusPanel";
 
 // ── Emotion display helpers ───────────────────────────────────────────────────
 
@@ -96,6 +97,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [showDirectorCut, setShowDirectorCut] = useState(false);
   const [showHarvest, setShowHarvest]       = useState(false);
   const [showConverge, setShowConverge]     = useState(false);
+  const [showCorpus, setShowCorpus]         = useState(false);
 
   const fetchActivePressures = useCallback(async () => {
     try {
@@ -449,6 +451,14 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           >
             <Zap className="w-4 h-4" />
             <span className="hidden sm:inline">Converge</span>
+          </button>
+          <button
+            onClick={() => setShowCorpus(true)}
+            title="Director Policy — learned from self-play corpus"
+            className="bg-violet-900 hover:bg-violet-700 text-violet-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <Shuffle className="w-4 h-4" />
+            <span className="hidden sm:inline">Policy</span>
           </button>
           <button
             onClick={() => setShowSettings(true)}
@@ -1019,6 +1029,12 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       {showConverge && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
           <ConvergePanel onClose={() => setShowConverge(false)} />
+        </div>
+      )}
+
+      {showCorpus && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <CorpusPanel onClose={() => setShowCorpus(false)} />
         </div>
       )}
     </div>

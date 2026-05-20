@@ -1709,9 +1709,30 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
       res.status(400).json({ error: 'body.target must be a SceneTarget with sceneIdx' }); return;
     }
     const state = buildNarrativeState(stage);
-    const budget = req.body?.budget ?? { maxIterations: 4, candidatesPerIteration: 2 };
     const seed = typeof req.body?.seed === 'number' ? req.body.seed : Date.now();
     const generate = makeLLMCandidateGenerator();
+
+    // G13→G1: if corpus has runs, mine the Director Policy and pass it to the budget.
+    let directorPolicy: import('./server/nvm/selfplay/mine.ts').DirectorPolicy | undefined;
+    const corpusRuns = stage.getCorpusRuns(30);
+    if (corpusRuns.length > 0) {
+      const { mineCorpus } = await import('./server/nvm/selfplay/mine.ts');
+      const fakeReport = {
+        runs: corpusRuns.map(r => ({
+          scenarioId: r.scenario_id, seed: 0, proofPassRate: r.proof_pass_rate,
+          meanValuation: r.mean_valuation, score: r.score,
+          topOperators: [] as import('./server/nvm/converge/operators.ts').MutationOperator[],
+          scenes: [], effectiveOperators: [], totalIterations: 0,
+        })),
+        meanScore: corpusRuns.reduce((s, r) => s + r.score, 0) / corpusRuns.length,
+        bestRun: { scenarioId: '', seed: 0, proofPassRate: 0, meanValuation: 0, score: 0, topOperators: [], scenes: [], effectiveOperators: [], totalIterations: 0 },
+        worstRun: { scenarioId: '', seed: 0, proofPassRate: 0, meanValuation: 0, score: 0, topOperators: [], scenes: [], effectiveOperators: [], totalIterations: 0 },
+        operatorFrequency: {} as Record<import('./server/nvm/converge/operators.ts').MutationOperator, number>,
+      };
+      directorPolicy = mineCorpus(fakeReport).policy;
+    }
+
+    const budget = { ...(req.body?.budget ?? { maxIterations: 4, candidatesPerIteration: 2 }), directorPolicy };
     const result = await convergeScene(state, target, generate, budget, seed);
 
     // Persist any new ghost commits from convergence into Stage ghost ledger

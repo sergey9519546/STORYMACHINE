@@ -21,7 +21,7 @@ import { emptyState, stateHash, relationshipKey } from './server/nvm/state/Narra
 import type { NarrativeState } from './server/nvm/state/NarrativeState.ts';
 import { applyStoryOp, applyStoryOps } from './server/nvm/ops/dispatcher.ts';
 import { loadMechanisms, loadMechanismsCached } from './server/nvm/mechanisms/loader.ts';
-import { runTier1, tier1Passes } from './server/nvm/proof/kernel.ts';
+import { runTier1, tier1Passes, runTier2, tier2Score } from './server/nvm/proof/kernel.ts';
 import { runM15Harness, buildNoraWarehouseIR } from './server/nvm/__tests__/m1.5-harness.ts';
 import { whatBreaksIfRemoved } from './server/nvm/query/whatBreaks.ts';
 import { summarizeOps } from './server/nvm/state/StoryCommit.ts';
@@ -5479,5 +5479,76 @@ describe('NVM — LLM Candidate Generator (Wave 15)', () => {
     const candidates = await gen(spec, 2);
     assert.equal(candidates.length, 2);
     assert.equal(candidates[0].sceneIdx, 0);
+  });
+});
+
+// ── Wave 16: Tier 2 Proof Kernel ─────────────────────────────────────────────
+
+describe('NVM — Tier 2 Proof Kernel (Wave 16)', () => {
+  function minimalIR(ops: StoryOp[]): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR {
+    return {
+      transitionId: `t2-${Date.now()}`,
+      sceneIdx: 1,
+      sceneFunction: 'build_tension',
+      activeMechanisms: [],
+      beforeStateHash: 'x',
+      ops,
+      preconditions: [],
+      postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: Date.now() },
+    };
+  }
+
+  it('runTier2 returns 3 ProofResults (necessity, specificity, dialogue)', () => {
+    const ir = minimalIR([
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'nora', predicate: 'hides', object: 'loan', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ]);
+    const results = runTier2(ir, emptyState());
+    assert.equal(results.length, 3);
+    assert.ok(results.some(r => r.proof === 'NecessityProof'));
+    assert.ok(results.some(r => r.proof === 'SpecificityProof'));
+    assert.ok(results.some(r => r.proof === 'DialogueProof'));
+  });
+
+  it('tier2Score is 100 when all Tier 2 proofs pass', () => {
+    // Rich, specific ops tend to pass
+    const ir = minimalIR([
+      { op: 'ADD_FACT', fact: { factId: 'fact-nora-loan', subject: 'nora', predicate: 'borrowed_from', object: 'krogstad', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'helmer', belief: { id: 'b1', proposition: 'nora is innocent', confidence: 0.9, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+      { op: 'APPRAISE_EMOTION', charId: 'nora', emotion: { joy: 0, distress: 60, anger: 0, fear: 80, pride: 0, shame: 0, dominant: 'fear' as const, intensity: 80, last_updated_at: 1 } },
+      { op: 'SEED_CLUE', clueId: 'clue-letter', carrier: 'object' },
+    ]);
+    const results = runTier2(ir, emptyState());
+    const s = tier2Score(results);
+    assert.ok(s >= 0 && s <= 100, `tier2Score out of range: ${s}`);
+  });
+
+  it('tier2Score is 0 when all Tier 2 proofs fail', () => {
+    const results = [
+      { proof: 'NecessityProof' as const, tier: 2 as const, pass: false, reason: 'x', findings: [] },
+      { proof: 'SpecificityProof' as const, tier: 2 as const, pass: false, reason: 'x', findings: [] },
+      { proof: 'DialogueProof' as const, tier: 2 as const, pass: false, reason: 'x', findings: [] },
+    ];
+    assert.equal(tier2Score(results), 0);
+  });
+
+  it('tier2Score is partial when one proof fails', () => {
+    const results = [
+      { proof: 'NecessityProof' as const, tier: 2 as const, pass: true, reason: 'ok', findings: [] },
+      { proof: 'SpecificityProof' as const, tier: 2 as const, pass: false, reason: 'x', findings: [] },
+      { proof: 'DialogueProof' as const, tier: 2 as const, pass: true, reason: 'ok', findings: [] },
+    ];
+    const s = tier2Score(results);
+    assert.ok(s > 0 && s < 100, `expected partial score, got ${s}`);
+  });
+
+  it('Tier 2 failures appear in proof names (NecessityProof / SpecificityProof / DialogueProof)', () => {
+    // Generic/vague ops trigger specificity failure
+    const ir = minimalIR([
+      { op: 'ADD_FACT', fact: { factId: 'f', subject: 'thing', predicate: 'does', object: 'event', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      { op: 'ADD_FACT', fact: { factId: 'g', subject: 'entity', predicate: 'causes', object: 'thing', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ]);
+    const results = runTier2(ir, emptyState());
+    assert.ok(results.every(r => ['NecessityProof','SpecificityProof','DialogueProof'].includes(r.proof)));
   });
 });

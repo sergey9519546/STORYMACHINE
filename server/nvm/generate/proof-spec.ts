@@ -100,6 +100,25 @@ export function proofsToConstraints(
             detail: finding.subjectId,
           });
           break;
+        // Tier 2 quality-gate failures — translated to free-form guidance
+        case 'NecessityProof':
+          constraints.push({
+            kind: 'free_form',
+            description: 'Remove redundant ops. Every op must shift a belief, emotion, relationship, or fact in a new direction.',
+          });
+          break;
+        case 'SpecificityProof':
+          constraints.push({
+            kind: 'free_form',
+            description: 'Replace vague placeholders with concrete names: specific charIds, factIds, clueIds. No "event" or "thing" generics.',
+          });
+          break;
+        case 'DialogueProof':
+          constraints.push({
+            kind: 'free_form',
+            description: `Dialogue violation: ${finding.message}. Fix before generating.`,
+          });
+          break;
         default:
           constraints.push({ kind: 'free_form', description: finding.message });
       }

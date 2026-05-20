@@ -18,12 +18,15 @@ import type { MutationOperator } from './operators.ts';
 import type { CandidateGenerator, SceneTarget } from '../generate/proof-spec.ts';
 import type { GhostReason } from '../repro/ghost-ledger.ts';
 import type { WritersRoomResult } from '../room/room.ts';
-import { runTier1, tier1Passes } from '../proof/kernel.ts';
+import type { DirectorPolicy } from '../selfplay/mine.ts';
+import { runTier1, tier1Passes, runTier2, failedProofs } from '../proof/kernel.ts';
 import { deriveTensionLedger } from '../valuation/futures.ts';
 import { runQualityEngine } from '../quality/index.ts';
 import { runWritersRoom } from '../room/room.ts';
 import { buildGenerationSpec } from '../generate/proof-spec.ts';
 import { applyOperator, ALL_OPERATORS } from './operators.ts';
+import { queryPolicy } from '../selfplay/mine.ts';
+import { computeTopology } from '../valuation/topology.ts';
 import { makePrng, randInt } from '../repro/seed.ts';
 
 export interface ConvergeStep {
@@ -55,6 +58,8 @@ export interface ConvergeResult {
 export interface ConvergeBudget {
   maxIterations: number;
   candidatesPerIteration: number;
+  /** When present, biases operator selection via corpus-learned Director Policy (G13→G1). */
+  directorPolicy?: DirectorPolicy;
 }
 
 const DEFAULT_BUDGET: ConvergeBudget = { maxIterations: 8, candidatesPerIteration: 3 };
@@ -88,10 +93,21 @@ export async function convergeScene(
 
     let candidates: NarrativeTransitionIR[];
     // G2→G1: Writers' Room drives mutation operator selection after iteration 0.
+    // G13→G1: Director Policy (from corpus) biases operator when room has no consensus.
     let roomResult: WritersRoomResult | null = null;
     if (best && iter > 0) {
       roomResult = runWritersRoom(best, state);
-      const op: MutationOperator = roomResult.suggestedOperator ?? ALL_OPERATORS[randInt(prng, ALL_OPERATORS.length)];
+      let op: MutationOperator;
+      if (roomResult.suggestedOperator) {
+        op = roomResult.suggestedOperator;
+      } else if (budget.directorPolicy) {
+        const arcLedger = deriveTensionLedger(state, target.sceneIdx);
+        const topology = computeTopology([arcLedger]);
+        const policyOps = queryPolicy(budget.directorPolicy, topology.dominantArc ?? 'unknown');
+        op = (policyOps[0] as MutationOperator | undefined) ?? ALL_OPERATORS[randInt(prng, ALL_OPERATORS.length)];
+      } else {
+        op = ALL_OPERATORS[randInt(prng, ALL_OPERATORS.length)];
+      }
       const mutation = applyOperator(op, best, state, seed + iter);
       const fresh = await generate(spec, 1);
       candidates = [mutation.ir, ...fresh];
@@ -170,7 +186,11 @@ export async function convergeScene(
     }
 
     if (best) {
-      currentFailures = runTier1(best, state).filter(r => !r.pass);
+      // Merge Tier 1 + Tier 2 failures so the next GenerationSpec includes
+      // both hard-block fixes and quality-gate guidance.
+      const t1Failures = failedProofs(runTier1(best, state));
+      const t2Failures = failedProofs(runTier2(best, state));
+      currentFailures = [...t1Failures, ...t2Failures];
     }
   }
 
