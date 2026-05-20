@@ -3,24 +3,16 @@ import { Ghost, Crosshair, Target, Heart, PlusCircle, List, Users, Search, Chevr
 import { FountainBlock } from '../lib/fountain';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { ScriptCharacter } from '../types';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-interface Character {
-  id: string;
-  name: string;
-  ghost: string;
-  lie: string;
-  want: string;
-  need: string;
-}
-
 interface SidebarProps {
-  characters: Character[];
+  characters: ScriptCharacter[];
   onAddCharacter: () => void;
-  onUpdateCharacter: (id: string, field: keyof Character, value: string) => void;
+  onUpdateCharacter: (id: string, field: keyof ScriptCharacter, value: string) => void;
   scriptText: string;
   parsedBlocks: FountainBlock[];
   onNavigate: (lineIndex: number) => void;
@@ -36,7 +28,7 @@ function CharacterNameField({
 }: {
   charId: string;
   value: string;
-  onUpdate: (id: string, field: keyof Character, value: string) => void;
+  onUpdate: (id: string, field: keyof ScriptCharacter, value: string) => void;
 }) {
   const [touched, setTouched] = useState(false);
 
@@ -80,10 +72,10 @@ function LongTextField({
   onUpdate,
 }: {
   charId: string;
-  field: keyof Character;
+  field: keyof ScriptCharacter;
   value: string;
   placeholder: string;
-  onUpdate: (id: string, field: keyof Character, value: string) => void;
+  onUpdate: (id: string, field: keyof ScriptCharacter, value: string) => void;
 }) {
   const displayValue = value.slice(0, LONG_FIELD_MAX);
   const count = displayValue.length;
@@ -213,10 +205,10 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
 
                 <div className="space-y-4">
                   {[
-                    { icon: Ghost, label: 'Ghost', field: 'ghost' as keyof Character, placeholder: 'What haunts them?' },
-                    { icon: Crosshair, label: 'Lie', field: 'lie' as keyof Character, placeholder: 'What lie do they believe?' },
-                    { icon: Target, label: 'Want', field: 'want' as keyof Character, placeholder: 'What do they want?' },
-                    { icon: Heart, label: 'Need', field: 'need' as keyof Character, placeholder: 'What do they need?' },
+                    { icon: Ghost, label: 'Ghost', field: 'ghost' as keyof ScriptCharacter, placeholder: 'What haunts them?' },
+                    { icon: Crosshair, label: 'Lie', field: 'lie' as keyof ScriptCharacter, placeholder: 'What lie do they believe?' },
+                    { icon: Target, label: 'Want', field: 'want' as keyof ScriptCharacter, placeholder: 'What do they want?' },
+                    { icon: Heart, label: 'Need', field: 'need' as keyof ScriptCharacter, placeholder: 'What do they need?' },
                   ].map(item => (
                     <div key={item.field} className="flex items-start gap-3">
                       <item.icon className="w-3 h-3 text-black dark:text-white mt-1 shrink-0" />

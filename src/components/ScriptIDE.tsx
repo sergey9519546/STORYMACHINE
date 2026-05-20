@@ -38,7 +38,7 @@ import AnalysisPanel from "./scriptide/AnalysisPanel";
 import SnapshotManager from "./scriptide/SnapshotManager";
 import ResearchNotes from "./scriptide/ResearchNotes";
 import Toolbar from "./scriptide/Toolbar";
-import { ScriptCharacter } from "./scriptide/CharacterManager";
+import { ScriptCharacter } from "../types";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

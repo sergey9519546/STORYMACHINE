@@ -1,15 +1,7 @@
 import React, { useState } from 'react';
 import { Sparkles, MessageSquare, Activity, Loader2, User } from 'lucide-react';
 import { motion } from 'motion/react';
-// The ScriptIDE character type (simpler than the full game Character in types.ts)
-interface ScriptCharacter {
-  id: string;
-  name: string;
-  ghost: string;
-  lie: string;
-  want: string;
-  need: string;
-}
+import { ScriptCharacter } from '../types';
 
 interface AIPanelProps {
   script: string;

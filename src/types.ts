@@ -233,3 +233,12 @@ export interface GameState {
   history: Scene[];
   ncpStoryform?: Record<string, unknown>; // Narrative Context Protocol JSON schema
 }
+
+export interface ScriptCharacter {
+  id: string;
+  name: string;
+  ghost: string;
+  lie: string;
+  want: string;
+  need: string;
+}
