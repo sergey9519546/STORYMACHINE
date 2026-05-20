@@ -1640,19 +1640,12 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     res.json({ ...planResult, pressuresInjected });
   }));
 
-  // GET /api/nvm/ghost-commits — list ghost commits (shadow canon for What-If)
-  app.get('/api/nvm/ghost-commits', gameLimiter, asyncHandler(async (req, res) => {
-    const { stage } = getOrCreateSession(sessionId(req));
-    const ghosts = stage.ghostLedgerGet();
-    res.json({ count: ghosts.length, ghosts });
-  }));
-
   // GET /api/nvm/momentum — narrative momentum score (5th tension signal)
   app.get('/api/nvm/momentum', gameLimiter, asyncHandler(async (req, res) => {
     const { stage } = getOrCreateSession(sessionId(req));
     const { momentumScore } = await import('./server/nvm/valuation/futures.ts');
     const commits = stage.getCommits().filter(c => !c.reverted);
-    res.json({ momentum: momentumScore(commits), commitCount: commits.length });
+    res.json({ momentumScore: momentumScore(commits), commitCount: commits.length });
   }));
 
   // POST /api/nvm/inject-ops — Director's Cut: inject custom StoryOps into the canon.
@@ -1700,6 +1693,124 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
       ops: ops.length,
       newStateHash: stateHash(newState),
       label: req.body?.label ?? 'director_cut',
+    });
+  }));
+
+  // POST /api/nvm/converge — run the G1 convergence loop on a scene target.
+  // Body: { target: SceneTarget, budget?: { maxIterations, candidatesPerIteration }, seed?: number }
+  // Returns: ConvergeResult (history, converged, finalValuation, finalQuality, ghosts[])
+  app.post('/api/nvm/converge', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { convergeScene } = await import('./server/nvm/converge/loop.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const { makeLLMCandidateGenerator } = await import('./server/nvm/generate/llm-generator.ts');
+    const target = req.body?.target;
+    if (!target || typeof target !== 'object' || typeof target.sceneIdx !== 'number') {
+      res.status(400).json({ error: 'body.target must be a SceneTarget with sceneIdx' }); return;
+    }
+    const state = buildNarrativeState(stage);
+    const budget = req.body?.budget ?? { maxIterations: 4, candidatesPerIteration: 2 };
+    const seed = typeof req.body?.seed === 'number' ? req.body.seed : Date.now();
+    const generate = makeLLMCandidateGenerator();
+    const result = await convergeScene(state, target, generate, budget, seed);
+
+    // Persist any new ghost commits from convergence into Stage ghost ledger
+    const { appendGhost } = await import('./server/nvm/repro/ghost-ledger.ts');
+    for (const ghost of result.ghosts) {
+      appendGhost(stage, {
+        ghostId: ghost.ir.transitionId,
+        parentCommitId: null,
+        sceneIdx: ghost.ir.sceneIdx,
+        ir: ghost.ir,
+        reason: ghost.reason,
+        rejectedAt: Date.now(),
+      });
+    }
+
+    res.json({
+      converged: result.converged,
+      iterations: result.iterations,
+      finalValuation: result.finalValuation,
+      finalQuality: result.finalQuality,
+      finalComposite: result.finalComposite,
+      history: result.history,
+      ghostCount: result.ghosts.length,
+      ir: result.ir,
+    });
+  }));
+
+  // GET /api/nvm/corpus — top corpus runs + Director policy
+  app.get('/api/nvm/corpus', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { mineCorpus } = await import('./server/nvm/selfplay/mine.ts');
+    const limit = typeof req.query['limit'] === 'string' ? parseInt(req.query['limit'], 10) : 20;
+    const runs = stage.getCorpusRuns(isNaN(limit) ? 20 : Math.min(limit, 100));
+    if (runs.length === 0) {
+      res.json({ playbook: null, runs: [], message: 'No corpus runs yet. POST /api/nvm/selfplay to generate.' });
+      return;
+    }
+    // Build a minimal CorpusReport shape for mineCorpus
+    const fakeReport = {
+      runs: runs.map(r => ({
+        scenarioId: r.scenario_id,
+        seed: 0,
+        proofPassRate: r.proof_pass_rate,
+        meanValuation: r.mean_valuation,
+        score: r.score,
+        topOperators: [] as import('./server/nvm/converge/operators.ts').MutationOperator[],
+        scenes: [],
+        effectiveOperators: [],
+        totalIterations: 0,
+      })),
+      meanScore: runs.reduce((s, r) => s + r.score, 0) / runs.length,
+      bestRun: runs[0] ? { scenarioId: runs[0].scenario_id, seed: 0, proofPassRate: runs[0].proof_pass_rate, meanValuation: runs[0].mean_valuation, score: runs[0].score, topOperators: [], scenes: [], effectiveOperators: [], totalIterations: 0 } : { scenarioId: '', seed: 0, proofPassRate: 0, meanValuation: 0, score: 0, topOperators: [], scenes: [], effectiveOperators: [], totalIterations: 0 },
+      worstRun: runs[runs.length - 1] ? { scenarioId: runs[runs.length - 1].scenario_id, seed: 0, proofPassRate: runs[runs.length - 1].proof_pass_rate, meanValuation: runs[runs.length - 1].mean_valuation, score: runs[runs.length - 1].score, topOperators: [], scenes: [], effectiveOperators: [], totalIterations: 0 } : { scenarioId: '', seed: 0, proofPassRate: 0, meanValuation: 0, score: 0, topOperators: [], scenes: [], effectiveOperators: [], totalIterations: 0 },
+      operatorFrequency: {} as Record<import('./server/nvm/converge/operators.ts').MutationOperator, number>,
+    };
+    const playbook = mineCorpus(fakeReport);
+    res.json({ playbook, runs, runCount: runs.length });
+  }));
+
+  // POST /api/nvm/selfplay — run N headless sims and persist corpus results.
+  // Body: { scenarios: SimScenario[] }  (max 5 for HTTP budget)
+  app.post('/api/nvm/selfplay', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { runSelfPlay } = await import('./server/nvm/selfplay/corpus.ts');
+    const { makeLLMCandidateGenerator } = await import('./server/nvm/generate/llm-generator.ts');
+    const { extractGenome } = await import('./server/nvm/selfplay/genome.ts');
+    const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+    const scenarios = req.body?.scenarios;
+    if (!Array.isArray(scenarios) || scenarios.length === 0) {
+      res.status(400).json({ error: 'body.scenarios must be a non-empty array' }); return;
+    }
+    if (scenarios.length > 5) {
+      res.status(400).json({ error: 'Maximum 5 scenarios per HTTP self-play request' }); return;
+    }
+    const generate = makeLLMCandidateGenerator();
+    const report = await runSelfPlay(scenarios, generate);
+
+    // Persist each run to Stage corpus
+    const state = buildNarrativeState(stage);
+    const commits = stage.getCommits();
+    const ghosts = stage.ghostLedgerGet();
+    for (const run of report.runs) {
+      const genome = extractGenome({ commits, state, ghosts }, run.scenarioId);
+      stage.appendCorpusRun({
+        run_id: `${run.scenarioId}-${run.seed}-${Date.now()}`,
+        scenario_id: run.scenarioId,
+        score: run.score,
+        proof_pass_rate: run.proofPassRate,
+        mean_valuation: run.meanValuation,
+        ops_count: run.scenes.reduce((s, ir) => s + ir.ops.length, 0),
+        genome_json: JSON.stringify(genome),
+      });
+    }
+
+    res.json({
+      runs: report.runs.length,
+      meanScore: report.meanScore,
+      bestScenario: report.bestRun.scenarioId,
+      operatorFrequency: report.operatorFrequency,
     });
   }));
 

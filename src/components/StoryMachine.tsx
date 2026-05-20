@@ -19,6 +19,7 @@ import WhatIfPanel from "./WhatIfPanel";
 import EpistemicMap from "./EpistemicMap";
 import DirectorCutPanel from "./DirectorCutPanel";
 import { HarvestPanel } from "./HarvestPanel";
+import { ConvergePanel } from "./ConvergePanel";
 
 // ── Emotion display helpers ───────────────────────────────────────────────────
 
@@ -94,6 +95,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [showEpistemic, setShowEpistemic]   = useState(false);
   const [showDirectorCut, setShowDirectorCut] = useState(false);
   const [showHarvest, setShowHarvest]       = useState(false);
+  const [showConverge, setShowConverge]     = useState(false);
 
   const fetchActivePressures = useCallback(async () => {
     try {
@@ -439,6 +441,14 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           >
             <FileDown className="w-4 h-4" />
             <span className="hidden sm:inline">Harvest</span>
+          </button>
+          <button
+            onClick={() => setShowConverge(true)}
+            title="Convergence Search — AlphaZero-for-drama"
+            className="bg-rose-900 hover:bg-rose-700 text-rose-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <Zap className="w-4 h-4" />
+            <span className="hidden sm:inline">Converge</span>
           </button>
           <button
             onClick={() => setShowSettings(true)}
@@ -1003,6 +1013,12 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       {showHarvest && (
         <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 60 }}>
           <HarvestPanel onClose={() => setShowHarvest(false)} />
+        </div>
+      )}
+
+      {showConverge && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <ConvergePanel onClose={() => setShowConverge(false)} />
         </div>
       )}
     </div>

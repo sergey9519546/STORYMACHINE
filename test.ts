@@ -68,6 +68,7 @@ import {
   dialogueWarnings,
 } from './server/nvm/quality/index.ts';
 import { momentumScore } from './server/nvm/valuation/futures.ts';
+import { makeLLMCandidateGenerator } from './server/nvm/generate/llm-generator.ts';
 
 describe('safeJsonParse', () => {
   it('returns parsed value for valid JSON object', () => {
@@ -5422,5 +5423,61 @@ describe('NVM — Quality Engine Extensions (Wave 12)', () => {
     const ledger = deriveTensionLedger(state, 1);
     const unexposed = ledger.positions.filter(p => p.kind === 'unexposed_lie');
     assert.equal(unexposed.length, 0, 'high-confidence told belief should not trigger unexposed_lie');
+  });
+});
+
+// ── Wave 15: LLM Candidate Generator (stub path) ─────────────────────────────
+
+describe('NVM — LLM Candidate Generator (Wave 15)', () => {
+  const stubTarget: SceneTarget = {
+    sceneIdx: 2,
+    sceneFunction: 'build_tension',
+    activeMechanisms: [],
+    tensionTarget: 50,
+    qualityTarget: 40,
+  };
+
+  it('makeLLMCandidateGenerator returns a function', () => {
+    const gen = makeLLMCandidateGenerator();
+    assert.equal(typeof gen, 'function');
+  });
+
+  it('stub path produces N candidates when LLM is unavailable', async () => {
+    // No GEMINI_API_KEY in test env → falls back to structural stubs
+    const gen = makeLLMCandidateGenerator();
+    const state = emptyState();
+    const spec = buildGenerationSpec(state, stubTarget, []);
+    const candidates = await gen(spec, 3);
+    assert.equal(candidates.length, 3);
+    for (const c of candidates) {
+      assert.equal(c.sceneIdx, stubTarget.sceneIdx);
+      assert.equal(c.sceneFunction, stubTarget.sceneFunction);
+      assert.ok(c.ops.length > 0, 'stub must produce at least one op');
+    }
+  });
+
+  it('stub candidates have unique transitionIds', async () => {
+    const gen = makeLLMCandidateGenerator();
+    const state = emptyState();
+    const spec = buildGenerationSpec(state, stubTarget, []);
+    const candidates = await gen(spec, 4);
+    const ids = new Set(candidates.map(c => c.transitionId));
+    assert.equal(ids.size, 4, 'all transitionIds must be unique');
+  });
+
+  it('stub candidate provenance is model_generated', async () => {
+    const gen = makeLLMCandidateGenerator();
+    const state = emptyState();
+    const spec = buildGenerationSpec(state, stubTarget, []);
+    const [c] = await gen(spec, 1);
+    assert.equal(c.provenance.origin, 'model_generated');
+  });
+
+  it('stub generator produces candidates for sceneIdx 0', async () => {
+    const gen = makeLLMCandidateGenerator();
+    const spec = buildGenerationSpec(emptyState(), { ...stubTarget, sceneIdx: 0 }, []);
+    const candidates = await gen(spec, 2);
+    assert.equal(candidates.length, 2);
+    assert.equal(candidates[0].sceneIdx, 0);
   });
 });
