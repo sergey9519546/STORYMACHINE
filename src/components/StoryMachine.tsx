@@ -49,6 +49,16 @@ const EMOTION_COLOR: Record<EmotionType, string> = {
   shame:    'bg-gray-500 text-white',
 };
 
+const EMOTION_BG: Record<EmotionType, string> = {
+  neutral:  'bg-gray-200',
+  joy:      'bg-green-500',
+  distress: 'bg-red-800',
+  anger:    'bg-[#FF4444]',
+  fear:     'bg-purple-600',
+  pride:    'bg-yellow-400',
+  shame:    'bg-gray-500',
+};
+
 const PERSUASION_BADGE: Record<string, string> = {
   logic:        'bg-blue-600 text-white',
   emotion:      'bg-pink-500 text-white',
@@ -755,7 +765,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                                 <div
                                   key={k}
                                   title={`${k}: ${agent.emotionState![k]}`}
-                                  className={`w-1.5 transition-all ${EMOTION_COLOR[k].split(' ')[0]}`}
+                                  className={`w-1.5 transition-all ${EMOTION_BG[k]}`}
                                   style={{ height: `${Math.max(2, (agent.emotionState![k] / 100) * 12)}px` }}
                                 />
                               ))}
