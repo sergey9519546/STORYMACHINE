@@ -8136,3 +8136,256 @@ describe('NVM — End-Condition Detector + Screenplay Compiler (Wave 38)', () =>
       'one annotation per record');
   });
 });
+
+// ── Wave 39: 12-Pass Revision Pipeline ────────────────────────────────────────
+
+import { structurePass }    from './server/nvm/revision/passes/structure.ts';
+import { causalityPass }    from './server/nvm/revision/passes/causality.ts';
+import { intentionPass }    from './server/nvm/revision/passes/intention.ts';
+import { beliefPass }       from './server/nvm/revision/passes/belief.ts';
+import { conflictPass }     from './server/nvm/revision/passes/conflict.ts';
+import { characterArcPass } from './server/nvm/revision/passes/character-arc.ts';
+import { dialoguePass }     from './server/nvm/revision/passes/dialogue.ts';
+import { rhythmPass }       from './server/nvm/revision/passes/rhythm.ts';
+import { pacingPass }       from './server/nvm/revision/passes/pacing.ts';
+import { originalityPass }  from './server/nvm/revision/passes/originality.ts';
+import { payoffPass }       from './server/nvm/revision/passes/payoff.ts';
+import { voicePass }        from './server/nvm/revision/passes/voice.ts';
+import { runRevisionPipeline } from './server/nvm/revision/pipeline.ts';
+
+/** Minimal fountain text for testing */
+const SAMPLE_FOUNTAIN = `Title: TEST
+Author: Test
+
+INT. THE OFFICE - DAY
+
+Alice looks around nervously. She takes a deep breath.
+
+ALICE
+We need to talk. I feel so angry.
+
+BOB
+Yes.
+
+INT. THE WAREHOUSE - NIGHT
+
+Bob stares into the distance. A single tear runs down his face.
+
+ALICE
+As you know, Bob, we discussed the plan.
+
+BOB
+Absolutely.
+`;
+
+/** Make a minimal PassInput with no records/structure */
+/** Minimal StructureState for Wave 39 tests */
+function makeStructureForRevision(act = 'act1', revelation = 0, clues = 0, escalating = false): import('./server/nvm/screenplay/structure.ts').StructureState {
+  return {
+    actPosition: act as import('./server/nvm/screenplay/structure.ts').ActPosition,
+    completionPercent: act === 'act3' ? 80 : 20,
+    avgSuspensePerScene: 2,
+    escalating,
+    reversalCount: 1,
+    reversalDensity: 1,
+    approachingClimax: act === 'act3',
+    openClues: clues,
+    revelationCount: revelation,
+    midpointPressure: 2,
+    tightestScene: null,
+  };
+}
+
+function makePassInput(fountain = SAMPLE_FOUNTAIN): import('./server/nvm/revision/passes/types.ts').PassInput {
+  return {
+    fountain,
+    original: fountain,
+    annotations: [],
+    structure: makeStructureForRevision('act1', 0, 0, false),
+    records: [],
+    approvedSpans: [],
+  };
+}
+
+/** Make a PassInput with rich records for more thorough tests */
+function makeRichPassInput(): import('./server/nvm/revision/passes/types.ts').PassInput {
+  const commits = Array.from({ length: 6 }, (_, i) =>
+    makeScreenplayCommit(i, [
+      { op: 'UPDATE_READER_STATE', delta: { suspense: i % 2 === 0 ? 2 : -1 } },
+      { op: 'SEED_CLUE', clueId: `clue_${i}`, carrier: 'object' },
+    ])
+  );
+  const records = buildScreenplayMemory(commits);
+  const structure = analyzeStructure(records, commits);
+  const compiled = compileScreenplay(commits, emptyState(), records, structure, 'TEST');
+  return {
+    fountain: compiled.fountain,
+    original: compiled.fountain,
+    annotations: compiled.annotations,
+    structure,
+    records,
+    approvedSpans: [],
+  };
+}
+
+describe('NVM — 12-Pass Revision Pipeline (Wave 39)', () => {
+  // ── Individual pass smoke tests ───────────────────────────────────────────
+
+  it('structurePass: returns PassResult with correct pass name', async () => {
+    const result = await structurePass(makePassInput());
+    assert.equal(result.pass, 'structure');
+    assert.ok(Array.isArray(result.issues), 'issues is array');
+    assert.ok(typeof result.revisedFountain === 'string', 'revisedFountain is string');
+    assert.ok(typeof result.changed === 'boolean', 'changed is boolean');
+    assert.ok(typeof result.summary === 'string', 'summary is string');
+  });
+
+  it('causalityPass: returns PassResult with correct pass name', async () => {
+    const result = await causalityPass(makePassInput());
+    assert.equal(result.pass, 'causality');
+    assert.ok(Array.isArray(result.issues));
+    assert.ok(typeof result.revisedFountain === 'string');
+  });
+
+  it('intentionPass: returns PassResult with correct pass name', async () => {
+    const result = await intentionPass(makePassInput());
+    assert.equal(result.pass, 'intention');
+    assert.ok(Array.isArray(result.issues));
+  });
+
+  it('beliefPass: returns PassResult with correct pass name', async () => {
+    const result = await beliefPass(makePassInput());
+    assert.equal(result.pass, 'belief');
+    assert.ok(Array.isArray(result.issues));
+  });
+
+  it('conflictPass: detects FLAT_SUSPENSE_ARC for non-escalating story', async () => {
+    const input = makePassInput();
+    // Override structure to have non-escalating, 5+ records
+    const richInput = makeRichPassInput();
+    const result = await conflictPass({
+      ...richInput,
+      structure: { ...richInput.structure, escalating: false },
+    });
+    assert.equal(result.pass, 'conflict');
+    assert.ok(Array.isArray(result.issues));
+    // With non-escalating structure and 5+ records, should flag FLAT_SUSPENSE_ARC
+    const flatArc = result.issues.find(i => i.rule === 'FLAT_SUSPENSE_ARC');
+    assert.ok(flatArc, 'FLAT_SUSPENSE_ARC detected for non-escalating story');
+  });
+
+  it('characterArcPass: returns PassResult with correct pass name', async () => {
+    const result = await characterArcPass(makePassInput());
+    assert.equal(result.pass, 'character-arc');
+    assert.ok(Array.isArray(result.issues));
+  });
+
+  it('dialoguePass: detects ON_THE_NOSE and AS_YOU_KNOW_BOB in sample', async () => {
+    const result = await dialoguePass(makePassInput());
+    assert.equal(result.pass, 'dialogue');
+    const onNose = result.issues.find(i => i.rule === 'ON_THE_NOSE');
+    const asYouKnow = result.issues.find(i => i.rule === 'AS_YOU_KNOW_BOB');
+    assert.ok(onNose, 'ON_THE_NOSE issue detected');
+    assert.ok(asYouKnow, 'AS_YOU_KNOW_BOB issue detected');
+  });
+
+  it('rhythmPass: returns PassResult with correct pass name', async () => {
+    const result = await rhythmPass(makePassInput());
+    assert.equal(result.pass, 'rhythm');
+    assert.ok(Array.isArray(result.issues));
+    assert.ok(typeof result.revisedFountain === 'string');
+  });
+
+  it('pacingPass: returns PassResult with correct pass name', async () => {
+    const result = await pacingPass(makePassInput());
+    assert.equal(result.pass, 'pacing');
+    assert.ok(Array.isArray(result.issues));
+  });
+
+  it('originalityPass: detects clichés in sample fountain', async () => {
+    const result = await originalityPass(makePassInput());
+    assert.equal(result.pass, 'originality');
+    const clicheIssue = result.issues.find(i => i.rule === 'CLICHE_PHRASE');
+    assert.ok(clicheIssue, `CLICHE_PHRASE detected: ${JSON.stringify(result.issues.map(i => i.rule))}`);
+  });
+
+  it('payoffPass: returns PassResult with correct pass name', async () => {
+    const result = await payoffPass(makePassInput());
+    assert.equal(result.pass, 'payoff');
+    assert.ok(Array.isArray(result.issues));
+  });
+
+  it('voicePass: returns PassResult with correct pass name', async () => {
+    const result = await voicePass(makePassInput());
+    assert.equal(result.pass, 'voice');
+    assert.ok(Array.isArray(result.issues));
+    assert.ok(typeof result.revisedFountain === 'string');
+  });
+
+  // ── Pipeline integration tests ────────────────────────────────────────────
+
+  it('pipeline: runRevisionPipeline runs all 12 passes', async () => {
+    const commits: StoryCommit[] = [];
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    const compiled = compileScreenplay(commits, emptyState(), records, structure, 'TEST');
+
+    const result = await runRevisionPipeline(compiled, records, structure, []);
+    assert.equal(result.passResults.length, 12, 'all 12 passes ran');
+    assert.ok(typeof result.totalIssuesFound === 'number', 'totalIssuesFound is number');
+    assert.ok(typeof result.passesWithChanges === 'number', 'passesWithChanges is number');
+    assert.ok(typeof result.finalFountain === 'string', 'finalFountain is string');
+    assert.ok(typeof result.originalFountain === 'string', 'originalFountain is string');
+    assert.ok(typeof result.completedAt === 'number', 'completedAt is number');
+  });
+
+  it('pipeline: pass names are correct in order', async () => {
+    const commits: StoryCommit[] = [];
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    const compiled = compileScreenplay(commits, emptyState(), records, structure);
+
+    const result = await runRevisionPipeline(compiled, records, structure);
+    const expectedOrder = [
+      'structure', 'causality', 'intention', 'belief', 'conflict',
+      'character-arc', 'dialogue', 'rhythm', 'pacing', 'originality', 'payoff', 'voice',
+    ];
+    const actualOrder = result.passResults.map(p => p.pass);
+    assert.deepEqual(actualOrder, expectedOrder, 'passes run in correct order');
+  });
+
+  it('pipeline: approved spans are passed through without errors', async () => {
+    const commits: StoryCommit[] = [];
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    const compiled = compileScreenplay(commits, emptyState(), records, structure);
+
+    const approvedSpans = [{ startLine: 1, endLine: 3, reason: 'title page' }];
+    const result = await runRevisionPipeline(compiled, records, structure, approvedSpans);
+    assert.equal(result.passResults.length, 12, 'all 12 passes complete with approved spans');
+  });
+
+  it('pipeline: totalIssuesFound = sum of per-pass issue counts', async () => {
+    const commits: StoryCommit[] = [];
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    const compiled = compileScreenplay(commits, emptyState(), records, structure);
+
+    const result = await runRevisionPipeline(compiled, records, structure);
+    const sumIssues = result.passResults.reduce((s, p) => s + p.issues.length, 0);
+    assert.equal(result.totalIssuesFound, sumIssues, 'totalIssuesFound equals sum of pass issue counts');
+  });
+
+  it('pipeline: finalFountain equals originalFountain in stub mode (no LLM)', async () => {
+    // Without a real LLM key, all rewrites fall back to stub (no change)
+    const commits: StoryCommit[] = [];
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    const compiled = compileScreenplay(commits, emptyState(), records, structure);
+
+    const result = await runRevisionPipeline(compiled, records, structure);
+    assert.equal(result.finalFountain, result.originalFountain,
+      'stub mode: fountain is unchanged (no LLM key)');
+    assert.equal(result.passesWithChanges, 0, 'stub mode: no passes changed text');
+  });
+});

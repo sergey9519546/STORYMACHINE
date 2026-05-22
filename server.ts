@@ -2912,6 +2912,39 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     res.json({ compiled, endCondition });
   }));
 
+  // POST /api/nvm/revise — 12-pass revision pipeline (Wave 39).
+  // Body: { approvedSpans?: ApprovedSpan[], title?: string }
+  // Returns: RevisionResult
+  app.post('/api/nvm/revise', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { approvedSpans = [], title = 'UNTITLED' } = req.body as { approvedSpans?: unknown[]; title?: string };
+
+    const { buildScreenplayMemory } = await import('./server/nvm/screenplay/memory.ts');
+    const { analyzeStructure } = await import('./server/nvm/screenplay/structure.ts');
+    const { compileScreenplay } = await import('./server/nvm/screenplay/compile.ts');
+    const { runRevisionPipeline } = await import('./server/nvm/revision/pipeline.ts');
+    const { buildNarrativeState, emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+
+    type StoryCommitT = import('./server/nvm/state/StoryCommit.ts').StoryCommit;
+    const allCommits = (stage.getCommits() as StoryCommitT[]).filter(c => !c.reverted);
+
+    const base = buildNarrativeState(stage);
+    let folded = emptyState();
+    for (const c of allCommits) folded = applyStoryOps(folded, c.ops);
+    const state = { ...base, ...folded, turn: stage.getTurnCount() };
+
+    const records = buildScreenplayMemory(allCommits);
+    const structure = analyzeStructure(records, allCommits);
+    const compiled = compileScreenplay(allCommits, state, records, structure, title);
+
+    // approvedSpans validated loosely — we trust the pipeline to ignore malformed spans
+    const safeSpans = Array.isArray(approvedSpans) ? approvedSpans as import('./server/nvm/revision/passes/types.ts').ApprovedSpan[] : [];
+
+    const revisionResult = await runRevisionPipeline(compiled, records, structure, safeSpans);
+    res.json(revisionResult);
+  }));
+
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
