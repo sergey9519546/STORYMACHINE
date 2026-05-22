@@ -41,6 +41,35 @@ export default function StartScreen({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const files = Array.from(e.dataTransfer.files);
+      const processDroppedFiles = async (droppedFiles: File[]) => {
+        const newUploadedFiles = await Promise.all(
+          droppedFiles.map((file) => {
+            return new Promise<UploadedFile | null>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = (event) => {
+                const text = event.target?.result;
+                if (typeof text === 'string') {
+                  resolve({ name: file.name, content: text, size: file.size, category: 'Lore' });
+                } else {
+                  resolve(null);
+                }
+              };
+              reader.readAsText(file);
+            });
+          })
+        );
+
+        const validFiles = newUploadedFiles.filter((f): f is UploadedFile => f !== null);
+        if (validFiles.length > 0) {
+          setUploadedFiles((prev) => [...prev, ...validFiles]);
+        }
+      };
+
+      processDroppedFiles(files);
+    }
   };
 
   const handleStart = () => {

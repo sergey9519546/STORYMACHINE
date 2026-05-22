@@ -818,6 +818,24 @@ export default function ScriptIDE({
     setSnapshots(snapshots.filter((s) => s.id !== id));
   };
 
+  // ── New Project handler ──────────────────────────────────────────────────────
+  const handleNewProject = () => {
+    if (window.confirm("Are you sure you want to start a new project? This will clear all unsaved progress, characters, and settings.")) {
+      try {
+        localStorage.removeItem("script_draft");
+        localStorage.removeItem("theme");
+        localStorage.removeItem("script_snapshots");
+        localStorage.removeItem("script_characters");
+        localStorage.removeItem("research_notes");
+        localStorage.removeItem("director_state");
+        localStorage.removeItem("typewriter_sound");
+      } catch {
+        // Ignore
+      }
+      window.location.reload();
+    }
+  };
+
   // ── Research note handlers ────────────────────────────────────────────────────
   const handleAddNote = () => {
     setResearchNotes([
@@ -1053,6 +1071,7 @@ export default function ScriptIDE({
           }}
           onExportFountain={exportFountain}
           onOpenStoryMachine={onOpenStoryMachine}
+          onNewProject={handleNewProject}
         />
 
         <div
@@ -1151,13 +1170,13 @@ export default function ScriptIDE({
           {(
             [
               { id: "production", icon: Film, label: "Production" },
-              { id: "analysis", icon: null, label: "Analysis" },
+              { id: "analysis", icon: BarChart3, label: "Analysis" },
               { id: "storyEngine", icon: Sparkles, label: "Engine" },
               { id: "codex", icon: BookOpen, label: "Codex" },
               { id: "research", icon: Layers, label: "Research" },
               { id: "titlePage", icon: Film, label: "Title" },
             ] as const
-          ).map(({ id, label }) => (
+          ).map(({ id, icon, label }) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
@@ -1168,6 +1187,7 @@ export default function ScriptIDE({
                   : "hover:bg-gray-800"
               }`}
             >
+              {icon && React.createElement(icon, { className: "w-4 h-4" })}
               {label}
             </button>
           ))}

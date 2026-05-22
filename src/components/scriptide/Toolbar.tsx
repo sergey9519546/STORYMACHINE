@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, Settings2, Layers, Download, Loader2 } from "lucide-react";
+import { BookOpen, Settings2, Layers, Download, Loader2, FilePlus } from "lucide-react";
 
 interface ToolbarProps {
   isSaving: boolean;
@@ -13,6 +13,7 @@ interface ToolbarProps {
   onToggleTypewriterSound: () => void;
   onExportFountain: () => void;
   onOpenStoryMachine?: () => void;
+  onNewProject?: () => void;
 }
 
 export default function Toolbar({
@@ -27,6 +28,7 @@ export default function Toolbar({
   onToggleTypewriterSound,
   onExportFountain,
   onOpenStoryMachine,
+  onNewProject,
 }: ToolbarProps) {
   return (
     <div className="p-4 border-b-4 border-black bg-black text-white flex justify-between items-center z-20">
@@ -90,6 +92,13 @@ export default function Toolbar({
           }`}
         >
           <Layers className="w-3 h-3" aria-hidden="true" /> Director&apos;s Layer
+        </button>
+        <button
+          onClick={onNewProject}
+          aria-label="Start New Project"
+          className="bg-white text-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors brutal-border flex items-center gap-2"
+        >
+          <FilePlus className="w-3 h-3" aria-hidden="true" /> New Project
         </button>
         <button
           onClick={onExportFountain}
