@@ -8044,3 +8044,95 @@ describe('NVM — Live Screenplay Memory + Structure (Wave 37)', () => {
     assert.equal(structure.escalating, true, 'suspense rising → escalating');
   });
 });
+
+// ── Wave 38: End-Condition Detector + Screenplay Compiler ─────────────────────
+import { detectEndCondition } from './server/nvm/screenplay/end-condition.ts';
+import { compileScreenplay } from './server/nvm/screenplay/compile.ts';
+
+describe('NVM — End-Condition Detector + Screenplay Compiler (Wave 38)', () => {
+  // ── detectEndCondition ─────────────────────────────────────────────────────
+
+  it('endCond: returns complete=false for zero scenes', () => {
+    const result = detectEndCondition([], { actPosition: 'act1', completionPercent: 0,
+      avgSuspensePerScene: 0, escalating: false, reversalCount: 0, reversalDensity: 0,
+      approachingClimax: false, openClues: 0, revelationCount: 0, midpointPressure: 0,
+      tightestScene: null }, []);
+    assert.equal(result.complete, false, 'zero scenes → not complete');
+    assert.ok(result.gaps.length > 0, 'gaps present');
+  });
+
+  it('endCond: confidence increases with more completion signals', () => {
+    const makeStructure = (act: string, revelation: number, clues: number, escalating: boolean) => ({
+      actPosition: act as any,
+      completionPercent: act === 'act3' ? 80 : 20,
+      avgSuspensePerScene: 2,
+      escalating,
+      reversalCount: 1,
+      reversalDensity: 1,
+      approachingClimax: act === 'act3',
+      openClues: clues,
+      revelationCount: revelation,
+      midpointPressure: 2,
+      tightestScene: 3,
+    });
+
+    // 5 scenes, act1, no revelation
+    const baseRecords = Array.from({ length: 5 }, (_, i) =>
+      annotateCommit(makeScreenplayCommit(i, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }]))
+    );
+    const lowResult = detectEndCondition(baseRecords, makeStructure('act1', 0, 3, false), []);
+
+    // 5 scenes, act3, revelation, escalating, no open clues
+    const highResult = detectEndCondition(baseRecords, makeStructure('act3', 2, 0, true), []);
+
+    assert.ok(highResult.confidence > lowResult.confidence,
+      `high confidence (${highResult.confidence}) > low confidence (${lowResult.confidence})`);
+  });
+
+  it('endCond: result has reasons and gaps arrays', () => {
+    const commits = Array.from({ length: 5 }, (_, i) =>
+      makeScreenplayCommit(i, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }])
+    );
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    const result = detectEndCondition(records, structure, commits);
+    assert.ok(Array.isArray(result.reasons), 'reasons is array');
+    assert.ok(Array.isArray(result.gaps), 'gaps is array');
+    assert.ok(typeof result.confidence === 'number' && result.confidence >= 0 && result.confidence <= 100,
+      `confidence in [0,100]: ${result.confidence}`);
+  });
+
+  // ── compileScreenplay ──────────────────────────────────────────────────────
+
+  it('compile: compileScreenplay returns fountain + annotations + summary', () => {
+    const commits: StoryCommit[] = [];
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    const compiled = compileScreenplay(commits, emptyState(), records, structure, 'TEST STORY');
+    assert.ok(typeof compiled.fountain === 'string', 'fountain is string');
+    assert.ok(Array.isArray(compiled.annotations), 'annotations is array');
+    assert.ok(typeof compiled.structureSummary === 'string', 'structureSummary is string');
+    assert.ok(typeof compiled.wordCount === 'number', 'wordCount is number');
+    assert.ok(typeof compiled.compiledAt === 'number', 'compiledAt is number');
+  });
+
+  it('compile: structureSummary includes actPosition', () => {
+    const commits: StoryCommit[] = [];
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    const compiled = compileScreenplay(commits, emptyState(), records, structure);
+    assert.ok(compiled.structureSummary.includes('ACT1') || compiled.structureSummary.includes('act1'),
+      `structureSummary includes act1: "${compiled.structureSummary}"`);
+  });
+
+  it('compile: annotations length matches records length', () => {
+    const commits = Array.from({ length: 3 }, (_, i) =>
+      makeScreenplayCommit(i, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }])
+    );
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    const compiled = compileScreenplay(commits, emptyState(), records, structure);
+    assert.equal(compiled.annotations.length, records.length,
+      'one annotation per record');
+  });
+});

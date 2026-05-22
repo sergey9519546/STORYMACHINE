@@ -2882,6 +2882,36 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     res.json({ records, structure, totalScenes: records.length });
   }));
 
+  // POST /api/nvm/compile — End-Condition Detector + Screenplay Compiler (Wave 38).
+  // Body: { title?: string }
+  // Returns: { compiled: CompiledScreenplay, endCondition: EndConditionResult }
+  app.post('/api/nvm/compile', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { title = 'UNTITLED' } = req.body as { title?: string };
+
+    const { buildScreenplayMemory } = await import('./server/nvm/screenplay/memory.ts');
+    const { analyzeStructure } = await import('./server/nvm/screenplay/structure.ts');
+    const { detectEndCondition } = await import('./server/nvm/screenplay/end-condition.ts');
+    const { compileScreenplay } = await import('./server/nvm/screenplay/compile.ts');
+    const { buildNarrativeState, emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+
+    type StoryCommitT = import('./server/nvm/state/StoryCommit.ts').StoryCommit;
+    const allCommits = (stage.getCommits() as StoryCommitT[]).filter(c => !c.reverted);
+
+    const base = buildNarrativeState(stage);
+    let folded = emptyState();
+    for (const c of allCommits) folded = applyStoryOps(folded, c.ops);
+    const state = { ...base, ...folded, turn: stage.getTurnCount() };
+
+    const records = buildScreenplayMemory(allCommits);
+    const structure = analyzeStructure(records, allCommits);
+    const endCondition = detectEndCondition(records, structure, allCommits);
+    const compiled = compileScreenplay(allCommits, state, records, structure, title);
+
+    res.json({ compiled, endCondition });
+  }));
+
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
