@@ -4,3 +4,6 @@
 ## 2024-05-19 - [O(N) Rendering Latency Bottleneck in Fountain Highlighting]
 **Learning:** Found an unexpected O(N^2) memory scaling issue caused by `text.split("\n")` being mapped into a massive dictionary (`lineClasses`) and then mapped *again* to create React elements. This double-allocation strategy causes measurable frame stuttering when typing in large scripts since it executes completely synchronously on the main thread during high-frequency render events.
 **Action:** When parsing hierarchical document structures to flat nodes (like text lines), always prefer mapping directly over the parsed AST (e.g. `blocks`) to generate React Elements instead of building intermediate hash maps or re-splitting raw strings.
+## 2026-05-22 - [O(N^2) Rendering Latency Bottleneck in Fountain Highlighting Fixed]
+**Learning:** Confirmed that `block.text.split("\n")` within `renderHighlightedText` created unnecessary sub-loops and massive dictionary re-allocations on every keystroke in large scripts, causing main-thread stuttering. `parseFountain` already parses blocks to single lines, making the inner loop redundant.
+**Action:** Removed `split("\n")` inner loop in `renderHighlightedText` inside `ScriptIDE.tsx` and mapped directly over the `blocks` list. This prevents double-allocation per line and reduces O(N^2) behavior back to O(N) single-pass iteration.

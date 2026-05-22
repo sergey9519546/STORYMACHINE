@@ -98,20 +98,15 @@ const renderHighlightedText = (_text: string, blocks: FountainBlock[]) => {
       className = "font-bold uppercase text-orange-500";
     else if (block.type === "lyrics") className = "italic text-zinc-500";
 
-    const blockLines = block.text.split("\n");
-    for (let j = 0; j < blockLines.length; j++) {
-      const lineText = blockLines[j];
-      const isLastBlock = i === blocks.length - 1;
-      const isLastLineInBlock = j === blockLines.length - 1;
+    const isLastBlock = i === blocks.length - 1;
 
-      result.push(
-        <span key={lineIdx} className={className || ""}>
-          {lineText || " "}
-          {!(isLastBlock && isLastLineInBlock) ? "\n" : ""}
-        </span>
-      );
-      lineIdx++;
-    }
+    result.push(
+      <span key={lineIdx} className={className || ""}>
+        {block.text || " "}
+        {!isLastBlock ? "\n" : ""}
+      </span>
+    );
+    lineIdx++;
   }
 
   return result;
