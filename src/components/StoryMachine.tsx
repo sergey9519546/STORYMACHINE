@@ -36,6 +36,7 @@ import { CharacterArcPanel } from "./CharacterArcPanel";
 import { RegressionPanel } from "./RegressionPanel";
 import { MomentumPanel } from "./MomentumPanel";
 import { VoiceDNAPanel } from "./VoiceDNAPanel";
+import { LivePlayPanel } from "./LivePlayPanel";
 
 // ── Emotion display helpers ───────────────────────────────────────────────────
 
@@ -128,6 +129,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [showRegression, setShowRegression]     = useState(false);
   const [showMomentum, setShowMomentum]         = useState(false);
   const [showVoiceDNA, setShowVoiceDNA]         = useState(false);
+  const [showLivePlay, setShowLivePlay]         = useState(false);
 
   const fetchActivePressures = useCallback(async () => {
     try {
@@ -609,6 +611,14 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           >
             <span style={{ fontSize: 14 }}>🧬</span>
             <span className="hidden sm:inline">Voice</span>
+          </button>
+          <button
+            onClick={() => setShowLivePlay(true)}
+            title="Author Presence — STEER, INJECT, OVERRULE live story beats"
+            className="bg-rose-950 hover:bg-rose-800 text-rose-300 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <span style={{ fontSize: 14 }}>✍</span>
+            <span className="hidden sm:inline">Live</span>
           </button>
           <button
             onClick={() => setShowSettings(true)}
@@ -1275,6 +1285,12 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       {showVoiceDNA && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
           <VoiceDNAPanel onClose={() => setShowVoiceDNA(false)} />
+        </div>
+      )}
+
+      {showLivePlay && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <LivePlayPanel onClose={() => setShowLivePlay(false)} />
         </div>
       )}
     </div>

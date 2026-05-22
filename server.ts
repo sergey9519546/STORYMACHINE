@@ -2680,6 +2680,110 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     });
   }));
 
+  // POST /api/nvm/live/move — Author-Presence Move Bus (Wave 33).
+  // Body: { text: string, sceneIdx?: number }
+  // Parses freeform author text → StoryOp[] → Tier-1 proof gate → StoryCommit.
+  // Returns: { verb, summary, ops, commitId?, tier1Pass, ambiguous }
+  app.post('/api/nvm/live/move', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { text, sceneIdx: bodySceneIdx } = req.body as { text?: string; sceneIdx?: number };
+    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+      res.status(400).json({ error: 'text is required' });
+      return;
+    }
+
+    const { parseAuthorMove, buildAuthorCommit } = await import('./server/nvm/live/move-bus.ts');
+    const { buildNarrativeState, emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+
+    type StoryCommitT = import('./server/nvm/state/StoryCommit.ts').StoryCommit;
+    const allCommits = (stage.getCommits() as StoryCommitT[]).filter(c => !c.reverted);
+
+    // Fold committed ops into state for accurate proof-gate evaluation
+    const baseState = buildNarrativeState(stage);
+    let foldedState = emptyState();
+    for (const c of allCommits) foldedState = applyStoryOps(foldedState, c.ops);
+    const beforeState = { ...baseState, ...foldedState, turn: stage.getTurnCount() };
+
+    const sceneIdx = typeof bodySceneIdx === 'number'
+      ? bodySceneIdx
+      : (allCommits[allCommits.length - 1]?.sceneIdx ?? 0) + 1;
+
+    const move = parseAuthorMove(text.trim(), beforeState, { sceneIdx });
+
+    // OVERRULE: revert last commit and return early
+    if (move.intent.verb === 'OVERRULE') {
+      const last = allCommits[allCommits.length - 1];
+      if (last) {
+        stage.revertCommit(last.commitId);
+        res.json({ verb: 'OVERRULE', summary: move.summary, commitId: null, reverted: last.commitId, tier1Pass: true, ambiguous: false });
+      } else {
+        res.json({ verb: 'OVERRULE', summary: 'No commit to revert', commitId: null, reverted: null, tier1Pass: true, ambiguous: true });
+      }
+      return;
+    }
+
+    const parentId = allCommits.length > 0 ? allCommits[allCommits.length - 1].commitId : null;
+    const commit = buildAuthorCommit({ move, beforeState, sceneIdx, parentId });
+
+    if (commit) {
+      stage.appendCommit(commit);
+      res.json({
+        verb: move.intent.verb,
+        summary: move.summary,
+        ops: commit.ops,
+        commitId: commit.commitId,
+        tier1Pass: true,
+        ambiguous: move.ambiguous,
+      });
+    } else {
+      res.json({
+        verb: move.intent.verb,
+        summary: move.summary,
+        ops: move.ops,
+        commitId: null,
+        tier1Pass: false,
+        ambiguous: move.ambiguous,
+      });
+    }
+  }));
+
+  // GET /api/nvm/live/feed — Committed-scene stream for the LivePlayPanel.
+  // Returns: { commits: { commitId, sceneIdx, ops, deltaSummary, opSummary, createdAt }[] }
+  app.get('/api/nvm/live/feed', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    type StoryCommitT = import('./server/nvm/state/StoryCommit.ts').StoryCommit;
+    const allCommits = (stage.getCommits() as StoryCommitT[]).filter(c => !c.reverted);
+
+    const feed = allCommits.map(c => {
+      const beliefCount = c.ops.filter(o => o.op === 'UPDATE_BELIEF').length;
+      const factCount   = c.ops.filter(o => o.op === 'ADD_FACT').length;
+      const suspenseOps = c.ops.filter(o => o.op === 'UPDATE_READER_STATE');
+      const suspenseDelta  = suspenseOps.reduce((s, o) =>
+        s + ((o as { op: string; delta: { suspense?: number } }).delta.suspense ?? 0), 0);
+      const curiosityDelta = suspenseOps.reduce((s, o) =>
+        s + ((o as { op: string; delta: { curiosity?: number } }).delta.curiosity ?? 0), 0);
+      const parts: string[] = [];
+      if (factCount > 0)   parts.push(`${factCount} fact${factCount !== 1 ? 's' : ''}`);
+      if (beliefCount > 0) parts.push(`${beliefCount} belief${beliefCount !== 1 ? 's' : ''}`);
+      if (suspenseDelta > 0)  parts.push(`suspense +${suspenseDelta}`);
+      if (curiosityDelta > 0) parts.push(`curiosity +${curiosityDelta}`);
+      const opSummary = parts.length > 0 ? parts.join(', ') : `${c.ops.length} ops`;
+
+      return {
+        commitId:     c.commitId,
+        parentId:     c.parentId,
+        sceneIdx:     c.sceneIdx,
+        createdAt:    c.createdAt,
+        ops:          c.ops,
+        deltaSummary: c.deltaSummary,
+        opSummary,
+      };
+    });
+
+    res.json({ commits: feed, totalCommits: feed.length });
+  }));
+
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {

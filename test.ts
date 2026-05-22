@@ -7479,3 +7479,138 @@ describe('NVM — Action↔StoryOp Bridge (Wave 32)', () => {
     assert.ok(beliefOps.some(o => o.charId === 'carol'), 'carol director update included');
   });
 });
+
+// ── Wave 33: Author-Presence Move Bus ─────────────────────────────────────────
+import { parseAuthorMove, buildAuthorCommit } from './server/nvm/live/move-bus.ts';
+import type { AuthorCommitInput } from './server/nvm/live/move-bus.ts';
+
+describe('NVM — Author-Presence Move Bus (Wave 33)', () => {
+  // ── parseAuthorMove: STEER ──────────────────────────────────────────────────
+
+  it('moveBus: STEER keyword recognized', () => {
+    const result = parseAuthorMove('Steer Alice toward confronting Bob', emptyState());
+    assert.equal(result.intent.verb, 'STEER', 'verb = STEER');
+    assert.equal(result.ambiguous, false, 'not ambiguous');
+    assert.ok(result.summary.includes('STEER'), 'summary mentions STEER');
+  });
+
+  it('moveBus: STEER emits ADD_FACT + RAISE_CLOCK + UPDATE_READER_STATE', () => {
+    const result = parseAuthorMove('steer bob to reveal the money location', emptyState());
+    assert.equal(result.ops.filter(o => o.op === 'ADD_FACT').length, 1, '1 ADD_FACT');
+    assert.equal(result.ops.filter(o => o.op === 'RAISE_CLOCK').length, 1, '1 RAISE_CLOCK');
+    assert.equal(result.ops.filter(o => o.op === 'UPDATE_READER_STATE').length, 1, '1 UPDATE_READER_STATE');
+  });
+
+  it('moveBus: STEER with unrecognizable pattern → ambiguous', () => {
+    const result = parseAuthorMove('steer', emptyState()); // no char or goal
+    assert.equal(result.intent.verb, 'STEER', 'verb still STEER');
+    assert.equal(result.ambiguous, true, 'ambiguous when pattern fails');
+    assert.equal(result.ops.length, 0, 'no ops when ambiguous');
+  });
+
+  it('moveBus: STEER clock ID uses charId', () => {
+    const result = parseAuthorMove('Steer carol toward accusing alice', emptyState());
+    const clockOp = result.ops.find(o => o.op === 'RAISE_CLOCK') as { op: 'RAISE_CLOCK'; clockId: string } | undefined;
+    assert.ok(clockOp?.clockId.includes('carol'), 'clock ID includes character name');
+  });
+
+  // ── parseAuthorMove: INJECT ────────────────────────────────────────────────
+
+  it('moveBus: INJECT fact creates ADD_FACT with predicate author_fact', () => {
+    const result = parseAuthorMove('inject fact: the safe is empty', emptyState());
+    assert.equal(result.intent.verb, 'INJECT', 'verb = INJECT');
+    const factOp = result.ops.find(o => o.op === 'ADD_FACT') as { op: 'ADD_FACT'; fact: { predicate: string; object: string } } | undefined;
+    assert.ok(factOp, 'ADD_FACT present');
+    assert.equal(factOp!.fact.predicate, 'author_fact', 'predicate = author_fact');
+    assert.ok(factOp!.fact.object.includes('safe is empty'), 'content preserved in object');
+  });
+
+  it('moveBus: INJECT clue seeds a SEED_CLUE op', () => {
+    const result = parseAuthorMove('inject clue: a torn envelope under the desk', emptyState());
+    const clueOp = result.ops.find(o => o.op === 'SEED_CLUE');
+    assert.ok(clueOp, 'SEED_CLUE emitted');
+    assert.ok(result.ops.some(o => o.op === 'UPDATE_READER_STATE'), 'curiosity UPDATE_READER_STATE');
+  });
+
+  it('moveBus: INJECT clue detects carrier type from content', () => {
+    const objResult = parseAuthorMove('inject clue: the golden object gleams', emptyState());
+    const sndResult = parseAuthorMove('inject clue: a strange sound echoes', emptyState());
+    const objClue = objResult.ops.find(o => o.op === 'SEED_CLUE') as { op: 'SEED_CLUE'; clueId: string; carrier: string } | undefined;
+    const sndClue = sndResult.ops.find(o => o.op === 'SEED_CLUE') as { op: 'SEED_CLUE'; clueId: string; carrier: string } | undefined;
+    assert.equal(objClue?.carrier, 'object', 'object carrier detected');
+    assert.equal(sndClue?.carrier, 'sound', 'sound carrier detected');
+  });
+
+  it('moveBus: INJECT pressure raises suspense + clock', () => {
+    const result = parseAuthorMove('inject pressure: alice is about to be discovered', emptyState());
+    const rsOp = result.ops.find(o => o.op === 'UPDATE_READER_STATE') as { op: string; delta: { suspense?: number } } | undefined;
+    const clockOp = result.ops.find(o => o.op === 'RAISE_CLOCK');
+    assert.ok(rsOp?.delta.suspense && rsOp.delta.suspense >= 2, 'suspense >= 2 for pressure');
+    assert.ok(clockOp, 'RAISE_CLOCK for pressure');
+  });
+
+  // ── parseAuthorMove: OVERRULE ──────────────────────────────────────────────
+
+  it('moveBus: OVERRULE recognized and returns no ops', () => {
+    const result = parseAuthorMove('overrule — that scene was wrong', emptyState());
+    assert.equal(result.intent.verb, 'OVERRULE', 'verb = OVERRULE');
+    assert.equal(result.ops.length, 0, 'OVERRULE has no ops');
+    assert.equal(result.ambiguous, false, 'not ambiguous');
+  });
+
+  it('moveBus: "undo" keyword maps to OVERRULE', () => {
+    const result = parseAuthorMove('undo last move', emptyState());
+    assert.equal(result.intent.verb, 'OVERRULE', 'undo → OVERRULE');
+  });
+
+  // ── parseAuthorMove: implicit INJECT (fallback) ────────────────────────────
+
+  it('moveBus: plain prose without verb defaults to INJECT fact', () => {
+    const result = parseAuthorMove('the lights flicker and go out', emptyState());
+    assert.equal(result.intent.verb, 'INJECT', 'plain prose = implicit INJECT');
+    assert.ok(result.ops.some(o => o.op === 'ADD_FACT'), 'still produces ADD_FACT');
+    assert.ok(result.summary.includes('implicit'), 'summary marks it implicit');
+  });
+
+  // ── buildAuthorCommit ──────────────────────────────────────────────────────
+
+  it('moveBus: buildAuthorCommit returns commit for valid INJECT', () => {
+    const move = parseAuthorMove('inject fact: the vault was opened at midnight', emptyState(), { sceneIdx: 0 });
+    const input: AuthorCommitInput = {
+      move,
+      beforeState: emptyState(),
+      sceneIdx: 0,
+      parentId: null,
+    };
+    const commit = buildAuthorCommit(input);
+    assert.ok(commit !== null, 'commit returned for valid INJECT');
+    assert.equal(commit!.sceneIdx, 0, 'sceneIdx correct');
+    assert.equal(commit!.parentId, null, 'parentId null for first commit');
+    assert.ok(commit!.ops.length > 0, 'ops non-empty');
+  });
+
+  it('moveBus: buildAuthorCommit returns null for OVERRULE (no ops)', () => {
+    const move = parseAuthorMove('overrule', emptyState());
+    const input: AuthorCommitInput = {
+      move,
+      beforeState: emptyState(),
+      sceneIdx: 1,
+      parentId: 'some-parent',
+    };
+    const commit = buildAuthorCommit(input);
+    assert.equal(commit, null, 'OVERRULE returns null (no ops to commit)');
+  });
+
+  it('moveBus: buildAuthorCommit chains parentId correctly', () => {
+    const move = parseAuthorMove('inject fact: alice slips away', emptyState(), { sceneIdx: 0 });
+    const input: AuthorCommitInput = {
+      move,
+      beforeState: emptyState(),
+      sceneIdx: 0,
+      parentId: 'parent-abc-123',
+    };
+    const commit = buildAuthorCommit(input);
+    assert.ok(commit, 'commit produced');
+    assert.equal(commit!.parentId, 'parent-abc-123', 'parentId chained');
+  });
+});
