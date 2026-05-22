@@ -2844,6 +2844,29 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     res.json(field);
   }));
 
+  // GET /api/nvm/conflicts — Conflict Orchestrator + Intention Registry (Wave 36).
+  // Returns: { registry: IntentionRegistry, conflicts: ConflictReport }
+  app.get('/api/nvm/conflicts', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { buildIntentionRegistry } = await import('./server/nvm/drama/intention-registry.ts');
+    const { computeConflicts } = await import('./server/nvm/drama/conflict-orchestrator.ts');
+    const { buildNarrativeState, emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+
+    type StoryCommitT = import('./server/nvm/state/StoryCommit.ts').StoryCommit;
+    const allCommits = (stage.getCommits() as StoryCommitT[]).filter(c => !c.reverted);
+
+    const base = buildNarrativeState(stage);
+    let folded = emptyState();
+    for (const c of allCommits) folded = applyStoryOps(folded, c.ops);
+    const state = { ...base, ...folded, turn: stage.getTurnCount() };
+
+    const registry = buildIntentionRegistry(stage);
+    const conflicts = computeConflicts(registry, state);
+
+    res.json({ registry, conflicts });
+  }));
+
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {

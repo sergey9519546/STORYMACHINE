@@ -7819,3 +7819,99 @@ describe('NVM — Forward Latent Branch Field (Wave 35)', () => {
     assert.equal(field.currentSceneIdx, 6, 'currentSceneIdx = last.sceneIdx + 1');
   });
 });
+
+// ── Wave 36: Conflict Orchestrator + Intention Registry ───────────────────────
+import { buildIntentionRegistry } from './server/nvm/drama/intention-registry.ts';
+import { computeConflicts } from './server/nvm/drama/conflict-orchestrator.ts';
+
+describe('NVM — Conflict Orchestrator + Intention Registry (Wave 36)', () => {
+  // ── buildIntentionRegistry ─────────────────────────────────────────────────
+
+  it('conflictOrch: registry has one intention per living agent', () => {
+    const stage = makeStage(); // alice + bob, both alive
+    const registry = buildIntentionRegistry(stage);
+    assert.equal(registry.totalChars, 2, '2 intentions for alice + bob');
+    assert.equal(registry.intentions.length, 2, 'intentions array length = 2');
+  });
+
+  it('conflictOrch: intention includes charId, name, wantNow, terminalWant, whatTheyLose', () => {
+    const stage = makeStage();
+    const registry = buildIntentionRegistry(stage);
+    for (const intention of registry.intentions) {
+      assert.ok(typeof intention.charId === 'string' && intention.charId.length > 0, 'charId present');
+      assert.ok(typeof intention.name === 'string' && intention.name.length > 0, 'name present');
+      assert.ok(typeof intention.wantNow === 'string' && intention.wantNow.length > 0, 'wantNow present');
+      assert.ok(typeof intention.terminalWant === 'string', 'terminalWant present');
+      assert.ok(typeof intention.whatTheyLose === 'string', 'whatTheyLose present');
+      assert.ok(typeof intention.urgency === 'number' && intention.urgency >= 0 && intention.urgency <= 100, 'urgency in [0,100]');
+    }
+  });
+
+  it('conflictOrch: registry sorted by urgency descending', () => {
+    const stage = makeStage();
+    const registry = buildIntentionRegistry(stage);
+    for (let i = 1; i < registry.intentions.length; i++) {
+      assert.ok(
+        registry.intentions[i - 1].urgency >= registry.intentions[i].urgency,
+        'sorted by urgency desc'
+      );
+    }
+  });
+
+  it('conflictOrch: empty stage gives empty registry', async () => {
+    const { Stage } = await import('./server/engine/Stage.ts');
+    const emptyStage = new Stage(':memory:');
+    const registry = buildIntentionRegistry(emptyStage);
+    assert.equal(registry.totalChars, 0, 'zero intentions for empty stage');
+  });
+
+  // ── computeConflicts ───────────────────────────────────────────────────────
+
+  it('conflictOrch: computeConflicts returns all 5 fields', () => {
+    const stage = makeStage();
+    const registry = buildIntentionRegistry(stage);
+    const conflicts = computeConflicts(registry, emptyState());
+    assert.ok(Array.isArray(conflicts.collisions), 'collisions is array');
+    assert.ok(Array.isArray(conflicts.threatenedPlans), 'threatenedPlans is array');
+    assert.ok(Array.isArray(conflicts.tickingClocks), 'tickingClocks is array');
+    assert.ok(Array.isArray(conflicts.leverageReversals), 'leverageReversals is array');
+    assert.ok(typeof conflicts.totalDramaticPressure === 'number', 'totalDramaticPressure is number');
+  });
+
+  it('conflictOrch: ticking clocks detected from state clocks', () => {
+    const stateWithClock = { ...emptyState(), clocks: { revelation_clock: 7, mystery_clock: 3 } };
+    const registry = buildIntentionRegistry(makeStage());
+    const conflicts = computeConflicts(registry, stateWithClock);
+    const clockIds = conflicts.tickingClocks.map(c => c.clockId);
+    assert.ok(clockIds.includes('revelation_clock'), 'revelation_clock detected');
+    assert.ok(clockIds.includes('mystery_clock'), 'mystery_clock detected');
+  });
+
+  it('conflictOrch: critical urgency for clock level >= 8', () => {
+    const stateWithClock = { ...emptyState(), clocks: { tension: 9 } };
+    const registry = buildIntentionRegistry(makeStage());
+    const conflicts = computeConflicts(registry, stateWithClock);
+    const tensionClock = conflicts.tickingClocks.find(c => c.clockId === 'tension');
+    assert.equal(tensionClock?.urgency, 'critical', 'level 9 → critical');
+  });
+
+  it('conflictOrch: totalDramaticPressure in [0,100]', () => {
+    const registry = buildIntentionRegistry(makeStage());
+    const conflicts = computeConflicts(registry, emptyState());
+    assert.ok(
+      conflicts.totalDramaticPressure >= 0 && conflicts.totalDramaticPressure <= 100,
+      `pressure in [0,100]: ${conflicts.totalDramaticPressure}`
+    );
+  });
+
+  it('conflictOrch: collisions sorted by severity descending', () => {
+    const registry = buildIntentionRegistry(makeStage());
+    const conflicts = computeConflicts(registry, emptyState());
+    for (let i = 1; i < conflicts.collisions.length; i++) {
+      assert.ok(
+        conflicts.collisions[i - 1].severity >= conflicts.collisions[i].severity,
+        'collisions sorted by severity desc'
+      );
+    }
+  });
+});
