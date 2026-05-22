@@ -2680,6 +2680,271 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     });
   }));
 
+  // POST /api/nvm/live/move — Author-Presence Move Bus (Wave 33).
+  // Body: { text: string, sceneIdx?: number }
+  // Parses freeform author text → StoryOp[] → Tier-1 proof gate → StoryCommit.
+  // Returns: { verb, summary, ops, commitId?, tier1Pass, ambiguous }
+  app.post('/api/nvm/live/move', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { text, sceneIdx: bodySceneIdx } = req.body as { text?: string; sceneIdx?: number };
+    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+      res.status(400).json({ error: 'text is required' });
+      return;
+    }
+
+    const { parseAuthorMove, buildAuthorCommit } = await import('./server/nvm/live/move-bus.ts');
+    const { buildNarrativeState, emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+
+    type StoryCommitT = import('./server/nvm/state/StoryCommit.ts').StoryCommit;
+    const allCommits = (stage.getCommits() as StoryCommitT[]).filter(c => !c.reverted);
+
+    // Fold committed ops into state for accurate proof-gate evaluation
+    const baseState = buildNarrativeState(stage);
+    let foldedState = emptyState();
+    for (const c of allCommits) foldedState = applyStoryOps(foldedState, c.ops);
+    const beforeState = { ...baseState, ...foldedState, turn: stage.getTurnCount() };
+
+    const sceneIdx = typeof bodySceneIdx === 'number'
+      ? bodySceneIdx
+      : (allCommits[allCommits.length - 1]?.sceneIdx ?? 0) + 1;
+
+    const move = parseAuthorMove(text.trim(), beforeState, { sceneIdx });
+
+    // OVERRULE: revert last commit and return early
+    if (move.intent.verb === 'OVERRULE') {
+      const last = allCommits[allCommits.length - 1];
+      if (last) {
+        stage.revertCommit(last.commitId);
+        res.json({ verb: 'OVERRULE', summary: move.summary, commitId: null, reverted: last.commitId, tier1Pass: true, ambiguous: false });
+      } else {
+        res.json({ verb: 'OVERRULE', summary: 'No commit to revert', commitId: null, reverted: null, tier1Pass: true, ambiguous: true });
+      }
+      return;
+    }
+
+    const parentId = allCommits.length > 0 ? allCommits[allCommits.length - 1].commitId : null;
+    const commit = buildAuthorCommit({ move, beforeState, sceneIdx, parentId });
+
+    if (commit) {
+      stage.appendCommit(commit);
+      res.json({
+        verb: move.intent.verb,
+        summary: move.summary,
+        ops: commit.ops,
+        commitId: commit.commitId,
+        tier1Pass: true,
+        ambiguous: move.ambiguous,
+      });
+    } else {
+      res.json({
+        verb: move.intent.verb,
+        summary: move.summary,
+        ops: move.ops,
+        commitId: null,
+        tier1Pass: false,
+        ambiguous: move.ambiguous,
+      });
+    }
+  }));
+
+  // GET /api/nvm/live/feed — Committed-scene stream for the LivePlayPanel.
+  // Returns: { commits: { commitId, sceneIdx, ops, deltaSummary, opSummary, createdAt }[] }
+  app.get('/api/nvm/live/feed', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    type StoryCommitT = import('./server/nvm/state/StoryCommit.ts').StoryCommit;
+    const allCommits = (stage.getCommits() as StoryCommitT[]).filter(c => !c.reverted);
+
+    const feed = allCommits.map(c => {
+      const beliefCount = c.ops.filter(o => o.op === 'UPDATE_BELIEF').length;
+      const factCount   = c.ops.filter(o => o.op === 'ADD_FACT').length;
+      const suspenseOps = c.ops.filter(o => o.op === 'UPDATE_READER_STATE');
+      const suspenseDelta  = suspenseOps.reduce((s, o) =>
+        s + ((o as { op: string; delta: { suspense?: number } }).delta.suspense ?? 0), 0);
+      const curiosityDelta = suspenseOps.reduce((s, o) =>
+        s + ((o as { op: string; delta: { curiosity?: number } }).delta.curiosity ?? 0), 0);
+      const parts: string[] = [];
+      if (factCount > 0)   parts.push(`${factCount} fact${factCount !== 1 ? 's' : ''}`);
+      if (beliefCount > 0) parts.push(`${beliefCount} belief${beliefCount !== 1 ? 's' : ''}`);
+      if (suspenseDelta > 0)  parts.push(`suspense +${suspenseDelta}`);
+      if (curiosityDelta > 0) parts.push(`curiosity +${curiosityDelta}`);
+      const opSummary = parts.length > 0 ? parts.join(', ') : `${c.ops.length} ops`;
+
+      return {
+        commitId:     c.commitId,
+        parentId:     c.parentId,
+        sceneIdx:     c.sceneIdx,
+        createdAt:    c.createdAt,
+        ops:          c.ops,
+        deltaSummary: c.deltaSummary,
+        opSummary,
+      };
+    });
+
+    res.json({ commits: feed, totalCommits: feed.length });
+  }));
+
+  // POST /api/nvm/live/advance — Reactive Turn Cycle (Wave 34).
+  // Body: { beats?: number, locationId?: string }
+  // Runs N beats of NPC reaction from the current state; each produces a StoryCommit.
+  // Returns: { commits: FeedEntry[], turnsRun, stoppedBecause }
+  app.post('/api/nvm/live/advance', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage, orchestrator } = getOrCreateSession(sessionId(req));
+    const { beats = 1, locationId } = req.body as { beats?: number; locationId?: string };
+    const safeBeats = Math.max(1, Math.min(5, typeof beats === 'number' ? beats : 1));
+
+    const { advanceWorld } = await import('./server/nvm/live/loop.ts');
+    const result = await advanceWorld(stage, orchestrator, safeBeats, locationId);
+
+    // Build feed entries for the new commits so the client can display them
+    const feedEntries = result.commits.map(c => {
+      const beliefCount = c.ops.filter(o => o.op === 'UPDATE_BELIEF').length;
+      const factCount   = c.ops.filter(o => o.op === 'ADD_FACT').length;
+      const parts: string[] = [];
+      if (factCount > 0)   parts.push(`${factCount} fact${factCount !== 1 ? 's' : ''}`);
+      if (beliefCount > 0) parts.push(`${beliefCount} belief${beliefCount !== 1 ? 's' : ''}`);
+      return {
+        commitId:     c.commitId,
+        parentId:     c.parentId,
+        sceneIdx:     c.sceneIdx,
+        createdAt:    c.createdAt,
+        deltaSummary: c.deltaSummary,
+        opSummary:    parts.join(', ') || `${c.ops.length} ops`,
+      };
+    });
+
+    res.json({
+      commits: feedEntries,
+      turnsRun: result.turnsRun,
+      stoppedBecause: result.stoppedBecause,
+    });
+  }));
+
+  // GET /api/nvm/branch/field — Forward Latent Branch Field (Wave 35).
+  // Returns: { branches: BranchPacket[], currentSceneIdx, generatedAt }
+  // Query: ?seed=<number> (optional; defaults to Date.now())
+  app.get('/api/nvm/branch/field', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const seed = typeof req.query.seed === 'string' ? parseInt(req.query.seed, 10) : undefined;
+
+    const { generateBranchField } = await import('./server/nvm/branch/field.ts');
+    const { buildNarrativeState, emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+
+    type StoryCommitT = import('./server/nvm/state/StoryCommit.ts').StoryCommit;
+    const allCommits = (stage.getCommits() as StoryCommitT[]).filter(c => !c.reverted);
+
+    // Fold commits into state for accurate scoring
+    const base = buildNarrativeState(stage);
+    let folded = emptyState();
+    for (const c of allCommits) folded = applyStoryOps(folded, c.ops);
+    const state = { ...base, ...folded, turn: stage.getTurnCount() };
+
+    const field = generateBranchField(state, allCommits, seed);
+    res.json(field);
+  }));
+
+  // GET /api/nvm/conflicts — Conflict Orchestrator + Intention Registry (Wave 36).
+  // Returns: { registry: IntentionRegistry, conflicts: ConflictReport }
+  app.get('/api/nvm/conflicts', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { buildIntentionRegistry } = await import('./server/nvm/drama/intention-registry.ts');
+    const { computeConflicts } = await import('./server/nvm/drama/conflict-orchestrator.ts');
+    const { buildNarrativeState, emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+
+    type StoryCommitT = import('./server/nvm/state/StoryCommit.ts').StoryCommit;
+    const allCommits = (stage.getCommits() as StoryCommitT[]).filter(c => !c.reverted);
+
+    const base = buildNarrativeState(stage);
+    let folded = emptyState();
+    for (const c of allCommits) folded = applyStoryOps(folded, c.ops);
+    const state = { ...base, ...folded, turn: stage.getTurnCount() };
+
+    const registry = buildIntentionRegistry(stage);
+    const conflicts = computeConflicts(registry, state);
+
+    res.json({ registry, conflicts });
+  }));
+
+  // GET /api/nvm/screenplay/memory — Live Screenplay Memory (Wave 37).
+  // Returns: { records: ScreenplaySceneRecord[], structure: StructureState, totalScenes }
+  app.get('/api/nvm/screenplay/memory', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { buildScreenplayMemory } = await import('./server/nvm/screenplay/memory.ts');
+    const { analyzeStructure } = await import('./server/nvm/screenplay/structure.ts');
+
+    type StoryCommitT = import('./server/nvm/state/StoryCommit.ts').StoryCommit;
+    const allCommits = (stage.getCommits() as StoryCommitT[]).filter(c => !c.reverted);
+    const records = buildScreenplayMemory(allCommits);
+    const structure = analyzeStructure(records, allCommits);
+
+    res.json({ records, structure, totalScenes: records.length });
+  }));
+
+  // POST /api/nvm/compile — End-Condition Detector + Screenplay Compiler (Wave 38).
+  // Body: { title?: string }
+  // Returns: { compiled: CompiledScreenplay, endCondition: EndConditionResult }
+  app.post('/api/nvm/compile', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { title = 'UNTITLED' } = req.body as { title?: string };
+
+    const { buildScreenplayMemory } = await import('./server/nvm/screenplay/memory.ts');
+    const { analyzeStructure } = await import('./server/nvm/screenplay/structure.ts');
+    const { detectEndCondition } = await import('./server/nvm/screenplay/end-condition.ts');
+    const { compileScreenplay } = await import('./server/nvm/screenplay/compile.ts');
+    const { buildNarrativeState, emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+
+    type StoryCommitT = import('./server/nvm/state/StoryCommit.ts').StoryCommit;
+    const allCommits = (stage.getCommits() as StoryCommitT[]).filter(c => !c.reverted);
+
+    const base = buildNarrativeState(stage);
+    let folded = emptyState();
+    for (const c of allCommits) folded = applyStoryOps(folded, c.ops);
+    const state = { ...base, ...folded, turn: stage.getTurnCount() };
+
+    const records = buildScreenplayMemory(allCommits);
+    const structure = analyzeStructure(records, allCommits);
+    const endCondition = detectEndCondition(records, structure, allCommits);
+    const compiled = compileScreenplay(allCommits, state, records, structure, title);
+
+    res.json({ compiled, endCondition });
+  }));
+
+  // POST /api/nvm/revise — 12-pass revision pipeline (Wave 39).
+  // Body: { approvedSpans?: ApprovedSpan[], title?: string }
+  // Returns: RevisionResult
+  app.post('/api/nvm/revise', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { approvedSpans = [], title = 'UNTITLED' } = req.body as { approvedSpans?: unknown[]; title?: string };
+
+    const { buildScreenplayMemory } = await import('./server/nvm/screenplay/memory.ts');
+    const { analyzeStructure } = await import('./server/nvm/screenplay/structure.ts');
+    const { compileScreenplay } = await import('./server/nvm/screenplay/compile.ts');
+    const { runRevisionPipeline } = await import('./server/nvm/revision/pipeline.ts');
+    const { buildNarrativeState, emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+
+    type StoryCommitT = import('./server/nvm/state/StoryCommit.ts').StoryCommit;
+    const allCommits = (stage.getCommits() as StoryCommitT[]).filter(c => !c.reverted);
+
+    const base = buildNarrativeState(stage);
+    let folded = emptyState();
+    for (const c of allCommits) folded = applyStoryOps(folded, c.ops);
+    const state = { ...base, ...folded, turn: stage.getTurnCount() };
+
+    const records = buildScreenplayMemory(allCommits);
+    const structure = analyzeStructure(records, allCommits);
+    const compiled = compileScreenplay(allCommits, state, records, structure, title);
+
+    // approvedSpans validated loosely — we trust the pipeline to ignore malformed spans
+    const safeSpans = Array.isArray(approvedSpans) ? approvedSpans as import('./server/nvm/revision/passes/types.ts').ApprovedSpan[] : [];
+
+    const revisionResult = await runRevisionPipeline(compiled, records, structure, safeSpans);
+    res.json(revisionResult);
+  }));
+
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {

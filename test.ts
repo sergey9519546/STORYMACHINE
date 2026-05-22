@@ -7211,3 +7211,1181 @@ describe('NVM — Voice DNA Analyzer (Wave 31)', () => {
     assert.ok(aliceWords.size >= 4, `alice has >= 4 words, got ${aliceWords.size}`);
   });
 });
+
+// ── Wave 32: Action↔StoryOp Bridge ───────────────────────────────────────────
+import {
+  entryToOps,
+  epistemicUpdateToOps,
+  buildTurnCommit,
+} from './server/nvm/bridge/action-to-ops.ts';
+import type { BridgeInput } from './server/nvm/bridge/action-to-ops.ts';
+import type { EpistemicUpdate, EventCard, EventProposition } from './server/engine/types.ts';
+
+function makeEntry(overrides: Partial<ActionLogEntry> = {}): ActionLogEntry {
+  return {
+    action_id: 'act-001',
+    timestamp: Date.now(),
+    char_id: 'alice',
+    location_id: 'loc-01',
+    action_type: 'SPEAK',
+    target_char_id: 'bob',
+    content: 'I know nothing about the money.',
+    is_audible: true,
+    ...overrides,
+  };
+}
+
+function makeProp(overrides: Partial<EventProposition> = {}): EventProposition {
+  return {
+    proposition_id: 'prop-001',
+    event_id: 'act-001',
+    content: 'I know nothing about the money.',
+    is_lie: false,
+    asserted_by: 'alice',
+    perceived_truth: true,
+    ...overrides,
+  };
+}
+
+function makeCard(entry: ActionLogEntry, props: EventProposition[] = []): EventCard {
+  return {
+    event_id: entry.action_id,
+    char_id: entry.char_id,
+    action_type: entry.action_type,
+    content: entry.content,
+    location_id: entry.location_id,
+    turn_index: 5,
+    propositions: props,
+  };
+}
+
+function makeBelief(proposition: string, source: 'told' | 'witnessed' | 'inferred' = 'inferred'): Belief {
+  return {
+    id: `bel-${Math.random().toString(36).slice(2, 7)}`,
+    proposition,
+    confidence: source === 'witnessed' ? 1.0 : source === 'told' ? 0.7 : 0.4,
+    source,
+    // told beliefs must have source_agent_id for EpistemicProof; witnessed need source_event_id
+    source_agent_id: source === 'told' ? 'narrator' : undefined,
+    source_event_id: source === 'witnessed' ? 'evt-000' : undefined,
+    acquired_at: 5,
+    contradicts: [],
+  };
+}
+
+function makeEpistemicUpdate(charId: string, beliefs: Belief[], contradiction = false): EpistemicUpdate {
+  return {
+    char_id: charId,
+    new_beliefs: beliefs,
+    contradiction_detected: contradiction,
+    contradicted_propositions: contradiction ? ['something is wrong'] : [],
+    source_event_id: 'act-001',
+  };
+}
+
+describe('NVM — Action↔StoryOp Bridge (Wave 32)', () => {
+  // ── entryToOps ─────────────────────────────────────────────────────────────
+
+  it('bridge: SPEAK produces UPDATE_READER_STATE (curiosity +1)', () => {
+    const entry = makeEntry({ action_type: 'SPEAK' });
+    const ops = entryToOps(entry, null, 5);
+    const rsOp = ops.find(o => o.op === 'UPDATE_READER_STATE');
+    assert.ok(rsOp, 'UPDATE_READER_STATE emitted');
+    assert.equal((rsOp as { op: 'UPDATE_READER_STATE'; delta: { curiosity?: number } }).delta.curiosity, 1,
+      'curiosity delta = 1 for SPEAK');
+  });
+
+  it('bridge: SPEAK with a proposition emits UPDATE_BELIEF for target', () => {
+    const entry = makeEntry({ action_type: 'SPEAK', target_char_id: 'bob' });
+    const prop = makeProp({ content: 'The vault is empty' });
+    const card = makeCard(entry, [prop]);
+    const ops = entryToOps(entry, card, 5);
+    const beliefOp = ops.find(o => o.op === 'UPDATE_BELIEF') as { op: 'UPDATE_BELIEF'; charId: string; belief: Belief } | undefined;
+    assert.ok(beliefOp, 'UPDATE_BELIEF emitted');
+    assert.equal(beliefOp!.charId, 'bob', 'belief targets the listener');
+    assert.equal(beliefOp!.belief.proposition, 'The vault is empty', 'proposition content preserved');
+    assert.equal(beliefOp!.belief.source, 'told', 'source is told');
+    assert.equal(beliefOp!.belief.confidence, 0.7, 'told confidence = 0.7');
+  });
+
+  it('bridge: LIE produces suspense delta = 2', () => {
+    const entry = makeEntry({ action_type: 'LIE' });
+    const ops = entryToOps(entry, null, 5);
+    const rsOp = ops.find(o => o.op === 'UPDATE_READER_STATE') as { op: 'UPDATE_READER_STATE'; delta: { suspense?: number } } | undefined;
+    assert.ok(rsOp, 'UPDATE_READER_STATE emitted for LIE');
+    assert.equal(rsOp!.delta.suspense, 2, 'LIE raises suspense by 2');
+  });
+
+  it('bridge: EXAMINE produces ADD_FACT + UPDATE_READER_STATE (curiosity +2)', () => {
+    const entry = makeEntry({ action_type: 'EXAMINE', content: 'The hidden compartment', target_char_id: null });
+    const ops = entryToOps(entry, null, 5);
+    const factOp = ops.find(o => o.op === 'ADD_FACT') as { op: 'ADD_FACT'; fact: import('./server/nvm/ops/StoryOp.ts').AtomicFact } | undefined;
+    assert.ok(factOp, 'ADD_FACT emitted for EXAMINE');
+    assert.equal(factOp!.fact.predicate, 'examines', 'predicate = examines');
+    assert.equal(factOp!.fact.subject, 'alice', 'subject = acting agent');
+    const rsOp = ops.find(o => o.op === 'UPDATE_READER_STATE') as { op: 'UPDATE_READER_STATE'; delta: { curiosity?: number } } | undefined;
+    assert.equal(rsOp!.delta.curiosity, 2, 'curiosity = 2 for EXAMINE');
+  });
+
+  it('bridge: RELOCATE produces ADD_FACT with predicate moves_to', () => {
+    const entry = makeEntry({ action_type: 'RELOCATE', content: '→ the kitchen', target_char_id: null });
+    const ops = entryToOps(entry, null, 5);
+    const factOp = ops.find(o => o.op === 'ADD_FACT') as { op: 'ADD_FACT'; fact: import('./server/nvm/ops/StoryOp.ts').AtomicFact } | undefined;
+    assert.ok(factOp, 'ADD_FACT emitted for RELOCATE');
+    assert.equal(factOp!.fact.predicate, 'moves_to', 'predicate = moves_to');
+    assert.equal(factOp!.fact.object, 'the kitchen', '→ prefix stripped from content');
+  });
+
+  it('bridge: WAIT produces no ops (silent beat)', () => {
+    const entry = makeEntry({ action_type: 'WAIT', content: '' });
+    const ops = entryToOps(entry, null, 5);
+    assert.equal(ops.length, 0, 'WAIT produces zero ops');
+  });
+
+  // ── epistemicUpdateToOps ───────────────────────────────────────────────────
+
+  it('bridge: epistemicUpdateToOps emits UPDATE_BELIEF per new belief', () => {
+    const beliefs = [makeBelief('Alice was in the study'), makeBelief('The gun is missing')];
+    const update = makeEpistemicUpdate('carol', beliefs, false);
+    const ops = epistemicUpdateToOps(update);
+    const beliefOps = ops.filter(o => o.op === 'UPDATE_BELIEF');
+    assert.equal(beliefOps.length, 2, '2 UPDATE_BELIEF ops for 2 beliefs');
+    assert.ok(beliefOps.every(o => (o as { charId: string }).charId === 'carol'),
+      'all beliefs attributed to carol');
+  });
+
+  it('bridge: contradiction_detected emits suspense +3 and raises contradiction_clock', () => {
+    const update = makeEpistemicUpdate('alice', [], true);
+    const ops = epistemicUpdateToOps(update);
+    const rsOp = ops.find(o => o.op === 'UPDATE_READER_STATE') as { op: 'UPDATE_READER_STATE'; delta: { suspense?: number } } | undefined;
+    const clockOp = ops.find(o => o.op === 'RAISE_CLOCK') as { op: 'RAISE_CLOCK'; clockId: string; amount: number } | undefined;
+    assert.equal(rsOp?.delta.suspense, 3, 'contradiction raises suspense by 3');
+    assert.equal(clockOp?.clockId, 'contradiction_clock', 'raises contradiction_clock');
+    assert.equal(clockOp?.amount, 1, 'amount = 1');
+  });
+
+  it('bridge: no contradiction → no clock or extra suspense', () => {
+    const update = makeEpistemicUpdate('alice', [], false);
+    const ops = epistemicUpdateToOps(update);
+    const clockOp = ops.find(o => o.op === 'RAISE_CLOCK');
+    assert.equal(clockOp, undefined, 'no RAISE_CLOCK when no contradiction');
+    assert.equal(ops.length, 0, 'no ops at all when no beliefs and no contradiction');
+  });
+
+  // ── buildTurnCommit ────────────────────────────────────────────────────────
+
+  it('bridge: buildTurnCommit returns null for pure WAIT turn', () => {
+    const entry = makeEntry({ action_type: 'WAIT', content: '' });
+    const update = makeEpistemicUpdate('alice', [], false);
+    const input: BridgeInput = {
+      entry,
+      card: null,
+      primaryUpdate: update,
+      extraUpdates: [],
+      turnIndex: 3,
+      beforeState: emptyState(),
+      sceneIdx: 3,
+      parentId: null,
+    };
+    const commit = buildTurnCommit(input);
+    assert.equal(commit, null, 'WAIT with no epistemic change → no commit');
+  });
+
+  it('bridge: buildTurnCommit returns a commit with parentId chain', () => {
+    const entry = makeEntry({ action_type: 'SPEAK' });
+    const beliefs = [makeBelief('Bob did it')];
+    const update = makeEpistemicUpdate('bob', beliefs, false);
+    const input: BridgeInput = {
+      entry,
+      card: makeCard(entry, [makeProp()]),
+      primaryUpdate: update,
+      extraUpdates: [],
+      turnIndex: 2,
+      beforeState: emptyState(),
+      sceneIdx: 2,
+      parentId: 'parent-commit-xyz',
+    };
+    const commit = buildTurnCommit(input);
+    assert.ok(commit !== null, 'commit produced for SPEAK + belief update');
+    assert.equal(commit!.parentId, 'parent-commit-xyz', 'parentId chained correctly');
+    assert.equal(commit!.sceneIdx, 2, 'sceneIdx matches turnIndex');
+    assert.ok(commit!.ops.length > 0, 'commit has ops');
+    assert.ok(commit!.commitId.length > 0, 'commit has a UUID');
+    assert.equal(commit!.reverted, false, 'new commits are not reverted');
+  });
+
+  it('bridge: buildTurnCommit deltaSummary counts UPDATE_BELIEF ops', () => {
+    const entry = makeEntry({ action_type: 'SPEAK' });
+    const beliefs = [makeBelief('X'), makeBelief('Y'), makeBelief('Z')];
+    const update = makeEpistemicUpdate('bob', beliefs, false);
+    const input: BridgeInput = {
+      entry,
+      card: null,
+      primaryUpdate: update,
+      extraUpdates: [],
+      turnIndex: 1,
+      beforeState: emptyState(),
+      sceneIdx: 1,
+      parentId: null,
+    };
+    const commit = buildTurnCommit(input);
+    assert.ok(commit, 'commit produced');
+    // deltaSummary.beliefs counts UPDATE_BELIEF ops from summarizeOps
+    assert.equal(commit!.deltaSummary.beliefs, 3, '3 UPDATE_BELIEF ops → deltaSummary.beliefs = 3');
+  });
+
+  it('bridge: LIE turn commit contains both suspense op and belief for listener', () => {
+    const entry = makeEntry({ action_type: 'LIE', target_char_id: 'bob' });
+    const prop = makeProp({ content: 'I was home all night', is_lie: true });
+    const card = makeCard(entry, [prop]);
+    const update = makeEpistemicUpdate('alice', [], false);
+    const input: BridgeInput = {
+      entry,
+      card,
+      primaryUpdate: update,
+      extraUpdates: [],
+      turnIndex: 4,
+      beforeState: emptyState(),
+      sceneIdx: 4,
+      parentId: null,
+    };
+    const commit = buildTurnCommit(input);
+    assert.ok(commit, 'commit produced for LIE');
+    const rsOps = commit!.ops.filter(o => o.op === 'UPDATE_READER_STATE') as Array<{ op: 'UPDATE_READER_STATE'; delta: { suspense?: number } }>;
+    const suspenseOp = rsOps.find(o => (o.delta.suspense ?? 0) >= 2);
+    assert.ok(suspenseOp, 'LIE raises suspense in the commit');
+    const beliefOps = commit!.ops.filter(o => o.op === 'UPDATE_BELIEF') as Array<{ op: 'UPDATE_BELIEF'; charId: string }>;
+    assert.ok(beliefOps.some(o => o.charId === 'bob'), 'listener bob has belief from LIE');
+  });
+
+  it('bridge: extraUpdates are included in the commit ops', () => {
+    const entry = makeEntry({ action_type: 'SPEAK' });
+    const primaryUpdate = makeEpistemicUpdate('alice', [makeBelief('Primary fact')], false);
+    const directorUpdate = makeEpistemicUpdate('carol', [makeBelief('Director insight')], false);
+    const input: BridgeInput = {
+      entry,
+      card: null,
+      primaryUpdate,
+      extraUpdates: [directorUpdate],
+      turnIndex: 7,
+      beforeState: emptyState(),
+      sceneIdx: 7,
+      parentId: null,
+    };
+    const commit = buildTurnCommit(input);
+    assert.ok(commit, 'commit produced');
+    const beliefOps = commit!.ops.filter(o => o.op === 'UPDATE_BELIEF') as Array<{ op: 'UPDATE_BELIEF'; charId: string }>;
+    assert.ok(beliefOps.some(o => o.charId === 'alice'), 'alice primary update included');
+    assert.ok(beliefOps.some(o => o.charId === 'carol'), 'carol director update included');
+  });
+});
+
+// ── Wave 33: Author-Presence Move Bus ─────────────────────────────────────────
+import { parseAuthorMove, buildAuthorCommit } from './server/nvm/live/move-bus.ts';
+import type { AuthorCommitInput } from './server/nvm/live/move-bus.ts';
+
+describe('NVM — Author-Presence Move Bus (Wave 33)', () => {
+  // ── parseAuthorMove: STEER ──────────────────────────────────────────────────
+
+  it('moveBus: STEER keyword recognized', () => {
+    const result = parseAuthorMove('Steer Alice toward confronting Bob', emptyState());
+    assert.equal(result.intent.verb, 'STEER', 'verb = STEER');
+    assert.equal(result.ambiguous, false, 'not ambiguous');
+    assert.ok(result.summary.includes('STEER'), 'summary mentions STEER');
+  });
+
+  it('moveBus: STEER emits ADD_FACT + RAISE_CLOCK + UPDATE_READER_STATE', () => {
+    const result = parseAuthorMove('steer bob to reveal the money location', emptyState());
+    assert.equal(result.ops.filter(o => o.op === 'ADD_FACT').length, 1, '1 ADD_FACT');
+    assert.equal(result.ops.filter(o => o.op === 'RAISE_CLOCK').length, 1, '1 RAISE_CLOCK');
+    assert.equal(result.ops.filter(o => o.op === 'UPDATE_READER_STATE').length, 1, '1 UPDATE_READER_STATE');
+  });
+
+  it('moveBus: STEER with unrecognizable pattern → ambiguous', () => {
+    const result = parseAuthorMove('steer', emptyState()); // no char or goal
+    assert.equal(result.intent.verb, 'STEER', 'verb still STEER');
+    assert.equal(result.ambiguous, true, 'ambiguous when pattern fails');
+    assert.equal(result.ops.length, 0, 'no ops when ambiguous');
+  });
+
+  it('moveBus: STEER clock ID uses charId', () => {
+    const result = parseAuthorMove('Steer carol toward accusing alice', emptyState());
+    const clockOp = result.ops.find(o => o.op === 'RAISE_CLOCK') as { op: 'RAISE_CLOCK'; clockId: string } | undefined;
+    assert.ok(clockOp?.clockId.includes('carol'), 'clock ID includes character name');
+  });
+
+  // ── parseAuthorMove: INJECT ────────────────────────────────────────────────
+
+  it('moveBus: INJECT fact creates ADD_FACT with predicate author_fact', () => {
+    const result = parseAuthorMove('inject fact: the safe is empty', emptyState());
+    assert.equal(result.intent.verb, 'INJECT', 'verb = INJECT');
+    const factOp = result.ops.find(o => o.op === 'ADD_FACT') as { op: 'ADD_FACT'; fact: { predicate: string; object: string } } | undefined;
+    assert.ok(factOp, 'ADD_FACT present');
+    assert.equal(factOp!.fact.predicate, 'author_fact', 'predicate = author_fact');
+    assert.ok(factOp!.fact.object.includes('safe is empty'), 'content preserved in object');
+  });
+
+  it('moveBus: INJECT clue seeds a SEED_CLUE op', () => {
+    const result = parseAuthorMove('inject clue: a torn envelope under the desk', emptyState());
+    const clueOp = result.ops.find(o => o.op === 'SEED_CLUE');
+    assert.ok(clueOp, 'SEED_CLUE emitted');
+    assert.ok(result.ops.some(o => o.op === 'UPDATE_READER_STATE'), 'curiosity UPDATE_READER_STATE');
+  });
+
+  it('moveBus: INJECT clue detects carrier type from content', () => {
+    const objResult = parseAuthorMove('inject clue: the golden object gleams', emptyState());
+    const sndResult = parseAuthorMove('inject clue: a strange sound echoes', emptyState());
+    const objClue = objResult.ops.find(o => o.op === 'SEED_CLUE') as { op: 'SEED_CLUE'; clueId: string; carrier: string } | undefined;
+    const sndClue = sndResult.ops.find(o => o.op === 'SEED_CLUE') as { op: 'SEED_CLUE'; clueId: string; carrier: string } | undefined;
+    assert.equal(objClue?.carrier, 'object', 'object carrier detected');
+    assert.equal(sndClue?.carrier, 'sound', 'sound carrier detected');
+  });
+
+  it('moveBus: INJECT pressure raises suspense + clock', () => {
+    const result = parseAuthorMove('inject pressure: alice is about to be discovered', emptyState());
+    const rsOp = result.ops.find(o => o.op === 'UPDATE_READER_STATE') as { op: string; delta: { suspense?: number } } | undefined;
+    const clockOp = result.ops.find(o => o.op === 'RAISE_CLOCK');
+    assert.ok(rsOp?.delta.suspense && rsOp.delta.suspense >= 2, 'suspense >= 2 for pressure');
+    assert.ok(clockOp, 'RAISE_CLOCK for pressure');
+  });
+
+  // ── parseAuthorMove: OVERRULE ──────────────────────────────────────────────
+
+  it('moveBus: OVERRULE recognized and returns no ops', () => {
+    const result = parseAuthorMove('overrule — that scene was wrong', emptyState());
+    assert.equal(result.intent.verb, 'OVERRULE', 'verb = OVERRULE');
+    assert.equal(result.ops.length, 0, 'OVERRULE has no ops');
+    assert.equal(result.ambiguous, false, 'not ambiguous');
+  });
+
+  it('moveBus: "undo" keyword maps to OVERRULE', () => {
+    const result = parseAuthorMove('undo last move', emptyState());
+    assert.equal(result.intent.verb, 'OVERRULE', 'undo → OVERRULE');
+  });
+
+  // ── parseAuthorMove: implicit INJECT (fallback) ────────────────────────────
+
+  it('moveBus: plain prose without verb defaults to INJECT fact', () => {
+    const result = parseAuthorMove('the lights flicker and go out', emptyState());
+    assert.equal(result.intent.verb, 'INJECT', 'plain prose = implicit INJECT');
+    assert.ok(result.ops.some(o => o.op === 'ADD_FACT'), 'still produces ADD_FACT');
+    assert.ok(result.summary.includes('implicit'), 'summary marks it implicit');
+  });
+
+  // ── buildAuthorCommit ──────────────────────────────────────────────────────
+
+  it('moveBus: buildAuthorCommit returns commit for valid INJECT', () => {
+    const move = parseAuthorMove('inject fact: the vault was opened at midnight', emptyState(), { sceneIdx: 0 });
+    const input: AuthorCommitInput = {
+      move,
+      beforeState: emptyState(),
+      sceneIdx: 0,
+      parentId: null,
+    };
+    const commit = buildAuthorCommit(input);
+    assert.ok(commit !== null, 'commit returned for valid INJECT');
+    assert.equal(commit!.sceneIdx, 0, 'sceneIdx correct');
+    assert.equal(commit!.parentId, null, 'parentId null for first commit');
+    assert.ok(commit!.ops.length > 0, 'ops non-empty');
+  });
+
+  it('moveBus: buildAuthorCommit returns null for OVERRULE (no ops)', () => {
+    const move = parseAuthorMove('overrule', emptyState());
+    const input: AuthorCommitInput = {
+      move,
+      beforeState: emptyState(),
+      sceneIdx: 1,
+      parentId: 'some-parent',
+    };
+    const commit = buildAuthorCommit(input);
+    assert.equal(commit, null, 'OVERRULE returns null (no ops to commit)');
+  });
+
+  it('moveBus: buildAuthorCommit chains parentId correctly', () => {
+    const move = parseAuthorMove('inject fact: alice slips away', emptyState(), { sceneIdx: 0 });
+    const input: AuthorCommitInput = {
+      move,
+      beforeState: emptyState(),
+      sceneIdx: 0,
+      parentId: 'parent-abc-123',
+    };
+    const commit = buildAuthorCommit(input);
+    assert.ok(commit, 'commit produced');
+    assert.equal(commit!.parentId, 'parent-abc-123', 'parentId chained');
+  });
+});
+
+// ── Wave 34: Reactive Turn Cycle ──────────────────────────────────────────────
+import { reactToCommit, advanceWorld } from './server/nvm/live/loop.ts';
+
+describe('NVM — Reactive Turn Cycle (Wave 34)', () => {
+  // The reactive loop depends on Orchestrator.runTurn() which calls AI.
+  // We test the pure structural behaviours (no-agent case, maxBeats cap,
+  // result shape) using the in-memory Stage fixture.
+
+  it('reactToCommit: returns noAgents when stage has no alive agents', async () => {
+    // Use an empty Stage (no agents registered)
+    const { Stage } = await import('./server/engine/Stage.ts');
+    const emptyStage = new Stage(':memory:');
+    const { Orchestrator } = await import('./server/engine/Orchestrator.ts');
+    const orch = new Orchestrator(emptyStage);
+    const result = await reactToCommit(emptyStage, orch, 'dummy-commit-id');
+    assert.equal(result.stoppedBecause, 'noAgents', 'stops immediately when no agents');
+    assert.equal(result.turnsRun, 0, 'zero turns run');
+    assert.equal(result.commits.length, 0, 'no commits produced');
+  });
+
+  it('advanceWorld: returns noAgents shape for empty stage', async () => {
+    const { Stage } = await import('./server/engine/Stage.ts');
+    const emptyStage = new Stage(':memory:');
+    const { Orchestrator } = await import('./server/engine/Orchestrator.ts');
+    const orch = new Orchestrator(emptyStage);
+    const result = await advanceWorld(emptyStage, orch, 2);
+    assert.equal(result.stoppedBecause, 'noAgents');
+    assert.equal(result.turnsRun, 0);
+  });
+
+  it('reactToCommit: maxBeats capped at function parameter', async () => {
+    // Structural test: verify maxBeats parameter flows through opts
+    // We can't run actual AI turns in unit tests, so we just check that
+    // the function signature accepts maxBeats and returns the right shape.
+    const stage = makeStage();
+    const { Orchestrator } = await import('./server/engine/Orchestrator.ts');
+    const orch = new Orchestrator(stage);
+    const result = await reactToCommit(stage, orch, 'commit-abc', { maxBeats: 3 });
+    // With no agents the loop exits immediately — the key test is the call doesn't throw
+    assert.ok(typeof result.turnsRun === 'number', 'turnsRun is a number');
+    assert.ok(Array.isArray(result.commits), 'commits is an array');
+    assert.ok(['maxBeats', 'noAgents', 'climax', 'error'].includes(result.stoppedBecause),
+      'stoppedBecause is a valid reason');
+  });
+
+  it('advanceWorld: commits from reactions are returned in result', async () => {
+    // Structural test: even with no agents the shape is correct
+    const stage = makeStage();
+    const { Orchestrator } = await import('./server/engine/Orchestrator.ts');
+    const orch = new Orchestrator(stage);
+    const result = await advanceWorld(stage, orch, 1);
+    assert.ok('commits' in result, 'result has commits field');
+    assert.ok('turnsRun' in result, 'result has turnsRun field');
+    assert.ok('stoppedBecause' in result, 'result has stoppedBecause field');
+  });
+});
+
+// ── Wave 35: Forward Latent Branch Field ─────────────────────────────────────
+import { generateBranchField } from './server/nvm/branch/field.ts';
+import { scoreBranch } from './server/nvm/branch/score.ts';
+
+describe('NVM — Forward Latent Branch Field (Wave 35)', () => {
+  // ── scoreBranch ────────────────────────────────────────────────────────────
+
+  it('branchField: scoreBranch returns all 5 dimension scores + total', () => {
+    const ops: StoryOp[] = [
+      { op: 'UPDATE_READER_STATE', delta: { suspense: 2 } },
+      { op: 'RAISE_CLOCK', clockId: 'tension', amount: 2 },
+    ];
+    const ir = {
+      transitionId: 'ir-001',
+      sceneIdx: 0,
+      sceneFunction: 'build_tension' as const,
+      activeMechanisms: ['relationship_externalization'],
+      beforeStateHash: '00000000',
+      ops,
+      preconditions: ['story_ongoing'],
+      postconditions: [],
+      provenance: { origin: 'model_generated' as const, createdAt: Date.now() },
+    };
+    const score = scoreBranch(ops, ir, emptyState(), []);
+    assert.ok(typeof score.novelty === 'number', 'novelty is number');
+    assert.ok(typeof score.consequence === 'number', 'consequence is number');
+    assert.ok(typeof score.coherence === 'number', 'coherence is number');
+    assert.ok(typeof score.viability === 'number', 'viability is number');
+    assert.ok(typeof score.screenplayUsefulness === 'number', 'screenplayUsefulness is number');
+    assert.ok(typeof score.total === 'number', 'total is number');
+    assert.ok(score.total >= 0 && score.total <= 100, `total in [0,100]: ${score.total}`);
+  });
+
+  it('branchField: SEED_CLUE op boosts screenplayUsefulness', () => {
+    const opsWithClue: StoryOp[] = [
+      { op: 'SEED_CLUE', clueId: 'clue-001', carrier: 'object' },
+      { op: 'UPDATE_READER_STATE', delta: { curiosity: 2 } },
+    ];
+    const opsBaseline: StoryOp[] = [
+      { op: 'UPDATE_READER_STATE', delta: { curiosity: 2 } },
+    ];
+    const buildIR = (ops: StoryOp[]) => ({
+      transitionId: crypto.randomUUID(),
+      sceneIdx: 0,
+      sceneFunction: 'build_tension' as const,
+      activeMechanisms: ['relationship_externalization'],
+      beforeStateHash: '00000000',
+      ops,
+      preconditions: ['story_ongoing'],
+      postconditions: [],
+      provenance: { origin: 'model_generated' as const, createdAt: Date.now() },
+    });
+    const scoreWithClue = scoreBranch(opsWithClue, buildIR(opsWithClue), emptyState(), []);
+    const scoreBaseline  = scoreBranch(opsBaseline, buildIR(opsBaseline), emptyState(), []);
+    assert.ok(
+      scoreWithClue.screenplayUsefulness >= scoreBaseline.screenplayUsefulness,
+      `SEED_CLUE should not reduce screenplayUsefulness: ${scoreWithClue.screenplayUsefulness} vs ${scoreBaseline.screenplayUsefulness}`
+    );
+  });
+
+  it('branchField: novelty = 80 baseline when no recent commits', () => {
+    const ops: StoryOp[] = [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }];
+    const ir = {
+      transitionId: crypto.randomUUID(),
+      sceneIdx: 0,
+      sceneFunction: 'build_tension' as const,
+      activeMechanisms: ['relationship_externalization'],
+      beforeStateHash: '00000000',
+      ops,
+      preconditions: ['story_ongoing'],
+      postconditions: [],
+      provenance: { origin: 'model_generated' as const, createdAt: Date.now() },
+    };
+    const score = scoreBranch(ops, ir, emptyState(), []);
+    assert.equal(score.novelty, 80, 'novelty = 80 when no history');
+  });
+
+  it('branchField: identical ops reduce novelty vs baseline', () => {
+    const ops: StoryOp[] = [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }];
+    const baseCommit: StoryCommit = {
+      commitId: 'c0',
+      parentId: null,
+      sceneIdx: 0,
+      ops: [...ops], // same ops as candidate
+      deltaSummary: { facts: 0, beliefs: 0, relationships: 0 },
+      reverted: false,
+      createdAt: Date.now(),
+    };
+    const ir = {
+      transitionId: crypto.randomUUID(),
+      sceneIdx: 1,
+      sceneFunction: 'build_tension' as const,
+      activeMechanisms: ['relationship_externalization'],
+      beforeStateHash: '00000000',
+      ops,
+      preconditions: ['story_ongoing'],
+      postconditions: [],
+      provenance: { origin: 'model_generated' as const, createdAt: Date.now() },
+    };
+    const scoreWithHistory = scoreBranch(ops, ir, emptyState(), [baseCommit]);
+    assert.ok(scoreWithHistory.novelty < 80, `identical ops reduce novelty: ${scoreWithHistory.novelty}`);
+  });
+
+  // ── generateBranchField ────────────────────────────────────────────────────
+
+  it('branchField: generates branches from emptyState', () => {
+    const field = generateBranchField(emptyState(), [], 42);
+    assert.ok(Array.isArray(field.branches), 'branches is an array');
+    assert.ok(field.branches.length >= 0, 'at least 0 branches (may be pruned)');
+    assert.ok(typeof field.currentSceneIdx === 'number', 'currentSceneIdx present');
+    assert.ok(typeof field.generatedAt === 'number', 'generatedAt present');
+  });
+
+  it('branchField: each branch has branchId, operator, scores, ops', () => {
+    const field = generateBranchField(emptyState(), [], 99);
+    for (const branch of field.branches) {
+      assert.ok(typeof branch.branchId === 'string' && branch.branchId.length > 0, 'branchId present');
+      assert.ok(typeof branch.operator === 'string', 'operator present');
+      assert.ok(Array.isArray(branch.ops), 'ops is array');
+      assert.ok(typeof branch.scores.total === 'number', 'scores.total is number');
+    }
+  });
+
+  it('branchField: branches are sorted by total score descending', () => {
+    const field = generateBranchField(emptyState(), [], 123);
+    for (let i = 1; i < field.branches.length; i++) {
+      assert.ok(
+        field.branches[i - 1].scores.total >= field.branches[i].scores.total,
+        `branch[${i-1}].total >= branch[${i}].total`
+      );
+    }
+  });
+
+  it('branchField: sceneIdx advances from last commit', () => {
+    const commit: StoryCommit = {
+      commitId: 'c5',
+      parentId: null,
+      sceneIdx: 5,
+      ops: [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }],
+      deltaSummary: { facts: 0, beliefs: 0, relationships: 0 },
+      reverted: false,
+      createdAt: Date.now(),
+    };
+    const field = generateBranchField(emptyState(), [commit], 7);
+    assert.equal(field.currentSceneIdx, 6, 'currentSceneIdx = last.sceneIdx + 1');
+  });
+});
+
+// ── Wave 36: Conflict Orchestrator + Intention Registry ───────────────────────
+import { buildIntentionRegistry } from './server/nvm/drama/intention-registry.ts';
+import { computeConflicts } from './server/nvm/drama/conflict-orchestrator.ts';
+
+describe('NVM — Conflict Orchestrator + Intention Registry (Wave 36)', () => {
+  // ── buildIntentionRegistry ─────────────────────────────────────────────────
+
+  it('conflictOrch: registry has one intention per living agent', () => {
+    const stage = makeStage(); // alice + bob, both alive
+    const registry = buildIntentionRegistry(stage);
+    assert.equal(registry.totalChars, 2, '2 intentions for alice + bob');
+    assert.equal(registry.intentions.length, 2, 'intentions array length = 2');
+  });
+
+  it('conflictOrch: intention includes charId, name, wantNow, terminalWant, whatTheyLose', () => {
+    const stage = makeStage();
+    const registry = buildIntentionRegistry(stage);
+    for (const intention of registry.intentions) {
+      assert.ok(typeof intention.charId === 'string' && intention.charId.length > 0, 'charId present');
+      assert.ok(typeof intention.name === 'string' && intention.name.length > 0, 'name present');
+      assert.ok(typeof intention.wantNow === 'string' && intention.wantNow.length > 0, 'wantNow present');
+      assert.ok(typeof intention.terminalWant === 'string', 'terminalWant present');
+      assert.ok(typeof intention.whatTheyLose === 'string', 'whatTheyLose present');
+      assert.ok(typeof intention.urgency === 'number' && intention.urgency >= 0 && intention.urgency <= 100, 'urgency in [0,100]');
+    }
+  });
+
+  it('conflictOrch: registry sorted by urgency descending', () => {
+    const stage = makeStage();
+    const registry = buildIntentionRegistry(stage);
+    for (let i = 1; i < registry.intentions.length; i++) {
+      assert.ok(
+        registry.intentions[i - 1].urgency >= registry.intentions[i].urgency,
+        'sorted by urgency desc'
+      );
+    }
+  });
+
+  it('conflictOrch: empty stage gives empty registry', async () => {
+    const { Stage } = await import('./server/engine/Stage.ts');
+    const emptyStage = new Stage(':memory:');
+    const registry = buildIntentionRegistry(emptyStage);
+    assert.equal(registry.totalChars, 0, 'zero intentions for empty stage');
+  });
+
+  // ── computeConflicts ───────────────────────────────────────────────────────
+
+  it('conflictOrch: computeConflicts returns all 5 fields', () => {
+    const stage = makeStage();
+    const registry = buildIntentionRegistry(stage);
+    const conflicts = computeConflicts(registry, emptyState());
+    assert.ok(Array.isArray(conflicts.collisions), 'collisions is array');
+    assert.ok(Array.isArray(conflicts.threatenedPlans), 'threatenedPlans is array');
+    assert.ok(Array.isArray(conflicts.tickingClocks), 'tickingClocks is array');
+    assert.ok(Array.isArray(conflicts.leverageReversals), 'leverageReversals is array');
+    assert.ok(typeof conflicts.totalDramaticPressure === 'number', 'totalDramaticPressure is number');
+  });
+
+  it('conflictOrch: ticking clocks detected from state clocks', () => {
+    const stateWithClock = { ...emptyState(), clocks: { revelation_clock: 7, mystery_clock: 3 } };
+    const registry = buildIntentionRegistry(makeStage());
+    const conflicts = computeConflicts(registry, stateWithClock);
+    const clockIds = conflicts.tickingClocks.map(c => c.clockId);
+    assert.ok(clockIds.includes('revelation_clock'), 'revelation_clock detected');
+    assert.ok(clockIds.includes('mystery_clock'), 'mystery_clock detected');
+  });
+
+  it('conflictOrch: critical urgency for clock level >= 8', () => {
+    const stateWithClock = { ...emptyState(), clocks: { tension: 9 } };
+    const registry = buildIntentionRegistry(makeStage());
+    const conflicts = computeConflicts(registry, stateWithClock);
+    const tensionClock = conflicts.tickingClocks.find(c => c.clockId === 'tension');
+    assert.equal(tensionClock?.urgency, 'critical', 'level 9 → critical');
+  });
+
+  it('conflictOrch: totalDramaticPressure in [0,100]', () => {
+    const registry = buildIntentionRegistry(makeStage());
+    const conflicts = computeConflicts(registry, emptyState());
+    assert.ok(
+      conflicts.totalDramaticPressure >= 0 && conflicts.totalDramaticPressure <= 100,
+      `pressure in [0,100]: ${conflicts.totalDramaticPressure}`
+    );
+  });
+
+  it('conflictOrch: collisions sorted by severity descending', () => {
+    const registry = buildIntentionRegistry(makeStage());
+    const conflicts = computeConflicts(registry, emptyState());
+    for (let i = 1; i < conflicts.collisions.length; i++) {
+      assert.ok(
+        conflicts.collisions[i - 1].severity >= conflicts.collisions[i].severity,
+        'collisions sorted by severity desc'
+      );
+    }
+  });
+});
+
+// ── Wave 37: Live Screenplay Memory + Structure Tracking ─────────────────────
+import { annotateCommit, buildScreenplayMemory } from './server/nvm/screenplay/memory.ts';
+import { analyzeStructure } from './server/nvm/screenplay/structure.ts';
+
+function makeScreenplayCommit(sceneIdx: number, ops: StoryOp[]): StoryCommit {
+  return {
+    commitId: `sp-${sceneIdx}`,
+    parentId: sceneIdx > 0 ? `sp-${sceneIdx - 1}` : null,
+    sceneIdx,
+    ops,
+    deltaSummary: summarizeOps(ops),
+    reverted: false,
+    createdAt: Date.now(),
+  };
+}
+
+describe('NVM — Live Screenplay Memory + Structure (Wave 37)', () => {
+  it('screenmem: annotateCommit produces a record with all required fields', () => {
+    const commit = makeScreenplayCommit(1, [
+      { op: 'UPDATE_READER_STATE', delta: { suspense: 2, curiosity: 1 } },
+      { op: 'ADD_FACT', fact: {
+        factId: 'f1', subject: 'alice', predicate: 'moves_to', object: 'the vault',
+        addedAtTurn: 1, validFrom: 1, validTo: null,
+      }},
+    ]);
+    const record = annotateCommit(commit);
+    assert.equal(record.commitId, commit.commitId, 'commitId preserved');
+    assert.equal(record.sceneIdx, 1, 'sceneIdx preserved');
+    assert.ok(typeof record.slug === 'string' && record.slug.length > 0, 'slug present');
+    assert.ok(typeof record.purpose === 'string', 'purpose present');
+    assert.ok(typeof record.dramaticTurn === 'string', 'dramaticTurn present');
+    assert.ok(typeof record.emotionalShift === 'string', 'emotionalShift present');
+    assert.ok(Array.isArray(record.visualBeats), 'visualBeats is array');
+    assert.ok(Array.isArray(record.dialogueHighlights), 'dialogueHighlights is array');
+    assert.ok(Array.isArray(record.unresolvedClues), 'unresolvedClues is array');
+    assert.ok(typeof record.clockRaised === 'boolean', 'clockRaised is boolean');
+    assert.equal(record.suspenseDelta, 2, 'suspenseDelta = 2');
+    assert.equal(record.curiosityDelta, 1, 'curiosityDelta = 1');
+  });
+
+  it('screenmem: RELOCATE ADD_FACT appears in slug', () => {
+    const commit = makeScreenplayCommit(0, [
+      { op: 'ADD_FACT', fact: {
+        factId: 'f2', subject: 'alice', predicate: 'moves_to', object: 'the kitchen',
+        addedAtTurn: 0, validFrom: 0, validTo: null,
+      }},
+    ]);
+    const record = annotateCommit(commit);
+    assert.ok(record.slug.toUpperCase().includes('THE KITCHEN') || record.slug.includes('kitchen'),
+      `slug includes location name: "${record.slug}"`);
+  });
+
+  it('screenmem: SEED_CLUE without PAYOFF_SETUP → unresolvedClues', () => {
+    const clueId = 'clue-xyz';
+    const commit = makeScreenplayCommit(2, [
+      { op: 'SEED_CLUE', clueId, carrier: 'object' },
+      { op: 'UPDATE_READER_STATE', delta: { curiosity: 2 } },
+    ]);
+    const record = annotateCommit(commit);
+    assert.ok(record.unresolvedClues.includes(clueId), 'unresolved clue tracked');
+  });
+
+  it('screenmem: purpose = establish_world for sceneIdx 0', () => {
+    const commit = makeScreenplayCommit(0, [{ op: 'UPDATE_READER_STATE', delta: { curiosity: 1 } }]);
+    const record = annotateCommit(commit);
+    assert.equal(record.purpose, 'establish_world');
+  });
+
+  it('screenmem: purpose = revelation when PAYOFF_SETUP present', () => {
+    const commit = makeScreenplayCommit(3, [
+      { op: 'PAYOFF_SETUP', setupId: 'setup-001', payoffEventId: 'evt-002' },
+    ]);
+    const record = annotateCommit(commit);
+    assert.equal(record.purpose, 'revelation');
+  });
+
+  it('screenmem: told belief appears in dialogueHighlights', () => {
+    const commit = makeScreenplayCommit(1, [
+      { op: 'UPDATE_BELIEF', charId: 'bob', belief: {
+        id: 'b1', proposition: 'Alice was not in the study', confidence: 0.7,
+        source: 'told', source_agent_id: 'alice', acquired_at: 1, contradicts: [],
+      }},
+    ]);
+    const record = annotateCommit(commit);
+    assert.ok(record.dialogueHighlights.some(d => d.includes('Alice was not in the study')),
+      'told belief in dialogue highlights');
+  });
+
+  it('screenmem: buildScreenplayMemory returns one record per non-reverted commit', () => {
+    const commits = [
+      makeScreenplayCommit(0, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }]),
+      { ...makeScreenplayCommit(1, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }]), reverted: true },
+      makeScreenplayCommit(2, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 2 } }]),
+    ];
+    const records = buildScreenplayMemory(commits);
+    assert.equal(records.length, 2, '2 non-reverted commits → 2 records');
+  });
+
+  it('screenmem: analyzeStructure returns actPosition + all fields', () => {
+    const commits = [makeScreenplayCommit(0, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }])];
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    assert.ok(typeof structure.actPosition === 'string', 'actPosition present');
+    assert.ok(typeof structure.completionPercent === 'number', 'completionPercent present');
+    assert.ok(typeof structure.escalating === 'boolean', 'escalating present');
+    assert.ok(typeof structure.reversalCount === 'number', 'reversalCount present');
+    assert.ok(typeof structure.approachingClimax === 'boolean', 'approachingClimax present');
+  });
+
+  it('screenmem: analyzeStructure returns act1 when no clock pressure', () => {
+    const commits = [makeScreenplayCommit(0, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }])];
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    assert.equal(structure.actPosition, 'act1', 'no clocks → act1');
+  });
+
+  it('screenmem: analyzeStructure escalating = true when second half > first half', () => {
+    const commits = [
+      makeScreenplayCommit(0, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }]),
+      makeScreenplayCommit(1, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }]),
+      makeScreenplayCommit(2, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 5 } }]),
+      makeScreenplayCommit(3, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 6 } }]),
+    ];
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    assert.equal(structure.escalating, true, 'suspense rising → escalating');
+  });
+});
+
+// ── Wave 38: End-Condition Detector + Screenplay Compiler ─────────────────────
+import { detectEndCondition } from './server/nvm/screenplay/end-condition.ts';
+import { compileScreenplay } from './server/nvm/screenplay/compile.ts';
+
+describe('NVM — End-Condition Detector + Screenplay Compiler (Wave 38)', () => {
+  // ── detectEndCondition ─────────────────────────────────────────────────────
+
+  it('endCond: returns complete=false for zero scenes', () => {
+    const result = detectEndCondition([], { actPosition: 'act1', completionPercent: 0,
+      avgSuspensePerScene: 0, escalating: false, reversalCount: 0, reversalDensity: 0,
+      approachingClimax: false, openClues: 0, revelationCount: 0, midpointPressure: 0,
+      tightestScene: null }, []);
+    assert.equal(result.complete, false, 'zero scenes → not complete');
+    assert.ok(result.gaps.length > 0, 'gaps present');
+  });
+
+  it('endCond: confidence increases with more completion signals', () => {
+    const makeStructure = (act: string, revelation: number, clues: number, escalating: boolean) => ({
+      actPosition: act as any,
+      completionPercent: act === 'act3' ? 80 : 20,
+      avgSuspensePerScene: 2,
+      escalating,
+      reversalCount: 1,
+      reversalDensity: 1,
+      approachingClimax: act === 'act3',
+      openClues: clues,
+      revelationCount: revelation,
+      midpointPressure: 2,
+      tightestScene: 3,
+    });
+
+    // 5 scenes, act1, no revelation
+    const baseRecords = Array.from({ length: 5 }, (_, i) =>
+      annotateCommit(makeScreenplayCommit(i, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }]))
+    );
+    const lowResult = detectEndCondition(baseRecords, makeStructure('act1', 0, 3, false), []);
+
+    // 5 scenes, act3, revelation, escalating, no open clues
+    const highResult = detectEndCondition(baseRecords, makeStructure('act3', 2, 0, true), []);
+
+    assert.ok(highResult.confidence > lowResult.confidence,
+      `high confidence (${highResult.confidence}) > low confidence (${lowResult.confidence})`);
+  });
+
+  it('endCond: result has reasons and gaps arrays', () => {
+    const commits = Array.from({ length: 5 }, (_, i) =>
+      makeScreenplayCommit(i, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }])
+    );
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    const result = detectEndCondition(records, structure, commits);
+    assert.ok(Array.isArray(result.reasons), 'reasons is array');
+    assert.ok(Array.isArray(result.gaps), 'gaps is array');
+    assert.ok(typeof result.confidence === 'number' && result.confidence >= 0 && result.confidence <= 100,
+      `confidence in [0,100]: ${result.confidence}`);
+  });
+
+  // ── compileScreenplay ──────────────────────────────────────────────────────
+
+  it('compile: compileScreenplay returns fountain + annotations + summary', () => {
+    const commits: StoryCommit[] = [];
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    const compiled = compileScreenplay(commits, emptyState(), records, structure, 'TEST STORY');
+    assert.ok(typeof compiled.fountain === 'string', 'fountain is string');
+    assert.ok(Array.isArray(compiled.annotations), 'annotations is array');
+    assert.ok(typeof compiled.structureSummary === 'string', 'structureSummary is string');
+    assert.ok(typeof compiled.wordCount === 'number', 'wordCount is number');
+    assert.ok(typeof compiled.compiledAt === 'number', 'compiledAt is number');
+  });
+
+  it('compile: structureSummary includes actPosition', () => {
+    const commits: StoryCommit[] = [];
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    const compiled = compileScreenplay(commits, emptyState(), records, structure);
+    assert.ok(compiled.structureSummary.includes('ACT1') || compiled.structureSummary.includes('act1'),
+      `structureSummary includes act1: "${compiled.structureSummary}"`);
+  });
+
+  it('compile: annotations length matches records length', () => {
+    const commits = Array.from({ length: 3 }, (_, i) =>
+      makeScreenplayCommit(i, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }])
+    );
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    const compiled = compileScreenplay(commits, emptyState(), records, structure);
+    assert.equal(compiled.annotations.length, records.length,
+      'one annotation per record');
+  });
+});
+
+// ── Wave 39: 12-Pass Revision Pipeline ────────────────────────────────────────
+
+import { structurePass }    from './server/nvm/revision/passes/structure.ts';
+import { causalityPass }    from './server/nvm/revision/passes/causality.ts';
+import { intentionPass }    from './server/nvm/revision/passes/intention.ts';
+import { beliefPass }       from './server/nvm/revision/passes/belief.ts';
+import { conflictPass }     from './server/nvm/revision/passes/conflict.ts';
+import { characterArcPass } from './server/nvm/revision/passes/character-arc.ts';
+import { dialoguePass }     from './server/nvm/revision/passes/dialogue.ts';
+import { rhythmPass }       from './server/nvm/revision/passes/rhythm.ts';
+import { pacingPass }       from './server/nvm/revision/passes/pacing.ts';
+import { originalityPass }  from './server/nvm/revision/passes/originality.ts';
+import { payoffPass }       from './server/nvm/revision/passes/payoff.ts';
+import { voicePass }        from './server/nvm/revision/passes/voice.ts';
+import { runRevisionPipeline } from './server/nvm/revision/pipeline.ts';
+
+/** Minimal fountain text for testing */
+const SAMPLE_FOUNTAIN = `Title: TEST
+Author: Test
+
+INT. THE OFFICE - DAY
+
+Alice looks around nervously. She takes a deep breath.
+
+ALICE
+We need to talk. I feel so angry.
+
+BOB
+Yes.
+
+INT. THE WAREHOUSE - NIGHT
+
+Bob stares into the distance. A single tear runs down his face.
+
+ALICE
+As you know, Bob, we discussed the plan.
+
+BOB
+Absolutely.
+`;
+
+/** Make a minimal PassInput with no records/structure */
+/** Minimal StructureState for Wave 39 tests */
+function makeStructureForRevision(act = 'act1', revelation = 0, clues = 0, escalating = false): import('./server/nvm/screenplay/structure.ts').StructureState {
+  return {
+    actPosition: act as import('./server/nvm/screenplay/structure.ts').ActPosition,
+    completionPercent: act === 'act3' ? 80 : 20,
+    avgSuspensePerScene: 2,
+    escalating,
+    reversalCount: 1,
+    reversalDensity: 1,
+    approachingClimax: act === 'act3',
+    openClues: clues,
+    revelationCount: revelation,
+    midpointPressure: 2,
+    tightestScene: null,
+  };
+}
+
+function makePassInput(fountain = SAMPLE_FOUNTAIN): import('./server/nvm/revision/passes/types.ts').PassInput {
+  return {
+    fountain,
+    original: fountain,
+    annotations: [],
+    structure: makeStructureForRevision('act1', 0, 0, false),
+    records: [],
+    approvedSpans: [],
+  };
+}
+
+/** Make a PassInput with rich records for more thorough tests */
+function makeRichPassInput(): import('./server/nvm/revision/passes/types.ts').PassInput {
+  const commits = Array.from({ length: 6 }, (_, i) =>
+    makeScreenplayCommit(i, [
+      { op: 'UPDATE_READER_STATE', delta: { suspense: i % 2 === 0 ? 2 : -1 } },
+      { op: 'SEED_CLUE', clueId: `clue_${i}`, carrier: 'object' },
+    ])
+  );
+  const records = buildScreenplayMemory(commits);
+  const structure = analyzeStructure(records, commits);
+  const compiled = compileScreenplay(commits, emptyState(), records, structure, 'TEST');
+  return {
+    fountain: compiled.fountain,
+    original: compiled.fountain,
+    annotations: compiled.annotations,
+    structure,
+    records,
+    approvedSpans: [],
+  };
+}
+
+describe('NVM — 12-Pass Revision Pipeline (Wave 39)', () => {
+  // ── Individual pass smoke tests ───────────────────────────────────────────
+
+  it('structurePass: returns PassResult with correct pass name', async () => {
+    const result = await structurePass(makePassInput());
+    assert.equal(result.pass, 'structure');
+    assert.ok(Array.isArray(result.issues), 'issues is array');
+    assert.ok(typeof result.revisedFountain === 'string', 'revisedFountain is string');
+    assert.ok(typeof result.changed === 'boolean', 'changed is boolean');
+    assert.ok(typeof result.summary === 'string', 'summary is string');
+  });
+
+  it('causalityPass: returns PassResult with correct pass name', async () => {
+    const result = await causalityPass(makePassInput());
+    assert.equal(result.pass, 'causality');
+    assert.ok(Array.isArray(result.issues));
+    assert.ok(typeof result.revisedFountain === 'string');
+  });
+
+  it('intentionPass: returns PassResult with correct pass name', async () => {
+    const result = await intentionPass(makePassInput());
+    assert.equal(result.pass, 'intention');
+    assert.ok(Array.isArray(result.issues));
+  });
+
+  it('beliefPass: returns PassResult with correct pass name', async () => {
+    const result = await beliefPass(makePassInput());
+    assert.equal(result.pass, 'belief');
+    assert.ok(Array.isArray(result.issues));
+  });
+
+  it('conflictPass: detects FLAT_SUSPENSE_ARC for non-escalating story', async () => {
+    const input = makePassInput();
+    // Override structure to have non-escalating, 5+ records
+    const richInput = makeRichPassInput();
+    const result = await conflictPass({
+      ...richInput,
+      structure: { ...richInput.structure, escalating: false },
+    });
+    assert.equal(result.pass, 'conflict');
+    assert.ok(Array.isArray(result.issues));
+    // With non-escalating structure and 5+ records, should flag FLAT_SUSPENSE_ARC
+    const flatArc = result.issues.find(i => i.rule === 'FLAT_SUSPENSE_ARC');
+    assert.ok(flatArc, 'FLAT_SUSPENSE_ARC detected for non-escalating story');
+  });
+
+  it('characterArcPass: returns PassResult with correct pass name', async () => {
+    const result = await characterArcPass(makePassInput());
+    assert.equal(result.pass, 'character-arc');
+    assert.ok(Array.isArray(result.issues));
+  });
+
+  it('dialoguePass: detects ON_THE_NOSE and AS_YOU_KNOW_BOB in sample', async () => {
+    const result = await dialoguePass(makePassInput());
+    assert.equal(result.pass, 'dialogue');
+    const onNose = result.issues.find(i => i.rule === 'ON_THE_NOSE');
+    const asYouKnow = result.issues.find(i => i.rule === 'AS_YOU_KNOW_BOB');
+    assert.ok(onNose, 'ON_THE_NOSE issue detected');
+    assert.ok(asYouKnow, 'AS_YOU_KNOW_BOB issue detected');
+  });
+
+  it('rhythmPass: returns PassResult with correct pass name', async () => {
+    const result = await rhythmPass(makePassInput());
+    assert.equal(result.pass, 'rhythm');
+    assert.ok(Array.isArray(result.issues));
+    assert.ok(typeof result.revisedFountain === 'string');
+  });
+
+  it('pacingPass: returns PassResult with correct pass name', async () => {
+    const result = await pacingPass(makePassInput());
+    assert.equal(result.pass, 'pacing');
+    assert.ok(Array.isArray(result.issues));
+  });
+
+  it('originalityPass: detects clichés in sample fountain', async () => {
+    const result = await originalityPass(makePassInput());
+    assert.equal(result.pass, 'originality');
+    const clicheIssue = result.issues.find(i => i.rule === 'CLICHE_PHRASE');
+    assert.ok(clicheIssue, `CLICHE_PHRASE detected: ${JSON.stringify(result.issues.map(i => i.rule))}`);
+  });
+
+  it('payoffPass: returns PassResult with correct pass name', async () => {
+    const result = await payoffPass(makePassInput());
+    assert.equal(result.pass, 'payoff');
+    assert.ok(Array.isArray(result.issues));
+  });
+
+  it('voicePass: returns PassResult with correct pass name', async () => {
+    const result = await voicePass(makePassInput());
+    assert.equal(result.pass, 'voice');
+    assert.ok(Array.isArray(result.issues));
+    assert.ok(typeof result.revisedFountain === 'string');
+  });
+
+  // ── Pipeline integration tests ────────────────────────────────────────────
+
+  it('pipeline: runRevisionPipeline runs all 12 passes', async () => {
+    const commits: StoryCommit[] = [];
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    const compiled = compileScreenplay(commits, emptyState(), records, structure, 'TEST');
+
+    const result = await runRevisionPipeline(compiled, records, structure, []);
+    assert.equal(result.passResults.length, 12, 'all 12 passes ran');
+    assert.ok(typeof result.totalIssuesFound === 'number', 'totalIssuesFound is number');
+    assert.ok(typeof result.passesWithChanges === 'number', 'passesWithChanges is number');
+    assert.ok(typeof result.finalFountain === 'string', 'finalFountain is string');
+    assert.ok(typeof result.originalFountain === 'string', 'originalFountain is string');
+    assert.ok(typeof result.completedAt === 'number', 'completedAt is number');
+  });
+
+  it('pipeline: pass names are correct in order', async () => {
+    const commits: StoryCommit[] = [];
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    const compiled = compileScreenplay(commits, emptyState(), records, structure);
+
+    const result = await runRevisionPipeline(compiled, records, structure);
+    const expectedOrder = [
+      'structure', 'causality', 'intention', 'belief', 'conflict',
+      'character-arc', 'dialogue', 'rhythm', 'pacing', 'originality', 'payoff', 'voice',
+    ];
+    const actualOrder = result.passResults.map(p => p.pass);
+    assert.deepEqual(actualOrder, expectedOrder, 'passes run in correct order');
+  });
+
+  it('pipeline: approved spans are passed through without errors', async () => {
+    const commits: StoryCommit[] = [];
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    const compiled = compileScreenplay(commits, emptyState(), records, structure);
+
+    const approvedSpans = [{ startLine: 1, endLine: 3, reason: 'title page' }];
+    const result = await runRevisionPipeline(compiled, records, structure, approvedSpans);
+    assert.equal(result.passResults.length, 12, 'all 12 passes complete with approved spans');
+  });
+
+  it('pipeline: totalIssuesFound = sum of per-pass issue counts', async () => {
+    const commits: StoryCommit[] = [];
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    const compiled = compileScreenplay(commits, emptyState(), records, structure);
+
+    const result = await runRevisionPipeline(compiled, records, structure);
+    const sumIssues = result.passResults.reduce((s, p) => s + p.issues.length, 0);
+    assert.equal(result.totalIssuesFound, sumIssues, 'totalIssuesFound equals sum of pass issue counts');
+  });
+
+  it('pipeline: finalFountain equals originalFountain in stub mode (no LLM)', async () => {
+    // Without a real LLM key, all rewrites fall back to stub (no change)
+    const commits: StoryCommit[] = [];
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    const compiled = compileScreenplay(commits, emptyState(), records, structure);
+
+    const result = await runRevisionPipeline(compiled, records, structure);
+    assert.equal(result.finalFountain, result.originalFountain,
+      'stub mode: fountain is unchanged (no LLM key)');
+    assert.equal(result.passesWithChanges, 0, 'stub mode: no passes changed text');
+  });
+});

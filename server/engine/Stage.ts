@@ -623,6 +623,13 @@ export class Stage {
     ).get(char_id) as ActionLogEntry | undefined;
   }
 
+  // Wave 32: retrieve one ActionLogEntry by its primary key.
+  public getActionById(action_id: string): ActionLogEntry | undefined {
+    return this.db.prepare(
+      'SELECT * FROM Action_Log WHERE action_id = ?',
+    ).get(action_id) as ActionLogEntry | undefined;
+  }
+
   public getSensoryFilter(location_id: string, limit: number = 10): ActionLogEntry[] {
     return (this.db.prepare(
       'SELECT * FROM Action_Log WHERE location_id = ? AND is_audible = 1 ORDER BY rowid DESC LIMIT ?'
@@ -873,6 +880,22 @@ export class Stage {
   public getAllEventPropositions(): EventProposition[] {
     return (this.db.prepare('SELECT * FROM Event_Propositions').all() as Array<Record<string, unknown>>)
       .map(r => this._parsePropositionRow(r));
+  }
+
+  // Wave 32: retrieve one EventCard (with its propositions) by action ID.
+  public getEventCard(event_id: string): EventCard | undefined {
+    const row = this.db.prepare('SELECT * FROM Event_Cards WHERE event_id = ?').get(event_id) as Record<string, unknown> | undefined;
+    if (!row) return undefined;
+    const propositions = this.getEventPropositions(event_id);
+    return {
+      event_id: row.event_id as string,
+      char_id: row.char_id as string,
+      action_type: row.action_type as import('./types.ts').ActionType,
+      content: row.content as string,
+      location_id: row.location_id as string,
+      turn_index: row.turn_index as number,
+      propositions,
+    };
   }
 
   // Returns true if any proposition tied to one of the given event_ids is an
