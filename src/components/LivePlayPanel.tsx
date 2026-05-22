@@ -115,6 +115,20 @@ export function LivePlayPanel({ onClose }: Props) {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) submitMove();
   };
 
+  const advanceWorld = useCallback(async (beats: number) => {
+    setSubmitting(true); setError(null);
+    try {
+      const res = await fetch('/api/nvm/live/advance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ beats }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Server error');
+      await loadFeed();
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setSubmitting(false); }
+  }, [submitting, loadFeed]);
+
   const commits = feed?.commits ?? [];
 
   return (
@@ -231,6 +245,28 @@ export function LivePlayPanel({ onClose }: Props) {
           >
             {submitting ? 'Committing…' : `▶ ${verb}`}
           </button>
+
+          {/* Advance World (reactive beats) */}
+          <div>
+            <div style={{ color: '#475569', fontSize: 10, marginBottom: 6 }}>ADVANCE WORLD</div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {[1, 2, 3].map(n => (
+                <button
+                  key={n}
+                  onClick={() => advanceWorld(n)}
+                  disabled={submitting}
+                  style={{
+                    flex: 1, padding: '5px 0', borderRadius: 5, cursor: submitting ? 'not-allowed' : 'pointer',
+                    fontSize: 10, fontFamily: 'monospace',
+                    border: '1px solid #334155', background: '#1e293b', color: '#64748b',
+                  }}
+                >{n} beat{n !== 1 ? 's' : ''}</button>
+              ))}
+            </div>
+            <div style={{ color: '#334155', fontSize: 9, marginTop: 3 }}>
+              NPC reactions fire from current world state
+            </div>
+          </div>
 
           {/* Last result */}
           {lastResult && <MoveResultCard result={lastResult} />}

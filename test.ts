@@ -7614,3 +7614,60 @@ describe('NVM — Author-Presence Move Bus (Wave 33)', () => {
     assert.equal(commit!.parentId, 'parent-abc-123', 'parentId chained');
   });
 });
+
+// ── Wave 34: Reactive Turn Cycle ──────────────────────────────────────────────
+import { reactToCommit, advanceWorld } from './server/nvm/live/loop.ts';
+
+describe('NVM — Reactive Turn Cycle (Wave 34)', () => {
+  // The reactive loop depends on Orchestrator.runTurn() which calls AI.
+  // We test the pure structural behaviours (no-agent case, maxBeats cap,
+  // result shape) using the in-memory Stage fixture.
+
+  it('reactToCommit: returns noAgents when stage has no alive agents', async () => {
+    // Use an empty Stage (no agents registered)
+    const { Stage } = await import('./server/engine/Stage.ts');
+    const emptyStage = new Stage(':memory:');
+    const { Orchestrator } = await import('./server/engine/Orchestrator.ts');
+    const orch = new Orchestrator(emptyStage);
+    const result = await reactToCommit(emptyStage, orch, 'dummy-commit-id');
+    assert.equal(result.stoppedBecause, 'noAgents', 'stops immediately when no agents');
+    assert.equal(result.turnsRun, 0, 'zero turns run');
+    assert.equal(result.commits.length, 0, 'no commits produced');
+  });
+
+  it('advanceWorld: returns noAgents shape for empty stage', async () => {
+    const { Stage } = await import('./server/engine/Stage.ts');
+    const emptyStage = new Stage(':memory:');
+    const { Orchestrator } = await import('./server/engine/Orchestrator.ts');
+    const orch = new Orchestrator(emptyStage);
+    const result = await advanceWorld(emptyStage, orch, 2);
+    assert.equal(result.stoppedBecause, 'noAgents');
+    assert.equal(result.turnsRun, 0);
+  });
+
+  it('reactToCommit: maxBeats capped at function parameter', async () => {
+    // Structural test: verify maxBeats parameter flows through opts
+    // We can't run actual AI turns in unit tests, so we just check that
+    // the function signature accepts maxBeats and returns the right shape.
+    const stage = makeStage();
+    const { Orchestrator } = await import('./server/engine/Orchestrator.ts');
+    const orch = new Orchestrator(stage);
+    const result = await reactToCommit(stage, orch, 'commit-abc', { maxBeats: 3 });
+    // With no agents the loop exits immediately — the key test is the call doesn't throw
+    assert.ok(typeof result.turnsRun === 'number', 'turnsRun is a number');
+    assert.ok(Array.isArray(result.commits), 'commits is an array');
+    assert.ok(['maxBeats', 'noAgents', 'climax', 'error'].includes(result.stoppedBecause),
+      'stoppedBecause is a valid reason');
+  });
+
+  it('advanceWorld: commits from reactions are returned in result', async () => {
+    // Structural test: even with no agents the shape is correct
+    const stage = makeStage();
+    const { Orchestrator } = await import('./server/engine/Orchestrator.ts');
+    const orch = new Orchestrator(stage);
+    const result = await advanceWorld(stage, orch, 1);
+    assert.ok('commits' in result, 'result has commits field');
+    assert.ok('turnsRun' in result, 'result has turnsRun field');
+    assert.ok('stoppedBecause' in result, 'result has stoppedBecause field');
+  });
+});

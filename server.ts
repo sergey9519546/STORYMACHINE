@@ -2784,6 +2784,42 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     res.json({ commits: feed, totalCommits: feed.length });
   }));
 
+  // POST /api/nvm/live/advance — Reactive Turn Cycle (Wave 34).
+  // Body: { beats?: number, locationId?: string }
+  // Runs N beats of NPC reaction from the current state; each produces a StoryCommit.
+  // Returns: { commits: FeedEntry[], turnsRun, stoppedBecause }
+  app.post('/api/nvm/live/advance', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage, orchestrator } = getOrCreateSession(sessionId(req));
+    const { beats = 1, locationId } = req.body as { beats?: number; locationId?: string };
+    const safeBeats = Math.max(1, Math.min(5, typeof beats === 'number' ? beats : 1));
+
+    const { advanceWorld } = await import('./server/nvm/live/loop.ts');
+    const result = await advanceWorld(stage, orchestrator, safeBeats, locationId);
+
+    // Build feed entries for the new commits so the client can display them
+    const feedEntries = result.commits.map(c => {
+      const beliefCount = c.ops.filter(o => o.op === 'UPDATE_BELIEF').length;
+      const factCount   = c.ops.filter(o => o.op === 'ADD_FACT').length;
+      const parts: string[] = [];
+      if (factCount > 0)   parts.push(`${factCount} fact${factCount !== 1 ? 's' : ''}`);
+      if (beliefCount > 0) parts.push(`${beliefCount} belief${beliefCount !== 1 ? 's' : ''}`);
+      return {
+        commitId:     c.commitId,
+        parentId:     c.parentId,
+        sceneIdx:     c.sceneIdx,
+        createdAt:    c.createdAt,
+        deltaSummary: c.deltaSummary,
+        opSummary:    parts.join(', ') || `${c.ops.length} ops`,
+      };
+    });
+
+    res.json({
+      commits: feedEntries,
+      turnsRun: result.turnsRun,
+      stoppedBecause: result.stoppedBecause,
+    });
+  }));
+
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
