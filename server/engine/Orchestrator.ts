@@ -6,6 +6,9 @@ import { DirectorNode } from './DirectorNode.ts';
 import { CausalSpine } from './CausalSpine.ts';
 import { AppraisalEngine } from './AppraisalEngine.ts';
 import { logger } from '../lib/logger.ts';
+// Wave 32 — Action↔StoryOp Bridge: unify the live sim with the canon ledger.
+import { buildTurnCommit } from '../nvm/bridge/action-to-ops.ts';
+import { buildNarrativeState } from '../nvm/state/NarrativeState.ts';
 
 // Events streamed to clients via SSE during a runRoomSimulation call.
 export type RoomProgressEvent =
@@ -21,6 +24,8 @@ export class Orchestrator {
   private spine: CausalSpine;
   private appraiser: AppraisalEngine;
   private locationMap: Map<string, Location> = new Map();
+  // Wave 32: tracks the most-recent StoryCommit ID so parent chains are correct.
+  private _lastCommitId: string | null = null;
 
   constructor(stage: Stage) {
     this.stage = stage;
@@ -35,6 +40,11 @@ export class Orchestrator {
     // Orchestrator over an existing DB) resumes the session without re-init.
     for (const sheet of this.stage.getAllAgents()) {
       this.agents.set(sheet.char_id, new Agent(sheet, this.stage));
+    }
+    // Wave 32: seed parent chain from the last commit already in the ledger.
+    const existingCommits = this.stage.getCommits();
+    if (existingCommits.length > 0) {
+      this._lastCommitId = existingCommits[existingCommits.length - 1].commitId;
     }
   }
 
@@ -156,6 +166,28 @@ export class Orchestrator {
       this.appraiser.appraise(u);
     }
     this.appraiser.applyContagion(currentNodeId);
+
+    // ── Wave 32: bridge action → StoryOp[] → StoryCommit (canon ledger) ────────
+    // Snapshot the narrative state BEFORE the commit so the proof kernel can
+    // verify preconditions against the pre-turn world.
+    const beforeState = buildNarrativeState(this.stage);
+    const card = action.action_type !== 'WAIT'
+      ? (this.stage.getEventCard(action_id) ?? null)
+      : null;
+    const commit = buildTurnCommit({
+      entry: actionEntry,
+      card,
+      primaryUpdate: update,
+      extraUpdates: directorUpdates,
+      turnIndex,
+      beforeState,
+      sceneIdx: turnIndex,
+      parentId: this._lastCommitId,
+    });
+    if (commit) {
+      this.stage.appendCommit(commit);
+      this._lastCommitId = commit.commitId;
+    }
 
     return action;
   }
@@ -312,6 +344,32 @@ export class Orchestrator {
             const before = suspicionBefore.get(rec.target_id) ?? target.suspicion_score;
             const success = target.suspicion_score < before - 2;
             this.stage.updatePersuasionOutcome(rec.id, success);
+          }
+        }
+
+        // Wave 32: commit this round's epistemic batch to the canon ledger.
+        // We use the last action of the round as the representative entry;
+        // all agent epistemic updates in the round are bundled into one commit.
+        const lastEntry = this.stage.getActionById(lastActionId);
+        if (lastEntry) {
+          const roundCard = this.stage.getEventCard(lastActionId) ?? null;
+          const beforeStateRoom = buildNarrativeState(this.stage);
+          const [primaryUp, ...extraUps] = epistemicUpdates;
+          if (primaryUp) {
+            const roundCommit = buildTurnCommit({
+              entry: lastEntry,
+              card: roundCard,
+              primaryUpdate: primaryUp,
+              extraUpdates: extraUps,
+              turnIndex: this.stage.getTurnCount(),
+              beforeState: beforeStateRoom,
+              sceneIdx: this.stage.getTurnCount(),
+              parentId: this._lastCommitId,
+            });
+            if (roundCommit) {
+              this.stage.appendCommit(roundCommit);
+              this._lastCommitId = roundCommit.commitId;
+            }
           }
         }
       }

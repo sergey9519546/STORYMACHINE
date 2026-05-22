@@ -7211,3 +7211,271 @@ describe('NVM — Voice DNA Analyzer (Wave 31)', () => {
     assert.ok(aliceWords.size >= 4, `alice has >= 4 words, got ${aliceWords.size}`);
   });
 });
+
+// ── Wave 32: Action↔StoryOp Bridge ───────────────────────────────────────────
+import {
+  entryToOps,
+  epistemicUpdateToOps,
+  buildTurnCommit,
+} from './server/nvm/bridge/action-to-ops.ts';
+import type { BridgeInput } from './server/nvm/bridge/action-to-ops.ts';
+import type { EpistemicUpdate, EventCard, EventProposition } from './server/engine/types.ts';
+
+function makeEntry(overrides: Partial<ActionLogEntry> = {}): ActionLogEntry {
+  return {
+    action_id: 'act-001',
+    timestamp: Date.now(),
+    char_id: 'alice',
+    location_id: 'loc-01',
+    action_type: 'SPEAK',
+    target_char_id: 'bob',
+    content: 'I know nothing about the money.',
+    is_audible: true,
+    ...overrides,
+  };
+}
+
+function makeProp(overrides: Partial<EventProposition> = {}): EventProposition {
+  return {
+    proposition_id: 'prop-001',
+    event_id: 'act-001',
+    content: 'I know nothing about the money.',
+    is_lie: false,
+    asserted_by: 'alice',
+    perceived_truth: true,
+    ...overrides,
+  };
+}
+
+function makeCard(entry: ActionLogEntry, props: EventProposition[] = []): EventCard {
+  return {
+    event_id: entry.action_id,
+    char_id: entry.char_id,
+    action_type: entry.action_type,
+    content: entry.content,
+    location_id: entry.location_id,
+    turn_index: 5,
+    propositions: props,
+  };
+}
+
+function makeBelief(proposition: string, source: 'told' | 'witnessed' | 'inferred' = 'inferred'): Belief {
+  return {
+    id: `bel-${Math.random().toString(36).slice(2, 7)}`,
+    proposition,
+    confidence: source === 'witnessed' ? 1.0 : source === 'told' ? 0.7 : 0.4,
+    source,
+    // told beliefs must have source_agent_id for EpistemicProof; witnessed need source_event_id
+    source_agent_id: source === 'told' ? 'narrator' : undefined,
+    source_event_id: source === 'witnessed' ? 'evt-000' : undefined,
+    acquired_at: 5,
+    contradicts: [],
+  };
+}
+
+function makeEpistemicUpdate(charId: string, beliefs: Belief[], contradiction = false): EpistemicUpdate {
+  return {
+    char_id: charId,
+    new_beliefs: beliefs,
+    contradiction_detected: contradiction,
+    contradicted_propositions: contradiction ? ['something is wrong'] : [],
+    source_event_id: 'act-001',
+  };
+}
+
+describe('NVM — Action↔StoryOp Bridge (Wave 32)', () => {
+  // ── entryToOps ─────────────────────────────────────────────────────────────
+
+  it('bridge: SPEAK produces UPDATE_READER_STATE (curiosity +1)', () => {
+    const entry = makeEntry({ action_type: 'SPEAK' });
+    const ops = entryToOps(entry, null, 5);
+    const rsOp = ops.find(o => o.op === 'UPDATE_READER_STATE');
+    assert.ok(rsOp, 'UPDATE_READER_STATE emitted');
+    assert.equal((rsOp as { op: 'UPDATE_READER_STATE'; delta: { curiosity?: number } }).delta.curiosity, 1,
+      'curiosity delta = 1 for SPEAK');
+  });
+
+  it('bridge: SPEAK with a proposition emits UPDATE_BELIEF for target', () => {
+    const entry = makeEntry({ action_type: 'SPEAK', target_char_id: 'bob' });
+    const prop = makeProp({ content: 'The vault is empty' });
+    const card = makeCard(entry, [prop]);
+    const ops = entryToOps(entry, card, 5);
+    const beliefOp = ops.find(o => o.op === 'UPDATE_BELIEF') as { op: 'UPDATE_BELIEF'; charId: string; belief: Belief } | undefined;
+    assert.ok(beliefOp, 'UPDATE_BELIEF emitted');
+    assert.equal(beliefOp!.charId, 'bob', 'belief targets the listener');
+    assert.equal(beliefOp!.belief.proposition, 'The vault is empty', 'proposition content preserved');
+    assert.equal(beliefOp!.belief.source, 'told', 'source is told');
+    assert.equal(beliefOp!.belief.confidence, 0.7, 'told confidence = 0.7');
+  });
+
+  it('bridge: LIE produces suspense delta = 2', () => {
+    const entry = makeEntry({ action_type: 'LIE' });
+    const ops = entryToOps(entry, null, 5);
+    const rsOp = ops.find(o => o.op === 'UPDATE_READER_STATE') as { op: 'UPDATE_READER_STATE'; delta: { suspense?: number } } | undefined;
+    assert.ok(rsOp, 'UPDATE_READER_STATE emitted for LIE');
+    assert.equal(rsOp!.delta.suspense, 2, 'LIE raises suspense by 2');
+  });
+
+  it('bridge: EXAMINE produces ADD_FACT + UPDATE_READER_STATE (curiosity +2)', () => {
+    const entry = makeEntry({ action_type: 'EXAMINE', content: 'The hidden compartment', target_char_id: null });
+    const ops = entryToOps(entry, null, 5);
+    const factOp = ops.find(o => o.op === 'ADD_FACT') as { op: 'ADD_FACT'; fact: import('./server/nvm/ops/StoryOp.ts').AtomicFact } | undefined;
+    assert.ok(factOp, 'ADD_FACT emitted for EXAMINE');
+    assert.equal(factOp!.fact.predicate, 'examines', 'predicate = examines');
+    assert.equal(factOp!.fact.subject, 'alice', 'subject = acting agent');
+    const rsOp = ops.find(o => o.op === 'UPDATE_READER_STATE') as { op: 'UPDATE_READER_STATE'; delta: { curiosity?: number } } | undefined;
+    assert.equal(rsOp!.delta.curiosity, 2, 'curiosity = 2 for EXAMINE');
+  });
+
+  it('bridge: RELOCATE produces ADD_FACT with predicate moves_to', () => {
+    const entry = makeEntry({ action_type: 'RELOCATE', content: '→ the kitchen', target_char_id: null });
+    const ops = entryToOps(entry, null, 5);
+    const factOp = ops.find(o => o.op === 'ADD_FACT') as { op: 'ADD_FACT'; fact: import('./server/nvm/ops/StoryOp.ts').AtomicFact } | undefined;
+    assert.ok(factOp, 'ADD_FACT emitted for RELOCATE');
+    assert.equal(factOp!.fact.predicate, 'moves_to', 'predicate = moves_to');
+    assert.equal(factOp!.fact.object, 'the kitchen', '→ prefix stripped from content');
+  });
+
+  it('bridge: WAIT produces no ops (silent beat)', () => {
+    const entry = makeEntry({ action_type: 'WAIT', content: '' });
+    const ops = entryToOps(entry, null, 5);
+    assert.equal(ops.length, 0, 'WAIT produces zero ops');
+  });
+
+  // ── epistemicUpdateToOps ───────────────────────────────────────────────────
+
+  it('bridge: epistemicUpdateToOps emits UPDATE_BELIEF per new belief', () => {
+    const beliefs = [makeBelief('Alice was in the study'), makeBelief('The gun is missing')];
+    const update = makeEpistemicUpdate('carol', beliefs, false);
+    const ops = epistemicUpdateToOps(update);
+    const beliefOps = ops.filter(o => o.op === 'UPDATE_BELIEF');
+    assert.equal(beliefOps.length, 2, '2 UPDATE_BELIEF ops for 2 beliefs');
+    assert.ok(beliefOps.every(o => (o as { charId: string }).charId === 'carol'),
+      'all beliefs attributed to carol');
+  });
+
+  it('bridge: contradiction_detected emits suspense +3 and raises contradiction_clock', () => {
+    const update = makeEpistemicUpdate('alice', [], true);
+    const ops = epistemicUpdateToOps(update);
+    const rsOp = ops.find(o => o.op === 'UPDATE_READER_STATE') as { op: 'UPDATE_READER_STATE'; delta: { suspense?: number } } | undefined;
+    const clockOp = ops.find(o => o.op === 'RAISE_CLOCK') as { op: 'RAISE_CLOCK'; clockId: string; amount: number } | undefined;
+    assert.equal(rsOp?.delta.suspense, 3, 'contradiction raises suspense by 3');
+    assert.equal(clockOp?.clockId, 'contradiction_clock', 'raises contradiction_clock');
+    assert.equal(clockOp?.amount, 1, 'amount = 1');
+  });
+
+  it('bridge: no contradiction → no clock or extra suspense', () => {
+    const update = makeEpistemicUpdate('alice', [], false);
+    const ops = epistemicUpdateToOps(update);
+    const clockOp = ops.find(o => o.op === 'RAISE_CLOCK');
+    assert.equal(clockOp, undefined, 'no RAISE_CLOCK when no contradiction');
+    assert.equal(ops.length, 0, 'no ops at all when no beliefs and no contradiction');
+  });
+
+  // ── buildTurnCommit ────────────────────────────────────────────────────────
+
+  it('bridge: buildTurnCommit returns null for pure WAIT turn', () => {
+    const entry = makeEntry({ action_type: 'WAIT', content: '' });
+    const update = makeEpistemicUpdate('alice', [], false);
+    const input: BridgeInput = {
+      entry,
+      card: null,
+      primaryUpdate: update,
+      extraUpdates: [],
+      turnIndex: 3,
+      beforeState: emptyState(),
+      sceneIdx: 3,
+      parentId: null,
+    };
+    const commit = buildTurnCommit(input);
+    assert.equal(commit, null, 'WAIT with no epistemic change → no commit');
+  });
+
+  it('bridge: buildTurnCommit returns a commit with parentId chain', () => {
+    const entry = makeEntry({ action_type: 'SPEAK' });
+    const beliefs = [makeBelief('Bob did it')];
+    const update = makeEpistemicUpdate('bob', beliefs, false);
+    const input: BridgeInput = {
+      entry,
+      card: makeCard(entry, [makeProp()]),
+      primaryUpdate: update,
+      extraUpdates: [],
+      turnIndex: 2,
+      beforeState: emptyState(),
+      sceneIdx: 2,
+      parentId: 'parent-commit-xyz',
+    };
+    const commit = buildTurnCommit(input);
+    assert.ok(commit !== null, 'commit produced for SPEAK + belief update');
+    assert.equal(commit!.parentId, 'parent-commit-xyz', 'parentId chained correctly');
+    assert.equal(commit!.sceneIdx, 2, 'sceneIdx matches turnIndex');
+    assert.ok(commit!.ops.length > 0, 'commit has ops');
+    assert.ok(commit!.commitId.length > 0, 'commit has a UUID');
+    assert.equal(commit!.reverted, false, 'new commits are not reverted');
+  });
+
+  it('bridge: buildTurnCommit deltaSummary counts UPDATE_BELIEF ops', () => {
+    const entry = makeEntry({ action_type: 'SPEAK' });
+    const beliefs = [makeBelief('X'), makeBelief('Y'), makeBelief('Z')];
+    const update = makeEpistemicUpdate('bob', beliefs, false);
+    const input: BridgeInput = {
+      entry,
+      card: null,
+      primaryUpdate: update,
+      extraUpdates: [],
+      turnIndex: 1,
+      beforeState: emptyState(),
+      sceneIdx: 1,
+      parentId: null,
+    };
+    const commit = buildTurnCommit(input);
+    assert.ok(commit, 'commit produced');
+    // deltaSummary.beliefs counts UPDATE_BELIEF ops from summarizeOps
+    assert.equal(commit!.deltaSummary.beliefs, 3, '3 UPDATE_BELIEF ops → deltaSummary.beliefs = 3');
+  });
+
+  it('bridge: LIE turn commit contains both suspense op and belief for listener', () => {
+    const entry = makeEntry({ action_type: 'LIE', target_char_id: 'bob' });
+    const prop = makeProp({ content: 'I was home all night', is_lie: true });
+    const card = makeCard(entry, [prop]);
+    const update = makeEpistemicUpdate('alice', [], false);
+    const input: BridgeInput = {
+      entry,
+      card,
+      primaryUpdate: update,
+      extraUpdates: [],
+      turnIndex: 4,
+      beforeState: emptyState(),
+      sceneIdx: 4,
+      parentId: null,
+    };
+    const commit = buildTurnCommit(input);
+    assert.ok(commit, 'commit produced for LIE');
+    const rsOps = commit!.ops.filter(o => o.op === 'UPDATE_READER_STATE') as Array<{ op: 'UPDATE_READER_STATE'; delta: { suspense?: number } }>;
+    const suspenseOp = rsOps.find(o => (o.delta.suspense ?? 0) >= 2);
+    assert.ok(suspenseOp, 'LIE raises suspense in the commit');
+    const beliefOps = commit!.ops.filter(o => o.op === 'UPDATE_BELIEF') as Array<{ op: 'UPDATE_BELIEF'; charId: string }>;
+    assert.ok(beliefOps.some(o => o.charId === 'bob'), 'listener bob has belief from LIE');
+  });
+
+  it('bridge: extraUpdates are included in the commit ops', () => {
+    const entry = makeEntry({ action_type: 'SPEAK' });
+    const primaryUpdate = makeEpistemicUpdate('alice', [makeBelief('Primary fact')], false);
+    const directorUpdate = makeEpistemicUpdate('carol', [makeBelief('Director insight')], false);
+    const input: BridgeInput = {
+      entry,
+      card: null,
+      primaryUpdate,
+      extraUpdates: [directorUpdate],
+      turnIndex: 7,
+      beforeState: emptyState(),
+      sceneIdx: 7,
+      parentId: null,
+    };
+    const commit = buildTurnCommit(input);
+    assert.ok(commit, 'commit produced');
+    const beliefOps = commit!.ops.filter(o => o.op === 'UPDATE_BELIEF') as Array<{ op: 'UPDATE_BELIEF'; charId: string }>;
+    assert.ok(beliefOps.some(o => o.charId === 'alice'), 'alice primary update included');
+    assert.ok(beliefOps.some(o => o.charId === 'carol'), 'carol director update included');
+  });
+});
