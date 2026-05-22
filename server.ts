@@ -2867,6 +2867,21 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     res.json({ registry, conflicts });
   }));
 
+  // GET /api/nvm/screenplay/memory — Live Screenplay Memory (Wave 37).
+  // Returns: { records: ScreenplaySceneRecord[], structure: StructureState, totalScenes }
+  app.get('/api/nvm/screenplay/memory', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const { buildScreenplayMemory } = await import('./server/nvm/screenplay/memory.ts');
+    const { analyzeStructure } = await import('./server/nvm/screenplay/structure.ts');
+
+    type StoryCommitT = import('./server/nvm/state/StoryCommit.ts').StoryCommit;
+    const allCommits = (stage.getCommits() as StoryCommitT[]).filter(c => !c.reverted);
+    const records = buildScreenplayMemory(allCommits);
+    const structure = analyzeStructure(records, allCommits);
+
+    res.json({ records, structure, totalScenes: records.length });
+  }));
+
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {

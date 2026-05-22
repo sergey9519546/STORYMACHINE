@@ -7915,3 +7915,132 @@ describe('NVM — Conflict Orchestrator + Intention Registry (Wave 36)', () => {
     }
   });
 });
+
+// ── Wave 37: Live Screenplay Memory + Structure Tracking ─────────────────────
+import { annotateCommit, buildScreenplayMemory } from './server/nvm/screenplay/memory.ts';
+import { analyzeStructure } from './server/nvm/screenplay/structure.ts';
+
+function makeScreenplayCommit(sceneIdx: number, ops: StoryOp[]): StoryCommit {
+  return {
+    commitId: `sp-${sceneIdx}`,
+    parentId: sceneIdx > 0 ? `sp-${sceneIdx - 1}` : null,
+    sceneIdx,
+    ops,
+    deltaSummary: summarizeOps(ops),
+    reverted: false,
+    createdAt: Date.now(),
+  };
+}
+
+describe('NVM — Live Screenplay Memory + Structure (Wave 37)', () => {
+  it('screenmem: annotateCommit produces a record with all required fields', () => {
+    const commit = makeScreenplayCommit(1, [
+      { op: 'UPDATE_READER_STATE', delta: { suspense: 2, curiosity: 1 } },
+      { op: 'ADD_FACT', fact: {
+        factId: 'f1', subject: 'alice', predicate: 'moves_to', object: 'the vault',
+        addedAtTurn: 1, validFrom: 1, validTo: null,
+      }},
+    ]);
+    const record = annotateCommit(commit);
+    assert.equal(record.commitId, commit.commitId, 'commitId preserved');
+    assert.equal(record.sceneIdx, 1, 'sceneIdx preserved');
+    assert.ok(typeof record.slug === 'string' && record.slug.length > 0, 'slug present');
+    assert.ok(typeof record.purpose === 'string', 'purpose present');
+    assert.ok(typeof record.dramaticTurn === 'string', 'dramaticTurn present');
+    assert.ok(typeof record.emotionalShift === 'string', 'emotionalShift present');
+    assert.ok(Array.isArray(record.visualBeats), 'visualBeats is array');
+    assert.ok(Array.isArray(record.dialogueHighlights), 'dialogueHighlights is array');
+    assert.ok(Array.isArray(record.unresolvedClues), 'unresolvedClues is array');
+    assert.ok(typeof record.clockRaised === 'boolean', 'clockRaised is boolean');
+    assert.equal(record.suspenseDelta, 2, 'suspenseDelta = 2');
+    assert.equal(record.curiosityDelta, 1, 'curiosityDelta = 1');
+  });
+
+  it('screenmem: RELOCATE ADD_FACT appears in slug', () => {
+    const commit = makeScreenplayCommit(0, [
+      { op: 'ADD_FACT', fact: {
+        factId: 'f2', subject: 'alice', predicate: 'moves_to', object: 'the kitchen',
+        addedAtTurn: 0, validFrom: 0, validTo: null,
+      }},
+    ]);
+    const record = annotateCommit(commit);
+    assert.ok(record.slug.toUpperCase().includes('THE KITCHEN') || record.slug.includes('kitchen'),
+      `slug includes location name: "${record.slug}"`);
+  });
+
+  it('screenmem: SEED_CLUE without PAYOFF_SETUP → unresolvedClues', () => {
+    const clueId = 'clue-xyz';
+    const commit = makeScreenplayCommit(2, [
+      { op: 'SEED_CLUE', clueId, carrier: 'object' },
+      { op: 'UPDATE_READER_STATE', delta: { curiosity: 2 } },
+    ]);
+    const record = annotateCommit(commit);
+    assert.ok(record.unresolvedClues.includes(clueId), 'unresolved clue tracked');
+  });
+
+  it('screenmem: purpose = establish_world for sceneIdx 0', () => {
+    const commit = makeScreenplayCommit(0, [{ op: 'UPDATE_READER_STATE', delta: { curiosity: 1 } }]);
+    const record = annotateCommit(commit);
+    assert.equal(record.purpose, 'establish_world');
+  });
+
+  it('screenmem: purpose = revelation when PAYOFF_SETUP present', () => {
+    const commit = makeScreenplayCommit(3, [
+      { op: 'PAYOFF_SETUP', setupId: 'setup-001', payoffEventId: 'evt-002' },
+    ]);
+    const record = annotateCommit(commit);
+    assert.equal(record.purpose, 'revelation');
+  });
+
+  it('screenmem: told belief appears in dialogueHighlights', () => {
+    const commit = makeScreenplayCommit(1, [
+      { op: 'UPDATE_BELIEF', charId: 'bob', belief: {
+        id: 'b1', proposition: 'Alice was not in the study', confidence: 0.7,
+        source: 'told', source_agent_id: 'alice', acquired_at: 1, contradicts: [],
+      }},
+    ]);
+    const record = annotateCommit(commit);
+    assert.ok(record.dialogueHighlights.some(d => d.includes('Alice was not in the study')),
+      'told belief in dialogue highlights');
+  });
+
+  it('screenmem: buildScreenplayMemory returns one record per non-reverted commit', () => {
+    const commits = [
+      makeScreenplayCommit(0, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }]),
+      { ...makeScreenplayCommit(1, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }]), reverted: true },
+      makeScreenplayCommit(2, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 2 } }]),
+    ];
+    const records = buildScreenplayMemory(commits);
+    assert.equal(records.length, 2, '2 non-reverted commits → 2 records');
+  });
+
+  it('screenmem: analyzeStructure returns actPosition + all fields', () => {
+    const commits = [makeScreenplayCommit(0, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }])];
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    assert.ok(typeof structure.actPosition === 'string', 'actPosition present');
+    assert.ok(typeof structure.completionPercent === 'number', 'completionPercent present');
+    assert.ok(typeof structure.escalating === 'boolean', 'escalating present');
+    assert.ok(typeof structure.reversalCount === 'number', 'reversalCount present');
+    assert.ok(typeof structure.approachingClimax === 'boolean', 'approachingClimax present');
+  });
+
+  it('screenmem: analyzeStructure returns act1 when no clock pressure', () => {
+    const commits = [makeScreenplayCommit(0, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }])];
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    assert.equal(structure.actPosition, 'act1', 'no clocks → act1');
+  });
+
+  it('screenmem: analyzeStructure escalating = true when second half > first half', () => {
+    const commits = [
+      makeScreenplayCommit(0, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }]),
+      makeScreenplayCommit(1, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }]),
+      makeScreenplayCommit(2, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 5 } }]),
+      makeScreenplayCommit(3, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 6 } }]),
+    ];
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    assert.equal(structure.escalating, true, 'suspense rising → escalating');
+  });
+});
