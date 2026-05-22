@@ -2820,6 +2820,30 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     });
   }));
 
+  // GET /api/nvm/branch/field — Forward Latent Branch Field (Wave 35).
+  // Returns: { branches: BranchPacket[], currentSceneIdx, generatedAt }
+  // Query: ?seed=<number> (optional; defaults to Date.now())
+  app.get('/api/nvm/branch/field', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const seed = typeof req.query.seed === 'string' ? parseInt(req.query.seed, 10) : undefined;
+
+    const { generateBranchField } = await import('./server/nvm/branch/field.ts');
+    const { buildNarrativeState, emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+
+    type StoryCommitT = import('./server/nvm/state/StoryCommit.ts').StoryCommit;
+    const allCommits = (stage.getCommits() as StoryCommitT[]).filter(c => !c.reverted);
+
+    // Fold commits into state for accurate scoring
+    const base = buildNarrativeState(stage);
+    let folded = emptyState();
+    for (const c of allCommits) folded = applyStoryOps(folded, c.ops);
+    const state = { ...base, ...folded, turn: stage.getTurnCount() };
+
+    const field = generateBranchField(state, allCommits, seed);
+    res.json(field);
+  }));
+
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {

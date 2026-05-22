@@ -7671,3 +7671,151 @@ describe('NVM — Reactive Turn Cycle (Wave 34)', () => {
     assert.ok('stoppedBecause' in result, 'result has stoppedBecause field');
   });
 });
+
+// ── Wave 35: Forward Latent Branch Field ─────────────────────────────────────
+import { generateBranchField } from './server/nvm/branch/field.ts';
+import { scoreBranch } from './server/nvm/branch/score.ts';
+
+describe('NVM — Forward Latent Branch Field (Wave 35)', () => {
+  // ── scoreBranch ────────────────────────────────────────────────────────────
+
+  it('branchField: scoreBranch returns all 5 dimension scores + total', () => {
+    const ops: StoryOp[] = [
+      { op: 'UPDATE_READER_STATE', delta: { suspense: 2 } },
+      { op: 'RAISE_CLOCK', clockId: 'tension', amount: 2 },
+    ];
+    const ir = {
+      transitionId: 'ir-001',
+      sceneIdx: 0,
+      sceneFunction: 'build_tension' as const,
+      activeMechanisms: ['relationship_externalization'],
+      beforeStateHash: '00000000',
+      ops,
+      preconditions: ['story_ongoing'],
+      postconditions: [],
+      provenance: { origin: 'model_generated' as const, createdAt: Date.now() },
+    };
+    const score = scoreBranch(ops, ir, emptyState(), []);
+    assert.ok(typeof score.novelty === 'number', 'novelty is number');
+    assert.ok(typeof score.consequence === 'number', 'consequence is number');
+    assert.ok(typeof score.coherence === 'number', 'coherence is number');
+    assert.ok(typeof score.viability === 'number', 'viability is number');
+    assert.ok(typeof score.screenplayUsefulness === 'number', 'screenplayUsefulness is number');
+    assert.ok(typeof score.total === 'number', 'total is number');
+    assert.ok(score.total >= 0 && score.total <= 100, `total in [0,100]: ${score.total}`);
+  });
+
+  it('branchField: SEED_CLUE op boosts screenplayUsefulness', () => {
+    const opsWithClue: StoryOp[] = [
+      { op: 'SEED_CLUE', clueId: 'clue-001', carrier: 'object' },
+      { op: 'UPDATE_READER_STATE', delta: { curiosity: 2 } },
+    ];
+    const opsBaseline: StoryOp[] = [
+      { op: 'UPDATE_READER_STATE', delta: { curiosity: 2 } },
+    ];
+    const buildIR = (ops: StoryOp[]) => ({
+      transitionId: crypto.randomUUID(),
+      sceneIdx: 0,
+      sceneFunction: 'build_tension' as const,
+      activeMechanisms: ['relationship_externalization'],
+      beforeStateHash: '00000000',
+      ops,
+      preconditions: ['story_ongoing'],
+      postconditions: [],
+      provenance: { origin: 'model_generated' as const, createdAt: Date.now() },
+    });
+    const scoreWithClue = scoreBranch(opsWithClue, buildIR(opsWithClue), emptyState(), []);
+    const scoreBaseline  = scoreBranch(opsBaseline, buildIR(opsBaseline), emptyState(), []);
+    assert.ok(
+      scoreWithClue.screenplayUsefulness >= scoreBaseline.screenplayUsefulness,
+      `SEED_CLUE should not reduce screenplayUsefulness: ${scoreWithClue.screenplayUsefulness} vs ${scoreBaseline.screenplayUsefulness}`
+    );
+  });
+
+  it('branchField: novelty = 80 baseline when no recent commits', () => {
+    const ops: StoryOp[] = [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }];
+    const ir = {
+      transitionId: crypto.randomUUID(),
+      sceneIdx: 0,
+      sceneFunction: 'build_tension' as const,
+      activeMechanisms: ['relationship_externalization'],
+      beforeStateHash: '00000000',
+      ops,
+      preconditions: ['story_ongoing'],
+      postconditions: [],
+      provenance: { origin: 'model_generated' as const, createdAt: Date.now() },
+    };
+    const score = scoreBranch(ops, ir, emptyState(), []);
+    assert.equal(score.novelty, 80, 'novelty = 80 when no history');
+  });
+
+  it('branchField: identical ops reduce novelty vs baseline', () => {
+    const ops: StoryOp[] = [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }];
+    const baseCommit: StoryCommit = {
+      commitId: 'c0',
+      parentId: null,
+      sceneIdx: 0,
+      ops: [...ops], // same ops as candidate
+      deltaSummary: { facts: 0, beliefs: 0, relationships: 0 },
+      reverted: false,
+      createdAt: Date.now(),
+    };
+    const ir = {
+      transitionId: crypto.randomUUID(),
+      sceneIdx: 1,
+      sceneFunction: 'build_tension' as const,
+      activeMechanisms: ['relationship_externalization'],
+      beforeStateHash: '00000000',
+      ops,
+      preconditions: ['story_ongoing'],
+      postconditions: [],
+      provenance: { origin: 'model_generated' as const, createdAt: Date.now() },
+    };
+    const scoreWithHistory = scoreBranch(ops, ir, emptyState(), [baseCommit]);
+    assert.ok(scoreWithHistory.novelty < 80, `identical ops reduce novelty: ${scoreWithHistory.novelty}`);
+  });
+
+  // ── generateBranchField ────────────────────────────────────────────────────
+
+  it('branchField: generates branches from emptyState', () => {
+    const field = generateBranchField(emptyState(), [], 42);
+    assert.ok(Array.isArray(field.branches), 'branches is an array');
+    assert.ok(field.branches.length >= 0, 'at least 0 branches (may be pruned)');
+    assert.ok(typeof field.currentSceneIdx === 'number', 'currentSceneIdx present');
+    assert.ok(typeof field.generatedAt === 'number', 'generatedAt present');
+  });
+
+  it('branchField: each branch has branchId, operator, scores, ops', () => {
+    const field = generateBranchField(emptyState(), [], 99);
+    for (const branch of field.branches) {
+      assert.ok(typeof branch.branchId === 'string' && branch.branchId.length > 0, 'branchId present');
+      assert.ok(typeof branch.operator === 'string', 'operator present');
+      assert.ok(Array.isArray(branch.ops), 'ops is array');
+      assert.ok(typeof branch.scores.total === 'number', 'scores.total is number');
+    }
+  });
+
+  it('branchField: branches are sorted by total score descending', () => {
+    const field = generateBranchField(emptyState(), [], 123);
+    for (let i = 1; i < field.branches.length; i++) {
+      assert.ok(
+        field.branches[i - 1].scores.total >= field.branches[i].scores.total,
+        `branch[${i-1}].total >= branch[${i}].total`
+      );
+    }
+  });
+
+  it('branchField: sceneIdx advances from last commit', () => {
+    const commit: StoryCommit = {
+      commitId: 'c5',
+      parentId: null,
+      sceneIdx: 5,
+      ops: [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }],
+      deltaSummary: { facts: 0, beliefs: 0, relationships: 0 },
+      reverted: false,
+      createdAt: Date.now(),
+    };
+    const field = generateBranchField(emptyState(), [commit], 7);
+    assert.equal(field.currentSceneIdx, 6, 'currentSceneIdx = last.sceneIdx + 1');
+  });
+});
