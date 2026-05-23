@@ -393,8 +393,30 @@ export default function ScriptIDE({
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
     let actionLines = 0;
-    let wordCount = scriptText.trim().split(/\s+/).length;
-    if (scriptText.trim() === "") wordCount = 0;
+
+    // Fast O(N) single-pass word counting without regex split arrays
+    let wordCount = 0;
+    let inWord = false;
+    for (let i = 0; i < scriptText.length; i++) {
+      const charCode = scriptText.charCodeAt(i);
+      // Spaces, tabs, newlines, and common unicode whitespaces including NBSP
+      const isWhitespace =
+        charCode === 32 ||
+        charCode === 9 ||
+        charCode === 10 ||
+        charCode === 13 ||
+        charCode === 160 || // NBSP
+        (charCode >= 8192 && charCode <= 8202) || // En/Em quads and spaces
+        charCode === 8232 || // Line separator
+        charCode === 8233;   // Paragraph separator
+
+      if (!isWhitespace && !inWord) {
+        wordCount++;
+        inWord = true;
+      } else if (isWhitespace && inWord) {
+        inWord = false;
+      }
+    }
 
     blocks.forEach((block) => {
       if (block.type === "character") {
