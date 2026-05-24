@@ -45,6 +45,7 @@ export function causalProof(ir: NarrativeTransitionIR, state: NarrativeState): P
             proof: 'CausalProof', severity: 'block',
             message: `op[${link.opIdx}] declares causedBy "${causedBy}" but that ID is not in prior state`,
             subjectId: causedBy,
+            opIdx: link.opIdx,  // M7: structured field — don't parse from message
           });
         }
       }

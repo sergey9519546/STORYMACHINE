@@ -62,6 +62,13 @@ export interface ConvergeResult {
 export interface ConvergeBudget {
   maxIterations: number;
   candidatesPerIteration: number;
+  /**
+   * H6: Hard cap on the total number of LLM `generate()` calls across all
+   * iterations. When exceeded the loop stops early and returns the best
+   * candidate found so far.  Defaults to maxIterations × candidatesPerIteration
+   * (same behaviour as before — set explicitly to reduce cost).
+   */
+  maxLLMCalls?: number;
   /** When present, biases operator selection via corpus-learned Director Policy (G13→G1). */
   directorPolicy?: DirectorPolicy;
 }
@@ -92,8 +99,12 @@ export async function convergeScene(
   let currentFailures: ProofResult[] = [];
   let currentQualityWarnings: import('../quality/index.ts').QualityWarning[] = [];
   let lastCandidates: NarrativeTransitionIR[] = [];
+  // H6: Track cumulative LLM calls; stop when budget.maxLLMCalls is reached.
+  const llmCallLimit = budget.maxLLMCalls ?? budget.maxIterations * budget.candidatesPerIteration;
+  let llmCallCount = 0;
 
   for (let iter = 0; iter < budget.maxIterations; iter++) {
+    if (llmCallCount >= llmCallLimit) break;
     // Quality-aware spec (Wave 27): quality warnings + Propp gaps feed back as constraints.
     const baseSpec = buildGenerationSpec(state, target, currentFailures);
     let specConstraints = baseSpec.constraints;
@@ -131,9 +142,11 @@ export async function convergeScene(
       }
       const mutation = applyOperator(op, best, state, seed + iter);
       const fresh = await generate(spec, 1);
+      llmCallCount += 1;
       candidates = [mutation.ir, ...fresh];
     } else {
       candidates = await generate(spec, budget.candidatesPerIteration);
+      llmCallCount += budget.candidatesPerIteration;
     }
     lastCandidates = candidates;
 

@@ -583,6 +583,38 @@ export class Stage {
       .run(goalStack ? JSON.stringify(goalStack) : null, char_id);
   }
 
+  /**
+   * H5: Atomic goal stack mutation.
+   * Writes the goal stack update AND the mutation log entry inside a single
+   * BEGIN/COMMIT transaction so they can never diverge on DB failure.
+   * After a successful write, returns the committed goal stack.
+   */
+  public updateGoalStackWithMutation(
+    char_id: string,
+    goalStack: GoalStack,
+    mutation: GoalMutation,
+  ): GoalStack {
+    this.db.transaction(() => {
+      this.db.prepare('UPDATE Character_State SET goal_stack_json = ? WHERE char_id = ?')
+        .run(JSON.stringify(goalStack), char_id);
+      this.db.prepare(
+        `INSERT OR REPLACE INTO Goal_Mutations
+         (mutation_id, char_id, turn_index, trigger_event_id, mutation_type, description, new_subgoal, old_subgoal)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        mutation.mutation_id,
+        mutation.char_id,
+        mutation.turn_index,
+        mutation.trigger_event_id,
+        mutation.mutation_type,
+        mutation.description,
+        mutation.new_subgoal ?? null,
+        mutation.old_subgoal ?? null,
+      );
+    })();
+    return goalStack;
+  }
+
   public updateEmotionState(char_id: string, emotion: EmotionState) {
     this.db.prepare('UPDATE Character_State SET emotion_state_json = ? WHERE char_id = ?')
       .run(JSON.stringify(emotion), char_id);

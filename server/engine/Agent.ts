@@ -835,9 +835,8 @@ Based on what you just witnessed:
       const gsRaw = this.sheet.goalStack;
       if (gsRaw) {
         // Work on a shallow copy so this.sheet.goalStack is NOT mutated in-place.
-        // If the DB write below fails, the in-memory sheet stays consistent with the DB.
         const gs: GoalStack = { ...gsRaw, instrumental: [...gsRaw.instrumental] };
-        let changed = false;
+        const pendingMutations: GoalMutation[] = [];
         const triggerEventId = observableActions[observableActions.length - 1]?.action_id ?? 'epistemic_update';
         const turnIndex = this.stage.getTurnCount();
 
@@ -856,8 +855,7 @@ Based on what you just witnessed:
               const achieved = gs.instrumental.filter(g => g.achieved);
               gs.instrumental = [...active, ...achieved].slice(0, GOAL_CAP);
             }
-            changed = true;
-            const mut: GoalMutation = {
+            pendingMutations.push({
               mutation_id: randomUUID(),
               char_id: this.sheet.char_id,
               turn_index: turnIndex,
@@ -865,8 +863,7 @@ Based on what you just witnessed:
               mutation_type: 'subgoal_added',
               description: `${this.sheet.name} formed new subgoal: "${gsu.add_subgoal}"`,
               new_subgoal: gsu.add_subgoal,
-            };
-            this.stage.recordGoalMutation(mut);
+            });
           } // end !duplicate
         }
 
@@ -876,8 +873,7 @@ Based on what you just witnessed:
           if (idx >= 0) {
             const achieved = gs.instrumental[idx];
             gs.instrumental[idx].achieved = true;
-            changed = true;
-            const mut: GoalMutation = {
+            pendingMutations.push({
               mutation_id: randomUUID(),
               char_id: this.sheet.char_id,
               turn_index: turnIndex,
@@ -885,12 +881,21 @@ Based on what you just witnessed:
               mutation_type: 'subgoal_achieved',
               description: `${this.sheet.name} achieved subgoal: "${achieved.description}"`,
               old_subgoal: achieved.description,
-            };
-            this.stage.recordGoalMutation(mut);
+            });
           }
         }
 
-        if (changed) this.stage.updateGoalStack(this.sheet.char_id, gs);
+        // H5: Write goal stack + all mutation records atomically.
+        // If the first mutation has a companion goal-stack change, use the
+        // atomic helper; otherwise write each mutation individually.
+        if (pendingMutations.length > 0) {
+          // Use the atomic helper for the first mutation (goal stack + record together).
+          this.stage.updateGoalStackWithMutation(this.sheet.char_id, gs, pendingMutations[0]);
+          // Write any additional mutations individually (uncommon — both branches fired).
+          for (const mut of pendingMutations.slice(1)) {
+            this.stage.recordGoalMutation(mut);
+          }
+        }
       }
     }
 

@@ -204,17 +204,30 @@ export default function ScriptIDE({
   const engineStateRef = useRef<EngineState | null>(null);
 
   // ── Persist to localStorage ──────────────────────────────────────────────────
+  // H1: Split into two effects:
+  // 1) isSaving indicator responds immediately to any change (good UX).
+  // 2) Actual lsSet() calls are debounced at 500ms so rapid keystrokes only
+  //    write once, preventing localStorage hammering on long scripts.
   useEffect(() => {
-    lsSet("script_draft", scriptText);
+    // Write non-text settings immediately (they change rarely and aren't typed)
     lsSet("theme", isDarkMode ? "dark" : "light");
-    lsSet("script_snapshots", JSON.stringify(snapshots));
-    lsSet("script_characters", JSON.stringify(characters));
-    lsSet("research_notes", JSON.stringify(researchNotes));
 
+    // Show saving indicator immediately
     setIsSaving(true);
-    const timer = setTimeout(() => setIsSaving(false), 800);
-    return () => clearTimeout(timer);
+    const indicatorTimer = setTimeout(() => setIsSaving(false), 800);
+    return () => clearTimeout(indicatorTimer);
   }, [scriptText, isDarkMode, snapshots, characters, researchNotes]);
+
+  useEffect(() => {
+    // Debounced write of heavy text data (script_draft may be hundreds of KB)
+    const debounceTimer = setTimeout(() => {
+      lsSet("script_draft", scriptText);
+      lsSet("script_snapshots", JSON.stringify(snapshots));
+      lsSet("script_characters", JSON.stringify(characters));
+      lsSet("research_notes", JSON.stringify(researchNotes));
+    }, 500);
+    return () => clearTimeout(debounceTimer);
+  }, [scriptText, snapshots, characters, researchNotes]);
 
   // ── Dark mode DOM sync ──────────────────────────────────────────────────────
   useEffect(() => {

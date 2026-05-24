@@ -62,14 +62,22 @@ export interface CorpusReport {
 /**
  * Run N headless sims (one per scenario) and return a CorpusReport.
  * Each sim uses `generate` as the candidate source — pass a mock for tests.
+ *
+ * H6: `maxSimulations` caps how many scenarios are executed.  Scenarios beyond
+ * the cap are silently skipped so callers don't need to pre-slice the array.
  */
 export async function runSelfPlay(
   scenarios: SimScenario[],
   generate: CandidateGenerator,
+  maxSimulations?: number,
 ): Promise<CorpusReport> {
+  const effectiveScenarios = maxSimulations != null
+    ? scenarios.slice(0, maxSimulations)
+    : scenarios;
+
   const runs: SimResult[] = [];
 
-  for (const scenario of scenarios) {
+  for (const scenario of effectiveScenarios) {
     const result = await runOneSim(scenario, generate);
     runs.push(result);
   }
