@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { EngineState, StoryConfig, DirectorState } from "../types";
 import { analyzeScriptBlock } from "../services/director";
 import { parseFountain, FountainBlock } from "../lib/fountain";
@@ -432,12 +432,12 @@ export default function ScriptIDE({
   }, [scriptText, parsedBlocks]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Scroll sync ──────────────────────────────────────────────────────────────
-  const handleScroll = () => {
+  const handleScroll = useCallback(() => {
     if (editorRef.current && highlightRef.current) {
       highlightRef.current.scrollTop = editorRef.current.scrollTop;
       highlightRef.current.scrollLeft = editorRef.current.scrollLeft;
     }
-  };
+  }, []);
 
   // ── AI analysis ──────────────────────────────────────────────────────────────
   const triggerAnalysis = async (text: string) => {
@@ -687,7 +687,7 @@ export default function ScriptIDE({
   };
 
   // ── Navigation ───────────────────────────────────────────────────────────────
-  const handleNavigate = (lineIndex: number) => {
+  const handleNavigate = useCallback((lineIndex: number) => {
     if (!editorRef.current) return;
     const lines = scriptText.split("\n");
     let charCount = 0;
@@ -700,10 +700,10 @@ export default function ScriptIDE({
     const lineHeight = 24;
     editorRef.current.scrollTop = lineIndex * lineHeight - 100;
     handleScroll();
-  };
+  }, [scriptText, handleScroll]);
 
   // ── Character handlers ───────────────────────────────────────────────────────
-  const handleAddCharacter = () => {
+  const handleAddCharacter = useCallback(() => {
     const newChar: ScriptCharacter = {
       id: Date.now().toString(),
       name: "",
@@ -712,16 +712,16 @@ export default function ScriptIDE({
       want: "",
       need: "",
     };
-    setCharacters([...characters, newChar]);
-  };
+    setCharacters(prev => [...prev, newChar]);
+  }, []);
 
-  const handleUpdateCharacter = (id: string, field: string, value: string) => {
-    setCharacters(
-      characters.map((char) =>
+  const handleUpdateCharacter = useCallback((id: string, field: string, value: string) => {
+    setCharacters(prev =>
+      prev.map((char) =>
         char.id === id ? { ...char, [field]: value } : char
       )
     );
-  };
+  }, []);
 
   // ── AI suggestion apply ──────────────────────────────────────────────────────
   const handleApplySuggestion = (suggestion: string) => {

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, memo } from 'react';
 import { Ghost, Crosshair, Target, Heart, PlusCircle, List, Users, Search, ChevronRight } from 'lucide-react';
 import { FountainBlock } from '../lib/fountain';
 import { clsx, type ClassValue } from 'clsx';
@@ -117,7 +117,7 @@ function LongTextField({
   );
 }
 
-export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter, scriptText, parsedBlocks, onNavigate }: SidebarProps) {
+const Sidebar = memo(function Sidebar({ characters, onAddCharacter, onUpdateCharacter, scriptText, parsedBlocks, onNavigate }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<'scenes' | 'characters'>('scenes');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -243,4 +243,6 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
       </div>
     </div>
   );
-}
+});
+
+export default Sidebar;
