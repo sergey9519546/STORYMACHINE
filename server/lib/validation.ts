@@ -85,6 +85,27 @@ export const AiConfigSchema = z.object({
   embModel:    z.string().max(256).optional(),
 });
 
+// M8: Beat outline validation — each beat's text fields are capped and
+// checked for control characters before they're stored and later injected
+// into agent prompts.  Combined with C1 sanitizeForPrompt() at write-time.
+const CONTROL_CHARS_RE = /[\x00-\x08\x0b\x0c\x0d\x0e-\x1f\x7f]/;
+const noControlChars = z.string().refine(s => !CONTROL_CHARS_RE.test(s), {
+  message: 'must not contain control characters',
+});
+
+export const OutlineBeatSchema = z.object({
+  phase: z.string().min(1).max(64),
+  turn_start: z.number().int().min(0),
+  turn_end: z.number().int().min(0),
+  goal:       noControlChars.max(500).default(''),
+  constraint: noControlChars.max(500).default(''),
+  avoid:      noControlChars.max(500).default(''),
+}).passthrough();
+
+export const OutlineBodySchema = z.object({
+  beats: z.array(OutlineBeatSchema).max(50),
+});
+
 // ── Middleware factory ───────────────────────────────────────────────────────
 // Usage:  app.post('/api/foo', validate(FooSchema), handler)
 // On failure returns HTTP 400 with { error: '<first issue message>' }.

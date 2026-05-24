@@ -1,8 +1,9 @@
 // Wave 39 — Revision Panel
 // Shows the 12-pass revision pipeline UI: trigger revision, view per-pass
 // diffs with issue breakdowns, accept/reject individual pass results.
+// H8: Uses SSE streaming endpoint so each pass result appears as it completes.
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 
 interface RevisionIssue {
   location: string;
@@ -62,24 +63,57 @@ export function RevisionPanel({ onClose }: RevisionPanelProps) {
   const [acceptedPasses, setAcceptedPasses] = useState<Set<string>>(new Set());
   const [rejectedPasses, setRejectedPasses] = useState<Set<string>>(new Set());
   const [finalFountain, setFinalFountain] = useState<string | null>(null);
+  // H8: Live per-pass progress — appended as each SSE pass_complete event arrives
+  const [streamedPasses, setStreamedPasses] = useState<PassResult[]>([]);
+  const [streamProgress, setStreamProgress] = useState<{ done: number; total: number } | null>(null);
+  const evtRef = useRef<EventSource | null>(null);
 
-  const runRevision = useCallback(async () => {
+  const runRevision = useCallback(() => {
+    // Close any existing stream
+    if (evtRef.current) { evtRef.current.close(); evtRef.current = null; }
+
     setRunning(true);
     setError(null);
     setResult(null);
+    setStreamedPasses([]);
+    setStreamProgress(null);
     setAcceptedPasses(new Set());
     setRejectedPasses(new Set());
     setFinalFountain(null);
-    try {
-      const res = await fetch('/api/nvm/revise', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
-      if (!res.ok) throw new Error(`Server error: ${res.status}`);
-      const data = await res.json() as RevisionResult;
-      setResult(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unknown error');
-    } finally {
+
+    const es = new EventSource('/api/nvm/revise-stream');
+    evtRef.current = es;
+
+    es.onmessage = (ev) => {
+      try {
+        const data = JSON.parse(ev.data) as
+          | { type: 'pass_complete'; passIndex: number; totalPasses: number; passResult: PassResult }
+          | { type: 'revision_complete'; result: RevisionResult }
+          | { type: 'revision_error'; error: string };
+
+        if (data.type === 'pass_complete') {
+          setStreamedPasses(prev => [...prev, data.passResult]);
+          setStreamProgress({ done: data.passIndex + 1, total: data.totalPasses });
+        } else if (data.type === 'revision_complete') {
+          setResult(data.result);
+          setRunning(false);
+          es.close();
+          evtRef.current = null;
+        } else if (data.type === 'revision_error') {
+          setError(data.error);
+          setRunning(false);
+          es.close();
+          evtRef.current = null;
+        }
+      } catch { /* ignore parse errors */ }
+    };
+
+    es.onerror = () => {
+      setError('SSE connection lost — try again');
       setRunning(false);
-    }
+      es.close();
+      evtRef.current = null;
+    };
   }, []);
 
   const acceptPass = useCallback((passName: string, revised: string) => {
@@ -147,13 +181,55 @@ export function RevisionPanel({ onClose }: RevisionPanelProps) {
           </div>
         )}
 
-        {/* Running state */}
+        {/* Running state — H8: shows live per-pass progress via SSE */}
         {running && (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <div className="text-3xl mb-3 animate-pulse">🖊</div>
-              <p className="text-zinc-400 text-sm">Running 12 revision passes…</p>
-              <p className="text-zinc-600 text-xs mt-1">Diagnosing structure, causality, dialogue, and more</p>
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Progress header */}
+            <div className="px-4 py-3 border-b border-zinc-800/50 flex-shrink-0">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-base animate-pulse">🖊</span>
+                <span className="text-xs font-semibold text-zinc-300">
+                  {streamProgress
+                    ? `Pass ${streamProgress.done} / ${streamProgress.total} complete…`
+                    : 'Starting revision pipeline…'}
+                </span>
+              </div>
+              {streamProgress && (
+                <div className="w-full bg-zinc-800 rounded-full h-1.5">
+                  <div
+                    className="bg-purple-500 h-1.5 rounded-full transition-all duration-500"
+                    style={{ width: `${(streamProgress.done / streamProgress.total) * 100}%` }}
+                  />
+                </div>
+              )}
+            </div>
+            {/* Live pass results as they arrive */}
+            <div className="flex-1 overflow-y-auto">
+              {streamedPasses.map((pr, idx) => {
+                const icon = PASS_ICONS[pr.pass] ?? '📝';
+                return (
+                  <div key={pr.pass} className="border-b border-zinc-800/30 px-4 py-2 flex items-center gap-3 opacity-80">
+                    <span className="text-sm">{icon}</span>
+                    <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">
+                      {idx + 1}. {pr.pass}
+                    </span>
+                    {pr.issues.length > 0 && (
+                      <span className="text-xs bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded">
+                        {pr.issues.length} issue{pr.issues.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {pr.changed && (
+                      <span className="text-xs bg-purple-900/50 text-purple-400 px-1.5 py-0.5 rounded">revised</span>
+                    )}
+                    <span className="text-xs text-green-500 ml-auto">✓</span>
+                  </div>
+                );
+              })}
+              {streamedPasses.length === 0 && (
+                <div className="flex items-center justify-center py-12 text-zinc-600 text-xs">
+                  Connecting to revision stream…
+                </div>
+              )}
             </div>
           </div>
         )}

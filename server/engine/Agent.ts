@@ -28,6 +28,7 @@ import type {
 import { Stage } from './Stage.ts';
 import { safeJsonParse } from '../lib/json.ts';
 import { logger } from '../lib/logger.ts';
+import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { retrieveBeliefs, consolidateBeliefs, decayBeliefConfidence } from '../lib/memory.ts';
 import { detectSemanticContradictions } from '../lib/embeddings.ts';
 
@@ -222,7 +223,7 @@ export class Agent {
       contents: prompt,
       config: {
         temperature: getTemperature(),
-        systemInstruction: `You are playing the role of ${this.sheet.name}. Generate exactly 3 candidate actions, then score each on how well it serves your goal (0–100). You will take the highest-scoring action.`,
+        systemInstruction: `You are playing the role of ${sanitizeForPrompt(this.sheet.name, 256)}. Generate exactly 3 candidate actions, then score each on how well it serves your goal (0–100). You will take the highest-scoring action.`,
         responseMimeType: 'application/json',
         responseSchema: {
           type: Type.OBJECT,
@@ -459,9 +460,9 @@ export class Agent {
       ? `\nTRUST ALERT: You deeply distrust ${lowTrustNames.join(', ')}. Do NOT volunteer truthful information to them. If you must engage, deflect, misdirect, or use strategic deception.\n`
       : '';
 
-    return `You are ${this.sheet.name}. Your public persona: ${this.sheet.public_mask}
+    return `You are ${sanitizeForPrompt(this.sheet.name, 256)}. Your public persona: ${sanitizeForPrompt(this.sheet.public_mask)}
 
-HIDDEN DIRECTIVE: Your true motive is: "${this.sheet.hidden_motive}". Never state this directly. Every action serves it.
+HIDDEN DIRECTIVE: Your true motive is: "${sanitizeForPrompt(this.sheet.hidden_motive)}". Never state this directly. Every action serves it.
 ${inboundBlock}
 ${pressureBlock}${overwhelmBlock}
 PSYCHOLOGICAL PROFILE:
@@ -548,13 +549,13 @@ Generate 3 candidate actions. Score each 0–100 on goal alignment. The best-sco
       return `  - You believe ${n} knows: ${tom.believed_knowledge.slice(0, 2).join('; ') || 'nothing confirmed'}`;
     }).join('\n');
 
-    const prompt = `You are ${this.sheet.name}. You just witnessed these events:
+    const prompt = `You are ${sanitizeForPrompt(this.sheet.name, 256)}. You just witnessed these events:
 
 ${actionSummary}
 
 Your existing beliefs: ${currentBeliefsSummary || 'none yet'}
 Others in the room: ${otherAgentNames || 'none'}
-Your motive: ${this.sheet.hidden_motive}
+Your motive: ${sanitizeForPrompt(this.sheet.hidden_motive)}
 
 LEVEL-2 THEORY OF MIND (what you think others know):
 ${tomSummary || '  (No established models yet.)'}
@@ -733,17 +734,23 @@ Based on what you just witnessed:
       : mergedBeliefs;
 
     // Semantic contradiction detection (every 5 turns): supplement Jaccard with embeddings
+    // C6: wrapped in try-catch — embedding provider failure must not crash the epistemic update.
     if (currentTurn > 0 && currentTurn % 5 === 0 && freshBeliefs.length > 0) {
-      const semanticPairs = await detectSemanticContradictions(existingBeliefs, freshBeliefs);
-      for (const { existing_id, new_id, similarity } of semanticPairs) {
-        // Annotate both beliefs in finalBeliefs with the contradicts field
-        const eb = finalBeliefs.find(b => b.id === existing_id);
-        const nb = finalBeliefs.find(b => b.id === new_id);
-        if (eb && nb) {
-          eb.contradicts = [...new Set([...(eb.contradicts ?? []), new_id])];
-          nb.contradicts = [...new Set([...(nb.contradicts ?? []), existing_id])];
-          logger.info('semantic_contradiction', { agent: this.sheet.name, similarity: similarity.toFixed(2), a: eb.proposition.slice(0, 60), b: nb.proposition.slice(0, 60) });
+      try {
+        const semanticPairs = await detectSemanticContradictions(existingBeliefs, freshBeliefs);
+        for (const { existing_id, new_id, similarity } of semanticPairs) {
+          // Annotate both beliefs in finalBeliefs with the contradicts field
+          const eb = finalBeliefs.find(b => b.id === existing_id);
+          const nb = finalBeliefs.find(b => b.id === new_id);
+          if (eb && nb) {
+            eb.contradicts = [...new Set([...(eb.contradicts ?? []), new_id])];
+            nb.contradicts = [...new Set([...(nb.contradicts ?? []), existing_id])];
+            logger.info('semantic_contradiction', { agent: this.sheet.name, similarity: similarity.toFixed(2), a: eb.proposition.slice(0, 60), b: nb.proposition.slice(0, 60) });
+          }
         }
+      } catch (embedErr) {
+        logger.warn('semantic_contradiction_skipped', { agent: this.sheet.name, reason: (embedErr as Error).message });
+        // Continue with undetected semantic contradictions — Jaccard-based detection still ran above.
       }
     }
 
@@ -828,9 +835,8 @@ Based on what you just witnessed:
       const gsRaw = this.sheet.goalStack;
       if (gsRaw) {
         // Work on a shallow copy so this.sheet.goalStack is NOT mutated in-place.
-        // If the DB write below fails, the in-memory sheet stays consistent with the DB.
         const gs: GoalStack = { ...gsRaw, instrumental: [...gsRaw.instrumental] };
-        let changed = false;
+        const pendingMutations: GoalMutation[] = [];
         const triggerEventId = observableActions[observableActions.length - 1]?.action_id ?? 'epistemic_update';
         const turnIndex = this.stage.getTurnCount();
 
@@ -849,8 +855,7 @@ Based on what you just witnessed:
               const achieved = gs.instrumental.filter(g => g.achieved);
               gs.instrumental = [...active, ...achieved].slice(0, GOAL_CAP);
             }
-            changed = true;
-            const mut: GoalMutation = {
+            pendingMutations.push({
               mutation_id: randomUUID(),
               char_id: this.sheet.char_id,
               turn_index: turnIndex,
@@ -858,8 +863,7 @@ Based on what you just witnessed:
               mutation_type: 'subgoal_added',
               description: `${this.sheet.name} formed new subgoal: "${gsu.add_subgoal}"`,
               new_subgoal: gsu.add_subgoal,
-            };
-            this.stage.recordGoalMutation(mut);
+            });
           } // end !duplicate
         }
 
@@ -869,8 +873,7 @@ Based on what you just witnessed:
           if (idx >= 0) {
             const achieved = gs.instrumental[idx];
             gs.instrumental[idx].achieved = true;
-            changed = true;
-            const mut: GoalMutation = {
+            pendingMutations.push({
               mutation_id: randomUUID(),
               char_id: this.sheet.char_id,
               turn_index: turnIndex,
@@ -878,12 +881,21 @@ Based on what you just witnessed:
               mutation_type: 'subgoal_achieved',
               description: `${this.sheet.name} achieved subgoal: "${achieved.description}"`,
               old_subgoal: achieved.description,
-            };
-            this.stage.recordGoalMutation(mut);
+            });
           }
         }
 
-        if (changed) this.stage.updateGoalStack(this.sheet.char_id, gs);
+        // H5: Write goal stack + all mutation records atomically.
+        // If the first mutation has a companion goal-stack change, use the
+        // atomic helper; otherwise write each mutation individually.
+        if (pendingMutations.length > 0) {
+          // Use the atomic helper for the first mutation (goal stack + record together).
+          this.stage.updateGoalStackWithMutation(this.sheet.char_id, gs, pendingMutations[0]);
+          // Write any additional mutations individually (uncommon — both branches fired).
+          for (const mut of pendingMutations.slice(1)) {
+            this.stage.recordGoalMutation(mut);
+          }
+        }
       }
     }
 
@@ -931,10 +943,10 @@ Based on what you just witnessed:
 
     const response = await generateContent({
       model: getModel('fast'),
-      contents: `You are ${this.sheet.name}. Reflect on these recent events and synthesize exactly 3 high-level insights.\n\nEvents:\n${transcript}\n\nExisting beliefs: ${existingBeliefs || 'none'}\n\nOutput 3 reflective insights that go beyond the surface events — patterns, implications, strategic assessments.`,
+      contents: `You are ${sanitizeForPrompt(this.sheet.name, 256)}. Reflect on these recent events and synthesize exactly 3 high-level insights.\n\nEvents:\n${transcript}\n\nExisting beliefs: ${existingBeliefs || 'none'}\n\nOutput 3 reflective insights that go beyond the surface events — patterns, implications, strategic assessments.`,
       config: {
         temperature: getTemperature(),
-        systemInstruction: `You are ${this.sheet.name} in a reflective moment. Synthesize insights, not observations.`,
+        systemInstruction: `You are ${sanitizeForPrompt(this.sheet.name, 256)} in a reflective moment. Synthesize insights, not observations.`,
         responseMimeType: 'application/json',
         responseSchema: {
           type: Type.OBJECT,
@@ -1010,9 +1022,9 @@ Based on what you just witnessed:
     const blockedDescs = active.slice(0, 3).map(g => `- ${g.description}`).join('\n');
     const response = await generateContent({
       model: getModel('fast'),
-      contents: `You are ${this.sheet.name}. Your current subgoals are ALL blocked by prerequisites that haven't been met:\n${blockedDescs}\n\nTerminal objective: ${gs.terminal.description}\n\nGenerate exactly 2 new instrumental subgoals you can pursue RIGHT NOW, without prerequisites.`,
+      contents: `You are ${sanitizeForPrompt(this.sheet.name, 256)}. Your current subgoals are ALL blocked by prerequisites that haven't been met:\n${blockedDescs}\n\nTerminal objective: ${sanitizeForPrompt(gs.terminal.description)}\n\nGenerate exactly 2 new instrumental subgoals you can pursue RIGHT NOW, without prerequisites.`,
       config: {
-        systemInstruction: `You are replanning as ${this.sheet.name}. Output only JSON.`,
+        systemInstruction: `You are replanning as ${sanitizeForPrompt(this.sheet.name, 256)}. Output only JSON.`,
         responseMimeType: 'application/json',
         responseSchema: {
           type: Type.OBJECT,

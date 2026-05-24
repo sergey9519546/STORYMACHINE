@@ -33,6 +33,7 @@ export function intentionalProof(ir: NarrativeTransitionIR, state: NarrativeStat
           proof: 'IntentionalProof', severity: 'block',
           message: `op[${i}] ${op.op} references ungrounded character "${charId}"`,
           subjectId: charId,
+          opIdx: i,  // M7: structured field — don't parse from message
         });
       }
     }

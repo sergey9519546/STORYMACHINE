@@ -38,9 +38,30 @@ export default function StartScreen({
     setIsDragging(false);
   };
 
+  // H3: Read dropped files (previously a no-op stub).
+  // Accepts .txt / .fountain / .fdx / text-like files; reads as text via FileReader.
+  const ALLOWED_EXTS = /\.(txt|fountain|fdx|md|htm|html)$/i;
+  const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB per file
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
+    const droppedFiles = Array.from(e.dataTransfer.files).filter(f =>
+      ALLOWED_EXTS.test(f.name) && f.size <= MAX_FILE_SIZE
+    );
+    droppedFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const text = ev.target?.result;
+        if (typeof text === 'string') {
+          setUploadedFiles(prev => [
+            ...prev,
+            { name: file.name, content: text, size: file.size, category: 'Lore' as const },
+          ]);
+        }
+      };
+      reader.readAsText(file);
+    });
   };
 
   const handleStart = () => {

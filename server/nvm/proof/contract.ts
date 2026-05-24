@@ -23,6 +23,9 @@ export interface ProofFinding {
   severity: 'block' | 'flag' | 'info';
   message: string;
   subjectId?: string;   // char_id / fact_id / op index the finding refers to
+  /** M7: op index in the IR ops array this finding refers to. Use instead of
+   *  encoding the index in the message string, which is fragile. */
+  opIdx?: number;
 }
 
 export interface ProofResult {

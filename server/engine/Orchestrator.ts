@@ -318,18 +318,19 @@ export class Orchestrator {
 
       // ── Batch epistemic updates: ONCE per agent per ROUND (not per action) ──
       // This prevents O(agents × actions) Gemini calls (fanout explosion).
+      // C4: serialized (not Promise.all) to prevent concurrent SQLite belief writes
+      // that would interleave and silently lose updates under WAL mode.
       if (!didRelocate && lastActionId) {
         const recentActions = this.stage.getSensoryFilter(location_id, maxTurns);
         // Snapshot suspicion scores before epistemic updates for persuasion outcome tracking
         const suspicionBefore = new Map<string, number>(
           agentsInRoom.map(a => [a.char_id, a.suspicion_score]),
         );
-        const epistemicUpdates = await Promise.all(
-          agentsInRoom
-            .map(a => this.agents.get(a.char_id))
-            .filter((a): a is Agent => a !== undefined)
-            .map(a => a.updateEpistemics(recentActions))
-        );
+        const epistemicUpdates: import('./types.ts').EpistemicUpdate[] = [];
+        for (const sheet of agentsInRoom) {
+          const agent = this.agents.get(sheet.char_id);
+          if (agent) epistemicUpdates.push(await agent.updateEpistemics(recentActions));
+        }
         for (const update of epistemicUpdates) {
           this._runSpineForUpdate(update, lastActionId, location_id);
           this.appraiser.appraise(update);
@@ -487,6 +488,8 @@ export class Orchestrator {
   // ── Spine wiring helper ─────────────────────────────────────────────────────
   // Called after every EpistemicUpdate to create contradiction edges, goal
   // mutations, dramatic pressure, and beat traces.  Pure deterministic; no AI.
+  // H4: each spine call is individually try-catched; a single failure does not
+  // abort the entire turn — remaining spine operations continue.
   private _runSpineForUpdate(
     update: EpistemicUpdate,
     triggerEventId: string,
@@ -495,58 +498,83 @@ export class Orchestrator {
     if (!update.contradiction_detected) {
       // No conflict — but new beliefs may still corroborate or update existing ones.
       if (update.new_beliefs.length > 0) {
-        this.spine.processBeliefReinforcement(update.char_id, update.new_beliefs, triggerEventId);
+        try {
+          this.spine.processBeliefReinforcement(update.char_id, update.new_beliefs, triggerEventId);
+        } catch (err) {
+          logger.warn('spine_belief_reinforcement_error', { char_id: update.char_id, error: (err as Error).message });
+        }
       }
       return;
     }
     if (update.new_beliefs.length === 0) {
-      this.stage.addDramaticPressure({
-        pressure_id: randomUUID(),
-        target_char_id: update.char_id,
-        trigger_event_id: update.source_event_id ?? triggerEventId,
-        pressure_type: 'CONFRONT',
-        intensity: 45,
-        bias_hint: `Something you heard contradicts what you already know. You sense the inconsistency, even if you can't place it yet. Trust that instinct.`,
-        expires_at_turn: this.stage.getTurnCount() + 3,
-        applied: false,
-      });
+      try {
+        this.stage.addDramaticPressure({
+          pressure_id: randomUUID(),
+          target_char_id: update.char_id,
+          trigger_event_id: update.source_event_id ?? triggerEventId,
+          pressure_type: 'CONFRONT',
+          intensity: 45,
+          bias_hint: `Something you heard contradicts what you already know. You sense the inconsistency, even if you can't place it yet. Trust that instinct.`,
+          expires_at_turn: this.stage.getTurnCount() + 3,
+          applied: false,
+        });
+      } catch (err) {
+        logger.warn('spine_dramatic_pressure_error', { char_id: update.char_id, error: (err as Error).message });
+      }
       return;
     }
 
-    const edges = this.spine.processBeliefUpdate(
-      update.char_id,
-      update.new_beliefs,
-      triggerEventId,
-      update.contradiction_detected,
-      update.contradicted_propositions,
-    );
+    let edges: ReturnType<typeof this.spine.processBeliefUpdate> = [];
+    try {
+      edges = this.spine.processBeliefUpdate(
+        update.char_id,
+        update.new_beliefs,
+        triggerEventId,
+        update.contradiction_detected,
+        update.contradicted_propositions,
+      );
+    } catch (err) {
+      logger.warn('spine_belief_update_error', { char_id: update.char_id, error: (err as Error).message });
+      return;
+    }
 
     if (edges.length === 0) return;
 
-    const { mutations, pressures } = this.spine.processContradiction(
-      update.char_id,
-      edges,
-      triggerEventId,
-    );
+    let mutations: unknown[] = [];
+    let pressures: unknown[] = [];
+    try {
+      ({ mutations, pressures } = this.spine.processContradiction(
+        update.char_id,
+        edges,
+        triggerEventId,
+      ));
+    } catch (err) {
+      logger.warn('spine_contradiction_error', { char_id: update.char_id, error: (err as Error).message });
+      return;
+    }
 
     if (mutations.length > 0 || pressures.length > 0) {
-      const agent = this.stage.getAgent(update.char_id);
-      const agentName = agent?.name ?? update.char_id;
-      this.spine.createBeatTrace({
-        triggerEventId,
-        beatType: 'contradiction_discovered',
-        participants: [update.char_id, ...new Set(edges.map(e => {
-          // include the source agent of the contradicted belief if known
-          const allBeliefs = agent?.beliefs ?? [];
-          return allBeliefs.find(b => b.id === e.from_belief_id)?.source_agent_id ?? '';
-        }).filter(Boolean))],
-        causalChain: [triggerEventId],
-        locationId,
-        narrativeSummary: `${agentName} discovers a contradiction in their belief graph, triggering ${mutations.length} goal mutation(s) and ${pressures.length} dramatic pressure(s).`,
-        fountainHint: `${agentName.toUpperCase()} pauses — something doesn't add up. The air between them changes.`,
-      });
+      try {
+        const agent = this.stage.getAgent(update.char_id);
+        const agentName = agent?.name ?? update.char_id;
+        this.spine.createBeatTrace({
+          triggerEventId,
+          beatType: 'contradiction_discovered',
+          participants: [update.char_id, ...new Set(edges.map(e => {
+            // include the source agent of the contradicted belief if known
+            const allBeliefs = agent?.beliefs ?? [];
+            return allBeliefs.find(b => b.id === e.from_belief_id)?.source_agent_id ?? '';
+          }).filter(Boolean))],
+          causalChain: [triggerEventId],
+          locationId,
+          narrativeSummary: `${agentName} discovers a contradiction in their belief graph, triggering ${mutations.length} goal mutation(s) and ${pressures.length} dramatic pressure(s).`,
+          fountainHint: `${agentName.toUpperCase()} pauses — something doesn't add up. The air between them changes.`,
+        });
 
-      logger.info('contradiction_processed', { agent: agentName, edges: edges.length, mutations: mutations.length, pressures: pressures.length });
+        logger.info('contradiction_processed', { agent: agentName, edges: edges.length, mutations: mutations.length, pressures: pressures.length });
+      } catch (err) {
+        logger.warn('spine_beat_trace_error', { char_id: update.char_id, error: (err as Error).message });
+      }
     }
   }
 }

@@ -170,6 +170,14 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
     ledgerEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [ledger]);
 
+  // C5: unified fetch-failure notifier — shows a toast only when the component
+  // is still mounted (suppresses spurious errors fired during unmount).
+  const notifyFetchFailure = useCallback((endpoint: string, err: unknown) => {
+    if (!mountedRef.current) return; // unmounting — not a user-visible error
+    const msg = err instanceof Error ? err.message : String(err);
+    showError(`Background fetch failed (${endpoint}): ${msg}`);
+  }, [showError]);
+
   const fetchState = async () => {
     try {
       const res = await fetch("/api/state");
@@ -180,7 +188,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       if (data.agents.length > 0) {
         fetchPersuasionLog(data.agents.map(a => a.char_id));
       }
-    } catch { /* silent — background poll */ }
+    } catch (err) { notifyFetchFailure('/api/state', err); }
   };
 
   const fetchLedger = async () => {
@@ -189,7 +197,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       if (!res.ok || !mountedRef.current) return;
       const data = await res.json() as ActionLogEntry[];
       setLedger(data);
-    } catch { /* silent — background poll */ }
+    } catch (err) { notifyFetchFailure('/api/ledger', err); }
   };
 
   const fetchIllusionState = async () => {
@@ -198,7 +206,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       if (!res.ok || !mountedRef.current) return;
       const data = await res.json() as IllusionState;
       setIllusionState(data);
-    } catch { /* silent — background poll */ }
+    } catch (err) { notifyFetchFailure('/api/simulation/illusion-state', err); }
   };
 
   const fetchSpineData = async () => {
@@ -212,7 +220,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       if (beatsRes.ok)     setBeatTraces(await beatsRes.json() as BeatTrace[]);
       if (edgesRes.ok)     setBeliefEdges(await edgesRes.json() as BeliefEdge[]);
       if (mutationsRes.ok) setGoalMutations(await mutationsRes.json() as GoalMutation[]);
-    } catch { /* silent — background poll */ }
+    } catch (err) { notifyFetchFailure('/api/beat-traces+edges+mutations', err); }
   };
 
   const refreshAll = useCallback(async () => {

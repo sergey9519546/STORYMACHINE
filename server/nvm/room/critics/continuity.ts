@@ -23,11 +23,19 @@ export function continuityCritic(ir: NarrativeTransitionIR, state: NarrativeStat
   for (const result of results) {
     if (result.pass) continue;
     for (const finding of result.findings) {
-      const opIdx = finding.message.match(/op\[(\d+)\]/)?.[1];
+      // M7: Use structured opIdx field instead of fragile regex on the message string.
+      // Falls back to regex for backwards-compat with any proof that predates the field.
+      const structuredIdx = finding.opIdx;
+      const legacyIdx = structuredIdx === undefined
+        ? (finding.message.match(/op\[(\d+)\]/)?.[1] !== undefined
+            ? Number(finding.message.match(/op\[(\d+)\]/)?.[1])
+            : null)
+        : null;
+      const targetOpIdx = structuredIdx ?? legacyIdx;
       critiques.push({
         criticId: 'continuity',
         severity: 80,   // proof failures are always high severity
-        targetOpIdx: opIdx !== undefined ? Number(opIdx) : null,
+        targetOpIdx,
         objection: `[${result.proof}] ${finding.message}`,
         suggestedOperator: PROOF_TO_OPERATOR[result.proof] ?? null,
         attentionBid: 85,

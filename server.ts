@@ -8,13 +8,14 @@ import { generateContent, getImageProvider, getTTSProvider, getModel } from './s
 import { rateLimit } from 'express-rate-limit';
 import { Stage } from './server/engine/Stage.ts';
 import { Orchestrator, type RoomProgressEvent } from './server/engine/Orchestrator.ts';
-import type { CharacterSheet, Location, StageSnapshot, StoryStructure, DirectorStyle } from './server/engine/types.ts';
+import type { CharacterSheet, Location, StageSnapshot, StoryStructure, DirectorStyle, OutlineBeat } from './server/engine/types.ts';
 import { transcriptToFountain, extractCharactersFromLog, syuzhetSort, wrapSyuzhetFountain } from './server/lib/fountain.ts';
 import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES, STYLE_MODIFIERS } from './server/lib/structure-presets.ts';
 import { logger, requestLogger } from './server/lib/logger.ts';
 import { metrics } from './server/lib/metrics.ts';
-import { validate, InitBodySchema, TurnBodySchema, RunRoomBodySchema, ImportBodySchema, AiConfigSchema } from './server/lib/validation.ts';
+import { validate, InitBodySchema, TurnBodySchema, RunRoomBodySchema, ImportBodySchema, AiConfigSchema, OutlineBodySchema } from './server/lib/validation.ts';
 import { initFromEnv, applyConfig, getPublicConfig } from './server/lib/ai-config.ts';
+import { sanitizeForPrompt } from './server/lib/prompt-utils.ts';
 
 // ── Startup validation ────────────────────────────────────────────────────────
 const AI_PROVIDER = process.env.AI_PROVIDER ?? 'gemini';
@@ -573,10 +574,17 @@ async function startServer() {
     const wallTimer = setTimeout(() => {
       if (!disconnected) {
         emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: 'error: stream timeout (5 min)' });
-        res.end();
       }
-      disconnected = true;
+      disconnected = true; // triggers ensureEnded() to skip the write, but it still calls res.end()
     }, SSE_MAX_MS);
+
+    // C3: Single-flag guard ensures res.end() is called exactly once even when
+    // the early-return paths or the error handler both want to close the stream.
+    let ended = false;
+    const ensureEnded = () => {
+      if (!ended && !disconnected) { ended = true; res.end(); }
+      else if (!ended) { ended = true; }
+    };
 
     let lockKey = '';
     try {
@@ -586,7 +594,7 @@ async function startServer() {
 
       if (runningRooms.has(lockKey)) {
         emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: 'already_running' });
-        res.end();
+        ensureEnded();
         return;
       }
 
@@ -598,7 +606,7 @@ async function startServer() {
       const { stage, orchestrator } = getOrCreateSession(sid);
       if (!stage.getLocation(nodeId)) {
         emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: `error: location '${nodeId}' not found` });
-        res.end();
+        ensureEnded();
         return;
       }
       runningRooms.add(lockKey);
@@ -611,9 +619,8 @@ async function startServer() {
       emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: `error: ${(err as Error).message}` });
     } finally {
       clearTimeout(wallTimer);
+      ensureEnded();
     }
-
-    if (!disconnected) res.end();
   });
 
   // ── Scene grouping endpoint ──────────────────────────────────────────────────
@@ -879,12 +886,27 @@ async function startServer() {
     res.json({ beats: illusion.outline ?? [] });
   }));
 
-  app.post('/api/outline', gameLimiter, asyncHandler(async (req, res) => {
+  app.post('/api/outline', gameLimiter, validate(OutlineBodySchema), asyncHandler(async (req, res) => {
     const { stage } = getOrCreateSession(sessionId(req));
     const beats = req.body?.beats;
     if (!Array.isArray(beats)) { res.status(400).json({ error: 'beats array required' }); return; }
-    stage.setOutline(beats);
-    res.json({ status: 'ok', beatCount: beats.length });
+    // Sanitize each beat's text fields before persisting — they are later embedded in agent prompts.
+    const sanitizedBeats = (beats as unknown[]).map(b => {
+      if (typeof b !== 'object' || b === null) return b;
+      const beat = b as Record<string, unknown>;
+      const sanitizeField = (v: unknown, max = 500) =>
+        typeof v === 'string' ? sanitizeForPrompt(v, max) : v;
+      return {
+        ...beat,
+        goal:       sanitizeField(beat.goal),
+        constraint: sanitizeField(beat.constraint),
+        avoid:      sanitizeField(beat.avoid),
+        description: sanitizeField(beat.description, 1000),
+        title:      sanitizeField(beat.title, 256),
+      };
+    });
+    stage.setOutline(sanitizedBeats as OutlineBeat[]);
+    res.json({ status: 'ok', beatCount: sanitizedBeats.length });
   }));
 
   app.delete('/api/outline', gameLimiter, asyncHandler(async (req, res) => {
@@ -1143,6 +1165,39 @@ async function startServer() {
     res.json(storyform);
   }));
 
+  // ── ScriptIDE persistence routes (H2) ────────────────────────────────────────
+  // Server-side save/load for the ScriptIDE writing environment.
+  // Data is keyed by session — same cookie-based session as the rest of the API.
+  // The frontend mirrors to localStorage as well; server is the authoritative backup.
+
+  app.post('/api/scriptide/save', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const body = req.body as {
+      scriptText?: unknown;
+      snapshots?: unknown;
+      characters?: unknown;
+      researchNotes?: unknown;
+      isDarkMode?: unknown;
+    };
+    const scriptText     = typeof body.scriptText     === 'string' ? body.scriptText.substring(0, 500_000) : '';
+    const snapshots      = Array.isArray(body.snapshots)     ? body.snapshots.slice(0, 20)  : [];
+    const characters     = Array.isArray(body.characters)    ? body.characters.slice(0, 100) : [];
+    const researchNotes  = Array.isArray(body.researchNotes) ? body.researchNotes.slice(0, 200) : [];
+    const isDarkMode     = body.isDarkMode === true;
+    stage.saveScriptIDEState(sessionId(req), { scriptText, snapshots, characters, researchNotes, isDarkMode });
+    res.json({ status: 'saved', updatedAt: Date.now() });
+  }));
+
+  app.get('/api/scriptide/load', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const saved = stage.loadScriptIDEState(sessionId(req));
+    if (!saved) {
+      res.json({ status: 'empty', scriptText: '', snapshots: [], characters: [], researchNotes: [], isDarkMode: false, updatedAt: null });
+      return;
+    }
+    res.json({ status: 'ok', ...saved });
+  }));
+
   // ── ScriptIDE AI routes ────────────────────────────────────────────────────
   // Optional script context — the current editor contents, capped, so AI
   // suggestions stay consistent with established tone, characters, and facts.
@@ -1188,7 +1243,7 @@ STRICT CONSTRAINTS:
 3. SENSORY WRITING: Focus on lighting, sound, texture, and kinetic movement. Use active verbs. Avoid "is/are" where possible.
 4. ECONOMY: Keep action blocks to 4 lines maximum. Break up text to control the reader's pacing.
 ${contextBlock}${wbProfiles}
-INPUT: ${beat}
+INPUT: ${sanitizeForPrompt(beat, 8000)}
 OUTPUT: Generate the Scene Heading and Action lines.`,
     }, { label: 'world-build', timeoutMs: 30_000 });
     res.json({ result: response.text ?? '' });
@@ -1236,7 +1291,7 @@ INSTRUCTIONS:
 3. Differentiate voices based on provided psychological profiles.
 4. Add brief, behavior-revealing parentheticals only if absolutely necessary.
 ${dlgContextBlock}
-INPUT DIALOGUE: ${dialogue}
+INPUT DIALOGUE: ${sanitizeForPrompt(dialogue, 8000)}
 CHARACTER PROFILES: ${JSON.stringify(profiles)}
 OUTPUT: Provide 2 alternative versions of the dialogue exchange, explaining the subtextual strategy used in each.`,
     }, { label: 'refine-dialogue', timeoutMs: 30_000 });
@@ -1262,7 +1317,7 @@ ANALYSIS CRITERIA:
 3. The Dilemma: Are the choices too easy? Propose a "best bad choice" scenario.
 4. Pacing: Suggest where to slow down to build dread, or speed up to simulate panic.
 ${tnContextBlock}${tnProfiles}
-INPUT SCENE: ${scene}
+INPUT SCENE: ${sanitizeForPrompt(scene, 8000)}
 OUTPUT: A bulleted diagnostic report with 3 actionable suggestions. Where a character's want, lie, or wound is relevant, ground the suggestion in it.`,
     }, { label: 'analyze-tension', timeoutMs: 30_000 });
     res.json({ result: response.text ?? '' });
@@ -1275,7 +1330,7 @@ OUTPUT: A bulleted diagnostic report with 3 actionable suggestions. Where a char
       contents: `SYSTEM ROLE: You are a strict script editor enforcing a "Semantic Firewall".
 OBJECTIVE: Rewrite the following action block — remove all camera directions and technical jargon. Describe what happens in the world, not what the camera does.
 
-INPUT: ${text}
+INPUT: ${sanitizeForPrompt(text, 8000)}
 OUTPUT: Just the rewritten action text, nothing else.`,
     }, { label: 'clean-action', timeoutMs: 30_000 });
     res.json({ result: response.text ?? '' });
@@ -2711,6 +2766,19 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
 
     const move = parseAuthorMove(text.trim(), beforeState, { sceneIdx });
 
+    // C2: Structural validation of the parsed move before building a StoryCommit.
+    // Rejects moves whose ops array contains unknown verbs or malformed payloads.
+    const VALID_OP_KINDS = new Set([
+      'ADD_FACT', 'EXPIRE_FACT', 'UPDATE_BELIEF', 'APPRAISE_EMOTION',
+      'SHIFT_RELATIONSHIP', 'ADVANCE_OBJECT_ARC', 'TRIGGER_RULE', 'SEED_CLUE',
+      'PAYOFF_SETUP', 'RAISE_CLOCK', 'ADVANCE_THEME_ARGUMENT', 'UPDATE_READER_STATE',
+      'RECORD_VISUAL_FACT', 'RECORD_SONIC_FACT',
+    ]);
+    if (!Array.isArray(move.ops) || move.ops.some(o => typeof o !== 'object' || o === null || !VALID_OP_KINDS.has((o as { op: string }).op))) {
+      res.status(400).json({ error: 'parseAuthorMove produced an invalid ops array', verb: move.intent.verb, ambiguous: true });
+      return;
+    }
+
     // OVERRULE: revert last commit and return early
     if (move.intent.verb === 'OVERRULE') {
       const last = allCommits[allCommits.length - 1];
@@ -2914,7 +2982,7 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
 
   // POST /api/nvm/revise — 12-pass revision pipeline (Wave 39).
   // Body: { approvedSpans?: ApprovedSpan[], title?: string }
-  // Returns: RevisionResult
+  // Returns: RevisionResult (blocking — waits for all 12 passes)
   app.post('/api/nvm/revise', gameLimiter, asyncHandler(async (req, res) => {
     const { stage } = getOrCreateSession(sessionId(req));
     const { approvedSpans = [], title = 'UNTITLED' } = req.body as { approvedSpans?: unknown[]; title?: string };
@@ -2944,6 +3012,61 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     const revisionResult = await runRevisionPipeline(compiled, records, structure, safeSpans);
     res.json(revisionResult);
   }));
+
+  // GET /api/nvm/revise-stream — H8: SSE streaming variant of the revision pipeline.
+  // Emits one SSE event per pass as it completes, then a final 'revision_complete' event
+  // with the full RevisionResult.  The RevisionPanel switches to this endpoint so users
+  // see live per-pass progress instead of a spinner for the full 12-pass duration.
+  app.get('/api/nvm/revise-stream', gameLimiter, async (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    let disconnected = false;
+    let ended = false;
+    req.on('close', () => { disconnected = true; });
+
+    const emitSSE = (data: unknown) => {
+      if (!disconnected && !ended) res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+    const ensureEnded = () => {
+      if (!ended) { ended = true; if (!disconnected) res.end(); }
+    };
+
+    const { title = 'UNTITLED' } = req.query as { title?: string };
+    try {
+      const { stage } = getOrCreateSession(sessionId(req));
+      const { buildScreenplayMemory } = await import('./server/nvm/screenplay/memory.ts');
+      const { analyzeStructure } = await import('./server/nvm/screenplay/structure.ts');
+      const { compileScreenplay } = await import('./server/nvm/screenplay/compile.ts');
+      const { runRevisionPipeline } = await import('./server/nvm/revision/pipeline.ts');
+      const { buildNarrativeState, emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+      const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+
+      type StoryCommitT = import('./server/nvm/state/StoryCommit.ts').StoryCommit;
+      const allCommits = (stage.getCommits() as StoryCommitT[]).filter(c => !c.reverted);
+
+      const base = buildNarrativeState(stage);
+      let folded = emptyState();
+      for (const c of allCommits) folded = applyStoryOps(folded, c.ops);
+      const state = { ...base, ...folded, turn: stage.getTurnCount() };
+
+      const records = buildScreenplayMemory(allCommits);
+      const structure = analyzeStructure(records, allCommits);
+      const compiled = compileScreenplay(allCommits, state, records, structure, title);
+
+      const result = await runRevisionPipeline(compiled, records, structure, [], event => {
+        emitSSE(event); // pass_complete event per revision pass
+      });
+      emitSSE({ type: 'revision_complete', result });
+    } catch (err) {
+      emitSSE({ type: 'revision_error', error: (err as Error).message });
+    } finally {
+      ensureEnded();
+    }
+  });
 
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.
