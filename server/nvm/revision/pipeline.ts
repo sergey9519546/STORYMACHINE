@@ -55,6 +55,17 @@ export interface RevisionResult {
 // ── Pipeline ──────────────────────────────────────────────────────────────────
 
 /**
+ * H8: Progress event emitted after each pass completes.
+ * Used by the SSE streaming endpoint to stream pass results to the UI.
+ */
+export interface RevisionProgressEvent {
+  type: 'pass_complete';
+  passIndex: number;
+  totalPasses: number;
+  passResult: PassResult;
+}
+
+/**
  * Run all 12 revision passes over a compiled screenplay.
  *
  * Each pass receives the fountain text as modified by all prior passes.
@@ -65,12 +76,14 @@ export interface RevisionResult {
  * @param records       Screenplay memory records from buildScreenplayMemory()
  * @param structure     Current structural state from analyzeStructure()
  * @param approvedSpans Spans the author has locked — never changed by any pass
+ * @param onProgress    H8: Optional callback — called after each pass with progress info
  */
 export async function runRevisionPipeline(
   compiled: CompiledScreenplay,
   records: ScreenplaySceneRecord[],
   structure: StructureState,
   approvedSpans: ApprovedSpan[] = [],
+  onProgress?: (event: RevisionProgressEvent) => void,
 ): Promise<RevisionResult> {
   const originalFountain = compiled.fountain;
   const { annotations } = compiled;
@@ -94,8 +107,8 @@ export async function runRevisionPipeline(
   const passResults: PassResult[] = [];
   let currentFountain = originalFountain;
 
-  for (const pass of passes) {
-    const result = await pass({
+  for (let i = 0; i < passes.length; i++) {
+    const result = await passes[i]({
       fountain: currentFountain,
       original: originalFountain,
       annotations,
@@ -105,6 +118,7 @@ export async function runRevisionPipeline(
     });
     passResults.push(result);
     currentFountain = result.revisedFountain;
+    onProgress?.({ type: 'pass_complete', passIndex: i, totalPasses: passes.length, passResult: result });
   }
 
   const totalIssuesFound = passResults.reduce((s, r) => s + r.issues.length, 0);

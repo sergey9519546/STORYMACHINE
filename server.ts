@@ -2982,7 +2982,7 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
 
   // POST /api/nvm/revise — 12-pass revision pipeline (Wave 39).
   // Body: { approvedSpans?: ApprovedSpan[], title?: string }
-  // Returns: RevisionResult
+  // Returns: RevisionResult (blocking — waits for all 12 passes)
   app.post('/api/nvm/revise', gameLimiter, asyncHandler(async (req, res) => {
     const { stage } = getOrCreateSession(sessionId(req));
     const { approvedSpans = [], title = 'UNTITLED' } = req.body as { approvedSpans?: unknown[]; title?: string };
@@ -3012,6 +3012,61 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     const revisionResult = await runRevisionPipeline(compiled, records, structure, safeSpans);
     res.json(revisionResult);
   }));
+
+  // GET /api/nvm/revise-stream — H8: SSE streaming variant of the revision pipeline.
+  // Emits one SSE event per pass as it completes, then a final 'revision_complete' event
+  // with the full RevisionResult.  The RevisionPanel switches to this endpoint so users
+  // see live per-pass progress instead of a spinner for the full 12-pass duration.
+  app.get('/api/nvm/revise-stream', gameLimiter, async (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    let disconnected = false;
+    let ended = false;
+    req.on('close', () => { disconnected = true; });
+
+    const emitSSE = (data: unknown) => {
+      if (!disconnected && !ended) res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+    const ensureEnded = () => {
+      if (!ended) { ended = true; if (!disconnected) res.end(); }
+    };
+
+    const { title = 'UNTITLED' } = req.query as { title?: string };
+    try {
+      const { stage } = getOrCreateSession(sessionId(req));
+      const { buildScreenplayMemory } = await import('./server/nvm/screenplay/memory.ts');
+      const { analyzeStructure } = await import('./server/nvm/screenplay/structure.ts');
+      const { compileScreenplay } = await import('./server/nvm/screenplay/compile.ts');
+      const { runRevisionPipeline } = await import('./server/nvm/revision/pipeline.ts');
+      const { buildNarrativeState, emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+      const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+
+      type StoryCommitT = import('./server/nvm/state/StoryCommit.ts').StoryCommit;
+      const allCommits = (stage.getCommits() as StoryCommitT[]).filter(c => !c.reverted);
+
+      const base = buildNarrativeState(stage);
+      let folded = emptyState();
+      for (const c of allCommits) folded = applyStoryOps(folded, c.ops);
+      const state = { ...base, ...folded, turn: stage.getTurnCount() };
+
+      const records = buildScreenplayMemory(allCommits);
+      const structure = analyzeStructure(records, allCommits);
+      const compiled = compileScreenplay(allCommits, state, records, structure, title);
+
+      const result = await runRevisionPipeline(compiled, records, structure, [], event => {
+        emitSSE(event); // pass_complete event per revision pass
+      });
+      emitSSE({ type: 'revision_complete', result });
+    } catch (err) {
+      emitSSE({ type: 'revision_error', error: (err as Error).message });
+    } finally {
+      ensureEnded();
+    }
+  });
 
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.
