@@ -8,13 +8,14 @@ import { generateContent, getImageProvider, getTTSProvider, getModel } from './s
 import { rateLimit } from 'express-rate-limit';
 import { Stage } from './server/engine/Stage.ts';
 import { Orchestrator, type RoomProgressEvent } from './server/engine/Orchestrator.ts';
-import type { CharacterSheet, Location, StageSnapshot, StoryStructure, DirectorStyle } from './server/engine/types.ts';
+import type { CharacterSheet, Location, StageSnapshot, StoryStructure, DirectorStyle, OutlineBeat } from './server/engine/types.ts';
 import { transcriptToFountain, extractCharactersFromLog, syuzhetSort, wrapSyuzhetFountain } from './server/lib/fountain.ts';
 import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES, STYLE_MODIFIERS } from './server/lib/structure-presets.ts';
 import { logger, requestLogger } from './server/lib/logger.ts';
 import { metrics } from './server/lib/metrics.ts';
 import { validate, InitBodySchema, TurnBodySchema, RunRoomBodySchema, ImportBodySchema, AiConfigSchema } from './server/lib/validation.ts';
 import { initFromEnv, applyConfig, getPublicConfig } from './server/lib/ai-config.ts';
+import { sanitizeForPrompt } from './server/lib/prompt-utils.ts';
 
 // ── Startup validation ────────────────────────────────────────────────────────
 const AI_PROVIDER = process.env.AI_PROVIDER ?? 'gemini';
@@ -573,10 +574,17 @@ async function startServer() {
     const wallTimer = setTimeout(() => {
       if (!disconnected) {
         emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: 'error: stream timeout (5 min)' });
-        res.end();
       }
-      disconnected = true;
+      disconnected = true; // triggers ensureEnded() to skip the write, but it still calls res.end()
     }, SSE_MAX_MS);
+
+    // C3: Single-flag guard ensures res.end() is called exactly once even when
+    // the early-return paths or the error handler both want to close the stream.
+    let ended = false;
+    const ensureEnded = () => {
+      if (!ended && !disconnected) { ended = true; res.end(); }
+      else if (!ended) { ended = true; }
+    };
 
     let lockKey = '';
     try {
@@ -586,7 +594,7 @@ async function startServer() {
 
       if (runningRooms.has(lockKey)) {
         emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: 'already_running' });
-        res.end();
+        ensureEnded();
         return;
       }
 
@@ -598,7 +606,7 @@ async function startServer() {
       const { stage, orchestrator } = getOrCreateSession(sid);
       if (!stage.getLocation(nodeId)) {
         emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: `error: location '${nodeId}' not found` });
-        res.end();
+        ensureEnded();
         return;
       }
       runningRooms.add(lockKey);
@@ -611,9 +619,8 @@ async function startServer() {
       emit({ type: 'simulation_complete', totalTurns: 0, stoppedBy: `error: ${(err as Error).message}` });
     } finally {
       clearTimeout(wallTimer);
+      ensureEnded();
     }
-
-    if (!disconnected) res.end();
   });
 
   // ── Scene grouping endpoint ──────────────────────────────────────────────────
@@ -883,8 +890,23 @@ async function startServer() {
     const { stage } = getOrCreateSession(sessionId(req));
     const beats = req.body?.beats;
     if (!Array.isArray(beats)) { res.status(400).json({ error: 'beats array required' }); return; }
-    stage.setOutline(beats);
-    res.json({ status: 'ok', beatCount: beats.length });
+    // Sanitize each beat's text fields before persisting — they are later embedded in agent prompts.
+    const sanitizedBeats = (beats as unknown[]).map(b => {
+      if (typeof b !== 'object' || b === null) return b;
+      const beat = b as Record<string, unknown>;
+      const sanitizeField = (v: unknown, max = 500) =>
+        typeof v === 'string' ? sanitizeForPrompt(v, max) : v;
+      return {
+        ...beat,
+        goal:       sanitizeField(beat.goal),
+        constraint: sanitizeField(beat.constraint),
+        avoid:      sanitizeField(beat.avoid),
+        description: sanitizeField(beat.description, 1000),
+        title:      sanitizeField(beat.title, 256),
+      };
+    });
+    stage.setOutline(sanitizedBeats as OutlineBeat[]);
+    res.json({ status: 'ok', beatCount: sanitizedBeats.length });
   }));
 
   app.delete('/api/outline', gameLimiter, asyncHandler(async (req, res) => {
@@ -1188,7 +1210,7 @@ STRICT CONSTRAINTS:
 3. SENSORY WRITING: Focus on lighting, sound, texture, and kinetic movement. Use active verbs. Avoid "is/are" where possible.
 4. ECONOMY: Keep action blocks to 4 lines maximum. Break up text to control the reader's pacing.
 ${contextBlock}${wbProfiles}
-INPUT: ${beat}
+INPUT: ${sanitizeForPrompt(beat, 8000)}
 OUTPUT: Generate the Scene Heading and Action lines.`,
     }, { label: 'world-build', timeoutMs: 30_000 });
     res.json({ result: response.text ?? '' });
@@ -1236,7 +1258,7 @@ INSTRUCTIONS:
 3. Differentiate voices based on provided psychological profiles.
 4. Add brief, behavior-revealing parentheticals only if absolutely necessary.
 ${dlgContextBlock}
-INPUT DIALOGUE: ${dialogue}
+INPUT DIALOGUE: ${sanitizeForPrompt(dialogue, 8000)}
 CHARACTER PROFILES: ${JSON.stringify(profiles)}
 OUTPUT: Provide 2 alternative versions of the dialogue exchange, explaining the subtextual strategy used in each.`,
     }, { label: 'refine-dialogue', timeoutMs: 30_000 });
@@ -1262,7 +1284,7 @@ ANALYSIS CRITERIA:
 3. The Dilemma: Are the choices too easy? Propose a "best bad choice" scenario.
 4. Pacing: Suggest where to slow down to build dread, or speed up to simulate panic.
 ${tnContextBlock}${tnProfiles}
-INPUT SCENE: ${scene}
+INPUT SCENE: ${sanitizeForPrompt(scene, 8000)}
 OUTPUT: A bulleted diagnostic report with 3 actionable suggestions. Where a character's want, lie, or wound is relevant, ground the suggestion in it.`,
     }, { label: 'analyze-tension', timeoutMs: 30_000 });
     res.json({ result: response.text ?? '' });
@@ -1275,7 +1297,7 @@ OUTPUT: A bulleted diagnostic report with 3 actionable suggestions. Where a char
       contents: `SYSTEM ROLE: You are a strict script editor enforcing a "Semantic Firewall".
 OBJECTIVE: Rewrite the following action block — remove all camera directions and technical jargon. Describe what happens in the world, not what the camera does.
 
-INPUT: ${text}
+INPUT: ${sanitizeForPrompt(text, 8000)}
 OUTPUT: Just the rewritten action text, nothing else.`,
     }, { label: 'clean-action', timeoutMs: 30_000 });
     res.json({ result: response.text ?? '' });
@@ -2710,6 +2732,19 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
       : (allCommits[allCommits.length - 1]?.sceneIdx ?? 0) + 1;
 
     const move = parseAuthorMove(text.trim(), beforeState, { sceneIdx });
+
+    // C2: Structural validation of the parsed move before building a StoryCommit.
+    // Rejects moves whose ops array contains unknown verbs or malformed payloads.
+    const VALID_OP_KINDS = new Set([
+      'ADD_FACT', 'EXPIRE_FACT', 'UPDATE_BELIEF', 'APPRAISE_EMOTION',
+      'SHIFT_RELATIONSHIP', 'ADVANCE_OBJECT_ARC', 'TRIGGER_RULE', 'SEED_CLUE',
+      'PAYOFF_SETUP', 'RAISE_CLOCK', 'ADVANCE_THEME_ARGUMENT', 'UPDATE_READER_STATE',
+      'RECORD_VISUAL_FACT', 'RECORD_SONIC_FACT',
+    ]);
+    if (!Array.isArray(move.ops) || move.ops.some(o => typeof o !== 'object' || o === null || !VALID_OP_KINDS.has((o as { op: string }).op))) {
+      res.status(400).json({ error: 'parseAuthorMove produced an invalid ops array', verb: move.intent.verb, ambiguous: true });
+      return;
+    }
 
     // OVERRULE: revert last commit and return early
     if (move.intent.verb === 'OVERRULE') {

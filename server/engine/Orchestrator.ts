@@ -318,18 +318,19 @@ export class Orchestrator {
 
       // ── Batch epistemic updates: ONCE per agent per ROUND (not per action) ──
       // This prevents O(agents × actions) Gemini calls (fanout explosion).
+      // C4: serialized (not Promise.all) to prevent concurrent SQLite belief writes
+      // that would interleave and silently lose updates under WAL mode.
       if (!didRelocate && lastActionId) {
         const recentActions = this.stage.getSensoryFilter(location_id, maxTurns);
         // Snapshot suspicion scores before epistemic updates for persuasion outcome tracking
         const suspicionBefore = new Map<string, number>(
           agentsInRoom.map(a => [a.char_id, a.suspicion_score]),
         );
-        const epistemicUpdates = await Promise.all(
-          agentsInRoom
-            .map(a => this.agents.get(a.char_id))
-            .filter((a): a is Agent => a !== undefined)
-            .map(a => a.updateEpistemics(recentActions))
-        );
+        const epistemicUpdates: import('./types.ts').EpistemicUpdate[] = [];
+        for (const sheet of agentsInRoom) {
+          const agent = this.agents.get(sheet.char_id);
+          if (agent) epistemicUpdates.push(await agent.updateEpistemics(recentActions));
+        }
         for (const update of epistemicUpdates) {
           this._runSpineForUpdate(update, lastActionId, location_id);
           this.appraiser.appraise(update);
