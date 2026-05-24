@@ -13,7 +13,7 @@ import { transcriptToFountain, extractCharactersFromLog, syuzhetSort, wrapSyuzhe
 import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES, STYLE_MODIFIERS } from './server/lib/structure-presets.ts';
 import { logger, requestLogger } from './server/lib/logger.ts';
 import { metrics } from './server/lib/metrics.ts';
-import { validate, InitBodySchema, TurnBodySchema, RunRoomBodySchema, ImportBodySchema, AiConfigSchema } from './server/lib/validation.ts';
+import { validate, InitBodySchema, TurnBodySchema, RunRoomBodySchema, ImportBodySchema, AiConfigSchema, OutlineBodySchema } from './server/lib/validation.ts';
 import { initFromEnv, applyConfig, getPublicConfig } from './server/lib/ai-config.ts';
 import { sanitizeForPrompt } from './server/lib/prompt-utils.ts';
 
@@ -886,7 +886,7 @@ async function startServer() {
     res.json({ beats: illusion.outline ?? [] });
   }));
 
-  app.post('/api/outline', gameLimiter, asyncHandler(async (req, res) => {
+  app.post('/api/outline', gameLimiter, validate(OutlineBodySchema), asyncHandler(async (req, res) => {
     const { stage } = getOrCreateSession(sessionId(req));
     const beats = req.body?.beats;
     if (!Array.isArray(beats)) { res.status(400).json({ error: 'beats array required' }); return; }

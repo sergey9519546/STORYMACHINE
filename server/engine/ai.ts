@@ -75,6 +75,9 @@ export const geminiEmbeddingProvider: EmbeddingProvider = {
   },
 };
 
+// RESERVED: Image and TTS providers are implemented but not yet wired to any
+// story generation or screenplay output path.  Future: wire via P2 export
+// pipeline or an image-generation toggle in the Director panel.
 export const geminiImageProvider: ImageProvider = {
   generate: async (prompt: string): Promise<string | undefined> => {
     try {
