@@ -1165,6 +1165,39 @@ async function startServer() {
     res.json(storyform);
   }));
 
+  // ── ScriptIDE persistence routes (H2) ────────────────────────────────────────
+  // Server-side save/load for the ScriptIDE writing environment.
+  // Data is keyed by session — same cookie-based session as the rest of the API.
+  // The frontend mirrors to localStorage as well; server is the authoritative backup.
+
+  app.post('/api/scriptide/save', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const body = req.body as {
+      scriptText?: unknown;
+      snapshots?: unknown;
+      characters?: unknown;
+      researchNotes?: unknown;
+      isDarkMode?: unknown;
+    };
+    const scriptText     = typeof body.scriptText     === 'string' ? body.scriptText.substring(0, 500_000) : '';
+    const snapshots      = Array.isArray(body.snapshots)     ? body.snapshots.slice(0, 20)  : [];
+    const characters     = Array.isArray(body.characters)    ? body.characters.slice(0, 100) : [];
+    const researchNotes  = Array.isArray(body.researchNotes) ? body.researchNotes.slice(0, 200) : [];
+    const isDarkMode     = body.isDarkMode === true;
+    stage.saveScriptIDEState(sessionId(req), { scriptText, snapshots, characters, researchNotes, isDarkMode });
+    res.json({ status: 'saved', updatedAt: Date.now() });
+  }));
+
+  app.get('/api/scriptide/load', gameLimiter, asyncHandler(async (req, res) => {
+    const { stage } = getOrCreateSession(sessionId(req));
+    const saved = stage.loadScriptIDEState(sessionId(req));
+    if (!saved) {
+      res.json({ status: 'empty', scriptText: '', snapshots: [], characters: [], researchNotes: [], isDarkMode: false, updatedAt: null });
+      return;
+    }
+    res.json({ status: 'ok', ...saved });
+  }));
+
   // ── ScriptIDE AI routes ────────────────────────────────────────────────────
   // Optional script context — the current editor contents, capped, so AI
   // suggestions stay consistent with established tone, characters, and facts.

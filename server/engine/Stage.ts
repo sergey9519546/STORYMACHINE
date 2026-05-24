@@ -209,6 +209,22 @@ export class Stage {
           CREATE INDEX IF NOT EXISTS idx_corpus_scenario ON Self_Play_Corpus(scenario_id);
         `);
       },
+      // v12 → v13: ScriptIDE_State — server-side persistence for the ScriptIDE
+      //   writing environment.  One row per session; upserted on every save.
+      //   Data is also mirrored to localStorage for offline resilience.
+      () => {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS ScriptIDE_State (
+            session_id    TEXT PRIMARY KEY,
+            script_text   TEXT NOT NULL DEFAULT '',
+            snapshots_json TEXT NOT NULL DEFAULT '[]',
+            characters_json TEXT NOT NULL DEFAULT '[]',
+            research_notes_json TEXT NOT NULL DEFAULT '[]',
+            is_dark_mode  INTEGER NOT NULL DEFAULT 0,
+            updated_at    INTEGER NOT NULL
+          );
+        `);
+      },
     ];
     for (let i = current; i < MIGRATIONS.length; i++) {
       this.db.transaction(() => {
@@ -1459,6 +1475,60 @@ export class Stage {
       proof_pass_rate: number; mean_valuation: number;
       ops_count: number; genome_json: string; created_at: number;
     }>;
+  }
+
+  // ── ScriptIDE server-side persistence (H2) ───────────────────────────────────
+
+  public saveScriptIDEState(sessionId: string, state: {
+    scriptText: string;
+    snapshots: unknown[];
+    characters: unknown[];
+    researchNotes: unknown[];
+    isDarkMode: boolean;
+  }): void {
+    this.db.prepare(`
+      INSERT OR REPLACE INTO ScriptIDE_State
+        (session_id, script_text, snapshots_json, characters_json, research_notes_json, is_dark_mode, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      sessionId,
+      state.scriptText,
+      JSON.stringify(state.snapshots),
+      JSON.stringify(state.characters),
+      JSON.stringify(state.researchNotes),
+      state.isDarkMode ? 1 : 0,
+      Date.now(),
+    );
+  }
+
+  public loadScriptIDEState(sessionId: string): {
+    scriptText: string;
+    snapshots: unknown[];
+    characters: unknown[];
+    researchNotes: unknown[];
+    isDarkMode: boolean;
+    updatedAt: number;
+  } | null {
+    const row = this.db.prepare(
+      'SELECT * FROM ScriptIDE_State WHERE session_id = ?'
+    ).get(sessionId) as {
+      script_text: string;
+      snapshots_json: string;
+      characters_json: string;
+      research_notes_json: string;
+      is_dark_mode: number;
+      updated_at: number;
+    } | undefined;
+
+    if (!row) return null;
+    return {
+      scriptText: row.script_text,
+      snapshots: safeJsonParse<unknown[]>(row.snapshots_json, []),
+      characters: safeJsonParse<unknown[]>(row.characters_json, []),
+      researchNotes: safeJsonParse<unknown[]>(row.research_notes_json, []),
+      isDarkMode: row.is_dark_mode === 1,
+      updatedAt: row.updated_at,
+    };
   }
 
   private _insertRawAction(entry: ActionLogEntry): void {
