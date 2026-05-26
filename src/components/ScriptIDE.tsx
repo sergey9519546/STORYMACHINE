@@ -261,17 +261,24 @@ export default function ScriptIDE({
   }, []); // mount only
 
   // Auto-save to server every 30s (in addition to localStorage debounce).
+  // Use a ref to hold the latest state to avoid resetting the interval on every keystroke.
+  const saveStateRef = useRef({ scriptText, snapshots, characters, researchNotes, isDarkMode });
+  useEffect(() => {
+    saveStateRef.current = { scriptText, snapshots, characters, researchNotes, isDarkMode };
+  }, [scriptText, snapshots, characters, researchNotes, isDarkMode]);
+
   useEffect(() => {
     const saveToServer = () => {
+      const state = saveStateRef.current;
       fetch('/api/scriptide/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scriptText, snapshots, characters, researchNotes, isDarkMode }),
+        body: JSON.stringify(state),
       }).catch(() => { /* non-critical */ });
     };
     const interval = setInterval(saveToServer, 30_000);
     return () => clearInterval(interval);
-  }, [scriptText, snapshots, characters, researchNotes, isDarkMode]);
+  }, []);
 
   // ── Dark mode DOM sync ──────────────────────────────────────────────────────
   useEffect(() => {
