@@ -79,9 +79,10 @@ const renderHighlightedText = (_text: string, blocks: FountainBlock[]) => {
   // Refactored from a two-pass O(N) array allocation/dictionary build to a single-pass iteration.
   // We map directly over `blocks`, significantly reducing memory allocations for large scripts
   // and lowering UI render latency during keystrokes.
+  // Furthermore, `fountain.ts` parseFountain already guarantees each `block.text` is exactly
+  // one line. We removed the redundant `.split("\n")` here to prevent O(N^2) allocations.
 
   const result: React.ReactNode[] = [];
-  let lineIdx = 0;
 
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i];
@@ -98,20 +99,14 @@ const renderHighlightedText = (_text: string, blocks: FountainBlock[]) => {
       className = "font-bold uppercase text-orange-500";
     else if (block.type === "lyrics") className = "italic text-zinc-500";
 
-    const blockLines = block.text.split("\n");
-    for (let j = 0; j < blockLines.length; j++) {
-      const lineText = blockLines[j];
-      const isLastBlock = i === blocks.length - 1;
-      const isLastLineInBlock = j === blockLines.length - 1;
+    const isLastBlock = i === blocks.length - 1;
 
-      result.push(
-        <span key={lineIdx} className={className || ""}>
-          {lineText || " "}
-          {!(isLastBlock && isLastLineInBlock) ? "\n" : ""}
-        </span>
-      );
-      lineIdx++;
-    }
+    result.push(
+      <span key={i} className={className || ""}>
+        {block.text || " "}
+        {!isLastBlock ? "\n" : ""}
+      </span>
+    );
   }
 
   return result;
