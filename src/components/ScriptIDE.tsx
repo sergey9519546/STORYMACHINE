@@ -98,20 +98,17 @@ const renderHighlightedText = (_text: string, blocks: FountainBlock[]) => {
       className = "font-bold uppercase text-orange-500";
     else if (block.type === "lyrics") className = "italic text-zinc-500";
 
-    const blockLines = block.text.split("\n");
-    for (let j = 0; j < blockLines.length; j++) {
-      const lineText = blockLines[j];
-      const isLastBlock = i === blocks.length - 1;
-      const isLastLineInBlock = j === blockLines.length - 1;
-
-      result.push(
-        <span key={lineIdx} className={className || ""}>
-          {lineText || " "}
-          {!(isLastBlock && isLastLineInBlock) ? "\n" : ""}
-        </span>
-      );
-      lineIdx++;
-    }
+    // ⚡ Bolt Performance Optimization:
+    // parseFountain already yields single-line blocks. Avoid String.prototype.split('\n')
+    // and redundant iterations to prevent O(N^2) memory scaling and garbage collection spikes.
+    const isLastBlock = i === blocks.length - 1;
+    result.push(
+      <span key={lineIdx} className={className || ""}>
+        {block.text || " "}
+        {!isLastBlock ? "\n" : ""}
+      </span>
+    );
+    lineIdx++;
   }
 
   return result;
@@ -441,8 +438,22 @@ export default function ScriptIDE({
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
     let actionLines = 0;
-    let wordCount = scriptText.trim().split(/\s+/).length;
-    if (scriptText.trim() === "") wordCount = 0;
+
+    // ⚡ Bolt Performance Optimization:
+    // Replaced scriptText.trim().split(/\s+/).length with a zero-allocation charCode loop
+    // to avoid intermediate array allocations during high-frequency render paths.
+    let wordCount = 0;
+    let inWord = false;
+    for (let i = 0; i < scriptText.length; i++) {
+      if (scriptText.charCodeAt(i) > 32) {
+        if (!inWord) {
+          inWord = true;
+          wordCount++;
+        }
+      } else {
+        inWord = false;
+      }
+    }
 
     blocks.forEach((block) => {
       if (block.type === "character") {
@@ -592,9 +603,15 @@ export default function ScriptIDE({
   // ── Key handler ──────────────────────────────────────────────────────────────
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const cursor = e.currentTarget.selectionStart;
-    const textBeforeCursor = scriptText.substring(0, cursor);
-    const lines = textBeforeCursor.split("\n");
-    const currentLine = lines[lines.length - 1];
+
+    // ⚡ Bolt Performance Optimization:
+    // Avoid String.prototype.split('\n') to find the current line during high-frequency keystroke events.
+    // Instead, search backwards for the last newline character using charCodeAt.
+    let lineStart = cursor - 1;
+    while (lineStart >= 0 && scriptText.charCodeAt(lineStart) !== 10) {
+      lineStart--;
+    }
+    const currentLine = scriptText.substring(lineStart + 1, cursor);
 
     if (e.key === "i" || e.key === "I") {
       if (currentLine === "") {
@@ -737,11 +754,22 @@ export default function ScriptIDE({
   // ── Navigation ───────────────────────────────────────────────────────────────
   const handleNavigate = (lineIndex: number) => {
     if (!editorRef.current) return;
-    const lines = scriptText.split("\n");
+
+    // ⚡ Bolt Performance Optimization:
+    // Avoid String.prototype.split('\n') which creates a large array.
+    // Instead, iterate to find the correct index based on newline count.
     let charCount = 0;
-    for (let i = 0; i < lineIndex; i++) {
-      charCount += lines[i].length + 1;
+    let currentLineIndex = 0;
+    for (let i = 0; i < scriptText.length; i++) {
+      if (currentLineIndex === lineIndex) {
+        break;
+      }
+      if (scriptText.charCodeAt(i) === 10) { // '\n'
+        currentLineIndex++;
+      }
+      charCount++;
     }
+
     editorRef.current.focus();
     editorRef.current.setSelectionRange(charCount, charCount);
 
