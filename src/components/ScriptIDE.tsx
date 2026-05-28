@@ -98,11 +98,13 @@ const renderHighlightedText = (_text: string, blocks: FountainBlock[]) => {
       className = "font-bold uppercase text-orange-500";
     else if (block.type === "lyrics") className = "italic text-zinc-500";
 
-    const blockLines = block.text.split("\n");
-    for (let j = 0; j < blockLines.length; j++) {
-      const lineText = blockLines[j];
+    let blockStart = 0;
+    while (true) {
+      let nextNewline = block.text.indexOf("\n", blockStart);
+      const isLastLineInBlock = nextNewline === -1;
+      const endIdx = isLastLineInBlock ? block.text.length : nextNewline;
+      const lineText = block.text.substring(blockStart, endIdx);
       const isLastBlock = i === blocks.length - 1;
-      const isLastLineInBlock = j === blockLines.length - 1;
 
       result.push(
         <span key={lineIdx} className={className || ""}>
@@ -111,6 +113,9 @@ const renderHighlightedText = (_text: string, blocks: FountainBlock[]) => {
         </span>
       );
       lineIdx++;
+
+      if (isLastLineInBlock) break;
+      blockStart = nextNewline + 1;
     }
   }
 
@@ -441,8 +446,17 @@ export default function ScriptIDE({
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
     let actionLines = 0;
-    let wordCount = scriptText.trim().split(/\s+/).length;
-    if (scriptText.trim() === "") wordCount = 0;
+    let wordCount = 0;
+    let inWord = false;
+    for (let i = 0; i < scriptText.length; i++) {
+      const code = scriptText.charCodeAt(i);
+      if (code === 32 || code === 10 || code === 9 || code === 13) {
+        inWord = false;
+      } else if (!inWord) {
+        wordCount++;
+        inWord = true;
+      }
+    }
 
     blocks.forEach((block) => {
       if (block.type === "character") {
@@ -593,8 +607,8 @@ export default function ScriptIDE({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const cursor = e.currentTarget.selectionStart;
     const textBeforeCursor = scriptText.substring(0, cursor);
-    const lines = textBeforeCursor.split("\n");
-    const currentLine = lines[lines.length - 1];
+    const lastNewlineIdx = textBeforeCursor.lastIndexOf("\n");
+    const currentLine = textBeforeCursor.substring(lastNewlineIdx + 1);
 
     if (e.key === "i" || e.key === "I") {
       if (currentLine === "") {
@@ -737,10 +751,13 @@ export default function ScriptIDE({
   // ── Navigation ───────────────────────────────────────────────────────────────
   const handleNavigate = (lineIndex: number) => {
     if (!editorRef.current) return;
-    const lines = scriptText.split("\n");
     let charCount = 0;
-    for (let i = 0; i < lineIndex; i++) {
-      charCount += lines[i].length + 1;
+    let currentLineIdx = 0;
+    while (currentLineIdx < lineIndex) {
+      const nextNewline = scriptText.indexOf("\n", charCount);
+      if (nextNewline === -1) break;
+      charCount = nextNewline + 1;
+      currentLineIdx++;
     }
     editorRef.current.focus();
     editorRef.current.setSelectionRange(charCount, charCount);
