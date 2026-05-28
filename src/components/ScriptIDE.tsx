@@ -441,8 +441,22 @@ export default function ScriptIDE({
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
     let actionLines = 0;
-    let wordCount = scriptText.trim().split(/\s+/).length;
-    if (scriptText.trim() === "") wordCount = 0;
+
+    // ⚡ Bolt Performance Optimization:
+    // Replaced `scriptText.trim().split(/\s+/).length` with a zero-allocation charCode loop
+    // to prevent large intermediate array allocations and GC spikes on every keystroke.
+    let wordCount = 0;
+    let inWord = false;
+    for (let i = 0; i < scriptText.length; i++) {
+      if (scriptText.charCodeAt(i) > 32) {
+        if (!inWord) {
+          wordCount++;
+          inWord = true;
+        }
+      } else {
+        inWord = false;
+      }
+    }
 
     blocks.forEach((block) => {
       if (block.type === "character") {
@@ -592,9 +606,12 @@ export default function ScriptIDE({
   // ── Key handler ──────────────────────────────────────────────────────────────
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const cursor = e.currentTarget.selectionStart;
-    const textBeforeCursor = scriptText.substring(0, cursor);
-    const lines = textBeforeCursor.split("\n");
-    const currentLine = lines[lines.length - 1];
+
+    // ⚡ Bolt Performance Optimization:
+    // Used `lastIndexOf("\n")` instead of `textBeforeCursor.split("\n")` to find
+    // the current line without allocating an array of all preceding lines.
+    const lastNewlineIdx = scriptText.lastIndexOf("\n", cursor - 1);
+    const currentLine = scriptText.substring(lastNewlineIdx + 1, cursor);
 
     if (e.key === "i" || e.key === "I") {
       if (currentLine === "") {
@@ -737,10 +754,18 @@ export default function ScriptIDE({
   // ── Navigation ───────────────────────────────────────────────────────────────
   const handleNavigate = (lineIndex: number) => {
     if (!editorRef.current) return;
-    const lines = scriptText.split("\n");
+
+    // ⚡ Bolt Performance Optimization:
+    // Replaced `scriptText.split("\n")` with `indexOf("\n")` to calculate cursor offset
+    // without creating a massive intermediate string array of the entire document.
     let charCount = 0;
     for (let i = 0; i < lineIndex; i++) {
-      charCount += lines[i].length + 1;
+      const nextNewline = scriptText.indexOf("\n", charCount);
+      if (nextNewline === -1) {
+        charCount = scriptText.length;
+        break;
+      }
+      charCount = nextNewline + 1;
     }
     editorRef.current.focus();
     editorRef.current.setSelectionRange(charCount, charCount);
