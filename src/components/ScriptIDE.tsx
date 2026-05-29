@@ -194,6 +194,7 @@ export default function ScriptIDE({
     safeJsonParse(lsGet("script_characters"), [])
   );
   const [directorsLayer, setDirectorsLayer] = useState(false);
+  const [rightPanelOpen, setRightPanelOpen] = useState(() => lsGet("right_panel_open") !== "false");
   const [isCleaning, setIsCleaning] = useState<number | null>(null);
   const [cleanError, setCleanError] = useState<string | null>(null);
   const cleanErrTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -220,6 +221,7 @@ export default function ScriptIDE({
   useEffect(() => {
     // Write non-text settings immediately (they change rarely and aren't typed)
     lsSet("theme", isDarkMode ? "dark" : "light");
+    lsSet("right_panel_open", String(rightPanelOpen));
 
     // Show saving indicator immediately
     setIsSaving(true);
@@ -1091,8 +1093,10 @@ export default function ScriptIDE({
           directorsLayer={directorsLayer}
           wordCount={stats.wordCount}
           isTypewriterSound={isTypewriterSound}
+          rightPanelOpen={rightPanelOpen}
           onToggleHUD={() => setShowDirectorHUD(!showDirectorHUD)}
           onToggleDirectorsLayer={() => setDirectorsLayer(!directorsLayer)}
+          onToggleRightPanel={() => setRightPanelOpen(prev => !prev)}
           onToggleTypewriterSound={() => {
             setIsTypewriterSound(prev => {
               lsSet("typewriter_sound", prev ? "off" : "on");
@@ -1194,6 +1198,7 @@ export default function ScriptIDE({
       </div>
 
       {/* RIGHT PANEL: VIRTUAL PRODUCTION & DIRECTOR DASHBOARD */}
+      {rightPanelOpen && (
       <div className="w-[400px] shrink-0 h-full flex flex-col bg-[#e8e8e3] overflow-y-auto">
         <div className="flex bg-black text-white overflow-x-auto">
           {(
@@ -1529,6 +1534,7 @@ export default function ScriptIDE({
           )}
         </div>
       </div>
+      )}
 
       {/* ── DIRECTOR HUD OVERLAY ── */}
       <AnimatePresence>

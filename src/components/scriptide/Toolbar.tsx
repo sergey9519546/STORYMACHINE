@@ -1,6 +1,8 @@
 import React from "react";
 import { BookOpen, Settings2, Layers, Download, Loader2 } from "lucide-react";
 
+import { PanelRightClose, PanelRightOpen } from "lucide-react";
+
 interface ToolbarProps {
   isSaving: boolean;
   isAnalyzing: boolean;
@@ -8,9 +10,11 @@ interface ToolbarProps {
   directorsLayer: boolean;
   wordCount: number;
   isTypewriterSound: boolean;
+  rightPanelOpen: boolean;
   onToggleHUD: () => void;
   onToggleDirectorsLayer: () => void;
   onToggleTypewriterSound: () => void;
+  onToggleRightPanel: () => void;
   onExportFountain: () => void;
   onOpenStoryMachine?: () => void;
 }
@@ -22,9 +26,11 @@ export default function Toolbar({
   directorsLayer,
   wordCount,
   isTypewriterSound,
+  rightPanelOpen,
   onToggleHUD,
   onToggleDirectorsLayer,
   onToggleTypewriterSound,
+  onToggleRightPanel,
   onExportFountain,
   onOpenStoryMachine,
 }: ToolbarProps) {
@@ -52,6 +58,17 @@ export default function Toolbar({
         <div className="text-[10px] font-mono text-gray-400 hidden sm:block">
           {wordCount} words
         </div>
+        <button
+          onClick={onToggleRightPanel}
+          aria-label={rightPanelOpen ? "Close Side Panel" : "Open Side Panel"}
+          aria-pressed={rightPanelOpen}
+          className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border flex items-center gap-2 ${
+            rightPanelOpen ? "bg-black text-white" : "bg-white text-black"
+          }`}
+        >
+          {rightPanelOpen ? <PanelRightClose className="w-3 h-3" /> : <PanelRightOpen className="w-3 h-3" />}
+          PANEL
+        </button>
         <button
           onClick={onToggleTypewriterSound}
           aria-label={isTypewriterSound ? "Mute typewriter sound" : "Enable typewriter sound"}
