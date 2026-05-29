@@ -98,11 +98,16 @@ const renderHighlightedText = (_text: string, blocks: FountainBlock[]) => {
       className = "font-bold uppercase text-orange-500";
     else if (block.type === "lyrics") className = "italic text-zinc-500";
 
-    const blockLines = block.text.split("\n");
-    for (let j = 0; j < blockLines.length; j++) {
-      const lineText = blockLines[j];
+    // O(N) memory allocation avoidance: use slice instead of split
+    let startIdx = 0;
+    let j = 0;
+    while (startIdx <= block.text.length) {
+      const nextIdx = block.text.indexOf("\n", startIdx);
+      const isLastLineInBlock = nextIdx === -1;
+      const endIdx = isLastLineInBlock ? block.text.length : nextIdx;
+      const lineText = block.text.slice(startIdx, endIdx);
+
       const isLastBlock = i === blocks.length - 1;
-      const isLastLineInBlock = j === blockLines.length - 1;
 
       result.push(
         <span key={lineIdx} className={className || ""}>
@@ -111,6 +116,10 @@ const renderHighlightedText = (_text: string, blocks: FountainBlock[]) => {
         </span>
       );
       lineIdx++;
+      j++;
+
+      if (isLastLineInBlock) break;
+      startIdx = nextIdx + 1;
     }
   }
 
@@ -441,8 +450,20 @@ export default function ScriptIDE({
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
     let actionLines = 0;
-    let wordCount = scriptText.trim().split(/\s+/).length;
-    if (scriptText.trim() === "") wordCount = 0;
+
+    // O(N) word counting without splitting
+    let wordCount = 0;
+    let inWord = false;
+    for (let i = 0; i < scriptText.length; i++) {
+      if (scriptText.charCodeAt(i) > 32) {
+        if (!inWord) {
+          wordCount++;
+          inWord = true;
+        }
+      } else {
+        inWord = false;
+      }
+    }
 
     blocks.forEach((block) => {
       if (block.type === "character") {
@@ -593,8 +614,12 @@ export default function ScriptIDE({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const cursor = e.currentTarget.selectionStart;
     const textBeforeCursor = scriptText.substring(0, cursor);
-    const lines = textBeforeCursor.split("\n");
-    const currentLine = lines[lines.length - 1];
+
+    // Extract current line text without allocating array of all previous lines
+    const lastNewlineIdx = textBeforeCursor.lastIndexOf("\n");
+    const currentLine = lastNewlineIdx === -1
+      ? textBeforeCursor
+      : textBeforeCursor.slice(lastNewlineIdx + 1);
 
     if (e.key === "i" || e.key === "I") {
       if (currentLine === "") {
@@ -737,11 +762,20 @@ export default function ScriptIDE({
   // ── Navigation ───────────────────────────────────────────────────────────────
   const handleNavigate = (lineIndex: number) => {
     if (!editorRef.current) return;
-    const lines = scriptText.split("\n");
+
+    // Find index of character at start of target line without allocating arrays
     let charCount = 0;
-    for (let i = 0; i < lineIndex; i++) {
-      charCount += lines[i].length + 1;
+    let currentLineIdx = 0;
+    while (currentLineIdx < lineIndex) {
+      const nextNewlineIdx = scriptText.indexOf("\n", charCount);
+      if (nextNewlineIdx === -1) {
+        charCount = scriptText.length;
+        break;
+      }
+      charCount = nextNewlineIdx + 1;
+      currentLineIdx++;
     }
+
     editorRef.current.focus();
     editorRef.current.setSelectionRange(charCount, charCount);
 
