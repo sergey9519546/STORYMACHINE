@@ -727,6 +727,7 @@ export class Stage {
       emotional_arc: config.emotional_arc,
       director_style: config.director_style,
       expected_turns: config.expected_turns,
+      story_theme: config.story_theme,
     };
   }
 
@@ -742,6 +743,7 @@ export class Stage {
         emotional_arc: next.emotional_arc,
         director_style: next.director_style,
         expected_turns: next.expected_turns,
+        story_theme: next.story_theme,
       };
       this.db.prepare(`
         UPDATE Illusion_State

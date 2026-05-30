@@ -421,7 +421,7 @@ export function relationshipRepairGaps(
 ): string[] {
   const gaps: string[] = [];
   for (const [key, deltas] of Object.entries(state.relationships)) {
-    const net = deltas.reduce((s, d) => s + d.amount, 0);
+    const net = deltas.reduce((s, d) => s + (isFinite(d.amount) ? d.amount : 0), 0);
     if (net < -0.4) {
       const [a, b] = key.split('|');
       const hasRepair = ir.ops.some(

@@ -140,7 +140,7 @@ export function deriveTensionLedger(state: NarrativeState, sceneIdx: number): Te
 
   // Relationship tensions: large negative shift history
   for (const [key, deltas] of Object.entries(state.relationships)) {
-    const net = deltas.reduce((s, d) => s + d.amount, 0);
+    const net = deltas.reduce((s, d) => s + (isFinite(d.amount) ? d.amount : 0), 0);
     if (net < -0.3) {
       const pos = openPosition(
         `rel_tension_${key}`,

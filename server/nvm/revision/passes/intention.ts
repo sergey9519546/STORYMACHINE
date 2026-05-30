@@ -29,7 +29,7 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
   // Fountain character cues are ALL-CAPS lines that aren't sluglines/transitions
   const fountainChars = new Set<string>();
   for (const line of linesInFountain) {
-    if (/^[A-Z][A-Z\s]{2,}$/.test(line.trim()) && !/^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END)/i.test(line.trim())) {
+    if (/^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(line.trim()) && !/^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END|ACT|MIDPOINT|SCENE)/i.test(line.trim())) {
       fountainChars.add(line.trim().split('(')[0].trim());
     }
   }
