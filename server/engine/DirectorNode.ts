@@ -276,7 +276,11 @@ From ${sObserverName}'s perspective only:
       .map(u => {
         const target = allAgents.find(a => a.name === u.agent_name);
         if (!target) return null;
-        return { char_id: target.char_id, delta: Math.max(-20, Math.min(20, u.delta)), reason: u.reason };
+        // u.delta is LLM-parsed; coerce to finite BEFORE clamping (Math.min/max
+        // pass NaN through). A NaN delta would poison suspicion_score, which
+        // drives contagion, initiative order, and persuasion-outcome tracking.
+        const safeDelta = typeof u.delta === 'number' && isFinite(u.delta) ? u.delta : 0;
+        return { char_id: target.char_id, delta: Math.max(-20, Math.min(20, safeDelta)), reason: u.reason };
       })
       .filter((u): u is { char_id: string; delta: number; reason: string } => u !== null);
 
