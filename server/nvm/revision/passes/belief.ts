@@ -34,7 +34,7 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     const relatedWitnessed = witnessedBeliefs.filter(w =>
       w.sceneIdx < told.sceneIdx &&
       // Very rough overlap check: shared significant words
-      sharedWords(w.proposition, told.proposition) >= 1
+      sharedWords(w.proposition, told.proposition) >= 2
     );
     // If there IS a witnessed fact that contradicts what's being told, that's a deception
     // that's fine — but if there's no prior context at all, it's a belief orphan

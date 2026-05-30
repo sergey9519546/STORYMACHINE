@@ -43,6 +43,7 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     // ── Consecutive scenes with identical emotional shift ─────────────────
     if (i >= 2 && curr.emotionalShift === prev.emotionalShift && curr.emotionalShift !== 'neutral') {
       const prevPrev = records[i - 2];
+      if (!prevPrev) continue;
       if (prevPrev.emotionalShift === curr.emotionalShift) {
         issues.push({
           location: `Scenes ${i - 2}–${i}`,

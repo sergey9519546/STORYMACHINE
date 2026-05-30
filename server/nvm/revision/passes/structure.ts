@@ -45,7 +45,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
   }
 
   // ── Tightest scene should be in second half ───────────────────────────────
-  if (structure.tightestScene !== null && n > 4 && structure.tightestScene < Math.floor(n * 0.4)) {
+  if (structure.tightestScene !== null && n > 6 && structure.tightestScene < Math.floor(n * 0.4)) {
     issues.push({
       location: `Scene ${structure.tightestScene}`,
       rule: 'CLIMAX_TOO_EARLY',

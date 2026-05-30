@@ -81,6 +81,10 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
     const act1Lines = Array.from({ length: act1End }, (_, i) => sceneLengths.get(i) ?? 0).reduce((s, v) => s + v, 0);
     const act3Lines = Array.from({ length: n - act3Start }, (_, i) => sceneLengths.get(act3Start + i) ?? 0).reduce((s, v) => s + v, 0);
     const totalLines = lengths.reduce((s, v) => s + v, 0);
+    if (totalLines === 0) return {
+      pass: 'pacing', issues: [], revisedFountain: fountain, changed: false,
+      summary: 'Pacing pass: all scenes are empty',
+    };
 
     const act1Pct = act1Lines / totalLines;
     const act3Pct = act3Lines / totalLines;
