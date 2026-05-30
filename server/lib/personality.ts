@@ -13,7 +13,9 @@ import type { DarkTriad, BigFive, DefenseMechanism, AttachmentStyle, ActionType 
 export type { ActionType };
 
 // Normalize a trait value (0–100) to a -1 to +1 deviation from neutral.
-const dev = (v: number) => (v - 50) / 50;
+// Guard against NaN/undefined traits (character sheet missing fields or persisted
+// from malformed LLM output): treat as neutral (50), which produces 0 deviation.
+const dev = (v: number) => (typeof v === 'number' && isFinite(v) ? (v - 50) / 50 : 0);
 
 export function actionBiasWeights(
   dt: DarkTriad,

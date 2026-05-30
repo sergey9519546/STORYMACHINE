@@ -1917,10 +1917,12 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     }
 
     const rawBudget = req.body?.budget ?? {};
+    const bibleSummary = buildStoryBibleSummary(stage);
     const budget = {
       maxIterations: Math.min(Number(rawBudget.maxIterations ?? 4), 10),
       candidatesPerIteration: Math.min(Number(rawBudget.candidatesPerIteration ?? 2), 5),
       directorPolicy,
+      bibleSummary: bibleSummary || undefined,
     };
     const result = await convergeScene(state, target, generate, budget, seed);
 
@@ -2273,9 +2275,11 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     }
 
     const rawBudgetArc = req.body?.budget ?? {};
+    const bibleSummaryArc = buildStoryBibleSummary(stage);
     const baseBudget = {
       maxIterations: Math.min(Number(rawBudgetArc.maxIterations ?? 3), 10),
       candidatesPerIteration: Math.min(Number(rawBudgetArc.candidatesPerIteration ?? 2), 5),
+      bibleSummary: bibleSummaryArc || undefined,
     };
     const budget = { ...baseBudget, directorPolicy };
     const baseSeed = typeof req.body?.seed === 'number' ? req.body.seed : Date.now();

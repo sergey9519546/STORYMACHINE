@@ -311,6 +311,43 @@ const TENSION_ARC_EXISTS: NarrativeInvariant = {
   },
 };
 
+const BELIEF_REVERSAL: NarrativeInvariant = {
+  id: 'BELIEF_REVERSAL',
+  name: 'Belief Reversal',
+  category: 'character',
+  description: 'A compelling story has characters who change their minds. At least one character should update the same belief proposition with a confidence shift ≥ 0.35.',
+  check(commits) {
+    if (commits.length < 3) return result(this, 'na', 'Fewer than 3 scenes — checking later.');
+    const beliefOps = opsOfKind(commits, 'UPDATE_BELIEF');
+    if (beliefOps.length < 2) return result(this, 'warning', 'Too few belief updates to assess belief reversals.');
+
+    // Group by charId + proposition prefix (first 40 chars to handle paraphrases)
+    const byKey: Record<string, Array<{ sceneIdx: number; confidence: number }>> = {};
+    for (const { sceneIdx, op } of beliefOps) {
+      const key = `${op.charId}::${op.belief.proposition.toLowerCase().slice(0, 40)}`;
+      (byKey[key] ??= []).push({ sceneIdx, confidence: op.belief.confidence });
+    }
+
+    // Look for any key with 2+ entries where confidence shifts by ≥ 0.35
+    for (const entries of Object.values(byKey)) {
+      if (entries.length < 2) continue;
+      const sorted = entries.slice().sort((a, b) => a.sceneIdx - b.sceneIdx);
+      for (let i = 1; i < sorted.length; i++) {
+        const delta = Math.abs(sorted[i].confidence - sorted[i - 1].confidence);
+        if (isFinite(delta) && delta >= 0.35) {
+          return result(this, 'pass', 'At least one character has undergone a significant belief reversal.');
+        }
+      }
+    }
+
+    if (commits.length >= 5) {
+      return result(this, 'warning',
+        'No belief reversals detected after 5+ scenes. Characters who never change their minds are less compelling.');
+    }
+    return result(this, 'pass', 'Story still in early scenes — belief reversals expected as it develops.');
+  },
+};
+
 const PROPP_COMPLICATION_EXISTS: NarrativeInvariant = {
   id: 'PROPP_COMPLICATION_EXISTS',
   name: 'Propp: Complication Exists',
@@ -340,6 +377,7 @@ export const ALL_INVARIANTS: NarrativeInvariant[] = [
   EMOTIONAL_JOURNEY,
   RELATIONSHIP_ARC_EXISTS,
   CHARACTER_AGENCY_SPREAD,
+  BELIEF_REVERSAL,
   // Clues
   CLUE_BEFORE_PAYOFF,
   CLUE_PLANTED_BY_MIDPOINT,

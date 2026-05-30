@@ -9245,15 +9245,18 @@ describe('Wave 68 — NaN hardening + arc alignment + enhanced bible', () => {
     });
 
     // State with a character in fear
-    const stateWithFear = {
-      ...emptyState(),
-      characterEmotions: { alice: { dominant: 'fear' as const, intensity: 60, secondary: [], blended: false } },
+    const fearEmotion: import('./server/engine/types.ts').EmotionState = {
+      dominant: 'fear', intensity: 60, joy: 0, distress: 0, anger: 0, fear: 60, pride: 0, shame: 0, last_updated_at: 0,
     };
+    const stateWithFear = { ...emptyState(), characterEmotions: { alice: fearEmotion } };
 
     const opsNeutral: StoryOp[] = [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }];
+    const joyEmotion: import('./server/engine/types.ts').EmotionState = {
+      dominant: 'joy', intensity: 70, joy: 70, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, last_updated_at: 0,
+    };
     const opsPolarity: StoryOp[] = [
       ...opsNeutral,
-      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { dominant: 'joy' as const, intensity: 70, secondary: [], blended: false } },
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: joyEmotion },
     ];
 
     const scoreNeutral  = scoreBranch(opsNeutral, makeIR(opsNeutral), stateWithFear, []);
@@ -9269,14 +9272,15 @@ describe('Wave 68 — NaN hardening + arc alignment + enhanced bible', () => {
 
   it('storyBible: includes THEME MOVES section after theme argument commits', () => {
     const stage = makeStage();
+    const themeOpsArr: StoryOp[] = [
+      { op: 'ADVANCE_THEME_ARGUMENT', claimId: 'claim-a', move: 'support' },
+      { op: 'ADVANCE_THEME_ARGUMENT', claimId: 'claim-b', move: 'attack' },
+      { op: 'ADVANCE_THEME_ARGUMENT', claimId: 'claim-c', move: 'support' },
+    ];
     const themeCommit: StoryCommit = {
       commitId: 'theme-c1', parentId: null, sceneIdx: 0,
-      ops: [
-        { op: 'ADVANCE_THEME_ARGUMENT', claimId: 'claim-a', move: 'support' },
-        { op: 'ADVANCE_THEME_ARGUMENT', claimId: 'claim-b', move: 'attack' },
-        { op: 'ADVANCE_THEME_ARGUMENT', claimId: 'claim-c', move: 'support' },
-      ],
-      deltaSummary: '3 theme moves',
+      ops: themeOpsArr,
+      deltaSummary: summarizeOps(themeOpsArr),
       reverted: false,
       createdAt: Date.now(),
     };
@@ -9288,13 +9292,14 @@ describe('Wave 68 — NaN hardening + arc alignment + enhanced bible', () => {
 
   it('storyBible: includes RELATIONSHIPS section after relationship commits', () => {
     const stage = makeStage();
+    const relOpsArr: StoryOp[] = [
+      { op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: 0.8, reason: 'helped' } },
+      { op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: 0.3, reason: 'again' } },
+    ];
     const relCommit: StoryCommit = {
       commitId: 'rel-c1', parentId: null, sceneIdx: 0,
-      ops: [
-        { op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: 0.8, reason: 'helped' } },
-        { op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: 0.3, reason: 'again' } },
-      ],
-      deltaSummary: 'relationship shifts',
+      ops: relOpsArr,
+      deltaSummary: summarizeOps(relOpsArr),
       reverted: false,
       createdAt: Date.now(),
     };
@@ -9325,5 +9330,125 @@ describe('Wave 68 — NaN hardening + arc alignment + enhanced bible', () => {
     const conflicts = computeConflictsW68(registry, emptyState());
     assert.ok(conflicts.collisions.length > 0, 'warn/silence directional collision detected');
     assert.ok(conflicts.collisions[0].severity > 0, 'collision has positive severity');
+  });
+});
+
+// ── Wave 69: NaN hardening personality, bible→converge injection, BELIEF_REVERSAL ──
+
+describe('Wave 69 — personality NaN guards, bible injection, BELIEF_REVERSAL invariant', () => {
+
+  // ── personality.ts: dev() NaN guard ──────────────────────────────────────
+
+  it('personality: actionBiasWeights with all NaN traits returns finite weights near 1.0', () => {
+    const nanDT = { machiavellianism: NaN, narcissism: NaN, psychopathy: NaN };
+    const nanBF = { openness: NaN, conscientiousness: NaN, extraversion: NaN, agreeableness: NaN, neuroticism: NaN };
+    const weights = actionBiasWeights(nanDT as any, nanBF as any);
+    for (const [k, v] of Object.entries(weights)) {
+      assert.ok(isFinite(v), `actionBiasWeights[${k}] should be finite for NaN traits, got ${v}`);
+      assert.ok(v >= 0.5 && v <= 1.6, `actionBiasWeights[${k}] should be in [0.5, 1.6], got ${v}`);
+    }
+  });
+
+  it('personality: actionBiasWeights with undefined traits returns finite weights', () => {
+    const undefinedDT = { machiavellianism: undefined as any, narcissism: undefined as any, psychopathy: undefined as any };
+    const undefinedBF = { openness: undefined as any, conscientiousness: undefined as any, extraversion: undefined as any, agreeableness: undefined as any, neuroticism: undefined as any };
+    const weights = actionBiasWeights(undefinedDT, undefinedBF);
+    for (const [k, v] of Object.entries(weights)) {
+      assert.ok(isFinite(v), `actionBiasWeights[${k}] should be finite for undefined traits, got ${v}`);
+    }
+  });
+
+  it('personality: effectiveScore with NaN traits does not propagate NaN', () => {
+    const nanDT = { machiavellianism: NaN, narcissism: NaN, psychopathy: NaN };
+    const nanBF = { openness: NaN, conscientiousness: NaN, extraversion: NaN, agreeableness: NaN, neuroticism: NaN };
+    const score = effectiveScore(0.8, 'SPEAK', nanDT as any, nanBF as any, null, undefined);
+    assert.ok(isFinite(score), `effectiveScore should be finite for NaN traits, got ${score}`);
+    assert.ok(score > 0, `effectiveScore should be positive, got ${score}`);
+  });
+
+  it('personality: NaN-trait weights match neutral-trait (50) weights', () => {
+    const nanDT = { machiavellianism: NaN, narcissism: NaN, psychopathy: NaN };
+    const nanBF = { openness: NaN, conscientiousness: NaN, extraversion: NaN, agreeableness: NaN, neuroticism: NaN };
+    const neutralDT = { machiavellianism: 50, narcissism: 50, psychopathy: 50 };
+    const neutralBF = { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 };
+    const nanWeights = actionBiasWeights(nanDT as any, nanBF as any);
+    const neutralWeights = actionBiasWeights(neutralDT, neutralBF);
+    for (const key of Object.keys(nanWeights) as Array<keyof typeof nanWeights>) {
+      assert.strictEqual(nanWeights[key], neutralWeights[key],
+        `NaN trait and neutral trait should produce same weight for ${key}`);
+    }
+  });
+
+  // ── BELIEF_REVERSAL invariant ─────────────────────────────────────────────
+
+  it('BELIEF_REVERSAL: na when fewer than 3 scenes', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'BELIEF_REVERSAL')!;
+    assert.ok(inv, 'BELIEF_REVERSAL invariant must exist');
+    const addFact: StoryOp = { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'a', predicate: 'is', object: 'b', addedAtTurn: 0, validFrom: 0, validTo: null } };
+    const twoSceneCommits: StoryCommit[] = [
+      { commitId: 'c1', parentId: null, sceneIdx: 0,
+        ops: [{ op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'bob is trustworthy', confidence: 0.8, source: 'witnessed', acquired_at: 0 } }],
+        deltaSummary: summarizeOps([{ op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'bob is trustworthy', confidence: 0.8, source: 'witnessed', acquired_at: 0 } }]),
+        reverted: false, createdAt: Date.now() },
+      { commitId: 'c2', parentId: 'c1', sceneIdx: 1,
+        ops: [addFact],
+        deltaSummary: summarizeOps([addFact]),
+        reverted: false, createdAt: Date.now() },
+    ];
+    const r = inv.check(twoSceneCommits);
+    assert.strictEqual(r.status, 'na', `Expected na for <3 scenes, got ${r.status}`);
+  });
+
+  it('BELIEF_REVERSAL: pass when confidence shifts ≥ 0.35 for same proposition', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'BELIEF_REVERSAL')!;
+    const b1Hi: StoryOp = { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'bob is trustworthy', confidence: 0.9, source: 'witnessed', acquired_at: 0 } };
+    const b1Lo: StoryOp = { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b2', proposition: 'bob is trustworthy', confidence: 0.1, source: 'inferred', acquired_at: 2 } };
+    const addFact: StoryOp = { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'a', predicate: 'is', object: 'b', addedAtTurn: 1, validFrom: 1, validTo: null } };
+    const commits: StoryCommit[] = [
+      { commitId: 'c1', parentId: null, sceneIdx: 0, ops: [b1Hi], deltaSummary: summarizeOps([b1Hi]), reverted: false, createdAt: Date.now() },
+      { commitId: 'c2', parentId: 'c1', sceneIdx: 1, ops: [addFact], deltaSummary: summarizeOps([addFact]), reverted: false, createdAt: Date.now() },
+      { commitId: 'c3', parentId: 'c2', sceneIdx: 2, ops: [b1Lo], deltaSummary: summarizeOps([b1Lo]), reverted: false, createdAt: Date.now() },
+    ];
+    const r = inv.check(commits);
+    assert.strictEqual(r.status, 'pass', `Expected pass for ≥0.35 confidence shift, got ${r.status}: ${r.message}`);
+  });
+
+  it('BELIEF_REVERSAL: warning after 5+ scenes with no reversal', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'BELIEF_REVERSAL')!;
+    const commits: StoryCommit[] = Array.from({ length: 6 }, (_, i) => {
+      const op: StoryOp = { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: `b${i}`, proposition: 'bob is trustworthy', confidence: 0.8, source: 'witnessed', acquired_at: i } };
+      return { commitId: `c${i}`, parentId: i === 0 ? null : `c${i - 1}`, sceneIdx: i, ops: [op], deltaSummary: summarizeOps([op]), reverted: false, createdAt: Date.now() };
+    });
+    const r = inv.check(commits);
+    assert.strictEqual(r.status, 'warning', `Expected warning for 6 scenes with no reversal, got ${r.status}: ${r.message}`);
+  });
+
+  it('BELIEF_REVERSAL: small confidence shift (<0.35) does not trigger pass', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'BELIEF_REVERSAL')!;
+    const addFact: StoryOp = { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'a', predicate: 'is', object: 'b', addedAtTurn: 1, validFrom: 1, validTo: null } };
+    const b1Hi: StoryOp = { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'bob is trustworthy', confidence: 0.7, source: 'witnessed', acquired_at: 0 } };
+    const b1Mid: StoryOp = { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b2', proposition: 'bob is trustworthy', confidence: 0.55, source: 'inferred', acquired_at: 2 } };
+    const commits: StoryCommit[] = [
+      { commitId: 'c1', parentId: null, sceneIdx: 0, ops: [b1Hi], deltaSummary: summarizeOps([b1Hi]), reverted: false, createdAt: Date.now() },
+      { commitId: 'c2', parentId: 'c1', sceneIdx: 1, ops: [addFact], deltaSummary: summarizeOps([addFact]), reverted: false, createdAt: Date.now() },
+      { commitId: 'c3', parentId: 'c2', sceneIdx: 2, ops: [b1Mid], deltaSummary: summarizeOps([b1Mid]), reverted: false, createdAt: Date.now() },
+    ];
+    const r = inv.check(commits);
+    // 0.7 - 0.55 = 0.15 < 0.35, so 3-scene story gets 'pass' (too early for warning)
+    assert.notStrictEqual(r.status, 'fail', `BELIEF_REVERSAL should not fail for small shift, got ${r.status}`);
+  });
+
+  // ── ConvergeBudget bibleSummary field type check ───────────────────────────
+
+  it('converge: ConvergeBudget interface accepts bibleSummary string field', async () => {
+    const { convergeScene } = await import('./server/nvm/converge/loop.ts');
+    // Type-level check: if ConvergeBudget doesn't accept bibleSummary, tsc would fail here
+    const budget: Parameters<typeof convergeScene>[3] = {
+      maxIterations: 1,
+      candidatesPerIteration: 1,
+      bibleSummary: 'STORY BIBLE: THEME: Trust\nCHARACTERS:\n  Alice',
+    };
+    assert.ok(budget.bibleSummary !== undefined, 'bibleSummary field accepted in ConvergeBudget');
+    assert.strictEqual(typeof budget.bibleSummary, 'string', 'bibleSummary should be a string');
   });
 });

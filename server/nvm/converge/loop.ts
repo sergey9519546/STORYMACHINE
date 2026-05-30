@@ -72,6 +72,12 @@ export interface ConvergeBudget {
   maxLLMCalls?: number;
   /** When present, biases operator selection via corpus-learned Director Policy (G13→G1). */
   directorPolicy?: DirectorPolicy;
+  /**
+   * Wave 69: Live Story Bible summary text (built from Stage by caller).
+   * Prepended to every GenerationSpec systemPreamble so the LLM candidate
+   * generator has full story context — characters, arcs, clocks, theme.
+   */
+  bibleSummary?: string;
 }
 
 const DEFAULT_BUDGET: ConvergeBudget = { maxIterations: 8, candidatesPerIteration: 3 };
@@ -118,10 +124,16 @@ export async function convergeScene(
         proppGaps,
       );
     }
+    // Wave 69: prepend the live Story Bible to the system preamble so the LLM
+    // candidate generator knows the full story context — characters, arcs, clocks.
+    const basePreamble = buildSystemPreamble(specConstraints, state);
+    const systemPreamble = budget.bibleSummary
+      ? `${budget.bibleSummary}\n\n${basePreamble}`
+      : basePreamble;
     const spec = {
       ...baseSpec,
       constraints: specConstraints,
-      systemPreamble: buildSystemPreamble(specConstraints, state),
+      systemPreamble,
     };
 
     let candidates: NarrativeTransitionIR[];
