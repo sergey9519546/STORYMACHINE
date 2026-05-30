@@ -12,14 +12,22 @@ const CLICHE_PHRASES = [
   'you don\'t understand', 'we\'re not so different', 'i had no choice',
   'you were always the strong one', 'i never meant to hurt you',
   'this changes everything', 'over my dead body',
+  'we can get through this', 'it was never meant to be',
+  'i was just doing my job', 'you have no idea what i\'ve been through',
+  'trust me on this', 'i\'m not who you think i am',
+  'you lied to me', 'just let it go', 'this isn\'t over',
+  'things will never be the same', 'you complete me',
   // Action clichés
   'looks around nervously', 'takes a deep breath', 'fights back tears',
   'runs a hand through', 'stares into the distance', 'jaw drops',
   'eyes go wide', 'heart sinks', 'blood runs cold',
-  'a single tear', 'laughs to himself',
+  'a single tear', 'laughs to himself', 'swallows hard',
+  'shifts uncomfortably', 'bites his lip', 'bites her lip',
+  'forces a smile', 'lets out a long breath',
   // Scene clichés
   'begins to rain', 'phone rings', 'alarm goes off',
   'the screen goes black', 'camera pulls back',
+  'nothing but silence', 'time seems to stop', 'the world falls away',
 ];
 
 // ── Generic scene descriptor patterns ────────────────────────────────────────
@@ -29,7 +37,12 @@ const GENERIC_PATTERNS = [
   /\bmeanwhile\b/i,
   /\blater that (day|night|evening)\b/i,
   /\bthe next (day|morning|night)\b/i,
-  /\bsuddenly\b/i, // overused
+  /\bsuddenly\b/i,
+  /\bfor what seems like (an eternity|forever|hours)\b/i,
+  /\bthe air (is|was) thick\b/i,
+  /\b(time|world) (seems|seemed) to (stop|freeze|stand still)\b/i,
+  /\bnothing would ever be the same\b/i,
+  /\bwithout another word\b/i,
 ];
 
 export async function originalityPass(input: PassInput): Promise<PassResult> {

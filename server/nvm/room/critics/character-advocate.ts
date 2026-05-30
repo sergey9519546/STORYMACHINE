@@ -12,14 +12,24 @@ export function characterAdvocateCritic(ir: NarrativeTransitionIR, state: Narrat
   ir.ops.forEach((op, i) => {
     if (op.op === 'APPRAISE_EMOTION') {
       const prev = state.characterEmotions[op.charId];
-      // Sudden full emotional reversal (e.g. pride → shame with no story event between)
+      // Sudden full emotional reversal (e.g. pride → shame with no story event between).
+      // Suppressed when the same IR contains a causal bridging event (ADD_FACT,
+      // SHIFT_RELATIONSHIP, or UPDATE_BELIEF for this character) BEFORE this op —
+      // those events explain the change without requiring an extra bridging scene.
       if (prev && prev.dominant !== op.emotion.dominant && op.emotion.intensity > 70) {
-        critiques.push({
-          criticId: 'character_advocate', severity: 50, targetOpIdx: i,
-          objection: `${op.charId} shifts from ${prev.dominant} to ${op.emotion.dominant} at intensity ${op.emotion.intensity} with no bridging beat`,
-          suggestedOperator: 'deepen_wound',
-          attentionBid: 55,
-        });
+        const hasBridgingEvent = ir.ops.slice(0, i).some(p =>
+          p.op === 'ADD_FACT' ||
+          (p.op === 'SHIFT_RELATIONSHIP' && p.pair.includes(op.charId)) ||
+          (p.op === 'UPDATE_BELIEF' && p.charId === op.charId),
+        );
+        if (!hasBridgingEvent) {
+          critiques.push({
+            criticId: 'character_advocate', severity: 50, targetOpIdx: i,
+            objection: `${op.charId} shifts from ${prev.dominant} to ${op.emotion.dominant} at intensity ${op.emotion.intensity} with no bridging beat`,
+            suggestedOperator: 'deepen_wound',
+            attentionBid: 55,
+          });
+        }
       }
       // Zero-intensity dominant is incoherent (also caught by lint, but critic flags it too)
       if (op.emotion.intensity === 0) {

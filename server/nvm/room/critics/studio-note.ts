@@ -9,9 +9,13 @@ import type { Critique } from '../room.ts';
 export function studioNoteCritic(ir: NarrativeTransitionIR, state: NarrativeState): Critique[] {
   const critiques: Critique[] = [];
 
-  // No reader state update — audience not engaged
+  // No reader state update — audience not engaged.
+  // Exempt scene types that serve structural purposes where direct engagement
+  // tracking is less critical: reveal_character and establish_world are deep
+  // character/world scenes that earn engagement through content, not audience-state ops.
   const hasReaderUpdate = ir.ops.some(op => op.op === 'UPDATE_READER_STATE');
-  if (!hasReaderUpdate && ir.sceneIdx > 0) {
+  const exemptFromReaderCheck: NarrativeTransitionIR['sceneFunction'][] = ['reveal_character', 'establish_world'];
+  if (!hasReaderUpdate && ir.sceneIdx > 0 && !exemptFromReaderCheck.includes(ir.sceneFunction)) {
     critiques.push({
       criticId: 'studio_note', severity: 35, targetOpIdx: null,
       objection: 'No UPDATE_READER_STATE — scene does not move the audience needle',

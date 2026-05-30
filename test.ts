@@ -9862,3 +9862,93 @@ describe('Wave 77 — convergence loop arc promises + THEME_ARGUMENT_PROGRESSES 
     assert.equal(budget.openPromises![0].kind, 'CLUE');
   });
 });
+
+// ── Wave 78: critics improvements + cliché expansion ──────────────────────────
+
+describe('Wave 78 — character-advocate false-positive fix, studio-note scene exemption, cliché expansion', () => {
+  function makeIR78(
+    sceneFunction: import('./server/nvm/ir/NarrativeTransitionIR.ts').SceneFunction,
+    ops: StoryOp[],
+  ): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR {
+    return {
+      transitionId: 'w78', sceneIdx: 2, sceneFunction, activeMechanisms: [],
+      beforeStateHash: 'x', ops, preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 0 },
+    };
+  }
+
+  // ── character-advocate ─────────────────────────────────────────────────────
+
+  it('character-advocate does NOT fire on emotional shift when IR has prior bridging fact', async () => {
+    const { characterAdvocateCritic } = await import('./server/nvm/room/critics/character-advocate.ts');
+    const state = emptyState();
+    state.characterEmotions['alice'] = { joy: 80, distress: 0, anger: 0, fear: 0, pride: 80, shame: 0, dominant: 'pride', intensity: 80, last_updated_at: 0 };
+    const ir = makeIR78('build_tension', [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'alice', predicate: 'discovered', object: 'betrayal', addedAtTurn: 2, validFrom: 2, validTo: null } },
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { dominant: 'shame', intensity: 75, joy: 0, distress: 0, anger: 0, fear: 0, pride: 0, shame: 75, last_updated_at: 2 } },
+    ]);
+    const critiques = characterAdvocateCritic(ir, state);
+    const reversal = critiques.filter(c => c.objection.includes('bridging beat'));
+    assert.equal(reversal.length, 0, 'should NOT fire when ADD_FACT bridges the emotional shift');
+  });
+
+  it('character-advocate DOES fire when no bridging event exists for emotional reversal', async () => {
+    const { characterAdvocateCritic } = await import('./server/nvm/room/critics/character-advocate.ts');
+    const state = emptyState();
+    state.characterEmotions['bob'] = { joy: 80, distress: 0, anger: 0, fear: 0, pride: 80, shame: 0, dominant: 'joy', intensity: 80, last_updated_at: 0 };
+    const ir = makeIR78('build_tension', [
+      // No ADD_FACT / SHIFT_RELATIONSHIP / UPDATE_BELIEF before the emotion op
+      { op: 'APPRAISE_EMOTION', charId: 'bob', emotion: { dominant: 'shame', intensity: 75, joy: 0, distress: 0, anger: 0, fear: 0, pride: 0, shame: 75, last_updated_at: 2 } },
+    ]);
+    const critiques = characterAdvocateCritic(ir, state);
+    const reversal = critiques.filter(c => c.objection.includes('bridging beat'));
+    assert.ok(reversal.length > 0, 'should fire when no bridging event precedes the emotional reversal');
+  });
+
+  // ── studio-note ────────────────────────────────────────────────────────────
+
+  it('studio-note does NOT require UPDATE_READER_STATE for reveal_character scenes', async () => {
+    const { studioNoteCritic } = await import('./server/nvm/room/critics/studio-note.ts');
+    const ir = makeIR78('reveal_character', [
+      { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'bob is secretly afraid', confidence: 0.7, source: 'witnessed', source_event_id: 'e1', acquired_at: 2 } },
+    ]);
+    const critiques = studioNoteCritic(ir, emptyState());
+    const noReaderUpdate = critiques.filter(c => c.objection.includes('UPDATE_READER_STATE'));
+    assert.equal(noReaderUpdate.length, 0, 'reveal_character should be exempt from UPDATE_READER_STATE requirement');
+  });
+
+  it('studio-note DOES require UPDATE_READER_STATE for advance_plot scenes', async () => {
+    const { studioNoteCritic } = await import('./server/nvm/room/critics/studio-note.ts');
+    const ir = makeIR78('advance_plot', [
+      { op: 'ADD_FACT', fact: { factId: 'f2', subject: 'plot', predicate: 'advanced', object: 'yes', addedAtTurn: 2, validFrom: 2, validTo: null } },
+    ]);
+    const critiques = studioNoteCritic(ir, emptyState());
+    const noReaderUpdate = critiques.filter(c => c.objection.includes('UPDATE_READER_STATE'));
+    assert.ok(noReaderUpdate.length > 0, 'advance_plot should still require UPDATE_READER_STATE');
+  });
+
+  // ── cliché expansion ───────────────────────────────────────────────────────
+
+  it('originalityPass detects newly-added cliché phrases', async () => {
+    const newCliches = [
+      'we can get through this',
+      'swallows hard',
+      'forces a smile',
+    ];
+    const { originalityPass: origPass } = await import('./server/nvm/revision/passes/originality.ts');
+    for (const cliche of newCliches) {
+      const fountain = `INT. ROOM - DAY\n\nALICE\n(${cliche})\n\nBOB\nYou okay?`;
+      // Pass input uses type that includes structure — we only need fountain for cliché detection
+      const stub = {
+        fountain,
+        original: fountain,
+        annotations: [],
+        structure: { actPosition: 'act2a', completionPercent: 40, totalClockPressure: 0, midpointPressure: 0, reversalCount: 0, tightestScene: null, avgSuspensePerScene: 0, escalating: false, reversalDensity: 0, approachingClimax: false, openClues: 0, revelationCount: 0 } as import('./server/nvm/screenplay/structure.ts').StructureState,
+        records: [],
+        approvedSpans: [],
+      };
+      const result = await origPass(stub as import('./server/nvm/revision/passes/types.ts').PassInput);
+      assert.ok(result.issues.some(i => i.rule === 'CLICHE_PHRASE'), `Should detect cliché: "${cliche}"`);
+    }
+  });
+});
