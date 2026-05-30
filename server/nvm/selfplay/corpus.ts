@@ -9,6 +9,7 @@ import type { CandidateGenerator, SceneTarget } from '../generate/proof-spec.ts'
 import type { MutationOperator } from '../converge/operators.ts';
 import { convergeScene } from '../converge/loop.ts';
 import { emptyState } from '../state/NarrativeState.ts';
+import { logger } from '../../lib/logger.ts';
 import { applyStoryOps } from '../ops/dispatcher.ts';
 import { runTier1 } from '../proof/kernel.ts';
 import { deriveTensionLedger } from '../valuation/futures.ts';
@@ -78,8 +79,12 @@ export async function runSelfPlay(
   const runs: SimResult[] = [];
 
   for (const scenario of effectiveScenarios) {
-    const result = await runOneSim(scenario, generate);
-    runs.push(result);
+    try {
+      const result = await runOneSim(scenario, generate);
+      runs.push(result);
+    } catch (err) {
+      logger.error('selfplay_scenario_failed', { scenarioId: scenario.scenarioId, error: (err as Error).message });
+    }
   }
 
   if (runs.length === 0) {

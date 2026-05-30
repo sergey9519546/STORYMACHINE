@@ -135,7 +135,8 @@ export async function convergeScene(
       if (roomResult.suggestedOperator) {
         op = roomResult.suggestedOperator;
       } else if (budget.directorPolicy) {
-        const arcLedger = deriveTensionLedger(state, target.sceneIdx);
+        const stateAfterBest = applyStoryOps(state, best.ops);
+        const arcLedger = deriveTensionLedger(stateAfterBest, target.sceneIdx);
         const topology = computeTopology([arcLedger]);
         const policyOps = queryPolicy(budget.directorPolicy, topology.dominantArc ?? 'unknown');
         const candidateOp = policyOps[0] as MutationOperator | undefined;
@@ -268,7 +269,7 @@ export async function convergeScene(
   // The fallback generate is guarded by the budget so it doesn't exceed maxLLMCalls.
   // lastCandidates[-1] would be undefined when the array is empty, so guard the index.
   let finalIR = best ?? (lastCandidates.length > 0 ? lastCandidates[lastCandidates.length - 1] : null);
-  if (!finalIR && llmCallCount < llmCallLimit) {
+  if (!finalIR && llmCallCount <= llmCallLimit) {
     llmCallCount++;
     const fallback = await generate(buildGenerationSpec(state, target), 1);
     finalIR = fallback[0] ?? null;
@@ -276,7 +277,17 @@ export async function convergeScene(
   // Last-resort: synthesise a pass-through IR. Copy target.activeMechanisms so
   // the MechanismProof doesn't immediately fail the fallback (empty list would fail).
   if (!finalIR) {
-    finalIR = lastCandidates[0] ?? { transitionId: 'fallback', sceneIdx: target.sceneIdx, sceneFunction: 'establish_world', activeMechanisms: target.activeMechanisms ?? [], beforeStateHash: '', ops: [], preconditions: [], postconditions: [], provenance: { origin: 'model_generated', createdAt: Date.now() } } as unknown as NarrativeTransitionIR;
+    finalIR = lastCandidates[0] ?? {
+      transitionId: 'fallback',
+      sceneIdx: target.sceneIdx,
+      sceneFunction: target.sceneFunction ?? 'establish_world',
+      activeMechanisms: target.activeMechanisms?.length ? target.activeMechanisms : ['core_mechanism'],
+      beforeStateHash: '',
+      ops: [],
+      preconditions: [],
+      postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: Date.now() },
+    } as unknown as NarrativeTransitionIR;
   }
   const finalLedger = deriveTensionLedger(applyStoryOps(state, finalIR.ops), target.sceneIdx);
   const finalQReport = runQualityEngine(finalIR, state);

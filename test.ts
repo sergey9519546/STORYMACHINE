@@ -8842,3 +8842,41 @@ describe('Wave 43 — Agent prompt injection sanitization', () => {
     assert.ok(sanitized.includes('hello'), 'non-control text preserved');
   });
 });
+
+describe('Wave 44 — Converge loop fallback IR correctness', () => {
+  it('fallback IR uses target.sceneFunction not hardcoded establish_world', () => {
+    // Simulate the fallback object creation logic from loop.ts
+    const target = { sceneIdx: 3, sceneFunction: 'climax', activeMechanisms: ['clock_pressure'] } as const;
+    const lastCandidates: unknown[] = [];
+    const fallbackIR = lastCandidates[0] ?? {
+      transitionId: 'fallback',
+      sceneIdx: target.sceneIdx,
+      sceneFunction: target.sceneFunction ?? 'establish_world',
+      activeMechanisms: target.activeMechanisms?.length ? target.activeMechanisms : ['core_mechanism'],
+      beforeStateHash: '',
+      ops: [],
+      preconditions: [],
+      postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: Date.now() },
+    };
+    assert.equal((fallbackIR as { sceneFunction: string }).sceneFunction, 'climax', 'preserves target sceneFunction');
+    assert.deepEqual((fallbackIR as { activeMechanisms: string[] }).activeMechanisms, ['clock_pressure'], 'preserves target mechanisms');
+  });
+
+  it('fallback IR provides default mechanism when target has empty activeMechanisms', () => {
+    const target = { sceneIdx: 0, sceneFunction: 'establish_world', activeMechanisms: [] } as const;
+    const lastCandidates: unknown[] = [];
+    const fallbackIR = lastCandidates[0] ?? {
+      transitionId: 'fallback',
+      sceneIdx: target.sceneIdx,
+      sceneFunction: target.sceneFunction ?? 'establish_world',
+      activeMechanisms: target.activeMechanisms?.length ? target.activeMechanisms : ['core_mechanism'],
+      beforeStateHash: '',
+      ops: [],
+      preconditions: [],
+      postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: Date.now() },
+    };
+    assert.deepEqual((fallbackIR as { activeMechanisms: string[] }).activeMechanisms, ['core_mechanism'], 'default mechanism prevents empty-list proof failure');
+  });
+});

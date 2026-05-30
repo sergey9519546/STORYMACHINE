@@ -107,7 +107,9 @@ export class Orchestrator {
     const agent = this.agents.get(agentId);
     if (!agent) throw new Error('Agent not found');
 
-    const currentNodeId = this.stage.getAgent(agentId)!.current_location_id;
+    const _stageAgent = this.stage.getAgent(agentId);
+    if (!_stageAgent) throw new Error(`Agent ${agentId} missing from stage`);
+    const currentNodeId = _stageAgent.current_location_id;
     const action = await agent.takeTurn();
 
     if (action.action_type === 'RELOCATE' && action.target) {
@@ -422,12 +424,15 @@ export class Orchestrator {
 
       // ── Climax detection: emit a revelation beat and stop ──
       if (this._isClimaxReached(location_id)) {
-        const lastId = lastActionId || agentsInRoom[0]?.char_id || '';
+        if (!lastActionId) {
+          logger.warn('climax_no_trigger_action', { location_id });
+          break;
+        }
         this.spine.createBeatTrace({
-          triggerEventId: lastId,
+          triggerEventId: lastActionId,
           beatType: 'revelation',
           participants: agentsInRoom.map(a => a.char_id),
-          causalChain: [lastId],
+          causalChain: [lastActionId],
           locationId: location_id,
           narrativeSummary: 'The illusion has collapsed. Every contradiction has detonated. This is the Prestige.',
           fountainHint: 'HOLD on the faces. Everything has changed. The audience finally understands.',
