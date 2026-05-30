@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { EngineState, StoryConfig, DirectorState } from "../types";
 import { analyzeScriptBlock } from "../services/director";
 import { parseFountain, FountainBlock } from "../lib/fountain";
+import { fountainToFdx } from "../lib/fdx";
 import { safeJsonParse } from "../lib/json";
 import {
   Loader2,
@@ -801,6 +802,17 @@ export default function ScriptIDE({
     URL.revokeObjectURL(url);
   };
 
+  const exportFDX = () => {
+    const fdx = fountainToFdx(scriptText);
+    const blob = new Blob([fdx], { type: "application/xml" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "script.fdx";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // ── Clean action AI ──────────────────────────────────────────────────────────
   const handleCleanAction = async (index: number, text: string) => {
     cleanActionAbortRef.current?.abort();
@@ -1101,6 +1113,7 @@ export default function ScriptIDE({
             });
           }}
           onExportFountain={exportFountain}
+          onExportFDX={exportFDX}
           onOpenStoryMachine={onOpenStoryMachine}
         />
 

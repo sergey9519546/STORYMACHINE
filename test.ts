@@ -172,6 +172,7 @@ import { CausalSpine } from './server/engine/CausalSpine.ts';
 import { Orchestrator } from './server/engine/Orchestrator.ts';
 import { transcriptToFountain } from './server/lib/fountain.ts';
 import { parseFountain } from './src/lib/fountain.ts';
+import { fountainToFdx } from './src/lib/fdx.ts';
 import type { ActionLogEntry, Belief, CharacterSheet, Location } from './server/engine/types.ts';
 import { ACTION_TYPES } from './server/engine/types.ts';
 
@@ -9002,5 +9003,77 @@ describe('Wave 44 — Converge loop fallback IR correctness', () => {
       provenance: { origin: 'model_generated', createdAt: Date.now() },
     };
     assert.deepEqual((fallbackIR as { activeMechanisms: string[] }).activeMechanisms, ['core_mechanism'], 'default mechanism prevents empty-list proof failure');
+  });
+});
+
+// ── Wave 58 — Fountain parser: lineNumber + dual dialogue (M5) ────────────────
+
+describe('Fountain parser — lineNumber tracking', () => {
+  it('assigns 1-indexed line numbers to every block', () => {
+    const script = `INT. ROOM - DAY\n\nALICE\nHello.`;
+    const blocks = parseFountain(script);
+    assert.equal(blocks[0].lineNumber, 1, 'scene heading on line 1');
+    assert.equal(blocks[1].lineNumber, 2, 'empty line on line 2');
+    assert.equal(blocks[2].lineNumber, 3, 'character on line 3');
+    assert.equal(blocks[3].lineNumber, 4, 'dialogue on line 4');
+  });
+
+  it('camera-bleed lint error includes the line number', () => {
+    const script = `INT. ROOM - DAY\n\nWE SEE the door open slowly.`;
+    const blocks = parseFountain(script);
+    const flagged = blocks.find(b => b.lintErrors && b.lintErrors.length > 0);
+    assert.ok(flagged, 'a block should be flagged for camera bleed');
+    assert.ok(/Line 3:/.test(flagged!.lintErrors![0]), 'lint message should reference line 3');
+  });
+});
+
+describe('Fountain parser — dual dialogue detection', () => {
+  it('marks a caret-suffixed cue and its partner as dual_dialogue', () => {
+    const script = `INT. ROOM - DAY\n\nALICE\nWhat do you mean?\n\nBOB ^\nExactly what I said.`;
+    const blocks = parseFountain(script);
+    const alice = blocks.find(b => b.text.trim() === 'ALICE');
+    const bob = blocks.find(b => b.text.includes('BOB'));
+    assert.equal(bob?.type, 'dual_dialogue', 'caret cue is dual_dialogue');
+    assert.equal(alice?.type, 'dual_dialogue', 'preceding cue is retroactively dual_dialogue');
+  });
+});
+
+// ── Wave 62 — Final Draft (.fdx) export (P2) ─────────────────────────────────
+
+describe('fountainToFdx', () => {
+  it('produces valid FDX XML scaffolding', () => {
+    const fdx = fountainToFdx(`INT. ROOM - DAY\n\nA man sits alone.`);
+    assert.ok(fdx.startsWith('<?xml'), 'starts with XML declaration');
+    assert.ok(fdx.includes('<FinalDraft'), 'has FinalDraft root');
+    assert.ok(fdx.includes('</FinalDraft>'), 'closes FinalDraft root');
+    assert.ok(fdx.includes('<Content>'), 'has Content block');
+  });
+
+  it('maps scene headings, action, character, and dialogue to FDX types', () => {
+    const fdx = fountainToFdx(`INT. ROOM - DAY\n\nA man sits.\n\nALICE\nHello there.`);
+    assert.ok(fdx.includes('Type="Scene Heading"'), 'scene heading mapped');
+    assert.ok(fdx.includes('Type="Action"'), 'action mapped');
+    assert.ok(fdx.includes('Type="Character"'), 'character mapped');
+    assert.ok(fdx.includes('Type="Dialogue"'), 'dialogue mapped');
+  });
+
+  it('XML-escapes special characters in text', () => {
+    const fdx = fountainToFdx(`INT. ROOM - DAY\n\nHe said "less & more" <loudly>.`);
+    assert.ok(fdx.includes('&amp;'), 'ampersand escaped');
+    assert.ok(fdx.includes('&lt;') && fdx.includes('&gt;'), 'angle brackets escaped');
+    assert.ok(fdx.includes('&quot;'), 'quotes escaped');
+    assert.ok(!/[^&]& /.test(fdx.replace(/&amp;|&lt;|&gt;|&quot;|&apos;/g, '')), 'no raw ampersands remain');
+  });
+
+  it('skips title-page key:value lines from the body', () => {
+    const fdx = fountainToFdx(`Title: My Script\nAuthor: Me\n\nINT. ROOM - DAY\n\nAction here.`);
+    assert.ok(!fdx.includes('Title: My Script'), 'title-page line not in body');
+    assert.ok(fdx.includes('Action here.'), 'real action survives');
+  });
+
+  it('strips the dual-dialogue caret from the FDX character name', () => {
+    const fdx = fountainToFdx(`INT. ROOM - DAY\n\nALICE\nHi.\n\nBOB ^\nHey.`);
+    assert.ok(!fdx.includes('BOB ^'), 'caret should be stripped');
+    assert.ok(fdx.includes('<Text>BOB</Text>'), 'clean BOB cue present');
   });
 });

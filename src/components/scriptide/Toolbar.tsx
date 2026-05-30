@@ -12,6 +12,7 @@ interface ToolbarProps {
   onToggleDirectorsLayer: () => void;
   onToggleTypewriterSound: () => void;
   onExportFountain: () => void;
+  onExportFDX: () => void;
   onOpenStoryMachine?: () => void;
 }
 
@@ -26,6 +27,7 @@ export default function Toolbar({
   onToggleDirectorsLayer,
   onToggleTypewriterSound,
   onExportFountain,
+  onExportFDX,
   onOpenStoryMachine,
 }: ToolbarProps) {
   return (
@@ -96,7 +98,15 @@ export default function Toolbar({
           aria-label="Export script as Fountain file"
           className="bg-white text-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors brutal-border flex items-center gap-2"
         >
-          <Download className="w-3 h-3" aria-hidden="true" /> Export .Fountain
+          <Download className="w-3 h-3" aria-hidden="true" /> .Fountain
+        </button>
+        <button
+          onClick={onExportFDX}
+          aria-label="Export script as Final Draft FDX file"
+          title="Export as Final Draft (.fdx)"
+          className="bg-white text-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors brutal-border flex items-center gap-2"
+        >
+          <Download className="w-3 h-3" aria-hidden="true" /> .FDX
         </button>
         <button
           onClick={onOpenStoryMachine}
