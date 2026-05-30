@@ -4,6 +4,7 @@ import http from 'node:http';
 import { safeJsonParse } from './src/lib/json.ts';
 import { withTimeout, generateContent, setLLMProvider, resetLLMProvider, setEmbeddingProvider, setImageProvider, setTTSProvider, getEmbeddingProvider, getImageProvider, getTTSProvider, resetAllProviders, noopImageProvider, noopTTSProvider, noopEmbeddingProvider } from './server/engine/ai.ts';
 import { analyzeSubtext } from './server/lib/subtext-meter.ts';
+import { genrePromptBlock, GENRE_MODIFIERS, GENRE_NAMES } from './server/lib/genre-router.ts';
 import { scoreBelief, retrieveBeliefs, consolidateBeliefs, decayBeliefConfidence } from './server/lib/memory.ts';
 import { metrics } from './server/lib/metrics.ts';
 import { actionBiasWeights, defenseActionBias, effectiveScore, attachmentActionBias } from './server/lib/personality.ts';
@@ -1309,6 +1310,56 @@ describe('Stage — getDirectorTensionState / saveDirectorTensionState', () => {
     const ts = stage.getDirectorTensionState();
     assert.equal(ts.accumulator, 80);
     assert.deepEqual(ts.history, [9, 8]);
+  });
+
+  // Wave 60 regression: updateIllusionState must NOT wipe tension state.
+  // Both live in config_json; rebuilding config from scratch on phase advance
+  // (which happens every turn via the Director) silently reset the accumulator.
+  it('preserves tension state across updateIllusionState calls', () => {
+    const stage = makeStage();
+    stage.saveDirectorTensionState(77, [4, 5, 6]);
+    // Simulate a Director phase advance that updates illusion state
+    stage.updateIllusionState({ phase: 'Turn', story_theme: 'power corrupts' });
+    const ts = stage.getDirectorTensionState();
+    assert.equal(ts.accumulator, 77, 'accumulator must survive updateIllusionState');
+    assert.deepEqual(ts.history, [4, 5, 6], 'history must survive updateIllusionState');
+    // And the new illusion fields must have persisted too
+    const s = stage.getIllusionState();
+    assert.equal(s.phase, 'Turn');
+    assert.equal(s.story_theme, 'power corrupts');
+  });
+
+  it('persists and round-trips story_genre through updateIllusionState', () => {
+    const stage = makeStage();
+    stage.updateIllusionState({ story_genre: 'noir' });
+    assert.equal(stage.getIllusionState().story_genre, 'noir');
+    // Updating an unrelated field must not clear the genre
+    stage.updateIllusionState({ phase: 'Prestige' });
+    assert.equal(stage.getIllusionState().story_genre, 'noir');
+  });
+});
+
+// ── Genre router (P8) ────────────────────────────────────────────────────────
+
+describe('genre-router — genrePromptBlock', () => {
+  it('returns empty string when genre is undefined', () => {
+    assert.equal(genrePromptBlock(undefined), '');
+  });
+
+  it('produces a tone instruction, register, and cliché list for each genre', () => {
+    for (const genre of Object.keys(GENRE_NAMES) as Array<keyof typeof GENRE_NAMES>) {
+      const block = genrePromptBlock(genre);
+      assert.ok(block.length > 0, `${genre} should produce a block`);
+      assert.ok(/GENRE —/.test(block), `${genre} block should name the genre`);
+      assert.ok(/AVOID THESE/.test(block), `${genre} block should list clichés`);
+      assert.ok(/REGISTER:/.test(block), `${genre} block should state register`);
+    }
+  });
+
+  it('every GENRE_MODIFIERS entry has at least 3 forbidden clichés', () => {
+    for (const [genre, mod] of Object.entries(GENRE_MODIFIERS)) {
+      assert.ok(mod.forbiddenCliches.length >= 3, `${genre} should have ≥3 clichés`);
+    }
   });
 });
 

@@ -2,6 +2,7 @@ import { Type } from '@google/genai';
 import { randomUUID } from 'crypto';
 import { getModel, getTemperature, generateContent } from './ai.ts';
 import { STYLE_MODIFIERS } from '../lib/structure-presets.ts';
+import { genrePromptBlock } from '../lib/genre-router.ts';
 import { effectiveScore } from '../lib/personality.ts';
 import { ACTION_TYPES } from './types.ts';
 import type {
@@ -438,6 +439,13 @@ export class Agent {
     const styleBlock = illusionState.director_style
       ? `\n${STYLE_MODIFIERS[illusionState.director_style]?.agentInstruction ?? ''}\n`
       : '';
+
+    // ── Genre Instruction (orthogonal to director style: genre = emotional
+    //    contract, style = how it's shot) ──
+    const genreBlock = (() => {
+      const g = genrePromptBlock(illusionState.story_genre);
+      return g ? `\n${g}\n` : '';
+    })();
     const activeBeat = illusionState.outline?.find(b =>
       b.phase === illusionPhase && currentTurn >= b.turn_start && currentTurn <= b.turn_end,
     );
@@ -532,7 +540,7 @@ ${beatHint}
 
 PERSUASION LEVERAGE:
 ${persuasionHints || '  (No other agents present.)'}
-${styleBlock}
+${styleBlock}${genreBlock}
 Generate 3 candidate actions. Score each 0–100 on goal alignment. The best-scoring will be selected.${emotionBlock}`;
   }
 

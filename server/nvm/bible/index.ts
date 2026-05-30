@@ -30,6 +30,9 @@ export function buildStoryBibleSummary(stage: Stage): string {
   if (illusionState.director_style) {
     parts.push(`STYLE: ${illusionState.director_style}`);
   }
+  if (illusionState.story_genre) {
+    parts.push(`GENRE: ${illusionState.story_genre}`);
+  }
   parts.push(`STORY PHASE: ${illusionState.phase ?? 'Setup'} | Turn ${stage.getTurnCount()}`);
 
   // ── Characters with current emotional state and active goal ───────────────

@@ -233,6 +233,7 @@ export default function DirectorPanel({
   const [storyStructure, setStoryStructure] = useState<string>('');
   const [emotionalArc, setEmotionalArc] = useState<string>('');
   const [directorStyle, setDirectorStyle] = useState<string>('');
+  const [storyGenre, setStoryGenre] = useState<string>('');
   const [expectedTurns, setExpectedTurns] = useState<number>(20);
   const [presetSaved, setPresetSaved] = useState<boolean | null>(null);
   const [applyingPreset, setApplyingPreset] = useState(false);
@@ -268,6 +269,7 @@ export default function DirectorPanel({
       .then(r => r.ok ? r.json() as Promise<{
         structure: string | null; emotional_arc: string | null;
         director_style: string | null; expected_turns: number; pacing_target: string | null;
+        story_genre: string | null;
       }> : null)
       .then(data => {
         if (!data) return;
@@ -276,6 +278,7 @@ export default function DirectorPanel({
         if (data.director_style) setDirectorStyle(data.director_style);
         if (data.expected_turns) setExpectedTurns(data.expected_turns);
         if (data.pacing_target) setPacingTarget(data.pacing_target as 'slow' | 'medium' | 'fast');
+        if (data.story_genre) setStoryGenre(data.story_genre);
       })
       .catch((e: unknown) => console.error('[DirectorPanel] story-config fetch failed:', e));
   }, []);
@@ -438,6 +441,16 @@ export default function DirectorPanel({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ style }),
+    }).catch(() => {});
+  }, []);
+
+  const saveStoryGenre = useCallback(async (genre: string) => {
+    setStoryGenre(genre);
+    if (!genre) return;
+    await fetch("/api/story-genre", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ genre }),
     }).catch(() => {});
   }, []);
 
@@ -1179,6 +1192,29 @@ export default function DirectorPanel({
                 </select>
                 {directorStyle && (
                   <p className="text-[9px] text-gray-400 mt-1 font-mono uppercase">Injected into every agent's character prompt and modulates Director pressure tone.</p>
+                )}
+              </div>
+
+              {/* Story genre */}
+              <div>
+                <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest block mb-1">Genre</label>
+                <select
+                  value={storyGenre}
+                  onChange={e => saveStoryGenre(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">— None —</option>
+                  <option value="thriller">Thriller — Propulsive Suspense</option>
+                  <option value="horror">Horror — Creeping Dread</option>
+                  <option value="drama">Drama — Internal Conflict</option>
+                  <option value="comedy">Comedy — Character-Driven Wit</option>
+                  <option value="romance">Romance — Yearning & Risk</option>
+                  <option value="sci_fi">Science Fiction — Premise-Driven</option>
+                  <option value="noir">Noir — Moral Fog</option>
+                  <option value="mystery">Mystery — Fair-Play Investigation</option>
+                </select>
+                {storyGenre && (
+                  <p className="text-[9px] text-gray-400 mt-1 font-mono uppercase">Sets tone, register, and genre-specific clichés to avoid. Composes with cinematic style.</p>
                 )}
               </div>
             </div>

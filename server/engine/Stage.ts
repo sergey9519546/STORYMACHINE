@@ -728,6 +728,7 @@ export class Stage {
       director_style: config.director_style,
       expected_turns: config.expected_turns,
       story_theme: config.story_theme,
+      story_genre: config.story_genre,
     };
   }
 
@@ -737,13 +738,21 @@ export class Stage {
     this.db.transaction(() => {
       const current = this.getIllusionState();
       const next = { ...current, ...state };
+      // Read the RAW config blob and merge — config_json also stores keys this
+      // method does not manage (tension_accumulator, tension_history, written by
+      // saveDirectorTensionState). Rebuilding config from scratch would wipe the
+      // Director's tension accumulator back to its default on every phase advance.
+      const rawRow = this.db.prepare('SELECT config_json FROM Illusion_State WHERE id = 1').get() as { config_json: string | null } | undefined;
+      const existingConfig = safeJsonParse<Record<string, unknown>>(rawRow?.config_json ?? '{}', {});
       const config = {
+        ...existingConfig,
         pacing_target: next.pacing_target,
         structure: next.structure,
         emotional_arc: next.emotional_arc,
         director_style: next.director_style,
         expected_turns: next.expected_turns,
         story_theme: next.story_theme,
+        story_genre: next.story_genre,
       };
       this.db.prepare(`
         UPDATE Illusion_State
@@ -1289,6 +1298,8 @@ export class Stage {
           emotional_arc: s.emotional_arc,
           director_style: s.director_style,
           expected_turns: s.expected_turns,
+          story_theme: s.story_theme,
+          story_genre: s.story_genre,
         };
       })(),
       beat_traces: this.getAllBeatTraces(),

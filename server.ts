@@ -933,6 +933,7 @@ async function startServer() {
       expected_turns: s.expected_turns ?? 20,
       pacing_target: s.pacing_target ?? null,
       story_theme: s.story_theme ?? null,
+      story_genre: s.story_genre ?? null,
     });
   }));
 
@@ -976,6 +977,21 @@ async function startServer() {
     const { stage } = getOrCreateSession(sessionId(req));
     stage.updateIllusionState({ director_style: style as NonNullable<import('./server/engine/types.ts').IllusionState['director_style']> });
     res.json({ style });
+  }));
+
+  // Set story genre — persists to IllusionState; injected into agent prompts and
+  // the story bible as tone/vocabulary/cliché-avoidance routing (genre-router.ts).
+  app.post('/api/story-genre', gameLimiter, asyncHandler(async (req, res) => {
+    const { GENRE_NAMES } = await import('./server/lib/genre-router.ts');
+    const { genre } = req.body as { genre?: string };
+    const VALID = Object.keys(GENRE_NAMES);
+    if (!genre || !VALID.includes(genre)) {
+      res.status(400).json({ error: `genre must be one of: ${VALID.join(', ')}` });
+      return;
+    }
+    const { stage } = getOrCreateSession(sessionId(req));
+    stage.updateIllusionState({ story_genre: genre as NonNullable<import('./server/engine/types.ts').IllusionState['story_genre']> });
+    res.json({ genre });
   }));
 
   // Set story theme — persists to IllusionState; wires authorIntent.theme into NarrativeState.

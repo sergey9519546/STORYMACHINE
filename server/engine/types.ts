@@ -196,6 +196,18 @@ export type DirectorStyle =
   | 'aster'
   | 'lynch';
 
+// TO ADD A NEW GENRE: extend this union, then add an entry in
+//   server/lib/genre-router.ts GENRE_MODIFIERS.
+export type StoryGenre =
+  | 'thriller'
+  | 'horror'
+  | 'drama'
+  | 'comedy'
+  | 'romance'
+  | 'sci_fi'
+  | 'noir'
+  | 'mystery';
+
 export interface IllusionState {
   phase: IllusionPhase;
   planted_elements: IllusionElement[];
@@ -209,6 +221,7 @@ export interface IllusionState {
   director_style?: DirectorStyle;
   expected_turns?: number;      // writer's estimate of total session length for arc curve
   story_theme?: string;         // author-declared thematic statement ("power corrupts", etc.)
+  story_genre?: StoryGenre;     // genre routing signal — selects tone/vocabulary/cliché modifiers
 }
 
 // ── Persuasion strategy ──────────────────────────────────────────────────────
@@ -451,7 +464,7 @@ export interface StageSnapshot {
   illusion_state: Pick<IllusionState,
     | 'phase' | 'planted_elements' | 'pending_recontextualization'
     | 'outline' | 'pacing_target' | 'structure' | 'emotional_arc'
-    | 'director_style' | 'expected_turns'>;
+    | 'director_style' | 'expected_turns' | 'story_theme' | 'story_genre'>;
   beat_traces: BeatTrace[];
   belief_edges: BeliefEdge[];
   goal_mutations: GoalMutation[];
