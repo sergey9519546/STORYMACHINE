@@ -50,8 +50,9 @@ function normalize(arr: number[]): number[] {
 
 // Linear resample arr to targetLength points.
 function resample(arr: number[], targetLength: number): number[] {
+  if (arr.length === 0 || targetLength <= 0) return Array(Math.max(0, targetLength)).fill(0.5);
   if (arr.length === targetLength) return arr;
-  if (arr.length === 1 || targetLength <= 1) return Array(targetLength).fill(arr[0]);
+  if (arr.length === 1 || targetLength === 1) return Array(targetLength).fill(arr[0]);
   const result: number[] = [];
   for (let i = 0; i < targetLength; i++) {
     const t = i / (targetLength - 1);

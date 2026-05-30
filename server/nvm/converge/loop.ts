@@ -92,7 +92,7 @@ const DEFAULT_BUDGET: ConvergeBudget = { maxIterations: 8, candidatesPerIteratio
 // Normalize tension to 0-100 using the target as the reference ceiling.
 // At tensionTarget → 100; above tensionTarget → capped at 100.
 function normalizeTension(tension: number, tensionTarget: number): number {
-  if (tensionTarget <= 0) return 100;
+  if (!isFinite(tension) || !isFinite(tensionTarget) || tensionTarget <= 0) return 0;
   return Math.max(0, Math.min(100, (tension / tensionTarget) * 100));
 }
 

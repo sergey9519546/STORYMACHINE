@@ -238,7 +238,8 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
 function computeUrgency(currentScene: number, [earliest, latest]: [number, number]): PromiseUrgency {
   if (currentScene > latest)    return 'overdue';
   if (currentScene >= earliest) return 'due_soon';
-  if (currentScene >= earliest - 2) return 'on_track';
+  // Clamp earliest - 2 to 0 so negative scene indices don't produce spurious 'on_track'.
+  if (currentScene >= Math.max(0, earliest - 2)) return 'on_track';
   return 'not_yet';
 }
 

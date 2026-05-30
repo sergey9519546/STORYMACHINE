@@ -100,7 +100,13 @@ export function arcConstraintsFromTracker(
       case 'THEME':
         return { kind: 'free_form' as const, description: `Resolve arc promise: ${base}. Add an ADVANCE_THEME_ARGUMENT with move='resolve'.` };
       case 'OBJECT':
-        return { kind: 'free_form' as const, description: `Resolve arc promise: ${base}. Advance the ADVANCE_OBJECT_ARC to a terminal state (destroyed, resolved, returned, complete, found).` };
+        return { kind: 'free_form' as const, description: `Resolve arc promise: ${base}. Advance the ADVANCE_OBJECT_ARC to a terminal state (destroyed, resolved, returned, complete, found, lost_permanently).` };
+      default: {
+        // Exhaustiveness guard — if a new OpenPromise kind is added without updating this switch,
+        // TypeScript will infer 'never' here and the build will fail.
+        const _exhaustive: never = p.kind;
+        return { kind: 'free_form' as const, description: `Resolve arc promise: ${base}.` };
+      }
     }
   });
 }
