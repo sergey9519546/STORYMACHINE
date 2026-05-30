@@ -152,6 +152,9 @@ function parseInject(text: string, sceneIdx: number): ParsedAuthorMove {
   }
   const kind = (m[1] ?? 'fact').toLowerCase() as 'fact' | 'clue' | 'pressure' | 'reveal' | 'secret';
   const content = m[2].trim();
+  if (!content) {
+    return { intent: { verb: 'INJECT' }, ops: [], summary: 'INJECT: empty content — ignored', ambiguous: true };
+  }
   const ops: StoryOp[] = [];
 
   if (kind === 'clue') {

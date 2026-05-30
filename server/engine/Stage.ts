@@ -43,6 +43,7 @@ export class Stage {
     // Skip for :memory: — pragmas don't persist there but the calls are harmless.
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('synchronous = NORMAL');
+    this.db.pragma('foreign_keys = ON');
     this.initSchema();
     this.runMigrations();
   }

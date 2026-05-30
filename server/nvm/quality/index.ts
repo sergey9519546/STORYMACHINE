@@ -107,15 +107,17 @@ function opText(op: StoryOp): string {
 export function specificityScore(ops: StoryOp[]): number {
   if (ops.length === 0) return 1;
   let totalScore = 0;
+  let scoredOps = 0;
   for (const op of ops) {
     const text = opText(op).toLowerCase();
-    if (!text) { totalScore += 1; continue; }
+    if (!text) continue; // skip ops with no extractable text (SEED_CLUE, RAISE_CLOCK, etc.)
+    scoredOps++;
     const vagueCount = VAGUE_TERMS.filter(t => text.includes(t)).length;
     const wordCount = text.split(/\s+/).length;
     const opScore = Math.max(0, 1 - (vagueCount * 0.25) - (wordCount < 3 ? 0.3 : 0));
     totalScore += opScore;
   }
-  return totalScore / ops.length;
+  return scoredOps === 0 ? 1 : totalScore / scoredOps;
 }
 
 // ── 2. Dialogue Validators (all 10) ──────────────────────────────────────────
