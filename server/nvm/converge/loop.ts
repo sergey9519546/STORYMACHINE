@@ -80,7 +80,7 @@ const DEFAULT_BUDGET: ConvergeBudget = { maxIterations: 8, candidatesPerIteratio
 // At tensionTarget → 100; above tensionTarget → capped at 100.
 function normalizeTension(tension: number, tensionTarget: number): number {
   if (tensionTarget <= 0) return 100;
-  return Math.min(100, (tension / tensionTarget) * 100);
+  return Math.max(0, Math.min(100, (tension / tensionTarget) * 100));
 }
 
 export async function convergeScene(
@@ -299,7 +299,7 @@ export async function convergeScene(
     converged: false,
     finalValuation: finalLedger.totalTension,
     finalQuality: finalQReport.score,
-    finalComposite: bestComposite === -Infinity ? 0 : bestComposite,
+    finalComposite: (!isFinite(bestComposite) || isNaN(bestComposite)) ? 0 : bestComposite,
     ghosts,
   };
 }

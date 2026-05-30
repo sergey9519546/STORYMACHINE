@@ -95,7 +95,9 @@ function parseOp(raw: Record<string, unknown>): StoryOp | null {
         return { op, setupId: raw['setupId'], payoffEventId: raw['payoffEventId'] };
       case 'RAISE_CLOCK':
         if (typeof raw['clockId'] !== 'string') return null;
-        return { op, clockId: raw['clockId'], amount: Number(raw['amount'] ?? 1) };
+        const rawAmt = raw['amount'];
+        const parsedAmt = typeof rawAmt === 'number' ? rawAmt : (typeof rawAmt === 'string' ? parseFloat(rawAmt) : 1);
+        return { op, clockId: raw['clockId'], amount: isFinite(parsedAmt) ? parsedAmt : 1 };
       case 'ADVANCE_THEME_ARGUMENT':
         if (typeof raw['claimId'] !== 'string') return null;
         return { op, claimId: raw['claimId'], move: (raw['move'] ?? 'support') as StoryOp & { op: 'ADVANCE_THEME_ARGUMENT' } extends { move: infer M } ? M : never };
@@ -140,6 +142,7 @@ function parseIR(raw: unknown, spec: GenerationSpec, idx: number): NarrativeTran
     provenance: { origin: 'model_generated', createdAt: Date.now(), model: 'gemini' },
     causalLinks: Array.isArray(obj['causalLinks'])
       ? (obj['causalLinks'] as Array<{ opIdx: number; causedBy: string[] }>)
+          .filter(link => typeof link.opIdx === 'number' && link.opIdx >= 0 && link.opIdx < ops.length)
       : undefined,
   };
 }

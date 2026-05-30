@@ -263,7 +263,7 @@ export default function DirectorPanel({
     fetch("/api/outline")
       .then(r => r.ok ? r.json() as Promise<{ beats: OutlineBeat[] }> : { beats: [] })
       .then(data => { if (data.beats.length > 0) setOutlineBeats(data.beats); })
-      .catch(() => {});
+      .catch((e: unknown) => console.error('[DirectorPanel] outline fetch failed:', e));
     fetch("/api/story-config")
       .then(r => r.ok ? r.json() as Promise<{
         structure: string | null; emotional_arc: string | null;
@@ -277,7 +277,7 @@ export default function DirectorPanel({
         if (data.expected_turns) setExpectedTurns(data.expected_turns);
         if (data.pacing_target) setPacingTarget(data.pacing_target as 'slow' | 'medium' | 'fast');
       })
-      .catch(() => {});
+      .catch((e: unknown) => console.error('[DirectorPanel] story-config fetch failed:', e));
   }, []);
 
   // ── Escape key ────────────────────────────────────────────────────────────

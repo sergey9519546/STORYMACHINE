@@ -305,9 +305,9 @@ export class Orchestrator {
         if (action.action_type === 'LIE' && !incitingActionEmitted) {
           incitingActionEmitted = true;
           const liar = this.stage.getAgent(agentSheet.char_id);
-          const witnesses = this.spine.resolveVisibility(actionEntry,
+          const witnesses = (this.spine.resolveVisibility(actionEntry,
             this.stage.getAllAgents().map(a => ({ char_id: a.char_id, current_location_id: a.current_location_id })),
-          ).filter(id => id !== agentSheet.char_id);
+          ) ?? []).filter(id => id !== agentSheet.char_id);
           this.spine.createBeatTrace({
             triggerEventId: action_id,
             beatType: 'inciting_action',
@@ -364,7 +364,7 @@ export class Orchestrator {
         // Record persuasion outcomes: success when target's suspicion decreased
         const currentTurn = this.stage.getTurnCount();
         for (const agent of agentsInRoom) {
-          const log = this.stage.getPersuasionLog(agent.char_id, agentsInRoom.length * 2);
+          const log = this.stage.getPersuasionLog(agent.char_id, agentsInRoom.length * 2) ?? [];
           for (const rec of log.filter(r => r.turn === currentTurn && r.success === undefined)) {
             const target = this.stage.getAgent(rec.target_id);
             if (!target) continue;

@@ -75,7 +75,7 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
 
         case 'RAISE_CLOCK': {
           const existing = openClocks.get(op.clockId);
-          const newTotal = (existing?.totalAmount ?? 0) + op.amount;
+          const newTotal = (existing?.totalAmount ?? 0) + (isFinite(op.amount) ? op.amount : 0);
           if (newTotal <= 0) {
             if (existing) resolvedCount++;
             openClocks.delete(op.clockId);
@@ -88,7 +88,8 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
         case 'SHIFT_RELATIONSHIP': {
           const key = [...op.pair].sort().join('|');
           const existing = openRelNeg.get(key);
-          const net = (existing?.netAmount ?? 0) + op.delta.amount;
+          const deltaAmt = typeof op.delta?.amount === 'number' && isFinite(op.delta.amount) ? op.delta.amount : 0;
+          const net = (existing?.netAmount ?? 0) + deltaAmt;
           if (net >= -0.1) {
             if (existing) resolvedCount++;
             openRelNeg.delete(key);
