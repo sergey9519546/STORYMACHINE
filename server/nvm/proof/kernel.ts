@@ -37,6 +37,7 @@ export function runTier1(ir: NarrativeTransitionIR, state: NarrativeState): Proo
 }
 
 export function tier1Passes(results: ProofResult[]): boolean {
+  if (results.length === 0) return false; // vacuous-true bypass: no proofs run = not safe
   return results.every(r => r.pass);
 }
 

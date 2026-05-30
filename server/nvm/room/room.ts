@@ -35,6 +35,7 @@ import { continuityCritic } from './critics/continuity.ts';
 import { characterAdvocateCritic } from './critics/character-advocate.ts';
 import { studioNoteCritic } from './critics/studio-note.ts';
 import { dramaturgeCritic } from './critics/dramaturge.ts';
+import { logger } from '../../lib/logger.ts';
 
 export type CriticFn = (
   ir: NarrativeTransitionIR,
@@ -56,10 +57,14 @@ export function runWritersRoom(
 ): WritersRoomResult {
   const allCritiques: Critique[] = [];
 
-  // Each critic inspects and bids
-  for (const { fn } of CRITICS) {
-    const c = fn(ir, state);
-    allCritiques.push(...c);
+  // Each critic inspects and bids — isolated so one crash can't silence others
+  for (const { id, fn } of CRITICS) {
+    try {
+      const c = fn(ir, state);
+      allCritiques.push(...c);
+    } catch (err) {
+      logger.error('critics_error', { criticId: id, error: (err as Error).message });
+    }
   }
 
   // Consensus: 100 if all critics agree (all same severity bucket), 0 if maximally opposed

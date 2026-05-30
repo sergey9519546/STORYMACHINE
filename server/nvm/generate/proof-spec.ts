@@ -7,6 +7,7 @@ import type { NarrativeState } from '../state/NarrativeState.ts';
 import type { ProofResult } from '../proof/contract.ts';
 import type { NarrativeTransitionIR } from '../ir/NarrativeTransitionIR.ts';
 import type { SceneFunction } from '../ir/NarrativeTransitionIR.ts';
+import { sanitizeForPrompt } from '../../lib/prompt-utils.ts';
 
 export interface SceneTarget {
   sceneIdx: number;
@@ -139,11 +140,13 @@ export function proofsToConstraints(
 
 // Build the system preamble that encodes constraints as LLM instructions.
 export function buildSystemPreamble(constraints: GenerationConstraint[], state: NarrativeState): string {
-  const knownChars = Object.keys(state.characterBeliefs).join(', ') || 'none yet';
+  const knownChars = Object.keys(state.characterBeliefs)
+    .map(id => sanitizeForPrompt(id, 64))
+    .join(', ') || 'none yet';
   const activeFacts = state.objectiveReality.length;
 
   const constraintLines = constraints
-    .map((c, i) => `${i + 1}. [${c.kind}] ${c.description}`)
+    .map((c, i) => `${i + 1}. [${c.kind}] ${sanitizeForPrompt(c.description, 400)}`)
     .join('\n');
 
   return [
@@ -164,6 +167,8 @@ export function buildGenerationSpec(
   target: SceneTarget,
   failures: ProofResult[] = [],
 ): GenerationSpec {
+  if (target.sceneIdx < 0) throw new Error('buildGenerationSpec: sceneIdx must be >= 0');
+  if (!target.sceneFunction) throw new Error('buildGenerationSpec: sceneFunction is required');
   const constraints = proofsToConstraints(state, target, failures);
   const systemPreamble = buildSystemPreamble(constraints, state);
   return { state, target, constraints, systemPreamble };
