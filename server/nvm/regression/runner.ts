@@ -44,7 +44,7 @@ export function runNarrativeRegression(commits: StoryCommit[]): RegressionReport
   }
 
   const denominator = pass + fail + warning;
-  const score = denominator === 0 ? 100
+  const score = denominator === 0 ? 0
     : Math.round(((pass + 0.5 * warning) / denominator) * 100);
 
   const byCategory: RegressionReport['byCategory'] = {

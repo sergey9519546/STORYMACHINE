@@ -227,10 +227,16 @@ export class AppraisalEngine {
         const rate = CONTAGION_RATE * trust;
 
         // joy and distress are contagious; fear is mildly; anger is self-directed
-        me.joy      = Math.max(0, Math.min(100, Math.round(me.joy      + rate * 1.2 * (other.joy      - me.joy))));
-        me.distress = Math.max(0, Math.min(100, Math.round(me.distress + rate * 0.8 * (other.distress - me.distress))));
-        me.fear     = Math.max(0, Math.min(100, Math.round(me.fear     + rate * 0.5 * (other.fear     - me.fear))));
+        // Accumulate without rounding — round once after all agents contribute
+        me.joy      = Math.max(0, Math.min(100, me.joy      + rate * 1.2 * (other.joy      - me.joy)));
+        me.distress = Math.max(0, Math.min(100, me.distress + rate * 0.8 * (other.distress - me.distress)));
+        me.fear     = Math.max(0, Math.min(100, me.fear     + rate * 0.5 * (other.fear     - me.fear)));
       }
+
+      // Round after all contagion contributions are accumulated
+      me.joy      = Math.round(me.joy);
+      me.distress = Math.round(me.distress);
+      me.fear     = Math.round(me.fear);
 
       setDominant(me);
       me.last_updated_at = turnIndex;

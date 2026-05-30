@@ -36,6 +36,7 @@ function sceneWordFrequencies(fountain: string): Map<number, Map<string, number>
 
 /** Jaccard distance between two frequency maps (as presence/absence) */
 function jaccardDistance(a: Map<string, number>, b: Map<string, number>): number {
+  if (a.size === 0 || b.size === 0) return 0; // dialogue-only scenes have no action vocabulary
   const setA = new Set(a.keys());
   const setB = new Set(b.keys());
   const intersection = [...setA].filter(w => setB.has(w)).length;

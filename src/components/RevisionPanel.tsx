@@ -3,7 +3,7 @@
 // diffs with issue breakdowns, accept/reject individual pass results.
 // H8: Uses SSE streaming endpoint so each pass result appears as it completes.
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 
 interface RevisionIssue {
   location: string;
@@ -68,6 +68,10 @@ export function RevisionPanel({ onClose }: RevisionPanelProps) {
   const [streamProgress, setStreamProgress] = useState<{ done: number; total: number } | null>(null);
   const evtRef = useRef<EventSource | null>(null);
 
+  useEffect(() => {
+    return () => { evtRef.current?.close(); };
+  }, []);
+
   const runRevision = useCallback(() => {
     // Close any existing stream
     if (evtRef.current) { evtRef.current.close(); evtRef.current = null; }
@@ -105,7 +109,7 @@ export function RevisionPanel({ onClose }: RevisionPanelProps) {
           es.close();
           evtRef.current = null;
         }
-      } catch { /* ignore parse errors */ }
+      } catch (parseErr) { console.warn('[RevisionPanel] SSE parse error:', parseErr); }
     };
 
     es.onerror = () => {

@@ -82,7 +82,7 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
           severity: 'major',
           suggestedFix: 'Break long action blocks with white space, one-word lines, or visual beat separators',
         });
-        longStreak = 0; // reset
+        // Do not reset — let streak grow past 5 without re-firing for the same run
       }
     } else {
       longStreak = 0;
@@ -104,7 +104,7 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           suggestedFix: 'Expand at least one fragment into a full beat that grounds the reader in the scene',
         });
-        shortStreak = 0;
+        // Do not reset — let streak grow past 4 without re-firing for the same run
       }
     } else {
       shortStreak = 0;

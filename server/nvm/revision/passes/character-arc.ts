@@ -97,7 +97,10 @@ function dominantShift(records: PassInput['records']): string {
   if (records.length === 0) return 'neutral';
   const counts: Record<string, number> = {};
   for (const r of records) {
-    counts[r.emotionalShift] = (counts[r.emotionalShift] ?? 0) + 1;
+    const shift = r.emotionalShift ?? 'neutral';
+    counts[shift] = (counts[shift] ?? 0) + 1;
   }
-  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'neutral';
+  const entries = Object.entries(counts);
+  if (entries.length === 0) return 'neutral';
+  return entries.sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'neutral';
 }

@@ -302,7 +302,8 @@ const TENSION_ARC_EXISTS: NarrativeInvariant = {
     for (const { sceneIdx, op } of emos) {
       sceneIntensity[sceneIdx] = Math.max(sceneIntensity[sceneIdx] ?? 0, op.emotion.intensity ?? 0);
     }
-    const values = Object.values(sceneIntensity);
+    const values = Object.values(sceneIntensity).filter(v => isFinite(v));
+    if (values.length === 0) return result(this, 'warning', 'No finite intensity values in APPRAISE_EMOTION ops.');
     const range = Math.max(...values) - Math.min(...values);
     if (range >= 3) return result(this, 'pass', `Emotional intensity ranges ${Math.min(...values)}–${Math.max(...values)} — strong tension arc.`);
     if (range >= 1) return result(this, 'warning', `Emotional intensity range is ${range}. Expand peaks and valleys for a more dynamic arc.`);

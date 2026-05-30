@@ -81,7 +81,8 @@ export class CausalSpine {
     if (lies.length === 0) return [];
 
     const target = this.stage.getAgent(targetId);
-    const targetName = target?.name ?? targetId;
+    if (!target) return [];
+    const targetName = target.name ?? targetId;
     const turnIndex = this.stage.getTurnCount();
 
     const newBeliefs: Belief[] = [];
@@ -258,7 +259,7 @@ export class CausalSpine {
     if (wordsA.size === 0 || wordsB.size === 0) return false;
     let shared = 0;
     for (const w of wordsA) if (wordsB.has(w)) shared++;
-    return shared / Math.min(wordsA.size, wordsB.size) >= 0.6;
+    return shared / Math.min(wordsA.size, wordsB.size) >= 0.75;
   }
 
   // 3. From contradiction edges: resolve WHO was lied to and by whom,

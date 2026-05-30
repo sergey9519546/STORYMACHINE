@@ -194,7 +194,7 @@ function LauncherTab() {
       {/* Scenario list */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {scenarios.map((sc, i) => (
-          <div key={i} style={{ background: '#1e293b', borderRadius: 5, padding: '10px 12px', display: 'grid', gridTemplateColumns: '1fr 80px 60px 28px', gap: 8, alignItems: 'center' }}>
+          <div key={sc.scenarioId || i} style={{ background: '#1e293b', borderRadius: 5, padding: '10px 12px', display: 'grid', gridTemplateColumns: '1fr 80px 60px 28px', gap: 8, alignItems: 'center' }}>
             <div>
               <div style={labelSt}>Scenario ID</div>
               <input value={sc.scenarioId} onChange={e => updateScenario(i, { scenarioId: e.target.value })}
@@ -398,13 +398,16 @@ function GenomeTab() {
   const [error, setError]         = useState<string | null>(null);
 
   useEffect(() => {
+    setLoading(true);
     fetch('/api/nvm/corpus').then(r => r.json()).then((d: CorpusData) => {
       setRuns(d.runs ?? []);
       if (d.runs?.length >= 2) {
         setRunIdA(d.runs[0].run_id);
         setRunIdB(d.runs[1].run_id);
       }
-    }).catch(() => {});
+    }).catch((e: unknown) => {
+      setError(e instanceof Error ? e.message : 'Failed to load corpus');
+    }).finally(() => setLoading(false));
   }, []);
 
   async function runDiff() {

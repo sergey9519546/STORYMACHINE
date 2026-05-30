@@ -590,7 +590,7 @@ export default function DirectorPanel({
                 </div>
                 <div className="space-y-4">
                   {currentScene.choices.map((choice, idx) => (
-                    <div key={idx} className={`bg-white p-4 brutal-border-thick brutal-shadow relative ${!availableIndices.has(idx) ? "opacity-60" : ""}`}>
+                    <div key={`choice-${choice.text.slice(0, 20)}-${idx}`} className={`bg-white p-4 brutal-border-thick brutal-shadow relative ${!availableIndices.has(idx) ? "opacity-60" : ""}`}>
                       {!availableIndices.has(idx) && (
                         <span
                           className="absolute top-2 left-2 bg-[#FF4444] text-white text-[8px] px-2 py-0.5 font-bold uppercase tracking-widest cursor-help"
@@ -1028,7 +1028,7 @@ export default function DirectorPanel({
                 <label className="text-black font-bold uppercase tracking-wider text-xs block mb-2">Active Secrets:</label>
                 <div className="space-y-2">
                   {directorState.activeSecrets?.map((secret, idx) => (
-                    <div key={idx} className="p-3 border-2 border-black bg-gray-50 flex flex-col gap-1">
+                    <div key={`secret-${secret.owner}-${idx}`} className="p-3 border-2 border-black bg-gray-50 flex flex-col gap-1">
                       <span className="font-bold text-xs uppercase">{secret.owner}</span>
                       <span className="text-sm">{secret.content}</span>
                       <span className={`text-[10px] uppercase font-bold ${secret.revealed ? "text-red-600" : "text-green-600"}`}>
@@ -1043,7 +1043,7 @@ export default function DirectorPanel({
                 <label className="text-black font-bold uppercase tracking-wider text-xs block mb-2">NPCs:</label>
                 <div className="space-y-2">
                   {directorState.npcs?.map((npc, idx) => (
-                    <div key={idx} className="p-3 border-2 border-black bg-gray-50 flex flex-col gap-1">
+                    <div key={`npc-${npc.name}-${npc.role}-${idx}`} className="p-3 border-2 border-black bg-gray-50 flex flex-col gap-1">
                       <span className="font-bold text-xs uppercase">{npc.name} ({npc.role})</span>
                       <span className="text-sm">Agenda: {npc.agenda}</span>
                       <span className="text-[10px] uppercase font-bold text-gray-500">Trust: {npc.trustworthiness}%</span>
@@ -1229,7 +1229,7 @@ export default function DirectorPanel({
               ) : (
                 <div className="space-y-4">
                   {outlineBeats.map((beat, idx) => (
-                    <div key={idx} className="bg-gray-50 p-4 brutal-border-thick brutal-shadow relative space-y-3">
+                    <div key={`beat-${beat.phase ?? ''}-${beat.turn_start ?? ''}-${beat.turn_end ?? ''}-${idx}`} className="bg-gray-50 p-4 brutal-border-thick brutal-shadow relative space-y-3">
                       <button
                         onClick={() => removeOutlineBeat(idx)}
                         aria-label={`Remove beat ${idx + 1}`}
