@@ -168,6 +168,7 @@ describe('Fountain script block parsing (regex patterns)', () => {
 //           DramaticPressure, BeatTrace, and Fountain [[BEAT:...]] output.
 
 import { Stage } from './server/engine/Stage.ts';
+import { exportCharacter, importCharacter, isCharacterMemoryBundle, CHARACTER_BUNDLE_SCHEMA_VERSION } from './server/engine/character-memory.ts';
 import { CausalSpine } from './server/engine/CausalSpine.ts';
 import { Orchestrator } from './server/engine/Orchestrator.ts';
 import { transcriptToFountain } from './server/lib/fountain.ts';
@@ -1325,6 +1326,72 @@ describe('Stage — exportSnapshot / importSnapshot', () => {
     assert.equal(snap.agents.length, 0);
     assert.equal(snap.action_log.length, 0);
     assert.equal(snap.beat_traces.length, 0);
+  });
+});
+
+// ── P6 — Character memory export / import ─────────────────────────────────────
+
+describe('character-memory — export / import', () => {
+  it('exports a bundle with the full psychological sheet and an arc summary', () => {
+    const stage = makeStage();
+    const bundle = exportCharacter(stage, 'alice', 'sess-A');
+    assert.ok(bundle, 'bundle should be produced');
+    assert.equal(bundle!.schemaVersion, CHARACTER_BUNDLE_SCHEMA_VERSION);
+    assert.equal(bundle!.sheet.name, 'Alice');
+    assert.equal(bundle!.sheet.current_location_id, '', 'location is cleared for portability');
+    assert.ok(bundle!.sheet.goalStack, 'goal stack preserved');
+    assert.ok(/Alice/.test(bundle!.arcSummary), 'arc summary mentions the character');
+  });
+
+  it('returns null when exporting an unknown character', () => {
+    const stage = makeStage();
+    assert.equal(exportCharacter(stage, 'nobody'), null);
+  });
+
+  it('imports a bundle into a fresh session, placing the character in a location', () => {
+    const source = makeStage();
+    const bundle = exportCharacter(source, 'alice')!;
+
+    const target = new Stage(':memory:');
+    target.addLocation({ location_id: 'lobby', name: 'Lobby', description: '', adjacent_locations: [] });
+    const result = importCharacter(target, bundle);
+
+    assert.equal(result.charId, 'alice');
+    assert.equal(result.remapped, false);
+    const imported = target.getAgent('alice');
+    assert.ok(imported, 'character should exist in target');
+    assert.equal(imported!.current_location_id, 'lobby', 'placed in the target location');
+    assert.ok(imported!.goalStack, 'goal stack survived the round trip');
+  });
+
+  it('remaps char_id on collision instead of clobbering an existing character', () => {
+    const source = makeStage();
+    const bundle = exportCharacter(source, 'alice')!;
+
+    // target already has an 'alice'
+    const target = makeStage();
+    const result = importCharacter(target, bundle);
+
+    assert.equal(result.remapped, true);
+    assert.equal(result.charId, 'alice_2');
+    assert.ok(target.getAgent('alice'), 'original alice untouched');
+    assert.ok(target.getAgent('alice_2'), 'imported alice remapped');
+  });
+
+  it('rejects a bundle with a newer schema version', () => {
+    const source = makeStage();
+    const bundle = exportCharacter(source, 'alice')!;
+    bundle.schemaVersion = 999;
+    const target = makeStage();
+    assert.throws(() => importCharacter(target, bundle), /Unsupported bundle schemaVersion/);
+  });
+
+  it('validates bundle shape via isCharacterMemoryBundle', () => {
+    assert.equal(isCharacterMemoryBundle(null), false);
+    assert.equal(isCharacterMemoryBundle({}), false);
+    assert.equal(isCharacterMemoryBundle({ schemaVersion: 1 }), false);
+    const source = makeStage();
+    assert.equal(isCharacterMemoryBundle(exportCharacter(source, 'alice')), true);
   });
 });
 

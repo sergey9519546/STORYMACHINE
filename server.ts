@@ -1234,6 +1234,45 @@ async function startServer() {
     res.json({ status: 'ok', ...saved });
   }));
 
+  // ── Character memory export / import (P6) ─────────────────────────────────────
+  // Carry a character's full psychological history (beliefs, goals, ToM,
+  // emotion, psychology) between stories so they can be reused across projects.
+
+  app.post('/api/characters/export', gameLimiter, asyncHandler(async (req, res) => {
+    const { exportCharacter } = await import('./server/engine/character-memory.ts');
+    const charId = req.body?.charId;
+    if (typeof charId !== 'string' || !charId.trim()) {
+      res.status(400).json({ error: 'body.charId (string) is required' });
+      return;
+    }
+    const sid = sessionId(req);
+    const { stage } = getOrCreateSession(sid);
+    const bundle = exportCharacter(stage, charId, sid);
+    if (!bundle) {
+      res.status(404).json({ error: `character "${charId}" not found in this session` });
+      return;
+    }
+    res.json(bundle);
+  }));
+
+  app.post('/api/characters/import', gameLimiter, asyncHandler(async (req, res) => {
+    const { importCharacter, isCharacterMemoryBundle } = await import('./server/engine/character-memory.ts');
+    const bundle = req.body?.bundle;
+    if (!isCharacterMemoryBundle(bundle)) {
+      res.status(400).json({ error: 'body.bundle is not a valid CharacterMemoryBundle' });
+      return;
+    }
+    const targetLocationId = typeof req.body?.targetLocationId === 'string'
+      ? req.body.targetLocationId : undefined;
+    const { stage } = getOrCreateSession(sessionId(req));
+    try {
+      const result = importCharacter(stage, bundle, targetLocationId);
+      res.json({ status: 'imported', ...result });
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
+  }));
+
   // ── ScriptIDE AI routes ────────────────────────────────────────────────────
   // Optional script context — the current editor contents, capped, so AI
   // suggestions stay consistent with established tone, characters, and facts.
