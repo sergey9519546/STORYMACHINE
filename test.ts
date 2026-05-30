@@ -45,7 +45,7 @@ import { redTeamVerdict } from './server/nvm/valuation/audience-redteam.ts';
 import { twoReaderReport } from './server/nvm/valuation/two-reader.ts';
 import { computeTopology, onTrackForArc } from './server/nvm/valuation/topology.ts';
 import {
-  proofsToConstraints, buildGenerationSpec,
+  proofsToConstraints, buildGenerationSpec, buildSystemPreamble,
   type CandidateGenerator, type SceneTarget,
 } from './server/nvm/generate/proof-spec.ts';
 import { applyOperator, ALL_OPERATORS } from './server/nvm/converge/operators.ts';
@@ -9579,5 +9579,100 @@ describe('Wave 71 — LLM confidence NaN guards + mine.ts operator scoring', () 
     for (const eff of playbook.policy.operatorEffectiveness) {
       assert.ok(isFinite(eff.score), `operatorEffectiveness score should be finite, got ${eff.score}`);
     }
+  });
+});
+
+// ── Wave 75: buildSystemPreamble state enrichment ─────────────────────────────
+
+describe('Wave 75 — buildSystemPreamble state enrichment', () => {
+  const baseTarget: SceneTarget = {
+    sceneIdx: 2,
+    sceneFunction: 'complicate',
+    activeMechanisms: ['suspense_escalation'],
+    tensionTarget: 70,
+  };
+
+  it('empty state produces a valid preamble without NaN', () => {
+    const preamble = buildSystemPreamble([], emptyState());
+    assert.ok(!preamble.includes('NaN'), 'preamble must not contain NaN');
+    assert.ok(preamble.includes('NarrativeTransitionIR'), 'must identify role');
+  });
+
+  it('preamble includes dominant character emotion when emotions are present', () => {
+    const state = emptyState();
+    state.characterEmotions['alice'] = {
+      joy: 0, distress: 85, anger: 0, fear: 0, pride: 0, shame: 0,
+      dominant: 'distress', intensity: 85, last_updated_at: 1,
+    };
+    const preamble = buildSystemPreamble([], state);
+    assert.ok(preamble.includes('alice'), 'should mention character name');
+    assert.ok(preamble.includes('distress'), 'should mention dominant emotion');
+    assert.ok(preamble.includes('85'), 'should include intensity');
+  });
+
+  it('preamble includes clock pressure when clocks are active', () => {
+    const state = emptyState();
+    state.clocks['bomb_timer'] = 5;
+    state.clocks['deadline'] = 12;
+    const preamble = buildSystemPreamble([], state);
+    assert.ok(preamble.includes('bomb_timer'), 'should list highest-pressure clock');
+    assert.ok(preamble.includes('deadline'), 'should list second clock');
+  });
+
+  it('preamble includes audience suspense level', () => {
+    const state = emptyState();
+    state.audienceState.suspense = 78;
+    state.audienceState.curiosity = 40;
+    const preamble = buildSystemPreamble([], state);
+    assert.ok(preamble.includes('suspense=78'), 'should include suspense value');
+    assert.ok(preamble.includes('curiosity=40'), 'should include curiosity value');
+  });
+
+  it('preamble includes theme when authorIntent.theme is set', () => {
+    const state = emptyState();
+    state.authorIntent.theme = 'redemption through sacrifice';
+    const preamble = buildSystemPreamble([], state);
+    assert.ok(preamble.includes('redemption through sacrifice'), 'should include theme text');
+  });
+
+  it('preamble includes last theme move direction', () => {
+    const state = emptyState();
+    state.themeArgument.push({ claimId: 'guilt_is_inherited', move: 'support' });
+    const preamble = buildSystemPreamble([], state);
+    assert.ok(preamble.includes('support'), 'should include theme move type');
+    assert.ok(preamble.includes('guilt_is_inherited'), 'should include claim id');
+  });
+
+  it('NaN emotion intensity is excluded from preamble', () => {
+    const state = emptyState();
+    state.characterEmotions['ghost'] = {
+      joy: NaN, distress: NaN, anger: NaN, fear: NaN, pride: NaN, shame: NaN,
+      dominant: 'neutral', intensity: NaN, last_updated_at: 0,
+    };
+    const preamble = buildSystemPreamble([], state);
+    assert.ok(!preamble.includes('NaN'), 'NaN emotions must not appear in preamble');
+  });
+
+  it('preamble includes relationship heat for active dyads', () => {
+    const state = emptyState();
+    state.relationships['alice|bob'] = [
+      { dimension: 'trust', amount: -0.4, addedAtTurn: 1 },
+      { dimension: 'trust', amount: -0.6, addedAtTurn: 2 },
+    ];
+    const preamble = buildSystemPreamble([], state);
+    assert.ok(preamble.includes('alice'), 'should mention relationship parties');
+    assert.ok(preamble.includes('bob'), 'should mention relationship parties');
+  });
+
+  it('buildGenerationSpec preamble includes enriched context for non-empty state', () => {
+    const state = emptyState();
+    state.characterEmotions['rex'] = {
+      joy: 0, distress: 0, anger: 90, fear: 0, pride: 0, shame: 0,
+      dominant: 'anger', intensity: 90, last_updated_at: 2,
+    };
+    state.clocks['revenge_clock'] = 3;
+    const spec = buildGenerationSpec(state, baseTarget, []);
+    assert.ok(spec.systemPreamble.includes('anger'), 'spec preamble should include emotion');
+    assert.ok(spec.systemPreamble.includes('revenge_clock'), 'spec preamble should include clocks');
   });
 });

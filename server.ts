@@ -1413,11 +1413,14 @@ OUTPUT: A bulleted diagnostic report with 3 actionable suggestions. Where a char
 
   app.post('/api/scriptide/clean-action', aiLimiter, asyncHandler(async (req, res) => {
     const text = requireString(req.body?.text, 'text');
+    const caSession = sessions.get(sessionId(req));
+    const caGenre = caSession?.stage.getIllusionState().story_genre;
+    const caGenreHint = caGenre ? `\nGENRE: ${sanitizeForPrompt(caGenre, 80)} — match the established tone when choosing action verbs.\n` : '';
     const response = await generateContent({
       model: modelForTask('ACTION'),
       contents: `SYSTEM ROLE: You are a strict script editor enforcing a "Semantic Firewall".
 OBJECTIVE: Rewrite the following action block — remove all camera directions and technical jargon. Describe what happens in the world, not what the camera does.
-
+${caGenreHint}
 INPUT: ${sanitizeForPrompt(text, 8000)}
 OUTPUT: Just the rewritten action text, nothing else.`,
     }, { label: 'clean-action', timeoutMs: 30_000 });
@@ -1436,6 +1439,12 @@ OUTPUT: Just the rewritten action text, nothing else.`,
     const want  = sanitizeForPrompt(requireString(profile.want,  'profile.want'), 1000);
     const need  = sanitizeForPrompt(requireString(profile.need,  'profile.need'), 1000);
 
+    const cpBibleBlock = (() => {
+      const s = sessions.get(sessionId(req));
+      const b = s ? buildStoryBibleSummary(s.stage) : '';
+      return b ? `\nSTORY CONTEXT (arc and world the character lives in — let it inflect the description):\n${b}\n` : '';
+    })();
+
     const response = await generateContent({
       model: modelForTask('CHARACTER'),
       contents: `SYSTEM ROLE: You are a character designer specializing in psychological realism and "Show, Don't Tell".
@@ -1447,7 +1456,7 @@ INSTRUCTIONS:
 2. Focus on: Posture, micro-expressions, clothing wear-and-tear, grooming habits, and how they occupy space.
 3. Use sensory details.
 4. Keep it to 2-3 evocative paragraphs.
-
+${cpBibleBlock}
 CHARACTER PROFILE:
 Name: ${name}
 Ghost (Trauma): ${ghost}

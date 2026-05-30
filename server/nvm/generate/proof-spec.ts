@@ -142,11 +142,70 @@ export function proofsToConstraints(
 }
 
 // Build the system preamble that encodes constraints as LLM instructions.
+// Includes a rich snapshot of current story state so the generator has full
+// emotional, structural, and relational context — not just a character list.
 export function buildSystemPreamble(constraints: GenerationConstraint[], state: NarrativeState): string {
   const knownChars = Object.keys(state.characterBeliefs)
     .map(id => sanitizeForPrompt(id, 64))
     .join(', ') || 'none yet';
   const activeFacts = state.objectiveReality.length;
+
+  // ── Emotional landscape ────────────────────────────────────────────────────
+  const emotionLines = Object.entries(state.characterEmotions)
+    .filter(([, e]) => typeof e.intensity === 'number' && isFinite(e.intensity) && e.intensity > 0)
+    .sort((a, b) => b[1].intensity - a[1].intensity)
+    .slice(0, 6)
+    .map(([id, e]) => `${sanitizeForPrompt(id, 48)}: ${e.dominant}@${Math.round(e.intensity)}`);
+  const emotionBlock = emotionLines.length > 0
+    ? `Character emotions: ${emotionLines.join(', ')}.`
+    : '';
+
+  // ── Audience state ─────────────────────────────────────────────────────────
+  const { suspense, curiosity, investment } = state.audienceState;
+  const audienceBlock = (typeof suspense === 'number' && isFinite(suspense)) || (typeof curiosity === 'number' && isFinite(curiosity))
+    ? `Audience: suspense=${Math.round(isFinite(suspense) ? suspense : 0)}, curiosity=${Math.round(isFinite(curiosity) ? curiosity : 0)}, investment=${Math.round(isFinite(investment) ? investment : 0)}.`
+    : '';
+
+  // ── Active clocks (urgency) ────────────────────────────────────────────────
+  const clockEntries = Object.entries(state.clocks)
+    .filter(([, v]) => typeof v === 'number' && isFinite(v) && v > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([id, v]) => `${sanitizeForPrompt(id, 48)}=${v}`);
+  const clockBlock = clockEntries.length > 0
+    ? `Active clocks (highest first): ${clockEntries.join(', ')}.`
+    : '';
+
+  // ── Relationship heat ──────────────────────────────────────────────────────
+  const relEntries = Object.entries(state.relationships)
+    .filter(([, deltas]) => deltas.length > 0)
+    .sort((a, b) => b[1].length - a[1].length)
+    .slice(0, 4)
+    .map(([key, deltas]) => {
+      const last = deltas[deltas.length - 1];
+      const sign = typeof last?.amount === 'number' && isFinite(last.amount)
+        ? (last.amount >= 0 ? '+' : '') + last.amount.toFixed(1)
+        : '?';
+      return `${sanitizeForPrompt(key.replace('|', '↔'), 64)} (last shift: ${sign})`;
+    });
+  const relBlock = relEntries.length > 0
+    ? `Relationship heat: ${relEntries.join('; ')}.`
+    : '';
+
+  // ── Theme direction ────────────────────────────────────────────────────────
+  const themeBlock = state.authorIntent.theme
+    ? `Theme: "${sanitizeForPrompt(state.authorIntent.theme, 120)}".`
+    : '';
+  const lastThemeMove = state.themeArgument.length > 0
+    ? state.themeArgument[state.themeArgument.length - 1]
+    : null;
+  const themeMoveBlock = lastThemeMove
+    ? `Last theme move: ${lastThemeMove.move} on claim "${sanitizeForPrompt(lastThemeMove.claimId, 64)}".`
+    : '';
+
+  const stateLines = [emotionBlock, audienceBlock, clockBlock, relBlock, themeBlock, themeMoveBlock]
+    .filter(Boolean)
+    .join(' ');
 
   const constraintLines = constraints
     .map((c, i) => `${i + 1}. [${c.kind}] ${sanitizeForPrompt(c.description, 400)}`)
@@ -155,13 +214,14 @@ export function buildSystemPreamble(constraints: GenerationConstraint[], state: 
   return [
     'You are a story compiler generating a NarrativeTransitionIR.',
     `Known characters: ${knownChars}. Active facts: ${activeFacts}.`,
+    stateLines,
     '',
     'PROOF CONSTRAINTS (your output must satisfy all of these):',
     constraintLines,
     '',
     'Return ONLY valid JSON matching the NarrativeTransitionIR schema.',
     'Every op must be grounded in the constraints above.',
-  ].join('\n');
+  ].filter(l => l !== undefined).join('\n');
 }
 
 // Compose the full GenerationSpec from state, target, and failures.
