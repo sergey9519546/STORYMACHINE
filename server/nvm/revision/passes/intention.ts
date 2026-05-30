@@ -64,12 +64,15 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
   // ── Act 3 without a character making the climactic choice ─────────────────
   if (structure.actPosition === 'act3' || structure.actPosition === 'epilogue') {
     const act3Records = records.slice(Math.floor(records.length * 0.75));
-    const hasClearTurn = act3Records.some(r => r.dramaticTurn !== 'none');
-    if (!hasClearTurn && records.length >= 5) {
+    // Check purpose rather than dramaticTurn string: deriveDramaticTurn never returns 'none',
+    // so the dramaticTurn field is always truthy. Purpose reflects actual op content.
+    const dramaticPurposes = new Set(['climax', 'turning_point', 'revelation', 'raise_stakes']);
+    const hasClearTurn = act3Records.some(r => dramaticPurposes.has(r.purpose));
+    if (!hasClearTurn && act3Records.length > 0) {
       issues.push({
         location: 'Act 3',
         rule: 'CLIMAX_WITHOUT_CHOICE',
-        description: 'The third act contains no clear dramatic turn — the climax lacks a character-driven resolution',
+        description: 'The third act contains no climax, turning point, or revelation — the climax lacks a character-driven resolution',
         severity: 'critical',
         suggestedFix: 'Add a moment where the protagonist makes an irreversible choice that resolves the central tension',
       });

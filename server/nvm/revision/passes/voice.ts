@@ -26,9 +26,10 @@ function sceneWordFrequencies(fountain: string): Map<number, Map<string, number>
     if (isDialogue) continue; // skip dialogue
     if (sceneIdx < 0) continue;
 
-    // Count words in action line
+    // Count words in action line (skip stopwords to isolate voice markers)
     const freqs = sceneFreqs.get(sceneIdx)!;
-    const words = trimmed.toLowerCase().split(/\W+/).filter(w => w.length > 3);
+    const voiceStopwords = new Set(['that', 'this', 'with', 'from', 'have', 'into', 'they', 'them', 'then', 'were', 'been', 'than', 'when', 'also', 'just', 'here', 'there', 'over', 'back', 'down', 'away', 'through', 'scene', 'line', 'time', 'room', 'door', 'hand', 'face', 'eyes', 'head', 'very']);
+    const words = trimmed.toLowerCase().split(/\W+/).filter(w => w.length > 3 && !voiceStopwords.has(w));
     for (const w of words) freqs.set(w, (freqs.get(w) ?? 0) + 1);
   }
   return sceneFreqs;
@@ -36,7 +37,9 @@ function sceneWordFrequencies(fountain: string): Map<number, Map<string, number>
 
 /** Jaccard distance between two frequency maps (as presence/absence) */
 function jaccardDistance(a: Map<string, number>, b: Map<string, number>): number {
-  if (a.size === 0 || b.size === 0) return 0; // dialogue-only scenes have no action vocabulary
+  // Dialogue-only scenes have no action vocabulary — return neutral 0.5 rather than 0
+  // to avoid biasing the comparison toward "identical voice" when we have no data.
+  if (a.size === 0 || b.size === 0) return 0.5;
   const setA = new Set(a.keys());
   const setB = new Set(b.keys());
   const intersection = [...setA].filter(w => setB.has(w)).length;
@@ -97,13 +100,17 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
   }
 
   // ── Tonal consistency check via emotional shift vs prose distance ──────────
+  // Elevated vocabulary signals beauty/positivity — mismatched with negative scenes.
+  const elevatedWords = new Set(['beautiful', 'gorgeous', 'stunning', 'elegant', 'sublime', 'majestic', 'radiant', 'glorious', 'magnificent', 'serene', 'perfect', 'wonderful']);
   for (let i = 0; i < records.length && i < freqList.length; i++) {
     const record = records[i];
-    if (record.emotionalShift === 'negative' && (freqList[i][1].get('beautiful') ?? 0) > 2) {
+    const sceneFreq = freqList[i][1];
+    const elevatedCount = [...elevatedWords].reduce((s, w) => s + (sceneFreq.get(w) ?? 0), 0);
+    if (record.emotionalShift === 'negative' && elevatedCount > 2) {
       issues.push({
         location: `Scene ${i} (${record.slug})`,
         rule: 'TONE_REGISTER_MISMATCH',
-        description: `Scene ${i} has a negative emotional shift but the prose uses elevated/positive language — tone and affect are misaligned`,
+        description: `Scene ${i} has a negative emotional shift but the prose uses elevated/positive language (${elevatedCount} elevated words) — tone and affect are misaligned`,
         severity: 'minor',
         suggestedFix: 'Align the prose register with the scene\'s emotional valence',
       });

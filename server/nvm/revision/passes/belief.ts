@@ -70,17 +70,19 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
   // ── Consecutive told-beliefs with no witness ───────────────────────────────
   // More than 3 told beliefs in a row without any witnessed belief = exposition dump
   let consecutiveTold = 0;
+  let expositionStartScene = -1;
   for (const r of records) {
     if (r.dialogueHighlights.length > 0 && r.revelation === null) {
+      if (consecutiveTold === 0) expositionStartScene = r.sceneIdx;
       consecutiveTold++;
     } else {
       consecutiveTold = 0;
     }
     if (consecutiveTold >= 3) {
       issues.push({
-        location: `Around Scene ${r.sceneIdx}`,
+        location: `Scenes ${expositionStartScene}–${r.sceneIdx}`,
         rule: 'EXPOSITION_DUMP',
-        description: '3+ consecutive scenes deliver told beliefs with no witnessed confirmation — exposition feels inert',
+        description: `Scenes ${expositionStartScene}–${r.sceneIdx}: 3+ consecutive scenes deliver told beliefs with no witnessed confirmation — exposition feels inert`,
         severity: 'major',
         suggestedFix: 'Break the exposition streak with a scene that shows rather than tells the key information',
       });

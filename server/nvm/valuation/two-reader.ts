@@ -68,6 +68,8 @@ export function twoReaderReport(state: NarrativeState, ledger: TensionLedger): T
   };
 }
 
+const DECEPTION_PATTERN = /\b(lied|lying|lie|false|deceived|deception|deceiving|betrayed|betrayal|manipulated|framed)\b/;
+
 function computeIronyDensity(state: NarrativeState): number {
   // Audience knows facts that at least one character believes falsely
   const knownFacts = new Set(state.audienceState.knownFacts.map(f => f.toLowerCase()));
@@ -77,8 +79,8 @@ function computeIronyDensity(state: NarrativeState): number {
       if (b.source === 'told' && b.confidence > 0.5) {
         const prop = b.proposition.toLowerCase();
         const audienceKnowsConflict = [...knownFacts].some(f =>
-          f.includes('lied') || f.includes('false') || f.includes('deceived') ||
-          prop.split(' ').some(w => w.length > 3 && knownFacts.has(w)),
+          DECEPTION_PATTERN.test(f) ||
+          prop.split(/\s+/).some(w => w.length > 3 && knownFacts.has(w)),
         );
         if (audienceKnowsConflict) ironyCount++;
       }
@@ -91,7 +93,9 @@ function computeStructuralElegance(state: NarrativeState): number {
   // Ratio of payoffs to clues — high ratio = elegant (every clue pays off)
   const clueCount = state.clues.length;
   const payoffCount = state.payoffs.length;
-  if (clueCount === 0) return 50;
+  // Zero clues means no setup/payoff architecture — score 0 rather than 50 to
+  // prevent stories without planted clues from getting an unearned middle score.
+  if (clueCount === 0) return payoffCount === 0 ? 0 : 10;
   const ratio = payoffCount / clueCount;
   return Math.round(Math.min(100, ratio * 80 + ((state.audienceState?.investment ?? 0) / 100 * 20)));
 }

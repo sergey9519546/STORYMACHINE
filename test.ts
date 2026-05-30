@@ -10118,3 +10118,126 @@ describe('Wave 79 — payoff timing, clock magnitude, pacing weights, showrunner
       'Gate 1b should NOT fire when SEED_CLUE op is present');
   });
 });
+
+// ── Wave 80 ───────────────────────────────────────────────────────────────────
+describe('Wave 80 — intention bug fix, belief location, voice precision, two-reader elegance', () => {
+  function makeStructure80(
+    actPosition: import('./server/nvm/screenplay/structure.ts').StructureState['actPosition'],
+    extras: Partial<import('./server/nvm/screenplay/structure.ts').StructureState> = {},
+  ): import('./server/nvm/screenplay/structure.ts').StructureState {
+    return {
+      actPosition, completionPercent: 80, midpointPressure: 0,
+      reversalCount: 0, tightestScene: null, avgSuspensePerScene: 0, escalating: false,
+      reversalDensity: 0, approachingClimax: false, openClues: 0, revelationCount: 0,
+      ...extras,
+    };
+  }
+
+  function makeRecord80(
+    overrides: Partial<import('./server/nvm/screenplay/memory.ts').ScreenplaySceneRecord>,
+  ): import('./server/nvm/screenplay/memory.ts').ScreenplaySceneRecord {
+    return {
+      commitId: 'c0', sceneIdx: 0, slug: 'INT. TEST', purpose: 'character_moment',
+      dramaticTurn: 'Scene character moment', revelation: null, emotionalShift: 'neutral',
+      visualBeats: [], dialogueHighlights: [], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [], clockRaised: false, clockDelta: 0,
+      suspenseDelta: 0, curiosityDelta: 0, createdAt: 0,
+      ...overrides,
+    };
+  }
+
+  // ── intention CLIMAX_WITHOUT_CHOICE now actually fires ─────────────────────
+
+  it('intentionPass fires CLIMAX_WITHOUT_CHOICE when act3 has only character_moment scenes', async () => {
+    const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+    const records = Array.from({ length: 6 }, (_, i) =>
+      makeRecord80({ sceneIdx: i, purpose: 'character_moment' as const }),
+    );
+    const stub = {
+      fountain: Array.from({ length: 6 }, (_, i) => `INT. SCENE${i} - DAY\n\nAction.`).join('\n\n'),
+      original: '', annotations: [], approvedSpans: [],
+      structure: makeStructure80('act3'),
+      records,
+    };
+    const result = await intentionPass(stub as import('./server/nvm/revision/passes/types.ts').PassInput);
+    assert.ok(result.issues.some(i => i.rule === 'CLIMAX_WITHOUT_CHOICE'),
+      'CLIMAX_WITHOUT_CHOICE should fire when no climax/turning_point/revelation scene in Act 3');
+  });
+
+  it('intentionPass does NOT fire CLIMAX_WITHOUT_CHOICE when act3 has a climax scene', async () => {
+    const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+    const records = Array.from({ length: 6 }, (_, i) =>
+      makeRecord80({ sceneIdx: i, purpose: i === 5 ? 'climax' as const : 'character_moment' as const }),
+    );
+    const stub = {
+      fountain: Array.from({ length: 6 }, (_, i) => `INT. SCENE${i} - DAY\n\nAction.`).join('\n\n'),
+      original: '', annotations: [], approvedSpans: [],
+      structure: makeStructure80('act3'),
+      records,
+    };
+    const result = await intentionPass(stub as import('./server/nvm/revision/passes/types.ts').PassInput);
+    assert.ok(!result.issues.some(i => i.rule === 'CLIMAX_WITHOUT_CHOICE'),
+      'CLIMAX_WITHOUT_CHOICE should NOT fire when a climax scene exists');
+  });
+
+  // ── belief EXPOSITION_DUMP reports correct start scene ────────────────────
+
+  it('beliefPass EXPOSITION_DUMP location points to start scene, not current scene', async () => {
+    const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+    const records = [
+      makeRecord80({ sceneIdx: 0, revelation: null, dialogueHighlights: [] }),
+      makeRecord80({ sceneIdx: 1, revelation: null, dialogueHighlights: ['alice: believes truth'] }),
+      makeRecord80({ sceneIdx: 2, revelation: null, dialogueHighlights: ['bob: knows secret'] }),
+      makeRecord80({ sceneIdx: 3, revelation: null, dialogueHighlights: ['alice: admits fault'] }),
+      makeRecord80({ sceneIdx: 4, revelation: null, dialogueHighlights: [] }),
+    ];
+    const stub = {
+      fountain: 'INT. A - DAY\n\nAction.\n\nINT. B - DAY\n\nTalk.',
+      original: '', annotations: [], approvedSpans: [],
+      structure: makeStructure80('act2a'),
+      records,
+    };
+    const result = await beliefPass(stub as import('./server/nvm/revision/passes/types.ts').PassInput);
+    const dump = result.issues.find(i => i.rule === 'EXPOSITION_DUMP');
+    assert.ok(dump, 'EXPOSITION_DUMP should fire for 3+ consecutive told scenes');
+    assert.ok(dump!.location.includes('1'), 'Location should reference the start scene (1), not end scene (3)');
+  });
+
+  // ── voice jaccardDistance returns 0.5 for empty scenes ────────────────────
+
+  it('voicePass does not report VOICE_TOO_UNIFORM when some scenes are dialogue-only', async () => {
+    const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+    // All scenes are dialogue-only (no action lines) — previous code would give distance 0 (identical)
+    // and fire VOICE_TOO_UNIFORM; new code uses 0.5 neutral which avoids this false positive.
+    const fountain = [
+      'INT. A - DAY\n\nALICE\nHello.\n\nBOB\nHi.',
+      'INT. B - DAY\n\nALICE\nGoodbye.\n\nBOB\nSee you.',
+      'INT. C - DAY\n\nALICE\nWait.\n\nBOB\nWhat?',
+      'INT. D - DAY\n\nALICE\nNothing.\n\nBOB\nOkay.',
+      'INT. E - DAY\n\nALICE\nSorry.\n\nBOB\nFine.',
+    ].join('\n\n');
+    const records = Array.from({ length: 5 }, (_, i) => makeRecord80({ sceneIdx: i }));
+    const stub = {
+      fountain, original: '', annotations: [], approvedSpans: [],
+      structure: makeStructure80('act2a'),
+      records,
+    };
+    const result = await voicePass(stub as import('./server/nvm/revision/passes/types.ts').PassInput);
+    assert.ok(!result.issues.some(i => i.rule === 'VOICE_TOO_UNIFORM'),
+      'VOICE_TOO_UNIFORM should not fire for dialogue-only scenes (insufficient data for comparison)');
+  });
+
+  // ── two-reader structuralElegance = 0 for zero-clue story ─────────────────
+
+  it('computeStructuralElegance returns 0 for story with no clues', async () => {
+    const { computeFirstWatch } = await import('./server/nvm/valuation/two-reader.ts');
+    // Build a minimal state with no clues
+    const state = emptyState();
+    const dummyLedger: import('./server/nvm/valuation/futures.ts').TensionLedger = {
+      positions: [], totalTension: 0, sceneIdx: 0,
+    };
+    const result = computeFirstWatch(state, dummyLedger);
+    assert.equal(result.structuralElegance, 0,
+      'Structural elegance should be 0 when no clues exist (not the old default of 50)');
+  });
+});
