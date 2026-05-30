@@ -2878,7 +2878,9 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
       : null;
     const sceneIdx = rawSceneIdx ?? (allCommits[allCommits.length - 1]?.sceneIdx ?? 0) + 1;
 
-    const move = parseAuthorMove(text.trim(), beforeState, { sceneIdx });
+    // C1: strip control characters and cap length before parsing — the parsed
+    // content flows into ADD_FACT.object, which is later rendered in exports.
+    const move = parseAuthorMove(sanitizeForPrompt(text.trim(), 2000), beforeState, { sceneIdx });
 
     // C2: Structural validation of the parsed move before building a StoryCommit.
     // Rejects moves whose ops array contains unknown verbs or malformed payloads.

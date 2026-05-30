@@ -86,13 +86,17 @@ export function applyStoryOp(state: NarrativeState, op: StoryOp): NarrativeState
 
     case 'UPDATE_READER_STATE': {
       const a = state.audienceState;
+      // `?? 0` does NOT catch NaN (NaN ?? 0 === NaN). A single non-finite delta
+      // would poison audienceState, which feeds the tension ledger, convergence
+      // scoring, and every UI tension readout. Coerce non-finite deltas to 0.
+      const fin = (n: number | undefined): number => (typeof n === 'number' && isFinite(n) ? n : 0);
       return {
         ...state,
         audienceState: {
           knownFacts: op.delta.knownFact ? [...a.knownFacts, op.delta.knownFact] : a.knownFacts,
-          suspense:   Math.max(0, a.suspense   + (op.delta.suspense   ?? 0)),
-          curiosity:  Math.max(0, a.curiosity  + (op.delta.curiosity  ?? 0)),
-          investment: Math.max(0, a.investment + (op.delta.investment ?? 0)),
+          suspense:   Math.max(0, a.suspense   + fin(op.delta.suspense)),
+          curiosity:  Math.max(0, a.curiosity  + fin(op.delta.curiosity)),
+          investment: Math.max(0, a.investment + fin(op.delta.investment)),
         },
       };
     }

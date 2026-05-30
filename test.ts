@@ -3260,6 +3260,17 @@ describe('NVM — StoryOp dispatcher (14 ops, pure)', () => {
     assert.equal(s.audienceState.suspense, 0.4);
     assert.equal(s.audienceState.knownFacts.length, 1);
   });
+  it('UPDATE_READER_STATE coerces non-finite deltas to 0 (no NaN poisoning)', () => {
+    // A NaN delta must not poison audienceState — it feeds the tension ledger,
+    // convergence scoring, and every UI tension readout. (?? 0 does NOT catch NaN.)
+    let s = applyStoryOp(emptyState(), { op: 'UPDATE_READER_STATE', delta: { suspense: 10 } });
+    s = applyStoryOp(s, { op: 'UPDATE_READER_STATE', delta: { suspense: NaN, investment: Infinity, curiosity: 5 } });
+    assert.ok(isFinite(s.audienceState.suspense), 'suspense stays finite');
+    assert.ok(isFinite(s.audienceState.investment), 'investment stays finite');
+    assert.equal(s.audienceState.suspense, 10, 'NaN suspense delta is treated as 0');
+    assert.equal(s.audienceState.investment, 0, 'Infinity investment delta is treated as 0');
+    assert.equal(s.audienceState.curiosity, 5, 'finite curiosity delta still applies');
+  });
   it('RECORD_VISUAL_FACT appends a visual scene fact', () => {
     const s = applyStoryOp(emptyState(), { op: 'RECORD_VISUAL_FACT', sceneId: 'sc1', fact: 'rain on glass' });
     assert.equal(s.sceneFacts[0].kind, 'visual');
