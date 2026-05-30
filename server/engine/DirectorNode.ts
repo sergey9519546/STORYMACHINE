@@ -291,7 +291,14 @@ From ${sObserverName}'s perspective only:
 
     return {
       observer_id,
-      tension_delta: Math.max(-20, Math.min(20, raw.tension_delta ?? 0)),
+      // tension_delta is parsed from LLM JSON. A non-finite value (NaN, or a
+      // non-numeric type that coerces to NaN) survives Math.min/Math.max
+      // unchanged (Math.min(20, NaN) === NaN) — and would then poison
+      // avgTensionDelta → _tensionAccumulator → the persisted Director tension
+      // state. Coerce to a finite number BEFORE clamping.
+      tension_delta: Math.max(-20, Math.min(20,
+        typeof raw.tension_delta === 'number' && isFinite(raw.tension_delta) ? raw.tension_delta : 0,
+      )),
       contradiction_detected: raw.contradiction_detected ?? false,
       new_beliefs: safeBeliefs,
       suspicion_updates: filteredUpdates,
