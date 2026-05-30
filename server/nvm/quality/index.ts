@@ -198,7 +198,15 @@ export function dialogueWarnings(ir: NarrativeTransitionIR, state: NarrativeStat
 
     // DV7: Tension drop without resolution — emotion intensity falls sharply without relationship repair
     if (op.op === 'APPRAISE_EMOTION') {
-      const priorIntensity = state.characterEmotions[op.charId]?.intensity ?? 0;
+      // Check state first, then look for a prior APPRAISE_EMOTION in this same IR
+      let priorIntensity = state.characterEmotions[op.charId]?.intensity ?? 0;
+      for (let j = i - 1; j >= 0; j--) {
+        const prev = ir.ops[j];
+        if (prev.op === 'APPRAISE_EMOTION' && prev.charId === op.charId) {
+          priorIntensity = prev.emotion.intensity;
+          break;
+        }
+      }
       if (priorIntensity > 0 && op.emotion.intensity < priorIntensity - 20) {
         const hasRepair = ir.ops.some(
           o => o.op === 'SHIFT_RELATIONSHIP' && o.delta.amount > 0.2 &&
@@ -439,6 +447,7 @@ export function buildCausalGraph(ir: NarrativeTransitionIR): CausalPlotGraph {
 
   if (ir.causalLinks) {
     for (const link of ir.causalLinks) {
+      if (link.opIdx < 0 || link.opIdx >= ir.ops.length) continue; // out-of-bounds opIdx
       for (const causedBy of link.causedBy) {
         edges.push({ from: causedBy, toOpIdx: link.opIdx });
       }

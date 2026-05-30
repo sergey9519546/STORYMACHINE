@@ -12,9 +12,16 @@ export function applyStoryOp(state: NarrativeState, op: StoryOp): NarrativeState
     case 'ADD_FACT':
       return { ...state, objectiveReality: [...state.objectiveReality, op.fact] };
 
-    case 'EXPIRE_FACT':
+    case 'EXPIRE_FACT': {
       // Expiry is monotone: take the earliest expiry turn so a later EXPIRE_FACT
       // can never silently extend (re-open) a validity window that was already closed.
+      // Warn if factId doesn't exist (TemporalProof should have caught this upstream).
+      const factExists = state.objectiveReality.some(f => f.factId === op.factId);
+      if (!factExists) {
+        // eslint-disable-next-line no-console
+        console.warn(`[dispatcher] EXPIRE_FACT: factId "${op.factId}" not found — op is a no-op`);
+        return state;
+      }
       return {
         ...state,
         objectiveReality: state.objectiveReality.map(f =>
@@ -22,6 +29,7 @@ export function applyStoryOp(state: NarrativeState, op: StoryOp): NarrativeState
             ? { ...f, validTo: f.validTo === null ? op.atTurn : Math.min(f.validTo, op.atTurn) }
             : f),
       };
+    }
 
     case 'UPDATE_BELIEF': {
       const existing = state.characterBeliefs[op.charId] ?? [];
