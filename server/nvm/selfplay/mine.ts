@@ -68,10 +68,13 @@ export function mineCorpus(report: CorpusReport, topN = 3): Playbook {
     }
   }
   const operatorEffectiveness = [...operatorScores.entries()]
-    .map(([operator, scores]) => ({
-      operator,
-      score: scores.reduce((a, b) => a + b, 0) / scores.length,
-    }))
+    .map(([operator, scores]) => {
+      const finiteScores = scores.filter(s => isFinite(s));
+      return {
+        operator,
+        score: finiteScores.length > 0 ? finiteScores.reduce((a, b) => a + b, 0) / finiteScores.length : 0,
+      };
+    })
     .sort((a, b) => b.score - a.score);
 
   // Group runs by arc archetype (we don't compute topology here — use 'unknown' as default)
@@ -87,7 +90,8 @@ export function mineCorpus(report: CorpusReport, topN = 3): Playbook {
 
   const rankedCombos: RankedCombo[] = [];
   for (const [, bucket] of buckets) {
-    const meanScore = bucket.reduce((s, r) => s + r.score, 0) / bucket.length;
+    const finiteScores = bucket.map(r => r.score).filter(s => isFinite(s));
+    const meanScore = finiteScores.length > 0 ? finiteScores.reduce((s, v) => s + v, 0) / finiteScores.length : 0;
     const opFreq = new Map<MutationOperator, number>();
     for (const run of bucket) {
       for (const op of run.topOperators) opFreq.set(op, (opFreq.get(op) ?? 0) + 1);

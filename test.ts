@@ -9499,3 +9499,85 @@ describe('Wave 70 — revision rewrite storyContext enrichment', () => {
       'Pipeline handles empty fountain gracefully');
   });
 });
+
+// ── Wave 71: NaN guards for LLM confidence fields in Agent + mine.ts ─────────
+import type { SimResult } from './server/nvm/selfplay/corpus.ts';
+
+describe('Wave 71 — LLM confidence NaN guards + mine.ts operator scoring', () => {
+
+  // ── mine.ts: operatorEffectiveness NaN guard ─────────────────────────────
+
+  it('mineCorpus: NaN run.score does not poison operatorEffectiveness', () => {
+    type MOp = import('./server/nvm/converge/operators.ts').MutationOperator;
+    const nanRun: SimResult = {
+      scenarioId: 'drama_test', seed: 1, proofPassRate: 0.8,
+      meanValuation: NaN, score: NaN,
+      topOperators: ['sharpen_theme' as MOp],
+      scenes: [], effectiveOperators: [], totalIterations: 2,
+    };
+    const goodRun: SimResult = {
+      scenarioId: 'drama_good', seed: 2, proofPassRate: 0.9,
+      meanValuation: 80, score: 0.85,
+      topOperators: ['sharpen_theme' as MOp],
+      scenes: [], effectiveOperators: [], totalIterations: 2,
+    };
+    const report = {
+      runs: [nanRun, goodRun],
+      meanScore: 0.5,
+      bestRun: goodRun,
+      worstRun: nanRun,
+      operatorFrequency: {} as Record<MOp, number>,
+    };
+    const playbook = mineCorpus(report);
+    const sharpScore = playbook.policy.operatorEffectiveness.find(o => o.operator === 'sharpen_theme');
+    assert.ok(sharpScore !== undefined, 'sharpen_theme should appear in effectiveness');
+    assert.ok(isFinite(sharpScore!.score), `operator score should be finite, got ${sharpScore!.score}`);
+    assert.ok(sharpScore!.score >= 0, 'operator score should be non-negative');
+  });
+
+  it('mineCorpus: bucket meanScore with all NaN runs returns 0 not NaN', () => {
+    type MOp = import('./server/nvm/converge/operators.ts').MutationOperator;
+    const nanRun1: SimResult = {
+      scenarioId: 'thriller_test', seed: 1, proofPassRate: 0.5,
+      meanValuation: NaN, score: NaN,
+      topOperators: [], scenes: [], effectiveOperators: [], totalIterations: 1,
+    };
+    const nanRun2: SimResult = {
+      scenarioId: 'thriller_test2', seed: 2, proofPassRate: 0.5,
+      meanValuation: NaN, score: NaN,
+      topOperators: [], scenes: [], effectiveOperators: [], totalIterations: 1,
+    };
+    const report = {
+      runs: [nanRun1, nanRun2],
+      meanScore: NaN,
+      bestRun: nanRun1,
+      worstRun: nanRun2,
+      operatorFrequency: {} as Record<MOp, number>,
+    };
+    const playbook = mineCorpus(report);
+    for (const combo of playbook.policy.rankedCombos) {
+      assert.ok(isFinite(combo.meanScore), `rankedCombo meanScore should be finite, got ${combo.meanScore}`);
+    }
+  });
+
+  it('mineCorpus: all-NaN scores produce safe policy (operatorEffectiveness scores finite)', () => {
+    type MOp = import('./server/nvm/converge/operators.ts').MutationOperator;
+    const nanRun: SimResult = {
+      scenarioId: 'x', seed: 0, proofPassRate: NaN, meanValuation: NaN, score: NaN,
+      topOperators: ['raise_stakes' as MOp],
+      scenes: [], effectiveOperators: [], totalIterations: 1,
+    };
+    const report = {
+      runs: [nanRun],
+      meanScore: NaN,
+      bestRun: nanRun,
+      worstRun: nanRun,
+      operatorFrequency: {} as Record<MOp, number>,
+    };
+    const playbook = mineCorpus(report);
+    assert.ok(playbook.policy, 'policy should be returned even with NaN scores');
+    for (const eff of playbook.policy.operatorEffectiveness) {
+      assert.ok(isFinite(eff.score), `operatorEffectiveness score should be finite, got ${eff.score}`);
+    }
+  });
+});

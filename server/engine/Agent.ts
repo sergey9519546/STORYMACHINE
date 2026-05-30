@@ -756,10 +756,11 @@ Based on what you just witnessed:
           && b.source_action_index < observableActions.length
           ? b.source_action_index : null;
         const srcAction = srcIdx !== null ? observableActions[srcIdx] : null;
+        const rawConf = b.confidence;
         return {
           id: randomUUID(),
           proposition: b.proposition,
-          confidence: Math.max(0, Math.min(1, b.confidence)),
+          confidence: typeof rawConf === 'number' && isFinite(rawConf) ? Math.max(0, Math.min(1, rawConf)) : 0.5,
           source: (b.source as BeliefSource) ?? 'inferred',
           source_agent_id: srcAction?.char_id,
           source_event_id: srcAction?.action_id,
@@ -814,12 +815,13 @@ Based on what you just witnessed:
         observedIds.add(targetAgent.char_id);
         const existing = currentToM[targetAgent.char_id];
         const clamp01 = (v: number | null | undefined) =>
-          typeof v === 'number' ? Math.max(0, Math.min(1, v)) : undefined;
+          typeof v === 'number' && isFinite(v) ? Math.max(0, Math.min(1, v)) : undefined;
         const newHistoryEvent = entry.shared_history_event?.trim() || null;
+        const rawTrust = entry.trust_level;
         currentToM[targetAgent.char_id] = {
           subject_id: targetAgent.char_id,
           believed_motive: entry.believed_motive,
-          trust_level: Math.max(0, Math.min(1, entry.trust_level)),
+          trust_level: typeof rawTrust === 'number' && isFinite(rawTrust) ? Math.max(0, Math.min(1, rawTrust)) : 0.5,
           believed_knowledge: [
             ...(existing?.believed_knowledge ?? []),
             ...(entry.new_believed_knowledge ?? []),
@@ -1072,7 +1074,7 @@ Based on what you just witnessed:
       .map(r => ({
         id: randomUUID(),
         proposition: r.insight,
-        confidence: Math.max(0, Math.min(1, r.confidence)),
+        confidence: typeof r.confidence === 'number' && isFinite(r.confidence) ? Math.max(0, Math.min(1, r.confidence)) : 0.5,
         source: 'inferred' as BeliefSource,
         acquired_at: this.stage.getTurnCount(),
       }));
