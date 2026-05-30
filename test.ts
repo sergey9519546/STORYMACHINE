@@ -3254,6 +3254,37 @@ describe('NVM — StoryCommit ledger (Stage migration v8)', () => {
     assert.equal(s.beliefs, 1);
     assert.equal(s.relationships, 0);
   });
+  it('summarizeOps counts all 14 op families', () => {
+    const s = summarizeOps([
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'a', predicate: 'b', object: 'c', addedAtTurn: 0, validFrom: 0, validTo: null } },
+      { op: 'EXPIRE_FACT', factId: 'f1', atTurn: 1 },
+      { op: 'UPDATE_BELIEF', charId: 'a', belief: { id: 'b1', proposition: 'p', confidence: 1, source: 'inferred', acquired_at: 0 } },
+      { op: 'APPRAISE_EMOTION', charId: 'a', emotion: { joy: 0, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'joy', intensity: 0, last_updated_at: 0 } },
+      { op: 'SHIFT_RELATIONSHIP', pair: ['a', 'b'], delta: { dimension: 'trust', amount: 0.1, reason: 'test' } },
+      { op: 'SEED_CLUE', clueId: 'cl1', carrier: 'object' },
+      { op: 'PAYOFF_SETUP', setupId: 's1', payoffEventId: 'e1' },
+      { op: 'RAISE_CLOCK', clockId: 'c1', amount: 1 },
+      { op: 'ADVANCE_THEME_ARGUMENT', claimId: 'th1', move: 'support' },
+      { op: 'ADVANCE_OBJECT_ARC', objectId: 'o1', toState: 'active' },
+      { op: 'TRIGGER_RULE', mechanismId: 'm1', ruleId: 'r1' },
+      { op: 'UPDATE_READER_STATE', delta: { suspense: 5 } },
+      { op: 'RECORD_VISUAL_FACT', sceneId: 'sc1', fact: 'The room is dark' },
+      { op: 'RECORD_SONIC_FACT', sceneId: 'sc1', fact: 'Thunder' },
+    ]);
+    assert.equal(s.facts, 2);
+    assert.equal(s.beliefs, 1);
+    assert.equal(s.relationships, 1);
+    assert.equal(s.emotions, 1);
+    assert.equal(s.clues, 1);
+    assert.equal(s.payoffs, 1);
+    assert.equal(s.clocks, 1);
+    assert.equal(s.themeArguments, 1);
+    assert.equal(s.objectArcs, 1);
+    assert.equal(s.rules, 1);
+    assert.equal(s.readerStateUpdates, 1);
+    assert.equal(s.visualFacts, 1);
+    assert.equal(s.sonicFacts, 1);
+  });
 });
 
 describe('NVM — What-Breaks-If-Removed', () => {

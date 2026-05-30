@@ -66,9 +66,11 @@ export async function rewritePass(input: RewriteInput): Promise<RewriteResult> {
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: { temperature: 0.4, maxOutputTokens: 8192 },
     });
-    const text = response.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-    if (text.trim().length >= fountain.length * 0.95) {
-      return { revised: text.trim(), usedLLM: true };
+    const text = (response.candidates?.[0]?.content?.parts?.[0]?.text ?? '').trim();
+    // Accept if non-empty and at least 70% of original length — allows meaningful
+    // compression (tightened dialogue, removed padding) without accepting truncations.
+    if (text.length > 0 && text.length >= fountain.length * 0.70) {
+      return { revised: text, usedLLM: true };
     }
   } catch {
     // No key or LLM error — stub fallback

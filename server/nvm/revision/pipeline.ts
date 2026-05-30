@@ -122,7 +122,7 @@ export async function runRevisionPipeline(
   for (let i = 0; i < passes.length; i++) {
     const { name, fn } = passes[i];
     try {
-      const result = await fn({
+      let result = await fn({
         fountain: currentFountain,
         original: originalFountain,
         annotations,
@@ -130,8 +130,15 @@ export async function runRevisionPipeline(
         records,
         approvedSpans,
       });
+      // Guard: if a pass returns empty fountain, keep prior pass output so empty
+      // results don't cascade through the remaining 11 passes.
+      if (result.revisedFountain?.trim()) {
+        currentFountain = result.revisedFountain;
+      } else if (result.revisedFountain !== undefined) {
+        logger.error('revision_pass_empty_fountain', { passName: name, passIndex: i });
+        result = { ...result, revisedFountain: currentFountain, changed: false };
+      }
       passResults.push(result);
-      currentFountain = result.revisedFountain;
       onProgress?.({ type: 'pass_complete', passIndex: i, totalPasses: passes.length, passResult: result });
     } catch (err) {
       logger.error('revision_pass_failed', { passIndex: i, passName: name, error: (err as Error).message });

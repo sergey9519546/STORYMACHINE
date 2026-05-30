@@ -2609,11 +2609,12 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     res.json(runNarrativeRegression(allCommits));
   }));
 
-  // GET /api/nvm/momentum — narrative momentum dashboard (Wave 30).
+  // GET /api/nvm/momentum-dashboard — full narrative momentum dashboard (Wave 30).
   // Replays the full commit history scene by scene, computing quality score,
   // regression score, tension total, and proof pass rate at each step.
   // Returns a time-series array for the writer's CI dashboard.
-  app.get('/api/nvm/momentum', gameLimiter, asyncHandler(async (req, res) => {
+  // NOTE: distinct from GET /api/nvm/momentum (simple scalar score above).
+  app.get('/api/nvm/momentum-dashboard', gameLimiter, asyncHandler(async (req, res) => {
     const { stage } = getOrCreateSession(sessionId(req));
     const { runQualityEngine } = await import('./server/nvm/quality/index.ts');
     const { runNarrativeRegression } = await import('./server/nvm/regression/runner.ts');
@@ -2801,9 +2802,10 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     for (const c of allCommits) foldedState = applyStoryOps(foldedState, c.ops);
     const beforeState = { ...baseState, ...foldedState, turn: stage.getTurnCount() };
 
-    const sceneIdx = typeof bodySceneIdx === 'number'
-      ? bodySceneIdx
-      : (allCommits[allCommits.length - 1]?.sceneIdx ?? 0) + 1;
+    const rawSceneIdx = typeof bodySceneIdx === 'number' && Number.isFinite(bodySceneIdx) && bodySceneIdx >= 0
+      ? Math.floor(bodySceneIdx)
+      : null;
+    const sceneIdx = rawSceneIdx ?? (allCommits[allCommits.length - 1]?.sceneIdx ?? 0) + 1;
 
     const move = parseAuthorMove(text.trim(), beforeState, { sceneIdx });
 
@@ -3068,6 +3070,7 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     let disconnected = false;
     let ended = false;
     req.on('close', () => { disconnected = true; });
+    req.on('error', () => { disconnected = true; });
 
     const emitSSE = (data: unknown) => {
       if (!disconnected && !ended) res.write(`data: ${JSON.stringify(data)}\n\n`);

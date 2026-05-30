@@ -244,7 +244,7 @@ function computeUrgency(currentScene: number, [earliest, latest]: [number, numbe
 
 function computePacingScore(age: number, minAge: number, maxAge: number): number {
   if (age < minAge) return 1;
-  if (age <= maxAge) return 1 - ((age - minAge) / (maxAge - minAge)) * 0.5;
+  if (age <= maxAge) return maxAge === minAge ? 1 : 1 - ((age - minAge) / (maxAge - minAge)) * 0.5;
   const overdue = age - maxAge;
   return Math.max(0, 0.5 - overdue * 0.08);
 }

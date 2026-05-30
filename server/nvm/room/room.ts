@@ -67,11 +67,29 @@ export function runWritersRoom(
     }
   }
 
-  // Consensus: 100 if all critics agree (all same severity bucket), 0 if maximally opposed
+  // De-duplicate: if two critics raise the same objection text, keep only the
+  // highest-severity one to avoid inflating scores and confusing transcripts.
+  const seenObjections = new Map<string, number>();
+  const dedupedCritiques: Critique[] = [];
+  for (const c of allCritiques) {
+    const key = c.objection.slice(0, 120);
+    const idx = seenObjections.get(key);
+    if (idx === undefined) {
+      seenObjections.set(key, dedupedCritiques.length);
+      dedupedCritiques.push(c);
+    } else if (c.severity > (dedupedCritiques[idx]?.severity ?? 0)) {
+      dedupedCritiques[idx] = c; // replace with higher-severity version
+    }
+  }
+  allCritiques.length = 0;
+  allCritiques.push(...dedupedCritiques);
+
+  // Consensus: 100 if all critics agree (all same severity bucket), 0 if maximally opposed.
+  // Clamped to [0, 100] to guard against edge-case arithmetic.
   const severities = allCritiques.map(c => c.severity);
   const maxSev = Math.max(...severities, 0);
   const minSev = Math.min(...severities, 0);
-  const consensus = allCritiques.length === 0 ? 100 : Math.round(100 - (maxSev - minSev));
+  const consensus = allCritiques.length === 0 ? 100 : Math.max(0, Math.round(100 - (maxSev - minSev)));
 
   // Dominant critic: highest total attentionBid
   const bidsBycritic = new Map<string, number>();

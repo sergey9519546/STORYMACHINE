@@ -31,7 +31,7 @@ export function computeFirstWatch(state: NarrativeState, ledger: TensionLedger):
   const ironyDensity = computeIronyDensity(state);
   const structuralElegance = computeStructuralElegance(state);
   // First-watch values suspense and mystery most
-  const overallScore = Math.round(suspense * 0.5 + ironyDensity * 0.3 + structuralElegance * 0.2);
+  const overallScore = Math.min(100, Math.round(suspense * 0.5 + ironyDensity * 0.3 + structuralElegance * 0.2));
   return {
     mode: 'first_watch',
     suspense,
@@ -93,5 +93,5 @@ function computeStructuralElegance(state: NarrativeState): number {
   const payoffCount = state.payoffs.length;
   if (clueCount === 0) return 50;
   const ratio = payoffCount / clueCount;
-  return Math.round(Math.min(100, ratio * 80 + (state.audienceState.investment * 0.2)));
+  return Math.round(Math.min(100, ratio * 80 + (state.audienceState.investment / 100 * 20)));
 }

@@ -9,11 +9,13 @@ import type { Critique } from '../room.ts';
 export function showrunnerCritic(ir: NarrativeTransitionIR, state: NarrativeState): Critique[] {
   const critiques: Critique[] = [];
 
-  // Gate 1: scene should have postconditions (else it's a placeholder)
-  if (ir.postconditions.length === 0) {
+  // Gate 1: plot-advancing scenes should have postconditions (else they're placeholders).
+  // Exposition and world-building scenes don't require them.
+  const requiresPostconditions: NarrativeTransitionIR['sceneFunction'][] = ['advance_plot', 'build_tension', 'set_up_payoff'];
+  if (requiresPostconditions.includes(ir.sceneFunction) && ir.postconditions.length === 0) {
     critiques.push({
       criticId: 'showrunner', severity: 55, targetOpIdx: null,
-      objection: 'Scene declares no postconditions — unclear what changed dramatically',
+      objection: `"${ir.sceneFunction}" scene declares no postconditions — unclear what changed dramatically`,
       suggestedOperator: 'raise_stakes',
       attentionBid: 60,
     });
