@@ -1206,7 +1206,7 @@ async function startServer() {
   // suggestions stay consistent with established tone, characters, and facts.
   const scriptContextOf = (body: unknown): string => {
     const ctx = (body as Record<string, unknown> | undefined)?.scriptContext;
-    return typeof ctx === 'string' ? ctx.substring(0, 8000) : '';
+    return typeof ctx === 'string' ? sanitizeForPrompt(ctx, 8000) : '';
   };
 
   // Lenient character-profile sanitizer for endpoints where profiles are
@@ -1216,7 +1216,7 @@ async function startServer() {
     return (raw as unknown[]).slice(0, 20).map((p) => {
       if (typeof p !== 'object' || p === null) return { name: '', ghost: '', lie: '', want: '', need: '' };
       const prof = p as Record<string, unknown>;
-      const s = (v: unknown, max = 1000) => (typeof v === 'string' ? v.substring(0, max) : '');
+      const s = (v: unknown, max = 1000) => (typeof v === 'string' ? sanitizeForPrompt(v, max) : '');
       return { name: s(prof.name, 256), ghost: s(prof.ghost), lie: s(prof.lie), want: s(prof.want), need: s(prof.need) };
     }).filter((p) => p.name);
   };
@@ -1380,7 +1380,7 @@ OUTPUT: A visceral character description.`,
     const storyConfig = engineState?.config as Record<string, unknown> ?? {};
     const characters = Array.isArray(req.body?.characters) ? (req.body.characters as unknown[]).slice(0, 20) : [];
     const visualAnchor = typeof engineState?.protagonist?.visualAnchor === 'string'
-      ? engineState.protagonist.visualAnchor.substring(0, 500) : '';
+      ? sanitizeForPrompt(engineState.protagonist.visualAnchor, 500) : '';
 
     // ── Active Codex RAG: inject known facts for consistency ──
     const activeCodexEntries = Array.isArray(engineState?.directorState?.activeCodexEntries)
@@ -1391,7 +1391,7 @@ OUTPUT: A visceral character description.`,
 
     // ── Information Position bias from previous scene ──
     const prevInfoPos = typeof engineState?.currentAnalysis?.informationPosition === 'string'
-      ? engineState.currentAnalysis.informationPosition : null;
+      ? sanitizeForPrompt(engineState.currentAnalysis.informationPosition, 128) : null;
     const infoPosBias = prevInfoPos
       ? `\nPrevious scene information position was "${prevInfoPos}". Consider how this asymmetry should evolve.`
       : '';
@@ -1418,7 +1418,7 @@ Current Director State: ${JSON.stringify(engineState?.directorState ?? {}).subst
 Characters Profile: ${JSON.stringify(characters).substring(0, 2000)}${infoPosBias}${activeTl}${codexBlock}
 ${structureBlock}
 Script Text:
-${scriptText.substring(0, 8000)}
+${sanitizeForPrompt(scriptText, 8000)}
 
 Provide a detailed SceneAnalysis and updated DirectorState.
 Include cinematic composition, narrative metrics, director commentary, and quality validation.

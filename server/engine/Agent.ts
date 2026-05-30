@@ -559,7 +559,7 @@ Generate 3 candidate actions. Score each 0–100 on goal alignment. The best-sco
     // Numbered so Gemini can reference by index when reporting source_action_index.
     // LIE appears as SPEAK — epistemic isolation: the character doesn't know which statements are lies.
     const actionSummary = observableActions.map((a, i) => {
-      const name = this.stage.getAgent(a.char_id)?.name ?? 'Unknown';
+      const name = sanitizeForPrompt(this.stage.getAgent(a.char_id)?.name ?? 'Unknown', 128);
       const tag = a.action_type === 'LIE' ? 'SPEAK' : a.action_type;
       return `[${i}] [${tag}] ${name}: ${a.content}`;
     }).join('\n');
@@ -569,11 +569,11 @@ Generate 3 candidate actions. Score each 0–100 on goal alignment. The best-sco
       .map(b => `"${b.proposition}" (${Math.round(b.confidence * 100)}%)`)
       .join(', ');
 
-    const otherAgentNames = otherAgentsInRoom.map(a => a.name).join(', ');
+    const otherAgentNames = otherAgentsInRoom.map(a => sanitizeForPrompt(a.name, 128)).join(', ');
 
     // ToM² context: what do you think others know / believe?
     const tomSummary = Object.values(this.sheet.theoryOfMind ?? {}).slice(0, 3).map(tom => {
-      const n = this.stage.getAgent(tom.subject_id)?.name ?? tom.subject_id;
+      const n = sanitizeForPrompt(this.stage.getAgent(tom.subject_id)?.name ?? tom.subject_id, 128);
       return `  - You believe ${n} knows: ${tom.believed_knowledge.slice(0, 2).join('; ') || 'nothing confirmed'}`;
     }).join('\n');
 
@@ -600,7 +600,7 @@ Based on what you just witnessed:
       contents: prompt,
       config: {
         temperature: getTemperature(),
-        systemInstruction: `You are updating the internal state of ${this.sheet.name} based on recent observations.`,
+        systemInstruction: `You are updating the internal state of ${sanitizeForPrompt(this.sheet.name, 256)} based on recent observations.`,
         responseMimeType: 'application/json',
         responseSchema: {
           type: Type.OBJECT,
@@ -998,7 +998,7 @@ Based on what you just witnessed:
     if (recentFull.length === 0) return;
 
     const transcript = recentFull.map(a => {
-      const name = this.stage.getAgent(a.char_id)?.name ?? 'Unknown';
+      const name = sanitizeForPrompt(this.stage.getAgent(a.char_id)?.name ?? 'Unknown', 128);
       return `[${a.action_type}] ${name}: ${a.content}`;
     }).join('\n');
 
