@@ -5,23 +5,48 @@
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
 
-/** Count non-empty lines in a scene block */
+/**
+ * Compute weighted line counts per scene.
+ * Dialogue lines read ~2x faster than action lines, so they're weighted at 0.5
+ * to give an approximation of reading time rather than raw line count.
+ */
 function sceneLineCount(fountain: string): Map<number, number> {
   const lines = fountain.split('\n');
   const counts = new Map<number, number>();
   let currentScene = -1;
-  let lineCount = 0;
+  let weightedCount = 0;
+  // A character cue is an ALL-CAPS line (optional indent) followed by dialogue.
+  let nextLineIsDialogue = false;
 
   for (const line of lines) {
-    if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(line.trim())) {
-      if (currentScene >= 0) counts.set(currentScene, lineCount);
+    const trimmed = line.trim();
+    if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(trimmed)) {
+      if (currentScene >= 0) counts.set(currentScene, Math.round(weightedCount));
       currentScene++;
-      lineCount = 0;
-    } else if (currentScene >= 0 && line.trim()) {
-      lineCount++;
+      weightedCount = 0;
+      nextLineIsDialogue = false;
+    } else if (currentScene >= 0 && trimmed) {
+      // Character cue: all-caps, optionally with parenthetical suffix
+      if (/^[A-Z][A-Z0-9 \-'\.]{1,}(\s*\(.*\))?$/.test(trimmed) && trimmed.length < 40) {
+        nextLineIsDialogue = true;
+        // Character cue itself doesn't count toward pacing weight
+      } else if (nextLineIsDialogue && !/^\(/.test(trimmed)) {
+        // Dialogue line — reads faster
+        weightedCount += 0.5;
+      } else if (/^\(/.test(trimmed)) {
+        // Parenthetical — very short, negligible
+        weightedCount += 0.25;
+        nextLineIsDialogue = true;
+      } else {
+        // Action line
+        weightedCount += 1;
+        nextLineIsDialogue = false;
+      }
+    } else if (currentScene >= 0 && !trimmed) {
+      nextLineIsDialogue = false;
     }
   }
-  if (currentScene >= 0) counts.set(currentScene, lineCount);
+  if (currentScene >= 0) counts.set(currentScene, Math.round(weightedCount));
   return counts;
 }
 

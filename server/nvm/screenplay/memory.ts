@@ -40,8 +40,14 @@ export interface ScreenplaySceneRecord {
   dialogueHighlights: string[];
   /** Clues planted but not yet resolved (SEED_CLUE without PAYOFF_SETUP) */
   unresolvedClues: string[];
+  /** Clue IDs seeded (SEED_CLUE) in this specific scene */
+  seededClueIds: string[];
+  /** Setup IDs paid off (PAYOFF_SETUP) in this specific scene */
+  payoffSetupIds: string[];
   /** Whether a clock was raised this scene */
   clockRaised: boolean;
+  /** Net clock pressure added this scene (sum of RAISE_CLOCK amounts) */
+  clockDelta: number;
   /** Total suspense delta from UPDATE_READER_STATE */
   suspenseDelta: number;
   /** Total curiosity delta */
@@ -111,7 +117,11 @@ export function annotateCommit(commit: StoryCommit): ScreenplaySceneRecord {
     emotionOps.length > 0 ? 'positive' : 'neutral';
 
   // ── Clock detection ───────────────────────────────────────────────────────
-  const clockRaised = ops.some(o => o.op === 'RAISE_CLOCK');
+  const clockOpsLocal = ops.filter(o => o.op === 'RAISE_CLOCK');
+  const clockRaised = clockOpsLocal.length > 0;
+  const clockDelta = clockOpsLocal.reduce(
+    (s, o) => { const a = (o as Extract<StoryOp, {op:'RAISE_CLOCK'}>).amount; return s + (isFinite(a) ? a : 0); }, 0,
+  );
 
   // ── Purpose ───────────────────────────────────────────────────────────────
   const purpose = derivePurpose(ops, commit.sceneIdx);
@@ -133,7 +143,10 @@ export function annotateCommit(commit: StoryCommit): ScreenplaySceneRecord {
     visualBeats,
     dialogueHighlights,
     unresolvedClues,
+    seededClueIds: [...seededClueIds],
+    payoffSetupIds: [...paidOffSetupIds],
     clockRaised,
+    clockDelta,
     suspenseDelta,
     curiosityDelta,
     createdAt: commit.createdAt,

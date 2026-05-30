@@ -10,22 +10,20 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
   const issues: RevisionIssue[] = [];
 
   // ── Collect all clue plant/payoff timeline ────────────────────────────────
+  // Use seededClueIds / payoffSetupIds (per-scene fields) for accurate timing.
+  // unresolvedClues is a global-filtered view; it can't reliably detect WHEN a payoff occurs.
   const clueInfo: Map<string, { plantedAt: number; slug: string }> = new Map();
   const payoffInfo: Map<string, number> = new Map();
 
   for (const r of records) {
-    for (const clueId of r.unresolvedClues) {
+    for (const clueId of (r.seededClueIds ?? r.unresolvedClues)) {
       if (!clueInfo.has(clueId)) {
         clueInfo.set(clueId, { plantedAt: r.sceneIdx, slug: r.slug });
       }
     }
-    // Detect payoffs: ops with PAYOFF_SETUP — proxied by checking if a scene has revelation
-    // and its records no longer carry the clue
-    for (const [clueId, info] of clueInfo) {
-      if (!r.unresolvedClues.includes(clueId) && r.sceneIdx > info.plantedAt) {
-        if (!payoffInfo.has(clueId)) {
-          payoffInfo.set(clueId, r.sceneIdx);
-        }
+    for (const setupId of (r.payoffSetupIds ?? [])) {
+      if (!payoffInfo.has(setupId)) {
+        payoffInfo.set(setupId, r.sceneIdx);
       }
     }
   }

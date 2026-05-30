@@ -9952,3 +9952,169 @@ describe('Wave 78 — character-advocate false-positive fix, studio-note scene e
     }
   });
 });
+
+// ── Wave 79 ───────────────────────────────────────────────────────────────────
+describe('Wave 79 — payoff timing, clock magnitude, pacing weights, showrunner Gate 1b', () => {
+  function makeRecord79(
+    overrides: Partial<import('./server/nvm/screenplay/memory.ts').ScreenplaySceneRecord>,
+  ): import('./server/nvm/screenplay/memory.ts').ScreenplaySceneRecord {
+    return {
+      commitId: 'c0', sceneIdx: 0, slug: 'INT. TEST', purpose: 'character_moment',
+      dramaticTurn: '', revelation: null, emotionalShift: 'neutral',
+      visualBeats: [], dialogueHighlights: [], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [], clockRaised: false, clockDelta: 0,
+      suspenseDelta: 0, curiosityDelta: 0, createdAt: 0,
+      ...overrides,
+    };
+  }
+
+  // ── annotateCommit / buildScreenplayMemory new fields ──────────────────────
+
+  it('annotateCommit populates seededClueIds from SEED_CLUE ops', async () => {
+    const { annotateCommit } = await import('./server/nvm/screenplay/memory.ts');
+    const commit = {
+      commitId: 'c1', sceneIdx: 1, reverted: false, createdAt: 1,
+      ops: [
+        { op: 'SEED_CLUE', clueId: 'clue-1', carrier: 'line' },
+        { op: 'SEED_CLUE', clueId: 'clue-2', carrier: 'gesture' },
+      ],
+    } as unknown as import('./server/nvm/state/StoryCommit.ts').StoryCommit;
+    const record = annotateCommit(commit);
+    assert.deepEqual(record.seededClueIds.sort(), ['clue-1', 'clue-2']);
+  });
+
+  it('annotateCommit populates payoffSetupIds from PAYOFF_SETUP ops', async () => {
+    const { annotateCommit } = await import('./server/nvm/screenplay/memory.ts');
+    const commit = {
+      commitId: 'c2', sceneIdx: 3, reverted: false, createdAt: 3,
+      ops: [
+        { op: 'PAYOFF_SETUP', setupId: 'clue-1', payoffEventId: 'evt-7' },
+      ],
+    } as unknown as import('./server/nvm/state/StoryCommit.ts').StoryCommit;
+    const record = annotateCommit(commit);
+    assert.deepEqual(record.payoffSetupIds, ['clue-1']);
+    assert.equal(record.seededClueIds.length, 0);
+  });
+
+  it('annotateCommit computes clockDelta as sum of RAISE_CLOCK amounts', async () => {
+    const { annotateCommit } = await import('./server/nvm/screenplay/memory.ts');
+    const commit = {
+      commitId: 'c3', sceneIdx: 2, reverted: false, createdAt: 2,
+      ops: [
+        { op: 'RAISE_CLOCK', clockId: 'bomb', amount: 3 },
+        { op: 'RAISE_CLOCK', clockId: 'deadline', amount: 2 },
+      ],
+    } as unknown as import('./server/nvm/state/StoryCommit.ts').StoryCommit;
+    const record = annotateCommit(commit);
+    assert.equal(record.clockDelta, 5);
+    assert.equal(record.clockRaised, true);
+  });
+
+  // ── payoffPass PAYOFF_TOO_QUICK now fires correctly ────────────────────────
+
+  it('payoffPass detects PAYOFF_TOO_QUICK when clue planted and resolved in consecutive scenes', async () => {
+    const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+    const makeStructure = () => ({
+      actPosition: 'act1' as const, completionPercent: 20, totalClockPressure: 0,
+      midpointPressure: 0, reversalCount: 0, tightestScene: null,
+      avgSuspensePerScene: 0, escalating: false, reversalDensity: 0,
+      approachingClimax: false, openClues: 0, revelationCount: 0,
+    });
+    const records = [
+      makeRecord79({ sceneIdx: 0, seededClueIds: ['clue-x'] }),
+      makeRecord79({ sceneIdx: 1, payoffSetupIds: ['clue-x'], purpose: 'revelation' }),
+      makeRecord79({ sceneIdx: 2 }),
+      makeRecord79({ sceneIdx: 3 }),
+    ];
+    const stub = {
+      fountain: 'INT. A - DAY\n\nAction.\n\nINT. B - DAY\n\nResolve.',
+      original: 'INT. A - DAY\n\nAction.\n\nINT. B - DAY\n\nResolve.',
+      annotations: [], approvedSpans: [],
+      structure: makeStructure(),
+      records,
+    };
+    const result = await payoffPass(stub as import('./server/nvm/revision/passes/types.ts').PassInput);
+    assert.ok(result.issues.some(i => i.rule === 'PAYOFF_TOO_QUICK'), 'PAYOFF_TOO_QUICK should fire for consecutive plant→payoff');
+  });
+
+  // ── conflict CLOCK_WITHOUT_CONFRONTATION uses magnitude ───────────────────
+
+  it('conflictPass does NOT fire CLOCK_WITHOUT_CONFRONTATION for minor clock raises (delta <= 1)', async () => {
+    const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+    const makeStructureC = () => ({
+      actPosition: 'act2a' as const, completionPercent: 40, totalClockPressure: 10,
+      midpointPressure: 5, reversalCount: 0, tightestScene: null,
+      avgSuspensePerScene: 3, escalating: true, reversalDensity: 0,
+      approachingClimax: false, openClues: 0, revelationCount: 0,
+    });
+    // Three scenes each with clockDelta = 0.5 (minor raises) and no reversals
+    const records = Array.from({ length: 6 }, (_, i) =>
+      makeRecord79({ sceneIdx: i, clockRaised: true, clockDelta: 0.5 }),
+    );
+    const stub = {
+      fountain: Array.from({ length: 6 }, (_, i) => `INT. SCENE${i} - DAY\n\nAction.`).join('\n\n'),
+      original: '', annotations: [], approvedSpans: [],
+      structure: makeStructureC(),
+      records,
+    };
+    const result = await conflictPass(stub as import('./server/nvm/revision/passes/types.ts').PassInput);
+    assert.ok(!result.issues.some(i => i.rule === 'CLOCK_WITHOUT_CONFRONTATION'),
+      'Should NOT fire when clock raises are minor (delta <= 1)');
+  });
+
+  it('conflictPass fires CLOCK_WITHOUT_CONFRONTATION for significant clock raises (delta > 1)', async () => {
+    const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+    const makeStructureC = () => ({
+      actPosition: 'act2b' as const, completionPercent: 60, totalClockPressure: 20,
+      midpointPressure: 8, reversalCount: 0, tightestScene: null,
+      avgSuspensePerScene: 3, escalating: true, reversalDensity: 0,
+      approachingClimax: false, openClues: 0, revelationCount: 0,
+    });
+    const records = Array.from({ length: 6 }, (_, i) =>
+      makeRecord79({ sceneIdx: i, clockRaised: true, clockDelta: 3 }),
+    );
+    const stub = {
+      fountain: Array.from({ length: 6 }, (_, i) => `INT. SCENE${i} - DAY\n\nAction.`).join('\n\n'),
+      original: '', annotations: [], approvedSpans: [],
+      structure: makeStructureC(),
+      records,
+    };
+    const result = await conflictPass(stub as import('./server/nvm/revision/passes/types.ts').PassInput);
+    assert.ok(result.issues.some(i => i.rule === 'CLOCK_WITHOUT_CONFRONTATION'),
+      'Should fire when multiple significant clock raises have no reversal');
+  });
+
+  // ── showrunner Gate 1b ─────────────────────────────────────────────────────
+
+  it('showrunner fires for set_up_payoff scene with no SEED_CLUE or PAYOFF_SETUP op', async () => {
+    const { showrunnerCritic } = await import('./server/nvm/room/critics/showrunner.ts');
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 'w79a', sceneIdx: 2, sceneFunction: 'set_up_payoff',
+      activeMechanisms: [], beforeStateHash: 'x',
+      ops: [{ op: 'ADD_FACT', fact: { factId: 'f1', subject: 'bob', predicate: 'met', object: 'alice', addedAtTurn: 2, validFrom: 2, validTo: null } }],
+      preconditions: ['something dramatic changes'],
+      postconditions: ['clue planted'],
+      provenance: { origin: 'model_generated', createdAt: 0 },
+    };
+    const critiques = showrunnerCritic(ir, emptyState());
+    assert.ok(critiques.some(c => c.objection.includes('SEED_CLUE') || c.objection.includes('PAYOFF_SETUP')),
+      'Gate 1b should fire when set_up_payoff has no payoff ops');
+  });
+
+  it('showrunner does NOT fire Gate 1b when set_up_payoff has a SEED_CLUE op', async () => {
+    const { showrunnerCritic } = await import('./server/nvm/room/critics/showrunner.ts');
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 'w79b', sceneIdx: 2, sceneFunction: 'set_up_payoff',
+      activeMechanisms: [], beforeStateHash: 'x',
+      ops: [
+        { op: 'SEED_CLUE', clueId: 'fingerprint', carrier: 'object' },
+      ],
+      preconditions: [],
+      postconditions: ['clue planted'],
+      provenance: { origin: 'model_generated', createdAt: 0 },
+    };
+    const critiques = showrunnerCritic(ir, emptyState());
+    assert.ok(!critiques.some(c => c.objection.includes('SEED_CLUE') || c.objection.includes('PAYOFF_SETUP')),
+      'Gate 1b should NOT fire when SEED_CLUE op is present');
+  });
+});

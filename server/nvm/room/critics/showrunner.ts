@@ -21,6 +21,20 @@ export function showrunnerCritic(ir: NarrativeTransitionIR, state: NarrativeStat
     });
   }
 
+  // Gate 1b: set_up_payoff scenes must have an actual SEED_CLUE or PAYOFF_SETUP op —
+  // postconditions alone don't prove a clue was planted or paid off.
+  if (ir.sceneFunction === 'set_up_payoff') {
+    const hasPayoffOp = ir.ops.some(op => op.op === 'SEED_CLUE' || op.op === 'PAYOFF_SETUP');
+    if (!hasPayoffOp) {
+      critiques.push({
+        criticId: 'showrunner', severity: 50, targetOpIdx: null,
+        objection: '"set_up_payoff" scene has no SEED_CLUE or PAYOFF_SETUP op — the payoff architecture is asserted but not built',
+        suggestedOperator: 'raise_stakes',
+        attentionBid: 55,
+      });
+    }
+  }
+
   // Gate 2: if build_tension scene has no RAISE_CLOCK or SHIFT_RELATIONSHIP, query it
   if (ir.sceneFunction === 'build_tension') {
     const hasStakeRaiser = ir.ops.some(op =>

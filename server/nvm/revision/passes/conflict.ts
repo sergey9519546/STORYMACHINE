@@ -42,13 +42,14 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
   }
 
   // ── Clock pressure without confrontation ─────────────────────────────────
-  const clockRaisedScenes = records.filter(r => r.clockRaised).length;
+  // Only count scenes with meaningful clock pressure (delta > 1) to avoid flagging minor raises.
+  const clockRaisedScenes = records.filter(r => (r.clockDelta ?? (r.clockRaised ? 1.1 : 0)) > 1).length;
   const reversalScenes = records.filter(r => r.suspenseDelta < -1).length;
   if (clockRaisedScenes >= 3 && reversalScenes === 0) {
     issues.push({
       location: 'Conflict escalation',
       rule: 'CLOCK_WITHOUT_CONFRONTATION',
-      description: `Clock is raised ${clockRaisedScenes} times but no confrontation/reversal follows — ticking clocks need detonation`,
+      description: `Clock is raised significantly ${clockRaisedScenes} times but no confrontation/reversal follows — ticking clocks need detonation`,
       severity: 'major',
       suggestedFix: 'Add a scene where the clock expires and forces a confrontation between opposing characters',
     });
