@@ -21,7 +21,7 @@ function sceneWordFrequencies(fountain: string): Map<number, Map<string, number>
       isDialogue = false;
       continue;
     }
-    if (/^[A-Z][A-Z\s]{2,}$/.test(trimmed)) { isDialogue = true; continue; }
+    if (/^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(trimmed)) { isDialogue = true; continue; }
     if (!trimmed) { isDialogue = false; continue; }
     if (isDialogue) continue; // skip dialogue
     if (sceneIdx < 0) continue;

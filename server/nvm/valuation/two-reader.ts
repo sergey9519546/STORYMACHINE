@@ -93,5 +93,5 @@ function computeStructuralElegance(state: NarrativeState): number {
   const payoffCount = state.payoffs.length;
   if (clueCount === 0) return 50;
   const ratio = payoffCount / clueCount;
-  return Math.round(Math.min(100, ratio * 80 + (state.audienceState.investment / 100 * 20)));
+  return Math.round(Math.min(100, ratio * 80 + ((state.audienceState?.investment ?? 0) / 100 * 20)));
 }

@@ -16,12 +16,12 @@ function extractDialogue(fountain: string): Array<{ speaker: string; line: strin
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     // Character cue: ALL CAPS, not a slugline/transition
-    if (/^[A-Z][A-Z\s]{2,}$/.test(line) && !/^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END|ACT|MIDPOINT|SCENE)/.test(line)) {
+    if (/^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(line) && !/^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END|ACT|MIDPOINT|SCENE)/.test(line)) {
       currentSpeaker = line.split('(')[0].trim();
       isDialogue = true;
     } else if (isDialogue && line && !line.startsWith('(') && currentSpeaker) {
       // Parenthetical wraps in parens — skip
-      if (!line.startsWith('(') && !line.endsWith(')')) {
+      if (!line.startsWith('(')) {
         dialogue.push({ speaker: currentSpeaker, line, lineNum: i + 1 });
       }
     } else if (!line) {

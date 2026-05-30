@@ -32,7 +32,7 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
 
   // ── Orphan clues (never paid off) ────────────────────────────────────────
   for (const [clueId, info] of clueInfo) {
-    if (!payoffInfo.has(clueId) && structure.actPosition === 'act3') {
+    if (!payoffInfo.has(clueId) && (structure.actPosition === 'act3' || structure.completionPercent >= 70)) {
       issues.push({
         location: `Scene ${info.plantedAt} (${info.slug})`,
         rule: 'ORPHAN_CLUE',

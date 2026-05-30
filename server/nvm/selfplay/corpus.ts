@@ -157,7 +157,7 @@ async function runOneSim(scenario: SimScenario, generate: CandidateGenerator): P
     ? proofPassRates.reduce((a, b) => a + b, 0) / proofPassRates.length
     : 0;
   const meanValuation = valuations.length > 0
-    ? valuations.reduce((a, b) => a + b, 0) / valuations.length
+    ? valuations.reduce((a, b) => a + (Number.isFinite(b) ? b : 0), 0) / valuations.length
     : 0;
   const score = 0.5 * proofPassRate + 0.5 * (Math.min(meanValuation, 100) / 100);
 
