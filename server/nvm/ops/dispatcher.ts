@@ -13,10 +13,14 @@ export function applyStoryOp(state: NarrativeState, op: StoryOp): NarrativeState
       return { ...state, objectiveReality: [...state.objectiveReality, op.fact] };
 
     case 'EXPIRE_FACT':
+      // Expiry is monotone: take the earliest expiry turn so a later EXPIRE_FACT
+      // can never silently extend (re-open) a validity window that was already closed.
       return {
         ...state,
         objectiveReality: state.objectiveReality.map(f =>
-          f.factId === op.factId ? { ...f, validTo: op.atTurn } : f),
+          f.factId === op.factId
+            ? { ...f, validTo: f.validTo === null ? op.atTurn : Math.min(f.validTo, op.atTurn) }
+            : f),
       };
 
     case 'UPDATE_BELIEF': {

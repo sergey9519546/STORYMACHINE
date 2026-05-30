@@ -14,7 +14,7 @@ function knownCharIds(state: NarrativeState): Set<string> {
   return new Set([
     ...Object.keys(state.characterBeliefs),
     ...Object.keys(state.characterEmotions),
-    ...Object.keys(state.relationships).flatMap(k => k.split(':')),
+    ...Object.keys(state.relationships).flatMap(k => k.split('|')),
   ]);
 }
 

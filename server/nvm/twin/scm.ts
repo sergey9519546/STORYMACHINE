@@ -88,5 +88,9 @@ export function buildSCM(stage: Stage): StructuralCausalModel {
     if (!order.includes(id)) order.push(id);
   }
 
+  // Kahn's algorithm produces roots-first. The interface contract specifies
+  // "leaves first, roots last" for do-calculus traversal, so reverse.
+  order.reverse();
+
   return { nodes, order };
 }

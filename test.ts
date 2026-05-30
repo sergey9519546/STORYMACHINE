@@ -8397,6 +8397,10 @@ describe('NVM — 12-Pass Revision Pipeline (Wave 39)', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { sanitizeForPrompt } from './server/lib/prompt-utils.ts';
+import { temporalProof } from './server/nvm/proof/tier1/temporal.ts';
+import { genericnessProof } from './server/nvm/proof/tier3/genericness.ts';
+import { biasAuditProof } from './server/nvm/proof/tier4/bias-audit.ts';
+import { parseAuthorMove as parseAuthorMoveW41 } from './server/nvm/live/move-bus.ts';
 
 describe('C1 — sanitizeForPrompt (prompt injection defense)', () => {
   it('strips NUL byte', () => {
@@ -8484,5 +8488,238 @@ describe('C2 — validateAuthorMove op-kind guard', () => {
     const invalid = Array.isArray(ops) &&
       ops.some(o => typeof o !== 'object' || o === null || !VALID_OPS.has((o as { op: string }).op));
     assert.ok(invalid, 'null in ops array should fail validation');
+  });
+});
+
+// ── Wave 41 — regression tests for all engine bugs fixed ──────────────────────
+
+describe('Wave 41 — temporalProof blocks EXPIRE on unknown fact', () => {
+  const mkIR = (ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[]) => ({
+    transitionId: 't1', sceneIdx: 1, sceneFunction: 'establish_world' as const,
+    activeMechanisms: [], beforeStateHash: '', ops,
+    preconditions: [], postconditions: [],
+    provenance: { origin: 'model_generated' as const, createdAt: 0 },
+  });
+  const emptyS = () => ({
+    turn: 0, phase: 'Setup' as const,
+    objectiveReality: [], characterBeliefs: {}, characterEmotions: {},
+    relationships: {}, clues: [], payoffs: [], themeArgument: [], firedRules: [],
+    clocks: {}, objectArcs: {}, sceneFacts: [], audienceState: { knownFacts: [], suspense: 0, curiosity: 0, investment: 0 },
+  });
+
+  it('passes when expiring a fact that exists in state', () => {
+    const state = { ...emptyS(), objectiveReality: [{ factId: 'f1', subject: 's', predicate: 'p', object: 'o', addedAtTurn: 0, validFrom: 0, validTo: null as null }] };
+    const ir = mkIR([{ op: 'EXPIRE_FACT', factId: 'f1', atTurn: 1 }]);
+    assert.equal(temporalProof(ir, state).pass, true);
+  });
+
+  it('blocks EXPIRE on a fact never added (was silently ignored before)', () => {
+    const ir = mkIR([{ op: 'EXPIRE_FACT', factId: 'ghost_fact', atTurn: 1 }]);
+    const result = temporalProof(ir, emptyS());
+    assert.equal(result.pass, false, 'should block EXPIRE on non-existent fact');
+    assert.ok(result.findings?.some(f => f.message.includes('never added')), 'message should say never added');
+  });
+
+  it('blocks EXPIRE before ADD_FACT turn', () => {
+    const state = { ...emptyS(), objectiveReality: [{ factId: 'f2', subject: 's', predicate: 'p', object: 'o', addedAtTurn: 5, validFrom: 5, validTo: null as null }] };
+    const ir = mkIR([{ op: 'EXPIRE_FACT', factId: 'f2', atTurn: 3 }]);
+    assert.equal(temporalProof(ir, state).pass, false);
+  });
+});
+
+describe('Wave 41 — genericnessProof uses | not : for relationship keys', () => {
+  const mkState = (relKey: string) => ({
+    turn: 0, phase: 'Setup' as const,
+    objectiveReality: [], characterBeliefs: {}, characterEmotions: {},
+    relationships: { [relKey]: [{ amount: 0.5, reason: 'met', valence: 'positive' as const }] },
+    clues: [], payoffs: [], themeArgument: [], firedRules: [],
+    clocks: {}, objectArcs: {}, sceneFacts: [], audienceState: { knownFacts: [], suspense: 0, curiosity: 0, investment: 0 },
+  });
+  const mkIR = (charId: string) => ({
+    transitionId: 't', sceneIdx: 2, sceneFunction: 'establish_world' as const,
+    activeMechanisms: [], beforeStateHash: '', preconditions: [], postconditions: [],
+    ops: [{ op: 'UPDATE_BELIEF' as const, charId, belief: { id: 'b', proposition: 'test', confidence: 0.8, source: 'witnessed' as const, source_event_id: 'e', acquired_at: 0, contradicts: [] } }],
+    provenance: { origin: 'model_generated' as const, createdAt: 0 },
+  });
+
+  it('recognises a character from relationship key using pipe separator', () => {
+    // 'alice|bob' — alice is known via relationship; referencing alice should NOT be generic
+    const state = mkState('alice|bob');
+    const ir = mkIR('alice');
+    const result = genericnessProof(ir, state);
+    assert.equal(result.pass, true, 'character in relationship (pipe key) should be known, not generic');
+  });
+
+  it('would have wrongly flagged generic with colon separator (regression guard)', () => {
+    // If we used colon split, 'alice|bob' would never split into known chars
+    const fakeKnown = new Set(['alice|bob'.split(':').flat()].flat()); // wrong (colon) split
+    assert.equal(fakeKnown.has('alice'), false, 'colon split should NOT find alice (verifying old bug)');
+    // Correct pipe split should find alice
+    const correctKnown = new Set('alice|bob'.split('|'));
+    assert.equal(correctKnown.has('alice'), true, 'pipe split SHOULD find alice');
+  });
+});
+
+describe('Wave 41 — biasAuditProof uses ≥75% threshold not 100%', () => {
+  const mkEmotionOp = (charId: string, dominant: string) => ({
+    op: 'APPRAISE_EMOTION' as const,
+    charId,
+    emotion: { joy: 0, distress: 0, anger: 0, fear: 50, pride: 0, shame: 0, dominant: dominant as import('./server/engine/types.ts').EmotionType, intensity: 50, last_updated_at: 0 },
+  });
+  const mkIR = (ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[]) => ({
+    transitionId: 't', sceneIdx: 1, sceneFunction: 'establish_world' as const,
+    activeMechanisms: [], beforeStateHash: '', ops,
+    preconditions: [], postconditions: [],
+    provenance: { origin: 'model_generated' as const, createdAt: 0 },
+  });
+  const emptyState = () => ({
+    turn: 0, phase: 'Setup' as const, objectiveReality: [], characterBeliefs: {}, characterEmotions: {},
+    relationships: {}, clues: [], payoffs: [], themeArgument: [], firedRules: [],
+    clocks: {}, objectArcs: {}, sceneFacts: [], audienceState: { knownFacts: [], suspense: 0, curiosity: 0, investment: 0 },
+  });
+
+  it('passes when fewer than 3 emotion ops', () => {
+    const ir = mkIR([mkEmotionOp('a', 'fear'), mkEmotionOp('b', 'fear')]);
+    assert.equal(biasAuditProof(ir, emptyState()).pass, true);
+  });
+
+  it('fails when 4 of 4 characters share same emotion (100%)', () => {
+    const ir = mkIR(['a','b','c','d'].map(c => mkEmotionOp(c, 'fear')));
+    assert.equal(biasAuditProof(ir, emptyState()).pass, false);
+  });
+
+  it('now fails when 3 of 4 characters share same emotion (≥75% — was passing before)', () => {
+    const ir = mkIR([mkEmotionOp('a','fear'), mkEmotionOp('b','fear'), mkEmotionOp('c','fear'), mkEmotionOp('d','joy')]);
+    // With old code (count === total), this would PASS because 3 ≠ 4
+    // With new threshold (≥75%), this should FAIL
+    assert.equal(biasAuditProof(ir, emptyState()).pass, false, '3/4 homogeneity should be flagged');
+  });
+
+  it('passes when exactly 2 of 4 characters share same emotion (50% — below threshold)', () => {
+    const ir = mkIR([mkEmotionOp('a','fear'), mkEmotionOp('b','fear'), mkEmotionOp('c','joy'), mkEmotionOp('d','distress')]);
+    assert.equal(biasAuditProof(ir, emptyState()).pass, true, '50% should not be flagged');
+  });
+});
+
+describe('Wave 41 — STEER away from uses correct predicate', () => {
+  const mkState = () => ({
+    turn: 2, phase: 'Setup' as const, objectiveReality: [], characterBeliefs: {}, characterEmotions: {},
+    relationships: {}, clues: [], payoffs: [], themeArgument: [], firedRules: [],
+    clocks: {}, objectArcs: {}, sceneFacts: [], audienceState: { knownFacts: [], suspense: 0, curiosity: 0, investment: 0 },
+  });
+
+  it('STEER toward uses author_steers_toward predicate', () => {
+    const result = parseAuthorMoveW41('Steer alice toward confronting bob', mkState());
+    assert.equal(result.ambiguous, false);
+    const factOp = result.ops.find(o => o.op === 'ADD_FACT') as import('./server/nvm/ops/StoryOp.ts').StoryOp & { op: 'ADD_FACT' } | undefined;
+    assert.ok(factOp, 'should have ADD_FACT op');
+    assert.equal((factOp as { op: 'ADD_FACT'; fact: { predicate: string } }).fact.predicate, 'author_steers_toward');
+  });
+
+  it('STEER away from uses author_steers_away_from predicate (was inverted before)', () => {
+    const result = parseAuthorMoveW41('steer carol away from the safe', mkState());
+    assert.equal(result.ambiguous, false);
+    const factOp = result.ops.find(o => o.op === 'ADD_FACT') as import('./server/nvm/ops/StoryOp.ts').StoryOp & { op: 'ADD_FACT' } | undefined;
+    assert.ok(factOp, 'should have ADD_FACT op');
+    assert.equal((factOp as { op: 'ADD_FACT'; fact: { predicate: string } }).fact.predicate, 'author_steers_away_from', 'away from must not use toward predicate');
+  });
+});
+
+describe('Wave 41 — EXPIRE_FACT monotone (cannot re-open validity)', () => {
+  it('first expiry sets validTo', () => {
+    const state = {
+      turn: 0, phase: 'Setup' as const,
+      objectiveReality: [{ factId: 'f1', subject: 's', predicate: 'p', object: 'o', addedAtTurn: 0, validFrom: 0, validTo: null as null }],
+      characterBeliefs: {}, characterEmotions: {}, relationships: {}, clues: [], payoffs: [],
+      themeArgument: [], firedRules: [], clocks: {}, objectArcs: {}, sceneFacts: [],
+      audienceState: { knownFacts: [], suspense: 0, curiosity: 0, investment: 0 },
+    };
+    const result = applyStoryOps(state, [{ op: 'EXPIRE_FACT', factId: 'f1', atTurn: 5 }]);
+    assert.equal(result.objectiveReality[0].validTo, 5);
+  });
+
+  it('second expiry with later turn does NOT extend the window (was re-opening before)', () => {
+    const state = {
+      turn: 0, phase: 'Setup' as const,
+      objectiveReality: [{ factId: 'f1', subject: 's', predicate: 'p', object: 'o', addedAtTurn: 0, validFrom: 0, validTo: 5 }],
+      characterBeliefs: {}, characterEmotions: {}, relationships: {}, clues: [], payoffs: [],
+      themeArgument: [], firedRules: [], clocks: {}, objectArcs: {}, sceneFacts: [],
+      audienceState: { knownFacts: [], suspense: 0, curiosity: 0, investment: 0 },
+    };
+    const result = applyStoryOps(state, [{ op: 'EXPIRE_FACT', factId: 'f1', atTurn: 10 }]);
+    assert.equal(result.objectiveReality[0].validTo, 5, 'later EXPIRE must not push validTo forward');
+  });
+
+  it('earlier expiry overwrites with the earlier turn (monotone minimum)', () => {
+    const state = {
+      turn: 0, phase: 'Setup' as const,
+      objectiveReality: [{ factId: 'f1', subject: 's', predicate: 'p', object: 'o', addedAtTurn: 0, validFrom: 0, validTo: 10 }],
+      characterBeliefs: {}, characterEmotions: {}, relationships: {}, clues: [], payoffs: [],
+      themeArgument: [], firedRules: [], clocks: {}, objectArcs: {}, sceneFacts: [],
+      audienceState: { knownFacts: [], suspense: 0, curiosity: 0, investment: 0 },
+    };
+    const result = applyStoryOps(state, [{ op: 'EXPIRE_FACT', factId: 'f1', atTurn: 3 }]);
+    assert.equal(result.objectiveReality[0].validTo, 3, 'earlier expiry should take precedence');
+  });
+});
+
+describe('Wave 41 — contractBelief requires defined source_event_id for co-contraction', () => {
+  it('does NOT co-contract beliefs that share only undefined source_event_id', () => {
+    const beliefs: import('./server/engine/types.ts').Belief[] = [
+      { id: 'b1', proposition: 'Alice is honest', confidence: 0.8, source: 'witnessed', source_event_id: undefined, acquired_at: 5, contradicts: [] },
+      { id: 'b2', proposition: 'Bob is trustworthy', confidence: 0.7, source: 'witnessed', source_event_id: undefined, acquired_at: 5, contradicts: [] },
+      { id: 'b3', proposition: 'Carol is late', confidence: 0.6, source: 'witnessed', source_event_id: undefined, acquired_at: 5, contradicts: [] },
+    ];
+    const result = contractBelief(beliefs, 'b1');
+    // b2 and b3 share undefined+same turn but must NOT be co-contracted (old bug wiped whole turn)
+    assert.equal(result.length, 2, 'only target belief removed, not same-turn beliefs with undefined source_event_id');
+    assert.ok(result.some(b => b.id === 'b2'), 'b2 must survive');
+    assert.ok(result.some(b => b.id === 'b3'), 'b3 must survive');
+  });
+
+  it('still co-contracts beliefs with matching defined source_event_id', () => {
+    const beliefs: import('./server/engine/types.ts').Belief[] = [
+      { id: 'b1', proposition: 'Alice said X', confidence: 0.8, source: 'told', source_event_id: 'evt:42', acquired_at: 5, contradicts: [] },
+      { id: 'b2', proposition: 'Alice also said Y', confidence: 0.7, source: 'told', source_event_id: 'evt:42', acquired_at: 5, contradicts: [] },
+    ];
+    const result = contractBelief(beliefs, 'b1');
+    assert.equal(result.length, 0, 'both beliefs share a defined event id and should be co-contracted');
+  });
+});
+
+describe('Wave 41 — reviseBelief uses contradicts edges as primary path', () => {
+  it('contracts via explicit contradicts edge regardless of source type', () => {
+    const beliefs: import('./server/engine/types.ts').Belief[] = [
+      { id: 'old', proposition: 'Nora is honest', confidence: 0.9, source: 'told', source_event_id: 'e1', acquired_at: 1, contradicts: [] },
+    ];
+    const newBelief: import('./server/engine/types.ts').Belief = {
+      id: 'new', proposition: 'Nora is lying', confidence: 0.8, source: 'told', source_event_id: 'e2', acquired_at: 2,
+      contradicts: ['old'],   // explicit edge
+    };
+    const result = reviseBelief(beliefs, newBelief);
+    assert.ok(!result.some(b => b.id === 'old'), 'old belief should be contracted via explicit edge');
+    assert.ok(result.some(b => b.id === 'new'), 'new belief should be present');
+  });
+});
+
+describe('Wave 41 — applyCredence prefers source_agent_id for told beliefs', () => {
+  it('uses source_agent_id when present', () => {
+    const belief: import('./server/engine/types.ts').Belief = {
+      id: 'b', proposition: 'X', confidence: 1.0, source: 'told',
+      source_agent_id: 'agent_bob', source_event_id: 'evt:99', acquired_at: 0, contradicts: [],
+    };
+    const credMap = { agent_bob: { sourceId: 'agent_bob', credence: 0.5, observations: 1, updatedAt: 0 } };
+    const result = applyCredence(belief, credMap);
+    assert.ok(Math.abs(result.confidence - 0.5) < 0.01, 'confidence should be scaled by agent credence');
+  });
+
+  it('falls back to event source prefix when source_agent_id absent', () => {
+    const belief: import('./server/engine/types.ts').Belief = {
+      id: 'b', proposition: 'X', confidence: 1.0, source: 'witnessed',
+      source_agent_id: undefined, source_event_id: 'agent_carol:evt1', acquired_at: 0, contradicts: [],
+    };
+    const credMap = { agent_carol: { sourceId: 'agent_carol', credence: 0.3, observations: 1, updatedAt: 0 } };
+    const result = applyCredence(belief, credMap);
+    assert.ok(Math.abs(result.confidence - 0.3) < 0.01, 'should use event source prefix as fallback');
   });
 });

@@ -27,6 +27,7 @@ import { buildGenerationSpec, buildSystemPreamble } from '../generate/proof-spec
 import { buildQualityAwareConstraints } from '../generate/quality-spec.ts';
 import { proppMorphology } from '../quality/index.ts';
 import { applyOperator, ALL_OPERATORS } from './operators.ts';
+import { applyStoryOps } from '../ops/dispatcher.ts';
 import { queryPolicy } from '../selfplay/mine.ts';
 import { computeTopology } from '../valuation/topology.ts';
 import { makePrng, randInt } from '../repro/seed.ts';
@@ -136,7 +137,11 @@ export async function convergeScene(
         const arcLedger = deriveTensionLedger(state, target.sceneIdx);
         const topology = computeTopology([arcLedger]);
         const policyOps = queryPolicy(budget.directorPolicy, topology.dominantArc ?? 'unknown');
-        op = (policyOps[0] as MutationOperator | undefined) ?? ALL_OPERATORS[randInt(prng, ALL_OPERATORS.length)];
+        const candidateOp = policyOps[0] as MutationOperator | undefined;
+        // Validate against known operators — a stale corpus string could crash applyOperator.
+        op = (candidateOp && (ALL_OPERATORS as readonly string[]).includes(candidateOp))
+          ? candidateOp
+          : ALL_OPERATORS[randInt(prng, ALL_OPERATORS.length)];
       } else {
         op = ALL_OPERATORS[randInt(prng, ALL_OPERATORS.length)];
       }
@@ -158,7 +163,11 @@ export async function convergeScene(
     for (const candidate of candidates) {
       const tier1Results = runTier1(candidate, state);
       const passed = tier1Passes(tier1Results);
-      const ledger = deriveTensionLedger(state, target.sceneIdx);
+      // Apply candidate ops to get post-transition state before valuing — otherwise
+      // every candidate in an iteration gets the identical pre-transition tension score,
+      // making the tension reward signal and convergence gate completely inert.
+      const postState = applyStoryOps(state, candidate.ops);
+      const ledger = deriveTensionLedger(postState, target.sceneIdx);
       const valuationScore = ledger.totalTension;
 
       // Quality gate — run on all candidates (even failed proofs) so the
@@ -208,8 +217,10 @@ export async function convergeScene(
         convergedThisIter.push({ ir: candidate, valuation: valuationScore, quality: qualityScore, composite: compositeScore, t3 });
       }
 
-      // Track best composite (for mutation and fallback)
-      if (compositeScore > bestComposite) {
+      // Track best composite — only among Tier-1-passing candidates, so mutations
+      // are never seeded from an IR that fails hard blocks and the fallback path
+      // never returns an illegal transition.
+      if (passed && compositeScore > bestComposite) {
         best = candidate;
         bestComposite = compositeScore;
       }
@@ -250,10 +261,19 @@ export async function convergeScene(
     }
   }
 
-  // Budget exhausted — return best we found
-  const finalIR = best ?? lastCandidates[lastCandidates.length - 1] ??
-    (await generate(buildGenerationSpec(state, target), 1))[0];
-  const finalLedger = deriveTensionLedger(state, target.sceneIdx);
+  // Budget exhausted — return best Tier-1-passing candidate found.
+  // The fallback generate is guarded by the budget so it doesn't exceed maxLLMCalls.
+  let finalIR = best ?? lastCandidates[lastCandidates.length - 1];
+  if (!finalIR && llmCallCount < llmCallLimit) {
+    llmCallCount++;
+    const fallback = await generate(buildGenerationSpec(state, target), 1);
+    finalIR = fallback[0];
+  }
+  // Last-resort: synthesise an empty pass-through IR using the last candidate as a base.
+  if (!finalIR) {
+    finalIR = lastCandidates[0] ?? { transitionId: 'fallback', sceneIdx: target.sceneIdx, sceneFunction: 'establish_world', activeMechanisms: [], beforeStateHash: '', ops: [], preconditions: [], postconditions: [], provenance: { origin: 'model_generated', createdAt: Date.now() } } as unknown as NarrativeTransitionIR;
+  }
+  const finalLedger = deriveTensionLedger(applyStoryOps(state, finalIR.ops), target.sceneIdx);
   const finalQReport = runQualityEngine(finalIR, state);
 
   return {

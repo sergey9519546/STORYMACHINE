@@ -228,7 +228,13 @@ export class Stage {
     ];
     for (let i = current; i < MIGRATIONS.length; i++) {
       this.db.transaction(() => {
-        MIGRATIONS[i]();
+        try {
+          MIGRATIONS[i]();
+        } catch (err) {
+          const msg = (err as Error).message ?? '';
+          // SQLite has no ADD COLUMN IF NOT EXISTS — treat duplicate-column as idempotent.
+          if (!msg.includes('duplicate column name')) throw err;
+        }
         this.db.pragma(`user_version = ${i + 1}`);
       })();
     }
@@ -1343,15 +1349,25 @@ export class Stage {
   // ── Drama Positions (v11) ────────────────────────────────────────────────────
 
   public upsertDramaPosition(p: import('../nvm/valuation/futures.ts').DramaticPosition, sceneIdx: number): void {
+    // Use INSERT ... ON CONFLICT DO UPDATE so that mark-to-market refreshes never
+    // overwrite the `closed` flag — a previously-closed position must stay closed.
     this.db.prepare(`
-      INSERT OR REPLACE INTO Drama_Positions
+      INSERT INTO Drama_Positions
         (position_id, kind, char_id, description, opened_at_scene,
          expected_payoff, time_decay, mark_to_market, closed, scene_idx, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+      ON CONFLICT(position_id) DO UPDATE SET
+        kind           = excluded.kind,
+        char_id        = excluded.char_id,
+        description    = excluded.description,
+        expected_payoff = excluded.expected_payoff,
+        time_decay     = excluded.time_decay,
+        mark_to_market = excluded.mark_to_market,
+        scene_idx      = excluded.scene_idx
     `).run(
       p.positionId, p.kind, p.charId ?? null, p.description,
       p.openedAtScene, p.expectedPayoff, p.timeDecay, p.markToMarket,
-      0, sceneIdx, Date.now(),
+      sceneIdx, Date.now(),
     );
   }
 

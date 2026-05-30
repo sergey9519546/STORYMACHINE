@@ -327,10 +327,23 @@ export function necessityScore(ops: StoryOp[]): number {
   if (ops.length === 0) return 1;
   const necessary = ops.filter((op, i) => {
     if (op.op === 'ADD_FACT') {
-      const referencedLater = ops.slice(i + 1).some(
-        later => later.op === 'UPDATE_BELIEF' &&
-                 later.belief.proposition.toLowerCase().includes(op.fact.factId.toLowerCase()),
-      );
+      // A fact is necessary if a later op structurally references the same subject/object,
+      // or if causal links declare it as a cause. Testing prose inclusion of the factId
+      // (a UUID) was always false, scoring every multi-fact scene as "padded".
+      const { subject, object: factObj } = op.fact;
+      const referencedLater = ops.slice(i + 1).some(later => {
+        if (later.op === 'UPDATE_BELIEF') {
+          return later.belief.proposition.toLowerCase().includes(subject.toLowerCase()) ||
+                 later.belief.proposition.toLowerCase().includes(factObj.toLowerCase());
+        }
+        if (later.op === 'ADD_FACT') {
+          return later.fact.subject === factObj || later.fact.object === subject;
+        }
+        if (later.op === 'APPRAISE_EMOTION') {
+          return later.charId === subject;
+        }
+        return false;
+      });
       return referencedLater || ops.filter(o => o.op === 'ADD_FACT').length === 1;
     }
     if (op.op === 'APPRAISE_EMOTION') {
@@ -428,11 +441,20 @@ export function buildCausalGraph(ir: NarrativeTransitionIR): CausalPlotGraph {
   // rootOps = not a causal target (nothing declares it as caused-by)
   const rootOps = nodes.filter(n => !targetSet.has(n.opIdx)).map(n => n.opIdx);
 
-  // leafOps = opIdx not referenced as a "from" by any edge (heuristic: numeric ids)
-  const causingIdxs = new Set(
-    edges.map(e => parseInt(e.from)).filter(n => !isNaN(n)),
-  );
-  const leafOps = nodes.filter(n => !causingIdxs.has(n.opIdx)).map(n => n.opIdx);
+  // leafOps = ops that are not declared as the cause of any other op.
+  // causalLinks use entity ids (factId/charId) as "from", not op indices — so
+  // `parseInt(e.from)` was always NaN, making every node a leaf. Instead we find
+  // the ops that produce entities referenced as causes, and mark those as non-leaf.
+  const causingEntityIds = new Set(edges.map(e => e.from));
+  // Map entities back to producer op indices (ADD_FACT produces a factId; UPDATE_BELIEF produces a beliefId)
+  const producerOpIdxs = new Set<number>();
+  nodes.forEach(n => {
+    const op = ir.ops[n.opIdx];
+    if (!op) return;
+    if (op.op === 'ADD_FACT' && causingEntityIds.has(op.fact.factId)) producerOpIdxs.add(n.opIdx);
+    if (op.op === 'UPDATE_BELIEF' && causingEntityIds.has(op.belief.id)) producerOpIdxs.add(n.opIdx);
+  });
+  const leafOps = nodes.filter(n => !producerOpIdxs.has(n.opIdx)).map(n => n.opIdx);
 
   return { nodes, edges, rootOps, leafOps };
 }

@@ -59,7 +59,9 @@ export function updateCredence(
  * Result: confidence × credence (a character with low trust has lower confidence).
  */
 export function applyCredence(belief: Belief, credenceMap: SourceCredenceMap): Belief {
-  const sourceId = (belief.source_event_id ?? '').split(':')[0] || 'unknown';
+  // For told beliefs prefer the agent who told it; fall back to event source prefix.
+  const sourceId = belief.source_agent_id
+    ?? ((belief.source_event_id ?? '').split(':')[0] || 'unknown');
   const credence = credenceMap[sourceId]?.credence ?? 0.7;   // default 0.7
   return { ...belief, confidence: Math.max(0, Math.min(1, belief.confidence * credence)) };
 }
@@ -84,11 +86,14 @@ export function contractBelief(beliefs: Belief[], beliefId: string): Belief[] {
   const dependents = new Set<string>();
   dependents.add(beliefId);
 
-  // Simple dependency heuristic: beliefs acquired in the same turn with the same
-  // source_event_id were likely derived together and should be co-contracted.
+  // Co-contraction: only beliefs that share an explicit, non-empty source_event_id
+  // with the target are considered causally co-derived. Using undefined-equals-undefined
+  // would incorrectly wipe every belief acquired on the same turn (violating AGM
+  // minimal-change: one contraction must not cascade to an entire turn's belief set).
   for (const b of beliefs) {
     if (
       b.id !== beliefId &&
+      target.source_event_id &&
       b.source_event_id === target.source_event_id &&
       b.acquired_at === target.acquired_at
     ) {
@@ -109,18 +114,25 @@ export function contractBelief(beliefs: Belief[], beliefId: string): Belief[] {
  * @returns The revised belief set.
  */
 export function reviseBelief(beliefs: Belief[], newBelief: Belief): Belief[] {
+  // Contract any belief that conflicts with the new one. Two conflict criteria:
+  //   1. Explicit: the belief declares the other in its `contradicts` id list.
+  //      This is the authoritative path when belief graphs carry provenance edges.
+  //   2. Heuristic: same 40-char proposition stem with witnessed/told source
+  //      asymmetry. Kept for backward compatibility with callers that don't set
+  //      `contradicts`, but explicit edges take precedence.
   const stem = newBelief.proposition.slice(0, 40);
-
-  // Contract any belief whose proposition stem conflicts
   let contracted = beliefs;
   for (const b of beliefs) {
-    const bStem = b.proposition.slice(0, 40);
-    const conflict =
-      bStem === stem &&
+    const declaredConflict =
+      (newBelief.contradicts?.includes(b.id)) ||
+      (b.contradicts?.includes(newBelief.id));
+    const stemConflict =
+      !declaredConflict &&   // don't double-contract
+      b.proposition.slice(0, 40) === stem &&
       b.source !== newBelief.source &&
       ((b.source === 'witnessed' && newBelief.source === 'told') ||
        (b.source === 'told' && newBelief.source === 'witnessed'));
-    if (conflict) {
+    if (declaredConflict || stemConflict) {
       contracted = contractBelief(contracted, b.id);
     }
   }

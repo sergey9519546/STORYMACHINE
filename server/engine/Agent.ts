@@ -192,6 +192,8 @@ export class Agent {
   private sheet: CharacterSheet;
   private stage: Stage;
   private _reflectionInFlight = false;
+  // Persuasion strategies computed in buildEnhancedPrompt; written to DB in takeTurn.
+  private _pendingPersuasionStrategies = new Map<string, string>();
 
   constructor(sheet: CharacterSheet, stage: Stage) {
     this.sheet = sheet;
@@ -308,13 +310,30 @@ export class Agent {
       (raw.candidates ?? [])[0] ?? { action_type: 'SPEAK', content: '', target: null },
     );
 
-    return {
+    const action: NarrativeAction = {
       action_type: VALID_ACTIONS.has(best.action_type)
         ? best.action_type as NarrativeAction['action_type']
         : 'SPEAK',
       target: best.target ?? null,
       content: best.content || '...',
     };
+
+    // Write persuasion records exactly once per turn, after the action is chosen.
+    // Previously this happened inside buildEnhancedPrompt (a DB write inside a pure
+    // prompt builder), which caused double-recording on retries.
+    const currentTurn = this.stage.getTurnCount();
+    for (const [targetId, strategy] of this._pendingPersuasionStrategies) {
+      this.stage.recordPersuasion({
+        id: randomUUID(),
+        agent_id: this.sheet.char_id,
+        target_id: targetId,
+        strategy: strategy as PersuasionStrategy,
+        turn: currentTurn,
+      });
+    }
+    this._pendingPersuasionStrategies.clear();
+
+    return action;
   }
 
   private buildEnhancedPrompt(
@@ -426,13 +445,18 @@ export class Agent {
       ? 'NARRATIVE PHASE: TURN — a contradiction has emerged; press toward confrontation or defense.'
       : 'NARRATIVE PHASE: PRESTIGE — the illusion is collapsing; act as if everything is being recontextualized.';
 
-    // ── D: Dynamic Persuasion — named strategy per target, recorded to Stage ──
+    // ── D: Dynamic Persuasion — named strategy per target ──
+    // The strategy is selected here (reads history) but the persuasion record is
+    // written in takeTurn() after the action is committed — not during prompt
+    // construction, which can be called multiple times (retries, observers).
+    const persuasionStrategies = new Map<string, string>();
     const persuasionHints = otherAgents.map(other => {
       const history = this.stage.getPersuasionHistory(this.sheet.char_id, other.char_id, 8);
       const strategy = selectPersuasionStrategy(other, history);
-      this.stage.recordPersuasion({ id: randomUUID(), agent_id: this.sheet.char_id, target_id: other.char_id, strategy, turn: currentTurn });
+      persuasionStrategies.set(other.char_id, strategy);
       return `  - With ${other.name} [${strategy}]: ${PERSUASION_HINT[strategy](other.name)}`;
     }).join('\n');
+    this._pendingPersuasionStrategies = persuasionStrategies;
 
     // ── Dramatic Pressure (Director's bias signal — consumed once) ──
     const activePressures = this.stage.getActivePressures(this.sheet.char_id);
@@ -882,6 +906,22 @@ Based on what you just witnessed:
               description: `${this.sheet.name} achieved subgoal: "${achieved.description}"`,
               old_subgoal: achieved.description,
             });
+            // Promote to terminal achievement when all instrumental goals are done.
+            // This is the primary climax trigger (_isClimaxReached) — without this,
+            // the "terminal goal achieved → resolution" arc is permanently dead code.
+            const allDone = gs.instrumental.every(g => g.achieved);
+            if (allDone && !gs.terminal.achieved) {
+              gs.terminal = { ...gs.terminal, achieved: true };
+              pendingMutations.push({
+                mutation_id: randomUUID(),
+                char_id: this.sheet.char_id,
+                turn_index: turnIndex,
+                trigger_event_id: triggerEventId,
+                mutation_type: 'subgoal_achieved',
+                description: `${this.sheet.name} achieved TERMINAL GOAL: "${gs.terminal.description}"`,
+                new_subgoal: gs.terminal.description,
+              });
+            }
           }
         }
 

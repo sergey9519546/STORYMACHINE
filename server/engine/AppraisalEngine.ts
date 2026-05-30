@@ -87,7 +87,12 @@ export class AppraisalEngine {
     }
 
     // ── Appraise recent goal mutations ──
-    const mutations = this.stage.getRecentGoalMutations(update.char_id, turnIndex);
+    // Filter to ONLY mutations created on the current turn. The 5-turn window in
+    // getRecentGoalMutations exists for historical queries; re-counting prior turns'
+    // mutations each subsequent turn would inflate emotions to 100 and keep them
+    // pinned for 5 turns from a single event — corrupting the entire psychology layer.
+    const mutations = this.stage.getRecentGoalMutations(update.char_id, turnIndex)
+      .filter(m => m.turn_index === turnIndex);
     for (const m of mutations) {
       if (m.mutation_type === 'subgoal_achieved') {
         next.joy = Math.min(100, next.joy + 30);
