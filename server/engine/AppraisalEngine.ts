@@ -223,6 +223,7 @@ export class AppraisalEngine {
         if (b.char_id === a.char_id) continue;
         const trust = tom[b.char_id]?.trust_level ?? 0.3;
         const other = snap[b.char_id];
+        if (!other) continue;
         const rate = CONTAGION_RATE * trust;
 
         // joy and distress are contagious; fear is mildly; anger is self-directed
