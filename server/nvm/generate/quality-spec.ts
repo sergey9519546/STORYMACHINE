@@ -10,6 +10,7 @@
 import type { GenerationConstraint } from './proof-spec.ts';
 import type { QualityWarning, ProppAnalysis, ProppStage } from '../quality/index.ts';
 import type { OpenPromise } from '../quality/arc-tracker.ts';
+import { sanitizeForPrompt } from '../../lib/prompt-utils.ts';
 
 // ── Quality warning → constraint ──────────────────────────────────────────────
 
@@ -85,10 +86,10 @@ export function arcConstraintsFromTracker(
     .slice(0, maxConstraints);
 
   return urgentPromises.map(p => {
-    const base = p.description;
+    const base = sanitizeForPrompt(p.description, 200);
     switch (p.kind) {
       case 'CLUE':
-        return { kind: 'must_seed_clue' as const, description: `Resolve arc promise: ${base}. Use a PAYOFF_SETUP op.`, detail: p.promiseId.replace('clue:', '') };
+        return { kind: 'must_seed_clue' as const, description: `Resolve arc promise: ${base}. Use a PAYOFF_SETUP op.`, detail: sanitizeForPrompt(p.promiseId.replace('clue:', ''), 128) };
       case 'CLOCK':
         return { kind: 'free_form' as const, description: `Resolve arc promise: ${base}. Add a RAISE_CLOCK with a negative amount to count it down.` };
       case 'REL':

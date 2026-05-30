@@ -60,45 +60,48 @@ export function proofsToConstraints(
 
   // Always: use the target mechanisms
   for (const m of target.activeMechanisms) {
-    constraints.push({ kind: 'must_use_mechanism', description: `Activate mechanism: ${m}`, detail: m });
+    const safeM = sanitizeForPrompt(m, 128);
+    constraints.push({ kind: 'must_use_mechanism', description: `Activate mechanism: ${safeM}`, detail: safeM });
   }
 
   // From failures
   for (const result of failures) {
     for (const finding of result.findings) {
+      const safeSubj = sanitizeForPrompt(finding.subjectId ?? '', 128);
+      const safeMsg  = sanitizeForPrompt(finding.message   ?? '', 300);
       switch (result.proof) {
         case 'IntentionalProof':
           constraints.push({
             kind: 'must_introduce_character',
-            description: `Introduce character "${finding.subjectId}" with an UPDATE_BELIEF op before referencing them`,
-            detail: finding.subjectId,
+            description: `Introduce character "${safeSubj}" with an UPDATE_BELIEF op before referencing them`,
+            detail: safeSubj,
           });
           break;
         case 'TemporalProof':
           constraints.push({
             kind: 'must_add_fact',
-            description: `ADD_FACT for "${finding.subjectId}" must precede any EXPIRE_FACT referencing it`,
-            detail: finding.subjectId,
+            description: `ADD_FACT for "${safeSubj}" must precede any EXPIRE_FACT referencing it`,
+            detail: safeSubj,
           });
           break;
         case 'EarnedRevealProof':
           constraints.push({
             kind: 'must_earn_reveal',
-            description: `SEED_CLUE "${finding.subjectId}" must appear before the PAYOFF_SETUP fires`,
-            detail: finding.subjectId,
+            description: `SEED_CLUE "${safeSubj}" must appear before the PAYOFF_SETUP fires`,
+            detail: safeSubj,
           });
           break;
         case 'EpistemicProof':
           constraints.push({
             kind: 'free_form',
-            description: `Epistemic constraint: ${finding.message}`,
+            description: `Epistemic constraint: ${safeMsg}`,
           });
           break;
         case 'CausalProof':
           constraints.push({
             kind: 'must_verify_causal_link',
-            description: finding.message,
-            detail: finding.subjectId,
+            description: safeMsg,
+            detail: safeSubj,
           });
           break;
         // Tier 2 quality-gate failures — translated to free-form guidance
@@ -117,11 +120,11 @@ export function proofsToConstraints(
         case 'DialogueProof':
           constraints.push({
             kind: 'free_form',
-            description: `Dialogue violation: ${finding.message}. Fix before generating.`,
+            description: `Dialogue violation: ${safeMsg}. Fix before generating.`,
           });
           break;
         default:
-          constraints.push({ kind: 'free_form', description: finding.message });
+          constraints.push({ kind: 'free_form', description: safeMsg });
       }
     }
   }
