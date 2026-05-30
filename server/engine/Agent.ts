@@ -31,6 +31,7 @@ import { logger } from '../lib/logger.ts';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { retrieveBeliefs, consolidateBeliefs, decayBeliefConfidence } from '../lib/memory.ts';
 import { detectSemanticContradictions } from '../lib/embeddings.ts';
+import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
 
 // ── Psychology prompt helpers ────────────────────────────────────────────────
 
@@ -521,7 +522,7 @@ AVAILABLE EXITS: ${
       : '(none — you cannot leave this location)';
   })()
 }
-
+${(() => { const b = buildStoryBibleSummary(this.stage); return b ? `\n${b}\n` : ''; })()}
 RECENT EVENTS:
 ${historyStr}
 

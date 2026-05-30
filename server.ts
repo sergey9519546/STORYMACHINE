@@ -16,6 +16,7 @@ import { metrics } from './server/lib/metrics.ts';
 import { validate, InitBodySchema, TurnBodySchema, RunRoomBodySchema, ImportBodySchema, AiConfigSchema, OutlineBodySchema } from './server/lib/validation.ts';
 import { initFromEnv, applyConfig, getPublicConfig } from './server/lib/ai-config.ts';
 import { sanitizeForPrompt } from './server/lib/prompt-utils.ts';
+import { buildStoryBibleSummary } from './server/nvm/bible/index.ts';
 
 // ── Startup validation ────────────────────────────────────────────────────────
 const AI_PROVIDER = process.env.AI_PROVIDER ?? 'gemini';
@@ -1250,6 +1251,11 @@ async function startServer() {
       ? `\nEXISTING SCRIPT (for continuity — match the established tone, characters, locations, and facts; do not contradict them):\n${scriptContext}\n`
       : '';
     const wbProfiles = profilesBlock(sanitizeProfiles(req.body?.profiles));
+    const bibleBlock = (() => {
+      const s = sessions.get(sessionId(req));
+      const b = s ? buildStoryBibleSummary(s.stage) : '';
+      return b ? `\n${b}\n` : '';
+    })();
     const response = await generateContent({
       model: getModel(),
       contents: `SYSTEM ROLE: You are a master screenwriter and world-builder. Your task is to generate or expand a scene based on the user's beat outline.
@@ -1261,7 +1267,7 @@ STRICT CONSTRAINTS:
 2. NO CAMERA DIRECTIONS: You are strictly forbidden from using camera terminology (e.g., "We see", "Pan to", "Close up", "Wide shot", "Angle on"). Describe the environment and the action as it happens in the world, not through a lens.
 3. SENSORY WRITING: Focus on lighting, sound, texture, and kinetic movement. Use active verbs. Avoid "is/are" where possible.
 4. ECONOMY: Keep action blocks to 4 lines maximum. Break up text to control the reader's pacing.
-${contextBlock}${wbProfiles}
+${contextBlock}${bibleBlock}${wbProfiles}
 INPUT: ${sanitizeForPrompt(beat, 8000)}
 OUTPUT: Generate the Scene Heading and Action lines.`,
     }, { label: 'world-build', timeoutMs: 30_000 });
@@ -1296,6 +1302,11 @@ OUTPUT: Generate the Scene Heading and Action lines.`,
     const dlgContextBlock = dlgContext
       ? `\nSURROUNDING SCRIPT (preserve each character's established voice and the scene's continuity):\n${dlgContext}\n`
       : '';
+    const dlgBibleBlock = (() => {
+      const s = sessions.get(sessionId(req));
+      const b = s ? buildStoryBibleSummary(s.stage) : '';
+      return b ? `\n${b}\n` : '';
+    })();
     const response = await generateContent({
       model: getModel(),
       contents: `SYSTEM ROLE: You are an expert dialogue doctor, specializing in subtext, character voice, and dramatic irony.
@@ -1307,7 +1318,7 @@ INSTRUCTIONS:
 2. Rewrite the dialogue so the characters are fighting for their 'Want' indirectly.
 3. Differentiate voices based on provided psychological profiles.
 4. Add brief, behavior-revealing parentheticals only if absolutely necessary.
-${dlgContextBlock}
+${dlgContextBlock}${dlgBibleBlock}
 INPUT DIALOGUE: ${sanitizeForPrompt(dialogue, 8000)}
 CHARACTER PROFILES: ${JSON.stringify(profiles)}
 OUTPUT: Provide 2 alternative versions of the dialogue exchange, explaining the subtextual strategy used in each.`,
@@ -1322,6 +1333,11 @@ OUTPUT: Provide 2 alternative versions of the dialogue exchange, explaining the 
       ? `\nSURROUNDING SCRIPT (consider how tension carries over from adjacent scenes):\n${tnContext}\n`
       : '';
     const tnProfiles = profilesBlock(sanitizeProfiles(req.body?.profiles));
+    const tnBibleBlock = (() => {
+      const s = sessions.get(sessionId(req));
+      const b = s ? buildStoryBibleSummary(s.stage) : '';
+      return b ? `\n${b}\n` : '';
+    })();
     const response = await generateContent({
       model: getModel(),
       contents: `SYSTEM ROLE: You are a structural script consultant influenced by Hitchcock's theory of suspense.
@@ -1333,7 +1349,7 @@ ANALYSIS CRITERIA:
 2. The Ticking Clock: Is there a time constraint? If not, suggest a micro-deadline.
 3. The Dilemma: Are the choices too easy? Propose a "best bad choice" scenario.
 4. Pacing: Suggest where to slow down to build dread, or speed up to simulate panic.
-${tnContextBlock}${tnProfiles}
+${tnContextBlock}${tnBibleBlock}${tnProfiles}
 INPUT SCENE: ${sanitizeForPrompt(scene, 8000)}
 OUTPUT: A bulleted diagnostic report with 3 actionable suggestions. Where a character's want, lie, or wound is relevant, ground the suggestion in it.`,
     }, { label: 'analyze-tension', timeoutMs: 30_000 });
