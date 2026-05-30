@@ -1419,6 +1419,8 @@ export class Stage {
 
   // ── Ghost ledger (v9) ────────────────────────────────────────────────────────
 
+  private static readonly MAX_GHOST_COMMITS = 200;
+
   public ghostLedgerAppend(ghost: import('../nvm/repro/ghost-ledger.ts').GhostCommit): void {
     this.db.prepare(`
       INSERT OR IGNORE INTO Ghost_Commits
@@ -1428,6 +1430,13 @@ export class Stage {
       ghost.ghostId, ghost.parentCommitId ?? null, ghost.sceneIdx,
       JSON.stringify(ghost.ir), ghost.reason, ghost.rejectedAt,
     );
+    // Prune oldest entries beyond cap so the table doesn't grow unbounded
+    this.db.prepare(`
+      DELETE FROM Ghost_Commits WHERE ghost_id IN (
+        SELECT ghost_id FROM Ghost_Commits ORDER BY rejected_at ASC
+        LIMIT MAX(0, (SELECT COUNT(*) FROM Ghost_Commits) - ?)
+      )
+    `).run(Stage.MAX_GHOST_COMMITS);
   }
 
   public ghostLedgerGet(sceneIdx?: number): import('../nvm/repro/ghost-ledger.ts').GhostCommit[] {

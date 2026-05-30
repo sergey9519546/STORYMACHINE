@@ -16,6 +16,7 @@ export function makePrng(seed: Seed): () => number {
 
 // Deterministic integer in [0, n).
 export function randInt(prng: () => number, n: number): number {
+  if (n <= 0) return 0; // guard: empty or invalid range returns 0
   return Math.floor(prng() * n);
 }
 

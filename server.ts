@@ -1343,11 +1343,11 @@ OUTPUT: Just the rewritten action text, nothing else.`,
       res.status(400).json({ error: 'profile is required' });
       return;
     }
-    const name  = requireString(profile.name,  'profile.name', 256);
-    const ghost = requireString(profile.ghost, 'profile.ghost');
-    const lie   = requireString(profile.lie,   'profile.lie');
-    const want  = requireString(profile.want,  'profile.want');
-    const need  = requireString(profile.need,  'profile.need');
+    const name  = sanitizeForPrompt(requireString(profile.name,  'profile.name', 256), 256);
+    const ghost = sanitizeForPrompt(requireString(profile.ghost, 'profile.ghost'), 1000);
+    const lie   = sanitizeForPrompt(requireString(profile.lie,   'profile.lie'), 1000);
+    const want  = sanitizeForPrompt(requireString(profile.want,  'profile.want'), 1000);
+    const need  = sanitizeForPrompt(requireString(profile.need,  'profile.need'), 1000);
 
     const response = await generateContent({
       model: getModel(),
