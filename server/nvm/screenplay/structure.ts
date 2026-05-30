@@ -109,14 +109,13 @@ export function analyzeStructure(
   const approachingClimax = recentClockRaises >= 2 || actPosition === 'act3';
 
   // ── Open clues ────────────────────────────────────────────────────────────
+  // Build a Set to deduplicate clue IDs — a single clue can appear in multiple
+  // records' unresolvedClues arrays, so a reduce-sum would overcount.
   const plantedClues = new Set<string>();
-  const paidOffClues = new Set<string>();
   for (const record of records) {
     for (const clueId of record.unresolvedClues) plantedClues.add(clueId);
-    // Payoffs would remove from unresolved (the commit that pays off won't have the clue in unresolvedClues)
   }
-  // unresolvedClues are from records — they're already filtered to seeds without payoffs
-  const openClues = records.reduce((s, r) => s + r.unresolvedClues.length, 0);
+  const openClues = plantedClues.size;
 
   // ── Revelation count ──────────────────────────────────────────────────────
   const revelationCount = records.filter(r => r.revelation !== null).length;

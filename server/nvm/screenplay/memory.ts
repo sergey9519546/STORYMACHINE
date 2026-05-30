@@ -144,7 +144,24 @@ export function annotateCommit(commit: StoryCommit): ScreenplaySceneRecord {
  * Build the full screenplay memory: one record per non-reverted commit.
  */
 export function buildScreenplayMemory(commits: StoryCommit[]): ScreenplaySceneRecord[] {
-  return commits.filter(c => !c.reverted).map(annotateCommit);
+  const active = commits.filter(c => !c.reverted);
+
+  // Two-pass: first collect ALL paid-off setupIds across the full ledger,
+  // then pass that set to annotateCommit so clues resolved in later scenes
+  // are correctly removed from earlier scenes' unresolvedClues lists.
+  const allPaidOffIds = new Set<string>();
+  for (const c of active) {
+    for (const op of c.ops) {
+      if (op.op === 'PAYOFF_SETUP') allPaidOffIds.add(op.setupId);
+    }
+  }
+
+  return active.map(c => {
+    const record = annotateCommit(c);
+    // Remove globally-paid-off clues from this record's unresolved list.
+    record.unresolvedClues = record.unresolvedClues.filter(id => !allPaidOffIds.has(id));
+    return record;
+  });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
