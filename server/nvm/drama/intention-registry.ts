@@ -77,9 +77,13 @@ export function buildIntentionRegistry(stage: Stage): IntentionRegistry {
     const wantNow = currentSubgoal ?? gs?.terminal.description ?? 'survive the scene';
 
     // Urgency: terminal goal value, boosted if threatened
+    // Guard against NaN: terminal.value is a number but could be NaN if persisted
+    // from malformed JSON; `?? 50` only guards null/undefined, not NaN.
     const threatened = agent.suspicion_score > 60 ||
       (gs?.terminal.achieved === false && agent.suspicion_score > 40);
-    const urgency = Math.min(100, (gs?.terminal.value ?? 50) + (threatened ? 20 : 0));
+    const rawValue = gs?.terminal.value;
+    const safeValue = typeof rawValue === 'number' && isFinite(rawValue) ? rawValue : 50;
+    const urgency = Math.min(100, safeValue + (threatened ? 20 : 0));
 
     intentions.push({
       charId: agent.char_id,

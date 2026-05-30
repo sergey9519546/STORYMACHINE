@@ -22,6 +22,9 @@ export interface BranchScore {
   coherence: number;          // 0-100
   viability: number;          // 0-100
   screenplayUsefulness: number; // 0-100
+  /** Scene-level arc alignment: does this branch advance character arcs,
+   *  pay off setups, or create an emotional polarity shift? */
+  arcAlignment: number;       // 0-100
   total: number;              // weighted average
 }
 
@@ -56,12 +59,21 @@ export function scoreBranch(
   // ── Screenplay usefulness: tension + reveal potential ─────────────────────
   const screenplayUsefulness = computeScreenplayUsefulness(ops, state);
 
-  // Weighted total (equal weights for now; can tune)
+  // ── Arc alignment: does this branch advance arcs, pay off setups, or create
+  //    a polarity shift relative to the current emotional state? ─────────────
+  const arcAlignment = computeArcAlignment(ops, state);
+
+  // Weighted total — 6 dimensions summing to 1.0
   const total = Math.round(
-    (novelty * 0.2 + consequence * 0.25 + coherence * 0.25 + viability * 0.15 + screenplayUsefulness * 0.15)
+    novelty * 0.15 +
+    consequence * 0.2 +
+    coherence * 0.2 +
+    viability * 0.15 +
+    screenplayUsefulness * 0.15 +
+    arcAlignment * 0.15,
   );
 
-  return { novelty, consequence, coherence, viability, screenplayUsefulness, total };
+  return { novelty, consequence, coherence, viability, screenplayUsefulness, arcAlignment, total };
 }
 
 // ── Scoring helpers ───────────────────────────────────────────────────────────
@@ -130,6 +142,48 @@ function computeConsequence(ops: StoryOp[]): number {
       default: score += 2;
     }
   }
+
+  return Math.min(100, score);
+}
+
+/**
+ * Arc alignment (0–100): rewards scene-level dramatic progress.
+ *
+ *  - Polarity shift: APPRAISE_EMOTION with a valence opposite to the character's
+ *    current dominant emotion (state.characterEmotions). The scene should "turn".
+ *  - Goal advancement: ADVANCE_OBJECT_ARC ops signal a character's plan bearing fruit.
+ *  - Payoff: PAYOFF_SETUP ops close a dramatic loop that was opened earlier.
+ *  - Theme resolution: ADVANCE_THEME_ARGUMENT 'resolve' moves the argument to closure.
+ */
+function computeArcAlignment(ops: StoryOp[], state: NarrativeState): number {
+  let score = 30; // baseline — every branch has some arc value
+
+  const NEGATIVE_EMOTIONS = new Set(['fear', 'distress', 'anger', 'shame', 'contempt']);
+  const POSITIVE_EMOTIONS = new Set(['joy', 'trust', 'admiration', 'relief', 'love']);
+
+  // Polarity shift: emotion op with opposite valence to the character's current state
+  for (const op of ops) {
+    if (op.op !== 'APPRAISE_EMOTION') continue;
+    const current = state.characterEmotions[op.charId];
+    if (!current) continue;
+    const currentNeg = NEGATIVE_EMOTIONS.has(current.dominant);
+    const newNeg = NEGATIVE_EMOTIONS.has(op.emotion.dominant);
+    const newPos = POSITIVE_EMOTIONS.has(op.emotion.dominant);
+    if (currentNeg && newPos) { score += 25; break; } // dark→light turn
+    if (!currentNeg && newNeg) { score += 20; break; } // light→dark reversal
+  }
+
+  // Object arc advancement = character's plan bears fruit
+  score += ops.filter(o => o.op === 'ADVANCE_OBJECT_ARC').length * 15;
+
+  // Payoff setup = dramatic loop closes
+  score += ops.filter(o => o.op === 'PAYOFF_SETUP').length * 20;
+
+  // Theme resolution = argument reaches a conclusion
+  score += ops.filter(o => o.op === 'ADVANCE_THEME_ARGUMENT' && o.move === 'resolve').length * 15;
+
+  // Clue seeding = future arc primed
+  score += ops.filter(o => o.op === 'SEED_CLUE').length * 8;
 
   return Math.min(100, score);
 }

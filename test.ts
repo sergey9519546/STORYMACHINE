@@ -7883,7 +7883,7 @@ import { scoreBranch } from './server/nvm/branch/score.ts';
 describe('NVM — Forward Latent Branch Field (Wave 35)', () => {
   // ── scoreBranch ────────────────────────────────────────────────────────────
 
-  it('branchField: scoreBranch returns all 5 dimension scores + total', () => {
+  it('branchField: scoreBranch returns all 6 dimension scores + total', () => {
     const ops: StoryOp[] = [
       { op: 'UPDATE_READER_STATE', delta: { suspense: 2 } },
       { op: 'RAISE_CLOCK', clockId: 'tension', amount: 2 },
@@ -7905,8 +7905,10 @@ describe('NVM — Forward Latent Branch Field (Wave 35)', () => {
     assert.ok(typeof score.coherence === 'number', 'coherence is number');
     assert.ok(typeof score.viability === 'number', 'viability is number');
     assert.ok(typeof score.screenplayUsefulness === 'number', 'screenplayUsefulness is number');
+    assert.ok(typeof score.arcAlignment === 'number', 'arcAlignment is number');
     assert.ok(typeof score.total === 'number', 'total is number');
     assert.ok(score.total >= 0 && score.total <= 100, `total in [0,100]: ${score.total}`);
+    assert.ok(score.arcAlignment >= 0 && score.arcAlignment <= 100, `arcAlignment in [0,100]: ${score.arcAlignment}`);
   });
 
   it('branchField: SEED_CLUE op boosts screenplayUsefulness', () => {
@@ -9153,5 +9155,175 @@ describe('fountainToFdx', () => {
     const fdx = fountainToFdx(`INT. ROOM - DAY\n\nALICE\nHi.\n\nBOB ^\nHey.`);
     assert.ok(!fdx.includes('BOB ^'), 'caret should be stripped');
     assert.ok(fdx.includes('<Text>BOB</Text>'), 'clean BOB cue present');
+  });
+});
+
+// ── Wave 68: NaN hardening, arc alignment, enhanced bible ────────────────────
+import { buildIntentionRegistry as buildIntentionRegistryW68 } from './server/nvm/drama/intention-registry.ts';
+import { computeConflicts as computeConflictsW68 } from './server/nvm/drama/conflict-orchestrator.ts';
+import { buildStoryBibleSummary } from './server/nvm/bible/index.ts';
+
+describe('Wave 68 — NaN hardening + arc alignment + enhanced bible', () => {
+
+  // ── NaN guard: intention-registry urgency ──────────────────────────────────
+
+  it('intentionRegistry: NaN terminal.value is replaced with 50 for urgency', () => {
+    const stage = makeStage();
+    const agent = stage.getAllAgents()[0];
+    if (!agent?.goalStack) return; // skip if no agent
+    // Inject NaN into terminal.value via type coercion
+    const gs = agent.goalStack as typeof agent.goalStack & { terminal: { value: number } };
+    const originalValue = gs.terminal.value;
+    gs.terminal.value = NaN;
+    try {
+      const registry = buildIntentionRegistryW68(stage);
+      const found = registry.intentions.find(i => i.charId === agent.char_id);
+      assert.ok(found !== undefined, 'agent found in registry');
+      assert.ok(isFinite(found!.urgency), `urgency should be finite, got ${found!.urgency}`);
+      assert.ok(found!.urgency >= 0 && found!.urgency <= 100, `urgency in [0,100]: ${found!.urgency}`);
+    } finally {
+      gs.terminal.value = originalValue;
+    }
+  });
+
+  it('intentionRegistry: threatened urgency caps at 100', () => {
+    const stage = makeStage();
+    const registry = buildIntentionRegistryW68(stage);
+    for (const i of registry.intentions) {
+      assert.ok(i.urgency <= 100, `urgency must not exceed 100 for ${i.name}: ${i.urgency}`);
+    }
+  });
+
+  // ── NaN guard: conflict-orchestrator totalDramaticPressure ────────────────
+
+  it('conflictOrch: totalDramaticPressure is finite even with NaN-urgency intentions', () => {
+    const stage = makeStage();
+    const registry = buildIntentionRegistryW68(stage);
+    // Poison urgency on all intentions
+    for (const i of registry.intentions) {
+      (i as { urgency: number }).urgency = NaN;
+    }
+    const conflicts = computeConflictsW68(registry, emptyState());
+    assert.ok(isFinite(conflicts.totalDramaticPressure), `totalDramaticPressure must be finite: ${conflicts.totalDramaticPressure}`);
+    assert.ok(conflicts.totalDramaticPressure >= 0 && conflicts.totalDramaticPressure <= 100,
+      `totalDramaticPressure in [0,100]: ${conflicts.totalDramaticPressure}`);
+  });
+
+  // ── Arc alignment: PAYOFF_SETUP boosts arcAlignment ───────────────────────
+
+  it('branchScore: PAYOFF_SETUP op boosts arcAlignment vs baseline', () => {
+    const makeIR = (ops: StoryOp[]) => ({
+      transitionId: crypto.randomUUID(), sceneIdx: 1,
+      sceneFunction: 'reveal_character' as const,
+      activeMechanisms: ['relationship_externalization'],
+      beforeStateHash: '00000000', ops, preconditions: ['story_ongoing'],
+      postconditions: [], provenance: { origin: 'model_generated' as const, createdAt: Date.now() },
+    });
+
+    const opsBaseline: StoryOp[] = [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }];
+    const opsWithPayoff: StoryOp[] = [
+      ...opsBaseline,
+      { op: 'PAYOFF_SETUP', setupId: 'setup-001', payoffEventId: 'payoff-001' },
+    ];
+
+    const scoreBaseline = scoreBranch(opsBaseline, makeIR(opsBaseline), emptyState(), []);
+    const scorePayoff   = scoreBranch(opsWithPayoff, makeIR(opsWithPayoff), emptyState(), []);
+
+    assert.ok(
+      scorePayoff.arcAlignment > scoreBaseline.arcAlignment,
+      `PAYOFF_SETUP should boost arcAlignment: ${scoreBaseline.arcAlignment} → ${scorePayoff.arcAlignment}`,
+    );
+  });
+
+  it('branchScore: polarity shift (dark→light emotion) boosts arcAlignment', () => {
+    const makeIR = (ops: StoryOp[]) => ({
+      transitionId: crypto.randomUUID(), sceneIdx: 1,
+      sceneFunction: 'reveal_character' as const,
+      activeMechanisms: ['relationship_externalization'],
+      beforeStateHash: '00000000', ops, preconditions: ['story_ongoing'],
+      postconditions: [], provenance: { origin: 'model_generated' as const, createdAt: Date.now() },
+    });
+
+    // State with a character in fear
+    const stateWithFear = {
+      ...emptyState(),
+      characterEmotions: { alice: { dominant: 'fear' as const, intensity: 60, secondary: [], blended: false } },
+    };
+
+    const opsNeutral: StoryOp[] = [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }];
+    const opsPolarity: StoryOp[] = [
+      ...opsNeutral,
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { dominant: 'joy' as const, intensity: 70, secondary: [], blended: false } },
+    ];
+
+    const scoreNeutral  = scoreBranch(opsNeutral, makeIR(opsNeutral), stateWithFear, []);
+    const scorePolarity = scoreBranch(opsPolarity, makeIR(opsPolarity), stateWithFear, []);
+
+    assert.ok(
+      scorePolarity.arcAlignment > scoreNeutral.arcAlignment,
+      `Polarity shift should boost arcAlignment: ${scoreNeutral.arcAlignment} → ${scorePolarity.arcAlignment}`,
+    );
+  });
+
+  // ── Enhanced bible: theme trajectory section ──────────────────────────────
+
+  it('storyBible: includes THEME MOVES section after theme argument commits', () => {
+    const stage = makeStage();
+    const themeCommit: StoryCommit = {
+      commitId: 'theme-c1', parentId: null, sceneIdx: 0,
+      ops: [
+        { op: 'ADVANCE_THEME_ARGUMENT', claimId: 'claim-a', move: 'support' },
+        { op: 'ADVANCE_THEME_ARGUMENT', claimId: 'claim-b', move: 'attack' },
+        { op: 'ADVANCE_THEME_ARGUMENT', claimId: 'claim-c', move: 'support' },
+      ],
+      deltaSummary: '3 theme moves',
+      reverted: false,
+      createdAt: Date.now(),
+    };
+    stage.appendCommit(themeCommit);
+    const bible = buildStoryBibleSummary(stage);
+    assert.ok(bible.includes('THEME MOVES'), 'bible includes THEME MOVES section');
+    assert.ok(bible.includes('support'), 'bible includes support move');
+  });
+
+  it('storyBible: includes RELATIONSHIPS section after relationship commits', () => {
+    const stage = makeStage();
+    const relCommit: StoryCommit = {
+      commitId: 'rel-c1', parentId: null, sceneIdx: 0,
+      ops: [
+        { op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: 0.8, reason: 'helped' } },
+        { op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: 0.3, reason: 'again' } },
+      ],
+      deltaSummary: 'relationship shifts',
+      reverted: false,
+      createdAt: Date.now(),
+    };
+    stage.appendCommit(relCommit);
+    const bible = buildStoryBibleSummary(stage);
+    assert.ok(bible.includes('RELATIONSHIPS'), 'bible includes RELATIONSHIPS section');
+  });
+
+  // ── Expanded conflict vocabulary (warn/silence, cooperate/betray) ──────────
+
+  it('conflictOrch: warn/silence pair detected as directional collision', () => {
+    // Create two intentions with warn/silence contradiction
+    const warnIntention = {
+      charId: 'alice', name: 'Alice',
+      wantNow: 'warn the witnesses before it is too late',
+      terminalWant: 'warn the witnesses before it is too late',
+      currentSubgoal: null, beliefJustifying: [],
+      whatTheyLose: 'lives', urgency: 70, threatened: false,
+    };
+    const silenceIntention = {
+      charId: 'bob', name: 'Bob',
+      wantNow: 'silence the witnesses permanently',
+      terminalWant: 'silence the witnesses permanently',
+      currentSubgoal: null, beliefJustifying: [],
+      whatTheyLose: 'power', urgency: 75, threatened: false,
+    };
+    const registry = { intentions: [warnIntention, silenceIntention], totalChars: 2, builtAt: Date.now() };
+    const conflicts = computeConflictsW68(registry, emptyState());
+    assert.ok(conflicts.collisions.length > 0, 'warn/silence directional collision detected');
+    assert.ok(conflicts.collisions[0].severity > 0, 'collision has positive severity');
   });
 });

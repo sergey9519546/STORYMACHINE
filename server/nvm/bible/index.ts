@@ -35,7 +35,7 @@ export function buildStoryBibleSummary(stage: Stage): string {
   }
   parts.push(`STORY PHASE: ${illusionState.phase ?? 'Setup'} | Turn ${stage.getTurnCount()}`);
 
-  // ── Characters with current emotional state and active goal ───────────────
+  // ── Characters with emotional state, active goal, and arc progress ────────
   if (agents.length > 0) {
     const charLines: string[] = ['CHARACTERS:'];
     for (const a of agents.slice(0, 6)) {
@@ -44,7 +44,15 @@ export function buildStoryBibleSummary(stage: Stage): string {
         ? ` [${es.dominant} ${es.intensity}]` : '';
       const goal = a.goalStack?.instrumental.find(g => !g.achieved)?.description;
       const goalStr = goal ? ` → ${sanitizeForPrompt(goal, 80)}` : '';
-      charLines.push(`  ${sanitizeForPrompt(a.name, 80)}${emotionStr}${goalStr}`);
+      // Arc progress: fraction of instrumental goals achieved
+      const gs = a.goalStack;
+      let arcStr = '';
+      if (gs && gs.instrumental.length > 0) {
+        const achieved = gs.instrumental.filter(g => g.achieved).length;
+        const pct = Math.round((achieved / gs.instrumental.length) * 100);
+        arcStr = ` (arc ${pct}%)`;
+      }
+      charLines.push(`  ${sanitizeForPrompt(a.name, 80)}${emotionStr}${arcStr}${goalStr}`);
     }
     parts.push(charLines.join('\n'));
   }
@@ -85,6 +93,48 @@ export function buildStoryBibleSummary(stage: Stage): string {
     .slice(0, 3);
   if (hotClocks.length > 0) {
     parts.push(`ACTIVE CLOCKS: ${hotClocks.map(([id, v]) => `${id}=${v}`).join(', ')}`);
+  }
+
+  // ── Theme argument trajectory ────────────────────────────────────────────
+  const themeMoveCounts: Record<string, number> = {};
+  let resolveCount = 0;
+  for (const c of commits) {
+    for (const op of c.ops) {
+      if (op.op === 'ADVANCE_THEME_ARGUMENT') {
+        themeMoveCounts[op.move] = (themeMoveCounts[op.move] ?? 0) + 1;
+        if (op.move === 'resolve') resolveCount++;
+      }
+    }
+  }
+  if (Object.keys(themeMoveCounts).length > 0) {
+    const moveSummary = Object.entries(themeMoveCounts)
+      .sort(([, a], [, b]) => b - a)
+      .map(([m, n]) => `${n}×${m}`)
+      .join(', ');
+    const resolved = resolveCount > 0 ? ' ← RESOLVED' : '';
+    parts.push(`THEME MOVES: ${moveSummary}${resolved}`);
+  }
+
+  // ── Strongest relationship tensions from live state ──────────────────────
+  // (Read NarrativeState from commits rather than calling buildNarrativeState to
+  //  avoid circular dependency; approximate from SHIFT_RELATIONSHIP op totals)
+  const relTotals: Record<string, number> = {};
+  for (const c of commits) {
+    for (const op of c.ops) {
+      if (op.op === 'SHIFT_RELATIONSHIP') {
+        const key = op.pair.slice().sort().join('|');
+        const a = op.delta.amount;
+        relTotals[key] = (relTotals[key] ?? 0) + (isFinite(a) ? a : 0);
+      }
+    }
+  }
+  const strongRels = Object.entries(relTotals)
+    .filter(([, v]) => Math.abs(v) >= 0.5)
+    .sort(([, a], [, b]) => Math.abs(b) - Math.abs(a))
+    .slice(0, 3);
+  if (strongRels.length > 0) {
+    const relStr = strongRels.map(([k, v]) => `${k}=${v > 0 ? '+' : ''}${v.toFixed(1)}`).join(', ');
+    parts.push(`RELATIONSHIPS: ${relStr}`);
   }
 
   const summary = `STORY BIBLE (live — do not contradict):\n${parts.join('\n')}`;
