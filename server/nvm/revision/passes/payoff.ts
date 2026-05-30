@@ -41,16 +41,40 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     }
   }
 
-  // ── Clue paid off in the very next scene (too quick) ─────────────────────
+  // ── Clue paid off too quickly (same scene or very next scene) ───────────
   for (const [clueId, payoffScene] of payoffInfo) {
     const info = clueInfo.get(clueId);
-    if (info && payoffScene - info.plantedAt === 1) {
+    if (info) {
+      const gap = payoffScene - info.plantedAt;
+      if (gap === 0) {
+        issues.push({
+          location: `Scene ${payoffScene}`,
+          rule: 'PAYOFF_TOO_QUICK',
+          description: `Clue "${clueId}" is planted and paid off in the same scene — the audience has no time to form a question`,
+          severity: 'major',
+          suggestedFix: `Move the payoff of "${clueId}" at least 3 scenes later to create a proper anticipation arc`,
+        });
+      } else if (gap === 1) {
+        issues.push({
+          location: `Scene ${payoffScene}`,
+          rule: 'PAYOFF_TOO_QUICK',
+          description: `Clue "${clueId}" is planted and paid off in consecutive scenes — no suspense window for the audience`,
+          severity: 'minor',
+          suggestedFix: `Move the payoff of "${clueId}" at least 2-3 scenes later to build anticipation`,
+        });
+      }
+    }
+  }
+
+  // ── Dangling payoffs (PAYOFF_SETUP with no matching clue ever seeded) ────
+  for (const [setupId, payoffScene] of payoffInfo) {
+    if (!clueInfo.has(setupId)) {
       issues.push({
         location: `Scene ${payoffScene}`,
-        rule: 'PAYOFF_TOO_QUICK',
-        description: `Clue "${clueId}" is planted and paid off in consecutive scenes — no suspense window for the audience`,
-        severity: 'minor',
-        suggestedFix: `Move the payoff of "${clueId}" at least 2-3 scenes later to build anticipation`,
+        rule: 'DANGLING_PAYOFF',
+        description: `A payoff for "${setupId}" arrives in Scene ${payoffScene} but no matching setup was ever seeded — the audience will feel disoriented`,
+        severity: 'major',
+        suggestedFix: `Add a SEED_CLUE for "${setupId}" earlier in the story, or remove the payoff if it references something never established`,
       });
     }
   }

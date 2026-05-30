@@ -10855,3 +10855,207 @@ describe('Wave 86 — character-arc dramaticTurn bug, Agent goal mutation, pacin
     assert.ok(decayTrust(2.0) <= 1, 'Result is always ≤1');
   });
 });
+
+// ── Wave 87 ───────────────────────────────────────────────────────────────────
+describe('Wave 87 — payoff precision, repeated-purpose detection, dominant guard', () => {
+
+  // ── payoff: same-scene payoff (gap=0) ─────────────────────────────────────
+
+  it('payoffPass detects same-scene (gap=0) payoff as PAYOFF_TOO_QUICK major', async () => {
+    const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+    const records = [
+      {
+        commitId: 'c0', sceneIdx: 0, slug: 'INT. ROOM - DAY', purpose: 'set_up_payoff',
+        dramaticTurn: 'planted', revelation: null, clockRaised: false, clockDelta: 0,
+        emotionalShift: 'neutral', suspenseDelta: 0,
+        dialogueHighlights: [], unresolvedClues: [],
+        seededClueIds: ['clue-A'],    // planted here
+        payoffSetupIds: ['clue-A'],   // AND paid off here — same scene!
+        readerStateAnnotation: null,
+      },
+    ];
+    const structure = {
+      actPosition: 'act1' as const, completionPercent: 20,
+      revelationCount: 0, approachingClimax: false,
+      avgSuspensePerScene: 0, escalating: false,
+      reversalCount: 0, reversalDensity: 0,
+      openClues: 0, midpointPressure: 0, tightestScene: null,
+    };
+    const result = await payoffPass({
+      fountain: 'INT. ROOM - DAY\nHello.\n',
+      original: 'INT. ROOM - DAY\nHello.\n',
+      records: records as unknown as Parameters<typeof payoffPass>[0]['records'],
+      structure: structure as Parameters<typeof payoffPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const tooQuick = result.issues.filter(i => i.rule === 'PAYOFF_TOO_QUICK');
+    assert.ok(tooQuick.length >= 1, 'Should flag same-scene payoff as PAYOFF_TOO_QUICK');
+    assert.equal(tooQuick[0].severity, 'major', 'Same-scene payoff should be major severity');
+  });
+
+  it('payoffPass detects consecutive-scene (gap=1) payoff as PAYOFF_TOO_QUICK minor', async () => {
+    const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+    const records = [
+      {
+        commitId: 'c0', sceneIdx: 0, slug: 'INT. ROOM - DAY', purpose: 'establish_world',
+        dramaticTurn: 'planted', revelation: null, clockRaised: false, clockDelta: 0,
+        emotionalShift: 'neutral', suspenseDelta: 0,
+        dialogueHighlights: [], unresolvedClues: [],
+        seededClueIds: ['clue-B'], payoffSetupIds: [],
+        readerStateAnnotation: null,
+      },
+      {
+        commitId: 'c1', sceneIdx: 1, slug: 'INT. ROOM - NIGHT', purpose: 'set_up_payoff',
+        dramaticTurn: 'paid off', revelation: null, clockRaised: false, clockDelta: 0,
+        emotionalShift: 'positive', suspenseDelta: 1,
+        dialogueHighlights: [], unresolvedClues: [],
+        seededClueIds: [], payoffSetupIds: ['clue-B'],
+        readerStateAnnotation: null,
+      },
+    ];
+    const structure = {
+      actPosition: 'act1' as const, completionPercent: 20,
+      revelationCount: 0, approachingClimax: false,
+      avgSuspensePerScene: 0, escalating: false,
+      reversalCount: 0, reversalDensity: 0,
+      openClues: 0, midpointPressure: 0, tightestScene: null,
+    };
+    const result = await payoffPass({
+      fountain: 'INT. ROOM - DAY\nScene.\nINT. ROOM - NIGHT\nScene.\n',
+      original: 'INT. ROOM - DAY\nScene.\nINT. ROOM - NIGHT\nScene.\n',
+      records: records as unknown as Parameters<typeof payoffPass>[0]['records'],
+      structure: structure as Parameters<typeof payoffPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const tooQuick = result.issues.filter(i => i.rule === 'PAYOFF_TOO_QUICK');
+    assert.ok(tooQuick.length >= 1, 'Should flag consecutive-scene payoff');
+    assert.equal(tooQuick[0].severity, 'minor', 'Consecutive-scene payoff should be minor severity');
+  });
+
+  it('payoffPass detects DANGLING_PAYOFF when setupId was never seeded', async () => {
+    const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+    const records = [
+      {
+        commitId: 'c0', sceneIdx: 0, slug: 'INT. ROOM - DAY', purpose: 'establish_world',
+        dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+        emotionalShift: 'neutral', suspenseDelta: 0,
+        dialogueHighlights: [], unresolvedClues: [],
+        seededClueIds: [], // no clue seeded
+        payoffSetupIds: ['ghost-clue'], // but paying off something never seeded!
+        readerStateAnnotation: null,
+      },
+    ];
+    const structure = {
+      actPosition: 'act3' as const, completionPercent: 80,
+      revelationCount: 0, approachingClimax: true,
+      avgSuspensePerScene: 5, escalating: true,
+      reversalCount: 1, reversalDensity: 1,
+      openClues: 0, midpointPressure: 3, tightestScene: 0,
+    };
+    const result = await payoffPass({
+      fountain: 'INT. ROOM - DAY\nScene.\n',
+      original: 'INT. ROOM - DAY\nScene.\n',
+      records: records as unknown as Parameters<typeof payoffPass>[0]['records'],
+      structure: structure as Parameters<typeof payoffPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const dangling = result.issues.filter(i => i.rule === 'DANGLING_PAYOFF');
+    assert.ok(dangling.length >= 1, 'Should detect dangling payoff for never-seeded setupId');
+    assert.ok(dangling[0].description.includes('ghost-clue'));
+  });
+
+  // ── intention: REPEATED_PURPOSE ───────────────────────────────────────────
+
+  it('intentionPass fires REPEATED_PURPOSE for 3 consecutive establish_world scenes', async () => {
+    const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+    const makeRec = (idx: number, purpose: string) => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose,
+      dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+      emotionalShift: 'neutral', suspenseDelta: 0,
+      dialogueHighlights: [], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [],
+      readerStateAnnotation: null,
+    });
+    const records = [
+      makeRec(0, 'establish_world'),
+      makeRec(1, 'establish_world'),
+      makeRec(2, 'establish_world'), // 3rd → fires
+      makeRec(3, 'raise_stakes'),
+    ];
+    const structure = {
+      actPosition: 'act1' as const, completionPercent: 20,
+      revelationCount: 0, approachingClimax: false,
+      avgSuspensePerScene: 0, escalating: false,
+      reversalCount: 0, reversalDensity: 0,
+      openClues: 0, midpointPressure: 0, tightestScene: null,
+    };
+    const result = await intentionPass({
+      fountain: 'INT. SC0 - DAY\nA.\nINT. SC1 - DAY\nB.\nINT. SC2 - DAY\nC.\nINT. SC3 - DAY\nD.\n',
+      original: 'INT. SC0 - DAY\nA.\nINT. SC1 - DAY\nB.\nINT. SC2 - DAY\nC.\nINT. SC3 - DAY\nD.\n',
+      records: records as unknown as Parameters<typeof intentionPass>[0]['records'],
+      structure: structure as Parameters<typeof intentionPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const repeated = result.issues.filter(i => i.rule === 'REPEATED_PURPOSE');
+    assert.ok(repeated.length >= 1, 'Should fire REPEATED_PURPOSE for 3 consecutive establish_world scenes');
+    assert.ok(repeated[0].description.includes('establish_world'));
+  });
+
+  it('intentionPass does NOT fire REPEATED_PURPOSE for 3 consecutive raise_stakes scenes', async () => {
+    const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+    const makeRec = (idx: number, purpose: string) => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose,
+      dramaticTurn: 'something', revelation: null, clockRaised: true, clockDelta: 1,
+      emotionalShift: 'negative', suspenseDelta: 2,
+      dialogueHighlights: [], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [],
+      readerStateAnnotation: null,
+    });
+    const records = [
+      makeRec(0, 'raise_stakes'),
+      makeRec(1, 'raise_stakes'),
+      makeRec(2, 'raise_stakes'), // 3+ of a dramatic purpose — OK
+    ];
+    const structure = {
+      actPosition: 'act2b' as const, completionPercent: 60,
+      revelationCount: 0, approachingClimax: false,
+      avgSuspensePerScene: 2, escalating: true,
+      reversalCount: 0, reversalDensity: 0,
+      openClues: 0, midpointPressure: 2, tightestScene: 2,
+    };
+    const result = await intentionPass({
+      fountain: 'INT. SC0 - DAY\nA.\nINT. SC1 - DAY\nB.\nINT. SC2 - DAY\nC.\n',
+      original: 'INT. SC0 - DAY\nA.\nINT. SC1 - DAY\nB.\nINT. SC2 - DAY\nC.\n',
+      records: records as unknown as Parameters<typeof intentionPass>[0]['records'],
+      structure: structure as Parameters<typeof intentionPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const repeated = result.issues.filter(i => i.rule === 'REPEATED_PURPOSE');
+    assert.ok(repeated.length === 0, 'raise_stakes streak should NOT trigger REPEATED_PURPOSE');
+  });
+
+  // ── proof-spec: e.dominant guard ─────────────────────────────────────────
+
+  it('buildSystemPreamble skips emotion entries with missing dominant field', async () => {
+    const { buildSystemPreamble } = await import('./server/nvm/generate/proof-spec.ts');
+    const { emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+    const state = emptyState() as import('./server/nvm/state/NarrativeState.ts').NarrativeState;
+    // Inject emotion with undefined dominant (malformed/partial state)
+    state.characterEmotions = {
+      alice: { joy: 0, distress: 80, anger: 0, fear: 0, pride: 0, shame: 0,
+               dominant: undefined as unknown as import('./server/engine/types.ts').EmotionType,
+               intensity: 80, last_updated_at: 0 },
+      bob: { joy: 50, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0,
+             dominant: 'joy' as const, intensity: 50, last_updated_at: 0 },
+    };
+    const preamble = buildSystemPreamble([], state);
+    // alice should be filtered out (undefined dominant), bob should appear
+    assert.ok(!preamble.includes('undefined@80'), 'Should not emit "undefined@N" for missing dominant');
+    assert.ok(preamble.includes('bob'), 'Should still emit bob with valid dominant');
+  });
+});

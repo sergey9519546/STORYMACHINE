@@ -152,7 +152,7 @@ export function buildSystemPreamble(constraints: GenerationConstraint[], state: 
 
   // ── Emotional landscape ────────────────────────────────────────────────────
   const emotionLines = Object.entries(state.characterEmotions)
-    .filter(([, e]) => typeof e.intensity === 'number' && isFinite(e.intensity) && e.intensity > 0)
+    .filter(([, e]) => typeof e.intensity === 'number' && isFinite(e.intensity) && e.intensity > 0 && e.dominant)
     .sort((a, b) => b[1].intensity - a[1].intensity)
     .slice(0, 6)
     .map(([id, e]) => `${sanitizeForPrompt(id, 48)}: ${e.dominant}@${Math.round(e.intensity)}`);

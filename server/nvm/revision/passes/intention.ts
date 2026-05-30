@@ -61,6 +61,36 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
     });
   }
 
+  // ── Repeated scene purpose (3+ consecutive same-purpose scenes) ──────────
+  // Three consecutive scenes tagged with the same purpose signal stalled momentum.
+  if (records.length >= 3) {
+    let streakPurpose = records[0].purpose;
+    let streakStart = 0;
+    let streakLen = 1;
+    for (let i = 1; i < records.length; i++) {
+      if (records[i].purpose === streakPurpose) {
+        streakLen++;
+      } else {
+        streakPurpose = records[i].purpose;
+        streakStart = i;
+        streakLen = 1;
+      }
+      if (streakLen === 3) {
+        // Non-dramatic purposes that need variety
+        const boringPurposes = new Set(['establish_world', 'character_moment']);
+        if (boringPurposes.has(streakPurpose)) {
+          issues.push({
+            location: `Scenes ${streakStart}–${i} (${records[streakStart].slug})`,
+            rule: 'REPEATED_PURPOSE',
+            description: `Three consecutive scenes share the same purpose (${streakPurpose}) — the story stalls without a shift in function`,
+            severity: 'major',
+            suggestedFix: `Break the run of "${streakPurpose}" scenes with a scene that raises stakes, complicates the situation, or delivers a revelation`,
+          });
+        }
+      }
+    }
+  }
+
   // ── Act 3 without a character making the climactic choice ─────────────────
   if (structure.actPosition === 'act3' || structure.actPosition === 'epilogue') {
     const act3Records = records.slice(Math.floor(records.length * 0.75));
