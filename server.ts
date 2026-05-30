@@ -1966,6 +1966,135 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     });
   }));
 
+  // GET /api/nvm/converge-stream — Wave 85 (H8): SSE streaming variant of G1 convergence.
+  // Query params: sceneIdx, sceneFunction, tensionTarget, qualityTarget, maxIterations, candidatesPerIteration
+  // Emits one SSE event per evaluated candidate (type: 'converge_step'), then a final
+  // 'converge_complete' event with the full ConvergeResult.
+  app.get('/api/nvm/converge-stream', gameLimiter, async (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    let disconnected = false;
+    let ended = false;
+    req.on('close', () => { disconnected = true; });
+    req.on('error', () => { disconnected = true; });
+    const emitSSE = (data: unknown) => {
+      if (!disconnected && !ended) res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+    const ensureEnded = () => { if (!ended) { ended = true; res.end(); } };
+
+    try {
+      const { stage } = getOrCreateSession(sessionId(req));
+      const { convergeScene } = await import('./server/nvm/converge/loop.ts');
+      const { buildNarrativeState } = await import('./server/nvm/state/NarrativeState.ts');
+      const { makeLLMCandidateGenerator } = await import('./server/nvm/generate/llm-generator.ts');
+      const { analyzeArcCompletion } = await import('./server/nvm/quality/arc-tracker.ts');
+
+      const q = req.query as Record<string, string>;
+      const sceneIdx = Math.max(0, parseInt(q['sceneIdx'] ?? '0', 10) || 0);
+      const sceneFunction = (q['sceneFunction'] ?? 'build_tension') as import('./server/nvm/generate/proof-spec.ts').SceneTarget['sceneFunction'];
+      const tensionTarget = Math.max(0, Math.min(200, parseFloat(q['tensionTarget'] ?? '60') || 60));
+      const qualityTarget = Math.max(0, Math.min(100, parseFloat(q['qualityTarget'] ?? '60') || 60));
+      const maxIterations = Math.min(10, Math.max(1, parseInt(q['maxIterations'] ?? '4', 10) || 4));
+      const candidatesPerIteration = Math.min(5, Math.max(1, parseInt(q['candidatesPerIteration'] ?? '2', 10) || 2));
+
+      const state = buildNarrativeState(stage);
+      const generate = makeLLMCandidateGenerator();
+      const seed = Date.now();
+
+      let directorPolicy: import('./server/nvm/selfplay/mine.ts').DirectorPolicy | undefined;
+      const corpusRuns = stage.getCorpusRuns(30);
+      if (corpusRuns.length > 0) {
+        const { mineCorpus } = await import('./server/nvm/selfplay/mine.ts');
+        const fakeReport = {
+          runs: corpusRuns.map((r: { scenario_id: string; proof_pass_rate: number; mean_valuation: number; score: number }) => ({
+            scenarioId: r.scenario_id, seed: 0, proofPassRate: r.proof_pass_rate,
+            meanValuation: r.mean_valuation, score: r.score,
+            topOperators: [] as import('./server/nvm/converge/operators.ts').MutationOperator[],
+            scenes: [], effectiveOperators: [], totalIterations: 0,
+          })),
+          meanScore: corpusRuns.reduce((s: number, r: { score: number }) => s + r.score, 0) / corpusRuns.length,
+          bestRun: { scenarioId: '', seed: 0, proofPassRate: 0, meanValuation: 0, score: 0, topOperators: [], scenes: [], effectiveOperators: [], totalIterations: 0 },
+          worstRun: { scenarioId: '', seed: 0, proofPassRate: 0, meanValuation: 0, score: 0, topOperators: [], scenes: [], effectiveOperators: [], totalIterations: 0 },
+          operatorFrequency: {} as Record<import('./server/nvm/converge/operators.ts').MutationOperator, number>,
+        };
+        directorPolicy = mineCorpus(fakeReport).policy;
+      }
+
+      const allCommitsForArc = stage.getCommits().filter((c: import('./server/nvm/state/StoryCommit.ts').StoryCommit) => !c.reverted);
+      const arcReport = analyzeArcCompletion(allCommitsForArc.map((c: import('./server/nvm/state/StoryCommit.ts').StoryCommit) => ({ sceneIdx: c.sceneIdx, ops: c.ops })));
+      const bibleSummary = buildStoryBibleSummary(stage);
+
+      const target = { sceneIdx, sceneFunction, activeMechanisms: [], tensionTarget, qualityTarget };
+      const budget = {
+        maxIterations,
+        candidatesPerIteration,
+        directorPolicy,
+        bibleSummary: bibleSummary || undefined,
+        openPromises: arcReport.openPromises.length > 0 ? arcReport.openPromises : undefined,
+        onStep: (step: import('./server/nvm/converge/loop.ts').ConvergeStep) => {
+          emitSSE({
+            type: 'converge_step',
+            step: {
+              iteration: step.iteration,
+              candidateId: step.candidateId,
+              passed: step.passed,
+              valuationScore: step.valuationScore,
+              qualityScore: step.qualityScore,
+              compositeScore: step.compositeScore,
+              ghostReason: step.ghostReason,
+              writersRoomSummary: step.writersRoomSummary,
+            },
+          });
+        },
+      };
+
+      const result = await convergeScene(state, target, generate, budget, seed);
+
+      // Persist ghosts
+      const { appendGhost } = await import('./server/nvm/repro/ghost-ledger.ts');
+      for (const ghost of result.ghosts) {
+        appendGhost(stage, {
+          ghostId: ghost.ir.transitionId,
+          parentCommitId: null,
+          sceneIdx: ghost.ir.sceneIdx,
+          ir: ghost.ir,
+          reason: ghost.reason,
+          rejectedAt: Date.now(),
+        });
+      }
+
+      emitSSE({
+        type: 'converge_complete',
+        result: {
+          converged: result.converged,
+          iterations: result.iterations,
+          finalValuation: result.finalValuation,
+          finalQuality: result.finalQuality,
+          finalComposite: result.finalComposite,
+          ghostCount: result.ghosts.length,
+          history: result.history.map(s => ({
+            iteration: s.iteration,
+            candidateId: s.candidateId,
+            passed: s.passed,
+            valuationScore: s.valuationScore,
+            qualityScore: s.qualityScore,
+            compositeScore: s.compositeScore,
+            ghostReason: s.ghostReason,
+            writersRoomSummary: s.writersRoomSummary,
+          })),
+        },
+      });
+    } catch (err) {
+      emitSSE({ type: 'converge_error', error: (err as Error).message });
+    } finally {
+      ensureEnded();
+    }
+  });
+
   // GET /api/nvm/corpus — top corpus runs + Director policy
   app.get('/api/nvm/corpus', gameLimiter, asyncHandler(async (req, res) => {
     const { stage } = getOrCreateSession(sessionId(req));

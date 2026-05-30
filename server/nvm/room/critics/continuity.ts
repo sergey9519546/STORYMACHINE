@@ -23,14 +23,9 @@ export function continuityCritic(ir: NarrativeTransitionIR, state: NarrativeStat
   for (const result of results) {
     if (result.pass) continue;
     for (const finding of result.findings) {
-      // M7: Use structured opIdx field instead of fragile regex on the message string.
-      // Falls back to regex for backwards-compat with any proof that predates the field.
-      const structuredIdx = finding.opIdx;
-      let targetOpIdx: number | null = structuredIdx ?? null;
-      if (targetOpIdx === null && finding.message) {
-        const m = finding.message.match(/op\[(\d+)\]/);
-        targetOpIdx = m ? Number(m[1]) : null;
-      }
+      // M7: All Tier-1 proofs now set opIdx directly on ProofFinding.
+      // No regex fallback needed — the structured field is the source of truth.
+      const targetOpIdx: number | null = finding.opIdx ?? null;
       critiques.push({
         criticId: 'continuity',
         severity: 80,   // proof failures are always high severity

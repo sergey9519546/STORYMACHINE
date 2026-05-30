@@ -10474,3 +10474,187 @@ describe('Wave 84 — file category inference (UI logic)', () => {
     assert.equal(inferDropCategory('data.export.csv'), 'Rules');
   });
 });
+
+// ── Wave 85 ───────────────────────────────────────────────────────────────────
+describe('Wave 85 — converge loop onStep callback + M7 continuity cleanup', () => {
+
+  // ── onStep callback ───────────────────────────────────────────────────────
+
+  it('ConvergeStep onStep callback fires for each evaluated candidate', async () => {
+    const { convergeScene } = await import('./server/nvm/converge/loop.ts');
+    const { emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+
+    const steps: unknown[] = [];
+    let generateCalls = 0;
+
+    const fakeGenerate = async (_spec: unknown, n: number) => {
+      generateCalls += n;
+      return Array.from({ length: n }, (_, i) => ({
+        transitionId: `cand-${generateCalls}-${i}`,
+        sceneIdx: 0,
+        sceneFunction: 'build_tension' as const,
+        activeMechanisms: ['core_mechanism'],
+        beforeStateHash: '',
+        ops: [],
+        preconditions: [{ type: 'state_exists' as const, factId: 'world' }],
+        postconditions: [],
+        provenance: { origin: 'model_generated' as const, createdAt: Date.now() },
+      }));
+    };
+
+    const state = emptyState();
+    const target = { sceneIdx: 0, sceneFunction: 'build_tension' as const, activeMechanisms: [], tensionTarget: 1, qualityTarget: 1 };
+    const budget = {
+      maxIterations: 2,
+      candidatesPerIteration: 2,
+      onStep: (step: import('./server/nvm/converge/loop.ts').ConvergeStep) => {
+        steps.push({ iteration: step.iteration, passed: step.passed });
+      },
+    };
+
+    await convergeScene(state as import('./server/nvm/state/NarrativeState.ts').NarrativeState, target, fakeGenerate as unknown as import('./server/nvm/generate/proof-spec.ts').CandidateGenerator, budget);
+
+    // Should have received at least one step (iter 0 with candidatesPerIteration=2 means 2 steps)
+    assert.ok(steps.length >= 2, `Expected ≥2 onStep calls, got ${steps.length}`);
+    // First step should be iteration 0
+    assert.equal((steps[0] as { iteration: number }).iteration, 0);
+  });
+
+  it('onStep callback receives valid ConvergeStep fields', async () => {
+    const { convergeScene } = await import('./server/nvm/converge/loop.ts');
+    const { emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+
+    const collectedSteps: import('./server/nvm/converge/loop.ts').ConvergeStep[] = [];
+
+    const fakeGenerate = async (_spec: unknown, n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        transitionId: `t-${i}`,
+        sceneIdx: 0,
+        sceneFunction: 'build_tension' as const,
+        activeMechanisms: ['core_mechanism'],
+        beforeStateHash: '',
+        ops: [],
+        preconditions: [{ type: 'state_exists' as const, factId: 'x' }],
+        postconditions: [],
+        provenance: { origin: 'model_generated' as const, createdAt: Date.now() },
+      }));
+
+    const state = emptyState();
+    const target = { sceneIdx: 0, sceneFunction: 'build_tension' as const, activeMechanisms: [], tensionTarget: 1, qualityTarget: 1 };
+    await convergeScene(
+      state as import('./server/nvm/state/NarrativeState.ts').NarrativeState,
+      target,
+      fakeGenerate as unknown as import('./server/nvm/generate/proof-spec.ts').CandidateGenerator,
+      { maxIterations: 1, candidatesPerIteration: 1, onStep: s => collectedSteps.push(s) },
+    );
+
+    assert.ok(collectedSteps.length >= 1);
+    const s = collectedSteps[0];
+    assert.equal(typeof s.iteration, 'number');
+    assert.equal(typeof s.candidateId, 'string');
+    assert.equal(typeof s.passed, 'boolean');
+    assert.equal(typeof s.valuationScore, 'number');
+    assert.equal(typeof s.qualityScore, 'number');
+    assert.equal(typeof s.compositeScore, 'number');
+    assert.ok(isFinite(s.compositeScore), 'compositeScore should be finite');
+  });
+
+  it('onStep not required — omitting it does not throw', async () => {
+    const { convergeScene } = await import('./server/nvm/converge/loop.ts');
+    const { emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+
+    const fakeGenerate = async (_spec: unknown, n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        transitionId: `t-${i}`,
+        sceneIdx: 0,
+        sceneFunction: 'build_tension' as const,
+        activeMechanisms: ['core_mechanism'],
+        beforeStateHash: '',
+        ops: [],
+        preconditions: [{ type: 'state_exists' as const, factId: 'x' }],
+        postconditions: [],
+        provenance: { origin: 'model_generated' as const, createdAt: Date.now() },
+      }));
+
+    const state = emptyState();
+    const target = { sceneIdx: 0, sceneFunction: 'build_tension' as const, activeMechanisms: [], tensionTarget: 1, qualityTarget: 1 };
+    // No onStep in budget — should complete without error
+    const result = await convergeScene(
+      state as import('./server/nvm/state/NarrativeState.ts').NarrativeState,
+      target,
+      fakeGenerate as unknown as import('./server/nvm/generate/proof-spec.ts').CandidateGenerator,
+      { maxIterations: 1, candidatesPerIteration: 1 },
+    );
+    assert.ok(result, 'Result should be returned');
+    assert.ok(Array.isArray(result.history), 'history should be an array');
+  });
+
+  // ── M7 continuity critic — structured opIdx ───────────────────────────────
+
+  it('M7: continuity critic uses opIdx directly from ProofFinding (no regex)', async () => {
+    const { continuityCritic } = await import('./server/nvm/room/critics/continuity.ts');
+    // APPRAISE_EMOTION on an unknown charId triggers IntentionalProof (only references, doesn't introduce).
+    // UPDATE_BELIEF introduces the character into `known` so it would always pass — use APPRAISE_EMOTION.
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 'test-continuity-m7',
+      sceneIdx: 1,
+      sceneFunction: 'build_tension',
+      activeMechanisms: ['core_mechanism'],
+      beforeStateHash: '',
+      ops: [
+        {
+          op: 'APPRAISE_EMOTION',
+          charId: 'ghost_character_xyz',
+          emotion: { joy: 0, distress: 80, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'distress' as const, intensity: 80, last_updated_at: 0 },
+        } as import('./server/nvm/ops/StoryOp.ts').StoryOp,
+      ],
+      preconditions: ['world_exists'],
+      postconditions: [],
+      provenance: { origin: 'model_generated' as const, createdAt: Date.now() },
+    };
+
+    const { emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+    const state = emptyState() as import('./server/nvm/state/NarrativeState.ts').NarrativeState;
+
+    const critiques = continuityCritic(ir, state);
+    // Should produce at least one critique (IntentionalProof failure)
+    const intCritique = critiques.find(c => c.objection.includes('IntentionalProof'));
+    assert.ok(intCritique, 'Should have an IntentionalProof critique');
+    // targetOpIdx should be 0 (first op) — derived from structured opIdx, not regex
+    assert.equal(intCritique!.targetOpIdx, 0, 'targetOpIdx should be 0 from structured opIdx field');
+  });
+
+  it('M7: continuity critic returns null targetOpIdx when opIdx is not set', async () => {
+    const { continuityCritic } = await import('./server/nvm/room/critics/continuity.ts');
+    // CausalProof finding for missing preconditions has no opIdx
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 'test-causal-noop',
+      sceneIdx: 2, // non-initial so causal proof checks preconditions
+      sceneFunction: 'build_tension',
+      activeMechanisms: ['core_mechanism'],
+      beforeStateHash: '',
+      ops: [
+        {
+          op: 'UPDATE_BELIEF',
+          charId: 'alice',
+          belief: { id: 'b1', proposition: 'test', confidence: 0.8, source: 'witnessed' as const, acquired_at: 0 },
+        } as import('./server/nvm/ops/StoryOp.ts').StoryOp,
+      ],
+      preconditions: [], // missing preconditions → CausalProof fails
+      postconditions: [],
+      provenance: { origin: 'model_generated' as const, createdAt: Date.now() },
+    };
+
+    const { emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+    const state = emptyState() as import('./server/nvm/state/NarrativeState.ts').NarrativeState;
+    state.characterBeliefs = { alice: [] };
+
+    const critiques = continuityCritic(ir, state);
+    const causalCritique = critiques.find(c => c.objection.includes('CausalProof'));
+    // CausalProof "missing preconditions" finding sets no opIdx → targetOpIdx should be null
+    if (causalCritique) {
+      assert.equal(causalCritique.targetOpIdx, null,
+        'CausalProof missing-preconditions finding should yield null targetOpIdx');
+    }
+  });
+});

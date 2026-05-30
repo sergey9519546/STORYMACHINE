@@ -85,6 +85,12 @@ export interface ConvergeBudget {
    * Previously hardcoded as [] — now thread from the caller via server.ts.
    */
   openPromises?: import('../quality/arc-tracker.ts').OpenPromise[];
+  /**
+   * Wave 85 (H8): Per-step streaming callback. Called synchronously after each
+   * candidate is evaluated so callers (e.g. the SSE endpoint) can stream
+   * progress to the client without waiting for the full loop to finish.
+   */
+  onStep?: (step: ConvergeStep) => void;
 }
 
 const DEFAULT_BUDGET: ConvergeBudget = { maxIterations: 8, candidatesPerIteration: 3 };
@@ -234,6 +240,7 @@ export async function convergeScene(
           : undefined,
       };
       history.push(step);
+      budget.onStep?.(step);
 
       // Buffer fully-converged candidates for Tier 3 ranking
       if (passed && tensionMet && qualityMet) {
