@@ -111,7 +111,7 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
     }
   }
 
-  const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'rhythm', approvedSpans });
+  const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'rhythm', approvedSpans, storyContext: input.storyContext });
   const changed = revised !== fountain;
 
   return {

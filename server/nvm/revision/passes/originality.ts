@@ -89,7 +89,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
   // ── Limit total cliché issues to avoid overwhelming output ────────────────
   const dedupedIssues = issues.slice(0, 8);
 
-  const { revised, usedLLM } = await rewritePass({ fountain, issues: dedupedIssues, passName: 'originality', approvedSpans });
+  const { revised, usedLLM } = await rewritePass({ fountain, issues: dedupedIssues, passName: 'originality', approvedSpans, storyContext: input.storyContext });
   const changed = revised !== fountain;
 
   return {

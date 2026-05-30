@@ -9452,3 +9452,50 @@ describe('Wave 69 — personality NaN guards, bible injection, BELIEF_REVERSAL i
     assert.strictEqual(typeof budget.bibleSummary, 'string', 'bibleSummary should be a string');
   });
 });
+
+// ── Wave 70: rewrite.ts story context enrichment ─────────────────────────────
+import { rewritePass } from './server/nvm/revision/rewrite.ts';
+import type { StoryContext } from './server/nvm/revision/passes/types.ts';
+
+describe('Wave 70 — revision rewrite storyContext enrichment', () => {
+
+  it('rewritePass: returns original when no issues regardless of storyContext', async () => {
+    const ctx: StoryContext = { theme: 'Power corrupts', genre: 'thriller' };
+    const result = await rewritePass({
+      fountain: 'INT. OFFICE - DAY\n\nACTION.\n\nJOHN\nHello.',
+      issues: [],
+      passName: 'dialogue',
+      approvedSpans: [],
+      storyContext: ctx,
+    });
+    assert.strictEqual(result.usedLLM, false, 'No LLM call for empty issue list');
+    assert.ok(result.revised.length > 0, 'Returns original text');
+  });
+
+  it('StoryContext interface: all fields optional', () => {
+    const full: StoryContext = { theme: 'Trust', genre: 'drama', directorStyle: 'Kubrick', characters: 'Alice, Bob' };
+    const minimal: StoryContext = {};
+    const partial: StoryContext = { theme: 'Power' };
+    assert.ok(full.theme === 'Trust', 'full context has theme');
+    assert.ok(Object.keys(minimal).length === 0, 'empty context is valid');
+    assert.ok(partial.genre === undefined, 'optional fields are truly optional');
+  });
+
+  it('PassInput: storyContext field accepted and threaded through pipeline', async () => {
+    const { compileScreenplay } = await import('./server/nvm/screenplay/compile.ts');
+    const { buildScreenplayMemory } = await import('./server/nvm/screenplay/memory.ts');
+    const { analyzeStructure } = await import('./server/nvm/screenplay/structure.ts');
+    const { emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+
+    const minimalCommits: StoryCommit[] = [];
+    const records = buildScreenplayMemory(minimalCommits);
+    const structure = analyzeStructure(records, minimalCommits);
+    const compiled = compileScreenplay(minimalCommits, emptyState(), [], structure, 'Test');
+    const ctx: StoryContext = { theme: 'Test theme', genre: 'drama' };
+
+    // runRevisionPipeline accepts storyContext as 6th param — if types are wrong, tsc fails
+    const result = await runRevisionPipeline(compiled, records, structure, [], undefined, ctx);
+    assert.ok(result.passResults.length === 0 || result.passResults.length === 12,
+      'Pipeline handles empty fountain gracefully');
+  });
+});

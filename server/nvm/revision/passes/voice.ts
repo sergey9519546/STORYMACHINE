@@ -110,7 +110,7 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
     }
   }
 
-  const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'voice', approvedSpans });
+  const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'voice', approvedSpans, storyContext: input.storyContext });
   const changed = revised !== fountain;
 
   return {

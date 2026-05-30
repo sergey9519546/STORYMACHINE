@@ -110,7 +110,7 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
     }
   }
 
-  const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'pacing', approvedSpans });
+  const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'pacing', approvedSpans, storyContext: input.storyContext });
   const changed = revised !== fountain;
 
   return {

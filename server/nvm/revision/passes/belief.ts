@@ -88,7 +88,7 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     }
   }
 
-  const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'belief', approvedSpans });
+  const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'belief', approvedSpans, storyContext: input.storyContext });
   const changed = revised !== fountain;
 
   return {

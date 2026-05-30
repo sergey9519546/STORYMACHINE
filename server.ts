@@ -3129,7 +3129,21 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     // approvedSpans validated loosely — we trust the pipeline to ignore malformed spans
     const safeSpans = Array.isArray(approvedSpans) ? approvedSpans as import('./server/nvm/revision/passes/types.ts').ApprovedSpan[] : [];
 
-    const revisionResult = await runRevisionPipeline(compiled, records, structure, safeSpans);
+    const illusionCtx = stage.getIllusionState();
+    const characterSummary = stage.getAllAgents().slice(0, 6)
+      .map(a => {
+        const es = a.emotionState;
+        const emo = es && es.dominant !== 'neutral' && es.intensity >= 20 ? ` [${es.dominant}]` : '';
+        return sanitizeForPrompt(a.name, 60) + emo;
+      }).join(', ');
+    const storyCtx: import('./server/nvm/revision/passes/types.ts').StoryContext = {
+      theme: illusionCtx.story_theme ? sanitizeForPrompt(illusionCtx.story_theme, 200) : undefined,
+      genre: illusionCtx.story_genre ?? undefined,
+      directorStyle: illusionCtx.director_style ?? undefined,
+      characters: characterSummary || undefined,
+    };
+
+    const revisionResult = await runRevisionPipeline(compiled, records, structure, safeSpans, undefined, storyCtx);
     res.json(revisionResult);
   }));
 
@@ -3179,9 +3193,23 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
       const structure = analyzeStructure(records, allCommits);
       const compiled = compileScreenplay(allCommits, state, records, structure, title);
 
+      const illusionCtxStream = stage.getIllusionState();
+      const characterSummaryStream = stage.getAllAgents().slice(0, 6)
+        .map(a => {
+          const es = a.emotionState;
+          const emo = es && es.dominant !== 'neutral' && es.intensity >= 20 ? ` [${es.dominant}]` : '';
+          return sanitizeForPrompt(a.name, 60) + emo;
+        }).join(', ');
+      const storyCtxStream: import('./server/nvm/revision/passes/types.ts').StoryContext = {
+        theme: illusionCtxStream.story_theme ? sanitizeForPrompt(illusionCtxStream.story_theme, 200) : undefined,
+        genre: illusionCtxStream.story_genre ?? undefined,
+        directorStyle: illusionCtxStream.director_style ?? undefined,
+        characters: characterSummaryStream || undefined,
+      };
+
       const result = await runRevisionPipeline(compiled, records, structure, [], event => {
         emitSSE(event); // pass_complete event per revision pass
-      });
+      }, storyCtxStream);
       emitSSE({ type: 'revision_complete', result });
     } catch (err) {
       emitSSE({ type: 'revision_error', error: (err as Error).message });

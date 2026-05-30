@@ -56,7 +56,7 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     }
   }
 
-  const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'causality', approvedSpans });
+  const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'causality', approvedSpans, storyContext: input.storyContext });
   const changed = revised !== fountain;
 
   return {

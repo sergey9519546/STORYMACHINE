@@ -3,13 +3,14 @@
 // only the flagged layer, preserving approved spans.
 // Falls back (returns original) when LLM is unavailable.
 
-import type { RevisionIssue, ApprovedSpan, PassName } from './passes/types.ts';
+import type { RevisionIssue, ApprovedSpan, PassName, StoryContext } from './passes/types.ts';
 
 export interface RewriteInput {
   fountain: string;
   issues: RevisionIssue[];
   passName: PassName;
   approvedSpans: ApprovedSpan[];
+  storyContext?: StoryContext;
 }
 
 export interface RewriteResult {
@@ -33,18 +34,33 @@ function approvedSpanInstructions(spans: ApprovedSpan[], lines: string[]): strin
  * Attempt an LLM prose rewrite. Returns original if LLM unavailable or fails.
  */
 export async function rewritePass(input: RewriteInput): Promise<RewriteResult> {
-  const { fountain, issues, passName, approvedSpans } = input;
+  const { fountain, issues, passName, approvedSpans, storyContext } = input;
   if (issues.length === 0) return { revised: fountain, usedLLM: false };
+
+  const { sanitizeForPrompt } = await import('../../lib/prompt-utils.ts');
 
   const lines = fountain.split('\n');
   const issueBlock = issues
-    .map(i => `  [${i.severity.toUpperCase()}] ${i.location} — ${i.rule}: ${i.description}${i.suggestedFix ? ` (fix: ${i.suggestedFix})` : ''}`)
+    .map(i => {
+      const loc = sanitizeForPrompt(i.location, 120);
+      const desc = sanitizeForPrompt(i.description, 300);
+      const fix = i.suggestedFix ? ` (fix: ${sanitizeForPrompt(i.suggestedFix, 200)})` : '';
+      return `  [${i.severity.toUpperCase()}] ${loc} — ${i.rule}: ${desc}${fix}`;
+    })
     .join('\n');
 
+  // Build story context preamble so the LLM understands the tone and stakes
+  const contextBlock: string[] = [];
+  if (storyContext?.theme) contextBlock.push(`STORY THEME: ${sanitizeForPrompt(storyContext.theme, 200)}`);
+  if (storyContext?.genre) contextBlock.push(`GENRE: ${sanitizeForPrompt(storyContext.genre, 80)}`);
+  if (storyContext?.directorStyle) contextBlock.push(`DIRECTOR STYLE: ${sanitizeForPrompt(storyContext.directorStyle, 150)}`);
+  if (storyContext?.characters) contextBlock.push(`CHARACTERS: ${sanitizeForPrompt(storyContext.characters, 400)}`);
+
   const prompt = [
+    ...(contextBlock.length > 0 ? [...contextBlock, ''] : []),
     `You are a screenplay editor performing the "${passName}" revision pass.`,
     `Rewrite the following Fountain screenplay to fix ONLY the issues listed below.`,
-    `Do not change anything outside the scope of the "${passName}" pass.`,
+    `Preserve the story's theme, tone, and character voices. Do not change anything outside the scope of the "${passName}" pass.`,
     `Return the COMPLETE revised Fountain text with no extra commentary.`,
     '',
     'Issues to fix:',

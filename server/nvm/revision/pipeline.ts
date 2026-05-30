@@ -20,7 +20,7 @@
 import type { CompiledScreenplay, SceneAnnotation } from '../screenplay/compile.ts';
 import type { StructureState } from '../screenplay/structure.ts';
 import type { ScreenplaySceneRecord } from '../screenplay/memory.ts';
-import type { PassResult, ApprovedSpan } from './passes/types.ts';
+import type { PassResult, ApprovedSpan, StoryContext } from './passes/types.ts';
 import { logger } from '../../lib/logger.ts';
 
 import { structurePass }    from './passes/structure.ts';
@@ -85,6 +85,7 @@ export async function runRevisionPipeline(
   structure: StructureState,
   approvedSpans: ApprovedSpan[] = [],
   onProgress?: (event: RevisionProgressEvent) => void,
+  storyContext?: StoryContext,
 ): Promise<RevisionResult> {
   const originalFountain = compiled.fountain;
   const annotations = compiled.annotations ?? [];
@@ -129,6 +130,7 @@ export async function runRevisionPipeline(
         structure,
         records,
         approvedSpans,
+        storyContext,
       });
       // Guard: if a pass returns empty fountain, keep prior pass output so empty
       // results don't cascade through the remaining 11 passes.
