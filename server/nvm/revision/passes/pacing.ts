@@ -69,6 +69,11 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
   const avgLength = lengths.reduce((s, v) => s + v, 0) / lengths.length;
 
   // ── Scenes that are disproportionately long ───────────────────────────────
+  // Guard: all-whitespace scripts produce avgLength=0; skip per-scene checks in that case.
+  if (!isFinite(avgLength) || avgLength === 0) {
+    return { pass: 'pacing', issues: [], revisedFountain: fountain, changed: false, summary: 'Pacing pass: all scenes are empty' };
+  }
+
   for (const [sceneIdx, lineCount] of sceneLengths) {
     const record = records[sceneIdx];
     const ann = annotations[sceneIdx];

@@ -838,7 +838,7 @@ Based on what you just witnessed:
       // E: CICERO trust decay — unobserved agents lose 0.01 trust per update
       for (const [agentId, tom] of Object.entries(currentToM)) {
         if (!observedIds.has(agentId)) {
-          currentToM[agentId] = { ...tom, trust_level: Math.max(0, tom.trust_level - 0.01) };
+          currentToM[agentId] = { ...tom, trust_level: Math.max(0, Math.min(1, tom.trust_level - 0.01)) };
         }
       }
 
@@ -916,7 +916,8 @@ Based on what you just witnessed:
           const idx = gs.instrumental.findIndex(g => g.description.toLowerCase().includes(needle));
           if (idx >= 0) {
             const achieved = gs.instrumental[idx];
-            gs.instrumental[idx].achieved = true;
+            // Immutable update — shallow copy means elements are shared references; mutate via replacement.
+            gs.instrumental[idx] = { ...achieved, achieved: true };
             pendingMutations.push({
               mutation_id: randomUUID(),
               char_id: this.sheet.char_id,

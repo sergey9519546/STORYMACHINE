@@ -66,11 +66,14 @@ export interface CorpusReport {
  *
  * H6: `maxSimulations` caps how many scenarios are executed.  Scenarios beyond
  * the cap are silently skipped so callers don't need to pre-slice the array.
+ * `maxScenesPerScenario` caps how many scene targets each sim processes, bounding
+ * LLM calls to `maxSimulations × maxScenesPerScenario × 4 iterations × 2 candidates`.
  */
 export async function runSelfPlay(
   scenarios: SimScenario[],
   generate: CandidateGenerator,
   maxSimulations?: number,
+  maxScenesPerScenario?: number,
 ): Promise<CorpusReport> {
   const effectiveScenarios = maxSimulations != null
     ? scenarios.slice(0, maxSimulations)
@@ -80,7 +83,7 @@ export async function runSelfPlay(
 
   for (const scenario of effectiveScenarios) {
     try {
-      const result = await runOneSim(scenario, generate);
+      const result = await runOneSim(scenario, generate, maxScenesPerScenario);
       runs.push(result);
     } catch (err) {
       logger.error('selfplay_scenario_failed', { scenarioId: scenario.scenarioId, error: (err as Error).message });
@@ -111,7 +114,7 @@ export async function runSelfPlay(
 
 // ── Internal: single sim ──────────────────────────────────────────────────────
 
-async function runOneSim(scenario: SimScenario, generate: CandidateGenerator): Promise<SimResult> {
+async function runOneSim(scenario: SimScenario, generate: CandidateGenerator, maxScenes?: number): Promise<SimResult> {
   let state: NarrativeState = scenario.initialState
     ? { ...scenario.initialState }
     : emptyState();
@@ -122,7 +125,18 @@ async function runOneSim(scenario: SimScenario, generate: CandidateGenerator): P
   const operatorCounts = new Map<MutationOperator, number>();
   let totalIterations = 0;
 
-  for (const target of scenario.sceneTargets) {
+  // H6: cap scenes per sim to bound LLM cost; log skipped count for transparency.
+  const effectiveTargets = maxScenes != null ? scenario.sceneTargets.slice(0, maxScenes) : scenario.sceneTargets;
+  if (maxScenes != null && scenario.sceneTargets.length > maxScenes) {
+    logger.warn('selfplay_scenes_capped', {
+      scenarioId: scenario.scenarioId,
+      total: scenario.sceneTargets.length,
+      cap: maxScenes,
+      skipped: scenario.sceneTargets.length - maxScenes,
+    });
+  }
+
+  for (const target of effectiveTargets) {
     const convergeResult = await convergeScene(
       state, target, generate,
       { maxIterations: 4, candidatesPerIteration: 2 },

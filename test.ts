@@ -10658,3 +10658,200 @@ describe('Wave 85 — converge loop onStep callback + M7 continuity cleanup', ()
     }
   });
 });
+
+// ── Wave 86 ───────────────────────────────────────────────────────────────────
+describe('Wave 86 — character-arc dramaticTurn bug, Agent goal mutation, pacing guard, corpus cap', () => {
+
+  // ── character-arc: UNMOTIVATED_TRANSFORMATION now uses r.purpose ──────────
+
+  it('characterArcPass fires UNMOTIVATED_TRANSFORMATION when middle has no dramatic purpose', async () => {
+    const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+    // 6 records: first two negative, last two positive, middle two are 'establish_world' (non-dramatic)
+    const makeRec = (idx: number, shift: string, purpose: string) => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose,
+      dramaticTurn: `Scene ${purpose}`, // freeform — never 'none'
+      revelation: null, clockRaised: false, clockDelta: 0,
+      emotionalShift: shift, suspenseDelta: 0,
+      dialogueHighlights: [], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [],
+      readerStateAnnotation: null,
+    });
+    const records = [
+      makeRec(0, 'negative', 'establish_world'),
+      makeRec(1, 'negative', 'establish_world'),
+      makeRec(2, 'establish_world', 'establish_world'), // middle — non-dramatic
+      makeRec(3, 'establish_world', 'establish_world'), // middle — non-dramatic
+      makeRec(4, 'positive', 'character_moment'),
+      makeRec(5, 'positive', 'character_moment'),
+    ];
+    const structure = {
+      actPosition: 'act2' as const, completionPercent: 50,
+      revelationCount: 0, approachingClimax: false,
+      avgSuspensePerScene: 0, escalating: false, reversalDensity: 0,
+      openClues: 0,
+    };
+    const result = await characterArcPass({
+      fountain: 'INT. TEST - DAY\nA scene.\n',
+      original: 'INT. TEST - DAY\nA scene.\n',
+      records: records as unknown as Parameters<typeof characterArcPass>[0]['records'],
+      structure: structure as unknown as Parameters<typeof characterArcPass>[0]['structure'],
+      annotations: records.map(() => ({ revelation: null })) as unknown as Parameters<typeof characterArcPass>[0]['annotations'],
+      approvedSpans: [],
+    });
+    const hasUnmotivated = result.issues.some(i => i.rule === 'UNMOTIVATED_TRANSFORMATION');
+    assert.ok(hasUnmotivated, 'Should fire UNMOTIVATED_TRANSFORMATION when middle scenes have no dramatic purpose');
+  });
+
+  it('characterArcPass does NOT fire UNMOTIVATED_TRANSFORMATION when middle has revelation', async () => {
+    const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+    const makeRec = (idx: number, shift: string, purpose: string, rev: string | null = null) => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose,
+      dramaticTurn: `Some turn`, revelation: rev, clockRaised: false, clockDelta: 0,
+      emotionalShift: shift, suspenseDelta: 0,
+      dialogueHighlights: [], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [],
+      readerStateAnnotation: null,
+    });
+    const records = [
+      makeRec(0, 'negative', 'establish_world'),
+      makeRec(1, 'negative', 'establish_world'),
+      makeRec(2, 'establish_world', 'establish_world', 'The truth about alice'), // middle has revelation
+      makeRec(3, 'establish_world', 'character_moment'),
+      makeRec(4, 'positive', 'character_moment'),
+      makeRec(5, 'positive', 'resolution'),
+    ];
+    const structure = {
+      actPosition: 'act2' as const, completionPercent: 50,
+      revelationCount: 1, approachingClimax: false,
+      avgSuspensePerScene: 0, escalating: false, reversalDensity: 0,
+      openClues: 0,
+    };
+    const result = await characterArcPass({
+      fountain: 'INT. TEST - DAY\nA scene.\n',
+      original: 'INT. TEST - DAY\nA scene.\n',
+      records: records as unknown as Parameters<typeof characterArcPass>[0]['records'],
+      structure: structure as unknown as Parameters<typeof characterArcPass>[0]['structure'],
+      annotations: records.map(() => ({ revelation: null })) as unknown as Parameters<typeof characterArcPass>[0]['annotations'],
+      approvedSpans: [],
+    });
+    const hasUnmotivated = result.issues.some(i => i.rule === 'UNMOTIVATED_TRANSFORMATION');
+    assert.ok(!hasUnmotivated, 'Should NOT fire UNMOTIVATED_TRANSFORMATION when middle has a revelation');
+  });
+
+  // ── pacing: avgLength=0 guard ─────────────────────────────────────────────
+
+  it('pacingPass handles zero-line scenes without NaN', async () => {
+    const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+    // Fountain with scene headers but no content lines → all scenes have 0 lines
+    const fountain = 'INT. EMPTY - DAY\nINT. ALSO EMPTY - NIGHT\n';
+    const result = await pacingPass({
+      fountain,
+      original: fountain,
+      records: [],
+      structure: { actPosition: 'act1' as const, completionPercent: 20, revelationCount: 0, approachingClimax: false, avgSuspensePerScene: 0, escalating: false, reversalDensity: 0, openClues: 0 } as unknown as Parameters<typeof pacingPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    assert.equal(result.pass, 'pacing');
+    assert.equal(result.changed, false);
+    // No NaN in any issue description
+    for (const issue of result.issues) {
+      assert.ok(!issue.description.includes('NaN'), `Issue description should not contain NaN: ${issue.description}`);
+    }
+  });
+
+  // ── corpus: maxScenesPerScenario cap ─────────────────────────────────────
+
+  it('runSelfPlay respects maxScenesPerScenario by capping scene targets', async () => {
+    const { runSelfPlay } = await import('./server/nvm/selfplay/corpus.ts');
+
+    const scenesProcessed: number[] = [];
+    const fakeGenerate = async (_spec: unknown, n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        transitionId: `t-${scenesProcessed.length}-${i}`,
+        sceneIdx: scenesProcessed.length,
+        sceneFunction: 'build_tension' as const,
+        activeMechanisms: ['core_mechanism'],
+        beforeStateHash: '',
+        ops: [],
+        preconditions: ['world_exists'],
+        postconditions: [],
+        provenance: { origin: 'model_generated' as const, createdAt: Date.now() },
+      }));
+
+    const scenario = {
+      scenarioId: 'test-cap',
+      seed: 42,
+      sceneTargets: [0, 1, 2, 3, 4].map(i => ({
+        sceneIdx: i,
+        sceneFunction: 'build_tension' as const,
+        activeMechanisms: [] as string[],
+        tensionTarget: 1,
+        qualityTarget: 1,
+      })),
+    };
+
+    // With cap of 2, only first 2 targets should run
+    const report = await runSelfPlay(
+      [scenario],
+      fakeGenerate as unknown as import('./server/nvm/generate/proof-spec.ts').CandidateGenerator,
+      undefined,
+      2, // maxScenesPerScenario
+    );
+
+    assert.equal(report.runs.length, 1, 'Should have one run');
+    // The run should have processed at most 2 scenes
+    assert.ok(report.runs[0].scenes.length <= 2, `Expected ≤2 scenes, got ${report.runs[0].scenes.length}`);
+  });
+
+  it('runSelfPlay with no cap processes all scene targets', async () => {
+    const { runSelfPlay } = await import('./server/nvm/selfplay/corpus.ts');
+
+    const fakeGenerate = async (_spec: unknown, n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        transitionId: `t-${i}`,
+        sceneIdx: 0,
+        sceneFunction: 'build_tension' as const,
+        activeMechanisms: ['core_mechanism'],
+        beforeStateHash: '',
+        ops: [],
+        preconditions: ['world_exists'],
+        postconditions: [],
+        provenance: { origin: 'model_generated' as const, createdAt: Date.now() },
+      }));
+
+    const scenario = {
+      scenarioId: 'test-no-cap',
+      seed: 42,
+      sceneTargets: [0, 1, 2].map(i => ({
+        sceneIdx: i,
+        sceneFunction: 'build_tension' as const,
+        activeMechanisms: [] as string[],
+        tensionTarget: 1,
+        qualityTarget: 1,
+      })),
+    };
+
+    const report = await runSelfPlay(
+      [scenario],
+      fakeGenerate as unknown as import('./server/nvm/generate/proof-spec.ts').CandidateGenerator,
+    );
+
+    assert.equal(report.runs.length, 1);
+    assert.equal(report.runs[0].scenes.length, 3, 'Without cap, all 3 scenes should run');
+  });
+
+  // ── Agent trust decay upper bound ─────────────────────────────────────────
+
+  it('trust decay clamps to [0, 1] — upper bound added', () => {
+    // Simulate the trust decay expression directly
+    const decayTrust = (trust: number) => Math.max(0, Math.min(1, trust - 0.01));
+    // Starting above 1 (shouldn't happen normally) — result is clamped to 1 (1.5-0.01=1.49, min(1,1.49)=1)
+    assert.equal(decayTrust(1.5), 1, 'Over-limit trust decays but stays clamped at 1');
+    assert.equal(decayTrust(1.0), 0.99, 'Full trust decays to 0.99');
+    assert.equal(decayTrust(0.005), 0, 'Trust below decay step clamps to 0');
+    assert.equal(decayTrust(0), 0, 'Zero trust stays zero');
+    // Upper bound: result can never exceed 1 regardless of input
+    assert.ok(decayTrust(2.0) <= 1, 'Result is always ≤1');
+  });
+});

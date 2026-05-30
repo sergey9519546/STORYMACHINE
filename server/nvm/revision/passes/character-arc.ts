@@ -39,10 +39,12 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
 
   // ── Transformation without a causal scene ────────────────────────────────
   if (firstShift !== lastShift && firstShift !== 'neutral' && lastShift !== 'neutral') {
-    // Good — there's a shift. Check it's not abrupt (no scene with revelation/turn in between)
+    // Good — there's a shift. Check it's not abrupt (no scene with revelation/turn in between).
+    // NOTE: `dramaticTurn` is a freeform string that never equals 'none' — check `purpose` instead.
+    const dramaticPurposes = new Set(['revelation', 'turning_point', 'climax', 'raise_stakes', 'complicate']);
     const middleRecords = records.slice(Math.floor(records.length / 3), Math.floor(records.length * 2 / 3));
-    const hasTransformationCause = middleRecords.some(r => r.revelation !== null || r.dramaticTurn !== 'none');
-    if (!hasTransformationCause) {
+    const hasTransformationCause = middleRecords.some(r => r.revelation !== null || dramaticPurposes.has(r.purpose));
+    if (!hasTransformationCause && middleRecords.length >= 1) {
       issues.push({
         location: 'Mid-story character arc',
         rule: 'UNMOTIVATED_TRANSFORMATION',

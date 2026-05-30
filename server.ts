@@ -2144,8 +2144,10 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     }
     const rawMax = req.body?.maxSimulations;
     const maxSimulations = typeof rawMax === 'number' && rawMax > 0 ? Math.min(rawMax, 50) : undefined;
+    const rawMaxScenes = req.body?.maxScenesPerScenario;
+    const maxScenesPerScenario = typeof rawMaxScenes === 'number' && rawMaxScenes > 0 ? Math.min(rawMaxScenes, 100) : undefined;
     const generate = makeLLMCandidateGenerator();
-    const report = await runSelfPlay(scenarios, generate, maxSimulations);
+    const report = await runSelfPlay(scenarios, generate, maxSimulations, maxScenesPerScenario);
 
     // Persist each run to Stage corpus
     const state = buildNarrativeState(stage);
