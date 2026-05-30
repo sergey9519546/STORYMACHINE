@@ -29,14 +29,20 @@ export function redTeamVerdict(
   const visibleClues = plan.requiredClueIds.filter(id => seededClueIds.has(id));
   const missingClues = plan.requiredClueIds.filter(id => !seededClueIds.has(id));
 
-  // Heuristic base confidence without any clues — derived from audience's known facts
+  // Heuristic base confidence without any clues — derived from audience's known facts.
+  // investment reflects how emotionally committed the audience is, which raises the
+  // probability they can piece together context even without explicit clues.
   const topicWords = plan.description.toLowerCase().split(/\s+/);
   const knownFactHits = knownFacts.filter(f =>
     topicWords.some(w => w.length > 3 && f.toLowerCase().includes(w)),
   ).length;
 
-  const baseConfidence = Math.min(0.95, (knownFactHits / Math.max(1, plan.requiredClueIds.length)) * 0.6
-    + (suspense / 100) * 0.2);
+  const safeInvestment = typeof investment === 'number' && isFinite(investment) ? investment : 0;
+  const baseConfidence = Math.min(0.95,
+    (knownFactHits / Math.max(1, plan.requiredClueIds.length)) * 0.6
+    + (suspense / 100) * 0.2
+    + (safeInvestment / 100) * 0.15,
+  );
 
   // Clue contribution: each visible clue boosts confidence
   const clueBoost = Math.min(0.5, visibleClues.length * 0.12);

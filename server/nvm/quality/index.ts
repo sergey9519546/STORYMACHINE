@@ -89,6 +89,10 @@ export interface QualityReport {
 const VAGUE_TERMS = [
   'something', 'things', 'stuff', 'happened', 'felt', 'said', 'did',
   'went', 'came', 'got', 'very', 'really', 'kind of', 'sort of',
+  // Additional qualifiers that signal under-specified content
+  'everything', 'nothing', 'everyone', 'someone', 'anyone', 'somehow',
+  'somewhere', 'sometime', 'certain', 'obvious', 'clearly', 'simply',
+  'just something', 'some kind', 'a lot', 'a bit',
 ];
 
 function opText(op: StoryOp): string {
@@ -253,6 +257,24 @@ export function dialogueWarnings(ir: NarrativeTransitionIR, state: NarrativeStat
         });
       }
     }
+
+    // DV11: Unexplained pride — pride without a prior achievement in this IR or state
+    if (op.op === 'APPRAISE_EMOTION' && op.emotion.dominant === 'pride') {
+      const hasAchievement = ir.ops.slice(0, i).some(
+        p => p.op === 'PAYOFF_SETUP' ||
+             (p.op === 'SHIFT_RELATIONSHIP' && p.delta.amount > 0.3 && p.pair.includes(op.charId)),
+      );
+      const stateHasPositive = Object.entries(state.relationships)
+        .filter(([key]) => key.includes(op.charId))
+        .some(([, deltas]) => deltas.reduce((s, d) => s + (isFinite(d.amount) ? d.amount : 0), 0) > 0.3);
+      if (!hasAchievement && !stateHasPositive) {
+        warnings.push({
+          engine: 'dialogue_validator', opIdx: i, rule: 'DV11_UNEXPLAINED_PRIDE',
+          message: `APPRAISE_EMOTION pride for ${op.charId} without a prior PAYOFF_SETUP or positive relationship shift — what did they accomplish?`,
+          penalty: 18,
+        });
+      }
+    }
   });
 
   // DV6: Character monologue — same charId dominates ≥3 consecutive character ops
@@ -339,7 +361,7 @@ export function revealReady(state: NarrativeState): { ready: boolean; score: num
 
 // ── 5. Necessity-as-form ─────────────────────────────────────────────────────
 
-export function necessityScore(ops: StoryOp[]): number {
+export function necessityScore(ops: StoryOp[], state?: NarrativeState): number {
   if (ops.length === 0) return 1;
   const necessary = ops.filter((op, i) => {
     if (op.op === 'ADD_FACT') {
@@ -363,11 +385,24 @@ export function necessityScore(ops: StoryOp[]): number {
       return referencedLater || ops.filter(o => o.op === 'ADD_FACT').length === 1;
     }
     if (op.op === 'APPRAISE_EMOTION') {
-      const earlier = ops.slice(0, i).some(
+      // Redundant in this IR if same char+dominant appears earlier
+      const earlierInIR = ops.slice(0, i).some(
         e => e.op === 'APPRAISE_EMOTION' && e.charId === op.charId &&
              e.emotion.dominant === op.emotion.dominant,
       );
-      return !earlier;
+      if (earlierInIR) return false;
+      // Redundant against existing state: if char already has this dominant at near-same intensity
+      if (state) {
+        const existing = state.characterEmotions[op.charId];
+        if (existing &&
+            existing.dominant === op.emotion.dominant &&
+            typeof existing.intensity === 'number' && isFinite(existing.intensity) &&
+            typeof op.emotion.intensity === 'number' && isFinite(op.emotion.intensity) &&
+            Math.abs(existing.intensity - op.emotion.intensity) < 8) {
+          return false; // re-asserting virtually the same emotional state
+        }
+      }
+      return true;
     }
     return true;
   });
@@ -541,11 +576,11 @@ export function runQualityEngine(ir: NarrativeTransitionIR, state: NarrativeStat
     });
   }
 
-  // Dialogue validators (all 10)
+  // Dialogue validators (all 11)
   warnings.push(...dialogueWarnings(ir, state));
 
-  // Necessity
-  const necessity = necessityScore(ir.ops);
+  // Necessity (state-aware: catches re-asserting existing emotions)
+  const necessity = necessityScore(ir.ops, state);
   if (necessity < 0.8) {
     warnings.push({
       engine: 'necessity', opIdx: null, rule: 'UNNECESSARY_OPS',

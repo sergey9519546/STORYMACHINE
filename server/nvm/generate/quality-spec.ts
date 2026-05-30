@@ -56,6 +56,9 @@ export function qualityConstraintsFromWarnings(
       case 'DV10_STRUCTURAL_UNIFORMITY':
         constraints.push({ kind: 'free_form', description: 'Use at least 3 different op kinds in this scene. Structural variety creates rhythm: world fact → belief → emotion → relationship → theme.' });
         break;
+      case 'DV11_UNEXPLAINED_PRIDE':
+        constraints.push({ kind: 'free_form', description: 'A character\'s pride must follow an earned achievement. Add a PAYOFF_SETUP or a positive SHIFT_RELATIONSHIP before the APPRAISE_EMOTION pride to ground what they accomplished.' });
+        break;
       case 'LOW_SPECIFICITY':
         constraints.push({ kind: 'free_form', description: 'Replace vague terms (something, happened, felt, things) with concrete specifics: named objects, precise actions, sensory details. Every op should be unmistakably this story, not any story.' });
         break;

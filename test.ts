@@ -9587,7 +9587,7 @@ describe('Wave 71 — LLM confidence NaN guards + mine.ts operator scoring', () 
 describe('Wave 75 — buildSystemPreamble state enrichment', () => {
   const baseTarget: SceneTarget = {
     sceneIdx: 2,
-    sceneFunction: 'complicate',
+    sceneFunction: 'build_tension',
     activeMechanisms: ['suspense_escalation'],
     tensionTarget: 70,
   };
@@ -9656,8 +9656,8 @@ describe('Wave 75 — buildSystemPreamble state enrichment', () => {
   it('preamble includes relationship heat for active dyads', () => {
     const state = emptyState();
     state.relationships['alice|bob'] = [
-      { dimension: 'trust', amount: -0.4, addedAtTurn: 1 },
-      { dimension: 'trust', amount: -0.6, addedAtTurn: 2 },
+      { dimension: 'trust', amount: -0.4, reason: 'betrayal' },
+      { dimension: 'trust', amount: -0.6, reason: 'lie discovered' },
     ];
     const preamble = buildSystemPreamble([], state);
     assert.ok(preamble.includes('alice'), 'should mention relationship parties');
@@ -9674,5 +9674,118 @@ describe('Wave 75 — buildSystemPreamble state enrichment', () => {
     const spec = buildGenerationSpec(state, baseTarget, []);
     assert.ok(spec.systemPreamble.includes('anger'), 'spec preamble should include emotion');
     assert.ok(spec.systemPreamble.includes('revenge_clock'), 'spec preamble should include clocks');
+  });
+});
+
+// ── Wave 76: Quality engine improvements ──────────────────────────────────────
+
+describe('Wave 76 — quality engine DV11, vague terms, necessityScore state-aware, redteam investment', () => {
+
+  // ── DV11: Unexplained pride ────────────────────────────────────────────────
+
+  function makeIR76(ops: StoryOp[]): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR {
+    return {
+      transitionId: 'w76-test', sceneIdx: 2, sceneFunction: 'build_tension',
+      activeMechanisms: [], beforeStateHash: 'x', ops,
+      preconditions: [], postconditions: [], provenance: { origin: 'model_generated', createdAt: 0 },
+    };
+  }
+
+  it('DV11 fires when pride emotion has no prior achievement in IR or state', () => {
+    const ir = makeIR76([
+      { op: 'APPRAISE_EMOTION', charId: 'rex', emotion: { dominant: 'pride', intensity: 70, joy: 70, distress: 0, anger: 0, fear: 0, pride: 70, shame: 0, last_updated_at: 1 } },
+    ]);
+    const report = runQualityEngine(ir, emptyState());
+    assert.ok(report.warnings.some(w => w.rule === 'DV11_UNEXPLAINED_PRIDE'), 'DV11 should fire for groundless pride');
+  });
+
+  it('DV11 does not fire when PAYOFF_SETUP precedes pride', () => {
+    const ir = makeIR76([
+      { op: 'PAYOFF_SETUP', setupId: 'clue_1', payoffEventId: 'payoff_1' },
+      { op: 'APPRAISE_EMOTION', charId: 'rex', emotion: { dominant: 'pride', intensity: 70, joy: 70, distress: 0, anger: 0, fear: 0, pride: 70, shame: 0, last_updated_at: 1 } },
+    ]);
+    const report = runQualityEngine(ir, emptyState());
+    assert.ok(!report.warnings.some(w => w.rule === 'DV11_UNEXPLAINED_PRIDE'), 'DV11 should not fire when payoff precedes pride');
+  });
+
+  it('DV11 does not fire when state has prior positive relationship for that character', () => {
+    const state = emptyState();
+    state.relationships['alice|rex'] = [{ dimension: 'admiration', amount: 0.5, reason: 'saved the day' }];
+    const ir = makeIR76([
+      { op: 'APPRAISE_EMOTION', charId: 'rex', emotion: { dominant: 'pride', intensity: 60, joy: 60, distress: 0, anger: 0, fear: 0, pride: 60, shame: 0, last_updated_at: 1 } },
+    ]);
+    const report = runQualityEngine(ir, state);
+    assert.ok(!report.warnings.some(w => w.rule === 'DV11_UNEXPLAINED_PRIDE'), 'DV11 should not fire when state has positive relationship');
+  });
+
+  // ── Expanded VAGUE_TERMS ───────────────────────────────────────────────────
+
+  it('specificityScore penalizes "everything" and "somehow" as vague qualifiers', () => {
+    const vagueBelief: StoryOp = {
+      op: 'UPDATE_BELIEF',
+      charId: 'alice',
+      belief: { id: 'b1', proposition: 'everything is somehow connected to the outcome', confidence: 0.8, source: 'witnessed', source_event_id: 'e1', acquired_at: 0 },
+    };
+    const score = specificityScore([vagueBelief]);
+    assert.ok(score < 1.0, 'vague qualifier "everything"/"somehow" should lower specificity');
+  });
+
+  it('specificityScore penalizes "obvious" and "clearly" as vague qualifiers', () => {
+    const op: StoryOp = {
+      op: 'UPDATE_BELIEF',
+      charId: 'alice',
+      belief: { id: 'b2', proposition: 'it is clearly obvious that something bad happened', confidence: 0.6, source: 'told', source_event_id: 'e2', acquired_at: 0 },
+    };
+    const score = specificityScore([op]);
+    assert.ok(score < 0.7, 'multiple vague terms should bring score below 0.7');
+  });
+
+  // ── necessityScore state-aware ─────────────────────────────────────────────
+
+  it('necessityScore(ops, state) marks emotion as redundant when state already has identical dominant+intensity', () => {
+    const state = emptyState();
+    state.characterEmotions['alice'] = { joy: 0, distress: 0, anger: 0, fear: 75, pride: 0, shame: 0, dominant: 'fear', intensity: 75, last_updated_at: 0 };
+    const ops: StoryOp[] = [
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { dominant: 'fear', intensity: 76, joy: 0, distress: 0, anger: 0, fear: 76, pride: 0, shame: 0, last_updated_at: 1 } },
+    ];
+    const score = necessityScore(ops, state);
+    assert.ok(score < 1.0, 'restating an existing near-identical emotion should reduce necessity score');
+  });
+
+  it('necessityScore(ops, state) allows emotion when intensity shifts significantly', () => {
+    const state = emptyState();
+    state.characterEmotions['alice'] = { joy: 0, distress: 0, anger: 0, fear: 30, pride: 0, shame: 0, dominant: 'fear', intensity: 30, last_updated_at: 0 };
+    const ops: StoryOp[] = [
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { dominant: 'fear', intensity: 80, joy: 0, distress: 0, anger: 0, fear: 80, pride: 0, shame: 0, last_updated_at: 1 } },
+    ];
+    const score = necessityScore(ops, state);
+    assert.ok(score >= 1.0, 'a significant intensity shift should not be penalized');
+  });
+
+  it('necessityScore backward-compatible: works without state parameter', () => {
+    const ops: StoryOp[] = [
+      { op: 'APPRAISE_EMOTION', charId: 'bob', emotion: { dominant: 'joy', intensity: 60, joy: 60, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, last_updated_at: 1 } },
+    ];
+    assert.doesNotThrow(() => necessityScore(ops), 'should not throw without state');
+    assert.equal(necessityScore(ops), 1.0, 'single non-redundant emotion should score 1.0');
+  });
+
+  // ── redTeamVerdict investment fix ──────────────────────────────────────────
+
+  it('redTeamVerdict baseConfidence increases with high audience investment', () => {
+    const plan: import('./server/nvm/reveal/RevealPlan.ts').RevealPlan = {
+      revealId: 'r1', description: 'the butler did the crime',
+      requiredClueIds: ['c1', 'c2'], payoffSetupId: 'setup_r1',
+    };
+    const lowInvestmentState = emptyState();
+    lowInvestmentState.audienceState = { knownFacts: [], suspense: 50, curiosity: 40, investment: 0 };
+    const highInvestmentState = emptyState();
+    highInvestmentState.audienceState = { knownFacts: [], suspense: 50, curiosity: 40, investment: 100 };
+    const lowVerdict = redTeamVerdict(plan, lowInvestmentState);
+    const highVerdict = redTeamVerdict(plan, highInvestmentState);
+    assert.ok(
+      highVerdict.guessConfidence >= lowVerdict.guessConfidence,
+      'high investment should produce equal or higher guess confidence than low investment',
+    );
   });
 });
