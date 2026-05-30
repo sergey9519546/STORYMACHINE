@@ -279,7 +279,7 @@ const CLOCK_RESOLVED: NarrativeInvariant = {
     if (clockOps.length === 0) return result(this, 'na', 'No clocks in story.');
     const clockTotals: Record<string, number> = {};
     for (const { op } of clockOps) {
-      clockTotals[op.clockId] = (clockTotals[op.clockId] ?? 0) + op.amount;
+      clockTotals[op.clockId] = (clockTotals[op.clockId] ?? 0) + (isFinite(op.amount) ? op.amount : 0);
     }
     const runaway = Object.entries(clockTotals).filter(([, total]) => total > 3);
     if (runaway.length === 0) return result(this, 'pass', 'All clocks are being counted down.');

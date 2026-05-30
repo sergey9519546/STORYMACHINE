@@ -71,7 +71,7 @@ export function analyzeStructure(
     .filter(c => !c.reverted)
     .flatMap(c => c.ops)
     .filter(o => o.op === 'RAISE_CLOCK')
-    .reduce((s, o) => s + (o as { amount: number }).amount, 0);
+    .reduce((s, o) => { const a = (o as { amount: number }).amount; return s + (isFinite(a) ? a : 0); }, 0);
 
   const actPosition: ActPosition =
     totalClockPressure >= 15 ? 'act3' :
