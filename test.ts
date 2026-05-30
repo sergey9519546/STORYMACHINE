@@ -10241,3 +10241,78 @@ describe('Wave 80 — intention bug fix, belief location, voice precision, two-r
       'Structural elegance should be 0 when no clues exist (not the old default of 50)');
   });
 });
+
+// ── Wave 81 ───────────────────────────────────────────────────────────────────
+describe('Wave 81 — genericness deduplication + arc-tracker PAYOFF_SETUP refactor', () => {
+  // ── genericnessProof deduplication ───────────────────────────────────────────
+
+  it('genericnessProof counts each distinct character once even with multiple ops', async () => {
+    const { genericnessProof } = await import('./server/nvm/proof/tier3/genericness.ts');
+    // alice is known; newChar is unknown
+    // 3 SHIFT_RELATIONSHIP ops: alice↔newChar repeated — with old code this was 6 refs (3 unknown)
+    // With new Set approach: 2 unique refs (alice, newChar) → 1 unknown / 2 = 50% → pass
+    const state = emptyState();
+    state.characterBeliefs['alice'] = [];
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 'w81a', sceneIdx: 1, sceneFunction: 'advance_plot',
+      activeMechanisms: ['core_mechanism'], beforeStateHash: 'x',
+      ops: [
+        { op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'newChar'], delta: { dimension: 'trust', amount: -0.3, reason: 'conflict' } },
+        { op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'newChar'], delta: { dimension: 'trust', amount: -0.1, reason: 'further conflict' } },
+      ],
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 0 },
+    };
+    const result = genericnessProof(ir, state);
+    // With deduplication: 2 unique chars, 1 unknown (newChar) = 50% → pass (≤ threshold)
+    assert.equal(result.pass, true, 'Should pass: 1 unknown out of 2 unique chars = 50% (at or below threshold)');
+  });
+
+  it('genericnessProof still fails when majority of DISTINCT characters are unknown', async () => {
+    const { genericnessProof } = await import('./server/nvm/proof/tier3/genericness.ts');
+    const state = emptyState();
+    state.characterBeliefs['alice'] = [];
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 'w81b', sceneIdx: 1, sceneFunction: 'advance_plot',
+      activeMechanisms: ['core_mechanism'], beforeStateHash: 'x',
+      ops: [
+        { op: 'APPRAISE_EMOTION', charId: 'stranger1', emotion: { dominant: 'fear', intensity: 60, joy: 0, distress: 0, anger: 0, fear: 60, pride: 0, shame: 0, last_updated_at: 1 } },
+        { op: 'APPRAISE_EMOTION', charId: 'stranger2', emotion: { dominant: 'anger', intensity: 70, joy: 0, distress: 0, anger: 70, fear: 0, pride: 0, shame: 0, last_updated_at: 1 } },
+        { op: 'APPRAISE_EMOTION', charId: 'stranger3', emotion: { dominant: 'distress', intensity: 50, joy: 0, distress: 50, anger: 0, fear: 0, pride: 0, shame: 0, last_updated_at: 1 } },
+        // alice is known
+        { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'danger is real', confidence: 0.8, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+      ],
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 0 },
+    };
+    const result = genericnessProof(ir, state);
+    // 4 unique chars: alice (known), stranger1/2/3 (unknown) → 3/4 = 75% > 50% threshold → fail
+    assert.equal(result.pass, false, 'Should fail: 3 unknown out of 4 distinct chars = 75%');
+  });
+
+  // ── arc-tracker PAYOFF_SETUP resolution ──────────────────────────────────────
+
+  it('analyzeArcCompletion correctly resolves a clue via PAYOFF_SETUP', async () => {
+    const { analyzeArcCompletion } = await import('./server/nvm/quality/arc-tracker.ts');
+    const scenes = [
+      {
+        sceneIdx: 0,
+        ops: [{ op: 'SEED_CLUE', clueId: 'the-letter', carrier: 'object' }] as import('./server/nvm/ops/StoryOp.ts').StoryOp[],
+      },
+      {
+        sceneIdx: 1,
+        ops: [] as import('./server/nvm/ops/StoryOp.ts').StoryOp[],
+      },
+      {
+        sceneIdx: 2,
+        ops: [{ op: 'PAYOFF_SETUP', setupId: 'the-letter', payoffEventId: 'evt-reveal' }] as import('./server/nvm/ops/StoryOp.ts').StoryOp[],
+      },
+    ];
+    const report = analyzeArcCompletion(scenes);
+    // Clue planted at scene 0, paid off at scene 2 → resolved
+    assert.equal(report.resolvedCount, 1, 'Clue should be counted as resolved via PAYOFF_SETUP');
+    // The clue should NOT appear in openPromises since it was paid off
+    assert.equal(report.openPromises.filter(p => p.promiseId.includes('the-letter')).length, 0,
+      'Paid-off clue should not appear in openPromises');
+  });
+});

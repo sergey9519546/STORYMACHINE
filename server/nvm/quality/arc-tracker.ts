@@ -68,8 +68,7 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
           break;
 
         case 'PAYOFF_SETUP': {
-          const matchedClue = [...openClues.keys()].find(id => id === op.setupId);
-          if (matchedClue) { openClues.delete(matchedClue); resolvedCount++; }
+          if (openClues.has(op.setupId)) { openClues.delete(op.setupId); resolvedCount++; }
           break;
         }
 
