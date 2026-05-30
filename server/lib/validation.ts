@@ -94,12 +94,14 @@ const noControlChars = z.string().refine(s => !CONTROL_CHARS_RE.test(s), {
 });
 
 export const OutlineBeatSchema = z.object({
-  phase: z.string().min(1).max(64),
+  phase: z.enum(['Setup', 'Turn', 'Prestige']),
   turn_start: z.number().int().min(0),
   turn_end: z.number().int().min(0),
-  goal:       noControlChars.max(500).default(''),
-  constraint: noControlChars.max(500).default(''),
-  avoid:      noControlChars.max(500).default(''),
+  goal:        noControlChars.max(500).default(''),
+  constraint:  noControlChars.max(500).default(''),
+  avoid:       noControlChars.max(500).default(''),
+  title:       noControlChars.max(256).default('').optional(),
+  description: noControlChars.max(1000).default('').optional(),
 }).passthrough().refine(
   b => b.turn_end >= b.turn_start,
   { message: 'turn_end must be >= turn_start', path: ['turn_end'] },

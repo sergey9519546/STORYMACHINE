@@ -369,8 +369,12 @@ export class Orchestrator {
           }
         }
         for (const update of epistemicUpdates) {
-          this._runSpineForUpdate(update, lastActionId, location_id);
-          this.appraiser.appraise(update);
+          try {
+            this._runSpineForUpdate(update, lastActionId, location_id);
+            this.appraiser.appraise(update);
+          } catch (spineErr) {
+            logger.warn('epistemic_spine_appraise_error', { location_id, error: (spineErr as Error).message });
+          }
         }
         // Record persuasion outcomes: success when target's suspicion decreased
         const currentTurn = this.stage.getTurnCount();
@@ -466,16 +470,24 @@ export class Orchestrator {
     const directorUpdates = await this.director.evaluateRoom(location_id, allActions);
     const lastActionId = allActions[allActions.length - 1]?.action_id ?? '';
     for (const update of directorUpdates) {
-      this._runSpineForUpdate(update, lastActionId, location_id);
-      this.appraiser.appraise(update);
+      try {
+        this._runSpineForUpdate(update, lastActionId, location_id);
+        this.appraiser.appraise(update);
+      } catch (dirErr) {
+        logger.warn('director_spine_appraise_error', { location_id, error: (dirErr as Error).message });
+      }
     }
     onProgress?.({ type: 'director_eval', totalTurns: turnCount });
 
     // ── OCC contagion: emotions diffuse between co-present agents ──
-    this.appraiser.applyContagion(location_id);
-    // Suspicion contagion: distressed/fearful agents raise others' suspicion,
-    // weighted by distrust. Runs after Director updates to layer on top correctly.
-    this.appraiser.applySuspicionContagion(location_id);
+    try {
+      this.appraiser.applyContagion(location_id);
+      // Suspicion contagion: distressed/fearful agents raise others' suspicion,
+      // weighted by distrust. Runs after Director updates to layer on top correctly.
+      this.appraiser.applySuspicionContagion(location_id);
+    } catch (contagionErr) {
+      logger.warn('contagion_error', { location_id, error: (contagionErr as Error).message });
+    }
 
     onProgress?.({ type: 'simulation_complete', totalTurns: turnCount });
   }

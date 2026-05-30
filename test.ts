@@ -10316,3 +10316,58 @@ describe('Wave 81 — genericness deduplication + arc-tracker PAYOFF_SETUP refac
       'Paid-off clue should not appear in openPromises');
   });
 });
+
+// ── Wave 82 ───────────────────────────────────────────────────────────────────
+describe('Wave 82 — OutlineBeatSchema phase enum, director try-catch', () => {
+  // ── OutlineBeatSchema phase enum validation ────────────────────────────────
+
+  it('OutlineBeatSchema rejects invalid phase values', async () => {
+    const { OutlineBeatSchema } = await import('./server/lib/validation.ts');
+    const result = OutlineBeatSchema.safeParse({
+      phase: 'Act1', turn_start: 0, turn_end: 5, goal: '', constraint: '', avoid: '',
+    });
+    assert.equal(result.success, false, 'Should reject invalid phase "Act1"');
+  });
+
+  it('OutlineBeatSchema accepts valid phase values', async () => {
+    const { OutlineBeatSchema } = await import('./server/lib/validation.ts');
+    for (const phase of ['Setup', 'Turn', 'Prestige']) {
+      const result = OutlineBeatSchema.safeParse({
+        phase, turn_start: 0, turn_end: 5, goal: 'test', constraint: '', avoid: '',
+      });
+      assert.equal(result.success, true, `Should accept valid phase: "${phase}"`);
+    }
+  });
+
+  it('OutlineBeatSchema rejects description with control characters', async () => {
+    const { OutlineBeatSchema } = await import('./server/lib/validation.ts');
+    const result = OutlineBeatSchema.safeParse({
+      phase: 'Setup', turn_start: 0, turn_end: 5, goal: '', constraint: '', avoid: '',
+      description: 'normal text\x00injection attempt',
+    });
+    assert.equal(result.success, false, 'Should reject description with null byte');
+  });
+
+  it('OutlineBeatSchema accepts beat with optional title and description', async () => {
+    const { OutlineBeatSchema } = await import('./server/lib/validation.ts');
+    const result = OutlineBeatSchema.safeParse({
+      phase: 'Turn', turn_start: 3, turn_end: 7,
+      goal: 'Confront the villain', constraint: 'No external help', avoid: 'Deus ex machina',
+      title: 'The Confrontation',
+      description: 'Alice faces her nemesis in the abandoned warehouse.',
+    });
+    assert.equal(result.success, true, 'Should accept beat with valid optional title and description');
+    if (result.success) {
+      assert.equal((result.data as { title?: string }).title, 'The Confrontation');
+    }
+  });
+
+  it('OutlineBeatSchema rejects title over 256 chars', async () => {
+    const { OutlineBeatSchema } = await import('./server/lib/validation.ts');
+    const result = OutlineBeatSchema.safeParse({
+      phase: 'Setup', turn_start: 0, turn_end: 2, goal: '', constraint: '', avoid: '',
+      title: 'x'.repeat(257),
+    });
+    assert.equal(result.success, false, 'Should reject title over 256 characters');
+  });
+});
