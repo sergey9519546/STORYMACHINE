@@ -38,7 +38,7 @@ export function showrunnerCritic(ir: NarrativeTransitionIR, state: NarrativeStat
 
   // Gate 3: theme argument should advance in set_up_payoff or advance_plot scenes
   const themeScenes: NarrativeTransitionIR['sceneFunction'][] = ['advance_plot', 'set_up_payoff'];
-  if (themeScenes.includes(ir.sceneFunction) && state.authorIntent.theme) {
+  if (themeScenes.includes(ir.sceneFunction) && state.authorIntent.theme?.trim()) {
     const hasThemeOp = ir.ops.some(op => op.op === 'ADVANCE_THEME_ARGUMENT');
     if (!hasThemeOp) {
       critiques.push({

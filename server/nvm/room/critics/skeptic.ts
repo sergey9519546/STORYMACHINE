@@ -22,7 +22,7 @@ export function skepticCritic(ir: NarrativeTransitionIR, _state: NarrativeState)
 
     // Large relationship leap without causal link
     if (op.op === 'SHIFT_RELATIONSHIP' && Math.abs(op.delta.amount) > 0.6) {
-      const hasLink = (ir.causalLinks ?? []).some(l => l.opIdx === i);
+      const hasLink = (ir.causalLinks ?? []).some(l => l.opIdx === i && l.causedBy.length > 0);
       if (!hasLink) {
         critiques.push({
           criticId: 'skeptic', severity: 45, targetOpIdx: i,
