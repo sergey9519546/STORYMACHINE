@@ -36,25 +36,45 @@ function stubIR(spec: GenerationSpec, idx: number): NarrativeTransitionIR {
 function parseOp(raw: Record<string, unknown>): StoryOp | null {
   try {
     const op = raw['op'] as string;
+    const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
     switch (op) {
-      case 'ADD_FACT':
-        return { op, fact: raw['fact'] as StoryOp & { op: 'ADD_FACT' } extends { fact: infer F } ? F : never };
-      case 'UPDATE_BELIEF':
-        return { op, charId: raw['charId'] as string, belief: raw['belief'] as StoryOp & { op: 'UPDATE_BELIEF' } extends { belief: infer B } ? B : never };
-      case 'APPRAISE_EMOTION':
-        return { op, charId: raw['charId'] as string, emotion: raw['emotion'] as StoryOp & { op: 'APPRAISE_EMOTION' } extends { emotion: infer E } ? E : never };
-      case 'SHIFT_RELATIONSHIP':
-        return { op, pair: raw['pair'] as [string, string], delta: raw['delta'] as StoryOp & { op: 'SHIFT_RELATIONSHIP' } extends { delta: infer D } ? D : never };
+      case 'ADD_FACT': {
+        const fact = raw['fact'];
+        if (!isObj(fact) || typeof fact['factId'] !== 'string' || typeof fact['subject'] !== 'string') return null;
+        return { op, fact: fact as unknown as StoryOp & { op: 'ADD_FACT' } extends { fact: infer F } ? F : never };
+      }
+      case 'UPDATE_BELIEF': {
+        const belief = raw['belief'];
+        if (!isObj(belief) || typeof belief['proposition'] !== 'string') return null;
+        return { op, charId: raw['charId'] as string, belief: belief as unknown as StoryOp & { op: 'UPDATE_BELIEF' } extends { belief: infer B } ? B : never };
+      }
+      case 'APPRAISE_EMOTION': {
+        const emotion = raw['emotion'];
+        if (!isObj(emotion)) return null;
+        return { op, charId: raw['charId'] as string, emotion: emotion as unknown as StoryOp & { op: 'APPRAISE_EMOTION' } extends { emotion: infer E } ? E : never };
+      }
+      case 'SHIFT_RELATIONSHIP': {
+        const pair = raw['pair'];
+        if (!Array.isArray(pair) || pair.length < 2 || typeof pair[0] !== 'string' || typeof pair[1] !== 'string') return null;
+        if (!isObj(raw['delta'])) return null;
+        return { op, pair: pair as [string, string], delta: raw['delta'] as unknown as StoryOp & { op: 'SHIFT_RELATIONSHIP' } extends { delta: infer D } ? D : never };
+      }
       case 'SEED_CLUE':
-        return { op, clueId: raw['clueId'] as string, carrier: (raw['carrier'] ?? 'object') as StoryOp & { op: 'SEED_CLUE' } extends { carrier: infer C } ? C : never };
+        if (typeof raw['clueId'] !== 'string') return null;
+        return { op, clueId: raw['clueId'], carrier: (raw['carrier'] ?? 'object') as StoryOp & { op: 'SEED_CLUE' } extends { carrier: infer C } ? C : never };
       case 'PAYOFF_SETUP':
-        return { op, setupId: raw['setupId'] as string, payoffEventId: raw['payoffEventId'] as string };
+        if (typeof raw['setupId'] !== 'string' || typeof raw['payoffEventId'] !== 'string') return null;
+        return { op, setupId: raw['setupId'], payoffEventId: raw['payoffEventId'] };
       case 'RAISE_CLOCK':
-        return { op, clockId: raw['clockId'] as string, amount: Number(raw['amount'] ?? 1) };
+        if (typeof raw['clockId'] !== 'string') return null;
+        return { op, clockId: raw['clockId'], amount: Number(raw['amount'] ?? 1) };
       case 'ADVANCE_THEME_ARGUMENT':
-        return { op, claimId: raw['claimId'] as string, move: (raw['move'] ?? 'support') as StoryOp & { op: 'ADVANCE_THEME_ARGUMENT' } extends { move: infer M } ? M : never };
-      case 'UPDATE_READER_STATE':
-        return { op, delta: raw['delta'] as StoryOp & { op: 'UPDATE_READER_STATE' } extends { delta: infer D } ? D : never };
+        if (typeof raw['claimId'] !== 'string') return null;
+        return { op, claimId: raw['claimId'], move: (raw['move'] ?? 'support') as StoryOp & { op: 'ADVANCE_THEME_ARGUMENT' } extends { move: infer M } ? M : never };
+      case 'UPDATE_READER_STATE': {
+        if (!isObj(raw['delta'])) return null;
+        return { op, delta: raw['delta'] as unknown as StoryOp & { op: 'UPDATE_READER_STATE' } extends { delta: infer D } ? D : never };
+      }
       default:
         return null;
     }

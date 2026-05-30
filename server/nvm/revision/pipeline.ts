@@ -88,6 +88,17 @@ export async function runRevisionPipeline(
   const originalFountain = compiled.fountain;
   const { annotations } = compiled;
 
+  // Guard: empty fountain means there's nothing to revise. Return early rather than
+  // running 12 passes on an empty string and silently reporting 0 issues found.
+  if (!originalFountain?.trim()) {
+    return {
+      passResults: [], finalFountain: originalFountain ?? '',
+      originalFountain: originalFountain ?? '',
+      totalIssuesFound: 0, passesWithChanges: 0,
+      completedAt: Date.now(),
+    };
+  }
+
   // The passes run sequentially; each receives the output of the prior pass.
   const passes = [
     structurePass,

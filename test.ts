@@ -8735,24 +8735,18 @@ describe('Wave 41 — applyCredence prefers source_agent_id for told beliefs', (
 // ── Wave 42 regression tests ──────────────────────────────────────────────────
 
 describe('Wave 42 — tier2Score uses float division not Math.ceil', () => {
+  const mkR = (proof: string, pass: boolean) =>
+    ({ proof: proof as import('./server/nvm/proof/contract.ts').ProofName, pass, tier: 2 as const, reason: '', findings: [] });
+
   it('3 proofs: 1 failure → score 67 (not 66 with old ceil)', () => {
     // Old formula: 100 - ceil(100/3)*1 = 100 - 34 = 66
     // New formula: round(100 - 100/3*1) = round(66.67) = 67
-    const results = [
-      { proof: 'NecessityProof', pass: false, findings: [] },
-      { proof: 'SpecificityProof', pass: true, findings: [] },
-      { proof: 'DialogueProof', pass: true, findings: [] },
-    ];
-    const score = tier2Score(results);
-    assert.equal(score, 67, `expected 67 (float division), got ${score}`);
+    const results = [mkR('NecessityProof', false), mkR('SpecificityProof', true), mkR('DialogueProof', true)];
+    assert.equal(tier2Score(results), 67, 'expected 67 with float division');
   });
 
   it('3 proofs: 0 failures → 100', () => {
-    const results = [
-      { proof: 'NecessityProof', pass: true, findings: [] },
-      { proof: 'SpecificityProof', pass: true, findings: [] },
-      { proof: 'DialogueProof', pass: true, findings: [] },
-    ];
+    const results = [mkR('NecessityProof', true), mkR('SpecificityProof', true), mkR('DialogueProof', true)];
     assert.equal(tier2Score(results), 100);
   });
 

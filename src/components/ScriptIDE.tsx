@@ -202,6 +202,9 @@ export default function ScriptIDE({
   // Always-current ref so async callbacks (triggerAnalysis) see the latest engineState
   // rather than a stale closure from 2 s ago.
   const engineStateRef = useRef<EngineState | null>(null);
+  // Always-current characters ref so the 2s debounced analysis sees the latest roster.
+  // Without this, adding a character during the debounce window would use the old list.
+  const charactersRef = useRef(characters);
 
   // ── Persist to localStorage ──────────────────────────────────────────────────
   // H1: Split into two effects:
@@ -272,6 +275,11 @@ export default function ScriptIDE({
       document.documentElement.classList.remove("dark");
     }
   }, [isDarkMode]);
+
+  // Keep both refs in sync so async callbacks always read the latest values.
+  useEffect(() => {
+    charactersRef.current = characters;
+  }, [characters]);
 
   // Keep engineStateRef in sync so triggerAnalysis always reads the latest state (F3).
   useEffect(() => {
@@ -492,7 +500,9 @@ export default function ScriptIDE({
     setEngineState((prev) => (prev ? { ...prev, isAnalyzing: true } : null));
 
     try {
-      const newState = await analyzeScriptBlock(currentEngineState, text, characters, abort.signal);
+      // Use charactersRef.current so we always see the latest character roster,
+      // even if characters changed during the 2s debounce window.
+      const newState = await analyzeScriptBlock(currentEngineState, text, charactersRef.current, abort.signal);
       if (currentGeneration === analysisGenerationRef.current) {
         setEngineState(newState);
       }
