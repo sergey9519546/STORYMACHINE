@@ -140,6 +140,7 @@ function LauncherTab() {
   const [running, setRunning]         = useState(false);
   const [result, setResult]           = useState<{ runs: number; meanScore: number; bestScenario: string; operatorFrequency: Record<string, number> } | null>(null);
   const [error, setError]             = useState<string | null>(null);
+  const [maxSimulations, setMaxSimulations] = useState<number>(5);
 
   function addScenario() {
     setScenarios(s => [...s, makeDefaultScenario(s.length)]);
@@ -158,6 +159,7 @@ function LauncherTab() {
     try {
       const SCENE_FNS = ['advance_plot', 'build_tension', 'reveal_character', 'establish_world', 'set_up_payoff'];
       const body = {
+        maxSimulations,
         scenarios: scenarios.map(sc => ({
           scenarioId: sc.scenarioId,
           seed: sc.seed,
@@ -214,10 +216,16 @@ function LauncherTab() {
         ))}
       </div>
 
-      <div style={{ display: 'flex', gap: 10 }}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
         <button onClick={addScenario} disabled={scenarios.length >= 5} style={btnSt('#1e293b')}>
           + Add Scenario
         </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div style={labelSt}>Max Sims</div>
+          <input type="number" min={1} max={50} value={maxSimulations}
+            onChange={e => setMaxSimulations(Math.max(1, Math.min(50, Number(e.target.value))))}
+            style={{ ...inputSt, width: 60 }} title="Cap total simulations to control LLM cost" />
+        </div>
         <button onClick={launch} disabled={running} style={{ ...btnSt('#7c3aed'), flex: 1, fontWeight: 700 }}>
           {running ? 'Running headless sims…' : `Launch ${scenarios.length} scenario${scenarios.length !== 1 ? 's' : ''}`}
         </button>

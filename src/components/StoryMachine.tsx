@@ -154,22 +154,6 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
     fetchActivePressures();
   }, [fetchActivePressures]);
 
-  const fetchPersuasionLog = useCallback(async (agentIds: string[]) => {
-    const entries = await Promise.all(
-      agentIds.map(id =>
-        fetch(`/api/persuasion/${id}`).then(r => r.ok ? r.json() as Promise<PersuasionRecord[]> : [])
-      )
-    );
-    if (!mountedRef.current) return;
-    const map: Record<string, PersuasionRecord[]> = {};
-    agentIds.forEach((id, i) => { map[id] = entries[i] ?? []; });
-    setPersuasionLog(map);
-  }, []);
-
-  useEffect(() => {
-    ledgerEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [ledger]);
-
   // C5: unified fetch-failure notifier — shows a toast only when the component
   // is still mounted (suppresses spurious errors fired during unmount).
   const notifyFetchFailure = useCallback((endpoint: string, err: unknown) => {
@@ -177,6 +161,25 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
     const msg = err instanceof Error ? err.message : String(err);
     showError(`Background fetch failed (${endpoint}): ${msg}`);
   }, [showError]);
+
+  const fetchPersuasionLog = useCallback(async (agentIds: string[]) => {
+    try {
+      const entries = await Promise.all(
+        agentIds.map(id =>
+          fetch(`/api/persuasion/${id}`)
+            .then(r => r.ok ? r.json() as Promise<PersuasionRecord[]> : [])
+        )
+      );
+      if (!mountedRef.current) return;
+      const map: Record<string, PersuasionRecord[]> = {};
+      agentIds.forEach((id, i) => { map[id] = entries[i] ?? []; });
+      setPersuasionLog(map);
+    } catch (err) { notifyFetchFailure('/api/persuasion', err); }
+  }, [notifyFetchFailure]);
+
+  useEffect(() => {
+    ledgerEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [ledger]);
 
   const fetchState = async () => {
     try {

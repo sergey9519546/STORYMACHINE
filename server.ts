@@ -1903,8 +1903,10 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     if (scenarios.length > 5) {
       res.status(400).json({ error: 'Maximum 5 scenarios per HTTP self-play request' }); return;
     }
+    const rawMax = req.body?.maxSimulations;
+    const maxSimulations = typeof rawMax === 'number' && rawMax > 0 ? Math.min(rawMax, 50) : undefined;
     const generate = makeLLMCandidateGenerator();
-    const report = await runSelfPlay(scenarios, generate);
+    const report = await runSelfPlay(scenarios, generate, maxSimulations);
 
     // Persist each run to Stage corpus
     const state = buildNarrativeState(stage);

@@ -100,7 +100,10 @@ export const OutlineBeatSchema = z.object({
   goal:       noControlChars.max(500).default(''),
   constraint: noControlChars.max(500).default(''),
   avoid:      noControlChars.max(500).default(''),
-}).passthrough();
+}).passthrough().refine(
+  b => b.turn_end >= b.turn_start,
+  { message: 'turn_end must be >= turn_start', path: ['turn_end'] },
+);
 
 export const OutlineBodySchema = z.object({
   beats: z.array(OutlineBeatSchema).max(50),
