@@ -194,11 +194,11 @@ export function makeLLMCandidateGenerator(): CandidateGenerator {
   return async (spec: GenerationSpec, n: number): Promise<NarrativeTransitionIR[]> => {
     // Dynamic import to avoid circular dependency at module load time.
     let provider: import('../../engine/ai.ts').LLMProvider;
-    let getModel: (tier: 'fast' | 'pro') => string;
+    let candidateModel: string;
     try {
       const ai = await import('../../engine/ai.ts');
       provider = ai.geminiProvider;
-      getModel = ai.getModel;
+      candidateModel = ai.modelForTask('CANDIDATE');
       // Test that the provider is usable (key present)
       ai.getAI();
     } catch {
@@ -220,7 +220,7 @@ export function makeLLMCandidateGenerator(): CandidateGenerator {
 
     try {
       const response = await provider.generate({
-        model: getModel('fast'),
+        model: candidateModel,
         contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
         config: {
           responseMimeType: 'application/json',

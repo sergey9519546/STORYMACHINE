@@ -62,7 +62,7 @@ export async function rewritePass(input: RewriteInput): Promise<RewriteResult> {
     ai.getAI(); // throws if no key
 
     const response = await ai.geminiProvider.generate({
-      model: ai.getModel('fast'),
+      model: ai.modelForTask('REVISION'),
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: { temperature: 0.4, maxOutputTokens: 8192 },
     });

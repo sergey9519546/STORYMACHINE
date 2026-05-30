@@ -1,6 +1,6 @@
 import { Type } from '@google/genai';
 import { randomUUID } from 'crypto';
-import { getModel, getTemperature, generateContent } from './ai.ts';
+import { getModel, getTemperature, generateContent, modelForTask } from './ai.ts';
 import { STYLE_MODIFIERS } from '../lib/structure-presets.ts';
 import { genrePromptBlock } from '../lib/genre-router.ts';
 import { effectiveScore } from '../lib/personality.ts';
@@ -226,7 +226,7 @@ export class Agent {
     // ── ToT Planning: generate 3 candidates, self-select the best ──
     // High-volume per-turn call — routed to the fast model tier.
     const response = await generateContent({
-      model: getModel('fast'),
+      model: modelForTask('AGENT_TURN'),
       contents: prompt,
       config: {
         temperature: getTemperature(),
@@ -605,7 +605,7 @@ Based on what you just witnessed:
 5. Level-3 ToM: What do you think each other agent believes that YOU believe about THEM? (meta-epistemic inference)`;
 
     const response = await generateContent({
-      model: getModel('fast'),
+      model: modelForTask('EPISTEMICS'),
       contents: prompt,
       config: {
         temperature: getTemperature(),
@@ -1014,7 +1014,7 @@ Based on what you just witnessed:
     const existingBeliefs = (this.sheet.beliefs ?? []).slice(0, 5).map(b => b.proposition).join('; ');
 
     const response = await generateContent({
-      model: getModel('fast'),
+      model: modelForTask('EPISTEMICS'),
       contents: `You are ${sanitizeForPrompt(this.sheet.name, 256)}. Reflect on these recent events and synthesize exactly 3 high-level insights.\n\nEvents:\n${transcript}\n\nExisting beliefs: ${existingBeliefs || 'none'}\n\nOutput 3 reflective insights that go beyond the surface events — patterns, implications, strategic assessments.`,
       config: {
         temperature: getTemperature(),
@@ -1102,7 +1102,7 @@ Based on what you just witnessed:
 
     const blockedDescs = active.slice(0, 3).map(g => `- ${g.description}`).join('\n');
     const response = await generateContent({
-      model: getModel('fast'),
+      model: modelForTask('EPISTEMICS'),
       contents: `You are ${sanitizeForPrompt(this.sheet.name, 256)}. Your current subgoals are ALL blocked by prerequisites that haven't been met:\n${blockedDescs}\n\nTerminal objective: ${sanitizeForPrompt(gs.terminal.description)}\n\nGenerate exactly 2 new instrumental subgoals you can pursue RIGHT NOW, without prerequisites.`,
       config: {
         systemInstruction: `You are replanning as ${sanitizeForPrompt(this.sheet.name, 256)}. Output only JSON.`,

@@ -4,7 +4,7 @@ import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import fs from 'fs';
 import { Type } from '@google/genai';
-import { generateContent, getImageProvider, getTTSProvider, getModel } from './server/engine/ai.ts';
+import { generateContent, getImageProvider, getTTSProvider, getModel, modelForTask } from './server/engine/ai.ts';
 import { rateLimit } from 'express-rate-limit';
 import { Stage } from './server/engine/Stage.ts';
 import { Orchestrator, type RoomProgressEvent } from './server/engine/Orchestrator.ts';
@@ -1273,7 +1273,7 @@ async function startServer() {
       return b ? `\n${b}\n` : '';
     })();
     const response = await generateContent({
-      model: getModel(),
+      model: modelForTask('WORLDBUILD'),
       contents: `SYSTEM ROLE: You are a master screenwriter and world-builder. Your task is to generate or expand a scene based on the user's beat outline.
 
 OBJECTIVE: Write visceral, evocative action lines and scene descriptions that establish mood, time, and place.
@@ -1324,7 +1324,7 @@ OUTPUT: Generate the Scene Heading and Action lines.`,
       return b ? `\n${b}\n` : '';
     })();
     const response = await generateContent({
-      model: getModel(),
+      model: modelForTask('DIALOGUE'),
       contents: `SYSTEM ROLE: You are an expert dialogue doctor, specializing in subtext, character voice, and dramatic irony.
 
 OBJECTIVE: Analyze the provided dialogue and rewrite it to remove "on-the-nose" exposition.
@@ -1355,7 +1355,7 @@ OUTPUT: Provide 2 alternative versions of the dialogue exchange, explaining the 
       return b ? `\n${b}\n` : '';
     })();
     const response = await generateContent({
-      model: getModel(),
+      model: modelForTask('ANALYSIS'),
       contents: `SYSTEM ROLE: You are a structural script consultant influenced by Hitchcock's theory of suspense.
 
 OBJECTIVE: Analyze the provided scene and identify opportunities to heighten psychological stakes.
@@ -1375,7 +1375,7 @@ OUTPUT: A bulleted diagnostic report with 3 actionable suggestions. Where a char
   app.post('/api/scriptide/clean-action', aiLimiter, asyncHandler(async (req, res) => {
     const text = requireString(req.body?.text, 'text');
     const response = await generateContent({
-      model: getModel(),
+      model: modelForTask('ACTION'),
       contents: `SYSTEM ROLE: You are a strict script editor enforcing a "Semantic Firewall".
 OBJECTIVE: Rewrite the following action block — remove all camera directions and technical jargon. Describe what happens in the world, not what the camera does.
 
@@ -1398,7 +1398,7 @@ OUTPUT: Just the rewritten action text, nothing else.`,
     const need  = sanitizeForPrompt(requireString(profile.need,  'profile.need'), 1000);
 
     const response = await generateContent({
-      model: getModel(),
+      model: modelForTask('CHARACTER'),
       contents: `SYSTEM ROLE: You are a character designer specializing in psychological realism and "Show, Don't Tell".
 
 OBJECTIVE: Generate a visceral physical description of a character based on their psychological profile. Reflect internal state through external details.
@@ -1478,7 +1478,7 @@ ${structure ? `structuralNode must name a specific beat from the ${structure} st
 ${dirStyle ? `Cinematic composition and commentary must be filtered through the ${dirStyle} style.` : ''}`;
 
     const analysisResponse = await generateContent({
-      model: getModel(),
+      model: modelForTask('ANALYSIS'),
       contents: prompt,
       config: {
         systemInstruction: 'You are the AI Director, a strict narrative dungeon master enforcing psychological and structural rules of screenwriting.',

@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { safeJsonParse } from './src/lib/json.ts';
-import { withTimeout, generateContent, setLLMProvider, resetLLMProvider, setEmbeddingProvider, setImageProvider, setTTSProvider, getEmbeddingProvider, getImageProvider, getTTSProvider, resetAllProviders, noopImageProvider, noopTTSProvider, noopEmbeddingProvider } from './server/engine/ai.ts';
+import { withTimeout, generateContent, setLLMProvider, resetLLMProvider, setEmbeddingProvider, setImageProvider, setTTSProvider, getEmbeddingProvider, getImageProvider, getTTSProvider, resetAllProviders, noopImageProvider, noopTTSProvider, noopEmbeddingProvider, getModel, modelForTask } from './server/engine/ai.ts';
 import { analyzeSubtext } from './server/lib/subtext-meter.ts';
 import { genrePromptBlock, GENRE_MODIFIERS, GENRE_NAMES } from './server/lib/genre-router.ts';
 import { scoreBelief, retrieveBeliefs, consolidateBeliefs, decayBeliefConfidence } from './server/lib/memory.ts';
@@ -783,6 +783,48 @@ describe('withTimeout', () => {
       () => withTimeout(never, 10, 'my-label'),
       (err: Error) => err.message.includes('my-label'),
     );
+  });
+});
+
+// ── P5 — Multi-model task routing ────────────────────────────────────────────
+
+describe('modelForTask', () => {
+  it('routes high-volume tasks to the fast tier', () => {
+    const fast = getModel('fast');
+    assert.equal(modelForTask('AGENT_TURN'), fast);
+    assert.equal(modelForTask('EPISTEMICS'), fast);
+    assert.equal(modelForTask('ACTION'), fast);
+    assert.equal(modelForTask('GHOST_TEXT'), fast);
+  });
+
+  it('routes quality-critical single-shot tasks to the pro tier', () => {
+    const pro = getModel('pro');
+    assert.equal(modelForTask('WORLDBUILD'), pro);
+    assert.equal(modelForTask('DIALOGUE'), pro);
+    assert.equal(modelForTask('ANALYSIS'), pro);
+    assert.equal(modelForTask('OUTLINE'), pro);
+  });
+
+  it('honors a per-task env override', () => {
+    const prev = process.env.AI_TASK_TIER_ACTION;
+    process.env.AI_TASK_TIER_ACTION = 'pro';
+    try {
+      assert.equal(modelForTask('ACTION'), getModel('pro'));
+    } finally {
+      if (prev === undefined) delete process.env.AI_TASK_TIER_ACTION;
+      else process.env.AI_TASK_TIER_ACTION = prev;
+    }
+  });
+
+  it('ignores an invalid env override and falls back to the default tier', () => {
+    const prev = process.env.AI_TASK_TIER_AGENT_TURN;
+    process.env.AI_TASK_TIER_AGENT_TURN = 'gigantic';
+    try {
+      assert.equal(modelForTask('AGENT_TURN'), getModel('fast'));
+    } finally {
+      if (prev === undefined) delete process.env.AI_TASK_TIER_AGENT_TURN;
+      else process.env.AI_TASK_TIER_AGENT_TURN = prev;
+    }
   });
 });
 
