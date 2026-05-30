@@ -260,7 +260,13 @@ export class Orchestrator {
         if (currentSheet?.is_alive === false) continue;
 
         logger.debug('agent_turn', { agent: currentSheet.name, location_id });
-        const action = await agent.takeTurn();
+        let action: import('./types.ts').NarrativeAction;
+        try {
+          action = await agent.takeTurn();
+        } catch (takeTurnErr) {
+          logger.warn('agent_take_turn_failed', { agent: currentSheet.name, error: (takeTurnErr as Error).message });
+          action = { action_type: 'WAIT', content: '(waits)', target: null };
+        }
         onProgress?.({ type: 'agent_action', agentId: agentSheet.char_id, agentName: currentSheet.name, action, turnIndex: this.stage.getTurnCount() });
 
         if (action.action_type === 'RELOCATE' && action.target) {
@@ -355,7 +361,12 @@ export class Orchestrator {
         const epistemicUpdates: import('./types.ts').EpistemicUpdate[] = [];
         for (const sheet of agentsInRoom) {
           const agent = this.agents.get(sheet.char_id);
-          if (agent) epistemicUpdates.push(await agent.updateEpistemics(recentActions));
+          if (!agent) continue;
+          try {
+            epistemicUpdates.push(await agent.updateEpistemics(recentActions));
+          } catch (epistemicsErr) {
+            logger.warn('agent_epistemics_failed', { agent: sheet.char_id, error: (epistemicsErr as Error).message });
+          }
         }
         for (const update of epistemicUpdates) {
           this._runSpineForUpdate(update, lastActionId, location_id);
@@ -496,8 +507,8 @@ export class Orchestrator {
         const agentsA = this.stage.getAgentsInLocation(a).filter(x => x.is_alive !== false);
         const agentsB = this.stage.getAgentsInLocation(b).filter(x => x.is_alive !== false);
         // Primary key: accumulated suspicion in the room (higher → more urgent)
-        const suspA = agentsA.reduce((s, ag) => s + (ag.suspicion_score ?? 0), 0);
-        const suspB = agentsB.reduce((s, ag) => s + (ag.suspicion_score ?? 0), 0);
+        const suspA = agentsA.reduce((s, ag) => s + (isFinite(ag.suspicion_score) ? ag.suspicion_score : 0), 0);
+        const suspB = agentsB.reduce((s, ag) => s + (isFinite(ag.suspicion_score) ? ag.suspicion_score : 0), 0);
         if (suspB !== suspA) return suspB - suspA;
         // Secondary key: number of agents (more agents → more narrative potential)
         if (agentsB.length !== agentsA.length) return agentsB.length - agentsA.length;
