@@ -351,7 +351,7 @@ export class Agent {
     const historyStr = history.length === 0
       ? '(Silence. You are the first to speak.)'
       : history.map((e, i) => {
-          const name = this.stage.getAgent(e.char_id)?.name ?? 'Unknown';
+          const name = sanitizeForPrompt(this.stage.getAgent(e.char_id)?.name ?? 'Unknown', 128);
           const tag = e.action_type === 'LIE' ? 'SPEAK' : e.action_type;
           const isRecent = i >= history.length - VERBATIM_WINDOW;
           const content = isRecent ? e.content : e.content.slice(0, 80) + (e.content.length > 80 ? '…' : '');
@@ -375,7 +375,7 @@ export class Agent {
     const tomEntries = Object.values(this.sheet.theoryOfMind ?? {}).slice(0, 5);
     const tomStr = tomEntries.length > 0
       ? tomEntries.map(tom => {
-          const name = this.stage.getAgent(tom.subject_id)?.name ?? tom.subject_id;
+          const name = sanitizeForPrompt(this.stage.getAgent(tom.subject_id)?.name ?? tom.subject_id, 128);
           const knowledge = tom.believed_knowledge.slice(0, 3).map(k => `"${k}"`).join(', ');
           const relParts: string[] = [`trust=${Math.round(tom.trust_level * 100)}%`];
           if (tom.affinity !== undefined) relParts.push(`affinity=${Math.round(tom.affinity * 100)}%`);
@@ -383,7 +383,7 @@ export class Agent {
           if (tom.debt !== undefined && tom.debt > 0.1) relParts.push(`debt=${Math.round(tom.debt * 100)}%`);
           const history = tom.shared_history?.slice(-2).map(e => `"${e}"`).join(', ');
           if (history) relParts.push(`history=[${history}]`);
-          return `  - ${name}: ${relParts.join(', ')}, motive="${tom.believed_motive}", I think they know: [${knowledge}]`;
+          return `  - ${name}: ${relParts.join(', ')}, motive="${sanitizeForPrompt(tom.believed_motive, 256)}", I think they know: [${knowledge}]`;
         }).join('\n')
       : '  (You have not yet formed models of the others here.)';
 
@@ -397,14 +397,14 @@ export class Agent {
             g => !g.achieved && (g.depends_on ?? []).some(dep => !gs.instrumental.find(x => x.id === dep)?.achieved),
           );
           return [
-            `TERMINAL OBJECTIVE: ${gs.terminal.description}`,
-            `CURRENT SUBGOAL: ${next?.description ?? 'gather information and orient yourself'}`,
+            `TERMINAL OBJECTIVE: ${sanitizeForPrompt(gs.terminal.description, 400)}`,
+            `CURRENT SUBGOAL: ${sanitizeForPrompt(next?.description ?? 'gather information and orient yourself', 256)}`,
             blocked.length > 0
-              ? `BLOCKED (awaiting prerequisites): ${blocked.map(g => g.description).join('; ')}`
+              ? `BLOCKED (awaiting prerequisites): ${blocked.map(g => sanitizeForPrompt(g.description, 200)).join('; ')}`
               : '',
           ].filter(Boolean).join('\n');
         })()
-      : `TERMINAL OBJECTIVE: ${this.sheet.hidden_motive}\nCURRENT SUBGOAL: Assess who in this room is a threat or an asset to your objective.`;
+      : `TERMINAL OBJECTIVE: ${sanitizeForPrompt(this.sheet.hidden_motive)}\nCURRENT SUBGOAL: Assess who in this room is a threat or an asset to your objective.`;
 
     // ── Psychology block ──
     const actionBias = describeActionBias(this.sheet.darkTriad, this.sheet.attachmentStyle, this.sheet.suspicion_score);
@@ -416,7 +416,7 @@ export class Agent {
     // Inbound persuasion: someone targeted YOU this turn — let you resist or yield in-character.
     const inbound = this.stage.getInboundPersuasion(this.sheet.char_id);
     const inboundBlock = (inbound && inbound.turn >= currentTurn - 1)
-      ? `\nINBOUND INFLUENCE: ${this.stage.getAgent(inbound.agent_id)?.name ?? 'someone'} is using a [${inbound.strategy}] approach on you. You can resist, yield, or co-opt it — but you feel the pressure.\n`
+      ? `\nINBOUND INFLUENCE: ${sanitizeForPrompt(this.stage.getAgent(inbound.agent_id)?.name ?? 'someone', 128)} is using a [${inbound.strategy}] approach on you. You can resist, yield, or co-opt it — but you feel the pressure.\n`
       : '';
 
     // ── G: OCC Emotional State ──
@@ -424,7 +424,7 @@ export class Agent {
       const es = this.sheet.emotionState;
       if (!es || es.dominant === 'neutral' || es.intensity < 15) return '';
       const angerTarget = es.dominant === 'anger' && es.anger_target_id
-        ? ` — directed at ${this.stage.getAgent(es.anger_target_id)?.name ?? 'someone in this room'}`
+        ? ` — directed at ${sanitizeForPrompt(this.stage.getAgent(es.anger_target_id)?.name ?? 'someone in this room', 128)}`
         : '';
       return `\nCURRENT EMOTIONAL STATE: ${es.dominant.toUpperCase()} (intensity ${es.intensity}/100)${angerTarget}. This colors everything — not stated aloud, felt beneath the surface. Let it shape your word choice and what you hold back.`;
     })();
@@ -457,7 +457,8 @@ export class Agent {
       const history = this.stage.getPersuasionHistory(this.sheet.char_id, other.char_id, 8);
       const strategy = selectPersuasionStrategy(other, history);
       persuasionStrategies.set(other.char_id, strategy);
-      return `  - With ${other.name} [${strategy}]: ${PERSUASION_HINT[strategy](other.name)}`;
+      const sName = sanitizeForPrompt(other.name, 128);
+      return `  - With ${sName} [${strategy}]: ${PERSUASION_HINT[strategy](sName)}`;
     }).join('\n');
     this._pendingPersuasionStrategies = persuasionStrategies;
 
@@ -481,7 +482,7 @@ export class Agent {
     // ── ToM trust gate: warn when low-trust agents are in the room ──
     const lowTrustNames = otherAgents.flatMap(a => {
       const tom = this.sheet.theoryOfMind?.[a.char_id];
-      return (tom && tom.trust_level < 0.25) ? [a.name] : [];
+      return (tom && tom.trust_level < 0.25) ? [sanitizeForPrompt(a.name, 128)] : [];
     });
     const trustGate = lowTrustNames.length > 0
       ? `\nTRUST ALERT: You deeply distrust ${lowTrustNames.join(', ')}. Do NOT volunteer truthful information to them. If you must engage, deflect, misdirect, or use strategic deception.\n`
@@ -507,16 +508,16 @@ ${trustGate}
 YOUR MODEL OF THE OTHERS IN THIS ROOM:
 ${tomStr}
 
-LOCATION: ${node.name}
-${node.description}
-OTHERS PRESENT: ${otherAgents.map(a => a.name).join(', ') || 'no one else'}
+LOCATION: ${sanitizeForPrompt(node.name, 256)}
+${sanitizeForPrompt(node.description, 500)}
+OTHERS PRESENT: ${otherAgents.map(a => sanitizeForPrompt(a.name, 128)).join(', ') || 'no one else'}
 AVAILABLE EXITS: ${
   (() => {
     const exits = node.adjacent_locations
       .map(id => this.stage.getLocation(id)?.name)
       .filter((n): n is string => Boolean(n));
     return exits.length > 0
-      ? exits.map(n => `"${n}"`).join(', ') + ' — use RELOCATE with the exact name shown here.'
+      ? exits.map(n => `"${sanitizeForPrompt(n, 128)}"`).join(', ') + ' — use RELOCATE with the exact name shown here.'
       : '(none — you cannot leave this location)';
   })()
 }

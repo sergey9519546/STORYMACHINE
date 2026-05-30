@@ -629,7 +629,7 @@ async function startServer() {
   // ── Scene grouping endpoint ──────────────────────────────────────────────────
   // Groups the action log into scenes: contiguous blocks of actions sharing the
   // same location_id. Useful for screenplay structure analysis and export.
-  app.get('/api/scenes', asyncHandler(async (req, res) => {
+  app.get('/api/scenes', gameLimiter, asyncHandler(async (req, res) => {
     const { stage } = getOrCreateSession(sessionId(req));
     const log = stage.getFullLedger();
 

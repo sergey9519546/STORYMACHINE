@@ -8,7 +8,9 @@ import { AppraisalEngine } from './AppraisalEngine.ts';
 import { logger } from '../lib/logger.ts';
 // Wave 32 — Action↔StoryOp Bridge: unify the live sim with the canon ledger.
 import { buildTurnCommit } from '../nvm/bridge/action-to-ops.ts';
-import { buildNarrativeState } from '../nvm/state/NarrativeState.ts';
+import { buildNarrativeState, emptyState } from '../nvm/state/NarrativeState.ts';
+import type { NarrativeState } from '../nvm/state/NarrativeState.ts';
+import { applyStoryOps } from '../nvm/ops/dispatcher.ts';
 
 // Events streamed to clients via SSE during a runRoomSimulation call.
 export type RoomProgressEvent =
@@ -26,6 +28,9 @@ export class Orchestrator {
   private locationMap: Map<string, Location> = new Map();
   // Wave 32: tracks the most-recent StoryCommit ID so parent chains are correct.
   private _lastCommitId: string | null = null;
+  // Wave 43: running NarrativeState accumulated from committed ops so the proof
+  // gate sees prior facts/clocks/relationships, not just the current IR's ops.
+  private _narrativeState: NarrativeState = emptyState();
 
   constructor(stage: Stage) {
     this.stage = stage;
@@ -45,6 +50,11 @@ export class Orchestrator {
     const existingCommits = this.stage.getCommits();
     if (existingCommits.length > 0) {
       this._lastCommitId = existingCommits[existingCommits.length - 1].commitId;
+    }
+    // Wave 43: fold existing commits into _narrativeState so the proof gate
+    // sees prior facts/clocks/relationships on every subsequent turn.
+    for (const c of existingCommits) {
+      this._narrativeState = applyStoryOps(this._narrativeState, c.ops);
     }
   }
 
@@ -170,7 +180,19 @@ export class Orchestrator {
     // ── Wave 32: bridge action → StoryOp[] → StoryCommit (canon ledger) ────────
     // Snapshot the narrative state BEFORE the commit so the proof kernel can
     // verify preconditions against the pre-turn world.
-    const beforeState = buildNarrativeState(this.stage);
+    // Wave 43: use running _narrativeState (accumulated ops) so prior facts/
+    // clocks/relationships are visible to the proof gate (not just DB beliefs).
+    const beforeState: NarrativeState = {
+      ...this._narrativeState,
+      ...(() => {
+        const db = buildNarrativeState(this.stage);
+        return {
+          characterBeliefs:  { ...this._narrativeState.characterBeliefs,  ...db.characterBeliefs },
+          characterEmotions: { ...this._narrativeState.characterEmotions, ...db.characterEmotions },
+        };
+      })(),
+      turn: this.stage.getTurnCount(),
+    };
     const card = action.action_type !== 'WAIT'
       ? (this.stage.getEventCard(action_id) ?? null)
       : null;
@@ -187,6 +209,8 @@ export class Orchestrator {
     if (commit) {
       this.stage.appendCommit(commit);
       this._lastCommitId = commit.commitId;
+      // Wave 43: advance running state so next turn sees this commit's ops.
+      this._narrativeState = applyStoryOps(this._narrativeState, commit.ops);
     }
 
     return action;
@@ -354,7 +378,17 @@ export class Orchestrator {
         const lastEntry = this.stage.getActionById(lastActionId);
         if (lastEntry) {
           const roundCard = this.stage.getEventCard(lastActionId) ?? null;
-          const beforeStateRoom = buildNarrativeState(this.stage);
+          const beforeStateRoom: NarrativeState = {
+            ...this._narrativeState,
+            ...(() => {
+              const db = buildNarrativeState(this.stage);
+              return {
+                characterBeliefs:  { ...this._narrativeState.characterBeliefs,  ...db.characterBeliefs },
+                characterEmotions: { ...this._narrativeState.characterEmotions, ...db.characterEmotions },
+              };
+            })(),
+            turn: this.stage.getTurnCount(),
+          };
           const [primaryUp, ...extraUps] = epistemicUpdates;
           if (primaryUp) {
             const roundCommit = buildTurnCommit({
@@ -370,6 +404,8 @@ export class Orchestrator {
             if (roundCommit) {
               this.stage.appendCommit(roundCommit);
               this._lastCommitId = roundCommit.commitId;
+              // Wave 43: advance running state so next round sees this commit.
+              this._narrativeState = applyStoryOps(this._narrativeState, roundCommit.ops);
             }
           }
         }
