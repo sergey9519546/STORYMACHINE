@@ -304,12 +304,17 @@ export class Agent {
       });
     }
     const VALID_ACTIONS = new Set<string>(ACTION_TYPES);
+    // goal_score is LLM-parsed. A non-finite value breaks the reduce: NaN > x is
+    // always false, so a NaN-scored seed candidate would win every comparison
+    // and freeze selection. Coerce to a finite score before ranking.
+    const finiteGoalScore = (n: number | undefined): number =>
+      (typeof n === 'number' && isFinite(n) ? n : 0);
     const best = (raw.candidates ?? []).reduce<Candidate>(
       (top, c) => {
         const cType = VALID_ACTIONS.has(c.action_type) ? c.action_type as ActionType : 'SPEAK';
         const tType = VALID_ACTIONS.has(top.action_type) ? top.action_type as ActionType : 'SPEAK';
-        const cScore = effectiveScore(c.goal_score ?? 0, cType, dt, bf, activeDefense, attachStyle);
-        const tScore = effectiveScore(top.goal_score ?? 0, tType, dt, bf, activeDefense, attachStyle);
+        const cScore = effectiveScore(finiteGoalScore(c.goal_score), cType, dt, bf, activeDefense, attachStyle);
+        const tScore = effectiveScore(finiteGoalScore(top.goal_score), tType, dt, bf, activeDefense, attachStyle);
         return cScore > tScore ? c : top;
       },
       (raw.candidates ?? [])[0] ?? { action_type: 'SPEAK', content: '', target: null },
