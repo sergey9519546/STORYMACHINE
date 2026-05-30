@@ -44,10 +44,10 @@ export function parseFountain(text: string): FountainBlock[] {
     if (trimmed.startsWith('/*')) {
       inBoneyard = true;
     }
-    
+
     if (inBoneyard) {
       blocks.push({ id: `block-${i}`, type: 'boneyard', text: line });
-      if (trimmed.endsWith('*/')) {
+      if (trimmed.includes('*/') && !(trimmed.startsWith('/*') && !trimmed.includes('*/'))) {
         inBoneyard = false;
       }
       continue;
@@ -68,7 +68,7 @@ export function parseFountain(text: string): FountainBlock[] {
       type = 'lyrics';
     } else if (trimmed.startsWith('>') && trimmed.endsWith('<')) {
       type = 'centered';
-    } else if (trimmed.match(/^[A-Z][A-Z0-9 \t]+(\(V\.O\.\)|\(O\.S\.\))?$/) && i < lines.length - 1 && lines[i+1].trim() !== '') {
+    } else if (trimmed.match(/^[A-Z][A-Z0-9 \t'.#\-]*(\s*\(V\.O\.\)|\s*\(O\.S\.\)|\s*\(CONT'D\))?$/) && i < lines.length - 1 && lines[i+1].trim() !== '') {
       // Character names are all caps, not followed by empty line
       // Check if previous block was empty or it's the first line
       const prevBlock = blocks.length > 0 ? blocks[blocks.length - 1] : null;
@@ -111,6 +111,12 @@ export function parseFountain(text: string): FountainBlock[] {
       text: line,
       lintErrors: lintErrors.length > 0 ? lintErrors : undefined
     });
+  }
+
+  // Warn about unclosed boneyard — remaining lines were already pushed as boneyard blocks
+  // but future authors should know the comment was never closed.
+  if (inBoneyard) {
+    blocks.push({ id: `block-eof-boneyard`, type: 'boneyard', text: '/* UNCLOSED BONEYARD COMMENT */' });
   }
 
   return blocks;

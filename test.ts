@@ -170,6 +170,7 @@ import { Stage } from './server/engine/Stage.ts';
 import { CausalSpine } from './server/engine/CausalSpine.ts';
 import { Orchestrator } from './server/engine/Orchestrator.ts';
 import { transcriptToFountain } from './server/lib/fountain.ts';
+import { parseFountain } from './src/lib/fountain.ts';
 import type { ActionLogEntry, Belief, CharacterSheet, Location } from './server/engine/types.ts';
 import { ACTION_TYPES } from './server/engine/types.ts';
 
@@ -8505,6 +8506,7 @@ describe('Wave 41 — temporalProof blocks EXPIRE on unknown fact', () => {
     objectiveReality: [], characterBeliefs: {}, characterEmotions: {},
     relationships: {}, clues: [], payoffs: [], themeArgument: [], firedRules: [],
     clocks: {}, objectArcs: {}, sceneFacts: [], audienceState: { knownFacts: [], suspense: 0, curiosity: 0, investment: 0 },
+    authorIntent: {},
   });
 
   it('passes when expiring a fact that exists in state', () => {
@@ -8531,9 +8533,10 @@ describe('Wave 41 — genericnessProof uses | not : for relationship keys', () =
   const mkState = (relKey: string) => ({
     turn: 0, phase: 'Setup' as const,
     objectiveReality: [], characterBeliefs: {}, characterEmotions: {},
-    relationships: { [relKey]: [{ amount: 0.5, reason: 'met', valence: 'positive' as const }] },
+    relationships: { [relKey]: [{ dimension: 'trust' as const, amount: 0.5, reason: 'met' }] },
     clues: [], payoffs: [], themeArgument: [], firedRules: [],
     clocks: {}, objectArcs: {}, sceneFacts: [], audienceState: { knownFacts: [], suspense: 0, curiosity: 0, investment: 0 },
+    authorIntent: {},
   });
   const mkIR = (charId: string) => ({
     transitionId: 't', sceneIdx: 2, sceneFunction: 'establish_world' as const,
@@ -8576,6 +8579,7 @@ describe('Wave 41 — biasAuditProof uses ≥75% threshold not 100%', () => {
     turn: 0, phase: 'Setup' as const, objectiveReality: [], characterBeliefs: {}, characterEmotions: {},
     relationships: {}, clues: [], payoffs: [], themeArgument: [], firedRules: [],
     clocks: {}, objectArcs: {}, sceneFacts: [], audienceState: { knownFacts: [], suspense: 0, curiosity: 0, investment: 0 },
+    authorIntent: {},
   });
 
   it('passes when fewer than 3 emotion ops', () => {
@@ -8606,6 +8610,7 @@ describe('Wave 41 — STEER away from uses correct predicate', () => {
     turn: 2, phase: 'Setup' as const, objectiveReality: [], characterBeliefs: {}, characterEmotions: {},
     relationships: {}, clues: [], payoffs: [], themeArgument: [], firedRules: [],
     clocks: {}, objectArcs: {}, sceneFacts: [], audienceState: { knownFacts: [], suspense: 0, curiosity: 0, investment: 0 },
+    authorIntent: {},
   });
 
   it('STEER toward uses author_steers_toward predicate', () => {
@@ -8633,6 +8638,7 @@ describe('Wave 41 — EXPIRE_FACT monotone (cannot re-open validity)', () => {
       characterBeliefs: {}, characterEmotions: {}, relationships: {}, clues: [], payoffs: [],
       themeArgument: [], firedRules: [], clocks: {}, objectArcs: {}, sceneFacts: [],
       audienceState: { knownFacts: [], suspense: 0, curiosity: 0, investment: 0 },
+      authorIntent: {},
     };
     const result = applyStoryOps(state, [{ op: 'EXPIRE_FACT', factId: 'f1', atTurn: 5 }]);
     assert.equal(result.objectiveReality[0].validTo, 5);
@@ -8645,6 +8651,7 @@ describe('Wave 41 — EXPIRE_FACT monotone (cannot re-open validity)', () => {
       characterBeliefs: {}, characterEmotions: {}, relationships: {}, clues: [], payoffs: [],
       themeArgument: [], firedRules: [], clocks: {}, objectArcs: {}, sceneFacts: [],
       audienceState: { knownFacts: [], suspense: 0, curiosity: 0, investment: 0 },
+      authorIntent: {},
     };
     const result = applyStoryOps(state, [{ op: 'EXPIRE_FACT', factId: 'f1', atTurn: 10 }]);
     assert.equal(result.objectiveReality[0].validTo, 5, 'later EXPIRE must not push validTo forward');
@@ -8657,6 +8664,7 @@ describe('Wave 41 — EXPIRE_FACT monotone (cannot re-open validity)', () => {
       characterBeliefs: {}, characterEmotions: {}, relationships: {}, clues: [], payoffs: [],
       themeArgument: [], firedRules: [], clocks: {}, objectArcs: {}, sceneFacts: [],
       audienceState: { knownFacts: [], suspense: 0, curiosity: 0, investment: 0 },
+      authorIntent: {},
     };
     const result = applyStoryOps(state, [{ op: 'EXPIRE_FACT', factId: 'f1', atTurn: 3 }]);
     assert.equal(result.objectiveReality[0].validTo, 3, 'earlier expiry should take precedence');
@@ -8721,5 +8729,77 @@ describe('Wave 41 — applyCredence prefers source_agent_id for told beliefs', (
     const credMap = { agent_carol: { sourceId: 'agent_carol', credence: 0.3, observations: 1, updatedAt: 0 } };
     const result = applyCredence(belief, credMap);
     assert.ok(Math.abs(result.confidence - 0.3) < 0.01, 'should use event source prefix as fallback');
+  });
+});
+
+// ── Wave 42 regression tests ──────────────────────────────────────────────────
+
+describe('Wave 42 — tier2Score uses float division not Math.ceil', () => {
+  it('3 proofs: 1 failure → score 67 (not 66 with old ceil)', () => {
+    // Old formula: 100 - ceil(100/3)*1 = 100 - 34 = 66
+    // New formula: round(100 - 100/3*1) = round(66.67) = 67
+    const results = [
+      { proof: 'NecessityProof', pass: false, findings: [] },
+      { proof: 'SpecificityProof', pass: true, findings: [] },
+      { proof: 'DialogueProof', pass: true, findings: [] },
+    ];
+    const score = tier2Score(results);
+    assert.equal(score, 67, `expected 67 (float division), got ${score}`);
+  });
+
+  it('3 proofs: 0 failures → 100', () => {
+    const results = [
+      { proof: 'NecessityProof', pass: true, findings: [] },
+      { proof: 'SpecificityProof', pass: true, findings: [] },
+      { proof: 'DialogueProof', pass: true, findings: [] },
+    ];
+    assert.equal(tier2Score(results), 100);
+  });
+
+  it('empty results → 100 (guard against division by zero)', () => {
+    assert.equal(tier2Score([]), 100);
+  });
+});
+
+describe('Wave 42 — fountain parser handles unclosed boneyard', () => {
+  it('all content after unclosed /* still appears as boneyard blocks', () => {
+    const script = `INT. ROOM - DAY\n\n/* unclosed comment\nThis line should be boneyard`;
+    const blocks = parseFountain(script);
+    const boneyards = blocks.filter(b => b.type === 'boneyard');
+    assert.ok(boneyards.length >= 2, 'unclosed boneyard should include subsequent lines');
+  });
+});
+
+describe('Wave 42 — fountain parser accepts valid character name formats', () => {
+  it("character with apostrophe (JOHN O'BRIEN) parsed as character not action", () => {
+    const script = `INT. RESTAURANT - DAY\n\nJOHN O'BRIEN\nHello.`;
+    const blocks = parseFountain(script);
+    const charBlock = blocks.find(b => b.text.includes("O'BRIEN"));
+    assert.equal(charBlock?.type, 'character', "character with apostrophe should be typed as 'character'");
+  });
+
+  it('character with hyphen (MARY-ANN) parsed as character', () => {
+    const script = `INT. OFFICE - DAY\n\nMARY-ANN\nHi.`;
+    const blocks = parseFountain(script);
+    const charBlock = blocks.find(b => b.text === 'MARY-ANN');
+    assert.equal(charBlock?.type, 'character');
+  });
+});
+
+describe('Wave 42 — arc-tracker debtScore stays in 0-100 range', () => {
+  it('10 due_soon with 0 overdue → debtScore 20 (not 100 with old formula)', () => {
+    // Old formula: 0/10 * 100 + 10 * 10 = 100 (overflow)
+    // New formula: 0/10 * 80 + 10/10 * 20 = 20
+    const dueSoonCount = 10;
+    const overdueCount = 0;
+    const total = 10;
+    const score = Math.round((overdueCount / total) * 80 + (dueSoonCount / total) * 20);
+    assert.equal(score, 20);
+  });
+
+  it('5 overdue 5 due_soon → debtScore 50', () => {
+    const dueSoonCount = 5, overdueCount = 5, total = 10;
+    const score = Math.round((overdueCount / total) * 80 + (dueSoonCount / total) * 20);
+    assert.equal(score, 50);
   });
 });

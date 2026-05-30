@@ -330,6 +330,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   };
 
   const handleRunRoom = async (nodeId: string) => {
+    if (loading) return;  // prevent double-click from spawning concurrent SSE streams
     evtSourceRef.current?.close();
     setLoading(true);
     setStreamLog([]);
@@ -772,9 +773,9 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                             <span className={`text-[9px] px-1.5 py-0.5 font-bold uppercase ${EMOTION_COLOR[agent.emotionState.dominant]}`}>
                               {agent.emotionState.dominant} {agent.emotionState.intensity}/100
                             </span>
-                            {agent.emotionState.anger_target_id && (
+                            {agent.emotionState?.anger_target_id && (
                               <span className="text-[9px] text-[#FF4444] font-bold uppercase">
-                                → {agents.find(a => a.char_id === agent.emotionState!.anger_target_id)?.name ?? '?'}
+                                → {agents.find(a => a.char_id === agent.emotionState?.anger_target_id)?.name ?? '?'}
                               </span>
                             )}
                             {/* mini emotion bars */}

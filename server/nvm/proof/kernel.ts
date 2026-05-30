@@ -54,10 +54,12 @@ export function runTier2(ir: NarrativeTransitionIR, state: NarrativeState): Proo
   ];
 }
 
-// Summarize Tier 2 as a 0–100 score: 100 when all pass; deduct 33 per failure.
+// Summarize Tier 2 as a 0–100 score: 100 when all pass; deduct equal weight per failure.
+// Using float division (not Math.ceil) so each of N proofs contributes exactly 100/N points.
 export function tier2Score(results: ProofResult[]): number {
+  if (results.length === 0) return 100;
   const failures = results.filter(r => !r.pass).length;
-  return Math.max(0, 100 - failures * Math.ceil(100 / results.length));
+  return Math.max(0, Math.round(100 - failures * (100 / results.length)));
 }
 
 // Tier 3 ranking-signal proofs — do not block or flag; only influence candidate

@@ -145,15 +145,21 @@ export function dialogueWarnings(ir: NarrativeTransitionIR, state: NarrativeStat
       }
     }
 
-    // DV3: Unmotivated emotion — no prior belief/fact change in same IR
+    // DV3: Unmotivated emotion — no prior belief/fact change in same IR.
+    // Only fires when BOTH: (a) no causal op precedes in this IR AND (b) the character
+    // has no prior beliefs AND the world has no facts. A character can be emotionally
+    // motivated by their existing beliefs or the pre-existing world state; checking
+    // objectiveReality alone was too strict and produced false positives.
     if (op.op === 'APPRAISE_EMOTION') {
       const priorCausal = ir.ops.slice(0, i).some(
         p => p.op === 'UPDATE_BELIEF' || p.op === 'ADD_FACT' || p.op === 'SHIFT_RELATIONSHIP',
       );
-      if (!priorCausal && state.objectiveReality.length === 0) {
+      const charBeliefs = state.characterBeliefs[op.charId] ?? [];
+      const noStateGrounding = state.objectiveReality.length === 0 && charBeliefs.length === 0;
+      if (!priorCausal && noStateGrounding) {
         warnings.push({
           engine: 'dialogue_validator', opIdx: i, rule: 'DV3_UNMOTIVATED_EMOTION',
-          message: `APPRAISE_EMOTION for ${op.charId} has no causal predecessor in this IR or state`,
+          message: `APPRAISE_EMOTION for ${op.charId} has no causal predecessor in this IR or prior state`,
           penalty: 25,
         });
       }

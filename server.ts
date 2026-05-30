@@ -563,6 +563,7 @@ async function startServer() {
 
     let disconnected = false;
     req.on('close', () => { disconnected = true; });
+    req.on('error', () => { disconnected = true; });
 
     const emit = (event: RoomProgressEvent) => {
       if (!disconnected) res.write(`data: ${JSON.stringify(event)}\n\n`);
@@ -580,10 +581,12 @@ async function startServer() {
 
     // C3: Single-flag guard ensures res.end() is called exactly once even when
     // the early-return paths or the error handler both want to close the stream.
+    // Calling res.end() when the client already disconnected is safe — Node.js
+    // ignores writes to a destroyed socket, so we always call it to release
+    // the server-side file descriptor regardless of disconnected state.
     let ended = false;
     const ensureEnded = () => {
-      if (!ended && !disconnected) { ended = true; res.end(); }
-      else if (!ended) { ended = true; }
+      if (!ended) { ended = true; res.end(); }
     };
 
     let lockKey = '';
@@ -1263,14 +1266,12 @@ OUTPUT: Generate the Scene Heading and Action lines.`,
       profiles = (rawProfiles as unknown[]).slice(0, 20).map((p) => {
         if (typeof p !== 'object' || p === null) return { name: '', ghost: '', lie: '', want: '', need: '' };
         const prof = p as Record<string, unknown>;
-        const sanitize = (v: unknown, max = 1000) =>
-          typeof v === 'string' ? v.substring(0, max) : '';
         return {
-          name:  sanitize(prof.name, 256),
-          ghost: sanitize(prof.ghost),
-          lie:   sanitize(prof.lie),
-          want:  sanitize(prof.want),
-          need:  sanitize(prof.need),
+          name:  sanitizeForPrompt(typeof prof.name  === 'string' ? prof.name  : '', 256),
+          ghost: sanitizeForPrompt(typeof prof.ghost === 'string' ? prof.ghost : '', 1000),
+          lie:   sanitizeForPrompt(typeof prof.lie   === 'string' ? prof.lie   : '', 1000),
+          want:  sanitizeForPrompt(typeof prof.want  === 'string' ? prof.want  : '', 1000),
+          need:  sanitizeForPrompt(typeof prof.need  === 'string' ? prof.need  : '', 1000),
         };
       });
     }
@@ -1385,7 +1386,7 @@ OUTPUT: A visceral character description.`,
     const activeCodexEntries = Array.isArray(engineState?.directorState?.activeCodexEntries)
       ? (engineState.directorState.activeCodexEntries as Array<Record<string, string>>).slice(0, 5) : [];
     const codexBlock = activeCodexEntries.length > 0
-      ? `\n\nRAG MEMORY (active codex — ensure scene is consistent with these facts):\n${activeCodexEntries.map(e => `- [${e.title ?? ''}]: ${e.content ?? ''}`).join('\n')}`
+      ? `\n\nRAG MEMORY (active codex — ensure scene is consistent with these facts):\n${activeCodexEntries.map(e => `- [${sanitizeForPrompt(e.title ?? '', 256)}]: ${sanitizeForPrompt(e.content ?? '', 500)}`).join('\n')}`
       : '';
 
     // ── Information Position bias from previous scene ──
@@ -1398,7 +1399,7 @@ OUTPUT: A visceral character description.`,
     // ── Throughline context ──
     const tl = engineState?.directorState?.throughlines as Record<string, unknown> | undefined;
     const activeTl = Array.isArray(tl?.activeThroughlines) && tl.activeThroughlines.length > 0
-      ? `\nACTIVE THROUGHLINES: ${(tl.activeThroughlines as string[]).join(', ')}. Objective: "${tl.objectiveStory ?? ''}". Relationship: "${tl.relationshipStory ?? ''}".`
+      ? `\nACTIVE THROUGHLINES: ${(tl.activeThroughlines as string[]).map(t => sanitizeForPrompt(t, 128)).join(', ')}. Objective: "${sanitizeForPrompt(String(tl.objectiveStory ?? ''), 512)}". Relationship: "${sanitizeForPrompt(String(tl.relationshipStory ?? ''), 512)}".`
       : '';
 
     // ── Story architecture config — injected so AI analysis is structure-aware ──
@@ -1461,8 +1462,14 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
       ? analysisData.sceneAnalysis.audioDialogue : '';
 
     const [imageUrl, audioResult] = await Promise.all([
-      getImageProvider().generate(imagePromptText),
-      getTTSProvider().speak(audioText),
+      getImageProvider().generate(imagePromptText).catch((e: Error) => {
+        logger.warn('image_generation_failed', { error: e.message });
+        return undefined;
+      }),
+      getTTSProvider().speak(audioText).catch((e: Error) => {
+        logger.warn('tts_generation_failed', { error: e.message });
+        return undefined;
+      }),
     ]);
     const audioUrl = audioResult?.dataUrl;
 
@@ -1951,8 +1958,11 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     if (!runA || !runB) {
       res.status(404).json({ error: `Run(s) not found: ${!runA ? runIdA : ''} ${!runB ? runIdB : ''}`.trim() }); return;
     }
-    const genomeA = JSON.parse(runA.genome_json);
-    const genomeB = JSON.parse(runB.genome_json);
+    const genomeA = safeJsonParse(runA.genome_json, null);
+    const genomeB = safeJsonParse(runB.genome_json, null);
+    if (!genomeA || !genomeB) {
+      res.status(422).json({ error: 'One or both genome records contain invalid JSON' }); return;
+    }
     const diff = diffGenomes(genomeA, genomeB);
     res.json({ diff, genomeA, genomeB });
   }));
@@ -1972,8 +1982,11 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     if (!runA || !runB) {
       res.status(404).json({ error: 'Run(s) not found' }); return;
     }
-    const genomeA = JSON.parse(runA.genome_json);
-    const genomeB = JSON.parse(runB.genome_json);
+    const genomeA = safeJsonParse(runA.genome_json, null);
+    const genomeB = safeJsonParse(runB.genome_json, null);
+    if (!genomeA || !genomeB) {
+      res.status(422).json({ error: 'One or both genome records contain invalid JSON' }); return;
+    }
     const bred = breedGenomes(genomeA, genomeB, typeof newId === 'string' ? newId : `bred-${Date.now()}`);
     res.json(bred);
   }));
@@ -3032,10 +3045,11 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
       if (!disconnected && !ended) res.write(`data: ${JSON.stringify(data)}\n\n`);
     };
     const ensureEnded = () => {
-      if (!ended) { ended = true; if (!disconnected) res.end(); }
+      if (!ended) { ended = true; res.end(); }
     };
 
-    const { title = 'UNTITLED' } = req.query as { title?: string };
+    const rawTitle = req.query?.title;
+    const title = typeof rawTitle === 'string' ? sanitizeForPrompt(rawTitle, 256) : 'UNTITLED';
     try {
       const { stage } = getOrCreateSession(sessionId(req));
       const { buildScreenplayMemory } = await import('./server/nvm/screenplay/memory.ts');

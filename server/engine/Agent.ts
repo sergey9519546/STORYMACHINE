@@ -194,6 +194,9 @@ export class Agent {
   private _reflectionInFlight = false;
   // Persuasion strategies computed in buildEnhancedPrompt; written to DB in takeTurn.
   private _pendingPersuasionStrategies = new Map<string, string>();
+  // Circuit breaker: cap consecutive replan attempts so a perpetually-blocked
+  // goal stack cannot cause an infinite replanning loop.
+  private _replanAttempts = 0;
 
   constructor(sheet: CharacterSheet, stage: Stage) {
     this.sheet = sheet;
@@ -945,7 +948,26 @@ Based on what you just witnessed:
       const latestGs = this.sheet.goalStack;
       const trigId = observableActions[observableActions.length - 1]?.action_id ?? 'epistemic_update';
       if (latestGs && getReadyGoals(latestGs).length === 0 && latestGs.instrumental.some(g => !g.achieved)) {
-        await this.replanGoals(trigId);
+        if (this._replanAttempts < 3) {
+          this._replanAttempts++;
+          await this.replanGoals(trigId);
+        } else {
+          // After 3 failed replans, mark all active goals achieved to break the deadlock.
+          // This prevents an infinite replanning loop when the LLM keeps producing
+          // goals that also deadlock. The terminal goal remains unachieved (correct).
+          this.refreshSheet();
+          const gsNow = this.sheet.goalStack;
+          if (gsNow) {
+            this.stage.updateGoalStack(this.sheet.char_id, {
+              ...gsNow,
+              instrumental: gsNow.instrumental.map(g => ({ ...g, achieved: true })),
+            });
+          }
+          this._replanAttempts = 0;
+          logger.warn('goal_deadlock_force_clear', { agent: this.sheet.name });
+        }
+      } else {
+        this._replanAttempts = 0;  // reset counter when goals are not blocked
       }
     }
 
@@ -1017,6 +1039,11 @@ Based on what you just witnessed:
       logger.warn('agent_parse_fallback', { agent: this.sheet.name, method: 'synthesizeReflections', preview: reflRaw.substring(0, 120) });
     }
 
+    // Refresh sheet here: the LLM call above is async and may have taken seconds.
+    // Another updateEpistemics could have written new beliefs to the DB during that
+    // time. Re-reading ensures we merge reflection beliefs onto the current set, not
+    // the stale snapshot captured before the await.
+    this.refreshSheet();
     const existingBeliefsFull = this.sheet.beliefs ?? [];
     const existingProps = new Set(existingBeliefsFull.map(b => b.proposition.toLowerCase()));
 

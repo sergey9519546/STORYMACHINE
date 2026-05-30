@@ -67,7 +67,7 @@ export async function rewritePass(input: RewriteInput): Promise<RewriteResult> {
       config: { temperature: 0.4, maxOutputTokens: 8192 },
     });
     const text = response.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-    if (text.trim().length > fountain.length * 0.3) {
+    if (text.trim().length >= fountain.length * 0.8) {
       return { revised: text.trim(), usedLLM: true };
     }
   } catch {

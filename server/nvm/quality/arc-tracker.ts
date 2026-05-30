@@ -220,9 +220,15 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
   openPromises.sort((a, b) => urgencyOrder[a.urgency] - urgencyOrder[b.urgency] || a.pacingScore - b.pacingScore);
 
   const overdueCount = openPromises.filter(p => p.urgency === 'overdue').length;
+  const dueSoonCount = openPromises.filter(p => p.urgency === 'due_soon').length;
+  // Normalized 0–100: overdue weighted 80%, due_soon weighted 20%.
+  // Both terms are proportions (count/total) so the result stays in [0, 100].
   const debtScore = openPromises.length === 0
     ? 0
-    : Math.round((overdueCount / openPromises.length) * 100 + openPromises.filter(p => p.urgency === 'due_soon').length * 10);
+    : Math.round(
+        (overdueCount / openPromises.length) * 80 +
+        (dueSoonCount  / openPromises.length) * 20,
+      );
 
   return { totalScenes, openPromises, resolvedCount, overdueCount, debtScore: Math.min(100, debtScore) };
 }

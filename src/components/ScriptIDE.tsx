@@ -833,10 +833,10 @@ export default function ScriptIDE({
   const confirmSnapshot = () => {
     if (snapshotModal.name.trim()) {
       const newSnapshot = {
-        id: Date.now().toString(),
+        id: crypto.randomUUID(),
         name: snapshotModal.name.trim(),
         text: scriptText,
-        date: new Date().toLocaleString(),
+        date: new Date().toLocaleString('en-US'),
       };
       setSnapshots([newSnapshot, ...snapshots].slice(0, 20));
     }

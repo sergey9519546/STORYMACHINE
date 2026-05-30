@@ -96,7 +96,7 @@ export async function convergeScene(
   const effectiveQualityTarget = target.qualityTarget ?? 60;
 
   let best: NarrativeTransitionIR | null = null;
-  let bestComposite = -1;
+  let bestComposite = -Infinity;
   let currentFailures: ProofResult[] = [];
   let currentQualityWarnings: import('../quality/index.ts').QualityWarning[] = [];
   let lastCandidates: NarrativeTransitionIR[] = [];
@@ -128,6 +128,7 @@ export async function convergeScene(
     // G2→G1: Writers' Room drives mutation operator selection after iteration 0.
     // G13→G1: Director Policy (from corpus) biases operator when room has no consensus.
     let roomResult: WritersRoomResult | null = null;
+    let iterOperator: MutationOperator | undefined;
     if (best && iter > 0) {
       roomResult = runWritersRoom(best, state);
       let op: MutationOperator;
@@ -145,6 +146,7 @@ export async function convergeScene(
       } else {
         op = ALL_OPERATORS[randInt(prng, ALL_OPERATORS.length)];
       }
+      iterOperator = op;
       const mutation = applyOperator(op, best, state, seed + iter);
       const fresh = await generate(spec, 1);
       llmCallCount += 1;
@@ -205,6 +207,7 @@ export async function convergeScene(
         qualityScore,
         compositeScore,
         tier3Rank: t3,
+        operator: iterOperator,
         ghostReason,
         writersRoomSummary: roomResult
           ? `dominant=${roomResult.dominantCritic} op=${roomResult.suggestedOperator ?? 'none'} consensus=${roomResult.consensus}`
@@ -263,15 +266,17 @@ export async function convergeScene(
 
   // Budget exhausted — return best Tier-1-passing candidate found.
   // The fallback generate is guarded by the budget so it doesn't exceed maxLLMCalls.
-  let finalIR = best ?? lastCandidates[lastCandidates.length - 1];
+  // lastCandidates[-1] would be undefined when the array is empty, so guard the index.
+  let finalIR = best ?? (lastCandidates.length > 0 ? lastCandidates[lastCandidates.length - 1] : null);
   if (!finalIR && llmCallCount < llmCallLimit) {
     llmCallCount++;
     const fallback = await generate(buildGenerationSpec(state, target), 1);
-    finalIR = fallback[0];
+    finalIR = fallback[0] ?? null;
   }
-  // Last-resort: synthesise an empty pass-through IR using the last candidate as a base.
+  // Last-resort: synthesise a pass-through IR. Copy target.activeMechanisms so
+  // the MechanismProof doesn't immediately fail the fallback (empty list would fail).
   if (!finalIR) {
-    finalIR = lastCandidates[0] ?? { transitionId: 'fallback', sceneIdx: target.sceneIdx, sceneFunction: 'establish_world', activeMechanisms: [], beforeStateHash: '', ops: [], preconditions: [], postconditions: [], provenance: { origin: 'model_generated', createdAt: Date.now() } } as unknown as NarrativeTransitionIR;
+    finalIR = lastCandidates[0] ?? { transitionId: 'fallback', sceneIdx: target.sceneIdx, sceneFunction: 'establish_world', activeMechanisms: target.activeMechanisms ?? [], beforeStateHash: '', ops: [], preconditions: [], postconditions: [], provenance: { origin: 'model_generated', createdAt: Date.now() } } as unknown as NarrativeTransitionIR;
   }
   const finalLedger = deriveTensionLedger(applyStoryOps(state, finalIR.ops), target.sceneIdx);
   const finalQReport = runQualityEngine(finalIR, state);
@@ -283,7 +288,7 @@ export async function convergeScene(
     converged: false,
     finalValuation: finalLedger.totalTension,
     finalQuality: finalQReport.score,
-    finalComposite: bestComposite,
+    finalComposite: bestComposite === -Infinity ? 0 : bestComposite,
     ghosts,
   };
 }
