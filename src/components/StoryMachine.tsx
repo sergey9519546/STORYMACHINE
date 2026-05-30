@@ -137,8 +137,10 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
     try {
       const res = await fetch("/api/dramatic-pressure-all");
       if (res.ok && mountedRef.current) setActivePressures(await res.json() as Array<{ char_id: string; pressures: DramaticPressure[] }>);
-    } catch { /* non-critical background fetch */ }
-  }, []);
+    } catch (err) {
+      if (mountedRef.current) showError(`Dramatic pressure fetch failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }, [showError]);
 
   // Close any in-flight SSE connection and mark unmounted
   useEffect(() => () => {

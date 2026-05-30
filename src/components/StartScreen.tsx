@@ -43,6 +43,13 @@ export default function StartScreen({
   const ALLOWED_EXTS = /\.(txt|fountain|fdx|md|htm|html)$/i;
   const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB per file
 
+  const inferDropCategory = (filename: string): typeof uploadedFiles[number]['category'] => {
+    const ext = filename.toLowerCase().split('.').pop() ?? '';
+    if (ext === 'fountain' || ext === 'fdx') return 'Plot';
+    if (ext === 'json' || ext === 'csv') return 'Rules';
+    return 'Lore';
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
@@ -56,7 +63,7 @@ export default function StartScreen({
         if (typeof text === 'string') {
           setUploadedFiles(prev => [
             ...prev,
-            { name: file.name, content: text, size: file.size, category: 'Lore' as const },
+            { name: file.name, content: text, size: file.size, category: inferDropCategory(file.name) },
           ]);
         }
       };

@@ -10436,3 +10436,41 @@ describe('Wave 83 — quality-spec lost_permanently, topology resample guard, no
       'OBJECT constraint description should include lost_permanently terminal state');
   });
 });
+
+// ── Wave 84 ───────────────────────────────────────────────────────────────────
+describe('Wave 84 — file category inference (UI logic)', () => {
+  // These tests verify the category inference logic from React components as pure functions.
+
+  function inferDropCategory(filename: string): string {
+    const ext = filename.toLowerCase().split('.').pop() ?? '';
+    if (ext === 'fountain' || ext === 'fdx') return 'Plot';
+    if (ext === 'json' || ext === 'csv') return 'Rules';
+    return 'Lore';
+  }
+
+  it('infers Plot category for .fountain files', () => {
+    assert.equal(inferDropCategory('screenplay.fountain'), 'Plot');
+    assert.equal(inferDropCategory('SCRIPT.FDX'), 'Plot');
+  });
+
+  it('infers Rules category for .json and .csv files', () => {
+    assert.equal(inferDropCategory('rules.json'), 'Rules');
+    assert.equal(inferDropCategory('data.csv'), 'Rules');
+  });
+
+  it('defaults to Lore for .txt, .md, and unknown extensions', () => {
+    assert.equal(inferDropCategory('notes.txt'), 'Lore');
+    assert.equal(inferDropCategory('world.md'), 'Lore');
+    assert.equal(inferDropCategory('document.html'), 'Lore');
+    assert.equal(inferDropCategory('unknown.xyz'), 'Lore');
+  });
+
+  it('handles filenames with no extension', () => {
+    assert.equal(inferDropCategory('noextension'), 'Lore');
+  });
+
+  it('handles filenames with multiple dots', () => {
+    assert.equal(inferDropCategory('my.screenplay.fountain'), 'Plot');
+    assert.equal(inferDropCategory('data.export.csv'), 'Rules');
+  });
+});

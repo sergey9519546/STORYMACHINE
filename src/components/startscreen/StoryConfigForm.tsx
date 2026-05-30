@@ -41,13 +41,20 @@ export function StoryConfigForm({
 }: StoryConfigFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const inferCategory = (filename: string): FileCategory => {
+    const ext = filename.toLowerCase().split('.').pop() ?? '';
+    if (ext === 'fountain' || ext === 'fdx') return 'Plot';
+    if (ext === 'json' || ext === 'csv') return 'Rules';
+    return 'Lore';
+  };
+
   const processFiles = (files: File[]) => {
     files.forEach(file => {
       const reader = new FileReader();
       reader.onload = (event) => {
         const text = event.target?.result;
         if (typeof text === 'string') {
-          onUploadedFilesChange([...uploadedFiles, { name: file.name, content: text, size: file.size, category: 'Lore' }]);
+          onUploadedFilesChange([...uploadedFiles, { name: file.name, content: text, size: file.size, category: inferCategory(file.name) }]);
         }
       };
       reader.readAsText(file);
@@ -125,7 +132,7 @@ export function StoryConfigForm({
           </button>
           <input
             type="file"
-            accept=".txt,.md,.csv,.json"
+            accept=".txt,.md,.csv,.json,.fountain,.fdx,.htm,.html"
             multiple
             ref={fileInputRef}
             onChange={handleFileUpload}
