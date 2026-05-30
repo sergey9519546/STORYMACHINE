@@ -86,7 +86,7 @@ const renderHighlightedText = (text: string, blocks: FountainBlock[]) => {
       let className = "";
       if (block.type === "scene_heading")
         className = "font-bold text-blue-600 dark:text-blue-400";
-      if (block.type === "character")
+      if (block.type === "character" || block.type === "dual_dialogue")
         className = "font-bold text-purple-600 dark:text-purple-400";
       if (block.type === "parenthetical") className = "italic text-zinc-500";
       if (block.type === "dialogue")
