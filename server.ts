@@ -1732,7 +1732,8 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
     const state = buildNarrativeState(stage);
     const currentScene = typeof req.body?.currentScene === 'number' ? req.body.currentScene : state.turn;
     const result = backchain(fp, state, currentScene);
-    const biases = scheduleToGoalBiases(result, fp.description ?? `fixed point @ scene ${fp.atScene}`);
+    const { sanitizeForPrompt } = await import('./server/lib/prompt-utils.ts');
+    const biases = scheduleToGoalBiases(result, sanitizeForPrompt(fp.description ?? `fixed point @ scene ${fp.atScene}`, 1000));
     res.json({ ...result, biases });
   }));
 
@@ -1828,7 +1829,12 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
       directorPolicy = mineCorpus(fakeReport).policy;
     }
 
-    const budget = { ...(req.body?.budget ?? { maxIterations: 4, candidatesPerIteration: 2 }), directorPolicy };
+    const rawBudget = req.body?.budget ?? {};
+    const budget = {
+      maxIterations: Math.min(Number(rawBudget.maxIterations ?? 4), 10),
+      candidatesPerIteration: Math.min(Number(rawBudget.candidatesPerIteration ?? 2), 5),
+      directorPolicy,
+    };
     const result = await convergeScene(state, target, generate, budget, seed);
 
     // Persist any new ghost commits from convergence into Stage ghost ledger
@@ -2179,7 +2185,11 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
       directorPolicy = mineCorpus(fakeReport).policy;
     }
 
-    const baseBudget = req.body?.budget ?? { maxIterations: 3, candidatesPerIteration: 2 };
+    const rawBudgetArc = req.body?.budget ?? {};
+    const baseBudget = {
+      maxIterations: Math.min(Number(rawBudgetArc.maxIterations ?? 3), 10),
+      candidatesPerIteration: Math.min(Number(rawBudgetArc.candidatesPerIteration ?? 2), 5),
+    };
     const budget = { ...baseBudget, directorPolicy };
     const baseSeed = typeof req.body?.seed === 'number' ? req.body.seed : Date.now();
     const generate = makeLLMCandidateGenerator();

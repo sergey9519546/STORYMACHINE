@@ -35,29 +35,57 @@ function stubIR(spec: GenerationSpec, idx: number): NarrativeTransitionIR {
 
 function parseOp(raw: Record<string, unknown>): StoryOp | null {
   try {
-    const op = raw['op'] as string;
+    const opStr = raw['op'];
+    if (typeof opStr !== 'string') return null;
+    const op = opStr;
     const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
     switch (op) {
       case 'ADD_FACT': {
         const fact = raw['fact'];
-        if (!isObj(fact) || typeof fact['factId'] !== 'string' || typeof fact['subject'] !== 'string') return null;
-        return { op, fact: fact as unknown as StoryOp & { op: 'ADD_FACT' } extends { fact: infer F } ? F : never };
+        if (!isObj(fact)) return null;
+        // Validate all required AtomicFact fields
+        if (typeof fact['factId'] !== 'string' ||
+            typeof fact['subject'] !== 'string' ||
+            typeof fact['predicate'] !== 'string' ||
+            typeof fact['object'] !== 'string') return null;
+        const addedAtTurn = typeof fact['addedAtTurn'] === 'number' ? fact['addedAtTurn'] : 0;
+        const validFrom   = typeof fact['validFrom']   === 'number' ? fact['validFrom']   : 0;
+        const validTo     = fact['validTo'] === null ? null : (typeof fact['validTo'] === 'number' ? fact['validTo'] : null);
+        return { op: 'ADD_FACT', fact: {
+          factId: fact['factId'] as string, subject: fact['subject'] as string,
+          predicate: fact['predicate'] as string, object: fact['object'] as string,
+          addedAtTurn, validFrom, validTo,
+        }};
+      }
+      case 'EXPIRE_FACT': {
+        if (typeof raw['factId'] !== 'string') return null;
+        return { op: 'EXPIRE_FACT', factId: raw['factId'], atTurn: typeof raw['atTurn'] === 'number' ? raw['atTurn'] : 0 };
       }
       case 'UPDATE_BELIEF': {
         const belief = raw['belief'];
-        if (!isObj(belief) || typeof belief['proposition'] !== 'string') return null;
-        return { op, charId: raw['charId'] as string, belief: belief as unknown as StoryOp & { op: 'UPDATE_BELIEF' } extends { belief: infer B } ? B : never };
+        const charId = raw['charId'];
+        if (!isObj(belief) || typeof belief['proposition'] !== 'string' || typeof charId !== 'string') return null;
+        return { op: 'UPDATE_BELIEF', charId, belief: belief as unknown as StoryOp & { op: 'UPDATE_BELIEF' } extends { belief: infer B } ? B : never };
       }
       case 'APPRAISE_EMOTION': {
         const emotion = raw['emotion'];
-        if (!isObj(emotion)) return null;
-        return { op, charId: raw['charId'] as string, emotion: emotion as unknown as StoryOp & { op: 'APPRAISE_EMOTION' } extends { emotion: infer E } ? E : never };
+        const charId  = raw['charId'];
+        if (!isObj(emotion) || typeof charId !== 'string') return null;
+        return { op: 'APPRAISE_EMOTION', charId, emotion: emotion as unknown as StoryOp & { op: 'APPRAISE_EMOTION' } extends { emotion: infer E } ? E : never };
       }
       case 'SHIFT_RELATIONSHIP': {
         const pair = raw['pair'];
         if (!Array.isArray(pair) || pair.length < 2 || typeof pair[0] !== 'string' || typeof pair[1] !== 'string') return null;
         if (!isObj(raw['delta'])) return null;
-        return { op, pair: pair as [string, string], delta: raw['delta'] as unknown as StoryOp & { op: 'SHIFT_RELATIONSHIP' } extends { delta: infer D } ? D : never };
+        return { op: 'SHIFT_RELATIONSHIP', pair: pair as [string, string], delta: raw['delta'] as unknown as StoryOp & { op: 'SHIFT_RELATIONSHIP' } extends { delta: infer D } ? D : never };
+      }
+      case 'ADVANCE_OBJECT_ARC': {
+        if (typeof raw['objectId'] !== 'string' || typeof raw['toState'] !== 'string') return null;
+        return { op: 'ADVANCE_OBJECT_ARC', objectId: raw['objectId'], toState: raw['toState'] };
+      }
+      case 'TRIGGER_RULE': {
+        if (typeof raw['mechanismId'] !== 'string' || typeof raw['ruleId'] !== 'string') return null;
+        return { op: 'TRIGGER_RULE', mechanismId: raw['mechanismId'], ruleId: raw['ruleId'] };
       }
       case 'SEED_CLUE':
         if (typeof raw['clueId'] !== 'string') return null;
@@ -74,6 +102,14 @@ function parseOp(raw: Record<string, unknown>): StoryOp | null {
       case 'UPDATE_READER_STATE': {
         if (!isObj(raw['delta'])) return null;
         return { op, delta: raw['delta'] as unknown as StoryOp & { op: 'UPDATE_READER_STATE' } extends { delta: infer D } ? D : never };
+      }
+      case 'RECORD_VISUAL_FACT': {
+        if (typeof raw['fact'] !== 'string') return null;
+        return { op: 'RECORD_VISUAL_FACT', sceneId: String(raw['sceneId'] ?? ''), fact: raw['fact'] };
+      }
+      case 'RECORD_SONIC_FACT': {
+        if (typeof raw['fact'] !== 'string') return null;
+        return { op: 'RECORD_SONIC_FACT', sceneId: String(raw['sceneId'] ?? ''), fact: raw['fact'] };
       }
       default:
         return null;

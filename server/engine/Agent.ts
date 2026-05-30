@@ -1029,8 +1029,12 @@ Based on what you just witnessed:
           required: ['reflections'],
         },
       },
-    }, { label: `synthesizeReflections:${this.sheet.name}`, timeoutMs: 20_000 });
+    }, { label: `synthesizeReflections:${this.sheet.name}`, timeoutMs: 20_000 }).catch(err => {
+      logger.error('agent_ai_error', { agent: this.sheet.name, method: 'synthesizeReflections', message: (err as Error).message });
+      return null;
+    });
 
+    if (!response) return;
     const reflRaw = response.text ?? '{}';
     const parsed = safeJsonParse<{ reflections: Array<{ insight: string; confidence: number }> }>(
       reflRaw,
