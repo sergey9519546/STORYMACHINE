@@ -239,6 +239,11 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
     try {
       // Reset first so a new scenario never inherits stale agents/ledger from a
       // prior session (sessions now persist to disk between server restarts).
+      // Clear stale client state immediately so the UI doesn't show prior session data
+      // while the server is resetting.
+      setPersuasionLog({});
+      setActivePressures([]);
+      setStreamLog([]);
       const resetRes = await fetch("/api/reset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

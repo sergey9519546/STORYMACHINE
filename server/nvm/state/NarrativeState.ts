@@ -70,7 +70,7 @@ export function buildNarrativeState(stage: Stage): NarrativeState {
   const state = emptyState();
   state.turn = stage.getTurnCount();
   const illusion = stage.getIllusionState();
-  state.authorIntent = { targetStructure: illusion.structure };
+  state.authorIntent = { targetStructure: illusion.structure, theme: illusion.story_theme };
   for (const agent of stage.getAllAgents()) {
     if (agent.beliefs?.length) state.characterBeliefs[agent.char_id] = agent.beliefs;
     if (agent.emotionState) state.characterEmotions[agent.char_id] = agent.emotionState;

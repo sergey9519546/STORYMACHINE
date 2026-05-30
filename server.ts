@@ -931,6 +931,7 @@ async function startServer() {
       director_style: s.director_style ?? null,
       expected_turns: s.expected_turns ?? 20,
       pacing_target: s.pacing_target ?? null,
+      story_theme: s.story_theme ?? null,
     });
   }));
 
@@ -974,6 +975,21 @@ async function startServer() {
     const { stage } = getOrCreateSession(sessionId(req));
     stage.updateIllusionState({ director_style: style as NonNullable<import('./server/engine/types.ts').IllusionState['director_style']> });
     res.json({ style });
+  }));
+
+  // Set story theme — persists to IllusionState; wires authorIntent.theme into NarrativeState.
+  // Theme is injected into: convergence sharpen_theme operator, showrunner critic,
+  // proof lint, and story bible projection.
+  app.post('/api/story-theme', gameLimiter, asyncHandler(async (req, res) => {
+    const { sanitizeForPrompt } = await import('./server/lib/prompt-utils.ts');
+    const raw = req.body?.theme;
+    if (typeof raw !== 'string') {
+      res.status(400).json({ error: 'body.theme (string) is required' }); return;
+    }
+    const theme = sanitizeForPrompt(raw.trim(), 500);
+    const { stage } = getOrCreateSession(sessionId(req));
+    stage.updateIllusionState({ story_theme: theme });
+    res.json({ theme });
   }));
 
   // ── Writer pacing target ──────────────────────────────────────────────────

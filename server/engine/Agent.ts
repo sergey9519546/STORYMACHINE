@@ -376,12 +376,12 @@ export class Agent {
     const tomStr = tomEntries.length > 0
       ? tomEntries.map(tom => {
           const name = sanitizeForPrompt(this.stage.getAgent(tom.subject_id)?.name ?? tom.subject_id, 128);
-          const knowledge = tom.believed_knowledge.slice(0, 3).map(k => `"${k}"`).join(', ');
+          const knowledge = tom.believed_knowledge.slice(0, 3).map(k => `"${sanitizeForPrompt(k, 300)}"`).join(', ');
           const relParts: string[] = [`trust=${Math.round(tom.trust_level * 100)}%`];
           if (tom.affinity !== undefined) relParts.push(`affinity=${Math.round(tom.affinity * 100)}%`);
           if (tom.power_balance !== undefined) relParts.push(`power=${tom.power_balance < 0.4 ? 'they dominate' : tom.power_balance > 0.6 ? 'I dominate' : 'equal'}`);
           if (tom.debt !== undefined && tom.debt > 0.1) relParts.push(`debt=${Math.round(tom.debt * 100)}%`);
-          const history = tom.shared_history?.slice(-2).map(e => `"${e}"`).join(', ');
+          const history = tom.shared_history?.slice(-2).map(e => `"${sanitizeForPrompt(e, 300)}"`).join(', ');
           if (history) relParts.push(`history=[${history}]`);
           return `  - ${name}: ${relParts.join(', ')}, motive="${sanitizeForPrompt(tom.believed_motive, 256)}", I think they know: [${knowledge}]`;
         }).join('\n')
@@ -574,7 +574,7 @@ Generate 3 candidate actions. Score each 0–100 on goal alignment. The best-sco
     // ToM² context: what do you think others know / believe?
     const tomSummary = Object.values(this.sheet.theoryOfMind ?? {}).slice(0, 3).map(tom => {
       const n = sanitizeForPrompt(this.stage.getAgent(tom.subject_id)?.name ?? tom.subject_id, 128);
-      return `  - You believe ${n} knows: ${tom.believed_knowledge.slice(0, 2).join('; ') || 'nothing confirmed'}`;
+      return `  - You believe ${n} knows: ${tom.believed_knowledge.slice(0, 2).map(k => sanitizeForPrompt(k, 300)).join('; ') || 'nothing confirmed'}`;
     }).join('\n');
 
     const prompt = `You are ${sanitizeForPrompt(this.sheet.name, 256)}. You just witnessed these events:

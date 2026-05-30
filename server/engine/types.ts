@@ -208,6 +208,7 @@ export interface IllusionState {
   emotional_arc?: EmotionalArc;
   director_style?: DirectorStyle;
   expected_turns?: number;      // writer's estimate of total session length for arc curve
+  story_theme?: string;         // author-declared thematic statement ("power corrupts", etc.)
 }
 
 // ── Persuasion strategy ──────────────────────────────────────────────────────

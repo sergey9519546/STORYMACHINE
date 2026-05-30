@@ -62,11 +62,13 @@ export function applyStoryOp(state: NarrativeState, op: StoryOp): NarrativeState
         payoffs: [...state.payoffs, { setupId: op.setupId, payoffEventId: op.payoffEventId }],
       };
 
-    case 'RAISE_CLOCK':
+    case 'RAISE_CLOCK': {
+      const amount = (typeof op.amount === 'number' && isFinite(op.amount)) ? op.amount : 0;
       return {
         ...state,
-        clocks: { ...state.clocks, [op.clockId]: (state.clocks[op.clockId] ?? 0) + op.amount },
+        clocks: { ...state.clocks, [op.clockId]: (state.clocks[op.clockId] ?? 0) + amount },
       };
+    }
 
     case 'ADVANCE_THEME_ARGUMENT':
       return {
@@ -80,9 +82,9 @@ export function applyStoryOp(state: NarrativeState, op: StoryOp): NarrativeState
         ...state,
         audienceState: {
           knownFacts: op.delta.knownFact ? [...a.knownFacts, op.delta.knownFact] : a.knownFacts,
-          suspense:   a.suspense   + (op.delta.suspense   ?? 0),
-          curiosity:  a.curiosity  + (op.delta.curiosity  ?? 0),
-          investment: a.investment + (op.delta.investment ?? 0),
+          suspense:   Math.max(0, a.suspense   + (op.delta.suspense   ?? 0)),
+          curiosity:  Math.max(0, a.curiosity  + (op.delta.curiosity  ?? 0)),
+          investment: Math.max(0, a.investment + (op.delta.investment ?? 0)),
         },
       };
     }

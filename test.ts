@@ -6847,7 +6847,7 @@ import { ALL_INVARIANTS } from './server/nvm/regression/invariants.ts';
 import { runNarrativeRegression } from './server/nvm/regression/runner.ts';
 
 function makeCommit(sceneIdx: number, ops: StoryOp[]): StoryCommit {
-  return { commitId: `c${sceneIdx}`, parentId: null, sceneIdx, ops, deltaSummary: { facts: 0, beliefs: 0, relationships: 0 }, reverted: false, createdAt: 1 };
+  return { commitId: `c${sceneIdx}`, parentId: null, sceneIdx, ops, deltaSummary: summarizeOps(ops), reverted: false, createdAt: 1 };
 }
 
 function baseOp(): StoryOp {
@@ -7000,7 +7000,7 @@ describe('NVM — Narrative Regression Suite (Wave 29)', () => {
 // ── Wave 30 — Narrative Momentum Dashboard ────────────────────────────────────
 
 function makeMomentumCommit(sceneIdx: number, ops: StoryOp[]): StoryCommit {
-  return { commitId: `m${sceneIdx}`, parentId: null, sceneIdx, ops, deltaSummary: { facts: 0, beliefs: 0, relationships: 0 }, reverted: false, createdAt: 1 };
+  return { commitId: `m${sceneIdx}`, parentId: null, sceneIdx, ops, deltaSummary: summarizeOps(ops), reverted: false, createdAt: 1 };
 }
 
 function buildIR(commit: StoryCommit): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR {
@@ -7757,7 +7757,7 @@ describe('NVM — Forward Latent Branch Field (Wave 35)', () => {
       parentId: null,
       sceneIdx: 0,
       ops: [...ops], // same ops as candidate
-      deltaSummary: { facts: 0, beliefs: 0, relationships: 0 },
+      deltaSummary: summarizeOps(ops),
       reverted: false,
       createdAt: Date.now(),
     };
@@ -7812,7 +7812,7 @@ describe('NVM — Forward Latent Branch Field (Wave 35)', () => {
       parentId: null,
       sceneIdx: 5,
       ops: [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }],
-      deltaSummary: { facts: 0, beliefs: 0, relationships: 0 },
+      deltaSummary: summarizeOps([{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }]),
       reverted: false,
       createdAt: Date.now(),
     };

@@ -1211,7 +1211,9 @@ export class Stage {
       sceneIdx: r.scene_idx as number,
       ops: safeJsonParse<StoryOp[]>(r.ops_json as string, []),
       deltaSummary: safeJsonParse(r.delta_summary_json as string,
-        { facts: 0, beliefs: 0, relationships: 0 }),
+        { facts: 0, beliefs: 0, relationships: 0, emotions: 0, clues: 0, payoffs: 0,
+          clocks: 0, themeArguments: 0, objectArcs: 0, rules: 0, readerStateUpdates: 0,
+          visualFacts: 0, sonicFacts: 0 }),
       reverted: Boolean(r.reverted),
       createdAt: r.created_at as number,
     };
