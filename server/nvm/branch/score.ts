@@ -48,7 +48,7 @@ export function scoreBranch(
   // ── Coherence: Tier-1 proof gate ─────────────────────────────────────────
   const tier1 = runTier1(ir, state);
   const passCount = tier1.filter(r => r.pass).length;
-  const coherence = Math.round((passCount / tier1.length) * 100);
+  const coherence = tier1.length > 0 ? Math.round((passCount / tier1.length) * 100) : 100;
 
   // ── Viability: specificity (reuses quality engine) ───────────────────────
   const viability = Math.min(100, Math.round(specificityScore(ops) * 1.5));
@@ -113,15 +113,18 @@ function computeConsequence(ops: StoryOp[]): number {
       case 'UPDATE_BELIEF':     score += 6;  break;
       case 'APPRAISE_EMOTION':  score += 5;  break;
       case 'SHIFT_RELATIONSHIP':score += 12; break;
-      case 'RAISE_CLOCK':
-        score += (op as Extract<StoryOp, {op:'RAISE_CLOCK'}>).amount * 4;
+      case 'RAISE_CLOCK': {
+        const a = (op as Extract<StoryOp, {op:'RAISE_CLOCK'}>).amount;
+        score += (isFinite(a) ? a : 0) * 4;
         break;
+      }
       case 'SEED_CLUE':         score += 15; break;
       case 'PAYOFF_SETUP':      score += 20; break;
       case 'ADVANCE_THEME_ARGUMENT': score += 10; break;
       case 'UPDATE_READER_STATE': {
         const d = (op as Extract<StoryOp, {op:'UPDATE_READER_STATE'}>).delta;
-        score += (Math.abs(d.suspense ?? 0) + Math.abs(d.curiosity ?? 0) + Math.abs(d.investment ?? 0)) * 3;
+        const sv = d.suspense ?? 0; const cv = d.curiosity ?? 0; const iv = d.investment ?? 0;
+        score += (Math.abs(isFinite(sv) ? sv : 0) + Math.abs(isFinite(cv) ? cv : 0) + Math.abs(isFinite(iv) ? iv : 0)) * 3;
         break;
       }
       default: score += 2;
@@ -136,7 +139,7 @@ function computeScreenplayUsefulness(ops: StoryOp[], _state: NarrativeState): nu
 
   // Raises in tension are screenplay-useful
   const clockOps = ops.filter(o => o.op === 'RAISE_CLOCK');
-  score += clockOps.reduce((s, o) => s + (o as Extract<StoryOp, {op:'RAISE_CLOCK'}>).amount * 5, 0);
+  score += clockOps.reduce((s, o) => { const a = (o as Extract<StoryOp, {op:'RAISE_CLOCK'}>).amount; return s + (isFinite(a) ? a : 0) * 5; }, 0);
 
   // Clues are highly screenplay-useful (setup/payoff)
   score += ops.filter(o => o.op === 'SEED_CLUE').length * 15;
