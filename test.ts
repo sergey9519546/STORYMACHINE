@@ -9789,3 +9789,76 @@ describe('Wave 76 — quality engine DV11, vague terms, necessityScore state-awa
     );
   });
 });
+
+// ── Wave 77: convergence loop arc promises + THEME_ARGUMENT_PROGRESSES ────────
+
+describe('Wave 77 — convergence loop arc promises + THEME_ARGUMENT_PROGRESSES invariant', () => {
+  function mkCommit77(id: string, parent: string | null, idx: number, ops: StoryOp[]): StoryCommit {
+    return { commitId: id, parentId: parent, sceneIdx: idx, ops,
+      deltaSummary: summarizeOps(ops), reverted: false, createdAt: Date.now() };
+  }
+
+  // ── THEME_ARGUMENT_PROGRESSES ──────────────────────────────────────────────
+
+  it('THEME_ARGUMENT_PROGRESSES is na for fewer than 4 scenes', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'THEME_ARGUMENT_PROGRESSES')!;
+    assert.ok(inv, 'invariant must be registered');
+    const commits = [
+      mkCommit77('c0', null, 0, [{ op: 'ADD_FACT', fact: { factId: 'f0', subject: 'world', predicate: 'exists', object: 'true', addedAtTurn: 0, validFrom: 0, validTo: null } }]),
+      mkCommit77('c1', 'c0', 1, [{ op: 'RAISE_CLOCK', clockId: 'timer', amount: 1 }]),
+    ];
+    const r = inv.check(commits);
+    assert.equal(r.status, 'na', 'should be na when fewer than 4 scenes');
+  });
+
+  it('THEME_ARGUMENT_PROGRESSES passes when a theme move exists', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'THEME_ARGUMENT_PROGRESSES')!;
+    const themeOps: StoryOp[] = [{ op: 'ADVANCE_THEME_ARGUMENT', claimId: 'redemption', move: 'support' }];
+    const commits = [
+      mkCommit77('c0', null, 0, [{ op: 'ADD_FACT', fact: { factId: 'f0', subject: 'world', predicate: 'exists', object: 'true', addedAtTurn: 0, validFrom: 0, validTo: null } }]),
+      mkCommit77('c1', 'c0', 1, [{ op: 'RAISE_CLOCK', clockId: 'timer', amount: 1 }]),
+      mkCommit77('c2', 'c1', 2, themeOps),
+      mkCommit77('c3', 'c2', 3, [{ op: 'RAISE_CLOCK', clockId: 'timer', amount: 1 }]),
+    ];
+    const r = inv.check(commits);
+    assert.equal(r.status, 'pass', 'should pass when theme argument exists');
+  });
+
+  it('THEME_ARGUMENT_PROGRESSES warns at scenes 4-5 without theme ops', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'THEME_ARGUMENT_PROGRESSES')!;
+    const clockOp: StoryOp = { op: 'RAISE_CLOCK', clockId: 'c', amount: 1 };
+    const commits = [0, 1, 2, 3, 4].map((i, idx) => mkCommit77(`c${i}`, idx === 0 ? null : `c${i - 1}`, i, [clockOp]));
+    const r = inv.check(commits);
+    assert.ok(r.status === 'warning' || r.status === 'fail', 'should warn or fail at 5 scenes without theme');
+  });
+
+  it('THEME_ARGUMENT_PROGRESSES fails at 6+ scenes without theme ops', () => {
+    const inv = ALL_INVARIANTS.find(i => i.id === 'THEME_ARGUMENT_PROGRESSES')!;
+    const clockOp: StoryOp = { op: 'RAISE_CLOCK', clockId: 'c', amount: 1 };
+    const commits = [0, 1, 2, 3, 4, 5, 6].map((i, idx) => mkCommit77(`c${i}`, idx === 0 ? null : `c${i - 1}`, i, [clockOp]));
+    const r = inv.check(commits);
+    assert.equal(r.status, 'fail', 'should fail at 7 scenes without any theme argument');
+  });
+
+  it('ALL_INVARIANTS includes THEME_ARGUMENT_PROGRESSES', () => {
+    assert.ok(ALL_INVARIANTS.some(i => i.id === 'THEME_ARGUMENT_PROGRESSES'), 'must be registered');
+  });
+
+  // ── openPromises threading into ConvergeBudget ─────────────────────────────
+
+  it('ConvergeBudget accepts openPromises field without TypeScript error', () => {
+    type Budget = import('./server/nvm/converge/loop.ts').ConvergeBudget;
+    const promise: import('./server/nvm/quality/arc-tracker.ts').OpenPromise = {
+      promiseId: 'clue:test', kind: 'CLUE', description: 'needs payoff',
+      openedAtScene: 0, targetWindow: [3, 8], urgency: 'due_soon',
+      suggestedOp: 'PAYOFF_SETUP', pacingScore: 0.7,
+    };
+    const budget: Budget = {
+      maxIterations: 3,
+      candidatesPerIteration: 2,
+      openPromises: [promise],
+    };
+    assert.ok(budget.openPromises!.length === 1, 'openPromises field accepted in ConvergeBudget');
+    assert.equal(budget.openPromises![0].kind, 'CLUE');
+  });
+});

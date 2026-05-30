@@ -364,6 +364,29 @@ const PROPP_COMPLICATION_EXISTS: NarrativeInvariant = {
   },
 };
 
+const THEME_ARGUMENT_PROGRESSES: NarrativeInvariant = {
+  id: 'THEME_ARGUMENT_PROGRESSES',
+  name: 'Theme Argument Progresses',
+  category: 'theme',
+  description: 'Stories without a developing theme argument feel hollow. At least one ADVANCE_THEME_ARGUMENT should appear by scene 4.',
+  check(commits) {
+    if (commits.length < 4) return result(this, 'na', 'Fewer than 4 scenes — theme development not yet expected.');
+    const themeOps = opsOfKind(commits, 'ADVANCE_THEME_ARGUMENT');
+    if (themeOps.length > 0) {
+      const moves = new Set(themeOps.map(t => t.op.move));
+      if (moves.has('resolve')) {
+        return result(this, 'pass', `Theme resolved after ${themeOps.length} argument move(s).`);
+      }
+      return result(this, 'pass', `Theme is developing with ${themeOps.length} move(s) [${[...moves].join(', ')}].`);
+    }
+    const sceneCount = maxScene(commits) + 1;
+    if (sceneCount >= 6) {
+      return result(this, 'fail', `${sceneCount} scenes with zero theme argument moves. Stories without a developing theme lack emotional stakes.`);
+    }
+    return result(this, 'warning', `${sceneCount} scenes with no ADVANCE_THEME_ARGUMENT. Introduce a thematic claim soon.`);
+  },
+};
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 
 export const ALL_INVARIANTS: NarrativeInvariant[] = [
@@ -387,4 +410,5 @@ export const ALL_INVARIANTS: NarrativeInvariant[] = [
   TENSION_ARC_EXISTS,
   // Theme
   THEME_SUPPORTED_BEFORE_RESOLVED,
+  THEME_ARGUMENT_PROGRESSES,
 ];

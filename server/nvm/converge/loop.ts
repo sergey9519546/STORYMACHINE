@@ -78,6 +78,13 @@ export interface ConvergeBudget {
    * generator has full story context — characters, arcs, clocks, theme.
    */
   bibleSummary?: string;
+  /**
+   * Wave 77: Open arc-completion promises from analyzeArcCompletion().
+   * Overdue/due-soon promises are forwarded to buildQualityAwareConstraints
+   * so the LLM is explicitly told which unresolved promises need closing.
+   * Previously hardcoded as [] — now thread from the caller via server.ts.
+   */
+  openPromises?: import('../quality/arc-tracker.ts').OpenPromise[];
 }
 
 const DEFAULT_BUDGET: ConvergeBudget = { maxIterations: 8, candidatesPerIteration: 3 };
@@ -120,7 +127,7 @@ export async function convergeScene(
       specConstraints = buildQualityAwareConstraints(
         baseSpec.constraints,
         currentQualityWarnings,
-        [],   // arc-completion promises not available without commit history; uses [] here
+        budget.openPromises ?? [],
         proppGaps,
       );
     }
