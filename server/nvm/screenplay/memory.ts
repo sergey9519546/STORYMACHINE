@@ -96,10 +96,10 @@ export function annotateCommit(commit: StoryCommit): ScreenplaySceneRecord {
   // ── Emotional shift ───────────────────────────────────────────────────────
   const suspenseDelta = ops
     .filter(o => o.op === 'UPDATE_READER_STATE')
-    .reduce((s, o) => s + ((o as Extract<StoryOp, {op:'UPDATE_READER_STATE'}>).delta.suspense ?? 0), 0);
+    .reduce((s, o) => { const v = (o as Extract<StoryOp, {op:'UPDATE_READER_STATE'}>).delta.suspense ?? 0; return s + (isFinite(v) ? v : 0); }, 0);
   const curiosityDelta = ops
     .filter(o => o.op === 'UPDATE_READER_STATE')
-    .reduce((s, o) => s + ((o as Extract<StoryOp, {op:'UPDATE_READER_STATE'}>).delta.curiosity ?? 0), 0);
+    .reduce((s, o) => { const v = (o as Extract<StoryOp, {op:'UPDATE_READER_STATE'}>).delta.curiosity ?? 0; return s + (isFinite(v) ? v : 0); }, 0);
   const emotionOps = ops.filter(o => o.op === 'APPRAISE_EMOTION');
   const negativeEmotions = emotionOps.filter(o =>
     ['distress', 'anger', 'fear', 'shame'].includes(
@@ -172,7 +172,7 @@ function derivePurpose(ops: StoryOp[], sceneIdx: number): ScenePurpose {
   if (ops.some(o => o.op === 'SEED_CLUE')) return 'introduce_conflict';
   const clockOps = ops.filter(o => o.op === 'RAISE_CLOCK');
   if (clockOps.length > 0) {
-    const totalAmount = clockOps.reduce((s, o) => s + (o as Extract<StoryOp, {op:'RAISE_CLOCK'}>).amount, 0);
+    const totalAmount = clockOps.reduce((s, o) => { const a = (o as Extract<StoryOp, {op:'RAISE_CLOCK'}>).amount; return s + (isFinite(a) ? a : 0); }, 0);
     if (totalAmount >= 3) return 'climax';
     if (totalAmount >= 2) return 'raise_stakes';
     return 'complicate';
