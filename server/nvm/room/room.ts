@@ -85,10 +85,12 @@ export function runWritersRoom(
   allCritiques.push(...dedupedCritiques);
 
   // Consensus: 100 if all critics agree (all same severity bucket), 0 if maximally opposed.
-  // Clamped to [0, 100] to guard against edge-case arithmetic.
+  // Use spread only when array is non-empty — the empty case is already handled by the ternary.
+  // Adding 0 to Math.min/max would artificially anchor minSev at 0, making unanimous high-severity
+  // critiques look like low consensus (e.g., all at 70 → range 70 → consensus 30 instead of 100).
   const severities = allCritiques.map(c => c.severity);
-  const maxSev = Math.max(...severities, 0);
-  const minSev = Math.min(...severities, 0);
+  const maxSev = severities.length > 0 ? Math.max(...severities) : 0;
+  const minSev = severities.length > 0 ? Math.min(...severities) : 0;
   const consensus = allCritiques.length === 0 ? 100 : Math.max(0, Math.round(100 - (maxSev - minSev)));
 
   // Dominant critic: highest total attentionBid

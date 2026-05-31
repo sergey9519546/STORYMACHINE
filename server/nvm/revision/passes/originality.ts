@@ -86,7 +86,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
     }
   }
 
-  // ── All scenes have the same purpose (no originality in structure) ────────
+  // ── Scene purpose variety: fully uniform or critically low variety ────────
   const purposes = records.map(r => r.purpose);
   const purposeSet = new Set(purposes);
   if (purposeSet.size === 1 && records.length >= 4) {
@@ -96,6 +96,16 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       description: `All ${records.length} scenes share the same purpose (${purposes[0]}) — the screenplay lacks tonal/functional variety`,
       severity: 'major',
       suggestedFix: 'Vary scene functions: mix setup, conflict, revelation, character moment, and comedic relief',
+    });
+  } else if (purposeSet.size <= 2 && records.length >= 8) {
+    // Low variety: only 2 distinct purposes across 8+ scenes means structural monotony
+    const topTwo = [...purposeSet].join(' and ');
+    issues.push({
+      location: 'Overall scene variety',
+      rule: 'LOW_SCENE_VARIETY',
+      description: `${records.length} scenes use only ${purposeSet.size} distinct purpose(s) (${topTwo}) — insufficient structural variety for a story this long`,
+      severity: 'minor',
+      suggestedFix: 'Introduce revelation, raising-stakes, and relief scenes to create a fuller dramatic arc',
     });
   }
 

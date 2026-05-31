@@ -93,7 +93,9 @@ export function applyStoryOp(state: NarrativeState, op: StoryOp): NarrativeState
       return {
         ...state,
         audienceState: {
-          knownFacts: op.delta.knownFact ? [...a.knownFacts, op.delta.knownFact] : a.knownFacts,
+          knownFacts: op.delta.knownFact
+          ? [...a.knownFacts, op.delta.knownFact].slice(-100) // cap to prevent unbounded growth
+          : a.knownFacts,
           suspense:   Math.max(0, a.suspense   + fin(op.delta.suspense)),
           curiosity:  Math.max(0, a.curiosity  + fin(op.delta.curiosity)),
           investment: Math.max(0, a.investment + fin(op.delta.investment)),

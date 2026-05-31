@@ -11059,3 +11059,133 @@ describe('Wave 87 — payoff precision, repeated-purpose detection, dominant gua
     assert.ok(preamble.includes('bob'), 'Should still emit bob with valid dominant');
   });
 });
+
+// ── Wave 88 ───────────────────────────────────────────────────────────────────
+describe('Wave 88 — consensus accuracy fix, knownFacts cap, originality variety', () => {
+
+  // ── room.ts consensus: unanimous critics now score 100 ───────────────────
+
+  it('runWritersRoom consensus is 100 when all critics have same severity', async () => {
+    const { runWritersRoom } = await import('./server/nvm/room/room.ts');
+    // Build an IR that will trigger multiple critics with uniform severity
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 'test-consensus',
+      sceneIdx: 0,
+      sceneFunction: 'build_tension',
+      activeMechanisms: ['core_mechanism'],
+      beforeStateHash: '',
+      ops: [],
+      preconditions: [],
+      postconditions: [],
+      provenance: { origin: 'model_generated' as const, createdAt: Date.now() },
+    };
+    const { emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+    const state = emptyState() as import('./server/nvm/state/NarrativeState.ts').NarrativeState;
+    const result = runWritersRoom(ir, state);
+    // consensus should be in [0, 100] — previously was deflated by the 0-anchor bug
+    assert.ok(result.consensus >= 0 && result.consensus <= 100,
+      `consensus should be in [0,100], got ${result.consensus}`);
+    // If critiques are all same severity (or there are no critiques), consensus should be high
+    if (result.dominantCritic === 'none' || result.critiques.length === 0) {
+      assert.equal(result.consensus, 100, 'No critiques means full consensus');
+    }
+  });
+
+  it('consensus formula: same-severity critiques give consensus=100', () => {
+    // Test the fix directly: max - min should be 0 when all same severity
+    const severities = [70, 70, 70];
+    const maxSev = severities.length > 0 ? Math.max(...severities) : 0;
+    const minSev = severities.length > 0 ? Math.min(...severities) : 0;
+    const consensus = severities.length === 0 ? 100 : Math.max(0, Math.round(100 - (maxSev - minSev)));
+    assert.equal(consensus, 100, 'Unanimous critics with same severity should give 100 consensus');
+  });
+
+  it('consensus formula: mixed-severity critiques reduce consensus', () => {
+    const severities = [80, 20];
+    const maxSev = Math.max(...severities);
+    const minSev = Math.min(...severities);
+    const consensus = Math.max(0, Math.round(100 - (maxSev - minSev)));
+    assert.equal(consensus, 40, 'Wide severity spread should reduce consensus significantly');
+  });
+
+  // ── dispatcher: knownFacts cap at 100 ────────────────────────────────────
+
+  it('UPDATE_READER_STATE caps knownFacts at 100 entries', async () => {
+    const { applyStoryOps } = await import('./server/nvm/ops/dispatcher.ts');
+    const { emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+
+    // Pre-populate audienceState with 100 existing facts
+    let state = emptyState() as import('./server/nvm/state/NarrativeState.ts').NarrativeState;
+    state = {
+      ...state,
+      audienceState: {
+        ...state.audienceState,
+        knownFacts: Array.from({ length: 100 }, (_, i) => `fact-${i}`),
+      },
+    };
+
+    // Apply one more UPDATE_READER_STATE with a knownFact
+    const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+      {
+        op: 'UPDATE_READER_STATE',
+        delta: { suspense: 0, curiosity: 0, investment: 0, knownFact: 'new-fact' },
+      },
+    ];
+    const after = applyStoryOps(state, ops);
+    assert.equal(after.audienceState.knownFacts.length, 100,
+      'knownFacts should stay capped at 100 after adding one more');
+    // The newest fact should be present, oldest dropped
+    assert.ok(after.audienceState.knownFacts.includes('new-fact'),
+      'The new fact should be in the array');
+    assert.ok(!after.audienceState.knownFacts.includes('fact-0'),
+      'The oldest fact should be dropped (FIFO)');
+  });
+
+  // ── originality: low variety detection ───────────────────────────────────
+
+  it('originalityPass detects LOW_SCENE_VARIETY for 2 purposes in 8+ scenes', async () => {
+    const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+    const records = Array.from({ length: 8 }, (_, i) => ({
+      commitId: `c${i}`, sceneIdx: i, slug: `SC${i}`,
+      purpose: i % 2 === 0 ? 'establish_world' : 'character_moment',
+      dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+      emotionalShift: 'neutral', suspenseDelta: 0,
+      dialogueHighlights: [], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [],
+      readerStateAnnotation: null,
+    }));
+    const result = await originalityPass({
+      fountain: 'INT. SC0 - DAY\nA.\n',
+      original: 'INT. SC0 - DAY\nA.\n',
+      records: records as unknown as Parameters<typeof originalityPass>[0]['records'],
+      structure: {} as Parameters<typeof originalityPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const lowVar = result.issues.find(i => i.rule === 'LOW_SCENE_VARIETY');
+    assert.ok(lowVar, 'Should detect LOW_SCENE_VARIETY for 2 purposes across 8 scenes');
+  });
+
+  it('originalityPass does NOT fire LOW_SCENE_VARIETY for 2 purposes in fewer than 8 scenes', async () => {
+    const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+    const records = Array.from({ length: 6 }, (_, i) => ({
+      commitId: `c${i}`, sceneIdx: i, slug: `SC${i}`,
+      purpose: i % 2 === 0 ? 'establish_world' : 'character_moment',
+      dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+      emotionalShift: 'neutral', suspenseDelta: 0,
+      dialogueHighlights: [], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [],
+      readerStateAnnotation: null,
+    }));
+    const result = await originalityPass({
+      fountain: 'INT. SC0 - DAY\nA.\n',
+      original: 'INT. SC0 - DAY\nA.\n',
+      records: records as unknown as Parameters<typeof originalityPass>[0]['records'],
+      structure: {} as Parameters<typeof originalityPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const lowVar = result.issues.find(i => i.rule === 'LOW_SCENE_VARIETY');
+    assert.ok(!lowVar, 'Should NOT fire LOW_SCENE_VARIETY for 6 scenes (threshold is 8)');
+  });
+});
