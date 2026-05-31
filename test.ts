@@ -14,6 +14,15 @@ import { geminiSchemaToJsonSchema } from './server/lib/ai-providers/schema.ts';
 import { makeOpenAICompatLLMProvider, makeOpenAICompatEmbeddingProvider } from './server/lib/ai-providers/openai-compat.ts';
 import { applyConfig, getPublicConfig, initFromEnv } from './server/lib/ai-config.ts';
 import type { GenerateContentParameters, GenerateContentResponse } from '@google/genai';
+import {
+  describeAttachment,
+  selectActiveDefense,
+  describeActionBias,
+  deriveSpeechPattern,
+  computeDefenseLevel,
+  selectPersuasionStrategy,
+  getReadyGoals,
+} from './server/engine/agent/psychology.ts';
 import { STORY_OP_KINDS } from './server/nvm/ops/StoryOp.ts';
 import type { StoryOp } from './server/nvm/ops/StoryOp.ts';
 import { PROOF_TIERS, passResult, failResult } from './server/nvm/proof/contract.ts';
@@ -11538,5 +11547,98 @@ describe('Wave 92 — fountainToDocx', () => {
     const text = latin1(fountainToDocx('Title: My Script\nAuthor: Me\n\nINT. ROOM - DAY\n\nAction.'));
     assert.ok(!text.includes('Title: My Script'), 'title-page line not in body');
     assert.ok(text.includes('Action'), 'body content present');
+  });
+});
+
+// ── M4: Agent psychology module (extracted from Agent.ts) ─────────────────────
+describe('agent/psychology', () => {
+  // Build a full EmotionState with the named emotion dominant at a given intensity.
+  const emo = (dominant: 'shame' | 'anger' | 'fear' | 'distress' | 'pride', intensity: number) => ({
+    joy: 0, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0,
+    [dominant]: intensity, dominant, intensity, last_updated_at: 0,
+  });
+  it('describeAttachment returns a distinct line per attachment style', () => {
+    const anxious  = describeAttachment('anxious');
+    const avoidant = describeAttachment('avoidant');
+    const secure   = describeAttachment(undefined);
+    assert.ok(anxious.length > 0 && avoidant.length > 0 && secure.length > 0);
+    assert.notEqual(anxious, avoidant);
+    assert.notEqual(avoidant, secure);
+  });
+
+  it('selectActiveDefense returns null when emotion intensity is below threshold', () => {
+    const mechanisms = ['denial', 'projection'] as const;
+    const low = selectActiveDefense([...mechanisms], emo('shame', 10));
+    assert.equal(low, null);
+  });
+
+  it('selectActiveDefense picks an emotion-appropriate mechanism when intense', () => {
+    const chosen = selectActiveDefense(['denial', 'projection'], emo('shame', 80));
+    // shame prefers denial/rationalization/repression — denial is available
+    assert.equal(chosen, 'denial');
+  });
+
+  it('selectActiveDefense falls back to the first mechanism when none preferred', () => {
+    const chosen = selectActiveDefense(['displacement'], emo('shame', 80));
+    assert.equal(chosen, 'displacement');
+  });
+
+  it('selectActiveDefense returns null with no mechanisms', () => {
+    assert.equal(selectActiveDefense(undefined, emo('fear', 90)), null);
+    assert.equal(selectActiveDefense([], emo('fear', 90)), null);
+  });
+
+  it('describeActionBias reflects high machiavellianism', () => {
+    const bias = describeActionBias({ machiavellianism: 90, narcissism: 50, psychopathy: 50 }, undefined, 0);
+    assert.match(bias, /LIE is a natural tool/);
+  });
+
+  it('describeActionBias gives a neutral default when traits are middling', () => {
+    const bias = describeActionBias({ machiavellianism: 50, narcissism: 50, psychopathy: 50 }, undefined, 0);
+    assert.match(bias, /best serves your immediate goal/);
+  });
+
+  it('deriveSpeechPattern layers Big Five and emotion cues', () => {
+    const pattern = deriveSpeechPattern(
+      { openness: 90, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 },
+      undefined,
+      emo('anger', 60),
+    );
+    assert.match(pattern, /complex vocabulary/);
+    assert.match(pattern, /Monosyllabic/);
+  });
+
+  it('computeDefenseLevel escalates with neuroticism and suspicion', () => {
+    assert.match(computeDefenseLevel(80, 70), /breaking_point/);
+    assert.match(computeDefenseLevel(65, 10), /^high/);
+    assert.match(computeDefenseLevel(10, 10), /^low/);
+  });
+
+  it('selectPersuasionStrategy prefers a strategy with 2+ prior successes', () => {
+    const target = {
+      bigFive: { openness: 90, conscientiousness: 90, extraversion: 50, agreeableness: 50, neuroticism: 50 },
+    } as Parameters<typeof selectPersuasionStrategy>[0];
+    // base would be 'logic'; but emotion has 2 successes → should switch to emotion
+    const history = [
+      { strategy: 'emotion', success: true },
+      { strategy: 'emotion', success: true },
+    ] as Parameters<typeof selectPersuasionStrategy>[1];
+    assert.equal(selectPersuasionStrategy(target, history), 'emotion');
+  });
+
+  it('getReadyGoals returns only goals whose dependencies are satisfied', () => {
+    const gs = {
+      terminal: { id: 't', description: 'win', value: 100, achieved: false },
+      instrumental: [
+        { id: 'a', description: 'A', value: 50, achieved: true },
+        { id: 'b', description: 'B', value: 60, achieved: false, depends_on: ['a'] },
+        { id: 'c', description: 'C', value: 70, achieved: false, depends_on: ['z'] },
+      ],
+    } as Parameters<typeof getReadyGoals>[0];
+    const ready = getReadyGoals(gs);
+    const ids = ready.map(g => g.id);
+    assert.ok(ids.includes('b'), 'B is ready (dep a achieved)');
+    assert.ok(!ids.includes('c'), 'C is blocked (dep z unmet)');
+    assert.ok(!ids.includes('a'), 'A already achieved, not returned');
   });
 });
