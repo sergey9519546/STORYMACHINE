@@ -275,7 +275,9 @@ const DV_RULES = [
   'DV1_ON_THE_NOSE', 'DV2_REDUNDANT_BELIEF', 'DV3_UNMOTIVATED_EMOTION',
   'DV4_UNGROUNDED_RELATIONSHIP', 'DV5_NO_HUMAN_PRESENCE', 'DV6_CHARACTER_MONOLOGUE',
   'DV7_UNMOTIVATED_TENSION_DROP', 'DV8_ABRUPT_RELATIONSHIP', 'DV9_UNGROUNDED_THEME',
-  'DV10_STRUCTURAL_UNIFORMITY',
+  'DV10_STRUCTURAL_UNIFORMITY', 'DV11_UNEXPLAINED_PRIDE',
+  'DV12_TALKING_HEADS', 'DV13_UNACKNOWLEDGED_CLOCK', 'DV14_EMOTIONAL_FLATLINE',
+  'DV15_GOAL_FREE_SCENE',
 ];
 const DV_LABELS: Record<string, string> = {
   DV1_ON_THE_NOSE: 'On-the-Nose — told belief at full confidence',
@@ -288,6 +290,11 @@ const DV_LABELS: Record<string, string> = {
   DV8_ABRUPT_RELATIONSHIP: 'Abrupt Relationship — large shift without emotion',
   DV9_UNGROUNDED_THEME: 'Ungrounded Theme — resolve/support without facts',
   DV10_STRUCTURAL_UNIFORMITY: 'Structural Uniformity — all ops same kind',
+  DV11_UNEXPLAINED_PRIDE: 'Unexplained Pride — no prior achievement',
+  DV12_TALKING_HEADS: 'Talking Heads — dialogue with no world consequence',
+  DV13_UNACKNOWLEDGED_CLOCK: 'Unacknowledged Clock — stakes invisible to characters',
+  DV14_EMOTIONAL_FLATLINE: 'Emotional Flatline — character emotion never arcs',
+  DV15_GOAL_FREE_SCENE: 'Goal-Free Scene — no arc/theme/payoff/clock progress',
 };
 
 function DialogueTab({ report }: { report: QualitySceneReport }) {
@@ -297,7 +304,7 @@ function DialogueTab({ report }: { report: QualitySceneReport }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ color: '#64748b', fontSize: 10, marginBottom: 4 }}>
-        {firedRules.size} of 10 dialogue validators triggered
+        {firedRules.size} of {DV_RULES.length} dialogue validators triggered
       </div>
       {DV_RULES.map(rule => {
         const ws = dvWarnings.filter(w => w.rule === rule);
