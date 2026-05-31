@@ -3,6 +3,7 @@ import { EngineState, StoryConfig, DirectorState } from "../types";
 import { analyzeScriptBlock } from "../services/director";
 import { parseFountain, FountainBlock } from "../lib/fountain";
 import { fountainToFdx } from "../lib/fdx";
+import { fountainToPdf } from "../lib/pdf";
 import { safeJsonParse } from "../lib/json";
 import {
   Loader2,
@@ -631,6 +632,20 @@ export default function ScriptIDE({
     URL.revokeObjectURL(url);
   };
 
+  const exportPDF = () => {
+    // Industry-standard PDF: US Letter, Courier 12pt, standard margins/indents.
+    const bytes = fountainToPdf(scriptText);
+    // Copy into a fresh ArrayBuffer so the Blob owns a clean, correctly-typed buffer.
+    const buf = bytes.slice().buffer;
+    const blob = new Blob([buf], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "script.pdf";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // ── Clean action AI ──────────────────────────────────────────────────────────
   const handleCleanAction = async (index: number, text: string) => {
     cleanActionAbortRef.current?.abort();
@@ -932,6 +947,7 @@ export default function ScriptIDE({
           }}
           onExportFountain={exportFountain}
           onExportFDX={exportFDX}
+          onExportPDF={exportPDF}
           onOpenStoryMachine={onOpenStoryMachine}
         />
 

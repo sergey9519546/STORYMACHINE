@@ -174,6 +174,8 @@ import { Orchestrator } from './server/engine/Orchestrator.ts';
 import { transcriptToFountain } from './server/lib/fountain.ts';
 import { parseFountain } from './src/lib/fountain.ts';
 import { fountainToFdx } from './src/lib/fdx.ts';
+import { layoutScreenplay, LINES_PER_PAGE } from './src/lib/screenplay-layout.ts';
+import { fountainToPdf } from './src/lib/pdf.ts';
 import type { ActionLogEntry, Belief, CharacterSheet, Location } from './server/engine/types.ts';
 import { ACTION_TYPES } from './server/engine/types.ts';
 
@@ -11286,5 +11288,127 @@ describe('Wave 89 — dead-condition revival, severity-aware truncation, NaN har
     state.clocks['deadline'] = 5;
     const ledger = deriveTensionLedger(state, 1);
     assert.ok(isFinite(ledger.totalTension), 'Infinity investment must be coerced, not propagated');
+  });
+});
+
+// ── Wave 91 — Screenplay layout engine + PDF export (P2) ──────────────────────
+describe('Wave 91 — screenplay layout engine', () => {
+  it('uppercases and indents a scene heading at 1.5 inches (108pt)', () => {
+    const pages = layoutScreenplay('INT. coffee shop - day\n\nA man sits.');
+    const heading = pages[0].lines.find(l => l.text.includes('COFFEE'));
+    assert.ok(heading, 'scene heading present');
+    assert.equal(heading!.text, 'INT. COFFEE SHOP - DAY', 'scene heading uppercased');
+    assert.equal(heading!.xPt, 108, 'scene heading indented 1.5in = 108pt');
+  });
+
+  it('indents a character cue at 3.7 inches and dialogue at 2.5 inches', () => {
+    const pages = layoutScreenplay('INT. ROOM - DAY\n\nAction.\n\nMARA\nHello there.');
+    const all = pages.flatMap(p => p.lines);
+    const cue = all.find(l => l.text === 'MARA');
+    const dlg = all.find(l => l.text === 'Hello there.');
+    assert.ok(cue && dlg, 'cue and dialogue present');
+    assert.ok(Math.abs(cue!.xPt - 3.7 * 72) < 0.01, 'character cue at 3.7in');
+    assert.ok(Math.abs(dlg!.xPt - 2.5 * 72) < 0.01, 'dialogue at 2.5in');
+  });
+
+  it('wraps long dialogue onto multiple lines within the dialogue width', () => {
+    const longLine = 'This is a very long line of dialogue that absolutely must wrap across several physical lines because it greatly exceeds the dialogue column width of thirty-five characters.';
+    const pages = layoutScreenplay(`INT. ROOM - DAY\n\nA.\n\nBOB\n${longLine}`);
+    const dialogueLines = pages.flatMap(p => p.lines).filter(l => l.xPt > 0 && Math.abs(l.xPt - 2.5 * 72) < 0.01);
+    assert.ok(dialogueLines.length >= 4, 'long dialogue wraps to multiple lines');
+    for (const l of dialogueLines) {
+      assert.ok(l.text.length <= 35, `each wrapped dialogue line ≤ 35 chars (got ${l.text.length})`);
+    }
+  });
+
+  it('never exceeds LINES_PER_PAGE lines on any page', () => {
+    let script = 'INT. ROOM - DAY\n\n';
+    for (let i = 0; i < 40; i++) {
+      script += `INT. LOC ${i} - DAY\n\nAction describing scene ${i} in some detail here.\n\nCHAR${i}\nDialogue line for scene ${i}.\n\n`;
+    }
+    const pages = layoutScreenplay(script);
+    assert.ok(pages.length > 1, 'long script spans multiple pages');
+    for (const p of pages) {
+      assert.ok(p.lines.length <= LINES_PER_PAGE, `page ${p.pageNumber} within line cap`);
+    }
+  });
+
+  it('does not orphan a scene heading or character cue at the bottom of a page', () => {
+    let script = 'INT. ROOM - DAY\n\n';
+    for (let i = 0; i < 40; i++) {
+      script += `INT. LOC ${i} - DAY\n\nAction ${i} text here for spacing.\n\nCHAR${i}\nDialogue ${i}.\n\n`;
+    }
+    const pages = layoutScreenplay(script);
+    for (let pi = 0; pi < pages.length - 1; pi++) {
+      const last = pages[pi].lines[pages[pi].lines.length - 1];
+      assert.ok(!/^(INT\.|EXT\.)/.test(last.text), `page ${pages[pi].pageNumber} does not end on a scene heading`);
+      assert.ok(!/^CHAR\d+$/.test(last.text), `page ${pages[pi].pageNumber} does not end on a character cue`);
+    }
+  });
+
+  it('right-aligns transitions', () => {
+    const pages = layoutScreenplay('INT. ROOM - DAY\n\nA.\n\nCUT TO:');
+    const t = pages.flatMap(p => p.lines).find(l => l.text.includes('CUT TO'));
+    assert.ok(t, 'transition present');
+    // right edge at 7.5in; x = 7.5*72 - len*7.2
+    const expected = 7.5 * 72 - t!.text.length * 7.2;
+    assert.ok(Math.abs(t!.xPt - expected) < 0.01, 'transition right-aligned to 7.5in');
+  });
+
+  it('returns a single empty page for an empty script', () => {
+    const pages = layoutScreenplay('');
+    assert.equal(pages.length, 1, 'one page');
+    assert.equal(pages[0].lines.length, 0, 'no lines');
+  });
+
+  it('skips Fountain title-page key:value lines from the body', () => {
+    const pages = layoutScreenplay('Title: My Script\nAuthor: Me\n\nINT. ROOM - DAY\n\nAction.');
+    const all = pages.flatMap(p => p.lines).map(l => l.text);
+    assert.ok(!all.some(t => t.startsWith('Title:') || t.startsWith('Author:')), 'title-page lines excluded from body');
+  });
+});
+
+describe('Wave 91 — fountainToPdf', () => {
+  function toLatin1(bytes: Uint8Array): string {
+    let s = '';
+    for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return s;
+  }
+
+  it('emits a valid PDF header and EOF marker', () => {
+    const pdf = fountainToPdf('INT. ROOM - DAY\n\nA man sits.');
+    const text = toLatin1(pdf);
+    assert.ok(text.startsWith('%PDF-1.4'), 'PDF header present');
+    assert.ok(text.trimEnd().endsWith('%%EOF'), 'EOF marker present');
+  });
+
+  it('produces an xref table whose every offset points at its object', () => {
+    const pdf = fountainToPdf('INT. ROOM - DAY\n\nAction.\n\nALICE\nHello.');
+    const text = toLatin1(pdf);
+    const startxref = parseInt(text.match(/startxref\s+(\d+)/)![1], 10);
+    assert.equal(text.slice(startxref, startxref + 4), 'xref', 'startxref points to xref keyword');
+    const size = parseInt(text.match(/\/Size (\d+)/)![1], 10);
+    const lines = text.slice(startxref).split('\n');
+    for (let n = 1; n < size; n++) {
+      const off = parseInt(lines[2 + n].slice(0, 10), 10);
+      assert.ok(text.slice(off).startsWith(`${n} 0 obj`), `xref entry ${n} resolves to "${n} 0 obj"`);
+    }
+  });
+
+  it('numbers pages from 2 onward, never page 1', () => {
+    let script = 'INT. ROOM - DAY\n\n';
+    for (let i = 0; i < 40; i++) {
+      script += `INT. LOC ${i} - DAY\n\nAction ${i}.\n\nCHAR${i}\nDialogue ${i} line.\n\n`;
+    }
+    const text = toLatin1(fountainToPdf(script));
+    assert.ok(text.includes('(2.) Tj'), 'page 2 carries a page number');
+    assert.ok(!text.includes('(1.) Tj'), 'page 1 has no page number');
+  });
+
+  it('escapes PDF-special characters in dialogue', () => {
+    const pdf = fountainToPdf('INT. ROOM - DAY\n\nBOB\nThis (parenthetical) and a backslash \\ here.');
+    const text = toLatin1(pdf);
+    assert.ok(text.includes('\\(parenthetical\\)'), 'parentheses escaped');
+    assert.ok(text.includes('\\\\'), 'backslash escaped');
   });
 });

@@ -13,6 +13,7 @@ interface ToolbarProps {
   onToggleTypewriterSound: () => void;
   onExportFountain: () => void;
   onExportFDX: () => void;
+  onExportPDF: () => void;
   onOpenStoryMachine?: () => void;
 }
 
@@ -28,6 +29,7 @@ export default function Toolbar({
   onToggleTypewriterSound,
   onExportFountain,
   onExportFDX,
+  onExportPDF,
   onOpenStoryMachine,
 }: ToolbarProps) {
   return (
@@ -107,6 +109,14 @@ export default function Toolbar({
           className="bg-white text-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors brutal-border flex items-center gap-2"
         >
           <Download className="w-3 h-3" aria-hidden="true" /> .FDX
+        </button>
+        <button
+          onClick={onExportPDF}
+          aria-label="Export script as industry-standard PDF"
+          title="Export as PDF (Courier 12pt, industry margins)"
+          className="bg-white text-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors brutal-border flex items-center gap-2"
+        >
+          <Download className="w-3 h-3" aria-hidden="true" /> .PDF
         </button>
         <button
           onClick={onOpenStoryMachine}
