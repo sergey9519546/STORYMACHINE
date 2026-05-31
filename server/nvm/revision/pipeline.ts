@@ -131,6 +131,7 @@ export async function runRevisionPipeline(
         records,
         approvedSpans,
         storyContext,
+        priorPassResults: passResults.length > 0 ? [...passResults] : undefined,
       });
       // Guard: if a pass returns empty fountain, keep prior pass output so empty
       // results don't cascade through the remaining 11 passes.

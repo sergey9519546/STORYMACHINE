@@ -119,7 +119,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
   );
   const dedupedIssues = prioritized.slice(0, 8);
 
-  const { revised, usedLLM } = await rewritePass({ fountain, issues: dedupedIssues, passName: 'originality', approvedSpans, storyContext: input.storyContext });
+  const { revised, usedLLM } = await rewritePass({ fountain, issues: dedupedIssues, passName: 'originality', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
   return {

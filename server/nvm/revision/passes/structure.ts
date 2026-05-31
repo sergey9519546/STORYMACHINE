@@ -67,7 +67,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
   }
 
   // ── Rewrite ───────────────────────────────────────────────────────────────
-  const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'structure', approvedSpans, storyContext: input.storyContext });
+  const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'structure', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
   return {

@@ -60,6 +60,9 @@ export interface PassInput {
   approvedSpans: ApprovedSpan[];
   /** Live story context injected into every LLM rewrite prompt */
   storyContext?: StoryContext;
+  /** Results from all passes that ran before this one — lets each pass avoid
+   *  undoing prior improvements and coordinate with earlier diagnostic work. */
+  priorPassResults?: PassResult[];
 }
 
 export interface PassResult {

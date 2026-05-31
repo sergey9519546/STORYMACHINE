@@ -3,7 +3,7 @@
 // only the flagged layer, preserving approved spans.
 // Falls back (returns original) when LLM is unavailable.
 
-import type { RevisionIssue, ApprovedSpan, PassName, StoryContext } from './passes/types.ts';
+import type { RevisionIssue, ApprovedSpan, PassName, PassResult, StoryContext } from './passes/types.ts';
 
 export interface RewriteInput {
   fountain: string;
@@ -11,6 +11,8 @@ export interface RewriteInput {
   passName: PassName;
   approvedSpans: ApprovedSpan[];
   storyContext?: StoryContext;
+  /** Compact summaries of passes that already ran — prevents undoing prior improvements. */
+  priorPassResults?: PassResult[];
 }
 
 export interface RewriteResult {
@@ -34,7 +36,7 @@ function approvedSpanInstructions(spans: ApprovedSpan[], lines: string[]): strin
  * Attempt an LLM prose rewrite. Returns original if LLM unavailable or fails.
  */
 export async function rewritePass(input: RewriteInput): Promise<RewriteResult> {
-  const { fountain, issues, passName, approvedSpans, storyContext } = input;
+  const { fountain, issues, passName, approvedSpans, storyContext, priorPassResults } = input;
   if (issues.length === 0) return { revised: fountain, usedLLM: false };
 
   const { sanitizeForPrompt } = await import('../../lib/prompt-utils.ts');
@@ -56,6 +58,19 @@ export async function rewritePass(input: RewriteInput): Promise<RewriteResult> {
   if (storyContext?.directorStyle) contextBlock.push(`DIRECTOR STYLE: ${sanitizeForPrompt(storyContext.directorStyle, 150)}`);
   if (storyContext?.characters) contextBlock.push(`CHARACTERS: ${sanitizeForPrompt(storyContext.characters, 400)}`);
 
+  // Build prior pass coordination block — tells the LLM what earlier passes
+  // already changed so it doesn't undo improvements or re-diagnose resolved issues.
+  const priorBlock: string[] = [];
+  if (priorPassResults && priorPassResults.length > 0) {
+    priorBlock.push('Revision passes already completed before this one:');
+    for (const r of priorPassResults) {
+      const changed = r.changed ? 'CHANGED' : 'no changes';
+      const summary = sanitizeForPrompt(r.summary, 100);
+      priorBlock.push(`  [${r.pass}] ${changed}: ${summary}`);
+    }
+    priorBlock.push('Do NOT undo any of the above improvements.');
+  }
+
   const prompt = [
     ...(contextBlock.length > 0 ? [...contextBlock, ''] : []),
     `You are a screenplay editor performing the "${passName}" revision pass.`,
@@ -63,6 +78,7 @@ export async function rewritePass(input: RewriteInput): Promise<RewriteResult> {
     `Preserve the story's theme, tone, and character voices. Do not change anything outside the scope of the "${passName}" pass.`,
     `Return the COMPLETE revised Fountain text with no extra commentary.`,
     '',
+    ...(priorBlock.length > 0 ? [...priorBlock, ''] : []),
     'Issues to fix:',
     issueBlock,
     approvedSpanInstructions(approvedSpans, lines),
