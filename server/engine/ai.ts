@@ -18,6 +18,10 @@ export function getAI(): GoogleGenAI {
 
 export interface LLMProvider {
   generate(params: GenerateContentParameters): Promise<GenerateContentResponse>;
+  /** Optional streaming generate. Yields response chunks (each with a `.text`).
+   *  Providers that don't support streaming can omit this; callers fall back to
+   *  a single non-streamed generate. */
+  generateStream?(params: GenerateContentParameters): Promise<AsyncIterable<GenerateContentResponse>>;
 }
 
 export interface EmbeddingProvider {
@@ -63,6 +67,7 @@ function pcmToWav(pcmData: Buffer, sampleRate: number, numChannels: number): Buf
 
 export const geminiProvider: LLMProvider = {
   generate: (params) => getAI().models.generateContent(params),
+  generateStream: (params) => getAI().models.generateContentStream(params),
 };
 
 export const geminiEmbeddingProvider: EmbeddingProvider = {
@@ -311,4 +316,45 @@ export async function generateContent(
       res ? (res as GenerateContentResponse & { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }).usageMetadata : undefined,
     );
   }
+}
+
+// Streaming variant of generateContent — goes through the active LLM provider so
+// it can be stubbed in tests and stays consistent with the non-streaming path.
+// Records a single metrics entry once the stream is exhausted (latency = full
+// stream duration). If the active provider has no generateStream, falls back to
+// a one-shot generate yielded as a single chunk.
+export async function generateContentStream(
+  params: GenerateContentParameters,
+  opts: { label: string },
+): Promise<AsyncIterable<GenerateContentResponse>> {
+  const { label } = opts;
+  const started = Date.now();
+
+  if (!_provider.generateStream) {
+    // Fallback: single non-streamed call wrapped as a one-element async iterable.
+    const res = await generateContent(params, { label });
+    async function* single(): AsyncGenerator<GenerateContentResponse> { yield res; }
+    return single();
+  }
+
+  const inner = await _provider.generateStream(params);
+  async function* tracked(): AsyncGenerator<GenerateContentResponse> {
+    let ok = false;
+    let last: GenerateContentResponse | undefined;
+    try {
+      for await (const chunk of inner) {
+        last = chunk;
+        yield chunk;
+      }
+      ok = true;
+    } finally {
+      metrics.recordAiCall(
+        label,
+        Date.now() - started,
+        ok,
+        last ? (last as GenerateContentResponse & { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }).usageMetadata : undefined,
+      );
+    }
+  }
+  return tracked();
 }

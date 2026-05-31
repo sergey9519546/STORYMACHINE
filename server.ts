@@ -1308,14 +1308,14 @@ ${prefix}
 ${suffix || '(end of document)'}
 === OUTPUT ONLY THE CONTINUATION TEXT — NO PREFIX, NO SUFFIX, NO PREAMBLE ===`;
 
-      const { getAI, modelForTask } = await import('./server/engine/ai.ts');
+      const { generateContentStream, modelForTask } = await import('./server/engine/ai.ts');
 
-      // Stream tokens as they arrive using the Gemini streaming API directly
-      const stream = await getAI().models.generateContentStream({
+      // Stream tokens via the provider abstraction (testable + metered).
+      const stream = await generateContentStream({
         model: modelForTask('GHOST_TEXT'),
         contents: prompt,
         config: { maxOutputTokens: 256, temperature: 0.85 },
-      });
+      }, { label: 'scriptide-complete' });
 
       let hasTokens = false;
       for await (const chunk of stream) {

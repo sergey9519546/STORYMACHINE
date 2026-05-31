@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { safeJsonParse } from './src/lib/json.ts';
-import { withTimeout, generateContent, setLLMProvider, resetLLMProvider, setEmbeddingProvider, setImageProvider, setTTSProvider, getEmbeddingProvider, getImageProvider, getTTSProvider, resetAllProviders, noopImageProvider, noopTTSProvider, noopEmbeddingProvider, getModel, modelForTask } from './server/engine/ai.ts';
+import { withTimeout, generateContent, generateContentStream, setLLMProvider, resetLLMProvider, setEmbeddingProvider, setImageProvider, setTTSProvider, getEmbeddingProvider, getImageProvider, getTTSProvider, resetAllProviders, noopImageProvider, noopTTSProvider, noopEmbeddingProvider, getModel, modelForTask } from './server/engine/ai.ts';
 import { analyzeSubtext } from './server/lib/subtext-meter.ts';
 import { genrePromptBlock, GENRE_MODIFIERS, GENRE_NAMES } from './server/lib/genre-router.ts';
 import { scoreBelief, retrieveBeliefs, consolidateBeliefs, decayBeliefConfidence } from './server/lib/memory.ts';
@@ -1840,6 +1840,40 @@ describe('ai — LLM provider seam', () => {
       const res = await generateContent({ model: 'x', contents: 'y' }, { label: 'unit:retry', maxAttempts: 3 });
       assert.equal(res.text, 'RECOVERED');
       assert.equal(attempts, 2, 'should have retried exactly once');
+    } finally {
+      resetLLMProvider();
+    }
+  });
+
+  it('generateContentStream yields each provider chunk in order (P1 ghost text)', async () => {
+    setLLMProvider({
+      generate: async () => ({ text: 'X' } as never),
+      generateStream: async () => {
+        async function* gen() {
+          yield { text: 'Hello' } as never;
+          yield { text: ', ' } as never;
+          yield { text: 'world' } as never;
+        }
+        return gen();
+      },
+    });
+    try {
+      const stream = await generateContentStream({ model: 'x', contents: 'y' }, { label: 'unit:stream' });
+      const tokens: string[] = [];
+      for await (const chunk of stream) tokens.push(chunk.text ?? '');
+      assert.deepEqual(tokens, ['Hello', ', ', 'world']);
+    } finally {
+      resetLLMProvider();
+    }
+  });
+
+  it('generateContentStream falls back to a single generate when the provider cannot stream', async () => {
+    setLLMProvider({ generate: async () => ({ text: 'ONE_SHOT' } as never) }); // no generateStream
+    try {
+      const stream = await generateContentStream({ model: 'x', contents: 'y' }, { label: 'unit:stream-fallback' });
+      const tokens: string[] = [];
+      for await (const chunk of stream) tokens.push(chunk.text ?? '');
+      assert.deepEqual(tokens, ['ONE_SHOT'], 'fallback yields the one-shot result as a single chunk');
     } finally {
       resetLLMProvider();
     }
