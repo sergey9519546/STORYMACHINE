@@ -76,20 +76,30 @@ export function deriveTensionLedger(state: NarrativeState, sceneIdx: number): Te
   // Belief-vs-reality conflicts: character believes X, but objective reality says not-X.
   // Detected heuristically: look for character beliefs whose proposition mentions a
   // subject+predicate that appears in objective reality with a different object.
+  // Cross-checking the belief against factIndex gives us a higher-fidelity signal:
+  // a belief that references a fact subject is more likely to be a real contradiction.
   const factIndex = new Map<string, string>(); // "subject|predicate" → object
+  const factSubjects = new Set<string>();
   for (const f of state.objectiveReality) {
     factIndex.set(`${f.subject}|${f.predicate}`, f.object);
+    factSubjects.add(f.subject.toLowerCase());
   }
   for (const [charId, beliefs] of Object.entries(state.characterBeliefs)) {
     for (const belief of beliefs) {
       // Simple heuristic: if the belief was told (not witnessed) it may be false
       if (belief.source === 'told' && belief.confidence > 0.5) {
+        // Boost expectedPayoff if the belief proposition references a known fact subject —
+        // that means the character holds a told-belief about something in objective reality,
+        // which is a concrete contradiction setup rather than a vague potential deception.
+        const propLower = belief.proposition.toLowerCase();
+        const referencesKnownFact = factSubjects.size > 0 &&
+          [...factSubjects].some(s => propLower.includes(s));
         const pos = openPosition(
           `belief_conflict_${charId}_${belief.id}`,
           'belief_conflict',
           `${charId} holds a potentially false told-belief: "${belief.proposition.slice(0, 60)}"`,
           sceneIdx,
-          75,
+          referencesKnownFact ? 90 : 75,
           charId,
         );
         positions.push(markToMarket(pos, sceneIdx, investment));
@@ -97,14 +107,20 @@ export function deriveTensionLedger(state: NarrativeState, sceneIdx: number): Te
     }
   }
 
-  // Open payoffs: PAYOFF_SETUP ops whose setups haven't been paid off yet
-  for (const payoff of state.payoffs) {
+  // Open payoffs: PAYOFF_SETUP ops whose setups haven't been paid off yet.
+  // Urgency INCREASES with age — earlier setups are more overdue. We estimate
+  // planting order from array position (earlier index = older setup) and boost
+  // expectedPayoff by up to +25 for the oldest unresolved promise.
+  for (let pi = 0; pi < state.payoffs.length; pi++) {
+    const payoff = state.payoffs[pi];
+    const estimatedAge = Math.max(0, state.payoffs.length - 1 - pi);
+    const urgencyBoost = Math.min(25, estimatedAge * 5);
     const pos = openPosition(
       `payoff_${payoff.setupId}`,
       'open_payoff',
-      `Setup "${payoff.setupId}" is planted, payoff pending`,
+      `Setup "${payoff.setupId}" is planted, payoff ${urgencyBoost > 0 ? '(overdue) ' : ''}pending`,
       sceneIdx,
-      85,
+      85 + urgencyBoost,
     );
     positions.push(markToMarket(pos, sceneIdx, investment));
   }
@@ -143,7 +159,9 @@ export function deriveTensionLedger(state: NarrativeState, sceneIdx: number): Te
     }
   }
 
-  // Relationship tensions: large negative shift history
+  // Relationship tensions: large shifts in either direction.
+  // Negative net = unresolved conflict; positive net = charged anticipatory tension
+  // (romantic buildup, loyalty on the line). Both create dramatic pressure.
   for (const [key, deltas] of Object.entries(state.relationships)) {
     const net = deltas.reduce((s, d) => s + (isFinite(d.amount) ? d.amount : 0), 0);
     if (net < -0.3) {
@@ -153,6 +171,18 @@ export function deriveTensionLedger(state: NarrativeState, sceneIdx: number): Te
         `Relationship ${key} has net delta ${net.toFixed(2)} — unresolved conflict`,
         sceneIdx,
         60,
+      );
+      positions.push(markToMarket(pos, sceneIdx, investment));
+    } else if (net > 0.3) {
+      // Positive anticipatory tension: high stake positive relationships create
+      // dramatic pressure when threatened (the more there is to lose, the higher
+      // the stakes of any scene that endangers this bond).
+      const pos = openPosition(
+        `rel_anticipation_${key}`,
+        'unresolved_relationship',
+        `Relationship ${key} has positive tension (net ${net.toFixed(2)}) — high-stakes bond at risk`,
+        sceneIdx,
+        Math.min(55, 30 + net * 25),
       );
       positions.push(markToMarket(pos, sceneIdx, investment));
     }

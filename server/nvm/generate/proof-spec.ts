@@ -162,8 +162,23 @@ export function buildSystemPreamble(constraints: GenerationConstraint[], state: 
 
   // ── Audience state ─────────────────────────────────────────────────────────
   const { suspense, curiosity, investment } = state.audienceState;
-  const audienceBlock = (typeof suspense === 'number' && isFinite(suspense)) || (typeof curiosity === 'number' && isFinite(curiosity))
-    ? `Audience: suspense=${Math.round(isFinite(suspense) ? suspense : 0)}, curiosity=${Math.round(isFinite(curiosity) ? curiosity : 0)}, investment=${Math.round(isFinite(investment) ? investment : 0)}.`
+  const safeSuspense = Math.round(isFinite(suspense) ? suspense : 0);
+  const safeCuriosity = Math.round(isFinite(curiosity) ? curiosity : 0);
+  const safeInvestment = Math.round(isFinite(investment) ? investment : 0);
+  // Prescriptive directive: tell the LLM how to calibrate op intensity based on
+  // the current audience state, not just what the numbers are.
+  let audienceDirective = '';
+  if (safeSuspense < 30 && safeCuriosity < 30) {
+    audienceDirective = 'The audience is disengaged — prioritise curiosity hooks (SEED_CLUE, ADD_FACT) over resolution.';
+  } else if (safeSuspense >= 70) {
+    audienceDirective = 'Suspense is high — escalate pressure: add a RAISE_CLOCK or SHIFT_RELATIONSHIP consequence.';
+  } else if (safeCuriosity >= 70 && safeSuspense < 40) {
+    audienceDirective = 'Curiosity is high but tension is low — plant a reveal or complication via ADD_FACT or PAYOFF_SETUP.';
+  } else if (safeInvestment >= 70) {
+    audienceDirective = 'Audience investment is high — threaten what they care about: introduce cost or complication.';
+  }
+  const audienceBlock = (safeSuspense > 0 || safeCuriosity > 0 || audienceDirective)
+    ? [`Audience: suspense=${safeSuspense}, curiosity=${safeCuriosity}, investment=${safeInvestment}.`, audienceDirective].filter(Boolean).join(' ')
     : '';
 
   // ── Active clocks (urgency) ────────────────────────────────────────────────

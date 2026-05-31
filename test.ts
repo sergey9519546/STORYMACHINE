@@ -3274,10 +3274,10 @@ describe('NVM — buildEnrichedState (historical replay)', () => {
 
   it('replays SHIFT_RELATIONSHIP ops from committed scenes into state', () => {
     const stage = makeStage();
+    const ops1 = [{ op: 'SHIFT_RELATIONSHIP' as const, pair: ['alice', 'bob'] as [string, string], delta: { dimension: 'trust' as const, amount: 0.4, reason: 'saved each other' } }];
     stage.appendCommit({
       commitId: 'c1', parentId: null, sceneIdx: 0, reverted: false, createdAt: Date.now(),
-      deltaSummary: 'trust shift',
-      ops: [{ op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: 0.4, reason: 'saved each other' } }],
+      deltaSummary: summarizeOps(ops1), ops: ops1,
     });
     const state = buildEnrichedState(stage);
     const key = relationshipKey('alice', 'bob');
@@ -3288,10 +3288,10 @@ describe('NVM — buildEnrichedState (historical replay)', () => {
 
   it('replays RAISE_CLOCK ops so clocks are non-zero', () => {
     const stage = makeStage();
+    const ops2 = [{ op: 'RAISE_CLOCK' as const, clockId: 'bomb_timer', amount: 5 }];
     stage.appendCommit({
       commitId: 'c2', parentId: null, sceneIdx: 0, reverted: false, createdAt: Date.now(),
-      deltaSummary: 'clock',
-      ops: [{ op: 'RAISE_CLOCK', clockId: 'bomb_timer', amount: 5 }],
+      deltaSummary: summarizeOps(ops2), ops: ops2,
     });
     const state = buildEnrichedState(stage);
     assert.equal(state.clocks['bomb_timer'], 5);
@@ -3299,10 +3299,10 @@ describe('NVM — buildEnrichedState (historical replay)', () => {
 
   it('replays ADD_FACT ops into objectiveReality', () => {
     const stage = makeStage();
+    const ops3 = [{ op: 'ADD_FACT' as const, fact: { factId: 'f1', subject: 'vault', predicate: 'contains', object: 'the ledger', addedAtTurn: 0, validFrom: 0, validTo: null } }];
     stage.appendCommit({
       commitId: 'c3', parentId: null, sceneIdx: 0, reverted: false, createdAt: Date.now(),
-      deltaSummary: 'fact',
-      ops: [{ op: 'ADD_FACT', fact: { factId: 'f1', subject: 'vault', predicate: 'contains', object: 'the ledger', addedAtTurn: 0, validFrom: 0, validTo: null } }],
+      deltaSummary: summarizeOps(ops3), ops: ops3,
     });
     const state = buildEnrichedState(stage);
     assert.equal(state.objectiveReality.length, 1);
@@ -3311,10 +3311,10 @@ describe('NVM — buildEnrichedState (historical replay)', () => {
 
   it('skips reverted commits during replay', () => {
     const stage = makeStage();
+    const ops4 = [{ op: 'RAISE_CLOCK' as const, clockId: 'bomb_timer', amount: 99 }];
     stage.appendCommit({
       commitId: 'c4', parentId: null, sceneIdx: 0, reverted: true, createdAt: Date.now(),
-      deltaSummary: 'reverted',
-      ops: [{ op: 'RAISE_CLOCK', clockId: 'bomb_timer', amount: 99 }],
+      deltaSummary: summarizeOps(ops4), ops: ops4,
     });
     const state = buildEnrichedState(stage);
     assert.ok(!('bomb_timer' in state.clocks), 'reverted commit should not affect state');
@@ -4117,6 +4117,42 @@ describe('NVM — Contradiction Futures Market (C1)', () => {
   it('tensionMonotone fails for a sharp drop', () => {
     const mk = (t: number, s: number) => ({ positions: [], totalTension: t, sceneIdx: s });
     assert.equal(tensionMonotone([mk(50, 0), mk(60, 1), mk(5, 2)]), false);
+  });
+
+  it('deriveTensionLedger boosts belief conflict when belief references a known fact subject', () => {
+    const state = emptyState();
+    state.objectiveReality.push({ factId: 'f1', subject: 'vault', predicate: 'contains', object: 'the diamond', addedAtTurn: 0, validFrom: 0, validTo: null });
+    state.characterBeliefs['alice'] = [{ id: 'b1', proposition: 'the vault is empty', confidence: 0.8, source: 'told', source_agent_id: 'bob', acquired_at: 1 }];
+    state.audienceState.investment = 100;
+    const ledger = deriveTensionLedger(state, 1);
+    const beliefPos = ledger.positions.find(p => p.kind === 'belief_conflict');
+    assert.ok(beliefPos, 'should have belief_conflict position');
+    assert.ok(beliefPos!.expectedPayoff >= 90, 'belief referencing known fact subject should have boosted expectedPayoff');
+  });
+
+  it('deriveTensionLedger assigns higher urgency to older payoffs', () => {
+    const state = emptyState();
+    state.audienceState.investment = 100;
+    state.payoffs.push({ setupId: 'early_setup', payoffEventId: 'e1' });
+    state.payoffs.push({ setupId: 'late_setup', payoffEventId: 'e2' });
+    const ledger = deriveTensionLedger(state, 5);
+    const earlyPayoff = ledger.positions.find(p => p.positionId === 'payoff_early_setup');
+    const latePayoff = ledger.positions.find(p => p.positionId === 'payoff_late_setup');
+    assert.ok(earlyPayoff && latePayoff, 'both payoff positions should exist');
+    assert.ok(earlyPayoff!.expectedPayoff > latePayoff!.expectedPayoff, 'older setup should have higher urgency');
+  });
+
+  it('deriveTensionLedger creates positions for positive relationship anticipation', () => {
+    const state = emptyState();
+    state.audienceState.investment = 100;
+    state.relationships['alice|bob'] = [
+      { dimension: 'love', amount: 0.5, reason: 'growing closer' },
+      { dimension: 'trust', amount: 0.3, reason: 'trust built' },
+    ];
+    const ledger = deriveTensionLedger(state, 2);
+    const anticipation = ledger.positions.find(p => p.positionId === 'rel_anticipation_alice|bob');
+    assert.ok(anticipation, 'positive relationship should create anticipatory tension position');
+    assert.ok(anticipation!.markToMarket > 0, 'anticipatory tension should have positive markToMarket');
   });
 
   it('Stage v11: Drama_Positions round-trips via upsert + getOpenPositions', () => {

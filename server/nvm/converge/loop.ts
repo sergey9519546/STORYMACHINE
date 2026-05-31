@@ -6,7 +6,8 @@
 // Rejected candidates go to the Ghost Ledger (A2) with specific reasons.
 // Budget limits total LLM calls.
 //
-// Composite score = 0.5 * normalizedTension + 0.5 * qualityScore (0–100 each).
+// Composite score = 0.6 * normalizedTension + 0.4 * qualityScore (0–100 each).
+// Dramatic tension is the primary goal; craft quality is the secondary gate.
 // The convergence criterion is all three gates simultaneously.
 
 import type { NarrativeTransitionIR } from '../ir/NarrativeTransitionIR.ts';
@@ -211,7 +212,8 @@ export async function convergeScene(
       // Guard the composite at its source so a single non-finite signal can't
       // propagate into bestComposite tracking, the convergedThisIter winner sort,
       // or finalComposite on either the converged or budget-exhausted return path.
-      const rawComposite = 0.5 * tensionNorm + 0.5 * qualityScore;
+      // 60/40 weighting: dramatic tension is the primary objective; quality is craft gate.
+      const rawComposite = 0.6 * tensionNorm + 0.4 * qualityScore;
       const compositeScore = isFinite(rawComposite) ? rawComposite : 0;
 
       const tensionMet = valuationScore >= target.tensionTarget;
@@ -296,7 +298,9 @@ export async function convergeScene(
   }
 
   // Budget exhausted — return best Tier-1-passing candidate found.
-  // The fallback generate is guarded by the budget so it doesn't exceed maxLLMCalls.
+  // Prefer the highest-composite Tier-1-passing candidate; if that candidate also
+  // passes the quality gate we call it a "soft converge". Log quality gate miss so
+  // callers can detect low-craft fallbacks.
   // lastCandidates[-1] would be undefined when the array is empty, so guard the index.
   let finalIR = best ?? (lastCandidates.length > 0 ? lastCandidates[lastCandidates.length - 1] : null);
   if (!finalIR && llmCallCount <= llmCallLimit) {
