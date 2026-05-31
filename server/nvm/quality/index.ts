@@ -93,6 +93,13 @@ const VAGUE_TERMS = [
   'everything', 'nothing', 'everyone', 'someone', 'anyone', 'somehow',
   'somewhere', 'sometime', 'certain', 'obvious', 'clearly', 'simply',
   'just something', 'some kind', 'a lot', 'a bit',
+  // Placeholder action verbs — no concrete subject/object implied
+  'started to', 'began to', 'moved', 'looked at', 'seemed', 'appeared',
+  // Vague emotional weasel words — describe no specific internal state
+  'weird', 'strange', 'odd', 'unsettling', 'unnerving',
+  // Filler intensifiers that add no information
+  'quite', 'rather', 'somewhat', 'fairly', 'pretty much', 'basically',
+  'generally', 'mostly', 'usually', 'often',
 ];
 
 function opText(op: StoryOp): string {

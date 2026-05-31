@@ -16,7 +16,15 @@ export function characterAdvocateCritic(ir: NarrativeTransitionIR, state: Narrat
       // Suppressed when the same IR contains a causal bridging event (ADD_FACT,
       // SHIFT_RELATIONSHIP, or UPDATE_BELIEF for this character) BEFORE this op —
       // those events explain the change without requiring an extra bridging scene.
-      if (prev && prev.dominant !== op.emotion.dominant && op.emotion.intensity > 70) {
+      // An emotion reversal is suspicious if:
+      // (a) the dominant changes AND the intensity delta is large (> 40) — sudden swing
+      // (b) OR the dominant changes while intensity stays high (both > 60) — feels unearned
+      // Suppress when the same IR already contains a causal bridging event before this op.
+      const intensityDelta = prev ? Math.abs(op.emotion.intensity - prev.intensity) : 0;
+      const bothHighIntensity = prev && prev.intensity > 60 && op.emotion.intensity > 60;
+      const reversalSuspicious = prev && prev.dominant !== op.emotion.dominant &&
+        (intensityDelta > 40 || bothHighIntensity);
+      if (reversalSuspicious) {
         const hasBridgingEvent = ir.ops.slice(0, i).some(p =>
           p.op === 'ADD_FACT' ||
           (p.op === 'SHIFT_RELATIONSHIP' && p.pair.includes(op.charId)) ||
@@ -25,7 +33,7 @@ export function characterAdvocateCritic(ir: NarrativeTransitionIR, state: Narrat
         if (!hasBridgingEvent) {
           critiques.push({
             criticId: 'character_advocate', severity: 50, targetOpIdx: i,
-            objection: `${op.charId} shifts from ${prev.dominant} to ${op.emotion.dominant} at intensity ${op.emotion.intensity} with no bridging beat`,
+            objection: `${op.charId} shifts from ${prev!.dominant}(${prev!.intensity}) to ${op.emotion.dominant}(${op.emotion.intensity}) — intensity delta ${intensityDelta} with no bridging beat`,
             suggestedOperator: 'deepen_wound',
             attentionBid: 55,
           });

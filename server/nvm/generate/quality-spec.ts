@@ -102,22 +102,25 @@ export function arcConstraintsFromTracker(
 
   return urgentPromises.map(p => {
     const base = sanitizeForPrompt(p.description, 200);
+    const urgencyPrefix = p.urgency === 'overdue'
+      ? 'URGENT (overdue): '
+      : 'Due soon: ';
     switch (p.kind) {
       case 'CLUE':
-        return { kind: 'must_seed_clue' as const, description: `Resolve arc promise: ${base}. Use a PAYOFF_SETUP op.`, detail: sanitizeForPrompt(p.promiseId.replace('clue:', ''), 128) };
+        return { kind: 'must_seed_clue' as const, description: `${urgencyPrefix}Resolve arc promise: ${base}. Use a PAYOFF_SETUP op.`, detail: sanitizeForPrompt(p.promiseId.replace('clue:', ''), 128) };
       case 'CLOCK':
-        return { kind: 'free_form' as const, description: `Resolve arc promise: ${base}. Add a RAISE_CLOCK with a negative amount to count it down.` };
+        return { kind: 'free_form' as const, description: `${urgencyPrefix}Resolve arc promise: ${base}. Add a RAISE_CLOCK with a negative amount to count it down — the audience has been waiting.` };
       case 'REL':
-        return { kind: 'free_form' as const, description: `Resolve arc promise: ${base}. Add a positive SHIFT_RELATIONSHIP to begin the recovery arc.` };
+        return { kind: 'free_form' as const, description: `${urgencyPrefix}Resolve arc promise: ${base}. Add a positive SHIFT_RELATIONSHIP to begin the recovery arc — the rift cannot be ignored any longer.` };
       case 'THEME':
-        return { kind: 'free_form' as const, description: `Resolve arc promise: ${base}. Add an ADVANCE_THEME_ARGUMENT with move='resolve'.` };
+        return { kind: 'free_form' as const, description: `${urgencyPrefix}Resolve arc promise: ${base}. Add an ADVANCE_THEME_ARGUMENT with move='resolve' — the theme argument is overdue for a position.` };
       case 'OBJECT':
-        return { kind: 'free_form' as const, description: `Resolve arc promise: ${base}. Advance the ADVANCE_OBJECT_ARC to a terminal state (destroyed, resolved, returned, complete, found, lost_permanently).` };
+        return { kind: 'free_form' as const, description: `${urgencyPrefix}Resolve arc promise: ${base}. Advance the ADVANCE_OBJECT_ARC to a terminal state (destroyed, resolved, returned, complete, found, lost_permanently).` };
       default: {
         // Exhaustiveness guard — if a new OpenPromise kind is added without updating this switch,
         // TypeScript will infer 'never' here and the build will fail.
         const _exhaustive: never = p.kind;
-        return { kind: 'free_form' as const, description: `Resolve arc promise: ${base}.` };
+        return { kind: 'free_form' as const, description: `${urgencyPrefix}Resolve arc promise: ${base}.` };
       }
     }
   });
