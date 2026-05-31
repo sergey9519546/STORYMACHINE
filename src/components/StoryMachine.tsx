@@ -1159,7 +1159,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                           <GitBranch className="w-2.5 h-2.5" />
                           {beat.causal_chain.map((id, i) => (
                             <span key={id}>
-                              {id.substring(0, 8)}…{i < beat.causal_chain.length - 1 && <span className="mx-0.5">→</span>}
+                              {id.slice(0, 8)}…{i < beat.causal_chain.length - 1 && <span className="mx-0.5">→</span>}
                             </span>
                           ))}
                         </div>
