@@ -39,6 +39,7 @@ import { PROOF_TIERS, passResult, failResult } from './server/nvm/proof/contract
 import type { ProofName } from './server/nvm/proof/contract.ts';
 import { emptyState, stateHash, relationshipKey } from './server/nvm/state/NarrativeState.ts';
 import type { NarrativeState } from './server/nvm/state/NarrativeState.ts';
+import { buildEnrichedState } from './server/nvm/state/enrichedState.ts';
 import { applyStoryOp, applyStoryOps } from './server/nvm/ops/dispatcher.ts';
 import { loadMechanisms, loadMechanismsCached } from './server/nvm/mechanisms/loader.ts';
 import { runTier1, tier1Passes, runTier2, tier2Score, runTier3, tier3Rank, runTier4 } from './server/nvm/proof/kernel.ts';
@@ -3259,6 +3260,64 @@ describe('NVM — NarrativeState', () => {
   });
   it('relationshipKey is order-independent', () => {
     assert.equal(relationshipKey('alice', 'bob'), relationshipKey('bob', 'alice'));
+  });
+});
+
+describe('NVM — buildEnrichedState (historical replay)', () => {
+  it('empty stage returns state with no relationships or clocks', () => {
+    const stage = makeStage();
+    const state = buildEnrichedState(stage);
+    assert.deepEqual(state.relationships, {});
+    assert.deepEqual(state.clocks, {});
+    assert.deepEqual(state.objectiveReality, []);
+  });
+
+  it('replays SHIFT_RELATIONSHIP ops from committed scenes into state', () => {
+    const stage = makeStage();
+    stage.appendCommit({
+      commitId: 'c1', parentId: null, sceneIdx: 0, reverted: false, createdAt: Date.now(),
+      deltaSummary: 'trust shift',
+      ops: [{ op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: 0.4, reason: 'saved each other' } }],
+    });
+    const state = buildEnrichedState(stage);
+    const key = relationshipKey('alice', 'bob');
+    assert.ok(key in state.relationships, 'relationship key should exist after replay');
+    assert.equal(state.relationships[key].length, 1);
+    assert.equal(state.relationships[key][0].amount, 0.4);
+  });
+
+  it('replays RAISE_CLOCK ops so clocks are non-zero', () => {
+    const stage = makeStage();
+    stage.appendCommit({
+      commitId: 'c2', parentId: null, sceneIdx: 0, reverted: false, createdAt: Date.now(),
+      deltaSummary: 'clock',
+      ops: [{ op: 'RAISE_CLOCK', clockId: 'bomb_timer', amount: 5 }],
+    });
+    const state = buildEnrichedState(stage);
+    assert.equal(state.clocks['bomb_timer'], 5);
+  });
+
+  it('replays ADD_FACT ops into objectiveReality', () => {
+    const stage = makeStage();
+    stage.appendCommit({
+      commitId: 'c3', parentId: null, sceneIdx: 0, reverted: false, createdAt: Date.now(),
+      deltaSummary: 'fact',
+      ops: [{ op: 'ADD_FACT', fact: { factId: 'f1', subject: 'vault', predicate: 'contains', object: 'the ledger', addedAtTurn: 0, validFrom: 0, validTo: null } }],
+    });
+    const state = buildEnrichedState(stage);
+    assert.equal(state.objectiveReality.length, 1);
+    assert.equal(state.objectiveReality[0].factId, 'f1');
+  });
+
+  it('skips reverted commits during replay', () => {
+    const stage = makeStage();
+    stage.appendCommit({
+      commitId: 'c4', parentId: null, sceneIdx: 0, reverted: true, createdAt: Date.now(),
+      deltaSummary: 'reverted',
+      ops: [{ op: 'RAISE_CLOCK', clockId: 'bomb_timer', amount: 99 }],
+    });
+    const state = buildEnrichedState(stage);
+    assert.ok(!('bomb_timer' in state.clocks), 'reverted commit should not affect state');
   });
 });
 

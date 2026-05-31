@@ -1,6 +1,7 @@
 import express from 'express';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
+import { buildEnrichedState } from '../nvm/state/enrichedState.ts';
 import {
   asyncHandler, requireString, safeJsonParse, sessionId, getOrCreateSession,
   gameLimiter,
@@ -71,8 +72,7 @@ router.get('/api/debug/explain-scene/:locationId', gameLimiter, asyncHandler(asy
 router.get('/api/nvm/tension', gameLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { deriveTensionLedger } = await import('../nvm/valuation/futures.ts');
-  const { buildNarrativeState } = await import('../nvm/state/NarrativeState.ts');
-  const state = buildNarrativeState(stage);
+  const state = buildEnrichedState(stage);
   const commits = stage.getCommits().filter(c => !c.reverted);
   const sceneIdx = commits.length > 0 ? commits[commits.length - 1].sceneIdx : 0;
   res.json(deriveTensionLedger(state, sceneIdx));
@@ -83,8 +83,7 @@ router.get('/api/nvm/two-reader', gameLimiter, asyncHandler(async (req, res) => 
   const { stage } = getOrCreateSession(sessionId(req));
   const { deriveTensionLedger } = await import('../nvm/valuation/futures.ts');
   const { twoReaderReport } = await import('../nvm/valuation/two-reader.ts');
-  const { buildNarrativeState } = await import('../nvm/state/NarrativeState.ts');
-  const state = buildNarrativeState(stage);
+  const state = buildEnrichedState(stage);
   const commits = stage.getCommits().filter(c => !c.reverted);
   const sceneIdx = commits.length > 0 ? commits[commits.length - 1].sceneIdx : 0;
   const ledger = deriveTensionLedger(state, sceneIdx);
@@ -96,8 +95,7 @@ router.get('/api/nvm/topology', gameLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { deriveTensionLedger } = await import('../nvm/valuation/futures.ts');
   const { computeTopology } = await import('../nvm/valuation/topology.ts');
-  const { buildNarrativeState } = await import('../nvm/state/NarrativeState.ts');
-  const state = buildNarrativeState(stage);
+  const state = buildEnrichedState(stage);
   const commits = stage.getCommits().filter(c => !c.reverted);
   const ledgers = commits.map((c, i) => deriveTensionLedger(state, c.sceneIdx ?? i));
   res.json(computeTopology(ledgers));
@@ -107,12 +105,11 @@ router.get('/api/nvm/topology', gameLimiter, asyncHandler(async (req, res) => {
 router.post('/api/nvm/redteam', gameLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { redTeamVerdict } = await import('../nvm/valuation/audience-redteam.ts');
-  const { buildNarrativeState } = await import('../nvm/state/NarrativeState.ts');
   const plan = req.body?.plan;
   if (!plan || typeof plan.revealId !== 'string') {
     res.status(400).json({ error: 'body.plan must be a RevealPlan' }); return;
   }
-  const state = buildNarrativeState(stage);
+  const state = buildEnrichedState(stage);
   res.json(redTeamVerdict(plan, state));
 }));
 
@@ -122,12 +119,11 @@ router.post('/api/nvm/redteam', gameLimiter, asyncHandler(async (req, res) => {
 router.post('/api/nvm/quality', gameLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { runQualityEngine } = await import('../nvm/quality/index.ts');
-  const { buildNarrativeState } = await import('../nvm/state/NarrativeState.ts');
   const ir = req.body?.ir;
   if (!ir || typeof ir !== 'object' || !Array.isArray(ir.ops)) {
     res.status(400).json({ error: 'body.ir must be a NarrativeTransitionIR' }); return;
   }
-  const state = buildNarrativeState(stage);
+  const state = buildEnrichedState(stage);
   res.json(runQualityEngine(ir, state));
 }));
 
@@ -140,9 +136,8 @@ router.get('/api/nvm/project/:target', gameLimiter, asyncHandler(async (req, res
   if (!VALID.includes(target)) {
     res.status(400).json({ error: `Unknown projection target "${target}". Valid: ${VALID.join(', ')}` }); return;
   }
-  const { buildNarrativeState } = await import('../nvm/state/NarrativeState.ts');
   const commits = stage.getCommits().filter(c => !c.reverted);
-  const state = buildNarrativeState(stage);
+  const state = buildEnrichedState(stage);
   const ghosts = stage.ghostLedgerGet();
   const canon = { commits, state, ghosts };
   res.json(project(canon, target));
@@ -183,12 +178,11 @@ router.post('/api/nvm/twin/do', gameLimiter, asyncHandler(async (req, res) => {
 router.post('/api/nvm/author/fixed-points', gameLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { planToward } = await import('../nvm/author/fixed-points.ts');
-  const { buildNarrativeState } = await import('../nvm/state/NarrativeState.ts');
   const fps = req.body?.fixedPoints;
   if (!Array.isArray(fps) || fps.length === 0) {
     res.status(400).json({ error: 'body.fixedPoints must be a non-empty array' }); return;
   }
-  const state = buildNarrativeState(stage);
+  const state = buildEnrichedState(stage);
   const currentScene = typeof req.body?.currentScene === 'number' ? req.body.currentScene : state.turn;
   const planResult = planToward(state, fps, currentScene);
 
@@ -235,12 +229,11 @@ router.post('/api/nvm/author/fixed-points', gameLimiter, asyncHandler(async (req
 router.post('/api/nvm/author/backchain', gameLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { backchain, scheduleToGoalBiases } = await import('../nvm/author/backchain.ts');
-  const { buildNarrativeState } = await import('../nvm/state/NarrativeState.ts');
   const fp = req.body?.fixedPoint;
   if (!fp || typeof fp.atScene !== 'number') {
     res.status(400).json({ error: 'body.fixedPoint with atScene (number) is required' }); return;
   }
-  const state = buildNarrativeState(stage);
+  const state = buildEnrichedState(stage);
   const currentScene = typeof req.body?.currentScene === 'number' ? req.body.currentScene : state.turn;
   const result = backchain(fp, state, currentScene);
   const { sanitizeForPrompt } = await import('../lib/prompt-utils.ts');
@@ -260,7 +253,7 @@ router.get('/api/nvm/momentum', gameLimiter, asyncHandler(async (req, res) => {
 router.post('/api/nvm/inject-ops', gameLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { applyStoryOps } = await import('../nvm/ops/dispatcher.ts');
-  const { buildNarrativeState, stateHash } = await import('../nvm/state/NarrativeState.ts');
+  const { stateHash } = await import('../nvm/state/NarrativeState.ts');
   const { summarizeOps } = await import('../nvm/state/StoryCommit.ts');
   const { randomUUID } = await import('node:crypto');
   const { STORY_OP_KINDS } = await import('../nvm/ops/StoryOp.ts');
@@ -276,7 +269,7 @@ router.post('/api/nvm/inject-ops', gameLimiter, asyncHandler(async (req, res) =>
     }
   }
 
-  const state = buildNarrativeState(stage);
+  const state = buildEnrichedState(stage);
   const commits = stage.getCommits().filter(c => !c.reverted);
   const parentId = commits[commits.length - 1]?.commitId ?? null;
   const sceneIdx = typeof req.body?.sceneIdx === 'number' ? req.body.sceneIdx : state.turn;
@@ -306,13 +299,12 @@ router.post('/api/nvm/inject-ops', gameLimiter, asyncHandler(async (req, res) =>
 router.post('/api/nvm/converge', gameLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { convergeScene } = await import('../nvm/converge/loop.ts');
-  const { buildNarrativeState } = await import('../nvm/state/NarrativeState.ts');
   const { makeLLMCandidateGenerator } = await import('../nvm/generate/llm-generator.ts');
   const target = req.body?.target;
   if (!target || typeof target !== 'object' || typeof target.sceneIdx !== 'number') {
     res.status(400).json({ error: 'body.target must be a SceneTarget with sceneIdx' }); return;
   }
-  const state = buildNarrativeState(stage);
+  const state = buildEnrichedState(stage);
   const seed = typeof req.body?.seed === 'number' ? req.body.seed : Date.now();
   const generate = makeLLMCandidateGenerator();
 
@@ -395,7 +387,6 @@ router.get('/api/nvm/converge-stream', gameLimiter, async (req, res) => {
   try {
     const { stage } = getOrCreateSession(sessionId(req));
     const { convergeScene } = await import('../nvm/converge/loop.ts');
-    const { buildNarrativeState } = await import('../nvm/state/NarrativeState.ts');
     const { makeLLMCandidateGenerator } = await import('../nvm/generate/llm-generator.ts');
     const { analyzeArcCompletion } = await import('../nvm/quality/arc-tracker.ts');
 
@@ -407,7 +398,7 @@ router.get('/api/nvm/converge-stream', gameLimiter, async (req, res) => {
     const maxIterations = Math.min(10, Math.max(1, parseInt(q['maxIterations'] ?? '4', 10) || 4));
     const candidatesPerIteration = Math.min(5, Math.max(1, parseInt(q['candidatesPerIteration'] ?? '2', 10) || 2));
 
-    const state = buildNarrativeState(stage);
+    const state = buildEnrichedState(stage);
     const generate = makeLLMCandidateGenerator();
     const seed = Date.now();
 
@@ -539,7 +530,6 @@ router.post('/api/nvm/selfplay', gameLimiter, asyncHandler(async (req, res) => {
   const { runSelfPlay } = await import('../nvm/selfplay/corpus.ts');
   const { makeLLMCandidateGenerator } = await import('../nvm/generate/llm-generator.ts');
   const { extractGenome } = await import('../nvm/selfplay/genome.ts');
-  const { buildNarrativeState } = await import('../nvm/state/NarrativeState.ts');
   const scenarios = req.body?.scenarios;
   if (!Array.isArray(scenarios) || scenarios.length === 0) {
     res.status(400).json({ error: 'body.scenarios must be a non-empty array' }); return;
@@ -555,7 +545,7 @@ router.post('/api/nvm/selfplay', gameLimiter, asyncHandler(async (req, res) => {
   const report = await runSelfPlay(scenarios, generate, maxSimulations, maxScenesPerScenario);
 
   // Persist each run to Stage corpus
-  const state = buildNarrativeState(stage);
+  const state = buildEnrichedState(stage);
   const commits = stage.getCommits();
   const ghosts = stage.ghostLedgerGet();
   for (const run of report.runs) {
@@ -583,9 +573,8 @@ router.post('/api/nvm/selfplay', gameLimiter, asyncHandler(async (req, res) => {
 router.get('/api/nvm/genome/current', gameLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { extractGenome } = await import('../nvm/selfplay/genome.ts');
-  const { buildNarrativeState } = await import('../nvm/state/NarrativeState.ts');
   const commits = stage.getCommits();
-  const state = buildNarrativeState(stage);
+  const state = buildEnrichedState(stage);
   const ghosts = stage.ghostLedgerGet();
   const genome = extractGenome({ commits, state, ghosts }, 'current');
   res.json(genome);
@@ -704,12 +693,11 @@ router.post('/api/nvm/repair', gameLimiter, asyncHandler(async (req, res) => {
   const { runTier1, runTier2, runTier4 } = await import('../nvm/proof/kernel.ts');
   const { repair } = await import('../nvm/proof/repair.ts');
   const { lint } = await import('../nvm/proof/lint.ts');
-  const { buildNarrativeState } = await import('../nvm/state/NarrativeState.ts');
   const ir = req.body?.ir;
   if (!ir || typeof ir !== 'object' || !Array.isArray(ir.ops)) {
     res.status(400).json({ error: 'body.ir must be a NarrativeTransitionIR with ops[]' }); return;
   }
-  const state = buildNarrativeState(stage);
+  const state = buildEnrichedState(stage);
   const t1 = runTier1(ir, state);
   const t2 = runTier2(ir, state);
   const t4 = runTier4(ir, state);
@@ -731,15 +719,12 @@ router.post('/api/nvm/repair', gameLimiter, asyncHandler(async (req, res) => {
 router.get('/api/nvm/arc-timeline', gameLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { runTier1, runTier2, tier2Score } = await import('../nvm/proof/kernel.ts');
-  const { buildNarrativeState } = await import('../nvm/state/NarrativeState.ts');
+  const { emptyState } = await import('../nvm/state/NarrativeState.ts');
   const { applyStoryOps } = await import('../nvm/ops/dispatcher.ts');
   const { deriveTensionLedger } = await import('../nvm/valuation/futures.ts');
   const { runQualityEngine } = await import('../nvm/quality/index.ts');
   const commits = stage.getCommits().filter((c: import('../nvm/state/StoryCommit.ts').StoryCommit) => !c.reverted);
-  let rollingState = buildNarrativeState(stage);
-  // Reset to empty and replay for accurate per-scene state
-  const { emptyState } = await import('../nvm/state/NarrativeState.ts');
-  rollingState = emptyState();
+  let rollingState = emptyState();
 
   const scenes = [];
   for (const commit of commits) {
@@ -783,7 +768,6 @@ router.get('/api/nvm/arc-timeline', gameLimiter, asyncHandler(async (req, res) =
 router.post('/api/nvm/converge-arc', gameLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { convergeScene } = await import('../nvm/converge/loop.ts');
-  const { buildNarrativeState } = await import('../nvm/state/NarrativeState.ts');
   const { applyStoryOps } = await import('../nvm/ops/dispatcher.ts');
   const { makeLLMCandidateGenerator } = await import('../nvm/generate/llm-generator.ts');
   const { mineCorpus } = await import('../nvm/selfplay/mine.ts');
@@ -832,7 +816,7 @@ router.post('/api/nvm/converge-arc', gameLimiter, asyncHandler(async (req, res) 
   const baseSeed = typeof req.body?.seed === 'number' ? req.body.seed : Date.now();
   const generate = makeLLMCandidateGenerator();
 
-  let rollingState = buildNarrativeState(stage);
+  let rollingState = buildEnrichedState(stage);
   const sceneResults = [];
   let totalComposite = 0;
   let convergedCount = 0;
@@ -892,9 +876,8 @@ router.post('/api/nvm/converge-arc', gameLimiter, asyncHandler(async (req, res) 
 router.get('/api/nvm/sidecar', gameLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { buildSidecar } = await import('../nvm/project/sidecar.ts');
-  const { buildNarrativeState } = await import('../nvm/state/NarrativeState.ts');
   const commits = stage.getCommits();
-  const state = buildNarrativeState(stage);
+  const state = buildEnrichedState(stage);
   const ghosts = stage.ghostLedgerGet();
   const sidecar = buildSidecar({ commits, state, ghosts });
   res.setHeader('Content-Disposition', 'attachment; filename="story.nvm.json"');
@@ -944,8 +927,7 @@ router.get('/api/nvm/quality/scene/:commitId', gameLimiter, asyncHandler(async (
 // GET /api/nvm/epistemic — current epistemic state
 router.get('/api/nvm/epistemic', gameLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
-  const { buildNarrativeState } = await import('../nvm/state/NarrativeState.ts');
-  const state = buildNarrativeState(stage);
+  const state = buildEnrichedState(stage);
 
   // Flatten all character beliefs into a unified belief map
   const beliefs: Array<{ charId: string; beliefId: string; proposition: string; confidence: number; source: string }> = [];
@@ -1011,14 +993,14 @@ router.get('/api/nvm/epistemic', gameLimiter, asyncHandler(async (req, res) => {
 // GET /api/nvm/health — unified story health dashboard.
 router.get('/api/nvm/health', gameLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
-  const { buildNarrativeState, emptyState } = await import('../nvm/state/NarrativeState.ts');
+  const { emptyState } = await import('../nvm/state/NarrativeState.ts');
   const { deriveTensionLedger, momentumScore } = await import('../nvm/valuation/futures.ts');
   const { computeTopology } = await import('../nvm/valuation/topology.ts');
   const { analyzeArcCompletion } = await import('../nvm/quality/arc-tracker.ts');
   const { runTier1, runTier2, tier2Score } = await import('../nvm/proof/kernel.ts');
   const { applyStoryOps } = await import('../nvm/ops/dispatcher.ts');
 
-  const state = buildNarrativeState(stage);
+  const state = buildEnrichedState(stage);
   const allCommits = stage.getCommits().filter((c: import('../nvm/state/StoryCommit.ts').StoryCommit) => !c.reverted);
   const commitCount = allCommits.length;
   const sceneIdx = commitCount > 0 ? allCommits[commitCount - 1].sceneIdx : 0;
