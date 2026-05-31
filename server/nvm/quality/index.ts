@@ -488,6 +488,26 @@ export function necessityScore(ops: StoryOp[], state?: NarrativeState): number {
       }
       return true;
     }
+    if (op.op === 'SHIFT_RELATIONSHIP') {
+      // Redundant if the same pair was already shifted in the same direction earlier in this IR.
+      // Two positive (or two negative) shifts on Alice↔Bob are the same beat restated —
+      // they should be merged into one meaningful shift or replaced with an escalation.
+      const [pA, pB] = op.pair;
+      const sameSignEarlier = ops.slice(0, i).some(
+        e => e.op === 'SHIFT_RELATIONSHIP' &&
+             e.pair.includes(pA) && e.pair.includes(pB) &&
+             Math.sign(e.delta.amount) === Math.sign(op.delta.amount),
+      );
+      if (sameSignEarlier) return false;
+    }
+    if (op.op === 'ADVANCE_THEME_ARGUMENT') {
+      // Same claimId + same move twice in one IR is pure duplication.
+      const dupEarlier = ops.slice(0, i).some(
+        e => e.op === 'ADVANCE_THEME_ARGUMENT' &&
+             e.claimId === op.claimId && e.move === op.move,
+      );
+      if (dupEarlier) return false;
+    }
     return true;
   });
   return necessary.length / ops.length;

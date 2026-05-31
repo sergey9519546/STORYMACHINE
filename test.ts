@@ -9964,6 +9964,68 @@ describe('Wave 76 — quality engine DV11, vague terms, necessityScore state-awa
   });
 });
 
+// ── Wave 100: necessityScore — SHIFT_RELATIONSHIP and ADVANCE_THEME_ARGUMENT ──
+
+describe('Wave 100 — necessityScore SHIFT_RELATIONSHIP and ADVANCE_THEME_ARGUMENT', () => {
+  function mkRelOp(pair: [string, string], amount: number): StoryOp {
+    return {
+      op: 'SHIFT_RELATIONSHIP', pair,
+      delta: { amount, reason: 'test reason', dimension: 'trust' },
+    };
+  }
+  function mkThemeOp(claimId: string, move: 'support' | 'attack' | 'resolve' | 'complicate'): StoryOp {
+    return { op: 'ADVANCE_THEME_ARGUMENT', claimId, move };
+  }
+
+  it('necessityScore flags duplicate same-sign SHIFT_RELATIONSHIP as redundant', () => {
+    const ops: StoryOp[] = [
+      mkRelOp(['alice', 'bob'], -0.3),
+      mkRelOp(['alice', 'bob'], -0.2),  // same pair, same sign — redundant
+    ];
+    assert.ok(necessityScore(ops) < 1.0, 'duplicate same-sign relationship shift should lower necessity score');
+  });
+
+  it('necessityScore allows opposite-sign SHIFT_RELATIONSHIP on same pair', () => {
+    const ops: StoryOp[] = [
+      mkRelOp(['alice', 'bob'], -0.4),  // negative shift
+      mkRelOp(['alice', 'bob'], 0.3),   // repair — different sign, allowed
+    ];
+    assert.equal(necessityScore(ops), 1.0, 'repair arc (opposite sign) on same pair is necessary');
+  });
+
+  it('necessityScore allows same-sign shifts on different pairs', () => {
+    const ops: StoryOp[] = [
+      mkRelOp(['alice', 'bob'], -0.3),
+      mkRelOp(['carol', 'bob'], -0.2),  // different pair — both necessary
+    ];
+    assert.equal(necessityScore(ops), 1.0, 'same-sign shifts on different pairs are both necessary');
+  });
+
+  it('necessityScore flags duplicate ADVANCE_THEME_ARGUMENT claimId+move as redundant', () => {
+    const ops: StoryOp[] = [
+      mkThemeOp('truth_costs_freedom', 'support'),
+      mkThemeOp('truth_costs_freedom', 'support'),  // exact duplicate
+    ];
+    assert.ok(necessityScore(ops) < 1.0, 'duplicate theme move should lower necessity score');
+  });
+
+  it('necessityScore allows same claimId with different moves', () => {
+    const ops: StoryOp[] = [
+      mkThemeOp('truth_costs_freedom', 'attack'),
+      mkThemeOp('truth_costs_freedom', 'support'),  // same claim, different move — OK
+    ];
+    assert.equal(necessityScore(ops), 1.0, 'different moves on same claim are both necessary');
+  });
+
+  it('necessityScore allows same move on different claimIds', () => {
+    const ops: StoryOp[] = [
+      mkThemeOp('truth_costs_freedom', 'support'),
+      mkThemeOp('power_corrupts', 'support'),  // different claim — OK
+    ];
+    assert.equal(necessityScore(ops), 1.0, 'same move on different claims are both necessary');
+  });
+});
+
 // ── Wave 77: convergence loop arc promises + THEME_ARGUMENT_PROGRESSES ────────
 
 describe('Wave 77 — convergence loop arc promises + THEME_ARGUMENT_PROGRESSES invariant', () => {

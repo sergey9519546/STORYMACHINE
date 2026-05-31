@@ -444,6 +444,7 @@ router.get('/api/nvm/converge-stream', gameLimiter, async (req, res) => {
             compositeScore: step.compositeScore,
             ghostReason: step.ghostReason,
             writersRoomSummary: step.writersRoomSummary,
+            operator: step.operator,
           },
         });
       },
@@ -1024,6 +1025,7 @@ router.get('/api/nvm/health', gameLimiter, asyncHandler(async (req, res) => {
   let t1PassCount = 0;
   let totalQuality = 0;
   let rollingState = emptyState();
+  const tier1FailureCounts: Record<string, number> = {};
   for (const commit of allCommits) {
     const ir: import('../nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
       transitionId: commit.commitId, sceneIdx: commit.sceneIdx, sceneFunction: 'advance_plot',
@@ -1034,11 +1036,20 @@ router.get('/api/nvm/health', gameLimiter, asyncHandler(async (req, res) => {
     const t1 = runTier1(ir, rollingState);
     const t2 = runTier2(ir, rollingState);
     if (t1.every(r => r.pass)) t1PassCount++;
+    for (const r of t1) {
+      if (!r.pass) {
+        tier1FailureCounts[r.proof] = (tier1FailureCounts[r.proof] ?? 0) + 1;
+      }
+    }
     totalQuality += tier2Score(t2);
     rollingState = applyStoryOps(rollingState, commit.ops);
   }
   const proofPassRate = commitCount > 0 ? Math.round((t1PassCount / commitCount) * 100) : 100;
   const avgQuality = commitCount > 0 ? Math.round(totalQuality / commitCount) : 0;
+  const tier1TopFailures = Object.entries(tier1FailureCounts)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5)
+    .map(([proof, failCount]) => ({ proof, failCount }));
 
   // Momentum (momentumScore expects StoryCommit[], not TensionLedger[])
   const momentum = momentumScore(allCommits);
@@ -1071,6 +1082,7 @@ router.get('/api/nvm/health', gameLimiter, asyncHandler(async (req, res) => {
     proof: {
       passRate: proofPassRate,
       avgQualityScore: avgQuality,
+      tier1TopFailures,
     },
   });
 }));

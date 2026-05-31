@@ -13,6 +13,7 @@ interface ConvergeStep {
   compositeScore: number;
   ghostReason?: string;
   writersRoomSummary?: string;
+  operator?: string;
 }
 
 interface ConvergeResult {
@@ -111,7 +112,10 @@ export function ConvergePanel({ onClose }: ConvPanelProps) {
         <td style={{ padding: '4px 8px', color: '#60a5fa' }}>{step.valuationScore.toFixed(1)}</td>
         <td style={{ padding: '4px 8px', color: '#a78bfa' }}>{step.qualityScore.toFixed(1)}</td>
         <td style={{ padding: '4px 8px', color: '#f9a8d4' }}>{step.compositeScore.toFixed(1)}</td>
-        <td style={{ padding: '4px 8px', color: '#64748b', fontSize: 11, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <td style={{ padding: '4px 8px', color: '#34d399', fontSize: 11, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {step.operator ? step.operator.replace(/_/g, ' ') : '—'}
+        </td>
+        <td style={{ padding: '4px 8px', color: '#64748b', fontSize: 11, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {step.writersRoomSummary ?? '—'}
         </td>
       </tr>
@@ -184,6 +188,7 @@ export function ConvergePanel({ onClose }: ConvPanelProps) {
                 <th style={{ padding: '4px 8px' }}>tension</th>
                 <th style={{ padding: '4px 8px' }}>quality</th>
                 <th style={{ padding: '4px 8px' }}>composite</th>
+                <th style={{ padding: '4px 8px' }}>operator</th>
                 <th style={{ padding: '4px 8px' }}>writers' room</th>
               </tr>
             </thead>
