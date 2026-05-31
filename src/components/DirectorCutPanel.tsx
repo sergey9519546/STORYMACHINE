@@ -36,6 +36,18 @@ const THEME_MOVES = ['support', 'attack', 'undercut', 'complicate', 'resolve'];
 const CLUE_CARRIERS = ['object', 'line', 'gesture', 'location', 'absence', 'behavior', 'camera', 'sound'];
 const REL_DIMENSIONS = ['love', 'trust', 'intimacy', 'admiration', 'resentment', 'fear', 'contempt', 'guilt', 'obligation', 'dependency'];
 
+// Numeric field parsers with a finite fallback. `??` only guards null/undefined,
+// so an empty or non-numeric input (parseFloat('') === NaN) would otherwise inject
+// NaN straight into the op payload sent to the server.
+function numField(raw: string | undefined, fallback: number): number {
+  const n = parseFloat(raw ?? '');
+  return isFinite(n) ? n : fallback;
+}
+function intField(raw: string | undefined, fallback: number): number {
+  const n = parseInt(raw ?? '', 10);
+  return isFinite(n) ? n : fallback;
+}
+
 function buildOp(kind: OpKind, fields: Record<string, string>): unknown {
   switch (kind) {
     case 'UPDATE_BELIEF': return {
@@ -44,7 +56,7 @@ function buildOp(kind: OpKind, fields: Record<string, string>): unknown {
       belief: {
         id: `b_cut_${Date.now()}`,
         proposition: fields.proposition ?? '',
-        confidence: parseFloat(fields.confidence ?? '0.8'),
+        confidence: numField(fields.confidence, 0.8),
         source: (fields.source ?? 'witnessed') as 'witnessed' | 'told' | 'inferred',
         source_event_id: `cut_${Date.now()}`,
         acquired_at: Date.now(),
@@ -52,7 +64,7 @@ function buildOp(kind: OpKind, fields: Record<string, string>): unknown {
     };
     case 'APPRAISE_EMOTION': {
       const dominant = fields.dominant ?? 'distress';
-      const intensity = parseInt(fields.intensity ?? '70');
+      const intensity = intField(fields.intensity, 70);
       const emo = { joy: 0, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0 };
       if (dominant in emo) (emo as Record<string, number>)[dominant] = intensity;
       return {
@@ -66,7 +78,7 @@ function buildOp(kind: OpKind, fields: Record<string, string>): unknown {
       pair: [fields.charA ?? 'char_1', fields.charB ?? 'char_2'],
       delta: {
         dimension: fields.dimension ?? 'trust',
-        amount: parseFloat(fields.amount ?? '0.3'),
+        amount: numField(fields.amount, 0.3),
         reason: fields.reason ?? '',
       },
     };
@@ -95,7 +107,7 @@ function buildOp(kind: OpKind, fields: Record<string, string>): unknown {
     case 'RAISE_CLOCK': return {
       op: 'RAISE_CLOCK',
       clockId: fields.clockId ?? 'main_clock',
-      amount: parseInt(fields.amount ?? '1'),
+      amount: intField(fields.amount, 1),
     };
   }
 }
