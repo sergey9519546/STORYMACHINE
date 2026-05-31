@@ -24,6 +24,7 @@ import {
   getReadyGoals,
 } from './server/engine/agent/psychology.ts';
 import { validatePersona, PERSONA_LIMITS } from './server/personas/types.ts';
+import { renderTemplate, getPrompt, hasPrompt } from './server/lib/prompts.ts';
 import {
   listPersonas,
   getPersona,
@@ -11719,5 +11720,44 @@ describe('personas/registry', () => {
     assert.match(block, /Lead line\./);
     assert.match(block, /- first hint/);
     assert.match(block, /- second hint/);
+  });
+});
+
+// ── M3: Prompt registry / template loader ─────────────────────────────────────
+describe('lib/prompts', () => {
+  it('renderTemplate substitutes {{var}} placeholders', () => {
+    const out = renderTemplate('Hello {{name}}, you are {{age}}.', { name: 'Mara', age: 40 });
+    assert.equal(out, 'Hello Mara, you are 40.');
+  });
+
+  it('renderTemplate collapses unknown/undefined placeholders to empty', () => {
+    assert.equal(renderTemplate('a{{missing}}b', {}), 'ab');
+    assert.equal(renderTemplate('a{{x}}b', { x: undefined }), 'ab');
+  });
+
+  it('renderTemplate tolerates whitespace inside the braces', () => {
+    assert.equal(renderTemplate('[{{  k  }}]', { k: 'v' }), '[v]');
+  });
+
+  it('getPrompt loads and interpolates the bundled scriptide-complete template', () => {
+    const out = getPrompt('scriptide-complete', {
+      personaLead: 'You are a noir writer.',
+      stylePreamble: '', genrePreamble: '', charPreamble: '', bibleBlock: '',
+      prefix: 'INT. BAR - NIGHT', suffix: '(end of document)',
+    });
+    assert.match(out, /You are a noir writer\./);
+    assert.match(out, /INT\. BAR - NIGHT/);
+    assert.match(out, /OUTPUT ONLY THE CONTINUATION TEXT/);
+    assert.ok(!out.includes('{{'), 'no unresolved placeholders remain');
+  });
+
+  it('hasPrompt is true for a bundled prompt and false for an unknown one', () => {
+    assert.equal(hasPrompt('scriptide-complete'), true);
+    assert.equal(hasPrompt('definitely-not-a-real-prompt'), false);
+  });
+
+  it('getPrompt rejects path-traversal names and returns empty', () => {
+    assert.equal(getPrompt('../secret'), '');
+    assert.equal(getPrompt('foo/bar'), '');
   });
 });

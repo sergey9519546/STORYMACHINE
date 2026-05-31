@@ -10,6 +10,7 @@ import {
 } from '../lib/session-store.ts';
 import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
 import { listPersonas, getPersona, registerUserPersona, personaPromptBlock } from '../personas/registry.ts';
+import { getPrompt } from '../lib/prompts.ts';
 import type { DirectorStyle, StoryStructure } from '../engine/types.ts';
 
 // ── Schema for analyzeScriptBlock ─────────────────────────────────────────────
@@ -271,23 +272,17 @@ router.get('/api/scriptide/complete', aiLimiter, async (req, res) => {
       return b ? `\nSTORY BIBLE (maintain consistency):\n${b}\n` : '';
     })();
 
-    // FIM (Fill-In-the-Middle) prompt structure: prefix + completion marker + suffix.
-    const prompt = `${personaLead} Write ONLY the continuation text that belongs between the prefix and suffix — no explanations, no markdown, no preamble.
-
-${stylePreamble}${genrePreamble}${charPreamble}${bibleBlock}
-RULES:
-- Output valid Fountain syntax only (scene headings, action, character cues, dialogue, parentheticals)
-- Match the voice, tone, and register of the existing text precisely
-- The continuation must fit naturally between the PREFIX and SUFFIX — do not repeat or contradict either
-- Maximum 3 sentences / 2 action lines / 1 dialogue exchange — keep completions short and targeted
-- Never break mid-word unless the prefix already does
-
-=== PREFIX (text before cursor) ===
-${prefix}
-=== CURSOR POSITION (insert your continuation here) ===
-=== SUFFIX (text after cursor — your output must connect to this) ===
-${suffix || '(end of document)'}
-=== OUTPUT ONLY THE CONTINUATION TEXT — NO PREFIX, NO SUFFIX, NO PREAMBLE ===`;
+    // FIM (Fill-In-the-Middle) prompt assembled from the versioned template
+    // registry (M3). All interpolated values are already sanitized above (C1).
+    const prompt = getPrompt('scriptide-complete', {
+      personaLead,
+      stylePreamble,
+      genrePreamble,
+      charPreamble,
+      bibleBlock,
+      prefix,
+      suffix: suffix || '(end of document)',
+    });
 
     const { generateContentStream, modelForTask: mft } = await import('../engine/ai.ts');
 

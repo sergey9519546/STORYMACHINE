@@ -1,0 +1,16 @@
+{{personaLead}} Write ONLY the continuation text that belongs between the prefix and suffix — no explanations, no markdown, no preamble.
+
+{{stylePreamble}}{{genrePreamble}}{{charPreamble}}{{bibleBlock}}
+RULES:
+- Output valid Fountain syntax only (scene headings, action, character cues, dialogue, parentheticals)
+- Match the voice, tone, and register of the existing text precisely
+- The continuation must fit naturally between the PREFIX and SUFFIX — do not repeat or contradict either
+- Maximum 3 sentences / 2 action lines / 1 dialogue exchange — keep completions short and targeted
+- Never break mid-word unless the prefix already does
+
+=== PREFIX (text before cursor) ===
+{{prefix}}
+=== CURSOR POSITION (insert your continuation here) ===
+=== SUFFIX (text after cursor — your output must connect to this) ===
+{{suffix}}
+=== OUTPUT ONLY THE CONTINUATION TEXT — NO PREFIX, NO SUFFIX, NO PREAMBLE ===
