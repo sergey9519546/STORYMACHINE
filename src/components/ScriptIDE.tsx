@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { EngineState, StoryConfig, DirectorState } from "../types";
 import { analyzeScriptBlock } from "../services/director";
 import { parseFountain, FountainBlock } from "../lib/fountain";
@@ -35,6 +35,7 @@ import AIPanel from "./AIPanel";
 import DirectorPanel from "./DirectorPanel";
 
 // Sub-components
+import FountainEditor, { FountainEditorHandle } from "./editor/FountainEditor";
 import AnalysisPanel from "./scriptide/AnalysisPanel";
 import SnapshotManager from "./scriptide/SnapshotManager";
 import ResearchNotes from "./scriptide/ResearchNotes";
@@ -75,39 +76,8 @@ const TENSION_BARS = [
 
 // ─── Syntax highlighting ─────────────────────────────────────────────────────
 
-const renderHighlightedText = (text: string, blocks: FountainBlock[]) => {
-  const lines = text.split("\n");
-
-  const lineClasses: Record<number, string> = {};
-  let currentLineIdx = 0;
-
-  blocks.forEach((block) => {
-    const blockLines = block.text.split("\n");
-    blockLines.forEach(() => {
-      let className = "";
-      if (block.type === "scene_heading")
-        className = "font-bold text-blue-600 dark:text-blue-400";
-      if (block.type === "character" || block.type === "dual_dialogue")
-        className = "font-bold text-purple-600 dark:text-purple-400";
-      if (block.type === "parenthetical") className = "italic text-zinc-500";
-      if (block.type === "dialogue")
-        className = "text-zinc-800 dark:text-zinc-200";
-      if (block.type === "transition")
-        className = "font-bold uppercase text-orange-500";
-      if (block.type === "lyrics") className = "italic text-zinc-500";
-
-      lineClasses[currentLineIdx] = className;
-      currentLineIdx++;
-    });
-  });
-
-  return lines.map((line, i) => (
-    <span key={i} className={lineClasses[i] || ""}>
-      {line || " "}
-      {i < lines.length - 1 ? "\n" : ""}
-    </span>
-  ));
-};
+// renderHighlightedText removed — CM6 FountainEditor handles syntax highlighting via
+// decorations (fountain-highlight.ts). The old textarea + overlay pattern is gone.
 
 // ─── localStorage helpers ────────────────────────────────────────────────────
 
@@ -192,8 +162,8 @@ export default function ScriptIDE({
 
   // ── Refs ────────────────────────────────────────────────────────────────────
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const editorRef = useRef<HTMLTextAreaElement>(null);
-  const highlightRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<FountainEditorHandle>(null);
+  // highlightRef removed — CM6 editor manages syntax highlighting internally
   const audioCtxRef = useRef<AudioContext | null>(null);
   const panelToggleCountRef = useRef(0);
   const keystrokeTimesRef = useRef<number[]>([]);
@@ -430,10 +400,7 @@ export default function ScriptIDE({
 
   // ── Memos ────────────────────────────────────────────────────────────────────
   const parsedBlocks = useMemo(() => parseFountain(scriptText), [scriptText]);
-  const highlightedText = useMemo(
-    () => renderHighlightedText(scriptText, parsedBlocks),
-    [scriptText, parsedBlocks]
-  );
+  // highlightedText removed — CM6 FountainEditor extension handles syntax highlighting
 
   const stats = useMemo(() => {
     const blocks = parsedBlocks;
@@ -479,13 +446,7 @@ export default function ScriptIDE({
     };
   }, [scriptText, parsedBlocks]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Scroll sync ──────────────────────────────────────────────────────────────
-  const handleScroll = () => {
-    if (editorRef.current && highlightRef.current) {
-      highlightRef.current.scrollTop = editorRef.current.scrollTop;
-      highlightRef.current.scrollLeft = editorRef.current.scrollLeft;
-    }
-  };
+  // handleScroll removed — CM6 editor manages its own scroll internally
 
   // ── AI analysis ──────────────────────────────────────────────────────────────
   const triggerAnalysis = async (text: string) => {
@@ -516,10 +477,8 @@ export default function ScriptIDE({
   };
 
   // ── Script change handler ────────────────────────────────────────────────────
-  const handleScriptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const text = e.target.value;
-    setScriptText(text);
-
+  // handleUserEdit: fires on every CM6 doc change (typewriter sound + keystroke biometrics)
+  const handleUserEdit = useCallback(() => {
     const now = performance.now();
     keystrokeTimesRef.current.push(now);
     if (keystrokeTimesRef.current.length > 20) keystrokeTimesRef.current.shift();
@@ -528,13 +487,11 @@ export default function ScriptIDE({
       const gaps = times.slice(1).map((t, i) => t - times[i]);
       const firstHalf = gaps.slice(0, Math.floor(gaps.length / 2));
       const secondHalf = gaps.slice(Math.floor(gaps.length / 2));
-      const avgFirst =
-        firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
-      const avgSecond =
-        secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
-      let trend: "accelerating" | "decelerating" | "stable" = "stable";
-      if (avgSecond < avgFirst * 0.85) trend = "accelerating";
-      else if (avgSecond > avgFirst * 1.15) trend = "decelerating";
+      const avgFirst = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
+      const avgSecond = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
+      let trend: 'accelerating' | 'decelerating' | 'stable' = 'stable';
+      if (avgSecond < avgFirst * 0.85) trend = 'accelerating';
+      else if (avgSecond > avgFirst * 1.15) trend = 'decelerating';
       setEngineState((prev) => {
         if (!prev) return prev;
         const bm = prev.directorState.playerModel.biometrics;
@@ -543,29 +500,19 @@ export default function ScriptIDE({
           ...prev,
           directorState: {
             ...prev.directorState,
-            playerModel: {
-              ...prev.directorState.playerModel,
-              biometrics: { ...bm, readTimeTrend: trend },
-            },
+            playerModel: { ...prev.directorState.playerModel, biometrics: { ...bm, readTimeTrend: trend } },
           },
         };
       });
     }
-
     if (isTypewriterSound) {
       try {
         if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
         const ctx = audioCtxRef.current;
-        const buf = ctx.createBuffer(
-          1,
-          Math.floor(ctx.sampleRate * 0.04),
-          ctx.sampleRate
-        );
+        const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.04), ctx.sampleRate);
         const data = buf.getChannelData(0);
         for (let i = 0; i < data.length; i++) {
-          data[i] =
-            (Math.random() * 2 - 1) *
-            Math.exp(-i / (ctx.sampleRate * 0.008));
+          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.008));
         }
         const src = ctx.createBufferSource();
         src.buffer = buf;
@@ -574,14 +521,12 @@ export default function ScriptIDE({
         src.connect(gain);
         gain.connect(ctx.destination);
         src.start();
-      } catch {
-        /* audio context unavailable */
-      }
+      } catch { /* audio context unavailable */ }
     }
+  }, [isTypewriterSound]);
 
-    if (highlightRef.current) {
-      highlightRef.current.scrollTop = e.target.scrollTop;
-    }
+  const handleScriptChange = (text: string) => {
+    setScriptText(text);
 
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
@@ -591,128 +536,11 @@ export default function ScriptIDE({
     }, 2000);
   };
 
-  // ── Key handler ──────────────────────────────────────────────────────────────
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    const cursor = e.currentTarget.selectionStart;
-    const textBeforeCursor = scriptText.substring(0, cursor);
-    const lines = textBeforeCursor.split("\n");
-    const currentLine = lines[lines.length - 1];
-
-    if (e.key === "i" || e.key === "I") {
-      if (currentLine === "") {
-        e.preventDefault();
-        const newText =
-          scriptText.substring(0, cursor) + "INT. " + scriptText.substring(cursor);
-        setScriptText(newText);
-        setTimeout(() => {
-          if (editorRef.current) {
-            editorRef.current.selectionStart = cursor + 5;
-            editorRef.current.selectionEnd = cursor + 5;
-          }
-        }, 0);
-        return;
-      }
-    } else if (e.key === "e" || e.key === "E") {
-      if (currentLine === "") {
-        e.preventDefault();
-        const newText =
-          scriptText.substring(0, cursor) + "EXT. " + scriptText.substring(cursor);
-        setScriptText(newText);
-        setTimeout(() => {
-          if (editorRef.current) {
-            editorRef.current.selectionStart = cursor + 5;
-            editorRef.current.selectionEnd = cursor + 5;
-          }
-        }, 0);
-        return;
-      }
-    }
-
-    if (e.key === "Enter") {
-      if (SCRIPT_ELEMENTS.CHARACTER.test(currentLine.trim())) {
-        e.preventDefault();
-        setActionModal({ show: true, charName: currentLine.trim(), cursor });
-        setActionInput("");
-      }
-    } else if (e.key === "Tab") {
-      e.preventDefault();
-
-      const trimmedLine = currentLine.trim();
-      if (
-        trimmedLine.length > 0 &&
-        trimmedLine === trimmedLine.toUpperCase() &&
-        !trimmedLine.startsWith("INT") &&
-        !trimmedLine.startsWith("EXT")
-      ) {
-        const matchingChar = characters.find(
-          (c) =>
-            c.name.toUpperCase().startsWith(trimmedLine) &&
-            c.name.toUpperCase() !== trimmedLine
-        );
-        if (matchingChar) {
-          const newText =
-            scriptText.substring(0, cursor - trimmedLine.length) +
-            matchingChar.name.toUpperCase() +
-            scriptText.substring(cursor);
-          setScriptText(newText);
-          const newCursor = cursor + (matchingChar.name.length - trimmedLine.length);
-          setTimeout(() => {
-            if (editorRef.current) {
-              editorRef.current.selectionStart = newCursor;
-              editorRef.current.selectionEnd = newCursor;
-            }
-          }, 0);
-          return;
-        }
-      }
-
-      let newText = "";
-      let newCursor = cursor;
-
-      if (currentLine.trim() === "") {
-        newText =
-          scriptText.substring(0, cursor) +
-          "          " +
-          scriptText.substring(cursor);
-        newCursor = cursor + 10;
-      } else if (
-        currentLine.startsWith("          ") &&
-        !currentLine.startsWith("            ")
-      ) {
-        newText =
-          scriptText.substring(0, cursor - currentLine.length) +
-          "            (" +
-          currentLine.trim() +
-          ")" +
-          scriptText.substring(cursor);
-        newCursor = cursor + 4;
-      } else if (currentLine.startsWith("            (")) {
-        newText =
-          scriptText.substring(0, cursor - currentLine.length) +
-          "                                        " +
-          currentLine.replace(/[()]/g, "").trim() +
-          ":" +
-          scriptText.substring(cursor);
-        newCursor = cursor + 30;
-      } else {
-        newText =
-          scriptText.substring(0, cursor) + "    " + scriptText.substring(cursor);
-        newCursor = cursor + 4;
-      }
-
-      setScriptText(newText);
-      setTimeout(() => {
-        if (editorRef.current) {
-          editorRef.current.selectionStart = newCursor;
-          editorRef.current.selectionEnd = newCursor;
-        }
-      }, 0);
-    }
-  };
+  // handleKeyDown removed — i/e/Tab/Enter handling now lives in the CM6 fountainKeymap
+  // extension. The action modal is triggered via FountainEditor's onCharacterEnter prop.
 
   // ── Action modal ─────────────────────────────────────────────────────────────
   const submitActionModal = (skip = false) => {
-    if (!editorRef.current) return;
     const { cursor } = actionModal;
     const textBefore = scriptText.substring(0, cursor);
     const textAfter = scriptText.substring(cursor);
@@ -727,30 +555,21 @@ export default function ScriptIDE({
     setActionModal({ show: false, charName: "", cursor: 0 });
     triggerAnalysis(newText);
 
+    // CM6: focus and place cursor via the EditorView
     setTimeout(() => {
-      if (editorRef.current) {
-        editorRef.current.focus();
-        const newCursorPos = cursor + insertion.length;
-        editorRef.current.setSelectionRange(newCursorPos, newCursorPos);
-      }
-    }, 0);
+      const view = editorRef.current?.getView();
+      if (!view) return;
+      view.focus();
+      const newPos = Math.min(cursor + insertion.length, view.state.doc.length);
+      view.dispatch({ selection: { anchor: newPos }, scrollIntoView: true });
+    }, 50);
   };
 
   // ── Navigation ───────────────────────────────────────────────────────────────
-  const handleNavigate = (lineIndex: number) => {
-    if (!editorRef.current) return;
-    const lines = scriptText.split("\n");
-    let charCount = 0;
-    for (let i = 0; i < lineIndex; i++) {
-      charCount += lines[i].length + 1;
-    }
-    editorRef.current.focus();
-    editorRef.current.setSelectionRange(charCount, charCount);
-
-    const lineHeight = 24;
-    editorRef.current.scrollTop = lineIndex * lineHeight - 100;
-    handleScroll();
-  };
+  const handleNavigate = useCallback((lineIndex: number) => {
+    // CM6 editor handles scroll and cursor placement natively via FountainEditorHandle
+    editorRef.current?.navigateTo(lineIndex + 1); // lineIndex is 0-indexed, navigateTo is 1-indexed
+  }, []);
 
   // ── Character handlers ───────────────────────────────────────────────────────
   const handleAddCharacter = () => {
@@ -775,8 +594,7 @@ export default function ScriptIDE({
 
   // ── AI suggestion apply ──────────────────────────────────────────────────────
   const handleApplySuggestion = (suggestion: string) => {
-    if (!editorRef.current) return;
-    const cursor = editorRef.current.selectionStart;
+    const cursor = editorRef.current?.getView()?.state.selection.main.head ?? scriptText.length;
     const textBefore = scriptText.substring(0, cursor);
     const textAfter = scriptText.substring(cursor);
     const newText = `${textBefore}\n${suggestion}\n${textAfter}`;
@@ -1121,27 +939,24 @@ export default function ScriptIDE({
           className="flex-1 relative overflow-hidden bg-white"
           aria-busy={engineState.isAnalyzing ? "true" : "false"}
         >
-          {/* Syntax Highlighting Layer */}
-          <div
-            ref={highlightRef}
-            className="absolute inset-0 p-8 font-courier text-lg leading-relaxed pointer-events-none whitespace-pre-wrap break-words overflow-hidden z-0"
-            aria-hidden="true"
-          >
-            {highlightedText}
-          </div>
-
-          {/* Input Layer */}
-          <textarea
+          {/* CodeMirror 6 editor — replaces the textarea + syntax-highlight overlay.
+              Syntax highlighting, inline AI ghost-text, and Fountain keybindings
+              are all handled as CM6 extensions inside FountainEditor. */}
+          <FountainEditor
             ref={editorRef}
-            aria-label="Script editor"
-            aria-multiline="true"
-            className="absolute inset-0 w-full h-full p-8 font-courier text-lg resize-none focus:outline-none leading-relaxed bg-transparent text-transparent caret-black whitespace-pre-wrap break-words z-10 selection:bg-blue-100 selection:text-transparent"
-            placeholder={"INT. STUDIO - DAY\n\nStart typing your script here..."}
             value={scriptText}
             onChange={handleScriptChange}
-            onKeyDown={handleKeyDown}
-            onScroll={handleScroll}
-            spellCheck={false}
+            onCharacterEnter={(charName, cursor) => {
+              setActionModal({ show: true, charName, cursor });
+              setActionInput("");
+            }}
+            onUserEdit={handleUserEdit}
+            characters={characters.map(c => c.name)}
+            completionCtx={{
+              directorStyle: initialConfig?.directorStyle,
+              characters: characters.map(c => c.name),
+            }}
+            isDarkMode={isDarkMode}
           />
 
           {/* Action Prompt Modal */}

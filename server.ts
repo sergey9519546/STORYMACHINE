@@ -1234,6 +1234,108 @@ async function startServer() {
     res.json({ status: 'ok', ...saved });
   }));
 
+  // ── P1: Inline AI copilot — FIM completion stream ──────────────────────────
+  // GET /api/scriptide/complete
+  // Query params: prefix (text before cursor), suffix (text after cursor),
+  //   directorStyle, genre, characters (comma-separated names)
+  // Emits SSE events: { type:'token', token:string } per chunk,
+  //   then { type:'done' } on completion, { type:'error', message } on failure.
+  app.get('/api/scriptide/complete', aiLimiter, async (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    let disconnected = false;
+    let ended = false;
+    req.on('close', () => { disconnected = true; });
+    req.on('error', () => { disconnected = true; });
+    const emitSSE = (data: unknown) => {
+      if (!disconnected && !ended) res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+    const ensureEnded = () => { if (!ended) { ended = true; res.end(); } };
+
+    try {
+      const q = req.query as Record<string, string>;
+      const rawPrefix    = typeof q['prefix']       === 'string' ? q['prefix']       : '';
+      const rawSuffix    = typeof q['suffix']       === 'string' ? q['suffix']       : '';
+      const dirStyle     = typeof q['directorStyle'] === 'string' ? q['directorStyle'] : '';
+      const genre        = typeof q['genre']        === 'string' ? q['genre']        : '';
+      const charNames    = typeof q['characters']   === 'string'
+        ? q['characters'].split(',').filter(Boolean).slice(0, 30)
+        : [];
+
+      if (rawPrefix.length < 10) {
+        emitSSE({ type: 'done' });
+        ensureEnded();
+        return;
+      }
+
+      // Sanitize all user-controlled strings before embedding in the prompt (C1)
+      const prefix  = sanitizeForPrompt(rawPrefix,  4000);
+      const suffix  = sanitizeForPrompt(rawSuffix,  1000);
+      const stylePreamble = dirStyle ? `DIRECTOR STYLE: ${sanitizeForPrompt(dirStyle, 150)}\n` : '';
+      const genrePreamble = genre    ? `GENRE: ${sanitizeForPrompt(genre, 80)}\n`              : '';
+      const charPreamble  = charNames.length > 0
+        ? `CHARACTERS ESTABLISHED IN SCRIPT: ${charNames.map(n => sanitizeForPrompt(n, 64)).join(', ')}\n`
+        : '';
+
+      // Grab story bible from the session if available — provides accumulated context
+      const sessionData = sessions.get(sessionId(req));
+      const bibleBlock = (() => {
+        const b = sessionData ? buildStoryBibleSummary(sessionData.stage) : '';
+        return b ? `\nSTORY BIBLE (maintain consistency):\n${b}\n` : '';
+      })();
+
+      // FIM (Fill-In-the-Middle) prompt structure: prefix + completion marker + suffix.
+      // This is the canonical approach for mid-document cursor insertions — prefix-only
+      // completion ignores what comes after the cursor and can contradict it.
+      const prompt = `You are an expert screenplay writer. Continue the Fountain-format screenplay from where the cursor is. Write ONLY the continuation text that belongs between the prefix and suffix — no explanations, no markdown, no preamble.
+
+${stylePreamble}${genrePreamble}${charPreamble}${bibleBlock}
+RULES:
+- Output valid Fountain syntax only (scene headings, action, character cues, dialogue, parentheticals)
+- Match the voice, tone, and register of the existing text precisely
+- The continuation must fit naturally between the PREFIX and SUFFIX — do not repeat or contradict either
+- Maximum 3 sentences / 2 action lines / 1 dialogue exchange — keep completions short and targeted
+- Never break mid-word unless the prefix already does
+
+=== PREFIX (text before cursor) ===
+${prefix}
+=== CURSOR POSITION (insert your continuation here) ===
+=== SUFFIX (text after cursor — your output must connect to this) ===
+${suffix || '(end of document)'}
+=== OUTPUT ONLY THE CONTINUATION TEXT — NO PREFIX, NO SUFFIX, NO PREAMBLE ===`;
+
+      const { getAI, modelForTask } = await import('./server/engine/ai.ts');
+
+      // Stream tokens as they arrive using the Gemini streaming API directly
+      const stream = await getAI().models.generateContentStream({
+        model: modelForTask('GHOST_TEXT'),
+        contents: prompt,
+        config: { maxOutputTokens: 256, temperature: 0.85 },
+      });
+
+      let hasTokens = false;
+      for await (const chunk of stream) {
+        if (disconnected) break;
+        const token = chunk.text ?? '';
+        if (token) {
+          hasTokens = true;
+          emitSSE({ type: 'token', token });
+        }
+      }
+
+      if (!hasTokens) emitSSE({ type: 'token', token: '' });
+      emitSSE({ type: 'done' });
+    } catch (err) {
+      emitSSE({ type: 'error', message: (err as Error).message ?? 'completion_failed' });
+    } finally {
+      ensureEnded();
+    }
+  });
+
   // ── Character memory export / import (P6) ─────────────────────────────────────
   // Carry a character's full psychological history (beliefs, goals, ToM,
   // emotion, psychology) between stories so they can be reused across projects.
