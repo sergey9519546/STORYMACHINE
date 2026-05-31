@@ -5,7 +5,7 @@
 //
 // Implemented:
 //   - Specificity score (vague vs. concrete op content)
-//   - 10 Dialogue Validators (full spec)
+//   - 15 Dialogue Validators (DV1-DV15)
 //   - ArcDebt (what emotional beats is the story "owed")
 //   - Reveal Readiness (is the audience ready for a reveal?)
 //   - Necessity-as-form (every op must earn its place)
@@ -307,6 +307,83 @@ export function dialogueWarnings(ir: NarrativeTransitionIR, state: NarrativeStat
         engine: 'dialogue_validator', opIdx: null, rule: 'DV10_STRUCTURAL_UNIFORMITY',
         message: `All ${ir.ops.length} ops are ${[...kinds][0]} — scene lacks structural variety`,
         penalty: 25,
+      });
+    }
+  }
+
+  // DV12: Talking heads — pure dialogue with no physical/world/story consequence.
+  // ≥3 belief-update ops and zero ops that change the physical world or story state.
+  {
+    const beliefCount = ir.ops.filter(op => op.op === 'UPDATE_BELIEF').length;
+    const worldCount  = ir.ops.filter(op =>
+      op.op === 'ADD_FACT' || op.op === 'SHIFT_RELATIONSHIP' ||
+      op.op === 'ADVANCE_OBJECT_ARC' || op.op === 'RAISE_CLOCK' ||
+      op.op === 'RECORD_VISUAL_FACT' || op.op === 'RECORD_SONIC_FACT',
+    ).length;
+    if (beliefCount >= 3 && worldCount === 0) {
+      warnings.push({
+        engine: 'dialogue_validator', opIdx: null, rule: 'DV12_TALKING_HEADS',
+        message: `${beliefCount} dialogue ops with zero world/relationship/story consequence — scene is purely expository`,
+        penalty: 20,
+      });
+    }
+  }
+
+  // DV13: Clock without acknowledgment — a ticking pressure no character perceives.
+  // RAISE_CLOCK present but no UPDATE_BELIEF proposition references the clock subject.
+  {
+    const clocks = ir.ops.filter((op): op is Extract<typeof op, { op: 'RAISE_CLOCK' }> => op.op === 'RAISE_CLOCK');
+    for (const clock of clocks) {
+      const subject = clock.clockId.toLowerCase();
+      const acknowledged = ir.ops.some(
+        op => op.op === 'UPDATE_BELIEF' &&
+              op.belief.proposition.toLowerCase().includes(subject),
+      );
+      if (!acknowledged) {
+        warnings.push({
+          engine: 'dialogue_validator', opIdx: null, rule: 'DV13_UNACKNOWLEDGED_CLOCK',
+          message: `RAISE_CLOCK "${clock.clockId}" has no character belief acknowledging it — stakes invisible`,
+          penalty: 15,
+        });
+      }
+    }
+  }
+
+  // DV14: Emotional flatline — a character's emotion never arcs within the scene.
+  // ≥3 APPRAISE_EMOTION ops for the same character, all with the same dominant emotion.
+  {
+    const emotionsByChar = new Map<string, string[]>();
+    for (const op of ir.ops) {
+      if (op.op !== 'APPRAISE_EMOTION') continue;
+      const list = emotionsByChar.get(op.charId) ?? [];
+      list.push(op.emotion.dominant);
+      emotionsByChar.set(op.charId, list);
+    }
+    for (const [charId, dominants] of emotionsByChar) {
+      if (dominants.length < 3) continue;
+      const allSame = dominants.every(d => d === dominants[0]);
+      if (allSame) {
+        warnings.push({
+          engine: 'dialogue_validator', opIdx: null, rule: 'DV14_EMOTIONAL_FLATLINE',
+          message: `${charId} has ${dominants.length} emotion ops all as "${dominants[0]}" — no emotional arc within scene`,
+          penalty: 12,
+        });
+      }
+    }
+  }
+
+  // DV15: Goal-free scene — character activity with no story-level consequence.
+  // ≥4 ops but none advance the story structure (no arc/theme/payoff/clock).
+  if (ir.ops.length >= 4) {
+    const hasStoryProgress = ir.ops.some(op =>
+      op.op === 'ADVANCE_OBJECT_ARC' || op.op === 'ADVANCE_THEME_ARGUMENT' ||
+      op.op === 'PAYOFF_SETUP' || op.op === 'RAISE_CLOCK',
+    );
+    if (!hasStoryProgress) {
+      warnings.push({
+        engine: 'dialogue_validator', opIdx: null, rule: 'DV15_GOAL_FREE_SCENE',
+        message: `${ir.ops.length} ops with no arc/theme/payoff/clock progress — scene has no story consequence`,
+        penalty: 20,
       });
     }
   }

@@ -177,16 +177,20 @@ export function buildSystemPreamble(constraints: GenerationConstraint[], state: 
     : '';
 
   // ── Relationship heat ──────────────────────────────────────────────────────
+  // Sort by absolute NET cumulative delta so the most dramatically charged
+  // relationships appear first, not the ones with the most update events.
   const relEntries = Object.entries(state.relationships)
     .filter(([, deltas]) => deltas.length > 0)
-    .sort((a, b) => b[1].length - a[1].length)
-    .slice(0, 4)
     .map(([key, deltas]) => {
-      const last = deltas[deltas.length - 1];
-      const sign = typeof last?.amount === 'number' && isFinite(last.amount)
-        ? (last.amount >= 0 ? '+' : '') + last.amount.toFixed(1)
-        : '?';
-      return `${sanitizeForPrompt(key.replace('|', '↔'), 64)} (last shift: ${sign})`;
+      const net = deltas.reduce((s, d) => s + (isFinite(d.amount) ? d.amount : 0), 0);
+      return { key, net };
+    })
+    .filter(({ net }) => isFinite(net))
+    .sort((a, b) => Math.abs(b.net) - Math.abs(a.net))
+    .slice(0, 4)
+    .map(({ key, net }) => {
+      const sign = (net >= 0 ? '+' : '') + net.toFixed(1);
+      return `${sanitizeForPrompt(key.replace('|', '↔'), 64)} (net: ${sign})`;
     });
   const relBlock = relEntries.length > 0
     ? `Relationship heat: ${relEntries.join('; ')}.`

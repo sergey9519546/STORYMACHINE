@@ -59,6 +59,18 @@ export function qualityConstraintsFromWarnings(
       case 'DV11_UNEXPLAINED_PRIDE':
         constraints.push({ kind: 'free_form', description: 'A character\'s pride must follow an earned achievement. Add a PAYOFF_SETUP or a positive SHIFT_RELATIONSHIP before the APPRAISE_EMOTION pride to ground what they accomplished.' });
         break;
+      case 'DV12_TALKING_HEADS':
+        constraints.push({ kind: 'free_form', description: 'This scene is pure dialogue — talking heads with no physical or story consequence. Add at least one world op: ADD_FACT, SHIFT_RELATIONSHIP, ADVANCE_OBJECT_ARC, or RAISE_CLOCK. Characters must DO something, not just exchange information.' });
+        break;
+      case 'DV13_UNACKNOWLEDGED_CLOCK':
+        constraints.push({ kind: 'free_form', description: 'A ticking clock (RAISE_CLOCK) was raised but no character perceives it. Add an UPDATE_BELIEF where at least one character\'s proposition references the clock subject — make the stakes visible to a human mind.' });
+        break;
+      case 'DV14_EMOTIONAL_FLATLINE':
+        constraints.push({ kind: 'free_form', description: 'A character\'s emotion never changes within this scene. Give them an emotional arc — they should enter and exit with a different dominant emotion, or at minimum a significant intensity shift caused by events.' });
+        break;
+      case 'DV15_GOAL_FREE_SCENE':
+        constraints.push({ kind: 'free_form', description: 'This scene has no story consequence: no arc advancement, no theme progress, no payoff, no ticking clock. Add at least one ADVANCE_OBJECT_ARC, ADVANCE_THEME_ARGUMENT, PAYOFF_SETUP, or RAISE_CLOCK to make this scene matter to the plot.' });
+        break;
       case 'LOW_SPECIFICITY':
         constraints.push({ kind: 'free_form', description: 'Replace vague terms (something, happened, felt, things) with concrete specifics: named objects, precise actions, sensory details. Every op should be unmistakably this story, not any story.' });
         break;

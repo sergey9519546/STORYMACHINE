@@ -1,0 +1,21 @@
+{
+  "id": "clue_cascade",
+  "kind": "clue_cascade",
+  "themeClaimTemplate": "What we see / What we were meant to see",
+  "physicalCarrier": { "type": "hidden_document_or_object", "required": true },
+  "lifecycleStates": ["seed_planted", "first_payoff", "cascade_active", "false_resolution", "deeper_truth", "final_reveal"],
+  "transitionRules": [
+    { "from": "seed_planted", "to": "first_payoff", "condition": "detective_or_protagonist_discovers_first_connection" },
+    { "from": "first_payoff", "to": "cascade_active", "condition": "first_payoff_reveals_a_new_more_troubling_clue" },
+    { "from": "cascade_active", "to": "false_resolution", "condition": "protagonist_believes_the_mystery_is_solved" },
+    { "from": "false_resolution", "to": "deeper_truth", "condition": "a_detail_contradicts_the_false_resolution" },
+    { "from": "deeper_truth", "to": "final_reveal", "condition": "protagonist_must_confront_the_person_or_institution_who_planted_the_false_trail" }
+  ],
+  "climaxProofPredicate": "protagonist_must_choose: accept_false_resolution | pursue_truth_at_cost_of_safety",
+  "endingProofPredicate": "audience_understands_who_planted_each_clue_and_why",
+  "invariants": [
+    "each_payoff_must_introduce_a_new_question_not_just_answer_the_prior_one",
+    "false_resolution_must_be_emotionally_satisfying_enough_to_be_plausible",
+    "the_deepest_truth_implicates_someone_the_audience_trusted"
+  ]
+}

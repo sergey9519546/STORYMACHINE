@@ -126,18 +126,36 @@ function complicateRelationship(ir: NarrativeTransitionIR, state: NarrativeState
   };
 }
 
-function weirdButValid(ir: NarrativeTransitionIR, _state: NarrativeState, seed: number): MutationResult {
+function weirdButValid(ir: NarrativeTransitionIR, state: NarrativeState, seed: number): MutationResult {
   const prng = makePrng(seed);
-  // Swap a RECORD_VISUAL_FACT detail or add a sonic/visual texture that's unexpected
+  // Add a concrete, scene-specific sensory detail that creates productive strangeness.
+  // Pull context from the existing ops and state to avoid generic template strings.
+  const facts = state.objectiveReality;
+  const chars = Object.keys(state.characterBeliefs);
+  const charName = chars.length > 0 ? chars[randInt(prng, chars.length)] : 'the protagonist';
+  const existingFact = facts.length > 0 ? facts[randInt(prng, facts.length)] : null;
+
+  // Sonic options reference known characters or facts for specificity
+  const sonicOptions = [
+    `${charName}'s silence after the question — louder than any answer`,
+    existingFact ? `a sound tied to "${existingFact.subject}" interrupts at the worst moment` : `a distant sound breaks the rhythm of the scene`,
+    `something mechanical fails at the exact wrong moment`,
+  ];
+  // Visual options
+  const visualOptions = [
+    `a physical object on screen contradicts what ${charName} just said`,
+    existingFact ? `the location itself — "${existingFact.subject}" — shows something the characters haven't noticed` : `a background detail undercuts the foreground drama`,
+    `${charName}'s body betrays what their words deny`,
+  ];
   const flavors = ['sound', 'camera'] as const;
   const flavor = flavors[randInt(prng, flavors.length)];
   const weirdOp: StoryOp = flavor === 'sound'
-    ? { op: 'RECORD_SONIC_FACT', sceneId: `s${ir.sceneIdx}`, fact: 'an unexpected sound undercuts the dialogue' }
-    : { op: 'RECORD_VISUAL_FACT', sceneId: `s${ir.sceneIdx}`, fact: 'a visual detail contradicts the spoken word' };
+    ? { op: 'RECORD_SONIC_FACT', sceneId: `s${ir.sceneIdx}`, fact: sonicOptions[randInt(prng, sonicOptions.length)] }
+    : { op: 'RECORD_VISUAL_FACT', sceneId: `s${ir.sceneIdx}`, fact: visualOptions[randInt(prng, visualOptions.length)] };
   return {
     ir: { ...ir, ops: [...ir.ops, weirdOp] },
     operator: 'weird_but_valid',
-    description: `Added ${flavor} texture that creates productive strangeness`,
+    description: `Added ${flavor} texture grounded in scene context: ${charName}`,
   };
 }
 
@@ -149,7 +167,7 @@ function sharpenTheme(ir: NarrativeTransitionIR, state: NarrativeState, seed: nu
   const move = moves[randInt(prng, moves.length)];
   const themeOp: StoryOp = {
     op: 'ADVANCE_THEME_ARGUMENT',
-    claimId: `theme_${ir.sceneIdx}_${Date.now()}`,
+    claimId: `theme_${ir.sceneIdx}_${randInt(prng, 99999)}`,
     move,
   };
   return {

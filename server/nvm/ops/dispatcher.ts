@@ -6,6 +6,7 @@ import { assertNever } from '../util/assertNever.ts';
 import type { StoryOp } from './StoryOp.ts';
 import type { NarrativeState } from '../state/NarrativeState.ts';
 import { relationshipKey } from '../state/NarrativeState.ts';
+import { logger } from '../../lib/logger.ts';
 
 export function applyStoryOp(state: NarrativeState, op: StoryOp): NarrativeState {
   switch (op.op) {
@@ -18,8 +19,7 @@ export function applyStoryOp(state: NarrativeState, op: StoryOp): NarrativeState
       // Warn if factId doesn't exist (TemporalProof should have caught this upstream).
       const factExists = state.objectiveReality.some(f => f.factId === op.factId);
       if (!factExists) {
-        // eslint-disable-next-line no-console
-        console.warn(`[dispatcher] EXPIRE_FACT: factId "${op.factId}" not found — op is a no-op`);
+        logger.warn('dispatcher_expire_fact_not_found', { factId: op.factId });
         return state;
       }
       return {

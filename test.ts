@@ -3374,8 +3374,8 @@ describe('NVM — StoryOp dispatcher (14 ops, pure)', () => {
 // ──────────────────────────────────────────────────────────────────────────────
 
 describe('NVM — mechanism schema loader', () => {
-  it('auto-discovers exactly 3 MVP mechanisms', () => {
-    assert.equal(loadMechanisms().size, 3);
+  it('auto-discovers mechanisms (MVP + Phase 2)', () => {
+    assert.ok(loadMechanisms().size >= 3, 'should have at least 3 mechanisms');
   });
   it('each mechanism validates: lifecycle, rules, invariants present', () => {
     for (const m of loadMechanisms().values()) {
@@ -3389,6 +3389,12 @@ describe('NVM — mechanism schema loader', () => {
     assert.ok(m.has('object_burden'));
     assert.ok(m.has('legitimacy_split'));
     assert.ok(m.has('relationship_externalization'));
+  });
+  it('resolves the 3 Phase 2 mechanism ids', () => {
+    const m = loadMechanisms();
+    assert.ok(m.has('false_purpose'), 'false_purpose mechanism should be present');
+    assert.ok(m.has('clue_cascade'), 'clue_cascade mechanism should be present');
+    assert.ok(m.has('identity_performance'), 'identity_performance mechanism should be present');
   });
   it('loadMechanismsCached returns a stable instance', () => {
     assert.strictEqual(loadMechanismsCached(), loadMechanismsCached());
@@ -11802,5 +11808,105 @@ describe('collab/yjs-server', () => {
 
   it('collabRoomCount starts at zero with no active rooms', () => {
     assert.equal(typeof collabRoomCount(), 'number');
+  });
+});
+
+// ── DV12-DV15: New quality violation rules ────────────────────────────────────
+describe('quality engine DV12-DV15 — new violation rules', () => {
+  function makeIR(ops: StoryOp[], sceneIdx = 1): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR {
+    return {
+      transitionId: 'dv_test', sceneIdx, sceneFunction: 'build_tension',
+      activeMechanisms: [], beforeStateHash: 'deadbeef', preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: Date.now() },
+      ops,
+    };
+  }
+  function mkBelief(id: string, prop: string, src: 'witnessed'|'told' = 'witnessed'): StoryOp {
+    return { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id, proposition: prop, confidence: 0.7, source: src, source_event_id: 'e1', acquired_at: 1 } };
+  }
+
+  // ── DV12: Talking heads ───────────────────────────────────────────────────────
+  it('DV12_TALKING_HEADS fires when ≥3 belief ops with no world/story consequence', () => {
+    const ops: StoryOp[] = [
+      mkBelief('b1', 'alice knows the plan'),
+      mkBelief('b2', 'alice suspects bob'),
+      mkBelief('b3', 'alice is confused'),
+    ];
+    const warnings = dialogueWarnings(makeIR(ops), emptyState());
+    assert.ok(warnings.some(w => w.rule === 'DV12_TALKING_HEADS'), 'DV12 should fire for pure dialogue scene');
+  });
+
+  it('DV12_TALKING_HEADS does not fire when a SHIFT_RELATIONSHIP op is present', () => {
+    const ops: StoryOp[] = [
+      mkBelief('b1', 'alice knows the plan'),
+      mkBelief('b2', 'alice suspects bob'),
+      mkBelief('b3', 'alice is confused'),
+      { op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: 0.3, reason: 'trust grows' } },
+    ];
+    const warnings = dialogueWarnings(makeIR(ops), emptyState());
+    assert.ok(!warnings.some(w => w.rule === 'DV12_TALKING_HEADS'), 'DV12 should not fire when world consequence exists');
+  });
+
+  // ── DV13: Unacknowledged clock ────────────────────────────────────────────────
+  it('DV13_UNACKNOWLEDGED_CLOCK fires when RAISE_CLOCK has no belief referencing it', () => {
+    const ops: StoryOp[] = [
+      { op: 'RAISE_CLOCK', clockId: 'deadline', amount: 20 },
+      mkBelief('b1', 'alice thinks something is wrong'),
+    ];
+    const warnings = dialogueWarnings(makeIR(ops), emptyState());
+    assert.ok(warnings.some(w => w.rule === 'DV13_UNACKNOWLEDGED_CLOCK'), 'DV13 should fire when clock is invisible to characters');
+  });
+
+  it('DV13_UNACKNOWLEDGED_CLOCK does not fire when a belief references the clock', () => {
+    const ops: StoryOp[] = [
+      { op: 'RAISE_CLOCK', clockId: 'deadline', amount: 20 },
+      { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'the deadline is approaching fast', confidence: 0.8, source: 'witnessed', source_event_id: 'e1', acquired_at: 1 } },
+    ];
+    const warnings = dialogueWarnings(makeIR(ops), emptyState());
+    assert.ok(!warnings.some(w => w.rule === 'DV13_UNACKNOWLEDGED_CLOCK'), 'DV13 should not fire when character acknowledges clock');
+  });
+
+  // ── DV14: Emotional flatline ──────────────────────────────────────────────────
+  it('DV14_EMOTIONAL_FLATLINE fires when same character has ≥3 same-dominant emotion ops', () => {
+    const ops: StoryOp[] = [
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { joy: 0, distress: 60, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'distress', intensity: 60, last_updated_at: 1 } },
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { joy: 0, distress: 65, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'distress', intensity: 65, last_updated_at: 2 } },
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { joy: 0, distress: 70, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'distress', intensity: 70, last_updated_at: 3 } },
+    ];
+    const warnings = dialogueWarnings(makeIR(ops), emptyState());
+    assert.ok(warnings.some(w => w.rule === 'DV14_EMOTIONAL_FLATLINE'), 'DV14 should fire for repeated same emotion');
+  });
+
+  it('DV14_EMOTIONAL_FLATLINE does not fire when emotion changes dominant', () => {
+    const ops: StoryOp[] = [
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { joy: 0, distress: 60, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'distress', intensity: 60, last_updated_at: 1 } },
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { joy: 0, distress: 0, anger: 70, fear: 0, pride: 0, shame: 0, dominant: 'anger', intensity: 70, last_updated_at: 2 } },
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { joy: 60, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'joy', intensity: 60, last_updated_at: 3 } },
+    ];
+    const warnings = dialogueWarnings(makeIR(ops), emptyState());
+    assert.ok(!warnings.some(w => w.rule === 'DV14_EMOTIONAL_FLATLINE'), 'DV14 should not fire when emotion evolves');
+  });
+
+  // ── DV15: Goal-free scene ─────────────────────────────────────────────────────
+  it('DV15_GOAL_FREE_SCENE fires when ≥4 ops with no story-structure progress', () => {
+    const ops: StoryOp[] = [
+      mkBelief('b1', 'alice knows the plan'),
+      mkBelief('b2', 'alice suspects bob'),
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { joy: 0, distress: 40, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'distress', intensity: 40, last_updated_at: 1 } },
+      mkBelief('b3', 'alice is confused about everything'),
+    ];
+    const warnings = dialogueWarnings(makeIR(ops), emptyState());
+    assert.ok(warnings.some(w => w.rule === 'DV15_GOAL_FREE_SCENE'), 'DV15 should fire for scene with no story consequence');
+  });
+
+  it('DV15_GOAL_FREE_SCENE does not fire when RAISE_CLOCK is present', () => {
+    const ops: StoryOp[] = [
+      mkBelief('b1', 'alice knows the plan'),
+      mkBelief('b2', 'alice suspects bob'),
+      mkBelief('b3', 'alice is confused'),
+      { op: 'RAISE_CLOCK', clockId: 'bomb_timer', amount: 30 },
+    ];
+    const warnings = dialogueWarnings(makeIR(ops), emptyState());
+    assert.ok(!warnings.some(w => w.rule === 'DV15_GOAL_FREE_SCENE'), 'DV15 should not fire when clock is raised');
   });
 });
