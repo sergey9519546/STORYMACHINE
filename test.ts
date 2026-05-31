@@ -1833,6 +1833,22 @@ describe('metrics', () => {
     const snap = metrics.snapshot() as { ai: { total_calls: number } };
     assert.equal(snap.ai.total_calls, 0);
   });
+
+  it('estimates token cost in USD per category and in total (M6)', () => {
+    metrics.reset();
+    // 1,000,000 input + 1,000,000 output tokens at default rates (0.075 / 0.30).
+    metrics.recordAiCall('cost:demo', 100, true, {
+      promptTokenCount: 1_000_000,
+      candidatesTokenCount: 1_000_000,
+    });
+    const snap = metrics.snapshot() as {
+      ai: { est_cost_usd: number; by_category: Record<string, { est_cost_usd: number }> };
+    };
+    // 0.075 (input) + 0.30 (output) = 0.375 USD
+    assert.ok(Math.abs(snap.ai.est_cost_usd - 0.375) < 1e-9, 'total cost estimate');
+    assert.ok(Math.abs(snap.ai.by_category['cost'].est_cost_usd - 0.375) < 1e-9, 'per-category cost estimate');
+    metrics.reset();
+  });
 });
 
 describe('ai — LLM provider seam', () => {
