@@ -161,6 +161,9 @@ export default function ScriptIDE({
   const [isCleaning, setIsCleaning] = useState<number | null>(null);
   const [cleanError, setCleanError] = useState<string | null>(null);
   const cleanErrTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // P9: inline copilot persona (custom ghost-text voice/specialty).
+  const [copilotPersona, setCopilotPersona] = useState<string>(() => lsGet("copilot_persona") || "default");
+  const [personaList, setPersonaList] = useState<Array<{ id: string; name: string; description: string }>>([]);
 
   // ── Refs ────────────────────────────────────────────────────────────────────
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -526,6 +529,21 @@ export default function ScriptIDE({
       } catch { /* audio context unavailable */ }
     }
   }, [isTypewriterSound]);
+
+  // P9: load the available copilot personas once for the picker.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/scriptide/personas")
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error("personas_fetch_failed"))))
+      .then((data: { personas?: Array<{ id: string; name: string; description: string }> }) => {
+        if (!cancelled && Array.isArray(data.personas)) setPersonaList(data.personas);
+      })
+      .catch(() => { /* picker falls back to the default-only list */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Persist persona selection so it survives reloads.
+  useEffect(() => { lsSet("copilot_persona", copilotPersona); }, [copilotPersona]);
 
   const handleScriptChange = (text: string) => {
     setScriptText(text);
@@ -968,6 +986,40 @@ export default function ScriptIDE({
           onOpenStoryMachine={onOpenStoryMachine}
         />
 
+        {/* P9: inline copilot persona picker — selects the ghost-text voice. */}
+        <div className="px-4 py-1.5 border-b-2 border-black bg-gray-50 flex items-center gap-2">
+          <label
+            htmlFor="copilot-persona"
+            className="text-[10px] font-bold uppercase tracking-widest text-gray-500"
+          >
+            Copilot
+          </label>
+          <select
+            id="copilot-persona"
+            value={copilotPersona}
+            onChange={(e) => setCopilotPersona(e.target.value)}
+            title={personaList.find((p) => p.id === copilotPersona)?.description ?? ""}
+            className="text-[11px] font-mono bg-white border-2 border-black px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-purple-500"
+          >
+            {(personaList.length > 0
+              ? personaList
+              : [{ id: "default", name: "Staff Writer", description: "" }]
+            ).map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          {(() => {
+            const desc = personaList.find((p) => p.id === copilotPersona)?.description;
+            return desc ? (
+              <span className="text-[10px] text-gray-400 italic hidden md:inline truncate">
+                {desc}
+              </span>
+            ) : null;
+          })()}
+        </div>
+
         <div
           className="flex-1 relative overflow-hidden bg-white"
           aria-busy={engineState.isAnalyzing ? "true" : "false"}
@@ -988,6 +1040,7 @@ export default function ScriptIDE({
             completionCtx={{
               directorStyle: initialConfig?.directorStyle,
               characters: characters.map(c => c.name),
+              persona: copilotPersona,
             }}
             isDarkMode={isDarkMode}
           />

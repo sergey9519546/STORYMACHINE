@@ -33,6 +33,8 @@ export interface CompletionContext {
   directorStyle?: string;
   genre?: string;
   characters?: string[];
+  /** Active copilot persona id (P9) — selects the ghost-text voice/specialty. */
+  persona?: string;
 }
 
 // ── SSE fetch helper — streams tokens, calls onToken, resolves with full text ─
@@ -50,6 +52,7 @@ function fetchCompletion(
       directorStyle: ctx.directorStyle ?? '',
       genre: ctx.genre ?? '',
       characters: (ctx.characters ?? []).join(','),
+      persona: ctx.persona ?? '',
     });
 
     const es = new EventSource(`/api/scriptide/complete?${params}`);

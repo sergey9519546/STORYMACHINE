@@ -130,7 +130,7 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
       () => inlineComplete(completionCtx),
       // Re-create when context keys change
       // eslint-disable-next-line react-hooks/exhaustive-deps
-      [completionCtx?.directorStyle, completionCtx?.genre, JSON.stringify(completionCtx?.characters)],
+      [completionCtx?.directorStyle, completionCtx?.genre, completionCtx?.persona, JSON.stringify(completionCtx?.characters)],
     );
 
     // ── Create EditorView once on mount ──────────────────────────────────────

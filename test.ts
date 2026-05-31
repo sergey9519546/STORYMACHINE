@@ -23,6 +23,14 @@ import {
   selectPersuasionStrategy,
   getReadyGoals,
 } from './server/engine/agent/psychology.ts';
+import { validatePersona, PERSONA_LIMITS } from './server/personas/types.ts';
+import {
+  listPersonas,
+  getPersona,
+  registerUserPersona,
+  personaPromptBlock,
+  _resetUserPersonas,
+} from './server/personas/registry.ts';
 import { STORY_OP_KINDS } from './server/nvm/ops/StoryOp.ts';
 import type { StoryOp } from './server/nvm/ops/StoryOp.ts';
 import { PROOF_TIERS, passResult, failResult } from './server/nvm/proof/contract.ts';
@@ -11640,5 +11648,76 @@ describe('agent/psychology', () => {
     assert.ok(ids.includes('b'), 'B is ready (dep a achieved)');
     assert.ok(!ids.includes('c'), 'C is blocked (dep z unmet)');
     assert.ok(!ids.includes('a'), 'A already achieved, not returned');
+  });
+});
+
+// ── P9: Copilot persona registry + validation ────────────────────────────────
+describe('personas/registry', () => {
+  it('validatePersona accepts a well-formed persona and clamps fields', () => {
+    const p = validatePersona({
+      id: 'my-voice',
+      name: 'My Voice',
+      description: 'd',
+      systemPreamble: 'Write like me.',
+      temperature: 5,            // out of range -> clamped to 2
+      maxOutputTokens: 99999,    // out of range -> clamped to 1024
+      contextInjectors: ['a', 'b'],
+    });
+    assert.ok(p, 'persona validated');
+    assert.equal(p!.id, 'my-voice');
+    assert.equal(p!.temperature, 2);
+    assert.equal(p!.maxOutputTokens, 1024);
+    assert.deepEqual(p!.contextInjectors, ['a', 'b']);
+  });
+
+  it('validatePersona rejects bad ids, missing name, missing preamble', () => {
+    assert.equal(validatePersona({ id: 'Bad Id', name: 'X', systemPreamble: 'y' }), null);
+    assert.equal(validatePersona({ id: 'ok', systemPreamble: 'y' }), null);
+    assert.equal(validatePersona({ id: 'ok', name: 'X' }), null);
+    assert.equal(validatePersona(null), null);
+    assert.equal(validatePersona('nope'), null);
+  });
+
+  it('validatePersona caps the number of context injectors', () => {
+    const many = Array.from({ length: 50 }, (_, i) => `line ${i}`);
+    const p = validatePersona({ id: 'x', name: 'X', systemPreamble: 'p', contextInjectors: many });
+    assert.ok(p);
+    assert.ok((p!.contextInjectors?.length ?? 0) <= PERSONA_LIMITS.maxInjectors);
+  });
+
+  it('listPersonas includes the built-in default and specialists', () => {
+    const ids = listPersonas().map(p => p.id);
+    assert.ok(ids.includes('default'), 'default persona loaded from disk');
+    assert.ok(ids.includes('noir-specialist'), 'noir specialist loaded');
+    assert.ok(ids.length >= 3, 'multiple built-in personas loaded');
+  });
+
+  it('getPersona falls back to default for unknown ids', () => {
+    const unknown = getPersona('does-not-exist');
+    assert.ok(unknown);
+    assert.equal(unknown!.id, 'default');
+  });
+
+  it('registerUserPersona adds a shadowing persona and strips builtin flag', () => {
+    _resetUserPersonas();
+    const reg = registerUserPersona({
+      id: 'custom-1', name: 'Custom', systemPreamble: 'Be bold.', builtin: true,
+    });
+    assert.ok(reg);
+    assert.equal(reg!.builtin, false, 'user persona cannot claim builtin');
+    assert.equal(getPersona('custom-1')!.name, 'Custom');
+    _resetUserPersonas();
+    assert.equal(getPersona('custom-1')!.id, 'default', 'removed after reset');
+  });
+
+  it('personaPromptBlock renders preamble plus injector bullets', () => {
+    const block = personaPromptBlock({
+      id: 'x', name: 'X', description: '',
+      systemPreamble: 'Lead line.',
+      contextInjectors: ['first hint', 'second hint'],
+    });
+    assert.match(block, /Lead line\./);
+    assert.match(block, /- first hint/);
+    assert.match(block, /- second hint/);
   });
 });

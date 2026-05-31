@@ -9,6 +9,7 @@ import {
   gameLimiter, aiLimiter, sessions,
 } from '../lib/session-store.ts';
 import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
+import { listPersonas, getPersona, registerUserPersona, personaPromptBlock } from '../personas/registry.ts';
 import type { DirectorStyle, StoryStructure } from '../engine/types.ts';
 
 // ── Schema for analyzeScriptBlock ─────────────────────────────────────────────
@@ -240,12 +241,19 @@ router.get('/api/scriptide/complete', aiLimiter, async (req, res) => {
     const charNames    = typeof q['characters']   === 'string'
       ? q['characters'].split(',').filter(Boolean).slice(0, 30)
       : [];
+    const personaId    = typeof q['persona']      === 'string' ? q['persona']      : '';
 
     if (rawPrefix.length < 10) {
       emitSSE({ type: 'done' });
       ensureEnded();
       return;
     }
+
+    // P9: resolve the active copilot persona (custom voice / genre specialist).
+    // The persona's preamble replaces the generic lead-in and its sampling knobs
+    // override the route defaults.
+    const persona = getPersona(personaId);
+    const personaLead = persona ? personaPromptBlock(persona) : 'You are an expert screenplay writer. Continue the Fountain-format screenplay from where the cursor is.';
 
     // Sanitize all user-controlled strings before embedding in the prompt (C1)
     const prefix  = sanitizeForPrompt(rawPrefix,  4000);
@@ -264,7 +272,7 @@ router.get('/api/scriptide/complete', aiLimiter, async (req, res) => {
     })();
 
     // FIM (Fill-In-the-Middle) prompt structure: prefix + completion marker + suffix.
-    const prompt = `You are an expert screenplay writer. Continue the Fountain-format screenplay from where the cursor is. Write ONLY the continuation text that belongs between the prefix and suffix — no explanations, no markdown, no preamble.
+    const prompt = `${personaLead} Write ONLY the continuation text that belongs between the prefix and suffix — no explanations, no markdown, no preamble.
 
 ${stylePreamble}${genrePreamble}${charPreamble}${bibleBlock}
 RULES:
@@ -284,10 +292,14 @@ ${suffix || '(end of document)'}
     const { generateContentStream, modelForTask: mft } = await import('../engine/ai.ts');
 
     // Stream tokens via the provider abstraction (testable + metered).
+    // Persona sampling knobs override the route defaults when present.
     const stream = await generateContentStream({
       model: mft('GHOST_TEXT'),
       contents: prompt,
-      config: { maxOutputTokens: 256, temperature: 0.85 },
+      config: {
+        maxOutputTokens: persona?.maxOutputTokens ?? 256,
+        temperature: persona?.temperature ?? 0.85,
+      },
     }, { label: 'scriptide-complete' });
 
     let hasTokens = false;
@@ -308,6 +320,24 @@ ${suffix || '(end of document)'}
     ensureEnded();
   }
 });
+
+// ── Copilot persona routes (P9) ─────────────────────────────────────────────
+// GET /api/scriptide/personas — list available copilot personas for the picker.
+router.get('/api/scriptide/personas', gameLimiter, asyncHandler(async (_req, res) => {
+  res.json({ personas: listPersonas() });
+}));
+
+// POST /api/scriptide/personas — register a custom (user-uploaded) persona.
+// Body: a CopilotPersona JSON object. Returns the normalized persona, or 400.
+router.post('/api/scriptide/personas', gameLimiter, asyncHandler(async (req, res) => {
+  const persona = registerUserPersona(req.body);
+  if (!persona) {
+    res.status(400).json({ error: 'Invalid persona: requires id (kebab-case), name, and systemPreamble.' });
+    return;
+  }
+  logger.info('persona_registered', { id: persona.id });
+  res.json({ persona });
+}));
 
 // ── ScriptIDE AI routes ────────────────────────────────────────────────────
 // Optional script context — the current editor contents, capped, so AI
