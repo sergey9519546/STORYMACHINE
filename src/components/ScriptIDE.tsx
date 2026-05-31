@@ -4,6 +4,7 @@ import { analyzeScriptBlock } from "../services/director";
 import { parseFountain, FountainBlock } from "../lib/fountain";
 import { fountainToFdx } from "../lib/fdx";
 import { fountainToPdf } from "../lib/pdf";
+import { fountainToDocx } from "../lib/docx";
 import { safeJsonParse } from "../lib/json";
 import {
   Loader2,
@@ -646,6 +647,21 @@ export default function ScriptIDE({
     URL.revokeObjectURL(url);
   };
 
+  const exportDOCX = () => {
+    // Word-compatible .docx: OOXML parts zipped (store method), Courier styles.
+    const bytes = fountainToDocx(scriptText);
+    const buf = bytes.slice().buffer;
+    const blob = new Blob([buf], {
+      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "script.docx";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // ── Clean action AI ──────────────────────────────────────────────────────────
   const handleCleanAction = async (index: number, text: string) => {
     cleanActionAbortRef.current?.abort();
@@ -948,6 +964,7 @@ export default function ScriptIDE({
           onExportFountain={exportFountain}
           onExportFDX={exportFDX}
           onExportPDF={exportPDF}
+          onExportDOCX={exportDOCX}
           onOpenStoryMachine={onOpenStoryMachine}
         />
 

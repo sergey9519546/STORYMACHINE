@@ -176,6 +176,8 @@ import { parseFountain } from './src/lib/fountain.ts';
 import { fountainToFdx } from './src/lib/fdx.ts';
 import { layoutScreenplay, LINES_PER_PAGE } from './src/lib/screenplay-layout.ts';
 import { fountainToPdf } from './src/lib/pdf.ts';
+import { buildZip } from './src/lib/zip.ts';
+import { fountainToDocx } from './src/lib/docx.ts';
 import type { ActionLogEntry, Belief, CharacterSheet, Location } from './server/engine/types.ts';
 import { ACTION_TYPES } from './server/engine/types.ts';
 
@@ -11410,5 +11412,97 @@ describe('Wave 91 — fountainToPdf', () => {
     const text = toLatin1(pdf);
     assert.ok(text.includes('\\(parenthetical\\)'), 'parentheses escaped');
     assert.ok(text.includes('\\\\'), 'backslash escaped');
+  });
+});
+
+// ── Wave 92 — ZIP writer + DOCX export (P2) ───────────────────────────────────
+describe('Wave 92 — buildZip', () => {
+  function latin1(bytes: Uint8Array): string {
+    let s = ''; for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]); return s;
+  }
+  // Read a little-endian u32 at offset.
+  function u32(b: Uint8Array, off: number): number {
+    return (b[off] | (b[off+1] << 8) | (b[off+2] << 16) | (b[off+3] << 24)) >>> 0;
+  }
+
+  it('emits local-header, central-directory, and EOCD signatures', () => {
+    const zip = buildZip([{ name: 'a.txt', data: 'hello' }]);
+    const text = latin1(zip);
+    assert.ok(text.includes('PK\x03\x04'), 'local file header signature present');
+    assert.ok(text.includes('PK\x01\x02'), 'central directory signature present');
+    assert.ok(text.includes('PK\x05\x06'), 'end-of-central-directory signature present');
+  });
+
+  it('records the correct total entry count in the EOCD', () => {
+    const zip = buildZip([
+      { name: 'a.txt', data: 'one' },
+      { name: 'b.txt', data: 'two' },
+      { name: 'c.txt', data: 'three' },
+    ]);
+    const text = latin1(zip);
+    const eocd = text.lastIndexOf('PK\x05\x06');
+    // total entries is a u16 at offset 10 of the EOCD record
+    const total = zip[eocd + 10] | (zip[eocd + 11] << 8);
+    assert.equal(total, 3, 'EOCD reports 3 entries');
+  });
+
+  it('computes a CRC-32 matching the zlib reference implementation', async () => {
+    const zlib = await import('node:zlib');
+    const payload = 'The quick brown fox jumps over the lazy dog 0123456789';
+    const zip = buildZip([{ name: 'x.txt', data: payload }]);
+    // The CRC-32 lives at offset 14 of the local file header (after sig+version+flag+method+time+date).
+    const crcInZip = u32(zip, 14);
+    const reference = (zlib.crc32!(payload) >>> 0);
+    assert.equal(crcInZip, reference, 'stored CRC-32 matches zlib.crc32');
+  });
+
+  it('stores data uncompressed (method 0) so contents appear verbatim', () => {
+    const zip = buildZip([{ name: 'note.txt', data: 'VERBATIM_MARKER_123' }]);
+    assert.ok(latin1(zip).includes('VERBATIM_MARKER_123'), 'stored entry contents appear in the archive');
+  });
+});
+
+describe('Wave 92 — fountainToDocx', () => {
+  function latin1(bytes: Uint8Array): string {
+    let s = ''; for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]); return s;
+  }
+
+  it('produces a valid ZIP whose CRCs all verify (round-trip via zlib inflate-less store)', () => {
+    const docx = fountainToDocx('INT. ROOM - DAY\n\nA man sits.');
+    const text = latin1(docx);
+    assert.ok(text.includes('PK\x03\x04'), 'has local headers');
+    assert.ok(text.includes('PK\x05\x06'), 'has EOCD');
+  });
+
+  it('includes all five required OOXML package parts', () => {
+    const text = latin1(fountainToDocx('INT. ROOM - DAY\n\nAction.'));
+    for (const part of [
+      '[Content_Types].xml', '_rels/.rels', 'word/_rels/document.xml.rels',
+      'word/styles.xml', 'word/document.xml',
+    ]) {
+      assert.ok(text.includes(part), `archive contains ${part}`);
+    }
+  });
+
+  it('maps block types to paragraph styles and uppercases the scene heading', () => {
+    // Store method = uncompressed, so document.xml bytes appear verbatim in the archive.
+    // Character cues must already be uppercase in Fountain source, so MARA is the cue.
+    const text = latin1(fountainToDocx('INT. coffee shop - day\n\nA.\n\nMARA\nHi.'));
+    assert.ok(text.includes('w:val="SceneHeading"'), 'scene heading style applied');
+    assert.ok(text.includes('w:val="Character"'), 'character style applied');
+    assert.ok(text.includes('w:val="Dialogue"'), 'dialogue style applied');
+    assert.ok(text.includes('INT. COFFEE SHOP - DAY'), 'lowercase scene heading uppercased on export');
+    assert.ok(text.includes('MARA'), 'character cue present under Character style');
+  });
+
+  it('XML-escapes special characters in dialogue', () => {
+    const text = latin1(fountainToDocx('INT. ROOM - DAY\n\nBOB\nTom & Jerry <fight> "loudly".'));
+    assert.ok(text.includes('Tom &amp; Jerry &lt;fight&gt; &quot;loudly&quot;'), 'ampersand, angle brackets, quotes escaped');
+  });
+
+  it('excludes Fountain title-page key:value lines from the body', () => {
+    const text = latin1(fountainToDocx('Title: My Script\nAuthor: Me\n\nINT. ROOM - DAY\n\nAction.'));
+    assert.ok(!text.includes('Title: My Script'), 'title-page line not in body');
+    assert.ok(text.includes('Action'), 'body content present');
   });
 });

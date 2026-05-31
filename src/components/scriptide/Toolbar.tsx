@@ -14,6 +14,7 @@ interface ToolbarProps {
   onExportFountain: () => void;
   onExportFDX: () => void;
   onExportPDF: () => void;
+  onExportDOCX: () => void;
   onOpenStoryMachine?: () => void;
 }
 
@@ -30,6 +31,7 @@ export default function Toolbar({
   onExportFountain,
   onExportFDX,
   onExportPDF,
+  onExportDOCX,
   onOpenStoryMachine,
 }: ToolbarProps) {
   return (
@@ -117,6 +119,14 @@ export default function Toolbar({
           className="bg-white text-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors brutal-border flex items-center gap-2"
         >
           <Download className="w-3 h-3" aria-hidden="true" /> .PDF
+        </button>
+        <button
+          onClick={onExportDOCX}
+          aria-label="Export script as Word document"
+          title="Export as Word (.docx)"
+          className="bg-white text-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors brutal-border flex items-center gap-2"
+        >
+          <Download className="w-3 h-3" aria-hidden="true" /> .DOCX
         </button>
         <button
           onClick={onOpenStoryMachine}
