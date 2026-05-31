@@ -83,9 +83,12 @@ export function buildStoryBibleSummary(stage: Stage): string {
       }
     }
   }
-  const unresolvedCount = [...plantedIds].filter(id => !paidIds.has(id)).length;
-  if (unresolvedCount > 0) {
-    parts.push(`OPEN CLUES: ${unresolvedCount} seeded but not yet paid off`);
+  const unresolvedClueIds = [...plantedIds].filter(id => !paidIds.has(id));
+  if (unresolvedClueIds.length > 0) {
+    // List actual clue IDs so the LLM can reference them in PAYOFF_SETUP ops
+    const topIds = unresolvedClueIds.slice(0, 5).map(id => `"${id}"`).join(', ');
+    const more = unresolvedClueIds.length > 5 ? ` (+${unresolvedClueIds.length - 5} more)` : '';
+    parts.push(`OPEN CLUES (${unresolvedClueIds.length}): ${topIds}${more} — not yet paid off`);
   }
   const hotClocks = Object.entries(clockTotals)
     .filter(([, v]) => v > 0)

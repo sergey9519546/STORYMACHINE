@@ -211,6 +211,35 @@ export function buildSystemPreamble(constraints: GenerationConstraint[], state: 
     ? `Relationship heat: ${relEntries.join('; ')}.`
     : '';
 
+  // ── Character beliefs (psychographic context) ─────────────────────────────
+  // Surface top-confidence beliefs per character so the LLM knows what each
+  // character believes about the world — essential for writing belief-motivated ops.
+  const beliefLines = Object.entries(state.characterBeliefs)
+    .flatMap(([charId, beliefs]) => {
+      const top = beliefs
+        .filter(b => b.confidence > 0.5)
+        .sort((a, b) => b.confidence - a.confidence)
+        .slice(0, 2);
+      return top.map(b =>
+        `${sanitizeForPrompt(charId, 40)} believes: "${sanitizeForPrompt(b.proposition, 80)}" (${(b.confidence * 100).toFixed(0)}% conf, ${b.source})`,
+      );
+    })
+    .slice(0, 8); // cap at 8 to avoid context bloat
+  const beliefBlock = beliefLines.length > 0
+    ? `Character beliefs: ${beliefLines.join('; ')}.`
+    : '';
+
+  // ── Open clues and planted payoffs ────────────────────────────────────────
+  // Give the LLM the actual clue IDs so it can reference them in PAYOFF_SETUP ops.
+  const openClueIds = state.clues.slice(0, 5).map(c => sanitizeForPrompt(c.clueId, 48));
+  const openPayoffSetups = state.payoffs.slice(0, 4).map(p => sanitizeForPrompt(p.setupId, 48));
+  const cluePayoffBlock = (openClueIds.length > 0 || openPayoffSetups.length > 0)
+    ? [
+        openClueIds.length > 0 ? `Open clues: ${openClueIds.join(', ')}.` : '',
+        openPayoffSetups.length > 0 ? `Pending payoffs: ${openPayoffSetups.join(', ')}.` : '',
+      ].filter(Boolean).join(' ')
+    : '';
+
   // ── Theme direction ────────────────────────────────────────────────────────
   const themeBlock = state.authorIntent.theme
     ? `Theme: "${sanitizeForPrompt(state.authorIntent.theme, 120)}".`
@@ -222,7 +251,7 @@ export function buildSystemPreamble(constraints: GenerationConstraint[], state: 
     ? `Last theme move: ${lastThemeMove.move} on claim "${sanitizeForPrompt(lastThemeMove.claimId, 64)}".`
     : '';
 
-  const stateLines = [emotionBlock, audienceBlock, clockBlock, relBlock, themeBlock, themeMoveBlock]
+  const stateLines = [emotionBlock, beliefBlock, audienceBlock, clockBlock, cluePayoffBlock, relBlock, themeBlock, themeMoveBlock]
     .filter(Boolean)
     .join(' ');
 
