@@ -109,8 +109,15 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
     });
   }
 
-  // ── Limit total cliché issues to avoid overwhelming output ────────────────
-  const dedupedIssues = issues.slice(0, 8);
+  // ── Limit total issues to avoid overwhelming output ───────────────────────
+  // Clichés (minor) are pushed first and would crowd out the higher-severity
+  // structural findings (UNIFORM_SCENE_PURPOSES is major) under a naive slice.
+  // Sort by severity so the most important issues always survive truncation.
+  const severityRank: Record<string, number> = { critical: 0, major: 1, minor: 2 };
+  const prioritized = [...issues].sort(
+    (a, b) => (severityRank[a.severity] ?? 3) - (severityRank[b.severity] ?? 3),
+  );
+  const dedupedIssues = prioritized.slice(0, 8);
 
   const { revised, usedLLM } = await rewritePass({ fountain, issues: dedupedIssues, passName: 'originality', approvedSpans, storyContext: input.storyContext });
   const changed = revised !== fountain;

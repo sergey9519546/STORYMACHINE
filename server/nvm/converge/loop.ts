@@ -208,7 +208,11 @@ export async function convergeScene(
       const t3 = tier3Rank(t3Results);
 
       const tensionNorm = normalizeTension(valuationScore, target.tensionTarget);
-      const compositeScore = 0.5 * tensionNorm + 0.5 * qualityScore;
+      // Guard the composite at its source so a single non-finite signal can't
+      // propagate into bestComposite tracking, the convergedThisIter winner sort,
+      // or finalComposite on either the converged or budget-exhausted return path.
+      const rawComposite = 0.5 * tensionNorm + 0.5 * qualityScore;
+      const compositeScore = isFinite(rawComposite) ? rawComposite : 0;
 
       const tensionMet = valuationScore >= target.tensionTarget;
       const qualityMet = qualityScore >= effectiveQualityTarget;

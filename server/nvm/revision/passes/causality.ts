@@ -30,13 +30,19 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     }
 
     // ── Suspense drop without a reversal scene ────────────────────────────
-    if (curr.suspenseDelta < -3 && ann?.dramaticTurn === 'none') {
+    // `dramaticTurn` is a freeform string (deriveDramaticTurn never returns 'none'),
+    // so the old `=== 'none'` check was always false and this rule never fired.
+    // A sharp suspense drop is *explained* when the scene's purpose releases tension
+    // (a resolution, climax, turning point, or revelation). If the drop happens in a
+    // non-resolving scene, the deflation has no on-page cause.
+    const tensionReleasingPurposes = new Set<string>(['resolution', 'climax', 'turning_point', 'revelation']);
+    if (curr.suspenseDelta < -3 && !tensionReleasingPurposes.has(curr.purpose)) {
       issues.push({
         location: `Scene ${i} (${curr.slug})`,
         rule: 'UNEXPLAINED_SUSPENSE_DROP',
-        description: `Suspense drops sharply in Scene ${i} but no dramatic turn is recorded — the cause is unclear`,
+        description: `Suspense drops sharply in Scene ${i} but the scene's purpose (${curr.purpose}) does not release tension — the cause of the deflation is unclear`,
         severity: 'minor',
-        suggestedFix: 'Add a brief scene of consequence showing why tensions deflated',
+        suggestedFix: 'Add a brief scene of consequence showing why tensions deflated, or recast this scene as a resolution/turning point',
       });
     }
 

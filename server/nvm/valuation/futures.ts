@@ -66,7 +66,12 @@ export function markToMarket(
 // This is a heuristic scan — the Convergence Loop can also maintain positions explicitly.
 export function deriveTensionLedger(state: NarrativeState, sceneIdx: number): TensionLedger {
   const positions: DramaticPosition[] = [];
-  const investment = Math.max(0.1, state.audienceState.investment / 100);
+  // Guard against a non-finite investment poisoning every position's markToMarket
+  // (and therefore totalTension, which feeds convergence scoring). `??`/`Math.max`
+  // do NOT catch NaN — Math.max(0.1, NaN) === NaN — so coerce explicitly first.
+  const rawInvestment = state.audienceState.investment;
+  const safeInvestment = (typeof rawInvestment === 'number' && isFinite(rawInvestment)) ? rawInvestment : 0;
+  const investment = Math.max(0.1, safeInvestment / 100);
 
   // Belief-vs-reality conflicts: character believes X, but objective reality says not-X.
   // Detected heuristically: look for character beliefs whose proposition mentions a

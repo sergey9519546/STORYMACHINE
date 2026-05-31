@@ -11189,3 +11189,102 @@ describe('Wave 88 — consensus accuracy fix, knownFacts cap, originality variet
     assert.ok(!lowVar, 'Should NOT fire LOW_SCENE_VARIETY for 6 scenes (threshold is 8)');
   });
 });
+
+// ── Wave 89 ───────────────────────────────────────────────────────────────────
+describe('Wave 89 — dead-condition revival, severity-aware truncation, NaN hardening', () => {
+  type Rec = import('./server/nvm/screenplay/memory.ts').ScreenplaySceneRecord;
+  function mkRec(overrides: Partial<Rec>): Rec {
+    return {
+      commitId: 'c0', sceneIdx: 0, slug: 'INT. TEST', purpose: 'character_moment',
+      dramaticTurn: 'something happens', revelation: null, emotionalShift: 'neutral',
+      visualBeats: [], dialogueHighlights: [], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [], clockRaised: false, clockDelta: 0,
+      suspenseDelta: 0, curiosityDelta: 0, createdAt: 0,
+      ...overrides,
+    };
+  }
+
+  // ── causality.ts: UNEXPLAINED_SUSPENSE_DROP was dead (dramaticTurn never 'none') ──
+  it('causalityPass fires UNEXPLAINED_SUSPENSE_DROP on a sharp drop in a non-resolving scene', async () => {
+    const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+    const records = [
+      mkRec({ sceneIdx: 0, purpose: 'raise_stakes', suspenseDelta: 4 }),
+      mkRec({ sceneIdx: 1, purpose: 'character_moment', suspenseDelta: -6 }),
+    ];
+    const result = await causalityPass({
+      fountain: 'INT. TEST - DAY\nAction.\n',
+      original: 'INT. TEST - DAY\nAction.\n',
+      records: records as unknown as Parameters<typeof causalityPass>[0]['records'],
+      structure: {} as Parameters<typeof causalityPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const drop = result.issues.find(i => i.rule === 'UNEXPLAINED_SUSPENSE_DROP');
+    assert.ok(drop, 'Should fire UNEXPLAINED_SUSPENSE_DROP — this rule was dead before Wave 89');
+  });
+
+  it('causalityPass does NOT fire UNEXPLAINED_SUSPENSE_DROP when the drop lands in a resolution scene', async () => {
+    const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+    const records = [
+      mkRec({ sceneIdx: 0, purpose: 'raise_stakes', suspenseDelta: 4 }),
+      mkRec({ sceneIdx: 1, purpose: 'resolution', suspenseDelta: -6 }),
+    ];
+    const result = await causalityPass({
+      fountain: 'INT. TEST - DAY\nAction.\n',
+      original: 'INT. TEST - DAY\nAction.\n',
+      records: records as unknown as Parameters<typeof causalityPass>[0]['records'],
+      structure: {} as Parameters<typeof causalityPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const drop = result.issues.find(i => i.rule === 'UNEXPLAINED_SUSPENSE_DROP');
+    assert.ok(!drop, 'A resolution scene legitimately releases tension — should not flag');
+  });
+
+  // ── originality.ts: severity-aware truncation keeps the major finding ──────────
+  it('originalityPass keeps the major UNIFORM_SCENE_PURPOSES issue even past 8 clichés', async () => {
+    const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+    // 9 distinct clichés (minor) would crowd out the structural finding under a naive slice(0,8).
+    const cliches = [
+      'we need to talk', 'i can explain', "you don't understand",
+      'this changes everything', 'over my dead body', 'trust me on this',
+      'you lied to me', 'just let it go', "this isn't over",
+    ];
+    const fountain = 'INT. ROOM - DAY\n' + cliches.join('\n') + '\n';
+    // All scenes share one purpose → UNIFORM_SCENE_PURPOSES (major) is pushed LAST.
+    const records = Array.from({ length: 5 }, (_, i) => mkRec({ sceneIdx: i, purpose: 'character_moment' }));
+    const result = await originalityPass({
+      fountain,
+      original: fountain,
+      records: records as unknown as Parameters<typeof originalityPass>[0]['records'],
+      structure: {} as Parameters<typeof originalityPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    assert.ok(result.issues.length <= 8, 'Truncation cap of 8 still holds');
+    const uniform = result.issues.find(i => i.rule === 'UNIFORM_SCENE_PURPOSES');
+    assert.ok(uniform, 'The major structural finding must survive truncation, not get crowded out by minor clichés');
+  });
+
+  // ── futures.ts: NaN investment must not poison the tension ledger ──────────────
+  it('deriveTensionLedger yields a finite totalTension even when investment is NaN', async () => {
+    const { deriveTensionLedger } = await import('./server/nvm/valuation/futures.ts');
+    const { emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+    const state = emptyState();
+    state.audienceState.investment = NaN;
+    state.clocks['bomb'] = 3;
+    const ledger = deriveTensionLedger(state, 2);
+    assert.ok(isFinite(ledger.totalTension), 'totalTension must be finite, not NaN');
+    assert.ok(ledger.positions.every(p => isFinite(p.markToMarket)), 'every position markToMarket must be finite');
+  });
+
+  it('deriveTensionLedger yields a finite totalTension even when investment is Infinity', async () => {
+    const { deriveTensionLedger } = await import('./server/nvm/valuation/futures.ts');
+    const { emptyState } = await import('./server/nvm/state/NarrativeState.ts');
+    const state = emptyState();
+    state.audienceState.investment = Infinity;
+    state.clocks['deadline'] = 5;
+    const ledger = deriveTensionLedger(state, 1);
+    assert.ok(isFinite(ledger.totalTension), 'Infinity investment must be coerced, not propagated');
+  });
+});
