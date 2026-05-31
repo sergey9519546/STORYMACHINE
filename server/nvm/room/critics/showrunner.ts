@@ -64,5 +64,20 @@ export function showrunnerCritic(ir: NarrativeTransitionIR, state: NarrativeStat
     }
   }
 
+  // Gate 4: provide_relief scenes shouldn't escalate pressure (contradictory signal).
+  // A scene labelled as relief but containing RAISE_CLOCK confuses the emotional register —
+  // the audience can't decompress while a countdown is being raised.
+  if (ir.sceneFunction === 'provide_relief') {
+    const hasEscalation = ir.ops.some(op => op.op === 'RAISE_CLOCK');
+    if (hasEscalation) {
+      critiques.push({
+        criticId: 'showrunner', severity: 45, targetOpIdx: null,
+        objection: '"provide_relief" scene contains RAISE_CLOCK — contradicts the relief function; audience cannot decompress under an escalating clock',
+        suggestedOperator: 'cut_on_the_nose',
+        attentionBid: 50,
+      });
+    }
+  }
+
   return critiques;
 }

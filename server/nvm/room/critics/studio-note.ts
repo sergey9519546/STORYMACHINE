@@ -13,7 +13,8 @@ export function studioNoteCritic(ir: NarrativeTransitionIR, state: NarrativeStat
   // Exempt scene types that serve structural purposes where direct engagement
   // tracking is less critical: reveal_character and establish_world are deep
   // character/world scenes that earn engagement through content, not audience-state ops.
-  const hasReaderUpdate = ir.ops.some(op => op.op === 'UPDATE_READER_STATE');
+  const readerUpdateOps = ir.ops.filter(op => op.op === 'UPDATE_READER_STATE');
+  const hasReaderUpdate = readerUpdateOps.length > 0;
   const exemptFromReaderCheck: NarrativeTransitionIR['sceneFunction'][] = ['reveal_character', 'establish_world'];
   if (!hasReaderUpdate && ir.sceneIdx > 0 && !exemptFromReaderCheck.includes(ir.sceneFunction)) {
     critiques.push({
@@ -22,6 +23,25 @@ export function studioNoteCritic(ir: NarrativeTransitionIR, state: NarrativeStat
       suggestedOperator: 'inject_irony',
       attentionBid: 40,
     });
+  }
+
+  // Low-magnitude reader update: the scene has an UPDATE_READER_STATE but the
+  // cumulative suspense/curiosity delta is trivially small (≤5 combined). A
+  // pro-forma audience op with delta=1 is noise — the scene didn't actually land.
+  if (hasReaderUpdate && ir.sceneIdx > 1) {
+    const totalDelta = readerUpdateOps.reduce((sum, op) => {
+      if (op.op !== 'UPDATE_READER_STATE') return sum;
+      const d = op.delta;
+      return sum + Math.abs(d.suspense ?? 0) + Math.abs(d.curiosity ?? 0) + Math.abs(d.investment ?? 0);
+    }, 0);
+    if (totalDelta <= 5) {
+      critiques.push({
+        criticId: 'studio_note', severity: 25, targetOpIdx: null,
+        objection: `UPDATE_READER_STATE cumulative delta=${totalDelta} — negligible audience impact; increase suspense/curiosity/investment moves`,
+        suggestedOperator: 'raise_stakes',
+        attentionBid: 30,
+      });
+    }
   }
 
   // Suspense dropping below 30 is commercially risky
