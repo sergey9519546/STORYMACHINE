@@ -10,6 +10,7 @@ import configRouter    from './server/routes/config.ts';
 import gameRouter      from './server/routes/game.ts';
 import scriptideRouter from './server/routes/scriptide.ts';
 import nvmRouter       from './server/routes/nvm.ts';
+import { attachCollabServer } from './server/collab/yjs-server.ts';
 
 const AI_PROVIDER = process.env.AI_PROVIDER ?? 'gemini';
 if (AI_PROVIDER === 'gemini' && !process.env.GEMINI_API_KEY) {
@@ -80,6 +81,11 @@ async function startServer() {
   const server = app.listen(PORT, '0.0.0.0', () => {
     logger.info('server_started', { port: PORT });
   });
+
+  // P4: real-time collaboration — Yjs sync over WebSocket on /collab/:room.
+  // Shares the HTTP server (and port); only claims the /collab upgrade path so
+  // Vite's HMR WebSocket in dev is left untouched.
+  attachCollabServer(server);
 
   // ── Graceful shutdown ────────────────────────────────────────────────────────
   const shutdown = (signal: string) => {

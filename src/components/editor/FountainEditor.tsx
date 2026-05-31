@@ -22,6 +22,7 @@ import { closeBrackets } from '@codemirror/autocomplete';
 import { fountainHighlight, fountainTheme } from './fountain-highlight.ts';
 import { inlineComplete, CompletionContext } from './inline-complete.ts';
 import { fountainKeymap, FountainKeymapOptions } from './fountain-keymap.ts';
+import { createCollabSession, CollabSession } from './collab.ts';
 
 export interface FountainEditorHandle {
   /** Navigate to a specific 1-indexed line number */
@@ -41,6 +42,14 @@ export interface FountainEditorProps {
   className?: string;
   /** Fires when the user types (after every doc change, before debounce) */
   onUserEdit?: () => void;
+  /**
+   * P4: when set, the editor joins a real-time collaboration room of this id.
+   * Yjs becomes the source of truth for the document; the `value` prop is used
+   * only to seed an empty shared doc, and external value-sync is disabled.
+   */
+  collabRoom?: string;
+  /** Display name for this user's remote cursor in collaboration mode. */
+  collabUserName?: string;
 }
 
 // ── Shared base theme ─────────────────────────────────────────────────────────
@@ -88,6 +97,8 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
       placeholder: placeholderText = 'INT. STUDIO - DAY\n\nStart typing your script here...',
       className = '',
       onUserEdit,
+      collabRoom,
+      collabUserName,
     },
     ref,
   ) {
@@ -106,6 +117,8 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
     // ── Compartments allow hot-swapping extensions without rebuilding state ────
     const themeCompartment = useRef(new Compartment());
     const completionCompartment = useRef(new Compartment());
+    // P4: live for the editor's lifetime when a collab room is set at mount.
+    const collabRef = useRef<CollabSession | null>(null);
 
     // ── Expose imperative handle ──────────────────────────────────────────────
     useImperativeHandle(ref, () => ({
@@ -152,9 +165,26 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
         },
       });
 
+      // P4: in collaboration mode, Yjs owns the document. Create the session and
+      // seed the shared doc from `value` only if it is empty (handled inside).
+      // The editor starts blank; yCollab populates it from the synced Y.Text.
+      let collabExtensions: typeof completionExt[] = [];
+      if (collabRoom) {
+        const session = createCollabSession({
+          room: collabRoom,
+          userName: collabUserName,
+          initialText: value,
+        });
+        collabRef.current = session;
+        collabExtensions = [session.extension];
+      }
+
       const state = EditorState.create({
-        doc: value,
+        // When collaborating, start empty — Yjs is the source of truth.
+        doc: collabRoom ? '' : value,
         extensions: [
+          // ── Collaboration (Yjs) — must precede history for proper undo scoping ─
+          ...collabExtensions,
           // ── History (undo/redo) ─────────────────────────────────────────────
           history(),
           // ── Standard editing keybindings ───────────────────────────────────
@@ -193,6 +223,9 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
       return () => {
         view.destroy();
         viewRef.current = null;
+        // Release the collaboration socket + shared doc on unmount.
+        collabRef.current?.destroy();
+        collabRef.current = null;
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // run once — value/extensions are hot-patched below
@@ -201,6 +234,9 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
     useEffect(() => {
       const view = viewRef.current;
       if (!view) return;
+      // In collaboration mode Yjs owns the document — never overwrite it from the
+      // `value` prop, or we would clobber remote edits.
+      if (collabRef.current) return;
       const currentDoc = view.state.doc.toString();
       if (currentDoc === value) return; // no-op
       view.dispatch({

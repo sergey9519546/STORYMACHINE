@@ -25,6 +25,7 @@ import {
 } from './server/engine/agent/psychology.ts';
 import { validatePersona, PERSONA_LIMITS } from './server/personas/types.ts';
 import { renderTemplate, getPrompt, hasPrompt } from './server/lib/prompts.ts';
+import { parseRoomId, collabRoomCount } from './server/collab/yjs-server.ts';
 import {
   listPersonas,
   getPersona,
@@ -11759,5 +11760,31 @@ describe('lib/prompts', () => {
   it('getPrompt rejects path-traversal names and returns empty', () => {
     assert.equal(getPrompt('../secret'), '');
     assert.equal(getPrompt('foo/bar'), '');
+  });
+});
+
+// ── P4: Yjs collaboration server — room id parsing ────────────────────────────
+describe('collab/yjs-server', () => {
+  it('parseRoomId extracts a valid room from a /collab/<room> path', () => {
+    assert.equal(parseRoomId('/collab/my-room'), 'my-room');
+    assert.equal(parseRoomId('/collab/abc_123'), 'abc_123');
+    assert.equal(parseRoomId('/collab/room/'), 'room');
+  });
+
+  it('parseRoomId strips query strings', () => {
+    assert.equal(parseRoomId('/collab/room42?token=x'), 'room42');
+  });
+
+  it('parseRoomId rejects non-collab paths and malformed ids', () => {
+    assert.equal(parseRoomId('/other/room'), null);
+    assert.equal(parseRoomId('/collab/'), null);
+    assert.equal(parseRoomId('/collab/has spaces'), null);
+    assert.equal(parseRoomId('/collab/a/b'), null);
+    assert.equal(parseRoomId(undefined), null);
+    assert.equal(parseRoomId('/collab/' + 'x'.repeat(65)), null);
+  });
+
+  it('collabRoomCount starts at zero with no active rooms', () => {
+    assert.equal(typeof collabRoomCount(), 'number');
   });
 });
