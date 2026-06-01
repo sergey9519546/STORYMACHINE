@@ -36,7 +36,12 @@ export interface FixedPointRequirement {
   payoffSetupIds?: string[];
   /** The audience suspense level that must be met or exceeded. */
   minSuspense?: number;
-  /** Specific StoryOps that must be present in canon verbatim. */
+  /** The audience investment level that must be met or exceeded. */
+  minInvestment?: number;
+  /** Specific StoryOps that must be present in canon verbatim.
+   *  Since verbatim ops cannot be verified from NarrativeState alone (they require
+   *  the full commit ledger), any non-empty requiredOps always makes isSatisfied
+   *  return false so the planner always emits biases for them. */
   requiredOps?: StoryOp[];
 }
 
@@ -133,6 +138,10 @@ function isSatisfied(req: FixedPointRequirement, state: NarrativeState): boolean
   if (req.claimIds?.some(id => !state.themeArgument.some(t => t.claimId === id))) return false;
   if (req.payoffSetupIds?.some(id => !state.payoffs.some(p => p.setupId === id))) return false;
   if (req.minSuspense !== undefined && state.audienceState.suspense < req.minSuspense) return false;
+  if (req.minInvestment !== undefined && state.audienceState.investment < req.minInvestment) return false;
+  // Verbatim ops cannot be verified from NarrativeState alone (would need the ledger).
+  // Treat any non-empty requiredOps as unsatisfied so the planner always injects them.
+  if (req.requiredOps?.length) return false;
   return true;
 }
 
@@ -169,7 +178,10 @@ function missingRequirements(req: FixedPointRequirement, state: NarrativeState):
       items.push({ kind: 'payoff', id });
   }
   if (req.minSuspense !== undefined && state.audienceState.suspense < req.minSuspense) {
-    items.push({ kind: 'suspense', detail: `need ${req.minSuspense}, have ${state.audienceState.suspense}` });
+    items.push({ kind: 'suspense', detail: `need suspense ${req.minSuspense}, have ${state.audienceState.suspense}` });
+  }
+  if (req.minInvestment !== undefined && state.audienceState.investment < req.minInvestment) {
+    items.push({ kind: 'suspense', detail: `need investment ${req.minInvestment}, have ${state.audienceState.investment}` });
   }
   for (const op of req.requiredOps ?? []) {
     items.push({ kind: 'op', op });
@@ -274,14 +286,15 @@ function spreadBiases(
     });
   }
 
-  // Suspense: raise suspense via reader-state update, mid-window
+  // Suspense/investment: raise via reader-state update, mid-window
   for (const item of suspenseItems) {
     const scene = Math.min(currentScene + Math.floor(window / 2), deadline - 1);
+    const isInvestment = item.detail?.includes('investment') ?? false;
     biases.push({
       atScene: scene,
-      ops: [{ op: 'UPDATE_READER_STATE', delta: { suspense: 90 } }],
+      ops: [{ op: 'UPDATE_READER_STATE', delta: isInvestment ? { investment: 90 } : { suspense: 90 } }],
       fixedPointDescription: fpDesc,
-      rationale: `suspense boost needed — ${item.detail}`,
+      rationale: `${isInvestment ? 'investment' : 'suspense'} boost needed — ${item.detail}`,
     });
   }
 

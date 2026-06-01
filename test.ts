@@ -14071,3 +14071,102 @@ describe('Wave 121 — branch score improvements', () => {
       `ADVANCE_OBJECT_ARC (${scoreWith.screenplayUsefulness}) should not score lower than ADD_FACT (${scoreWithout.screenplayUsefulness})`);
   });
 });
+
+// ── Wave 122 — fixed-points: isSatisfied bug fix + minInvestment requirement ──
+
+describe('Wave 122 — planToward: requiredOps never falsely satisfied', () => {
+  it('fixed point with only requiredOps is NOT added to alreadySatisfied', () => {
+    const state = emptyState();
+    const fp: FixedPoint = {
+      atScene: 5,
+      required: {
+        requiredOps: [{ op: 'SEED_CLUE', clueId: 'the_gun', carrier: 'object' }],
+      },
+      description: 'gun must be planted',
+    };
+    const result = planToward(state, [fp], 0);
+    assert.equal(result.alreadySatisfied.length, 0, 'requiredOps-only fixed point must not be alreadySatisfied');
+    assert.ok(result.biases.length > 0, 'planner must emit biases for required op');
+  });
+
+  it('fixed point with requiredOps emits a bias with the verbatim op', () => {
+    const state = emptyState();
+    const verbatimOp: StoryOp = { op: 'SEED_CLUE', clueId: 'bloody_glove', carrier: 'object' };
+    const fp: FixedPoint = {
+      atScene: 4,
+      required: { requiredOps: [verbatimOp] },
+      description: 'glove must be seeded',
+    };
+    const result = planToward(state, [fp], 0);
+    const injectedOps = result.biases.flatMap(b => b.ops);
+    assert.ok(
+      injectedOps.some(o => o.op === 'SEED_CLUE' && (o as { op: string; clueId: string }).clueId === 'bloody_glove'),
+      'verbatim SEED_CLUE op must appear in emitted biases',
+    );
+  });
+
+  it('fixed point with requiredOps AND factIds: fact already in state → still generates bias for op', () => {
+    const state = emptyState();
+    state.objectiveReality.push({ factId: 'piano', subject: 'piano', predicate: 'exists', object: 'true', addedAtTurn: 0, validFrom: 0, validTo: null });
+    const fp: FixedPoint = {
+      atScene: 4,
+      required: {
+        factIds: ['piano'],         // already satisfied
+        requiredOps: [{ op: 'ADVANCE_THEME_ARGUMENT', claimId: 'truth_costs', move: 'support' }],
+      },
+      description: 'piano + theme',
+    };
+    const result = planToward(state, [fp], 0);
+    // Should NOT be alreadySatisfied (because of requiredOps)
+    assert.equal(result.alreadySatisfied.length, 0);
+    // Should NOT emit ADD_FACT bias (piano already exists)
+    assert.ok(!result.biases.some(b => b.ops.some(o => o.op === 'ADD_FACT')), 'no ADD_FACT bias — piano already exists');
+    // Should emit bias for the verbatim op
+    assert.ok(result.biases.some(b => b.ops.some(o => o.op === 'ADVANCE_THEME_ARGUMENT')));
+  });
+});
+
+describe('Wave 122 — planToward: minInvestment requirement', () => {
+  it('emits UPDATE_READER_STATE investment bias when investment too low', () => {
+    const state = emptyState();
+    state.audienceState.investment = 20;
+    const fp: FixedPoint = {
+      atScene: 6,
+      required: { minInvestment: 70 },
+      description: 'audience must be invested',
+    };
+    const result = planToward(state, [fp], 0);
+    assert.ok(result.alreadySatisfied.length === 0, 'not already satisfied');
+    const hasInvestmentBias = result.biases.some(b =>
+      b.ops.some(o => o.op === 'UPDATE_READER_STATE' && 'investment' in (o as any).delta),
+    );
+    assert.ok(hasInvestmentBias, 'planner emits UPDATE_READER_STATE { investment } bias');
+  });
+
+  it('minInvestment fixed point is alreadySatisfied when investment is sufficient', () => {
+    const state = emptyState();
+    state.audienceState.investment = 80;
+    const fp: FixedPoint = {
+      atScene: 6,
+      required: { minInvestment: 70 },
+      description: 'audience must be invested',
+    };
+    const result = planToward(state, [fp], 0);
+    assert.equal(result.alreadySatisfied.length, 1, 'investment already sufficient → satisfied');
+    assert.equal(result.biases.length, 0, 'no biases needed');
+  });
+
+  it('minInvestment and minSuspense both below threshold → both biases emitted', () => {
+    const state = emptyState();
+    state.audienceState.suspense = 10;
+    state.audienceState.investment = 10;
+    const fp: FixedPoint = {
+      atScene: 8,
+      required: { minSuspense: 60, minInvestment: 60 },
+      description: 'high tension and investment',
+    };
+    const result = planToward(state, [fp], 0);
+    const opsInBiases = result.biases.flatMap(b => b.ops).filter(o => o.op === 'UPDATE_READER_STATE');
+    assert.ok(opsInBiases.length >= 2, 'two UPDATE_READER_STATE biases (suspense + investment)');
+  });
+});
