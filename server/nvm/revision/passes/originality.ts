@@ -4,6 +4,8 @@
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
+import { GENRE_MODIFIERS } from '../../../lib/genre-router.ts';
+import type { StoryGenre } from '../../../engine/types.ts';
 
 // ── Cliché phrase library ─────────────────────────────────────────────────────
 const CLICHE_PHRASES = [
@@ -82,6 +84,32 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Replace with a concrete, specific detail that only THIS story could have',
         });
         break; // one issue per line max
+      }
+    }
+  }
+
+  // ── Genre-specific forbidden clichés ─────────────────────────────────────
+  // When the story has a genre set, check each line against the genre's
+  // specific forbidden cliché list (from GENRE_MODIFIERS.forbiddenCliches).
+  if (input.storyContext?.genre) {
+    const genreMod = GENRE_MODIFIERS[input.storyContext.genre as StoryGenre];
+    if (genreMod) {
+      for (let i = 0; i < lines.length; i++) {
+        const lower = lines[i].toLowerCase();
+        for (const cliche of genreMod.forbiddenCliches) {
+          // Strip surrounding quotes from the cliché definition before matching
+          const clicheNorm = cliche.replace(/^["']|["']$/g, '').toLowerCase();
+          if (clicheNorm.length > 3 && lower.includes(clicheNorm)) {
+            issues.push({
+              location: `Line ${i + 1}`,
+              rule: 'GENRE_CLICHE',
+              description: `${input.storyContext.genre.toUpperCase()} cliché: "${cliche}" — a genre trope this story should subvert or avoid`,
+              severity: 'minor',
+              suggestedFix: `This is a known ${input.storyContext.genre} genre trap. Find a specific expression unique to this story's characters and world`,
+            });
+            break; // at most one genre cliché flagged per line
+          }
+        }
       }
     }
   }

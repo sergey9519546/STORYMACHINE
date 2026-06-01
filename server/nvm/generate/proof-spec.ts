@@ -124,6 +124,18 @@ export function proofsToConstraints(
             description: `Dialogue violation: ${safeMsg}. Fix before generating.`,
           });
           break;
+        case 'PolarityProof':
+          constraints.push({
+            kind: 'free_form',
+            description: 'Add an emotional polarity reversal: use APPRAISE_EMOTION to shift at least one established character from negative to positive valence (or vice versa). A scene where all emotion ops reinforce the same existing register is emotionally stagnant.',
+          });
+          break;
+        case 'ReincorporationProof':
+          constraints.push({
+            kind: 'free_form',
+            description: 'Reference prior story material: include at least one op with an existing charId (from state.characterBeliefs or state.characterEmotions), an existing clockId (from state.clocks), or an existing clueId (from state.clues). A scene that introduces only new identifiers is disconnected from the story.',
+          });
+          break;
         default:
           constraints.push({ kind: 'free_form', description: safeMsg });
       }

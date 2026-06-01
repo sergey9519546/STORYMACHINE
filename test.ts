@@ -13608,3 +13608,69 @@ describe('Wave 108 — cognition-emotion mismatch (lint + character advocate)', 
     });
   });
 }
+
+// ── Wave 118 — genre clichés in originality pass + PolarityProof/ReincorporationProof constraints ──
+{
+  const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+  const { proofsToConstraints } = await import('./server/nvm/generate/proof-spec.ts');
+  const { passResult, failResult } = await import('./server/nvm/proof/contract.ts');
+
+  const makePassInput = (fountain: string, genre?: string): import('./server/nvm/revision/passes/types.ts').PassInput => ({
+    fountain,
+    original: fountain,
+    annotations: [],
+    structure: { actOne: 0, actTwo: 0, actThree: 0, midpoint: 0, totalScenes: 1 } as unknown as import('./server/nvm/screenplay/structure.ts').StructureState,
+    records: [],
+    approvedSpans: [],
+    storyContext: genre ? { genre } : undefined,
+    priorPassResults: [],
+  });
+
+  describe('Wave 118 — originality pass: genre-specific clichés', () => {
+    it('originality: thriller genre + "the villain monologuing their full plan" → GENRE_CLICHE', async () => {
+      const fountain = 'INT. LAIR - NIGHT\nThe villain monologuing their full plan in front of everyone.\n';
+      const result = await originalityPass(makePassInput(fountain, 'thriller'));
+      assert.ok(result.issues.some(i => i.rule === 'GENRE_CLICHE'), 'thriller cliché detected');
+    });
+
+    it('originality: horror genre + "a cat jumping out for a fake scare" → GENRE_CLICHE', async () => {
+      const fountain = 'INT. BASEMENT - NIGHT\nA cat jumping out for a fake scare startles the hero.\n';
+      const result = await originalityPass(makePassInput(fountain, 'horror'));
+      assert.ok(result.issues.some(i => i.rule === 'GENRE_CLICHE'), 'horror cliché detected');
+    });
+
+    it('originality: thriller genre with clean text → no GENRE_CLICHE', async () => {
+      const fountain = 'INT. OFFICE - DAY\nShe slides the envelope across the desk without breaking eye contact.\n';
+      const result = await originalityPass(makePassInput(fountain, 'thriller'));
+      assert.ok(!result.issues.some(i => i.rule === 'GENRE_CLICHE'), 'no genre cliché in clean text');
+    });
+
+    it('originality: no genre set → no GENRE_CLICHE check', async () => {
+      const fountain = 'INT. LAIR - NIGHT\nThe villain explains everything.\n';
+      const result = await originalityPass(makePassInput(fountain));
+      assert.ok(!result.issues.some(i => i.rule === 'GENRE_CLICHE'), 'no genre → no genre cliché check');
+    });
+  });
+
+  describe('Wave 118 — proofsToConstraints: PolarityProof + ReincorporationProof', () => {
+    const makeFailedProof = (proof: import('./server/nvm/proof/contract.ts').ProofName): import('./server/nvm/proof/contract.ts').ProofResult =>
+      failResult(proof, 'test failure', [{ proof, severity: 'flag', message: 'test message' }]);
+
+    const makeTarget = (): import('./server/nvm/generate/proof-spec.ts').SceneTarget => ({
+      sceneIdx: 3, sceneFunction: 'advance_plot', activeMechanisms: [],
+      tensionTarget: 100, qualityTarget: 60,
+    });
+
+    it('proofsToConstraints: PolarityProof failure → polarity reversal constraint', () => {
+      const constraints = proofsToConstraints(emptyState(), makeTarget(), [makeFailedProof('PolarityProof')]);
+      assert.ok(constraints.some(c => c.description.includes('polarity reversal')),
+        'PolarityProof failure → polarity reversal constraint generated');
+    });
+
+    it('proofsToConstraints: ReincorporationProof failure → prior story material constraint', () => {
+      const constraints = proofsToConstraints(emptyState(), makeTarget(), [makeFailedProof('ReincorporationProof')]);
+      assert.ok(constraints.some(c => c.description.includes('prior story material')),
+        'ReincorporationProof failure → prior story material constraint generated');
+    });
+  });
+}
