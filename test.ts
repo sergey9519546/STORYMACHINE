@@ -12631,3 +12631,89 @@ describe('Wave 106 — attribution phantom refs, showrunner new checks', () => {
     assert.ok(!critiques.some(c => c.objection.includes('no UPDATE_BELIEF')), 'has UPDATE_BELIEF → no character-less critique');
   });
 });
+
+// ── Wave 107: necessity state-awareness, dramatic irony tension ─────────────────
+
+import { necessityProof } from './server/nvm/proof/tier2/necessity.ts';
+
+describe('Wave 107 — necessity state pass-through, dramatic irony tension', () => {
+  // ── necessity proof: state-aware re-assertion detection ─────────────────────
+
+  it('necessityProof: re-asserting existing emotion from state → fails (state-aware)', () => {
+    const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { dominant: 'fear', intensity: 72, joy: 0, distress: 0, anger: 0, fear: 72, pride: 0, shame: 0, last_updated_at: 0 } },
+    ];
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 't1', sceneIdx: 2, sceneFunction: 'build_tension',
+      activeMechanisms: [], beforeStateHash: '', ops,
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 1 },
+    };
+    // State already has alice at fear/intensity 75 (within 8 of 72)
+    const stateWithEmotion = {
+      ...emptyState(),
+      characterEmotions: {
+        alice: { dominant: 'fear' as const, intensity: 75, joy: 0, distress: 0, anger: 0, fear: 75, pride: 0, shame: 0, last_updated_at: 0 },
+      },
+    };
+    const result = necessityProof(ir, stateWithEmotion);
+    assert.ok(!result.pass, 'state-aware: re-asserting same fear@72 when state has fear@75 → necessity fails');
+  });
+
+  it('necessityProof: new emotion not in state → passes necessity', () => {
+    const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { dominant: 'joy', intensity: 80, joy: 80, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, last_updated_at: 0 } },
+    ];
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 't1', sceneIdx: 2, sceneFunction: 'build_tension',
+      activeMechanisms: [], beforeStateHash: '', ops,
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 1 },
+    };
+    // State has alice at fear (different dominant) → new joy emotion IS necessary
+    const stateWithFear = {
+      ...emptyState(),
+      characterEmotions: {
+        alice: { dominant: 'fear' as const, intensity: 70, joy: 0, distress: 0, anger: 0, fear: 70, pride: 0, shame: 0, last_updated_at: 0 },
+      },
+    };
+    const result = necessityProof(ir, stateWithFear);
+    assert.ok(result.pass, 'new emotion dominant → necessity passes');
+  });
+
+  // ── deriveTensionLedger: dramatic irony ─────────────────────────────────────
+
+  it('deriveTensionLedger: unperceived world fact → dramatic_irony tension position', () => {
+    const state = emptyState();
+    state.objectiveReality.push({ factId: 'f1', subject: 'butler', predicate: 'is', object: 'the killer', addedAtTurn: 0, validFrom: 0, validTo: null });
+    state.audienceState.investment = 70;
+    // No character has a belief mentioning 'butler' → dramatic irony
+    const ledger = deriveTensionLedger(state, 3);
+    const ironyPos = ledger.positions.find(p => p.kind === 'dramatic_irony');
+    assert.ok(ironyPos, 'unperceived fact creates dramatic_irony position');
+    assert.ok(ironyPos!.description.includes('butler'), 'fact subject in description');
+    assert.ok(ledger.totalTension > 0, 'dramatic irony contributes to total tension');
+  });
+
+  it('deriveTensionLedger: fact already in a character belief → no dramatic_irony position', () => {
+    const state = emptyState();
+    state.objectiveReality.push({ factId: 'f1', subject: 'butler', predicate: 'is', object: 'the killer', addedAtTurn: 0, validFrom: 0, validTo: null });
+    // Alice already knows about butler → no irony
+    state.characterBeliefs['alice'] = [{ id: 'b1', proposition: 'butler may be the killer', confidence: 0.6, source: 'inferred', acquired_at: 0 }];
+    state.audienceState.investment = 70;
+    const ledger = deriveTensionLedger(state, 3);
+    const ironyPos = ledger.positions.find(p => p.kind === 'dramatic_irony');
+    assert.ok(!ironyPos, 'character believes the fact → no dramatic irony');
+  });
+
+  it('deriveTensionLedger: capped at 5 dramatic irony positions even with 10 unperceived facts', () => {
+    const state = emptyState();
+    for (let i = 0; i < 10; i++) {
+      state.objectiveReality.push({ factId: `f${i}`, subject: `subject${i}`, predicate: 'is', object: `thing${i}`, addedAtTurn: 0, validFrom: 0, validTo: null });
+    }
+    state.audienceState.investment = 50;
+    const ledger = deriveTensionLedger(state, 2);
+    const ironyPositions = ledger.positions.filter(p => p.kind === 'dramatic_irony');
+    assert.ok(ironyPositions.length <= 5, 'capped at 5 dramatic irony positions');
+  });
+});

@@ -14,7 +14,7 @@ import type { StoryOpKind } from '../ops/StoryOp.ts';
 
 export interface DramaticPosition {
   positionId: string;
-  kind: 'belief_conflict' | 'unexposed_lie' | 'open_payoff' | 'ticking_clock' | 'unresolved_relationship';
+  kind: 'belief_conflict' | 'unexposed_lie' | 'open_payoff' | 'ticking_clock' | 'unresolved_relationship' | 'dramatic_irony';
   charId?: string;
   description: string;
   openedAtScene: number;
@@ -185,6 +185,30 @@ export function deriveTensionLedger(state: NarrativeState, sceneIdx: number): Te
         Math.min(55, 30 + net * 25),
       );
       positions.push(markToMarket(pos, sceneIdx, investment));
+    }
+  }
+
+  // Dramatic irony: facts in objective reality that NO character has registered in beliefs.
+  // The audience sees a fact the cast is blind to — a privileged knowledge gap.
+  // Cap at 5 to avoid inflating tension on information-dense setup scenes.
+  const allBeliefText = Object.values(state.characterBeliefs)
+    .flat()
+    .map(b => b.proposition.toLowerCase());
+  let ironyCount = 0;
+  for (const fact of state.objectiveReality) {
+    if (ironyCount >= 5) break;
+    const subjectLower = fact.subject.toLowerCase();
+    const perceivedByAny = allBeliefText.some(text => text.includes(subjectLower));
+    if (!perceivedByAny) {
+      const pos = openPosition(
+        `dramatic_irony_${fact.factId}`,
+        'dramatic_irony',
+        `Fact "${fact.subject} ${fact.predicate} ${fact.object}" is unperceived by any character — audience knows what they don't`,
+        sceneIdx,
+        70,
+      );
+      positions.push(markToMarket(pos, sceneIdx, investment));
+      ironyCount++;
     }
   }
 
