@@ -395,6 +395,41 @@ export function dialogueWarnings(ir: NarrativeTransitionIR, state: NarrativeStat
     }
   }
 
+  // DV16: Unwitnessed clue — SEED_CLUE fires but no character in the same IR has an
+  // UPDATE_BELIEF. A clue planted without a character present to register it exists
+  // only as a world-fact with no narrative hook into anyone's consciousness.
+  {
+    const clueOps = ir.ops.filter(op => op.op === 'SEED_CLUE');
+    if (clueOps.length > 0) {
+      const hasWitness = ir.ops.some(op => op.op === 'UPDATE_BELIEF');
+      if (!hasWitness) {
+        warnings.push({
+          engine: 'dialogue_validator', opIdx: null, rule: 'DV16_UNWITNESSED_CLUE',
+          message: `${clueOps.length} SEED_CLUE op(s) planted with no character UPDATE_BELIEF — who observed this clue? Add a witness belief.`,
+          penalty: 16,
+        });
+      }
+    }
+  }
+
+  // DV17: Unreceived payoff — PAYOFF_SETUP fires but no character in the IR updates
+  // their beliefs in response. The audience sees a reveal; no character registers it.
+  {
+    const payoffOps = ir.ops.filter(op => op.op === 'PAYOFF_SETUP');
+    if (payoffOps.length > 0) {
+      const hasReaction = ir.ops.some(op =>
+        op.op === 'UPDATE_BELIEF' || op.op === 'APPRAISE_EMOTION',
+      );
+      if (!hasReaction) {
+        warnings.push({
+          engine: 'dialogue_validator', opIdx: null, rule: 'DV17_UNRECEIVED_PAYOFF',
+          message: `PAYOFF_SETUP fires but no character reacts (no UPDATE_BELIEF or APPRAISE_EMOTION). A payoff without a receiver is a non-event. Add a character reaction.`,
+          penalty: 22,
+        });
+      }
+    }
+  }
+
   return warnings;
 }
 

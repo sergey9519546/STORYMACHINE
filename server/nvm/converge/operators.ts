@@ -16,7 +16,9 @@ export type MutationOperator =
   | 'complicate_relationship'
   | 'weird_but_valid'
   | 'sharpen_theme'
-  | 'invert_expectation';
+  | 'invert_expectation'
+  | 'pacing_compress'
+  | 'reveal_asymmetry';
 
 export interface MutationResult {
   ir: NarrativeTransitionIR;
@@ -194,6 +196,97 @@ function invertExpectation(ir: NarrativeTransitionIR, _state: NarrativeState, se
   };
 }
 
+function pacingCompress(ir: NarrativeTransitionIR, _state: NarrativeState, _seed: number): MutationResult {
+  if (ir.ops.length <= 2) return { ir, operator: 'pacing_compress', description: 'scene too short to compress' };
+  // Remove the last APPRAISE_EMOTION or UPDATE_BELIEF op if the same character already
+  // has an identical dominant emotion / same proposition earlier in the IR.
+  for (let i = ir.ops.length - 1; i >= 1; i--) {
+    const op = ir.ops[i];
+    if (op.op === 'APPRAISE_EMOTION') {
+      const duplicate = ir.ops.slice(0, i).some(
+        e => e.op === 'APPRAISE_EMOTION' && e.charId === op.charId &&
+             e.emotion.dominant === op.emotion.dominant,
+      );
+      if (duplicate) {
+        const newOps = [...ir.ops.slice(0, i), ...ir.ops.slice(i + 1)];
+        return {
+          ir: { ...ir, ops: newOps },
+          operator: 'pacing_compress',
+          description: `Removed redundant ${op.emotion.dominant} emotion op for ${op.charId} — duplicate beat excised`,
+        };
+      }
+    }
+    if (op.op === 'UPDATE_BELIEF') {
+      const duplicate = ir.ops.slice(0, i).some(
+        e => e.op === 'UPDATE_BELIEF' && e.charId === op.charId &&
+             e.belief.proposition === op.belief.proposition,
+      );
+      if (duplicate) {
+        const newOps = [...ir.ops.slice(0, i), ...ir.ops.slice(i + 1)];
+        return {
+          ir: { ...ir, ops: newOps },
+          operator: 'pacing_compress',
+          description: `Removed redundant belief op for ${op.charId} — proposition restated without change`,
+        };
+      }
+    }
+  }
+  // Fallback: remove the last world-fact op (ADD_FACT) to tighten a bloated scene
+  for (let i = ir.ops.length - 1; i >= 0; i--) {
+    if (ir.ops[i].op === 'ADD_FACT') {
+      const newOps = [...ir.ops.slice(0, i), ...ir.ops.slice(i + 1)];
+      return {
+        ir: { ...ir, ops: newOps },
+        operator: 'pacing_compress',
+        description: 'Removed trailing ADD_FACT op to tighten scene pacing',
+      };
+    }
+  }
+  return { ir, operator: 'pacing_compress', description: 'no compressible ops found' };
+}
+
+function revealAsymmetry(ir: NarrativeTransitionIR, state: NarrativeState, seed: number): MutationResult {
+  const prng = makePrng(seed);
+  // Find a character who holds beliefs that another character in the scene doesn't have.
+  // Insert an UPDATE_BELIEF for the uninformed character using a "told" belief from
+  // the informed character — establishing dramatic irony or reducing it.
+  const charIds = [...new Set(
+    ir.ops
+      .filter(op => op.op === 'UPDATE_BELIEF' || op.op === 'APPRAISE_EMOTION')
+      .map(op => (op as { charId: string }).charId),
+  )];
+  if (charIds.length < 2) {
+    // Single-character scene: add a "told" belief referencing a world fact
+    const facts = state.objectiveReality;
+    if (facts.length === 0) return { ir, operator: 'reveal_asymmetry', description: 'no world facts to create asymmetry from' };
+    const fact = facts[randInt(prng, facts.length)];
+    const char = charIds[0] ?? 'protagonist';
+    const newOp: StoryOp = {
+      op: 'UPDATE_BELIEF', charId: char,
+      belief: { id: `bel_asym_${ir.sceneIdx}_${randInt(prng, 99999)}`, proposition: `${fact.subject} ${fact.predicate} ${fact.object}`, confidence: 0.55, source: 'told', acquired_at: 0 },
+    };
+    return {
+      ir: { ...ir, ops: [...ir.ops, newOp] },
+      operator: 'reveal_asymmetry',
+      description: `Inserted "told" belief for ${char} about "${fact.subject}" to create dramatic irony`,
+    };
+  }
+  // Two or more characters: give the second character a belief the first has
+  const [informed, uninformed] = [charIds[randInt(prng, charIds.length)], charIds[(randInt(prng, charIds.length) + 1) % charIds.length]];
+  const informedBeliefs = state.characterBeliefs[informed] ?? [];
+  if (informedBeliefs.length === 0) return { ir, operator: 'reveal_asymmetry', description: `${informed} has no beliefs to create asymmetry from` };
+  const sourceBelief = informedBeliefs[randInt(prng, informedBeliefs.length)];
+  const newOp: StoryOp = {
+    op: 'UPDATE_BELIEF', charId: uninformed,
+    belief: { id: `bel_asym_${ir.sceneIdx}_${randInt(prng, 99999)}`, proposition: sourceBelief.proposition, confidence: 0.45, source: 'told', acquired_at: 0 },
+  };
+  return {
+    ir: { ...ir, ops: [...ir.ops, newOp] },
+    operator: 'reveal_asymmetry',
+    description: `${uninformed} learns what ${informed} knows: "${sourceBelief.proposition.slice(0, 40)}" — asymmetry established`,
+  };
+}
+
 // ── Operator dispatch ─────────────────────────────────────────────────────────
 
 const OPERATORS: Record<MutationOperator, (ir: NarrativeTransitionIR, state: NarrativeState, seed: number) => MutationResult> = {
@@ -205,6 +298,8 @@ const OPERATORS: Record<MutationOperator, (ir: NarrativeTransitionIR, state: Nar
   weird_but_valid:        weirdButValid,
   sharpen_theme:          sharpenTheme,
   invert_expectation:     invertExpectation,
+  pacing_compress:        pacingCompress,
+  reveal_asymmetry:       revealAsymmetry,
 };
 
 export function applyOperator(

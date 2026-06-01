@@ -71,6 +71,12 @@ export function qualityConstraintsFromWarnings(
       case 'DV15_GOAL_FREE_SCENE':
         constraints.push({ kind: 'free_form', description: 'This scene has no story consequence: no arc advancement, no theme progress, no payoff, no ticking clock. Add at least one ADVANCE_OBJECT_ARC, ADVANCE_THEME_ARGUMENT, PAYOFF_SETUP, or RAISE_CLOCK to make this scene matter to the plot.' });
         break;
+      case 'DV16_UNWITNESSED_CLUE':
+        constraints.push({ kind: 'free_form', description: 'A clue was planted (SEED_CLUE) but no character witnessed it — add at least one UPDATE_BELIEF for a character who was present to observe or discover the clue. A clue with no witness has no narrative hook.' });
+        break;
+      case 'DV17_UNRECEIVED_PAYOFF':
+        constraints.push({ kind: 'free_form', description: 'A payoff fires (PAYOFF_SETUP) but no character reacts with a belief update or emotional response. Add an UPDATE_BELIEF or APPRAISE_EMOTION immediately after the payoff so the reveal lands in a human mind.' });
+        break;
       case 'LOW_SPECIFICITY':
         constraints.push({ kind: 'free_form', description: 'Replace vague terms (something, happened, felt, things) with concrete specifics: named objects, precise actions, sensory details. Every op should be unmistakably this story, not any story.' });
         break;

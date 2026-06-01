@@ -4321,8 +4321,8 @@ describe('NVM — Proof-Driven Generation spec (G9)', () => {
     assert.ok(spec.systemPreamble.includes('NarrativeTransitionIR'));
   });
 
-  it('ALL_OPERATORS has exactly 8 operators', () => {
-    assert.equal(ALL_OPERATORS.length, 8);
+  it('ALL_OPERATORS has exactly 10 operators', () => {
+    assert.equal(ALL_OPERATORS.length, 10);
   });
 });
 
@@ -12274,7 +12274,7 @@ describe('Wave 104 — emotional debt, quality constraint gap, originality clich
   it('arc-tracker: peak fear opens an EMOTIONAL_DEBT promise', () => {
     const scenes = [{
       sceneIdx: 0,
-      ops: [{ op: 'APPRAISE_EMOTION' as const, charId: 'alice', emotion: { dominant: 'fear' as const, intensity: 80, joy: 0, distress: 0, anger: 0, fear: 80, pride: 0, shame: 0 } }],
+      ops: [{ op: 'APPRAISE_EMOTION' as const, charId: 'alice', emotion: { dominant: 'fear' as const, intensity: 80, joy: 0, distress: 0, anger: 0, fear: 80, pride: 0, shame: 0, last_updated_at: 0 } }],
     }];
     const report = analyzeArcCompletion(scenes);
     const debt = report.openPromises.find(p => p.kind === 'EMOTIONAL_DEBT');
@@ -12286,11 +12286,11 @@ describe('Wave 104 — emotional debt, quality constraint gap, originality clich
     const scenes = [
       {
         sceneIdx: 0,
-        ops: [{ op: 'APPRAISE_EMOTION' as const, charId: 'alice', emotion: { dominant: 'fear' as const, intensity: 80, joy: 0, distress: 0, anger: 0, fear: 80, pride: 0, shame: 0 } }],
+        ops: [{ op: 'APPRAISE_EMOTION' as const, charId: 'alice', emotion: { dominant: 'fear' as const, intensity: 80, joy: 0, distress: 0, anger: 0, fear: 80, pride: 0, shame: 0, last_updated_at: 0 } }],
       },
       {
         sceneIdx: 1,
-        ops: [{ op: 'APPRAISE_EMOTION' as const, charId: 'alice', emotion: { dominant: 'joy' as const, intensity: 60, joy: 60, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0 } }],
+        ops: [{ op: 'APPRAISE_EMOTION' as const, charId: 'alice', emotion: { dominant: 'joy' as const, intensity: 60, joy: 60, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, last_updated_at: 1 } }],
       },
     ];
     const report = analyzeArcCompletion(scenes);
@@ -12303,11 +12303,11 @@ describe('Wave 104 — emotional debt, quality constraint gap, originality clich
     const scenes = [
       {
         sceneIdx: 0,
-        ops: [{ op: 'APPRAISE_EMOTION' as const, charId: 'bob', emotion: { dominant: 'distress' as const, intensity: 85, joy: 0, distress: 85, anger: 0, fear: 0, pride: 0, shame: 0 } }],
+        ops: [{ op: 'APPRAISE_EMOTION' as const, charId: 'bob', emotion: { dominant: 'distress' as const, intensity: 85, joy: 0, distress: 85, anger: 0, fear: 0, pride: 0, shame: 0, last_updated_at: 0 } }],
       },
       {
         sceneIdx: 1,
-        ops: [{ op: 'APPRAISE_EMOTION' as const, charId: 'bob', emotion: { dominant: 'anger' as const, intensity: 30, joy: 0, distress: 0, anger: 30, fear: 0, pride: 0, shame: 0 } }],
+        ops: [{ op: 'APPRAISE_EMOTION' as const, charId: 'bob', emotion: { dominant: 'anger' as const, intensity: 30, joy: 0, distress: 0, anger: 30, fear: 0, pride: 0, shame: 0, last_updated_at: 1 } }],
       },
     ];
     const report = analyzeArcCompletion(scenes);
@@ -12318,7 +12318,7 @@ describe('Wave 104 — emotional debt, quality constraint gap, originality clich
   it('arc-tracker: low-intensity fear (<75) does NOT open an EMOTIONAL_DEBT', () => {
     const scenes = [{
       sceneIdx: 0,
-      ops: [{ op: 'APPRAISE_EMOTION' as const, charId: 'carol', emotion: { dominant: 'fear' as const, intensity: 60, joy: 0, distress: 0, anger: 0, fear: 60, pride: 0, shame: 0 } }],
+      ops: [{ op: 'APPRAISE_EMOTION' as const, charId: 'carol', emotion: { dominant: 'fear' as const, intensity: 60, joy: 0, distress: 0, anger: 0, fear: 60, pride: 0, shame: 0, last_updated_at: 0 } }],
     }];
     const report = analyzeArcCompletion(scenes);
     const debt = report.openPromises.find(p => p.kind === 'EMOTIONAL_DEBT');
@@ -12353,13 +12353,13 @@ describe('Wave 104 — emotional debt, quality constraint gap, originality clich
   // ── originality proof: cliché A — consecutive ADD_FACT run ───────────────────
 
   it('originalityProof: 3 consecutive ADD_FACT ops with no character op → cliché fail', () => {
-    const ops = [
-      { op: 'ADD_FACT' as const, fact: { subject: 'castle', predicate: 'is', object: 'abandoned', source: 'narrator' as const } },
-      { op: 'ADD_FACT' as const, fact: { subject: 'moat', predicate: 'is', object: 'dry', source: 'narrator' as const } },
-      { op: 'ADD_FACT' as const, fact: { subject: 'gate', predicate: 'is', object: 'open', source: 'narrator' as const } },
-      { op: 'UPDATE_BELIEF' as const, charId: 'alice', belief: { proposition: 'castle is dangerous', confidence: 0.7, source: 'inferred' as const } },
-      { op: 'APPRAISE_EMOTION' as const, charId: 'alice', emotion: { dominant: 'fear' as const, intensity: 60, joy: 0, distress: 0, anger: 0, fear: 60, pride: 0, shame: 0 } },
-      { op: 'SHIFT_RELATIONSHIP' as const, pair: ['alice', 'bob'] as [string, string], delta: { dimension: 'trust' as const, amount: -0.2 }, label: 'unease' },
+    const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'castle', predicate: 'is', object: 'abandoned', addedAtTurn: 0, validFrom: 0, validTo: null } },
+      { op: 'ADD_FACT', fact: { factId: 'f2', subject: 'moat', predicate: 'is', object: 'dry', addedAtTurn: 0, validFrom: 0, validTo: null } },
+      { op: 'ADD_FACT', fact: { factId: 'f3', subject: 'gate', predicate: 'is', object: 'open', addedAtTurn: 0, validFrom: 0, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'castle is dangerous', confidence: 0.7, source: 'inferred', acquired_at: 0 } },
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { dominant: 'fear', intensity: 60, joy: 0, distress: 0, anger: 0, fear: 60, pride: 0, shame: 0, last_updated_at: 0 } },
+      { op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: -0.2, reason: 'unease' } },
     ];
     const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
       transitionId: 't1', sceneIdx: 1, sceneFunction: 'advance_plot',
@@ -12373,12 +12373,12 @@ describe('Wave 104 — emotional debt, quality constraint gap, originality clich
   });
 
   it('originalityProof: ADD_FACT run broken by APPRAISE_EMOTION → pass', () => {
-    const ops = [
-      { op: 'ADD_FACT' as const, fact: { subject: 'castle', predicate: 'is', object: 'abandoned', source: 'narrator' as const } },
-      { op: 'ADD_FACT' as const, fact: { subject: 'moat', predicate: 'is', object: 'dry', source: 'narrator' as const } },
-      { op: 'APPRAISE_EMOTION' as const, charId: 'alice', emotion: { dominant: 'fear' as const, intensity: 60, joy: 0, distress: 0, anger: 0, fear: 60, pride: 0, shame: 0 } },
-      { op: 'ADD_FACT' as const, fact: { subject: 'gate', predicate: 'is', object: 'open', source: 'narrator' as const } },
-      { op: 'UPDATE_BELIEF' as const, charId: 'alice', belief: { proposition: 'castle is dangerous', confidence: 0.7, source: 'inferred' as const } },
+    const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'castle', predicate: 'is', object: 'abandoned', addedAtTurn: 0, validFrom: 0, validTo: null } },
+      { op: 'ADD_FACT', fact: { factId: 'f2', subject: 'moat', predicate: 'is', object: 'dry', addedAtTurn: 0, validFrom: 0, validTo: null } },
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { dominant: 'fear', intensity: 60, joy: 0, distress: 0, anger: 0, fear: 60, pride: 0, shame: 0, last_updated_at: 0 } },
+      { op: 'ADD_FACT', fact: { factId: 'f3', subject: 'gate', predicate: 'is', object: 'open', addedAtTurn: 0, validFrom: 0, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'castle is dangerous', confidence: 0.7, source: 'inferred', acquired_at: 0 } },
     ];
     const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
       transitionId: 't1', sceneIdx: 1, sceneFunction: 'advance_plot',
@@ -12393,11 +12393,11 @@ describe('Wave 104 — emotional debt, quality constraint gap, originality clich
   // ── originality proof: cliché B — same-scene relationship whiplash ────────────
 
   it('originalityProof: same pair both negative and positive delta in one scene → whiplash fail', () => {
-    const ops = [
-      { op: 'SHIFT_RELATIONSHIP' as const, pair: ['alice', 'bob'] as [string, string], delta: { dimension: 'trust' as const, amount: -0.5 }, label: 'argument' },
-      { op: 'APPRAISE_EMOTION' as const, charId: 'alice', emotion: { dominant: 'distress' as const, intensity: 55, joy: 0, distress: 55, anger: 0, fear: 0, pride: 0, shame: 0 } },
-      { op: 'SHIFT_RELATIONSHIP' as const, pair: ['bob', 'alice'] as [string, string], delta: { dimension: 'trust' as const, amount: 0.6 }, label: 'reconciliation' },
-      { op: 'APPRAISE_EMOTION' as const, charId: 'bob', emotion: { dominant: 'joy' as const, intensity: 55, joy: 55, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0 } },
+    const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+      { op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: -0.5, reason: 'argument' } },
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { dominant: 'distress', intensity: 55, joy: 0, distress: 55, anger: 0, fear: 0, pride: 0, shame: 0, last_updated_at: 0 } },
+      { op: 'SHIFT_RELATIONSHIP', pair: ['bob', 'alice'], delta: { dimension: 'trust', amount: 0.6, reason: 'reconciliation' } },
+      { op: 'APPRAISE_EMOTION', charId: 'bob', emotion: { dominant: 'joy', intensity: 55, joy: 55, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, last_updated_at: 0 } },
     ];
     const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
       transitionId: 't1', sceneIdx: 1, sceneFunction: 'advance_plot',
@@ -12411,11 +12411,11 @@ describe('Wave 104 — emotional debt, quality constraint gap, originality clich
   });
 
   it('originalityProof: only negative delta (no whiplash) → no cliché fail', () => {
-    const ops = [
-      { op: 'SHIFT_RELATIONSHIP' as const, pair: ['alice', 'bob'] as [string, string], delta: { dimension: 'trust' as const, amount: -0.4 }, label: 'betrayal' },
-      { op: 'UPDATE_BELIEF' as const, charId: 'alice', belief: { proposition: 'bob cannot be trusted', confidence: 0.8, source: 'observed' as const } },
-      { op: 'APPRAISE_EMOTION' as const, charId: 'alice', emotion: { dominant: 'anger' as const, intensity: 70, joy: 0, distress: 0, anger: 70, fear: 0, pride: 0, shame: 0 } },
-      { op: 'ADD_FACT' as const, fact: { subject: 'alice', predicate: 'leaves', object: 'the room', source: 'observed' as const } },
+    const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+      { op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: -0.4, reason: 'betrayal' } },
+      { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'bob cannot be trusted', confidence: 0.8, source: 'witnessed', acquired_at: 0 } },
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { dominant: 'anger', intensity: 70, joy: 0, distress: 0, anger: 70, fear: 0, pride: 0, shame: 0, last_updated_at: 0 } },
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'alice', predicate: 'leaves', object: 'the room', addedAtTurn: 0, validFrom: 0, validTo: null } },
     ];
     const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
       transitionId: 't1', sceneIdx: 1, sceneFunction: 'advance_plot',
@@ -12425,5 +12425,107 @@ describe('Wave 104 — emotional debt, quality constraint gap, originality clich
     };
     const result = originalityProof(ir, emptyState());
     assert.ok(result.pass, 'only negative relationship delta → no whiplash, passes');
+  });
+});
+
+// ── Wave 105: DV16/DV17 quality validators, pacing_compress + reveal_asymmetry operators ─
+
+describe('Wave 105 — DV16/DV17 unwitnessed clue / unreceived payoff, new mutation operators', () => {
+  function makeIR105(ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[]): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR {
+    return {
+      transitionId: 't1', sceneIdx: 1, sceneFunction: 'advance_plot',
+      activeMechanisms: [], beforeStateHash: '', ops,
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 1 },
+    };
+  }
+
+  it('DV16: SEED_CLUE with no UPDATE_BELIEF in same IR → DV16_UNWITNESSED_CLUE warning', () => {
+    const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+      { op: 'SEED_CLUE', clueId: 'bloodstain', carrier: 'object' },
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'floor', predicate: 'has', object: 'blood', addedAtTurn: 0, validFrom: 0, validTo: null } },
+    ];
+    const warnings = dialogueWarnings(makeIR105(ops), emptyState());
+    assert.ok(warnings.some(w => w.rule === 'DV16_UNWITNESSED_CLUE'), 'SEED_CLUE without witness → DV16');
+  });
+
+  it('DV16: SEED_CLUE with UPDATE_BELIEF in same IR → no DV16 warning', () => {
+    const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+      { op: 'SEED_CLUE', clueId: 'bloodstain', carrier: 'object' },
+      { op: 'UPDATE_BELIEF', charId: 'detective', belief: { id: 'b1', proposition: 'someone was hurt here', confidence: 0.8, source: 'witnessed', acquired_at: 0 } },
+    ];
+    const warnings = dialogueWarnings(makeIR105(ops), emptyState());
+    assert.ok(!warnings.some(w => w.rule === 'DV16_UNWITNESSED_CLUE'), 'witness belief present → no DV16');
+  });
+
+  it('DV17: PAYOFF_SETUP with no reaction ops → DV17_UNRECEIVED_PAYOFF', () => {
+    const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+      { op: 'PAYOFF_SETUP', setupId: 'bloodstain', payoffEventId: 'reveal_1' },
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'killer', predicate: 'was', object: 'butler', addedAtTurn: 0, validFrom: 0, validTo: null } },
+    ];
+    const warnings = dialogueWarnings(makeIR105(ops), emptyState());
+    assert.ok(warnings.some(w => w.rule === 'DV17_UNRECEIVED_PAYOFF'), 'payoff with no reaction → DV17');
+  });
+
+  it('DV17: PAYOFF_SETUP with APPRAISE_EMOTION reaction → no DV17 warning', () => {
+    const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+      { op: 'PAYOFF_SETUP', setupId: 'bloodstain', payoffEventId: 'reveal_1' },
+      { op: 'APPRAISE_EMOTION', charId: 'detective', emotion: { dominant: 'distress', intensity: 70, joy: 0, distress: 70, anger: 0, fear: 0, pride: 0, shame: 0, last_updated_at: 0 } },
+    ];
+    const warnings = dialogueWarnings(makeIR105(ops), emptyState());
+    assert.ok(!warnings.some(w => w.rule === 'DV17_UNRECEIVED_PAYOFF'), 'emotion reaction → no DV17');
+  });
+
+  it('pacing_compress: removes duplicate dominant emotion for same character', () => {
+    const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { dominant: 'fear', intensity: 70, joy: 0, distress: 0, anger: 0, fear: 70, pride: 0, shame: 0, last_updated_at: 0 } },
+      { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'danger is near', confidence: 0.8, source: 'inferred', acquired_at: 0 } },
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { dominant: 'fear', intensity: 75, joy: 0, distress: 0, anger: 0, fear: 75, pride: 0, shame: 0, last_updated_at: 1 } },
+    ];
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 't1', sceneIdx: 2, sceneFunction: 'advance_plot',
+      activeMechanisms: [], beforeStateHash: '', ops,
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 1 },
+    };
+    const result = applyOperator('pacing_compress', ir, emptyState(), 42);
+    assert.ok(result.ir.ops.length < ops.length, 'pacing_compress reduces op count');
+    assert.strictEqual(result.operator, 'pacing_compress');
+  });
+
+  it('pacing_compress: scene ≤2 ops → returns unchanged IR', () => {
+    const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'room', predicate: 'is', object: 'empty', addedAtTurn: 0, validFrom: 0, validTo: null } },
+      { op: 'RAISE_CLOCK', clockId: 'bomb', amount: 5 },
+    ];
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 't1', sceneIdx: 1, sceneFunction: 'advance_plot',
+      activeMechanisms: [], beforeStateHash: '', ops,
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 1 },
+    };
+    const result = applyOperator('pacing_compress', ir, emptyState(), 42);
+    assert.strictEqual(result.ir.ops.length, ops.length, 'too short → no change');
+  });
+
+  it('reveal_asymmetry: single-char scene with world fact → inserts told UPDATE_BELIEF', () => {
+    const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'vault is locked', confidence: 0.9, source: 'witnessed', acquired_at: 0 } },
+    ];
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 't1', sceneIdx: 1, sceneFunction: 'advance_plot',
+      activeMechanisms: [], beforeStateHash: '', ops,
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 1 },
+    };
+    const stateWithFact = {
+      ...emptyState(),
+      objectiveReality: [{ factId: 'f1', subject: 'vault', predicate: 'contains', object: 'ledger', addedAtTurn: 0, validFrom: 0, validTo: null }],
+    };
+    const result = applyOperator('reveal_asymmetry', ir, stateWithFact, 42);
+    assert.ok(result.ir.ops.length > ops.length, 'reveal_asymmetry adds a belief op');
+    const addedBelief = result.ir.ops.find(o => o.op === 'UPDATE_BELIEF' && (o as { belief: { source: string } }).belief.source === 'told');
+    assert.ok(addedBelief, 'inserted "told" belief');
+    assert.strictEqual(result.operator, 'reveal_asymmetry');
   });
 });
