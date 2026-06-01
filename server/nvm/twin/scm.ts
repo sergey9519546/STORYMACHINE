@@ -44,28 +44,73 @@ export function buildSCM(stage: Stage): StructuralCausalModel {
     });
   }
 
-  // Second pass: wire causalLinks from the IR stored in commits
-  // We can't re-read the IR from Stage (it's stored in ops_json without causalLinks),
-  // so we infer causality heuristically: within a commit, facts precede beliefs;
-  // across commits, beliefs depend on facts introduced in prior commits.
+  // Second pass: wire causal edges heuristically (IR causalLinks are not stored,
+  // so we infer: within a commit, facts precede beliefs; across commits, ops depend
+  // on the prior commit's op that introduced their subject entity.
+  // Wave 119: extended to cross-commit edges for facts, clues, clocks, and emotions.
+
+  // Build cross-commit lookup: entity → last opId that introduced it (across all prior commits).
+  // We maintain these maps as we process commits in chronological order.
+  const lastFactOpId = new Map<string, string>();     // factId → opId of most recent ADD_FACT
+  const lastClueOpId = new Map<string, string>();     // clueId → opId of most recent SEED_CLUE
+  const lastClockOpId = new Map<string, string>();    // clockId → opId of most recent RAISE_CLOCK
+  const lastBeliefOpId = new Map<string, string>();   // charId → opId of most recent UPDATE_BELIEF
+
+  function addEdge(parentId: string, childId: string): void {
+    const parentNode = nodes.get(parentId);
+    const childNode = nodes.get(childId);
+    if (!parentNode || !childNode) return;
+    if (!childNode.parents.includes(parentId)) childNode.parents.push(parentId);
+    if (!parentNode.children.includes(childId)) parentNode.children.push(childId);
+  }
+
   for (const commit of commits) {
-    // Intra-commit: UPDATE_BELIEF after ADD_FACT → ADD_FACT causes belief
     commit.ops.forEach((op, i) => {
+      const self = opId(commit.commitId, i);
+
+      // ── Intra-commit: UPDATE_BELIEF after ADD_FACT → fact causes belief
       if (op.op === 'UPDATE_BELIEF') {
         for (let j = 0; j < i; j++) {
           const prev = commit.ops[j];
           if (prev.op === 'ADD_FACT') {
-            const parent = opId(commit.commitId, j);
-            const child = opId(commit.commitId, i);
-            const parentNode = nodes.get(parent);
-            const childNode = nodes.get(child);
-            if (parentNode && childNode) {
-              if (!childNode.parents.includes(parent)) childNode.parents.push(parent);
-              if (!parentNode.children.includes(child)) parentNode.children.push(child);
-            }
+            addEdge(opId(commit.commitId, j), self);
           }
         }
       }
+
+      // ── Cross-commit: EXPIRE_FACT depends on the ADD_FACT that introduced the fact
+      if (op.op === 'EXPIRE_FACT') {
+        const src = lastFactOpId.get(op.factId);
+        if (src && src !== self) addEdge(src, self);
+      }
+
+      // ── Cross-commit: PAYOFF_SETUP depends on the SEED_CLUE that planted the clue
+      if (op.op === 'PAYOFF_SETUP') {
+        const src = lastClueOpId.get(op.setupId);
+        if (src && src !== self) addEdge(src, self);
+      }
+
+      // ── Cross-commit: RAISE_CLOCK chains — each raise depends on the prior raise of same clock
+      if (op.op === 'RAISE_CLOCK') {
+        const src = lastClockOpId.get(op.clockId);
+        if (src && src !== self) addEdge(src, self);
+      }
+
+      // ── Cross-commit: APPRAISE_EMOTION depends on the most recent UPDATE_BELIEF for same char
+      if (op.op === 'APPRAISE_EMOTION') {
+        const src = lastBeliefOpId.get(op.charId);
+        if (src && src !== self) addEdge(src, self);
+      }
+    });
+
+    // Update lookup maps AFTER processing this commit so intra-commit ops
+    // only see entities introduced by strictly prior commits.
+    commit.ops.forEach((op, i) => {
+      const self = opId(commit.commitId, i);
+      if (op.op === 'ADD_FACT') lastFactOpId.set(op.fact.factId, self);
+      if (op.op === 'SEED_CLUE') lastClueOpId.set(op.clueId, self);
+      if (op.op === 'RAISE_CLOCK') lastClockOpId.set(op.clockId, self);
+      if (op.op === 'UPDATE_BELIEF') lastBeliefOpId.set(op.charId, self);
     });
   }
 

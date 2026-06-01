@@ -13674,3 +13674,164 @@ describe('Wave 108 — cognition-emotion mismatch (lint + character advocate)', 
     });
   });
 }
+
+// ── Wave 119 — whatBreaks clock/clue tracking + SCM cross-commit edges ──────
+
+describe('Wave 119 — whatBreaksIfRemoved: clue break across multi-commit chain', () => {
+  function mkC(id: string, parent: string | null, ops: StoryOp[]): StoryCommit {
+    return { commitId: id, parentId: parent, sceneIdx: 0, ops, deltaSummary: summarizeOps(ops), reverted: false, createdAt: Date.now() };
+  }
+
+  it('flags both downstream commits when removed commit is sole SEED_CLUE for a multi-payoff arc', () => {
+    const stage = new Stage(':memory:');
+    const seed: StoryOp[] = [{ op: 'SEED_CLUE', clueId: 'ring', carrier: 'object' }];
+    const payoff1: StoryOp[] = [{ op: 'PAYOFF_SETUP', setupId: 'ring', payoffEventId: 'e1' }];
+    const payoff2: StoryOp[] = [{ op: 'PAYOFF_SETUP', setupId: 'ring', payoffEventId: 'e2' }];
+    stage.appendCommit(mkC('c1', null, seed));
+    stage.appendCommit(mkC('c2', 'c1', payoff1));
+    stage.appendCommit(mkC('c3', 'c2', payoff2));
+    const report = whatBreaksIfRemoved(stage, 'c1');
+    assert.equal(report.breaks.length, 2, 'both downstream payoffs break when sole seed is removed');
+    assert.ok(report.breaks.every(b => b.proof === 'ProvenanceProof'));
+    assert.ok(report.breaks.some(b => b.downstreamCommit === 'c2'));
+    assert.ok(report.breaks.some(b => b.downstreamCommit === 'c3'));
+  });
+
+  it('combined break: sole char and sole clue in same removed commit', () => {
+    const stage = new Stage(':memory:');
+    const introOps: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'rex', belief: { id: 'b1', proposition: 'p', confidence: 0.9, source: 'inferred', acquired_at: 1 } },
+      { op: 'SEED_CLUE', clueId: 'footprint', carrier: 'location' },
+    ];
+    const refOps: StoryOp[] = [
+      { op: 'APPRAISE_EMOTION', charId: 'rex', emotion: { joy: 0, distress: 0, anger: 80, fear: 0, pride: 0, shame: 0, dominant: 'anger', intensity: 80, last_updated_at: 2 } },
+      { op: 'PAYOFF_SETUP', setupId: 'footprint', payoffEventId: 'ev2' },
+    ];
+    stage.appendCommit(mkC('c1', null, introOps));
+    stage.appendCommit(mkC('c2', 'c1', refOps));
+    const report = whatBreaksIfRemoved(stage, 'c1');
+    assert.equal(report.breaks.length, 2, 'char break + clue break both detected');
+    assert.ok(report.breaks.some(b => b.proof === 'IntentionalProof'));
+    assert.ok(report.breaks.some(b => b.proof === 'ProvenanceProof'));
+  });
+
+  it('no break when removed commit has no unique introductions', () => {
+    const stage = new Stage(':memory:');
+    const belief: StoryOp[] = [{ op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'p', confidence: 0.9, source: 'inferred', acquired_at: 1 } }];
+    const emotion: StoryOp[] = [{ op: 'APPRAISE_EMOTION', charId: 'nora', emotion: { joy: 50, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'joy', intensity: 50, last_updated_at: 2 } }];
+    stage.appendCommit(mkC('c1', null, belief));
+    // c2 ALSO introduces nora via UPDATE_BELIEF, then c3 references nora
+    stage.appendCommit(mkC('c2', 'c1', belief));
+    stage.appendCommit(mkC('c3', 'c2', emotion));
+    const report = whatBreaksIfRemoved(stage, 'c1');
+    assert.equal(report.breaks.length, 0, 'not the sole introducer → no breaks');
+  });
+});
+
+describe('Wave 119 — whatBreaksIfRemoved: clue/payoff break detection', () => {
+  function mkC(id: string, parent: string | null, ops: StoryOp[]): StoryCommit {
+    return { commitId: id, parentId: parent, sceneIdx: 0, ops, deltaSummary: summarizeOps(ops), reverted: false, createdAt: Date.now() };
+  }
+
+  it('flags downstream PAYOFF_SETUP when removed commit is sole SEED_CLUE source', () => {
+    const stage = new Stage(':memory:');
+    const opsA: StoryOp[] = [{ op: 'SEED_CLUE', clueId: 'clue_ring', carrier: 'object' }];
+    const opsB: StoryOp[] = [{ op: 'PAYOFF_SETUP', setupId: 'clue_ring', payoffEventId: 'e1' }];
+    stage.appendCommit(mkC('c1', null, opsA));
+    stage.appendCommit(mkC('c2', 'c1', opsB));
+    const report = whatBreaksIfRemoved(stage, 'c1');
+    assert.equal(report.breaks.length, 1);
+    assert.equal(report.breaks[0].downstreamCommit, 'c2');
+    assert.equal(report.breaks[0].proof, 'ProvenanceProof');
+    assert.ok(report.breaks[0].reason.includes('clue_ring'));
+  });
+
+  it('no clue break when clue is seeded independently in another commit', () => {
+    const stage = new Stage(':memory:');
+    const seedOp: StoryOp[] = [{ op: 'SEED_CLUE', clueId: 'clue_ring', carrier: 'object' }];
+    const payoffOp: StoryOp[] = [{ op: 'PAYOFF_SETUP', setupId: 'clue_ring', payoffEventId: 'e1' }];
+    stage.appendCommit(mkC('c1', null, seedOp));
+    stage.appendCommit(mkC('c2', 'c1', seedOp));  // also seeds clue_ring
+    stage.appendCommit(mkC('c3', 'c2', payoffOp));
+    const report = whatBreaksIfRemoved(stage, 'c1');
+    // c2 also seeds the clue, so c3 payoff is safe
+    assert.equal(report.breaks.length, 0);
+  });
+});
+
+describe('Wave 119 — buildSCM: cross-commit causal edges', () => {
+  function mkC(id: string, parent: string | null, ops: StoryOp[], sceneIdx = 0): StoryCommit {
+    return { commitId: id, parentId: parent, sceneIdx, ops, deltaSummary: summarizeOps(ops), reverted: false, createdAt: Date.now() };
+  }
+
+  it('cross-commit EXPIRE_FACT → ADD_FACT edge is wired', () => {
+    const stage = new Stage(':memory:');
+    const opsA: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 's', predicate: 'p', object: 'o', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ];
+    const opsB: StoryOp[] = [{ op: 'EXPIRE_FACT', factId: 'f1', atTurn: 2 }];
+    stage.appendCommit(mkC('c1', null, opsA));
+    stage.appendCommit(mkC('c2', 'c1', opsB));
+    const scm = buildSCM(stage);
+    const addNode = scm.nodes.get('c1:0')!;
+    const expNode = scm.nodes.get('c2:0')!;
+    assert.ok(addNode.children.includes('c2:0'), 'ADD_FACT → EXPIRE_FACT cross-commit edge');
+    assert.ok(expNode.parents.includes('c1:0'), 'EXPIRE_FACT parent is cross-commit ADD_FACT');
+  });
+
+  it('cross-commit PAYOFF_SETUP → SEED_CLUE edge is wired', () => {
+    const stage = new Stage(':memory:');
+    const opsA: StoryOp[] = [{ op: 'SEED_CLUE', clueId: 'clue1', carrier: 'object' }];
+    const opsB: StoryOp[] = [{ op: 'PAYOFF_SETUP', setupId: 'clue1', payoffEventId: 'e_payoff' }];
+    stage.appendCommit(mkC('c1', null, opsA));
+    stage.appendCommit(mkC('c2', 'c1', opsB));
+    const scm = buildSCM(stage);
+    const seedNode = scm.nodes.get('c1:0')!;
+    const payoffNode = scm.nodes.get('c2:0')!;
+    assert.ok(seedNode.children.includes('c2:0'), 'SEED_CLUE → PAYOFF_SETUP cross-commit edge');
+    assert.ok(payoffNode.parents.includes('c1:0'), 'PAYOFF_SETUP parent is cross-commit SEED_CLUE');
+  });
+
+  it('cross-commit RAISE_CLOCK chain is wired', () => {
+    const stage = new Stage(':memory:');
+    const opsA: StoryOp[] = [{ op: 'RAISE_CLOCK', clockId: 'timer', amount: 20 }];
+    const opsB: StoryOp[] = [{ op: 'RAISE_CLOCK', clockId: 'timer', amount: 30 }];
+    stage.appendCommit(mkC('c1', null, opsA));
+    stage.appendCommit(mkC('c2', 'c1', opsB));
+    const scm = buildSCM(stage);
+    const first = scm.nodes.get('c1:0')!;
+    const second = scm.nodes.get('c2:0')!;
+    assert.ok(first.children.includes('c2:0'), 'first RAISE_CLOCK → second RAISE_CLOCK');
+    assert.ok(second.parents.includes('c1:0'), 'second RAISE_CLOCK parent is first');
+  });
+
+  it('cross-commit APPRAISE_EMOTION → UPDATE_BELIEF for same char is wired', () => {
+    const stage = new Stage(':memory:');
+    const opsA: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'nora', belief: { id: 'b1', proposition: 'p', confidence: 0.8, source: 'inferred', acquired_at: 1 } },
+    ];
+    const opsB: StoryOp[] = [
+      { op: 'APPRAISE_EMOTION', charId: 'nora', emotion: { joy: 0, distress: 0, anger: 0, fear: 0, pride: 70, shame: 0, dominant: 'pride', intensity: 70, last_updated_at: 2 } },
+    ];
+    stage.appendCommit(mkC('c1', null, opsA));
+    stage.appendCommit(mkC('c2', 'c1', opsB));
+    const scm = buildSCM(stage);
+    const beliefNode = scm.nodes.get('c1:0')!;
+    const emotionNode = scm.nodes.get('c2:0')!;
+    assert.ok(beliefNode.children.includes('c2:0'), 'UPDATE_BELIEF → APPRAISE_EMOTION cross-commit edge');
+    assert.ok(emotionNode.parents.includes('c1:0'), 'APPRAISE_EMOTION parent is cross-commit UPDATE_BELIEF');
+  });
+
+  it('different clocks do not form cross-commit edges', () => {
+    const stage = new Stage(':memory:');
+    const opsA: StoryOp[] = [{ op: 'RAISE_CLOCK', clockId: 'timer_a', amount: 10 }];
+    const opsB: StoryOp[] = [{ op: 'RAISE_CLOCK', clockId: 'timer_b', amount: 10 }];
+    stage.appendCommit(mkC('c1', null, opsA));
+    stage.appendCommit(mkC('c2', 'c1', opsB));
+    const scm = buildSCM(stage);
+    const nodeA = scm.nodes.get('c1:0')!;
+    const nodeB = scm.nodes.get('c2:0')!;
+    assert.equal(nodeA.children.length, 0, 'different clocks: no cross-commit edge');
+    assert.equal(nodeB.parents.length, 0);
+  });
+});
