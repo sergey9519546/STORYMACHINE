@@ -118,5 +118,18 @@ export function lint(ir: NarrativeTransitionIR, _state: NarrativeState): LintWar
     }
   });
 
+  // Rule 8: RAISE_CLOCK with amount ≤ 0 is either a no-op (0) or a clock defuse (negative).
+  // Zero-amount raises change nothing in state and waste an op slot; flag as info.
+  // Negative amounts are architecturally valid (defusing a clock) but unusual enough to flag.
+  ir.ops.forEach((op, i) => {
+    if (op.op === 'RAISE_CLOCK' && op.amount <= 0) {
+      warnings.push({
+        opIdx: i, op: op.op, rule: 'NOOP_CLOCK_RAISE',
+        message: `RAISE_CLOCK "${op.clockId}" amount=${op.amount} — ${op.amount === 0 ? 'zero-amount is a no-op (removes the op or use a positive amount)' : 'negative amount defuses the clock; verify this is intentional'}`,
+        severity: 'info',
+      });
+    }
+  });
+
   return warnings;
 }

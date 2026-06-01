@@ -460,6 +460,20 @@ export function computeArcDebt(state: NarrativeState, currentScene: number): str
     }
   }
 
+  // Emotional flatline: 3+ characters share the same dominant emotion in accumulated state.
+  // The ensemble has converged to a single emotional note — needs differentiation.
+  const dominantCounts = new Map<string, number>();
+  for (const emo of Object.values(state.characterEmotions)) {
+    if (emo.dominant !== 'neutral') {
+      dominantCounts.set(emo.dominant, (dominantCounts.get(emo.dominant) ?? 0) + 1);
+    }
+  }
+  for (const [emotion, count] of dominantCounts) {
+    if (count >= 3) {
+      debts.push(`${count} characters share dominant emotion "${emotion}" — ensemble is emotionally monotonous; differentiate their reactions`);
+    }
+  }
+
   return debts;
 }
 
@@ -534,6 +548,20 @@ export function necessityScore(ops: StoryOp[], state?: NarrativeState): number {
              Math.sign(e.delta.amount) === Math.sign(op.delta.amount),
       );
       if (sameSignEarlier) return false;
+    }
+    if (op.op === 'RAISE_CLOCK' && op.amount === 0) {
+      // A zero-amount clock raise changes nothing — pure no-op in the state machine.
+      return false;
+    }
+    if (op.op === 'UPDATE_BELIEF') {
+      // Same charId + same proposition already appears earlier in this IR — redundant.
+      const propNorm = op.belief.proposition.toLowerCase().trim();
+      const dupEarlier = ops.slice(0, i).some(
+        e => e.op === 'UPDATE_BELIEF' &&
+             e.charId === op.charId &&
+             e.belief.proposition.toLowerCase().trim() === propNorm,
+      );
+      if (dupEarlier) return false;
     }
     if (op.op === 'ADVANCE_THEME_ARGUMENT') {
       // Same claimId + same move twice in one IR is pure duplication.

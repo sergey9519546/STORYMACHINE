@@ -12963,3 +12963,91 @@ describe('Wave 108 — cognition-emotion mismatch (lint + character advocate)', 
     });
   });
 }
+
+// ── Wave 111 — necessityScore gaps, arcDebt emotional flatline, NOOP_CLOCK lint ──
+{
+  const { necessityScore, computeArcDebt } = await import('./server/nvm/quality/index.ts');
+  const { lint } = await import('./server/nvm/proof/lint.ts');
+
+  function makeIR111(ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[]): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR {
+    return {
+      transitionId: 't1', sceneIdx: 3, sceneFunction: 'advance_plot',
+      activeMechanisms: [], beforeStateHash: '', ops,
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 1 },
+    };
+  }
+
+  function stateWithEmotions(entries: Array<[string, string]>): import('./server/nvm/state/NarrativeState.ts').NarrativeState {
+    const characterEmotions: Record<string, import('./server/engine/types.ts').EmotionState> = {};
+    for (const [charId, dominant] of entries) {
+      characterEmotions[charId] = { dominant: dominant as import('./server/engine/types.ts').EmotionType, intensity: 70, joy: 0, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, last_updated_at: 0 };
+    }
+    return { ...emptyState(), characterEmotions };
+  }
+
+  describe('Wave 111 — necessityScore, arcDebt flatline, NOOP_CLOCK lint', () => {
+    it('necessityScore: zero-amount RAISE_CLOCK → scored as unnecessary', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'RAISE_CLOCK', clockId: 'bomb', amount: 0 },
+        { op: 'RAISE_CLOCK', clockId: 'bomb', amount: 2 },
+      ];
+      const score = necessityScore(ops);
+      // First op is unnecessary (amount=0), second is necessary → 1/2 = 0.5
+      assert.ok(score < 1, 'zero-amount RAISE_CLOCK reduces necessity score');
+      assert.ok(score >= 0.4, 'valid RAISE_CLOCK still contributes');
+    });
+
+    it('necessityScore: duplicate UPDATE_BELIEF same char+prop → unnecessary', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'the key is missing', confidence: 0.8, source: 'witnessed', source_event_id: 'e1', acquired_at: 0 } },
+        { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b2', proposition: 'the key is missing', confidence: 0.9, source: 'witnessed', source_event_id: 'e2', acquired_at: 0 } },
+      ];
+      const score = necessityScore(ops);
+      assert.ok(score < 1, 'duplicate proposition for same char → reduces necessity score');
+    });
+
+    it('necessityScore: two UPDATE_BELIEF same char DIFFERENT props → both necessary', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'the key is missing', confidence: 0.8, source: 'witnessed', source_event_id: 'e1', acquired_at: 0 } },
+        { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b2', proposition: 'the thief was here', confidence: 0.7, source: 'inferred', acquired_at: 0 } },
+      ];
+      const score = necessityScore(ops);
+      assert.strictEqual(score, 1, 'different propositions → fully necessary');
+    });
+
+    it('computeArcDebt: 3 chars with same dominant emotion → flatline debt', () => {
+      const state = stateWithEmotions([['alice', 'fear'], ['bob', 'fear'], ['charlie', 'fear']]);
+      const debts = computeArcDebt(state, 4);
+      assert.ok(debts.some(d => d.includes('emotionally monotonous')), '3 chars same emotion → flatline debt');
+    });
+
+    it('computeArcDebt: 2 chars with same emotion → no flatline debt (below threshold)', () => {
+      const state = stateWithEmotions([['alice', 'fear'], ['bob', 'fear']]);
+      const debts = computeArcDebt(state, 4);
+      assert.ok(!debts.some(d => d.includes('emotionally monotonous')), '2 chars → no flatline');
+    });
+
+    it('computeArcDebt: 3 chars each with different emotion → no flatline debt', () => {
+      const state = stateWithEmotions([['alice', 'fear'], ['bob', 'anger'], ['charlie', 'pride']]);
+      const debts = computeArcDebt(state, 4);
+      assert.ok(!debts.some(d => d.includes('emotionally monotonous')), 'diverse emotions → no flatline');
+    });
+
+    it('lint: RAISE_CLOCK with amount=0 → NOOP_CLOCK_RAISE info warning', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'RAISE_CLOCK', clockId: 'timer', amount: 0 },
+      ];
+      const warnings = lint(makeIR111(ops), emptyState());
+      assert.ok(warnings.some(w => w.rule === 'NOOP_CLOCK_RAISE' && w.severity === 'info'), 'zero-amount clock → NOOP_CLOCK_RAISE warning');
+    });
+
+    it('lint: RAISE_CLOCK with positive amount → no NOOP warning', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'RAISE_CLOCK', clockId: 'timer', amount: 3 },
+      ];
+      const warnings = lint(makeIR111(ops), emptyState());
+      assert.ok(!warnings.some(w => w.rule === 'NOOP_CLOCK_RAISE'), 'positive amount → no noop warning');
+    });
+  });
+}
