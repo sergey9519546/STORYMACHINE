@@ -26,6 +26,15 @@ export function epistemicProof(ir: NarrativeTransitionIR, _state: NarrativeState
         subjectId: b.id,
       });
     }
+    // Confidence must be in [0, 1] — values outside this range indicate a malformed
+    // belief (e.g. model generated confidence=1.5 or confidence=-0.2).
+    if (b.confidence < 0 || b.confidence > 1) {
+      findings.push({
+        proof: 'EpistemicProof', severity: 'block',
+        message: `${op.charId} belief "${b.proposition}" has invalid confidence=${b.confidence} (must be 0–1)`,
+        subjectId: b.id,
+      });
+    }
   }
   return findings.length
     ? failResult('EpistemicProof', 'a belief was acquired without legal provenance', findings)

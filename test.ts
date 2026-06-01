@@ -12882,3 +12882,84 @@ describe('Wave 108 — cognition-emotion mismatch (lint + character advocate)', 
     });
   });
 }
+
+// ── Wave 110 — EpistemicProof confidence bounds + showrunner preachy theme ──────
+{
+  const { epistemicProof } = await import('./server/nvm/proof/tier1/epistemic.ts');
+  const { showrunnerCritic } = await import('./server/nvm/room/critics/showrunner.ts');
+
+  function makeIR110(
+    ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[],
+    sceneIdx = 3,
+  ): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR {
+    return {
+      transitionId: 't1', sceneIdx, sceneFunction: 'advance_plot',
+      activeMechanisms: [], beforeStateHash: '', ops,
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 1 },
+    };
+  }
+
+  function stateWithTheme(moves: Array<{ claimId: string; move: import('./server/nvm/ops/StoryOp.ts').ThemeMove }>): import('./server/nvm/state/NarrativeState.ts').NarrativeState {
+    return { ...emptyState(), themeArgument: moves, authorIntent: { theme: 'power corrupts' } };
+  }
+
+  describe('Wave 110 — EpistemicProof confidence bounds + showrunner preachy theme', () => {
+    it('epistemicProof: confidence > 1 → hard block', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'I am invincible', confidence: 1.5, source: 'inferred', acquired_at: 0 } },
+      ];
+      const result = epistemicProof(makeIR110(ops), emptyState());
+      assert.ok(!result.pass, 'confidence > 1 → fail');
+      assert.ok(result.findings.some(f => f.message.includes('invalid confidence=1.5')), 'block with confidence message');
+    });
+
+    it('epistemicProof: confidence < 0 → hard block', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'nothing matters', confidence: -0.1, source: 'inferred', acquired_at: 0 } },
+      ];
+      const result = epistemicProof(makeIR110(ops), emptyState());
+      assert.ok(!result.pass, 'confidence < 0 → fail');
+    });
+
+    it('epistemicProof: confidence = 1.0 (boundary) → pass', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'confirmed fact', confidence: 1.0, source: 'witnessed', source_event_id: 'e1', acquired_at: 0 } },
+      ];
+      const result = epistemicProof(makeIR110(ops), emptyState());
+      assert.ok(result.pass, 'confidence = 1.0 → pass');
+    });
+
+    it('showrunner: 4+ support-only theme moves → preachy critique', () => {
+      const moves: Array<{ claimId: string; move: import('./server/nvm/ops/StoryOp.ts').ThemeMove }> = [
+        { claimId: 'c1', move: 'support' },
+        { claimId: 'c2', move: 'support' },
+        { claimId: 'c3', move: 'support' },
+        { claimId: 'c4', move: 'support' },
+      ];
+      const critiques = showrunnerCritic(makeIR110([]), stateWithTheme(moves));
+      assert.ok(critiques.some(c => c.objection.includes('all supporting, none opposing')), '4 support-only moves → preachy critique');
+    });
+
+    it('showrunner: 4+ theme moves including attack → no preachy critique', () => {
+      const moves: Array<{ claimId: string; move: import('./server/nvm/ops/StoryOp.ts').ThemeMove }> = [
+        { claimId: 'c1', move: 'support' },
+        { claimId: 'c2', move: 'support' },
+        { claimId: 'c3', move: 'attack' },
+        { claimId: 'c4', move: 'support' },
+      ];
+      const critiques = showrunnerCritic(makeIR110([]), stateWithTheme(moves));
+      assert.ok(!critiques.some(c => c.objection.includes('all supporting')), 'attack present → no preachy critique');
+    });
+
+    it('showrunner: 3 support moves (below threshold) → no preachy critique', () => {
+      const moves: Array<{ claimId: string; move: import('./server/nvm/ops/StoryOp.ts').ThemeMove }> = [
+        { claimId: 'c1', move: 'support' },
+        { claimId: 'c2', move: 'support' },
+        { claimId: 'c3', move: 'support' },
+      ];
+      const critiques = showrunnerCritic(makeIR110([]), stateWithTheme(moves));
+      assert.ok(!critiques.some(c => c.objection.includes('all supporting')), '< 4 moves → no preachy critique');
+    });
+  });
+}

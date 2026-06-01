@@ -105,5 +105,22 @@ export function showrunnerCritic(ir: NarrativeTransitionIR, state: NarrativeStat
     }
   }
 
+  // Gate 6: preachy theme argument — if state has 4+ theme moves and ALL are 'support'
+  // with no 'attack', 'undercut', or 'complicate' moves, the theme is being preached
+  // rather than argued. A good theme argument needs dialectical pressure.
+  if (state.themeArgument.length >= 4) {
+    const hasOpposing = state.themeArgument.some(
+      m => m.move === 'attack' || m.move === 'undercut' || m.move === 'complicate',
+    );
+    if (!hasOpposing) {
+      critiques.push({
+        criticId: 'showrunner', severity: 30, targetOpIdx: null,
+        objection: `Theme argument has ${state.themeArgument.length} moves — all supporting, none opposing. Add an ADVANCE_THEME_ARGUMENT with "attack", "undercut", or "complicate" to earn the theme through conflict, not assertion`,
+        suggestedOperator: 'sharpen_theme',
+        attentionBid: 35,
+      });
+    }
+  }
+
   return critiques;
 }
