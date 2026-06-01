@@ -4269,11 +4269,11 @@ describe('NVM — Emotional Topology (C3)', () => {
     assert.equal(report.dominantArc, 'riches_to_rags');
   });
 
-  it('returns 6 scored archetypes', () => {
+  it('returns 9 scored archetypes (including flat_line, oscillation, delayed_rise)', () => {
     const ledgers = [mkLedger(50, 0), mkLedger(70, 1), mkLedger(30, 2)];
     const report = computeTopology(ledgers);
-    assert.equal(report.scores.length, 6);
-    assert.ok(report.scores.every(s => s.rank >= 1 && s.rank <= 6));
+    assert.equal(report.scores.length, 9);
+    assert.ok(report.scores.every(s => s.rank >= 1 && s.rank <= 9));
   });
 
   it('handles empty ledger without throwing', () => {
@@ -6950,11 +6950,11 @@ describe('NVM — Story Health Dashboard (Wave 26)', () => {
     assert.equal(r.openPromises.length, 0);
   });
 
-  it('computeTopology: returns 6 archetype scores for multi-scene', () => {
+  it('computeTopology: returns 9 archetype scores for multi-scene', () => {
     const state = emptyState();
     const ledgers = [0, 1, 2, 3].map(i => deriveTensionLedger(state, i));
     const topo = computeTopology(ledgers);
-    assert.equal(topo.scores.length, 6, 'all 6 archetypes scored');
+    assert.equal(topo.scores.length, 9, 'all 9 archetypes scored (6 classic + 3 extended)');
     assert.ok(typeof topo.dominantArc === 'string', 'dominantArc is a string');
     assert.ok(typeof topo.coherence === 'number', 'coherence is a number');
   });
@@ -12170,5 +12170,95 @@ describe('Wave 102 — studio-note investment, skeptic clock, dramaturge orphan/
     ];
     const critiques = dramaturgeCritic(baseIR(10), state);
     assert.ok(!critiques.some(c => c.objection.includes('resolve') && c.objection.includes('theme')), 'resolved theme should not flag stall');
+  });
+});
+
+// ── Wave 103: topology archetypes, bias belief uniformity, genericness vagueness ─
+
+describe('Wave 103 — topology extended archetypes, belief uniformity, vague fact detection', () => {
+  it('topology: flat story detects flat_line archetype with high similarity', () => {
+    // All equal tension values → normalize returns all-0.5 → perfect cosine match with flat_line
+    const ledgers = [50, 50, 50, 50, 50, 50].map(t =>
+      ({ ...deriveTensionLedger(emptyState(), 0), totalTension: t }),
+    );
+    const topo = computeTopology(ledgers);
+    assert.equal(topo.scores.length, 9, 'should score 9 archetypes now');
+    const flatScore = topo.scores.find(s => s.archetype === 'flat_line');
+    assert.ok(flatScore && flatScore.similarity > 0.9, 'identical tension values should score ~1.0 on flat_line');
+    assert.equal(topo.dominantArc, 'flat_line', 'flat trajectory should be dominated by flat_line');
+  });
+
+  it('topology: monotone-rising story still identifies rags_to_riches over flat_line', () => {
+    const ledgers = [10, 20, 35, 55, 75, 95].map(t =>
+      ({ ...deriveTensionLedger(emptyState(), 0), totalTension: t }),
+    );
+    const topo = computeTopology(ledgers);
+    assert.equal(topo.dominantArc, 'rags_to_riches', 'monotone rise should still be rags_to_riches');
+  });
+
+  it('bias-audit: flags ≥3 characters sharing identical belief proposition', async () => {
+    const { biasAuditProof } = await import('./server/nvm/proof/tier4/bias-audit.ts');
+    const ops: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'the killer is among us', confidence: 0.7, source: 'told', source_event_id: 'e1', acquired_at: 1 } },
+      { op: 'UPDATE_BELIEF', charId: 'bob',   belief: { id: 'b2', proposition: 'the killer is among us', confidence: 0.7, source: 'told', source_event_id: 'e1', acquired_at: 1 } },
+      { op: 'UPDATE_BELIEF', charId: 'carol', belief: { id: 'b3', proposition: 'the killer is among us', confidence: 0.7, source: 'told', source_event_id: 'e1', acquired_at: 1 } },
+    ];
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 't1', sceneIdx: 1, sceneFunction: 'advance_plot',
+      activeMechanisms: [], beforeStateHash: '', ops,
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 1 },
+    };
+    const result = biasAuditProof(ir, emptyState());
+    assert.ok(!result.pass, 'should fail when 3 chars share identical belief');
+    assert.ok(result.findings.some(f => f.message.includes('uniformity') || f.message.includes('identical')), 'should mention belief uniformity');
+  });
+
+  it('bias-audit: allows 2 chars sharing belief (not 3)', async () => {
+    const { biasAuditProof } = await import('./server/nvm/proof/tier4/bias-audit.ts');
+    const ops: StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'the killer is among us', confidence: 0.7, source: 'told', source_event_id: 'e1', acquired_at: 1 } },
+      { op: 'UPDATE_BELIEF', charId: 'bob',   belief: { id: 'b2', proposition: 'the killer is among us', confidence: 0.7, source: 'told', source_event_id: 'e1', acquired_at: 1 } },
+      { op: 'UPDATE_BELIEF', charId: 'carol', belief: { id: 'b3', proposition: 'bob is suspicious', confidence: 0.6, source: 'witnessed', source_event_id: 'e2', acquired_at: 1 } },
+    ];
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 't1', sceneIdx: 1, sceneFunction: 'advance_plot',
+      activeMechanisms: [], beforeStateHash: '', ops,
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 1 },
+    };
+    const result = biasAuditProof(ir, emptyState());
+    assert.ok(result.pass, 'should pass when only 2 chars share a belief');
+  });
+
+  it('genericness: flags ADD_FACT with vague subject term "the city"', async () => {
+    const { genericnessProof } = await import('./server/nvm/proof/tier3/genericness.ts');
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'the city', predicate: 'is', object: 'dangerous', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ];
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 't1', sceneIdx: 1, sceneFunction: 'advance_plot',
+      activeMechanisms: [], beforeStateHash: '', ops,
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 1 },
+    };
+    const result = genericnessProof(ir, emptyState());
+    assert.ok(!result.pass, 'should fail for vague fact subject');
+    assert.ok(result.findings.some(f => f.message.includes('vague')), 'should mention vague fact');
+  });
+
+  it('genericness: allows specific named location in ADD_FACT', async () => {
+    const { genericnessProof } = await import('./server/nvm/proof/tier3/genericness.ts');
+    const ops: StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'St. Anselm Cathedral', predicate: 'contains', object: 'hidden_crypt', addedAtTurn: 1, validFrom: 1, validTo: null } },
+    ];
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 't1', sceneIdx: 1, sceneFunction: 'advance_plot',
+      activeMechanisms: [], beforeStateHash: '', ops,
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 1 },
+    };
+    const result = genericnessProof(ir, emptyState());
+    assert.ok(result.pass, 'specific named location should pass genericness');
   });
 });

@@ -14,7 +14,10 @@ export type ArcArchetype =
   | 'man_in_hole'             // fall then rise (redemption)
   | 'icarus'                  // rise then fall (hubris)
   | 'cinderella'              // rise, fall, rise (two-beat redemption)
-  | 'oedipus';                // fall, rise, fall (two-beat tragedy)
+  | 'oedipus'                 // fall, rise, fall (two-beat tragedy)
+  | 'flat_line'               // constant plateau — no tension movement (boring pacing signal)
+  | 'oscillation'             // repeating rise-fall cycles (thriller / tension seesaw)
+  | 'delayed_rise';           // flat start then explosive climax (slow burn)
 
 export interface TopologyScore {
   archetype: ArcArchetype;
@@ -38,6 +41,10 @@ const ARC_TEMPLATES: Record<ArcArchetype, number[]> = {
   icarus:          [0.2, 0.5, 0.75, 0.9, 0.6, 0.2],
   cinderella:      [0.3, 0.7, 0.4, 0.2, 0.6, 0.95],
   oedipus:         [0.8, 0.4, 0.7, 0.9, 0.5, 0.2],
+  // Extended archetypes (Wave 103) — detected via cosine similarity like the originals.
+  flat_line:       [0.5, 0.5, 0.5, 0.5, 0.5, 0.5],  // pacing signal: no movement
+  oscillation:     [0.1, 0.9, 0.1, 0.9, 0.1, 0.9],  // thriller seesaw
+  delayed_rise:    [0.05, 0.1, 0.15, 0.4, 0.75, 0.95], // slow burn
 };
 
 function normalize(arr: number[]): number[] {
