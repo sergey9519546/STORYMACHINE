@@ -6093,14 +6093,25 @@ describe('NVM — Tier 4 Ethics & Disclosure Proofs (Wave 18)', () => {
     assert.ok(ap && !ap.pass, 'empty causedBy → fails');
   });
 
-  it('AttributionProof passes when causal links cite evidence', () => {
+  it('AttributionProof passes when causal links cite a real factId from same IR', () => {
     const ir = makeIR(
       [{ op: 'ADD_FACT', fact: { factId: 'f', subject: 'a', predicate: 'b', object: 'c', addedAtTurn: 1, validFrom: 1, validTo: null } }],
-      [{ opIdx: 0, causedBy: ['fact-loan', 'char-nora'] }],
+      [{ opIdx: 0, causedBy: ['f'] }],
     );
     const results = runTier4(ir, emptyState());
     const ap = results.find(r => r.proof === 'AttributionProof');
-    assert.ok(ap?.pass, 'cited evidence → passes');
+    assert.ok(ap?.pass, 'real factId cited → passes');
+  });
+
+  it('AttributionProof fails when causal links cite phantom IDs not in IR or state', () => {
+    const ir = makeIR(
+      [{ op: 'ADD_FACT', fact: { factId: 'f', subject: 'a', predicate: 'b', object: 'c', addedAtTurn: 1, validFrom: 1, validTo: null } }],
+      [{ opIdx: 0, causedBy: ['nonexistent-id-xyz'] }],
+    );
+    const results = runTier4(ir, emptyState());
+    const ap = results.find(r => r.proof === 'AttributionProof');
+    assert.ok(ap && !ap.pass, 'phantom ID → fails (confabulation detected)');
+    assert.ok(ap?.findings.some(f => f.message.includes('phantom')), 'finding mentions phantom reference');
   });
 });
 
@@ -12527,5 +12538,96 @@ describe('Wave 105 — DV16/DV17 unwitnessed clue / unreceived payoff, new mutat
     const addedBelief = result.ir.ops.find(o => o.op === 'UPDATE_BELIEF' && (o as { belief: { source: string } }).belief.source === 'told');
     assert.ok(addedBelief, 'inserted "told" belief');
     assert.strictEqual(result.operator, 'reveal_asymmetry');
+  });
+});
+
+// ── Wave 106: attribution phantom refs, operator rotation, showrunner new checks ─
+
+import { showrunnerCritic } from './server/nvm/room/critics/showrunner.ts';
+import { attributionProof } from './server/nvm/proof/tier4/attribution.ts';
+
+describe('Wave 106 — attribution phantom refs, showrunner new checks', () => {
+  // ── Attribution proof: real state factId passes ──────────────────────────────
+
+  it('attributionProof: causedBy citing a prior state factId → passes', () => {
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 't1', sceneIdx: 1, sceneFunction: 'advance_plot',
+      activeMechanisms: [], beforeStateHash: '',
+      ops: [{ op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'vault is locked', confidence: 0.8, source: 'witnessed', acquired_at: 0 } }],
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 1 },
+      causalLinks: [{ opIdx: 0, causedBy: ['prior-fact-id'] }],
+    };
+    const stateWithFact = {
+      ...emptyState(),
+      objectiveReality: [{ factId: 'prior-fact-id', subject: 'vault', predicate: 'is', object: 'locked', addedAtTurn: 0, validFrom: 0, validTo: null }],
+    };
+    const result = attributionProof(ir, stateWithFact);
+    assert.ok(result.pass, 'state factId cited → attribution passes');
+  });
+
+  // ── Showrunner: provide_relief too sparse ─────────────────────────────────────
+
+  it('showrunner: provide_relief with 1 op → too sparse critique', () => {
+    const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'threat', predicate: 'has', object: 'passed', addedAtTurn: 0, validFrom: 0, validTo: null } },
+    ];
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 't1', sceneIdx: 5, sceneFunction: 'provide_relief',
+      activeMechanisms: [], beforeStateHash: '', ops,
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 1 },
+    };
+    const critiques = showrunnerCritic(ir, emptyState());
+    assert.ok(critiques.some(c => c.objection.includes('not enough dramatic material')), 'sparse relief → critique');
+  });
+
+  it('showrunner: provide_relief with 4 ops → no too-sparse critique', () => {
+    const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { dominant: 'joy', intensity: 60, joy: 60, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, last_updated_at: 0 } },
+      { op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: 0.3, reason: 'reconciliation' } },
+      { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'danger is over', confidence: 0.9, source: 'witnessed', acquired_at: 0 } },
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'sun', predicate: 'rises', object: 'over city', addedAtTurn: 0, validFrom: 0, validTo: null } },
+    ];
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 't1', sceneIdx: 5, sceneFunction: 'provide_relief',
+      activeMechanisms: [], beforeStateHash: '', ops,
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 1 },
+    };
+    const critiques = showrunnerCritic(ir, emptyState());
+    assert.ok(!critiques.some(c => c.objection.includes('not enough dramatic material')), '4 ops → no too-sparse critique');
+  });
+
+  // ── Showrunner: advance_plot without character ops ────────────────────────────
+
+  it('showrunner: advance_plot with only ADD_FACT (no character ops) → critique', () => {
+    const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'door', predicate: 'opens', object: 'slowly', addedAtTurn: 0, validFrom: 0, validTo: null } },
+      { op: 'ADD_FACT', fact: { factId: 'f2', subject: 'figure', predicate: 'enters', object: 'room', addedAtTurn: 0, validFrom: 0, validTo: null } },
+    ];
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 't1', sceneIdx: 3, sceneFunction: 'advance_plot',
+      activeMechanisms: [], beforeStateHash: '', ops,
+      preconditions: ['something_setup'], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 1 },
+    };
+    const critiques = showrunnerCritic(ir, emptyState());
+    assert.ok(critiques.some(c => c.objection.includes('no UPDATE_BELIEF')), 'advance_plot without character ops → critique');
+  });
+
+  it('showrunner: advance_plot with UPDATE_BELIEF → no character-less critique', () => {
+    const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'door', predicate: 'opens', object: 'slowly', addedAtTurn: 0, validFrom: 0, validTo: null } },
+      { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'someone is coming', confidence: 0.8, source: 'witnessed', acquired_at: 0 } },
+    ];
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 't1', sceneIdx: 3, sceneFunction: 'advance_plot',
+      activeMechanisms: [], beforeStateHash: '', ops,
+      preconditions: ['something_setup'], postconditions: ['alice_alerted'],
+      provenance: { origin: 'model_generated', createdAt: 1 },
+    };
+    const critiques = showrunnerCritic(ir, emptyState());
+    assert.ok(!critiques.some(c => c.objection.includes('no UPDATE_BELIEF')), 'has UPDATE_BELIEF → no character-less critique');
   });
 });

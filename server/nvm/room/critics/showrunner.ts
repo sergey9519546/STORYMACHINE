@@ -77,6 +77,32 @@ export function showrunnerCritic(ir: NarrativeTransitionIR, state: NarrativeStat
         attentionBid: 50,
       });
     }
+    // Gate 4b: relief scenes need at least 3 ops to earn the emotional space they claim.
+    // A "provide_relief" scene with 1–2 ops is a label without content — pure assertion.
+    if (ir.ops.length < 3) {
+      critiques.push({
+        criticId: 'showrunner', severity: 35, targetOpIdx: null,
+        objection: `"provide_relief" scene has only ${ir.ops.length} op(s) — not enough dramatic material to earn the audience's relief; relief must be felt, not just declared`,
+        suggestedOperator: 'deepen_wound',
+        attentionBid: 40,
+      });
+    }
+  }
+
+  // Gate 5: advance_plot scenes with no character-level ops don't advance the plot for
+  // any character — they advance the world but not the people in it.
+  if (ir.sceneFunction === 'advance_plot') {
+    const hasCharacterOp = ir.ops.some(op =>
+      op.op === 'UPDATE_BELIEF' || op.op === 'SHIFT_RELATIONSHIP' || op.op === 'APPRAISE_EMOTION',
+    );
+    if (!hasCharacterOp && ir.ops.length >= 2) {
+      critiques.push({
+        criticId: 'showrunner', severity: 35, targetOpIdx: null,
+        objection: '"advance_plot" scene has no UPDATE_BELIEF, SHIFT_RELATIONSHIP, or APPRAISE_EMOTION — the plot advances for the world but not for any character; add at least one human consequence',
+        suggestedOperator: 'complicate_relationship',
+        attentionBid: 40,
+      });
+    }
   }
 
   return critiques;

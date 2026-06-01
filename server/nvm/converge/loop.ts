@@ -33,6 +33,17 @@ import { queryPolicy } from '../selfplay/mine.ts';
 import { computeTopology } from '../valuation/topology.ts';
 import { makePrng, randInt } from '../repro/seed.ts';
 
+// Pick an operator not yet tried in this convergence session; if all have been tried, pick randomly.
+function pickUntried(
+  ops: readonly MutationOperator[],
+  tried: Set<MutationOperator>,
+  prng: () => number,
+): MutationOperator {
+  const untried = ops.filter(o => !tried.has(o));
+  const pool = untried.length > 0 ? untried : [...ops];
+  return pool[randInt(prng, pool.length)];
+}
+
 export interface ConvergeStep {
   iteration: number;
   candidateId: string;
@@ -123,6 +134,8 @@ export async function convergeScene(
   // H6: Track cumulative LLM calls; stop when budget.maxLLMCalls is reached.
   const llmCallLimit = budget.maxLLMCalls ?? budget.maxIterations * budget.candidatesPerIteration;
   let llmCallCount = 0;
+  // Operator rotation: prefer untried operators before repeating; reset after full cycle.
+  const triedOperators = new Set<MutationOperator>();
 
   for (let iter = 0; iter < budget.maxIterations; iter++) {
     if (llmCallCount >= llmCallLimit) break;
@@ -169,11 +182,13 @@ export async function convergeScene(
         // Validate against known operators — a stale corpus string could crash applyOperator.
         op = (candidateOp && (ALL_OPERATORS as readonly string[]).includes(candidateOp))
           ? candidateOp
-          : ALL_OPERATORS[randInt(prng, ALL_OPERATORS.length)];
+          : pickUntried(ALL_OPERATORS, triedOperators, prng);
       } else {
-        op = ALL_OPERATORS[randInt(prng, ALL_OPERATORS.length)];
+        op = pickUntried(ALL_OPERATORS, triedOperators, prng);
       }
       iterOperator = op;
+      triedOperators.add(op);
+      if (triedOperators.size >= ALL_OPERATORS.length) triedOperators.clear(); // reset after full cycle
       const mutation = applyOperator(op, best, state, seed + iter);
       const fresh = await generate(spec, 1);
       llmCallCount += 1;
