@@ -35,7 +35,20 @@ export function buildStoryBibleSummary(stage: Stage): string {
   }
   parts.push(`STORY PHASE: ${illusionState.phase ?? 'Setup'} | Turn ${stage.getTurnCount()}`);
 
-  // ── Characters with emotional state, active goal, and arc progress ────────
+  // ── Characters with emotional state, active goal, arc progress, and top belief ─
+  // Build a compact belief summary from commits for each named character.
+  // Track the highest-confidence belief per character across all commits.
+  const charTopBelief: Record<string, { proposition: string; confidence: number }> = {};
+  for (const c of commits) {
+    for (const op of c.ops) {
+      if (op.op !== 'UPDATE_BELIEF') continue;
+      const prev = charTopBelief[op.charId];
+      if (!prev || op.belief.confidence > prev.confidence) {
+        charTopBelief[op.charId] = { proposition: op.belief.proposition, confidence: op.belief.confidence };
+      }
+    }
+  }
+
   if (agents.length > 0) {
     const charLines: string[] = ['CHARACTERS:'];
     for (const a of agents.slice(0, 6)) {
@@ -52,7 +65,12 @@ export function buildStoryBibleSummary(stage: Stage): string {
         const pct = Math.round((achieved / gs.instrumental.length) * 100);
         arcStr = ` (arc ${pct}%)`;
       }
-      charLines.push(`  ${sanitizeForPrompt(a.name, 80)}${emotionStr}${arcStr}${goalStr}`);
+      // Top belief from commit history
+      const topBelief = charTopBelief[a.name];
+      const beliefStr = topBelief
+        ? ` believes: "${sanitizeForPrompt(topBelief.proposition, 60)}" (${Math.round(topBelief.confidence * 100)}%)`
+        : '';
+      charLines.push(`  ${sanitizeForPrompt(a.name, 80)}${emotionStr}${arcStr}${goalStr}${beliefStr}`);
     }
     parts.push(charLines.join('\n'));
   }

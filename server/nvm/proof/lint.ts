@@ -89,5 +89,34 @@ export function lint(ir: NarrativeTransitionIR, _state: NarrativeState): LintWar
     });
   }
 
+  // Rule 7: Cognition-emotion mismatch — a character asserts high certainty (confidence
+  // > 0.85) while simultaneously feeling shame or distress (intensity > 60).
+  // This often signals disconnected psychological portrayal: the model wrote the belief
+  // and the emotion independently without integrating them. Suppress if a bridging
+  // SHIFT_RELATIONSHIP or PAYOFF_SETUP appears between the two ops (earned complexity).
+  const SHAME_EMOTIONS = new Set(['shame', 'distress']);
+  const charHighConfidenceBeliefAt = new Map<string, number>(); // charId → opIdx
+  ir.ops.forEach((op, i) => {
+    if (op.op === 'UPDATE_BELIEF' && op.belief.confidence > 0.85) {
+      charHighConfidenceBeliefAt.set(op.charId, i);
+    }
+    if (op.op === 'APPRAISE_EMOTION' && SHAME_EMOTIONS.has(op.emotion.dominant) && op.emotion.intensity > 60) {
+      const beliefIdx = charHighConfidenceBeliefAt.get(op.charId);
+      if (beliefIdx !== undefined) {
+        // Check if a bridging event (SHIFT_RELATIONSHIP or PAYOFF_SETUP) appears between the two
+        const hasBridging = ir.ops.slice(beliefIdx + 1, i).some(
+          b => b.op === 'SHIFT_RELATIONSHIP' || b.op === 'PAYOFF_SETUP',
+        );
+        if (!hasBridging) {
+          warnings.push({
+            opIdx: i, op: op.op, rule: 'COGNITION_EMOTION_MISMATCH',
+            message: `${op.charId} asserts high confidence (>85%) but simultaneously feels ${op.emotion.dominant}(${op.emotion.intensity}) — disconnected psychological portrayal`,
+            severity: 'info',
+          });
+        }
+      }
+    }
+  });
+
   return warnings;
 }

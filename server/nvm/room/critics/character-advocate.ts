@@ -61,5 +61,31 @@ export function characterAdvocateCritic(ir: NarrativeTransitionIR, state: Narrat
     }
   });
 
+  // Cognition-emotion alignment: high-confidence belief + shame/distress in same IR
+  // without a motivating bridging event = disconnected psychology.
+  const SHAME_EMOTIONS = new Set(['shame', 'distress']);
+  const charHighConfidenceBeliefOpIdx = new Map<string, number>();
+  ir.ops.forEach((op, i) => {
+    if (op.op === 'UPDATE_BELIEF' && op.belief.confidence > 0.85) {
+      charHighConfidenceBeliefOpIdx.set(op.charId, i);
+    }
+    if (op.op === 'APPRAISE_EMOTION' && SHAME_EMOTIONS.has(op.emotion.dominant) && op.emotion.intensity > 60) {
+      const beliefIdx = charHighConfidenceBeliefOpIdx.get(op.charId);
+      if (beliefIdx !== undefined) {
+        const hasBridging = ir.ops.slice(beliefIdx + 1, i).some(
+          b => b.op === 'SHIFT_RELATIONSHIP' || b.op === 'PAYOFF_SETUP',
+        );
+        if (!hasBridging) {
+          critiques.push({
+            criticId: 'character_advocate', severity: 40, targetOpIdx: i,
+            objection: `${op.charId} declares high-confidence belief then feels ${op.emotion.dominant}(${op.emotion.intensity}) — cognition and emotion are disconnected; either the shame should motivate doubt, or add a bridging event that earns both`,
+            suggestedOperator: 'deepen_wound',
+            attentionBid: 45,
+          });
+        }
+      }
+    }
+  });
+
   return critiques;
 }

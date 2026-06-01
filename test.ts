@@ -12717,3 +12717,68 @@ describe('Wave 107 — necessity state pass-through, dramatic irony tension', ()
     assert.ok(ironyPositions.length <= 5, 'capped at 5 dramatic irony positions');
   });
 });
+
+// ── Wave 108: lint cognition-emotion mismatch, character advocate belief-shame ─
+
+describe('Wave 108 — cognition-emotion mismatch (lint + character advocate)', () => {
+  function makeIR108(ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[]): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR {
+    return {
+      transitionId: 't1', sceneIdx: 2, sceneFunction: 'advance_plot',
+      activeMechanisms: [], beforeStateHash: '', ops,
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 1 },
+    };
+  }
+
+  // ── lint: COGNITION_EMOTION_MISMATCH ────────────────────────────────────────
+
+  it('lint: high-confidence belief + shame in same IR with no bridging → COGNITION_EMOTION_MISMATCH', () => {
+    const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'I am right', confidence: 0.9, source: 'inferred', acquired_at: 0 } },
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { dominant: 'shame', intensity: 70, joy: 0, distress: 0, anger: 0, fear: 0, pride: 0, shame: 70, last_updated_at: 0 } },
+    ];
+    const warnings = lint(makeIR108(ops), emptyState());
+    assert.ok(warnings.some(w => w.rule === 'COGNITION_EMOTION_MISMATCH'), 'disconnected cognition-emotion → COGNITION_EMOTION_MISMATCH');
+  });
+
+  it('lint: high-confidence belief + shame with bridging SHIFT_RELATIONSHIP → no mismatch warning', () => {
+    const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'I am right', confidence: 0.9, source: 'inferred', acquired_at: 0 } },
+      { op: 'SHIFT_RELATIONSHIP', pair: ['alice', 'bob'], delta: { dimension: 'trust', amount: -0.5, reason: 'betrayal reveals shame' } },
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { dominant: 'shame', intensity: 75, joy: 0, distress: 0, anger: 0, fear: 0, pride: 0, shame: 75, last_updated_at: 0 } },
+    ];
+    const warnings = lint(makeIR108(ops), emptyState());
+    assert.ok(!warnings.some(w => w.rule === 'COGNITION_EMOTION_MISMATCH'), 'bridging event → no mismatch warning');
+  });
+
+  it('lint: low-confidence belief + shame → no mismatch warning', () => {
+    const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'maybe I was wrong', confidence: 0.4, source: 'inferred', acquired_at: 0 } },
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { dominant: 'shame', intensity: 70, joy: 0, distress: 0, anger: 0, fear: 0, pride: 0, shame: 70, last_updated_at: 0 } },
+    ];
+    const warnings = lint(makeIR108(ops), emptyState());
+    assert.ok(!warnings.some(w => w.rule === 'COGNITION_EMOTION_MISMATCH'), 'low confidence → no mismatch');
+  });
+
+  // ── character advocate: cognition-emotion alignment critique ─────────────────
+
+  it('characterAdvocate: high-confidence belief + distress with no bridging → critique', async () => {
+    const { characterAdvocateCritic: cac } = await import('./server/nvm/room/critics/character-advocate.ts');
+    const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'bob', belief: { id: 'b1', proposition: 'the plan is perfect', confidence: 0.95, source: 'inferred', acquired_at: 0 } },
+      { op: 'APPRAISE_EMOTION', charId: 'bob', emotion: { dominant: 'distress', intensity: 80, joy: 0, distress: 80, anger: 0, fear: 0, pride: 0, shame: 0, last_updated_at: 0 } },
+    ];
+    const critiques = cac(makeIR108(ops), emptyState());
+    assert.ok(critiques.some((c: { objection: string }) => c.objection.includes('cognition and emotion are disconnected')), 'high-confidence + distress → advocate critique');
+  });
+
+  it('characterAdvocate: different characters for belief and distress → no mismatch critique', async () => {
+    const { characterAdvocateCritic: cac } = await import('./server/nvm/room/critics/character-advocate.ts');
+    const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+      { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b1', proposition: 'the plan is perfect', confidence: 0.95, source: 'inferred', acquired_at: 0 } },
+      { op: 'APPRAISE_EMOTION', charId: 'bob', emotion: { dominant: 'distress', intensity: 80, joy: 0, distress: 80, anger: 0, fear: 0, pride: 0, shame: 0, last_updated_at: 0 } },
+    ];
+    const critiques = cac(makeIR108(ops), emptyState());
+    assert.ok(!critiques.some((c: { objection: string }) => c.objection.includes('cognition and emotion are disconnected')), 'different chars → no mismatch');
+  });
+});
