@@ -13279,3 +13279,115 @@ describe('Wave 108 — cognition-emotion mismatch (lint + character advocate)', 
     });
   });
 }
+
+// ── Wave 114 — tension ceiling, clock overload, urgency-weighted screenplay score ──
+{
+  const { studioNoteCritic } = await import('./server/nvm/room/critics/studio-note.ts');
+  const { showrunnerCritic } = await import('./server/nvm/room/critics/showrunner.ts');
+
+  const makeIR114 = (ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[], sceneIdx = 3, sceneFunction: import('./server/nvm/ir/NarrativeTransitionIR.ts').SceneFunction = 'build_tension'): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR => ({
+    transitionId: 'w114', sceneIdx, sceneFunction,
+    activeMechanisms: [], beforeStateHash: 'abc', ops,
+    preconditions: [], postconditions: [],
+    provenance: { origin: 'user_authored', createdAt: 0 },
+  });
+
+  describe('Wave 114 — studio_note tension ceiling', () => {
+    it('studioNoteCritic: suspense>=85 + RAISE_CLOCK + no relief → TENSION_CEILING critique', () => {
+      const state: import('./server/nvm/state/NarrativeState.ts').NarrativeState = {
+        ...emptyState(),
+        audienceState: { knownFacts: [], suspense: 90, curiosity: 50, investment: 50 },
+      };
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'RAISE_CLOCK', clockId: 'bomb-timer', amount: 5 },
+      ];
+      const critiques = studioNoteCritic(makeIR114(ops, 3), state);
+      assert.ok(critiques.some(c => c.objection.includes('ceiling') || c.objection.includes('numb')),
+        'suspense at 90 + RAISE_CLOCK with no relief → tension ceiling warning');
+    });
+
+    it('studioNoteCritic: suspense>=85 + RAISE_CLOCK + joy relief → no ceiling warning', () => {
+      const state: import('./server/nvm/state/NarrativeState.ts').NarrativeState = {
+        ...emptyState(),
+        audienceState: { knownFacts: [], suspense: 90, curiosity: 50, investment: 50 },
+      };
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'RAISE_CLOCK', clockId: 'bomb-timer', amount: 5 },
+        { op: 'APPRAISE_EMOTION', charId: 'Hero', emotion: { joy: 70, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'joy', intensity: 70, last_updated_at: 0 } },
+      ];
+      const critiques = studioNoteCritic(makeIR114(ops, 3), state);
+      assert.ok(!critiques.some(c => c.objection.includes('ceiling') || c.objection.includes('numb')),
+        'suspense at 90 + RAISE_CLOCK but joy relief → no ceiling warning');
+    });
+
+    it('studioNoteCritic: suspense=70 (below ceiling) + RAISE_CLOCK → no ceiling warning', () => {
+      const state: import('./server/nvm/state/NarrativeState.ts').NarrativeState = {
+        ...emptyState(),
+        audienceState: { knownFacts: [], suspense: 70, curiosity: 50, investment: 50 },
+      };
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'RAISE_CLOCK', clockId: 'c1', amount: 10 },
+      ];
+      const critiques = studioNoteCritic(makeIR114(ops, 3), state);
+      assert.ok(!critiques.some(c => c.objection.includes('ceiling')),
+        'suspense=70 is below the ceiling threshold → no warning');
+    });
+  });
+
+  describe('Wave 114 — showrunner clock overload', () => {
+    it('showrunnerCritic: 4+ clocks above 50 → clock overload critique', () => {
+      const state: import('./server/nvm/state/NarrativeState.ts').NarrativeState = {
+        ...emptyState(),
+        clocks: { 'c1': 60, 'c2': 70, 'c3': 55, 'c4': 80 },
+        themeArgument: [],
+      };
+      const critiques = showrunnerCritic(makeIR114([], 3, 'advance_plot'), state);
+      assert.ok(critiques.some(c => c.objection.includes('clocks') && c.objection.includes('urgency')),
+        '4 urgent clocks → clock overload critique');
+    });
+
+    it('showrunnerCritic: 3 urgent clocks → no overload warning (below threshold)', () => {
+      const state: import('./server/nvm/state/NarrativeState.ts').NarrativeState = {
+        ...emptyState(),
+        clocks: { 'c1': 60, 'c2': 70, 'c3': 55 },
+        themeArgument: [],
+      };
+      const critiques = showrunnerCritic(makeIR114([], 3, 'advance_plot'), state);
+      assert.ok(!critiques.some(c => c.objection.includes('urgency')),
+        '3 urgent clocks → no overload warning');
+    });
+
+    it('showrunnerCritic: 5 clocks but most below 50 → no overload warning', () => {
+      const state: import('./server/nvm/state/NarrativeState.ts').NarrativeState = {
+        ...emptyState(),
+        clocks: { 'c1': 30, 'c2': 20, 'c3': 10, 'c4': 55, 'c5': 40 },
+        themeArgument: [],
+      };
+      const critiques = showrunnerCritic(makeIR114([], 3, 'advance_plot'), state);
+      assert.ok(!critiques.some(c => c.objection.includes('urgency')),
+        'only 1 clock above 50 → no overload warning despite 5 total clocks');
+    });
+  });
+
+  describe('Wave 114 — screenplay usefulness: urgency-weighted clock score', () => {
+    const makeMinimalIR114 = (ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[]): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR => ({
+      transitionId: 'w114c', sceneIdx: 2, sceneFunction: 'advance_plot',
+      activeMechanisms: [], beforeStateHash: 'xyz', ops,
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'user_authored', createdAt: 0 },
+    });
+
+    it('branchScore: raising an urgent clock scores higher usefulness than a fresh one', () => {
+      const stateWithUrgentClock: import('./server/nvm/state/NarrativeState.ts').NarrativeState = {
+        ...emptyState(), clocks: { 'timer': 80 },
+      };
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'RAISE_CLOCK', clockId: 'timer', amount: 5 },
+      ];
+      const scoreUrgent  = scoreBranch(ops, makeMinimalIR114(ops), stateWithUrgentClock, []);
+      const scoreBaseline = scoreBranch(ops, makeMinimalIR114(ops), emptyState(), []);
+      assert.ok(scoreUrgent.screenplayUsefulness > scoreBaseline.screenplayUsefulness,
+        `urgent clock (${scoreUrgent.screenplayUsefulness}) should score higher than fresh clock (${scoreBaseline.screenplayUsefulness})`);
+    });
+  });
+}

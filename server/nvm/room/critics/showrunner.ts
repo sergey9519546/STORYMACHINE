@@ -105,6 +105,21 @@ export function showrunnerCritic(ir: NarrativeTransitionIR, state: NarrativeStat
     }
   }
 
+  // Gate 6b: clock overload — if 4+ clocks are active above the 50% urgency threshold
+  // the narrative is drowning in simultaneous countdowns; audiences can't prioritize.
+  // Urgency threshold: clock value > 50 indicates meaningful pressure.
+  {
+    const urgentClockCount = Object.values(state.clocks).filter(v => v > 50).length;
+    if (urgentClockCount >= 4) {
+      critiques.push({
+        criticId: 'showrunner', severity: 35, targetOpIdx: null,
+        objection: `${urgentClockCount} active clocks are above 50% urgency — narrative overcrowded; consolidate countdowns or defuse lower-priority clocks so the dominant threat is legible`,
+        suggestedOperator: 'raise_stakes',
+        attentionBid: 40,
+      });
+    }
+  }
+
   // Gate 6: preachy theme argument — if state has 4+ theme moves and ALL are 'support'
   // with no 'attack', 'undercut', or 'complicate' moves, the theme is being preached
   // rather than argued. A good theme argument needs dialectical pressure.

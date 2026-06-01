@@ -202,12 +202,18 @@ function computeArcAlignment(ops: StoryOp[], state: NarrativeState): number {
   return Math.min(100, score);
 }
 
-function computeScreenplayUsefulness(ops: StoryOp[], _state: NarrativeState): number {
+function computeScreenplayUsefulness(ops: StoryOp[], state: NarrativeState): number {
   let score = 50; // baseline
 
-  // Raises in tension are screenplay-useful
-  const clockOps = ops.filter(o => o.op === 'RAISE_CLOCK');
-  score += clockOps.reduce((s, o) => { const a = (o as Extract<StoryOp, {op:'RAISE_CLOCK'}>).amount; return s + (isFinite(a) ? a : 0) * 5; }, 0);
+  // Raises in tension are screenplay-useful; weight by how urgent the clock already is.
+  // A clock at 70/100 being pushed higher is more dramatic than a fresh clock at 5/100.
+  const clockOps = ops.filter(o => o.op === 'RAISE_CLOCK') as Extract<StoryOp, {op:'RAISE_CLOCK'}>[];
+  score += clockOps.reduce((s, o) => {
+    const a = isFinite(o.amount) ? o.amount : 0;
+    const existing = state.clocks[o.clockId] ?? 0;
+    const urgencyMultiplier = 1 + (existing / 100); // 1.0 at 0%, up to 2.0 at 100%
+    return s + a * 5 * urgencyMultiplier;
+  }, 0);
 
   // Clues are highly screenplay-useful (setup/payoff)
   score += ops.filter(o => o.op === 'SEED_CLUE').length * 15;

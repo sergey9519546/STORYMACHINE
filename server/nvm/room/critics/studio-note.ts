@@ -76,6 +76,25 @@ export function studioNoteCritic(ir: NarrativeTransitionIR, state: NarrativeStat
     });
   }
 
+  // Tension ceiling: when audience suspense is already near its maximum (≥85) and the
+  // scene adds more RAISE_CLOCK pressure with no positive-emotion relief, the audience
+  // reaches numbness — heightening past the ceiling yields diminishing returns.
+  if (state.audienceState.suspense >= 85 && ir.sceneIdx > 2) {
+    const hasClockEscalation = ir.ops.some(op => op.op === 'RAISE_CLOCK');
+    const POSITIVE_RELIEF = new Set(['joy', 'relief', 'trust', 'admiration']);
+    const hasReliefEmotion = ir.ops.some(
+      op => op.op === 'APPRAISE_EMOTION' && POSITIVE_RELIEF.has(op.emotion.dominant),
+    );
+    if (hasClockEscalation && !hasReliefEmotion) {
+      critiques.push({
+        criticId: 'studio_note', severity: 35, targetOpIdx: null,
+        objection: `Audience suspense is ${state.audienceState.suspense}/100 (near ceiling) and this scene adds more RAISE_CLOCK with no relief beat — audiences go numb above 85; add a positive emotion beat or pivot to consequence`,
+        suggestedOperator: 'cut_on_the_nose',
+        attentionBid: 40,
+      });
+    }
+  }
+
   // Provide_relief scenes that also have multiple belief updates feel like lectures
   if (ir.sceneFunction === 'provide_relief') {
     const beliefCount = ir.ops.filter(op => op.op === 'UPDATE_BELIEF').length;
