@@ -13992,3 +13992,82 @@ describe('Wave 120 — two-reader: irony density precision', () => {
     assert.equal(firstWatch.ironyDensity, 0, 'inferred belief → not counted as irony');
   });
 });
+
+// ── Wave 121 — branch scorer: intensity-weighted emotions, charId novelty, ADVANCE_OBJECT_ARC ──
+
+describe('Wave 121 — branch score improvements', () => {
+  const makeIR = (ops: StoryOp[]): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR => ({
+    transitionId: 'w121', sceneIdx: 2, sceneFunction: 'advance_plot',
+    activeMechanisms: [], beforeStateHash: 'xyz', ops,
+    preconditions: [], postconditions: [],
+    provenance: { origin: 'user_authored', createdAt: 0 },
+  });
+
+  it('high-intensity emotion scores more consequence than low-intensity', () => {
+    const highIntensity: StoryOp[] = [{
+      op: 'APPRAISE_EMOTION', charId: 'nora',
+      emotion: { joy: 0, distress: 0, anger: 0, fear: 95, pride: 0, shame: 0, dominant: 'fear', intensity: 95, last_updated_at: 1 },
+    }];
+    const lowIntensity: StoryOp[] = [{
+      op: 'APPRAISE_EMOTION', charId: 'nora',
+      emotion: { joy: 0, distress: 0, anger: 0, fear: 10, pride: 0, shame: 0, dominant: 'fear', intensity: 10, last_updated_at: 1 },
+    }];
+    const scoreHigh = scoreBranch(highIntensity, makeIR(highIntensity), emptyState(), []);
+    const scoreLow  = scoreBranch(lowIntensity, makeIR(lowIntensity), emptyState(), []);
+    assert.ok(scoreHigh.consequence > scoreLow.consequence,
+      `high-intensity emotion (${scoreHigh.consequence}) should have higher consequence than low (${scoreLow.consequence})`);
+  });
+
+  it('ADVANCE_OBJECT_ARC scores its own consequence (>default 2)', () => {
+    const arcOps: StoryOp[] = [{ op: 'ADVANCE_OBJECT_ARC', objectId: 'McGuffin', toState: 'activated' }];
+    const score = scoreBranch(arcOps, makeIR(arcOps), emptyState(), []);
+    // ADVANCE_OBJECT_ARC now gets +8; old default was +2. With just 1 op, consequence should be >5.
+    assert.ok(score.consequence > 5, `ADVANCE_OBJECT_ARC consequence (${score.consequence}) should exceed default-2 floor`);
+  });
+
+  it('reusing same char IDs as recent commits reduces novelty', () => {
+    const sharedChar = 'nora';
+    const opsNew: StoryOp[] = [{
+      op: 'APPRAISE_EMOTION', charId: sharedChar,
+      emotion: { joy: 50, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'joy', intensity: 50, last_updated_at: 1 },
+    }];
+    const opsUnique: StoryOp[] = [{
+      op: 'APPRAISE_EMOTION', charId: 'brand_new_character',
+      emotion: { joy: 50, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'joy', intensity: 50, last_updated_at: 1 },
+    }];
+    const prevOps: StoryOp[] = [{ op: 'APPRAISE_EMOTION', charId: sharedChar, emotion: { joy: 30, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'joy', intensity: 30, last_updated_at: 0 } }];
+    const recentCommit: StoryCommit = {
+      commitId: 'prev1', parentId: null, sceneIdx: 0,
+      ops: prevOps,
+      deltaSummary: summarizeOps(prevOps), reverted: false, createdAt: Date.now(),
+    };
+    const scoreReuse  = scoreBranch(opsNew, makeIR(opsNew), emptyState(), [recentCommit]);
+    const scoreUnique = scoreBranch(opsUnique, makeIR(opsUnique), emptyState(), [recentCommit]);
+    assert.ok(scoreUnique.novelty >= scoreReuse.novelty,
+      `unique char (${scoreUnique.novelty}) should be at least as novel as reused char (${scoreReuse.novelty})`);
+  });
+
+  it('high-intensity emotion boosts screenplayUsefulness', () => {
+    const highIntensity: StoryOp[] = [{
+      op: 'APPRAISE_EMOTION', charId: 'nora',
+      emotion: { joy: 0, distress: 0, anger: 0, fear: 85, pride: 0, shame: 0, dominant: 'fear', intensity: 85, last_updated_at: 1 },
+    }];
+    const lowIntensity: StoryOp[] = [{
+      op: 'APPRAISE_EMOTION', charId: 'nora',
+      emotion: { joy: 0, distress: 0, anger: 30, fear: 0, pride: 0, shame: 0, dominant: 'anger', intensity: 30, last_updated_at: 1 },
+    }];
+    const scoreHigh = scoreBranch(highIntensity, makeIR(highIntensity), emptyState(), []);
+    const scoreLow  = scoreBranch(lowIntensity, makeIR(lowIntensity), emptyState(), []);
+    assert.ok(scoreHigh.screenplayUsefulness >= scoreLow.screenplayUsefulness,
+      `high-intensity emotion (${scoreHigh.screenplayUsefulness}) ≥ low-intensity (${scoreLow.screenplayUsefulness}) in screenplay usefulness`);
+  });
+
+  it('ADVANCE_OBJECT_ARC boosts screenplayUsefulness', () => {
+    const withArc: StoryOp[] = [{ op: 'ADVANCE_OBJECT_ARC', objectId: 'obj1', toState: 'state2' }];
+    const withoutArc: StoryOp[] = [{ op: 'ADD_FACT', fact: { factId: 'f1', subject: 's', predicate: 'p', object: 'o', addedAtTurn: 1, validFrom: 1, validTo: null } }];
+    const scoreWith    = scoreBranch(withArc, makeIR(withArc), emptyState(), []);
+    const scoreWithout = scoreBranch(withoutArc, makeIR(withoutArc), emptyState(), []);
+    assert.ok(scoreWith.screenplayUsefulness >= scoreWithout.screenplayUsefulness,
+      `ADVANCE_OBJECT_ARC (${scoreWith.screenplayUsefulness}) should not score lower than ADD_FACT (${scoreWithout.screenplayUsefulness})`);
+  });
+});

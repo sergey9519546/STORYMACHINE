@@ -93,7 +93,7 @@ function computeNovelty(ops: StoryOp[], recentCommits: StoryCommit[]): number {
     if (sim < minSimilarity) minSimilarity = sim;
   }
 
-  // Also compare content fingerprint for UPDATE_BELIEF ops
+  // Compare content fingerprint for UPDATE_BELIEF ops
   const candidatePropositions = new Set(
     ops.filter(o => o.op === 'UPDATE_BELIEF')
        .map(o => (o as Extract<StoryOp, {op: 'UPDATE_BELIEF'}>).belief.proposition.toLowerCase().slice(0, 40))
@@ -111,7 +111,23 @@ function computeNovelty(ops: StoryOp[], recentCommits: StoryCommit[]): number {
     }
   }
 
-  const rawNovelty = 1 - Math.max(minSimilarity, maxPropOverlap * 0.5);
+  // Compare character fingerprint — reusing the same chars as recent commits is less novel
+  const candidateCharIds = new Set(
+    ops.filter(o => 'charId' in o).map(o => (o as { charId: string }).charId),
+  );
+  let maxCharOverlap = 0;
+  for (const c of recentCommits.slice(-3)) {
+    const recentCharIds = new Set(
+      c.ops.filter(o => 'charId' in o).map(o => (o as { charId: string }).charId),
+    );
+    if (recentCharIds.size > 0 && candidateCharIds.size > 0) {
+      const overlap = [...candidateCharIds].filter(ch => recentCharIds.has(ch)).length;
+      const charSim = overlap / Math.max(recentCharIds.size, candidateCharIds.size);
+      if (charSim > maxCharOverlap) maxCharOverlap = charSim;
+    }
+  }
+
+  const rawNovelty = 1 - Math.max(minSimilarity, maxPropOverlap * 0.5, maxCharOverlap * 0.3);
   return Math.round(rawNovelty * 100);
 }
 
@@ -128,8 +144,14 @@ function computeConsequence(ops: StoryOp[]): number {
         score += 6 * Math.max(0.2, isFinite(conf) ? conf : 0.5);
         break;
       }
-      case 'APPRAISE_EMOTION':  score += 5;  break;
+      case 'APPRAISE_EMOTION': {
+        // Weight by intensity: a high-intensity emotion shifts the story more than a mild one
+        const intensity = (op as Extract<StoryOp, {op:'APPRAISE_EMOTION'}>).emotion.intensity;
+        score += Math.max(2, (isFinite(intensity) ? intensity : 50) * 0.06);
+        break;
+      }
       case 'SHIFT_RELATIONSHIP':score += 12; break;
+      case 'ADVANCE_OBJECT_ARC': score += 8; break;
       case 'RAISE_CLOCK': {
         const a = (op as Extract<StoryOp, {op:'RAISE_CLOCK'}>).amount;
         score += (isFinite(a) ? a : 0) * 4;
@@ -224,6 +246,16 @@ function computeScreenplayUsefulness(ops: StoryOp[], state: NarrativeState): num
 
   // Relationship shifts = character drama
   score += ops.filter(o => o.op === 'SHIFT_RELATIONSHIP').length * 12;
+
+  // High-intensity emotions = dramatic peak moments (intensity > 60)
+  const highIntensityEmotions = ops.filter(o =>
+    o.op === 'APPRAISE_EMOTION' &&
+    (o as Extract<StoryOp, {op:'APPRAISE_EMOTION'}>).emotion.intensity > 60,
+  ).length;
+  score += highIntensityEmotions * 8;
+
+  // Object arc advancement = character plan bearing fruit = screenplay forward momentum
+  score += ops.filter(o => o.op === 'ADVANCE_OBJECT_ARC').length * 10;
 
   return Math.min(100, Math.max(0, score));
 }
