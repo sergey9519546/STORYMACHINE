@@ -8,6 +8,7 @@ import type { ProofResult } from '../proof/contract.ts';
 import type { NarrativeTransitionIR } from '../ir/NarrativeTransitionIR.ts';
 import type { SceneFunction } from '../ir/NarrativeTransitionIR.ts';
 import { sanitizeForPrompt } from '../../lib/prompt-utils.ts';
+import { genrePromptBlock } from '../../lib/genre-router.ts';
 
 export interface SceneTarget {
   sceneIdx: number;
@@ -168,7 +169,9 @@ export function buildSystemPreamble(constraints: GenerationConstraint[], state: 
   // Prescriptive directive: tell the LLM how to calibrate op intensity based on
   // the current audience state, not just what the numbers are.
   let audienceDirective = '';
-  if (safeSuspense < 30 && safeCuriosity < 30) {
+  if (safeSuspense >= 85 && safeInvestment >= 85) {
+    audienceDirective = 'CLIMAX CONDITIONS: suspense and investment both near ceiling — drive toward payoff resolution (PAYOFF_SETUP, ADVANCE_THEME_ARGUMENT resolve) rather than further escalation; the audience is primed for the culminating event.';
+  } else if (safeSuspense < 30 && safeCuriosity < 30) {
     audienceDirective = 'The audience is disengaged — prioritise curiosity hooks (SEED_CLUE, ADD_FACT) over resolution.';
   } else if (safeSuspense >= 70) {
     audienceDirective = 'Suspense is high — escalate pressure: add a RAISE_CLOCK or SHIFT_RELATIONSHIP consequence.';
@@ -266,6 +269,10 @@ export function buildSystemPreamble(constraints: GenerationConstraint[], state: 
     .filter(Boolean)
     .join(' ');
 
+  // Genre register: inject tone/vocabulary/cliché guidance when a genre is set.
+  // This ensures every candidate generation call respects the story's genre contract.
+  const genreBlock = genrePromptBlock(state.authorIntent.genre);
+
   const constraintLines = constraints
     .map((c, i) => `${i + 1}. [${c.kind}] ${sanitizeForPrompt(c.description, 400)}`)
     .join('\n');
@@ -274,13 +281,14 @@ export function buildSystemPreamble(constraints: GenerationConstraint[], state: 
     'You are a story compiler generating a NarrativeTransitionIR.',
     `Known characters: ${knownChars}. Active facts: ${activeFacts}.`,
     stateLines,
+    genreBlock,
     '',
     'PROOF CONSTRAINTS (your output must satisfy all of these):',
     constraintLines,
     '',
     'Return ONLY valid JSON matching the NarrativeTransitionIR schema.',
     'Every op must be grounded in the constraints above.',
-  ].filter(l => l !== undefined).join('\n');
+  ].filter(Boolean).join('\n');
 }
 
 // Compose the full GenerationSpec from state, target, and failures.

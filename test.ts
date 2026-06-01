@@ -13552,3 +13552,59 @@ describe('Wave 108 — cognition-emotion mismatch (lint + character advocate)', 
     });
   });
 }
+
+// ── Wave 117 — genre injection in buildSystemPreamble, climax directive ───────
+{
+  const { buildSystemPreamble } = await import('./server/nvm/generate/proof-spec.ts');
+
+  const makeSceneTarget117 = (): import('./server/nvm/generate/proof-spec.ts').SceneTarget => ({
+    sceneIdx: 3, sceneFunction: 'build_tension', activeMechanisms: [],
+    tensionTarget: 100, qualityTarget: 60,
+  });
+
+  describe('Wave 117 — buildSystemPreamble genre injection', () => {
+    it('preamble: thriller genre → includes GENRE — THRILLER instruction', () => {
+      const state = { ...emptyState(), authorIntent: { genre: 'thriller' as const } };
+      const preamble = buildSystemPreamble([], state);
+      assert.ok(preamble.includes('THRILLER'), 'thriller genre block injected into preamble');
+    });
+
+    it('preamble: horror genre → includes GENRE — HORROR instruction', () => {
+      const state = { ...emptyState(), authorIntent: { genre: 'horror' as const } };
+      const preamble = buildSystemPreamble([], state);
+      assert.ok(preamble.includes('HORROR'), 'horror genre block injected into preamble');
+    });
+
+    it('preamble: no genre → no GENRE block (neutral default)', () => {
+      const preamble = buildSystemPreamble([], emptyState());
+      assert.ok(!preamble.includes('GENRE —'), 'no genre set → no genre block in preamble');
+    });
+
+    it('preamble: genre forbidden clichés appear in preamble', () => {
+      const state = { ...emptyState(), authorIntent: { genre: 'mystery' as const } };
+      const preamble = buildSystemPreamble([], state);
+      assert.ok(preamble.includes('AVOID THESE MYSTERY'), 'mystery cliché list injected');
+    });
+  });
+
+  describe('Wave 117 — buildSystemPreamble climax directive', () => {
+    it('preamble: suspense>=85 AND investment>=85 → CLIMAX CONDITIONS directive', () => {
+      const state: import('./server/nvm/state/NarrativeState.ts').NarrativeState = {
+        ...emptyState(),
+        audienceState: { knownFacts: [], suspense: 90, curiosity: 50, investment: 88 },
+      };
+      const preamble = buildSystemPreamble([], state);
+      assert.ok(preamble.includes('CLIMAX CONDITIONS'), 'climax directive appears at high suspense + investment');
+    });
+
+    it('preamble: suspense=90 but investment=60 → escalation directive (not climax)', () => {
+      const state: import('./server/nvm/state/NarrativeState.ts').NarrativeState = {
+        ...emptyState(),
+        audienceState: { knownFacts: [], suspense: 90, curiosity: 50, investment: 60 },
+      };
+      const preamble = buildSystemPreamble([], state);
+      assert.ok(!preamble.includes('CLIMAX CONDITIONS'), 'investment below 85 → not climax directive');
+      assert.ok(preamble.includes('Suspense is high'), 'gets escalation directive instead');
+    });
+  });
+}
