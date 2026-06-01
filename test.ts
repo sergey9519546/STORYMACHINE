@@ -4321,8 +4321,8 @@ describe('NVM — Proof-Driven Generation spec (G9)', () => {
     assert.ok(spec.systemPreamble.includes('NarrativeTransitionIR'));
   });
 
-  it('ALL_OPERATORS has exactly 10 operators', () => {
-    assert.equal(ALL_OPERATORS.length, 10);
+  it('ALL_OPERATORS has exactly 12 operators', () => {
+    assert.equal(ALL_OPERATORS.length, 12);
   });
 });
 
@@ -13489,6 +13489,66 @@ describe('Wave 108 — cognition-emotion mismatch (lint + character advocate)', 
       const critiques = (characterAdvocateCritic as (ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR, state: import('./server/nvm/state/NarrativeState.ts').NarrativeState) => import('./server/nvm/room/room.ts').Critique[])(makeIR115(ops, 5), state);
       assert.ok(!critiques.some(c => c.objection.includes('neglected')),
         'Alice appears in scene via APPRAISE_EMOTION → no neglect critique');
+    });
+  });
+}
+
+// ── Wave 116 — plant_sensory_anchor + defuse_clock operators ─────────────────
+{
+  const makeIR116 = (ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[], sceneIdx = 2): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR => ({
+    transitionId: 'w116', sceneIdx, sceneFunction: 'build_tension',
+    activeMechanisms: [], beforeStateHash: 'abc', ops,
+    preconditions: [], postconditions: [],
+    provenance: { origin: 'user_authored', createdAt: 0 },
+  });
+
+  describe('Wave 116 — plant_sensory_anchor operator', () => {
+    it('plant_sensory_anchor: adds a RECORD_VISUAL_FACT or RECORD_SONIC_FACT', () => {
+      const result = applyOperator('plant_sensory_anchor', makeIR116([]), emptyState(), 42);
+      const added = result.ir.ops.filter(op => op.op === 'RECORD_VISUAL_FACT' || op.op === 'RECORD_SONIC_FACT');
+      assert.ok(added.length === 1, 'exactly one sensory op added');
+      assert.ok(result.description.includes('anchor'), 'description mentions anchor');
+    });
+
+    it('plant_sensory_anchor: calibrates to dominant emotion in IR', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'APPRAISE_EMOTION', charId: 'Hero', emotion: { joy: 0, distress: 0, anger: 0, fear: 90, pride: 0, shame: 0, dominant: 'fear', intensity: 90, last_updated_at: 0 } },
+      ];
+      const result = applyOperator('plant_sensory_anchor', makeIR116(ops), emptyState(), 1);
+      assert.ok(result.description.includes('fear'), 'description references the fear register');
+    });
+
+    it('plant_sensory_anchor: ALL_OPERATORS now contains both new operators', () => {
+      assert.ok(ALL_OPERATORS.includes('plant_sensory_anchor'), 'ALL_OPERATORS has plant_sensory_anchor');
+      assert.ok(ALL_OPERATORS.includes('defuse_clock'), 'ALL_OPERATORS has defuse_clock');
+    });
+  });
+
+  describe('Wave 116 — defuse_clock operator', () => {
+    it('defuse_clock: with existing clock in state → adds negative RAISE_CLOCK', () => {
+      const state: import('./server/nvm/state/NarrativeState.ts').NarrativeState = {
+        ...emptyState(), clocks: { 'bomb': 70 },
+      };
+      const result = applyOperator('defuse_clock', makeIR116([]), state, 99);
+      const defuseOp = result.ir.ops.find(op => op.op === 'RAISE_CLOCK') as Extract<import('./server/nvm/ops/StoryOp.ts').StoryOp, {op:'RAISE_CLOCK'}> | undefined;
+      assert.ok(defuseOp, 'RAISE_CLOCK op added');
+      assert.ok(defuseOp!.amount < 0, 'RAISE_CLOCK amount is negative (defuse)');
+      assert.equal(defuseOp!.clockId, 'bomb', 'targets the most urgent clock');
+    });
+
+    it('defuse_clock: picks most urgent clock when multiple exist', () => {
+      const state: import('./server/nvm/state/NarrativeState.ts').NarrativeState = {
+        ...emptyState(), clocks: { 'low-clock': 20, 'high-clock': 80 },
+      };
+      const result = applyOperator('defuse_clock', makeIR116([]), state, 5);
+      const defuseOp = result.ir.ops.find(op => op.op === 'RAISE_CLOCK') as Extract<import('./server/nvm/ops/StoryOp.ts').StoryOp, {op:'RAISE_CLOCK'}> | undefined;
+      assert.equal(defuseOp?.clockId, 'high-clock', 'targets the highest-value clock');
+    });
+
+    it('defuse_clock: no clock in state or IR → no-op', () => {
+      const result = applyOperator('defuse_clock', makeIR116([]), emptyState(), 7);
+      assert.equal(result.ir.ops.length, 0, 'no ops added when no clock exists');
+      assert.ok(result.description.includes('no clock'), 'description explains the no-op');
     });
   });
 }
