@@ -5877,15 +5877,17 @@ describe('NVM — Tier 2 Proof Kernel (Wave 16)', () => {
     };
   }
 
-  it('runTier2 returns 3 ProofResults (necessity, specificity, dialogue)', () => {
+  it('runTier2 returns 5 ProofResults (necessity, specificity, dialogue, polarity, reincorporation)', () => {
     const ir = minimalIR([
       { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'nora', predicate: 'hides', object: 'loan', addedAtTurn: 1, validFrom: 1, validTo: null } },
     ]);
     const results = runTier2(ir, emptyState());
-    assert.equal(results.length, 3);
+    assert.equal(results.length, 5);
     assert.ok(results.some(r => r.proof === 'NecessityProof'));
     assert.ok(results.some(r => r.proof === 'SpecificityProof'));
     assert.ok(results.some(r => r.proof === 'DialogueProof'));
+    assert.ok(results.some(r => r.proof === 'PolarityProof'));
+    assert.ok(results.some(r => r.proof === 'ReincorporationProof'));
   });
 
   it('tier2Score is 100 when all Tier 2 proofs pass', () => {
@@ -5920,14 +5922,15 @@ describe('NVM — Tier 2 Proof Kernel (Wave 16)', () => {
     assert.ok(s > 0 && s < 100, `expected partial score, got ${s}`);
   });
 
-  it('Tier 2 failures appear in proof names (NecessityProof / SpecificityProof / DialogueProof)', () => {
+  it('Tier 2 results all have recognized proof names', () => {
     // Generic/vague ops trigger specificity failure
     const ir = minimalIR([
       { op: 'ADD_FACT', fact: { factId: 'f', subject: 'thing', predicate: 'does', object: 'event', addedAtTurn: 1, validFrom: 1, validTo: null } },
       { op: 'ADD_FACT', fact: { factId: 'g', subject: 'entity', predicate: 'causes', object: 'thing', addedAtTurn: 1, validFrom: 1, validTo: null } },
     ]);
     const results = runTier2(ir, emptyState());
-    assert.ok(results.every(r => ['NecessityProof','SpecificityProof','DialogueProof'].includes(r.proof)));
+    const TIER2_NAMES = ['NecessityProof', 'SpecificityProof', 'DialogueProof', 'PolarityProof', 'ReincorporationProof'];
+    assert.ok(results.every(r => TIER2_NAMES.includes(r.proof)));
   });
 });
 
@@ -6630,7 +6633,7 @@ describe('NVM — Proof Inspector endpoint logic (Wave 23)', () => {
     const t4 = runTier4(ir, state);
 
     assert.equal(t1.length, 8, '8 Tier 1 proofs');
-    assert.equal(t2.length, 3, '3 Tier 2 proofs');
+    assert.equal(t2.length, 5, '5 Tier 2 proofs');
     assert.equal(t3.length, 2, '2 Tier 3 proofs');
     assert.equal(t4.length, 2, '2 Tier 4 proofs');
     assert.ok(typeof tier2Score(t2) === 'number', 'tier2Score is number');
@@ -13164,6 +13167,115 @@ describe('Wave 108 — cognition-emotion mismatch (lint + character advocate)', 
       const scoreNoMatch = scoreBranch(opsNoMatch, makeMinimalIR(opsNoMatch), emptyState(), []);
       assert.ok(scoreMatch.arcAlignment > scoreNoMatch.arcAlignment,
         `payoff matching seeded clue (${scoreMatch.arcAlignment}) should exceed unmatched payoff (${scoreNoMatch.arcAlignment})`);
+    });
+  });
+}
+
+// ── Wave 113 — PolarityProof + ReincorporationProof ──────────────────────────
+{
+  const { polarityProof } = await import('./server/nvm/proof/tier2/polarity.ts');
+  const { reincorporationProof } = await import('./server/nvm/proof/tier2/reincorporation.ts');
+
+  const makeIR113 = (ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[], sceneIdx = 3): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR => ({
+    transitionId: 'w113', sceneIdx, sceneFunction: 'advance_plot',
+    activeMechanisms: [], beforeStateHash: 'abc', ops,
+    preconditions: [], postconditions: [],
+    provenance: { origin: 'user_authored', createdAt: 0 },
+  });
+
+  const fearState = (): import('./server/nvm/state/NarrativeState.ts').NarrativeState => ({
+    ...emptyState(),
+    characterEmotions: {
+      'Alice': { joy: 0, distress: 0, anger: 0, fear: 70, pride: 0, shame: 0, dominant: 'fear', intensity: 70, last_updated_at: 1 },
+    },
+  });
+
+  describe('Wave 113 — PolarityProof', () => {
+    it('polarityProof: no emotion ops → pass (not applicable)', () => {
+      const result = polarityProof(makeIR113([]), emptyState());
+      assert.ok(result.pass, 'no emotion ops → pass');
+    });
+
+    it('polarityProof: emotion op on new character (no prior state) → pass', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'APPRAISE_EMOTION', charId: 'Bob', emotion: { joy: 0, distress: 60, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'distress', intensity: 60, last_updated_at: 0 } },
+      ];
+      const result = polarityProof(makeIR113(ops), emptyState());
+      assert.ok(result.pass, 'new character with no prior state → pass (no prior polarity to violate)');
+    });
+
+    it('polarityProof: fear→joy reversal → pass', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'APPRAISE_EMOTION', charId: 'Alice', emotion: { joy: 80, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'joy', intensity: 80, last_updated_at: 0 } },
+      ];
+      const result = polarityProof(makeIR113(ops), fearState());
+      assert.ok(result.pass, 'fear→joy is a polarity flip → pass');
+    });
+
+    it('polarityProof: fear→distress (same valence) → fail flag', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'APPRAISE_EMOTION', charId: 'Alice', emotion: { joy: 0, distress: 70, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'distress', intensity: 70, last_updated_at: 0 } },
+      ];
+      const result = polarityProof(makeIR113(ops), fearState());
+      assert.ok(!result.pass, 'fear→distress is same negative valence → fail');
+      assert.ok(result.findings.some(f => f.severity === 'flag'), 'finding should be a flag');
+    });
+  });
+
+  describe('Wave 113 — ReincorporationProof', () => {
+    it('reincorporationProof: scene 0 → always pass (establishing)', () => {
+      const result = reincorporationProof(makeIR113([], 0), emptyState());
+      assert.ok(result.pass, 'scene 0 → pass unconditionally');
+    });
+
+    it('reincorporationProof: scene 1 → always pass (establishing)', () => {
+      const result = reincorporationProof(makeIR113([], 1), emptyState());
+      assert.ok(result.pass, 'scene 1 → pass unconditionally');
+    });
+
+    it('reincorporationProof: scene 2 with known character → pass', () => {
+      const state: import('./server/nvm/state/NarrativeState.ts').NarrativeState = {
+        ...emptyState(),
+        characterEmotions: {
+          'Alice': { joy: 50, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'joy', intensity: 50, last_updated_at: 1 },
+        },
+      };
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'APPRAISE_EMOTION', charId: 'Alice', emotion: { joy: 0, distress: 60, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'distress', intensity: 60, last_updated_at: 0 } },
+      ];
+      const result = reincorporationProof(makeIR113(ops, 2), state);
+      assert.ok(result.pass, 'APPRAISE_EMOTION on existing character → pass');
+    });
+
+    it('reincorporationProof: scene 2 with ADVANCE_THEME_ARGUMENT → pass', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'ADVANCE_THEME_ARGUMENT', claimId: 'c1', move: 'support' },
+      ];
+      const result = reincorporationProof(makeIR113(ops, 2), emptyState());
+      assert.ok(result.pass, 'ADVANCE_THEME_ARGUMENT always counts as reincorporation');
+    });
+
+    it('reincorporationProof: scene 3 with only new-char emotion + new clock → fail flag', () => {
+      // Everything in this scene is brand-new: the char and clock don't exist in state
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'APPRAISE_EMOTION', charId: 'NewChar', emotion: { joy: 0, distress: 50, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'distress', intensity: 50, last_updated_at: 0 } },
+        { op: 'RAISE_CLOCK', clockId: 'brand-new-clock', amount: 5 },
+      ];
+      const result = reincorporationProof(makeIR113(ops, 3), emptyState());
+      assert.ok(!result.pass, 'scene 3 with all-new entities → fail');
+      assert.ok(result.findings.some(f => f.severity === 'flag'), 'finding is a flag, not block');
+    });
+
+    it('reincorporationProof: scene 3 with existing clock → pass', () => {
+      const state: import('./server/nvm/state/NarrativeState.ts').NarrativeState = {
+        ...emptyState(),
+        clocks: { 'main-clock': 40 },
+      };
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'RAISE_CLOCK', clockId: 'main-clock', amount: 10 },
+      ];
+      const result = reincorporationProof(makeIR113(ops, 3), state);
+      assert.ok(result.pass, 'RAISE_CLOCK on existing clock → pass');
     });
   });
 }

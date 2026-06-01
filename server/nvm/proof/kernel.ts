@@ -16,6 +16,8 @@ import { earnedRevealProof } from './tier1/earnedReveal.ts';
 import { necessityProof } from './tier2/necessity.ts';
 import { specificityProof } from './tier2/specificity.ts';
 import { dialogueProof } from './tier2/dialogue.ts';
+import { polarityProof } from './tier2/polarity.ts';
+import { reincorporationProof } from './tier2/reincorporation.ts';
 import { genericnessProof } from './tier3/genericness.ts';
 import { originalityProof } from './tier3/originality.ts';
 import { biasAuditProof } from './tier4/bias-audit.ts';
@@ -52,6 +54,8 @@ export function runTier2(ir: NarrativeTransitionIR, state: NarrativeState): Proo
     necessityProof(ir, state),
     specificityProof(ir, state),
     dialogueProof(ir, state),
+    polarityProof(ir, state),
+    reincorporationProof(ir, state),
   ];
 }
 
