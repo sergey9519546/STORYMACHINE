@@ -126,3 +126,24 @@ export function onTrackForArc(
   if (report.dominantArc !== target) return false;
   return report.coherence >= minCoherence;
 }
+
+export type TrajectoryMomentum = 'building' | 'declining' | 'stalling' | 'volatile';
+
+// Compute the local momentum of the last 3 scenes.
+// 'stalling'  — tension barely moves (spread < 5 across last 3 values)
+// 'volatile'  — large swings (spread > 30), typical of thriller seesaw
+// 'building'  — net upward trend in last 3 scenes (last > first by > 5)
+// 'declining' — net downward trend (first > last by > 5)
+// Returns 'stalling' for fewer than 2 data points.
+export function computeTrajectoryMomentum(ledgers: TensionLedger[]): TrajectoryMomentum {
+  if (ledgers.length < 2) return 'stalling';
+  const window = ledgers.slice(-3).map(l => l.totalTension);
+  const lo = Math.min(...window);
+  const hi = Math.max(...window);
+  const spread = hi - lo;
+  if (spread > 30) return 'volatile';
+  if (spread < 5) return 'stalling';
+  const first = window[0];
+  const last = window[window.length - 1];
+  return last > first ? 'building' : 'declining';
+}

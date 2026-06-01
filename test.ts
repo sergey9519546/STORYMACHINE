@@ -63,7 +63,7 @@ import {
 } from './server/nvm/valuation/futures.ts';
 import { redTeamVerdict } from './server/nvm/valuation/audience-redteam.ts';
 import { twoReaderReport } from './server/nvm/valuation/two-reader.ts';
-import { computeTopology, onTrackForArc } from './server/nvm/valuation/topology.ts';
+import { computeTopology, onTrackForArc, computeTrajectoryMomentum } from './server/nvm/valuation/topology.ts';
 import {
   proofsToConstraints, buildGenerationSpec, buildSystemPreamble,
   type CandidateGenerator, type SceneTarget,
@@ -13833,5 +13833,162 @@ describe('Wave 119 — buildSCM: cross-commit causal edges', () => {
     const nodeB = scm.nodes.get('c2:0')!;
     assert.equal(nodeA.children.length, 0, 'different clocks: no cross-commit edge');
     assert.equal(nodeB.parents.length, 0);
+  });
+});
+
+// ── Wave 120 — redTeam missingClueIds fix + topology momentum + irony precision ──
+
+describe('Wave 120 — audience-redteam: missingClueIds separated from weakClues', () => {
+  const makePlan = (requiredClueIds: string[]): import('./server/nvm/reveal/RevealPlan.ts').RevealPlan => ({
+    revealId: 'r1',
+    description: 'the killer escaped through the window',
+    requiredClueIds,
+    payoffSetupId: 'ps1',
+  });
+
+  it('missingClueIds contains unseeded required clues', () => {
+    const plan = makePlan(['clue_a', 'clue_b', 'clue_c']);
+    const state = emptyState();
+    state.clues.push({ clueId: 'clue_a', carrier: 'object' });  // only clue_a seeded
+    const verdict = redTeamVerdict(plan, state);
+    assert.ok(verdict.missingClueIds.includes('clue_b'), 'clue_b is missing');
+    assert.ok(verdict.missingClueIds.includes('clue_c'), 'clue_c is missing');
+    assert.ok(!verdict.missingClueIds.includes('clue_a'), 'clue_a is seeded, not missing');
+  });
+
+  it('weakClues does not include unseeded (missing) clues', () => {
+    const plan = makePlan(['clue_x', 'clue_y']);
+    const state = emptyState();
+    // Neither clue seeded
+    const verdict = redTeamVerdict(plan, state);
+    assert.equal(verdict.missingClueIds.length, 2, 'both clues missing');
+    // weakClues must only contain seeded clues — none seeded → none weak
+    assert.equal(verdict.weakClues.length, 0, 'no seeded clues = no weak clues');
+  });
+
+  it('weakClues flags visible clues that are individually redundant', () => {
+    // With 5 visible clues, each adding 0.12 boost, removing one still leaves 4*0.12=0.48 boost
+    // If baseConfidence + 4*0.12 >= 0.65, all 5 clues are "weak" individually
+    const plan = makePlan(['c1', 'c2', 'c3', 'c4', 'c5']);
+    const state = emptyState();
+    state.audienceState.suspense = 10;  // low base confidence
+    // Seed all 5 clues
+    ['c1', 'c2', 'c3', 'c4', 'c5'].forEach(id => state.clues.push({ clueId: id, carrier: 'object' }));
+    const verdict = redTeamVerdict(plan, state);
+    assert.equal(verdict.missingClueIds.length, 0, 'all clues seeded');
+    // With 5 clues, removing one leaves 4 → boost 0.48; test whether redundancy is flagged
+    assert.ok(Array.isArray(verdict.weakClues), 'weakClues is an array');
+  });
+
+  it('thin_mystery recommendation still appears with missingClueIds present', () => {
+    // Known facts overlapping plan description keywords push baseConfidence above 0.65
+    const plan: import('./server/nvm/reveal/RevealPlan.ts').RevealPlan = {
+      revealId: 'r_thin', description: 'killer escaped through window', requiredClueIds: ['clue_required'], payoffSetupId: 'ps',
+    };
+    const state = emptyState();
+    state.audienceState.knownFacts = ['the killer escaped through window', 'witnesses watched killer'];
+    const verdict = redTeamVerdict(plan, state);
+    assert.equal(verdict.recommendation, 'thin_mystery', 'overlapping known facts trigger thin_mystery');
+    assert.ok(verdict.missingClueIds.includes('clue_required'), 'unseeded clue appears in missingClueIds');
+  });
+});
+
+describe('Wave 120 — topology: computeTrajectoryMomentum', () => {
+  const mkL = (t: number): import('./server/nvm/valuation/futures.ts').TensionLedger =>
+    ({ positions: [], totalTension: t, sceneIdx: 0 });
+
+  it('stalling when tension barely moves (spread < 5)', () => {
+    const m = computeTrajectoryMomentum([mkL(50), mkL(51), mkL(52)]);
+    assert.equal(m, 'stalling');
+  });
+
+  it('stalling for fewer than 2 ledger entries', () => {
+    assert.equal(computeTrajectoryMomentum([]), 'stalling');
+    assert.equal(computeTrajectoryMomentum([mkL(50)]), 'stalling');
+  });
+
+  it('volatile when spread > 30 in last 3 scenes', () => {
+    const m = computeTrajectoryMomentum([mkL(10), mkL(80), mkL(20)]);
+    assert.equal(m, 'volatile');
+  });
+
+  it('building when last > first by > 5', () => {
+    const m = computeTrajectoryMomentum([mkL(20), mkL(30), mkL(40)]);
+    assert.equal(m, 'building');
+  });
+
+  it('declining when first > last by > 5', () => {
+    const m = computeTrajectoryMomentum([mkL(60), mkL(45), mkL(30)]);
+    assert.equal(m, 'declining');
+  });
+
+  it('uses only last 3 entries even with longer ledger', () => {
+    // First entries are volatile but last 3 are building
+    const ledgers = [mkL(10), mkL(90), mkL(5), mkL(20), mkL(30), mkL(45)];
+    const m = computeTrajectoryMomentum(ledgers);
+    assert.equal(m, 'building', 'last 3 entries [20,30,45] → building');
+  });
+});
+
+describe('Wave 120 — two-reader: irony density precision', () => {
+  it('irony detected when audience knows deception about the same subject', () => {
+    const state = emptyState();
+    state.characterBeliefs['alice'] = [{
+      id: 'b1',
+      proposition: 'Victor is innocent',
+      confidence: 0.9,
+      source: 'told',
+      source_agent_id: 'victor',
+      acquired_at: 1,
+    }];
+    state.audienceState.knownFacts = ['Victor lied about his alibi'];
+    const { firstWatch } = twoReaderReport(state, { positions: [], totalTension: 0, sceneIdx: 0 });
+    assert.ok(firstWatch.ironyDensity > 0, 'deception in fact + shared "victor" keyword → irony detected');
+  });
+
+  it('irony detected via negation: audience knows the negative of the belief', () => {
+    const state = emptyState();
+    state.characterBeliefs['bob'] = [{
+      id: 'b2',
+      proposition: 'the bridge is safe to cross',
+      confidence: 0.8,
+      source: 'told',
+      source_agent_id: 'informant',
+      acquired_at: 2,
+    }];
+    state.audienceState.knownFacts = ['the bridge is not safe'];
+    const { firstWatch } = twoReaderReport(state, { positions: [], totalTension: 0, sceneIdx: 0 });
+    assert.ok(firstWatch.ironyDensity > 0, 'negation + shared "bridge" keyword → irony detected');
+  });
+
+  it('no irony when known fact shares words but contains no deception or negation', () => {
+    const state = emptyState();
+    state.characterBeliefs['carol'] = [{
+      id: 'b3',
+      proposition: 'the treasure is buried under the oak tree',
+      confidence: 0.9,
+      source: 'told',
+      source_agent_id: 'pirate',
+      acquired_at: 3,
+    }];
+    // Audience knows a related fact but without deception or negation
+    state.audienceState.knownFacts = ['there is treasure buried somewhere nearby'];
+    const { firstWatch } = twoReaderReport(state, { positions: [], totalTension: 0, sceneIdx: 0 });
+    // "treasure" and "buried" overlap but no deception/negation → no irony
+    assert.equal(firstWatch.ironyDensity, 0, 'word overlap alone without deception/negation → no irony');
+  });
+
+  it('no irony for beliefs sourced from inferred (not told)', () => {
+    const state = emptyState();
+    state.characterBeliefs['dave'] = [{
+      id: 'b4',
+      proposition: 'victor is guilty',
+      confidence: 0.9,
+      source: 'inferred',  // not told
+      acquired_at: 4,
+    }];
+    state.audienceState.knownFacts = ['Victor lied about his alibi'];
+    const { firstWatch } = twoReaderReport(state, { positions: [], totalTension: 0, sceneIdx: 0 });
+    assert.equal(firstWatch.ironyDensity, 0, 'inferred belief → not counted as irony');
   });
 });

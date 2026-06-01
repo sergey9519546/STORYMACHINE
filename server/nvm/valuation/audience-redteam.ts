@@ -3,6 +3,7 @@
 // the mystery. Strong clues are ones the red-team cannot easily guess from
 // without them; weak clues are ones the mystery would have been solvable
 // anyway. Used to calibrate clue strength and RevealPlan quality.
+// Wave 120: separated missingClueIds from weakClues (semantic bug fix).
 
 import type { NarrativeState } from '../state/NarrativeState.ts';
 import type { RevealPlan } from '../reveal/RevealPlan.ts';
@@ -12,7 +13,8 @@ export interface RedTeamVerdict {
   canGuessWithout: boolean;   // true = clues are too obvious; reveal is unearned
   guessConfidence: number;    // 0–1: how confident the red-team is WITHOUT the clues
   clueStrengthScore: number;  // 0–100: how much the clues help (delta confidence)
-  weakClues: string[];        // clue IDs the red-team found unhelpful
+  missingClueIds: string[];   // required clue IDs not yet seeded in the story
+  weakClues: string[];        // visible clue IDs that are individually redundant
   recommendation: 'strengthen_clues' | 'ok' | 'thin_mystery';
 }
 
@@ -27,7 +29,7 @@ export function redTeamVerdict(
 
   // How many required clues are actually visible to the audience?
   const visibleClues = plan.requiredClueIds.filter(id => seededClueIds.has(id));
-  const missingClues = plan.requiredClueIds.filter(id => !seededClueIds.has(id));
+  const missingClueIds = plan.requiredClueIds.filter(id => !seededClueIds.has(id));
 
   // Heuristic base confidence without any clues — derived from audience's known facts.
   // investment reflects how emotionally committed the audience is, which raises the
@@ -44,12 +46,21 @@ export function redTeamVerdict(
     + (safeInvestment / 100) * 0.15,
   );
 
-  // Clue contribution: each visible clue boosts confidence
-  const clueBoost = Math.min(0.5, visibleClues.length * 0.12);
+  // Clue contribution: each visible clue boosts confidence by a fixed per-clue amount.
+  const perClueBoost = 0.12;
+  const clueBoost = Math.min(0.5, visibleClues.length * perClueBoost);
   const guessConfidenceWithClues = Math.min(0.98, baseConfidence + clueBoost);
 
   const clueStrengthScore = Math.round((guessConfidenceWithClues - baseConfidence) * 200);
   const canGuessWithout = baseConfidence > 0.65;
+
+  // A visible clue is "weak" (redundant) if removing it individually still leaves
+  // the mystery solvable — i.e., the remaining clues alone exceed the guessability
+  // threshold. This tells the writer which planted clues aren't pulling weight.
+  const weakClues = visibleClues.filter(_id => {
+    const boostWithout = Math.min(0.5, (visibleClues.length - 1) * perClueBoost);
+    return baseConfidence + boostWithout >= 0.65;
+  });
 
   let recommendation: RedTeamVerdict['recommendation'];
   if (canGuessWithout) {
@@ -65,7 +76,8 @@ export function redTeamVerdict(
     canGuessWithout,
     guessConfidence: Math.round(baseConfidence * 100) / 100,
     clueStrengthScore,
-    weakClues: missingClues.length > 0 ? missingClues : visibleClues.slice(0, Math.max(0, visibleClues.length - 2)),
+    missingClueIds,
+    weakClues,
     recommendation,
   };
 }

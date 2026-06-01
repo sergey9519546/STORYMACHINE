@@ -68,22 +68,38 @@ export function twoReaderReport(state: NarrativeState, ledger: TensionLedger): T
   };
 }
 
-const DECEPTION_PATTERN = /\b(lied|lying|lie|false|deceived|deception|deceiving|betrayed|betrayal|manipulated|framed)\b/;
+// Deception markers in known facts — indicates the audience knows someone is deceived.
+const DECEPTION_IN_FACT = /\b(lied|lying|lie|false|deceived|deception|deceiving|betrayed|betrayal|manipulated|framed|secretly|actually|truth is)\b/;
+
+// Negation words that signal a known fact contradicts a belief proposition.
+const NEGATION = /\b(not|never|no|false|isn'?t|wasn'?t|doesn'?t|didn'?t|can'?t|won'?t|isn't|wasn't|doesn't|didn't|can't|won't)\b/;
 
 function computeIronyDensity(state: NarrativeState): number {
-  // Audience knows facts that at least one character believes falsely
-  const knownFacts = new Set(state.audienceState.knownFacts.map(f => f.toLowerCase()));
+  // Dramatic irony: audience knows something that at least one character falsely believes.
+  // Two detection paths:
+  //   1. DIRECT: a known fact mentions deception, AND the belief proposition shares a
+  //      SUBJECT word (>4 chars) with that fact — specific enough to avoid false positives.
+  //   2. NEGATION: the known fact contains a negation word AND shares a subject keyword
+  //      with the character's told belief, implying the audience knows the opposite is true.
+  const knownFactsLower = state.audienceState.knownFacts.map(f => f.toLowerCase());
   let ironyCount = 0;
   for (const beliefs of Object.values(state.characterBeliefs)) {
     for (const b of beliefs) {
-      if (b.source === 'told' && b.confidence > 0.5) {
-        const prop = b.proposition.toLowerCase();
-        const audienceKnowsConflict = [...knownFacts].some(f =>
-          DECEPTION_PATTERN.test(f) ||
-          prop.split(/\s+/).some(w => w.length > 3 && knownFacts.has(w)),
-        );
-        if (audienceKnowsConflict) ironyCount++;
-      }
+      if (b.source !== 'told' || b.confidence <= 0.5) continue;
+      const propWords = new Set(
+        b.proposition.toLowerCase().split(/\W+/).filter(w => w.length > 4),
+      );
+      const audienceKnowsConflict = knownFactsLower.some(f => {
+        const factWords = f.split(/\W+/).filter((w: string) => w.length > 4);
+        const hasSharedWord = factWords.some((w: string) => propWords.has(w));
+        if (!hasSharedWord) return false;
+        // Path 1: fact explicitly mentions deception + shares a subject keyword
+        if (DECEPTION_IN_FACT.test(f)) return true;
+        // Path 2: fact uses negation + shares a subject keyword → audience knows the opposite
+        if (NEGATION.test(f)) return true;
+        return false;
+      });
+      if (audienceKnowsConflict) ironyCount++;
     }
   }
   return Math.min(100, ironyCount * 25);
