@@ -26,9 +26,10 @@ function sceneWordFrequencies(fountain: string): Map<number, Map<string, number>
     if (isDialogue) continue; // skip dialogue
     if (sceneIdx < 0) continue;
 
-    // Count words in action line (skip stopwords to isolate voice markers)
+    // Count words in action line (skip functional stopwords — preserve content words
+    // like 'room', 'door', 'hand' which carry voice in screenplay action)
     const freqs = sceneFreqs.get(sceneIdx)!;
-    const voiceStopwords = new Set(['that', 'this', 'with', 'from', 'have', 'into', 'they', 'them', 'then', 'were', 'been', 'than', 'when', 'also', 'just', 'here', 'there', 'over', 'back', 'down', 'away', 'through', 'scene', 'line', 'time', 'room', 'door', 'hand', 'face', 'eyes', 'head', 'very']);
+    const voiceStopwords = new Set(['that', 'this', 'with', 'from', 'have', 'into', 'they', 'them', 'then', 'were', 'been', 'than', 'when', 'also', 'just', 'here', 'there', 'over', 'back', 'down', 'away', 'through', 'very', 'would', 'could', 'should', 'might', 'their', 'about', 'what', 'which', 'some', 'each', 'will']);
     const words = trimmed.toLowerCase().split(/\W+/).filter(w => w.length > 3 && !voiceStopwords.has(w));
     for (const w of words) freqs.set(w, (freqs.get(w) ?? 0) + 1);
   }
@@ -99,18 +100,29 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
     });
   }
 
-  // ── Tonal consistency check via emotional shift vs prose distance ──────────
-  // Elevated vocabulary signals beauty/positivity — mismatched with negative scenes.
+  // ── Tonal consistency: prose register vs emotional valence (bidirectional) ──
+  // Elevated vocabulary in a negative scene = unintended lightness.
+  // Grim vocabulary in a positive scene = unintended darkness.
   const elevatedWords = new Set(['beautiful', 'gorgeous', 'stunning', 'elegant', 'sublime', 'majestic', 'radiant', 'glorious', 'magnificent', 'serene', 'perfect', 'wonderful']);
+  const grimWords = new Set(['dark', 'dead', 'death', 'blood', 'bleed', 'pain', 'suffer', 'wound', 'broken', 'shattered', 'destroyed', 'horrible', 'awful', 'dreadful', 'grim', 'bleak', 'gloomy', 'sinister', 'brutal', 'savage', 'violent', 'murder', 'corpse', 'dying', 'agony']);
   for (let i = 0; i < records.length && i < freqList.length; i++) {
     const record = records[i];
     const sceneFreq = freqList[i][1];
     const elevatedCount = [...elevatedWords].reduce((s, w) => s + (sceneFreq.get(w) ?? 0), 0);
+    const grimCount = [...grimWords].reduce((s, w) => s + (sceneFreq.get(w) ?? 0), 0);
     if (record.emotionalShift === 'negative' && elevatedCount > 2) {
       issues.push({
         location: `Scene ${i} (${record.slug})`,
         rule: 'TONE_REGISTER_MISMATCH',
         description: `Scene ${i} has a negative emotional shift but the prose uses elevated/positive language (${elevatedCount} elevated words) — tone and affect are misaligned`,
+        severity: 'minor',
+        suggestedFix: 'Align the prose register with the scene\'s emotional valence',
+      });
+    } else if (record.emotionalShift === 'positive' && grimCount > 2) {
+      issues.push({
+        location: `Scene ${i} (${record.slug})`,
+        rule: 'TONE_REGISTER_MISMATCH',
+        description: `Scene ${i} has a positive emotional shift but the prose uses grim/dark language (${grimCount} grim words) — tone and affect are misaligned`,
         severity: 'minor',
         suggestedFix: 'Align the prose register with the scene\'s emotional valence',
       });

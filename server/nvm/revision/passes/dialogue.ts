@@ -31,8 +31,11 @@ function extractDialogue(fountain: string): Array<{ speaker: string; line: strin
   return dialogue;
 }
 
-/** Detect on-the-nose emotion statements */
-const ON_THE_NOSE_RE = /\b(I (feel|am|feel so)|I'm (so |very )?(angry|sad|happy|scared|afraid|excited|devastated|thrilled|heartbroken|furious|terrified|devastated))\b/i;
+/** Detect on-the-nose emotion statements — requires explicit emotion word after "I feel/am" */
+const ON_THE_NOSE_RE = /\b(I (feel|am) (so |very )?(angry|sad|happy|scared|afraid|excited|devastated|thrilled|heartbroken|furious|terrified|depressed|anxious|nervous|proud|ashamed|guilty|jealous|hopeless|miserable)|I'm (so |very )?(angry|sad|happy|scared|afraid|excited|devastated|thrilled|heartbroken|furious|terrified|depressed|anxious|nervous|proud|ashamed|guilty|jealous|hopeless|miserable))\b/i;
+
+/** Detect explicit character trait labeling instead of showing */
+const TRAIT_LABELING_RE = /\b(you are|he is|she is|they are|you're|he's|she's|they're)\s+(so |very |such a |a )?(brave|smart|stupid|coward|liar|hero|weak|strong|fool|genius|monster|saint|evil|kind|cruel|honest|dishonest|reckless|ruthless|manipulative|selfish|selfless)\b/i;
 
 /** Detect pure exposition delivery ("As you know, Bob...") */
 const AS_YOU_KNOW_RE = /\b(as you know|you already know|as we discussed|as I told you|you remember that|let me explain|the reason (is|why))\b/i;
@@ -104,6 +107,19 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
     } else {
       consecutiveSpeaker = d.speaker;
       consecutiveCount = 1;
+    }
+  }
+
+  // ── Trait labeling (show don't tell) ──────────────────────────────────────
+  for (const d of dialogue) {
+    if (TRAIT_LABELING_RE.test(d.line)) {
+      issues.push({
+        location: `Line ${d.lineNum} (${d.speaker})`,
+        rule: 'TRAIT_LABELING',
+        description: `${d.speaker} explicitly labels a character trait: "${d.line.slice(0, 60)}${d.line.length > 60 ? '...' : ''}"`,
+        severity: 'minor',
+        suggestedFix: 'Show the trait through a specific action or choice rather than naming it directly',
+      });
     }
   }
 

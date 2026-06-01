@@ -14170,3 +14170,221 @@ describe('Wave 122 — planToward: minInvestment requirement', () => {
     assert.ok(opsInBiases.length >= 2, 'two UPDATE_READER_STATE biases (suspense + investment)');
   });
 });
+
+// ── Wave 123 — Quality Engine + Revision Pass improvements ──────────────────
+
+/** Build a minimal valid NarrativeTransitionIR for Wave 123 unit tests */
+function makeMinimalIR(sceneIdx: number, ops: StoryOp[]): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR {
+  return {
+    transitionId: `w123-ir-${sceneIdx}`,
+    sceneIdx,
+    sceneFunction: 'build_tension',
+    activeMechanisms: [],
+    beforeStateHash: '',
+    ops,
+    preconditions: [],
+    postconditions: [],
+    provenance: { origin: 'model_generated' as const, createdAt: 0 },
+  };
+}
+
+describe('Wave 123 — quality: DV18 consequence-free belief flip', () => {
+  it('fires when ADD_FACT contradicts a told belief and character has no emotion reaction', () => {
+    const state = emptyState();
+    state.characterBeliefs['alice'] = [{
+      id: 'b1', proposition: 'vault is safe', source: 'told', confidence: 0.9, acquired_at: 0,
+    } as import('./server/engine/types.ts').Belief];
+    const ir = makeMinimalIR(2, [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'vault', predicate: 'was_robbed', object: 'true', addedAtTurn: 2, validFrom: 2, validTo: null } },
+    ]);
+    const warnings = dialogueWarnings(ir, state);
+    const dv18 = warnings.find(w => w.rule === 'DV18_CONSEQUENCE_FREE_BELIEF_FLIP');
+    assert.ok(dv18, 'DV18 fires when belief is contradicted without emotional reaction');
+  });
+
+  it('does not fire when contradicted character has an APPRAISE_EMOTION in the IR', () => {
+    const state = emptyState();
+    state.characterBeliefs['alice'] = [{
+      id: 'b1', proposition: 'vault is safe', source: 'told', confidence: 0.9, acquired_at: 0,
+    } as import('./server/engine/types.ts').Belief];
+    const ir = makeMinimalIR(2, [
+      { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'vault', predicate: 'was_robbed', object: 'true', addedAtTurn: 2, validFrom: 2, validTo: null } },
+      { op: 'APPRAISE_EMOTION', charId: 'alice', emotion: { dominant: 'distress' as const, intensity: 85, fear: 60, distress: 80, joy: 0, anger: 0, pride: 0, shame: 0, last_updated_at: 0 } },
+    ]);
+    const warnings = dialogueWarnings(ir, state);
+    const dv18 = warnings.find(w => w.rule === 'DV18_CONSEQUENCE_FREE_BELIEF_FLIP');
+    assert.equal(dv18, undefined, 'DV18 does not fire when character reacts emotionally');
+  });
+});
+
+describe('Wave 123 — quality: DV13 acknowledges prior state beliefs', () => {
+  it('does not fire when character already has a belief about the clock in prior state', () => {
+    const state = emptyState();
+    state.characterBeliefs['bob'] = [{
+      id: 'b2', proposition: 'bomb_timer is counting down fast', source: 'witnessed', confidence: 0.8, acquired_at: 0,
+    } as import('./server/engine/types.ts').Belief];
+    const ir = makeMinimalIR(3, [{ op: 'RAISE_CLOCK', clockId: 'bomb_timer', amount: 10 }]);
+    const warnings = dialogueWarnings(ir, state);
+    const dv13 = warnings.find(w => w.rule === 'DV13_UNACKNOWLEDGED_CLOCK');
+    assert.equal(dv13, undefined, 'DV13 does not fire when character already knows about the clock');
+  });
+});
+
+describe('Wave 123 — quality: ArcDebt prolonged negative relationship', () => {
+  it('emits arc debt for prolonged extreme negative relationship (4+ shifts, net < -0.6)', () => {
+    const state = emptyState();
+    state.relationships['alice|bob'] = [
+      { dimension: 'trust' as const, amount: -0.2, reason: 'betrayal' },
+      { dimension: 'trust' as const, amount: -0.3, reason: 'fight' },
+      { dimension: 'trust' as const, amount: -0.1, reason: 'cold' },
+      { dimension: 'trust' as const, amount: -0.2, reason: 'distance' },
+    ];
+    const debts = computeArcDebt(state, 5);
+    const negRel = debts.find(d => d.includes('alice|bob') && d.includes('confrontation'));
+    assert.ok(negRel, 'arc debt detected for prolonged negative relationship');
+  });
+
+  it('does not fire arc debt when fewer than 4 shifts', () => {
+    const state = emptyState();
+    state.relationships['alice|bob'] = [
+      { dimension: 'trust' as const, amount: -0.4, reason: 'betrayal' },
+      { dimension: 'trust' as const, amount: -0.4, reason: 'fight' },
+    ];
+    const debts = computeArcDebt(state, 5);
+    const negRel = debts.find(d => d.includes('alice|bob') && d.includes('confrontation'));
+    assert.equal(negRel, undefined, 'no arc debt for short negative arc');
+  });
+});
+
+describe('Wave 123 — dialoguePass: ON_THE_NOSE_RE false-positive fix + TRAIT_LABELING', () => {
+  it('ON_THE_NOSE does not fire for "I feel the cold wind" (non-emotion "I feel")', async () => {
+    const fountain = 'INT. OFFICE - DAY\n\nALICE\nI feel the cold wind on my skin.\n';
+    const result = await dialoguePass(makePassInput(fountain));
+    const onNose = result.issues.find(i => i.rule === 'ON_THE_NOSE');
+    assert.equal(onNose, undefined, 'ON_THE_NOSE must not fire for physical "I feel" without emotion word');
+  });
+
+  it('ON_THE_NOSE fires correctly for "I feel so angry"', async () => {
+    const fountain = 'INT. OFFICE - DAY\n\nALICE\nI feel so angry right now.\n';
+    const result = await dialoguePass(makePassInput(fountain));
+    const onNose = result.issues.find(i => i.rule === 'ON_THE_NOSE');
+    assert.ok(onNose, 'ON_THE_NOSE fires for direct emotion statement');
+  });
+
+  it('TRAIT_LABELING fires when character labels another character', async () => {
+    const fountain = 'INT. OFFICE - DAY\n\nALICE\nYou are such a coward, you know that?\n\nBOB\nYou\'re right.\n';
+    const result = await dialoguePass(makePassInput(fountain));
+    const traitIssue = result.issues.find(i => i.rule === 'TRAIT_LABELING');
+    assert.ok(traitIssue, 'TRAIT_LABELING fires for explicit trait labeling in dialogue');
+  });
+});
+
+describe('Wave 123 — voicePass: bidirectional TONE_REGISTER_MISMATCH', () => {
+  it('fires for grim prose in a positive-shift scene', async () => {
+    const fountain = `INT. BRIGHT MORNING - DAY
+
+Blood and death everywhere. The brutal murder was savage and grim. Bleak corpse dying in agony.
+
+ALICE
+Good morning!
+
+INT. SECOND SCENE - DAY
+
+Normal action lines here.
+
+BOB
+Hello there.
+
+INT. THIRD SCENE - DAY
+
+More action here to pad out the scene.
+
+CAROL
+Hi.
+`;
+    const records: import('./server/nvm/screenplay/memory.ts').ScreenplaySceneRecord[] = [
+      {
+        commitId: 'c0', sceneIdx: 0, slug: 'INT. BRIGHT MORNING - DAY',
+        purpose: 'establish_world', dramaticTurn: 'intro', revelation: null,
+        emotionalShift: 'positive', visualBeats: [], dialogueHighlights: [],
+        unresolvedClues: [], seededClueIds: [], payoffSetupIds: [],
+        clockRaised: false, clockDelta: 0, suspenseDelta: 1, curiosityDelta: 0, createdAt: 0,
+      },
+      {
+        commitId: 'c1', sceneIdx: 1, slug: 'INT. SECOND SCENE - DAY',
+        purpose: 'establish_world', dramaticTurn: 'mid', revelation: null,
+        emotionalShift: 'neutral', visualBeats: [], dialogueHighlights: [],
+        unresolvedClues: [], seededClueIds: [], payoffSetupIds: [],
+        clockRaised: false, clockDelta: 0, suspenseDelta: 0, curiosityDelta: 0, createdAt: 0,
+      },
+      {
+        commitId: 'c2', sceneIdx: 2, slug: 'INT. THIRD SCENE - DAY',
+        purpose: 'establish_world', dramaticTurn: 'end', revelation: null,
+        emotionalShift: 'neutral', visualBeats: [], dialogueHighlights: [],
+        unresolvedClues: [], seededClueIds: [], payoffSetupIds: [],
+        clockRaised: false, clockDelta: 0, suspenseDelta: 0, curiosityDelta: 0, createdAt: 0,
+      },
+    ];
+    const result = await voicePass({ ...makePassInput(fountain), records, structure: makeStructureForRevision() });
+    const mismatch = result.issues.find(i => i.rule === 'TONE_REGISTER_MISMATCH');
+    assert.ok(mismatch, 'TONE_REGISTER_MISMATCH fires for grim prose in a positive-shift scene');
+  });
+});
+
+describe('Wave 123 — dialogueProof: MAX_WARNINGS scales with IR size', () => {
+  it('3 warnings on a 15-op IR passes DialogueProof (maxWarnings=3)', async () => {
+    const { dialogueProof } = await import('./server/nvm/proof/tier2/dialogue.ts');
+    const state = emptyState();
+    // 15 ADD_FACT ops → DV5 (no human), DV10 (all same kind), DV15 (no story progress) = 3 warnings
+    const ops: StoryOp[] = Array.from({ length: 15 }, (_, i) => ({
+      op: 'ADD_FACT' as const,
+      fact: { factId: `f${i}`, subject: `thing_${i}`, predicate: 'exists', object: 'true', addedAtTurn: 1, validFrom: 1, validTo: null },
+    }));
+    const ir = makeMinimalIR(2, ops);
+    const result = dialogueProof(ir, state);
+    // floor(15/5) = 3 → maxWarnings = min(4, max(2, 3)) = 3; 3 warnings ≤ 3 → pass
+    assert.ok(result.pass, `15-op IR with 3 warnings should pass DialogueProof (got: ${result.reason})`);
+  });
+
+  it('3 warnings on a 5-op IR fails DialogueProof (maxWarnings=2)', async () => {
+    const { dialogueProof } = await import('./server/nvm/proof/tier2/dialogue.ts');
+    const state = emptyState();
+    // 5 ADD_FACT ops → DV5, DV10, DV15 = 3 warnings
+    const ops: StoryOp[] = Array.from({ length: 5 }, (_, i) => ({
+      op: 'ADD_FACT' as const,
+      fact: { factId: `g${i}`, subject: `item_${i}`, predicate: 'exists', object: 'true', addedAtTurn: 1, validFrom: 1, validTo: null },
+    }));
+    const ir = makeMinimalIR(2, ops);
+    const result = dialogueProof(ir, state);
+    // floor(5/5) = 1 → maxWarnings = min(4, max(2, 1)) = 2; 3 warnings > 2 → fail
+    assert.ok(!result.pass, '5-op IR with 3 warnings should fail DialogueProof');
+  });
+});
+
+describe('Wave 123 — continuityCritic: severity maps from finding.severity', () => {
+  it('block-severity IntentionalProof finding maps to critic severity 92 (not old 80)', async () => {
+    const { continuityCritic } = await import('./server/nvm/room/critics/continuity.ts');
+    // APPRAISE_EMOTION on an unknown charId triggers IntentionalProof with 'block' severity
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 'test-w123-severity',
+      sceneIdx: 1, sceneFunction: 'build_tension',
+      activeMechanisms: ['core_mechanism'],
+      beforeStateHash: '',
+      ops: [{
+        op: 'APPRAISE_EMOTION',
+        charId: 'ghost_xyz_w123',
+        emotion: { joy: 0, distress: 80, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'distress' as const, intensity: 80, last_updated_at: 0 },
+      } as import('./server/nvm/ops/StoryOp.ts').StoryOp],
+      preconditions: ['world_exists'],
+      postconditions: [],
+      provenance: { origin: 'model_generated' as const, createdAt: Date.now() },
+    };
+    const state = emptyState();
+    const critiques = continuityCritic(ir, state);
+    const intCrit = critiques.find(c => c.objection.includes('IntentionalProof'));
+    assert.ok(intCrit, 'IntentionalProof critique present');
+    assert.equal(intCrit!.severity, 92, 'block-severity finding maps to critic severity 92');
+    assert.equal(intCrit!.attentionBid, 95, 'block-severity finding maps to attentionBid 95');
+    assert.notEqual(intCrit!.severity, 80, 'old hardcoded severity 80 is replaced');
+  });
+});

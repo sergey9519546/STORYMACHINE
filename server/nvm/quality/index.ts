@@ -337,16 +337,20 @@ export function dialogueWarnings(ir: NarrativeTransitionIR, state: NarrativeStat
   }
 
   // DV13: Clock without acknowledgment — a ticking pressure no character perceives.
-  // RAISE_CLOCK present but no UPDATE_BELIEF proposition references the clock subject.
+  // RAISE_CLOCK present but no UPDATE_BELIEF references the clock subject in this IR,
+  // and no prior character belief in state already acknowledges it from a past scene.
   {
     const clocks = ir.ops.filter((op): op is Extract<typeof op, { op: 'RAISE_CLOCK' }> => op.op === 'RAISE_CLOCK');
     for (const clock of clocks) {
       const subject = clock.clockId.toLowerCase();
-      const acknowledged = ir.ops.some(
+      const acknowledgedInIR = ir.ops.some(
         op => op.op === 'UPDATE_BELIEF' &&
               op.belief.proposition.toLowerCase().includes(subject),
       );
-      if (!acknowledged) {
+      const acknowledgedInState = Object.values(state.characterBeliefs).flat().some(
+        b => b.proposition.toLowerCase().includes(subject),
+      );
+      if (!acknowledgedInIR && !acknowledgedInState) {
         warnings.push({
           engine: 'dialogue_validator', opIdx: null, rule: 'DV13_UNACKNOWLEDGED_CLOCK',
           message: `RAISE_CLOCK "${clock.clockId}" has no character belief acknowledging it — stakes invisible`,
@@ -430,6 +434,42 @@ export function dialogueWarnings(ir: NarrativeTransitionIR, state: NarrativeStat
     }
   }
 
+  // DV18: Consequence-free belief flip — a new ADD_FACT shares subject keywords with
+  // a character's prior high-confidence told belief, but that character shows no
+  // emotional reaction (APPRAISE_EMOTION) in this IR. Reality contradicting what a
+  // character was told should produce an emotional consequence.
+  {
+    const addedFacts = ir.ops.filter((op): op is Extract<typeof op, { op: 'ADD_FACT' }> => op.op === 'ADD_FACT');
+    if (addedFacts.length > 0) {
+      for (const [charId, beliefs] of Object.entries(state.characterBeliefs)) {
+        const highConfTold = beliefs.filter(b => b.source === 'told' && b.confidence > 0.7);
+        let firedForChar = false;
+        for (const belief of highConfTold) {
+          if (firedForChar) break;
+          const propWords = new Set(
+            belief.proposition.toLowerCase().split(/\W+/).filter(w => w.length > 4),
+          );
+          const contradicted = addedFacts.some(op => {
+            const factText = `${op.fact.subject} ${op.fact.predicate} ${op.fact.object}`.toLowerCase();
+            return factText.split(/\W+/).some(w => w.length > 4 && propWords.has(w));
+          });
+          if (!contradicted) continue;
+          const hasReaction = ir.ops.some(
+            op => op.op === 'APPRAISE_EMOTION' && op.charId === charId,
+          );
+          if (!hasReaction) {
+            warnings.push({
+              engine: 'dialogue_validator', opIdx: null, rule: 'DV18_CONSEQUENCE_FREE_BELIEF_FLIP',
+              message: `New fact may contradict ${charId}'s told belief "${belief.proposition.slice(0, 40)}" but ${charId} shows no emotional reaction`,
+              penalty: 18,
+            });
+            firedForChar = true;
+          }
+        }
+      }
+    }
+  }
+
   return warnings;
 }
 
@@ -471,6 +511,15 @@ export function computeArcDebt(state: NarrativeState, currentScene: number): str
   for (const [emotion, count] of dominantCounts) {
     if (count >= 3) {
       debts.push(`${count} characters share dominant emotion "${emotion}" — ensemble is emotionally monotonous; differentiate their reactions`);
+    }
+  }
+
+  // Prolonged extreme negative relationship: 4+ shifts pushing a pair to net < -0.6
+  // signals an unresolved enmity with no repair arc — the story owes a confrontation.
+  for (const [key, deltas] of Object.entries(state.relationships)) {
+    const net = deltas.reduce((s, d) => s + (isFinite(d.amount) ? d.amount : 0), 0);
+    if (net < -0.6 && deltas.length >= 4) {
+      debts.push(`${key} has a prolonged extreme negative relationship (net ${net.toFixed(2)}, ${deltas.length} shifts) — needs a confrontation or repair beat`);
     }
   }
 
@@ -743,7 +792,7 @@ export function runQualityEngine(ir: NarrativeTransitionIR, state: NarrativeStat
     });
   }
 
-  // Dialogue validators (all 11)
+  // Dialogue validators (DV1–DV18)
   warnings.push(...dialogueWarnings(ir, state));
 
   // Necessity (state-aware: catches re-asserting existing emotions)

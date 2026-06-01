@@ -26,13 +26,15 @@ export function continuityCritic(ir: NarrativeTransitionIR, state: NarrativeStat
       // M7: All Tier-1 proofs now set opIdx directly on ProofFinding.
       // No regex fallback needed — the structured field is the source of truth.
       const targetOpIdx: number | null = finding.opIdx ?? null;
+      // 'block' findings are hard structural violations (severity 92);
+      // 'flag'/'info' findings are softer quality concerns (severity 75).
       critiques.push({
         criticId: 'continuity',
-        severity: 80,   // proof failures are always high severity
+        severity: finding.severity === 'block' ? 92 : 75,
         targetOpIdx,
         objection: `[${result.proof}] ${finding.message}`,
         suggestedOperator: PROOF_TO_OPERATOR[result.proof] ?? null,
-        attentionBid: 85,
+        attentionBid: finding.severity === 'block' ? 95 : 82,
       });
     }
   }
