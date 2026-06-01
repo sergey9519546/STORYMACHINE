@@ -44,5 +44,24 @@ export function skepticCritic(ir: NarrativeTransitionIR, _state: NarrativeState)
     });
   }
 
+  // Duplicate clock escalation: same clockId raised more than once in one IR.
+  // One scene can't plausibly tick the same clock twice without any reaction.
+  const clockRaises = ir.ops.filter(
+    (op): op is Extract<typeof op, { op: 'RAISE_CLOCK' }> => op.op === 'RAISE_CLOCK',
+  );
+  const clockSeenIds = new Set<string>();
+  for (const c of clockRaises) {
+    if (clockSeenIds.has(c.clockId)) {
+      critiques.push({
+        criticId: 'skeptic', severity: 40, targetOpIdx: null,
+        objection: `RAISE_CLOCK "${c.clockId}" fires twice in one scene — implausible double-escalation of the same pressure`,
+        suggestedOperator: 'raise_stakes',
+        attentionBid: 45,
+      });
+      break; // one warning per scene is enough
+    }
+    clockSeenIds.add(c.clockId);
+  }
+
   return critiques;
 }

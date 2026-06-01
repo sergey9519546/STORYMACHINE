@@ -251,7 +251,18 @@ export function buildSystemPreamble(constraints: GenerationConstraint[], state: 
     ? `Last theme move: ${lastThemeMove.move} on claim "${sanitizeForPrompt(lastThemeMove.claimId, 64)}".`
     : '';
 
-  const stateLines = [emotionBlock, beliefBlock, audienceBlock, clockBlock, cluePayoffBlock, relBlock, themeBlock, themeMoveBlock]
+  // ── Object arc states ─────────────────────────────────────────────────────
+  // Show which props/objects are in active use vs consumed/destroyed so the LLM
+  // doesn't reference an object that has already been resolved or destroyed.
+  const objectArcEntries = Object.entries(state.objectArcs)
+    .filter(([, s]) => typeof s === 'string' && s.trim())
+    .slice(0, 6)
+    .map(([id, s]) => `${sanitizeForPrompt(id, 40)}→${sanitizeForPrompt(s, 30)}`);
+  const objectArcBlock = objectArcEntries.length > 0
+    ? `Object arcs: ${objectArcEntries.join(', ')}.`
+    : '';
+
+  const stateLines = [emotionBlock, beliefBlock, audienceBlock, clockBlock, cluePayoffBlock, relBlock, objectArcBlock, themeBlock, themeMoveBlock]
     .filter(Boolean)
     .join(' ');
 

@@ -54,6 +54,17 @@ export function studioNoteCritic(ir: NarrativeTransitionIR, state: NarrativeStat
     });
   }
 
+  // Investment dropping below 25: audience no longer cares about the characters.
+  // Harder to recover from than low suspense — needs a personal cost or decision.
+  if (state.audienceState.investment < 25 && ir.sceneIdx > 3) {
+    critiques.push({
+      criticId: 'studio_note', severity: 50, targetOpIdx: null,
+      objection: `Audience investment is ${state.audienceState.investment}/100 — characters feel irrelevant; add a personal cost or decision`,
+      suggestedOperator: 'deepen_wound',
+      attentionBid: 55,
+    });
+  }
+
   // Provide_relief scenes that also have multiple belief updates feel like lectures
   if (ir.sceneFunction === 'provide_relief') {
     const beliefCount = ir.ops.filter(op => op.op === 'UPDATE_BELIEF').length;

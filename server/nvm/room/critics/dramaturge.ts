@@ -59,5 +59,31 @@ export function dramaturgeCritic(ir: NarrativeTransitionIR, state: NarrativeStat
     }
   }
 
+  // Too many open clues without any payoff — reader is overloaded and thread count
+  // exceeds what an audience can hold. More than 6 unresolved clues is a debt spiral.
+  const openClueCount = state.clues.length - state.payoffs.length;
+  if (openClueCount > 6) {
+    critiques.push({
+      criticId: 'dramaturge', severity: 45, targetOpIdx: null,
+      objection: `${openClueCount} open clues with no payoffs yet — mystery debt too high; pay off at least one thread`,
+      suggestedOperator: 'invert_expectation',
+      attentionBid: 50,
+    });
+  }
+
+  // Late-story stall: after scene 8, if the theme argument has never reached 'resolve',
+  // the story is structurally stuck in the middle. The LLM should push toward resolution.
+  if (ir.sceneIdx > 8) {
+    const hasResolve = state.themeArgument.some(m => m.move === 'resolve');
+    if (!hasResolve) {
+      critiques.push({
+        criticId: 'dramaturge', severity: 35, targetOpIdx: null,
+        objection: `Scene ${ir.sceneIdx} and no theme resolution yet — story needs ADVANCE_THEME_ARGUMENT 'resolve' to reach climax`,
+        suggestedOperator: 'sharpen_theme',
+        attentionBid: 40,
+      });
+    }
+  }
+
   return critiques;
 }

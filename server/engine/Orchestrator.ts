@@ -155,8 +155,12 @@ export class Orchestrator {
             contradicted_propositions: revealedBeliefs.map(b => b.proposition),
             source_event_id: action_id,
           };
-          this._runSpineForUpdate(revealUpdate, action_id, currentNodeId);
-          this.appraiser.appraise(revealUpdate);
+          try {
+            this._runSpineForUpdate(revealUpdate, action_id, currentNodeId);
+            this.appraiser.appraise(revealUpdate);
+          } catch (err) {
+            logger.warn('spine_reveal_failed', { agentId, error: (err as Error).message });
+          }
         }
       }
     }
@@ -164,8 +168,12 @@ export class Orchestrator {
     // Update the acting agent's epistemic state and run spine
     const recentActions = this.stage.getSensoryFilter(currentNodeId, 3);
     const update = await agent.updateEpistemics(recentActions);
-    this._runSpineForUpdate(update, action_id, currentNodeId);
-    this.appraiser.appraise(update);
+    try {
+      this._runSpineForUpdate(update, action_id, currentNodeId);
+      this.appraiser.appraise(update);
+    } catch (err) {
+      logger.warn('spine_epistemic_failed', { agentId, error: (err as Error).message });
+    }
 
     // ── Director evaluation ──
     // Single turns run the full Director pass (perspective evaluation, illusion-state
@@ -174,8 +182,12 @@ export class Orchestrator {
     const roomActions = this.stage.getSensoryFilter(currentNodeId, 6);
     const directorUpdates = await this.director.evaluateRoom(currentNodeId, roomActions);
     for (const u of directorUpdates) {
-      this._runSpineForUpdate(u, action_id, currentNodeId);
-      this.appraiser.appraise(u);
+      try {
+        this._runSpineForUpdate(u, action_id, currentNodeId);
+        this.appraiser.appraise(u);
+      } catch (err) {
+        logger.warn('spine_director_failed', { agentId, error: (err as Error).message });
+      }
     }
     this.appraiser.applyContagion(currentNodeId);
 

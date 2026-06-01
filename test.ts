@@ -12067,3 +12067,108 @@ describe('quality engine DV12-DV15 — new violation rules', () => {
     assert.ok(!warnings.some(w => w.rule === 'DV15_GOAL_FREE_SCENE'), 'DV15 should not fire when clock is raised');
   });
 });
+
+
+// ── Wave 102: critics — investment drop, duplicate clock, dramaturge gaps ─────
+
+describe('Wave 102 — studio-note investment, skeptic clock, dramaturge orphan/stall', () => {
+  type IR = import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR;
+
+  function baseIR(sceneIdx: number, ops: StoryOp[] = []): IR {
+    return {
+      transitionId: `t${sceneIdx}`, sceneIdx, sceneFunction: 'advance_plot',
+      activeMechanisms: ['m1'], beforeStateHash: '', ops,
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 1 },
+    };
+  }
+
+  it('studio-note flags investment < 25 after scene 3', async () => {
+    const { studioNoteCritic } = await import('./server/nvm/room/critics/studio-note.ts');
+    const state = emptyState();
+    state.audienceState = { knownFacts: [], suspense: 60, curiosity: 60, investment: 10 };
+    const ir: IR = { ...baseIR(5), ops: [
+      { op: 'UPDATE_READER_STATE', delta: { suspense: 10, curiosity: 5, investment: 2 } },
+    ]};
+    const critiques = studioNoteCritic(ir, state);
+    assert.ok(critiques.some(c => c.objection.includes('investment')), 'should flag low investment');
+  });
+
+  it('studio-note does NOT flag investment when at or above 25', async () => {
+    const { studioNoteCritic } = await import('./server/nvm/room/critics/studio-note.ts');
+    const state = emptyState();
+    state.audienceState = { knownFacts: [], suspense: 60, curiosity: 60, investment: 30 };
+    const ir: IR = { ...baseIR(5), ops: [
+      { op: 'UPDATE_READER_STATE', delta: { suspense: 10, curiosity: 5, investment: 2 } },
+    ]};
+    const critiques = studioNoteCritic(ir, state);
+    const investmentCrit = critiques.filter(c =>
+      c.criticId === 'studio_note' && c.severity === 50 && c.objection.includes('investment'),
+    );
+    assert.equal(investmentCrit.length, 0, 'should not flag investment at 30');
+  });
+
+  it('skeptic flags same clockId raised twice in one IR', async () => {
+    const { skepticCritic } = await import('./server/nvm/room/critics/skeptic.ts');
+    const ir = baseIR(3, [
+      { op: 'RAISE_CLOCK', clockId: 'bomb_timer', amount: 15 },
+      { op: 'RAISE_CLOCK', clockId: 'bomb_timer', amount: 20 },
+    ]);
+    const critiques = skepticCritic(ir, emptyState());
+    assert.ok(critiques.some(c => c.objection.includes('twice')), 'should flag duplicate clock raise');
+  });
+
+  it('skeptic allows different clock IDs in same IR', async () => {
+    const { skepticCritic } = await import('./server/nvm/room/critics/skeptic.ts');
+    const ir = baseIR(3, [
+      { op: 'RAISE_CLOCK', clockId: 'bomb_timer', amount: 15 },
+      { op: 'RAISE_CLOCK', clockId: 'deadline', amount: 10 },
+    ]);
+    const critiques = skepticCritic(ir, emptyState());
+    assert.ok(!critiques.some(c => c.objection.includes('twice')), 'different clock IDs should not fire');
+  });
+
+  it('dramaturge flags > 6 open clues (no payoffs)', async () => {
+    const { dramaturgeCritic } = await import('./server/nvm/room/critics/dramaturge.ts');
+    const state = emptyState();
+    state.clues = Array.from({ length: 7 }, (_, i) => ({ clueId: `clue_${i}`, carrier: 'object' as const }));
+    state.payoffs = [];
+    const critiques = dramaturgeCritic(baseIR(5), state);
+    assert.ok(critiques.some(c => c.objection.includes('open clues')), 'should flag clue overload');
+  });
+
+  it('dramaturge does NOT flag clue overload when open count ≤ 6', async () => {
+    const { dramaturgeCritic } = await import('./server/nvm/room/critics/dramaturge.ts');
+    const state = emptyState();
+    state.clues = Array.from({ length: 7 }, (_, i) => ({ clueId: `clue_${i}`, carrier: 'object' as const }));
+    // 2 paid off → 5 open
+    state.payoffs = [
+      { setupId: 'clue_0', payoffEventId: 'e1' },
+      { setupId: 'clue_1', payoffEventId: 'e2' },
+    ];
+    const critiques = dramaturgeCritic(baseIR(5), state);
+    assert.ok(!critiques.some(c => c.objection.includes('open clues')), 'open count ≤ 6 should not flag');
+  });
+
+  it('dramaturge flags late-story stall when no theme resolve by scene 9', async () => {
+    const { dramaturgeCritic } = await import('./server/nvm/room/critics/dramaturge.ts');
+    const state = emptyState();
+    state.themeArgument = [
+      { claimId: 'truth_costs', move: 'support' as const },
+      { claimId: 'truth_costs', move: 'attack' as const },
+    ];
+    const critiques = dramaturgeCritic(baseIR(9), state);
+    assert.ok(critiques.some(c => c.objection.includes('resolve')), 'should flag no theme resolution');
+  });
+
+  it('dramaturge does NOT flag when theme is already resolved', async () => {
+    const { dramaturgeCritic } = await import('./server/nvm/room/critics/dramaturge.ts');
+    const state = emptyState();
+    state.themeArgument = [
+      { claimId: 'truth_costs', move: 'support' as const },
+      { claimId: 'truth_costs', move: 'resolve' as const },
+    ];
+    const critiques = dramaturgeCritic(baseIR(10), state);
+    assert.ok(!critiques.some(c => c.objection.includes('resolve') && c.objection.includes('theme')), 'resolved theme should not flag stall');
+  });
+});
