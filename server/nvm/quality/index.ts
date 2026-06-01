@@ -5,7 +5,7 @@
 //
 // Implemented:
 //   - Specificity score (vague vs. concrete op content)
-//   - 15 Dialogue Validators (DV1-DV15)
+//   - 17 Dialogue Validators (DV1-DV17)
 //   - ArcDebt (what emotional beats is the story "owed")
 //   - Reveal Readiness (is the audience ready for a reveal?)
 //   - Necessity-as-form (every op must earn its place)

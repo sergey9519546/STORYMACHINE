@@ -44,6 +44,22 @@ export function dramaturgeCritic(ir: NarrativeTransitionIR, state: NarrativeStat
     }
   });
 
+  // Relationship vacuum: by scene 3, if there are 2+ named characters but no
+  // relationship dynamics have been established, the story has no interpersonal
+  // engine. Characters coexist without affecting each other.
+  if (ir.sceneIdx >= 3) {
+    const charCount = Object.keys(state.characterBeliefs).length;
+    const hasAnyRelationship = Object.keys(state.relationships).length > 0;
+    if (charCount >= 2 && !hasAnyRelationship) {
+      critiques.push({
+        criticId: 'dramaturge', severity: 35, targetOpIdx: null,
+        objection: `Scene ${ir.sceneIdx}: ${charCount} characters introduced but no SHIFT_RELATIONSHIP yet — character dynamics are unestablished`,
+        suggestedOperator: 'complicate_relationship',
+        attentionBid: 40,
+      });
+    }
+  }
+
   // No clues seeded by scene 4 = mystery engine hasn't started.
   // Check both prior state and current IR ops so the scene seeding the first clue
   // doesn't falsely trigger this warning.

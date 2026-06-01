@@ -6,7 +6,7 @@ import type { NarrativeTransitionIR } from '../../ir/NarrativeTransitionIR.ts';
 import type { NarrativeState } from '../../state/NarrativeState.ts';
 import type { Critique } from '../room.ts';
 
-export function skepticCritic(ir: NarrativeTransitionIR, _state: NarrativeState): Critique[] {
+export function skepticCritic(ir: NarrativeTransitionIR, state: NarrativeState): Critique[] {
   const critiques: Critique[] = [];
 
   ir.ops.forEach((op, i) => {
@@ -18,6 +18,32 @@ export function skepticCritic(ir: NarrativeTransitionIR, _state: NarrativeState)
         suggestedOperator: 'complicate_relationship',
         attentionBid: 55,
       });
+    }
+
+    // Belief reversal without evidential anchor: character already has established beliefs,
+    // but this scene updates them via a told source at high confidence (0.75–0.90)
+    // with no ADD_FACT or SHIFT_RELATIONSHIP bridging event before this op.
+    // The "> 0.9" check above handles the most egregious case; this catches the mid range.
+    if (
+      op.op === 'UPDATE_BELIEF' &&
+      op.belief.source === 'told' &&
+      op.belief.confidence >= 0.75 && op.belief.confidence <= 0.9
+    ) {
+      const charHasExistingBeliefs = (state.characterBeliefs[op.charId] ?? []).length > 0;
+      if (charHasExistingBeliefs) {
+        const hasEvidentialAnchor = ir.ops.slice(0, i).some(p =>
+          p.op === 'ADD_FACT' ||
+          (p.op === 'SHIFT_RELATIONSHIP' && p.pair.includes(op.charId)),
+        );
+        if (!hasEvidentialAnchor) {
+          critiques.push({
+            criticId: 'skeptic', severity: 40, targetOpIdx: i,
+            objection: `${op.charId} updates a told-belief at confidence ${op.belief.confidence.toFixed(2)} despite having no new factual or relational anchor in this scene — where did this certainty come from?`,
+            suggestedOperator: 'inject_irony',
+            attentionBid: 45,
+          });
+        }
+      }
     }
 
     // Large relationship leap without causal link

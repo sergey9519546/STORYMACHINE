@@ -12782,3 +12782,103 @@ describe('Wave 108 — cognition-emotion mismatch (lint + character advocate)', 
     assert.ok(!critiques.some((c: { objection: string }) => c.objection.includes('cognition and emotion are disconnected')), 'different chars → no mismatch');
   });
 });
+
+// ── Wave 109 — Skeptic belief-reversal, Studio-Note curiosity, Dramaturge relationship vacuum ─
+{
+  const { skepticCritic } = await import('./server/nvm/room/critics/skeptic.ts');
+  const { studioNoteCritic } = await import('./server/nvm/room/critics/studio-note.ts');
+  const { dramaturgeCritic } = await import('./server/nvm/room/critics/dramaturge.ts');
+
+  function makeIR109(
+    ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[],
+    sceneIdx = 4,
+    sceneFunction: import('./server/nvm/ir/NarrativeTransitionIR.ts').SceneFunction = 'advance_plot',
+  ): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR {
+    return {
+      transitionId: 't1', sceneIdx, sceneFunction,
+      activeMechanisms: [], beforeStateHash: '', ops,
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 1 },
+    };
+  }
+
+  function stateWithBeliefs(charId: string, beliefs: import('./server/engine/types.ts').Belief[]): import('./server/nvm/state/NarrativeState.ts').NarrativeState {
+    return {
+      ...emptyState(),
+      characterBeliefs: { [charId]: beliefs },
+    };
+  }
+
+  function stateWithAudience(curiosity: number, suspense: number, investment: number): import('./server/nvm/state/NarrativeState.ts').NarrativeState {
+    return {
+      ...emptyState(),
+      audienceState: { knownFacts: [], curiosity, suspense, investment },
+    };
+  }
+
+  function stateWithChars(chars: string[]): import('./server/nvm/state/NarrativeState.ts').NarrativeState {
+    const beliefs: Record<string, import('./server/engine/types.ts').Belief[]> = {};
+    for (const c of chars) {
+      beliefs[c] = [{ id: `b_${c}`, proposition: `${c} exists`, confidence: 0.8, source: 'witnessed', source_event_id: 'e1', acquired_at: 0 }];
+    }
+    return { ...emptyState(), characterBeliefs: beliefs };
+  }
+
+  describe('Wave 109 — critics: belief-reversal, curiosity floor, relationship vacuum', () => {
+    it('skeptic: told belief 0.75-0.9 conf with no ADD_FACT, char has existing beliefs → reversal critique', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b2', proposition: 'the map is real', confidence: 0.8, source: 'told', source_agent_id: 'bob', acquired_at: 4 } },
+      ];
+      const state = stateWithBeliefs('alice', [{ id: 'b1', proposition: 'the map is fake', confidence: 0.7, source: 'witnessed', source_event_id: 'e1', acquired_at: 0 }]);
+      const critiques = skepticCritic(makeIR109(ops), state);
+      assert.ok(critiques.some(c => c.criticId === 'skeptic' && c.objection.includes('relational anchor')), 'mid-range told belief + no anchor → reversal critique');
+    });
+
+    it('skeptic: told belief 0.8 conf WITH bridging ADD_FACT → no reversal critique', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'map', predicate: 'is', object: 'real', addedAtTurn: 4, validFrom: 4, validTo: null } },
+        { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b2', proposition: 'the map is real', confidence: 0.8, source: 'told', source_agent_id: 'bob', acquired_at: 4 } },
+      ];
+      const state = stateWithBeliefs('alice', [{ id: 'b1', proposition: 'the map is fake', confidence: 0.7, source: 'witnessed', source_event_id: 'e1', acquired_at: 0 }]);
+      const critiques = skepticCritic(makeIR109(ops), state);
+      assert.ok(!critiques.some(c => c.objection.includes('relational anchor')), 'ADD_FACT bridge → no reversal critique');
+    });
+
+    it('skeptic: told belief 0.8 conf but char has NO existing beliefs → no reversal critique', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'UPDATE_BELIEF', charId: 'alice', belief: { id: 'b2', proposition: 'the map is real', confidence: 0.8, source: 'told', source_agent_id: 'bob', acquired_at: 4 } },
+      ];
+      const critiques = skepticCritic(makeIR109(ops), emptyState());
+      assert.ok(!critiques.some(c => c.objection.includes('evidential anchor')), 'no existing beliefs → no reversal critique');
+    });
+
+    it('studio-note: curiosity < 20 after scene 3 → curiosity floor critique', () => {
+      const critiques = studioNoteCritic(makeIR109([], 4), stateWithAudience(15, 50, 60));
+      assert.ok(critiques.some(c => c.objection.includes('curiosity')), 'low curiosity → curiosity floor critique');
+    });
+
+    it('studio-note: curiosity >= 20 → no curiosity floor critique', () => {
+      const critiques = studioNoteCritic(makeIR109([], 4), stateWithAudience(25, 50, 60));
+      assert.ok(!critiques.some(c => c.objection.includes('curiosity') && c.objection.includes('stopped asking')), 'adequate curiosity → no floor critique');
+    });
+
+    it('dramaturge: scene 3+, 2 chars, no relationships → relationship vacuum critique', () => {
+      const critiques = dramaturgeCritic(makeIR109([], 3), stateWithChars(['alice', 'bob']));
+      assert.ok(critiques.some(c => c.objection.includes('dynamics are unestablished')), '2 chars + no rel → vacuum critique');
+    });
+
+    it('dramaturge: scene 3+, 2 chars WITH relationships → no vacuum critique', () => {
+      const state = {
+        ...stateWithChars(['alice', 'bob']),
+        relationships: { 'alice|bob': [{ dimension: 'trust' as const, amount: 0.4, reason: 'shared goal' }] },
+      };
+      const critiques = dramaturgeCritic(makeIR109([], 3), state);
+      assert.ok(!critiques.some(c => c.objection.includes('dynamics are unestablished')), 'relationships exist → no vacuum critique');
+    });
+
+    it('dramaturge: scene 2 (too early) → no vacuum critique even without relationships', () => {
+      const critiques = dramaturgeCritic(makeIR109([], 2), stateWithChars(['alice', 'bob']));
+      assert.ok(!critiques.some(c => c.objection.includes('dynamics are unestablished')), 'scene 2 → no vacuum critique');
+    });
+  });
+}

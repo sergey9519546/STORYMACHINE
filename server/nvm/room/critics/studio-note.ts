@@ -44,6 +44,17 @@ export function studioNoteCritic(ir: NarrativeTransitionIR, state: NarrativeStat
     }
   }
 
+  // Curiosity dropping below 20 after scene 2 — the audience has stopped asking questions.
+  // Curiosity is the engine that keeps viewers watching; its collapse precedes disengagement.
+  if (state.audienceState.curiosity < 20 && ir.sceneIdx > 2) {
+    critiques.push({
+      criticId: 'studio_note', severity: 40, targetOpIdx: null,
+      objection: `Audience curiosity is ${state.audienceState.curiosity}/100 — the story has stopped asking questions; plant a mystery, seed a clue, or reveal an unexpected fact`,
+      suggestedOperator: 'inject_irony',
+      attentionBid: 45,
+    });
+  }
+
   // Suspense dropping below 30 is commercially risky
   if (state.audienceState.suspense < 30 && ir.sceneIdx > 2) {
     critiques.push({
