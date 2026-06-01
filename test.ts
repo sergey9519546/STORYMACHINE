@@ -13391,3 +13391,104 @@ describe('Wave 108 — cognition-emotion mismatch (lint + character advocate)', 
     });
   });
 }
+
+// ── Wave 115 — op density overload, Propp coverage warning, character neglect ──
+{
+  const { characterAdvocateCritic } = await import('./server/nvm/room/critics/character-advocate.ts');
+
+  const makeIR115 = (ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[], sceneIdx = 6): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR => ({
+    transitionId: 'w115', sceneIdx, sceneFunction: 'advance_plot',
+    activeMechanisms: [], beforeStateHash: 'abc', ops,
+    preconditions: [], postconditions: [],
+    provenance: { origin: 'user_authored', createdAt: 0 },
+  });
+
+  describe('Wave 115 — quality engine: op density overload', () => {
+    it('runQualityEngine: >10 ops → OP_DENSITY_OVERLOAD warning', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = Array.from({ length: 12 }, (_, i) => ({
+        op: 'RAISE_CLOCK' as const, clockId: `c${i}`, amount: 1,
+      }));
+      const report = runQualityEngine(makeIR115(ops), emptyState());
+      assert.ok(report.warnings.some(w => w.rule === 'OP_DENSITY_OVERLOAD'),
+        '12 ops → OP_DENSITY_OVERLOAD warning');
+    });
+
+    it('runQualityEngine: exactly 10 ops → no density overload', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = Array.from({ length: 10 }, (_, i) => ({
+        op: 'RAISE_CLOCK' as const, clockId: `c${i}`, amount: 1,
+      }));
+      const report = runQualityEngine(makeIR115(ops), emptyState());
+      assert.ok(!report.warnings.some(w => w.rule === 'OP_DENSITY_OVERLOAD'),
+        'exactly 10 ops → no density overload (boundary)');
+    });
+  });
+
+  describe('Wave 115 — quality engine: Propp coverage warning', () => {
+    it('runQualityEngine: minimal ops at scene 5 → LOW_PROPP_COVERAGE warning', () => {
+      // A scene with only ADD_FACT covers at most 1 Propp stage (preparation)
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'A', predicate: 'is', object: 'present', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      ];
+      const report = runQualityEngine(makeIR115(ops, 5), emptyState());
+      // proppMorphology maps ADD_FACT → preparation only, so coverage = 1/7 ≈ 14% < 30%
+      assert.ok(report.warnings.some(w => w.rule === 'LOW_PROPP_COVERAGE'),
+        'scene 5 with preparation-only → LOW_PROPP_COVERAGE warning');
+    });
+
+    it('runQualityEngine: Propp coverage check skipped before scene 5', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'A', predicate: 'is', object: 'present', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      ];
+      const report = runQualityEngine(makeIR115(ops, 3), emptyState());
+      assert.ok(!report.warnings.some(w => w.rule === 'LOW_PROPP_COVERAGE'),
+        'scene 3 → Propp check not yet applied');
+    });
+  });
+
+  describe('Wave 115 — character advocate: narrative neglect', () => {
+    it('characterAdvocateCritic: established char absent from scene 5+ → neglect critique', () => {
+      const state: import('./server/nvm/state/NarrativeState.ts').NarrativeState = {
+        ...emptyState(),
+        characterBeliefs: {
+          'Alice': [
+            { id: 'b1', proposition: 'P1', confidence: 0.8, source: 'witnessed', acquired_at: 1 },
+            { id: 'b2', proposition: 'P2', confidence: 0.7, source: 'inferred', acquired_at: 2 },
+            { id: 'b3', proposition: 'P3', confidence: 0.9, source: 'told', acquired_at: 3 },
+          ],
+        },
+      };
+      // Scene has 4 ops about Bob, Alice is absent
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'RAISE_CLOCK', clockId: 'c1', amount: 5 },
+        { op: 'RAISE_CLOCK', clockId: 'c2', amount: 3 },
+        { op: 'RAISE_CLOCK', clockId: 'c3', amount: 2 },
+        { op: 'RAISE_CLOCK', clockId: 'c4', amount: 1 },
+      ];
+      const critiques = (characterAdvocateCritic as (ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR, state: import('./server/nvm/state/NarrativeState.ts').NarrativeState) => import('./server/nvm/room/room.ts').Critique[])(makeIR115(ops, 5), state);
+      assert.ok(critiques.some(c => c.objection.includes('Alice') && c.objection.includes('neglected')),
+        'Alice with 3 beliefs absent from 4-op scene → neglect critique');
+    });
+
+    it('characterAdvocateCritic: established char present in scene → no neglect', () => {
+      const state: import('./server/nvm/state/NarrativeState.ts').NarrativeState = {
+        ...emptyState(),
+        characterBeliefs: {
+          'Alice': [
+            { id: 'b1', proposition: 'P1', confidence: 0.8, source: 'witnessed', acquired_at: 1 },
+            { id: 'b2', proposition: 'P2', confidence: 0.7, source: 'inferred', acquired_at: 2 },
+            { id: 'b3', proposition: 'P3', confidence: 0.9, source: 'told', acquired_at: 3 },
+          ],
+        },
+      };
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'RAISE_CLOCK', clockId: 'c1', amount: 5 },
+        { op: 'APPRAISE_EMOTION', charId: 'Alice', emotion: { joy: 60, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'joy', intensity: 60, last_updated_at: 0 } },
+        { op: 'RAISE_CLOCK', clockId: 'c2', amount: 3 },
+        { op: 'RAISE_CLOCK', clockId: 'c3', amount: 2 },
+      ];
+      const critiques = (characterAdvocateCritic as (ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR, state: import('./server/nvm/state/NarrativeState.ts').NarrativeState) => import('./server/nvm/room/room.ts').Critique[])(makeIR115(ops, 5), state);
+      assert.ok(!critiques.some(c => c.objection.includes('neglected')),
+        'Alice appears in scene via APPRAISE_EMOTION → no neglect critique');
+    });
+  });
+}

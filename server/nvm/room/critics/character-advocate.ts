@@ -61,6 +61,28 @@ export function characterAdvocateCritic(ir: NarrativeTransitionIR, state: Narrat
     }
   });
 
+  // Narrative neglect: after scene 4, if a well-established character (≥3 beliefs in state)
+  // is absent from all ops in a substantive scene (≥4 ops), they're being forgotten.
+  // The story is losing track of a character it invested in building.
+  if (ir.sceneIdx > 4 && ir.ops.length >= 4) {
+    const scenePresentChars = new Set<string>();
+    for (const op of ir.ops) {
+      if ('charId' in op) scenePresentChars.add((op as { charId: string }).charId);
+      if (op.op === 'SHIFT_RELATIONSHIP') { scenePresentChars.add(op.pair[0]); scenePresentChars.add(op.pair[1]); }
+    }
+    for (const [charId, beliefs] of Object.entries(state.characterBeliefs)) {
+      if (beliefs.length >= 3 && !scenePresentChars.has(charId)) {
+        critiques.push({
+          criticId: 'character_advocate', severity: 30, targetOpIdx: null,
+          objection: `${charId} has ${beliefs.length} established beliefs but appears in no ops — narratively neglected in a ${ir.ops.length}-op scene`,
+          suggestedOperator: 'complicate_relationship',
+          attentionBid: 35,
+        });
+        break; // flag at most one neglected character per scene to avoid noise
+      }
+    }
+  }
+
   // Cognition-emotion alignment: high-confidence belief + shame/distress in same IR
   // without a motivating bridging event = disconnected psychology.
   const SHAME_EMOTIONS = new Set(['shame', 'distress']);

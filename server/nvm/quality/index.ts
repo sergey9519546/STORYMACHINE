@@ -766,11 +766,31 @@ export function runQualityEngine(ir: NarrativeTransitionIR, state: NarrativeStat
     });
   }
 
+  // Op density overload: more than 10 ops in a single scene fragments attention.
+  // Screenplay scenes have rhythm — too many simultaneous beats destroy pacing.
+  if (ir.ops.length > 10) {
+    warnings.push({
+      engine: 'density', opIdx: null, rule: 'OP_DENSITY_OVERLOAD',
+      message: `Scene has ${ir.ops.length} ops — exceeds the 10-op attention ceiling; consolidate or split`,
+      penalty: Math.min(30, (ir.ops.length - 10) * 3),
+    });
+  }
+
   const arcDebt = computeArcDebt(state, ir.sceneIdx);
   const rr = revealReady(state);
   const repairGaps = relationshipRepairGaps(state, ir);
   const causalGraph = buildCausalGraph(ir);
   const proppAnalysis = proppMorphology(ir);
+
+  // Propp coverage warning: after scene 5, if less than 30% of narrative stages
+  // are present in this scene, the story is skipping too many structural beats.
+  if (ir.sceneIdx >= 5 && proppAnalysis.coverage < 0.3) {
+    warnings.push({
+      engine: 'propp', opIdx: null, rule: 'LOW_PROPP_COVERAGE',
+      message: `Propp coverage ${(proppAnalysis.coverage * 100).toFixed(0)}% — scene skips most narrative stages; missing: ${proppAnalysis.absent.slice(0, 3).join(', ')}`,
+      penalty: Math.round((0.3 - proppAnalysis.coverage) * 40),
+    });
+  }
 
   const totalPenalty = warnings.reduce((s, w) => s + w.penalty, 0);
   const score = Math.max(0, 100 - totalPenalty);
