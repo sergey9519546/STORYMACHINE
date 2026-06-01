@@ -7095,12 +7095,13 @@ describe('NVM — Quality-Aware Generation Spec (Wave 27)', () => {
     assert.ok(all.some(c => c.description.includes('complication')), 'Propp gap → complication');
   });
 
-  it('qualityConstraintsFromWarnings: low-penalty warnings (<15) without matching rule → ignored', () => {
+  it('qualityConstraintsFromWarnings: unrecognized rules always generate a constraint regardless of penalty', () => {
     const warnings: import('./server/nvm/quality/index.ts').QualityWarning[] = [{
       engine: 'custom', opIdx: null, rule: 'UNKNOWN_RULE_XYZ', message: 'minor thing', penalty: 5,
     }];
     const constraints = qualityConstraintsFromWarnings(warnings);
-    assert.equal(constraints.length, 0, 'penalty < 15 + unknown rule → no constraint');
+    assert.equal(constraints.length, 1, 'unrecognized rule → constraint generated (no silent drop)');
+    assert.ok(constraints[0].description.includes('minor thing'), 'message included in constraint');
   });
 
   it('arcConstraintsFromTracker: THEME urgency → resolve theme constraint', () => {
@@ -12260,5 +12261,169 @@ describe('Wave 103 — topology extended archetypes, belief uniformity, vague fa
     };
     const result = genericnessProof(ir, emptyState());
     assert.ok(result.pass, 'specific named location should pass genericness');
+  });
+});
+
+// ── Wave 104: emotional debt tracker, quality constraint gap, originality clichés ─
+
+import { originalityProof } from './server/nvm/proof/tier3/originality.ts';
+
+describe('Wave 104 — emotional debt, quality constraint gap, originality clichés', () => {
+  // ── arc-tracker: EMOTIONAL_DEBT ──────────────────────────────────────────────
+
+  it('arc-tracker: peak fear opens an EMOTIONAL_DEBT promise', () => {
+    const scenes = [{
+      sceneIdx: 0,
+      ops: [{ op: 'APPRAISE_EMOTION' as const, charId: 'alice', emotion: { dominant: 'fear' as const, intensity: 80, joy: 0, distress: 0, anger: 0, fear: 80, pride: 0, shame: 0 } }],
+    }];
+    const report = analyzeArcCompletion(scenes);
+    const debt = report.openPromises.find(p => p.kind === 'EMOTIONAL_DEBT');
+    assert.ok(debt, 'EMOTIONAL_DEBT promise created for peak fear');
+    assert.strictEqual(debt!.promiseId, 'debt:alice');
+  });
+
+  it('arc-tracker: cathartic joy closes an EMOTIONAL_DEBT promise', () => {
+    const scenes = [
+      {
+        sceneIdx: 0,
+        ops: [{ op: 'APPRAISE_EMOTION' as const, charId: 'alice', emotion: { dominant: 'fear' as const, intensity: 80, joy: 0, distress: 0, anger: 0, fear: 80, pride: 0, shame: 0 } }],
+      },
+      {
+        sceneIdx: 1,
+        ops: [{ op: 'APPRAISE_EMOTION' as const, charId: 'alice', emotion: { dominant: 'joy' as const, intensity: 60, joy: 60, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0 } }],
+      },
+    ];
+    const report = analyzeArcCompletion(scenes);
+    const debt = report.openPromises.find(p => p.kind === 'EMOTIONAL_DEBT');
+    assert.ok(!debt, 'EMOTIONAL_DEBT resolved by cathartic joy');
+    assert.ok(report.resolvedCount >= 1, 'resolved count incremented');
+  });
+
+  it('arc-tracker: low-intensity follow-up closes an EMOTIONAL_DEBT promise', () => {
+    const scenes = [
+      {
+        sceneIdx: 0,
+        ops: [{ op: 'APPRAISE_EMOTION' as const, charId: 'bob', emotion: { dominant: 'distress' as const, intensity: 85, joy: 0, distress: 85, anger: 0, fear: 0, pride: 0, shame: 0 } }],
+      },
+      {
+        sceneIdx: 1,
+        ops: [{ op: 'APPRAISE_EMOTION' as const, charId: 'bob', emotion: { dominant: 'anger' as const, intensity: 30, joy: 0, distress: 0, anger: 30, fear: 0, pride: 0, shame: 0 } }],
+      },
+    ];
+    const report = analyzeArcCompletion(scenes);
+    const debt = report.openPromises.find(p => p.kind === 'EMOTIONAL_DEBT');
+    assert.ok(!debt, 'EMOTIONAL_DEBT resolved by low-intensity emotion');
+  });
+
+  it('arc-tracker: low-intensity fear (<75) does NOT open an EMOTIONAL_DEBT', () => {
+    const scenes = [{
+      sceneIdx: 0,
+      ops: [{ op: 'APPRAISE_EMOTION' as const, charId: 'carol', emotion: { dominant: 'fear' as const, intensity: 60, joy: 0, distress: 0, anger: 0, fear: 60, pride: 0, shame: 0 } }],
+    }];
+    const report = analyzeArcCompletion(scenes);
+    const debt = report.openPromises.find(p => p.kind === 'EMOTIONAL_DEBT');
+    assert.ok(!debt, 'intensity 60 < 75 → no emotional debt');
+  });
+
+  // ── quality-spec: EMOTIONAL_DEBT constraint ───────────────────────────────────
+
+  it('arcConstraintsFromTracker: EMOTIONAL_DEBT urgency → catharsis constraint', () => {
+    const promises: import('./server/nvm/quality/arc-tracker.ts').OpenPromise[] = [{
+      promiseId: 'debt:alice', kind: 'EMOTIONAL_DEBT',
+      description: '"alice" is stuck in fear (intensity 80) since scene 0 — owes a catharsis',
+      openedAtScene: 0, targetWindow: [2, 5], urgency: 'overdue',
+      suggestedOp: 'APPRAISE_EMOTION', pacingScore: 0.1,
+    }];
+    const constraints = arcConstraintsFromTracker(promises, 3);
+    assert.ok(constraints.some(c => c.description.includes('cathartic')), 'EMOTIONAL_DEBT → catharsis constraint');
+    assert.ok(constraints.some(c => c.description.includes('URGENT')), 'overdue → URGENT prefix');
+  });
+
+  // ── quality-spec: constraint gap fix ─────────────────────────────────────────
+
+  it('qualityConstraintsFromWarnings: unknown rule with penalty=1 generates constraint (no silent drop)', () => {
+    const warnings: import('./server/nvm/quality/index.ts').QualityWarning[] = [{
+      engine: 'custom', opIdx: null, rule: 'MY_FUTURE_RULE', message: 'very specific fix needed', penalty: 1,
+    }];
+    const constraints = qualityConstraintsFromWarnings(warnings);
+    assert.equal(constraints.length, 1, 'constraint generated for penny=1 unknown rule');
+    assert.ok(constraints[0].description.includes('very specific fix needed'), 'message included');
+  });
+
+  // ── originality proof: cliché A — consecutive ADD_FACT run ───────────────────
+
+  it('originalityProof: 3 consecutive ADD_FACT ops with no character op → cliché fail', () => {
+    const ops = [
+      { op: 'ADD_FACT' as const, fact: { subject: 'castle', predicate: 'is', object: 'abandoned', source: 'narrator' as const } },
+      { op: 'ADD_FACT' as const, fact: { subject: 'moat', predicate: 'is', object: 'dry', source: 'narrator' as const } },
+      { op: 'ADD_FACT' as const, fact: { subject: 'gate', predicate: 'is', object: 'open', source: 'narrator' as const } },
+      { op: 'UPDATE_BELIEF' as const, charId: 'alice', belief: { proposition: 'castle is dangerous', confidence: 0.7, source: 'inferred' as const } },
+      { op: 'APPRAISE_EMOTION' as const, charId: 'alice', emotion: { dominant: 'fear' as const, intensity: 60, joy: 0, distress: 0, anger: 0, fear: 60, pride: 0, shame: 0 } },
+      { op: 'SHIFT_RELATIONSHIP' as const, pair: ['alice', 'bob'] as [string, string], delta: { dimension: 'trust' as const, amount: -0.2 }, label: 'unease' },
+    ];
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 't1', sceneIdx: 1, sceneFunction: 'advance_plot',
+      activeMechanisms: [], beforeStateHash: '', ops,
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 1 },
+    };
+    const result = originalityProof(ir, emptyState());
+    assert.ok(!result.pass, 'consecutive ADD_FACT run → originality fail');
+    assert.ok(result.findings.some(f => f.message.includes('exposition dump')), 'finding mentions exposition dump');
+  });
+
+  it('originalityProof: ADD_FACT run broken by APPRAISE_EMOTION → pass', () => {
+    const ops = [
+      { op: 'ADD_FACT' as const, fact: { subject: 'castle', predicate: 'is', object: 'abandoned', source: 'narrator' as const } },
+      { op: 'ADD_FACT' as const, fact: { subject: 'moat', predicate: 'is', object: 'dry', source: 'narrator' as const } },
+      { op: 'APPRAISE_EMOTION' as const, charId: 'alice', emotion: { dominant: 'fear' as const, intensity: 60, joy: 0, distress: 0, anger: 0, fear: 60, pride: 0, shame: 0 } },
+      { op: 'ADD_FACT' as const, fact: { subject: 'gate', predicate: 'is', object: 'open', source: 'narrator' as const } },
+      { op: 'UPDATE_BELIEF' as const, charId: 'alice', belief: { proposition: 'castle is dangerous', confidence: 0.7, source: 'inferred' as const } },
+    ];
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 't1', sceneIdx: 1, sceneFunction: 'advance_plot',
+      activeMechanisms: [], beforeStateHash: '', ops,
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 1 },
+    };
+    const result = originalityProof(ir, emptyState());
+    assert.ok(result.pass, 'ADD_FACT run broken by character op → pass');
+  });
+
+  // ── originality proof: cliché B — same-scene relationship whiplash ────────────
+
+  it('originalityProof: same pair both negative and positive delta in one scene → whiplash fail', () => {
+    const ops = [
+      { op: 'SHIFT_RELATIONSHIP' as const, pair: ['alice', 'bob'] as [string, string], delta: { dimension: 'trust' as const, amount: -0.5 }, label: 'argument' },
+      { op: 'APPRAISE_EMOTION' as const, charId: 'alice', emotion: { dominant: 'distress' as const, intensity: 55, joy: 0, distress: 55, anger: 0, fear: 0, pride: 0, shame: 0 } },
+      { op: 'SHIFT_RELATIONSHIP' as const, pair: ['bob', 'alice'] as [string, string], delta: { dimension: 'trust' as const, amount: 0.6 }, label: 'reconciliation' },
+      { op: 'APPRAISE_EMOTION' as const, charId: 'bob', emotion: { dominant: 'joy' as const, intensity: 55, joy: 55, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0 } },
+    ];
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 't1', sceneIdx: 1, sceneFunction: 'advance_plot',
+      activeMechanisms: [], beforeStateHash: '', ops,
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 1 },
+    };
+    const result = originalityProof(ir, emptyState());
+    assert.ok(!result.pass, 'same-scene relationship whiplash → originality fail');
+    assert.ok(result.findings.some(f => f.message.includes('fight-and-make-up')), 'finding mentions fight-and-make-up');
+  });
+
+  it('originalityProof: only negative delta (no whiplash) → no cliché fail', () => {
+    const ops = [
+      { op: 'SHIFT_RELATIONSHIP' as const, pair: ['alice', 'bob'] as [string, string], delta: { dimension: 'trust' as const, amount: -0.4 }, label: 'betrayal' },
+      { op: 'UPDATE_BELIEF' as const, charId: 'alice', belief: { proposition: 'bob cannot be trusted', confidence: 0.8, source: 'observed' as const } },
+      { op: 'APPRAISE_EMOTION' as const, charId: 'alice', emotion: { dominant: 'anger' as const, intensity: 70, joy: 0, distress: 0, anger: 70, fear: 0, pride: 0, shame: 0 } },
+      { op: 'ADD_FACT' as const, fact: { subject: 'alice', predicate: 'leaves', object: 'the room', source: 'observed' as const } },
+    ];
+    const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
+      transitionId: 't1', sceneIdx: 1, sceneFunction: 'advance_plot',
+      activeMechanisms: [], beforeStateHash: '', ops,
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: 1 },
+    };
+    const result = originalityProof(ir, emptyState());
+    assert.ok(result.pass, 'only negative relationship delta → no whiplash, passes');
   });
 });

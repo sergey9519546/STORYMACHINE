@@ -78,5 +78,57 @@ export function originalityProof(
     }
   }
 
+  // ── Cliché check A: consecutive ADD_FACT run ≥3 with no character op in between ──
+  // A long unbroken run of world-facts without any character reaction is an
+  // exposition dump — structurally generic regardless of content.
+  const CONSECUTIVE_FACT_THRESHOLD = 3;
+  let consecutiveFacts = 0;
+  for (const op of ir.ops) {
+    if (op.op === 'ADD_FACT' || op.op === 'RECORD_VISUAL_FACT' || op.op === 'EXPIRE_FACT') {
+      consecutiveFacts++;
+      if (consecutiveFacts >= CONSECUTIVE_FACT_THRESHOLD) {
+        return failResult('OriginalityProof',
+          `${consecutiveFacts} consecutive world ops with no character response`, [
+          {
+            proof: 'OriginalityProof',
+            severity: 'info',
+            message: `${consecutiveFacts} consecutive world-fact ops with no character reaction (UPDATE_BELIEF, APPRAISE_EMOTION, or SHIFT_RELATIONSHIP). Break the exposition dump with a human response.`,
+          },
+        ]);
+      }
+    } else if (op.op === 'UPDATE_BELIEF' || op.op === 'APPRAISE_EMOTION' || op.op === 'SHIFT_RELATIONSHIP') {
+      consecutiveFacts = 0;
+    }
+  }
+
+  // ── Cliché check B: same-scene relationship whiplash ──────────────────────────
+  // A pair that swings both negative AND positive in the same scene has a dramatic
+  // fight-and-make-up arc compressed to a single beat — emotionally unconvincing.
+  const relPositive = new Map<string, number>(); // pairKey → positive delta total
+  const relNegative = new Map<string, number>(); // pairKey → negative delta total
+  for (const op of ir.ops) {
+    if (op.op !== 'SHIFT_RELATIONSHIP') continue;
+    const key = [...op.pair].sort().join('|');
+    const amt = typeof op.delta?.amount === 'number' ? op.delta.amount : 0;
+    if (amt > 0) relPositive.set(key, (relPositive.get(key) ?? 0) + amt);
+    else if (amt < 0) relNegative.set(key, (relNegative.get(key) ?? 0) + Math.abs(amt));
+  }
+  const WHIPLASH_THRESHOLD = 0.3;
+  for (const [key, posAmt] of relPositive) {
+    const negAmt = relNegative.get(key) ?? 0;
+    if (posAmt >= WHIPLASH_THRESHOLD && negAmt >= WHIPLASH_THRESHOLD) {
+      const [a, b] = key.split('|');
+      return failResult('OriginalityProof',
+        `${a}↔${b} relationship swings both +${posAmt.toFixed(2)} and -${negAmt.toFixed(2)} in one scene`, [
+        {
+          proof: 'OriginalityProof',
+          severity: 'info',
+          message: `"${a}" and "${b}" have a relationship fight-and-make-up within a single scene (±${Math.max(posAmt, negAmt).toFixed(2)}). Spread the arc across multiple scenes for emotional credibility.`,
+          subjectId: key,
+        },
+      ]);
+    }
+  }
+
   return passResult('OriginalityProof', `dominance=${dominance.toFixed(2)} — op mix is varied`);
 }

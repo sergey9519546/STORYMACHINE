@@ -81,9 +81,8 @@ export function qualityConstraintsFromWarnings(
         constraints.push({ kind: 'free_form', description: 'Give each character a distinct vocabulary. Characters should believe and express things in different ways — one speaks in absolutes, another in conditionals, etc.' });
         break;
       default:
-        if (w.penalty >= 15) {
-          constraints.push({ kind: 'free_form', description: `Quality fix required: ${w.message}` });
-        }
+        // Include all unrecognized quality warnings regardless of penalty so none silently disappear.
+        constraints.push({ kind: 'free_form', description: `Quality fix required: ${sanitizeForPrompt(w.message, 200)}` });
     }
   }
 
@@ -116,6 +115,8 @@ export function arcConstraintsFromTracker(
         return { kind: 'free_form' as const, description: `${urgencyPrefix}Resolve arc promise: ${base}. Add an ADVANCE_THEME_ARGUMENT with move='resolve' — the theme argument is overdue for a position.` };
       case 'OBJECT':
         return { kind: 'free_form' as const, description: `${urgencyPrefix}Resolve arc promise: ${base}. Advance the ADVANCE_OBJECT_ARC to a terminal state (destroyed, resolved, returned, complete, found, lost_permanently).` };
+      case 'EMOTIONAL_DEBT':
+        return { kind: 'free_form' as const, description: `${urgencyPrefix}Resolve arc promise: ${base}. Give this character a cathartic release — an APPRAISE_EMOTION with joy, pride, or neutral at lower intensity. Characters cannot stay in peak distress indefinitely.` };
       default: {
         // Exhaustiveness guard — if a new OpenPromise kind is added without updating this switch,
         // TypeScript will infer 'never' here and the build will fail.

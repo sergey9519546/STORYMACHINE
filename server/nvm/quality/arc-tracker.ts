@@ -14,7 +14,7 @@ import type { StoryOp } from '../ops/StoryOp.ts';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type PromiseKind = 'CLUE' | 'CLOCK' | 'REL' | 'THEME' | 'OBJECT';
+export type PromiseKind = 'CLUE' | 'CLOCK' | 'REL' | 'THEME' | 'OBJECT' | 'EMOTIONAL_DEBT';
 export type PromiseUrgency = 'overdue' | 'due_soon' | 'on_track' | 'not_yet';
 
 export interface OpenPromise {
@@ -51,12 +51,17 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
   const totalScenes = scenes.length;
 
   // Accumulate open/closed promises pass-over
-  const openClues       = new Map<string, number>();   // clueId → openedAtScene
-  const openClocks      = new Map<string, { scene: number; totalAmount: number }>();
-  const openRelNeg      = new Map<string, { scene: number; netAmount: number }>();
-  const openThemes      = new Map<string, { scene: number; moves: string[] }>();
-  const openObjects     = new Map<string, { scene: number; currentState: string }>();
-  let resolvedCount     = 0;
+  const openClues        = new Map<string, number>();   // clueId → openedAtScene
+  const openClocks       = new Map<string, { scene: number; totalAmount: number }>();
+  const openRelNeg       = new Map<string, { scene: number; netAmount: number }>();
+  const openThemes       = new Map<string, { scene: number; moves: string[] }>();
+  const openObjects      = new Map<string, { scene: number; currentState: string }>();
+  // EMOTIONAL_DEBT: character in peak distress/fear with no catharsis yet
+  const openEmotionalDebts = new Map<string, { scene: number; dominant: string; intensity: number }>();
+  let resolvedCount      = 0;
+
+  const HIGH_DISTRESS_EMOTIONS = new Set(['fear', 'distress', 'anger', 'shame']);
+  const CATHARTIC_EMOTIONS     = new Set(['joy', 'pride', 'neutral']);
 
   const TERMINAL_OBJECT_STATES = new Set(['destroyed', 'resolved', 'returned', 'complete', 'found', 'lost_permanently']);
 
@@ -119,6 +124,21 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
             openObjects.delete(op.objectId);
           } else {
             openObjects.set(op.objectId, { scene: sceneIdx, currentState: op.toState });
+          }
+          break;
+        }
+
+        case 'APPRAISE_EMOTION': {
+          const { dominant, intensity } = op.emotion;
+          if (HIGH_DISTRESS_EMOTIONS.has(dominant) && intensity >= 75) {
+            // Character enters peak distress — open an emotional debt
+            openEmotionalDebts.set(op.charId, { scene: sceneIdx, dominant, intensity });
+          } else if (openEmotionalDebts.has(op.charId)) {
+            // Cathartic resolution: calming emotion or intensity drops below 40
+            if (CATHARTIC_EMOTIONS.has(dominant) || intensity < 40) {
+              openEmotionalDebts.delete(op.charId);
+              resolvedCount++;
+            }
           }
           break;
         }
@@ -212,6 +232,23 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
       urgency,
       suggestedOp: 'ADVANCE_OBJECT_ARC',
       pacingScore: computePacingScore(age, 3, 12),
+    });
+  }
+
+  // EMOTIONAL_DEBT promises — catharsis should follow within 2–5 scenes
+  for (const [charId, { scene: openedAtScene, dominant, intensity }] of openEmotionalDebts) {
+    const age = totalScenes - openedAtScene;
+    const targetWindow: [number, number] = [openedAtScene + 2, openedAtScene + 5];
+    const urgency = computeUrgency(totalScenes - 1, targetWindow);
+    openPromises.push({
+      promiseId: `debt:${charId}`,
+      kind: 'EMOTIONAL_DEBT',
+      description: `"${charId}" is stuck in ${dominant} (intensity ${intensity}) since scene ${openedAtScene} — owes a catharsis`,
+      openedAtScene,
+      targetWindow,
+      urgency,
+      suggestedOp: 'APPRAISE_EMOTION',
+      pacingScore: computePacingScore(age, 2, 5),
     });
   }
 
