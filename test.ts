@@ -13051,3 +13051,119 @@ describe('Wave 108 — cognition-emotion mismatch (lint + character advocate)', 
     });
   });
 }
+
+// ── Wave 112 — genre-aware lint, confidence-weighted consequence, clue payoff arc ──
+{
+  const makeIR112 = (ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[], sceneIdx = 3): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR => ({
+    transitionId: 'w112', sceneIdx, sceneFunction: 'build_tension',
+    activeMechanisms: [], beforeStateHash: 'abc', ops,
+    preconditions: [], postconditions: [],
+    provenance: { origin: 'user_authored', createdAt: 0 },
+  });
+
+  const horrorState = (): import('./server/nvm/state/NarrativeState.ts').NarrativeState => ({
+    ...emptyState(),
+    audienceState: { knownFacts: [], suspense: 10, curiosity: 50, investment: 50 },
+    authorIntent: { genre: 'horror' },
+  });
+
+  describe('Wave 112 — genre-aware lint rules', () => {
+    it('lint: horror genre + low suspense at scene 3 → GENRE_SUSPENSE_FLOOR warn', () => {
+      const warnings = lint(makeIR112([], 3), horrorState());
+      assert.ok(warnings.some(w => w.rule === 'GENRE_SUSPENSE_FLOOR' && w.severity === 'warn'),
+        'horror + suspense=10 at scene 3 → GENRE_SUSPENSE_FLOOR');
+    });
+
+    it('lint: thriller genre + adequate suspense → no GENRE_SUSPENSE_FLOOR', () => {
+      const state = { ...emptyState(), audienceState: { knownFacts: [] as string[], suspense: 60, curiosity: 50, investment: 50 }, authorIntent: { genre: 'thriller' as const } };
+      const warnings = lint(makeIR112([], 4), state);
+      assert.ok(!warnings.some(w => w.rule === 'GENRE_SUSPENSE_FLOOR'),
+        'suspense=60 → no suspense floor warning');
+    });
+
+    it('lint: horror genre at scene 2 → no GENRE_SUSPENSE_FLOOR (too early)', () => {
+      const warnings = lint(makeIR112([], 2), horrorState());
+      assert.ok(!warnings.some(w => w.rule === 'GENRE_SUSPENSE_FLOOR'),
+        'scene 2 is too early for the suspense floor rule');
+    });
+
+    it('lint: mystery genre + no clues at scene 2 → GENRE_MYSTERY_NO_CLUES', () => {
+      const state = { ...emptyState(), authorIntent: { genre: 'mystery' as const } };
+      const warnings = lint(makeIR112([], 2), state);
+      assert.ok(warnings.some(w => w.rule === 'GENRE_MYSTERY_NO_CLUES' && w.severity === 'warn'),
+        'mystery with no clues at scene 2 → GENRE_MYSTERY_NO_CLUES');
+    });
+
+    it('lint: mystery genre + clue in state → no GENRE_MYSTERY_NO_CLUES', () => {
+      const state: import('./server/nvm/state/NarrativeState.ts').NarrativeState = {
+        ...emptyState(),
+        authorIntent: { genre: 'mystery' as const },
+        clues: [{ clueId: 'knife-handle', carrier: 'object' }],
+      };
+      const warnings = lint(makeIR112([], 3), state);
+      assert.ok(!warnings.some(w => w.rule === 'GENRE_MYSTERY_NO_CLUES'),
+        'clue already in state → no mystery no-clues warning');
+    });
+
+    it('lint: comedy genre + no positive emotion at scene 2 → GENRE_COMEDY_TONE_DRIFT', () => {
+      const state = { ...emptyState(), authorIntent: { genre: 'comedy' as const } };
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'APPRAISE_EMOTION', charId: 'A', emotion: { joy: 0, distress: 60, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'distress', intensity: 60, last_updated_at: 0 } },
+      ];
+      const warnings = lint(makeIR112(ops, 2), state);
+      assert.ok(warnings.some(w => w.rule === 'GENRE_COMEDY_TONE_DRIFT'),
+        'comedy + only negative emotion → GENRE_COMEDY_TONE_DRIFT');
+    });
+
+    it('lint: comedy genre + joy emotion → no GENRE_COMEDY_TONE_DRIFT', () => {
+      const state = { ...emptyState(), authorIntent: { genre: 'comedy' as const } };
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'APPRAISE_EMOTION', charId: 'A', emotion: { joy: 70, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'joy', intensity: 70, last_updated_at: 0 } },
+      ];
+      const warnings = lint(makeIR112(ops, 2), state);
+      assert.ok(!warnings.some(w => w.rule === 'GENRE_COMEDY_TONE_DRIFT'),
+        'joy emotion present → no tone drift warning');
+    });
+  });
+
+  describe('Wave 112 — branch score: confidence-weighted consequence + clue payoff arc', () => {
+    const makeMinimalIR = (ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[]): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR => ({
+      transitionId: 'w112b', sceneIdx: 2, sceneFunction: 'advance_plot',
+      activeMechanisms: [], beforeStateHash: 'xyz', ops,
+      preconditions: [], postconditions: [],
+      provenance: { origin: 'user_authored', createdAt: 0 },
+    });
+
+    it('branchScore: high-confidence belief scores more consequence than low-confidence', () => {
+      const highConf: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [{
+        op: 'UPDATE_BELIEF', charId: 'A',
+        belief: { id: 'b1', proposition: 'X is true', source: 'witnessed', source_event_id: 'ev1', confidence: 0.95, acquired_at: 0 },
+      }];
+      const lowConf: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [{
+        op: 'UPDATE_BELIEF', charId: 'A',
+        belief: { id: 'b2', proposition: 'Y is true', source: 'inferred', confidence: 0.2, acquired_at: 0 },
+      }];
+      const scoreHigh = scoreBranch(highConf, makeMinimalIR(highConf), emptyState(), []);
+      const scoreLow  = scoreBranch(lowConf, makeMinimalIR(lowConf), emptyState(), []);
+      assert.ok(scoreHigh.consequence > scoreLow.consequence,
+        `high-confidence belief (${scoreHigh.consequence}) should score higher consequence than low-confidence (${scoreLow.consequence})`);
+    });
+
+    it('branchScore: PAYOFF_SETUP matching seeded clue earns arc alignment bonus', () => {
+      const stateWithClue: import('./server/nvm/state/NarrativeState.ts').NarrativeState = {
+        ...emptyState(),
+        clues: [{ clueId: 'the-key', carrier: 'object' }],
+      };
+      const opsWithMatch: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'PAYOFF_SETUP', setupId: 'the-key', payoffEventId: 'door-opens' },
+      ];
+      const opsNoMatch: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'PAYOFF_SETUP', setupId: 'unknown-clue', payoffEventId: 'something-happens' },
+      ];
+      const scoreMatch   = scoreBranch(opsWithMatch, makeMinimalIR(opsWithMatch), stateWithClue, []);
+      const scoreNoMatch = scoreBranch(opsNoMatch, makeMinimalIR(opsNoMatch), emptyState(), []);
+      assert.ok(scoreMatch.arcAlignment > scoreNoMatch.arcAlignment,
+        `payoff matching seeded clue (${scoreMatch.arcAlignment}) should exceed unmatched payoff (${scoreNoMatch.arcAlignment})`);
+    });
+  });
+}

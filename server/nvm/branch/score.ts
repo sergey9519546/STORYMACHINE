@@ -122,7 +122,12 @@ function computeConsequence(ops: StoryOp[]): number {
     switch (op.op) {
       case 'ADD_FACT':          score += 8;  break;
       case 'EXPIRE_FACT':       score += 10; break;
-      case 'UPDATE_BELIEF':     score += 6;  break;
+      case 'UPDATE_BELIEF': {
+        const conf = (op as Extract<StoryOp, {op:'UPDATE_BELIEF'}>).belief.confidence;
+        // Weight by confidence so a high-certainty belief shift scores more than a tentative one
+        score += 6 * Math.max(0.2, isFinite(conf) ? conf : 0.5);
+        break;
+      }
       case 'APPRAISE_EMOTION':  score += 5;  break;
       case 'SHIFT_RELATIONSHIP':score += 12; break;
       case 'RAISE_CLOCK': {
@@ -184,6 +189,15 @@ function computeArcAlignment(ops: StoryOp[], state: NarrativeState): number {
 
   // Clue seeding = future arc primed
   score += ops.filter(o => o.op === 'SEED_CLUE').length * 8;
+
+  // Earned payoff bonus: PAYOFF_SETUP where setupId matches an already-seeded clue
+  // in state means this branch closes a real dramatic loop, not just declares one
+  const seededClueIds = new Set(state.clues.map(c => c.clueId));
+  const earnedPayoffs = ops.filter(o => {
+    if (o.op !== 'PAYOFF_SETUP') return false;
+    return seededClueIds.has((o as Extract<StoryOp, {op:'PAYOFF_SETUP'}>).setupId);
+  }).length;
+  score += earnedPayoffs * 12;
 
   return Math.min(100, score);
 }

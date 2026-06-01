@@ -131,5 +131,46 @@ export function lint(ir: NarrativeTransitionIR, _state: NarrativeState): LintWar
     }
   });
 
+  // Rule 9: genre-aware tension / tone / mystery contracts
+  const genre = _state.authorIntent.genre;
+  if (genre) {
+    // Horror / thriller require meaningful suspense by scene 3
+    if ((genre === 'horror' || genre === 'thriller') && ir.sceneIdx >= 3 && _state.audienceState.suspense < 25) {
+      warnings.push({
+        opIdx: null, op: 'UPDATE_READER_STATE', rule: 'GENRE_SUSPENSE_FLOOR',
+        message: `${genre} story: audience suspense is ${_state.audienceState.suspense}/100 at scene ${ir.sceneIdx} — ${genre} contract requires meaningful tension by scene 3; use RAISE_CLOCK or SHIFT_RELATIONSHIP to escalate`,
+        severity: 'warn',
+      });
+    }
+
+    // Mystery requires at least one planted clue by scene 2
+    if (genre === 'mystery' && ir.sceneIdx >= 2) {
+      const hasSeedClueInIR = ir.ops.some(op => op.op === 'SEED_CLUE');
+      const hasClueInState = _state.clues.length > 0;
+      if (!hasSeedClueInIR && !hasClueInState) {
+        warnings.push({
+          opIdx: null, op: 'SEED_CLUE', rule: 'GENRE_MYSTERY_NO_CLUES',
+          message: `mystery story: no clues planted by scene ${ir.sceneIdx} — mystery contract requires at least one SEED_CLUE before the investigation can begin`,
+          severity: 'warn',
+        });
+      }
+    }
+
+    // Comedy requires at least one positive emotional beat per scene after scene 1
+    if (genre === 'comedy' && ir.sceneIdx >= 2) {
+      const POSITIVE_COMEDY = new Set(['joy', 'relief', 'admiration', 'trust']);
+      const hasPositiveEmotion = ir.ops.some(op =>
+        op.op === 'APPRAISE_EMOTION' && POSITIVE_COMEDY.has(op.emotion.dominant),
+      );
+      if (!hasPositiveEmotion) {
+        warnings.push({
+          opIdx: null, op: 'APPRAISE_EMOTION', rule: 'GENRE_COMEDY_TONE_DRIFT',
+          message: `comedy story: scene ${ir.sceneIdx} has no positive emotional beat (joy, relief, admiration, trust) — comedy loses its tonal contract without at least one lightness beat per scene`,
+          severity: 'info',
+        });
+      }
+    }
+  }
+
   return warnings;
 }

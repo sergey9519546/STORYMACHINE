@@ -7,7 +7,7 @@
 // NarrativeState values purely; they never mutate Stage directly.
 
 import { createHash } from 'node:crypto';
-import type { Belief, EmotionState, StoryStructure } from '../../engine/types.ts';
+import type { Belief, EmotionState, StoryStructure, StoryGenre } from '../../engine/types.ts';
 import type { Stage } from '../../engine/Stage.ts';
 import type { AtomicFact, RelationshipDelta, ClueCarrier, ThemeMove } from '../ops/StoryOp.ts';
 
@@ -20,7 +20,7 @@ export interface NarrativeState {
   // Layer 3 — audience
   audienceState: { knownFacts: string[]; suspense: number; curiosity: number; investment: number };
   // Layer 4 — author intent
-  authorIntent: { theme?: string; targetStructure?: StoryStructure };
+  authorIntent: { theme?: string; targetStructure?: StoryStructure; genre?: StoryGenre };
   // Mechanism + narrative bookkeeping — one slot per StoryOp family
   relationships: Record<string, RelationshipDelta[]>;   // key = relationshipKey(a, b)
   objectArcs: Record<string, string>;                   // objectId → current lifecycle state
@@ -70,7 +70,7 @@ export function buildNarrativeState(stage: Stage): NarrativeState {
   const state = emptyState();
   state.turn = stage.getTurnCount();
   const illusion = stage.getIllusionState();
-  state.authorIntent = { targetStructure: illusion.structure, theme: illusion.story_theme };
+  state.authorIntent = { targetStructure: illusion.structure, theme: illusion.story_theme, genre: illusion.story_genre };
   for (const agent of stage.getAllAgents()) {
     if (agent.beliefs?.length) state.characterBeliefs[agent.char_id] = agent.beliefs;
     if (agent.emotionState) state.characterEmotions[agent.char_id] = agent.emotionState;
