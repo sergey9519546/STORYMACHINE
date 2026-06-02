@@ -13371,6 +13371,108 @@ He sits down in the chair.
     });
   });
 
+  describe('Wave 175 — beliefPass: revelation clustering, belief stagnation, single-scene overload', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const beliefInput = (records: any[], n: number) => ({
+      fountain: Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+      original: Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+      records: records as any, structure: {} as any, annotations: [], approvedSpans: [],
+    });
+
+    // ── REVELATION_CLUSTERING ─────────────────────────────────────────────────
+    it('beliefPass detects REVELATION_CLUSTERING when 3 revelations land in a 3-scene window', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      const records = Array.from({ length: 8 }, (_, i) =>
+        (i >= 2 && i <= 4)
+          ? makeRec(i, { revelation: `discovery ${i}`, dialogueHighlights: [`alice: reacts ${i}`] })
+          : makeRec(i),
+      );
+      const result = await beliefPass(beliefInput(records, 8));
+      const cluster = result.issues.filter(i => i.rule === 'REVELATION_CLUSTERING');
+      assert.ok(cluster.length >= 1, `Should detect REVELATION_CLUSTERING; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(cluster[0].severity === 'major');
+    });
+
+    it('beliefPass does NOT fire REVELATION_CLUSTERING when revelations are spaced out', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      const records = Array.from({ length: 8 }, (_, i) =>
+        (i === 1 || i === 4 || i === 7)
+          ? makeRec(i, { revelation: `discovery ${i}`, dialogueHighlights: [`alice: reacts ${i}`] })
+          : makeRec(i, { dialogueHighlights: [`alice: line ${i}`] }),
+      );
+      const result = await beliefPass(beliefInput(records, 8));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'REVELATION_CLUSTERING'),
+        'Should NOT fire when revelations are spread across the story',
+      );
+    });
+
+    // ── BELIEF_STAGNATION ─────────────────────────────────────────────────────
+    it('beliefPass detects BELIEF_STAGNATION when no told belief is ever contradicted', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      const records = Array.from({ length: 6 }, (_, i) =>
+        i < 4
+          ? makeRec(i, { dialogueHighlights: ['alice: the weather is nice today'] })
+          : i === 5
+          ? makeRec(i, { revelation: 'completely different unrelated topic xyz' })
+          : makeRec(i),
+      );
+      const result = await beliefPass(beliefInput(records, 6));
+      const stagnation = result.issues.filter(i => i.rule === 'BELIEF_STAGNATION');
+      assert.ok(stagnation.length >= 1, `Should detect BELIEF_STAGNATION; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(stagnation[0].severity === 'major');
+    });
+
+    it('beliefPass does NOT fire BELIEF_STAGNATION when a told belief is later contradicted', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      const records = Array.from({ length: 6 }, (_, i) =>
+        i < 4
+          ? makeRec(i, { dialogueHighlights: ['alice: the package is hidden safely'] })
+          : i === 5
+          ? makeRec(i, { revelation: 'the package is hidden no longer' })
+          : makeRec(i),
+      );
+      const result = await beliefPass(beliefInput(records, 6));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'BELIEF_STAGNATION'),
+        'Should NOT fire when a later revelation contradicts an earlier belief',
+      );
+    });
+
+    // ── SINGLE_SCENE_BELIEF_OVERLOAD ──────────────────────────────────────────
+    it('beliefPass detects SINGLE_SCENE_BELIEF_OVERLOAD when one scene packs 5+ assertions', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      const records = Array.from({ length: 5 }, (_, i) =>
+        i === 2
+          ? makeRec(i, { dialogueHighlights: ['alice: a', 'bob: b', 'carol: c', 'dan: d', 'eve: e'] })
+          : makeRec(i),
+      );
+      const result = await beliefPass(beliefInput(records, 5));
+      const overload = result.issues.filter(i => i.rule === 'SINGLE_SCENE_BELIEF_OVERLOAD');
+      assert.ok(overload.length >= 1, `Should detect SINGLE_SCENE_BELIEF_OVERLOAD; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(overload[0].severity === 'minor');
+    });
+
+    it('beliefPass does NOT fire SINGLE_SCENE_BELIEF_OVERLOAD when assertions are spread thin', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      const records = Array.from({ length: 5 }, (_, i) =>
+        makeRec(i, { dialogueHighlights: ['alice: a', 'bob: b'] }),
+      );
+      const result = await beliefPass(beliefInput(records, 5));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'SINGLE_SCENE_BELIEF_OVERLOAD'),
+        'Should NOT fire when no scene exceeds four belief assertions',
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

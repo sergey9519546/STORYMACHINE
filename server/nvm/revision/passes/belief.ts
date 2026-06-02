@@ -268,6 +268,69 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 175: Revelation clustering, belief stagnation, scene overload ───────
+
+  // REVELATION_CLUSTERING: Three or more revelations crammed into a single
+  // 3-scene window. The audience needs room between reversals to absorb each
+  // one; a flood of discoveries in quick succession blunts every individual
+  // surprise. Distinct from causality's front-loading (first-half bias) — this
+  // is a local density spike anywhere in the story.
+  if (records.length >= 8) {
+    for (let i = 0; i + 3 <= records.length; i++) {
+      const window = records.slice(i, i + 3);
+      const revCount = window.filter(r => r.revelation !== null).length;
+      if (revCount >= 3) {
+        issues.push({
+          location: `Scenes ${i}–${i + 2}`,
+          rule: 'REVELATION_CLUSTERING',
+          description: `Scenes ${i}–${i + 2} contain ${revCount} revelations in a row — a flood of reversals in a three-scene window. The audience has no room to absorb one discovery before the next arrives, and every surprise lands softer for it.`,
+          severity: 'major',
+          suggestedFix: 'Space the revelations out. Let a reversal breathe — give the characters (and the audience) a scene to react and recalibrate before the next truth lands. Bank some of these discoveries for later acts.',
+        });
+        break;
+      }
+    }
+  }
+
+  // BELIEF_STAGNATION: The story carries substantial belief content (4+ told
+  // beliefs and at least one witnessed revelation) yet no told belief is ever
+  // contradicted by a later witnessed fact — nobody ever turns out to be wrong.
+  // The belief/deception layer is static: assertions accumulate but none reverse.
+  if (records.length >= 6 && toldBeliefs.length >= 4 && witnessedBeliefs.length >= 1) {
+    const hasAnyContradiction = toldBeliefs.some(told =>
+      witnessedBeliefs.some(w => w.sceneIdx > told.sceneIdx && sharedWords(w.proposition, told.proposition) >= 2),
+    );
+    if (!hasAnyContradiction) {
+      issues.push({
+        location: 'Belief/deception layer',
+        rule: 'BELIEF_STAGNATION',
+        description: `Across ${toldBeliefs.length} told beliefs and ${witnessedBeliefs.length} revelation(s), no asserted belief is ever overturned by a later discovery — nobody is ever proven wrong. The belief layer accumulates assertions but never reverses one.`,
+        severity: 'major',
+        suggestedFix: 'Plant a belief in dialogue that a later scene contradicts. The engine of drama is a character acting on a false belief and paying for it — at least one thing a character is sure of should turn out to be wrong.',
+      });
+    }
+  }
+
+  // SINGLE_SCENE_BELIEF_OVERLOAD: One scene crams five or more separate belief
+  // assertions into its dialogue with no witnessed revelation — an information
+  // cram where the audience is asked to track too many propositions at once.
+  // Distinct from EXPOSITION_DUMP (consecutive told-only scenes); this is a
+  // single overloaded scene.
+  if (records.length >= 4) {
+    for (const r of records) {
+      if (r.revelation === null && r.dialogueHighlights.length >= 5) {
+        issues.push({
+          location: `Scene ${r.sceneIdx} (${r.slug})`,
+          rule: 'SINGLE_SCENE_BELIEF_OVERLOAD',
+          description: `Scene ${r.sceneIdx} packs ${r.dialogueHighlights.length} separate belief assertions into one scene with no witnessed payoff — the audience is asked to track too many propositions at once, and none of them register.`,
+          severity: 'minor',
+          suggestedFix: 'Distribute these assertions across multiple scenes, or cut to the two or three that actually matter. A scene that establishes one belief clearly beats a scene that establishes five forgettably.',
+        });
+        break;
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'belief', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
