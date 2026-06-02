@@ -136,6 +136,12 @@ export function proofsToConstraints(
             description: 'Reference prior story material: include at least one op with an existing charId (from state.characterBeliefs or state.characterEmotions), an existing clockId (from state.clocks), or an existing clueId (from state.clues). A scene that introduces only new identifiers is disconnected from the story.',
           });
           break;
+        case 'CharacterAgencyProof':
+          constraints.push({
+            kind: 'free_form',
+            description: 'Clock pressure demands character response: when RAISE_CLOCK is present, include at least one UPDATE_BELIEF, APPRAISE_EMOTION, SHIFT_RELATIONSHIP, or PAYOFF_SETUP op showing how the ticking clock forces a character to act or react. Pressure without response is dramatically inert.',
+          });
+          break;
         default:
           constraints.push({ kind: 'free_form', description: safeMsg });
       }
