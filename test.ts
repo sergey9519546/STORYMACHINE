@@ -10758,6 +10758,180 @@ Alice fidgets with her coffee cup, watching the steam rise. She doesn't blink.
     });
   });
 
+  // ── Wave 147: Relationship-arc pass enhancements ──────────────────────────
+  describe('Wave 147 — relationshipArcPass: climax timing, earned reversals, power dynamics', async () => {
+    it('relationshipArcPass detects RELATIONSHIP_CLIMAX_TIMING when major shift happens before climax', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const makeRec = (idx: number, relShifts: any[] = []): any => ({
+        commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose: 'dialogue',
+        dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+        emotionalShift: 'neutral', suspenseDelta: 1,
+        dialogueHighlights: [],
+        unresolvedClues: [], seededClueIds: [], payoffSetupIds: [],
+        visualBeats: [],
+        relationshipShifts: relShifts,
+      });
+
+      const records = [
+        makeRec(0, []),
+        makeRec(1, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.5 }]),
+        makeRec(2, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 2.0 }]), // Major shift early
+        makeRec(3, []),
+        makeRec(4, []),
+        makeRec(5, []),
+        makeRec(6, []),
+        makeRec(7, []),
+        makeRec(8, []),
+        makeRec(9, []),
+      ];
+
+      const result = await relationshipArcPass({
+        fountain: Array.from({ length: 10 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+        original: Array.from({ length: 10 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+        records: records as unknown as Parameters<typeof relationshipArcPass>[0]['records'],
+        structure: {} as any,
+        annotations: [],
+        approvedSpans: [],
+      });
+      const timing = result.issues.filter(i => i.rule === 'RELATIONSHIP_CLIMAX_TIMING');
+      assert.ok(timing.length >= 1, 'Should detect RELATIONSHIP_CLIMAX_TIMING when major shift happens before climax');
+      assert.ok(timing[0].severity === 'major');
+    });
+
+    it('relationshipArcPass does NOT fire RELATIONSHIP_CLIMAX_TIMING when major shift near climax', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const makeRec = (idx: number, relShifts: any[] = []): any => ({
+        commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose: 'dialogue',
+        dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+        emotionalShift: 'neutral', suspenseDelta: 1,
+        dialogueHighlights: [],
+        unresolvedClues: [], seededClueIds: [], payoffSetupIds: [],
+        visualBeats: [],
+        relationshipShifts: relShifts,
+      });
+
+      const records = [
+        makeRec(0, []),
+        makeRec(1, []),
+        makeRec(2, []),
+        makeRec(3, []),
+        makeRec(4, []),
+        makeRec(5, []),
+        makeRec(6, []),
+        makeRec(7, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 2.0 }]), // Major shift near climax
+        makeRec(8, []),
+        makeRec(9, []),
+      ];
+
+      const result = await relationshipArcPass({
+        fountain: Array.from({ length: 10 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+        original: Array.from({ length: 10 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+        records: records as unknown as Parameters<typeof relationshipArcPass>[0]['records'],
+        structure: {} as any,
+        annotations: [],
+        approvedSpans: [],
+      });
+      const timing = result.issues.filter(i => i.rule === 'RELATIONSHIP_CLIMAX_TIMING');
+      assert.ok(timing.length === 0, 'Should NOT fire when major shift is near climax');
+    });
+
+    it('relationshipArcPass detects RELATIONSHIP_UNEARNED_REVERSAL when reversal lacks setup', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const makeRec = (idx: number, relShifts: any[] = []): any => ({
+        commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose: 'dialogue',
+        dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+        emotionalShift: 'neutral', suspenseDelta: 0.5,
+        dialogueHighlights: [],
+        unresolvedClues: [], seededClueIds: [], payoffSetupIds: [],
+        visualBeats: [],
+        relationshipShifts: relShifts,
+      });
+
+      const records = [
+        makeRec(0, []),
+        makeRec(1, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 1.5 }]), // Warming
+        makeRec(2, []), // No setup
+        makeRec(3, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -2.0 }]), // Sudden reversal
+        makeRec(4, []),
+      ];
+
+      const result = await relationshipArcPass({
+        fountain: Array.from({ length: 5 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+        original: Array.from({ length: 5 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+        records: records as unknown as Parameters<typeof relationshipArcPass>[0]['records'],
+        structure: {} as any,
+        annotations: [],
+        approvedSpans: [],
+      });
+      const reversal = result.issues.filter(i => i.rule === 'RELATIONSHIP_UNEARNED_REVERSAL');
+      assert.ok(reversal.length >= 1, 'Should detect RELATIONSHIP_UNEARNED_REVERSAL when reversal lacks setup');
+      assert.ok(reversal[0].severity === 'major');
+    });
+
+    it('relationshipArcPass does NOT fire RELATIONSHIP_UNEARNED_REVERSAL when reversal has setup', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const makeRec = (idx: number, relShifts: any[] = [], suspense: number = 0.5, clues: string[] = []): any => ({
+        commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose: 'dialogue',
+        dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+        emotionalShift: 'neutral', suspenseDelta: suspense,
+        dialogueHighlights: [],
+        unresolvedClues: [], seededClueIds: clues, payoffSetupIds: [],
+        visualBeats: [],
+        relationshipShifts: relShifts,
+      });
+
+      const records = [
+        makeRec(0, []),
+        makeRec(1, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 1.5 }]), // Warming
+        makeRec(2, [], 2.0, ['clue_1']), // Setup: high suspense + clue
+        makeRec(3, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -2.0 }]), // Reversal justified
+        makeRec(4, []),
+      ];
+
+      const result = await relationshipArcPass({
+        fountain: Array.from({ length: 5 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+        original: Array.from({ length: 5 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+        records: records as unknown as Parameters<typeof relationshipArcPass>[0]['records'],
+        structure: {} as any,
+        annotations: [],
+        approvedSpans: [],
+      });
+      const reversal = result.issues.filter(i => i.rule === 'RELATIONSHIP_UNEARNED_REVERSAL');
+      assert.ok(reversal.length === 0, 'Should NOT fire when reversal has prior setup');
+    });
+
+    it('relationshipArcPass detects POWER_DYNAMIC_UNCHANGED when only affinity shifts', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const makeRec = (idx: number, relShifts: any[] = []): any => ({
+        commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose: 'dialogue',
+        dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+        emotionalShift: 'neutral', suspenseDelta: 1,
+        dialogueHighlights: [],
+        unresolvedClues: [], seededClueIds: [], payoffSetupIds: [],
+        visualBeats: [],
+        relationshipShifts: relShifts,
+      });
+
+      const records = [
+        makeRec(0, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.5 }]),
+        makeRec(1, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.8 }]),
+        makeRec(2, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -1.0 }]),
+      ];
+
+      const result = await relationshipArcPass({
+        fountain: Array.from({ length: 3 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+        original: Array.from({ length: 3 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+        records: records as unknown as Parameters<typeof relationshipArcPass>[0]['records'],
+        structure: {} as any,
+        annotations: [],
+        approvedSpans: [],
+      });
+      const power = result.issues.filter(i => i.rule === 'POWER_DYNAMIC_UNCHANGED');
+      assert.ok(power.length >= 1, 'Should detect POWER_DYNAMIC_UNCHANGED when only affinity shifts');
+      assert.ok(power[0].severity === 'minor');
+    });
+  });
+
   it('showrunner fires for set_up_payoff scene with no SEED_CLUE or PAYOFF_SETUP op', async () => {
     const { showrunnerCritic } = await import('./server/nvm/room/critics/showrunner.ts');
     const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
