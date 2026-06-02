@@ -10628,6 +10628,136 @@ describe('Wave 79 — payoff timing, clock magnitude, pacing weights, showrunner
 
   // ── showrunner Gate 1b ─────────────────────────────────────────────────────
 
+  // ── Wave 146: Voice pass enhancements ──────────────────────────────────────
+  describe('Wave 146 — voicePass: clichés and subtext', async () => {
+    it('voicePass detects CLICHE_DENSITY when screenplay overuses generic phrases', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // Create a fountain with many clichés
+      const clicheScenes = Array.from({ length: 5 }, (_, i) => `INT. SC${i} - DAY
+The room falls silent. A long pause. Awkward silence. They stare at each other. Suddenly...
+`).join('\n');
+
+      const makeRec = (idx: number): any => ({
+        commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`, purpose: 'dialogue',
+        dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+        emotionalShift: 'neutral', suspenseDelta: 1,
+        dialogueHighlights: ['alice: hello'],
+        unresolvedClues: [], seededClueIds: [], payoffSetupIds: [],
+        visualBeats: [],
+        relationshipShifts: [],
+      });
+
+      const records = Array.from({ length: 5 }, (_, i) => makeRec(i));
+
+      const result = await voicePass({
+        fountain: clicheScenes,
+        original: clicheScenes,
+        records: records as unknown as Parameters<typeof voicePass>[0]['records'],
+        structure: {} as any,
+        annotations: [],
+        approvedSpans: [],
+      });
+      const cliche = result.issues.filter(i => i.rule === 'CLICHE_DENSITY');
+      assert.ok(cliche.length >= 1, 'Should detect CLICHE_DENSITY for overuse of generic phrases');
+      assert.ok(cliche[0].severity === 'minor');
+    });
+
+    it('voicePass does NOT fire CLICHE_DENSITY when screenplay uses original language', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // Create a fountain with original, specific action
+      const originalScenes = Array.from({ length: 5 }, (_, i) => `INT. SC${i} - DAY
+Alice fidgets with her coffee cup, watching the steam rise. She doesn't blink.
+`).join('\n');
+
+      const makeRec = (idx: number): any => ({
+        commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`, purpose: 'dialogue',
+        dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+        emotionalShift: 'neutral', suspenseDelta: 1,
+        dialogueHighlights: ['alice: hello'],
+        unresolvedClues: [], seededClueIds: [], payoffSetupIds: [],
+        visualBeats: [],
+        relationshipShifts: [],
+      });
+
+      const records = Array.from({ length: 5 }, (_, i) => makeRec(i));
+
+      const result = await voicePass({
+        fountain: originalScenes,
+        original: originalScenes,
+        records: records as unknown as Parameters<typeof voicePass>[0]['records'],
+        structure: {} as any,
+        annotations: [],
+        approvedSpans: [],
+      });
+      const cliche = result.issues.filter(i => i.rule === 'CLICHE_DENSITY');
+      assert.ok(cliche.length === 0, 'Should NOT fire for original, specific language');
+    });
+
+    it('voicePass detects SUBTEXT_ABSENCE when characters state emotions directly', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const makeRec = (idx: number): any => ({
+        commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose: 'dialogue',
+        dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+        emotionalShift: 'negative', suspenseDelta: 2,
+        dialogueHighlights: [
+          'alice: i\'m angry right now',
+          'bob: i think we have a problem',
+          'alice: i believe you\'re wrong',
+          'bob: i\'m scared',
+        ],
+        unresolvedClues: [], seededClueIds: [], payoffSetupIds: [],
+        visualBeats: [],
+        relationshipShifts: [],
+      });
+
+      const records = Array.from({ length: 10 }, (_, i) => makeRec(i));
+
+      const fountainText = Array.from({ length: 10 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+
+      const result = await voicePass({
+        fountain: fountainText,
+        original: fountainText,
+        records: records as unknown as Parameters<typeof voicePass>[0]['records'],
+        structure: {} as any,
+        annotations: [],
+        approvedSpans: [],
+      });
+      const subtext = result.issues.filter(i => i.rule === 'SUBTEXT_ABSENCE');
+      assert.ok(subtext.length >= 1, 'Should detect SUBTEXT_ABSENCE for direct emotional statements');
+      assert.ok(subtext[0].severity === 'major');
+    });
+
+    it('voicePass does NOT fire SUBTEXT_ABSENCE when dialogue is minimal', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const makeRec = (idx: number): any => ({
+        commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose: 'dialogue',
+        dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+        emotionalShift: 'neutral', suspenseDelta: 1,
+        dialogueHighlights: [
+          'alice: i\'m angry right now',
+        ],
+        unresolvedClues: [], seededClueIds: [], payoffSetupIds: [],
+        visualBeats: [],
+        relationshipShifts: [],
+      });
+
+      const records = Array.from({ length: 10 }, (_, i) => makeRec(i));
+
+      const fountainText = Array.from({ length: 10 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+
+      const result = await voicePass({
+        fountain: fountainText,
+        original: fountainText,
+        records: records as unknown as Parameters<typeof voicePass>[0]['records'],
+        structure: {} as any,
+        annotations: [],
+        approvedSpans: [],
+      });
+      const subtext = result.issues.filter(i => i.rule === 'SUBTEXT_ABSENCE');
+      assert.ok(subtext.length === 0, 'Should NOT fire SUBTEXT_ABSENCE for minimal dialogue');
+    });
+  });
+
   it('showrunner fires for set_up_payoff scene with no SEED_CLUE or PAYOFF_SETUP op', async () => {
     const { showrunnerCritic } = await import('./server/nvm/room/critics/showrunner.ts');
     const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {

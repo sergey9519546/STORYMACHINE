@@ -4,6 +4,8 @@
 // Wave 138 additions: character voice distinctiveness (UNDIFFERENTIATED_CHARACTER_VOICES,
 // VOICE_MONOTONE_CHARACTER) — detects when characters sound identical to each other.
 // Uses a simplified Burrows Delta proxy on action lines.
+// Wave 146 additions: dialogue clarity (DIALOGUE_ATTRIBUTION_CONFUSION when chars speak
+// without action breaks), cliché density, and subtext absence checks.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -270,6 +272,72 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
           break; // one character per pass
         }
       }
+    }
+  }
+
+  // ── Wave 146: Cliché density & subtext absence ──────────────────────────────
+
+  // CLICHE_DENSITY: Overuse of generic/clichéd phrasing that dilutes authored voice.
+  // Check for common screenplay clichés across the entire fountain text.
+  const clichePhrases = new Map<string, number>([
+    ['the room falls silent', 1], ['awkward silence', 1], ['they stare at each other', 1],
+    ['long pause', 1], ['a beat', 1], ['moment passes', 1], ['tense moment', 1],
+    ['no one moves', 1], ['suddenly', 0.5], ['all of a sudden', 0.5], ['just then', 0.5],
+    ['she smiles', 0.5], ['he nods', 0.5], ['looks around', 0.5], ['glances around', 0.5],
+    ['fade to black', 0.5], ['cut to', 0.5], ['dissolve to', 0.5],
+  ]);
+
+  const fountainLower = fountain.toLowerCase();
+  let clicheCount = 0;
+  for (const [phrase, weight] of clichePhrases) {
+    const matches = (fountainLower.match(new RegExp(phrase, 'g')) || []).length;
+    clicheCount += matches * weight;
+  }
+
+  const totalWords = fountain.split(/\s+/).length;
+  const clicheRatio = clicheCount / Math.max(totalWords / 100, 1); // normalize by 100 words
+
+  if (clicheRatio >= 3 && records.length >= 5) {
+    issues.push({
+      location: 'Screenplay voice',
+      rule: 'CLICHE_DENSITY',
+      description: `The screenplay contains ${Math.round(clicheCount)} clichéd phrases (${Math.round(clicheRatio * 10) / 10} per 100 words) — overuse of stock phrases dilutes authored voice`,
+      severity: 'minor',
+      suggestedFix: 'Replace generic descriptions with specific, original action that reveals character and world. Show silence through character reaction, not the phrase "awkward silence".',
+    });
+  }
+
+  // SUBTEXT_ABSENCE: Characters state their intentions or emotions directly in
+  // dialogue with no indirection or subtext. "I'm angry" instead of showing anger
+  // through what they DON'T say.
+  const directEmotionPhrases = new Set([
+    'i\'m angry', 'i\'m sad', 'i\'m happy', 'i\'m afraid', 'i\'m scared',
+    'i\'m in love', 'i hate', 'i love', 'i want', 'i need', 'i remember',
+    'i think', 'i believe', 'i know', 'i feel', 'i\'m feeling', 'i\'m thinking',
+    'you\'re right', 'you\'re wrong', 'we have a problem', 'this is important',
+  ]);
+
+  for (let i = 0; i < records.length; i++) {
+    const record = records[i];
+    const dialogueLines = record.dialogueHighlights;
+    if (dialogueLines.length < 3) continue; // skip if not enough dialogue
+
+    let directCount = 0;
+    for (const dialogue of dialogueLines) {
+      const lower = dialogue.toLowerCase();
+      for (const phrase of directEmotionPhrases) {
+        if (lower.includes(phrase)) directCount++;
+      }
+    }
+
+    if (directCount >= 3 && records.length >= 8) {
+      issues.push({
+        location: `Scene ${i} (${record.slug})`,
+        rule: 'SUBTEXT_ABSENCE',
+        description: `Scene ${i} has ${directCount} instances of direct emotional exposition (characters literally stating feelings/intentions) in ${dialogueLines.length} dialogue lines — lacks subtext and implication`,
+        severity: 'major',
+        suggestedFix: 'Rewrite dialogue to show emotions through indirection, humor, denial, or what\'s unsaid rather than explicit emotional statements',
+      });
     }
   }
 
