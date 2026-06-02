@@ -11461,6 +11461,88 @@ He sits down in the chair.
     });
   });
 
+  // ── Wave 153: Character-arc pass enhancements ─────────────────────────────
+  describe('Wave 153 — characterArcPass: arc monotone, late introduction, whiplash', async () => {
+    const baseStructure = {
+      actPosition: 'act2b' as const, completionPercent: 60, totalClockPressure: 5,
+      midpointPressure: 2, reversalCount: 1, tightestScene: 6, avgSuspensePerScene: 1.5,
+      escalating: true, reversalDensity: 0.1, approachingClimax: false,
+      openClues: 1, revelationCount: 1,
+    };
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+
+    it('characterArcPass detects ARC_EMOTIONAL_MONOTONE when 90%+ scenes same register', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // All 8 scenes neutral → 100% monotone
+      const records = Array.from({ length: 8 }, (_, i) => makeRec(i, { emotionalShift: 'neutral' }));
+      const fountain = Array.from({ length: 8 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+      const result = await characterArcPass({
+        fountain, original: fountain,
+        records: records as any, structure: baseStructure as any, annotations: [], approvedSpans: [],
+      });
+      const monotone = result.issues.filter(i => i.rule === 'ARC_EMOTIONAL_MONOTONE');
+      assert.ok(monotone.length >= 1, 'Should detect ARC_EMOTIONAL_MONOTONE when emotional register never varies');
+      assert.ok(monotone[0].severity === 'major');
+    });
+
+    it('characterArcPass does NOT fire ARC_EMOTIONAL_MONOTONE when register varies', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      const shifts = ['positive', 'negative', 'neutral', 'positive', 'negative', 'neutral', 'positive', 'negative'];
+      const records = Array.from({ length: 8 }, (_, i) => makeRec(i, { emotionalShift: shifts[i] }));
+      const fountain = Array.from({ length: 8 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+      const result = await characterArcPass({
+        fountain, original: fountain,
+        records: records as any, structure: baseStructure as any, annotations: [], approvedSpans: [],
+      });
+      const monotone = result.issues.filter(i => i.rule === 'ARC_EMOTIONAL_MONOTONE');
+      assert.ok(monotone.length === 0, 'Should NOT fire when emotional register varies');
+    });
+
+    it('characterArcPass detects CHARACTER_LATE_INTRODUCTION for major char past midpoint', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // 10 scenes (midpoint=5). LATECOMER appears 5 times, only from Scene 6 onward.
+      let fountain = '';
+      for (let i = 0; i < 10; i++) {
+        fountain += `INT. SC${i} - DAY\n`;
+        if (i < 6) {
+          fountain += `ALICE\nHello there.\n\n`;
+        } else {
+          fountain += `LATECOMER\nI have arrived.\n\nALICE\nWho are you.\n\n`;
+        }
+      }
+      const records = Array.from({ length: 10 }, (_, i) => makeRec(i));
+      const result = await characterArcPass({
+        fountain, original: fountain,
+        records: records as any, structure: baseStructure as any, annotations: [], approvedSpans: [],
+      });
+      const late = result.issues.filter(i => i.rule === 'CHARACTER_LATE_INTRODUCTION');
+      assert.ok(late.length >= 1, 'Should detect CHARACTER_LATE_INTRODUCTION for major character introduced past midpoint');
+      assert.ok(late[0].severity === 'major');
+    });
+
+    it('characterArcPass detects EMOTIONAL_WHIPLASH for rapid polarity alternation', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // pos neg pos neg pos neg → 5 alternations, fires at 3
+      const shifts = ['positive', 'negative', 'positive', 'negative', 'positive', 'negative'];
+      const records = Array.from({ length: 6 }, (_, i) => makeRec(i, { emotionalShift: shifts[i] }));
+      const fountain = Array.from({ length: 6 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+      const result = await characterArcPass({
+        fountain, original: fountain,
+        records: records as any, structure: baseStructure as any, annotations: [], approvedSpans: [],
+      });
+      const whiplash = result.issues.filter(i => i.rule === 'EMOTIONAL_WHIPLASH');
+      assert.ok(whiplash.length >= 1, 'Should detect EMOTIONAL_WHIPLASH for 3+ polarity alternations');
+      assert.ok(whiplash[0].severity === 'minor');
+    });
+  });
+
   it('showrunner fires for set_up_payoff scene with no SEED_CLUE or PAYOFF_SETUP op', async () => {
     const { showrunnerCritic } = await import('./server/nvm/room/critics/showrunner.ts');
     const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {

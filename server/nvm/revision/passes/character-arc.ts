@@ -6,6 +6,9 @@
 // relational movement (CHARACTER_ARC_RELATIONAL_STASIS) and identifies when
 // the protagonist has no relationship arc despite being present everywhere
 // (CHARACTER_ARC_PROTAGONIST_PASSIVE).
+// Wave 153 additions: arc monotone (emotional state never varies mid-story),
+// late introduction (major character first appears past the midpoint), and
+// emotional whiplash (rapid alternating emotional shifts without grounding).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -160,6 +163,110 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
             `Give ${displayName} at least one relationship that moves: trust gained or lost, ` +
             `power reversed, alliance shifted. Static characters flatten the dramatic landscape.`,
         });
+      }
+    }
+  }
+
+  // ── Wave 153: Arc monotone, late introduction, emotional whiplash ───────────
+
+  // ARC_EMOTIONAL_MONOTONE: Across the whole story, every scene carries the same
+  // emotional shift (or all neutral). A character whose emotional register never
+  // varies has no inner life — the arc is a flat line, not a journey.
+  if (records.length >= 6) {
+    const shiftCounts = new Map<string, number>();
+    for (const r of records) {
+      const s = r.emotionalShift ?? 'neutral';
+      shiftCounts.set(s, (shiftCounts.get(s) ?? 0) + 1);
+    }
+    // Dominant shift covers ≥90% of scenes → monotone emotional landscape
+    const dominantCount = Math.max(...shiftCounts.values());
+    const dominantRatio = dominantCount / records.length;
+    if (dominantRatio >= 0.9) {
+      const dominant = [...shiftCounts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+      issues.push({
+        location: 'Emotional landscape',
+        rule: 'ARC_EMOTIONAL_MONOTONE',
+        description: `${Math.round(dominantRatio * 100)}% of scenes carry the same emotional register (${dominant}) — the story has no emotional dynamics; every beat lands at the same pitch`,
+        severity: 'major',
+        suggestedFix: 'Vary the emotional register scene to scene: a moment of levity before tragedy, a flash of hope before despair. Contrast is what makes any single emotion land.',
+      });
+    }
+  }
+
+  // CHARACTER_LATE_INTRODUCTION: A major character (≥4 cues) whose first
+  // appearance is past the story's midpoint. Introducing a significant player
+  // late deprives the audience of the investment needed for them to matter.
+  if (records.length >= 6) {
+    // Track first scene index where each character cue appears
+    const lines = fountain.split('\n');
+    const lineToScene: number[] = [];
+    let sceneIdx = -1;
+    for (const line of lines) {
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(line.trim())) sceneIdx++;
+      lineToScene.push(Math.max(0, sceneIdx));
+    }
+
+    const firstAppearance = new Map<string, number>();
+    const cueCounts = new Map<string, number>();
+    for (let i = 0; i < lines.length; i++) {
+      const t = lines[i].trim();
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(t) &&
+          !/^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END|ACT|MIDPOINT|SCENE)/i.test(t)) {
+        const charName = t.replace(/\s*\(.*?\)\s*$/, '').toLowerCase().trim();
+        if (charName === 'narrator' || charName === 'v.o.' || charName === 'o.s.') continue;
+        cueCounts.set(charName, (cueCounts.get(charName) ?? 0) + 1);
+        if (!firstAppearance.has(charName)) {
+          firstAppearance.set(charName, lineToScene[i]);
+        }
+      }
+    }
+
+    const midpoint = Math.floor(records.length / 2);
+    for (const [charName, count] of cueCounts) {
+      if (count >= 4) {
+        const firstScene = firstAppearance.get(charName) ?? 0;
+        if (firstScene > midpoint) {
+          const displayName = charName.replace(/_/g, ' ').toUpperCase();
+          issues.push({
+            location: `Character: ${displayName}`,
+            rule: 'CHARACTER_LATE_INTRODUCTION',
+            description: `${displayName} is a major character (${count} scenes) but first appears at Scene ${firstScene}, past the midpoint (Scene ${midpoint}) — the audience has no time to invest in them before they matter`,
+            severity: 'major',
+            suggestedFix: `Introduce ${displayName} (or plant their existence) in the first half of the story so their later prominence feels earned, not arbitrary`,
+          });
+          break; // one flag per pass
+        }
+      }
+    }
+  }
+
+  // EMOTIONAL_WHIPLASH: 4+ consecutive scenes that alternate emotional polarity
+  // (positive→negative→positive→negative) with no neutral grounding between.
+  // Rapid oscillation without settling feels manipulative rather than earned.
+  if (records.length >= 4) {
+    let alternations = 0;
+    let whiplashStart = -1;
+    for (let i = 1; i < records.length; i++) {
+      const prev = records[i - 1].emotionalShift;
+      const curr = records[i].emotionalShift;
+      const isOpposite =
+        (prev === 'positive' && curr === 'negative') ||
+        (prev === 'negative' && curr === 'positive');
+      if (isOpposite) {
+        if (alternations === 0) whiplashStart = i - 1;
+        alternations++;
+        if (alternations === 3) {
+          issues.push({
+            location: `Scenes ${whiplashStart}–${i}`,
+            rule: 'EMOTIONAL_WHIPLASH',
+            description: `Scenes ${whiplashStart}–${i} alternate emotional polarity 3+ times with no neutral grounding (positive↔negative) — rapid oscillation feels manipulative rather than earned`,
+            severity: 'minor',
+            suggestedFix: 'Let one emotional state breathe across two scenes before flipping. Give the audience a moment to absorb a feeling before reversing it.',
+          });
+          alternations = 0; // reset to avoid duplicate flags
+        }
+      } else {
+        alternations = 0;
       }
     }
   }
