@@ -2,6 +2,9 @@
 // Checks conflict escalation: flat arc, missing opposition, collisions not detonated.
 // Wave 144 additions: escalation plateau (peak then stalls), confrontation quality,
 // and conflict fatigue (reversals too frequent causing audience whiplash).
+// Wave 158 additions: threat amnesia (clock established but forgotten in second half),
+// antagonist vanish (all reversals in first 60%, none after), and single-register
+// conflict (all relationship shifts use the same dimension — one-axis drama).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -155,6 +158,70 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Space reversals further apart or let one reversal settle with a scene of consequence before introducing the next',
         });
         reversalStreak = 0; // reset to avoid duplicate fires
+      }
+    }
+  }
+
+  // ── Wave 158: Threat amnesia, antagonist vanish, single-register conflict ─────
+
+  // THREAT_AMNESIA: A clock is raised in Act 1 (first 25%) but never raised again
+  // in the second half (from 50% onward). The urgency that launched the story is
+  // abandoned — the audience forgets what's at stake. Requires 8+ scenes.
+  if (records.length >= 8) {
+    const act1Zone = Math.floor(records.length * 0.25);
+    const secondHalfStart = Math.floor(records.length * 0.5);
+
+    const clockInAct1 = records.slice(0, act1Zone).some(r => r.clockRaised);
+    const clockInSecondHalf = records.slice(secondHalfStart).some(r => r.clockRaised);
+
+    if (clockInAct1 && !clockInSecondHalf) {
+      issues.push({
+        location: `Act 1–Act 2 clock gap (Scenes ${act1Zone}–${records.length - 1})`,
+        rule: 'THREAT_AMNESIA',
+        description: `A clock is raised in Act 1 but no clock pressure appears in the second half (Scenes ${secondHalfStart}+) — the external threat that launched the story is forgotten, and stakes evaporate`,
+        severity: 'major',
+        suggestedFix: 'Re-invoke the original threat in Act 2b with an escalation (a closer deadline, a new consequence, or a complication that restores urgency)',
+      });
+    }
+  }
+
+  // ANTAGONIST_VANISH: All reversals (suspenseDelta < -1) occur before the 60%
+  // mark, with none after. The antagonistic force is active in the first half but
+  // passive or absent as the story approaches the climax — the protagonist faces
+  // a depleted opposition in the final act.
+  if (records.length >= 8) {
+    const splitPoint = Math.floor(records.length * 0.6);
+    const reversalsInFirst = records.slice(0, splitPoint).filter(r => r.suspenseDelta < -1).length;
+    const reversalsInLast = records.slice(splitPoint).filter(r => r.suspenseDelta < -1).length;
+
+    if (reversalsInFirst >= 2 && reversalsInLast === 0) {
+      issues.push({
+        location: `Late conflict (Scenes ${splitPoint}–${records.length - 1})`,
+        rule: 'ANTAGONIST_VANISH',
+        description: `${reversalsInFirst} reversals occur before Scene ${splitPoint} but none after — the antagonist's active opposition evaporates before the climax. The protagonist wins the finale against a passive opponent.`,
+        severity: 'major',
+        suggestedFix: 'Add at least one reversal or direct antagonistic action in the final 40% — the protagonist must face active opposition in the climax, not just the aftermath of it',
+      });
+    }
+  }
+
+  // SINGLE_REGISTER_CONFLICT: All relationship shifts use the same dimension
+  // (e.g., only 'trust', only 'power'). Real relationships operate on multiple
+  // axes. Single-dimension conflict produces thin drama where every scene feels
+  // like a repeat of the same relational beat. Requires 6+ scenes, 4+ shifts.
+  if (records.length >= 6) {
+    const allShifts = records.flatMap(r => r.relationshipShifts ?? []);
+    if (allShifts.length >= 4) {
+      const dimensions = new Set(allShifts.map(s => s.dimension));
+      if (dimensions.size === 1) {
+        const [onlyDim] = dimensions;
+        issues.push({
+          location: 'Relationship conflict layer',
+          rule: 'SINGLE_REGISTER_CONFLICT',
+          description: `All ${allShifts.length} relationship shifts use the same dimension ("${onlyDim}") — conflict operates on a single axis. Every relational scene delivers the same beat.`,
+          severity: 'minor',
+          suggestedFix: `Introduce a second conflict dimension (e.g., if all shifts are "${onlyDim}", add scenes that shift power, loyalty, or affection) to give the relationships texture and make each confrontation feel distinct`,
+        });
       }
     }
   }

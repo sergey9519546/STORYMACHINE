@@ -11762,6 +11762,130 @@ He sits down in the chair.
     });
   });
 
+  describe('Wave 158 — conflictPass: threat amnesia, antagonist vanish, single-register conflict', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const noAnnotations = (n: number) => Array.from({ length: n }, () => ({ revelation: false } as any));
+
+    it('conflictPass detects THREAT_AMNESIA when clock set in Act 1 disappears from second half', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 8 scenes: act1Zone=2, secondHalfStart=4
+      // clockRaised only in scene 1 (Act 1), not in scenes 4-7
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, { clockRaised: i === 1, suspenseDelta: 1 }),
+      );
+      const result = await conflictPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any,
+        structure: { escalating: true, reversalCount: 1, reversalDensity: 0.1, openClues: 0, approachingClimax: false, avgSuspensePerScene: 1 } as any,
+        annotations: noAnnotations(8), approvedSpans: [],
+      });
+      const amnesia = result.issues.filter(i => i.rule === 'THREAT_AMNESIA');
+      assert.ok(amnesia.length >= 1, `Should detect THREAT_AMNESIA; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(amnesia[0].severity === 'major');
+    });
+
+    it('conflictPass does NOT fire THREAT_AMNESIA when clock continues in second half', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, { clockRaised: i === 1 || i === 5, suspenseDelta: 1 }),
+      );
+      const result = await conflictPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any,
+        structure: { escalating: true, reversalCount: 1, reversalDensity: 0.1, openClues: 0, approachingClimax: false, avgSuspensePerScene: 1 } as any,
+        annotations: noAnnotations(8), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'THREAT_AMNESIA'),
+        'Should NOT fire when clock appears in second half',
+      );
+    });
+
+    it('conflictPass detects ANTAGONIST_VANISH when reversals disappear after 60% mark', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 10 scenes: splitPoint=6. Reversals at scenes 1 and 3, none at 6-9.
+      const records = Array.from({ length: 10 }, (_, i) =>
+        makeRec(i, { suspenseDelta: (i === 1 || i === 3) ? -2 : 1 }),
+      );
+      const result = await conflictPass({
+        fountain: blankFountain(10), original: blankFountain(10),
+        records: records as any,
+        structure: { escalating: true, reversalCount: 2, reversalDensity: 0.2, openClues: 0, approachingClimax: false, avgSuspensePerScene: 1 } as any,
+        annotations: noAnnotations(10), approvedSpans: [],
+      });
+      const vanish = result.issues.filter(i => i.rule === 'ANTAGONIST_VANISH');
+      assert.ok(vanish.length >= 1, `Should detect ANTAGONIST_VANISH; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(vanish[0].severity === 'major');
+    });
+
+    it('conflictPass does NOT fire ANTAGONIST_VANISH when reversals continue in final 40%', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      const records = Array.from({ length: 10 }, (_, i) =>
+        makeRec(i, { suspenseDelta: (i === 1 || i === 3 || i === 7) ? -2 : 1 }),
+      );
+      const result = await conflictPass({
+        fountain: blankFountain(10), original: blankFountain(10),
+        records: records as any,
+        structure: { escalating: true, reversalCount: 3, reversalDensity: 0.3, openClues: 0, approachingClimax: false, avgSuspensePerScene: 1 } as any,
+        annotations: noAnnotations(10), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'ANTAGONIST_VANISH'),
+        'Should NOT fire when a reversal exists in the final 40%',
+      );
+    });
+
+    it('conflictPass detects SINGLE_REGISTER_CONFLICT when all shifts use same dimension', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      const records = Array.from({ length: 6 }, (_, i) =>
+        makeRec(i, {
+          relationshipShifts: i < 4
+            ? [{ pairKey: 'alice|bob', dimension: 'trust', amount: i % 2 === 0 ? 0.3 : -0.3 }]
+            : [],
+        }),
+      );
+      const result = await conflictPass({
+        fountain: blankFountain(6), original: blankFountain(6),
+        records: records as any,
+        structure: { escalating: true, reversalCount: 0, reversalDensity: 0, openClues: 0, approachingClimax: false, avgSuspensePerScene: 1 } as any,
+        annotations: noAnnotations(6), approvedSpans: [],
+      });
+      const single = result.issues.filter(i => i.rule === 'SINGLE_REGISTER_CONFLICT');
+      assert.ok(single.length >= 1, `Should detect SINGLE_REGISTER_CONFLICT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(single[0].severity === 'minor');
+    });
+
+    it('conflictPass does NOT fire SINGLE_REGISTER_CONFLICT when shifts use multiple dimensions', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      const records = Array.from({ length: 6 }, (_, i) =>
+        makeRec(i, {
+          relationshipShifts: i < 4
+            ? [{ pairKey: 'alice|bob', dimension: i < 2 ? 'trust' : 'power', amount: 0.3 }]
+            : [],
+        }),
+      );
+      const result = await conflictPass({
+        fountain: blankFountain(6), original: blankFountain(6),
+        records: records as any,
+        structure: { escalating: true, reversalCount: 0, reversalDensity: 0, openClues: 0, approachingClimax: false, avgSuspensePerScene: 1 } as any,
+        annotations: noAnnotations(6), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'SINGLE_REGISTER_CONFLICT'),
+        'Should NOT fire when multiple relationship dimensions are present',
+      );
+    });
+  });
+
   describe('Wave 157 — pacingPass: climax underweight, midpoint collapse, resolution brevity', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
