@@ -260,18 +260,24 @@ export default function ScriptIDE({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // mount only
 
+  // Use a ref to hold the latest state for auto-saving without resetting the interval
+  const autoSaveStateRef = useRef({ scriptText, snapshots, characters, researchNotes, isDarkMode });
+  useEffect(() => {
+    autoSaveStateRef.current = { scriptText, snapshots, characters, researchNotes, isDarkMode };
+  }, [scriptText, snapshots, characters, researchNotes, isDarkMode]);
+
   // Auto-save to server every 30s (in addition to localStorage debounce).
   useEffect(() => {
     const saveToServer = () => {
       fetch('/api/scriptide/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scriptText, snapshots, characters, researchNotes, isDarkMode }),
+        body: JSON.stringify(autoSaveStateRef.current),
       }).catch(() => { /* non-critical */ });
     };
     const interval = setInterval(saveToServer, 30_000);
     return () => clearInterval(interval);
-  }, [scriptText, snapshots, characters, researchNotes, isDarkMode]);
+  }, []);
 
   // ── Dark mode DOM sync ──────────────────────────────────────────────────────
   useEffect(() => {
