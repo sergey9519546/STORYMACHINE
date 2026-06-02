@@ -11654,6 +11654,114 @@ He sits down in the chair.
     });
   });
 
+  // ── Wave 155: Causality pass enhancements ─────────────────────────────────
+  describe('Wave 155 — causalityPass: deus ex machina, suspense spike, goal opposition', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const noAnnotations = (n: number) => Array.from({ length: n }, () => ({ revelation: false } as any));
+
+    it('causalityPass detects DEUS_EX_MACHINA for unseeded late resolution', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // 10 scenes, climax zone starts scene 8. No clue ever seeded. Scene 9 resolves via revelation.
+      const records = Array.from({ length: 10 }, (_, i) =>
+        i === 9
+          ? makeRec(i, { revelation: 'the killer was the butler', purpose: 'resolution', suspenseDelta: -3 })
+          : makeRec(i),
+      );
+      const result = await causalityPass({
+        fountain: blankFountain(10), original: blankFountain(10),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(10), approvedSpans: [],
+      });
+      const deus = result.issues.filter(i => i.rule === 'DEUS_EX_MACHINA');
+      assert.ok(deus.length >= 1, 'Should detect DEUS_EX_MACHINA for unseeded late resolution');
+      assert.ok(deus[0].severity === 'critical');
+    });
+
+    it('causalityPass does NOT fire DEUS_EX_MACHINA when resolution was seeded early', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      const records = Array.from({ length: 10 }, (_, i) => {
+        if (i === 1) return makeRec(i, { seededClueIds: ['butler_clue'] }); // early seed
+        if (i === 9) return makeRec(i, { revelation: 'the killer was the butler', purpose: 'resolution', suspenseDelta: -3 });
+        return makeRec(i);
+      });
+      const result = await causalityPass({
+        fountain: blankFountain(10), original: blankFountain(10),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(10), approvedSpans: [],
+      });
+      const deus = result.issues.filter(i => i.rule === 'DEUS_EX_MACHINA');
+      assert.ok(deus.length === 0, 'Should NOT fire when resolution was seeded in Act 1');
+    });
+
+    it('causalityPass detects SUSPENSE_SPIKE_NO_CAUSE for sudden danger without buildup', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      const records = [
+        makeRec(0, { suspenseDelta: 0.5 }),
+        makeRec(1, { suspenseDelta: 0.5 }),
+        makeRec(2, { suspenseDelta: 0.5 }),
+        makeRec(3, { suspenseDelta: 4 }), // spike after flat scenes, no setup
+        makeRec(4, { suspenseDelta: 1 }),
+      ];
+      const result = await causalityPass({
+        fountain: blankFountain(5), original: blankFountain(5),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(5), approvedSpans: [],
+      });
+      const spike = result.issues.filter(i => i.rule === 'SUSPENSE_SPIKE_NO_CAUSE');
+      assert.ok(spike.length >= 1, 'Should detect SUSPENSE_SPIKE_NO_CAUSE for sudden unbuilt danger');
+      assert.ok(spike[0].severity === 'major');
+    });
+
+    it('causalityPass detects GOAL_WITHOUT_OPPOSITION when no resistance exists', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // Goal planted, but every scene is positive/flat — no opposition
+      const records = [
+        makeRec(0, { seededClueIds: ['goal1'] }),
+        makeRec(1, { suspenseDelta: 1, emotionalShift: 'positive' }),
+        makeRec(2, { suspenseDelta: 1.5, emotionalShift: 'positive' }),
+        makeRec(3, { suspenseDelta: 1, emotionalShift: 'neutral' }),
+        makeRec(4, { suspenseDelta: 1.5, emotionalShift: 'positive' }),
+        makeRec(5, { suspenseDelta: 1, emotionalShift: 'positive' }),
+      ];
+      const result = await causalityPass({
+        fountain: blankFountain(6), original: blankFountain(6),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(6), approvedSpans: [],
+      });
+      const opposition = result.issues.filter(i => i.rule === 'GOAL_WITHOUT_OPPOSITION');
+      assert.ok(opposition.length >= 1, 'Should detect GOAL_WITHOUT_OPPOSITION when goal meets no resistance');
+      assert.ok(opposition[0].severity === 'major');
+    });
+
+    it('causalityPass does NOT fire GOAL_WITHOUT_OPPOSITION when reversal opposes goal', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      const records = [
+        makeRec(0, { seededClueIds: ['goal1'] }),
+        makeRec(1, { suspenseDelta: 1 }),
+        makeRec(2, { suspenseDelta: -2 }), // reversal = opposition
+        makeRec(3, { suspenseDelta: 1 }),
+        makeRec(4, { suspenseDelta: 1.5 }),
+        makeRec(5, { suspenseDelta: 1 }),
+      ];
+      const result = await causalityPass({
+        fountain: blankFountain(6), original: blankFountain(6),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(6), approvedSpans: [],
+      });
+      const opposition = result.issues.filter(i => i.rule === 'GOAL_WITHOUT_OPPOSITION');
+      assert.ok(opposition.length === 0, 'Should NOT fire when a reversal opposes the goal');
+    });
+  });
+
   it('showrunner fires for set_up_payoff scene with no SEED_CLUE or PAYOFF_SETUP op', async () => {
     const { showrunnerCritic } = await import('./server/nvm/room/critics/showrunner.ts');
     const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {

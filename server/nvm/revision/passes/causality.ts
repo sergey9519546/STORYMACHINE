@@ -3,6 +3,9 @@
 // belief reversals without explanation.
 // Wave 141 additions: motivation coherence (unmotivated decisions, abandoned goals)
 // and action consequence (character actions that fail to affect plot or relationships).
+// Wave 155 additions: deus ex machina (late revelation closing the plot with no
+// setup), suspense spike without cause (sudden danger with no escalation), and
+// goal-conflict absence (protagonist goal never opposed by another force).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -179,6 +182,87 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
           description: `Goal/motivation "${goalId}" appears in Scenes ${appearances.slice(0, 3).join(', ')}${appearances.length > 3 ? ',...' : ''} but is never resolved or abandoned on-page — it just disappears`,
           severity: 'major',
           suggestedFix: `Either resolve "${goalId}" via payoff in the final act, or add an explicit scene where the character abandons or reframes the goal`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 155: Deus ex machina, suspense spike, goal-conflict absence ─────────
+
+  // DEUS_EX_MACHINA: A revelation in the final 20% of the story that resolves the
+  // plot but was never seeded. The audience feels cheated when the solution
+  // arrives from nowhere at the last moment.
+  if (records.length >= 8) {
+    const climaxZoneStart = Math.floor(records.length * 0.8);
+    for (let i = climaxZoneStart; i < records.length; i++) {
+      const r = records[i];
+      const ann = annotations[i];
+      const isResolvingRevelation = (r.revelation !== null || (ann && ann.revelation)) &&
+        (r.purpose === 'climax' || r.purpose === 'resolution' || r.suspenseDelta < -2);
+
+      if (isResolvingRevelation) {
+        // Was there ANY clue seeded in the first 60% that could anticipate this?
+        const setupZoneEnd = Math.floor(records.length * 0.6);
+        const hadEarlySetup = records.slice(0, setupZoneEnd).some(prev =>
+          (prev.seededClueIds?.length ?? 0) > 0,
+        );
+        if (!hadEarlySetup) {
+          issues.push({
+            location: `Scene ${i} (${r.slug})`,
+            rule: 'DEUS_EX_MACHINA',
+            description: `Scene ${i} resolves the plot via a late revelation, but no clue was planted in the first 60% of the story — the resolution arrives from nowhere`,
+            severity: 'critical',
+            suggestedFix: 'Plant the seed of this resolution in Act 1 or early Act 2. The solution must be available to the attentive audience before it arrives',
+          });
+          break; // one flag per pass
+        }
+      }
+    }
+  }
+
+  // SUSPENSE_SPIKE_NO_CAUSE: A sudden high suspense delta (>3) with no escalation
+  // in the preceding scenes (prior 2 scenes both had low suspense <1). Danger that
+  // materializes without buildup feels arbitrary rather than earned.
+  for (let i = 2; i < records.length; i++) {
+    const curr = records[i];
+    if (curr.suspenseDelta > 3) {
+      const prev1 = records[i - 1];
+      const prev2 = records[i - 2];
+      const noBuildup = prev1.suspenseDelta < 1 && prev2.suspenseDelta < 1;
+      // Only flag if no clock pressure or clue seeded recently to justify the spike
+      const noSetup = !prev1.clockRaised && !prev2.clockRaised &&
+        (prev1.seededClueIds?.length ?? 0) === 0 && (prev2.seededClueIds?.length ?? 0) === 0;
+      if (noBuildup && noSetup) {
+        issues.push({
+          location: `Scene ${i} (${curr.slug})`,
+          rule: 'SUSPENSE_SPIKE_NO_CAUSE',
+          description: `Scene ${i} spikes to suspense ${curr.suspenseDelta.toFixed(1)} after two flat scenes (${prev2.suspenseDelta.toFixed(1)}, ${prev1.suspenseDelta.toFixed(1)}) with no clock pressure or clue — the danger appears without buildup`,
+          severity: 'major',
+          suggestedFix: 'Escalate tension across the preceding scenes. Plant the threat or raise a clock so the spike feels like a culmination, not a jump-scare',
+        });
+        break; // one flag per pass
+      }
+    }
+  }
+
+  // GOAL_WITHOUT_OPPOSITION: The story plants a goal (recurring clue) but no scene
+  // ever shows a negative relationship shift or reversal opposing it. A goal with
+  // no opposing force has no dramatic tension — drama is desire meeting resistance.
+  if (records.length >= 6) {
+    const hasGoal = records.some(r => (r.seededClueIds?.length ?? 0) > 0);
+    if (hasGoal) {
+      const hasOpposition = records.some(r => {
+        const hasNegShift = (r.relationshipShifts ?? []).some(s => s.amount < -0.5);
+        const hasReversal = r.suspenseDelta < -1;
+        return hasNegShift || hasReversal;
+      });
+      if (!hasOpposition) {
+        issues.push({
+          location: 'Overall causal arc',
+          rule: 'GOAL_WITHOUT_OPPOSITION',
+          description: 'The story plants goals/clues but no scene shows opposition — no negative relationship shift, no reversal. A goal that meets no resistance generates no drama',
+          severity: 'major',
+          suggestedFix: 'Introduce an antagonistic force: a character who opposes the goal, a reversal that sets it back, or a relationship that sours as the protagonist pursues it',
         });
       }
     }
