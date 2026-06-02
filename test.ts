@@ -13269,6 +13269,108 @@ He sits down in the chair.
     });
   });
 
+  describe('Wave 174 — themePass: opening silence, single-keyword reliance, climax silence', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const themeCtx = { theme: 'loyalty and betrayal define us', genre: 'drama' };
+    const themeInput = (records: any[], n: number) => ({
+      fountain: blankFountain(n), original: blankFountain(n),
+      records: records as any, structure: {} as any, storyContext: themeCtx,
+      annotations: [], approvedSpans: [],
+    });
+
+    // ── THEME_OPENING_SILENT ──────────────────────────────────────────────────
+    it('themePass detects THEME_OPENING_SILENT when the first scenes lack theme language', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // 8 scenes: scenes 0-2 silent, scenes 3-7 carry the theme
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, { dialogueHighlights: i >= 3 ? ['alice: loyalty matters here'] : [] }),
+      );
+      const result = await themePass(themeInput(records, 8));
+      const opening = result.issues.filter(i => i.rule === 'THEME_OPENING_SILENT');
+      assert.ok(opening.length >= 1, `Should detect THEME_OPENING_SILENT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(opening[0].severity === 'major');
+    });
+
+    it('themePass does NOT fire THEME_OPENING_SILENT when the opening plants the theme', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, { dialogueHighlights: ['alice: loyalty matters here'] }),
+      );
+      const result = await themePass(themeInput(records, 8));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'THEME_OPENING_SILENT'),
+        'Should NOT fire when the opening scenes carry the theme',
+      );
+    });
+
+    // ── THEME_SINGLE_KEYWORD_RELIANCE ─────────────────────────────────────────
+    it('themePass detects THEME_SINGLE_KEYWORD_RELIANCE when one keyword dominates', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // Only "betrayal" ever appears; "loyalty" and "define" never dramatized
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, { dialogueHighlights: i < 6 ? ['alice: betrayal again'] : [] }),
+      );
+      const result = await themePass(themeInput(records, 8));
+      const reliance = result.issues.filter(i => i.rule === 'THEME_SINGLE_KEYWORD_RELIANCE');
+      assert.ok(reliance.length >= 1, `Should detect THEME_SINGLE_KEYWORD_RELIANCE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(reliance[0].severity === 'minor');
+    });
+
+    it('themePass does NOT fire THEME_SINGLE_KEYWORD_RELIANCE when keywords are balanced', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // Both "loyalty" and "betrayal" appear in roughly equal measure
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, {
+          dialogueHighlights: i < 3 ? ['alice: loyalty matters']
+            : i < 6 ? ['bob: betrayal stings'] : [],
+        }),
+      );
+      const result = await themePass(themeInput(records, 8));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'THEME_SINGLE_KEYWORD_RELIANCE'),
+        'Should NOT fire when multiple theme keywords are dramatized',
+      );
+    });
+
+    // ── THEME_CLIMAX_SCENE_SILENT ─────────────────────────────────────────────
+    it('themePass detects THEME_CLIMAX_SCENE_SILENT when the peak scene lacks theme language', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // 8 scenes: 0-6 carry the theme; scene 7 is the peak (suspense 3) but silent
+      const records = Array.from({ length: 8 }, (_, i) =>
+        i === 7
+          ? makeRec(i, { suspenseDelta: 3, dialogueHighlights: [] })
+          : makeRec(i, { dialogueHighlights: ['alice: loyalty above all'] }),
+      );
+      const result = await themePass(themeInput(records, 8));
+      const climax = result.issues.filter(i => i.rule === 'THEME_CLIMAX_SCENE_SILENT');
+      assert.ok(climax.length >= 1, `Should detect THEME_CLIMAX_SCENE_SILENT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(climax[0].severity === 'major');
+    });
+
+    it('themePass does NOT fire THEME_CLIMAX_SCENE_SILENT when the climax carries the theme', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const records = Array.from({ length: 8 }, (_, i) =>
+        i === 7
+          ? makeRec(i, { suspenseDelta: 3, dialogueHighlights: ['alice: loyalty wins'] })
+          : makeRec(i, { dialogueHighlights: ['alice: loyalty above all'] }),
+      );
+      const result = await themePass(themeInput(records, 8));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'THEME_CLIMAX_SCENE_SILENT'),
+        'Should NOT fire when the peak-suspense scene carries thematic language',
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

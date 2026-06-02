@@ -346,6 +346,87 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         });
       }
     }
+
+    // ── Wave 174: Opening silence, single-keyword reliance, climax silence ─────
+
+    // THEME_OPENING_SILENT: The first three scenes carry no thematic language.
+    // A screenplay should plant its central question in the opening — the
+    // audience needs to feel the theme before the plot complicates it. This is
+    // the inverse failure to THEME_FRONT_LOADED (theme dumped early then dropped):
+    // here the theme arrives late, with no thesis to set against the antithesis.
+    if (records.length >= 6) {
+      const openingCount = Math.min(3, records.length);
+      const openingSilent = records.slice(0, openingCount).every(r =>
+        !sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+      );
+      if (openingSilent) {
+        issues.push({
+          location: `Scenes 0–${openingCount - 1} (opening)`,
+          rule: 'THEME_OPENING_SILENT',
+          description: `The opening ${openingCount} scenes contain no language related to the theme "${themeRaw}" — the story complicates a question it never planted. The audience reaches the midpoint without knowing what the film is about.`,
+          severity: 'major',
+          suggestedFix: `Plant the theme in the opening: a line, an image, or a choice in the first scene or two that poses the question "${themeRaw}" without answering it. The thesis must precede the antithesis.`,
+        });
+      }
+    }
+
+    // THEME_SINGLE_KEYWORD_RELIANCE: The declared theme has multiple keywords,
+    // but resonance comes overwhelmingly from a single one while at least one
+    // other keyword is never dramatized at all. A theme like "loyalty and
+    // betrayal" that only ever shows betrayal represents one pole of its own
+    // tension — the dialectic is lopsided.
+    if (keywords.length >= 2) {
+      const perKwHits = expandedKeywords.map(forms => {
+        let total = 0;
+        for (const r of records) {
+          const text = sceneTexts.get(r.sceneIdx) ?? '';
+          for (const form of forms) {
+            let pos = text.indexOf(form);
+            while (pos !== -1) { total++; pos = text.indexOf(form, pos + form.length); }
+          }
+        }
+        return total;
+      });
+      const totalKwHits = perKwHits.reduce((s, v) => s + v, 0);
+      const topHits = Math.max(...perKwHits);
+      if (totalKwHits >= 5 && topHits / totalKwHits > 0.8 && perKwHits.some(h => h === 0)) {
+        const topIdx = perKwHits.indexOf(topHits);
+        const absent = keywords.filter((_, i) => perKwHits[i] === 0);
+        issues.push({
+          location: 'Thematic balance',
+          rule: 'THEME_SINGLE_KEYWORD_RELIANCE',
+          description: `Thematic resonance relies almost entirely on "${keywords[topIdx]}" (${Math.round(topHits / totalKwHits * 100)}% of all theme hits) while [${absent.join(', ')}] never appear — the theme "${themeRaw}" is represented by only one pole of its own tension`,
+          severity: 'minor',
+          suggestedFix: `Dramatize the neglected side of the theme. If "${keywords[topIdx]}" dominates, give [${absent.join(', ')}] their own scenes — a theme is a dialectic, and one pole without the other is a slogan.`,
+        });
+      }
+    }
+
+    // THEME_CLIMAX_SCENE_SILENT: Act 3 carries the theme somewhere, but the
+    // single highest-suspense scene — the climax beat itself — has no thematic
+    // resonance. The story answers its question adjacent to the climax rather
+    // than IN it. Distinct from THEME_UNRESOLVED (whole-act silence); this fires
+    // only when the act resonates but the peak moment doesn't.
+    if (records.length >= 8 && act3HasResonance) {
+      const climaxZoneStart = Math.floor(records.length * 0.75);
+      let climaxIdx = -1;
+      let maxSus = -Infinity;
+      for (let i = climaxZoneStart; i < records.length; i++) {
+        if (records[i].suspenseDelta > maxSus) { maxSus = records[i].suspenseDelta; climaxIdx = i; }
+      }
+      if (climaxIdx >= 0 && maxSus > 1.5) {
+        const climaxText = sceneTexts.get(records[climaxIdx].sceneIdx) ?? '';
+        if (!sceneHasResonance(climaxText, expandedKeywords)) {
+          issues.push({
+            location: `Scene ${records[climaxIdx].sceneIdx} (climax, peak suspense ${maxSus.toFixed(1)})`,
+            rule: 'THEME_CLIMAX_SCENE_SILENT',
+            description: `Act 3 carries the theme "${themeRaw}", but the climax scene (Scene ${records[climaxIdx].sceneIdx}, the peak-suspense beat) has no thematic language — the story resolves its question beside the climax rather than inside it`,
+            severity: 'major',
+            suggestedFix: `Move the thematic payoff into the climax itself. The single most dramatic moment should also be the most thematically charged: the protagonist's decisive action should embody the answer to "${themeRaw}".`,
+          });
+        }
+      }
+    }
   }
 
   const { revised, usedLLM } = await rewritePass({
