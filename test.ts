@@ -11762,6 +11762,111 @@ He sits down in the chair.
     });
   });
 
+  describe('Wave 160 — voicePass: passive action voice, interior monologue leak, qualifier overload', async () => {
+    function makePassInput(fountain: string) {
+      const records = Array.from({ length: 3 }, (_, i) => ({
+        commitId: `c${i}`, sceneIdx: i, slug: `INT. SC${i} - DAY`,
+        purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+        clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+        dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+        payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      }));
+      return {
+        fountain, original: fountain, records: records as any,
+        structure: {} as any, annotations: [] as any, approvedSpans: [],
+      };
+    }
+
+    it('voicePass detects PASSIVE_ACTION_VOICE when many action lines use passive constructions', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 12 action lines, 3 use passive voice → 25% > 15% threshold
+      const passiveLines = [
+        'A sound is heard in the distance.',
+        'The figure can be seen through the window.',
+        'The weapon was found under the seat.',
+      ].join('\n');
+      const normalLines = Array.from({ length: 9 }, (_, i) => `She walks to the door ${i}.`).join('\n');
+      const fountain = `INT. OFFICE - DAY\n\n${passiveLines}\n${normalLines}\n\nALICE\nHello.\n`;
+      const result = await voicePass(makePassInput(fountain));
+      const passive = result.issues.filter(i => i.rule === 'PASSIVE_ACTION_VOICE');
+      assert.ok(passive.length >= 1, `Should detect PASSIVE_ACTION_VOICE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(passive[0].severity === 'major');
+    });
+
+    it('voicePass does NOT fire PASSIVE_ACTION_VOICE when passive rate is below threshold', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const activeLines = Array.from({ length: 12 }, (_, i) => `She crosses to the window ${i}.`).join('\n');
+      const fountain = `INT. OFFICE - DAY\n\n${activeLines}\n\nALICE\nHello.\n`;
+      const result = await voicePass(makePassInput(fountain));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'PASSIVE_ACTION_VOICE'),
+        'Should NOT fire when action lines use active voice',
+      );
+    });
+
+    it('voicePass detects INTERIOR_MONOLOGUE_LEAK when action lines describe character thoughts', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const fountain = [
+        'INT. HALLWAY - DAY\n\n',
+        'She wonders if this is the right choice.\n',
+        'He realizes he has no way out.\n',
+        'She remembers the last time they spoke.\n',
+        'He walks to the door.\n',
+        'She crosses to the window.\n',
+        '\n',
+        'ALICE\nHello.\n',
+      ].join('');
+      const result = await voicePass(makePassInput(fountain));
+      const leak = result.issues.filter(i => i.rule === 'INTERIOR_MONOLOGUE_LEAK');
+      assert.ok(leak.length >= 1, `Should detect INTERIOR_MONOLOGUE_LEAK; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(leak[0].severity === 'major');
+    });
+
+    it('voicePass does NOT fire INTERIOR_MONOLOGUE_LEAK when action lines describe behavior', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const fountain = [
+        'INT. HALLWAY - DAY\n\n',
+        'She pauses at the door.\n',
+        'He grips the railing.\n',
+        'She stares at the window.\n',
+        'He turns slowly.\n',
+        'She crosses to the table.\n',
+      ].join('');
+      const result = await voicePass(makePassInput(fountain));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'INTERIOR_MONOLOGUE_LEAK'),
+        'Should NOT fire when action lines describe visible behavior',
+      );
+    });
+
+    it('voicePass detects QUALIFIER_OVERLOAD when >25% of action lines use hedging qualifiers', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 10 action lines, 3 use qualifiers → 30% > 25% threshold
+      const qualifiedLines = [
+        'She seems nervous about the meeting.',
+        'He appears to be uncomfortable.',
+        'Perhaps she should leave.',
+      ].join('\n');
+      const normalLines = Array.from({ length: 7 }, (_, i) => `She steps into the room ${i}.`).join('\n');
+      const fountain = `INT. OFFICE - DAY\n\n${qualifiedLines}\n${normalLines}\n\nALICE\nHello.\n`;
+      const result = await voicePass(makePassInput(fountain));
+      const qualifier = result.issues.filter(i => i.rule === 'QUALIFIER_OVERLOAD');
+      assert.ok(qualifier.length >= 1, `Should detect QUALIFIER_OVERLOAD; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(qualifier[0].severity === 'minor');
+    });
+
+    it('voicePass does NOT fire QUALIFIER_OVERLOAD when action lines are declarative', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const declarativeLines = Array.from({ length: 10 }, (_, i) => `She walks directly to position ${i}.`).join('\n');
+      const fountain = `INT. OFFICE - DAY\n\n${declarativeLines}\n\nALICE\nHello.\n`;
+      const result = await voicePass(makePassInput(fountain));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'QUALIFIER_OVERLOAD'),
+        'Should NOT fire when action lines are declarative',
+      );
+    });
+  });
+
   describe('Wave 159 — beliefPass: revelation isolated, told domination, belief asymmetry', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

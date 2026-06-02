@@ -6,6 +6,9 @@
 // Uses a simplified Burrows Delta proxy on action lines.
 // Wave 146 additions: dialogue clarity (DIALOGUE_ATTRIBUTION_CONFUSION when chars speak
 // without action breaks), cliché density, and subtext absence checks.
+// Wave 160 additions: passive action voice (action lines use passive constructions),
+// interior monologue leak (action lines describe character thoughts instead of behavior),
+// qualifier overload (excessive hedging words drain cinematic declarative authority).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -337,6 +340,93 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         description: `Scene ${i} has ${directCount} instances of direct emotional exposition (characters literally stating feelings/intentions) in ${dialogueLines.length} dialogue lines — lacks subtext and implication`,
         severity: 'major',
         suggestedFix: 'Rewrite dialogue to show emotions through indirection, humor, denial, or what\'s unsaid rather than explicit emotional statements',
+      });
+    }
+  }
+
+  // ── Wave 160: Passive voice, interior leak, qualifier overload ──────────────
+
+  // Scan action lines from the fountain (separate from dialogue).
+  const allLines = fountain.split('\n');
+  const actionOnlyLines: string[] = [];
+  let inDialogueBlock = false;
+  for (const line of allLines) {
+    const t = line.trim();
+    if (!t) { inDialogueBlock = false; continue; }
+    if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDialogueBlock = false; continue; }
+    if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDialogueBlock = true; continue; }
+    if (/^\(/.test(t)) continue; // parenthetical — stay in dialogue
+    if (inDialogueBlock) continue; // dialogue line
+    actionOnlyLines.push(t);
+  }
+
+  // PASSIVE_ACTION_VOICE: Action lines use passive voice constructions ("is heard",
+  // "can be seen", "appears to be found") — passive voice drains the visual, declarative
+  // energy that makes screenplay action come alive. Requires 10+ action lines and >15% rate.
+  if (actionOnlyLines.length >= 10) {
+    const passivePatterns = [
+      /\bis heard\b/i, /\bcan be seen\b/i, /\bcan be heard\b/i, /\bwas seen\b/i,
+      /\bwas heard\b/i, /\bare seen\b/i, /\bare heard\b/i, /\bis seen\b/i,
+      /\bis found\b/i, /\bwas found\b/i, /\bwere found\b/i, /\bis felt\b/i,
+      /\bcan be felt\b/i, /\bseems to be\b/i, /\bappears to be\b/i,
+    ];
+    const passiveLineCount = actionOnlyLines.filter(line =>
+      passivePatterns.some(p => p.test(line)),
+    ).length;
+    const passiveRate = passiveLineCount / actionOnlyLines.length;
+    if (passiveRate > 0.15) {
+      issues.push({
+        location: 'Action line prose',
+        rule: 'PASSIVE_ACTION_VOICE',
+        description: `${passiveLineCount} of ${actionOnlyLines.length} action lines (${Math.round(passiveRate * 100)}%) use passive constructions ("is heard", "can be seen", "appears to be") — passive voice drains cinematic energy and weakens directorial authority`,
+        severity: 'major',
+        suggestedFix: 'Rewrite passive constructions into active visual verbs: "A sound drifts in from the hallway" instead of "A sound is heard". Each action line should declare what the camera records.',
+      });
+    }
+  }
+
+  // INTERIOR_MONOLOGUE_LEAK: Action lines describe character psychology ("she wonders",
+  // "he thinks about", "she realizes", "he remembers") — inner thought that the camera
+  // cannot record. Screenplays must externalize psychology through action and behavior.
+  // Requires 3+ thought-description action lines.
+  if (actionOnlyLines.length >= 5) {
+    const thoughtPatterns = [
+      /\b(she|he|they)\s+wonders?\b/i, /\b(she|he|they)\s+thinks?\s+about\b/i,
+      /\b(she|he|they)\s+realizes?\b/i, /\b(she|he|they)\s+remembers?\b/i,
+      /\b(she|he|they)\s+feels?\s+(that|like|as if)\b/i,
+      /\b(she|he|they)\s+knows?\s+(that|this|it|the)\b/i,
+      /\b(she|he|they)\s+imagines?\b/i, /\b(she|he|they)\s+hopes?\s+(that|for|to)\b/i,
+      /\b(she|he|they)\s+wishes?\b/i, /\b(she|he|they)\s+senses?\s+that\b/i,
+    ];
+    const leakLines = actionOnlyLines.filter(line =>
+      thoughtPatterns.some(p => p.test(line)),
+    );
+    if (leakLines.length >= 3) {
+      issues.push({
+        location: 'Action line interiority',
+        rule: 'INTERIOR_MONOLOGUE_LEAK',
+        description: `${leakLines.length} action lines describe character psychology ("wonders", "realizes", "remembers") — the camera cannot record thought. These lines tell the reader about inner states instead of showing externalized behavior.`,
+        severity: 'major',
+        suggestedFix: 'Convert interior description to visible action: instead of "she realizes she\'s alone", write "She looks left, right. Nothing. She\'s alone." Let behavior carry the psychology.',
+      });
+    }
+  }
+
+  // QUALIFIER_OVERLOAD: Action lines overuse hedging qualifiers ("seems", "perhaps",
+  // "maybe", "slightly", "somewhat", "sort of", "kind of") that drain declarative
+  // cinematic authority. Screenplay action should assert, not hedge. If > 25% of
+  // action lines contain qualifiers, the voice sounds uncertain. Requires 8+ action lines.
+  if (actionOnlyLines.length >= 8) {
+    const qualifierPattern = /\b(seems?|appears?|perhaps|maybe|possibly|slightly|somewhat|rather|quite|sort of|kind of|a bit|almost|nearly|barely|roughly|apparently|presumably)\b/i;
+    const qualifierLineCount = actionOnlyLines.filter(l => qualifierPattern.test(l)).length;
+    const qualifierRate = qualifierLineCount / actionOnlyLines.length;
+    if (qualifierRate > 0.25) {
+      issues.push({
+        location: 'Action line authority',
+        rule: 'QUALIFIER_OVERLOAD',
+        description: `${qualifierLineCount} of ${actionOnlyLines.length} action lines (${Math.round(qualifierRate * 100)}%) use hedging qualifiers ("seems", "perhaps", "maybe", "sort of") — the prose sounds uncertain rather than visually declarative`,
+        severity: 'minor',
+        suggestedFix: 'Remove qualifiers from action lines: "He seems nervous" → "He tugs at his collar". Commit to what the camera sees — qualifiers are for uncertain narrators, not screenwriters.',
       });
     }
   }
