@@ -352,6 +352,100 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 176: Conjunction openings, ellipsis overuse, caps emphasis ─────────
+
+  // OPENING_CONJUNCTION_OVERUSE: More than 25% of action lines open with a
+  // coordinating conjunction ("And", "But", "So", "Then", "Yet"). An occasional
+  // conjunction-led line is a deliberate rhythmic choice; a quarter of all lines
+  // doing it is a verbal tic that makes the prose feel breathless and run-on.
+  // Requires 8+ action lines.
+  {
+    const conjRe = /^(and|but|so|then|yet|or)\b/i;
+    let actionN = 0;
+    let conjN = 0;
+    let inDlg = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg) continue;
+      actionN++;
+      if (conjRe.test(t)) conjN++;
+    }
+    if (actionN >= 8 && conjN / actionN > 0.25) {
+      issues.push({
+        location: 'Action line openings',
+        rule: 'OPENING_CONJUNCTION_OVERUSE',
+        description: `${conjN} of ${actionN} action lines (${Math.round(conjN / actionN * 100)}%) open with a conjunction ("And", "But", "Then") — a tic that strings the prose into a breathless run-on instead of standing each image on its own.`,
+        severity: 'minor',
+        suggestedFix: 'Cut the leading conjunctions. Let action lines begin with the subject performing the action; reserve a sentence-opening "But" for the rare beat where the reversal genuinely needs the hinge.',
+      });
+    }
+  }
+
+  // ELLIPSIS_OVERUSE: More than 30% of content lines (dialogue and action) trail
+  // off into an ellipsis. Ellipses signal hesitation or incompletion; when nearly
+  // every line uses one, the whole script reads as tentative and unresolved, and
+  // genuine trailing-off loses its weight. Requires 10+ content lines.
+  {
+    let contentN = 0;
+    let ellipsisN = 0;
+    let inDlg = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg = true; continue; }
+      if (/^\(/.test(t)) continue;
+      contentN++;
+      if (t.includes('...') || t.includes('…')) ellipsisN++;
+    }
+    if (contentN >= 10 && ellipsisN / contentN > 0.3) {
+      issues.push({
+        location: 'Dialogue and action lines',
+        rule: 'ELLIPSIS_OVERUSE',
+        description: `${ellipsisN} of ${contentN} content lines (${Math.round(ellipsisN / contentN * 100)}%) trail off into an ellipsis — when nearly every line hesitates, the whole script reads as tentative and the genuine trailing-off beats lose their weight.`,
+        severity: 'minor',
+        suggestedFix: 'Reserve ellipses for true hesitation or interruption. Let most lines land on a hard period; a definite stop reads as confidence, and makes the rare ellipsis actually mean something.',
+      });
+    }
+  }
+
+  // CAPS_EMPHASIS_OVERUSE: Action lines overuse ALL-CAPS words mid-sentence for
+  // emphasis ("He SLAMS the door", "She SCREAMS"). Screenplays reserve caps for
+  // character cues, sounds, and the first appearance of a character or key prop;
+  // sprinkling them through action for emphasis is amateur shouting on the page.
+  // Requires 8+ action lines and >20% with a mid-line caps word.
+  {
+    let actionN = 0;
+    let capsN = 0;
+    let inDlg = false;
+    const capsWordRe = /\b[A-Z]{3,}\b/;
+    const hasLowerRe = /[a-z]/;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg) continue;
+      actionN++;
+      // Only count lines that are prose (contain lowercase) yet shout a caps word
+      if (hasLowerRe.test(t) && capsWordRe.test(t)) capsN++;
+    }
+    if (actionN >= 8 && capsN / actionN > 0.2) {
+      issues.push({
+        location: 'Action line emphasis',
+        rule: 'CAPS_EMPHASIS_OVERUSE',
+        description: `${capsN} of ${actionN} action lines (${Math.round(capsN / actionN * 100)}%) shout an ALL-CAPS word mid-sentence for emphasis ("He SLAMS the door") — caps belong to cues, sounds, and first appearances, not to punching up ordinary action.`,
+        severity: 'minor',
+        suggestedFix: 'Strip the emphasis caps and let a stronger verb carry the force: "He SLAMS the door" → "He slams the door" reads no weaker, and "He kicks it shut" reads stronger. Save caps for the page\'s rare true accents.',
+      });
+    }
+  }
+
   // ── Limit total issues to avoid overwhelming output ───────────────────────
   // Clichés (minor) are pushed first and would crowd out the higher-severity
   // structural findings (UNIFORM_SCENE_PURPOSES is major) under a naive slice.

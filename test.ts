@@ -13473,6 +13473,118 @@ He sits down in the chair.
     });
   });
 
+  describe('Wave 176 — originalityPass: conjunction openings, ellipsis overuse, caps emphasis', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: ['establish_world', 'introduce_conflict', 'raise_stakes', 'revelation', 'climax', 'resolution'][idx % 6],
+      dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: idx % 2 === 0 ? 'positive' : 'negative', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const origInput = (fountain: string, n: number) => ({
+      fountain, original: fountain,
+      records: Array.from({ length: n }, (_, i) => makeRec(i)) as any,
+      structure: {} as any, annotations: [], approvedSpans: [],
+    });
+
+    // ── OPENING_CONJUNCTION_OVERUSE ───────────────────────────────────────────
+    it('originalityPass detects OPENING_CONJUNCTION_OVERUSE when >25% of action lines open with a conjunction', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const actions = [
+        'And the door swings open.', 'But she does not move.', 'So he waits in the hall.',
+        'The clock ticks on the wall.', 'A car passes outside.', 'The kettle steams.',
+        'Light spills across the floor.', 'She sets down the cup.',
+      ];
+      const fountain = `INT. ROOM - DAY\n\n${actions.join('\n')}\n`;
+      const result = await originalityPass(origInput(fountain, 2));
+      const conj = result.issues.filter(i => i.rule === 'OPENING_CONJUNCTION_OVERUSE');
+      assert.ok(conj.length >= 1, `Should detect OPENING_CONJUNCTION_OVERUSE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(conj[0].severity === 'minor');
+    });
+
+    it('originalityPass does NOT fire OPENING_CONJUNCTION_OVERUSE when openings are varied', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const actions = [
+        'The door swings open.', 'She does not move.', 'He waits in the hall.',
+        'The clock ticks on the wall.', 'A car passes outside.', 'The kettle steams.',
+        'Light spills across the floor.', 'She sets down the cup.',
+      ];
+      const fountain = `INT. ROOM - DAY\n\n${actions.join('\n')}\n`;
+      const result = await originalityPass(origInput(fountain, 2));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'OPENING_CONJUNCTION_OVERUSE'),
+        'Should NOT fire when action lines begin with their subjects',
+      );
+    });
+
+    // ── ELLIPSIS_OVERUSE ──────────────────────────────────────────────────────
+    it('originalityPass detects ELLIPSIS_OVERUSE when >30% of content lines trail off', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 10 content lines, 5 with ellipses
+      const body = [
+        'She steps inside...', 'He follows close behind...', 'The room is empty.',
+        'Maybe it always was...', 'A light flickers.', 'She turns slowly...',
+        'The floor creaks.', 'He whispers something...', 'The door clicks shut.',
+        'Nothing moves at all.',
+      ];
+      const fountain = `INT. ROOM - DAY\n\n${body.join('\n')}\n`;
+      const result = await originalityPass(origInput(fountain, 2));
+      const ell = result.issues.filter(i => i.rule === 'ELLIPSIS_OVERUSE');
+      assert.ok(ell.length >= 1, `Should detect ELLIPSIS_OVERUSE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(ell[0].severity === 'minor');
+    });
+
+    it('originalityPass does NOT fire ELLIPSIS_OVERUSE when lines end on hard stops', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const body = [
+        'She steps inside.', 'He follows close behind.', 'The room is empty.',
+        'Maybe it always was.', 'A light flickers.', 'She turns slowly.',
+        'The floor creaks.', 'He whispers something...', 'The door clicks shut.',
+        'Nothing moves at all.',
+      ];
+      const fountain = `INT. ROOM - DAY\n\n${body.join('\n')}\n`;
+      const result = await originalityPass(origInput(fountain, 2));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'ELLIPSIS_OVERUSE'),
+        'Should NOT fire when only a small fraction of lines use ellipses',
+      );
+    });
+
+    // ── CAPS_EMPHASIS_OVERUSE ─────────────────────────────────────────────────
+    it('originalityPass detects CAPS_EMPHASIS_OVERUSE when >20% of action lines shout a caps word', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const actions = [
+        'He SLAMS the door behind him.', 'She SCREAMS into the empty hall.',
+        'The lamp tips over.', 'A draft moves the curtain.',
+        'He steadies the table.', 'She crosses to the desk.',
+        'The clock keeps ticking.', 'Rain streaks the glass.',
+      ];
+      const fountain = `INT. ROOM - DAY\n\n${actions.join('\n')}\n`;
+      const result = await originalityPass(origInput(fountain, 2));
+      const caps = result.issues.filter(i => i.rule === 'CAPS_EMPHASIS_OVERUSE');
+      assert.ok(caps.length >= 1, `Should detect CAPS_EMPHASIS_OVERUSE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(caps[0].severity === 'minor');
+    });
+
+    it('originalityPass does NOT fire CAPS_EMPHASIS_OVERUSE when action prose is lowercase', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const actions = [
+        'He slams the door behind him.', 'She cries out into the empty hall.',
+        'The lamp tips over.', 'A draft moves the curtain.',
+        'He steadies the table.', 'She crosses to the desk.',
+        'The clock keeps ticking.', 'Rain streaks the glass.',
+      ];
+      const fountain = `INT. ROOM - DAY\n\n${actions.join('\n')}\n`;
+      const result = await originalityPass(origInput(fountain, 2));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'CAPS_EMPHASIS_OVERUSE'),
+        'Should NOT fire when action lines use ordinary lowercase prose',
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
