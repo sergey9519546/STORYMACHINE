@@ -11264,6 +11264,111 @@ We need to resolve this signing contract money deadline now.
     });
   });
 
+  // ── Wave 151: Rhythm pass enhancements ────────────────────────────────────
+  describe('Wave 151 — rhythmPass: camera direction, adverb clustering, over-description', async () => {
+    const blankRec = (idx: number): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [], payoffSetupIds: [],
+      visualBeats: [], relationshipShifts: [],
+    });
+
+    it('rhythmPass detects CAMERA_DIRECTION_OVERREACH for 2+ camera direction uses', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      const fountain = `INT. STREET - DAY
+We see Alice walking toward the building.
+
+She hesitates.
+
+The camera pulls back to reveal the entire block is on fire.
+
+We follow her as she runs to safety.
+
+We see smoke rising above the rooftops.
+
+She stops.
+`;
+      const result = await rhythmPass({
+        fountain, original: fountain,
+        records: [blankRec(0)] as any, structure: {} as any, annotations: [], approvedSpans: [],
+      });
+      const cam = result.issues.filter(i => i.rule === 'CAMERA_DIRECTION_OVERREACH');
+      assert.ok(cam.length >= 1, 'Should detect CAMERA_DIRECTION_OVERREACH for multiple "we see/camera" uses');
+      assert.ok(cam[0].severity === 'minor');
+    });
+
+    it('rhythmPass does NOT fire CAMERA_DIRECTION_OVERREACH when no camera directions present', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      const fountain = `INT. STREET - DAY
+Alice walks toward the building.
+
+She hesitates at the entrance.
+
+Smoke rises above the rooftops across the street.
+
+She turns and runs.
+`;
+      const result = await rhythmPass({
+        fountain, original: fountain,
+        records: [blankRec(0)] as any, structure: {} as any, annotations: [], approvedSpans: [],
+      });
+      const cam = result.issues.filter(i => i.rule === 'CAMERA_DIRECTION_OVERREACH');
+      assert.ok(cam.length === 0, 'Should NOT fire when no camera directions present');
+    });
+
+    it('rhythmPass detects ADVERB_CLUSTERING for line with 3+ adverbs', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      const fountain = `INT. ROOM - DAY
+She moves slowly, carefully, deliberately across the room, quietly closing the door.
+
+He watches her intently.
+
+She nods.
+
+He sighs.
+
+She leaves.
+
+He sits.
+
+He waits.
+
+He breathes.
+`;
+      const result = await rhythmPass({
+        fountain, original: fountain,
+        records: [blankRec(0)] as any, structure: {} as any, annotations: [], approvedSpans: [],
+      });
+      const adv = result.issues.filter(i => i.rule === 'ADVERB_CLUSTERING');
+      assert.ok(adv.length >= 1, 'Should detect ADVERB_CLUSTERING for 3+ adverbs in one line');
+      assert.ok(adv[0].severity === 'minor');
+    });
+
+    it('rhythmPass detects OVER_DESCRIPTION for character with 4+ physical adjectives', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      // Needs 4+ action lines to pass the early-exit guard
+      const fountain = `INT. PRECINCT - DAY
+DETECTIVE COLE enters. He is a tall, lean, weathered, scarred, tired man with sharp angular features.
+
+The room is quiet.
+
+Papers cover the desk.
+
+A phone sits on the corner.
+
+He sits down in the chair.
+`;
+      const result = await rhythmPass({
+        fountain, original: fountain,
+        records: [blankRec(0)] as any, structure: {} as any, annotations: [], approvedSpans: [],
+      });
+      const desc = result.issues.filter(i => i.rule === 'OVER_DESCRIPTION');
+      assert.ok(desc.length >= 1, 'Should detect OVER_DESCRIPTION for 4+ physical adjectives');
+      assert.ok(desc[0].severity === 'minor');
+    });
+  });
+
   it('showrunner fires for set_up_payoff scene with no SEED_CLUE or PAYOFF_SETUP op', async () => {
     const { showrunnerCritic } = await import('./server/nvm/room/critics/showrunner.ts');
     const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {

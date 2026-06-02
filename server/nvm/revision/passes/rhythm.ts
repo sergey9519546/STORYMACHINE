@@ -2,6 +2,9 @@
 // Checks sentence rhythm in action lines: monotonous sentence lengths,
 // run-on action blocks, staccato beats that need expansion.
 // Wave 137 additions: passive voice constructions, weak-verb chains.
+// Wave 151 additions: camera-direction overreach (writer directing the lens),
+// adverb clustering (lazy qualifier density in action lines), and
+// over-description (introducing characters with >4 physical descriptors).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -164,6 +167,69 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
       severity: 'minor',
       suggestedFix: 'Replace "started to run" with "ran"; "began to speak" with "spoke" — use the root verb directly',
     });
+  }
+
+  // ── Wave 151: Camera-direction, adverb clustering, over-description ──────────
+
+  // CAMERA_DIRECTION_OVERREACH: Writers directing the camera in action lines
+  // ("we see", "the camera", "close on", "cut to", "pull back to reveal") — this
+  // is the director's job. Spec scripts that over-direct read as amateur.
+  const cameraDirectionRe = /\b(we see|we hear|we follow|the camera|close on|close up|cut to|pull back|track (in|out|with)|camera (?:moves|pans|tilts|pushes|pulls|reveals|shows)|p\.o\.v\.|point of view|tight on|wide on|reveal\s+that)\b/i;
+  let cameraCount = 0;
+  for (const line of actionLines) {
+    if (cameraDirectionRe.test(line.text) && cameraCount < 3) {
+      cameraCount++;
+      if (cameraCount === 2) {
+        // Fire once when we hit 2+ instances
+        issues.push({
+          location: `Line ${line.lineNum}`,
+          rule: 'CAMERA_DIRECTION_OVERREACH',
+          description: `Action lines direct the camera ${cameraCount}+ times ("we see", "close on", "the camera moves", etc.) — spec screenplays should describe what happens, not how to shoot it`,
+          severity: 'minor',
+          suggestedFix: 'Remove camera directions. Describe the physical world and action directly: "She closes her eyes" not "Close on her eyes as they close"',
+        });
+      }
+    }
+  }
+
+  // ADVERB_CLUSTERING: Action lines dense with adverbs (-ly words) indicate
+  // weak verbs propped up by qualifiers. A concentrated adverb count is a tell.
+  // We flag any action line with 3+ adverbs — the verb is doing no work.
+  const adverbRe = /\b\w+ly\b/gi;
+  let adverbFlagCount = 0;
+  for (const line of actionLines) {
+    const adverbs = line.text.match(adverbRe) ?? [];
+    if (adverbs.length >= 3 && adverbFlagCount < 2) {
+      adverbFlagCount++;
+      issues.push({
+        location: `Line ${line.lineNum}`,
+        rule: 'ADVERB_CLUSTERING',
+        description: `Action line has ${adverbs.length} adverbs: "${adverbs.join('", "')}" — adverb clusters signal weak verbs propped up by qualifiers`,
+        severity: 'minor',
+        suggestedFix: `Replace the weak verb + adverb with a single precise verb. "Runs quickly" → "Sprints". "Speaks softly" → "Whispers".`,
+      });
+    }
+  }
+
+  // OVER_DESCRIPTION: An action line introducing a character with 4+ physical
+  // adjectives or descriptors signals style-sheet over-writing. The reader gets
+  // a catalogue instead of a specific, telling image.
+  // We detect this by looking for lines with 4+ adjectives describing a person.
+  const adjRe = /\b(tall|short|thin|fat|lean|heavy|broad|slender|stocky|muscular|frail|young|old|middle-aged|dark|fair|pale|tan|tanned|weathered|handsome|beautiful|ugly|plain|sharp|soft|hard|angular|round|tired|alert|nervous|calm|serious|intense|gentle|fierce|cold|warm|wild|controlled|elegant|rough|smooth|scarred|battered|groomed|unkempt)\b/gi;
+  for (let i = 0; i < actionLines.length; i++) {
+    const line = actionLines[i];
+    const adjMatches = line.text.match(adjRe) ?? [];
+    // Only fire for lines that seem to describe a person (contain a name-like pattern or "A MAN/WOMAN")
+    if (adjMatches.length >= 4 && /\b(man|woman|person|figure|character|he|she|detective|agent|officer|doctor|doctor|nurse|soldier|cop)\b/i.test(line.text)) {
+      issues.push({
+        location: `Line ${line.lineNum}`,
+        rule: 'OVER_DESCRIPTION',
+        description: `Line introduces a character with ${adjMatches.length} physical adjectives: "${adjMatches.join('", "')}" — an inventory of traits instead of one telling image`,
+        severity: 'minor',
+        suggestedFix: 'Cut to one or two specific, unexpected details that do more work than a list. What single image makes this person unforgettable?',
+      });
+      break; // one flag per pass
+    }
   }
 
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'rhythm', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
