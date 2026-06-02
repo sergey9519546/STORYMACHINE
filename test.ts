@@ -12472,6 +12472,157 @@ He sits down in the chair.
     });
   });
 
+  // ── Wave 168: Character arc pass enhancements ──────────────────────────────
+  describe('Wave 168 — characterArcPass: relational symmetry, arc resolution, secondary void', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const baseStructure = {
+      completionPercent: 50, actPosition: 'act2a' as const,
+      revelationCount: 1, approachingClimax: false,
+    };
+
+    // ── RELATIONAL_SYMMETRY_ABSENT ────────────────────────────────────────────
+    it('characterArcPass detects RELATIONAL_SYMMETRY_ABSENT when all shifts are positive', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // All 4 relationship shifts are positive
+      const records = Array.from({ length: 6 }, (_, i) =>
+        makeRec(i, {
+          relationshipShifts: i < 4
+            ? [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.5 }]
+            : [],
+        }),
+      );
+      const result = await characterArcPass({
+        fountain: blankFountain(6), original: blankFountain(6),
+        records: records as any, structure: baseStructure as any,
+        annotations: [], approvedSpans: [],
+      });
+      const sym = result.issues.filter(i => i.rule === 'RELATIONAL_SYMMETRY_ABSENT');
+      assert.ok(sym.length >= 1, `Expected RELATIONAL_SYMMETRY_ABSENT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(sym[0].severity === 'major');
+    });
+
+    it('characterArcPass does NOT fire RELATIONAL_SYMMETRY_ABSENT when shifts go both directions', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // Mix of positive and negative shifts
+      const records = [
+        makeRec(0, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.5 }] }),
+        makeRec(1, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.6 }] }),
+        makeRec(2, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.3 }] }),
+        makeRec(3, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.4 }] }),
+        makeRec(4), makeRec(5),
+      ];
+      const result = await characterArcPass({
+        fountain: blankFountain(6), original: blankFountain(6),
+        records: records as any, structure: baseStructure as any,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'RELATIONAL_SYMMETRY_ABSENT'),
+        'Should NOT fire when shifts include both positive and negative amounts',
+      );
+    });
+
+    // ── ARC_RESOLUTION_ABSENT ────────────────────────────────────────────────
+    it('characterArcPass detects ARC_RESOLUTION_ABSENT when Act 2 struggles but Act 3 has no positive', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // 8 scenes; act2=scenes 2-5; act3=scenes 6-7
+      // Act 2: 2 negative shifts; Act 3: all neutral
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, {
+          emotionalShift: (i === 3 || i === 4) ? 'negative' : 'neutral',
+        }),
+      );
+      const result = await characterArcPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: baseStructure as any,
+        annotations: [], approvedSpans: [],
+      });
+      const resolution = result.issues.filter(i => i.rule === 'ARC_RESOLUTION_ABSENT');
+      assert.ok(resolution.length >= 1, `Expected ARC_RESOLUTION_ABSENT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(resolution[0].severity === 'major');
+    });
+
+    it('characterArcPass does NOT fire ARC_RESOLUTION_ABSENT when Act 3 has a positive shift', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, {
+          emotionalShift: (i === 3 || i === 4) ? 'negative' : (i === 7 ? 'positive' : 'neutral'),
+        }),
+      );
+      const result = await characterArcPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: baseStructure as any,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'ARC_RESOLUTION_ABSENT'),
+        'Should NOT fire when Act 3 contains at least one positive emotional shift',
+      );
+    });
+
+    // ── SECONDARY_CHARACTER_VOID ─────────────────────────────────────────────
+    it('characterArcPass detects SECONDARY_CHARACTER_VOID when 2+ secondaries have no arc', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // ALICE: 6 cues (protagonist); BOB: 4 cues; CAROL: 4 cues
+      // Only ALICE appears in relationship shifts — BOB and CAROL are inert secondaries
+      const fountainLines: string[] = ['INT. OFFICE - DAY', ''];
+      for (let i = 0; i < 6; i++) fountainLines.push('ALICE', 'Hello.', '');
+      for (let i = 0; i < 4; i++) fountainLines.push('BOB', 'Hi.', '');
+      for (let i = 0; i < 4; i++) fountainLines.push('CAROL', 'Yes.', '');
+      const fountain = fountainLines.join('\n');
+      const records = Array.from({ length: 6 }, (_, i) =>
+        makeRec(i, {
+          relationshipShifts: i === 2
+            ? [{ pairKey: 'alice|dave', dimension: 'affinity', amount: -0.5 }]
+            : [],
+        }),
+      );
+      const result = await characterArcPass({
+        fountain, original: fountain,
+        records: records as any, structure: baseStructure as any,
+        annotations: [], approvedSpans: [],
+      });
+      const void_ = result.issues.filter(i => i.rule === 'SECONDARY_CHARACTER_VOID');
+      assert.ok(void_.length >= 1, `Expected SECONDARY_CHARACTER_VOID; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(void_[0].severity === 'minor');
+    });
+
+    it('characterArcPass does NOT fire SECONDARY_CHARACTER_VOID when secondaries have relationship arcs', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      const fountainLines: string[] = ['INT. OFFICE - DAY', ''];
+      for (let i = 0; i < 6; i++) fountainLines.push('ALICE', 'Hello.', '');
+      for (let i = 0; i < 4; i++) fountainLines.push('BOB', 'Hi.', '');
+      for (let i = 0; i < 4; i++) fountainLines.push('CAROL', 'Yes.', '');
+      const fountain = fountainLines.join('\n');
+      // BOB now has a shift (alice|bob) → only CAROL is inert → 1 inert secondary, doesn't fire
+      const records = Array.from({ length: 6 }, (_, i) =>
+        makeRec(i, {
+          relationshipShifts: i === 2
+            ? [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.5 }]
+            : [],
+        }),
+      );
+      const result = await characterArcPass({
+        fountain, original: fountain,
+        records: records as any, structure: baseStructure as any,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'SECONDARY_CHARACTER_VOID'),
+        'Should NOT fire when fewer than 2 secondary characters lack relationship arcs',
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

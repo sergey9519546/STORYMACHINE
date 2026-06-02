@@ -271,6 +271,91 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 168: Relational symmetry, arc resolution, secondary character void ──
+
+  // RELATIONAL_SYMMETRY_ABSENT: Every relationship shift in the story moves in the
+  // same direction — all improving or all deteriorating. Real dramatic relationships
+  // require both rise and fall to feel dynamic and three-dimensional.
+  if (records.length >= 6) {
+    const allAmounts: number[] = [];
+    for (const r of records) {
+      for (const shift of r.relationshipShifts ?? []) {
+        allAmounts.push(shift.amount);
+      }
+    }
+    if (allAmounts.length >= 4) {
+      const allPositive = allAmounts.every(a => a > 0);
+      const allNegative = allAmounts.every(a => a < 0);
+      if (allPositive || allNegative) {
+        const direction = allPositive ? 'positive (improving only)' : 'negative (deteriorating only)';
+        issues.push({
+          location: 'All relationship arcs',
+          rule: 'RELATIONAL_SYMMETRY_ABSENT',
+          description: `All ${allAmounts.length} relationship shifts in the story are ${direction} — no arc has both rise and fall. Unidirectional relationships are predictable rather than dramatic.`,
+          severity: 'major',
+          suggestedFix: 'Add at least one shift in the opposing direction: a trust built then broken, or a wound that slowly heals. Real relationships are tested by both growth and setback.',
+        });
+      }
+    }
+  }
+
+  // ARC_RESOLUTION_ABSENT: Act 2 has 2+ negative emotional shifts (protagonist
+  // struggles) but Act 3 (last 25%) has no positive shifts — the arc ends without
+  // catharsis or transformation. The internal journey was never resolved.
+  if (records.length >= 8) {
+    const act2Start = Math.floor(records.length * 0.25);
+    const act3Start = Math.floor(records.length * 0.75);
+    const act2NegCount = records.slice(act2Start, act3Start)
+      .filter(r => r.emotionalShift === 'negative').length;
+    const act3PosCount = records.slice(act3Start)
+      .filter(r => r.emotionalShift === 'positive').length;
+    if (act2NegCount >= 2 && act3PosCount === 0) {
+      issues.push({
+        location: `Act 3 (Scenes ${act3Start}–${records.length - 1})`,
+        rule: 'ARC_RESOLUTION_ABSENT',
+        description: `Act 2 has ${act2NegCount} negative emotional shifts (struggle) but Act 3 has no positive shifts — the protagonist's internal arc ends without catharsis or transformation`,
+        severity: 'major',
+        suggestedFix: 'Add at least one positive emotional beat in Act 3: a reconciliation, a hard-won clarity, or a moment of grace. The struggle must earn some form of resolution.',
+      });
+    }
+  }
+
+  // SECONDARY_CHARACTER_VOID: 2+ secondary characters (3+ fountain cues, not the
+  // protagonist) have zero relationship shifts across the story. The protagonist
+  // moves through a socially static environment — no one around them grows or changes.
+  if (records.length >= 6) {
+    const cueCounts2 = new Map<string, number>();
+    for (const line of fountain.split('\n')) {
+      const t = line.trim();
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(t) &&
+          !/^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END|ACT|MIDPOINT|SCENE)/i.test(t)) {
+        const charName = t.replace(/\s*\(.*?\)\s*$/, '').toLowerCase().trim();
+        if (charName !== 'narrator' && charName !== 'v.o.' && charName !== 'o.s.') {
+          cueCounts2.set(charName, (cueCounts2.get(charName) ?? 0) + 1);
+        }
+      }
+    }
+    const charsInArcs = new Set<string>();
+    for (const r of records) {
+      for (const shift of r.relationshipShifts ?? []) {
+        for (const id of shift.pairKey.split('|')) charsInArcs.add(id.toLowerCase());
+      }
+    }
+    const sortedChars = [...cueCounts2.entries()].sort((a, b) => b[1] - a[1]);
+    const secondaries = sortedChars.slice(1).filter(([, c]) => c >= 3);
+    const inertSecondaries = secondaries.filter(([id]) => !charsInArcs.has(id));
+    if (inertSecondaries.length >= 2) {
+      const names = inertSecondaries.slice(0, 3).map(([id]) => id.toUpperCase()).join(', ');
+      issues.push({
+        location: 'Secondary characters',
+        rule: 'SECONDARY_CHARACTER_VOID',
+        description: `${inertSecondaries.length} secondary characters (${names}) appear in 3+ scenes each but have no relationship shifts — the protagonist moves through a socially static landscape`,
+        severity: 'minor',
+        suggestedFix: 'Give at least one secondary character a relationship shift that intersects with the protagonist\'s journey. Even a single betrayal or alliance adds dramatic texture.',
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'character-arc', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
