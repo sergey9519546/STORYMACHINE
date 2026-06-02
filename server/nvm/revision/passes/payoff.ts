@@ -232,6 +232,67 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 167: Payoff-before-setup, setup clustering, payoff rate decline ─────
+
+  // PAYOFF_BEFORE_SETUP: A clue payoff occurs in an earlier scene than where the
+  // clue was seeded. The audience receives the answer before the question is posed.
+  for (const [clueId, payoffScene] of payoffInfo) {
+    const info = clueInfo.get(clueId);
+    if (info && payoffScene < info.plantedAt) {
+      issues.push({
+        location: `Scene ${payoffScene} (payoff) / Scene ${info.plantedAt} (setup)`,
+        rule: 'PAYOFF_BEFORE_SETUP',
+        description: `Clue "${clueId}" is paid off at Scene ${payoffScene} but not seeded until Scene ${info.plantedAt} — the audience receives the answer before the question is asked`,
+        severity: 'critical',
+        suggestedFix: `Move the seed for "${clueId}" to a scene before Scene ${payoffScene}, or move its payoff to after Scene ${info.plantedAt}`,
+      });
+    }
+  }
+
+  // SETUP_CLUSTERING: 70%+ of all planted clues are concentrated in a single act
+  // zone (each 25% segment). Good setup/payoff architecture seeds mysteries
+  // throughout the story, not in one burst that leaves other acts informationally thin.
+  if (clueInfo.size >= 4 && records.length >= 8) {
+    const zoneCounts = [0, 0, 0, 0]; // act1 / act2a / act2b / act3
+    for (const info of clueInfo.values()) {
+      const pct = info.plantedAt / records.length;
+      const zone = pct < 0.25 ? 0 : pct < 0.5 ? 1 : pct < 0.75 ? 2 : 3;
+      zoneCounts[zone]++;
+    }
+    const maxCount = Math.max(...zoneCounts);
+    if (maxCount / clueInfo.size > 0.7) {
+      const zoneNames = ['Act 1', 'early Act 2', 'late Act 2', 'Act 3'];
+      const zoneIdx = zoneCounts.indexOf(maxCount);
+      issues.push({
+        location: `${zoneNames[zoneIdx]} (${Math.round(zoneIdx * 25)}%–${Math.round((zoneIdx + 1) * 25)}%)`,
+        rule: 'SETUP_CLUSTERING',
+        description: `${maxCount} of ${clueInfo.size} clues (${Math.round(maxCount / clueInfo.size * 100)}%) are planted in ${zoneNames[zoneIdx]} — setup is concentrated rather than distributed. The audience receives all the questions in one burst.`,
+        severity: 'minor',
+        suggestedFix: 'Spread clue planting across all acts. Early setups build long-arc suspense; mid-story setups raise stakes; late setups create urgency before the climax.',
+      });
+    }
+  }
+
+  // PAYOFF_RATE_DECLINE: Act 2 delivers 2+ payoffs but Act 3 delivers none — dramatic
+  // resolutions cluster in the middle act, leaving the climax and finale informationally
+  // empty. The story's biggest emotional moments should resolve its planted threads.
+  if (records.length >= 8 && payoffInfo.size >= 2) {
+    const act2Start = Math.floor(records.length * 0.25);
+    const act3Start = Math.floor(records.length * 0.75);
+    const act2Payoffs = [...payoffInfo.values()].filter(s => s >= act2Start && s < act3Start).length;
+    const act3Payoffs = [...payoffInfo.values()].filter(s => s >= act3Start).length;
+    const act3Scenes = records.length - act3Start;
+    if (act2Payoffs >= 2 && act3Payoffs === 0 && act3Scenes >= 2) {
+      issues.push({
+        location: `Act 3 (Scenes ${act3Start}–${records.length - 1})`,
+        rule: 'PAYOFF_RATE_DECLINE',
+        description: `Act 2 delivers ${act2Payoffs} payoffs but Act 3 delivers none — dramatic resolutions cluster in the middle act, leaving the finale without any story-thread closure`,
+        severity: 'major',
+        suggestedFix: 'Move at least one significant payoff into Act 3. The story\'s biggest reveal should coincide with its climax, not precede it by an entire act',
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'payoff', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

@@ -12320,6 +12320,158 @@ He sits down in the chair.
     });
   });
 
+  // ── Wave 167: Payoff pass enhancements ────────────────────────────────────
+  describe('Wave 167 — payoffPass: payoff-before-setup, setup clustering, payoff rate decline', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const baseStructure = {
+      completionPercent: 50, actPosition: 'act2a' as const,
+      openClues: 0, reversalCount: 1, midpointPressure: 2, tightestScene: null,
+    };
+
+    // ── PAYOFF_BEFORE_SETUP ──────────────────────────────────────────────────
+    it('payoffPass detects PAYOFF_BEFORE_SETUP when payoff precedes setup in timeline', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // Scene 0 pays off 'gun', but 'gun' isn't seeded until scene 3 — temporal inversion
+      const records = [
+        makeRec(0, { payoffSetupIds: ['gun'] }),
+        makeRec(1),
+        makeRec(2),
+        makeRec(3, { seededClueIds: ['gun'] }),
+        makeRec(4),
+        makeRec(5),
+      ];
+      const result = await payoffPass({
+        fountain: blankFountain(6), original: blankFountain(6),
+        records: records as any, structure: baseStructure as any,
+        annotations: [], approvedSpans: [],
+      });
+      const before = result.issues.filter(i => i.rule === 'PAYOFF_BEFORE_SETUP');
+      assert.ok(before.length >= 1, `Expected PAYOFF_BEFORE_SETUP; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(before[0].severity === 'critical');
+    });
+
+    it('payoffPass does NOT fire PAYOFF_BEFORE_SETUP when setup precedes payoff', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // Scene 1 seeds 'gun', scene 4 pays it off — correct temporal order
+      const records = [
+        makeRec(0),
+        makeRec(1, { seededClueIds: ['gun'] }),
+        makeRec(2),
+        makeRec(3),
+        makeRec(4, { payoffSetupIds: ['gun'] }),
+        makeRec(5),
+      ];
+      const result = await payoffPass({
+        fountain: blankFountain(6), original: blankFountain(6),
+        records: records as any, structure: baseStructure as any,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'PAYOFF_BEFORE_SETUP'),
+        'Should NOT fire when setup precedes payoff in correct order',
+      );
+    });
+
+    // ── SETUP_CLUSTERING ─────────────────────────────────────────────────────
+    it('payoffPass detects SETUP_CLUSTERING when 70%+ of clues are in one act zone', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // 8 scenes; act2b = scenes 4-5 (50%-75%); 4 clues all planted in scenes 4,5
+      const records = [
+        makeRec(0), makeRec(1), makeRec(2), makeRec(3),
+        makeRec(4, { seededClueIds: ['c1', 'c2'] }),
+        makeRec(5, { seededClueIds: ['c3', 'c4'] }),
+        makeRec(6), makeRec(7),
+      ];
+      const result = await payoffPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: baseStructure as any,
+        annotations: [], approvedSpans: [],
+      });
+      const clustered = result.issues.filter(i => i.rule === 'SETUP_CLUSTERING');
+      assert.ok(clustered.length >= 1, `Expected SETUP_CLUSTERING; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(clustered[0].severity === 'minor');
+    });
+
+    it('payoffPass does NOT fire SETUP_CLUSTERING when clues are spread across all acts', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // 8 scenes; one clue per act zone
+      const records = [
+        makeRec(0, { seededClueIds: ['c1'] }),  // act1
+        makeRec(1), makeRec(2),
+        makeRec(3, { seededClueIds: ['c2'] }),  // act2a
+        makeRec(4),
+        makeRec(5, { seededClueIds: ['c3'] }),  // act2b
+        makeRec(6, { seededClueIds: ['c4'] }),  // act3
+        makeRec(7),
+      ];
+      const result = await payoffPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: baseStructure as any,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'SETUP_CLUSTERING'),
+        'Should NOT fire when clues are distributed across all act zones',
+      );
+    });
+
+    // ── PAYOFF_RATE_DECLINE ──────────────────────────────────────────────────
+    it('payoffPass detects PAYOFF_RATE_DECLINE when Act 2 has payoffs but Act 3 has none', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // 8 scenes; act2=scenes 2-5; act3=scenes 6-7; 2 payoffs in act2, 0 in act3
+      const records = [
+        makeRec(0, { seededClueIds: ['c1', 'c2'] }),
+        makeRec(1),
+        makeRec(2, { payoffSetupIds: ['c1'] }),  // act2 payoff
+        makeRec(3),
+        makeRec(4, { payoffSetupIds: ['c2'] }),  // act2 payoff
+        makeRec(5),
+        makeRec(6),  // act3 — no payoffs
+        makeRec(7),  // act3 — no payoffs
+      ];
+      const result = await payoffPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: baseStructure as any,
+        annotations: [], approvedSpans: [],
+      });
+      const decline = result.issues.filter(i => i.rule === 'PAYOFF_RATE_DECLINE');
+      assert.ok(decline.length >= 1, `Expected PAYOFF_RATE_DECLINE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(decline[0].severity === 'major');
+    });
+
+    it('payoffPass does NOT fire PAYOFF_RATE_DECLINE when Act 3 has at least one payoff', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      const records = [
+        makeRec(0, { seededClueIds: ['c1', 'c2'] }),
+        makeRec(1),
+        makeRec(2, { payoffSetupIds: ['c1'] }),  // act2 payoff
+        makeRec(3),
+        makeRec(4),
+        makeRec(5),
+        makeRec(6, { payoffSetupIds: ['c2'] }),  // act3 payoff
+        makeRec(7),
+      ];
+      const result = await payoffPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: baseStructure as any,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'PAYOFF_RATE_DECLINE'),
+        'Should NOT fire when Act 3 contains at least one payoff',
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
