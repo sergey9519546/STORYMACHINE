@@ -11369,6 +11369,98 @@ He sits down in the chair.
     });
   });
 
+  // ── Wave 152: Structure pass enhancements ─────────────────────────────────
+  describe('Wave 152 — structurePass: revelation drought, false climax, act symmetry', async () => {
+    const baseStructure = {
+      actPosition: 'act2a' as const, completionPercent: 50, totalClockPressure: 5,
+      midpointPressure: 2, reversalCount: 1, tightestScene: 6, avgSuspensePerScene: 1.5,
+      escalating: true, reversalDensity: 0.1, approachingClimax: false,
+      openClues: 1, revelationCount: 1,
+    };
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+
+    it('structurePass detects REVELATION_DROUGHT for 4 consecutive no-info scenes', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      const records = [
+        makeRec(0, { seededClueIds: ['c1'] }),  // has info
+        makeRec(1),  // drought start
+        makeRec(2),
+        makeRec(3),
+        makeRec(4),  // drought = 4
+        makeRec(5, { seededClueIds: ['c2'] }),  // back to info
+        makeRec(6), makeRec(7), makeRec(8),
+      ];
+      const result = await structurePass({
+        fountain: blankFountain(9), original: blankFountain(9),
+        records: records as any, structure: baseStructure as any, annotations: [], approvedSpans: [],
+      });
+      const drought = result.issues.filter(i => i.rule === 'REVELATION_DROUGHT');
+      assert.ok(drought.length >= 1, 'Should detect REVELATION_DROUGHT for 4 consecutive info-less scenes');
+      assert.ok(drought[0].severity === 'major');
+    });
+
+    it('structurePass does NOT fire REVELATION_DROUGHT when scenes have ongoing info delivery', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      const records = Array.from({ length: 9 }, (_, i) =>
+        makeRec(i, i % 2 === 0 ? { seededClueIds: [`c${i}`] } : {}),
+      );
+      const result = await structurePass({
+        fountain: blankFountain(9), original: blankFountain(9),
+        records: records as any, structure: baseStructure as any, annotations: [], approvedSpans: [],
+      });
+      const drought = result.issues.filter(i => i.rule === 'REVELATION_DROUGHT');
+      assert.ok(drought.length === 0, 'Should NOT fire when clues are seeded every other scene');
+    });
+
+    it('structurePass detects FALSE_CLIMAX when peak suspense is mid-story', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      const records = [
+        makeRec(0, { suspenseDelta: 1 }),
+        makeRec(1, { suspenseDelta: 1 }),
+        makeRec(2, { suspenseDelta: 4 }), // peak — mid-story (25% through 8-scene story)
+        makeRec(3, { suspenseDelta: 1 }),
+        makeRec(4, { suspenseDelta: 1 }),
+        makeRec(5, { suspenseDelta: 1 }),
+        makeRec(6, { suspenseDelta: 1.5 }),
+        makeRec(7, { suspenseDelta: 2 }),
+      ];
+      const result = await structurePass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: baseStructure as any, annotations: [], approvedSpans: [],
+      });
+      const falseclimax = result.issues.filter(i => i.rule === 'FALSE_CLIMAX');
+      assert.ok(falseclimax.length >= 1, 'Should detect FALSE_CLIMAX when peak suspense is before climax zone');
+      assert.ok(falseclimax[0].severity === 'major');
+    });
+
+    it('structurePass detects SETUP_RESOLUTION_IMBALANCE when setup far outnumbers payoff', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // 8 setup/character scenes, only 1 resolution → 8:1 imbalance
+      const records = [
+        ...Array.from({ length: 8 }, (_, i) => makeRec(i, { purpose: i % 2 === 0 ? 'establish_world' : 'character_moment' })),
+        makeRec(8, { purpose: 'resolution' }),
+      ];
+      const result = await structurePass({
+        fountain: blankFountain(9), original: blankFountain(9),
+        records: records as any,
+        structure: { ...baseStructure, actPosition: 'act3' as const } as any,
+        annotations: [], approvedSpans: [],
+      });
+      const imbalance = result.issues.filter(i => i.rule === 'SETUP_RESOLUTION_IMBALANCE');
+      assert.ok(imbalance.length >= 1, 'Should detect SETUP_RESOLUTION_IMBALANCE for 8:1 setup-to-payoff ratio');
+      assert.ok(imbalance[0].severity === 'minor');
+    });
+  });
+
   it('showrunner fires for set_up_payoff scene with no SEED_CLUE or PAYOFF_SETUP op', async () => {
     const { showrunnerCritic } = await import('./server/nvm/room/critics/showrunner.ts');
     const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {

@@ -4,6 +4,9 @@
 // Wave 139 additions: missing inciting incident (Act 1 without major shift),
 // weak act boundaries (Act 1 end and Act 2 end lack turning-point suspense deltas),
 // and protagonist passivity at climax (climax scene lacks decisive character action).
+// Wave 152 additions: revelation drought (long sequences without any revelation
+// or clue), false climax (peak suspense scene not near climax position), and
+// act symmetry imbalance (Act 1 and Act 3 wildly mismatched in scene count).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -120,6 +123,86 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         description: `Scene ${Math.min(act2End, n - 1)} (Act 2 ending) has low suspense delta (${act2EndRecord.suspenseDelta.toFixed(1)}) — Act 2 should end with a climactic turn that forces entry into Act 3`,
         severity: 'major',
         suggestedFix: 'The final Act 2 scene should be the highest-stakes moment before the climax: a major reversal, false climax, or all-is-lost moment',
+      });
+    }
+  }
+
+  // ── Wave 152: Revelation drought, false climax, act symmetry ─────────────────
+
+  // REVELATION_DROUGHT: A stretch of 4+ consecutive scenes with no revelation,
+  // planted clue, or relationship shift. The story goes quiet — no narrative
+  // information is being delivered to the audience during this stretch.
+  if (n >= 8) {
+    let droughtLen = 0;
+    let droughtStart = -1;
+    for (let i = 0; i < n; i++) {
+      const r = records[i];
+      const hasNarrativeInfo = r.revelation !== null ||
+        (r.seededClueIds?.length ?? 0) > 0 ||
+        (r.relationshipShifts?.length ?? 0) > 0;
+
+      if (!hasNarrativeInfo) {
+        if (droughtLen === 0) droughtStart = i;
+        droughtLen++;
+      } else {
+        droughtLen = 0;
+      }
+
+      if (droughtLen === 4) {
+        issues.push({
+          location: `Scenes ${droughtStart}–${i}`,
+          rule: 'REVELATION_DROUGHT',
+          description: `Scenes ${droughtStart}–${i}: 4 consecutive scenes with no revelation, planted clue, or relationship shift — the narrative goes dark; nothing is being learned or changed`,
+          severity: 'major',
+          suggestedFix: 'At least one of these scenes must deliver narrative payload: a clue, a revelation, or a shift in a key relationship. The audience should never go 4 scenes without learning something new.',
+        });
+        droughtLen = 0; // reset to avoid duplicate flags
+      }
+    }
+  }
+
+  // FALSE_CLIMAX: The highest-suspense scene occurs far from the story's
+  // expected climax zone (last 30%). When peak intensity lands in the middle
+  // the audience goes through the real climax feeling emotionally spent.
+  if (n >= 8) {
+    let peakScene = -1;
+    let peakSuspense = -Infinity;
+    for (let i = 0; i < n; i++) {
+      if (records[i].suspenseDelta > peakSuspense) {
+        peakSuspense = records[i].suspenseDelta;
+        peakScene = i;
+      }
+    }
+    const climaxZoneStart = Math.floor(n * 0.7);
+    // False climax: peak is not near the end AND peak suspense is meaningful (>2)
+    if (peakScene >= 0 && peakScene < climaxZoneStart && peakSuspense > 2) {
+      issues.push({
+        location: `Scene ${peakScene} (peak intensity)`,
+        rule: 'FALSE_CLIMAX',
+        description: `Peak suspense (${peakSuspense.toFixed(1)}) occurs at Scene ${peakScene} — ${Math.round(peakScene / n * 100)}% through the story — but the climax zone starts at Scene ${climaxZoneStart}. The story peaked too early; the real climax will feel anticlimactic.`,
+        severity: 'major',
+        suggestedFix: 'Either move high-intensity scenes into the final third, or build new complications in Act 2b that exceed the mid-story peak',
+      });
+    }
+  }
+
+  // SETUP_RESOLUTION_IMBALANCE: Setup scenes (establish_world, character_moment)
+  // outnumber payoff scenes (climax, resolution, turning_point) by 4:1 or more.
+  // This indicates a screenplay that front-loads context but rushes or collapses
+  // the emotional payoff the setup promised.
+  if (n >= 6) {
+    const setupPurposes = new Set(['establish_world', 'character_moment']);
+    const payoffPurposes = new Set(['climax', 'resolution', 'turning_point']);
+    const setupCount = records.filter(r => setupPurposes.has(r.purpose)).length;
+    const payoffCount = records.filter(r => payoffPurposes.has(r.purpose)).length;
+
+    if (payoffCount > 0 && setupCount / payoffCount >= 4) {
+      issues.push({
+        location: `Setup vs resolution`,
+        rule: 'SETUP_RESOLUTION_IMBALANCE',
+        description: `${setupCount} setup/character scenes but only ${payoffCount} payoff scenes (${(setupCount / payoffCount).toFixed(1)}:1 ratio) — the screenplay front-loads context but rushes its emotional resolution`,
+        severity: 'minor',
+        suggestedFix: 'Either cut setup scenes that don\'t directly raise the stakes, or expand the climax and resolution to honor the promise of the setup with adequate space',
       });
     }
   }
