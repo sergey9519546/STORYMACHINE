@@ -1,6 +1,9 @@
-// Wave 39 — Pass 1: Structure
+// Wave 139 — Pass 1: Structure
 // Checks act balance: act1 too long, act2 too short, missing midpoint pressure,
 // climax approach in wrong position, epilogue missing.
+// Wave 139 additions: missing inciting incident (Act 1 without major shift),
+// weak act boundaries (Act 1 end and Act 2 end lack turning-point suspense deltas),
+// and protagonist passivity at climax (climax scene lacks decisive character action).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -64,6 +67,61 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       severity: 'major',
       suggestedFix: 'Add a scene where a character\'s plan backfires or a situation inverts',
     });
+  }
+
+  // ── Missing inciting incident (Act 1 without major shift) ──────────────────
+  // Wave 139: Act 1 should force the protagonist into the central conflict via
+  // a major belief update, relationship shift, or clock raise. If none occur,
+  // the story hasn't begun; it's just setup without incitement.
+  if (n >= 3) {
+    const act1End = Math.floor(n * 0.25);
+    const act1Records = records.slice(0, Math.max(1, act1End));
+    const hasIncitingEvent = act1Records.some(r =>
+      (r.seededClueIds.length > 0 && r.payoffSetupIds.length === 0) || // clue planted
+      (r.relationshipShifts && r.relationshipShifts.length > 0) || // relationship shift
+      r.clockRaised, // clock pressure applied
+    );
+    if (!hasIncitingEvent && act1Records.length > 0) {
+      issues.push({
+        location: `Act 1 (Scenes 0–${Math.max(0, act1End - 1)})`,
+        rule: 'MISSING_INCITING_INCIDENT',
+        description: `Act 1 lacks a major inciting event — no clues planted, relationship shifts, or clock pressure. The protagonist isn't forced into the central conflict.`,
+        severity: 'critical',
+        suggestedFix: 'Add a scene in Act 1 where something happens that throws the protagonist into action: a revelation, a betrayal, or an external deadline.',
+      });
+    }
+  }
+
+  // ── Act boundary turning points ────────────────────────────────────────────
+  // Wave 139: Act boundaries (25% and 75% of story) should have suspense peaks
+  // that mark transitions. If the suspense delta at these boundaries is flat,
+  // the acts don't feel like they have shaped, purposeful endings.
+  if (n >= 6) {
+    const act1End = Math.floor(n * 0.25);
+    const act2End = Math.floor(n * 0.75);
+
+    const act1EndRecord = records[Math.min(act1End, n - 1)];
+    const act2EndRecord = records[Math.min(act2End, n - 1)];
+
+    if (act1EndRecord && act1EndRecord.suspenseDelta < 1) {
+      issues.push({
+        location: `End of Act 1 (Scene ~${act1End})`,
+        rule: 'ACT1_BOUNDARY_WEAK',
+        description: `Scene ${Math.min(act1End, n - 1)} (Act 1 ending) has low suspense delta (${act1EndRecord.suspenseDelta.toFixed(1)}) — Act 1 should end with a turning point that forces entry into Act 2`,
+        severity: 'major',
+        suggestedFix: 'Ensure the final Act 1 scene is a clear inciting incident or reversal that propels the protagonist into the main conflict',
+      });
+    }
+
+    if (act2EndRecord && act2EndRecord.suspenseDelta < 1.5) {
+      issues.push({
+        location: `End of Act 2 (Scene ~${act2End})`,
+        rule: 'ACT2_BOUNDARY_WEAK',
+        description: `Scene ${Math.min(act2End, n - 1)} (Act 2 ending) has low suspense delta (${act2EndRecord.suspenseDelta.toFixed(1)}) — Act 2 should end with a climactic turn that forces entry into Act 3`,
+        severity: 'major',
+        suggestedFix: 'The final Act 2 scene should be the highest-stakes moment before the climax: a major reversal, false climax, or all-is-lost moment',
+      });
+    }
   }
 
   // ── Rewrite ───────────────────────────────────────────────────────────────

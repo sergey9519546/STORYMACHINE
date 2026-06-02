@@ -15520,6 +15520,90 @@ describe('Wave 138 — voicePass: VOICE_MONOTONE_CHARACTER', () => {
   });
 });
 
+describe('Wave 139 — structurePass: Act boundaries + inciting incident', () => {
+  // Build a minimal PassInput with 6 scenes: Act 1 (0-1), Act 2a (2-3), Act 2b (4), Act 3 (5)
+  function makeStructInput(seedCluesInAct1 = false, highSuspenseAtAct1End = false, highSuspenseAtAct2End = false) {
+    const commits = [
+      // Act 1, Scene 0: optional clue seed
+      makeScreenplayCommit(0, [
+        { op: 'UPDATE_READER_STATE', delta: { suspense: 1 } } as StoryOp,
+        ...(seedCluesInAct1 ? [{ op: 'SEED_CLUE' as const, clueId: 'c1', carrier: 'object' as const } as StoryOp] : []),
+      ]),
+      // Act 1, Scene 1 (Act 1 boundary): optionally high suspense
+      makeScreenplayCommit(1, [
+        { op: 'UPDATE_READER_STATE', delta: { suspense: highSuspenseAtAct1End ? 2 : 0.5 } } as StoryOp,
+      ]),
+      // Act 2a, Scene 2
+      makeScreenplayCommit(2, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1.5 } } as StoryOp]),
+      // Act 2a, Scene 3
+      makeScreenplayCommit(3, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } } as StoryOp]),
+      // Act 2b, Scene 4 (Act 2 boundary): optionally high suspense
+      makeScreenplayCommit(4, [
+        { op: 'UPDATE_READER_STATE', delta: { suspense: highSuspenseAtAct2End ? 2.5 : 0.8 } } as StoryOp,
+      ]),
+      // Act 3, Scene 5
+      makeScreenplayCommit(5, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } } as StoryOp]),
+    ];
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    return { fountain: 'INT. A - DAY\n\n', original: '', annotations: [], structure, records, approvedSpans: [] };
+  }
+
+  it('MISSING_INCITING_INCIDENT fires when Act 1 has no clues, shifts, or clock raises', async () => {
+    const input = makeStructInput(false, false, false);
+    const result = await structurePass(input);
+    assert.ok(
+      result.issues.some(i => i.rule === 'MISSING_INCITING_INCIDENT'),
+      `should detect missing inciting incident; got: ${result.issues.map(i => i.rule).join(', ')}`,
+    );
+  });
+
+  it('MISSING_INCITING_INCIDENT does NOT fire when Act 1 seeds a clue', async () => {
+    const input = makeStructInput(true, false, false);
+    const result = await structurePass(input);
+    assert.ok(
+      !result.issues.some(i => i.rule === 'MISSING_INCITING_INCIDENT'),
+      `should not fire when Act 1 has a clue seed`,
+    );
+  });
+
+  it('ACT1_BOUNDARY_WEAK fires when Act 1 ending has low suspense delta', async () => {
+    const input = makeStructInput(true, false, false);
+    const result = await structurePass(input);
+    assert.ok(
+      result.issues.some(i => i.rule === 'ACT1_BOUNDARY_WEAK'),
+      `should detect weak Act 1 boundary; got: ${result.issues.map(i => i.rule).join(', ')}`,
+    );
+  });
+
+  it('ACT1_BOUNDARY_WEAK does NOT fire when Act 1 ending has high suspense delta', async () => {
+    const input = makeStructInput(true, true, false);
+    const result = await structurePass(input);
+    assert.ok(
+      !result.issues.some(i => i.rule === 'ACT1_BOUNDARY_WEAK'),
+      `should not fire when Act 1 boundary has high suspense`,
+    );
+  });
+
+  it('ACT2_BOUNDARY_WEAK fires when Act 2 ending has low suspense delta', async () => {
+    const input = makeStructInput(true, true, false);
+    const result = await structurePass(input);
+    assert.ok(
+      result.issues.some(i => i.rule === 'ACT2_BOUNDARY_WEAK'),
+      `should detect weak Act 2 boundary; got: ${result.issues.map(i => i.rule).join(', ')}`,
+    );
+  });
+
+  it('ACT2_BOUNDARY_WEAK does NOT fire when Act 2 ending has high suspense delta', async () => {
+    const input = makeStructInput(true, true, true);
+    const result = await structurePass(input);
+    assert.ok(
+      !result.issues.some(i => i.rule === 'ACT2_BOUNDARY_WEAK'),
+      `should not fire when Act 2 boundary has high suspense`,
+    );
+  });
+});
+
 describe('Wave 138 — characterArcPass: relational arc tracking', () => {
   // Build a PassInput with 5 records, using makeScreenplayCommit + buildScreenplayMemory
   // so all required ScreenplaySceneRecord fields are correctly populated.
