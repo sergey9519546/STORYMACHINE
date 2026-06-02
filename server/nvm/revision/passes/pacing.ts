@@ -4,6 +4,10 @@
 // Wave 143 additions: energy monotone (scenes all the same energy level),
 // rhythm variety (scenes lack alternating fast/slow pacing), and energy timing
 // (high-energy scenes placed where they won't impact story).
+// Wave 157 additions: climax scene underweight (peak Act 3 scene given fewer
+// lines than average), midpoint collapse (midpoint scene is too brief and flat
+// to function as structural pivot), resolution too brief (final scene ends
+// before the audience can experience the emotional release).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -208,6 +212,73 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Move or amplify high-energy scenes to occur after the midpoint. The story should accelerate toward, not away from, the climax.',
         });
       }
+    }
+  }
+
+  // ── Wave 157: Climax underweight, midpoint collapse, resolution brevity ──────
+
+  // CLIMAX_SCENE_UNDERWEIGHT: The Act 3 peak-suspense scene is shorter than 70%
+  // of average — the most important scene in the story is given less physical
+  // space than a setup scene. Emotional weight requires proportional page space.
+  if (records.length >= 6) {
+    const climaxZoneStart = Math.floor(records.length * 0.7);
+    let climaxSceneIdx = -1;
+    let maxClimaxSuspense = -Infinity;
+    for (let i = climaxZoneStart; i < records.length; i++) {
+      if (records[i].suspenseDelta > maxClimaxSuspense) {
+        maxClimaxSuspense = records[i].suspenseDelta;
+        climaxSceneIdx = i;
+      }
+    }
+    if (climaxSceneIdx >= 0 && maxClimaxSuspense > 1.5) {
+      const climaxLines = sceneLengths.get(climaxSceneIdx) ?? 0;
+      if (climaxLines > 0 && climaxLines < avgLength * 0.7) {
+        issues.push({
+          location: `Scene ${climaxSceneIdx} (climax, peak suspense ${maxClimaxSuspense.toFixed(1)})`,
+          rule: 'CLIMAX_SCENE_UNDERWEIGHT',
+          description: `The climax scene (Scene ${climaxSceneIdx}) is only ${climaxLines} lines — ${Math.round(climaxLines / avgLength * 100)}% of the story average. The most emotionally significant scene in the story is given less space than a setup scene.`,
+          severity: 'major',
+          suggestedFix: 'Expand the climax with physical staging, character reaction, and immediate consequence. The audience needs time to experience the weight of the moment before the story moves on.',
+        });
+      }
+    }
+  }
+
+  // MIDPOINT_COLLAPSE: The midpoint scene is shorter than 50% of average AND
+  // has low suspense — there is no structural pivot. The midpoint should feel
+  // like a gear-shift; when it's collapsed, Act 2a and Act 2b blur together.
+  if (records.length >= 8) {
+    const midIdx = Math.floor(records.length / 2);
+    const midLines = sceneLengths.get(midIdx) ?? 0;
+    if (midLines > 0 && midLines < avgLength * 0.5 && records[midIdx].suspenseDelta < 2) {
+      issues.push({
+        location: `Scene ${midIdx} (midpoint)`,
+        rule: 'MIDPOINT_COLLAPSE',
+        description: `The midpoint scene (Scene ${midIdx}) is only ${midLines} lines — ${Math.round(midLines / avgLength * 100)}% of average — with low suspense (${records[midIdx].suspenseDelta.toFixed(1)}). The structural pivot of the story is physically underdeveloped.`,
+        severity: 'major',
+        suggestedFix: 'Expand the midpoint with a substantial reversal or revelation. The midpoint should feel like a turning: the second half of Act 2 must be qualitatively different from the first.',
+      });
+    }
+  }
+
+  // RESOLUTION_TOO_BRIEF: The final scene (resolution/epilogue) is shorter than
+  // 50% of average, leaving no room for emotional release or denouement. A story
+  // that ends before it has time to breathe denies the audience the release they
+  // were building toward.
+  if (records.length >= 6) {
+    const lastSceneIdx = records.length - 1;
+    const lastLines = sceneLengths.get(lastSceneIdx) ?? 0;
+    const lastRecord = records[lastSceneIdx];
+    const isResolutionScene = lastRecord &&
+      (lastRecord.purpose === 'resolution' || lastRecord.suspenseDelta < 0);
+    if (isResolutionScene && lastLines > 0 && lastLines < avgLength * 0.5) {
+      issues.push({
+        location: `Scene ${lastSceneIdx} (final/resolution)`,
+        rule: 'RESOLUTION_TOO_BRIEF',
+        description: `The final scene (Scene ${lastSceneIdx}) is only ${lastLines} lines — ${Math.round(lastLines / avgLength * 100)}% of average. The story ends before there is space for emotional release or denouement.`,
+        severity: 'major',
+        suggestedFix: 'Expand the final scene with character reactions, a moment of reflection, and a visual or physical image that earns the emotional release the story has been building toward.',
+      });
     }
   }
 

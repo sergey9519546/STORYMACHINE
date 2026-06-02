@@ -11762,6 +11762,131 @@ He sits down in the chair.
     });
   });
 
+  describe('Wave 157 — pacingPass: climax underweight, midpoint collapse, resolution brevity', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const noAnnotations = (n: number) => Array.from({ length: n }, () => ({ revelation: false } as any));
+
+    // Build fountain with per-scene action-line counts (each action line = 1 weighted unit)
+    function makeFountainWithLengths(sceneLinesArray: number[]): string {
+      return sceneLinesArray.map((len, i) => {
+        const body = Array.from({ length: len }, (_, j) => `Scene ${i} action line ${j + 1}.`).join('\n');
+        return `INT. SC${i} - DAY\n\n${body}\n`;
+      }).join('\n');
+    }
+
+    it('pacingPass detects CLIMAX_SCENE_UNDERWEIGHT when climax scene is too short', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // 8 scenes: all 5 lines except scene 6 (climax zone starts at 5) gets 1 line
+      // avgLength ≈ (6*5 + 1 + 4) / 8 = 35/8 ≈ 4.4; climaxLines=1 < 4.4*0.7=3.1 → fires
+      const sceneLens = [5, 5, 5, 5, 5, 4, 1, 4];
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, { suspenseDelta: i === 6 ? 3 : 1 }), // scene 6 is climax
+      );
+      const result = await pacingPass({
+        fountain: makeFountainWithLengths(sceneLens),
+        original: '', records: records as any, structure: {} as any,
+        annotations: noAnnotations(8), approvedSpans: [],
+      });
+      const underweight = result.issues.filter(i => i.rule === 'CLIMAX_SCENE_UNDERWEIGHT');
+      assert.ok(underweight.length >= 1, `Should detect CLIMAX_SCENE_UNDERWEIGHT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(underweight[0].severity === 'major');
+    });
+
+    it('pacingPass does NOT fire CLIMAX_SCENE_UNDERWEIGHT when climax scene is well-sized', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      const sceneLens = [5, 5, 5, 5, 5, 4, 6, 4]; // scene 6 is climax, 6 lines > average
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, { suspenseDelta: i === 6 ? 3 : 1 }),
+      );
+      const result = await pacingPass({
+        fountain: makeFountainWithLengths(sceneLens),
+        original: '', records: records as any, structure: {} as any,
+        annotations: noAnnotations(8), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'CLIMAX_SCENE_UNDERWEIGHT'),
+        'Should NOT fire when climax scene has adequate length',
+      );
+    });
+
+    it('pacingPass detects MIDPOINT_COLLAPSE when midpoint is too short and flat', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // 8 scenes: midIdx = 4. All 5 lines except scene 4 = 1 line.
+      // avgLength = (7*5 + 1) / 8 = 4.5; midLines=1 < 4.5*0.5=2.25 → fires
+      const sceneLens = [5, 5, 5, 5, 1, 5, 5, 5];
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, { suspenseDelta: i === 4 ? 0.5 : 1 }), // midpoint flat
+      );
+      const result = await pacingPass({
+        fountain: makeFountainWithLengths(sceneLens),
+        original: '', records: records as any, structure: {} as any,
+        annotations: noAnnotations(8), approvedSpans: [],
+      });
+      const collapse = result.issues.filter(i => i.rule === 'MIDPOINT_COLLAPSE');
+      assert.ok(collapse.length >= 1, `Should detect MIDPOINT_COLLAPSE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(collapse[0].severity === 'major');
+    });
+
+    it('pacingPass does NOT fire MIDPOINT_COLLAPSE when midpoint has adequate length', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      const sceneLens = [5, 5, 5, 5, 5, 5, 5, 5]; // all equal, midpoint is same size
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, { suspenseDelta: i === 4 ? 0.5 : 1 }),
+      );
+      const result = await pacingPass({
+        fountain: makeFountainWithLengths(sceneLens),
+        original: '', records: records as any, structure: {} as any,
+        annotations: noAnnotations(8), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'MIDPOINT_COLLAPSE'),
+        'Should NOT fire when midpoint scene has adequate length',
+      );
+    });
+
+    it('pacingPass detects RESOLUTION_TOO_BRIEF when final scene is too short', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // 6 scenes: all 5 lines except scene 5 (final) = 1 line. purpose='resolution'
+      // avgLength = (5*5 + 1)/6 ≈ 4.3; lastLines=1 < 4.3*0.5=2.15 → fires
+      const sceneLens = [5, 5, 5, 5, 5, 1];
+      const records = Array.from({ length: 6 }, (_, i) =>
+        makeRec(i, { purpose: i === 5 ? 'resolution' : 'dialogue', suspenseDelta: i === 5 ? -1 : 1 }),
+      );
+      const result = await pacingPass({
+        fountain: makeFountainWithLengths(sceneLens),
+        original: '', records: records as any, structure: {} as any,
+        annotations: noAnnotations(6), approvedSpans: [],
+      });
+      const brief = result.issues.filter(i => i.rule === 'RESOLUTION_TOO_BRIEF');
+      assert.ok(brief.length >= 1, `Should detect RESOLUTION_TOO_BRIEF; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(brief[0].severity === 'major');
+    });
+
+    it('pacingPass does NOT fire RESOLUTION_TOO_BRIEF when final scene has adequate length', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      const sceneLens = [5, 5, 5, 5, 5, 5]; // final scene same size as all others
+      const records = Array.from({ length: 6 }, (_, i) =>
+        makeRec(i, { purpose: i === 5 ? 'resolution' : 'dialogue', suspenseDelta: i === 5 ? -1 : 1 }),
+      );
+      const result = await pacingPass({
+        fountain: makeFountainWithLengths(sceneLens),
+        original: '', records: records as any, structure: {} as any,
+        annotations: noAnnotations(6), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'RESOLUTION_TOO_BRIEF'),
+        'Should NOT fire when final scene has adequate length',
+      );
+    });
+  });
+
   describe('Wave 156 — intentionPass: reactive dominance, intention dropout, want/fear collision', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
