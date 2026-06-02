@@ -331,6 +331,66 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 190: Cold open void, unresolved excess, back-weighted revelations ───
+
+  // COLD_OPEN_BELIEF_VOID: The first quarter of the story carries no told beliefs
+  // and no revelations — the deception layer has no Act 1 foundation. Without
+  // early propositions to hold, the audience has nothing to believe or disbelieve
+  // when the complications arrive.
+  if (records.length >= 8) {
+    const act1BelEnd = Math.floor(records.length * 0.25);
+    const act1BelRecords = records.slice(0, act1BelEnd);
+    if (act1BelRecords.length >= 2) {
+      const hasBelief = act1BelRecords.some(r => r.dialogueHighlights.length > 0 || r.revelation !== null);
+      if (!hasBelief) {
+        issues.push({
+          location: 'Act 1 belief layer',
+          rule: 'COLD_OPEN_BELIEF_VOID',
+          severity: 'minor',
+          description: `The first ${act1BelEnd} scenes contain no belief assertions or witnessed revelations — the story's deception layer has no Act 1 foundation. The audience enters with nothing to believe or question.`,
+          suggestedFix: 'Plant at least one told belief or witnessed fact in Act 1. Give the audience a proposition to carry before the story complicates it.',
+        });
+      }
+    }
+  }
+
+  // UNRESOLVED_BELIEF_EXCESS: Four or more told beliefs accumulate across the
+  // story with no corresponding revelation (before or after) that shares significant
+  // vocabulary — every assertion is left permanently unaddressed. Too many orphaned
+  // beliefs signal a belief layer that asserts without ever resolving.
+  if (records.length >= 8 && toldBeliefs.length >= 4) {
+    const orphanedBeliefs = toldBeliefs.filter(told =>
+      !witnessedBeliefs.some(w => sharedWords(w.proposition, told.proposition) >= 2),
+    );
+    if (orphanedBeliefs.length >= 4) {
+      issues.push({
+        location: 'Belief/deception layer',
+        rule: 'UNRESOLVED_BELIEF_EXCESS',
+        severity: 'major',
+        description: `${orphanedBeliefs.length} told beliefs accumulate across the story with no corresponding revelation to confirm or contradict them — too many assertions are left permanently unaddressed.`,
+        suggestedFix: 'Resolve the key beliefs through witnessed scenes. A belief that is never confirmed or contradicted is narrative dead weight — give the audience the payoff they were promised.',
+      });
+    }
+  }
+
+  // REVELATION_BACK_WEIGHTED: When there are two or more revelations, 80%+ occur
+  // in the final quarter — the story withholds all discovery until the end. While
+  // a final reveal can be powerful, piling every revelation into the last act denies
+  // the audience mid-story discovery arcs and makes the ending feel like a trick.
+  if (records.length >= 8 && witnessedBeliefs.length >= 2) {
+    const finalQStart = Math.floor(records.length * 0.75);
+    const inFinalQ = witnessedBeliefs.filter(w => w.sceneIdx >= finalQStart).length;
+    if (inFinalQ / witnessedBeliefs.length >= 0.8) {
+      issues.push({
+        location: 'Revelation distribution',
+        rule: 'REVELATION_BACK_WEIGHTED',
+        severity: 'minor',
+        description: `${inFinalQ} of ${witnessedBeliefs.length} revelations (${Math.round((inFinalQ / witnessedBeliefs.length) * 100)}%) occur in the final quarter — the story withholds all discovery until the end, denying the audience mid-story revelation arcs.`,
+        suggestedFix: 'Move at least one revelation earlier. A mid-story discovery raises stakes for the second half; withholding everything until the end feels like a trick rather than a journey.',
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'belief', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

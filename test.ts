@@ -15294,6 +15294,114 @@ Running now, she turns the corner.
     });
   });
 
+  describe('Wave 190 — beliefPass: cold open void, unresolved excess, back-weighted revelations', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const beliefInput = (records: any[], n: number) => ({
+      fountain: Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+      original: Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+      records: records as any, structure: {} as any, annotations: [], approvedSpans: [],
+    });
+
+    // ── COLD_OPEN_BELIEF_VOID ──────────────────────────────────────────────────
+    it('beliefPass detects COLD_OPEN_BELIEF_VOID when first quarter has no belief content', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // records[0,1] are empty; records[2..7] have dialogue; revelation at 4 breaks exposition streak
+      const records = Array.from({ length: 8 }, (_, i) =>
+        i >= 2
+          ? makeRec(i, { dialogueHighlights: [`alice: note ${i}`], revelation: i === 4 ? 'something discovered' : null })
+          : makeRec(i),
+      );
+      const result = await beliefPass(beliefInput(records, 8));
+      const cold = result.issues.filter(i => i.rule === 'COLD_OPEN_BELIEF_VOID');
+      assert.ok(cold.length >= 1, `Should detect COLD_OPEN_BELIEF_VOID; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(cold[0].severity === 'minor');
+    });
+
+    it('beliefPass does NOT fire COLD_OPEN_BELIEF_VOID when Act 1 has belief content', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // records[0] already has a dialogueHighlight → Act 1 has belief content
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, {
+          dialogueHighlights: [`alice: note ${i}`],
+          revelation: i === 4 ? 'discovery' : null,
+        }),
+      );
+      const result = await beliefPass(beliefInput(records, 8));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'COLD_OPEN_BELIEF_VOID'),
+        'Should NOT fire when Act 1 already carries belief assertions',
+      );
+    });
+
+    // ── UNRESOLVED_BELIEF_EXCESS ───────────────────────────────────────────────
+    it('beliefPass detects UNRESOLVED_BELIEF_EXCESS when 4+ told beliefs have no revelation', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 8 unique told beliefs; revelation at scene 7 with completely different vocabulary
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, {
+          dialogueHighlights: [`alice: unique claim alpha bravo ${i}`],
+          revelation: i === 7 ? 'something entirely unrelated xyz' : null,
+        }),
+      );
+      const result = await beliefPass(beliefInput(records, 8));
+      const excess = result.issues.filter(i => i.rule === 'UNRESOLVED_BELIEF_EXCESS');
+      assert.ok(excess.length >= 1, `Should detect UNRESOLVED_BELIEF_EXCESS; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(excess[0].severity === 'major');
+    });
+
+    it('beliefPass does NOT fire UNRESOLVED_BELIEF_EXCESS when told beliefs are addressed', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // told beliefs about "treasure hidden underground"; revelation shares those words
+      const records = Array.from({ length: 8 }, (_, i) =>
+        i < 4
+          ? makeRec(i, { dialogueHighlights: ['alice: the treasure is hidden underground'] })
+          : makeRec(i, { revelation: i === 4 ? 'the treasure is hidden no longer underground' : null }),
+      );
+      const result = await beliefPass(beliefInput(records, 8));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'UNRESOLVED_BELIEF_EXCESS'),
+        'Should NOT fire when told beliefs are addressed by a revelation',
+      );
+    });
+
+    // ── REVELATION_BACK_WEIGHTED ───────────────────────────────────────────────
+    it('beliefPass detects REVELATION_BACK_WEIGHTED when all revelations are in the final quarter', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // finalQuarterStart=6; revelations at scenes 6,7 only → 100% in final quarter
+      const records = Array.from({ length: 8 }, (_, i) =>
+        i >= 6
+          ? makeRec(i, { revelation: `discovery ${i}`, dialogueHighlights: [`alice: reacts ${i}`] })
+          : makeRec(i, { dialogueHighlights: [`alice: belief ${i}`] }),
+      );
+      const result = await beliefPass(beliefInput(records, 8));
+      const backWeighted = result.issues.filter(i => i.rule === 'REVELATION_BACK_WEIGHTED');
+      assert.ok(backWeighted.length >= 1, `Should detect REVELATION_BACK_WEIGHTED; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(backWeighted[0].severity === 'minor');
+    });
+
+    it('beliefPass does NOT fire REVELATION_BACK_WEIGHTED when revelations are distributed', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // revelations at scenes 1, 4, 7 — only 1 of 3 in final quarter (33%) < 80%
+      const records = Array.from({ length: 8 }, (_, i) =>
+        i === 1 || i === 4 || i === 7
+          ? makeRec(i, { revelation: `discovery ${i}`, dialogueHighlights: [`alice: reacts ${i}`] })
+          : makeRec(i, { dialogueHighlights: [`alice: belief ${i}`] }),
+      );
+      const result = await beliefPass(beliefInput(records, 8));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'REVELATION_BACK_WEIGHTED'),
+        'Should NOT fire when revelations are distributed across the story',
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
