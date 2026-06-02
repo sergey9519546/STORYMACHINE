@@ -11012,6 +11012,116 @@ describe('Wave 86 — character-arc dramaticTurn bug, Agent goal mutation, pacin
     }
   });
 
+  // ── Wave 143: Energy monotone & rhythm variety ───────────────────────────
+
+  it('pacingPass detects ENERGY_MONOTONE when all scenes have similar length', async () => {
+    const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+    // Create 8 scenes all ~5 lines long (monotone energy)
+    const fountain = Array.from({ length: 8 }, (_, i) =>
+      `INT. SC${i} - DAY\nAction line.\nACTOR\nDialogue.\n`
+    ).join('');
+    const records = Array.from({ length: 8 }, (_, i) => ({
+      commitId: `c${i}`, sceneIdx: i, slug: `SC${i}`, purpose: 'dialogue',
+      dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+      emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [],
+      readerStateAnnotation: null,
+      relationshipShifts: [],
+    }));
+    const result = await pacingPass({
+      fountain,
+      original: fountain,
+      records: records as unknown as Parameters<typeof pacingPass>[0]['records'],
+      structure: { actPosition: 'act2b' as const, completionPercent: 60, revelationCount: 0, approachingClimax: false, avgSuspensePerScene: 1, escalating: false, reversalDensity: 0, openClues: 0 } as unknown as Parameters<typeof pacingPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const monotone = result.issues.filter(i => i.rule === 'ENERGY_MONOTONE');
+    assert.ok(monotone.length >= 1, 'Should detect ENERGY_MONOTONE for all scenes with similar length');
+    assert.ok(monotone[0].severity === 'major');
+  });
+
+  it('pacingPass detects RHYTHM_INVERSION when climax has lower energy than opening', async () => {
+    const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+    const fountain = Array.from({ length: 9 }, (_, i) =>
+      `INT. SC${i} - DAY\nAction.\n`
+    ).join('');
+    // Scenes 0-2 (first third): high suspense
+    // Scenes 6-8 (last third): low suspense
+    const makeRec = (idx: number, suspense: number): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose: 'dialogue',
+      dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+      emotionalShift: 'neutral', suspenseDelta: suspense,
+      dialogueHighlights: [], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [],
+      readerStateAnnotation: null,
+      relationshipShifts: [],
+    });
+    const records = [
+      makeRec(0, 4),
+      makeRec(1, 3.5),
+      makeRec(2, 3),
+      makeRec(3, 1.5),
+      makeRec(4, 1),
+      makeRec(5, 1.2),
+      makeRec(6, 0.5),
+      makeRec(7, 0.3),
+      makeRec(8, 0.8),
+    ];
+    const result = await pacingPass({
+      fountain,
+      original: fountain,
+      records: records as unknown as Parameters<typeof pacingPass>[0]['records'],
+      structure: { actPosition: 'act3' as const, completionPercent: 100, revelationCount: 1, approachingClimax: true, avgSuspensePerScene: 1.5, escalating: false, reversalDensity: 1, openClues: 0 } as unknown as Parameters<typeof pacingPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const inversion = result.issues.filter(i => i.rule === 'RHYTHM_INVERSION');
+    assert.ok(inversion.length >= 1, 'Should detect RHYTHM_INVERSION for high energy opening + low energy climax');
+    assert.ok(inversion[0].severity === 'critical');
+  });
+
+  it('pacingPass detects ENERGY_PLACEMENT_MISMATCH when high-energy scenes front-loaded', async () => {
+    const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+    const fountain = Array.from({ length: 10 }, (_, i) =>
+      `INT. SC${i} - DAY\nAction.\n`
+    ).join('');
+    // 4 high-energy scenes all in first 5 scenes
+    const makeRec = (idx: number, suspense: number): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose: 'dialogue',
+      dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+      emotionalShift: 'neutral', suspenseDelta: suspense,
+      dialogueHighlights: [], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [],
+      readerStateAnnotation: null,
+      relationshipShifts: [],
+    });
+    const records = [
+      makeRec(0, 3),
+      makeRec(1, 2.8),
+      makeRec(2, 1),
+      makeRec(3, 3.2),
+      makeRec(4, 2.9),
+      makeRec(5, 0.8),
+      makeRec(6, 0.5),
+      makeRec(7, 1),
+      makeRec(8, 0.6),
+      makeRec(9, 1.2),
+    ];
+    const result = await pacingPass({
+      fountain,
+      original: fountain,
+      records: records as unknown as Parameters<typeof pacingPass>[0]['records'],
+      structure: { actPosition: 'act2b' as const, completionPercent: 70, revelationCount: 1, approachingClimax: false, avgSuspensePerScene: 1.5, escalating: false, reversalDensity: 0, openClues: 1 } as unknown as Parameters<typeof pacingPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const mismatch = result.issues.filter(i => i.rule === 'ENERGY_PLACEMENT_MISMATCH');
+    assert.ok(mismatch.length >= 1, 'Should detect ENERGY_PLACEMENT_MISMATCH when high-energy scenes are front-loaded');
+    assert.ok(mismatch[0].severity === 'major');
+  });
+
   // ── corpus: maxScenesPerScenario cap ─────────────────────────────────────
 
   it('runSelfPlay respects maxScenesPerScenario by capping scene targets', async () => {
