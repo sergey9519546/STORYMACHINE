@@ -14130,6 +14130,109 @@ He sits down in the chair.
     });
   });
 
+  describe('Wave 186 — structurePass: Act 2 inversion, midpoint reversal absent, late inciting incident', async () => {
+    const baseStructure = {
+      actPosition: 'act2a' as const, completionPercent: 50, totalClockPressure: 5,
+      midpointPressure: 2, reversalCount: 1, tightestScene: 6, avgSuspensePerScene: 1.5,
+      escalating: true, reversalDensity: 0.1, approachingClimax: false,
+      openClues: 0, revelationCount: 1,
+    };
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const structInput = (records: any[], n: number) => ({
+      fountain: blankFountain(n), original: blankFountain(n),
+      records: records as any, structure: baseStructure as any, annotations: [], approvedSpans: [],
+    });
+
+    // SECOND_ACT_INVERSION — fires
+    it('SECOND_ACT_INVERSION fires when Act 2b suspense drops below Act 2a', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // n=12: act2a=[3,4,5] suspense=2.0; act2b=[6,7,8] suspense=0.5
+      const records = Array.from({ length: 12 }, (_, i) => makeRec(i, {
+        suspenseDelta: (i >= 3 && i < 6) ? 2.0 : (i >= 6 && i < 9) ? 0.5 : 1.0,
+      }));
+      const result = await structurePass(structInput(records, 12));
+      assert.ok(
+        result.issues.some(i => i.rule === 'SECOND_ACT_INVERSION'),
+        `Expected SECOND_ACT_INVERSION, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // SECOND_ACT_INVERSION — no-fire
+    it('SECOND_ACT_INVERSION does not fire when Act 2b maintains or increases suspense', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      const records = Array.from({ length: 12 }, (_, i) => makeRec(i, {
+        suspenseDelta: (i >= 3 && i < 6) ? 2.0 : (i >= 6 && i < 9) ? 2.5 : 1.0,
+      }));
+      const result = await structurePass(structInput(records, 12));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'SECOND_ACT_INVERSION'),
+        `Expected no SECOND_ACT_INVERSION, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // MIDPOINT_REVERSAL_ABSENT — fires
+    it('MIDPOINT_REVERSAL_ABSENT fires when midpoint zone has no reversal or revelation', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // n=10: midStart=4, midEnd=6; records 4,5 are default (suspense=1, no revelation)
+      const records = Array.from({ length: 10 }, (_, i) => makeRec(i));
+      const result = await structurePass(structInput(records, 10));
+      assert.ok(
+        result.issues.some(i => i.rule === 'MIDPOINT_REVERSAL_ABSENT'),
+        `Expected MIDPOINT_REVERSAL_ABSENT, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // MIDPOINT_REVERSAL_ABSENT — no-fire
+    it('MIDPOINT_REVERSAL_ABSENT does not fire when midpoint has a revelation', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      const records = Array.from({ length: 10 }, (_, i) => makeRec(i, {
+        revelation: i === 5 ? 'The killer was here all along.' : null,
+      }));
+      const result = await structurePass(structInput(records, 10));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'MIDPOINT_REVERSAL_ABSENT'),
+        `Expected no MIDPOINT_REVERSAL_ABSENT, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // INCITING_INCIDENT_TOO_LATE — fires
+    it('INCITING_INCIDENT_TOO_LATE fires when first dramatic event occurs after 40%', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // n=10: cutoff=4; first reversal at index 5 (50%) → 5 > 4 → fires
+      const records = Array.from({ length: 10 }, (_, i) => makeRec(i, {
+        suspenseDelta: i === 5 ? -2 : 1,
+      }));
+      const result = await structurePass(structInput(records, 10));
+      assert.ok(
+        result.issues.some(i => i.rule === 'INCITING_INCIDENT_TOO_LATE'),
+        `Expected INCITING_INCIDENT_TOO_LATE, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // INCITING_INCIDENT_TOO_LATE — no-fire
+    it('INCITING_INCIDENT_TOO_LATE does not fire when first dramatic event is early', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // n=10: cutoff=4; first reversal at index 2 (20%) → 2 > 4 is false → no fire
+      const records = Array.from({ length: 10 }, (_, i) => makeRec(i, {
+        suspenseDelta: i === 2 ? -2 : 1,
+      }));
+      const result = await structurePass(structInput(records, 10));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'INCITING_INCIDENT_TOO_LATE'),
+        `Expected no INCITING_INCIDENT_TOO_LATE, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+  });
+
   describe('Wave 185 — dialoguePass: question dominance, interruption void, speaker monopoly', async () => {
     const blankRec = (): any => ({
       commitId: 'c0', sceneIdx: 0, slug: 'INT. ROOM - DAY',

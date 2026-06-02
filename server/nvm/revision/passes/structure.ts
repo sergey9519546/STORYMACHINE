@@ -354,6 +354,79 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 186: Act 2 inversion, midpoint reversal absent, inciting incident late ──
+
+  // SECOND_ACT_INVERSION: Act 2b (50%–75%) averages significantly lower suspense
+  // than Act 2a (25%–50%). The middle of the story should build continuously;
+  // when the second half of Act 2 drops, the narrative inverts exactly where it
+  // should escalate toward the climax. Distinct from ESCALATION_REVERSED (whole arc)
+  // and ACT2_DEAD_ZONE (global mid-zone flatness).
+  if (n >= 8) {
+    const act2aStart = Math.floor(n * 0.25);
+    const act2bStart = Math.floor(n * 0.5);
+    const act2bEnd   = Math.floor(n * 0.75);
+    const act2aRecs  = records.slice(act2aStart, act2bStart);
+    const act2bRecs  = records.slice(act2bStart, act2bEnd);
+    if (act2aRecs.length >= 2 && act2bRecs.length >= 2) {
+      const avgAct2a = act2aRecs.reduce((s, r) => s + r.suspenseDelta, 0) / act2aRecs.length;
+      const avgAct2b = act2bRecs.reduce((s, r) => s + r.suspenseDelta, 0) / act2bRecs.length;
+      if (avgAct2a >= 1.3 && avgAct2b < avgAct2a * 0.7) {
+        issues.push({
+          location: `Act 2 (Scenes ${act2aStart}–${act2bEnd - 1})`,
+          rule: 'SECOND_ACT_INVERSION',
+          description: `Act 2a (Scenes ${act2aStart}–${act2bStart - 1}) averages ${avgAct2a.toFixed(1)} suspense but Act 2b (Scenes ${act2bStart}–${act2bEnd - 1}) drops to ${avgAct2b.toFixed(1)} — the second half of Act 2 de-escalates when it should build toward the climax.`,
+          severity: 'major',
+          suggestedFix: 'Raise the stakes in Act 2b: escalate the antagonist\'s pressure, tighten the deadline, or create a new complication that makes the protagonist\'s situation worse in the second half of the conflict zone.',
+        });
+      }
+    }
+  }
+
+  // MIDPOINT_REVERSAL_ABSENT: The midpoint zone (40%–60%) contains no reversal
+  // (suspenseDelta < -1) and no revelation. Great stories pivot at the midpoint —
+  // the protagonist's strategy shifts from reaction to action. A midpoint with no
+  // catalysing event is a story that passes through its centre without changing
+  // direction. Requires 10+ scenes for a meaningful midpoint zone.
+  if (n >= 10) {
+    const midStart   = Math.floor(n * 0.4);
+    const midEnd     = Math.ceil(n * 0.6);
+    const midRecords = records.slice(midStart, midEnd);
+    const hasMidEvent = midRecords.some(r =>
+      r.suspenseDelta < -1 || r.revelation !== null,
+    );
+    if (!hasMidEvent) {
+      issues.push({
+        location: `Midpoint zone (Scenes ${midStart}–${midEnd - 1})`,
+        rule: 'MIDPOINT_REVERSAL_ABSENT',
+        description: `The midpoint zone (Scenes ${midStart}–${midEnd - 1}) has no reversal and no revelation — the story passes through its structural centre without the pivot that shifts protagonist strategy from reaction to action.`,
+        severity: 'major',
+        suggestedFix: 'Place a major reversal or revelatory beat near the midpoint: a discovery that recontextualises the threat, or a setback that forces the protagonist to abandon their first strategy and commit to a new one.',
+      });
+    }
+  }
+
+  // INCITING_INCIDENT_TOO_LATE: The very first dramatic event (reversal or
+  // revelation) occurs past the 40% mark. The story takes too long to generate
+  // the event that sets the central conflict in motion — the audience sits through
+  // 40%+ of the story with no catalytic moment to orient them. Distinct from
+  // MISSING_INCITING_INCIDENT (which fires when Act 1 lacks clues/shifts/clock):
+  // this fires on the absolute lateness of the first dramatic event.
+  if (n >= 10) {
+    const lateCutoff = Math.floor(n * 0.4);
+    const firstEventIdx = records.findIndex(r =>
+      r.suspenseDelta < -1 || r.revelation !== null,
+    );
+    if (firstEventIdx > lateCutoff) {
+      issues.push({
+        location: `First dramatic event at Scene ${firstEventIdx}`,
+        rule: 'INCITING_INCIDENT_TOO_LATE',
+        description: `The first reversal or revelation occurs at Scene ${firstEventIdx} — ${Math.round(firstEventIdx / n * 100)}% through the story. The central conflict doesn't launch until after 40% has elapsed; the audience has no dramatic anchor for the opening.`,
+        severity: 'major',
+        suggestedFix: 'Move the inciting event before the 40% mark. The audience needs a dramatic anchor — a reversal, revelation, or shock — early enough to understand what the story is about before the midpoint arrives.',
+      });
+    }
+  }
+
   // ── Rewrite ───────────────────────────────────────────────────────────────
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'structure', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
