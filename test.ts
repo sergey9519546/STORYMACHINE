@@ -15013,7 +15013,7 @@ describe('Wave 134 — Relationship Arc Pass', () => {
   const makeAgencyIR = (ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[], sceneIdx = 2): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR => ({
     transitionId: 'agency-test', sceneIdx, sceneFunction: 'advance_plot',
     activeMechanisms: ['discovery'], beforeStateHash: 'abc', ops,
-    preconditions: [{ id: 'p1', description: 'prior state', isMet: true }], postconditions: [],
+    preconditions: [], postconditions: [],
     provenance: { origin: 'user_authored', createdAt: Date.now() },
   });
 
@@ -15124,15 +15124,7 @@ describe('Wave 135 — dialoguePass: Level 2 subtext analysis', () => {
       fountain,
       original: fountain,
       annotations: [],
-      structure: {
-        actPosition: 'act1',
-        completionPercent: 0,
-        midpointReached: false,
-        act2Tension: 0,
-        totalClockPressure: 0,
-        reversalCount: 0,
-        revelationCount: 0,
-      },
+      structure: makeStructureForRevision('act1', 0, 0, false),
       records,
       approvedSpans: [],
       storyContext: undefined,
@@ -15440,6 +15432,179 @@ Alice grabs the edge of the counter, knuckles white.
     assert.ok(
       !result.issues.some(i => i.rule === 'EMOTION_NAMING_IN_ACTION'),
       'behavioral action descriptions should not trigger emotion naming rule',
+    );
+  });
+});
+
+// ── Wave 138: voice distinctiveness + character arc relational stasis ──────────
+
+describe('Wave 138 — voicePass: UNDIFFERENTIATED_CHARACTER_VOICES', () => {
+  it('UNDIFFERENTIATED_CHARACTER_VOICES fires when two major characters share >75% vocabulary', async () => {
+    // Both ALICE and BOB use nearly identical vocabulary across many scenes
+    const aliceLines = Array.from({ length: 6 }, () =>
+      'ALICE\nRight well basically situation problem understand trust honestly concern really explain perspective.\n'
+    ).join('\n\n');
+    const bobLines = Array.from({ length: 6 }, () =>
+      'BOB\nRight well basically situation problem understand trust honestly concern really explain perspective.\n'
+    ).join('\n\n');
+    const fountain = `INT. ROOM - DAY\n\nScene.\n\n${aliceLines}\n\n${bobLines}`;
+    const result = await voicePass(makePassInput(fountain));
+    assert.ok(
+      result.issues.some(i => i.rule === 'UNDIFFERENTIATED_CHARACTER_VOICES'),
+      `UNDIFFERENTIATED_CHARACTER_VOICES should fire; got: ${result.issues.map(i => i.rule).join(', ')}`,
+    );
+  });
+
+  it('UNDIFFERENTIATED_CHARACTER_VOICES does NOT fire when characters have distinct vocabularies', async () => {
+    const aliceLines = Array.from({ length: 6 }, () =>
+      'ALICE\nStatistically probability coefficient deviation analysis quantitative systematic empirical baseline.\n'
+    ).join('\n\n');
+    const bobLines = Array.from({ length: 6 }, () =>
+      'BOB\nKill run grab smash punch door gun knife blood fight sprint push crash break.\n'
+    ).join('\n\n');
+    const fountain = `INT. LAB - DAY\n\nScene starts.\n\n${aliceLines}\n\n${bobLines}`;
+    const result = await voicePass(makePassInput(fountain));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'UNDIFFERENTIATED_CHARACTER_VOICES'),
+      `should not fire for characters with distinct vocabularies`,
+    );
+  });
+});
+
+describe('Wave 138 — voicePass: VOICE_MONOTONE_CHARACTER', () => {
+  it('VOICE_MONOTONE_CHARACTER fires when a character speaks in uniformly-sized lines', async () => {
+    // ALICE uses varied vocabulary but consistent line length (8-9 words each) — CV near 0
+    const varied = [
+      'ALICE\nRight then perhaps should probably check this carefully.\n',
+      'ALICE\nWait there maybe something wrong could happen today.\n',
+      'ALICE\nListen carefully because situation matters quite seriously right.\n',
+      'ALICE\nThink about whether problem requires immediate urgent attention.\n',
+      'ALICE\nSomething strange happened before which seemed quite important.\n',
+      'ALICE\nDoor opened slowly revealing something inside quite unexpected.\n',
+      'ALICE\nAlways remember what happened last time carefully always.\n',
+      'ALICE\nNothing strange about feeling worried concerned hesitant today.\n',
+      'ALICE\nMaybe later things better seem become clearer eventually.\n',
+      'ALICE\nDone finished completed absolutely positively completely finally.\n',
+      'ALICE\nKind gentle person would surely handle carefully gently.\n',
+      'ALICE\nNever ever forget remember always constantly ceaselessly forever.\n',
+    ].join('\n\n');
+    const fountain = `INT. ROOM - DAY\n\nSomething happens.\n\n${varied}`;
+    const result = await voicePass(makePassInput(fountain));
+    assert.ok(
+      result.issues.some(i => i.rule === 'VOICE_MONOTONE_CHARACTER'),
+      `VOICE_MONOTONE_CHARACTER should fire; got: ${result.issues.map(i => i.rule).join(', ')}`,
+    );
+  });
+
+  it('VOICE_MONOTONE_CHARACTER does NOT fire when a character varies their sentence lengths', async () => {
+    const varied = [
+      'ALICE\nNo.\n',
+      'ALICE\nI told you already.\n',
+      'ALICE\nAbsolutely not and if you ask me one more time I am walking out that door forever.\n',
+      'ALICE\nWait.\n',
+      'ALICE\nListen to me carefully because I will only say this once and I need you to understand.\n',
+      'ALICE\nStop.\n',
+      'ALICE\nYou have no idea what this costs.\n',
+      'ALICE\nFine.\n',
+      'ALICE\nThen we are done here and there is nothing left to discuss on any level whatsoever.\n',
+      'ALICE\nGo.\n',
+      'ALICE\nI mean it.\n',
+      'ALICE\nThere is still time to fix everything if we act right now before the whole thing falls apart.\n',
+    ].join('\n\n');
+    const fountain = `INT. OFFICE - DAY\n\nSomething happens.\n\n${varied}`;
+    const result = await voicePass(makePassInput(fountain));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'VOICE_MONOTONE_CHARACTER'),
+      `varied line lengths should not trigger monotone rule`,
+    );
+  });
+});
+
+describe('Wave 138 — characterArcPass: relational arc tracking', () => {
+  // Build a PassInput with 5 records, using makeScreenplayCommit + buildScreenplayMemory
+  // so all required ScreenplaySceneRecord fields are correctly populated.
+  // relShifts specifies SHIFT_RELATIONSHIP ops to include (go into commit 0 and 1).
+  function makeArcInputWithRelShifts(
+    fountain: string,
+    relShifts: Array<{ pair: [string, string]; dimension: string; amount: number }>,
+  ): Parameters<typeof characterArcPass>[0] {
+    const commits = [
+      makeScreenplayCommit(0, [
+        { op: 'UPDATE_READER_STATE', delta: { suspense: -1 } } as StoryOp,
+        ...(relShifts.slice(0, 1).map(s => ({
+          op: 'SHIFT_RELATIONSHIP' as const,
+          pair: s.pair,
+          delta: { dimension: s.dimension, amount: s.amount, reason: 'test' },
+        } as StoryOp))),
+      ]),
+      makeScreenplayCommit(1, [
+        { op: 'UPDATE_READER_STATE', delta: { suspense: 1 } } as StoryOp,
+        ...(relShifts.slice(1, 2).map(s => ({
+          op: 'SHIFT_RELATIONSHIP' as const,
+          pair: s.pair,
+          delta: { dimension: s.dimension, amount: s.amount, reason: 'test' },
+        } as StoryOp))),
+      ]),
+      makeScreenplayCommit(2, [
+        { op: 'UPDATE_READER_STATE', delta: { suspense: 1 } } as StoryOp,
+        { op: 'UPDATE_BELIEF' as const, charId: 'alice', belief: { id: 'b1', proposition: 'truth revealed', source: 'witnessed' as const, confidence: 0.9 } } as StoryOp,
+      ]),
+      makeScreenplayCommit(3, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 2 } } as StoryOp]),
+      makeScreenplayCommit(4, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 0 } } as StoryOp]),
+    ];
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    return { fountain, original: fountain, annotations: [], structure, records, approvedSpans: [] };
+  }
+
+  it('CHARACTER_ARC_PROTAGONIST_PASSIVE fires when protagonist has no relationship shift', async () => {
+    // ALICE appears 7 times (protagonist), BOB 4 times. Only BOB|CAROL shifts — alice has no arc.
+    const fountain = [
+      'INT. A - DAY\n\nScene.\n',
+      'ALICE\nHello there.\n\nALICE\nHello there.\n\nALICE\nHello there.\n',
+      'ALICE\nHello there.\n\nALICE\nHello there.\n\nALICE\nHello there.\n\nALICE\nHello there.\n',
+      'BOB\nHi.\n\nBOB\nHi.\n\nBOB\nHi.\n\nBOB\nHi.\n',
+    ].join('\n');
+    const result = await characterArcPass(makeArcInputWithRelShifts(fountain, [
+      { pair: ['bob', 'carol'], dimension: 'trust', amount: 0.5 },
+    ]));
+    assert.ok(
+      result.issues.some(i => i.rule === 'CHARACTER_ARC_PROTAGONIST_PASSIVE'),
+      `should detect protagonist without relational arc; got: ${result.issues.map(i => i.rule).join(', ')}`,
+    );
+  });
+
+  it('CHARACTER_ARC_PROTAGONIST_PASSIVE does NOT fire when protagonist has a relationship shift', async () => {
+    const fountain = [
+      'INT. A - DAY\n\nScene.\n',
+      'ALICE\nHello there.\n\nALICE\nHello there.\n\nALICE\nHello there.\n',
+      'ALICE\nHello there.\n\nALICE\nHello there.\n\nALICE\nHello there.\n\nALICE\nHello there.\n',
+      'BOB\nHi.\n\nBOB\nHi.\n\nBOB\nHi.\n\nBOB\nHi.\n',
+    ].join('\n');
+    const result = await characterArcPass(makeArcInputWithRelShifts(fountain, [
+      { pair: ['alice', 'bob'], dimension: 'trust', amount: -0.4 },
+    ]));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'CHARACTER_ARC_PROTAGONIST_PASSIVE'),
+      `protagonist with relational arc should not trigger the rule`,
+    );
+  });
+
+  it('CHARACTER_ARC_RELATIONAL_STASIS fires for secondary character with no relational movement', async () => {
+    // ALICE (7 cues, shifts with BOB), CAROL (4 cues, never shifts) — stasis should fire.
+    const fountain = [
+      'INT. A - DAY\n\nScene.\n',
+      'ALICE\nHello there.\n\nALICE\nHello there.\n\nALICE\nHello there.\n',
+      'ALICE\nHello there.\n\nALICE\nHello there.\n\nALICE\nHello there.\n\nALICE\nHello there.\n',
+      'CAROL\nHi.\n\nCAROL\nHi.\n\nCAROL\nHi.\n\nCAROL\nHi.\n',
+      'BOB\nHi.\n',
+    ].join('\n');
+    const result = await characterArcPass(makeArcInputWithRelShifts(fountain, [
+      { pair: ['alice', 'bob'], dimension: 'trust', amount: -0.4 },
+    ]));
+    assert.ok(
+      result.issues.some(i => i.rule === 'CHARACTER_ARC_RELATIONAL_STASIS'),
+      `should detect secondary character with no relational arc; got: ${result.issues.map(i => i.rule).join(', ')}`,
     );
   });
 });
