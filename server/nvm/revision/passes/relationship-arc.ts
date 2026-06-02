@@ -282,6 +282,82 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
     }
   }
 
+  // ── Wave 177: Whiplash, uniform direction, unresolved rupture ───────────────
+
+  // RELATIONSHIP_WHIPLASH: A pair flips direction three or more times across its
+  // shifts. The opposite failure to MONOTONE_RELATIONSHIP (never reverses): here
+  // the bond reverses so often it reads as erratic rather than evolving — the
+  // audience can't track where the relationship actually stands. Requires 4+
+  // shifts for the pair.
+  for (const [pairKey, stats] of pairStats) {
+    if (stats.shifts.length >= 4) {
+      const signs = stats.shifts.map(s => Math.sign(s.amount)).filter(x => x !== 0);
+      let changes = 0;
+      for (let i = 1; i < signs.length; i++) {
+        if (signs[i] !== signs[i - 1]) changes++;
+      }
+      if (changes >= 3) {
+        const [a, b] = pairKey.split('|');
+        issues.push({
+          location: `${a} ↔ ${b}`,
+          rule: 'RELATIONSHIP_WHIPLASH',
+          description: `The relationship between ${a} and ${b} reverses direction ${changes} times across ${stats.shifts.length} shifts — the bond whiplashes between warming and souring so often it reads as erratic rather than evolving. The audience loses track of where these two actually stand.`,
+          severity: 'minor',
+          suggestedFix: 'Consolidate the reversals into a clearer arc. A relationship can turn twice — a betrayal, then a hard-won reconciliation — but each turn must be earned and stick long enough to register before the next.',
+        });
+      }
+    }
+  }
+
+  // ALL_PAIRS_SAME_DIRECTION: Every significant relationship in the story drifts
+  // the same way — all warming or all souring. The relational world has no
+  // counterpoint: no bond strengthens while another frays. A story where every
+  // relationship moves in lockstep feels tonally flat. Requires 2+ pairs, each
+  // with a net movement of at least 0.3.
+  if (pairStats.size >= 2) {
+    const nets = [...pairStats.values()].map(p => p.shifts.reduce((s, x) => s + x.amount, 0));
+    const significant = nets.filter(nt => Math.abs(nt) >= 0.3);
+    if (significant.length === nets.length && significant.length >= 2) {
+      const allPos = significant.every(nt => nt > 0);
+      const allNeg = significant.every(nt => nt < 0);
+      if (allPos || allNeg) {
+        const direction = allPos ? 'warming' : 'souring';
+        issues.push({
+          location: 'Relational world',
+          rule: 'ALL_PAIRS_SAME_DIRECTION',
+          description: `All ${nets.length} relationships in the story drift the same way (${direction}) — no bond strengthens while another frays. The relational world moves in lockstep, with no counterpoint to give the ensemble tonal contrast.`,
+          severity: 'minor',
+          suggestedFix: `Reverse the trajectory of at least one relationship. If the central bond is ${direction}, let a secondary one move against it — contrast is what makes each individual arc legible.`,
+        });
+      }
+    }
+  }
+
+  // UNRESOLVED_RELATIONSHIP_RUPTURE: A pair suffers a strong negative shift
+  // (amount ≤ -0.5) well before the ending, and the story never returns to them
+  // — no later shift for that pair. The rupture is opened and abandoned, leaving
+  // an emotional thread dangling. Requires 6+ records and the rupture to fall
+  // before the final 20% (so there was room to resolve it).
+  if (records.length >= 6) {
+    const resolveCutoff = Math.floor(records.length * 0.8);
+    for (const [pairKey, stats] of pairStats) {
+      const rupture = stats.shifts.find(s => s.amount <= -0.5);
+      if (rupture && rupture.sceneIdx < resolveCutoff) {
+        const hasLater = stats.shifts.some(s => s.sceneIdx > rupture.sceneIdx);
+        if (!hasLater) {
+          const [a, b] = pairKey.split('|');
+          issues.push({
+            location: `${a} ↔ ${b} (rupture at Scene ${rupture.sceneIdx})`,
+            rule: 'UNRESOLVED_RELATIONSHIP_RUPTURE',
+            description: `The bond between ${a} and ${b} ruptures hard at Scene ${rupture.sceneIdx} (shift ${rupture.amount.toFixed(1)}) but the story never returns to them — no later beat addresses the break. The emotional thread is opened and left dangling with room to spare.`,
+            severity: 'major',
+            suggestedFix: `Give this rupture a payoff before the end: a reconciliation, a final confrontation, or at least a beat that registers the cost of the break. A relationship the story bothered to fracture deserves a scene that closes the wound or names it as permanent.`,
+          });
+        }
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({
     fountain, issues, passName: 'relationship-arc', approvedSpans,
     storyContext: input.storyContext, priorPassResults: input.priorPassResults,

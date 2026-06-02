@@ -13585,6 +13585,119 @@ He sits down in the chair.
     });
   });
 
+  describe('Wave 177 — relationshipArcPass: whiplash, uniform direction, unresolved rupture', async () => {
+    const makeRec = (idx: number, relShifts: any[] = []): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`, purpose: 'dialogue',
+      dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+      emotionalShift: 'neutral', suspenseDelta: 1, dialogueHighlights: [],
+      unresolvedClues: [], seededClueIds: [], payoffSetupIds: [], visualBeats: [],
+      relationshipShifts: relShifts,
+    });
+    const relInput = (records: any[], n: number) => ({
+      fountain: Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+      original: Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+      records: records as any, structure: {} as any, annotations: [], approvedSpans: [],
+    });
+
+    // ── RELATIONSHIP_WHIPLASH ─────────────────────────────────────────────────
+    it('relationshipArcPass detects RELATIONSHIP_WHIPLASH when a pair flips direction 3+ times', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const records = [
+        makeRec(0),
+        makeRec(1, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.5 }]),
+        makeRec(2, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.5 }]),
+        makeRec(3, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.5 }]),
+        makeRec(4, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.5 }]),
+        makeRec(5),
+      ];
+      const result = await relationshipArcPass(relInput(records, 6));
+      const whip = result.issues.filter(i => i.rule === 'RELATIONSHIP_WHIPLASH');
+      assert.ok(whip.length >= 1, `Should detect RELATIONSHIP_WHIPLASH; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(whip[0].severity === 'minor');
+    });
+
+    it('relationshipArcPass does NOT fire RELATIONSHIP_WHIPLASH when a pair has a clear arc', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const records = [
+        makeRec(0),
+        makeRec(1, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.5 }]),
+        makeRec(2, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.5 }]),
+        makeRec(3, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.5 }]),
+        makeRec(4, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.5 }]),
+        makeRec(5),
+      ];
+      const result = await relationshipArcPass(relInput(records, 6));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'RELATIONSHIP_WHIPLASH'),
+        'Should NOT fire when a pair reverses at most once',
+      );
+    });
+
+    // ── ALL_PAIRS_SAME_DIRECTION ──────────────────────────────────────────────
+    it('relationshipArcPass detects ALL_PAIRS_SAME_DIRECTION when every bond drifts the same way', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const records = [
+        makeRec(0),
+        makeRec(1, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.5 }]),
+        makeRec(2, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.5 }]),
+        makeRec(3, [{ pairKey: 'carol|dan', dimension: 'affinity', amount: 0.4 }]),
+        makeRec(4, [{ pairKey: 'carol|dan', dimension: 'affinity', amount: 0.4 }]),
+        makeRec(5),
+      ];
+      const result = await relationshipArcPass(relInput(records, 6));
+      const allSame = result.issues.filter(i => i.rule === 'ALL_PAIRS_SAME_DIRECTION');
+      assert.ok(allSame.length >= 1, `Should detect ALL_PAIRS_SAME_DIRECTION; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(allSame[0].severity === 'minor');
+    });
+
+    it('relationshipArcPass does NOT fire ALL_PAIRS_SAME_DIRECTION when bonds counterpoint each other', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const records = [
+        makeRec(0),
+        makeRec(1, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.5 }]),
+        makeRec(2, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.5 }]),
+        makeRec(3, [{ pairKey: 'carol|dan', dimension: 'affinity', amount: -0.4 }]),
+        makeRec(4, [{ pairKey: 'carol|dan', dimension: 'affinity', amount: -0.4 }]),
+        makeRec(5),
+      ];
+      const result = await relationshipArcPass(relInput(records, 6));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'ALL_PAIRS_SAME_DIRECTION'),
+        'Should NOT fire when one bond warms while another sours',
+      );
+    });
+
+    // ── UNRESOLVED_RELATIONSHIP_RUPTURE ───────────────────────────────────────
+    it('relationshipArcPass detects UNRESOLVED_RELATIONSHIP_RUPTURE when a break is never revisited', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const records = Array.from({ length: 8 }, (_, i) =>
+        i === 2
+          ? makeRec(i, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.6 }])
+          : makeRec(i),
+      );
+      const result = await relationshipArcPass(relInput(records, 8));
+      const rupture = result.issues.filter(i => i.rule === 'UNRESOLVED_RELATIONSHIP_RUPTURE');
+      assert.ok(rupture.length >= 1, `Should detect UNRESOLVED_RELATIONSHIP_RUPTURE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(rupture[0].severity === 'major');
+    });
+
+    it('relationshipArcPass does NOT fire UNRESOLVED_RELATIONSHIP_RUPTURE when the break is later addressed', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const records = Array.from({ length: 8 }, (_, i) =>
+        i === 2
+          ? makeRec(i, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.6 }])
+          : i === 5
+          ? makeRec(i, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.5 }])
+          : makeRec(i),
+      );
+      const result = await relationshipArcPass(relInput(records, 8));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'UNRESOLVED_RELATIONSHIP_RUPTURE'),
+        'Should NOT fire when a later beat addresses the rupture',
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
