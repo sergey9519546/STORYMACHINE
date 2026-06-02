@@ -14014,6 +14014,122 @@ He sits down in the chair.
     });
   });
 
+  describe('Wave 181 — payoffPass: flat payoffs, clue glut, scrambled order', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const baseStructure = {
+      completionPercent: 50, actPosition: 'act2a' as const,
+      openClues: 0, reversalCount: 1, midpointPressure: 2, tightestScene: null,
+    };
+    const payoffInput = (records: any[], n: number) => ({
+      fountain: blankFountain(n), original: blankFountain(n),
+      records: records as any, structure: baseStructure as any, annotations: [], approvedSpans: [],
+    });
+
+    // ── FLAT_PAYOFF ───────────────────────────────────────────────────────────
+    it('payoffPass detects FLAT_PAYOFF when payoffs resolve with no emotional weight', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      const records = [
+        makeRec(0, { seededClueIds: ['c1'] }),
+        makeRec(1, { seededClueIds: ['c2'] }),
+        makeRec(2),
+        makeRec(3),
+        makeRec(4, { payoffSetupIds: ['c1'] }), // flat
+        makeRec(5, { payoffSetupIds: ['c2'] }), // flat
+      ];
+      const result = await payoffPass(payoffInput(records, 6));
+      const flat = result.issues.filter(i => i.rule === 'FLAT_PAYOFF');
+      assert.ok(flat.length >= 1, `Should detect FLAT_PAYOFF; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(flat[0].severity === 'major');
+    });
+
+    it('payoffPass does NOT fire FLAT_PAYOFF when payoffs carry emotional weight', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      const records = [
+        makeRec(0, { seededClueIds: ['c1'] }),
+        makeRec(1, { seededClueIds: ['c2'] }),
+        makeRec(2),
+        makeRec(3),
+        makeRec(4, { payoffSetupIds: ['c1'], emotionalShift: 'negative' }),
+        makeRec(5, { payoffSetupIds: ['c2'], suspenseDelta: 2 }),
+      ];
+      const result = await payoffPass(payoffInput(records, 6));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'FLAT_PAYOFF'),
+        'Should NOT fire when payoff scenes carry emotional or suspense weight',
+      );
+    });
+
+    // ── CLUE_GLUT ─────────────────────────────────────────────────────────────
+    it('payoffPass detects CLUE_GLUT when too many clues are open at once', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      const records = Array.from({ length: 6 }, (_, i) =>
+        i < 5 ? makeRec(i, { seededClueIds: [`c${i}`] }) : makeRec(i),
+      );
+      const result = await payoffPass(payoffInput(records, 6));
+      const glut = result.issues.filter(i => i.rule === 'CLUE_GLUT');
+      assert.ok(glut.length >= 1, `Should detect CLUE_GLUT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(glut[0].severity === 'minor');
+    });
+
+    it('payoffPass does NOT fire CLUE_GLUT when open threads stay manageable', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      const records = Array.from({ length: 6 }, (_, i) =>
+        i < 3 ? makeRec(i, { seededClueIds: [`c${i}`] }) : makeRec(i),
+      );
+      const result = await payoffPass(payoffInput(records, 6));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'CLUE_GLUT'),
+        'Should NOT fire when only a few clues are open simultaneously',
+      );
+    });
+
+    // ── SETUP_PAYOFF_ORDER_SCRAMBLED ──────────────────────────────────────────
+    it('payoffPass detects SETUP_PAYOFF_ORDER_SCRAMBLED when payoff order inverts setup order', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // Plant c1,c2,c3 at 0,1,2; pay off in reverse at 8,7,6
+      const records = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0) return makeRec(i, { seededClueIds: ['c1'] });
+        if (i === 1) return makeRec(i, { seededClueIds: ['c2'] });
+        if (i === 2) return makeRec(i, { seededClueIds: ['c3'] });
+        if (i === 6) return makeRec(i, { payoffSetupIds: ['c3'] });
+        if (i === 7) return makeRec(i, { payoffSetupIds: ['c2'] });
+        if (i === 8) return makeRec(i, { payoffSetupIds: ['c1'] });
+        return makeRec(i);
+      });
+      const result = await payoffPass(payoffInput(records, 10));
+      const scrambled = result.issues.filter(i => i.rule === 'SETUP_PAYOFF_ORDER_SCRAMBLED');
+      assert.ok(scrambled.length >= 1, `Should detect SETUP_PAYOFF_ORDER_SCRAMBLED; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(scrambled[0].severity === 'minor');
+    });
+
+    it('payoffPass does NOT fire SETUP_PAYOFF_ORDER_SCRAMBLED when payoffs follow setup order', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      const records = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0) return makeRec(i, { seededClueIds: ['c1'] });
+        if (i === 1) return makeRec(i, { seededClueIds: ['c2'] });
+        if (i === 2) return makeRec(i, { seededClueIds: ['c3'] });
+        if (i === 6) return makeRec(i, { payoffSetupIds: ['c1'] });
+        if (i === 7) return makeRec(i, { payoffSetupIds: ['c2'] });
+        if (i === 8) return makeRec(i, { payoffSetupIds: ['c3'] });
+        return makeRec(i);
+      });
+      const result = await payoffPass(payoffInput(records, 10));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'SETUP_PAYOFF_ORDER_SCRAMBLED'),
+        'Should NOT fire when payoffs resolve in the same order as their setups',
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

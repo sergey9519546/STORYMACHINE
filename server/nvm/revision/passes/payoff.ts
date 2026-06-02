@@ -293,6 +293,95 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 181: Flat payoffs, clue glut, scrambled setup/payoff order ──────────
+
+  // FLAT_PAYOFF: Two or more payoff scenes land with no emotional weight —
+  // neutral emotion, low suspense, no relationship shift. A loop closing should
+  // carry a charge (relief, dread, vindication); a payoff that resolves
+  // mechanically squanders the anticipation the setup built. Distinct from
+  // SETUP_WITHOUT_CONSEQUENCE (which judges the clue's plant scenes).
+  {
+    const flatPayoffs: string[] = [];
+    for (const [setupId, payoffScene] of payoffInfo) {
+      const r = records[payoffScene];
+      if (!r) continue;
+      const isFlat =
+        r.emotionalShift === 'neutral' &&
+        r.suspenseDelta < 1.5 &&
+        (r.relationshipShifts?.length ?? 0) === 0;
+      if (isFlat) flatPayoffs.push(setupId);
+    }
+    if (flatPayoffs.length >= 2) {
+      issues.push({
+        location: `Payoffs: ${flatPayoffs.slice(0, 3).join(', ')}${flatPayoffs.length > 3 ? '…' : ''}`,
+        rule: 'FLAT_PAYOFF',
+        description: `${flatPayoffs.length} payoffs resolve with no emotional weight — neutral emotion, low suspense, no relationship shift. The loops close mechanically, squandering the anticipation their setups built.`,
+        severity: 'major',
+        suggestedFix: 'Stage each payoff for impact: the moment a planted thread resolves should land a charge — relief, dread, vindication, or cost. If a resolution carries no feeling, the setup wasn\'t worth planting.',
+      });
+    }
+  }
+
+  // CLUE_GLUT: At some point the audience is tracking five or more open clues at
+  // once (planted but not yet paid off). Too many simultaneous unresolved threads
+  // overload working memory — the viewer stops tracking and the mysteries blur.
+  if (clueInfo.size >= 5) {
+    let maxOpen = 0;
+    let glutScene = -1;
+    for (let s = 0; s < records.length; s++) {
+      let planted = 0;
+      let paid = 0;
+      for (const [id, info] of clueInfo) {
+        if (info.plantedAt <= s) planted++;
+        const ps = payoffInfo.get(id);
+        if (ps !== undefined && ps <= s) paid++;
+      }
+      const open = planted - paid;
+      if (open > maxOpen) { maxOpen = open; glutScene = s; }
+    }
+    if (maxOpen >= 5) {
+      issues.push({
+        location: `Around Scene ${glutScene}`,
+        rule: 'CLUE_GLUT',
+        description: `By Scene ${glutScene} the audience is tracking ${maxOpen} open clues at once — too many simultaneous unresolved threads overload working memory, and the mysteries start to blur together.`,
+        severity: 'minor',
+        suggestedFix: 'Resolve or consolidate some threads before opening new ones. Pay off an early clue to free up the audience\'s attention before planting the next, so each mystery has room to register.',
+      });
+    }
+  }
+
+  // SETUP_PAYOFF_ORDER_SCRAMBLED: Across 3+ resolved clue→payoff pairs, the
+  // order of payoffs largely reverses the order of setups — what's planted first
+  // pays off last and vice versa. A heavily scrambled order is hard to track;
+  // audiences follow nested or sequential setups, not a fully inverted stack.
+  {
+    const pairs: Array<{ plant: number; payoff: number }> = [];
+    for (const [id, info] of clueInfo) {
+      const ps = payoffInfo.get(id);
+      if (ps !== undefined && ps >= info.plantedAt) pairs.push({ plant: info.plantedAt, payoff: ps });
+    }
+    if (pairs.length >= 3) {
+      pairs.sort((a, b) => a.plant - b.plant);
+      let inversions = 0;
+      let total = 0;
+      for (let i = 0; i < pairs.length; i++) {
+        for (let j = i + 1; j < pairs.length; j++) {
+          total++;
+          if (pairs[j].payoff < pairs[i].payoff) inversions++;
+        }
+      }
+      if (total > 0 && inversions / total > 0.5) {
+        issues.push({
+          location: 'Setup/payoff ordering',
+          rule: 'SETUP_PAYOFF_ORDER_SCRAMBLED',
+          description: `Across ${pairs.length} resolved threads, ${Math.round(inversions / total * 100)}% of setup/payoff pairs are inverted — what's planted earliest pays off latest and vice versa. The order is scrambled enough that the audience can't track which answer belongs to which question.`,
+          severity: 'minor',
+          suggestedFix: 'Resolve threads in an order the audience can follow — sequential (first in, first out) or cleanly nested (last in, first out). A fully inverted payoff stack reads as chaos rather than craft.',
+        });
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'payoff', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
