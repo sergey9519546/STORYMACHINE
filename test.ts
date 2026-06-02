@@ -13036,6 +13036,122 @@ He sits down in the chair.
     });
   });
 
+  describe('Wave 172 — pacingPass: plateau, opening bloat, suspense/length decoupling', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const noAnnotations = (n: number) => Array.from({ length: n }, () => ({ revelation: false } as any));
+    function makeFountainWithLengths(sceneLinesArray: number[]): string {
+      return sceneLinesArray.map((len, i) => {
+        const body = Array.from({ length: len }, (_, j) => `Scene ${i} action line ${j + 1}.`).join('\n');
+        return `INT. SC${i} - DAY\n\n${body}\n`;
+      }).join('\n');
+    }
+
+    // ── PACING_PLATEAU ────────────────────────────────────────────────────────
+    it('pacingPass detects PACING_PLATEAU when 4 consecutive scenes match in length', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // Scenes 0-3 all 10 lines (plateau); rest varied so global variance stays high
+      const sceneLens = [10, 10, 10, 10, 2, 25, 3, 22, 4];
+      const records = Array.from({ length: 9 }, (_, i) => makeRec(i));
+      const result = await pacingPass({
+        fountain: makeFountainWithLengths(sceneLens),
+        original: '', records: records as any, structure: {} as any,
+        annotations: noAnnotations(9), approvedSpans: [],
+      });
+      const plateau = result.issues.filter(i => i.rule === 'PACING_PLATEAU');
+      assert.ok(plateau.length >= 1, `Should detect PACING_PLATEAU; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(plateau[0].severity === 'minor');
+    });
+
+    it('pacingPass does NOT fire PACING_PLATEAU when no 4-scene run is uniform', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      const sceneLens = [2, 10, 3, 15, 4, 12, 5, 20, 6];
+      const records = Array.from({ length: 9 }, (_, i) => makeRec(i));
+      const result = await pacingPass({
+        fountain: makeFountainWithLengths(sceneLens),
+        original: '', records: records as any, structure: {} as any,
+        annotations: noAnnotations(9), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'PACING_PLATEAU'),
+        'Should NOT fire when scene lengths vary across every 4-scene window',
+      );
+    });
+
+    // ── OPENING_SCENE_BLOAT ───────────────────────────────────────────────────
+    it('pacingPass detects OPENING_SCENE_BLOAT when scene 0 is >2x average', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // avg = (17 + 5*5)/6 = 7; scene 0 = 17 > 14 (2x) and < 17.5 (2.5x, below OVERLONG)
+      const sceneLens = [17, 5, 5, 5, 5, 5];
+      const records = Array.from({ length: 6 }, (_, i) => makeRec(i));
+      const result = await pacingPass({
+        fountain: makeFountainWithLengths(sceneLens),
+        original: '', records: records as any, structure: {} as any,
+        annotations: noAnnotations(6), approvedSpans: [],
+      });
+      const bloat = result.issues.filter(i => i.rule === 'OPENING_SCENE_BLOAT');
+      assert.ok(bloat.length >= 1, `Should detect OPENING_SCENE_BLOAT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(bloat[0].severity === 'minor');
+    });
+
+    it('pacingPass does NOT fire OPENING_SCENE_BLOAT when opening is proportionate', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      const sceneLens = [8, 7, 6, 9, 5, 7];
+      const records = Array.from({ length: 6 }, (_, i) => makeRec(i));
+      const result = await pacingPass({
+        fountain: makeFountainWithLengths(sceneLens),
+        original: '', records: records as any, structure: {} as any,
+        annotations: noAnnotations(6), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'OPENING_SCENE_BLOAT'),
+        'Should NOT fire when the opening scene is close to average length',
+      );
+    });
+
+    // ── SUSPENSE_LENGTH_DECOUPLING ────────────────────────────────────────────
+    it('pacingPass detects SUSPENSE_LENGTH_DECOUPLING when page space is inverse to tension', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // Low-tension scenes are long, high-tension scenes are short
+      const sceneLens = [18, 18, 4, 4, 16, 16, 4, 4];
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, { suspenseDelta: (i === 2 || i === 3 || i === 6 || i === 7) ? 3 : 0.5 }),
+      );
+      const result = await pacingPass({
+        fountain: makeFountainWithLengths(sceneLens),
+        original: '', records: records as any, structure: {} as any,
+        annotations: noAnnotations(8), approvedSpans: [],
+      });
+      const decoupling = result.issues.filter(i => i.rule === 'SUSPENSE_LENGTH_DECOUPLING');
+      assert.ok(decoupling.length >= 1, `Should detect SUSPENSE_LENGTH_DECOUPLING; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(decoupling[0].severity === 'major');
+    });
+
+    it('pacingPass does NOT fire SUSPENSE_LENGTH_DECOUPLING when high-tension scenes get more space', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // High-tension scenes are long, low-tension scenes are short (proper allocation)
+      const sceneLens = [4, 4, 18, 18, 5, 5, 16, 16];
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, { suspenseDelta: (i === 2 || i === 3 || i === 6 || i === 7) ? 3 : 0.5 }),
+      );
+      const result = await pacingPass({
+        fountain: makeFountainWithLengths(sceneLens),
+        original: '', records: records as any, structure: {} as any,
+        annotations: noAnnotations(8), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'SUSPENSE_LENGTH_DECOUPLING'),
+        'Should NOT fire when high-tension scenes are allocated more page space',
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

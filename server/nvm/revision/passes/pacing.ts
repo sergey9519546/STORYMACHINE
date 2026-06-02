@@ -282,6 +282,71 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 172: Plateau, opening bloat, suspense/length decoupling ─────────────
+
+  // PACING_PLATEAU: A run of 4+ consecutive scenes whose lengths sit within ±20%
+  // of one another. Even when the global scene-length variance is healthy (so
+  // ENERGY_MONOTONE stays quiet), a flat local stretch reads as a sag — four
+  // scenes in a row at the same cadence with no acceleration or contraction.
+  if (records.length >= 8) {
+    const orderedLengths = Array.from({ length: records.length }, (_, i) => sceneLengths.get(i) ?? 0);
+    for (let i = 0; i + 4 <= orderedLengths.length; i++) {
+      const window = orderedLengths.slice(i, i + 4);
+      const minLen = Math.min(...window);
+      const maxLen = Math.max(...window);
+      if (minLen > 0 && maxLen <= minLen * 1.2) {
+        issues.push({
+          location: `Scenes ${i}–${i + 3}`,
+          rule: 'PACING_PLATEAU',
+          description: `Scenes ${i}–${i + 3} all run within ±20% of the same length (${minLen}–${maxLen} lines) — a flat stretch with no acceleration or contraction. The cadence plateaus for four scenes in a row.`,
+          severity: 'minor',
+          suggestedFix: 'Break the plateau: hard-cut one of these scenes to a single beat, or expand another into a full set-piece. A run of same-length scenes reads as a monotone even when the rest of the script breathes.',
+        });
+        break; // one plateau report is enough
+      }
+    }
+  }
+
+  // OPENING_SCENE_BLOAT: The very first scene is more than 2x the story average.
+  // A bloated opening makes the audience wait through setup before the engine
+  // turns over — the hook arrives late. Distinct from OVERLONG_LOW_TENSION
+  // (>2.5x), this catches a merely-overweight opener specifically.
+  if (records.length >= 6) {
+    const openingLen = sceneLengths.get(0) ?? 0;
+    if (openingLen > 0 && openingLen > avgLength * 2 && openingLen <= avgLength * 2.5) {
+      issues.push({
+        location: `Scene 0 (${records[0]?.slug ?? 'opening'})`,
+        rule: 'OPENING_SCENE_BLOAT',
+        description: `The opening scene is ${openingLen} lines — ${Math.round(openingLen / avgLength * 100)}% of the story average. The story takes too long to get going before the central engine turns over.`,
+        severity: 'minor',
+        suggestedFix: 'Trim the opening to its sharpest entry point. Start as late into the scene as possible, cut throat-clearing setup, and let exposition arrive through later conflict rather than up front.',
+      });
+    }
+  }
+
+  // SUSPENSE_LENGTH_DECOUPLING: Page space is allocated inversely to dramatic
+  // weight — multiple high-tension scenes are crammed below average length while
+  // multiple low-tension scenes sprawl above it. Distinct from
+  // CLIMAX_SCENE_UNDERWEIGHT (single climax scene), this catches a systemic
+  // misallocation across the whole script.
+  if (records.length >= 8) {
+    const underweightHighTension = records.filter(
+      (r, i) => r.suspenseDelta > 2.5 && (sceneLengths.get(i) ?? 0) > 0 && (sceneLengths.get(i) ?? 0) < avgLength,
+    ).length;
+    const overweightLowTension = records.filter(
+      (r, i) => r.suspenseDelta < 1 && (sceneLengths.get(i) ?? 0) > avgLength,
+    ).length;
+    if (underweightHighTension >= 2 && overweightLowTension >= 2) {
+      issues.push({
+        location: 'Page-space allocation',
+        rule: 'SUSPENSE_LENGTH_DECOUPLING',
+        description: `Page space is decoupled from drama: ${underweightHighTension} high-tension scenes run below average length while ${overweightLowTension} low-tension scenes run above it. The script spends its pages on its quietest moments and rushes its loudest.`,
+        severity: 'major',
+        suggestedFix: 'Reallocate page space toward dramatic weight: expand the high-tension scenes with staging, reaction, and consequence; compress the low-tension scenes to their essential function.',
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'pacing', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
