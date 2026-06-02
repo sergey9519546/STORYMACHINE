@@ -316,6 +316,62 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 184: Abstract noun overload, filler gestures, gerund fragments ─────
+
+  // ABSTRACT_NOUN_OVERLOAD: Action lines that name psychological states instead of
+  // dramatising them through physical reality. A screenplay's action lines must
+  // describe what is seen and heard — when more than 30% name an internal feeling
+  // or abstract concept directly, the writing becomes novelistic.
+  if (actionLines.length >= 8) {
+    const abstractRe = /\b(feeling|feelings|thought|thoughts|emotion|emotions|mood|longing|desire|tension|anxiety|grief|regret|wonder|doubt|confusion|shame|guilt|despair|bitterness|sorrow|hatred|anguish|dread|yearning|nostalgia|melancholy|wistfulness|apprehension)\b/i;
+    const abstractCount = actionLines.filter(l => abstractRe.test(l.text)).length;
+    if (abstractCount / actionLines.length > 0.3) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'ABSTRACT_NOUN_OVERLOAD',
+        description: `${abstractCount} of ${actionLines.length} action lines (${Math.round(abstractCount / actionLines.length * 100)}%) name psychological states directly (feeling, grief, longing, despair…). Action lines must show; they cannot tell.`,
+        severity: 'minor',
+        suggestedFix: 'Replace abstract nouns with concrete physical action: "She grips the letter until her knuckles whiten" instead of "She feels grief". Let the body carry the emotion.',
+      });
+    }
+  }
+
+  // FILLER_GESTURE_EXCESS: Overuse of content-free body gestures (nodding, shrugging,
+  // sighing, fidgeting) that fill action lines without advancing story. When a story
+  // relies on filler gestures for more than 20% of its action, the scenes have no
+  // physical world — characters perform emotional semaphore in a vacuum.
+  if (actionLines.length >= 8) {
+    const fillerGestureRe = /\b(nods?|nodding|shrugs?|shrugging|sighs?|sighing|fidgets?|fidgeting|clears?\s+(?:his|her|their|a)\s+throat|shifts?\s+(?:uncomfortably|in\s+(?:his|her|their)\s+(?:seat|chair)))\b/i;
+    const fillerCount = actionLines.filter(l => fillerGestureRe.test(l.text)).length;
+    if (fillerCount >= 3 && fillerCount / actionLines.length > 0.2) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'FILLER_GESTURE_EXCESS',
+        description: `${fillerCount} action lines use content-free filler gestures (nods, shrugs, sighs, fidgets) — ${Math.round(fillerCount / actionLines.length * 100)}% of action is empty emotional semaphore with no physical world.`,
+        severity: 'minor',
+        suggestedFix: 'Replace filler gestures with specific physical actions that reveal character and place the reader in a concrete world. "He nods" tells nothing. "He lines up the shot glasses, one for each lie she told him" does.',
+      });
+    }
+  }
+
+  // GERUND_FRAGMENT_CHAIN: Action lines where more than 30% begin with a gerund
+  // ("-ing" present participle as a sentence fragment). Occasional gerund openings
+  // create economy and pace. When they dominate, the writing becomes a listicle
+  // of disconnected actions — the narrative loses grammatical coherence.
+  if (actionLines.length >= 8) {
+    const gerundRe = /^[A-Z][a-z]*ing\b/;
+    const gerundCount = actionLines.filter(l => gerundRe.test(l.text.trim())).length;
+    if (gerundCount >= 4 && gerundCount / actionLines.length > 0.3) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'GERUND_FRAGMENT_CHAIN',
+        description: `${gerundCount} of ${actionLines.length} action lines (${Math.round(gerundCount / actionLines.length * 100)}%) begin with a gerund fragment (Walking… Reaching… Turning…). The screenplay substitutes fragments for active sentences.`,
+        severity: 'minor',
+        suggestedFix: 'Convert gerund fragments to active sentences with a subject: "Walking to the door" → "She crosses to the door". Reserve gerund fragments for single-beat impact moments, not as a default register.',
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'rhythm', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

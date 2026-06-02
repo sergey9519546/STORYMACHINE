@@ -356,6 +356,94 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 182: Arc stall in Act 2, secondary arc mirror, climax void ──────
+
+  // ARC_STALL_IN_ACT2: The entire Act 2 conflict zone (25%–75%) has a neutral
+  // emotional register — no growth, no suffering, no arc movement. The protagonist
+  // neither wins nor loses ground across the story's central dramatic terrain.
+  if (records.length >= 8) {
+    const act2Start = Math.floor(records.length * 0.25);
+    const act2End   = Math.floor(records.length * 0.75);
+    const act2Records = records.slice(act2Start, act2End);
+    if (act2Records.length >= 3 && act2Records.every(r => r.emotionalShift === 'neutral')) {
+      issues.push({
+        location: `Act 2 (Scenes ${act2Start}–${act2End - 1})`,
+        rule: 'ARC_STALL_IN_ACT2',
+        description: `All ${act2Records.length} Act 2 scenes are emotionally neutral — the conflict zone registers no emotional charge. The protagonist neither grows nor suffers across the story's entire middle.`,
+        severity: 'major',
+        suggestedFix: 'Introduce at least two emotionally charged scenes in Act 2: a positive beat (hope, connection, small victory) and a negative beat (loss, betrayal, cost). The arc needs both poles to feel earned.',
+      });
+    }
+  }
+
+  // SECONDARY_ARC_MIRROR: Two or more secondary characters share the same net
+  // relationship arc direction (both improving or both deteriorating), making them
+  // functionally interchangeable as dramatic agents. The story lacks contrasting
+  // secondary arc perspectives — characters are echoes, not individuals.
+  if (records.length >= 6) {
+    const charNetArc = new Map<string, number>();
+    for (const r of records) {
+      for (const shift of r.relationshipShifts ?? []) {
+        for (const charId of shift.pairKey.split('|')) {
+          const id = charId.toLowerCase();
+          charNetArc.set(id, (charNetArc.get(id) ?? 0) + shift.amount);
+        }
+      }
+    }
+    if (charNetArc.size >= 3) {
+      const cueMap = new Map<string, number>();
+      for (const line of fountain.split('\n')) {
+        const t = line.trim();
+        if (/^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(t) &&
+            !/^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END|ACT|MIDPOINT|SCENE)/i.test(t)) {
+          const charName = t.replace(/\s*\(.*?\)\s*$/, '').toLowerCase().trim();
+          if (charName !== 'narrator' && charName !== 'v.o.' && charName !== 'o.s.') {
+            cueMap.set(charName, (cueMap.get(charName) ?? 0) + 1);
+          }
+        }
+      }
+      const protagonistId = [...cueMap.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
+      const significantSecondaries = [...charNetArc.entries()]
+        .filter(([id, net]) => id !== protagonistId && Math.abs(net) >= 0.3);
+      const positiveSecondaries = significantSecondaries.filter(([, net]) => net > 0);
+      const negativeSecondaries = significantSecondaries.filter(([, net]) => net < 0);
+      if (positiveSecondaries.length >= 2 || negativeSecondaries.length >= 2) {
+        const mirrored = positiveSecondaries.length >= 2 ? positiveSecondaries : negativeSecondaries;
+        const dir = positiveSecondaries.length >= 2 ? 'improving' : 'deteriorating';
+        const names = mirrored.slice(0, 3).map(([id]) => id.toUpperCase()).join(', ');
+        issues.push({
+          location: 'Secondary character arcs',
+          rule: 'SECONDARY_ARC_MIRROR',
+          description: `Secondary characters ${names} all have ${dir} net relationship arcs — they duplicate each other's arc trajectory and are functionally interchangeable as dramatic agents.`,
+          severity: 'minor',
+          suggestedFix: 'Give at least one secondary character an arc in the opposing direction. Contrasting arcs (one ally rising while another falls) create dramatic irony and prevent the story from feeling like everyone is on the same emotional journey.',
+        });
+      }
+    }
+  }
+
+  // ARC_CLIMAX_VOID: The scene explicitly marked as the climax is emotionally
+  // neutral, has no relationship shifts, and contains no revelation — the story's
+  // structural peak is dramatically hollow. The label exists without the substance.
+  if (records.length >= 6) {
+    const climaxRecord = records.find(r => r.purpose === 'climax');
+    if (climaxRecord !== undefined) {
+      const isHollow =
+        climaxRecord.emotionalShift === 'neutral' &&
+        (climaxRecord.relationshipShifts ?? []).length === 0 &&
+        climaxRecord.revelation === null;
+      if (isHollow) {
+        issues.push({
+          location: `Scene ${climaxRecord.sceneIdx} (climax)`,
+          rule: 'ARC_CLIMAX_VOID',
+          description: `The climax scene (Scene ${climaxRecord.sceneIdx}) is emotionally neutral, has no relationship shift, and contains no revelation — the story's designated peak moment carries no dramatic weight.`,
+          severity: 'major',
+          suggestedFix: 'The climax must carry the maximum emotional charge of the story: a revelation that recontextualizes everything, a relationship that breaks or transforms, or a moment of profound personal cost. The peak cannot be empty.',
+        });
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'character-arc', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

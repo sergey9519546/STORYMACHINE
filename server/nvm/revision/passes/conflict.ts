@@ -294,6 +294,89 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 183: Reversal vacuum, Act 1 conflict absent, convergence absent ──
+
+  // REVERSAL_WITHOUT_CONSEQUENCE: A reversal (suspenseDelta < -1) is followed by
+  // two consecutive flat scenes — no emotional reaction, no clock, no relational
+  // movement. The blow lands in a dramatic vacuum and the story absorbs it without
+  // ripple, making the reversal feel inert rather than pivotal.
+  if (records.length >= 6) {
+    for (let i = 0; i < records.length - 2; i++) {
+      if (records[i].suspenseDelta >= -1) continue;
+      const afterScenes = records.slice(i + 1, i + 3);
+      const isVacuum = afterScenes.length === 2 && afterScenes.every(a =>
+        a.emotionalShift === 'neutral' &&
+        !a.clockRaised &&
+        (a.relationshipShifts ?? []).every(s => Math.abs(s.amount) < 0.3) &&
+        a.suspenseDelta <= 1,
+      );
+      if (isVacuum) {
+        issues.push({
+          location: `Scene ${records[i].sceneIdx} (reversal)`,
+          rule: 'REVERSAL_WITHOUT_CONSEQUENCE',
+          description: `The reversal at Scene ${records[i].sceneIdx} (suspense drop: ${records[i].suspenseDelta.toFixed(1)}) lands in a dramatic vacuum — the next two scenes are emotionally flat with no clock, no relationship impact, and no causal reaction.`,
+          severity: 'minor',
+          suggestedFix: 'A reversal must ripple forward: the scene after a reversal should register its impact through emotional reaction, relationship strain, or an accelerating clock. Let the hit land.',
+        });
+        break;
+      }
+    }
+  }
+
+  // CONFLICT_ACT1_ABSENT: The entire Act 1 (first 25%) contains no conflict
+  // signal — no clock raised, no reversal-level suspense, no negative relationship
+  // shift. The story opens without any tension hook; the audience has nothing at
+  // stake and no reason to fear loss.
+  if (records.length >= 8) {
+    const act1End = Math.floor(records.length * 0.25);
+    const act1Records = records.slice(0, act1End);
+    if (act1Records.length >= 2) {
+      const hasConflictHook = act1Records.some(r =>
+        r.clockRaised ||
+        r.suspenseDelta > 2 ||
+        (r.relationshipShifts ?? []).some(s => s.amount < -0.3),
+      );
+      if (!hasConflictHook) {
+        issues.push({
+          location: `Act 1 (Scenes 0–${act1End - 1})`,
+          rule: 'CONFLICT_ACT1_ABSENT',
+          description: `Act 1 (${act1Records.length} scenes) contains no conflict signal: no clock raised, no reversal, no negative relationship shift. The story opens without tension — the audience has nothing at stake from the start.`,
+          severity: 'major',
+          suggestedFix: 'Introduce a conflict signal in the first 25%: raise a clock, create a minor relational rupture, or plant a threat. The opening must establish what the protagonist stands to lose before the audience will care about saving it.',
+        });
+      }
+    }
+  }
+
+  // CONFLICT_CONVERGENCE_ABSENT: Multiple active relational conflicts (≥2 distinct
+  // negative-shift pairKeys) and a clock pressure exist throughout the story but
+  // never intersect in the same scene. The threads run in parallel without the
+  // explosive convergence that creates a true dramatic peak — the story fragments
+  // its tension instead of detonating it.
+  if (records.length >= 10) {
+    const negPairKeys = new Set<string>();
+    for (const r of records) {
+      for (const shift of r.relationshipShifts ?? []) {
+        if (shift.amount < -0.3) negPairKeys.add(shift.pairKey);
+      }
+    }
+    const hasClockAnywhere = records.some(r => r.clockRaised);
+    if (negPairKeys.size >= 2 && hasClockAnywhere) {
+      const hasConvergence = records.some(r =>
+        r.clockRaised && (r.relationshipShifts ?? []).some(s => s.amount < -0.3),
+      );
+      if (!hasConvergence) {
+        issues.push({
+          location: 'Conflict architecture',
+          rule: 'CONFLICT_CONVERGENCE_ABSENT',
+          description: `${negPairKeys.size} active relational conflicts and a clock pressure run in parallel throughout the story but never meet in a single scene. The threads fragment the tension instead of converging into one explosive confrontation.`,
+          severity: 'major',
+          suggestedFix: 'Design a scene where the deadline and the relational conflict collide simultaneously — a clock that forces opposing characters into the same room where they cannot avoid confrontation. Convergence is what turns multiple conflicts into a climax.',
+        });
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'conflict', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

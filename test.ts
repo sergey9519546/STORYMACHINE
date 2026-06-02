@@ -14130,6 +14130,397 @@ He sits down in the chair.
     });
   });
 
+  describe('Wave 184 — rhythmPass: abstract noun overload, filler gestures, gerund fragments', async () => {
+    const blankRec = (idx: number): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [], payoffSetupIds: [],
+      visualBeats: [], relationshipShifts: [],
+    });
+
+    // ABSTRACT_NOUN_OVERLOAD — fires
+    it('ABSTRACT_NOUN_OVERLOAD fires when >30% of action lines name psychological states', async () => {
+      const fountain = `INT. OFFICE - DAY
+Her feeling of grief is overwhelming.
+
+She stares at the wall.
+
+The longing in her eyes is unmistakable.
+
+She sits down.
+
+His anxiety fills the room.
+
+He straightens his tie.
+
+Her despair builds as the silence continues.
+
+She looks away.
+
+He fidgets with his pen.
+
+She opens the window.
+`;
+      const result = await rhythmPass({ fountain, original: fountain, records: [blankRec(0)], structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        result.issues.some(i => i.rule === 'ABSTRACT_NOUN_OVERLOAD'),
+        `Expected ABSTRACT_NOUN_OVERLOAD, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // ABSTRACT_NOUN_OVERLOAD — no-fire
+    it('ABSTRACT_NOUN_OVERLOAD does not fire when action lines are concrete', async () => {
+      const fountain = `INT. OFFICE - DAY
+She grips the pen until her knuckles whiten.
+
+He crosses to the window and pushes it open.
+
+She tears the letter in half.
+
+He stacks the files into a neat tower.
+
+The tower collapses.
+
+She sweeps it off the desk.
+
+He watches from the doorway.
+
+She leaves without looking back.
+`;
+      const result = await rhythmPass({ fountain, original: fountain, records: [blankRec(0)], structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'ABSTRACT_NOUN_OVERLOAD'),
+        `Expected no ABSTRACT_NOUN_OVERLOAD, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // FILLER_GESTURE_EXCESS — fires
+    it('FILLER_GESTURE_EXCESS fires when filler gestures exceed threshold', async () => {
+      const fountain = `INT. KITCHEN - DAY
+Alice nods.
+
+She sighs and looks away.
+
+He shrugs.
+
+She nods again.
+
+He fidgets with his keys.
+
+She sighs once more.
+
+He shrugs and steps back.
+
+She pours a glass of water.
+`;
+      const result = await rhythmPass({ fountain, original: fountain, records: [blankRec(0)], structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        result.issues.some(i => i.rule === 'FILLER_GESTURE_EXCESS'),
+        `Expected FILLER_GESTURE_EXCESS, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // FILLER_GESTURE_EXCESS — no-fire
+    it('FILLER_GESTURE_EXCESS does not fire when gestures are rare', async () => {
+      const fountain = `INT. KITCHEN - DAY
+Alice pours coffee into a cracked mug.
+
+She sets it down without drinking.
+
+He pulls a chair out and sits.
+
+She opens the refrigerator, stares inside, closes it.
+
+He nods.
+
+She slides the envelope across the table.
+
+He picks it up and reads.
+
+She leaves.
+`;
+      const result = await rhythmPass({ fountain, original: fountain, records: [blankRec(0)], structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'FILLER_GESTURE_EXCESS'),
+        `Expected no FILLER_GESTURE_EXCESS, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // GERUND_FRAGMENT_CHAIN — fires
+    it('GERUND_FRAGMENT_CHAIN fires when >30% of action lines start with gerunds', async () => {
+      const fountain = `INT. CORRIDOR - NIGHT
+Walking toward the exit.
+
+Pushing the door open.
+
+Running down the stairs.
+
+Reaching for her phone.
+
+She dials a number.
+
+Waiting for an answer.
+
+Pressing herself against the wall.
+
+She holds her breath.
+
+Looking back over her shoulder.
+
+She keeps moving.
+`;
+      const result = await rhythmPass({ fountain, original: fountain, records: [blankRec(0)], structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        result.issues.some(i => i.rule === 'GERUND_FRAGMENT_CHAIN'),
+        `Expected GERUND_FRAGMENT_CHAIN, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // GERUND_FRAGMENT_CHAIN — no-fire
+    it('GERUND_FRAGMENT_CHAIN does not fire when gerund fragments are rare', async () => {
+      const fountain = `INT. CORRIDOR - NIGHT
+She walks toward the exit.
+
+He pushes the door open.
+
+She runs down the stairs.
+
+He reaches for his phone.
+
+She dials a number.
+
+He waits for an answer.
+
+She presses herself against the wall.
+
+Running now, she turns the corner.
+`;
+      const result = await rhythmPass({ fountain, original: fountain, records: [blankRec(0)], structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'GERUND_FRAGMENT_CHAIN'),
+        `Expected no GERUND_FRAGMENT_CHAIN, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+  });
+
+  describe('Wave 183 — conflictPass: reversal vacuum, Act 1 conflict absent, convergence absent', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const baseStructure = {
+      escalating: true, reversalDensity: 0.1, openClues: 0, completionPercent: 50,
+      avgSuspensePerScene: 1, approachingClimax: false, actPosition: 'act2a' as const,
+      midpointPressure: 2, tightestScene: null, reversalCount: 1,
+    };
+
+    // REVERSAL_WITHOUT_CONSEQUENCE — fires
+    it('REVERSAL_WITHOUT_CONSEQUENCE fires when reversal is followed by two flat scenes', async () => {
+      const records = [
+        makeRec(0), makeRec(1), makeRec(2),
+        makeRec(3, { suspenseDelta: -2 }), // reversal
+        makeRec(4), // flat aftermath
+        makeRec(5), // flat aftermath
+        makeRec(6), makeRec(7),
+      ];
+      const original = records.map((_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+      const result = await conflictPass({ fountain: original, records, original, structure: baseStructure as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        result.issues.some(i => i.rule === 'REVERSAL_WITHOUT_CONSEQUENCE'),
+        `Expected REVERSAL_WITHOUT_CONSEQUENCE, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // REVERSAL_WITHOUT_CONSEQUENCE — no-fire
+    it('REVERSAL_WITHOUT_CONSEQUENCE does not fire when reversal triggers an emotional reaction', async () => {
+      const records = [
+        makeRec(0), makeRec(1), makeRec(2),
+        makeRec(3, { suspenseDelta: -2 }), // reversal
+        makeRec(4, { emotionalShift: 'negative' }), // reaction — not flat
+        makeRec(5), makeRec(6), makeRec(7),
+      ];
+      const original = records.map((_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+      const result = await conflictPass({ fountain: original, records, original, structure: baseStructure as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'REVERSAL_WITHOUT_CONSEQUENCE'),
+        `Expected no REVERSAL_WITHOUT_CONSEQUENCE, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // CONFLICT_ACT1_ABSENT — fires
+    it('CONFLICT_ACT1_ABSENT fires when no conflict signal exists in Act 1', async () => {
+      // n=12: act1 = scenes 0-2 (floor(12*0.25)=3)
+      const records = Array.from({ length: 12 }, (_, i) => makeRec(i));
+      const original = records.map((_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+      const result = await conflictPass({ fountain: original, records, original, structure: baseStructure as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        result.issues.some(i => i.rule === 'CONFLICT_ACT1_ABSENT'),
+        `Expected CONFLICT_ACT1_ABSENT, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // CONFLICT_ACT1_ABSENT — no-fire
+    it('CONFLICT_ACT1_ABSENT does not fire when Act 1 has a clock hook', async () => {
+      const records = Array.from({ length: 12 }, (_, i) => makeRec(i, {
+        clockRaised: i === 1,
+      }));
+      const original = records.map((_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+      const result = await conflictPass({ fountain: original, records, original, structure: baseStructure as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'CONFLICT_ACT1_ABSENT'),
+        `Expected no CONFLICT_ACT1_ABSENT, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // CONFLICT_CONVERGENCE_ABSENT — fires
+    it('CONFLICT_CONVERGENCE_ABSENT fires when relational conflicts and clock never share a scene', async () => {
+      const records = Array.from({ length: 12 }, (_, i) => makeRec(i, {
+        relationshipShifts:
+          i === 2 ? [{ pairKey: 'alice|bob', dimension: 'trust', amount: -0.5 }] :
+          i === 4 ? [{ pairKey: 'carol|dan', dimension: 'power', amount: -0.6 }] : [],
+        clockRaised: i === 7,
+      }));
+      const original = records.map((_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+      const result = await conflictPass({ fountain: original, records, original, structure: baseStructure as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        result.issues.some(i => i.rule === 'CONFLICT_CONVERGENCE_ABSENT'),
+        `Expected CONFLICT_CONVERGENCE_ABSENT, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // CONFLICT_CONVERGENCE_ABSENT — no-fire
+    it('CONFLICT_CONVERGENCE_ABSENT does not fire when a scene contains both clock and neg shift', async () => {
+      const records = Array.from({ length: 12 }, (_, i) => makeRec(i, {
+        relationshipShifts:
+          i === 2 ? [{ pairKey: 'alice|bob', dimension: 'trust', amount: -0.5 }] :
+          i === 4 ? [{ pairKey: 'carol|dan', dimension: 'power', amount: -0.6 }] : [],
+        // Scene 7 has BOTH clock and neg shift → convergence
+        clockRaised: i === 7,
+      })).map((r, i) => i === 7
+        ? { ...r, clockRaised: true, relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: -0.4 }] }
+        : r,
+      );
+      const original = records.map((_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+      const result = await conflictPass({ fountain: original, records, original, structure: baseStructure as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'CONFLICT_CONVERGENCE_ABSENT'),
+        `Expected no CONFLICT_CONVERGENCE_ABSENT, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+  });
+
+  describe('Wave 182 — characterArcPass: arc stall in Act 2, secondary arc mirror, climax void', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+
+    // ARC_STALL_IN_ACT2 — fires
+    it('ARC_STALL_IN_ACT2 fires when all Act 2 scenes (25%-75%) are emotionally neutral', async () => {
+      // n=10: act2 = indices 2-6 (floor(10*0.25)=2, floor(10*0.75)=7)
+      const records = Array.from({ length: 10 }, (_, i) => makeRec(i, {
+        emotionalShift: (i === 0 || i === 1 || i >= 7) ? 'positive' : 'neutral',
+      }));
+      const original = Array.from({ length: 10 }, (_, i) => `INT. SC${i} - DAY\n\nAction.\n\n`).join('\n');
+      const result = await characterArcPass({ fountain: original, records, original, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        result.issues.some(i => i.rule === 'ARC_STALL_IN_ACT2'),
+        `Expected ARC_STALL_IN_ACT2, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // ARC_STALL_IN_ACT2 — no-fire
+    it('ARC_STALL_IN_ACT2 does not fire when Act 2 has an emotional beat', async () => {
+      const records = Array.from({ length: 10 }, (_, i) => makeRec(i, {
+        emotionalShift: i === 4 ? 'negative' : 'neutral',
+      }));
+      const original = Array.from({ length: 10 }, (_, i) => `INT. SC${i} - DAY\n\nAction.\n\n`).join('\n');
+      const result = await characterArcPass({ fountain: original, records, original, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'ARC_STALL_IN_ACT2'),
+        `Expected no ARC_STALL_IN_ACT2, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // SECONDARY_ARC_MIRROR — fires
+    it('SECONDARY_ARC_MIRROR fires when two secondaries share same-direction net arc', async () => {
+      // alice|bob and alice|carol both positive → alice, bob, carol all have positive nets
+      // dan has most cues (4) so is the protagonist proxy
+      const records = Array.from({ length: 8 }, (_, i) => makeRec(i, {
+        relationshipShifts: i < 4
+          ? [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.5 },
+             { pairKey: 'alice|carol', dimension: 'trust', amount: 0.4 }]
+          : [],
+      }));
+      const fountain182 = ['INT. SCENE - DAY', 'DAN', 'Hello.', 'DAN', 'Hi.', 'DAN', 'Bye.',
+        'DAN', 'Okay.', 'ALICE', 'Sure.', 'BOB', 'Right.', 'CAROL', 'Yes.'].join('\n');
+      const result = await characterArcPass({ fountain: fountain182, records, original: fountain182, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        result.issues.some(i => i.rule === 'SECONDARY_ARC_MIRROR'),
+        `Expected SECONDARY_ARC_MIRROR, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // SECONDARY_ARC_MIRROR — no-fire
+    it('SECONDARY_ARC_MIRROR does not fire when secondaries have opposing arc directions', async () => {
+      // alice net positive, carol net negative → opposite directions, no mirror
+      const records = Array.from({ length: 8 }, (_, i) => makeRec(i, {
+        relationshipShifts: i < 4
+          ? [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.5 },
+             { pairKey: 'carol|bob', dimension: 'trust', amount: -0.5 }]
+          : [],
+      }));
+      const fountain182 = ['INT. SCENE - DAY', 'DAN', 'Hello.', 'DAN', 'Hi.', 'DAN', 'Bye.',
+        'DAN', 'Okay.', 'ALICE', 'Sure.', 'BOB', 'Right.', 'CAROL', 'Yes.'].join('\n');
+      const result = await characterArcPass({ fountain: fountain182, records, original: fountain182, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'SECONDARY_ARC_MIRROR'),
+        `Expected no SECONDARY_ARC_MIRROR, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // ARC_CLIMAX_VOID — fires
+    it('ARC_CLIMAX_VOID fires when the climax scene is emotionally hollow', async () => {
+      const records = Array.from({ length: 8 }, (_, i) => makeRec(i, {
+        purpose: i === 6 ? 'climax' : 'dialogue',
+        emotionalShift: 'neutral',
+        relationshipShifts: [],
+        revelation: null,
+      }));
+      const original = Array.from({ length: 8 }, (_, i) => `INT. SC${i} - DAY\n\nAction.\n\n`).join('\n');
+      const result = await characterArcPass({ fountain: original, records, original, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        result.issues.some(i => i.rule === 'ARC_CLIMAX_VOID'),
+        `Expected ARC_CLIMAX_VOID, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // ARC_CLIMAX_VOID — no-fire
+    it('ARC_CLIMAX_VOID does not fire when the climax scene has emotional charge', async () => {
+      const records = Array.from({ length: 8 }, (_, i) => makeRec(i, {
+        purpose: i === 6 ? 'climax' : 'dialogue',
+        emotionalShift: i === 6 ? 'positive' : 'neutral',
+        relationshipShifts: [],
+        revelation: null,
+      }));
+      const original = Array.from({ length: 8 }, (_, i) => `INT. SC${i} - DAY\n\nAction.\n\n`).join('\n');
+      const result = await characterArcPass({ fountain: original, records, original, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'ARC_CLIMAX_VOID'),
+        `Expected no ARC_CLIMAX_VOID, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
