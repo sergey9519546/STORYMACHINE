@@ -10932,6 +10932,131 @@ Alice fidgets with her coffee cup, watching the steam rise. She doesn't blink.
     });
   });
 
+  // ── Wave 148: Theme pass enhancements ─────────────────────────────────────
+  describe('Wave 148 — themePass: heavy-handedness, dialectic, front-loading', async () => {
+    const makeFountain = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA scene.\n`).join('\n');
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral',
+      suspenseDelta: 1, dialogueHighlights: [],
+      unresolvedClues: [], seededClueIds: [], payoffSetupIds: [],
+      visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+
+    it('themePass detects THEME_HEAVY_HANDED when one scene repeats theme words 3x avg', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // Scene 1 is heavy-handed: "betrayal" repeated many times across fountain text + dialogue
+      const heavyFountainBlock = `INT. SC1 - DAY
+betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
+`;
+      const normalScene = (i: number) => `INT. SC${i} - DAY\nA scene.\n`;
+      const fountain = normalScene(0) + '\n' + heavyFountainBlock + '\n' +
+        Array.from({ length: 4 }, (_, i) => normalScene(i + 2)).join('\n');
+      const records = [
+        makeRec(0),
+        // dialogue highlights also repeat the keyword so total > 6 and > 3x avg
+        makeRec(1, { dialogueHighlights: ['alice: betrayal betrayal betrayal betrayal betrayal'] }),
+        makeRec(2), makeRec(3), makeRec(4), makeRec(5),
+      ];
+      const result = await themePass({
+        fountain, original: fountain,
+        records: records as any, structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'betrayal destroys trust' },
+      });
+      const heavy = result.issues.filter(i => i.rule === 'THEME_HEAVY_HANDED');
+      assert.ok(heavy.length >= 1, 'Should detect THEME_HEAVY_HANDED when scene repeats theme words far above average');
+      assert.ok(heavy[0].severity === 'major');
+    });
+
+    it('themePass detects THEME_NO_DIALECTIC when all resonant scenes are positive', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // All resonant scenes are emotionally neutral/positive — theme is never challenged
+      const fountain = Array.from({ length: 6 }, (_, i) => `INT. SC${i} - DAY\ntruth honesty trust\n`).join('\n');
+      const records = [
+        makeRec(0, { emotionalShift: 'positive', suspenseDelta: 1.5, dialogueHighlights: ['alice: truth matters'] }),
+        makeRec(1, { emotionalShift: 'positive', suspenseDelta: 1.0, dialogueHighlights: ['bob: honesty wins'] }),
+        makeRec(2, { emotionalShift: 'neutral',  suspenseDelta: 0.5, dialogueHighlights: ['charlie: trust each other'] }),
+        makeRec(3, { emotionalShift: 'positive', suspenseDelta: 1.5, dialogueHighlights: ['alice: truth sets free'] }),
+        makeRec(4, { emotionalShift: 'positive', suspenseDelta: 1.0, dialogueHighlights: ['bob: honest always'] }),
+        makeRec(5, { emotionalShift: 'neutral',  suspenseDelta: 0.5, dialogueHighlights: ['charlie: trust builds'] }),
+      ];
+      const result = await themePass({
+        fountain, original: fountain,
+        records: records as any, structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'truth sets you free' },
+      });
+      const dialectic = result.issues.filter(i => i.rule === 'THEME_NO_DIALECTIC');
+      assert.ok(dialectic.length >= 1, 'Should detect THEME_NO_DIALECTIC when theme is never challenged');
+      assert.ok(dialectic[0].severity === 'major');
+    });
+
+    it('themePass does NOT fire THEME_NO_DIALECTIC when a resonant scene has negative shift', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const fountain = Array.from({ length: 6 }, (_, i) => `INT. SC${i} - DAY\ntruth honesty\n`).join('\n');
+      const records = [
+        makeRec(0, { emotionalShift: 'positive',  suspenseDelta: 1.5, dialogueHighlights: ['alice: truth matters'] }),
+        makeRec(1, { emotionalShift: 'positive',  suspenseDelta: 1.0, dialogueHighlights: ['bob: honesty wins'] }),
+        makeRec(2, { emotionalShift: 'negative',  suspenseDelta: -2.0, dialogueHighlights: ['charlie: truth costs everything'] }), // challenge
+        makeRec(3, { emotionalShift: 'positive',  suspenseDelta: 1.5, dialogueHighlights: ['alice: truth sets free'] }),
+        makeRec(4, { emotionalShift: 'positive',  suspenseDelta: 1.0, dialogueHighlights: ['bob: honest always'] }),
+        makeRec(5, { emotionalShift: 'neutral',   suspenseDelta: 0.5, dialogueHighlights: ['charlie: trust builds'] }),
+      ];
+      const result = await themePass({
+        fountain, original: fountain,
+        records: records as any, structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'truth sets you free' },
+      });
+      const dialectic = result.issues.filter(i => i.rule === 'THEME_NO_DIALECTIC');
+      assert.ok(dialectic.length === 0, 'Should NOT fire when theme has a challenging negative scene');
+    });
+
+    it('themePass detects THEME_FRONT_LOADED when theme fades after opening third', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // Opening: dense theme language. Rest: completely absent.
+      const denseOpen = Array.from({ length: 2 }, (_, i) =>
+        `INT. SC${i} - DAY\npower corruption power corrupts powerful corrupt corruption\n`,
+      ).join('\n');
+      const silentRest = Array.from({ length: 4 }, (_, i) =>
+        `INT. SC${i + 2} - DAY\nA scene.\n`,
+      ).join('\n');
+      const fountain = denseOpen + '\n' + silentRest;
+      const records = [
+        makeRec(0, { dialogueHighlights: ['alice: power corrupts corrupt powerful corruption'] }),
+        makeRec(1, { dialogueHighlights: ['bob: corrupt powerful power corruption corrupted'] }),
+        makeRec(2), makeRec(3), makeRec(4), makeRec(5),
+      ];
+      const result = await themePass({
+        fountain, original: fountain,
+        records: records as any, structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'power corrupts absolutely' },
+      });
+      const frontLoaded = result.issues.filter(i => i.rule === 'THEME_FRONT_LOADED');
+      assert.ok(frontLoaded.length >= 1, 'Should detect THEME_FRONT_LOADED when theme fades after opening');
+      assert.ok(frontLoaded[0].severity === 'major');
+    });
+
+    it('themePass does NOT fire THEME_FRONT_LOADED when theme is distributed evenly', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // Theme language spread across all scenes
+      const fountain = Array.from({ length: 6 }, (_, i) =>
+        `INT. SC${i} - DAY\npower corruption\n`,
+      ).join('\n');
+      const records = Array.from({ length: 6 }, (_, i) =>
+        makeRec(i, { dialogueHighlights: [`char: power corrupts`] }),
+      );
+      const result = await themePass({
+        fountain, original: fountain,
+        records: records as any, structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'power corrupts absolutely' },
+      });
+      const frontLoaded = result.issues.filter(i => i.rule === 'THEME_FRONT_LOADED');
+      assert.ok(frontLoaded.length === 0, 'Should NOT fire when theme is evenly distributed');
+    });
+  });
+
   it('showrunner fires for set_up_payoff scene with no SEED_CLUE or PAYOFF_SETUP op', async () => {
     const { showrunnerCritic } = await import('./server/nvm/room/critics/showrunner.ts');
     const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {

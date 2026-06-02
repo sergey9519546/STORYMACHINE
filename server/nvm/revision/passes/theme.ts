@@ -7,6 +7,9 @@
 // It checks two failure modes:
 //   1. THEME_RESONANCE_GAP — too many scenes have zero language related to the theme
 //   2. THEME_UNRESOLVED   — Act 3 contains no thematic language (climax fails to answer)
+// Wave 148 additions: theme craft — heavy-handedness (too dense/preachy),
+// dialectic absence (theme asserted but never challenged), and front-loading
+// (theme dumped early then abandoned).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -169,6 +172,101 @@ export async function themePass(input: PassInput): Promise<PassResult> {
       suggestedFix:
         `Ensure that the story's dialogue and action consistently echo, test, and ultimately resolve the declared theme.`,
     });
+  }
+
+  // ── Wave 148: Theme craft — heavy-handedness, dialectic, front-loading ──────
+  // These only run when the theme IS resonating (not orphaned); they measure HOW
+  // well the theme is woven, not just whether it's present.
+  if (silentScenes.length < records.length) {
+    // Per-scene keyword density: count keyword hits per scene.
+    const sceneHitCounts = new Map<number, number>();
+    for (const r of records) {
+      const text = sceneTexts.get(r.sceneIdx) ?? '';
+      let hits = 0;
+      for (const forms of expandedKeywords) {
+        for (const form of forms) {
+          // Count occurrences of each form
+          let pos = text.indexOf(form);
+          while (pos !== -1) { hits++; pos = text.indexOf(form, pos + form.length); }
+        }
+      }
+      sceneHitCounts.set(r.sceneIdx, hits);
+    }
+
+    // THEME_HEAVY_HANDED — a scene repeats theme keywords so densely it becomes
+    // preachy/on-the-nose. We flag scenes where keyword hits are ≥6 AND more than
+    // 3x the average per-scene hit count — the theme is being hammered, not woven.
+    const totalHits = [...sceneHitCounts.values()].reduce((s, v) => s + v, 0);
+    const avgHits = totalHits / Math.max(records.length, 1);
+    for (const r of records) {
+      const hits = sceneHitCounts.get(r.sceneIdx) ?? 0;
+      if (hits >= 6 && hits > avgHits * 3 && avgHits > 0) {
+        issues.push({
+          location: `Scene ${r.sceneIdx} (${r.slug})`,
+          rule: 'THEME_HEAVY_HANDED',
+          description:
+            `Scene ${r.sceneIdx} repeats theme language ${hits} times (${(hits / avgHits).toFixed(1)}x the story average) — the theme "${themeRaw}" is stated on-the-nose rather than dramatized through subtext`,
+          severity: 'major',
+          suggestedFix:
+            `Cut explicit theme statements in this scene. Let one image or action carry the meaning instead of having characters articulate it directly. Theme lands hardest when implied.`,
+        });
+        break; // one heavy-handed flag per pass to avoid noise
+      }
+    }
+
+    // THEME_NO_DIALECTIC — the theme is echoed throughout but never CHALLENGED.
+    // A theme without a counterargument is propaganda. We approximate the presence
+    // of a counterargument by checking whether any thematic scene also carries a
+    // negative emotional shift or a reversal (suspenseDelta < -1) — i.e. a moment
+    // where the theme's value is questioned or fails the character. If every
+    // theme-resonant scene is emotionally neutral/positive, the theme is unchallenged.
+    const resonantScenes = records.filter(r =>
+      sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+    );
+    if (resonantScenes.length >= 3) {
+      const hasChallenge = resonantScenes.some(r =>
+        r.emotionalShift === 'negative' || r.suspenseDelta < -1,
+      );
+      if (!hasChallenge) {
+        issues.push({
+          location: 'Thematic arc',
+          rule: 'THEME_NO_DIALECTIC',
+          description:
+            `The theme "${themeRaw}" is echoed in ${resonantScenes.length} scenes but never challenged — no thematic scene carries a negative turn or reversal. A theme that is only ever affirmed feels like a lecture, not a question.`,
+          severity: 'major',
+          suggestedFix:
+            `Add a scene where the theme's value is tested and appears to fail — a moment where honesty backfires, love costs too much, or the protagonist's belief is genuinely shaken. The strongest themes survive their own counterargument.`,
+        });
+      }
+    }
+
+    // THEME_FRONT_LOADED — theme keywords cluster heavily in the first third then
+    // fade. The story introduces its theme as a thesis statement but stops
+    // dramatizing it. We compare resonance density in the first third vs the rest.
+    if (records.length >= 6) {
+      const third = Math.floor(records.length / 3);
+      const firstThirdHits = records.slice(0, third)
+        .reduce((s, r) => s + (sceneHitCounts.get(r.sceneIdx) ?? 0), 0);
+      const restHits = records.slice(third)
+        .reduce((s, r) => s + (sceneHitCounts.get(r.sceneIdx) ?? 0), 0);
+      const firstThirdScenes = third;
+      const restScenes = records.length - third;
+      const firstThirdDensity = firstThirdHits / Math.max(firstThirdScenes, 1);
+      const restDensity = restHits / Math.max(restScenes, 1);
+
+      // Front-loaded if the opening is dense (≥2 hits/scene) but the rest fades to <40% of that
+      if (firstThirdDensity >= 2 && restDensity < firstThirdDensity * 0.4) {
+        issues.push({
+          location: 'Thematic distribution',
+          rule: 'THEME_FRONT_LOADED',
+          description:
+            `The theme "${themeRaw}" is densely stated in the opening third (${firstThirdDensity.toFixed(1)} hits/scene) but fades to ${restDensity.toFixed(1)} hits/scene afterward — the story announces its theme then abandons dramatizing it`,
+          severity: 'major',
+          suggestedFix:
+            `Distribute theme touchpoints evenly. Rather than front-loading the thematic statement, let the theme deepen and complicate as the story progresses, paying off strongest at the climax.`,
+        });
+      }
+    }
   }
 
   const { revised, usedLLM } = await rewritePass({
