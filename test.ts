@@ -15003,3 +15003,188 @@ describe('Wave 134 — Relationship Arc Pass', () => {
   });
 
 });
+
+// ── Wave 135: Dialogue Subtext Level 2 ───────────────────────────────────────
+
+describe('Wave 135 — dialoguePass: Level 2 subtext analysis', () => {
+
+  function makeDialogueInput(fountain: string, records: import('./server/nvm/screenplay/memory.ts').ScreenplaySceneRecord[]): import('./server/nvm/revision/passes/types.ts').PassInput {
+    return {
+      fountain,
+      original: fountain,
+      annotations: [],
+      structure: {
+        actPosition: 'act1',
+        completionPercent: 0,
+        midpointReached: false,
+        act2Tension: 0,
+        totalClockPressure: 0,
+        reversalCount: 0,
+        revelationCount: 0,
+      },
+      records,
+      approvedSpans: [],
+      storyContext: undefined,
+    };
+  }
+
+  it('EMOTIONAL_SUPPRESSION fires when a speaker uses ≥60% positive vocab in a negative-shift scene', async () => {
+    const fountain = `INT. HOSPITAL - DAY
+
+ALICE
+Everything's fine, really.
+
+ALICE
+I'm okay, don't worry.
+
+ALICE
+It's going to be fine, no problem.
+
+BOB
+Are you sure?
+`;
+    const records: import('./server/nvm/screenplay/memory.ts').ScreenplaySceneRecord[] = [
+      makeSceneRecord({ sceneIdx: 0, emotionalShift: 'negative' }),
+    ];
+    const result = await dialoguePass(makeDialogueInput(fountain, records));
+    assert.ok(
+      result.issues.some(i => i.rule === 'EMOTIONAL_SUPPRESSION'),
+      'EMOTIONAL_SUPPRESSION should fire when speaker denies a negative-shift scene',
+    );
+  });
+
+  it('EMOTIONAL_SUPPRESSION does NOT fire when speaker has fewer than 3 lines', async () => {
+    const fountain = `INT. HOSPITAL - DAY
+
+ALICE
+Everything's fine.
+
+ALICE
+I'm okay.
+
+BOB
+Okay.
+`;
+    const records: import('./server/nvm/screenplay/memory.ts').ScreenplaySceneRecord[] = [
+      makeSceneRecord({ sceneIdx: 0, emotionalShift: 'negative' }),
+    ];
+    const result = await dialoguePass(makeDialogueInput(fountain, records));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'EMOTIONAL_SUPPRESSION'),
+      'EMOTIONAL_SUPPRESSION should not fire with fewer than 3 lines per speaker',
+    );
+  });
+
+  it('POWER_SILENCE fires when one speaker > 70% of lines in a large-relationship-shift scene', async () => {
+    const fountain = `INT. COURTROOM - DAY
+
+ALICE
+I never agreed to that.
+
+ALICE
+You can't just do this.
+
+ALICE
+Listen to me, this isn't fair.
+
+ALICE
+Why won't you say anything?
+
+BOB
+Fine.
+`;
+    const records: import('./server/nvm/screenplay/memory.ts').ScreenplaySceneRecord[] = [
+      makeSceneRecord({ sceneIdx: 0, relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: -0.8 }] }),
+    ];
+    const result = await dialoguePass(makeDialogueInput(fountain, records));
+    assert.ok(
+      result.issues.some(i => i.rule === 'POWER_SILENCE'),
+      'POWER_SILENCE should fire when one speaker dominates in a relationship-shifting scene',
+    );
+  });
+
+  it('QUESTION_DODGE fires when a direct question is followed by an unrelated response', async () => {
+    const fountain = `INT. KITCHEN - DAY
+
+ALICE
+Where were you last night during the blackout?
+
+BOB
+These flowers look beautiful today.
+`;
+    const records: import('./server/nvm/screenplay/memory.ts').ScreenplaySceneRecord[] = [
+      makeSceneRecord({ sceneIdx: 0 }),
+    ];
+    const result = await dialoguePass(makeDialogueInput(fountain, records));
+    assert.ok(
+      result.issues.some(i => i.rule === 'QUESTION_DODGE'),
+      'QUESTION_DODGE should fire when the response ignores the question subject',
+    );
+  });
+
+  it('QUESTION_DODGE does NOT fire when the response addresses the question', async () => {
+    const fountain = `INT. KITCHEN - DAY
+
+ALICE
+Where were you last night during the blackout?
+
+BOB
+I was at the station during the blackout, working late.
+`;
+    const records: import('./server/nvm/screenplay/memory.ts').ScreenplaySceneRecord[] = [
+      makeSceneRecord({ sceneIdx: 0 }),
+    ];
+    const result = await dialoguePass(makeDialogueInput(fountain, records));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'QUESTION_DODGE'),
+      'QUESTION_DODGE should not fire when the response contains question subjects',
+    );
+  });
+
+  it('DENIAL_INVERSION fires when a strong negative is immediately followed by a forced positive', async () => {
+    const fountain = `INT. LIVING ROOM - NIGHT
+
+ALICE
+I can't believe she's gone.
+
+ALICE
+But everything will be fine, I'm okay.
+
+BOB
+We'll get through this.
+`;
+    const records: import('./server/nvm/screenplay/memory.ts').ScreenplaySceneRecord[] = [
+      makeSceneRecord({ sceneIdx: 0, emotionalShift: 'negative' }),
+    ];
+    const result = await dialoguePass(makeDialogueInput(fountain, records));
+    assert.ok(
+      result.issues.some(i => i.rule === 'DENIAL_INVERSION'),
+      'DENIAL_INVERSION should fire for strong-negative → forced-positive sequence',
+    );
+  });
+
+  it('passes clean dialogue with none of the Level 2 rules', async () => {
+    const fountain = `INT. CAFE - DAY
+
+ALICE
+You've been avoiding me.
+
+BOB
+I needed some space to think.
+
+ALICE
+About what?
+
+BOB
+About everything that happened at the marina.
+`;
+    const records: import('./server/nvm/screenplay/memory.ts').ScreenplaySceneRecord[] = [
+      makeSceneRecord({ sceneIdx: 0, emotionalShift: 'neutral' }),
+    ];
+    const result = await dialoguePass(makeDialogueInput(fountain, records));
+    const level2Rules = ['EMOTIONAL_SUPPRESSION', 'POWER_SILENCE', 'QUESTION_DODGE', 'DENIAL_INVERSION'];
+    const level2Issues = result.issues.filter(i => level2Rules.includes(i.rule));
+    assert.equal(level2Issues.length, 0, `clean dialogue should not trigger Level 2 rules, got: ${level2Issues.map(i => i.rule).join(', ')}`);
+  });
+
+});
