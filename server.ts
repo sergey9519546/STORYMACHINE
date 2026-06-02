@@ -10,6 +10,7 @@ import configRouter    from './server/routes/config.ts';
 import gameRouter      from './server/routes/game.ts';
 import scriptideRouter from './server/routes/scriptide.ts';
 import nvmRouter       from './server/routes/nvm.ts';
+import exportRouter    from './server/routes/export.ts';
 import { attachCollabServer } from './server/collab/yjs-server.ts';
 
 const AI_PROVIDER = process.env.AI_PROVIDER ?? 'gemini';
@@ -40,6 +41,7 @@ async function startServer() {
   app.use(gameRouter);
   app.use(scriptideRouter);
   app.use(nvmRouter);
+  app.use(exportRouter);
 
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.

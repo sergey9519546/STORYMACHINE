@@ -1,5 +1,5 @@
 // ProjectionGalleryPanel — G3 Holographic Projection UI.
-// One canon, every format. All 10 ProjectionTargets available on demand.
+// One canon, every format. All 10 ProjectionTargets + P2 export (FDX/DOCX/PDF).
 
 import React, { useState, useCallback } from 'react';
 
@@ -84,6 +84,37 @@ export function ProjectionGalleryPanel({ onClose }: Props) {
     URL.revokeObjectURL(url);
   }
 
+  // P2 export helpers — only shown when fountain content is loaded
+  async function exportFountainAs(format: 'fdx' | 'docx' | 'print-html') {
+    const artifact = artifacts['fountain'];
+    if (!artifact) return;
+    const body = JSON.stringify({ fountain: artifact.content, title: 'Screenplay' });
+    const headers = { 'Content-Type': 'application/json' };
+
+    if (format === 'print-html') {
+      // Open in new tab so browser PDF print kicks in
+      const res = await fetch('/api/export/print-html', { method: 'POST', headers, body });
+      if (!res.ok) return;
+      const html = await res.text();
+      const w = window.open('', '_blank');
+      if (w) { w.document.open(); w.document.write(html); w.document.close(); }
+      return;
+    }
+
+    const endpoint = format === 'fdx' ? '/api/export/fdx' : '/api/export/docx';
+    const ext = format === 'fdx' ? 'fdx' : 'docx';
+    const mime = format === 'fdx' ? 'application/xml' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const res = await fetch(endpoint, { method: 'POST', headers, body });
+    if (!res.ok) return;
+    const blob = new Blob([await res.arrayBuffer()], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `screenplay.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const currentTab = TABS.find(t => t.id === activeTab)!;
   const currentArtifact = artifacts[activeTab];
   const isLoading = loading[activeTab];
@@ -160,6 +191,13 @@ export function ProjectionGalleryPanel({ onClose }: Props) {
               <button onClick={() => downloadArtifact(currentTab, currentArtifact)} style={btnStyle('#065f46')}>
                 ↓ Download .{currentTab.ext}
               </button>
+              {activeTab === 'fountain' && (
+                <>
+                  <button onClick={() => exportFountainAs('fdx')} style={btnStyle('#1e3a5f')} title="Export as Final Draft FDX">↓ FDX</button>
+                  <button onClick={() => exportFountainAs('docx')} style={btnStyle('#1e3a5f')} title="Export as Microsoft Word DOCX">↓ DOCX</button>
+                  <button onClick={() => exportFountainAs('print-html')} style={btnStyle('#1e3a5f')} title="Open print view for PDF">⎙ PDF</button>
+                </>
+              )}
             </>
           )}
         </div>
