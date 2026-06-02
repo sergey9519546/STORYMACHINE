@@ -35,6 +35,16 @@ export function epistemicProof(ir: NarrativeTransitionIR, _state: NarrativeState
         subjectId: b.id,
       });
     }
+    // Inferred beliefs must not carry near-certainty confidence (>0.65).
+    // A deduction is inherently uncertain; confidence≥0.65 on an inferred belief
+    // treats speculation as fact — a psychological realism violation.
+    if (b.source === 'inferred' && b.confidence > 0.65) {
+      findings.push({
+        proof: 'EpistemicProof', severity: 'block',
+        message: `${op.charId} inferred belief "${b.proposition}" has confidence=${b.confidence.toFixed(2)} — inferred beliefs must have confidence ≤ 0.65 (they are deductions, not observations)`,
+        subjectId: b.id,
+      });
+    }
   }
   return findings.length
     ? failResult('EpistemicProof', 'a belief was acquired without legal provenance', findings)

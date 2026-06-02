@@ -3211,8 +3211,8 @@ describe('NVM — StoryOp vocabulary (decision 1)', () => {
 
 describe('NVM — 4-tier proof contract (decision 3)', () => {
   it('PROOF_TIERS covers every ProofName', () => {
-    // Wave 1: 24. Wave 3 B1 adds EarnedRevealProof → 25.
-    assert.equal(Object.keys(PROOF_TIERS).length, 25);
+    // Wave 1: 24. Wave 3 B1 adds EarnedRevealProof → 25. Wave 136 adds CharacterAgencyProof → 26.
+    assert.equal(Object.keys(PROOF_TIERS).length, 26);
   });
   it('Tier 1 has exactly 8 proofs (7 original + EarnedRevealProof)', () => {
     const tier1 = Object.entries(PROOF_TIERS).filter(([, t]) => t === 1);
@@ -5877,17 +5877,18 @@ describe('NVM — Tier 2 Proof Kernel (Wave 16)', () => {
     };
   }
 
-  it('runTier2 returns 5 ProofResults (necessity, specificity, dialogue, polarity, reincorporation)', () => {
+  it('runTier2 returns 6 ProofResults (necessity, specificity, dialogue, polarity, reincorporation, character-agency)', () => {
     const ir = minimalIR([
       { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'nora', predicate: 'hides', object: 'loan', addedAtTurn: 1, validFrom: 1, validTo: null } },
     ]);
     const results = runTier2(ir, emptyState());
-    assert.equal(results.length, 5);
+    assert.equal(results.length, 6);
     assert.ok(results.some(r => r.proof === 'NecessityProof'));
     assert.ok(results.some(r => r.proof === 'SpecificityProof'));
     assert.ok(results.some(r => r.proof === 'DialogueProof'));
     assert.ok(results.some(r => r.proof === 'PolarityProof'));
     assert.ok(results.some(r => r.proof === 'ReincorporationProof'));
+    assert.ok(results.some(r => r.proof === 'CharacterAgencyProof'));
   });
 
   it('tier2Score is 100 when all Tier 2 proofs pass', () => {
@@ -5929,7 +5930,7 @@ describe('NVM — Tier 2 Proof Kernel (Wave 16)', () => {
       { op: 'ADD_FACT', fact: { factId: 'g', subject: 'entity', predicate: 'causes', object: 'thing', addedAtTurn: 1, validFrom: 1, validTo: null } },
     ]);
     const results = runTier2(ir, emptyState());
-    const TIER2_NAMES = ['NecessityProof', 'SpecificityProof', 'DialogueProof', 'PolarityProof', 'ReincorporationProof'];
+    const TIER2_NAMES = ['NecessityProof', 'SpecificityProof', 'DialogueProof', 'PolarityProof', 'ReincorporationProof', 'CharacterAgencyProof'];
     assert.ok(results.every(r => TIER2_NAMES.includes(r.proof)));
   });
 });
@@ -6633,7 +6634,7 @@ describe('NVM — Proof Inspector endpoint logic (Wave 23)', () => {
     const t4 = runTier4(ir, state);
 
     assert.equal(t1.length, 8, '8 Tier 1 proofs');
-    assert.equal(t2.length, 5, '5 Tier 2 proofs');
+    assert.equal(t2.length, 6, '6 Tier 2 proofs');
     assert.equal(t3.length, 2, '2 Tier 3 proofs');
     assert.equal(t4.length, 2, '2 Tier 4 proofs');
     assert.ok(typeof tier2Score(t2) === 'number', 'tier2Score is number');
@@ -15003,6 +15004,116 @@ describe('Wave 134 — Relationship Arc Pass', () => {
   });
 
 });
+
+// ── Wave 136: CharacterAgencyProof + EpistemicProof inferred guard ────────────
+{
+  const { characterAgencyProof } = await import('./server/nvm/proof/tier2/character-agency.ts');
+  const { epistemicProof: epistemicProof136 } = await import('./server/nvm/proof/tier1/epistemic.ts');
+
+  const makeAgencyIR = (ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[], sceneIdx = 2): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR => ({
+    transitionId: 'agency-test', sceneIdx, sceneFunction: 'advance_plot',
+    activeMechanisms: ['discovery'], beforeStateHash: 'abc', ops,
+    preconditions: [{ id: 'p1', description: 'prior state', isMet: true }], postconditions: [],
+    provenance: { origin: 'user_authored', createdAt: Date.now() },
+  });
+
+  const makeEpistIR = (ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[]): import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR => ({
+    transitionId: 'epistemic-test', sceneIdx: 2, sceneFunction: 'advance_plot',
+    activeMechanisms: ['discovery'], beforeStateHash: 'abc', ops,
+    preconditions: [], postconditions: [],
+    provenance: { origin: 'user_authored', createdAt: Date.now() },
+  });
+
+  describe('Wave 136 — CharacterAgencyProof', () => {
+    it('passes when scene 0 has clock but no character response (establishment scene)', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'RAISE_CLOCK', clockId: 'ticking-bomb', amount: 3 },
+      ];
+      const result = characterAgencyProof(makeAgencyIR(ops, 0), emptyState());
+      assert.ok(result.pass, 'scene 0 is exempt from character agency check');
+    });
+
+    it('passes when no clock is raised', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'Alice', predicate: 'enters', object: 'the room', addedAtTurn: 1, validFrom: 1, validTo: null } },
+      ];
+      const result = characterAgencyProof(makeAgencyIR(ops, 3), emptyState());
+      assert.ok(result.pass, 'no clock → agency proof not triggered');
+    });
+
+    it('passes when clock delta ≤1 (atmospheric pressure)', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'RAISE_CLOCK', clockId: 'atmospheric', amount: 1 },
+      ];
+      const result = characterAgencyProof(makeAgencyIR(ops, 3), emptyState());
+      assert.ok(result.pass, 'clock delta ≤1 exempted as atmospheric');
+    });
+
+    it('passes when clock raised and character responds with a belief update', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'RAISE_CLOCK', clockId: 'deadline', amount: 2 },
+        { op: 'UPDATE_BELIEF', charId: 'Alice', belief: { id: 'b1', proposition: 'Time is running out', confidence: 0.8, source: 'witnessed', source_event_id: 'evt1', acquired_at: 2 } },
+      ];
+      const result = characterAgencyProof(makeAgencyIR(ops, 3), emptyState());
+      assert.ok(result.pass, 'clock + belief update → agency proven');
+    });
+
+    it('flags when clock delta >1 with no character response ops', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'RAISE_CLOCK', clockId: 'deadline', amount: 3 },
+        { op: 'ADD_FACT', fact: { factId: 'f2', subject: 'bomb', predicate: 'ticks', object: 'louder', addedAtTurn: 2, validFrom: 2, validTo: null } },
+      ];
+      const result = characterAgencyProof(makeAgencyIR(ops, 3), emptyState());
+      assert.ok(!result.pass, 'clock +3 with no character response → agency fail');
+      assert.equal(result.findings[0]?.proof, 'CharacterAgencyProof');
+      assert.equal(result.findings[0]?.severity, 'flag');
+    });
+
+    it('passes when clock raised and character expresses emotion', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'RAISE_CLOCK', clockId: 'deadline', amount: 2 },
+        { op: 'APPRAISE_EMOTION', charId: 'Alice', emotion: { joy: 0, distress: 50, anger: 0, fear: 60, pride: 0, shame: 0, dominant: 'fear', intensity: 60, last_updated_at: 2 } },
+      ];
+      const result = characterAgencyProof(makeAgencyIR(ops, 3), emptyState());
+      assert.ok(result.pass, 'clock + emotion op → agency proven');
+    });
+  });
+
+  describe('Wave 136 — EpistemicProof: inferred-belief confidence guard', () => {
+    it('blocks inferred belief with confidence 0.9 (over-certain deduction)', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'UPDATE_BELIEF', charId: 'Alice', belief: { id: 'b1', proposition: 'Bob is the killer', confidence: 0.9, source: 'inferred', acquired_at: 2 } },
+      ];
+      const result = epistemicProof136(makeEpistIR(ops), emptyState());
+      assert.ok(!result.pass, 'inferred belief with confidence=0.9 should fail');
+      assert.ok(result.findings.some(f => f.message.includes('inferred') && f.message.includes('0.90')), 'finding mentions inferred + confidence value');
+    });
+
+    it('allows inferred belief with confidence 0.5 (appropriate uncertainty)', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'UPDATE_BELIEF', charId: 'Alice', belief: { id: 'b2', proposition: 'Bob may have been there', confidence: 0.5, source: 'inferred', acquired_at: 2 } },
+      ];
+      const result = epistemicProof136(makeEpistIR(ops), emptyState());
+      assert.ok(result.pass, 'inferred belief with confidence=0.5 should pass');
+    });
+
+    it('allows witnessed belief with high confidence (observations can be certain)', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'UPDATE_BELIEF', charId: 'Alice', belief: { id: 'b3', proposition: 'I saw Bob leave', confidence: 0.95, source: 'witnessed', source_event_id: 'evt1', acquired_at: 2 } },
+      ];
+      const result = epistemicProof136(makeEpistIR(ops), emptyState());
+      assert.ok(result.pass, 'witnessed belief with high confidence is valid');
+    });
+
+    it('allows inferred belief exactly at 0.65 boundary', () => {
+      const ops: import('./server/nvm/ops/StoryOp.ts').StoryOp[] = [
+        { op: 'UPDATE_BELIEF', charId: 'Alice', belief: { id: 'b4', proposition: 'Something is wrong here', confidence: 0.65, source: 'inferred', acquired_at: 2 } },
+      ];
+      const result = epistemicProof136(makeEpistIR(ops), emptyState());
+      assert.ok(result.pass, 'inferred belief exactly at 0.65 should pass (boundary is strict >)');
+    });
+  });
+}
 
 // ── Wave 135: Dialogue Subtext Level 2 ───────────────────────────────────────
 

@@ -12,7 +12,7 @@ export type ProofName =
   | 'EmotionProof' | 'RelationshipProof' | 'ThemeProof' | 'ReaderStateProof'
   | 'SpatialProof' | 'DialogueProof' | 'SubtextProof' | 'VoiceProof'
   | 'NecessityProof' | 'ReincorporationProof' | 'SpecificityProof'
-  | 'SurpriseProof' | 'PolarityProof'
+  | 'SurpriseProof' | 'PolarityProof' | 'CharacterAgencyProof'
   // Tier 3 — Ranking Signals
   | 'GenericnessProof' | 'OriginalityProof'
   // Tier 4 — Ethics & Disclosure
@@ -49,7 +49,7 @@ export const PROOF_TIERS: Record<ProofName, ProofTier> = {
   EmotionProof: 2, RelationshipProof: 2, ThemeProof: 2, ReaderStateProof: 2,
   SpatialProof: 2, DialogueProof: 2, SubtextProof: 2, VoiceProof: 2,
   NecessityProof: 2, ReincorporationProof: 2, SpecificityProof: 2,
-  SurpriseProof: 2, PolarityProof: 2,
+  SurpriseProof: 2, PolarityProof: 2, CharacterAgencyProof: 2,
   GenericnessProof: 3, OriginalityProof: 3,
   BiasAuditProof: 4, AttributionProof: 4,
 };
