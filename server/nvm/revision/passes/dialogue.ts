@@ -539,6 +539,77 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 178: Greeting ritual, vocative overuse, filler openers ─────────────
+
+  // GREETING_RITUAL_OVERUSE: Dialogue is padded with rote greetings and
+  // farewells ("Hello", "How are you", "Goodbye"). Screen dialogue should start
+  // as late and end as early as possible; ritual pleasantries are dead air that
+  // real scenes cut straight past. Requires 3+ greeting/farewell lines.
+  {
+    const greetingRe = /^(hello|hi|hey|good (morning|afternoon|evening|night)|goodbye|bye|see you( later| around)?|how are you|how'?s it going|what'?s up|nice to meet you|good to see you|take care)\b[.,!?]*$/i;
+    const greetingLines = dialogue.filter(d => greetingRe.test(d.line.trim()));
+    if (greetingLines.length >= 3) {
+      issues.push({
+        location: `${greetingLines.length} lines (e.g. line ${greetingLines[0].lineNum})`,
+        rule: 'GREETING_RITUAL_OVERUSE',
+        description: `${greetingLines.length} dialogue lines are rote greetings or farewells ("${greetingLines[0].line.trim()}", "${greetingLines[1].line.trim()}"…) — ritual pleasantries are dead air the scene should cut straight past.`,
+        severity: 'minor',
+        suggestedFix: 'Start scenes mid-conversation, after the hellos. Open on the first line that carries friction or intent; cut the greetings and goodbyes that surround the real exchange.',
+      });
+    }
+  }
+
+  // VOCATIVE_NAME_OVERUSE: Characters address each other by name far more often
+  // than people do in real speech ("Listen, John." / "John, you don't get it").
+  // Frequent vocatives are a tell of expository, on-the-nose writing. Requires
+  // 8+ dialogue lines, 2+ named speakers, and >25% of lines naming another.
+  if (dialogue.length >= 8) {
+    const speakerNames = new Set(
+      dialogue.map(d => d.speaker.toLowerCase()).filter(n => n.length >= 3),
+    );
+    if (speakerNames.size >= 2) {
+      let vocativeLines = 0;
+      for (const d of dialogue) {
+        const lower = d.line.toLowerCase();
+        const self = d.speaker.toLowerCase();
+        for (const name of speakerNames) {
+          if (name === self) continue;
+          const re = new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+          if (re.test(lower)) { vocativeLines++; break; }
+        }
+      }
+      const ratio = vocativeLines / dialogue.length;
+      if (vocativeLines >= 3 && ratio > 0.25) {
+        issues.push({
+          location: 'Dialogue throughout',
+          rule: 'VOCATIVE_NAME_OVERUSE',
+          description: `${vocativeLines} of ${dialogue.length} dialogue lines (${Math.round(ratio * 100)}%) address another character by name — people rarely use names this often in speech, and the frequency reads as expository writing announcing who's who.`,
+          severity: 'minor',
+          suggestedFix: 'Cut most of the names. A vocative should be reserved for the moment it carries weight — a warning, a plea, a final word. Sprinkled through every line, it flattens into a tic.',
+        });
+      }
+    }
+  }
+
+  // FILLER_OPENER_OVERUSE: More than 30% of dialogue lines open with a
+  // conversational throat-clear ("Well,", "Look,", "Listen,", "I mean,"). An
+  // occasional filler characterizes; a constant one makes every character sound
+  // hesitant and the dialogue sound like a first draft. Requires 8+ lines.
+  if (dialogue.length >= 8) {
+    const fillerRe = /^(well|look|listen|i mean|you know|okay|ok|so|now|see|right)\s*,/i;
+    const fillerLines = dialogue.filter(d => fillerRe.test(d.line.trim())).length;
+    const ratio = fillerLines / dialogue.length;
+    if (ratio > 0.3) {
+      issues.push({
+        location: 'Dialogue openings',
+        rule: 'FILLER_OPENER_OVERUSE',
+        description: `${fillerLines} of ${dialogue.length} dialogue lines (${Math.round(ratio * 100)}%) open with a filler interjection ("Well,", "Look,", "Listen,") — a constant throat-clear that makes every character sound hesitant and the dialogue sound unrevised.`,
+        severity: 'minor',
+        suggestedFix: 'Delete most of the openers and let the line start on its actual content. Reserve a "Look," for the beat where a character is genuinely steeling themselves to say something hard.',
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'dialogue', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

@@ -13698,6 +13698,126 @@ He sits down in the chair.
     });
   });
 
+  describe('Wave 178 — dialoguePass: greeting ritual, vocative overuse, filler openers', async () => {
+    const blankRec = (idx: number): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`, purpose: 'dialogue',
+      dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+      emotionalShift: 'neutral', suspenseDelta: 1, dialogueHighlights: [],
+      unresolvedClues: [], seededClueIds: [], payoffSetupIds: [], visualBeats: [],
+      relationshipShifts: [],
+    });
+    const dlgInput = (fountain: string) => ({
+      fountain, original: fountain,
+      records: [blankRec(0)] as any, structure: {} as any, annotations: [], approvedSpans: [],
+    });
+    // Build a fountain from [speaker, line] pairs under one scene heading
+    const buildDialogue = (pairs: Array<[string, string]>) =>
+      `INT. ROOM - DAY\n\n` + pairs.map(([s, l]) => `${s}\n${l}\n`).join('\n');
+
+    // ── GREETING_RITUAL_OVERUSE ───────────────────────────────────────────────
+    it('dialoguePass detects GREETING_RITUAL_OVERUSE when greetings pad the dialogue', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      const fountain = buildDialogue([
+        ['ALICE', 'Hello.'], ['BOB', 'Hi.'], ['ALICE', 'How are you?'],
+        ['BOB', 'I brought the files.'], ['ALICE', 'Good.'],
+      ]);
+      const result = await dialoguePass(dlgInput(fountain));
+      const greet = result.issues.filter(i => i.rule === 'GREETING_RITUAL_OVERUSE');
+      assert.ok(greet.length >= 1, `Should detect GREETING_RITUAL_OVERUSE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(greet[0].severity === 'minor');
+    });
+
+    it('dialoguePass does NOT fire GREETING_RITUAL_OVERUSE when dialogue starts mid-conversation', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      const fountain = buildDialogue([
+        ['ALICE', 'You took the money.'], ['BOB', 'I had no choice about the timing.'],
+        ['ALICE', 'There is always a choice.'], ['BOB', 'Not for people like us.'],
+        ['ALICE', 'Then we are done.'],
+      ]);
+      const result = await dialoguePass(dlgInput(fountain));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'GREETING_RITUAL_OVERUSE'),
+        'Should NOT fire when dialogue contains no ritual greetings',
+      );
+    });
+
+    // ── VOCATIVE_NAME_OVERUSE ─────────────────────────────────────────────────
+    it('dialoguePass detects VOCATIVE_NAME_OVERUSE when characters over-name each other', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      const fountain = buildDialogue([
+        ['ALICE', 'Bob, you have to listen to me.'],
+        ['BOB', 'Alice, I already heard you.'],
+        ['ALICE', 'Then act on it, Bob.'],
+        ['BOB', 'It is not that simple.'],
+        ['ALICE', 'It never is.'],
+        ['BOB', 'Give me time.'],
+        ['ALICE', 'We are out of time.'],
+        ['BOB', 'I understand that.'],
+      ]);
+      const result = await dialoguePass(dlgInput(fountain));
+      const voc = result.issues.filter(i => i.rule === 'VOCATIVE_NAME_OVERUSE');
+      assert.ok(voc.length >= 1, `Should detect VOCATIVE_NAME_OVERUSE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(voc[0].severity === 'minor');
+    });
+
+    it('dialoguePass does NOT fire VOCATIVE_NAME_OVERUSE when names are used sparingly', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      const fountain = buildDialogue([
+        ['ALICE', 'You have to listen to me.'],
+        ['BOB', 'I already heard you.'],
+        ['ALICE', 'Then act on it.'],
+        ['BOB', 'It is not that simple.'],
+        ['ALICE', 'It never is.'],
+        ['BOB', 'Give me time.'],
+        ['ALICE', 'We are out of time.'],
+        ['BOB', 'I understand that.'],
+      ]);
+      const result = await dialoguePass(dlgInput(fountain));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'VOCATIVE_NAME_OVERUSE'),
+        'Should NOT fire when characters rarely address each other by name',
+      );
+    });
+
+    // ── FILLER_OPENER_OVERUSE ─────────────────────────────────────────────────
+    it('dialoguePass detects FILLER_OPENER_OVERUSE when lines open with throat-clears', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      const fountain = buildDialogue([
+        ['ALICE', 'Well, I think you are wrong.'],
+        ['BOB', 'Look, it is complicated.'],
+        ['ALICE', 'Listen, I do not have time.'],
+        ['BOB', 'I mean, we could try again.'],
+        ['ALICE', 'That is enough.'],
+        ['BOB', 'Fine.'],
+        ['ALICE', 'Good.'],
+        ['BOB', 'Agreed for once.'],
+      ]);
+      const result = await dialoguePass(dlgInput(fountain));
+      const filler = result.issues.filter(i => i.rule === 'FILLER_OPENER_OVERUSE');
+      assert.ok(filler.length >= 1, `Should detect FILLER_OPENER_OVERUSE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(filler[0].severity === 'minor');
+    });
+
+    it('dialoguePass does NOT fire FILLER_OPENER_OVERUSE when lines start on content', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      const fountain = buildDialogue([
+        ['ALICE', 'I think you are wrong.'],
+        ['BOB', 'It is complicated.'],
+        ['ALICE', 'I do not have time.'],
+        ['BOB', 'We could try again.'],
+        ['ALICE', 'That is enough.'],
+        ['BOB', 'Fine by me.'],
+        ['ALICE', 'Good enough.'],
+        ['BOB', 'Agreed for once.'],
+      ]);
+      const result = await dialoguePass(dlgInput(fountain));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'FILLER_OPENER_OVERUSE'),
+        'Should NOT fire when dialogue lines begin on their content',
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
