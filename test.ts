@@ -14872,3 +14872,54 @@ describe('Wave 131 — Structure act-position blends dramatic events', () => {
   });
 
 });
+
+// ── Wave 132 — Rewrite truncation guard ──────────────────────────────────────
+
+import { evaluateRewrite, REWRITE_MIN_LENGTH_RATIO } from './server/nvm/revision/rewrite.ts';
+
+describe('Wave 132 — evaluateRewrite truncation/length guard', () => {
+
+  it('rejects MAX_TOKENS truncation even when text is long enough', () => {
+    const original = 'x'.repeat(1000);
+    const revised = 'y'.repeat(1000); // same length, but truncated finish reason
+    const verdict = evaluateRewrite(revised, original.length, 'MAX_TOKENS');
+    assert.equal(verdict.accept, false);
+    assert.ok(!verdict.accept && verdict.reason === 'truncated');
+  });
+
+  it('rejects empty output', () => {
+    const verdict = evaluateRewrite('   ', 1000, 'STOP');
+    assert.equal(verdict.accept, false);
+    assert.ok(!verdict.accept && verdict.reason === 'empty');
+  });
+
+  it('rejects output that shrank below the length ratio', () => {
+    const original = 'x'.repeat(1000);
+    const revised = 'y'.repeat(700); // 70% < 80% floor
+    const verdict = evaluateRewrite(revised, original.length, 'STOP');
+    assert.equal(verdict.accept, false);
+    assert.ok(!verdict.accept && verdict.reason === 'too_short');
+  });
+
+  it('accepts output at exactly the length ratio', () => {
+    const original = 'x'.repeat(1000);
+    const revised = 'y'.repeat(Math.ceil(1000 * REWRITE_MIN_LENGTH_RATIO));
+    const verdict = evaluateRewrite(revised, original.length, 'STOP');
+    assert.equal(verdict.accept, true);
+  });
+
+  it('accepts a normal full-length rewrite', () => {
+    const original = 'x'.repeat(1000);
+    const revised = 'y'.repeat(1050); // slightly longer (added detail)
+    const verdict = evaluateRewrite(revised, original.length, 'STOP');
+    assert.equal(verdict.accept, true);
+  });
+
+  it('accepts when finishReason is undefined (non-Gemini providers)', () => {
+    const original = 'x'.repeat(1000);
+    const revised = 'y'.repeat(1000);
+    const verdict = evaluateRewrite(revised, original.length, undefined);
+    assert.equal(verdict.accept, true);
+  });
+
+});

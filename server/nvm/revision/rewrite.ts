@@ -20,6 +20,36 @@ export interface RewriteResult {
   usedLLM: boolean;
 }
 
+/** Minimum fraction of the original length an accepted rewrite must retain.
+ *  Below this we assume the model silently dropped scenes. */
+export const REWRITE_MIN_LENGTH_RATIO = 0.80;
+
+export type RewriteVerdict =
+  | { accept: true }
+  | { accept: false; reason: 'truncated' | 'too_short' | 'empty' };
+
+/**
+ * Decide whether an LLM rewrite is safe to accept. Pure and exported so the
+ * truncation/length guards can be unit-tested without a live model.
+ *
+ * - Rejects when the model hit its token ceiling (finishReason MAX_TOKENS): the
+ *   screenplay's ending was dropped, so accepting would delete the final act.
+ * - Rejects when output is empty or shrank below REWRITE_MIN_LENGTH_RATIO.
+ */
+export function evaluateRewrite(
+  revisedText: string,
+  originalLength: number,
+  finishReason: string | undefined,
+): RewriteVerdict {
+  if (finishReason === 'MAX_TOKENS') return { accept: false, reason: 'truncated' };
+  const text = revisedText.trim();
+  if (text.length === 0) return { accept: false, reason: 'empty' };
+  if (text.length < originalLength * REWRITE_MIN_LENGTH_RATIO) {
+    return { accept: false, reason: 'too_short' };
+  }
+  return { accept: true };
+}
+
 /**
  * Build a protected-spans comment for the LLM prompt.
  */
@@ -91,21 +121,38 @@ export async function rewritePass(input: RewriteInput): Promise<RewriteResult> {
     // ── Try LLM ───────────────────────────────────────────────────────────────
   try {
     const ai = await import('../../engine/ai.ts');
+    const { logger } = await import('../../lib/logger.ts');
     ai.getAI(); // throws if no key
+
+    // Budget output tokens to comfortably exceed the input so the model can return
+    // the full screenplay without truncation. Roughly 1 token ≈ 4 chars; add 50%
+    // headroom and clamp to a sane ceiling.
+    const estInputTokens = Math.ceil(fountain.length / 4);
+    const maxOutputTokens = Math.min(32_768, Math.max(8_192, Math.ceil(estInputTokens * 1.5)));
 
     const response = await ai.geminiProvider.generate({
       model: ai.modelForTask('REVISION'),
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: { temperature: 0.4, maxOutputTokens: 8192 },
+      config: { temperature: 0.4, maxOutputTokens },
     });
-    const text = (response.candidates?.[0]?.content?.parts?.[0]?.text ?? '').trim();
-    // Accept if non-empty and at least 70% of original length — allows meaningful
-    // compression (tightened dialogue, removed padding) without accepting truncations.
-    if (text.length > 0 && text.length >= fountain.length * 0.70) {
+
+    const candidate = response.candidates?.[0];
+    const finishReason = candidate?.finishReason;
+    const text = (candidate?.content?.parts?.[0]?.text ?? '').trim();
+
+    const verdict = evaluateRewrite(text, fountain.length, finishReason);
+    if (verdict.accept) {
       return { revised: text, usedLLM: true };
     }
-  } catch {
-    // No key or LLM error — stub fallback
+    // Rejected — log why so silent quality loss is observable, then keep original.
+    logger.warn('revision_rewrite_rejected', {
+      passName, reason: verdict.reason, finishReason,
+      inputChars: fountain.length, outputChars: text.length,
+    });
+  } catch (err) {
+    // No key or LLM error — log then fall back to the unchanged draft.
+    const { logger } = await import('../../lib/logger.ts');
+    logger.warn('revision_rewrite_failed', { passName, message: (err as Error).message });
   }
 
   return { revised: fountain, usedLLM: false };
