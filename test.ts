@@ -15299,3 +15299,147 @@ About everything that happened at the marina.
   });
 
 });
+
+// ── Wave 137: Show-don't-tell — passive voice + emotion naming ─────────────────
+
+describe('Wave 137 — rhythmPass: PASSIVE_VOICE_OVERUSE + WEAK_VERB_CHAIN', () => {
+
+  it('PASSIVE_VOICE_OVERUSE fires when ≥3 action lines use passive constructions', async () => {
+    const fountain = `INT. WAREHOUSE - NIGHT
+
+The door was opened from inside.
+
+The box was found near the window.
+
+A gun was taken from the shelf.
+
+DETECTIVE
+What happened here?
+
+The body was carried out by the officers.
+`;
+    const result = await rhythmPass(makePassInput(fountain));
+    assert.ok(
+      result.issues.some(i => i.rule === 'PASSIVE_VOICE_OVERUSE'),
+      'PASSIVE_VOICE_OVERUSE should fire when ≥3 action lines use passive constructions',
+    );
+  });
+
+  it('PASSIVE_VOICE_OVERUSE does NOT fire with fewer than 3 passive lines', async () => {
+    const fountain = `INT. OFFICE - DAY
+
+The folder was left on the desk.
+
+Alice opens the window.
+
+Bob hands her the documents.
+
+ALICE
+Let's begin.
+`;
+    const result = await rhythmPass(makePassInput(fountain));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'PASSIVE_VOICE_OVERUSE'),
+      'PASSIVE_VOICE_OVERUSE should not fire with fewer than 3 passive lines',
+    );
+  });
+
+  it('WEAK_VERB_CHAIN fires when ≥2 action lines use "started to / began to"', async () => {
+    const fountain = `INT. HALLWAY - NIGHT
+
+Alice started to run toward the exit.
+
+Bob began to speak but stopped himself.
+
+The crowd started to disperse slowly.
+
+A door creaks open at the end of the corridor.
+
+CAROL
+We need to move.
+`;
+    const result = await rhythmPass(makePassInput(fountain));
+    assert.ok(
+      result.issues.some(i => i.rule === 'WEAK_VERB_CHAIN'),
+      'WEAK_VERB_CHAIN should fire when ≥2 action lines use auxiliary verb chains',
+    );
+  });
+
+  it('active-voice screenplay passes both rules cleanly', async () => {
+    const fountain = `INT. POLICE STATION - DAY
+
+Alice slams the folder on the desk.
+
+Bob crosses the room and grabs the phone.
+
+The officer hands over the evidence bag.
+
+ALICE
+Tell me what you saw.
+
+BOB
+I saw everything.
+`;
+    const result = await rhythmPass(makePassInput(fountain));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'PASSIVE_VOICE_OVERUSE' || i.rule === 'WEAK_VERB_CHAIN'),
+      'active-voice screenplay should not trigger passive or weak-chain rules',
+    );
+  });
+});
+
+describe('Wave 137 — originalityPass: EMOTION_NAMING_IN_ACTION', () => {
+
+  it('EMOTION_NAMING_IN_ACTION fires when action line names an emotion directly', async () => {
+    const fountain = `INT. LIVING ROOM - NIGHT
+
+Alice was devastated by the news.
+
+ALICE
+I can't believe it.
+
+BOB
+I'm sorry.
+`;
+    const result = await originalityPass(makePassInput(fountain));
+    assert.ok(
+      result.issues.some(i => i.rule === 'EMOTION_NAMING_IN_ACTION'),
+      'EMOTION_NAMING_IN_ACTION should fire for "was devastated" in action line',
+    );
+  });
+
+  it('EMOTION_NAMING_IN_ACTION does NOT fire for emotion words in dialogue', async () => {
+    const fountain = `INT. OFFICE - DAY
+
+Alice opens the window.
+
+ALICE
+I was so angry when I heard that.
+
+BOB
+I understand.
+`;
+    const result = await originalityPass(makePassInput(fountain));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'EMOTION_NAMING_IN_ACTION'),
+      'EMOTION_NAMING_IN_ACTION should not fire for emotion words in dialogue',
+    );
+  });
+
+  it('EMOTION_NAMING_IN_ACTION does NOT fire for behavioral action descriptions', async () => {
+    const fountain = `INT. KITCHEN - DAY
+
+Alice hurls the plate against the wall.
+
+BOB
+Easy—
+
+Alice grabs the edge of the counter, knuckles white.
+`;
+    const result = await originalityPass(makePassInput(fountain));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'EMOTION_NAMING_IN_ACTION'),
+      'behavioral action descriptions should not trigger emotion naming rule',
+    );
+  });
+});

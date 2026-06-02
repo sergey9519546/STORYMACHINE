@@ -1,6 +1,6 @@
-// Wave 39 — Pass 10: Originality
+// Wave 137 — Pass 10: Originality
 // Checks for clichés, generic scene descriptions, and predictable outcomes.
-// Reuses quality engine's genericness signals.
+// Wave 137 additions: emotion-naming in action lines (show-don't-tell violation).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -46,6 +46,11 @@ const GENERIC_PATTERNS = [
   /\bnothing would ever be the same\b/i,
   /\bwithout another word\b/i,
 ];
+
+// ── Emotion-naming in action lines (show-don't-tell violation) ────────────────
+// Matches: "John was angry", "She looked scared", "He seemed relieved"
+// Action lines must SHOW behavior — not NAME internal states.
+const ACTION_EMOTION_NAMING_RE = /\b(is|are|was|were|feel|feels|looks?|seems?|appears?)\s+(?:so\s+|very\s+|clearly\s+|obviously\s+)?(angry|furious|sad|depressed|scared|terrified|happy|elated|nervous|anxious|afraid|relieved|devastated|upset|worried|tense|confused|shocked|excited|frustrated|embarrassed|ashamed|guilty|jealous|hopeless|miserable|disgusted|irritated|annoyed|delighted|horrified|alarmed|bitter|resentful)\b/i;
 
 export async function originalityPass(input: PassInput): Promise<PassResult> {
   const { fountain, records, approvedSpans } = input;
@@ -135,6 +140,34 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
       severity: 'minor',
       suggestedFix: 'Introduce revelation, raising-stakes, and relief scenes to create a fuller dramatic arc',
     });
+  }
+
+  // ── Emotion-naming in action lines (show-don't-tell) ─────────────────────
+  // Flag up to 2 instances per pass to keep output focused. Only fires on
+  // non-dialogue, non-slug lines so stage direction isn't treated as action.
+  let emotionNamingCount = 0;
+  {
+    let inDialogue = false;
+    for (let i = 0; i < lines.length; i++) {
+      const t = lines[i].trim();
+      if (!t) { inDialogue = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDialogue = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(t)) { inDialogue = true; continue; }
+      if (inDialogue) continue; // skip dialogue lines
+      if (t.startsWith('(') && t.endsWith(')')) continue; // parenthetical
+
+      const match = t.match(ACTION_EMOTION_NAMING_RE);
+      if (match && emotionNamingCount < 2) {
+        emotionNamingCount++;
+        issues.push({
+          location: `Line ${i + 1}`,
+          rule: 'EMOTION_NAMING_IN_ACTION',
+          description: `Action line names an emotion directly: "${t.slice(0, 70)}${t.length > 70 ? '...' : ''}"`,
+          severity: 'major',
+          suggestedFix: `Show the emotional state through a specific physical behavior or concrete action instead of naming it (e.g., replace "${match[0]}" with what the character does)`,
+        });
+      }
+    }
   }
 
   // ── Limit total issues to avoid overwhelming output ───────────────────────

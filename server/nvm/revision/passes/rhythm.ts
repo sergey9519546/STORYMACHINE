@@ -1,6 +1,7 @@
-// Wave 39 — Pass 8: Rhythm/Prosody
+// Wave 137 — Pass 8: Rhythm/Prosody
 // Checks sentence rhythm in action lines: monotonous sentence lengths,
 // run-on action blocks, staccato beats that need expansion.
+// Wave 137 additions: passive voice constructions, weak-verb chains.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -26,6 +27,22 @@ function extractActionLines(fountain: string): Array<{ text: string; lineNum: nu
   }
   return action;
 }
+
+// ── Passive voice constructions (agentless) common in weak screenplay action ──
+// These are high-precision patterns: all are genuine passive constructions where
+// the subject receives action instead of performing it.
+const PASSIVE_VOICE_PHRASES: readonly string[] = [
+  'is seen', 'is heard', 'is found', 'is shown', 'is revealed', 'is discovered',
+  'is opened', 'is closed', 'is broken', 'is given', 'is taken', 'is placed',
+  'was seen', 'was heard', 'was found', 'was shown', 'was revealed', 'was discovered',
+  'was opened', 'was closed', 'was broken', 'was given', 'was taken', 'was placed',
+  'was killed', 'was shot', 'was hit', 'was thrown', 'was pushed', 'was pulled',
+  'was grabbed', 'was locked', 'was told', 'was left', 'was sent', 'was made',
+  'was brought', 'was carried', 'was dragged', 'was dropped', 'was led',
+];
+
+// ── Weak-verb-chain: auxiliary steps that bury the real action ─────────────
+const WEAK_VERB_CHAIN_RE = /\b(started? to|began? to|continued to|went on to|proceeded to|was about to|seemed to be|tried to)\s+\w+/i;
 
 /** Count sentences in a line (rough: split on . ! ?) */
 function countSentences(text: string): number {
@@ -109,6 +126,44 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
     } else {
       shortStreak = 0;
     }
+  }
+
+  // ── Passive voice: agentless constructions dilute cinematic drive ─────────
+  // Only fire when there are ≥3 passive constructions — an occasional passive is
+  // valid (e.g. "was born") but repeated use removes the active subject.
+  const passiveMatches: Array<{ lineNum: number; phrase: string }> = [];
+  for (const line of actionLines) {
+    const lower = line.text.toLowerCase();
+    for (const phrase of PASSIVE_VOICE_PHRASES) {
+      if (lower.includes(phrase)) {
+        passiveMatches.push({ lineNum: line.lineNum, phrase });
+        break; // one match per line is enough
+      }
+    }
+  }
+  if (passiveMatches.length >= 3) {
+    issues.push({
+      location: `Lines ${passiveMatches[0].lineNum}, ${passiveMatches[1].lineNum}, ${passiveMatches[2].lineNum}…`,
+      rule: 'PASSIVE_VOICE_OVERUSE',
+      description: `${passiveMatches.length} action lines use agentless passive constructions ("${passiveMatches[0].phrase}", …) — cinematic action requires active subjects`,
+      severity: 'minor',
+      suggestedFix: 'Rewrite: "The door was opened" → "Alice kicked the door open". Put the agent first and use an active verb',
+    });
+  }
+
+  // ── Weak-verb chains: "started to run", "began to speak" ─────────────────
+  const weakChainLines: number[] = [];
+  for (const line of actionLines) {
+    if (WEAK_VERB_CHAIN_RE.test(line.text)) weakChainLines.push(line.lineNum);
+  }
+  if (weakChainLines.length >= 2) {
+    issues.push({
+      location: `Lines ${weakChainLines.slice(0, 3).join(', ')}`,
+      rule: 'WEAK_VERB_CHAIN',
+      description: `${weakChainLines.length} action lines use weak auxiliary chains ("started to", "began to", "continued to") — bury the real verb and slow the scene`,
+      severity: 'minor',
+      suggestedFix: 'Replace "started to run" with "ran"; "began to speak" with "spoke" — use the root verb directly',
+    });
   }
 
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'rhythm', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
