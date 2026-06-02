@@ -651,34 +651,3 @@ router.post('/api/characters/import', gameLimiter, asyncHandler(async (req, res)
     res.status(400).json({ error: (err as Error).message });
   }
 }));
-
-// ── P2: Professional export pipeline — PDF / FDX / DOCX / Fountain ────────────
-// Accepts the current Fountain script and returns a downloadable file in the
-// requested industry format. One parser feeds all renderers (server/nvm/export).
-const EXPORT_FORMATS = new Set(['pdf', 'fdx', 'docx', 'fountain']);
-
-router.post('/api/scriptide/export', gameLimiter, asyncHandler(async (req, res) => {
-  const body = req.body as { fountain?: unknown; format?: unknown; filename?: unknown };
-  const fountain = typeof body.fountain === 'string' ? body.fountain : '';
-  const format = typeof body.format === 'string' ? body.format.toLowerCase() : '';
-  if (!fountain.trim()) {
-    res.status(400).json({ error: 'body.fountain (non-empty string) is required' });
-    return;
-  }
-  if (!EXPORT_FORMATS.has(format)) {
-    res.status(400).json({ error: `body.format must be one of: ${[...EXPORT_FORMATS].join(', ')}` });
-    return;
-  }
-  // Cap input size to keep export bounded (500k chars ≈ a very long feature).
-  const capped = fountain.substring(0, 500_000);
-  const safeName = (typeof body.filename === 'string' ? body.filename : 'screenplay')
-    .replace(/[^A-Za-z0-9_\-]/g, '_').substring(0, 80) || 'screenplay';
-
-  const { exportScreenplay } = await import('../nvm/export/index.ts');
-  const result = await exportScreenplay(capped, format as 'pdf' | 'fdx' | 'docx' | 'fountain');
-
-  res.setHeader('Content-Type', result.mimeType);
-  res.setHeader('Content-Disposition', `attachment; filename="${safeName}.${result.extension}"`);
-  res.setHeader('Content-Length', String(result.data.length));
-  res.send(result.data);
-}));
