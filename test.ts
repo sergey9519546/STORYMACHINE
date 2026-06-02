@@ -13818,6 +13818,102 @@ He sits down in the chair.
     });
   });
 
+  describe('Wave 179 — structurePass: escalation reversed, climax plateau, unresolved ending', async () => {
+    const baseStructure = {
+      actPosition: 'act2a' as const, completionPercent: 50, totalClockPressure: 5,
+      midpointPressure: 2, reversalCount: 1, tightestScene: 6, avgSuspensePerScene: 1.5,
+      escalating: true, reversalDensity: 0.1, approachingClimax: false,
+      openClues: 1, revelationCount: 1,
+    };
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const structInput = (records: any[], n: number) => ({
+      fountain: blankFountain(n), original: blankFountain(n),
+      records: records as any, structure: baseStructure as any, annotations: [], approvedSpans: [],
+    });
+
+    // ── ESCALATION_REVERSED ───────────────────────────────────────────────────
+    it('structurePass detects ESCALATION_REVERSED when the final third loses energy', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // 6 scenes: first third (0,1) high suspense, last third (4,5) low
+      const records = Array.from({ length: 6 }, (_, i) =>
+        makeRec(i, { suspenseDelta: i <= 1 ? 3 : 1 }),
+      );
+      const result = await structurePass(structInput(records, 6));
+      const esc = result.issues.filter(i => i.rule === 'ESCALATION_REVERSED');
+      assert.ok(esc.length >= 1, `Should detect ESCALATION_REVERSED; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(esc[0].severity === 'major');
+    });
+
+    it('structurePass does NOT fire ESCALATION_REVERSED when the story builds toward the end', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      const records = Array.from({ length: 6 }, (_, i) =>
+        makeRec(i, { suspenseDelta: i >= 4 ? 3 : 1 }),
+      );
+      const result = await structurePass(structInput(records, 6));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'ESCALATION_REVERSED'),
+        'Should NOT fire when suspense rises toward the final third',
+      );
+    });
+
+    // ── CLIMAX_PLATEAU ────────────────────────────────────────────────────────
+    it('structurePass detects CLIMAX_PLATEAU when no single scene peaks above the rest', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      const records = Array.from({ length: 8 }, (_, i) => makeRec(i, { suspenseDelta: 3 }));
+      const result = await structurePass(structInput(records, 8));
+      const plateau = result.issues.filter(i => i.rule === 'CLIMAX_PLATEAU');
+      assert.ok(plateau.length >= 1, `Should detect CLIMAX_PLATEAU; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(plateau[0].severity === 'major');
+    });
+
+    it('structurePass does NOT fire CLIMAX_PLATEAU when one scene clearly peaks', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, { suspenseDelta: i === 6 ? 3 : 1 }),
+      );
+      const result = await structurePass(structInput(records, 8));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'CLIMAX_PLATEAU'),
+        'Should NOT fire when a single scene holds the peak',
+      );
+    });
+
+    // ── UNRESOLVED_ENDING ─────────────────────────────────────────────────────
+    it('structurePass detects UNRESOLVED_ENDING when the final scene is still escalating', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      const records = Array.from({ length: 6 }, (_, i) =>
+        makeRec(i, { suspenseDelta: i === 5 ? 3 : 1 }),
+      );
+      const result = await structurePass(structInput(records, 6));
+      const unresolved = result.issues.filter(i => i.rule === 'UNRESOLVED_ENDING');
+      assert.ok(unresolved.length >= 1, `Should detect UNRESOLVED_ENDING; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(unresolved[0].severity === 'major');
+    });
+
+    it('structurePass does NOT fire UNRESOLVED_ENDING when the final scene resolves', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      const records = Array.from({ length: 6 }, (_, i) =>
+        i === 5
+          ? makeRec(i, { suspenseDelta: 3, purpose: 'resolution' })
+          : makeRec(i, { suspenseDelta: 1 }),
+      );
+      const result = await structurePass(structInput(records, 6));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'UNRESOLVED_ENDING'),
+        'Should NOT fire when the final scene is a resolution beat',
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

@@ -292,6 +292,68 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 179: Escalation reversed, climax plateau, unresolved ending ─────────
+
+  // ESCALATION_REVERSED: The story de-escalates overall — the final third's
+  // average suspense is well below the first third's. The narrative loses energy
+  // as it goes rather than building. Distinct from FALSE_CLIMAX (a single early
+  // peak): this is a whole-arc downward trend. Requires real opening energy
+  // (first-third average ≥ 1.5) so a flat story doesn't trip it.
+  if (n >= 6) {
+    const third = Math.floor(n / 3);
+    const firstThird = records.slice(0, third);
+    const lastThird = records.slice(n - third);
+    const avg = (arr: typeof records) => arr.reduce((s, r) => s + r.suspenseDelta, 0) / arr.length;
+    const firstAvg = avg(firstThird);
+    const lastAvg = avg(lastThird);
+    if (firstAvg >= 1.5 && lastAvg < firstAvg * 0.7) {
+      issues.push({
+        location: 'Overall escalation',
+        rule: 'ESCALATION_REVERSED',
+        description: `Suspense de-escalates across the story: the opening third averages ${firstAvg.toFixed(1)} but the final third drops to ${lastAvg.toFixed(1)} — the narrative loses energy as it goes instead of building toward the climax.`,
+        severity: 'major',
+        suggestedFix: 'Invert the energy curve. Either pull the high-intensity opening material back into the body of the story, or escalate the final third so the stakes are highest at the end, not the beginning.',
+      });
+    }
+  }
+
+  // CLIMAX_PLATEAU: There is no single distinct peak — the highest suspense value
+  // is shared across a large fraction of scenes, so the climax never stands out
+  // from the surrounding intensity. Distinct from FALSE_CLIMAX (peak located too
+  // early); here the problem is the peak isn't a peak at all. Requires a
+  // meaningful max (>1.5) repeated across 40%+ of scenes.
+  if (n >= 8) {
+    let maxSuspense = -Infinity;
+    for (const r of records) if (r.suspenseDelta > maxSuspense) maxSuspense = r.suspenseDelta;
+    const atMax = records.filter(r => r.suspenseDelta === maxSuspense).length;
+    const plateauThreshold = Math.max(3, Math.ceil(n * 0.4));
+    if (maxSuspense > 1.5 && atMax >= plateauThreshold) {
+      issues.push({
+        location: 'Suspense profile',
+        rule: 'CLIMAX_PLATEAU',
+        description: `${atMax} of ${n} scenes share the story's peak suspense (${maxSuspense.toFixed(1)}) — there is no single distinct climax, just a plateau of equal-intensity scenes. The audience can't feel the high point because everything is the high point.`,
+        severity: 'major',
+        suggestedFix: 'Carve out one undisputed peak. Dial back the intensity of the surrounding scenes so the climax stands alone as the most intense moment — a plateau has no summit.',
+      });
+    }
+  }
+
+  // UNRESOLVED_ENDING: The final scene is still escalating (high suspense) and
+  // isn't a resolution beat — the story stops mid-climb with no denouement. The
+  // audience is dropped before the release the rising action promised.
+  if (n >= 6) {
+    const last = records[n - 1];
+    if (last && last.suspenseDelta > 2 && last.purpose !== 'resolution') {
+      issues.push({
+        location: `Scene ${n - 1} (final scene)`,
+        rule: 'UNRESOLVED_ENDING',
+        description: `The final scene still carries high suspense (${last.suspenseDelta.toFixed(1)}) and isn't a resolution beat (purpose: "${last.purpose}") — the story stops mid-climb with no denouement, dropping the audience before the release the rising action promised.`,
+        severity: 'major',
+        suggestedFix: 'Add a resolution beat after the climax: a scene that lets the suspense discharge and shows the new equilibrium. Even an ambiguous ending needs a moment that registers the climax has happened.',
+      });
+    }
+  }
+
   // ── Rewrite ───────────────────────────────────────────────────────────────
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'structure', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
