@@ -1,6 +1,9 @@
 // Wave 39 — Pass 11: Payoff/Continuity
 // Checks planted clue/setup payoffs: orphan clues, setups paid off too quickly,
 // payoffs that arrive before their setups.
+// Wave 140 additions: setup without consequence (clues planted multiple times
+// but never affecting plot/character decisions) and consequence-delayed payoff
+// (payoff occurs too long after setup, breaking the audience's memory arc).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -99,6 +102,68 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
       severity: 'major',
       suggestedFix: 'Plant at least one object, phrase, or secret in Act 1 that pays off in Act 3',
     });
+  }
+
+  // ── Setup without consequence (Wave 140) ──────────────────────────────────
+  // Clues that appear multiple times (2+) but never cause narrative consequence:
+  // no relationship shifts, no emotional peaks, no high suspense delta.
+  // These are red herrings that aren't actually red herrings — they're just noise.
+  const clueAppearances: Map<string, number[]> = new Map();
+  for (const r of records) {
+    for (const clueId of (r.seededClueIds ?? r.unresolvedClues)) {
+      if (!clueAppearances.has(clueId)) {
+        clueAppearances.set(clueId, []);
+      }
+      clueAppearances.get(clueId)!.push(r.sceneIdx);
+    }
+  }
+
+  for (const [clueId, appearanceScenes] of clueAppearances) {
+    // Only flag if clue appears 2+ times
+    if (appearanceScenes.length >= 2) {
+      // Check if any appearance scene has narrative consequence
+      const hasConsequence = appearanceScenes.some(sceneIdx => {
+        const r = records[sceneIdx];
+        if (!r) return false;
+        // Consequence = relationship shift, high suspense delta, or emotional peak
+        const hasRelationshipShift = (r.relationshipShifts ?? []).length > 0;
+        const hasEmotionalPeak = r.emotionalShift !== 'neutral' && r.suspenseDelta > 1.5;
+        const isClimaticScene = r.purpose === 'climax' || r.suspenseDelta > 2;
+        return hasRelationshipShift || hasEmotionalPeak || isClimaticScene;
+      });
+
+      if (!hasConsequence) {
+        const clueInfo_obj = clueInfo.get(clueId);
+        const plantLocation = clueInfo_obj ? `Scene ${clueInfo_obj.plantedAt}` : 'Act 1';
+        issues.push({
+          location: `Clue appearances: Scenes ${appearanceScenes.join(', ')}`,
+          rule: 'SETUP_WITHOUT_CONSEQUENCE',
+          description: `Clue "${clueId}" appears ${appearanceScenes.length} times (planted at ${plantLocation}) but never drives a character decision or relationship shift — it's narrative noise, not meaningful setup`,
+          severity: 'major',
+          suggestedFix: `Either remove recurring mentions of "${clueId}" or add a scene where it causes a character to act or react with emotional stakes`,
+        });
+      }
+    }
+  }
+
+  // ── Consequence-delayed payoff (Wave 140) ────────────────────────────────
+  // Payoff occurs too far after setup (>6 scenes), breaking the audience's
+  // memory arc and reducing the dramatic impact of the payoff.
+  for (const [clueId, payoffScene] of payoffInfo) {
+    const info = clueInfo.get(clueId);
+    if (info) {
+      const gap = payoffScene - info.plantedAt;
+      // 6+ scene gap means audience likely forgot the setup
+      if (gap >= 6 && structure.completionPercent >= 70) {
+        issues.push({
+          location: `Clue payoff at Scene ${payoffScene}`,
+          rule: 'PAYOFF_MEMORY_GAP',
+          description: `Clue "${clueId}" planted in Scene ${info.plantedAt} is paid off ${gap} scenes later in Scene ${payoffScene} — the audience has likely forgotten the setup by the time the payoff arrives`,
+          severity: 'minor',
+          suggestedFix: `Add a callback or reminder of "${clueId}" 1-2 scenes before its payoff to rebuild audience memory`,
+        });
+      }
+    }
   }
 
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'payoff', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });

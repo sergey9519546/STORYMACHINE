@@ -11219,6 +11219,176 @@ describe('Wave 87 — payoff precision, repeated-purpose detection, dominant gua
     assert.ok(dangling[0].description.includes('ghost-clue'));
   });
 
+  // ── Wave 140 additions: SETUP_WITHOUT_CONSEQUENCE and PAYOFF_MEMORY_GAP ────
+
+  it('payoffPass detects SETUP_WITHOUT_CONSEQUENCE for clue appearing 2+ times without narrative consequence', async () => {
+    const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+    const records = [
+      {
+        commitId: 'c0', sceneIdx: 0, slug: 'INT. ROOM - DAY', purpose: 'establish_world',
+        dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+        emotionalShift: 'neutral', suspenseDelta: 0,
+        dialogueHighlights: [], unresolvedClues: [],
+        seededClueIds: ['mysterious-letter'], // plant clue
+        payoffSetupIds: [],
+        readerStateAnnotation: null,
+        relationshipShifts: [], // no relationship shift
+      },
+      {
+        commitId: 'c1', sceneIdx: 1, slug: 'INT. KITCHEN - DAY', purpose: 'dialogue',
+        dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+        emotionalShift: 'neutral', suspenseDelta: 0.5, // low suspense
+        dialogueHighlights: [], unresolvedClues: [],
+        seededClueIds: ['mysterious-letter'], // clue appears again
+        payoffSetupIds: [],
+        readerStateAnnotation: null,
+        relationshipShifts: [], // no consequence
+      },
+      {
+        commitId: 'c2', sceneIdx: 2, slug: 'INT. STUDY - DAY', purpose: 'complication',
+        dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+        emotionalShift: 'neutral', suspenseDelta: 0.3,
+        dialogueHighlights: [], unresolvedClues: [],
+        seededClueIds: [],
+        payoffSetupIds: [],
+        readerStateAnnotation: null,
+        relationshipShifts: [],
+      },
+    ];
+    const structure = {
+      actPosition: 'act2a' as const, completionPercent: 40,
+      revelationCount: 0, approachingClimax: false,
+      avgSuspensePerScene: 1, escalating: false,
+      reversalCount: 0, reversalDensity: 0,
+      openClues: 1, midpointPressure: 0, tightestScene: null,
+    };
+    const result = await payoffPass({
+      fountain: 'INT. ROOM - DAY\nA.\nINT. KITCHEN - DAY\nB.\nINT. STUDY - DAY\nC.\n',
+      original: 'INT. ROOM - DAY\nA.\nINT. KITCHEN - DAY\nB.\nINT. STUDY - DAY\nC.\n',
+      records: records as unknown as Parameters<typeof payoffPass>[0]['records'],
+      structure: structure as Parameters<typeof payoffPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const consequence = result.issues.filter(i => i.rule === 'SETUP_WITHOUT_CONSEQUENCE');
+    assert.ok(consequence.length >= 1, 'Should detect SETUP_WITHOUT_CONSEQUENCE for clue appearing 2+ times without consequence');
+    assert.ok(consequence[0].description.includes('mysterious-letter'));
+    assert.ok(consequence[0].severity === 'major');
+  });
+
+  it('payoffPass does NOT fire SETUP_WITHOUT_CONSEQUENCE when clue appears 2+ times WITH relationship shift', async () => {
+    const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+    const records = [
+      {
+        commitId: 'c0', sceneIdx: 0, slug: 'INT. ROOM - DAY', purpose: 'establish_world',
+        dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+        emotionalShift: 'neutral', suspenseDelta: 0,
+        dialogueHighlights: [], unresolvedClues: [],
+        seededClueIds: ['secret-document'], // plant clue
+        payoffSetupIds: [],
+        readerStateAnnotation: null,
+        relationshipShifts: [], // no consequence here
+      },
+      {
+        commitId: 'c1', sceneIdx: 1, slug: 'INT. OFFICE - DAY', purpose: 'confrontation',
+        dramaticTurn: 'revelation', revelation: 'secret-revealed', clockRaised: true, clockDelta: 2,
+        emotionalShift: 'positive', suspenseDelta: 2.5, // high suspense + emotion
+        dialogueHighlights: ['You know about the document?'], unresolvedClues: [],
+        seededClueIds: ['secret-document'], // clue appears again
+        payoffSetupIds: [],
+        readerStateAnnotation: null,
+        relationshipShifts: [{ pairKey: 'alice|bob', shiftMagnitude: 1.5 }], // HAS consequence
+      },
+    ];
+    const structure = {
+      actPosition: 'act2b' as const, completionPercent: 60,
+      revelationCount: 1, approachingClimax: false,
+      avgSuspensePerScene: 2, escalating: true,
+      reversalCount: 0, reversalDensity: 0,
+      openClues: 0, midpointPressure: 1, tightestScene: 1,
+    };
+    const result = await payoffPass({
+      fountain: 'INT. ROOM - DAY\nA.\nINT. OFFICE - DAY\nALICE\nYou know about the document?\n',
+      original: 'INT. ROOM - DAY\nA.\nINT. OFFICE - DAY\nALICE\nYou know about the document?\n',
+      records: records as unknown as Parameters<typeof payoffPass>[0]['records'],
+      structure: structure as Parameters<typeof payoffPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const consequence = result.issues.filter(i => i.rule === 'SETUP_WITHOUT_CONSEQUENCE');
+    assert.equal(consequence.length, 0, 'Should NOT fire SETUP_WITHOUT_CONSEQUENCE when clue has relationship shift consequence');
+  });
+
+  it('payoffPass detects PAYOFF_MEMORY_GAP for payoff 6+ scenes after setup', async () => {
+    const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+    const records = [];
+    for (let i = 0; i < 9; i++) {
+      records.push({
+        commitId: `c${i}`, sceneIdx: i, slug: `SC${i}`, purpose: 'dialogue',
+        dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+        emotionalShift: 'neutral', suspenseDelta: 0.5,
+        dialogueHighlights: [], unresolvedClues: [],
+        seededClueIds: i === 0 ? ['old-mystery'] : [], // plant at scene 0
+        payoffSetupIds: i === 7 ? ['old-mystery'] : [], // payoff at scene 7 (gap = 7)
+        readerStateAnnotation: null,
+        relationshipShifts: [],
+      });
+    }
+    const structure = {
+      actPosition: 'act3' as const, completionPercent: 85,
+      revelationCount: 1, approachingClimax: true,
+      avgSuspensePerScene: 1, escalating: true,
+      reversalCount: 0, reversalDensity: 0,
+      openClues: 0, midpointPressure: 0, tightestScene: 7,
+    };
+    const result = await payoffPass({
+      fountain: 'SC0\nA\nSC1\nB\nSC2\nC\nSC3\nD\nSC4\nE\nSC5\nF\nSC6\nG\nSC7\nH\nSC8\nI\n',
+      original: 'SC0\nA\nSC1\nB\nSC2\nC\nSC3\nD\nSC4\nE\nSC5\nF\nSC6\nG\nSC7\nH\nSC8\nI\n',
+      records: records as unknown as Parameters<typeof payoffPass>[0]['records'],
+      structure: structure as Parameters<typeof payoffPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const gap = result.issues.filter(i => i.rule === 'PAYOFF_MEMORY_GAP');
+    assert.ok(gap.length >= 1, 'Should detect PAYOFF_MEMORY_GAP for payoff 7 scenes after setup');
+    assert.ok(gap[0].description.includes('7 scenes'));
+    assert.ok(gap[0].severity === 'minor');
+  });
+
+  it('payoffPass does NOT fire PAYOFF_MEMORY_GAP for payoff only 5 scenes after setup', async () => {
+    const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+    const records = [];
+    for (let i = 0; i < 8; i++) {
+      records.push({
+        commitId: `c${i}`, sceneIdx: i, slug: `SC${i}`, purpose: 'dialogue',
+        dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+        emotionalShift: 'neutral', suspenseDelta: 0.5,
+        dialogueHighlights: [], unresolvedClues: [],
+        seededClueIds: i === 0 ? ['clue'] : [],
+        payoffSetupIds: i === 5 ? ['clue'] : [], // gap = 5 (should not fire)
+        readerStateAnnotation: null,
+        relationshipShifts: [],
+      });
+    }
+    const structure = {
+      actPosition: 'act3' as const, completionPercent: 80,
+      revelationCount: 1, approachingClimax: true,
+      avgSuspensePerScene: 1, escalating: true,
+      reversalCount: 0, reversalDensity: 0,
+      openClues: 0, midpointPressure: 0, tightestScene: 5,
+    };
+    const result = await payoffPass({
+      fountain: 'SC0\nA\nSC1\nB\nSC2\nC\nSC3\nD\nSC4\nE\nSC5\nF\nSC6\nG\nSC7\nH\n',
+      original: 'SC0\nA\nSC1\nB\nSC2\nC\nSC3\nD\nSC4\nE\nSC5\nF\nSC6\nG\nSC7\nH\n',
+      records: records as unknown as Parameters<typeof payoffPass>[0]['records'],
+      structure: structure as Parameters<typeof payoffPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const gap = result.issues.filter(i => i.rule === 'PAYOFF_MEMORY_GAP');
+    assert.equal(gap.length, 0, 'Should NOT fire PAYOFF_MEMORY_GAP for payoff only 5 scenes after setup');
+  });
+
   // ── intention: REPEATED_PURPOSE ───────────────────────────────────────────
 
   it('intentionPass fires REPEATED_PURPOSE for 3 consecutive establish_world scenes', async () => {
