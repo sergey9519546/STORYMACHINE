@@ -1,6 +1,8 @@
 // Wave 39 — Revision Panel
-// Shows the 12-pass revision pipeline UI: trigger revision, view per-pass
+// Shows the multi-pass revision pipeline UI: trigger revision, view per-pass
 // diffs with issue breakdowns, accept/reject individual pass results.
+// Pass count is data-driven (totalPasses from the SSE stream), so this UI adapts
+// automatically as passes are added to the pipeline (currently 14).
 // H8: Uses SSE streaming endpoint so each pass result appears as it completes.
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
