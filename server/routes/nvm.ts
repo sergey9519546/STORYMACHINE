@@ -542,8 +542,19 @@ router.post('/api/nvm/selfplay', gameLimiter, asyncHandler(async (req, res) => {
   const maxSimulations = typeof rawMax === 'number' && rawMax > 0 ? Math.min(rawMax, 50) : undefined;
   const rawMaxScenes = req.body?.maxScenesPerScenario;
   const maxScenesPerScenario = typeof rawMaxScenes === 'number' && rawMaxScenes > 0 ? Math.min(rawMaxScenes, 100) : undefined;
+
+  // H6: parse per-simulation convergence budget from request body.
+  const rawBudget = req.body?.budget;
+  const selfPlayBudget = rawBudget && typeof rawBudget === 'object' ? {
+    maxIterations:         Math.min(10, Math.max(1, parseInt(String(rawBudget.maxIterations         ?? 4), 10) || 4)),
+    candidatesPerIteration: Math.min(5,  Math.max(1, parseInt(String(rawBudget.candidatesPerIteration ?? 2), 10) || 2)),
+    ...(rawBudget.maxLLMCalls != null
+      ? { maxLLMCalls: Math.min(100, Math.max(1, parseInt(String(rawBudget.maxLLMCalls), 10) || 24)) }
+      : {}),
+  } : undefined;
+
   const generate = makeLLMCandidateGenerator();
-  const report = await runSelfPlay(scenarios, generate, maxSimulations, maxScenesPerScenario);
+  const report = await runSelfPlay(scenarios, generate, maxSimulations, maxScenesPerScenario, selfPlayBudget);
 
   // Persist each run to Stage corpus
   const state = buildEnrichedState(stage);

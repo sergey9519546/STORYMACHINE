@@ -4,6 +4,7 @@ import { generateContent, modelForTask, getImageProvider, getTTSProvider } from 
 import { logger } from '../lib/logger.ts';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES, STYLE_MODIFIERS } from '../lib/structure-presets.ts';
+import { composePromptModifiers, GENRE_NAMES } from '../lib/genre-router.ts';
 import {
   asyncHandler, requireString, safeJsonParse, sessionId, getOrCreateSession,
   gameLimiter, aiLimiter, sessions,
@@ -11,7 +12,7 @@ import {
 import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
 import { listPersonas, getPersona, registerUserPersona, personaPromptBlock } from '../personas/registry.ts';
 import { getPrompt } from '../lib/prompts.ts';
-import type { DirectorStyle, StoryStructure } from '../engine/types.ts';
+import type { DirectorStyle, StoryGenre, StoryStructure } from '../engine/types.ts';
 
 // ── Schema for analyzeScriptBlock ─────────────────────────────────────────────
 const AnalyzeScriptSchema = {
@@ -259,8 +260,18 @@ router.get('/api/scriptide/complete', aiLimiter, async (req, res) => {
     // Sanitize all user-controlled strings before embedding in the prompt (C1)
     const prefix  = sanitizeForPrompt(rawPrefix,  4000);
     const suffix  = sanitizeForPrompt(rawSuffix,  1000);
-    const stylePreamble = dirStyle ? `DIRECTOR STYLE: ${sanitizeForPrompt(dirStyle, 150)}\n` : '';
-    const genrePreamble = genre    ? `GENRE: ${sanitizeForPrompt(genre, 80)}\n`              : '';
+
+    // P8: use the full composed modifier (synergy override when available) instead
+    // of the simple "DIRECTOR STYLE: X" / "GENRE: Y" string fragments.
+    const isValidGenre = (s: string): s is StoryGenre =>
+      ['thriller','horror','drama','comedy','romance','sci_fi','noir','mystery'].includes(s);
+    const isValidStyle = (s: string): s is DirectorStyle =>
+      ['hitchcock','fincher','nolan','villeneuve','aster','lynch'].includes(s);
+    const composedGenre  = isValidGenre(genre)   ? genre   : undefined;
+    const composedStyle  = isValidStyle(dirStyle) ? dirStyle : undefined;
+    const { block: composedBlock } = composePromptModifiers(composedGenre, composedStyle);
+    const stylePreamble = composedBlock ? `${composedBlock}\n` : '';
+    const genrePreamble = '';  // merged into stylePreamble via composePromptModifiers
     const charPreamble  = charNames.length > 0
       ? `CHARACTERS ESTABLISHED IN SCRIPT: ${charNames.map(n => sanitizeForPrompt(n, 64)).join(', ')}\n`
       : '';
@@ -360,6 +371,17 @@ const profilesBlock = (profiles: Array<Record<string, string>>): string =>
     ? `\nCHARACTERS (keep every depiction consistent with these profiles — never contradict a want, lie, or wound):\n${profiles.map(p => `- ${p.name}: wants "${p.want || '?'}"; clings to the false belief "${p.lie || '?'}"; wounded by "${p.ghost || '?'}"`).join('\n')}\n`
     : '';
 
+// P8: Extract the composed genre+director style modifier block from the active session.
+// Returns a non-empty string when the session has a genre or director style configured.
+// Wraps with newlines so callers can safely include it in template variables.
+const sessionStyleGenreBlock = (req: import('express').Request): string => {
+  const s = sessions.get(sessionId(req));
+  if (!s) return '';
+  const ill = s.stage.getIllusionState();
+  const { block } = composePromptModifiers(ill.story_genre, ill.director_style);
+  return block ? `\n${block}\n` : '';
+};
+
 router.post('/api/scriptide/world-build', aiLimiter, asyncHandler(async (req, res) => {
   const beat = requireString(req.body?.beat, 'beat');
   const scriptContext = scriptContextOf(req.body);
@@ -379,6 +401,7 @@ router.post('/api/scriptide/world-build', aiLimiter, asyncHandler(async (req, re
       bibleBlock,
       profilesBlock: wbProfiles,
       beat: sanitizeForPrompt(beat, 8000),
+      styleGenreBlock: sessionStyleGenreBlock(req),
     }),
   }, { label: 'world-build', timeoutMs: 30_000 });
   res.json({ result: response.text ?? '' });
@@ -424,6 +447,7 @@ router.post('/api/scriptide/refine-dialogue', aiLimiter, asyncHandler(async (req
       bibleBlock: dlgBibleBlock,
       dialogue: sanitizeForPrompt(dialogue, 8000),
       profiles: JSON.stringify(profiles),
+      styleGenreBlock: sessionStyleGenreBlock(req),
     }),
   }, { label: 'refine-dialogue', timeoutMs: 30_000 });
   res.json({ result: response.text ?? '' });
@@ -448,6 +472,7 @@ router.post('/api/scriptide/analyze-tension', aiLimiter, asyncHandler(async (req
       bibleBlock: tnBibleBlock,
       profilesBlock: tnProfiles,
       scene: sanitizeForPrompt(scene, 8000),
+      styleGenreBlock: sessionStyleGenreBlock(req),
     }),
   }, { label: 'analyze-tension', timeoutMs: 30_000 });
   res.json({ result: response.text ?? '' });
@@ -455,13 +480,12 @@ router.post('/api/scriptide/analyze-tension', aiLimiter, asyncHandler(async (req
 
 router.post('/api/scriptide/clean-action', aiLimiter, asyncHandler(async (req, res) => {
   const text = requireString(req.body?.text, 'text');
-  const caSession = sessions.get(sessionId(req));
-  const caGenre = caSession?.stage.getIllusionState().story_genre;
-  const caGenreHint = caGenre ? `\nGENRE: ${sanitizeForPrompt(caGenre, 80)} — match the established tone when choosing action verbs.\n` : '';
+  // P8: use full composed modifier (synergy override when available) instead of a simple genre hint string.
+  const genreHint = sessionStyleGenreBlock(req);
   const response = await generateContent({
     model: modelForTask('ACTION'),
     contents: getPrompt('scriptide-clean-action', {
-      genreHint: caGenreHint,
+      genreHint,
       text: sanitizeForPrompt(text, 8000),
     }),
   }, { label: 'clean-action', timeoutMs: 30_000 });

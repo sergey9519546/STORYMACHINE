@@ -14407,3 +14407,141 @@ describe('Wave 123 — continuityCritic: severity maps from finding.severity', (
     assert.notEqual(intCrit!.severity, 80, 'old hardcoded severity 80 is replaced');
   });
 });
+
+// ── Wave 128 ─────────────────────────────────────────────────────────────────
+
+import { composePromptModifiers, SYNERGY_OVERRIDES } from './server/lib/genre-router.ts';
+
+describe('Wave 128 — P8: Genre×Director Synergy Compositor', () => {
+
+  it('composePromptModifiers: genre only — returns genre block, no synergy', () => {
+    const { block, hasSynergy } = composePromptModifiers('thriller', undefined);
+    assert.ok(block.includes('THRILLER'), 'block contains genre instruction');
+    assert.equal(hasSynergy, false, 'no director = no synergy');
+  });
+
+  it('composePromptModifiers: director only — returns director instruction, no synergy', () => {
+    const { block, hasSynergy } = composePromptModifiers(undefined, 'hitchcock');
+    assert.ok(block.includes('HITCHCOCK'), 'block contains director instruction');
+    assert.equal(hasSynergy, false, 'no genre = no synergy');
+  });
+
+  it('composePromptModifiers: non-synergy pair — concatenates both blocks', () => {
+    const { block, hasSynergy } = composePromptModifiers('drama', 'nolan');
+    // drama + nolan has no synergy override — should include both
+    assert.ok(block.includes('NOLAN'), 'director present');
+    assert.ok(block.includes('DRAMA'), 'genre present');
+    assert.equal(hasSynergy, false);
+  });
+
+  it('composePromptModifiers: thriller+hitchcock fires synergy override', () => {
+    const { block, hasSynergy } = composePromptModifiers('thriller', 'hitchcock');
+    assert.equal(hasSynergy, true, 'synergy flag set');
+    assert.ok(block.includes('SYNERGY'), 'block contains SYNERGY label');
+    assert.ok(block.includes('HITCHCOCK'), 'block mentions director');
+    assert.ok(block.includes('THRILLER'), 'block mentions genre');
+    // Should NOT fall back to separate blocks (no duplicated instruction)
+    assert.ok(!block.includes('CINEMATIC STYLE — HITCHCOCK'), 'should not include raw director instruction when synergy fires');
+  });
+
+  it('composePromptModifiers: horror+aster fires synergy override', () => {
+    const { hasSynergy, block } = composePromptModifiers('horror', 'aster');
+    assert.equal(hasSynergy, true);
+    assert.ok(block.includes('ASTER'), 'aster in synergy block');
+  });
+
+  it('composePromptModifiers: horror+lynch fires synergy override', () => {
+    const { hasSynergy } = composePromptModifiers('horror', 'lynch');
+    assert.equal(hasSynergy, true);
+  });
+
+  it('composePromptModifiers: no genre, no director — empty block', () => {
+    const { block, hasSynergy } = composePromptModifiers(undefined, undefined);
+    assert.equal(block, '', 'empty when both absent');
+    assert.equal(hasSynergy, false);
+  });
+
+  it('SYNERGY_OVERRIDES: all 14 expected keys present', () => {
+    const expectedKeys = [
+      'thriller_hitchcock', 'horror_aster', 'horror_lynch',
+      'mystery_hitchcock', 'mystery_fincher', 'noir_hitchcock', 'noir_lynch',
+      'drama_villeneuve', 'drama_aster', 'sci_fi_nolan', 'sci_fi_villeneuve',
+      'thriller_fincher', 'comedy_lynch', 'romance_villeneuve',
+    ];
+    for (const key of expectedKeys) {
+      assert.ok(SYNERGY_OVERRIDES[key] != null, `synergy key '${key}' exists`);
+      assert.ok(
+        typeof SYNERGY_OVERRIDES[key]!.combinedInstruction === 'string' && SYNERGY_OVERRIDES[key]!.combinedInstruction.length > 50,
+        `synergy '${key}' has substantive instruction`,
+      );
+    }
+  });
+
+  it('genrePromptBlock: still works independently', () => {
+    const block = genrePromptBlock('noir');
+    assert.ok(block.includes('NOIR'), 'genre instruction present');
+    assert.ok(block.includes('REGISTER'), 'register present');
+    assert.ok(block.includes('AVOID'), 'forbidden clichés present');
+  });
+
+  it('all 8 genres have GENRE_MODIFIERS entries', () => {
+    const genres: import('./server/engine/types.ts').StoryGenre[] = ['thriller','horror','drama','comedy','romance','sci_fi','noir','mystery'];
+    for (const g of genres) {
+      assert.ok(GENRE_MODIFIERS[g] != null, `genre modifier exists for ${g}`);
+    }
+  });
+
+});
+
+describe('Wave 128 — H6: SelfPlay budget threading', () => {
+
+  it('runSelfPlay: budget param is forwarded to convergeScene (compile-time type check)', async () => {
+    const { runSelfPlay } = await import('./server/nvm/selfplay/corpus.ts');
+    // The function must accept a budget parameter without TypeScript error.
+    // We test with a no-op generator that returns empty to verify the signature.
+    type CandidateGenerator = import('./server/nvm/generate/proof-spec.ts').CandidateGenerator;
+    const noopGen: CandidateGenerator = async () => [];
+    const scenarios = [{
+      scenarioId: 'wave128-budget-test',
+      seed: 42,
+      sceneTargets: [],
+    }];
+    // budget passed — should not throw at the call site (no LLM calls because sceneTargets is empty)
+    const report = await runSelfPlay(scenarios, noopGen, 1, 0, { maxIterations: 2, candidatesPerIteration: 1 });
+    assert.ok(report != null, 'report returned');
+    assert.equal(typeof report.meanScore, 'number', 'meanScore is a number');
+  });
+
+});
+
+describe('Wave 128 — M4: Agent module decomposition', () => {
+
+  it('agent/decision.ts: buildPrompt is exported and callable', async () => {
+    const { buildPrompt } = await import('./server/engine/agent/decision.ts');
+    assert.equal(typeof buildPrompt, 'function', 'buildPrompt is a function');
+  });
+
+  it('agent/decision.ts: selectBestAction is exported and callable', async () => {
+    const { selectBestAction } = await import('./server/engine/agent/decision.ts');
+    assert.equal(typeof selectBestAction, 'function', 'selectBestAction is a function');
+  });
+
+  it('agent/memory.ts: synthesizeReflectionsFor is exported and callable', async () => {
+    const { synthesizeReflectionsFor } = await import('./server/engine/agent/memory.ts');
+    assert.equal(typeof synthesizeReflectionsFor, 'function', 'synthesizeReflectionsFor is a function');
+  });
+
+  it('agent/memory.ts: replanGoalsFor is exported and callable', async () => {
+    const { replanGoalsFor } = await import('./server/engine/agent/memory.ts');
+    assert.equal(typeof replanGoalsFor, 'function', 'replanGoalsFor is a function');
+  });
+
+  it('Agent.ts: public interface unchanged (takeTurn + updateEpistemics + evaluateState)', async () => {
+    const { Agent } = await import('./server/engine/Agent.ts');
+    const proto = Agent.prototype;
+    assert.equal(typeof proto.takeTurn, 'function', 'takeTurn present');
+    assert.equal(typeof proto.updateEpistemics, 'function', 'updateEpistemics present');
+    assert.equal(typeof proto.evaluateState, 'function', 'evaluateState present');
+  });
+
+});

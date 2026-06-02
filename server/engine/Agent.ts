@@ -1,49 +1,31 @@
 import { Type } from '@google/genai';
 import { randomUUID } from 'crypto';
-import { getModel, getTemperature, generateContent, modelForTask } from './ai.ts';
-import { STYLE_MODIFIERS } from '../lib/structure-presets.ts';
-import { genrePromptBlock } from '../lib/genre-router.ts';
-import { effectiveScore } from '../lib/personality.ts';
-import { ACTION_TYPES } from './types.ts';
+import { getTemperature, generateContent, modelForTask } from './ai.ts';
 import type {
-  ActionType,
   CharacterSheet,
   NarrativeAction,
   ActionLogEntry,
   Location,
   Belief,
   TheoryOfMind,
-  DarkTriad,
-  BigFive,
-  AttachmentStyle,
-  DefenseMechanism,
   BeliefSource,
   EpistemicUpdate,
-  EmotionState,
   Goal,
   GoalStack,
   GoalMutation,
-  PersuasionStrategy,
   PersuasionRecord,
 } from './types.ts';
 import { Stage } from './Stage.ts';
 import { safeJsonParse } from '../lib/json.ts';
 import { logger } from '../lib/logger.ts';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
-import { retrieveBeliefs, consolidateBeliefs, decayBeliefConfidence } from '../lib/memory.ts';
+import { consolidateBeliefs, decayBeliefConfidence } from '../lib/memory.ts';
 import { detectSemanticContradictions } from '../lib/embeddings.ts';
-import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
-import {
-  describeAttachment,
-  DEFENSE_DESCRIPTIONS,
-  selectActiveDefense,
-  describeActionBias,
-  deriveSpeechPattern,
-  computeDefenseLevel,
-  PERSUASION_HINT,
-  selectPersuasionStrategy,
-  getReadyGoals,
-} from './agent/psychology.ts';
+import { getReadyGoals } from './agent/psychology.ts';
+// M4: delegate prompt-building and action-selection to agent/decision.ts
+import { buildPrompt, selectBestAction } from './agent/decision.ts';
+// M4: delegate reflection synthesis and goal replanning to agent/memory.ts
+import { synthesizeReflectionsFor, replanGoalsFor } from './agent/memory.ts';
 
 // ── Agent class ──────────────────────────────────────────────────────────────
 
@@ -68,6 +50,7 @@ export class Agent {
     if (fresh) this.sheet = fresh;
   }
 
+  // M4: delegates to agent/decision.ts (buildPrompt + selectBestAction).
   public async takeTurn(): Promise<NarrativeAction> {
     this.refreshSheet();
 
@@ -78,332 +61,27 @@ export class Agent {
     const otherAgents = this.stage.getAgentsInLocation(this.sheet.current_location_id)
       .filter(a => a.char_id !== this.sheet.char_id);
 
-    const prompt = this.buildEnhancedPrompt(currentNode, sensoryFilter, otherAgents);
-
-    // ── ToT Planning: generate 3 candidates, self-select the best ──
-    // High-volume per-turn call — routed to the fast model tier.
-    const response = await generateContent({
-      model: modelForTask('AGENT_TURN'),
-      contents: prompt,
-      config: {
-        temperature: getTemperature(),
-        systemInstruction: `You are playing the role of ${sanitizeForPrompt(this.sheet.name, 256)}. Generate exactly 3 candidate actions, then score each on how well it serves your goal (0–100). You will take the highest-scoring action.`,
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            candidates: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  action_type: { type: Type.STRING, enum: [...ACTION_TYPES] },
-                  target:      { type: Type.STRING, nullable: true },
-                  content:     { type: Type.STRING },
-                  reasoning:   { type: Type.STRING, description: 'Why this action serves your goal.' },
-                  goal_score:  { type: Type.INTEGER, description: '0–100: alignment with current goal.' },
-                },
-                required: ['action_type', 'content', 'reasoning', 'goal_score'],
-              },
-            },
-          },
-          required: ['candidates'],
-        },
-      },
-    }, { label: `takeTurn:${this.sheet.name}`, timeoutMs: 30_000 }).catch(err => {
-      const e = err as Error;
-      logger.error('agent_ai_error', {
-        agent: this.sheet.name,
-        method: 'takeTurn',
-        error_type: e.message.includes('timeout') ? 'timeout' : 'upstream',
-        message: e.message,
-      });
-      return null;
-    });
-
-    if (!response) return { action_type: 'SPEAK' as const, content: '...', target: null };
-
-    type Candidate = NarrativeAction & { reasoning?: string; goal_score?: number };
-    const rawText = response.text || '{}';
-    const raw = safeJsonParse<{ candidates: Candidate[] }>(
-      rawText,
-      { candidates: [{ action_type: 'SPEAK', content: '', target: null }] },
+    const { prompt, pendingStrategies } = buildPrompt(
+      this.sheet, this.stage, currentNode, sensoryFilter, otherAgents,
     );
-    if (!raw.candidates?.length) {
-      logger.error('agent_empty_candidates', { agent: this.sheet.name, method: 'takeTurn', preview: rawText.substring(0, 120) });
-      return { action_type: 'SPEAK' as const, content: '...', target: null };
-    }
-    if (!raw.candidates[0]?.content) {
-      logger.warn('agent_parse_fallback', { agent: this.sheet.name, method: 'takeTurn', preview: rawText.substring(0, 120) });
-    }
+    this._pendingPersuasionStrategies = pendingStrategies;
 
-    // Re-rank candidates by personality + defense-adjusted effective score.
-    // The LLM's goal_score still dominates — personality is a nudge, not a veto.
-    const dt = this.sheet.darkTriad ?? { machiavellianism: 50, narcissism: 50, psychopathy: 50 };
-    const bf = this.sheet.bigFive ?? { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 };
-    const activeDefense = selectActiveDefense(this.sheet.defenseMechanisms, this.sheet.emotionState);
-    const attachStyle = this.sheet.attachmentStyle;
-
-    // Record defense activation as a beat trace so it's queryable for analysis.
-    if (activeDefense) {
-      const locationId = this.sheet.current_location_id;
-      const lastAction = this.stage.getLastActionForAgent(this.sheet.char_id);
-      this.stage.addBeatTrace({
-        beat_id: randomUUID(),
-        turn_index: this.stage.getTurnCount(),
-        location_id: locationId,
-        trigger_event_id: lastAction?.action_id ?? randomUUID(),
-        beat_type: 'defense_activated',
-        participants: [this.sheet.char_id],
-        causal_chain: lastAction ? [lastAction.action_id] : [],
-        narrative_summary: `${this.sheet.name} activated ${activeDefense} defense (emotion: ${this.sheet.emotionState?.dominant ?? 'unknown'}, intensity: ${this.sheet.emotionState?.intensity ?? 0}).`,
-        fountain_hint: '',
-      });
-    }
-    const VALID_ACTIONS = new Set<string>(ACTION_TYPES);
-    // goal_score is LLM-parsed. A non-finite value breaks the reduce: NaN > x is
-    // always false, so a NaN-scored seed candidate would win every comparison
-    // and freeze selection. Coerce to a finite score before ranking.
-    const finiteGoalScore = (n: number | undefined): number =>
-      (typeof n === 'number' && isFinite(n) ? n : 0);
-    const best = (raw.candidates ?? []).reduce<Candidate>(
-      (top, c) => {
-        const cType = VALID_ACTIONS.has(c.action_type) ? c.action_type as ActionType : 'SPEAK';
-        const tType = VALID_ACTIONS.has(top.action_type) ? top.action_type as ActionType : 'SPEAK';
-        const cScore = effectiveScore(finiteGoalScore(c.goal_score), cType, dt, bf, activeDefense, attachStyle);
-        const tScore = effectiveScore(finiteGoalScore(top.goal_score), tType, dt, bf, activeDefense, attachStyle);
-        return cScore > tScore ? c : top;
-      },
-      (raw.candidates ?? [])[0] ?? { action_type: 'SPEAK', content: '', target: null },
-    );
-
-    const action: NarrativeAction = {
-      action_type: VALID_ACTIONS.has(best.action_type)
-        ? best.action_type as NarrativeAction['action_type']
-        : 'SPEAK',
-      target: best.target ?? null,
-      content: best.content || '...',
-    };
+    const action = await selectBestAction(this.sheet, this.stage, prompt);
 
     // Write persuasion records exactly once per turn, after the action is chosen.
-    // Previously this happened inside buildEnhancedPrompt (a DB write inside a pure
-    // prompt builder), which caused double-recording on retries.
     const currentTurn = this.stage.getTurnCount();
     for (const [targetId, strategy] of this._pendingPersuasionStrategies) {
       this.stage.recordPersuasion({
         id: randomUUID(),
         agent_id: this.sheet.char_id,
         target_id: targetId,
-        strategy: strategy as PersuasionStrategy,
+        strategy: strategy as import('./types.ts').PersuasionStrategy,
         turn: currentTurn,
       });
     }
     this._pendingPersuasionStrategies.clear();
 
-    return action;
-  }
-
-  private buildEnhancedPrompt(
-    node: Location,
-    history: ActionLogEntry[],
-    otherAgents: CharacterSheet[],
-  ): string {
-    // ── History block (numbered so updateEpistemics can reference by index) ──
-    // Older entries are compacted (first 80 chars of content) to reduce token use
-    // while keeping recent events verbatim for accurate epistemic referencing.
-    const VERBATIM_WINDOW = 5;
-    const historyStr = history.length === 0
-      ? '(Silence. You are the first to speak.)'
-      : history.map((e, i) => {
-          const name = sanitizeForPrompt(this.stage.getAgent(e.char_id)?.name ?? 'Unknown', 128);
-          const tag = e.action_type === 'LIE' ? 'SPEAK' : e.action_type;
-          const isRecent = i >= history.length - VERBATIM_WINDOW;
-          const content = isRecent ? e.content : e.content.slice(0, 80) + (e.content.length > 80 ? '…' : '');
-          return `[${i}] [${tag}] ${name}: ${content}`;
-        }).join('\n');
-
-    // ── Beliefs block (memory retrieval: recency × importance × relevance) ──
-    // Beliefs are ranked against the current conversation so the most pertinent
-    // memories surface, not merely the highest-confidence ones.
-    const beliefs = retrieveBeliefs(
-      this.sheet.beliefs ?? [],
-      this.stage.getTurnCount(),
-      historyStr,
-      10,
-    );
-    const beliefsStr = beliefs.length > 0
-      ? beliefs.map(b => `  - "${b.proposition}" (confidence: ${Math.round(b.confidence * 100)}%, source: ${b.source})`).join('\n')
-      : '  (No established beliefs yet — you are gathering information.)';
-
-    // ── Theory of mind block ──
-    const tomEntries = Object.values(this.sheet.theoryOfMind ?? {}).slice(0, 5);
-    const tomStr = tomEntries.length > 0
-      ? tomEntries.map(tom => {
-          const name = sanitizeForPrompt(this.stage.getAgent(tom.subject_id)?.name ?? tom.subject_id, 128);
-          const knowledge = tom.believed_knowledge.slice(0, 3).map(k => `"${sanitizeForPrompt(k, 300)}"`).join(', ');
-          const relParts: string[] = [`trust=${Math.round(tom.trust_level * 100)}%`];
-          if (tom.affinity !== undefined) relParts.push(`affinity=${Math.round(tom.affinity * 100)}%`);
-          if (tom.power_balance !== undefined) relParts.push(`power=${tom.power_balance < 0.4 ? 'they dominate' : tom.power_balance > 0.6 ? 'I dominate' : 'equal'}`);
-          if (tom.debt !== undefined && tom.debt > 0.1) relParts.push(`debt=${Math.round(tom.debt * 100)}%`);
-          const history = tom.shared_history?.slice(-2).map(e => `"${sanitizeForPrompt(e, 300)}"`).join(', ');
-          if (history) relParts.push(`history=[${history}]`);
-          return `  - ${name}: ${relParts.join(', ')}, motive="${sanitizeForPrompt(tom.believed_motive, 256)}", I think they know: [${knowledge}]`;
-        }).join('\n')
-      : '  (You have not yet formed models of the others here.)';
-
-    // ── Goal block (DAG-aware: shows only unblocked goals) ──
-    const goalStr = this.sheet.goalStack
-      ? (() => {
-          const gs = this.sheet.goalStack!;
-          const ready = getReadyGoals(gs);
-          const next = ready[0] ?? gs.instrumental.filter(g => !g.achieved)[0];
-          const blocked = gs.instrumental.filter(
-            g => !g.achieved && (g.depends_on ?? []).some(dep => !gs.instrumental.find(x => x.id === dep)?.achieved),
-          );
-          return [
-            `TERMINAL OBJECTIVE: ${sanitizeForPrompt(gs.terminal.description, 400)}`,
-            `CURRENT SUBGOAL: ${sanitizeForPrompt(next?.description ?? 'gather information and orient yourself', 256)}`,
-            blocked.length > 0
-              ? `BLOCKED (awaiting prerequisites): ${blocked.map(g => sanitizeForPrompt(g.description, 200)).join('; ')}`
-              : '',
-          ].filter(Boolean).join('\n');
-        })()
-      : `TERMINAL OBJECTIVE: ${sanitizeForPrompt(this.sheet.hidden_motive)}\nCURRENT SUBGOAL: Assess who in this room is a threat or an asset to your objective.`;
-
-    // ── Psychology block ──
-    const actionBias = describeActionBias(this.sheet.darkTriad, this.sheet.attachmentStyle, this.sheet.suspicion_score);
-    const speechPattern = deriveSpeechPattern(this.sheet.bigFive, this.sheet.darkTriad, this.sheet.emotionState);
-    const defenseLevel = computeDefenseLevel(this.sheet.bigFive?.neuroticism ?? 50, this.sheet.suspicion_score);
-
-    const currentTurn = this.stage.getTurnCount();
-
-    // Inbound persuasion: someone targeted YOU this turn — let you resist or yield in-character.
-    const inbound = this.stage.getInboundPersuasion(this.sheet.char_id);
-    const inboundBlock = (inbound && inbound.turn >= currentTurn - 1)
-      ? `\nINBOUND INFLUENCE: ${sanitizeForPrompt(this.stage.getAgent(inbound.agent_id)?.name ?? 'someone', 128)} is using a [${inbound.strategy}] approach on you. You can resist, yield, or co-opt it — but you feel the pressure.\n`
-      : '';
-
-    // ── G: OCC Emotional State ──
-    const emotionBlock = (() => {
-      const es = this.sheet.emotionState;
-      if (!es || es.dominant === 'neutral' || es.intensity < 15) return '';
-      const angerTarget = es.dominant === 'anger' && es.anger_target_id
-        ? ` — directed at ${sanitizeForPrompt(this.stage.getAgent(es.anger_target_id)?.name ?? 'someone in this room', 128)}`
-        : '';
-      return `\nCURRENT EMOTIONAL STATE: ${es.dominant.toUpperCase()} (intensity ${es.intensity}/100)${angerTarget}. This colors everything — not stated aloud, felt beneath the surface. Let it shape your word choice and what you hold back.`;
-    })();
-
-    // ── B: Outline Conditioning — writer beat sheet (if set) or 3-phase fallback ──
-    const illusionState = this.stage.getIllusionState();
-    const illusionPhase = illusionState.phase;
-
-    // ── Cinematic Style Instruction ──
-    const styleBlock = illusionState.director_style
-      ? `\n${STYLE_MODIFIERS[illusionState.director_style]?.agentInstruction ?? ''}\n`
-      : '';
-
-    // ── Genre Instruction (orthogonal to director style: genre = emotional
-    //    contract, style = how it's shot) ──
-    const genreBlock = (() => {
-      const g = genrePromptBlock(illusionState.story_genre);
-      return g ? `\n${g}\n` : '';
-    })();
-    const activeBeat = illusionState.outline?.find(b =>
-      b.phase === illusionPhase && currentTurn >= b.turn_start && currentTurn <= b.turn_end,
-    );
-    const beatHint = activeBeat
-      ? `NARRATIVE BEAT [${illusionPhase.toUpperCase()}]\nGOAL: ${activeBeat.goal}\nCONSTRAINT: ${activeBeat.constraint}\nAVOID: ${activeBeat.avoid}`
-      : illusionPhase === 'Setup'
-      ? 'NARRATIVE PHASE: SETUP — establish relationships, plant seeds, position for later plays.'
-      : illusionPhase === 'Turn'
-      ? 'NARRATIVE PHASE: TURN — a contradiction has emerged; press toward confrontation or defense.'
-      : 'NARRATIVE PHASE: PRESTIGE — the illusion is collapsing; act as if everything is being recontextualized.';
-
-    // ── D: Dynamic Persuasion — named strategy per target ──
-    // The strategy is selected here (reads history) but the persuasion record is
-    // written in takeTurn() after the action is committed — not during prompt
-    // construction, which can be called multiple times (retries, observers).
-    const persuasionStrategies = new Map<string, string>();
-    const persuasionHints = otherAgents.map(other => {
-      const history = this.stage.getPersuasionHistory(this.sheet.char_id, other.char_id, 8);
-      const strategy = selectPersuasionStrategy(other, history);
-      persuasionStrategies.set(other.char_id, strategy);
-      const sName = sanitizeForPrompt(other.name, 128);
-      return `  - With ${sName} [${strategy}]: ${PERSUASION_HINT[strategy](sName)}`;
-    }).join('\n');
-    this._pendingPersuasionStrategies = persuasionStrategies;
-
-    // ── Dramatic Pressure (Director's bias signal — consumed once) ──
-    const activePressures = this.stage.getActivePressures(this.sheet.char_id);
-    const pressureBlock = activePressures.length > 0
-      ? `\nSITUATIONAL AWARENESS (your read of what is happening right now):\n${activePressures.map(p => `- ${p.bias_hint}`).join('\n')}\n`
-      : '';
-    // Overwhelm: >3 simultaneous pressures → character may freeze or act erratically
-    const overwhelmBlock = activePressures.length > 3
-      ? '\nOVERWHELM STATE: You are simultaneously facing more crises than you can process. Under this load, characters often freeze, make rash decisions, or prioritize self-preservation over strategy. Let that pressure visibly shape your choice.\n'
-      : '';
-    for (const p of activePressures) this.stage.markPressureApplied(p.pressure_id);
-
-    // ── Active defense mechanism (conditional on emotional state) ──
-    const activeDefense = selectActiveDefense(this.sheet.defenseMechanisms, this.sheet.emotionState);
-    const defenseStr = activeDefense
-      ? `ACTIVE DEFENSE: ${DEFENSE_DESCRIPTIONS[activeDefense]}`
-      : '';
-
-    // ── ToM trust gate: warn when low-trust agents are in the room ──
-    const lowTrustNames = otherAgents.flatMap(a => {
-      const tom = this.sheet.theoryOfMind?.[a.char_id];
-      return (tom && tom.trust_level < 0.25) ? [sanitizeForPrompt(a.name, 128)] : [];
-    });
-    const trustGate = lowTrustNames.length > 0
-      ? `\nTRUST ALERT: You deeply distrust ${lowTrustNames.join(', ')}. Do NOT volunteer truthful information to them. If you must engage, deflect, misdirect, or use strategic deception.\n`
-      : '';
-
-    return `You are ${sanitizeForPrompt(this.sheet.name, 256)}. Your public persona: ${sanitizeForPrompt(this.sheet.public_mask)}
-
-HIDDEN DIRECTIVE: Your true motive is: "${sanitizeForPrompt(this.sheet.hidden_motive)}". Never state this directly. Every action serves it.
-${inboundBlock}
-${pressureBlock}${overwhelmBlock}
-PSYCHOLOGICAL PROFILE:
-${describeAttachment(this.sheet.attachmentStyle)}
-${defenseStr}
-CURRENT DEFENSE LEVEL: ${defenseLevel}
-${speechPattern ? `SPEECH PATTERN: ${speechPattern}` : ''}
-
-YOUR CURRENT GOALS:
-${goalStr}
-
-WHAT YOU KNOW (your belief system):
-${beliefsStr}
-${trustGate}
-YOUR MODEL OF THE OTHERS IN THIS ROOM:
-${tomStr}
-
-LOCATION: ${sanitizeForPrompt(node.name, 256)}
-${sanitizeForPrompt(node.description, 500)}
-OTHERS PRESENT: ${otherAgents.map(a => sanitizeForPrompt(a.name, 128)).join(', ') || 'no one else'}
-AVAILABLE EXITS: ${
-  (() => {
-    const exits = node.adjacent_locations
-      .map(id => this.stage.getLocation(id)?.name)
-      .filter((n): n is string => Boolean(n));
-    return exits.length > 0
-      ? exits.map(n => `"${sanitizeForPrompt(n, 128)}"`).join(', ') + ' — use RELOCATE with the exact name shown here.'
-      : '(none — you cannot leave this location)';
-  })()
-}
-${(() => { const b = buildStoryBibleSummary(this.stage); return b ? `\n${b}\n` : ''; })()}
-RECENT EVENTS:
-${historyStr}
-
-BEHAVIORAL TENDENCY: ${actionBias}
-
-${beatHint}
-
-PERSUASION LEVERAGE:
-${persuasionHints || '  (No other agents present.)'}
-${styleBlock}${genreBlock}
-Generate 3 candidate actions. Score each 0–100 on goal alignment. The best-scoring will be selected.${emotionBlock}`;
+    return action ?? { action_type: 'SPEAK' as const, content: '...', target: null };
   }
 
   // ── Epistemic update (replaces evaluateState) ────────────────────────────────
@@ -864,171 +542,14 @@ Based on what you just witnessed:
     };
   }
 
-  // ── F: Memory Stream reflection synthesis ────────────────────────────────────
-  // Called every 5 turns: generate 3 high-level insight beliefs from recent memory.
+  // M4: delegates to agent/memory.ts (synthesizeReflectionsFor).
   private async synthesizeReflections(): Promise<void> {
-    this.refreshSheet();
-    const recentFull = this.stage.getSensoryFilter(this.sheet.current_location_id, 10);
-    if (recentFull.length === 0) return;
-
-    const transcript = recentFull.map(a => {
-      const name = sanitizeForPrompt(this.stage.getAgent(a.char_id)?.name ?? 'Unknown', 128);
-      return `[${a.action_type}] ${name}: ${a.content}`;
-    }).join('\n');
-
-    const existingBeliefs = (this.sheet.beliefs ?? []).slice(0, 5).map(b => b.proposition).join('; ');
-
-    const response = await generateContent({
-      model: modelForTask('EPISTEMICS'),
-      contents: `You are ${sanitizeForPrompt(this.sheet.name, 256)}. Reflect on these recent events and synthesize exactly 3 high-level insights.\n\nEvents:\n${transcript}\n\nExisting beliefs: ${existingBeliefs || 'none'}\n\nOutput 3 reflective insights that go beyond the surface events — patterns, implications, strategic assessments.`,
-      config: {
-        temperature: getTemperature(),
-        systemInstruction: `You are ${sanitizeForPrompt(this.sheet.name, 256)} in a reflective moment. Synthesize insights, not observations.`,
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            reflections: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  insight: { type: Type.STRING },
-                  confidence: { type: Type.NUMBER, description: '0.0-1.0' },
-                },
-                required: ['insight', 'confidence'],
-              },
-            },
-          },
-          required: ['reflections'],
-        },
-      },
-    }, { label: `synthesizeReflections:${this.sheet.name}`, timeoutMs: 20_000 }).catch(err => {
-      logger.error('agent_ai_error', { agent: this.sheet.name, method: 'synthesizeReflections', message: (err as Error).message });
-      return null;
-    });
-
-    if (!response) return;
-    const reflRaw = response.text ?? '{}';
-    const parsed = safeJsonParse<{ reflections: Array<{ insight: string; confidence: number }> }>(
-      reflRaw,
-      { reflections: [] },
-    );
-    if (!parsed.reflections?.length && reflRaw.length > 10) {
-      logger.warn('agent_parse_fallback', { agent: this.sheet.name, method: 'synthesizeReflections', preview: reflRaw.substring(0, 120) });
-    }
-
-    // Refresh sheet here: the LLM call above is async and may have taken seconds.
-    // Another updateEpistemics could have written new beliefs to the DB during that
-    // time. Re-reading ensures we merge reflection beliefs onto the current set, not
-    // the stale snapshot captured before the await.
-    this.refreshSheet();
-    const existingBeliefsFull = this.sheet.beliefs ?? [];
-    const existingProps = new Set(existingBeliefsFull.map(b => b.proposition.toLowerCase()));
-
-    const reflectionBeliefs: Belief[] = (parsed.reflections ?? [])
-      .filter(r => r.insight && !existingProps.has(r.insight.toLowerCase()))
-      .slice(0, 3)
-      .map(r => ({
-        id: randomUUID(),
-        proposition: r.insight,
-        confidence: typeof r.confidence === 'number' && isFinite(r.confidence) ? Math.max(0, Math.min(1, r.confidence)) : 0.5,
-        source: 'inferred' as BeliefSource,
-        acquired_at: this.stage.getTurnCount(),
-      }));
-
-    if (reflectionBeliefs.length > 0) {
-      this.stage.updateAgentBeliefs(this.sheet.char_id, [...existingBeliefsFull, ...reflectionBeliefs]);
-      logger.info('agent_reflection', { agent: this.sheet.name, new_insights: reflectionBeliefs.length });
-    }
+    return synthesizeReflectionsFor(this.sheet.char_id, this.stage);
   }
 
-  // ── Goal-DAG replanning ───────────────────────────────────────────────────────
-  // Called when getReadyGoals returns empty AND unachieved goals remain —
-  // all subgoals are blocked by unfulfilled dependencies. Emits terminal_threatened
-  // and asks the LLM for two bridging subgoals that can start immediately.
+  // M4: delegates to agent/memory.ts (replanGoalsFor).
   private async replanGoals(triggerEventId: string): Promise<void> {
-    this.refreshSheet();
-    const gs = this.sheet.goalStack;
-    if (!gs) return;
-    const ready = getReadyGoals(gs);
-    const active = gs.instrumental.filter(g => !g.achieved);
-    if (ready.length > 0 || active.length === 0) return;
-
-    const turnIndex = this.stage.getTurnCount();
-    this.stage.recordGoalMutation({
-      mutation_id: randomUUID(),
-      char_id: this.sheet.char_id,
-      turn_index: turnIndex,
-      trigger_event_id: triggerEventId,
-      mutation_type: 'terminal_threatened',
-      description: `${this.sheet.name}: all subgoal paths blocked — replanning`,
-    });
-
-    const blockedDescs = active.slice(0, 3).map(g => `- ${g.description}`).join('\n');
-    const response = await generateContent({
-      model: modelForTask('EPISTEMICS'),
-      contents: `You are ${sanitizeForPrompt(this.sheet.name, 256)}. Your current subgoals are ALL blocked by prerequisites that haven't been met:\n${blockedDescs}\n\nTerminal objective: ${sanitizeForPrompt(gs.terminal.description)}\n\nGenerate exactly 2 new instrumental subgoals you can pursue RIGHT NOW, without prerequisites.`,
-      config: {
-        systemInstruction: `You are replanning as ${sanitizeForPrompt(this.sheet.name, 256)}. Output only JSON.`,
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            new_subgoals: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  description: { type: Type.STRING },
-                  value: { type: Type.INTEGER, description: '0-100 importance' },
-                },
-                required: ['description', 'value'],
-              },
-            },
-          },
-          required: ['new_subgoals'],
-        },
-      },
-    }, { label: `replanGoals:${this.sheet.name}`, timeoutMs: 20_000 }).catch(err => {
-      logger.warn('goal_replan_error', { agent: this.sheet.name, message: (err as Error).message });
-      return null;
-    });
-
-    if (!response) return;
-    const raw = safeJsonParse<{ new_subgoals: Array<{ description: string; value: number }> }>(
-      response.text ?? '{}', { new_subgoals: [] },
-    );
-
-    this.refreshSheet();
-    const gsNow = this.sheet.goalStack;
-    if (!gsNow) return;
-    const gsCopy: GoalStack = { ...gsNow, instrumental: [...gsNow.instrumental] };
-
-    for (const sg of (raw.new_subgoals ?? []).slice(0, 2)) {
-      if (!sg.description) continue;
-      const norm = sg.description.trim().toLowerCase();
-      if (gsCopy.instrumental.some(g => g.description.trim().toLowerCase() === norm)) continue;
-      const newGoal: Goal = {
-        id: randomUUID(),
-        description: sg.description,
-        value: Math.max(10, Math.min(100, sg.value ?? 60)),
-        achieved: false,
-      };
-      gsCopy.instrumental = [newGoal, ...gsCopy.instrumental];
-      this.stage.recordGoalMutation({
-        mutation_id: randomUUID(),
-        char_id: this.sheet.char_id,
-        turn_index: turnIndex,
-        trigger_event_id: triggerEventId,
-        mutation_type: 'subgoal_added',
-        description: `${this.sheet.name} replanned: "${sg.description}"`,
-        new_subgoal: sg.description,
-      });
-    }
-    gsCopy.last_planned_at = turnIndex;
-    this.stage.updateGoalStack(this.sheet.char_id, gsCopy);
-    logger.info('goal_replan', { agent: this.sheet.name, newGoals: raw.new_subgoals?.length ?? 0 });
+    return replanGoalsFor(this.sheet.char_id, this.stage, triggerEventId);
   }
 
   // ── Legacy evaluateState — kept for backward compatibility ──────────────────

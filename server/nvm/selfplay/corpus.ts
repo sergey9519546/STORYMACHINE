@@ -8,6 +8,7 @@ import type { NarrativeTransitionIR } from '../ir/NarrativeTransitionIR.ts';
 import type { CandidateGenerator, SceneTarget } from '../generate/proof-spec.ts';
 import type { MutationOperator } from '../converge/operators.ts';
 import { convergeScene } from '../converge/loop.ts';
+import type { ConvergeBudget } from '../converge/loop.ts';
 import { emptyState } from '../state/NarrativeState.ts';
 import { logger } from '../../lib/logger.ts';
 import { applyStoryOps } from '../ops/dispatcher.ts';
@@ -67,13 +68,15 @@ export interface CorpusReport {
  * H6: `maxSimulations` caps how many scenarios are executed.  Scenarios beyond
  * the cap are silently skipped so callers don't need to pre-slice the array.
  * `maxScenesPerScenario` caps how many scene targets each sim processes, bounding
- * LLM calls to `maxSimulations × maxScenesPerScenario × 4 iterations × 2 candidates`.
+ * LLM calls to `maxSimulations × maxScenesPerScenario × budget.maxIterations × budget.candidatesPerIteration`.
+ * `budget` overrides the default ConvergeBudget for every convergeScene call in this run.
  */
 export async function runSelfPlay(
   scenarios: SimScenario[],
   generate: CandidateGenerator,
   maxSimulations?: number,
   maxScenesPerScenario?: number,
+  budget?: Pick<ConvergeBudget, 'maxIterations' | 'candidatesPerIteration' | 'maxLLMCalls'>,
 ): Promise<CorpusReport> {
   const effectiveScenarios = maxSimulations != null
     ? scenarios.slice(0, maxSimulations)
@@ -83,7 +86,7 @@ export async function runSelfPlay(
 
   for (const scenario of effectiveScenarios) {
     try {
-      const result = await runOneSim(scenario, generate, maxScenesPerScenario);
+      const result = await runOneSim(scenario, generate, maxScenesPerScenario, budget);
       runs.push(result);
     } catch (err) {
       logger.error('selfplay_scenario_failed', { scenarioId: scenario.scenarioId, error: (err as Error).message });
@@ -114,7 +117,12 @@ export async function runSelfPlay(
 
 // ── Internal: single sim ──────────────────────────────────────────────────────
 
-async function runOneSim(scenario: SimScenario, generate: CandidateGenerator, maxScenes?: number): Promise<SimResult> {
+async function runOneSim(
+  scenario: SimScenario,
+  generate: CandidateGenerator,
+  maxScenes?: number,
+  budget?: Pick<ConvergeBudget, 'maxIterations' | 'candidatesPerIteration' | 'maxLLMCalls'>,
+): Promise<SimResult> {
   let state: NarrativeState = scenario.initialState
     ? { ...scenario.initialState }
     : emptyState();
@@ -136,10 +144,17 @@ async function runOneSim(scenario: SimScenario, generate: CandidateGenerator, ma
     });
   }
 
+  // H6: caller-supplied budget overrides the self-play defaults.
+  const convergeBudget: ConvergeBudget = {
+    maxIterations:         budget?.maxIterations         ?? 4,
+    candidatesPerIteration: budget?.candidatesPerIteration ?? 2,
+    ...(budget?.maxLLMCalls != null ? { maxLLMCalls: budget.maxLLMCalls } : {}),
+  };
+
   for (const target of effectiveTargets) {
     const convergeResult = await convergeScene(
       state, target, generate,
-      { maxIterations: 4, candidatesPerIteration: 2 },
+      convergeBudget,
       scenario.seed + target.sceneIdx,
     );
 
