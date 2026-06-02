@@ -11663,6 +11663,130 @@ describe('Wave 89 — dead-condition revival, severity-aware truncation, NaN har
     assert.ok(!drop, 'A resolution scene legitimately releases tension — should not flag');
   });
 
+  // ── Wave 141 additions: motivation & action consequence ──────────────────────
+
+  it('causalityPass detects UNMOTIVATED_DECISION when major decision has no prior setup', async () => {
+    const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+    const records = [
+      mkRec({ sceneIdx: 0, purpose: 'dialogue', suspenseDelta: 0.5, relationshipShifts: [] }),
+      mkRec({ sceneIdx: 1, purpose: 'dialogue', suspenseDelta: 0.3, relationshipShifts: [] }),
+      // Scene 2: major decision (high suspense) with NO setup in scenes 0-1
+      mkRec({ sceneIdx: 2, purpose: 'climax', suspenseDelta: 3.5, relationshipShifts: [{ pairKey: 'alice|bob', shiftMagnitude: 1 }] }),
+    ];
+    const result = await causalityPass({
+      fountain: 'INT. SC0 - DAY\nA.\nINT. SC1 - DAY\nB.\nINT. SC2 - DAY\nC.\n',
+      original: 'INT. SC0 - DAY\nA.\nINT. SC1 - DAY\nB.\nINT. SC2 - DAY\nC.\n',
+      records: records as unknown as Parameters<typeof causalityPass>[0]['records'],
+      structure: {} as Parameters<typeof causalityPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const unmotivated = result.issues.find(i => i.rule === 'UNMOTIVATED_DECISION');
+    assert.ok(unmotivated, 'Should detect UNMOTIVATED_DECISION for decision with no prior setup');
+    assert.ok(unmotivated?.severity === 'major');
+  });
+
+  it('causalityPass does NOT fire UNMOTIVATED_DECISION when decision has setup clue in prior scene', async () => {
+    const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+    const records = [
+      mkRec({ sceneIdx: 0, purpose: 'establish_world', seededClueIds: ['secret-revealed'] }),
+      // Scene 1: decision motivated by the clue from scene 0
+      mkRec({ sceneIdx: 1, purpose: 'climax', suspenseDelta: 3.5, relationshipShifts: [{ pairKey: 'alice|bob', shiftMagnitude: 1 }] }),
+    ];
+    const result = await causalityPass({
+      fountain: 'INT. SC0 - DAY\nA.\nINT. SC1 - DAY\nB.\n',
+      original: 'INT. SC0 - DAY\nA.\nINT. SC1 - DAY\nB.\n',
+      records: records as unknown as Parameters<typeof causalityPass>[0]['records'],
+      structure: {} as Parameters<typeof causalityPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const unmotivated = result.issues.find(i => i.rule === 'UNMOTIVATED_DECISION');
+    assert.ok(!unmotivated, 'Should NOT flag when decision has setup clue');
+  });
+
+  it('causalityPass detects ACTION_WITHOUT_CONSEQUENCE when planted clue has no character reaction', async () => {
+    const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+    const records = [
+      mkRec({ sceneIdx: 0, purpose: 'establish_world', seededClueIds: ['secret-letter'] }),
+      // Scene 1: no consequence (no relationship shift, no suspense spike, no emotion)
+      mkRec({ sceneIdx: 1, purpose: 'dialogue', suspenseDelta: 0.2, emotionalShift: 'neutral' }),
+      mkRec({ sceneIdx: 2, purpose: 'dialogue', suspenseDelta: 0.3, emotionalShift: 'neutral' }),
+    ];
+    const result = await causalityPass({
+      fountain: 'INT. SC0 - DAY\nA.\nINT. SC1 - DAY\nB.\nINT. SC2 - DAY\nC.\n',
+      original: 'INT. SC0 - DAY\nA.\nINT. SC1 - DAY\nB.\nINT. SC2 - DAY\nC.\n',
+      records: records as unknown as Parameters<typeof causalityPass>[0]['records'],
+      structure: {} as Parameters<typeof causalityPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const consequence = result.issues.find(i => i.rule === 'ACTION_WITHOUT_CONSEQUENCE');
+    assert.ok(consequence, 'Should detect ACTION_WITHOUT_CONSEQUENCE for clue with no character reaction');
+    assert.ok(consequence?.severity === 'major');
+  });
+
+  it('causalityPass does NOT fire ACTION_WITHOUT_CONSEQUENCE when action triggers relationship shift', async () => {
+    const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+    const records = [
+      mkRec({ sceneIdx: 0, purpose: 'establish_world', seededClueIds: ['secret-letter'] }),
+      // Scene 1: DOES have consequence (relationship shift)
+      mkRec({ sceneIdx: 1, purpose: 'confrontation', suspenseDelta: 2.5, relationshipShifts: [{ pairKey: 'alice|bob', shiftMagnitude: -1.5 }] }),
+    ];
+    const result = await causalityPass({
+      fountain: 'INT. SC0 - DAY\nA.\nINT. SC1 - DAY\nALICE\nYou lied.\n',
+      original: 'INT. SC0 - DAY\nA.\nINT. SC1 - DAY\nALICE\nYou lied.\n',
+      records: records as unknown as Parameters<typeof causalityPass>[0]['records'],
+      structure: {} as Parameters<typeof causalityPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const consequence = result.issues.find(i => i.rule === 'ACTION_WITHOUT_CONSEQUENCE');
+    assert.ok(!consequence, 'Should NOT flag when action triggers relationship shift');
+  });
+
+  it('causalityPass detects ABANDONED_GOAL when clue appears 2+ times then never resolves', async () => {
+    const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+    const records = [
+      mkRec({ sceneIdx: 0, seededClueIds: ['find-treasure'] }),
+      mkRec({ sceneIdx: 1, seededClueIds: ['find-treasure'] }),
+      mkRec({ sceneIdx: 2, seededClueIds: [] }), // treasure goal disappears, never paid off
+      mkRec({ sceneIdx: 3, seededClueIds: [] }),
+    ];
+    const result = await causalityPass({
+      fountain: 'INT. SC0 - DAY\nA.\nINT. SC1 - DAY\nB.\nINT. SC2 - DAY\nC.\nINT. SC3 - DAY\nD.\n',
+      original: 'INT. SC0 - DAY\nA.\nINT. SC1 - DAY\nB.\nINT. SC2 - DAY\nC.\nINT. SC3 - DAY\nD.\n',
+      records: records as unknown as Parameters<typeof causalityPass>[0]['records'],
+      structure: {} as Parameters<typeof causalityPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const abandoned = result.issues.find(i => i.rule === 'ABANDONED_GOAL');
+    assert.ok(abandoned, 'Should detect ABANDONED_GOAL for clue that appears 2+ times then vanishes');
+    assert.ok(abandoned?.description.includes('find-treasure'));
+    assert.ok(abandoned?.severity === 'major');
+  });
+
+  it('causalityPass does NOT fire ABANDONED_GOAL when clue is paid off', async () => {
+    const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+    const records = [
+      mkRec({ sceneIdx: 0, seededClueIds: ['find-treasure'] }),
+      mkRec({ sceneIdx: 1, seededClueIds: ['find-treasure'] }),
+      mkRec({ sceneIdx: 2, payoffSetupIds: ['find-treasure'] }), // treasure is paid off
+      mkRec({ sceneIdx: 3 }),
+    ];
+    const result = await causalityPass({
+      fountain: 'INT. SC0 - DAY\nA.\nINT. SC1 - DAY\nB.\nINT. SC2 - DAY\nC.\nINT. SC3 - DAY\nD.\n',
+      original: 'INT. SC0 - DAY\nA.\nINT. SC1 - DAY\nB.\nINT. SC2 - DAY\nC.\nINT. SC3 - DAY\nD.\n',
+      records: records as unknown as Parameters<typeof causalityPass>[0]['records'],
+      structure: {} as Parameters<typeof causalityPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const abandoned = result.issues.find(i => i.rule === 'ABANDONED_GOAL');
+    assert.ok(!abandoned, 'Should NOT flag when goal is paid off');
+  });
+
   // ── originality.ts: severity-aware truncation keeps the major finding ──────────
   it('originalityPass keeps the major UNIFORM_SCENE_PURPOSES issue even past 8 clichés', async () => {
     const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
