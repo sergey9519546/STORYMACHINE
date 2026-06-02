@@ -3,6 +3,9 @@
 //          monologue, trait labeling.
 // Level 2: implicit emotion divergence — emotional suppression, power silence,
 //          question dodge, denial inversion. Requires cross-referencing memory records.
+// Wave 150 additions: talking heads (no physical beats in long dialogue runs),
+// over-parenthetical (excessive direction undermining actors), and deadlock
+// dialogue (same argument cycling without escalation).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -276,6 +279,164 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             suggestedFix: 'Let the negative land. Silence, action, or a changed subject is more powerful than a reassurance',
           });
+        }
+      }
+    }
+  }
+
+  // ── Wave 150: Talking heads, over-parenthetical, deadlock dialogue ───────────
+
+  // TALKING_HEADS: Long stretches of dialogue with no action lines between them.
+  // Characters become disembodied voices; the physical world disappears.
+  // We count consecutive dialogue *exchanges* (each character-cue block) without
+  // any action line between them. Blank lines are Fountain formatting, not breaks.
+  {
+    const fountainLines = fountain.split('\n');
+    let exchangeCount = 0;       // how many char-cue blocks in a row without action
+    let exchangeStartLine = -1;  // line number when the current run began
+    let lastExchangeLine = -1;
+    let insideDialogueBlock = false; // true from char cue until blank line or action
+
+    for (let i = 0; i < fountainLines.length; i++) {
+      const t = fountainLines[i].trim();
+      const isSlug = /^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t);
+      const isCharCue = t && /^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(t) && !isSlug;
+      const isParenthetical = t.startsWith('(') && t.endsWith(')');
+      const isBlank = !t;
+      // Action: non-empty, not a slug, not a char cue, not parenth, not dialogue (i.e., inside dialogue block = false)
+      const isAction = t && !isSlug && !isCharCue && !isParenthetical && !insideDialogueBlock;
+
+      if (isSlug) {
+        // New scene — flush and reset
+        if (exchangeCount >= 5) {
+          issues.push({
+            location: `Lines ${exchangeStartLine + 1}–${lastExchangeLine + 1}`,
+            rule: 'TALKING_HEADS',
+            description: `${exchangeCount} consecutive dialogue exchanges with no action beat — characters lack physical presence in the scene`,
+            severity: 'minor',
+            suggestedFix: 'Insert at least one action line every 3-4 exchanges to keep characters grounded in physical space',
+          });
+        }
+        exchangeCount = 0; exchangeStartLine = -1; insideDialogueBlock = false;
+      } else if (isAction) {
+        // Action line breaks the talking-heads run
+        if (exchangeCount >= 5) {
+          issues.push({
+            location: `Lines ${exchangeStartLine + 1}–${lastExchangeLine + 1}`,
+            rule: 'TALKING_HEADS',
+            description: `${exchangeCount} consecutive dialogue exchanges with no action beat (lines ${exchangeStartLine + 1}–${lastExchangeLine + 1}) — characters become disembodied voices`,
+            severity: 'minor',
+            suggestedFix: 'Insert at least one action line every 3-4 exchanges to keep characters grounded in physical space',
+          });
+        }
+        exchangeCount = 0; exchangeStartLine = -1; insideDialogueBlock = false;
+      } else if (isCharCue) {
+        // Start of a new exchange block
+        if (exchangeCount === 0) exchangeStartLine = i;
+        exchangeCount++;
+        lastExchangeLine = i;
+        insideDialogueBlock = true;
+      } else if (isBlank) {
+        insideDialogueBlock = false;
+      } else if (insideDialogueBlock) {
+        lastExchangeLine = i; // dialogue content line
+      }
+    }
+    // Flush any open run at end-of-file
+    if (exchangeCount >= 5 && exchangeStartLine >= 0) {
+      issues.push({
+        location: `Lines ${exchangeStartLine + 1}–${lastExchangeLine + 1}`,
+        rule: 'TALKING_HEADS',
+        description: `${exchangeCount} consecutive dialogue exchanges with no action beat — characters become disembodied voices`,
+        severity: 'minor',
+        suggestedFix: 'Insert at least one action line every 3-4 exchanges to keep characters grounded in physical space',
+      });
+    }
+  }
+
+  // OVER_PARENTHETICAL: A character uses parenthetical stage directions on more
+  // than 40% of their dialogue lines. Over-direction undermines actors and signals
+  // the writer doesn't trust their own dialogue.
+  {
+    const fountainLines = fountain.split('\n');
+    const charParentheticalCount = new Map<string, number>();
+    const charLineCount = new Map<string, number>();
+    let currentChar = '';
+    let isInDialogue = false;
+
+    for (const line of fountainLines) {
+      const t = line.trim();
+      if (!t) { isInDialogue = false; continue; }
+      const isSlugLine = /^(INT\.|EXT\.)/i.test(t);
+      if (isSlugLine) { currentChar = ''; isInDialogue = false; continue; }
+      const isCharCueLine = /^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(t) && !isSlugLine;
+      if (isCharCueLine) {
+        currentChar = t.split('(')[0].trim();
+        isInDialogue = true;
+        continue;
+      }
+      if (isInDialogue && currentChar) {
+        if (t.startsWith('(') && t.endsWith(')')) {
+          charParentheticalCount.set(currentChar, (charParentheticalCount.get(currentChar) ?? 0) + 1);
+        } else {
+          charLineCount.set(currentChar, (charLineCount.get(currentChar) ?? 0) + 1);
+        }
+      } else if (t && !t.startsWith('(')) {
+        isInDialogue = false;
+      }
+    }
+
+    for (const [char, lineCount] of charLineCount) {
+      if (lineCount >= 6) {
+        const pCount = charParentheticalCount.get(char) ?? 0;
+        const ratio = pCount / lineCount;
+        if (ratio > 0.4) {
+          issues.push({
+            location: `Character: ${char}`,
+            rule: 'OVER_PARENTHETICAL',
+            description: `${char} has parenthetical stage directions on ${Math.round(ratio * 100)}% of their dialogue lines (${pCount} parentheticals / ${lineCount} lines) — over-direction undermines the dialogue and the actor`,
+            severity: 'minor',
+            suggestedFix: `Remove parentheticals that simply state the obvious emotional register. Trust the dialogue itself to convey tone — actors don't need instruction for every line`,
+          });
+          break; // one flag per pass
+        }
+      }
+    }
+  }
+
+  // DEADLOCK_DIALOGUE: Characters repeat the same surface-level argument across
+  // multiple consecutive exchanges without escalation — the dialogue cycles rather
+  // than building. We detect this by checking if the same keywords from a question
+  // or assertion appear in 3+ consecutive exchanges (same back-and-forth rhythm).
+  {
+    // Group dialogue into exchanges: pairs of [speaker A, speaker B]
+    if (dialogue.length >= 6) {
+      // Look for repetitive keyword patterns: same subject word appearing in 3+
+      // consecutive dialogue lines from alternating speakers.
+      const windowSize = 6;
+      for (let i = 0; i <= dialogue.length - windowSize; i++) {
+        const window = dialogue.slice(i, i + windowSize);
+        // Check speaker alternation (A B A B A B)
+        const alternates = window.every((d, j) => j === 0 || d.speaker !== window[j - 1].speaker);
+        if (!alternates) continue;
+
+        // Extract shared words across the 6-line window
+        const wordFreq = new Map<string, number>();
+        for (const d of window) {
+          const words = d.line.toLowerCase().split(/\W+/).filter(w => w.length > 4 && !STOPWORDS_Q.has(w));
+          for (const w of words) wordFreq.set(w, (wordFreq.get(w) ?? 0) + 1);
+        }
+        // A word appearing in 4+ of the 6 exchanges signals repetitive cycling
+        const cyclingWords = [...wordFreq.entries()].filter(([, c]) => c >= 4).map(([w]) => w);
+        if (cyclingWords.length >= 2) {
+          issues.push({
+            location: `Lines ${window[0].lineNum}–${window[window.length - 1].lineNum}`,
+            rule: 'DEADLOCK_DIALOGUE',
+            description: `Characters cycle the same argument without escalation across ${windowSize} lines — words repeated: "${cyclingWords.slice(0, 3).join('", "')}" — the scene goes nowhere`,
+            severity: 'minor',
+            suggestedFix: 'Escalate: one character must change tactics, reveal new information, or make a concession that shifts the dynamic. Circular arguments need a circuit-breaker',
+          });
+          break; // one flag per pass
         }
       }
     }

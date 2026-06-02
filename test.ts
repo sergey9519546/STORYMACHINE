@@ -11161,6 +11161,109 @@ He sits at his desk.
     });
   });
 
+  // ── Wave 150: Dialogue pass enhancements ──────────────────────────────────
+  describe('Wave 150 — dialoguePass: talking heads, over-parenthetical, deadlock', async () => {
+    const blankRec = (idx: number): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [], payoffSetupIds: [],
+      visualBeats: [], relationshipShifts: [],
+    });
+
+    it('dialoguePass detects TALKING_HEADS for long dialogue run with no action beats', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 12+ character-cue/dialogue lines with no action between them
+      let block = `INT. ROOM - DAY\n`;
+      for (let i = 0; i < 6; i++) {
+        block += `ALICE\nSomething important.\n\nBOB\nI disagree with that.\n\n`;
+      }
+      const result = await dialoguePass({
+        fountain: block, original: block,
+        records: [blankRec(0)] as any, structure: {} as any, annotations: [], approvedSpans: [],
+      });
+      const heads = result.issues.filter(i => i.rule === 'TALKING_HEADS');
+      assert.ok(heads.length >= 1, 'Should detect TALKING_HEADS for long unbroken dialogue run');
+      assert.ok(heads[0].severity === 'minor');
+    });
+
+    it('dialoguePass does NOT fire TALKING_HEADS when action breaks dialogue', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      let block = `INT. ROOM - DAY\n`;
+      for (let i = 0; i < 6; i++) {
+        block += `ALICE\nSomething important.\n\nBOB\nI disagree.\n\nShe sits down.\n\n`;
+      }
+      const result = await dialoguePass({
+        fountain: block, original: block,
+        records: [blankRec(0)] as any, structure: {} as any, annotations: [], approvedSpans: [],
+      });
+      const heads = result.issues.filter(i => i.rule === 'TALKING_HEADS');
+      assert.ok(heads.length === 0, 'Should NOT fire when action lines break the dialogue run');
+    });
+
+    it('dialoguePass detects OVER_PARENTHETICAL for a character directing every line', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // ALICE has a parenthetical on 6 of 7 lines = 86%
+      const fountain = `INT. ROOM - DAY
+ALICE
+(angrily)
+First line here.
+(desperately)
+Second line here.
+(quietly)
+Third line here.
+(bitterly)
+Fourth line here.
+(hopefully)
+Fifth line here.
+(sarcastically)
+Sixth line here.
+Seventh line no paren.
+
+BOB
+Okay.
+`;
+      const result = await dialoguePass({
+        fountain, original: fountain,
+        records: [blankRec(0)] as any, structure: {} as any, annotations: [], approvedSpans: [],
+      });
+      const overparen = result.issues.filter(i => i.rule === 'OVER_PARENTHETICAL');
+      assert.ok(overparen.length >= 1, 'Should detect OVER_PARENTHETICAL for >40% parenthetical rate');
+      assert.ok(overparen[0].severity === 'minor');
+    });
+
+    it('dialoguePass detects DEADLOCK_DIALOGUE for circular argument with repeated keywords', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // ALICE and BOB repeat "money contract signing deadline" cycle
+      const fountain = `INT. OFFICE - DAY
+ALICE
+The contract money signing deadline must happen today.
+
+BOB
+The contract money signing cannot happen before deadline review.
+
+ALICE
+Without the money contract we cannot meet the signing deadline.
+
+BOB
+The signing money deadline contract is not ready yet.
+
+ALICE
+This money contract deadline signing situation is impossible.
+
+BOB
+We need to resolve this signing contract money deadline now.
+`;
+      const result = await dialoguePass({
+        fountain, original: fountain,
+        records: [blankRec(0)] as any, structure: {} as any, annotations: [], approvedSpans: [],
+      });
+      const deadlock = result.issues.filter(i => i.rule === 'DEADLOCK_DIALOGUE');
+      assert.ok(deadlock.length >= 1, 'Should detect DEADLOCK_DIALOGUE for circular cycling argument');
+      assert.ok(deadlock[0].severity === 'minor');
+    });
+  });
+
   it('showrunner fires for set_up_payoff scene with no SEED_CLUE or PAYOFF_SETUP op', async () => {
     const { showrunnerCritic } = await import('./server/nvm/room/critics/showrunner.ts');
     const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
