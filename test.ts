@@ -11762,6 +11762,114 @@ He sits down in the chair.
     });
   });
 
+  describe('Wave 163 — originalityPass: act3 monotone, reaction overuse, emotional plateau', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'character_moment', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const noAnnotations = (n: number) => Array.from({ length: n }, () => ({ revelation: false } as any));
+
+    it('originalityPass detects SCENE_PURPOSE_MONOTONE_ACT3 when all Act 3 scenes same purpose', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 8 records: act3Start=6, scenes 6-7 both 'character_moment'
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, {
+          purpose: i < 6 ? (i % 3 === 0 ? 'raise_stakes' : i % 3 === 1 ? 'dialogue' : 'character_moment') : 'character_moment',
+        }),
+      );
+      const fountain = Array.from({ length: 8 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+      const result = await originalityPass({
+        fountain, original: fountain, records: records as any,
+        structure: {} as any, annotations: noAnnotations(8), approvedSpans: [],
+      });
+      const monotone = result.issues.filter(i => i.rule === 'SCENE_PURPOSE_MONOTONE_ACT3');
+      assert.ok(monotone.length >= 1, `Should detect SCENE_PURPOSE_MONOTONE_ACT3; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(monotone[0].severity === 'major');
+    });
+
+    it('originalityPass does NOT fire SCENE_PURPOSE_MONOTONE_ACT3 when Act 3 has varied purposes', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, { purpose: i === 6 ? 'climax' : i === 7 ? 'resolution' : 'character_moment' }),
+      );
+      const fountain = Array.from({ length: 8 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+      const result = await originalityPass({
+        fountain, original: fountain, records: records as any,
+        structure: {} as any, annotations: noAnnotations(8), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'SCENE_PURPOSE_MONOTONE_ACT3'),
+        'Should NOT fire when Act 3 has varied scene purposes',
+      );
+    });
+
+    it('originalityPass detects REACTION_SHOT_OVERUSE when >30% of action lines are terse reactions', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 10 action lines total: 4 reaction shots (40% > 30%)
+      const reactionLines = ['She nods.', 'He turns.', 'She looks.', 'He sighs.'].join('\n');
+      const normalLines = Array.from({ length: 6 }, (_, i) => `She crosses to the window in position ${i}.`).join('\n');
+      const fountain = `INT. OFFICE - DAY\n\n${reactionLines}\n${normalLines}\n\nALICE\nHello.\n`;
+      const records = [makeRec(0)];
+      const result = await originalityPass({
+        fountain, original: fountain, records: records as any,
+        structure: {} as any, annotations: noAnnotations(1), approvedSpans: [],
+      });
+      const reaction = result.issues.filter(i => i.rule === 'REACTION_SHOT_OVERUSE');
+      assert.ok(reaction.length >= 1, `Should detect REACTION_SHOT_OVERUSE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(reaction[0].severity === 'minor');
+    });
+
+    it('originalityPass does NOT fire REACTION_SHOT_OVERUSE when action lines are specific', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const specificLines = Array.from({ length: 10 }, (_, i) => `She reaches into the cabinet and pulls out item ${i}.`).join('\n');
+      const fountain = `INT. OFFICE - DAY\n\n${specificLines}\n\nALICE\nHello.\n`;
+      const records = [makeRec(0)];
+      const result = await originalityPass({
+        fountain, original: fountain, records: records as any,
+        structure: {} as any, annotations: noAnnotations(1), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'REACTION_SHOT_OVERUSE'),
+        'Should NOT fire when action lines contain specific content',
+      );
+    });
+
+    it('originalityPass detects EMOTIONAL_ARC_PLATEAU when all scenes are emotionally neutral', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const records = Array.from({ length: 7 }, (_, i) =>
+        makeRec(i, { emotionalShift: 'neutral', purpose: i % 2 === 0 ? 'raise_stakes' : 'dialogue' }),
+      );
+      const fountain = Array.from({ length: 7 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+      const result = await originalityPass({
+        fountain, original: fountain, records: records as any,
+        structure: {} as any, annotations: noAnnotations(7), approvedSpans: [],
+      });
+      const plateau = result.issues.filter(i => i.rule === 'EMOTIONAL_ARC_PLATEAU');
+      assert.ok(plateau.length >= 1, `Should detect EMOTIONAL_ARC_PLATEAU; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(plateau[0].severity === 'major');
+    });
+
+    it('originalityPass does NOT fire EMOTIONAL_ARC_PLATEAU when at least one scene has emotional shift', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const records = Array.from({ length: 7 }, (_, i) =>
+        makeRec(i, { emotionalShift: i === 3 ? 'positive' : 'neutral', purpose: 'dialogue' }),
+      );
+      const fountain = Array.from({ length: 7 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+      const result = await originalityPass({
+        fountain, original: fountain, records: records as any,
+        structure: {} as any, annotations: noAnnotations(7), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'EMOTIONAL_ARC_PLATEAU'),
+        'Should NOT fire when at least one scene has a non-neutral emotional shift',
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

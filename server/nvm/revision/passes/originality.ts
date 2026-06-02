@@ -4,6 +4,9 @@
 // Wave 149 additions: arc predictability (resolution telegraphed too early),
 // character introduction clichés, and sensory monotone (scenes lacking
 // concrete sensory grounding).
+// Wave 163 additions: scene purpose monotone in Act 3 (no functional variety in
+// the final act), reaction shot overuse (>30% of action lines are terse reactions),
+// and emotional arc plateau (all scenes neutral — no emotional peaks or valleys).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -275,6 +278,76 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         description: `Only ${Math.round(sensoryRatio * 100)}% of action lines (${sensoryCueCount}/${actionLineCount}) contain sound or tactile cues — the screenplay is purely visual, missing the texture that makes scenes physically felt`,
         severity: 'minor',
         suggestedFix: 'Add at least one non-visual sensory detail per scene: a sound, a temperature, a texture. What does this world feel like, not just look like?',
+      });
+    }
+  }
+
+  // ── Wave 163: Act 3 purpose monotone, reaction shot overuse, emotional plateau ──
+
+  // SCENE_PURPOSE_MONOTONE_ACT3: All Act 3 scenes (last 25%) share the same purpose.
+  // The final act lacks the functional variety of climax, crisis, resolution, and
+  // falling action — it's structurally monotone at the moment that should feel most
+  // dynamic. Requires 8+ records and Act 3 must have at least 2 scenes.
+  if (records.length >= 8) {
+    const act3StartIdx = Math.floor(records.length * 0.75);
+    const act3Records = records.slice(act3StartIdx);
+    if (act3Records.length >= 2) {
+      const act3PurposeSet = new Set(act3Records.map(r => r.purpose));
+      if (act3PurposeSet.size === 1) {
+        const [onlyPurpose] = act3PurposeSet;
+        issues.push({
+          location: `Act 3 (Scenes ${act3StartIdx}–${records.length - 1})`,
+          rule: 'SCENE_PURPOSE_MONOTONE_ACT3',
+          description: `All ${act3Records.length} Act 3 scenes use the same purpose ("${onlyPurpose}") — the final act lacks the functional variety of climax, crisis, resolution, and falling action`,
+          severity: 'major',
+          suggestedFix: `Vary Act 3 scene functions: include at least one climax scene, one turning point, and one resolution scene so the ending has a shape rather than just repeating the same narrative beat`,
+        });
+      }
+    }
+  }
+
+  // REACTION_SHOT_OVERUSE: More than 30% of action lines are single-beat reaction
+  // shots — a character plus one reaction verb and nothing else. These terse lines
+  // ("She nods.", "He turns.", "She looks.") are stock filler that substitutes for
+  // real physical specificity. Requires 8+ action lines.
+  const reactionShotPattern = /^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\s+(looks?|turns?|nods?|sighs?|pauses?|smiles?|laughs?|frowns?|grimaces?|glances?|stares?|stiffens?|freezes?|shrugs?)\s*\.?$/;
+  {
+    let totalActionLines2 = 0;
+    let reactionShotCount = 0;
+    let inDialogue3 = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDialogue3 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDialogue3 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDialogue3 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDialogue3) continue;
+      totalActionLines2++;
+      if (reactionShotPattern.test(t)) reactionShotCount++;
+    }
+    if (totalActionLines2 >= 8 && reactionShotCount / totalActionLines2 > 0.30) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'REACTION_SHOT_OVERUSE',
+        description: `${reactionShotCount} of ${totalActionLines2} action lines (${Math.round(reactionShotCount / totalActionLines2 * 100)}%) are single-beat reaction shots ("She nods.", "He turns.") — stock filler that replaces specific physical action`,
+        severity: 'minor',
+        suggestedFix: 'Replace terse reaction shots with specific, concrete actions that reveal character: what does she do that no other character would do in this moment?',
+      });
+    }
+  }
+
+  // EMOTIONAL_ARC_PLATEAU: All scenes have neutral emotional shifts — the story
+  // has no emotional peaks or valleys at all. Every scene leaves characters and
+  // audience in exactly the same affective state. Requires 6+ records.
+  if (records.length >= 6) {
+    const allNeutral = records.every(r => r.emotionalShift === 'neutral');
+    if (allNeutral) {
+      issues.push({
+        location: 'Emotional arc throughout',
+        rule: 'EMOTIONAL_ARC_PLATEAU',
+        description: `All ${records.length} scenes have neutral emotional shifts — the story has no emotional peaks or valleys. Every scene leaves characters and audience in exactly the same affective state.`,
+        severity: 'major',
+        suggestedFix: 'Give the story emotional shape: at least one scene should end on a positive note (relief, hope, connection) and one on a negative (loss, betrayal, setback). An emotionally flat story is not drama.',
       });
     }
   }
