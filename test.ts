@@ -11870,6 +11870,175 @@ He sits down in the chair.
     });
   });
 
+  // ── Wave 164: Dialogue pass enhancements ──────────────────────────────────
+  describe('Wave 164 — dialoguePass: rhetorical question flood, density inversion, voice uniformity', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+
+    // ── RHETORICAL_QUESTION_FLOOD ─────────────────────────────────────────────
+    it('dialoguePass detects RHETORICAL_QUESTION_FLOOD when speaker asks 3+ consecutive questions', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      const fountain = [
+        'INT. OFFICE - DAY',
+        '',
+        'ALICE',
+        'Where did he go?',
+        '',
+        'BOB',
+        "I don't know.",
+        '',
+        'ALICE',
+        "Why didn't you call me?",
+        '',
+        'BOB',
+        'I forgot.',
+        '',
+        'ALICE',
+        'What were you thinking?',
+        '',
+      ].join('\n');
+      const { issues } = await dialoguePass({
+        fountain, records: [makeRec(0)] as any, approvedSpans: [],
+        storyContext: undefined as any, priorPassResults: [],
+      });
+      assert.ok(
+        issues.some(i => i.rule === 'RHETORICAL_QUESTION_FLOOD'),
+        `Expected RHETORICAL_QUESTION_FLOOD; got: ${issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    it('dialoguePass does NOT fire RHETORICAL_QUESTION_FLOOD when speaker mixes questions with declarations', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      const fountain = [
+        'INT. OFFICE - DAY',
+        '',
+        'ALICE',
+        'Where did he go?',
+        '',
+        'BOB',
+        "I don't know.",
+        '',
+        'ALICE',
+        'I need to find him now.',
+        '',
+        'BOB',
+        "I'll help you look.",
+        '',
+        'ALICE',
+        'Can you call him?',
+        '',
+      ].join('\n');
+      const { issues } = await dialoguePass({
+        fountain, records: [makeRec(0)] as any, approvedSpans: [],
+        storyContext: undefined as any, priorPassResults: [],
+      });
+      assert.ok(
+        !issues.some(i => i.rule === 'RHETORICAL_QUESTION_FLOOD'),
+        'Should NOT fire when speaker mixes questions with declarative statements',
+      );
+    });
+
+    // ── DIALOGUE_DENSITY_INVERSION ────────────────────────────────────────────
+    it('dialoguePass detects DIALOGUE_DENSITY_INVERSION when climax talks more than setup', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 8 scenes: setup (0,1) = 2 lines each; climax (6,7) = 10 lines each
+      const buildHeavy = (idx: number) =>
+        `INT. SC${idx} - DAY\n\n` +
+        Array.from({ length: 5 }, (_, j) =>
+          `ALICE\nLine ${j + 1} of dialogue here.\n\nBOB\nResponse ${j + 1} here.\n`,
+        ).join('\n');
+      const buildSparse = (idx: number) =>
+        `INT. SC${idx} - DAY\n\nALICE\nHello.\n\nBOB\nHi.\n\n`;
+      const buildSingle = (idx: number) =>
+        `INT. SC${idx} - DAY\n\nALICE\nOkay.\n\n`;
+      const fountain =
+        buildSparse(0) + buildSparse(1) +
+        buildSingle(2) + buildSingle(3) + buildSingle(4) + buildSingle(5) +
+        buildHeavy(6) + buildHeavy(7);
+      const records = Array.from({ length: 8 }, (_, i) => makeRec(i));
+      const { issues } = await dialoguePass({
+        fountain, records: records as any, approvedSpans: [],
+        storyContext: undefined as any, priorPassResults: [],
+      });
+      assert.ok(
+        issues.some(i => i.rule === 'DIALOGUE_DENSITY_INVERSION'),
+        `Expected DIALOGUE_DENSITY_INVERSION; got: ${issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    it('dialoguePass does NOT fire DIALOGUE_DENSITY_INVERSION when setup talks more than climax', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      const buildHeavy = (idx: number) =>
+        `INT. SC${idx} - DAY\n\n` +
+        Array.from({ length: 5 }, (_, j) =>
+          `ALICE\nLine ${j + 1} here.\n\nBOB\nResp ${j + 1}.\n`,
+        ).join('\n');
+      const buildSparse = (idx: number) =>
+        `INT. SC${idx} - DAY\n\nALICE\nReady.\n\nBOB\nGo.\n\n`;
+      const buildSingle = (idx: number) =>
+        `INT. SC${idx} - DAY\n\nALICE\nOkay.\n\n`;
+      const fountain =
+        buildHeavy(0) + buildHeavy(1) +
+        buildSingle(2) + buildSingle(3) + buildSingle(4) + buildSingle(5) +
+        buildSparse(6) + buildSparse(7);
+      const records = Array.from({ length: 8 }, (_, i) => makeRec(i));
+      const { issues } = await dialoguePass({
+        fountain, records: records as any, approvedSpans: [],
+        storyContext: undefined as any, priorPassResults: [],
+      });
+      assert.ok(
+        !issues.some(i => i.rule === 'DIALOGUE_DENSITY_INVERSION'),
+        'Should NOT fire when setup zone has more dialogue than climax',
+      );
+    });
+
+    // ── CHARACTER_VOICE_UNIFORMITY ────────────────────────────────────────────
+    it('dialoguePass detects CHARACTER_VOICE_UNIFORMITY when all speakers share same rhythm', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // All 3 speakers have lines of identical length (~37 chars)
+      const line37 = 'This is roughly thirty-seven chars ok';
+      const entries: string[] = ['INT. OFFICE - DAY', ''];
+      for (let i = 0; i < 5; i++) {
+        entries.push('ALICE', line37, '', 'BOB', line37, '', 'CAROL', line37, '');
+      }
+      const fountain = entries.join('\n');
+      const { issues } = await dialoguePass({
+        fountain, records: [makeRec(0)] as any, approvedSpans: [],
+        storyContext: undefined as any, priorPassResults: [],
+      });
+      assert.ok(
+        issues.some(i => i.rule === 'CHARACTER_VOICE_UNIFORMITY'),
+        `Expected CHARACTER_VOICE_UNIFORMITY; got: ${issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    it('dialoguePass does NOT fire CHARACTER_VOICE_UNIFORMITY when speakers have distinct line lengths', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      const shortLine = 'Yes.';
+      const medLine = 'I understand what you are saying, really I do.';
+      const longLine = 'This is a very long and detailed line of dialogue that provides tremendous context for the entire scene and its dramatic stakes.';
+      const entries: string[] = ['INT. OFFICE - DAY', ''];
+      for (let i = 0; i < 5; i++) {
+        entries.push('ALICE', shortLine, '', 'BOB', medLine, '', 'CAROL', longLine, '');
+      }
+      const fountain = entries.join('\n');
+      const { issues } = await dialoguePass({
+        fountain, records: [makeRec(0)] as any, approvedSpans: [],
+        storyContext: undefined as any, priorPassResults: [],
+      });
+      assert.ok(
+        !issues.some(i => i.rule === 'CHARACTER_VOICE_UNIFORMITY'),
+        'Should NOT fire when speakers have distinct rhythmic signatures',
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

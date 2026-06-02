@@ -442,6 +442,103 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 164: Rhetorical question flood, dialogue density inversion, voice uniformity ──
+
+  // RHETORICAL_QUESTION_FLOOD: A speaker asks 3+ of their own consecutive speeches as questions
+  // (ignoring other speakers' interspersed turns). Urgency without a single declarative desire
+  // statement is passive — the character never says what they actually want.
+  {
+    const speakerSpeeches = new Map<string, Array<{ line: string; lineNum: number }>>();
+    for (const d of dialogue) {
+      if (!speakerSpeeches.has(d.speaker)) speakerSpeeches.set(d.speaker, []);
+      speakerSpeeches.get(d.speaker)!.push({ line: d.line, lineNum: d.lineNum });
+    }
+    for (const [speaker, speeches] of speakerSpeeches) {
+      if (speeches.length < 3) continue;
+      for (let i = 0; i <= speeches.length - 3; i++) {
+        const w3 = speeches.slice(i, i + 3);
+        if (w3.every(s => s.line.trim().endsWith('?'))) {
+          issues.push({
+            location: `Around line ${w3[0].lineNum} (${speaker})`,
+            rule: 'RHETORICAL_QUESTION_FLOOD',
+            description: `${speaker} asks 3+ consecutive questions across turns with no declarative statement — urgency without desire feels passive and evasive`,
+            severity: 'minor',
+            suggestedFix: 'Replace at least one question with a direct statement of what the character wants, fears, or knows. Characters who only ask questions never reveal themselves.',
+          });
+          break;
+        }
+      }
+    }
+  }
+
+  // DIALOGUE_DENSITY_INVERSION: Climax zone (last 25% of scenes) averages more dialogue
+  // lines per scene than setup zone (first 25%). Climax scenes should be action-compressed
+  // and punchy; heavy talk in the climax means the writer is explaining rather than showing.
+  if (records.length >= 8 && dialogue.length > 0) {
+    const ddiLineToScene = buildLineToSceneMap(fountain);
+    const sceneLineCounts = new Map<number, number>();
+    for (const d of dialogue) {
+      const si = ddiLineToScene[d.lineNum - 1] ?? 0;
+      sceneLineCounts.set(si, (sceneLineCounts.get(si) ?? 0) + 1);
+    }
+    const n = records.length;
+    const setupEnd = Math.floor(n * 0.25);
+    const climaxStart = Math.floor(n * 0.75);
+    const setupCounts: number[] = [];
+    const climaxCounts: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const cnt = sceneLineCounts.get(i) ?? 0;
+      if (i < setupEnd) setupCounts.push(cnt);
+      else if (i >= climaxStart) climaxCounts.push(cnt);
+    }
+    if (setupCounts.length >= 2 && climaxCounts.length >= 2) {
+      const setupAvg = setupCounts.reduce((s, c) => s + c, 0) / setupCounts.length;
+      const climaxAvg = climaxCounts.reduce((s, c) => s + c, 0) / climaxCounts.length;
+      if (setupAvg > 0 && climaxAvg > setupAvg * 1.5) {
+        issues.push({
+          location: `Climax zone (scenes ${climaxStart + 1}–${n})`,
+          rule: 'DIALOGUE_DENSITY_INVERSION',
+          description: `Climax zone averages ${climaxAvg.toFixed(1)} dialogue lines/scene vs ${setupAvg.toFixed(1)} in setup — the script talks more during the climax than the opening, inverting expected action compression`,
+          severity: 'major',
+          suggestedFix: 'Compress climax dialogue to short punchy exchanges; redistribute exposition to the setup zone where characters have room to breathe',
+        });
+      }
+    }
+  }
+
+  // CHARACTER_VOICE_UNIFORMITY: All significant speakers have nearly identical average
+  // line lengths across the screenplay. Distinct characters have distinct rhythms —
+  // terse vs. expansive. When all speakers share the same rhythm, no one has a voice.
+  if (dialogue.length >= 15) {
+    const speakerLengths = new Map<string, number[]>();
+    for (const d of dialogue) {
+      if (!speakerLengths.has(d.speaker)) speakerLengths.set(d.speaker, []);
+      speakerLengths.get(d.speaker)!.push(d.line.length);
+    }
+    const qualified = new Map<string, number>();
+    for (const [spk, lengths] of speakerLengths) {
+      if (lengths.length >= 5) {
+        qualified.set(spk, lengths.reduce((s, l) => s + l, 0) / lengths.length);
+      }
+    }
+    if (qualified.size >= 3) {
+      const avgs = [...qualified.values()];
+      const mean = avgs.reduce((s, a) => s + a, 0) / avgs.length;
+      if (mean > 5) {
+        const maxDev = Math.max(...avgs.map(a => Math.abs(a - mean) / mean));
+        if (maxDev < 0.2) {
+          issues.push({
+            location: 'All characters',
+            rule: 'CHARACTER_VOICE_UNIFORMITY',
+            description: `${qualified.size} speaking characters all share nearly identical dialogue rhythm (max length deviation: ${Math.round(maxDev * 100)}%) — no speaker has a distinct voice`,
+            severity: 'major',
+            suggestedFix: 'Differentiate rhythm: give one character terse fragments, another sprawling speeches, a third clipped single words. Voice lives in rhythm, not just vocabulary',
+          });
+        }
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'dialogue', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
