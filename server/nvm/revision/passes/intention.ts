@@ -76,10 +76,12 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         streakLen = 1;
       }
       if (streakLen === 3) {
-        // Purposes that stall narrative momentum when repeated 3+ times
-        const lowMomentumPurposes = new Set([
-          'establish_world', 'character_moment', 'dialogue_exposition',
-          'reflection', 'transition', 'introduction', 'recap',
+        // Low-momentum ScenePurpose values that stall the story when repeated 3+
+        // times. These are the non-escalating purposes from the ScenePurpose enum;
+        // the dramatic purposes (raise_stakes, revelation, turning_point, climax,
+        // complicate, introduce_conflict) are expected to recur and aren't flagged.
+        const lowMomentumPurposes = new Set<string>([
+          'establish_world', 'character_moment', 'resolution',
         ]);
         if (lowMomentumPurposes.has(streakPurpose)) {
           issues.push({

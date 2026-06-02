@@ -6,6 +6,7 @@
 import type { NarrativeTransitionIR, SceneFunction } from '../ir/NarrativeTransitionIR.ts';
 import type { StoryOp } from '../ops/StoryOp.ts';
 import type { CandidateGenerator, GenerationSpec } from './proof-spec.ts';
+import { logger } from '../../lib/logger.ts';
 
 // ── Structural stub (used when LLM is unavailable) ────────────────────────────
 
@@ -195,14 +196,24 @@ export function makeLLMCandidateGenerator(): CandidateGenerator {
     // Dynamic import to avoid circular dependency at module load time.
     let provider: import('../../engine/ai.ts').LLMProvider;
     let candidateModel: string;
+    let temperature: number;
     try {
       const ai = await import('../../engine/ai.ts');
       provider = ai.geminiProvider;
       candidateModel = ai.modelForTask('CANDIDATE');
+      // Candidate generation wants high diversity; bias the configured base
+      // temperature upward but never below 0.9 so the proof loop has variety
+      // to select from. Falls back to 0.9 if config is unavailable.
+      temperature = Math.max(0.9, ai.getTemperature());
       // Test that the provider is usable (key present)
       ai.getAI();
-    } catch {
-      // No key or provider unavailable — use stubs
+    } catch (err) {
+      // No key or provider unavailable — use stubs. Log so silent stub
+      // fallback is observable in metrics rather than invisible.
+      logger.warn('llm_generator_unavailable', {
+        sceneIdx: spec.target.sceneIdx,
+        message: (err as Error).message,
+      });
       return Array.from({ length: n }, (_, i) => stubIR(spec, i));
     }
 
@@ -237,7 +248,7 @@ export function makeLLMCandidateGenerator(): CandidateGenerator {
         config: {
           responseMimeType: 'application/json',
           responseSchema: IR_SCHEMA,
-          temperature: 0.9,
+          temperature,
         },
       });
 
@@ -246,10 +257,27 @@ export function makeLLMCandidateGenerator(): CandidateGenerator {
       const rawCandidates = parsed.candidates ?? [];
 
       const irs = rawCandidates.slice(0, n).map((c, i) => parseIR(c, spec, i));
+      // Track how many candidates degraded to stubs (empty/invalid ops) so quality
+      // erosion is visible. parseIR returns a stub when ops parse to empty.
+      const stubbedFromLLM = irs.filter(ir => ir.provenance.model === 'stub').length;
+      if (stubbedFromLLM > 0) {
+        logger.warn('llm_generator_partial_parse', {
+          sceneIdx: spec.target.sceneIdx,
+          requested: n,
+          returned: rawCandidates.length,
+          stubbed: stubbedFromLLM,
+        });
+      }
       // Pad with stubs if LLM returned fewer than requested
       while (irs.length < n) irs.push(stubIR(spec, irs.length));
       return irs;
-    } catch {
+    } catch (err) {
+      // Generation or JSON parse failed — log before falling back to stubs so the
+      // failure is observable rather than a silent quality regression.
+      logger.warn('llm_generator_failed', {
+        sceneIdx: spec.target.sceneIdx,
+        message: (err as Error).message,
+      });
       return Array.from({ length: n }, (_, i) => stubIR(spec, i));
     }
   };

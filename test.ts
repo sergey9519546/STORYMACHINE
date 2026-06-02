@@ -14643,13 +14643,32 @@ import type { PassInput } from './server/nvm/revision/passes/types.ts';
 import type { ScreenplaySceneRecord } from './server/nvm/screenplay/memory.ts';
 import type { StructureState } from './server/nvm/screenplay/structure.ts';
 
-function makeMinimalInput(overrides: Partial<PassInput> = {}): PassInput {
-  const baseRecord: ScreenplaySceneRecord = {
-    sceneIdx: 0, slug: 'INT. ROOM - DAY', purpose: 'establish_world',
-    dramaticTurn: 'none', revelation: null, emotionalShift: 'neutral',
-    visualBeats: [], dialogueHighlights: [], unresolvedClues: [],
-    seededClueIds: [], payoffSetupIds: [], suspenseDelta: 0, clockPressure: 0,
+// Complete ScreenplaySceneRecord factory — every required field present so the
+// records typecheck under `tsc --noEmit`, not just under runtime strip-types.
+function makeSceneRecord(over: Partial<ScreenplaySceneRecord> = {}): ScreenplaySceneRecord {
+  return {
+    commitId: `commit-${over.sceneIdx ?? 0}`,
+    sceneIdx: 0,
+    slug: 'INT. ROOM - DAY',
+    purpose: 'establish_world',
+    dramaticTurn: 'none',
+    revelation: null,
+    emotionalShift: 'neutral',
+    visualBeats: [],
+    dialogueHighlights: [],
+    unresolvedClues: [],
+    seededClueIds: [],
+    payoffSetupIds: [],
+    clockRaised: false,
+    clockDelta: 0,
+    suspenseDelta: 0,
+    curiosityDelta: 0,
+    createdAt: 0,
+    ...over,
   };
+}
+
+function makeMinimalInput(overrides: Partial<PassInput> = {}): PassInput {
   return {
     fountain: 'INT. ROOM - DAY\n\nA person sits.\n',
     original: 'INT. ROOM - DAY\n\nA person sits.\n',
@@ -14659,7 +14678,7 @@ function makeMinimalInput(overrides: Partial<PassInput> = {}): PassInput {
       openClues: 0, completionPercent: 20, midpointPressure: 0,
       tightestScene: 0,
     } as StructureState,
-    records: [baseRecord],
+    records: [makeSceneRecord()],
     approvedSpans: [],
     storyContext: {},
     ...overrides,
@@ -14681,12 +14700,11 @@ describe('Wave 130 — Theme Resonance Pass (Pass 13)', () => {
   });
 
   it('detects THEME_ORPHANED when zero scenes contain any theme keyword', async () => {
-    const records: ScreenplaySceneRecord[] = Array.from({ length: 4 }, (_, i) => ({
-      sceneIdx: i, slug: `INT. ROOM ${i} - DAY`, purpose: 'establish_world',
-      dramaticTurn: 'none', revelation: null, emotionalShift: 'neutral',
-      visualBeats: [], dialogueHighlights: ['completely unrelated text'], unresolvedClues: [],
-      seededClueIds: [], payoffSetupIds: [], suspenseDelta: 0, clockPressure: 0,
-    }));
+    const records: ScreenplaySceneRecord[] = Array.from({ length: 4 }, (_, i) =>
+      makeSceneRecord({
+        sceneIdx: i, slug: `INT. ROOM ${i} - DAY`,
+        dialogueHighlights: ['completely unrelated text'],
+      }));
     const fountain = records.map(r => `${r.slug}\n\nSome action.\n`).join('\n');
     const result = await themePass(makeMinimalInput({
       fountain,
@@ -14700,12 +14718,11 @@ describe('Wave 130 — Theme Resonance Pass (Pass 13)', () => {
   });
 
   it('does not flag when theme keywords appear in dialogue highlights', async () => {
-    const records: ScreenplaySceneRecord[] = Array.from({ length: 4 }, (_, i) => ({
-      sceneIdx: i, slug: `INT. ROOM ${i} - DAY`, purpose: 'establish_world',
-      dramaticTurn: 'none', revelation: null, emotionalShift: 'neutral',
-      visualBeats: [], dialogueHighlights: ['power corrupts everyone eventually'], unresolvedClues: [],
-      seededClueIds: [], payoffSetupIds: [], suspenseDelta: 0, clockPressure: 0,
-    }));
+    const records: ScreenplaySceneRecord[] = Array.from({ length: 4 }, (_, i) =>
+      makeSceneRecord({
+        sceneIdx: i, slug: `INT. ROOM ${i} - DAY`,
+        dialogueHighlights: ['power corrupts everyone eventually'],
+      }));
     const fountain = records.map(r => `${r.slug}\n\nThe power corrupts.\n`).join('\n');
     const result = await themePass(makeMinimalInput({
       fountain,
@@ -14720,14 +14737,13 @@ describe('Wave 130 — Theme Resonance Pass (Pass 13)', () => {
   });
 
   it('flags THEME_UNRESOLVED when Act 3 has no theme language', async () => {
-    const records: ScreenplaySceneRecord[] = Array.from({ length: 6 }, (_, i) => ({
-      sceneIdx: i, slug: `INT. ROOM ${i} - DAY`, purpose: i < 4 ? 'establish_world' : 'climax',
-      dramaticTurn: 'none', revelation: null, emotionalShift: 'neutral',
-      visualBeats: [],
-      // Only early scenes have theme words; Act 3 (last 30%: scenes 4,5) have nothing
-      dialogueHighlights: i < 4 ? ['power corrupts and destroys trust'] : ['completely unrelated'],
-      unresolvedClues: [], seededClueIds: [], payoffSetupIds: [], suspenseDelta: 0, clockPressure: 0,
-    }));
+    const records: ScreenplaySceneRecord[] = Array.from({ length: 6 }, (_, i) =>
+      makeSceneRecord({
+        sceneIdx: i, slug: `INT. ROOM ${i} - DAY`,
+        purpose: i < 4 ? 'establish_world' : 'climax',
+        // Only early scenes have theme words; Act 3 (last 30%: scenes 4,5) have nothing
+        dialogueHighlights: i < 4 ? ['power corrupts and destroys trust'] : ['completely unrelated'],
+      }));
     const fountain = records.map(r => `${r.slug}\n\n${r.dialogueHighlights[0]}\n`).join('\n');
     const result = await themePass(makeMinimalInput({
       fountain,
@@ -14756,14 +14772,14 @@ describe('Wave 130 — Causality pass REVELATION_WITHOUT_SETUP fix', () => {
     // Post-fix: checks ALL prior records for seededClueIds
     const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
     const records: ScreenplaySceneRecord[] = [
-      { sceneIdx: 0, slug: 'INT. ROOM - DAY', purpose: 'establish_world', dramaticTurn: 'none',
-        revelation: null, emotionalShift: 'neutral', visualBeats: [], dialogueHighlights: [],
+      makeSceneRecord({
+        sceneIdx: 0, slug: 'INT. ROOM - DAY',
         unresolvedClues: ['unrelated-clue'], seededClueIds: ['unrelated-clue'],
-        payoffSetupIds: [], suspenseDelta: 0, clockPressure: 0 },
-      { sceneIdx: 1, slug: 'INT. HALL - NIGHT', purpose: 'revelation', dramaticTurn: 'revelation',
-        revelation: 'the killer was the butler', emotionalShift: 'negative',
-        visualBeats: [], dialogueHighlights: [], unresolvedClues: [],
-        seededClueIds: [], payoffSetupIds: [], suspenseDelta: 5, clockPressure: 0 },
+      }),
+      makeSceneRecord({
+        sceneIdx: 1, slug: 'INT. HALL - NIGHT', purpose: 'revelation', dramaticTurn: 'revelation',
+        revelation: 'the killer was the butler', emotionalShift: 'negative', suspenseDelta: 5,
+      }),
     ];
     const annotations = [
       { slug: 'INT. ROOM - DAY', revelation: null },
@@ -14783,36 +14799,76 @@ describe('Wave 130 — Causality pass REVELATION_WITHOUT_SETUP fix', () => {
 
 describe('Wave 130 — Intention pass expanded boring purposes', () => {
 
-  it('flags REPEATED_PURPOSE for 3 consecutive reflection scenes', async () => {
+  it('flags REPEATED_PURPOSE for 3 consecutive character_moment scenes', async () => {
     const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
-    const records: ScreenplaySceneRecord[] = Array.from({ length: 4 }, (_, i) => ({
-      sceneIdx: i, slug: `INT. ROOM ${i}`, purpose: i < 3 ? 'reflection' : 'climax',
-      dramaticTurn: 'none', revelation: null, emotionalShift: 'neutral',
-      visualBeats: [], dialogueHighlights: [], unresolvedClues: [],
-      seededClueIds: [], payoffSetupIds: [], suspenseDelta: 0, clockPressure: 0,
-    }));
+    const records: ScreenplaySceneRecord[] = Array.from({ length: 4 }, (_, i) =>
+      makeSceneRecord({
+        sceneIdx: i, slug: `INT. ROOM ${i}`,
+        purpose: i < 3 ? 'character_moment' : 'climax',
+      }));
     const input = makeMinimalInput({ records });
     const result = await intentionPass(input);
     assert.ok(
       result.issues.some(i => i.rule === 'REPEATED_PURPOSE'),
-      'reflection (new boring purpose) should be flagged',
+      'character_moment (low-momentum purpose) should be flagged',
     );
   });
 
   it('still flags 3 consecutive establish_world scenes', async () => {
     const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
-    const records: ScreenplaySceneRecord[] = Array.from({ length: 3 }, (_, i) => ({
-      sceneIdx: i, slug: `INT. ROOM ${i}`, purpose: 'establish_world',
-      dramaticTurn: 'none', revelation: null, emotionalShift: 'neutral',
-      visualBeats: [], dialogueHighlights: [], unresolvedClues: [],
-      seededClueIds: [], payoffSetupIds: [], suspenseDelta: 0, clockPressure: 0,
-    }));
+    const records: ScreenplaySceneRecord[] = Array.from({ length: 3 }, (_, i) =>
+      makeSceneRecord({ sceneIdx: i, slug: `INT. ROOM ${i}`, purpose: 'establish_world' }));
     const input = makeMinimalInput({ records });
     const result = await intentionPass(input);
     assert.ok(
       result.issues.some(i => i.rule === 'REPEATED_PURPOSE'),
       'establish_world still flagged as low-momentum',
     );
+  });
+
+});
+
+// ── Wave 131 — Structure blend + LLM generator observability ─────────────────
+
+describe('Wave 131 — Structure act-position blends dramatic events', () => {
+
+  it('clock-less story with many revelations advances past act1', () => {
+    // 8 scenes, each with a revelation (UPDATE_BELIEF witnessed) but ZERO clocks.
+    // Pre-fix: stuck at act1 forever (totalClockPressure=0).
+    // Post-fix: revelations contribute dramatic pressure → advances.
+    const commits = Array.from({ length: 8 }, (_, i) =>
+      makeScreenplayCommit(i, [
+        { op: 'UPDATE_BELIEF', charId: 'alice', belief: {
+          id: `b${i}`, proposition: `revelation ${i}`, confidence: 0.9,
+          source: 'witnessed', source_event_id: `e${i}`, acquired_at: i,
+        } },
+        { op: 'UPDATE_READER_STATE', delta: { suspense: 5 } },
+      ]),
+    );
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    // 8 revelations × 2 = 16 dramatic pressure ≥ 15 → act3
+    assert.notEqual(structure.actPosition, 'act1', 'revelation-rich story should leave act1');
+  });
+
+  it('single bland scene still reports act1 (backward compat)', () => {
+    const commits = [makeScreenplayCommit(0, [{ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } }])];
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    assert.equal(structure.actPosition, 'act1', 'one low-suspense scene stays act1');
+  });
+
+  it('clock pressure and dramatic events both contribute to completion', () => {
+    // 2 clock raises (amount 3 each = 6) + 0 revelations → completion from clocks only
+    const commits = [
+      makeScreenplayCommit(0, [{ op: 'RAISE_CLOCK', clockId: 'c1', amount: 3 }]),
+      makeScreenplayCommit(1, [{ op: 'RAISE_CLOCK', clockId: 'c2', amount: 3 }]),
+    ];
+    const records = buildScreenplayMemory(commits);
+    const structure = analyzeStructure(records, commits);
+    // blendedPressure = 6 → completion = round(6/20*100) = 30
+    assert.ok(structure.completionPercent >= 25 && structure.completionPercent <= 35,
+      `completion reflects clock pressure (got ${structure.completionPercent})`);
   });
 
 });
