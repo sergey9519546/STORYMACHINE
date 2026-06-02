@@ -1,6 +1,9 @@
 // Wave 39 — Pass 4: Belief/Deception
 // Checks belief tracking and deception layers: lies that aren't set up,
 // belief reversals without evidence, deception without consequence.
+// Wave 145 additions: deception consequence tracking (lies that are never
+// discovered or create conflict), belief reversals with evidence checking,
+// and belief isolation (crucial beliefs never expressed).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -87,6 +90,100 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         suggestedFix: 'Break the exposition streak with a scene that shows rather than tells the key information',
       });
       consecutiveTold = 0; // reset to avoid duplicate flags
+    }
+  }
+
+  // ── Wave 145: Deception consequence & belief reversals ──────────────────────
+
+  // DECEPTION_WITHOUT_CONSEQUENCE: A character is told something false (lies or
+  // deliberately misleads) but the deception is never discovered by another
+  // character or creates conflict. The lie exists but has zero narrative impact.
+  for (const told of toldBeliefs) {
+    // Find witnessed facts that contradict the told belief (indicating a lie)
+    const contradiction = witnessedBeliefs.find(w =>
+      w.sceneIdx > told.sceneIdx &&
+      sharedWords(w.proposition, told.proposition) >= 2
+    );
+
+    if (contradiction) {
+      // There IS a contradiction, so this is a lie. Now check if the lie has consequence.
+      // Consequence = another character reacts (relationship shift) after learning the truth,
+      // or high suspense after the truth is revealed.
+      let hasConsequence = false;
+      for (let i = contradiction.sceneIdx + 1; i < Math.min(contradiction.sceneIdx + 3, records.length); i++) {
+        const followup = records[i];
+        if ((followup.relationshipShifts?.length ?? 0) > 0 || followup.suspenseDelta > 1.5) {
+          hasConsequence = true;
+          break;
+        }
+      }
+
+      if (!hasConsequence && contradiction.sceneIdx < records.length - 2) {
+        issues.push({
+          location: `Scene ${told.sceneIdx} (${told.slug}) → Scene ${contradiction.sceneIdx}`,
+          rule: 'DECEPTION_WITHOUT_CONSEQUENCE',
+          description: `Character is told "${told.proposition.slice(0, 60)}..." at Scene ${told.sceneIdx}, but the truth (revealed Scene ${contradiction.sceneIdx}) creates no relationship rupture or escalation — the lie is discovered but ignored`,
+          severity: 'major',
+          suggestedFix: 'Add a confrontation or consequence scene where the character discovering the lie reacts emotionally or shifts their relationship with the liar',
+        });
+      }
+    }
+  }
+
+  // BELIEF_REVERSAL_UNSUPPORTED: A character shifts their emotional state sharply
+  // (high suspense delta or negative emotional shift) but there's no prior scene
+  // planting a clue or raising a question that would justify the reversal.
+  // This indicates the character changed their mind/emotional stance without evidence.
+  for (let i = 1; i < records.length; i++) {
+    const curr = records[i];
+    const prev = records[i - 1];
+
+    // Detect reversal: significant swing in suspense delta or emotional tone flip
+    const isBigReversal = (curr.suspenseDelta > 2 && prev.suspenseDelta < 0.5) ||
+      (curr.emotionalShift !== prev.emotionalShift && curr.emotionalShift !== 'neutral');
+
+    if (isBigReversal && i >= 2) {
+      // Check if there was a clue or question planted in the 2 prior scenes
+      let hasSetup = false;
+      for (let j = Math.max(0, i - 2); j < i; j++) {
+        const setup = records[j];
+        if ((setup.seededClueIds?.length ?? 0) > 0 || setup.revelation !== null) {
+          hasSetup = true;
+          break;
+        }
+      }
+
+      if (!hasSetup) {
+        issues.push({
+          location: `Scene ${i} (${curr.slug})`,
+          rule: 'BELIEF_REVERSAL_UNSUPPORTED',
+          description: `Scene ${i} shows a major emotional or belief shift (suspense from ${prev.suspenseDelta} to ${curr.suspenseDelta}, mood ${prev.emotionalShift}→${curr.emotionalShift}) but no prior clue or revelation justifies the change — the reversal feels unmotivated`,
+          severity: 'major',
+          suggestedFix: 'Plant a revelatory moment 1-2 scenes before that explains why the character changed their belief or emotional stance',
+        });
+      }
+    }
+  }
+
+  // BELIEF_ISOLATION: A character has planted clues (indicating they're learning or
+  // hiding knowledge) but never expresses this belief in dialogue highlights. The
+  // belief is interior but never made legible to the audience, making the character's
+  // motivation opaque.
+  const scenesWithClues = records.filter(r => (r.seededClueIds?.length ?? 0) > 0);
+  for (const scene of scenesWithClues) {
+    const hasDialogue = scene.dialogueHighlights.length > 0;
+    if (!hasDialogue && records.length >= 5) {
+      // Only flag if this is a middle scene (not setup or epilogue) and there's enough story length
+      const isMiddle = scene.sceneIdx > 0 && scene.sceneIdx < records.length - 1;
+      if (isMiddle) {
+        issues.push({
+          location: `Scene ${scene.sceneIdx} (${scene.slug})`,
+          rule: 'BELIEF_ISOLATION',
+          description: `Scene ${scene.sceneIdx} plants clues (seeding knowledge) but has no dialogue highlights — the character's belief or discovery is kept entirely internal, making their motivation invisible to the audience`,
+          severity: 'major',
+          suggestedFix: 'Add a line of dialogue or internal monologue where the character expresses or reacts to the clue they\'ve discovered',
+        });
+      }
     }
   }
 

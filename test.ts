@@ -10430,6 +10430,202 @@ describe('Wave 79 — payoff timing, clock magnitude, pacing weights, showrunner
     assert.ok(fatigue[0].severity === 'minor');
   });
 
+  // ── Wave 145: Belief pass enhancements ─────────────────────────────────────
+  describe('Wave 145 — beliefPass: deception consequence and belief reversals', async () => {
+    it('beliefPass detects DECEPTION_WITHOUT_CONSEQUENCE when lie is discovered but ignored', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      const makeRec = (idx: number, dialogueHighlights: string[], revelation: string | null, suspense: number, relationShifts: any[]): any => ({
+        commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose: 'dialogue',
+        dramaticTurn: 'nothing', clockRaised: false, clockDelta: 0,
+        emotionalShift: suspense > 1 ? 'positive' : 'neutral',
+        suspenseDelta: suspense,
+        dialogueHighlights, revelation,
+        unresolvedClues: [],
+        seededClueIds: [], payoffSetupIds: [],
+        visualBeats: [],
+        relationshipShifts: relationShifts,
+      });
+      const records = [
+        makeRec(0, ['alice: Michael never stole anything from anyone'], null, 1, []),
+        makeRec(1, ['bob: right Michael would never steal'], null, 0.5, []),
+        makeRec(2, [], 'Michael stole the diamonds from prison', 2.5, []), // contradiction revealed
+        makeRec(3, ['charlie: what happens next'], null, 0.5, []), // no consequence
+        makeRec(4, [], null, 0.5, []),
+      ];
+      const result = await beliefPass({
+        fountain: Array.from({ length: 5 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+        original: Array.from({ length: 5 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+        records: records as unknown as Parameters<typeof beliefPass>[0]['records'],
+        structure: {} as any,
+        annotations: [],
+        approvedSpans: [],
+      });
+      const deception = result.issues.filter(i => i.rule === 'DECEPTION_WITHOUT_CONSEQUENCE');
+      assert.ok(deception.length >= 1, 'Should detect DECEPTION_WITHOUT_CONSEQUENCE when lie is discovered but creates no conflict');
+      assert.ok(deception[0].severity === 'major');
+    });
+
+    it('beliefPass does NOT fire DECEPTION_WITHOUT_CONSEQUENCE when lie discovery has consequence', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      const makeRec = (idx: number, dialogueHighlights: string[], revelation: string | null, suspense: number, relationShifts: any[]): any => ({
+        commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose: 'dialogue',
+        dramaticTurn: 'nothing', clockRaised: false, clockDelta: 0,
+        emotionalShift: suspense > 1 ? 'positive' : 'neutral',
+        suspenseDelta: suspense,
+        dialogueHighlights, revelation,
+        unresolvedClues: [],
+        seededClueIds: [], payoffSetupIds: [],
+        visualBeats: [],
+        relationshipShifts: relationShifts,
+      });
+      const records = [
+        makeRec(0, ['alice: Michael never stole anything from anyone'], null, 1, []),
+        makeRec(1, ['bob: right Michael would never steal'], null, 0.5, []),
+        makeRec(2, [], 'Michael stole the diamonds from prison', 2.5, []), // contradiction revealed
+        makeRec(3, ['charlie: you lied to everyone!'], null, 2, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -2 }]), // consequence: relationship shift
+        makeRec(4, [], null, 0.5, []),
+      ];
+      const result = await beliefPass({
+        fountain: Array.from({ length: 5 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+        original: Array.from({ length: 5 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+        records: records as unknown as Parameters<typeof beliefPass>[0]['records'],
+        structure: {} as any,
+        annotations: [],
+        approvedSpans: [],
+      });
+      const deception = result.issues.filter(i => i.rule === 'DECEPTION_WITHOUT_CONSEQUENCE');
+      assert.ok(deception.length === 0, 'Should NOT fire when lie discovery creates relationship consequence');
+    });
+
+    it('beliefPass detects BELIEF_REVERSAL_UNSUPPORTED when character mood flips without setup', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      const makeRec = (idx: number, emotionalShift: 'positive' | 'negative' | 'neutral', suspense: number, seededClues: string[]): any => ({
+        commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose: 'dialogue',
+        dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+        emotionalShift,
+        suspenseDelta: suspense,
+        dialogueHighlights: ['alice: hello'],
+        unresolvedClues: [],
+        seededClueIds: seededClues, payoffSetupIds: [],
+        visualBeats: [],
+        relationshipShifts: [],
+      });
+      const records = [
+        makeRec(0, 'neutral', 1, []),
+        makeRec(1, 'neutral', 0.5, []), // no setup
+        makeRec(2, 'positive', 3, []), // big reversal without clue/revelation
+        makeRec(3, 'positive', 1, []),
+      ];
+      const result = await beliefPass({
+        fountain: Array.from({ length: 4 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+        original: Array.from({ length: 4 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+        records: records as unknown as Parameters<typeof beliefPass>[0]['records'],
+        structure: {} as any,
+        annotations: [],
+        approvedSpans: [],
+      });
+      const reversal = result.issues.filter(i => i.rule === 'BELIEF_REVERSAL_UNSUPPORTED');
+      assert.ok(reversal.length >= 1, 'Should detect BELIEF_REVERSAL_UNSUPPORTED when mood flips without evidence');
+      assert.ok(reversal[0].severity === 'major');
+    });
+
+    it('beliefPass does NOT fire BELIEF_REVERSAL_UNSUPPORTED when reversal is supported by prior clue', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      const makeRec = (idx: number, emotionalShift: 'positive' | 'negative' | 'neutral', suspense: number, seededClues: string[]): any => ({
+        commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose: 'dialogue',
+        dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+        emotionalShift,
+        suspenseDelta: suspense,
+        dialogueHighlights: ['alice: hello'],
+        unresolvedClues: [],
+        seededClueIds: seededClues, payoffSetupIds: [],
+        visualBeats: [],
+        relationshipShifts: [],
+      });
+      const records = [
+        makeRec(0, 'neutral', 1, []),
+        makeRec(1, 'neutral', 0.5, ['clue_1']), // setup: clue planted
+        makeRec(2, 'positive', 3, []), // reversal justified by prior clue
+        makeRec(3, 'positive', 1, []),
+      ];
+      const result = await beliefPass({
+        fountain: Array.from({ length: 4 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+        original: Array.from({ length: 4 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+        records: records as unknown as Parameters<typeof beliefPass>[0]['records'],
+        structure: {} as any,
+        annotations: [],
+        approvedSpans: [],
+      });
+      const reversal = result.issues.filter(i => i.rule === 'BELIEF_REVERSAL_UNSUPPORTED');
+      assert.ok(reversal.length === 0, 'Should NOT fire when reversal is supported by prior clue');
+    });
+
+    it('beliefPass detects BELIEF_ISOLATION when scene plants clues but has no dialogue', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      const makeRec = (idx: number, dialogueHighlights: string[], seededClues: string[]): any => ({
+        commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose: 'dialogue',
+        dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+        emotionalShift: 'neutral',
+        suspenseDelta: 1,
+        dialogueHighlights,
+        unresolvedClues: [],
+        seededClueIds: seededClues, payoffSetupIds: [],
+        visualBeats: [],
+        relationshipShifts: [],
+      });
+      const records = [
+        makeRec(0, ['alice: setup'], []),
+        makeRec(1, [], ['clue_1']), // plants clue but no dialogue
+        makeRec(2, ['alice: hello'], []),
+        makeRec(3, ['bob: thanks'], []),
+        makeRec(4, ['charlie: yes'], []),
+      ];
+      const result = await beliefPass({
+        fountain: Array.from({ length: 5 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+        original: Array.from({ length: 5 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+        records: records as unknown as Parameters<typeof beliefPass>[0]['records'],
+        structure: {} as any,
+        annotations: [],
+        approvedSpans: [],
+      });
+      const isolation = result.issues.filter(i => i.rule === 'BELIEF_ISOLATION');
+      assert.ok(isolation.length >= 1, 'Should detect BELIEF_ISOLATION when clues are planted silently');
+      assert.ok(isolation[0].severity === 'major');
+    });
+
+    it('beliefPass does NOT fire BELIEF_ISOLATION when clue scene has dialogue', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      const makeRec = (idx: number, dialogueHighlights: string[], seededClues: string[]): any => ({
+        commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose: 'dialogue',
+        dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+        emotionalShift: 'neutral',
+        suspenseDelta: 1,
+        dialogueHighlights,
+        unresolvedClues: [],
+        seededClueIds: seededClues, payoffSetupIds: [],
+        visualBeats: [],
+        relationshipShifts: [],
+      });
+      const records = [
+        makeRec(0, ['alice: setup'], []),
+        makeRec(1, ['alice: I found the clue'], ['clue_1']), // plants clue WITH dialogue
+        makeRec(2, ['alice: hello'], []),
+        makeRec(3, ['bob: thanks'], []),
+        makeRec(4, ['charlie: yes'], []),
+      ];
+      const result = await beliefPass({
+        fountain: Array.from({ length: 5 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+        original: Array.from({ length: 5 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+        records: records as unknown as Parameters<typeof beliefPass>[0]['records'],
+        structure: {} as any,
+        annotations: [],
+        approvedSpans: [],
+      });
+      const isolation = result.issues.filter(i => i.rule === 'BELIEF_ISOLATION');
+      assert.ok(isolation.length === 0, 'Should NOT fire when clue scene has dialogue');
+    });
+  });
+
   // ── showrunner Gate 1b ─────────────────────────────────────────────────────
 
   it('showrunner fires for set_up_payoff scene with no SEED_CLUE or PAYOFF_SETUP op', async () => {
