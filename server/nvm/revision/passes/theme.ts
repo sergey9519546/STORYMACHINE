@@ -10,6 +10,9 @@
 // Wave 148 additions: theme craft — heavy-handedness (too dense/preachy),
 // dialectic absence (theme asserted but never challenged), and front-loading
 // (theme dumped early then abandoned).
+// Wave 162 additions: theme midpoint silent (structural pivot has no theme voice),
+// theme accelerating density absent (theme fades instead of amplifying toward climax),
+// theme dialectic in Act 3 absent (Act 2 challenges the theme but Act 3 only affirms).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -264,6 +267,82 @@ export async function themePass(input: PassInput): Promise<PassResult> {
           severity: 'major',
           suggestedFix:
             `Distribute theme touchpoints evenly. Rather than front-loading the thematic statement, let the theme deepen and complicate as the story progresses, paying off strongest at the climax.`,
+        });
+      }
+    }
+
+    // ── Wave 162: Midpoint silence, accelerating density, Act 3 dialectic ─────
+
+    // THEME_MIDPOINT_SILENT: The midpoint scene and its neighbors (±1) have no
+    // thematic resonance. The structural pivot of the story has no thematic voice —
+    // the gear-shift doesn't engage the story's central question.
+    if (records.length >= 6) {
+      const midIdx = Math.floor(records.length * 0.5);
+      const midText = sceneTexts.get(records[midIdx]?.sceneIdx ?? -1) ?? '';
+      const prevText = midIdx > 0 ? (sceneTexts.get(records[midIdx - 1]?.sceneIdx ?? -1) ?? '') : midText;
+      const nextText = midIdx < records.length - 1
+        ? (sceneTexts.get(records[midIdx + 1]?.sceneIdx ?? -1) ?? '')
+        : midText;
+
+      if (!sceneHasResonance(midText, expandedKeywords) &&
+          !sceneHasResonance(prevText, expandedKeywords) &&
+          !sceneHasResonance(nextText, expandedKeywords)) {
+        issues.push({
+          location: `Scene ${records[midIdx]?.sceneIdx ?? midIdx} (midpoint ±1)`,
+          rule: 'THEME_MIDPOINT_SILENT',
+          description: `The midpoint and adjacent scenes (Scenes ${Math.max(0, midIdx - 1)}–${Math.min(records.length - 1, midIdx + 1)}) have no thematic language — the structural pivot has no thematic voice`,
+          severity: 'major',
+          suggestedFix: `Add one thematic beat to the midpoint scene: a choice, image, or line of dialogue that resonates with "${themeRaw}". The midpoint is where the theme's second half begins — it should carry the question forward`,
+        });
+      }
+    }
+
+    // THEME_ACCELERATING_DENSITY_ABSENT: The thematic density in the final third is
+    // lower than the first third, meaning the theme fades instead of amplifying toward
+    // the climax. A well-structured story's theme should crescendo, not diminish.
+    if (records.length >= 6 && resonantScenes.length >= 4) {
+      const wavethird = Math.floor(records.length / 3);
+      const firstThirdSum = records.slice(0, wavethird)
+        .reduce((s, r) => s + (sceneHitCounts.get(r.sceneIdx) ?? 0), 0);
+      const lastThirdSum = records.slice(records.length - wavethird)
+        .reduce((s, r) => s + (sceneHitCounts.get(r.sceneIdx) ?? 0), 0);
+      const firstDens = firstThirdSum / Math.max(wavethird, 1);
+      const lastDens = lastThirdSum / Math.max(wavethird, 1);
+
+      if (firstDens > 0 && lastDens > 0 && firstDens > lastDens * 1.5) {
+        issues.push({
+          location: 'Thematic arc',
+          rule: 'THEME_ACCELERATING_DENSITY_ABSENT',
+          description: `Thematic density decreases from first third (${firstDens.toFixed(1)} hits/scene) to final third (${lastDens.toFixed(1)} hits/scene) — the theme "${themeRaw}" fades instead of amplifying toward the climax`,
+          severity: 'major',
+          suggestedFix: `Increase thematic resonance in the final act. The story's thematic question should be most urgently present at the moment of resolution — the climax should be the most thematically charged scene in the script`,
+        });
+      }
+    }
+
+    // THEME_DIALECTIC_IN_ACT3_ABSENT: Act 2 challenges the theme (a resonant scene
+    // with a negative shift or reversal) but Act 3 only affirms it. The question was
+    // asked in Act 2 but Act 3 gives an easy, unearned answer. Great drama keeps
+    // questioning through the climax.
+    if (records.length >= 6 && resonantScenes.length >= 3) {
+      const act3ZoneStart = Math.floor(records.length * 0.75);
+      const act2Resonant = resonantScenes.filter(r => r.sceneIdx < act3ZoneStart);
+      const act3Resonant = resonantScenes.filter(r => r.sceneIdx >= act3ZoneStart);
+
+      const act2HasChallenge = act2Resonant.some(r =>
+        r.emotionalShift === 'negative' || r.suspenseDelta < -1,
+      );
+      const act3HasChallenge = act3Resonant.some(r =>
+        r.emotionalShift === 'negative' || r.suspenseDelta < -1,
+      );
+
+      if (act2HasChallenge && !act3HasChallenge && act3Resonant.length >= 1) {
+        issues.push({
+          location: 'Act 3 thematic arc',
+          rule: 'THEME_DIALECTIC_IN_ACT3_ABSENT',
+          description: `The theme "${themeRaw}" is challenged in Act 2 (a resonant scene with a negative turn) but Act 3 only affirms it. The question was asked but the answer comes too easily — the climax doesn't earn its resolution.`,
+          severity: 'major',
+          suggestedFix: `Add one final challenge to the theme in Act 3 before the resolution — a moment where the protagonist's belief is tested one last time. The resolution carries more weight when the final answer arrives after the final doubt.`,
         });
       }
     }

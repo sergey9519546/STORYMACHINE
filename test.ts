@@ -11762,6 +11762,127 @@ He sits down in the chair.
     });
   });
 
+  describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const themeCtx = { theme: 'loyalty and betrayal define us', genre: 'drama' };
+
+    it('themePass detects THEME_MIDPOINT_SILENT when midpoint zone lacks thematic language', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // 8 scenes: theme in 0,1,6,7 — midpoint zone (3,4,5) has no theme keywords
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, {
+          dialogueHighlights: (i === 0 || i === 1)
+            ? [`alice: loyalty above everything`]
+            : (i === 6 || i === 7)
+            ? [`bob: betrayal changes everything`]
+            : [],
+        }),
+      );
+      const result = await themePass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: {} as any, storyContext: themeCtx,
+        annotations: [], approvedSpans: [],
+      });
+      const midSilent = result.issues.filter(i => i.rule === 'THEME_MIDPOINT_SILENT');
+      assert.ok(midSilent.length >= 1, `Should detect THEME_MIDPOINT_SILENT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(midSilent[0].severity === 'major');
+    });
+
+    it('themePass does NOT fire THEME_MIDPOINT_SILENT when midpoint has theme language', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // midpoint scene 4 has loyalty keyword
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, {
+          dialogueHighlights: (i === 0 || i === 4 || i === 7)
+            ? ['alice: loyalty is everything']
+            : [],
+        }),
+      );
+      const result = await themePass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: {} as any, storyContext: themeCtx,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'THEME_MIDPOINT_SILENT'),
+        'Should NOT fire when midpoint scene carries theme language',
+      );
+    });
+
+    it('themePass detects THEME_ACCELERATING_DENSITY_ABSENT when theme fades toward climax', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // 9 scenes (third=3): first third (0-2) very dense with theme, last third (6-8) sparse but present
+      const records = Array.from({ length: 9 }, (_, i) =>
+        makeRec(i, {
+          dialogueHighlights: i < 3
+            ? ['alice: loyalty loyalty loyalty loyalty loyalty loyalty betrayal betrayal betrayal']
+            : i >= 6
+            ? ['bob: loyalty'] // sparse — only 1 hit vs 9+ in first third
+            : ['carol: loyalty betrayal again'], // middle: moderate
+          emotionalShift: 'neutral', suspenseDelta: 1,
+        }),
+      );
+      const result = await themePass({
+        fountain: blankFountain(9), original: blankFountain(9),
+        records: records as any, structure: {} as any, storyContext: themeCtx,
+        annotations: [], approvedSpans: [],
+      });
+      const fading = result.issues.filter(i => i.rule === 'THEME_ACCELERATING_DENSITY_ABSENT');
+      assert.ok(fading.length >= 1, `Should detect THEME_ACCELERATING_DENSITY_ABSENT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(fading[0].severity === 'major');
+    });
+
+    it('themePass detects THEME_DIALECTIC_IN_ACT3_ABSENT when Act 3 only affirms theme', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // 8 scenes: act2 has a resonant scene with negative emotional shift (challenge),
+      // act3 (scenes 6-7) has resonant scenes but both neutral — no challenge in Act 3
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, {
+          dialogueHighlights: ['alice: loyalty prevails betrayal fails'],
+          emotionalShift: i === 3 ? 'negative' : 'neutral', // act2 challenge at scene 3
+          suspenseDelta: 1,
+        }),
+      );
+      const result = await themePass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: {} as any, storyContext: themeCtx,
+        annotations: [], approvedSpans: [],
+      });
+      const noAct3Dialectic = result.issues.filter(i => i.rule === 'THEME_DIALECTIC_IN_ACT3_ABSENT');
+      assert.ok(noAct3Dialectic.length >= 1, `Should detect THEME_DIALECTIC_IN_ACT3_ABSENT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(noAct3Dialectic[0].severity === 'major');
+    });
+
+    it('themePass does NOT fire THEME_DIALECTIC_IN_ACT3_ABSENT when Act 3 also challenges theme', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, {
+          dialogueHighlights: ['alice: loyalty and betrayal'],
+          emotionalShift: (i === 3 || i === 6) ? 'negative' : 'neutral', // challenge in both act2 and act3
+          suspenseDelta: 1,
+        }),
+      );
+      const result = await themePass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: {} as any, storyContext: themeCtx,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'THEME_DIALECTIC_IN_ACT3_ABSENT'),
+        'Should NOT fire when Act 3 also has a thematic challenge',
+      );
+    });
+  });
+
   describe('Wave 161 — relationshipArcPass: single pair, late introduction, velocity collapse', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
