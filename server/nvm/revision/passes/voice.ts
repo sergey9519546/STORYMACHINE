@@ -431,6 +431,87 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 173: Adverb crutch, filter words, exclamation overuse ──────────────
+
+  // ADVERB_CRUTCH: Action lines lean on -ly manner adverbs ("walks slowly",
+  // "turns quickly", "speaks softly") instead of strong, specific verbs. Adverbs
+  // patch a weak verb rather than choosing a precise one. Distinct from
+  // QUALIFIER_OVERLOAD (hedging words). Requires 8+ action lines and >30% rate.
+  if (actionOnlyLines.length >= 8) {
+    // -ly words that are not manner adverbs (nouns/adjectives ending in "ly")
+    const adverbExclude = new Set([
+      'only', 'family', 'early', 'ugly', 'holy', 'reply', 'supply', 'apply',
+      'imply', 'rely', 'ally', 'rally', 'jelly', 'belly', 'silly', 'lonely',
+      'lovely', 'likely', 'daily', 'weekly', 'monthly', 'yearly', 'friendly',
+      'lively', 'elderly', 'orderly', 'homely', 'costly', 'curly', 'burly',
+      'surly', 'july', 'assembly', 'anomaly', 'italy', 'comply', 'multiply',
+    ]);
+    const adverbLineCount = actionOnlyLines.filter(line => {
+      const matches = line.toLowerCase().match(/\b[a-z]{3,}ly\b/g) || [];
+      return matches.some(w => !adverbExclude.has(w));
+    }).length;
+    const adverbRate = adverbLineCount / actionOnlyLines.length;
+    if (adverbRate > 0.3) {
+      issues.push({
+        location: 'Action line verbs',
+        rule: 'ADVERB_CRUTCH',
+        description: `${adverbLineCount} of ${actionOnlyLines.length} action lines (${Math.round(adverbRate * 100)}%) lean on -ly adverbs ("walks slowly", "speaks softly") — adverbs patch a weak verb instead of choosing a precise one`,
+        severity: 'minor',
+        suggestedFix: 'Replace verb+adverb pairs with one strong verb: "walks slowly" → "shuffles"; "speaks softly" → "murmurs". A specific verb does the work the adverb is apologizing for.',
+      });
+    }
+  }
+
+  // FILTER_WORD_OVERLOAD: Action lines route the image through a perceiving
+  // character ("she sees the door open", "he watches her leave", "they notice
+  // the smoke") instead of presenting the image directly. Filter words add a
+  // layer of distance between the audience and the action. Distinct from
+  // PASSIVE_ACTION_VOICE (passive constructions) and INTERIOR_MONOLOGUE_LEAK
+  // (psychology). Requires 10+ action lines and >25% rate.
+  if (actionOnlyLines.length >= 10) {
+    const filterPattern = /\b(she|he|they|we|i)\s+(sees?|saw|watch(es|ed)?|look(s|ed)?\s+at|hears?|heard|notices?|noticed|observ(es|ed)|spots?|spotted|glimps(es|ed)|gazes?|stares?\s+at)\b/i;
+    const filterLineCount = actionOnlyLines.filter(l => filterPattern.test(l)).length;
+    const filterRate = filterLineCount / actionOnlyLines.length;
+    if (filterRate > 0.25) {
+      issues.push({
+        location: 'Action line perspective',
+        rule: 'FILTER_WORD_OVERLOAD',
+        description: `${filterLineCount} of ${actionOnlyLines.length} action lines (${Math.round(filterRate * 100)}%) route the image through a character's perception ("she sees", "he watches", "they notice") — filter words distance the audience from the action`,
+        severity: 'minor',
+        suggestedFix: 'Cut the filter and show the image directly: "She sees the door swing open" → "The door swings open." The camera already implies whose POV it is; let the action land unmediated.',
+      });
+    }
+  }
+
+  // EXCLAMATION_OVERUSE: Dialogue leans on exclamation marks to manufacture
+  // intensity. When too many lines shout, nothing reads as loud — the emotional
+  // dynamic range flattens. Requires 10+ dialogue lines and >35% with "!".
+  {
+    const dialogueLines: string[] = [];
+    let inDlg = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg = true; continue; }
+      if (/^\(/.test(t)) continue; // parenthetical
+      if (inDlg) dialogueLines.push(t);
+    }
+    if (dialogueLines.length >= 10) {
+      const exclaimCount = dialogueLines.filter(l => l.includes('!')).length;
+      const exclaimRate = exclaimCount / dialogueLines.length;
+      if (exclaimRate > 0.35) {
+        issues.push({
+          location: 'Dialogue intensity',
+          rule: 'EXCLAMATION_OVERUSE',
+          description: `${exclaimCount} of ${dialogueLines.length} dialogue lines (${Math.round(exclaimRate * 100)}%) end on an exclamation — when most lines shout, none of them land. The emotional dynamic range collapses.`,
+          severity: 'minor',
+          suggestedFix: 'Reserve exclamation marks for genuine peaks. Let intensity come from word choice and context, not punctuation: a flat "Get out." can read louder than "Get out!"',
+        });
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'voice', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

@@ -13152,6 +13152,123 @@ He sits down in the chair.
     });
   });
 
+  describe('Wave 173 — voicePass: adverb crutch, filter words, exclamation overuse', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const voiceInput = (fountain: string, n: number) => ({
+      fountain, original: fountain,
+      records: Array.from({ length: n }, (_, i) => makeRec(i)) as any,
+      structure: {} as any, annotations: [], approvedSpans: [],
+    });
+
+    // ── ADVERB_CRUTCH ─────────────────────────────────────────────────────────
+    it('voicePass detects ADVERB_CRUTCH when >30% of action lines use -ly adverbs', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const actions = [
+        'He walks slowly to the desk.', 'She turns quickly toward the door.',
+        'He speaks softly into the phone.', 'The desk is cluttered.',
+        'A lamp burns.', 'The window frames the street.',
+        'Papers cover the floor.', 'A clock ticks.',
+      ];
+      const fountain = `INT. OFFICE - DAY\n\n${actions.join('\n')}\n`;
+      const result = await voicePass(voiceInput(fountain, 1));
+      const adverb = result.issues.filter(i => i.rule === 'ADVERB_CRUTCH');
+      assert.ok(adverb.length >= 1, `Should detect ADVERB_CRUTCH; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(adverb[0].severity === 'minor');
+    });
+
+    it('voicePass does NOT fire ADVERB_CRUTCH when action verbs are strong and specific', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const actions = [
+        'He shuffles to the desk.', 'She wheels toward the door.',
+        'He murmurs into the phone.', 'The desk is cluttered.',
+        'A lamp burns.', 'The window frames the street.',
+        'Papers cover the floor.', 'A clock ticks.',
+      ];
+      const fountain = `INT. OFFICE - DAY\n\n${actions.join('\n')}\n`;
+      const result = await voicePass(voiceInput(fountain, 1));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'ADVERB_CRUTCH'),
+        'Should NOT fire when action lines use strong verbs without -ly adverbs',
+      );
+    });
+
+    // ── FILTER_WORD_OVERLOAD ──────────────────────────────────────────────────
+    it('voicePass detects FILTER_WORD_OVERLOAD when >25% of action lines route through perception', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const actions = [
+        'She sees the door swing open.', 'He watches her cross the room.',
+        'They notice the smoke curling up.', 'She stares at the photograph.',
+        'The rain streaks the glass.', 'A car idles outside.',
+        'The kettle steams.', 'Wind rattles the frame.',
+        'Dust settles on the sill.', 'The floor creaks.',
+      ];
+      const fountain = `INT. ROOM - DAY\n\n${actions.join('\n')}\n`;
+      const result = await voicePass(voiceInput(fountain, 1));
+      const filter = result.issues.filter(i => i.rule === 'FILTER_WORD_OVERLOAD');
+      assert.ok(filter.length >= 1, `Should detect FILTER_WORD_OVERLOAD; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(filter[0].severity === 'minor');
+    });
+
+    it('voicePass does NOT fire FILTER_WORD_OVERLOAD when images are presented directly', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const actions = [
+        'The door swings open.', 'She crosses the room.',
+        'Smoke curls up from the grate.', 'The photograph lies face-down.',
+        'The rain streaks the glass.', 'A car idles outside.',
+        'The kettle steams.', 'Wind rattles the frame.',
+        'Dust settles on the sill.', 'The floor creaks.',
+      ];
+      const fountain = `INT. ROOM - DAY\n\n${actions.join('\n')}\n`;
+      const result = await voicePass(voiceInput(fountain, 1));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'FILTER_WORD_OVERLOAD'),
+        'Should NOT fire when images are presented without perception filters',
+      );
+    });
+
+    // ── EXCLAMATION_OVERUSE ───────────────────────────────────────────────────
+    it('voicePass detects EXCLAMATION_OVERUSE when >35% of dialogue lines shout', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 10 dialogue lines, 5 with exclamation marks (50% > 35%)
+      const lines = [
+        'ALICE', 'Get out of here!', 'BOB', 'I will not leave!',
+        'ALICE', 'You always do this!', 'BOB', 'Maybe I do.',
+        'ALICE', 'That is enough!', 'BOB', 'Fine.',
+        'ALICE', 'Listen to me now!', 'BOB', 'I am listening.',
+        'ALICE', 'We need a plan.', 'BOB', 'Then make one.',
+      ];
+      const fountain = `INT. ROOM - DAY\n\n${lines.join('\n')}\n`;
+      const result = await voicePass(voiceInput(fountain, 1));
+      const excl = result.issues.filter(i => i.rule === 'EXCLAMATION_OVERUSE');
+      assert.ok(excl.length >= 1, `Should detect EXCLAMATION_OVERUSE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(excl[0].severity === 'minor');
+    });
+
+    it('voicePass does NOT fire EXCLAMATION_OVERUSE when dialogue uses restrained punctuation', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const lines = [
+        'ALICE', 'Get out of here.', 'BOB', 'I will not leave.',
+        'ALICE', 'You always do this.', 'BOB', 'Maybe I do.',
+        'ALICE', 'That is enough.', 'BOB', 'Fine.',
+        'ALICE', 'Listen to me now!', 'BOB', 'I am listening.',
+        'ALICE', 'We need a plan.', 'BOB', 'Then make one.',
+      ];
+      const fountain = `INT. ROOM - DAY\n\n${lines.join('\n')}\n`;
+      const result = await voicePass(voiceInput(fountain, 1));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'EXCLAMATION_OVERUSE'),
+        'Should NOT fire when only a small fraction of dialogue lines use exclamations',
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
