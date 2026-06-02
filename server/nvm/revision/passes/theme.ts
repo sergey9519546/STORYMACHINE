@@ -1,0 +1,189 @@
+// Wave 130 — Pass 13: Theme Resonance
+// Checks whether each scene's dialogue, action, and visual content actively
+// echoes, embodies, or challenges the declared story theme. A theme that's
+// stated in the logline but never dramatized is an empty promise.
+//
+// This pass only fires when storyContext.theme is set (a non-trivial statement).
+// It checks two failure modes:
+//   1. THEME_RESONANCE_GAP — too many scenes have zero language related to the theme
+//   2. THEME_UNRESOLVED   — Act 3 contains no thematic language (climax fails to answer)
+
+import type { PassInput, PassResult, RevisionIssue } from './types.ts';
+import { rewritePass } from '../rewrite.ts';
+
+const STOPWORDS = new Set([
+  'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+  'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+  'should', 'may', 'might', 'must', 'shall', 'can', 'that', 'this', 'it',
+  'in', 'on', 'at', 'to', 'of', 'and', 'or', 'but', 'not', 'with', 'by',
+  'for', 'from', 'as', 'into', 'through', 'during', 'before', 'after',
+  'all', 'any', 'each', 'every', 'some', 'very', 'just', 'then', 'when',
+  'who', 'what', 'where', 'how', 'if', 'so', 'its', 'their', 'them',
+  'they', 'we', 'you', 'he', 'she', 'his', 'her', 'our', 'your',
+]);
+
+function extractThemeKeywords(theme: string): string[] {
+  return theme.toLowerCase()
+    .split(/\W+/)
+    .filter(w => w.length > 3 && !STOPWORDS.has(w));
+}
+
+// Expand each keyword into related forms (crude stem/synonym expansion).
+// E.g., "betray" covers "betrayal", "betrayed", "betrayer", "betray".
+function expandKeyword(kw: string): string[] {
+  return [kw, kw + 's', kw + 'ed', kw + 'ing', kw + 'al', kw + 'er', kw + 'ful', kw + 'less'];
+}
+
+// Build the set of scene text from records (dialogue + revelation + slug).
+// Also scan the raw fountain text around each scene's line position using slugs.
+function buildSceneText(
+  records: PassInput['records'],
+  fountain: string,
+): Map<number, string> {
+  const fountainLines = fountain.split('\n');
+  const slugLineIndex = new Map<string, number>();
+
+  for (let i = 0; i < fountainLines.length; i++) {
+    const t = fountainLines[i].trim();
+    if (t && /^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) {
+      slugLineIndex.set(t.toLowerCase(), i);
+    }
+  }
+
+  const result = new Map<number, string>();
+
+  for (let ri = 0; ri < records.length; ri++) {
+    const r = records[ri];
+    const parts: string[] = [
+      r.slug,
+      ...r.dialogueHighlights,
+      r.revelation ?? '',
+    ];
+
+    // Also grab the fountain lines between this scene's slug and the next.
+    const slugKey = r.slug.toLowerCase();
+    const slugLine = slugLineIndex.get(slugKey) ?? -1;
+    if (slugLine >= 0) {
+      // Find the next scene heading line
+      const nextSlugLine = ri + 1 < records.length
+        ? (slugLineIndex.get(records[ri + 1].slug.toLowerCase()) ?? fountainLines.length)
+        : fountainLines.length;
+      const sceneBlock = fountainLines.slice(slugLine, nextSlugLine).join(' ');
+      parts.push(sceneBlock);
+    }
+
+    result.set(r.sceneIdx, parts.join(' ').toLowerCase());
+  }
+
+  return result;
+}
+
+function sceneHasResonance(text: string, expandedKeywords: string[][]): boolean {
+  return expandedKeywords.some(forms => forms.some(form => text.includes(form)));
+}
+
+export async function themePass(input: PassInput): Promise<PassResult> {
+  const { fountain, records, storyContext, approvedSpans } = input;
+
+  // Pass is a no-op unless the story has a declared theme
+  const themeRaw = storyContext?.theme?.trim() ?? '';
+  if (!themeRaw || records.length < 3) {
+    return {
+      pass: 'theme',
+      issues: [],
+      revisedFountain: fountain,
+      changed: false,
+      summary: 'Theme resonance pass: no theme declared (set story theme to activate this pass)',
+    };
+  }
+
+  const keywords = extractThemeKeywords(themeRaw);
+  if (keywords.length === 0) {
+    return {
+      pass: 'theme',
+      issues: [],
+      revisedFountain: fountain,
+      changed: false,
+      summary: 'Theme resonance pass: theme statement too sparse to extract keywords',
+    };
+  }
+
+  const expandedKeywords = keywords.map(expandKeyword);
+  const sceneTexts = buildSceneText(records, fountain);
+  const issues: RevisionIssue[] = [];
+
+  // ── Per-scene resonance audit ─────────────────────────────────────────────
+  const silentScenes: Array<{ idx: number; slug: string }> = [];
+  for (const r of records) {
+    const text = sceneTexts.get(r.sceneIdx) ?? '';
+    if (!sceneHasResonance(text, expandedKeywords)) {
+      silentScenes.push({ idx: r.sceneIdx, slug: r.slug });
+    }
+  }
+
+  // ── THEME_RESONANCE_GAP — >40% of scenes are theme-silent ─────────────────
+  const silenceRatio = silentScenes.length / records.length;
+  if (silenceRatio > 0.4 && records.length >= 4) {
+    const sample = silentScenes.slice(0, 3).map(s => `Scene ${s.idx} (${s.slug})`).join(', ');
+    const extra = silentScenes.length > 3 ? ` +${silentScenes.length - 3} more` : '';
+    issues.push({
+      location: sample + extra,
+      rule: 'THEME_RESONANCE_GAP',
+      description:
+        `${Math.round(silenceRatio * 100)}% of scenes (${silentScenes.length}/${records.length}) contain no language related to the theme "${themeRaw}". ` +
+        `Theme keywords expected: [${keywords.slice(0, 5).join(', ')}${keywords.length > 5 ? '…' : ''}].`,
+      severity: 'major',
+      suggestedFix:
+        `Find one moment per silent scene where a character's action, dialogue, or visual detail directly embodies or subverts the theme: "${themeRaw}"`,
+    });
+  }
+
+  // ── THEME_UNRESOLVED — Act 3 has no thematic language ─────────────────────
+  const act3Start = Math.floor(records.length * 0.7);
+  const act3Records = records.slice(act3Start);
+  const act3HasResonance = act3Records.some(r =>
+    sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+  );
+
+  if (!act3HasResonance && act3Records.length > 0) {
+    issues.push({
+      location: 'Act 3',
+      rule: 'THEME_UNRESOLVED',
+      description:
+        `Act 3 contains no language echoing the theme "${themeRaw}". The climax should deliver the story's thematic answer, not just resolve the plot.`,
+      severity: 'critical',
+      suggestedFix:
+        `The final act must explicitly answer or crystallize the theme. Have a character make a choice that embodies or refutes it: "${themeRaw}"`,
+    });
+  }
+
+  // ── THEME_ORPHANED — theme set but no scene has any resonance at all ───────
+  if (silentScenes.length === records.length) {
+    issues.length = 0; // replace the gap flag with a stronger one
+    issues.push({
+      location: 'Entire screenplay',
+      rule: 'THEME_ORPHANED',
+      description:
+        `The story declares the theme "${themeRaw}" but zero scenes contain any thematic language. Theme is not dramatized.`,
+      severity: 'critical',
+      suggestedFix:
+        `Ensure that the story's dialogue and action consistently echo, test, and ultimately resolve the declared theme.`,
+    });
+  }
+
+  const { revised, usedLLM } = await rewritePass({
+    fountain, issues, passName: 'theme', approvedSpans,
+    storyContext: input.storyContext, priorPassResults: input.priorPassResults,
+  });
+  const changed = revised !== fountain;
+
+  return {
+    pass: 'theme',
+    issues,
+    revisedFountain: revised,
+    changed,
+    summary: issues.length === 0
+      ? `Theme resonance pass: all scenes echo the theme "${themeRaw}"`
+      : `Theme resonance pass: ${issues.length} issue(s) — ${usedLLM ? 'rewritten' : 'flagged (stub mode)'}`,
+  };
+}

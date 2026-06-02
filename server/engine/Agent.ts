@@ -61,7 +61,7 @@ export class Agent {
     const otherAgents = this.stage.getAgentsInLocation(this.sheet.current_location_id)
       .filter(a => a.char_id !== this.sheet.char_id);
 
-    const { prompt, pendingStrategies } = buildPrompt(
+    const { prompt, pendingStrategies, consumedPressureIds } = buildPrompt(
       this.sheet, this.stage, currentNode, sensoryFilter, otherAgents,
     );
     this._pendingPersuasionStrategies = pendingStrategies;
@@ -80,6 +80,12 @@ export class Agent {
       });
     }
     this._pendingPersuasionStrategies.clear();
+
+    // Mark dramatic pressures consumed only after action is confirmed — prevents
+    // pressures being wasted if selectBestAction fails or times out.
+    for (const pressureId of consumedPressureIds) {
+      this.stage.markPressureApplied(pressureId);
+    }
 
     return action ?? { action_type: 'SPEAK' as const, content: '...', target: null };
   }

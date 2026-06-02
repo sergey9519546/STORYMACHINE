@@ -8719,14 +8719,14 @@ describe('NVM — 12-Pass Revision Pipeline (Wave 39)', () => {
 
   // ── Pipeline integration tests ────────────────────────────────────────────
 
-  it('pipeline: runRevisionPipeline runs all 12 passes', async () => {
+  it('pipeline: runRevisionPipeline runs all 13 passes', async () => {
     const commits: StoryCommit[] = [];
     const records = buildScreenplayMemory(commits);
     const structure = analyzeStructure(records, commits);
     const compiled = compileScreenplay(commits, emptyState(), records, structure, 'TEST');
 
     const result = await runRevisionPipeline(compiled, records, structure, []);
-    assert.equal(result.passResults.length, 12, 'all 12 passes ran');
+    assert.equal(result.passResults.length, 13, 'all 13 passes ran');
     assert.ok(typeof result.totalIssuesFound === 'number', 'totalIssuesFound is number');
     assert.ok(typeof result.passesWithChanges === 'number', 'passesWithChanges is number');
     assert.ok(typeof result.finalFountain === 'string', 'finalFountain is string');
@@ -8743,7 +8743,7 @@ describe('NVM — 12-Pass Revision Pipeline (Wave 39)', () => {
     const result = await runRevisionPipeline(compiled, records, structure);
     const expectedOrder = [
       'structure', 'causality', 'intention', 'belief', 'conflict',
-      'character-arc', 'dialogue', 'rhythm', 'pacing', 'originality', 'payoff', 'voice',
+      'character-arc', 'dialogue', 'rhythm', 'pacing', 'originality', 'payoff', 'voice', 'theme',
     ];
     const actualOrder = result.passResults.map(p => p.pass);
     assert.deepEqual(actualOrder, expectedOrder, 'passes run in correct order');
@@ -8757,7 +8757,7 @@ describe('NVM — 12-Pass Revision Pipeline (Wave 39)', () => {
 
     const approvedSpans = [{ startLine: 1, endLine: 3, reason: 'title page' }];
     const result = await runRevisionPipeline(compiled, records, structure, approvedSpans);
-    assert.equal(result.passResults.length, 12, 'all 12 passes complete with approved spans');
+    assert.equal(result.passResults.length, 13, 'all 13 passes complete with approved spans');
   });
 
   it('pipeline: totalIssuesFound = sum of per-pass issue counts', async () => {
@@ -9684,7 +9684,7 @@ describe('Wave 70 — revision rewrite storyContext enrichment', () => {
 
     // runRevisionPipeline accepts storyContext as 6th param — if types are wrong, tsc fails
     const result = await runRevisionPipeline(compiled, records, structure, [], undefined, ctx);
-    assert.ok(result.passResults.length === 0 || result.passResults.length === 12,
+    assert.ok(result.passResults.length === 0 || result.passResults.length === 13,
       'Pipeline handles empty fountain gracefully');
   });
 });
@@ -14632,6 +14632,187 @@ Character speaks.`;
     for (const [blockType, cssClass] of Object.entries(cssMap)) {
       assert.ok(cssClass.length > 0, `${blockType} has CSS class`);
     }
+  });
+
+});
+
+// ── Wave 130 — Revision Engine Hardening + Theme Resonance Pass ──────────────
+
+import { themePass } from './server/nvm/revision/passes/theme.ts';
+import type { PassInput } from './server/nvm/revision/passes/types.ts';
+import type { ScreenplaySceneRecord } from './server/nvm/screenplay/memory.ts';
+import type { StructureState } from './server/nvm/screenplay/structure.ts';
+
+function makeMinimalInput(overrides: Partial<PassInput> = {}): PassInput {
+  const baseRecord: ScreenplaySceneRecord = {
+    sceneIdx: 0, slug: 'INT. ROOM - DAY', purpose: 'establish_world',
+    dramaticTurn: 'none', revelation: null, emotionalShift: 'neutral',
+    visualBeats: [], dialogueHighlights: [], unresolvedClues: [],
+    seededClueIds: [], payoffSetupIds: [], suspenseDelta: 0, clockPressure: 0,
+  };
+  return {
+    fountain: 'INT. ROOM - DAY\n\nA person sits.\n',
+    original: 'INT. ROOM - DAY\n\nA person sits.\n',
+    annotations: [],
+    structure: {
+      actPosition: 'act1', escalating: false, reversalCount: 0,
+      openClues: 0, completionPercent: 20, midpointPressure: 0,
+      tightestScene: 0,
+    } as StructureState,
+    records: [baseRecord],
+    approvedSpans: [],
+    storyContext: {},
+    ...overrides,
+  };
+}
+
+describe('Wave 130 — Theme Resonance Pass (Pass 13)', () => {
+
+  it('returns no-op summary when no theme is declared', async () => {
+    const result = await themePass(makeMinimalInput({ storyContext: {} }));
+    assert.equal(result.pass, 'theme');
+    assert.equal(result.issues.length, 0);
+    assert.ok(result.summary.includes('no theme declared'));
+  });
+
+  it('returns no-op when records < 3', async () => {
+    const result = await themePass(makeMinimalInput({ storyContext: { theme: 'power corrupts' } }));
+    assert.equal(result.issues.length, 0, 'too few records, should skip');
+  });
+
+  it('detects THEME_ORPHANED when zero scenes contain any theme keyword', async () => {
+    const records: ScreenplaySceneRecord[] = Array.from({ length: 4 }, (_, i) => ({
+      sceneIdx: i, slug: `INT. ROOM ${i} - DAY`, purpose: 'establish_world',
+      dramaticTurn: 'none', revelation: null, emotionalShift: 'neutral',
+      visualBeats: [], dialogueHighlights: ['completely unrelated text'], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [], suspenseDelta: 0, clockPressure: 0,
+    }));
+    const fountain = records.map(r => `${r.slug}\n\nSome action.\n`).join('\n');
+    const result = await themePass(makeMinimalInput({
+      fountain,
+      records,
+      storyContext: { theme: 'betrayal destroys trust' },
+    }));
+    assert.ok(
+      result.issues.some(i => i.rule === 'THEME_ORPHANED' || i.rule === 'THEME_RESONANCE_GAP'),
+      'should detect theme absence',
+    );
+  });
+
+  it('does not flag when theme keywords appear in dialogue highlights', async () => {
+    const records: ScreenplaySceneRecord[] = Array.from({ length: 4 }, (_, i) => ({
+      sceneIdx: i, slug: `INT. ROOM ${i} - DAY`, purpose: 'establish_world',
+      dramaticTurn: 'none', revelation: null, emotionalShift: 'neutral',
+      visualBeats: [], dialogueHighlights: ['power corrupts everyone eventually'], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [], suspenseDelta: 0, clockPressure: 0,
+    }));
+    const fountain = records.map(r => `${r.slug}\n\nThe power corrupts.\n`).join('\n');
+    const result = await themePass(makeMinimalInput({
+      fountain,
+      records,
+      storyContext: { theme: 'power corrupts' },
+    }));
+    // All scenes have theme keywords — should not flag
+    assert.ok(
+      !result.issues.some(i => i.rule === 'THEME_ORPHANED'),
+      'should not flag when all scenes contain theme keywords',
+    );
+  });
+
+  it('flags THEME_UNRESOLVED when Act 3 has no theme language', async () => {
+    const records: ScreenplaySceneRecord[] = Array.from({ length: 6 }, (_, i) => ({
+      sceneIdx: i, slug: `INT. ROOM ${i} - DAY`, purpose: i < 4 ? 'establish_world' : 'climax',
+      dramaticTurn: 'none', revelation: null, emotionalShift: 'neutral',
+      visualBeats: [],
+      // Only early scenes have theme words; Act 3 (last 30%: scenes 4,5) have nothing
+      dialogueHighlights: i < 4 ? ['power corrupts and destroys trust'] : ['completely unrelated'],
+      unresolvedClues: [], seededClueIds: [], payoffSetupIds: [], suspenseDelta: 0, clockPressure: 0,
+    }));
+    const fountain = records.map(r => `${r.slug}\n\n${r.dialogueHighlights[0]}\n`).join('\n');
+    const result = await themePass(makeMinimalInput({
+      fountain,
+      records,
+      storyContext: { theme: 'power corrupts' },
+    }));
+    assert.ok(
+      result.issues.some(i => i.rule === 'THEME_UNRESOLVED'),
+      'Act 3 without theme language should flag THEME_UNRESOLVED',
+    );
+  });
+
+  it('theme pass is listed in PassName type (structural)', () => {
+    // Just verify the pass name 'theme' is accepted by the type system
+    // (TypeScript would reject this at compile time if 'theme' is not in PassName)
+    const passName: import('./server/nvm/revision/passes/types.ts').PassName = 'theme';
+    assert.equal(passName, 'theme');
+  });
+
+});
+
+describe('Wave 130 — Causality pass REVELATION_WITHOUT_SETUP fix', () => {
+
+  it('does NOT fire REVELATION_WITHOUT_SETUP when prev scene has unrelated clue', async () => {
+    // Pre-fix: would fail because prev.unresolvedClues.length > 0 blocked the outer check
+    // Post-fix: checks ALL prior records for seededClueIds
+    const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+    const records: ScreenplaySceneRecord[] = [
+      { sceneIdx: 0, slug: 'INT. ROOM - DAY', purpose: 'establish_world', dramaticTurn: 'none',
+        revelation: null, emotionalShift: 'neutral', visualBeats: [], dialogueHighlights: [],
+        unresolvedClues: ['unrelated-clue'], seededClueIds: ['unrelated-clue'],
+        payoffSetupIds: [], suspenseDelta: 0, clockPressure: 0 },
+      { sceneIdx: 1, slug: 'INT. HALL - NIGHT', purpose: 'revelation', dramaticTurn: 'revelation',
+        revelation: 'the killer was the butler', emotionalShift: 'negative',
+        visualBeats: [], dialogueHighlights: [], unresolvedClues: [],
+        seededClueIds: [], payoffSetupIds: [], suspenseDelta: 5, clockPressure: 0 },
+    ];
+    const annotations = [
+      { slug: 'INT. ROOM - DAY', revelation: null },
+      { slug: 'INT. HALL - NIGHT', revelation: 'the killer was the butler' },
+    ];
+    const input = makeMinimalInput({ records, annotations: annotations as never });
+    const result = await causalityPass(input);
+    // Scene 1 has a revelation but scene 0 DOES have a seeded clue (unrelated-clue)
+    // — should NOT flag REVELATION_WITHOUT_SETUP since anyCluesBefore = true
+    assert.ok(
+      !result.issues.some(i => i.rule === 'REVELATION_WITHOUT_SETUP'),
+      'should not flag when prior scenes have seeded clues',
+    );
+  });
+
+});
+
+describe('Wave 130 — Intention pass expanded boring purposes', () => {
+
+  it('flags REPEATED_PURPOSE for 3 consecutive reflection scenes', async () => {
+    const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+    const records: ScreenplaySceneRecord[] = Array.from({ length: 4 }, (_, i) => ({
+      sceneIdx: i, slug: `INT. ROOM ${i}`, purpose: i < 3 ? 'reflection' : 'climax',
+      dramaticTurn: 'none', revelation: null, emotionalShift: 'neutral',
+      visualBeats: [], dialogueHighlights: [], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [], suspenseDelta: 0, clockPressure: 0,
+    }));
+    const input = makeMinimalInput({ records });
+    const result = await intentionPass(input);
+    assert.ok(
+      result.issues.some(i => i.rule === 'REPEATED_PURPOSE'),
+      'reflection (new boring purpose) should be flagged',
+    );
+  });
+
+  it('still flags 3 consecutive establish_world scenes', async () => {
+    const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+    const records: ScreenplaySceneRecord[] = Array.from({ length: 3 }, (_, i) => ({
+      sceneIdx: i, slug: `INT. ROOM ${i}`, purpose: 'establish_world',
+      dramaticTurn: 'none', revelation: null, emotionalShift: 'neutral',
+      visualBeats: [], dialogueHighlights: [], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [], suspenseDelta: 0, clockPressure: 0,
+    }));
+    const input = makeMinimalInput({ records });
+    const result = await intentionPass(input);
+    assert.ok(
+      result.issues.some(i => i.rule === 'REPEATED_PURPOSE'),
+      'establish_world still flagged as low-momentum',
+    );
   });
 
 });

@@ -17,7 +17,8 @@ export type PassName =
   | 'pacing'
   | 'originality'
   | 'payoff'
-  | 'voice';
+  | 'voice'
+  | 'theme';
 
 export interface ApprovedSpan {
   /** 1-based line number (inclusive) */

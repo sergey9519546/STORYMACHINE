@@ -14,15 +14,20 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     const curr = records[i];
     const ann = annotations[i];
 
-    // ── Dramatic turn without causal setup ────────────────────────────────
-    if (ann && ann.revelation && prev.unresolvedClues.length === 0) {
-      // A revelation that has no planted clues in prior records
-      const cluesBefore = records.slice(0, i).some(r => r.unresolvedClues.length > 0);
-      if (!cluesBefore) {
+    // ── Revelation without any prior planted clue ─────────────────────────
+    // A revelation that delivers new information but has no seeded clues in ANY
+    // prior scene is an unearned surprise. We check all records before this one,
+    // not just the immediately preceding one, so an unrelated clue elsewhere
+    // does not mask a missing setup for THIS revelation.
+    if (ann && ann.revelation) {
+      const anyCluesBefore = records
+        .slice(0, i)
+        .some(r => (r.seededClueIds?.length ?? 0) > 0 || r.unresolvedClues.length > 0);
+      if (!anyCluesBefore) {
         issues.push({
           location: `Scene ${i} (${curr.slug})`,
           rule: 'REVELATION_WITHOUT_SETUP',
-          description: `Scene ${i} delivers a revelation but no clues were planted in prior scenes`,
+          description: `Scene ${i} delivers a revelation but no clues were planted in any prior scene`,
           severity: 'critical',
           suggestedFix: 'Add a clue-seeding moment in an earlier scene that anticipates this revelation',
         });

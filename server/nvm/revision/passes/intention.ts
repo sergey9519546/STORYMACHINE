@@ -76,9 +76,12 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         streakLen = 1;
       }
       if (streakLen === 3) {
-        // Non-dramatic purposes that need variety
-        const boringPurposes = new Set(['establish_world', 'character_moment']);
-        if (boringPurposes.has(streakPurpose)) {
+        // Purposes that stall narrative momentum when repeated 3+ times
+        const lowMomentumPurposes = new Set([
+          'establish_world', 'character_moment', 'dialogue_exposition',
+          'reflection', 'transition', 'introduction', 'recap',
+        ]);
+        if (lowMomentumPurposes.has(streakPurpose)) {
           issues.push({
             location: `Scenes ${streakStart}–${i} (${records[streakStart].slug})`,
             rule: 'REPEATED_PURPOSE',
@@ -86,6 +89,9 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
             severity: 'major',
             suggestedFix: `Break the run of "${streakPurpose}" scenes with a scene that raises stakes, complicates the situation, or delivers a revelation`,
           });
+          // Reset streak so a longer run doesn't re-fire at exactly 3 again
+          streakLen = 0;
+          streakStart = i + 1;
         }
       }
     }

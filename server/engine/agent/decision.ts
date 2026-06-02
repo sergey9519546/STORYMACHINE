@@ -46,13 +46,19 @@ export interface BuiltPrompt {
    * retried.
    */
   pendingStrategies: Map<string, string>;
+  /**
+   * Dramatic pressure IDs that were included in this prompt.
+   * The caller must mark these as applied (stage.markPressureApplied) ONLY
+   * after a successful action is recorded — not during prompt construction,
+   * which can be retried or fail without producing an action.
+   */
+  consumedPressureIds: string[];
 }
 
 /**
  * Construct the full agent decision prompt for one turn.
- * Pure: reads from `sheet` and `stage`; no writes except `stage.markPressureApplied`.
- * Returns both the prompt string and the computed persuasion strategies map so
- * the caller can commit strategies after the action is chosen.
+ * Now fully read-only: no writes to stage. Returns consumedPressureIds so the
+ * caller (Agent.takeTurn) can call markPressureApplied after a successful action.
  */
 export function buildPrompt(
   sheet: CharacterSheet,
@@ -172,7 +178,7 @@ export function buildPrompt(
   const overwhelmBlock = activePressures.length > 3
     ? '\nOVERWHELM STATE: You are simultaneously facing more crises than you can process. Under this load, characters often freeze, make rash decisions, or prioritize self-preservation over strategy. Let that pressure visibly shape your choice.\n'
     : '';
-  for (const p of activePressures) stage.markPressureApplied(p.pressure_id);
+  // pressures are read but NOT yet marked applied — caller does that after action succeeds
 
   // ── Active defense mechanism ──
   const activeDefense = selectActiveDefense(sheet.defenseMechanisms, sheet.emotionState);
@@ -232,7 +238,8 @@ PERSUASION LEVERAGE:
 ${persuasionHints || '  (No other agents present.)'}
 ${styleGenreBlock ? `\n${styleGenreBlock}\n` : ''}Generate 3 candidate actions. Score each 0–100 on goal alignment. The best-scoring will be selected.${emotionBlock}`;
 
-  return { prompt, pendingStrategies };
+  const consumedPressureIds = activePressures.map(p => p.pressure_id);
+  return { prompt, pendingStrategies, consumedPressureIds };
 }
 
 // ── selectBestAction ──────────────────────────────────────────────────────────
