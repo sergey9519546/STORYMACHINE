@@ -12623,6 +12623,159 @@ He sits down in the chair.
     });
   });
 
+  // ── Wave 169: Conflict pass enhancements ──────────────────────────────────
+  describe('Wave 169 — conflictPass: deadline absence, low-stakes conflict, interpersonal peak timing', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const baseStructure = {
+      completionPercent: 50, actPosition: 'act2a' as const,
+      escalating: true, avgSuspensePerScene: 1, openClues: 0,
+      reversalDensity: 1, approachingClimax: false,
+    };
+
+    // ── CONFLICT_WITHOUT_DEADLINE ─────────────────────────────────────────────
+    it('conflictPass detects CONFLICT_WITHOUT_DEADLINE when 5+ conflicts but no clock raised', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 6 records; 5 have negative relationship shifts (conflict scenes); none have clockRaised
+      const records = Array.from({ length: 6 }, (_, i) =>
+        makeRec(i, {
+          relationshipShifts: i < 5
+            ? [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.5 }]
+            : [],
+          clockRaised: false,
+        }),
+      );
+      const result = await conflictPass({
+        fountain: blankFountain(6), original: blankFountain(6),
+        records: records as any, structure: baseStructure as any,
+        annotations: [], approvedSpans: [],
+      });
+      const deadline = result.issues.filter(i => i.rule === 'CONFLICT_WITHOUT_DEADLINE');
+      assert.ok(deadline.length >= 1, `Expected CONFLICT_WITHOUT_DEADLINE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(deadline[0].severity === 'minor');
+    });
+
+    it('conflictPass does NOT fire CONFLICT_WITHOUT_DEADLINE when at least one clock is raised', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      const records = Array.from({ length: 6 }, (_, i) =>
+        makeRec(i, {
+          relationshipShifts: i < 5
+            ? [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.5 }]
+            : [],
+          clockRaised: i === 2,  // one clock raised
+        }),
+      );
+      const result = await conflictPass({
+        fountain: blankFountain(6), original: blankFountain(6),
+        records: records as any, structure: baseStructure as any,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'CONFLICT_WITHOUT_DEADLINE'),
+        'Should NOT fire when at least one scene raises a clock',
+      );
+    });
+
+    // ── LOW_STAKES_CONFLICT ───────────────────────────────────────────────────
+    it('conflictPass detects LOW_STAKES_CONFLICT when all shift magnitudes are below 0.4', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // All 4 shifts have small magnitudes (< 0.4)
+      const records = [
+        makeRec(0, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.1 }] }),
+        makeRec(1, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.2 }] }),
+        makeRec(2, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.15 }] }),
+        makeRec(3, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.3 }] }),
+        makeRec(4), makeRec(5),
+      ];
+      const result = await conflictPass({
+        fountain: blankFountain(6), original: blankFountain(6),
+        records: records as any, structure: baseStructure as any,
+        annotations: [], approvedSpans: [],
+      });
+      const low = result.issues.filter(i => i.rule === 'LOW_STAKES_CONFLICT');
+      assert.ok(low.length >= 1, `Expected LOW_STAKES_CONFLICT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(low[0].severity === 'major');
+    });
+
+    it('conflictPass does NOT fire LOW_STAKES_CONFLICT when at least one shift has high magnitude', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      const records = [
+        makeRec(0, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.1 }] }),
+        makeRec(1, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.6 }] }),  // high magnitude
+        makeRec(2, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.15 }] }),
+        makeRec(3, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.2 }] }),
+        makeRec(4), makeRec(5),
+      ];
+      const result = await conflictPass({
+        fountain: blankFountain(6), original: blankFountain(6),
+        records: records as any, structure: baseStructure as any,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'LOW_STAKES_CONFLICT'),
+        'Should NOT fire when at least one shift has magnitude ≥ 0.4',
+      );
+    });
+
+    // ── INTERPERSONAL_PEAK_TOO_EARLY ──────────────────────────────────────────
+    it('conflictPass detects INTERPERSONAL_PEAK_TOO_EARLY when worst shift occurs before 60%', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 8 scenes; climaxZone = floor(8*0.6) = 4; worst shift at scene 1 (before 4)
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, {
+          relationshipShifts: i === 1
+            ? [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.8 }]  // peak early
+            : i === 5
+            ? [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.3 }]
+            : i === 6
+            ? [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.3 }]
+            : [],
+        }),
+      );
+      const result = await conflictPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: baseStructure as any,
+        annotations: [], approvedSpans: [],
+      });
+      const peak = result.issues.filter(i => i.rule === 'INTERPERSONAL_PEAK_TOO_EARLY');
+      assert.ok(peak.length >= 1, `Expected INTERPERSONAL_PEAK_TOO_EARLY; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(peak[0].severity === 'major');
+    });
+
+    it('conflictPass does NOT fire INTERPERSONAL_PEAK_TOO_EARLY when worst shift is in the climax zone', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 8 scenes; worst shift at scene 5 (>= climaxZone 4)
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, {
+          relationshipShifts: i === 1
+            ? [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.3 }]
+            : i === 5
+            ? [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.8 }]  // peak late
+            : i === 6
+            ? [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.4 }]
+            : [],
+        }),
+      );
+      const result = await conflictPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: baseStructure as any,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'INTERPERSONAL_PEAK_TOO_EARLY'),
+        'Should NOT fire when the worst relationship shift is in or near the climax zone',
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

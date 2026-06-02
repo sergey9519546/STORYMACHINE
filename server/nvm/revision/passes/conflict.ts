@@ -226,6 +226,74 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 169: Deadline absence, low-stakes conflict, interpersonal peak timing ──
+
+  // CONFLICT_WITHOUT_DEADLINE: 5+ conflict scenes (negative shifts or reversals)
+  // but no clock raised anywhere. Interpersonal conflict without a deadline can be
+  // deferred indefinitely — nothing forces the characters' hands.
+  if (records.length >= 6) {
+    const conflictSceneCount = records.filter(r => {
+      const hasNegShift = (r.relationshipShifts ?? []).some(s => s.amount < -0.3);
+      const isReversal = r.suspenseDelta < -1;
+      return hasNegShift || isReversal;
+    }).length;
+    const hasAnyClockRaised = records.some(r => r.clockRaised);
+    if (conflictSceneCount >= 5 && !hasAnyClockRaised) {
+      issues.push({
+        location: 'Conflict architecture',
+        rule: 'CONFLICT_WITHOUT_DEADLINE',
+        description: `${conflictSceneCount} conflict scenes with no clock pressure anywhere — all conflict is interpersonal with no external urgency forcing it to a head`,
+        severity: 'minor',
+        suggestedFix: 'Add at least one external clock: a deadline, a closing window, or a consequence that expires. A ticking clock transforms interpersonal friction into unavoidable confrontation.',
+      });
+    }
+  }
+
+  // LOW_STAKES_CONFLICT: The largest relationship shift magnitude is below 0.4 —
+  // all conflict is minor. No scene creates a significant rupture in any relationship;
+  // the story operates at a perpetually low emotional temperature.
+  if (records.length >= 6) {
+    const allShifts2 = records.flatMap(r => r.relationshipShifts ?? []);
+    if (allShifts2.length >= 4) {
+      const maxMagnitude = Math.max(...allShifts2.map(s => Math.abs(s.amount)));
+      if (maxMagnitude < 0.4) {
+        issues.push({
+          location: 'Relationship conflict layer',
+          rule: 'LOW_STAKES_CONFLICT',
+          description: `Largest relationship shift is only ${maxMagnitude.toFixed(2)} — all ${allShifts2.length} shifts are minor. No scene delivers a high-magnitude rupture or bond.`,
+          severity: 'major',
+          suggestedFix: 'At least one scene must deliver a shift ≥0.5 in magnitude: a betrayal, a rescue, or an act of devotion that irreversibly changes a relationship',
+        });
+      }
+    }
+  }
+
+  // INTERPERSONAL_PEAK_TOO_EARLY: The scene with the most intense negative
+  // relationship shift (abs highest) occurs before the 60% mark. The relational
+  // climax passes before the dramatic climax — characters are partially reconciled
+  // when they should be at maximum opposition.
+  if (records.length >= 8) {
+    const negShiftScenes: Array<{ sceneIdx: number; amount: number }> = [];
+    for (const r of records) {
+      for (const shift of r.relationshipShifts ?? []) {
+        if (shift.amount < 0) negShiftScenes.push({ sceneIdx: r.sceneIdx, amount: shift.amount });
+      }
+    }
+    if (negShiftScenes.length >= 3) {
+      const peakShift = negShiftScenes.reduce((worst, s) => s.amount < worst.amount ? s : worst);
+      const climaxZone = Math.floor(records.length * 0.6);
+      if (peakShift.sceneIdx < climaxZone && peakShift.amount < -0.4) {
+        issues.push({
+          location: `Scene ${peakShift.sceneIdx} (relational peak)`,
+          rule: 'INTERPERSONAL_PEAK_TOO_EARLY',
+          description: `The most damaging relationship shift (${peakShift.amount.toFixed(2)}) occurs at Scene ${peakShift.sceneIdx} — ${Math.round(peakShift.sceneIdx / records.length * 100)}% through the story, before the climax zone (Scene ${climaxZone}+). The relational conflict peaks too early.`,
+          severity: 'major',
+          suggestedFix: 'Reserve the most damaging relational rupture for the climax or just before it. Maximum interpersonal damage should coincide with maximum dramatic stakes.',
+        });
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'conflict', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
