@@ -11762,6 +11762,153 @@ He sits down in the chair.
     });
   });
 
+  describe('Wave 156 — intentionPass: reactive dominance, intention dropout, want/fear collision', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const noAnnotations = (n: number) => Array.from({ length: n }, () => ({ revelation: false } as any));
+
+    it('intentionPass detects PROTAGONIST_REACTIVE_DOMINANCE when Act 2 is all reactive', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 8 scenes: Act 2 = scenes 2-5. All high suspense, none proactive.
+      const records = Array.from({ length: 8 }, (_, i) =>
+        i >= 2 && i <= 5
+          ? makeRec(i, { suspenseDelta: 2.5 }) // high stakes, no clockRaised, no seededClueIds
+          : makeRec(i),
+      );
+      const result = await intentionPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(8), approvedSpans: [],
+      });
+      const reactive = result.issues.filter(i => i.rule === 'PROTAGONIST_REACTIVE_DOMINANCE');
+      assert.ok(reactive.length >= 1, `Should detect PROTAGONIST_REACTIVE_DOMINANCE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(reactive[0].severity === 'major');
+    });
+
+    it('intentionPass does NOT fire PROTAGONIST_REACTIVE_DOMINANCE when protagonist initiates in Act 2', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      const records = Array.from({ length: 8 }, (_, i) =>
+        i >= 2 && i <= 5
+          ? makeRec(i, { suspenseDelta: 2.5, ...(i === 3 ? { clockRaised: true } : {}) })
+          : makeRec(i),
+      );
+      const result = await intentionPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(8), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'PROTAGONIST_REACTIVE_DOMINANCE'),
+        'Should NOT fire when protagonist raises a clock in Act 2',
+      );
+    });
+
+    it('intentionPass detects INTENTION_DROPOUT for Act 1 character who vanishes', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 8 scenes: alice in scenes 0 and 1 (Act 1 = first 30% = scenes 0-1), absent from scenes 4-7
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, {
+          dialogueHighlights: i === 0
+            ? ['alice: wants to escape the city']
+            : i === 1
+            ? ['alice: is terrified of what she saw']
+            : [],
+        }),
+      );
+      const result = await intentionPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(8), approvedSpans: [],
+      });
+      const dropout = result.issues.filter(i => i.rule === 'INTENTION_DROPOUT');
+      assert.ok(dropout.length >= 1, `Should detect INTENTION_DROPOUT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(dropout[0].severity === 'major');
+    });
+
+    it('intentionPass does NOT fire INTENTION_DROPOUT when Act 1 character reappears', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, {
+          dialogueHighlights: i === 0
+            ? ['alice: wants to escape the city']
+            : i === 1
+            ? ['alice: is terrified of what she saw']
+            : i === 5
+            ? ['alice: confronts her past'] // reappears after midpoint
+            : [],
+        }),
+      );
+      const result = await intentionPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(8), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'INTENTION_DROPOUT'),
+        'Should NOT fire when Act 1 character reappears in the second half',
+      );
+    });
+
+    it('intentionPass detects WANT_FEAR_COLLISION_ABSENT when wants and fears never intersect', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 6 scenes. Relationship shifts exist, but never paired with opposite emotional shift.
+      const records = [
+        makeRec(0),
+        makeRec(1, {
+          emotionalShift: 'positive',
+          relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.5 }],
+        }), // both positive — no collision
+        makeRec(2, {
+          emotionalShift: 'negative',
+          relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: -0.5 }],
+        }), // both negative — no collision
+        makeRec(3),
+        makeRec(4),
+        makeRec(5),
+      ];
+      const result = await intentionPass({
+        fountain: blankFountain(6), original: blankFountain(6),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(6), approvedSpans: [],
+      });
+      const collision = result.issues.filter(i => i.rule === 'WANT_FEAR_COLLISION_ABSENT');
+      assert.ok(collision.length >= 1, `Should detect WANT_FEAR_COLLISION_ABSENT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(collision[0].severity === 'major');
+    });
+
+    it('intentionPass does NOT fire WANT_FEAR_COLLISION_ABSENT when a want/fear collision exists', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      const records = [
+        makeRec(0),
+        makeRec(1, {
+          emotionalShift: 'positive', // protagonist wins emotionally...
+          relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: -0.6 }], // ...but damages relationship
+        }),
+        makeRec(2),
+        makeRec(3),
+        makeRec(4),
+        makeRec(5),
+      ];
+      const result = await intentionPass({
+        fountain: blankFountain(6), original: blankFountain(6),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(6), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'WANT_FEAR_COLLISION_ABSENT'),
+        'Should NOT fire when a want/fear collision scene exists',
+      );
+    });
+  });
+
   it('showrunner fires for set_up_payoff scene with no SEED_CLUE or PAYOFF_SETUP op', async () => {
     const { showrunnerCritic } = await import('./server/nvm/room/critics/showrunner.ts');
     const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
