@@ -115,9 +115,12 @@ function parseOp(raw: Record<string, unknown>): StoryOp | null {
         return { op: 'RECORD_SONIC_FACT', sceneId: String(raw['sceneId'] ?? ''), fact: raw['fact'] };
       }
       default:
+        // Unknown op kind from the model — drop it. Logged by the caller's
+        // partial-parse counter rather than here (per-op logging would be noisy).
         return null;
     }
-  } catch {
+  } catch (err) {
+    logger.debug('llm_op_parse_error', { message: (err as Error).message });
     return null;
   }
 }

@@ -19,6 +19,7 @@ import type { NarrativeTransitionIR } from '../ir/NarrativeTransitionIR.ts';
 import { applyOperator, ALL_OPERATORS, type MutationOperator } from '../converge/operators.ts';
 import { scoreBranch, type BranchScore } from './score.ts';
 import { stateHash } from '../state/NarrativeState.ts';
+import { logger } from '../../lib/logger.ts';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -90,8 +91,11 @@ export function generateBranchField(
         ops: mutatedIR.ops,
         scores,
       });
-    } catch {
-      // Operator failed (e.g. no applicable ops) — silently skip
+    } catch (err) {
+      // Operator failed (commonly: no applicable ops for this seed). Expected in
+      // the normal branching loop, so log at debug — available when diagnosing a
+      // genuinely broken operator without spamming production logs.
+      logger.debug('branch_operator_skipped', { operator, message: (err as Error).message });
     }
   }
 
