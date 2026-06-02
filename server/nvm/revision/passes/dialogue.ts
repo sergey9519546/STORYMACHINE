@@ -610,6 +610,69 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 185: Question dominance, interruption void, speaker monopoly ──────
+
+  // QUESTION_DOMINANCE: More than 45% of all dialogue lines are questions.
+  // Characters who spend most of their time asking rather than declaring or acting
+  // are running on inquiry instead of intention — the dialogue lacks agency.
+  // Different from RHETORICAL_QUESTION_FLOOD (same speaker, 3 consecutive).
+  if (dialogue.length >= 12) {
+    const questionLines = dialogue.filter(d => d.line.trim().endsWith('?'));
+    const ratio = questionLines.length / dialogue.length;
+    if (ratio > 0.45) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'QUESTION_DOMINANCE',
+        description: `${questionLines.length} of ${dialogue.length} dialogue lines (${Math.round(ratio * 100)}%) are questions — characters interrogate rather than act. Dialogue dominated by inquiry signals no one knows what they want.`,
+        severity: 'minor',
+        suggestedFix: 'Balance questions with declarations. Characters should want something and say it. Replace at least half the questions with active statements of desire, intention, or knowledge.',
+      });
+    }
+  }
+
+  // INTERRUPTION_VOID: Not a single dialogue line ends with an interruption marker
+  // ('--' or '—'). Real conversations collide, overlap, cut off. When every
+  // character waits their turn before speaking, the dialogue sounds like a formal
+  // debate rather than a living exchange between people under pressure.
+  if (dialogue.length >= 15) {
+    const interruptionRe = /--$|—$|–$/;
+    const hasInterruption = dialogue.some(d => interruptionRe.test(d.line.trim()));
+    if (!hasInterruption) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'INTERRUPTION_VOID',
+        description: `${dialogue.length} dialogue lines with no interruption markers ('--') — every character waits politely for their turn. Scenes under pressure need characters who cut each other off.`,
+        severity: 'minor',
+        suggestedFix: 'Add at least 2-3 interruptions in high-tension scenes (end a cut-off line with \'--\'). Characters who are afraid, urgent, or dominant don\'t let others finish.',
+      });
+    }
+  }
+
+  // SPEAKER_MONOPOLY: One character delivers more than 55% of all dialogue lines
+  // in a script with 2+ speakers. Unlike UNINTERRUPTED_MONOLOGUE (which tracks
+  // consecutive bursts), this fires on cumulative dominance — a character who
+  // speaks less often but always at length can still crowd out every other voice.
+  if (dialogue.length >= 15) {
+    const speakerCounts2 = new Map<string, number>();
+    for (const d of dialogue) {
+      speakerCounts2.set(d.speaker, (speakerCounts2.get(d.speaker) ?? 0) + 1);
+    }
+    if (speakerCounts2.size >= 2) {
+      const [monopolistName, monopolistLines] = [...speakerCounts2.entries()]
+        .sort((a, b) => b[1] - a[1])[0];
+      const ratio = monopolistLines / dialogue.length;
+      if (ratio > 0.55) {
+        issues.push({
+          location: `Character: ${monopolistName}`,
+          rule: 'SPEAKER_MONOPOLY',
+          description: `${monopolistName} delivers ${monopolistLines} of ${dialogue.length} total dialogue lines (${Math.round(ratio * 100)}%) — the story silences all other voices and hands the entire floor to one character.`,
+          severity: 'minor',
+          suggestedFix: `Redistribute dialogue: give other characters more lines that push back, pursue their own agenda, or reframe the conversation. Dominating the word count is not the same as driving the scene.`,
+        });
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'dialogue', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

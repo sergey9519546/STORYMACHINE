@@ -14130,6 +14130,337 @@ He sits down in the chair.
     });
   });
 
+  describe('Wave 185 — dialoguePass: question dominance, interruption void, speaker monopoly', async () => {
+    const blankRec = (): any => ({
+      commitId: 'c0', sceneIdx: 0, slug: 'INT. ROOM - DAY',
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+    });
+
+    // QUESTION_DOMINANCE — fires
+    it('QUESTION_DOMINANCE fires when >45% of dialogue lines are questions', async () => {
+      // 12 lines: 8 questions (67%). No single speaker has 3 consecutive questions.
+      const fountain = `INT. OFFICE - DAY
+
+ALICE
+Did you call her?
+
+BOB
+Why would I call?
+
+ALICE
+I thought you two talked.
+
+BOB
+We haven't spoken in weeks.
+
+ALICE
+Are you sure she knows?
+
+BOB
+How would she know?
+
+ALICE
+You could have told her.
+
+BOB
+Should I have?
+
+ALICE
+Doesn't she deserve the truth?
+
+BOB
+I don't know what the truth is.
+
+ALICE
+Can you just be honest?
+
+BOB
+Is this really about her?
+`;
+      const result = await dialoguePass({ fountain, original: fountain, records: [blankRec()], structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        result.issues.some(i => i.rule === 'QUESTION_DOMINANCE'),
+        `Expected QUESTION_DOMINANCE, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // QUESTION_DOMINANCE — no-fire
+    it('QUESTION_DOMINANCE does not fire when question rate is below threshold', async () => {
+      const fountain = `INT. OFFICE - DAY
+
+ALICE
+I think we need to talk.
+
+BOB
+What's on your mind?
+
+ALICE
+She called me this morning.
+
+BOB
+I didn't know.
+
+ALICE
+She said you two argued.
+
+BOB
+I handled it.
+
+ALICE
+She's upset.
+
+BOB
+I'll call her tonight.
+
+ALICE
+This can't keep happening.
+
+BOB
+I know. It won't.
+
+ALICE
+Good.
+
+BOB
+Okay.
+`;
+      const result = await dialoguePass({ fountain, original: fountain, records: [blankRec()], structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'QUESTION_DOMINANCE'),
+        `Expected no QUESTION_DOMINANCE, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // INTERRUPTION_VOID — fires
+    it('INTERRUPTION_VOID fires when no dialogue line has an interruption marker', async () => {
+      const fountain = `INT. HALLWAY - NIGHT
+
+ALICE
+We have to leave now.
+
+BOB
+I'm not going anywhere.
+
+ALICE
+You don't understand what's happening.
+
+BOB
+I understand perfectly.
+
+ALICE
+Then help me.
+
+BOB
+I can't.
+
+ALICE
+Why not?
+
+BOB
+Because I made a deal.
+
+ALICE
+With who?
+
+BOB
+It doesn't matter.
+
+ALICE
+It matters to me.
+
+BOB
+Then you shouldn't have asked.
+
+ALICE
+This is insane.
+
+BOB
+Walk away.
+
+ALICE
+I won't.
+`;
+      const result = await dialoguePass({ fountain, original: fountain, records: [blankRec()], structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        result.issues.some(i => i.rule === 'INTERRUPTION_VOID'),
+        `Expected INTERRUPTION_VOID, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // INTERRUPTION_VOID — no-fire
+    it('INTERRUPTION_VOID does not fire when interruption markers are present', async () => {
+      const fountain = `INT. HALLWAY - NIGHT
+
+ALICE
+We have to leave now.
+
+BOB
+I'm not going--
+
+ALICE
+Don't give me excuses.
+
+BOB
+You don't understand what--
+
+ALICE
+I understand everything.
+
+BOB
+I made a deal.
+
+ALICE
+With who?
+
+BOB
+It doesn't matter.
+
+ALICE
+It matters to me.
+
+BOB
+Then you shouldn't have asked.
+
+ALICE
+This is insane.
+
+BOB
+Walk away.
+
+ALICE
+I won't.
+`;
+      const result = await dialoguePass({ fountain, original: fountain, records: [blankRec()], structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'INTERRUPTION_VOID'),
+        `Expected no INTERRUPTION_VOID, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // SPEAKER_MONOPOLY — fires
+    it('SPEAKER_MONOPOLY fires when one character delivers >55% of all dialogue', async () => {
+      // ALICE: 10 lines, BOB: 7 lines → 17 total; ALICE=59%
+      // No 5-consecutive from ALICE (breaks at max 3 in a row)
+      const fountain = `INT. KITCHEN - DAY
+
+ALICE
+I need you to listen.
+
+ALICE
+This is important.
+
+ALICE
+What happened last night wasn't an accident.
+
+BOB
+What do you mean?
+
+ALICE
+Someone was in the house.
+
+ALICE
+I heard them.
+
+ALICE
+I saw the door open.
+
+BOB
+Are you sure?
+
+ALICE
+I'm completely sure.
+
+BOB
+Okay. Tell me what you saw.
+
+ALICE
+A figure. Near the stairs.
+
+ALICE
+Then it was gone.
+
+BOB
+Did you call the police?
+
+ALICE
+No. That's why I'm telling you.
+
+ALICE
+We need to handle this ourselves.
+
+BOB
+Why? What aren't you telling me?
+
+BOB
+Alice.
+`;
+      const result = await dialoguePass({ fountain, original: fountain, records: [blankRec()], structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        result.issues.some(i => i.rule === 'SPEAKER_MONOPOLY'),
+        `Expected SPEAKER_MONOPOLY, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // SPEAKER_MONOPOLY — no-fire
+    it('SPEAKER_MONOPOLY does not fire when dialogue is evenly distributed', async () => {
+      const fountain = `INT. KITCHEN - DAY
+
+ALICE
+I need you to listen.
+
+BOB
+I'm listening.
+
+ALICE
+Someone was in the house last night.
+
+BOB
+What? Are you sure?
+
+ALICE
+I saw the door open.
+
+BOB
+Did you call the police?
+
+ALICE
+No. Not yet.
+
+BOB
+We have to. This is serious.
+
+ALICE
+I know. I'm scared.
+
+BOB
+I'll call them now.
+
+ALICE
+Thank you.
+
+BOB
+We'll figure this out.
+
+ALICE
+Together.
+
+BOB
+Together.
+
+ALICE
+Okay.
+`;
+      const result = await dialoguePass({ fountain, original: fountain, records: [blankRec()], structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'SPEAKER_MONOPOLY'),
+        `Expected no SPEAKER_MONOPOLY, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+  });
+
   describe('Wave 184 — rhythmPass: abstract noun overload, filler gestures, gerund fragments', async () => {
     const blankRec = (idx: number): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
