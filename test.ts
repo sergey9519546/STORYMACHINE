@@ -14130,6 +14130,126 @@ He sits down in the chair.
     });
   });
 
+  describe('Wave 187 — causalityPass: consequence chain break, clock ghost, positive shift orphan', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const causalInput = (records: any[]) => ({
+      fountain: blankFountain(records.length), original: blankFountain(records.length),
+      records: records as any, structure: {} as any, annotations: [], approvedSpans: [],
+    });
+
+    // CONSEQUENCE_CHAIN_BREAK — fires
+    it('CONSEQUENCE_CHAIN_BREAK fires when high-suspense peak is followed by two flat scenes', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      const records = [
+        makeRec(0), makeRec(1),
+        makeRec(2, { suspenseDelta: 2.5 }), // high-action peak
+        makeRec(3), // flat aftermath
+        makeRec(4), // flat aftermath
+        makeRec(5),
+      ];
+      const result = await causalityPass(causalInput(records));
+      assert.ok(
+        result.issues.some(i => i.rule === 'CONSEQUENCE_CHAIN_BREAK'),
+        `Expected CONSEQUENCE_CHAIN_BREAK, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // CONSEQUENCE_CHAIN_BREAK — no-fire
+    it('CONSEQUENCE_CHAIN_BREAK does not fire when high-suspense peak triggers an emotional reaction', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      const records = [
+        makeRec(0), makeRec(1),
+        makeRec(2, { suspenseDelta: 2.5 }), // high-action peak
+        makeRec(3, { emotionalShift: 'negative' }), // reaction — not flat
+        makeRec(4),
+        makeRec(5),
+      ];
+      const result = await causalityPass(causalInput(records));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'CONSEQUENCE_CHAIN_BREAK'),
+        `Expected no CONSEQUENCE_CHAIN_BREAK, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // CLOCK_GHOST — fires
+    it('CLOCK_GHOST fires when clock raise is followed by three suspense-dead scenes', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      const records = [
+        makeRec(0),
+        makeRec(1, { clockRaised: true }), // clock raised
+        makeRec(2), // no urgency
+        makeRec(3), // no urgency
+        makeRec(4), // no urgency
+        makeRec(5),
+      ];
+      const result = await causalityPass(causalInput(records));
+      assert.ok(
+        result.issues.some(i => i.rule === 'CLOCK_GHOST'),
+        `Expected CLOCK_GHOST, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // CLOCK_GHOST — no-fire
+    it('CLOCK_GHOST does not fire when clock raise is followed by a suspense build', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      const records = [
+        makeRec(0),
+        makeRec(1, { clockRaised: true }), // clock raised
+        makeRec(2, { suspenseDelta: 2.5 }), // urgency registers
+        makeRec(3),
+        makeRec(4),
+        makeRec(5),
+      ];
+      const result = await causalityPass(causalInput(records));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'CLOCK_GHOST'),
+        `Expected no CLOCK_GHOST, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // POSITIVE_SHIFT_ORPHAN — fires
+    it('POSITIVE_SHIFT_ORPHAN fires when two positive shifts have no causal consequence', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // n=8: positive shifts at idx 1 and 5, both with flat following scenes
+      const records = Array.from({ length: 8 }, (_, i) => makeRec(i, {
+        relationshipShifts: (i === 1 || i === 5)
+          ? [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.5 }]
+          : [],
+      }));
+      const result = await causalityPass(causalInput(records));
+      assert.ok(
+        result.issues.some(i => i.rule === 'POSITIVE_SHIFT_ORPHAN'),
+        `Expected POSITIVE_SHIFT_ORPHAN, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // POSITIVE_SHIFT_ORPHAN — no-fire
+    it('POSITIVE_SHIFT_ORPHAN does not fire when a positive shift triggers a consequence', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // shift at idx 1 → idx 2 has revelation (consequence) → not an orphan; only 1 orphan → no fire
+      const records = Array.from({ length: 8 }, (_, i) => makeRec(i, {
+        relationshipShifts: (i === 1 || i === 5)
+          ? [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.5 }]
+          : [],
+        revelation: i === 2 ? 'Alice tells Bob the truth.' : null,
+      }));
+      const result = await causalityPass(causalInput(records));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'POSITIVE_SHIFT_ORPHAN'),
+        `Expected no POSITIVE_SHIFT_ORPHAN, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+  });
+
   describe('Wave 186 — structurePass: Act 2 inversion, midpoint reversal absent, late inciting incident', async () => {
     const baseStructure = {
       actPosition: 'act2a' as const, completionPercent: 50, totalClockPressure: 5,

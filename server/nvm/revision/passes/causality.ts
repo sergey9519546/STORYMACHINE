@@ -440,6 +440,98 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 187: Consequence chain break, clock ghost, positive shift orphan ───
+
+  // CONSEQUENCE_CHAIN_BREAK: A high-action peak (suspenseDelta ≥ 2) is followed
+  // by two consecutive flat scenes — no emotion, no clock, no relational movement,
+  // low suspense. The action surge dissipates without a causal ripple: the peak
+  // happened, and then the story acts as if it didn't. Distinct from CONSEQUENCE_
+  // DELAY_EXCESSIVE (clock/clue delay) and REVELATION_WITHOUT_REACTION (revelation
+  // specific). This fires on any high-suspense scene followed by a void.
+  if (records.length >= 6) {
+    const isFlat = (r: typeof records[0]) =>
+      r.emotionalShift === 'neutral' &&
+      !r.clockRaised &&
+      (r.relationshipShifts?.length ?? 0) === 0 &&
+      r.suspenseDelta <= 1;
+    for (let i = 0; i < records.length - 2; i++) {
+      if (records[i].suspenseDelta < 2) continue;
+      if (isFlat(records[i + 1]) && isFlat(records[i + 2])) {
+        issues.push({
+          location: `Scene ${records[i].sceneIdx} (action peak)`,
+          rule: 'CONSEQUENCE_CHAIN_BREAK',
+          description: `Scene ${records[i].sceneIdx} spikes to suspense ${records[i].suspenseDelta.toFixed(1)} but the next two scenes are completely flat — no emotional aftershock, no clock, no relationship movement. The action peak dissolves without causal consequence.`,
+          severity: 'minor',
+          suggestedFix: 'Let high-action peaks echo forward: show the emotional aftershock, the strained relationship, or the accelerated deadline in the scenes that immediately follow. Action without consequence is noise, not drama.',
+        });
+        break;
+      }
+    }
+  }
+
+  // CLOCK_GHOST: A clock is raised but the three scenes immediately following
+  // show no urgency — no suspense rise, no secondary clock, no antagonistic
+  // pressure. The deadline appears once and immediately fades into background
+  // noise. Distinct from CLOCK_RAISED_WITHOUT_PAYOFF (no payoff anywhere):
+  // this fires when the immediate aftermath of a clock-raise is suspense-dead.
+  if (records.length >= 6) {
+    for (let i = 0; i < records.length - 3; i++) {
+      if (!records[i].clockRaised) continue;
+      const following = records.slice(i + 1, i + 4);
+      const urgencyAbsent = following.length === 3 && following.every(r =>
+        r.suspenseDelta <= 1.5 &&
+        !r.clockRaised &&
+        (r.relationshipShifts ?? []).every(s => s.amount >= 0),
+      );
+      if (urgencyAbsent) {
+        issues.push({
+          location: `Scene ${records[i].sceneIdx} (clock raised)`,
+          rule: 'CLOCK_GHOST',
+          description: `A clock is raised at Scene ${records[i].sceneIdx} but the next three scenes show no urgency — no suspense build, no secondary clock, no antagonistic pressure. The deadline appears once and immediately fades.`,
+          severity: 'major',
+          suggestedFix: 'Build on the clock in each scene that follows its introduction: show the protagonist becoming more desperate, the antagonist pressing harder, or the deadline looming as a concrete presence — not a forgotten premise.',
+        });
+        break;
+      }
+    }
+  }
+
+  // POSITIVE_SHIFT_ORPHAN: Two or more positive relationship shifts (amount ≥ 0.4)
+  // occur with no causal consequence in the three scenes that follow each one.
+  // Alliances built and trust earned that produce nothing — no revelation, no
+  // escalation, no new conflict, no subsequent shift — are narratively inert. The
+  // relationship improves to no story purpose.
+  if (records.length >= 6) {
+    const posShiftIdxs: number[] = [];
+    for (let i = 0; i < records.length; i++) {
+      if ((records[i].relationshipShifts ?? []).some((s: { amount: number }) => s.amount >= 0.4)) {
+        posShiftIdxs.push(i);
+      }
+    }
+    if (posShiftIdxs.length >= 2) {
+      let orphanCount = 0;
+      for (const idx of posShiftIdxs) {
+        const following = records.slice(idx + 1, idx + 4);
+        const hasConsequence = following.some(r =>
+          r.revelation !== null ||
+          r.suspenseDelta > 1.5 ||
+          r.clockRaised ||
+          (r.relationshipShifts?.length ?? 0) > 0,
+        );
+        if (!hasConsequence) orphanCount++;
+      }
+      if (orphanCount >= 2) {
+        issues.push({
+          location: 'Positive relationship shifts',
+          rule: 'POSITIVE_SHIFT_ORPHAN',
+          description: `${orphanCount} positive relationship shifts (alliances, trust, reconciliation) have no causal consequence in the following scenes — the relationships improve but nothing in the story changes because of it.`,
+          severity: 'minor',
+          suggestedFix: 'Give positive shifts narrative weight: a new alliance enables a plan, reconciliation opens a door that was closed, trust creates a vulnerability that the antagonist can exploit. If the relationship improves but nothing changes, the scene earned nothing.',
+        });
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'causality', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
