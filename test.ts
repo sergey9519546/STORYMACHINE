@@ -11762,6 +11762,143 @@ He sits down in the chair.
     });
   });
 
+  describe('Wave 161 — relationshipArcPass: single pair, late introduction, velocity collapse', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+
+    it('relationshipArcPass detects SINGLE_PAIR_RELATIONSHIP when all shifts involve same pair', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // 7 records, 5+ shifts all between alice|bob
+      const records = Array.from({ length: 7 }, (_, i) =>
+        makeRec(i, {
+          relationshipShifts: i < 5
+            ? [{ pairKey: 'alice|bob', dimension: 'trust', amount: i % 2 === 0 ? 0.3 : -0.3 }]
+            : [],
+        }),
+      );
+      const result = await relationshipArcPass({
+        fountain: blankFountain(7), original: blankFountain(7),
+        records: records as any, structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      const single = result.issues.filter(i => i.rule === 'SINGLE_PAIR_RELATIONSHIP');
+      assert.ok(single.length >= 1, `Should detect SINGLE_PAIR_RELATIONSHIP; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(single[0].severity === 'minor');
+    });
+
+    it('relationshipArcPass does NOT fire SINGLE_PAIR_RELATIONSHIP when multiple pairs shift', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const records = Array.from({ length: 7 }, (_, i) =>
+        makeRec(i, {
+          relationshipShifts: i < 4
+            ? [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.3 }]
+            : i < 6
+            ? [{ pairKey: 'alice|carol', dimension: 'trust', amount: -0.4 }] // second pair
+            : [],
+        }),
+      );
+      const result = await relationshipArcPass({
+        fountain: blankFountain(7), original: blankFountain(7),
+        records: records as any, structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'SINGLE_PAIR_RELATIONSHIP'),
+        'Should NOT fire when multiple pairs have shifts',
+      );
+    });
+
+    it('relationshipArcPass detects LATE_RELATIONSHIP_INTRODUCTION when pair first shifts after midpoint', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // 10 records, midpoint=5, alice|bob first appears at scene 6
+      const records = Array.from({ length: 10 }, (_, i) =>
+        makeRec(i, {
+          relationshipShifts: i >= 6 && i <= 8
+            ? [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.4 }]
+            : [],
+        }),
+      );
+      const result = await relationshipArcPass({
+        fountain: blankFountain(10), original: blankFountain(10),
+        records: records as any, structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      const late = result.issues.filter(i => i.rule === 'LATE_RELATIONSHIP_INTRODUCTION');
+      assert.ok(late.length >= 1, `Should detect LATE_RELATIONSHIP_INTRODUCTION; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(late[0].severity === 'major');
+    });
+
+    it('relationshipArcPass does NOT fire LATE_RELATIONSHIP_INTRODUCTION when pair starts early', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // pair starts at scene 2 (before midpoint=5)
+      const records = Array.from({ length: 10 }, (_, i) =>
+        makeRec(i, {
+          relationshipShifts: i >= 2 && i <= 4
+            ? [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.4 }]
+            : [],
+        }),
+      );
+      const result = await relationshipArcPass({
+        fountain: blankFountain(10), original: blankFountain(10),
+        records: records as any, structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'LATE_RELATIONSHIP_INTRODUCTION'),
+        'Should NOT fire when pair relationship begins before the midpoint',
+      );
+    });
+
+    it('relationshipArcPass detects RELATIONSHIP_VELOCITY_COLLAPSE when second half has no shifts', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // 10 records, midpoint=5. Shifts only in scenes 0-3 (first half), none in 5-9.
+      const records = Array.from({ length: 10 }, (_, i) =>
+        makeRec(i, {
+          relationshipShifts: i < 4
+            ? [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.3 }]
+            : [],
+        }),
+      );
+      const result = await relationshipArcPass({
+        fountain: blankFountain(10), original: blankFountain(10),
+        records: records as any, structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      const collapse = result.issues.filter(i => i.rule === 'RELATIONSHIP_VELOCITY_COLLAPSE');
+      assert.ok(collapse.length >= 1, `Should detect RELATIONSHIP_VELOCITY_COLLAPSE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(collapse[0].severity === 'major');
+    });
+
+    it('relationshipArcPass does NOT fire RELATIONSHIP_VELOCITY_COLLAPSE when second half has shifts', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // Shifts in both halves
+      const records = Array.from({ length: 10 }, (_, i) =>
+        makeRec(i, {
+          relationshipShifts: (i < 4 || i === 7)
+            ? [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.3 }]
+            : [],
+        }),
+      );
+      const result = await relationshipArcPass({
+        fountain: blankFountain(10), original: blankFountain(10),
+        records: records as any, structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'RELATIONSHIP_VELOCITY_COLLAPSE'),
+        'Should NOT fire when second half contains relationship shifts',
+      );
+    });
+  });
+
   describe('Wave 160 — voicePass: passive action voice, interior monologue leak, qualifier overload', async () => {
     function makePassInput(fountain: string) {
       const records = Array.from({ length: 3 }, (_, i) => ({

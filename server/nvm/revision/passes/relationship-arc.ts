@@ -11,6 +11,9 @@
 //   3. NO_RELATIONSHIP_MOVEMENT — multi-character story with zero shifts at all
 // Wave 147 additions: climax timing (major shifts late), earned reversals
 // (reversals with prior tension), and power dynamic tracking.
+// Wave 161 additions: single pair relationship (all shifts involve only one pair),
+// late relationship introduction (pair with 3+ shifts first shifts after midpoint),
+// relationship velocity collapse (shifts in first half but none in second half).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -213,6 +216,69 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
           suggestedFix: `Add a scene where the power balance shifts: a moment where the subordinate character seizes agency, or the dominant character yields control. The relationship becomes fuller when both dimensions move.`,
         });
       }
+    }
+  }
+
+  // ── Wave 161: Single pair, late introduction, velocity collapse ─────────────
+
+  // SINGLE_PAIR_RELATIONSHIP: All relationship shifts (5+) involve the same pair.
+  // The story has only one active relational thread while all other characters
+  // remain relationally static — secondary character bonds never develop.
+  if (records.length >= 6) {
+    const allShiftsTotal = [...pairStats.values()].reduce((s, p) => s + p.shifts.length, 0);
+    if (allShiftsTotal >= 5 && pairStats.size === 1) {
+      const [onlyPair] = [...pairStats.keys()];
+      const [a, b] = onlyPair.split('|');
+      issues.push({
+        location: `${a} ↔ ${b} (only active pair)`,
+        rule: 'SINGLE_PAIR_RELATIONSHIP',
+        description: `All ${allShiftsTotal} relationship shifts involve only ${a} and ${b} — no other character relationships evolve. The story has one active relational thread while all other bonds remain static.`,
+        severity: 'minor',
+        suggestedFix: 'Give at least one secondary character an independent relationship arc — a shift in loyalty, trust, or power with a different character — to add relational texture beyond the central pair',
+      });
+    }
+  }
+
+  // LATE_RELATIONSHIP_INTRODUCTION: A pair with 3+ shifts has its first shift
+  // after the story's midpoint (50% mark). The relationship that matters most
+  // wasn't established before the story needed it to carry emotional weight.
+  if (records.length >= 8) {
+    const midpoint = Math.floor(records.length * 0.5);
+    for (const [pairKey, stats] of pairStats) {
+      if (stats.shifts.length >= 3 && stats.shifts[0].sceneIdx >= midpoint) {
+        const [a, b] = pairKey.split('|');
+        issues.push({
+          location: `${a} ↔ ${b} (first shift: Scene ${stats.shifts[0].sceneIdx})`,
+          rule: 'LATE_RELATIONSHIP_INTRODUCTION',
+          description: `The relationship between ${a} and ${b} (${stats.shifts.length} shifts) doesn't begin until Scene ${stats.shifts[0].sceneIdx} — past the story's midpoint. There isn't enough story left to earn the emotional weight of this bond.`,
+          severity: 'major',
+          suggestedFix: 'Introduce the first shift between these characters earlier — at least one beat before the midpoint — so the relationship has room to develop before it carries dramatic weight',
+        });
+      }
+    }
+  }
+
+  // RELATIONSHIP_VELOCITY_COLLAPSE: The first half of the story has 3+ shifts
+  // but the second half has none. Relational activity stops at the midpoint when
+  // it should be intensifying toward the climax.
+  if (records.length >= 8) {
+    const midpoint = Math.floor(records.length * 0.5);
+    let firstHalfShifts = 0;
+    let secondHalfShifts = 0;
+    for (const stats of pairStats.values()) {
+      for (const shift of stats.shifts) {
+        if (shift.sceneIdx < midpoint) firstHalfShifts++;
+        else secondHalfShifts++;
+      }
+    }
+    if (firstHalfShifts >= 3 && secondHalfShifts === 0) {
+      issues.push({
+        location: `Relational arc (Scenes ${midpoint}–${records.length - 1})`,
+        rule: 'RELATIONSHIP_VELOCITY_COLLAPSE',
+        description: `${firstHalfShifts} relationship shifts occur in the first half of the story but none in the second half — relational momentum collapses at the midpoint, when it should be building toward climax`,
+        severity: 'major',
+        suggestedFix: 'Add at least one relationship shift in the second half — either a major reversal approaching the climax or a quieter moment that registers the accumulated change between characters',
+      });
     }
   }
 
