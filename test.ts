@@ -11461,6 +11461,162 @@ describe('Wave 87 — payoff precision, repeated-purpose detection, dominant gua
     assert.ok(repeated.length === 0, 'raise_stakes streak should NOT trigger REPEATED_PURPOSE');
   });
 
+  // ── Wave 142: Scene entropy detection ───────────────────────────────────────
+
+  it('intentionPass detects ZERO_ENTROPY_SCENE for middle scene with no momentum', async () => {
+    const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+    const makeRec = (idx: number, emotionalShift: string, suspenseDelta: number, hasRelationshipShift: boolean) => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose: 'dialogue',
+      dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+      emotionalShift, suspenseDelta,
+      dialogueHighlights: [], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [],
+      readerStateAnnotation: null,
+      relationshipShifts: hasRelationshipShift ? [{ pairKey: 'a|b', shiftMagnitude: 1 }] : [],
+    });
+    const records = [
+      makeRec(0, 'neutral', 1, false), // opening scene
+      // Scene 1: NO emotional shift, NO suspense, NO clues, NO relationships — zero entropy
+      makeRec(1, 'neutral', 0.2, false),
+      makeRec(2, 'positive', 2, false), // closing scene
+      makeRec(3, 'negative', 1.5, false),
+      makeRec(4, 'neutral', 0.8, false),
+      makeRec(5, 'positive', 2.5, false),
+    ];
+    const structure = {
+      actPosition: 'act2b' as const, completionPercent: 60,
+      revelationCount: 0, approachingClimax: false,
+      avgSuspensePerScene: 1.5, escalating: true,
+      reversalCount: 0, reversalDensity: 0,
+      openClues: 0, midpointPressure: 1, tightestScene: 5,
+    };
+    const result = await intentionPass({
+      fountain: 'SC0\nA\nSC1\nB\nSC2\nC\nSC3\nD\nSC4\nE\nSC5\nF\n',
+      original: 'SC0\nA\nSC1\nB\nSC2\nC\nSC3\nD\nSC4\nE\nSC5\nF\n',
+      records: records as unknown as Parameters<typeof intentionPass>[0]['records'],
+      structure: structure as Parameters<typeof intentionPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const entropy = result.issues.filter(i => i.rule === 'ZERO_ENTROPY_SCENE');
+    assert.ok(entropy.length >= 1, 'Should detect ZERO_ENTROPY_SCENE for middle scene with no momentum');
+    assert.ok(entropy[0].severity === 'major');
+  });
+
+  it('intentionPass does NOT fire ZERO_ENTROPY_SCENE when scene has emotional shift', async () => {
+    const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+    const makeRec = (idx: number, emotionalShift: string) => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose: 'dialogue',
+      dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+      emotionalShift, suspenseDelta: 0.5,
+      dialogueHighlights: [], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [],
+      readerStateAnnotation: null,
+      relationshipShifts: [],
+    });
+    const records = [
+      makeRec(0, 'neutral'),
+      makeRec(1, 'positive'), // HAS emotional shift — should not flag
+      makeRec(2, 'positive'),
+      makeRec(3, 'negative'),
+      makeRec(4, 'neutral'),
+      makeRec(5, 'positive'),
+    ];
+    const structure = {
+      actPosition: 'act2b' as const, completionPercent: 60,
+      revelationCount: 0, approachingClimax: false,
+      avgSuspensePerScene: 1, escalating: true,
+      reversalCount: 0, reversalDensity: 0,
+      openClues: 0, midpointPressure: 0, tightestScene: 5,
+    };
+    const result = await intentionPass({
+      fountain: 'SC0\nA\nSC1\nB\nSC2\nC\nSC3\nD\nSC4\nE\nSC5\nF\n',
+      original: 'SC0\nA\nSC1\nB\nSC2\nC\nSC3\nD\nSC4\nE\nSC5\nF\n',
+      records: records as unknown as Parameters<typeof intentionPass>[0]['records'],
+      structure: structure as Parameters<typeof intentionPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const entropy = result.issues.filter(i => i.rule === 'ZERO_ENTROPY_SCENE' && i.location.includes('Scene 1'));
+    assert.ok(entropy.length === 0, 'Should NOT flag scene with emotional shift as zero entropy');
+  });
+
+  it('intentionPass detects ENTROPY_CLUSTER for 3 consecutive low-momentum scenes', async () => {
+    const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+    const makeRec = (idx: number, suspenseDelta: number) => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose: 'dialogue',
+      dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+      emotionalShift: 'neutral', suspenseDelta,
+      dialogueHighlights: [], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [],
+      readerStateAnnotation: null,
+      relationshipShifts: [],
+    });
+    const records = [
+      makeRec(0, 2),
+      // Scenes 1-3: 3 consecutive low-momentum scenes
+      makeRec(1, 0.5),
+      makeRec(2, 0.3),
+      makeRec(3, 0.8),
+      makeRec(4, 2.5),
+    ];
+    const structure = {
+      actPosition: 'act2b' as const, completionPercent: 60,
+      revelationCount: 0, approachingClimax: false,
+      avgSuspensePerScene: 1, escalating: true,
+      reversalCount: 0, reversalDensity: 0,
+      openClues: 0, midpointPressure: 0, tightestScene: 4,
+    };
+    const result = await intentionPass({
+      fountain: 'SC0\nA\nSC1\nB\nSC2\nC\nSC3\nD\nSC4\nE\n',
+      original: 'SC0\nA\nSC1\nB\nSC2\nC\nSC3\nD\nSC4\nE\n',
+      records: records as unknown as Parameters<typeof intentionPass>[0]['records'],
+      structure: structure as Parameters<typeof intentionPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const cluster = result.issues.filter(i => i.rule === 'ENTROPY_CLUSTER');
+    assert.ok(cluster.length >= 1, 'Should detect ENTROPY_CLUSTER for 3 consecutive low-momentum scenes');
+    assert.ok(cluster[0].severity === 'major');
+  });
+
+  it('intentionPass does NOT fire ENTROPY_CLUSTER when middle scene has relationship shift', async () => {
+    const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+    const makeRec = (idx: number, suspenseDelta: number, hasRelationshipShift: boolean) => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose: 'dialogue',
+      dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+      emotionalShift: 'neutral', suspenseDelta,
+      dialogueHighlights: [], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [],
+      readerStateAnnotation: null,
+      relationshipShifts: hasRelationshipShift ? [{ pairKey: 'a|b', shiftMagnitude: 1 }] : [],
+    });
+    const records = [
+      makeRec(0, 2, false),
+      makeRec(1, 0.5, false),
+      makeRec(2, 0.3, true), // middle scene has relationship shift — breaks the cluster
+      makeRec(3, 0.8, false),
+      makeRec(4, 2.5, false),
+    ];
+    const structure = {
+      actPosition: 'act2b' as const, completionPercent: 60,
+      revelationCount: 0, approachingClimax: false,
+      avgSuspensePerScene: 1, escalating: true,
+      reversalCount: 0, reversalDensity: 0,
+      openClues: 0, midpointPressure: 0, tightestScene: 4,
+    };
+    const result = await intentionPass({
+      fountain: 'SC0\nA\nSC1\nB\nSC2\nC\nSC3\nD\nSC4\nE\n',
+      original: 'SC0\nA\nSC1\nB\nSC2\nC\nSC3\nD\nSC4\nE\n',
+      records: records as unknown as Parameters<typeof intentionPass>[0]['records'],
+      structure: structure as Parameters<typeof intentionPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const cluster = result.issues.filter(i => i.rule === 'ENTROPY_CLUSTER');
+    assert.ok(cluster.length === 0, 'Should NOT fire ENTROPY_CLUSTER when one scene has relationship shift');
+  });
+
   // ── proof-spec: e.dominant guard ─────────────────────────────────────────
 
   it('buildSystemPreamble skips emotion entries with missing dominant field', async () => {

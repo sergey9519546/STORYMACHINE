@@ -1,6 +1,8 @@
 // Wave 39 — Pass 3: Intention
 // Checks character intention clarity: characters acting without readable goals,
 // want/fear asymmetry, unmotivated entrances.
+// Wave 142 additions: scene entropy detection (scenes that don't advance plot,
+// character development, or theme; scenes with zero narrative momentum).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -114,6 +116,62 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'critical',
         suggestedFix: 'Add a moment where the protagonist makes an irreversible choice that resolves the central tension',
       });
+    }
+  }
+
+  // ── Wave 142: Scene Entropy — scenes that don't advance story ──────────────
+  // ZERO_ENTROPY_SCENE: A scene with no emotional shift, no relationship change,
+  // no clues planted, and no clock raised — the scene changes nothing. These are
+  // narrative dead zones that kill momentum.
+  for (let i = 0; i < records.length; i++) {
+    const r = records[i];
+    const hasEmotionalShift = r.emotionalShift !== 'neutral';
+    const hasRelationshipShift = (r.relationshipShifts?.length ?? 0) > 0;
+    const hasPlantedClues = (r.seededClueIds?.length ?? 0) > 0;
+    const hasClockPressure = r.clockRaised || r.clockDelta > 1;
+    const isHighDrama = r.suspenseDelta > 2;
+
+    const hasAnyMomentum = hasEmotionalShift || hasRelationshipShift || hasPlantedClues || hasClockPressure || isHighDrama;
+
+    if (!hasAnyMomentum && records.length >= 6) {
+      // Only flag if this is a middle scene (not opening setup, not closing epilogue)
+      const isMiddle = i > 0 && i < records.length - 1;
+      if (isMiddle) {
+        issues.push({
+          location: `Scene ${i} (${r.slug})`,
+          rule: 'ZERO_ENTROPY_SCENE',
+          description: `Scene ${i} has no emotional shift, relationship change, planted clues, or clock pressure — the scene advances neither plot nor character`,
+          severity: 'major',
+          suggestedFix: 'Either add a moment where someone learns something, feels something, or commits to something; or cut the scene entirely',
+        });
+      }
+    }
+  }
+
+  // ENTROPY_CLUSTER: Three consecutive scenes with low momentum (suspense delta < 1).
+  // This indicates a pacing dead zone where the story stalls.
+  let lowMomentumCount = 0;
+  let clusterStart = -1;
+  for (let i = 0; i < records.length; i++) {
+    const r = records[i];
+    const isLowMomentum = r.suspenseDelta < 1 && (r.relationshipShifts?.length ?? 0) === 0 && (r.seededClueIds?.length ?? 0) === 0;
+
+    if (isLowMomentum) {
+      if (lowMomentumCount === 0) clusterStart = i;
+      lowMomentumCount++;
+    } else {
+      lowMomentumCount = 0;
+    }
+
+    if (lowMomentumCount === 3) {
+      issues.push({
+        location: `Scenes ${clusterStart}–${i}`,
+        rule: 'ENTROPY_CLUSTER',
+        description: `Three consecutive scenes (${clusterStart}–${i}) have low suspense and no relationship/clue advancement — the story stalls in a dead zone`,
+        severity: 'major',
+        suggestedFix: 'Add a turning point, revelation, or relationship shift to one of these scenes; or consolidate them into a single tighter scene',
+      });
+      lowMomentumCount = 0; // reset to avoid duplicate flags
     }
   }
 
