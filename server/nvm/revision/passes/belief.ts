@@ -4,6 +4,9 @@
 // Wave 145 additions: deception consequence tracking (lies that are never
 // discovered or create conflict), belief reversals with evidence checking,
 // and belief isolation (crucial beliefs never expressed).
+// Wave 159 additions: revelation isolated (discovery happens with no character
+// reaction in dialogue), told-belief domination (>70% tell vs show), and
+// belief asymmetry (one character dominates the deception layer 3:1 or more).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -182,6 +185,84 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
           description: `Scene ${scene.sceneIdx} plants clues (seeding knowledge) but has no dialogue highlights — the character's belief or discovery is kept entirely internal, making their motivation invisible to the audience`,
           severity: 'major',
           suggestedFix: 'Add a line of dialogue or internal monologue where the character expresses or reacts to the clue they\'ve discovered',
+        });
+      }
+    }
+  }
+
+  // ── Wave 159: Revelation isolated, told domination, belief asymmetry ─────────
+
+  // REVELATION_ISOLATED: A scene contains a revelation but neither the scene
+  // itself nor its immediate neighbors have any character dialogue. The discovery
+  // happens in silence — no character processes, reacts to, or articulates what
+  // they've just witnessed. Revelations need a human voice to resonate.
+  if (records.length >= 5) {
+    for (let i = 0; i < records.length; i++) {
+      const r = records[i];
+      if (r.revelation === null) continue;
+
+      const prevHasDialogue = i > 0 && records[i - 1].dialogueHighlights.length > 0;
+      const currHasDialogue = r.dialogueHighlights.length > 0;
+      const nextHasDialogue = i < records.length - 1 && records[i + 1].dialogueHighlights.length > 0;
+
+      if (!prevHasDialogue && !currHasDialogue && !nextHasDialogue) {
+        issues.push({
+          location: `Scene ${i} (${r.slug})`,
+          rule: 'REVELATION_ISOLATED',
+          description: `Scene ${i} contains a revelation ("${String(r.revelation).slice(0, 60)}") but no character dialogue appears in this or adjacent scenes — the discovery happens in silence with no human reaction`,
+          severity: 'major',
+          suggestedFix: 'Add dialogue in the revelation scene or the scene immediately after where a character processes, denies, or responds to what they\'ve just witnessed',
+        });
+      }
+    }
+  }
+
+  // TOLD_BELIEF_DOMINATION: More than 70% of belief-content scenes (scenes with
+  // dialogueHighlights or a revelation) are told-only — the story relies on
+  // characters asserting facts in dialogue rather than letting the audience
+  // witness them directly. Requires 6+ records and 4+ belief scenes.
+  if (records.length >= 6) {
+    const beliefScenes = records.filter(r => r.dialogueHighlights.length > 0 || r.revelation !== null);
+    if (beliefScenes.length >= 4) {
+      const toldOnlyCount = beliefScenes.filter(r => r.dialogueHighlights.length > 0 && r.revelation === null).length;
+      const toldRatio = toldOnlyCount / beliefScenes.length;
+      if (toldRatio > 0.7) {
+        issues.push({
+          location: 'Belief/revelation layer',
+          rule: 'TOLD_BELIEF_DOMINATION',
+          description: `${toldOnlyCount} of ${beliefScenes.length} belief scenes (${Math.round(toldRatio * 100)}%) are told-only with no witnessed revelation — the story tells far more than it shows`,
+          severity: 'major',
+          suggestedFix: 'Convert at least one told-belief scene to a witnessed event — let the audience discover the truth through action or direct observation rather than a character asserting it',
+        });
+      }
+    }
+  }
+
+  // BELIEF_ASYMMETRY: One character accounts for 3× or more belief appearances
+  // than any other character. The belief/deception layer is dominated by a single
+  // voice while others remain belief-opaque — creating thin psychological texture.
+  // Requires 6+ records and 4+ total dialogueHighlights.
+  if (records.length >= 6) {
+    const charBeliefCounts = new Map<string, number>();
+    for (const r of records) {
+      for (const h of r.dialogueHighlights) {
+        const m = h.match(/^(\w+):/);
+        if (m) charBeliefCounts.set(m[1], (charBeliefCounts.get(m[1]) ?? 0) + 1);
+      }
+    }
+    const totalBeliefs = Array.from(charBeliefCounts.values()).reduce((s, v) => s + v, 0);
+    if (totalBeliefs >= 4 && charBeliefCounts.size >= 2) {
+      const sorted = [...charBeliefCounts.values()].sort((a, b) => b - a);
+      const maxCount = sorted[0];
+      const secondCount = sorted[1] ?? 0;
+      if (secondCount > 0 && maxCount >= secondCount * 3) {
+        const dominantChar = [...charBeliefCounts.entries()].find(([, v]) => v === maxCount)?.[0] ?? '';
+        issues.push({
+          location: 'Belief distribution',
+          rule: 'BELIEF_ASYMMETRY',
+          description: `"${dominantChar}" accounts for ${maxCount} of ${totalBeliefs} belief appearances (${Math.round(maxCount / totalBeliefs * 100)}%) — the deception layer is dominated by a single voice; other characters remain psychologically opaque`,
+          severity: 'minor',
+          suggestedFix: 'Give secondary characters more belief-revealing moments — let other characters express, discover, or challenge beliefs to create a multi-perspective deception layer',
         });
       }
     }

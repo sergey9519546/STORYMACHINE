@@ -11762,6 +11762,140 @@ He sits down in the chair.
     });
   });
 
+  describe('Wave 159 — beliefPass: revelation isolated, told domination, belief asymmetry', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const noAnnotations = (n: number) => Array.from({ length: n }, () => ({ revelation: false } as any));
+    const blankFountain = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+
+    it('beliefPass detects REVELATION_ISOLATED when revelation has no adjacent dialogue', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // Scene 2 has a revelation, scenes 1 and 3 have no dialogue either
+      const records = [
+        makeRec(0, { dialogueHighlights: ['alice: something is wrong'] }),
+        makeRec(1), // no dialogue
+        makeRec(2, { revelation: 'the safe was empty all along' }), // no dialogue in scene
+        makeRec(3), // no dialogue
+        makeRec(4, { dialogueHighlights: ['bob: we need to leave'] }),
+      ];
+      const result = await beliefPass({
+        fountain: blankFountain(5), original: blankFountain(5),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(5), approvedSpans: [],
+      });
+      const isolated = result.issues.filter(i => i.rule === 'REVELATION_ISOLATED');
+      assert.ok(isolated.length >= 1, `Should detect REVELATION_ISOLATED; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(isolated[0].severity === 'major');
+    });
+
+    it('beliefPass does NOT fire REVELATION_ISOLATED when adjacent scene has dialogue', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      const records = [
+        makeRec(0),
+        makeRec(1),
+        makeRec(2, { revelation: 'the safe was empty all along' }),
+        makeRec(3, { dialogueHighlights: ['alice: I knew it, I knew it all along'] }), // reaction after
+        makeRec(4),
+      ];
+      const result = await beliefPass({
+        fountain: blankFountain(5), original: blankFountain(5),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(5), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'REVELATION_ISOLATED'),
+        'Should NOT fire when the following scene has character dialogue',
+      );
+    });
+
+    it('beliefPass detects TOLD_BELIEF_DOMINATION when >70% are told-only scenes', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 7 belief scenes: 6 told-only, 1 revelation = 86% told ratio
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, {
+          dialogueHighlights: i < 6 ? [`alice: asserts fact ${i}`] : [],
+          revelation: i === 6 ? 'the truth' : null,
+        }),
+      );
+      const result = await beliefPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(8), approvedSpans: [],
+      });
+      const domination = result.issues.filter(i => i.rule === 'TOLD_BELIEF_DOMINATION');
+      assert.ok(domination.length >= 1, `Should detect TOLD_BELIEF_DOMINATION; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(domination[0].severity === 'major');
+    });
+
+    it('beliefPass does NOT fire TOLD_BELIEF_DOMINATION when revelations are well-distributed', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 6 records: 3 told, 3 revelations = 50% told ratio
+      const records = Array.from({ length: 6 }, (_, i) =>
+        makeRec(i, {
+          dialogueHighlights: i % 2 === 0 ? [`alice: claims ${i}`] : [],
+          revelation: i % 2 === 1 ? `truth ${i}` : null,
+        }),
+      );
+      const result = await beliefPass({
+        fountain: blankFountain(6), original: blankFountain(6),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(6), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'TOLD_BELIEF_DOMINATION'),
+        'Should NOT fire when told and witnessed beliefs are balanced',
+      );
+    });
+
+    it('beliefPass detects BELIEF_ASYMMETRY when one character dominates dialogue 3:1', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // alice: 6 appearances, bob: 2 appearances = 3:1 ratio
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, {
+          dialogueHighlights: i < 6
+            ? ['alice: knows the secret']
+            : i === 6
+            ? ['bob: suspects something']
+            : ['bob: not sure'],
+        }),
+      );
+      const result = await beliefPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(8), approvedSpans: [],
+      });
+      const asymmetry = result.issues.filter(i => i.rule === 'BELIEF_ASYMMETRY');
+      assert.ok(asymmetry.length >= 1, `Should detect BELIEF_ASYMMETRY; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(asymmetry[0].severity === 'minor');
+    });
+
+    it('beliefPass does NOT fire BELIEF_ASYMMETRY when characters share belief space', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // alice: 3, bob: 3 — balanced
+      const records = Array.from({ length: 6 }, (_, i) =>
+        makeRec(i, {
+          dialogueHighlights: [i % 2 === 0 ? 'alice: has a theory' : 'bob: disagrees with alice'],
+        }),
+      );
+      const result = await beliefPass({
+        fountain: blankFountain(6), original: blankFountain(6),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(6), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'BELIEF_ASYMMETRY'),
+        'Should NOT fire when characters share belief appearances equally',
+      );
+    });
+  });
+
   describe('Wave 158 — conflictPass: threat amnesia, antagonist vanish, single-register conflict', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
