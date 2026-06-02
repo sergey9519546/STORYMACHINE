@@ -11057,6 +11057,110 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
     });
   });
 
+  // ── Wave 149: Originality pass enhancements ───────────────────────────────
+  describe('Wave 149 — originalityPass: arc telegraphed, intro clichés, sensory monotone', async () => {
+    const makeRec = (idx: number): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: idx % 2 === 0 ? 'establish_world' : 'raise_stakes',
+      dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+      emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+    });
+
+    it('originalityPass detects ARC_TELEGRAPHED when resolution is stated in opening', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // Opening line explicitly telegraphs resolution
+      const fountain = `INT. SC0 - DAY
+ALICE
+Everything will work out, I just know it.
+
+INT. SC1 - DAY
+Something happens.
+INT. SC2 - DAY
+Something happens.
+INT. SC3 - DAY
+Something happens.
+INT. SC4 - DAY
+Something happens.
+`;
+      const records = Array.from({ length: 5 }, (_, i) => makeRec(i));
+      const result = await originalityPass({
+        fountain, original: fountain,
+        records: records as any, structure: {} as any, annotations: [], approvedSpans: [],
+      });
+      const telegraphed = result.issues.filter(i => i.rule === 'ARC_TELEGRAPHED');
+      assert.ok(telegraphed.length >= 1, 'Should detect ARC_TELEGRAPHED when resolution is stated in opening act');
+      assert.ok(telegraphed[0].severity === 'major');
+    });
+
+    it('originalityPass does NOT fire ARC_TELEGRAPHED when opening is ambiguous', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const fountain = Array.from({ length: 5 }, (_, i) =>
+        `INT. SC${i} - DAY\nThe investigation begins.\n`,
+      ).join('\n');
+      const records = Array.from({ length: 5 }, (_, i) => makeRec(i));
+      const result = await originalityPass({
+        fountain, original: fountain,
+        records: records as any, structure: {} as any, annotations: [], approvedSpans: [],
+      });
+      const telegraphed = result.issues.filter(i => i.rule === 'ARC_TELEGRAPHED');
+      assert.ok(telegraphed.length === 0, 'Should NOT fire when opening is genuinely ambiguous');
+    });
+
+    it('originalityPass detects CHARACTER_INTRO_CLICHE for stereotyped character description', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const fountain = `INT. PRECINCT - DAY
+DETECTIVE COLE (50s), world-weary, hard-boiled, a man who has seen it all.
+
+He sits at his desk.
+`;
+      const records = [makeRec(0)];
+      const result = await originalityPass({
+        fountain, original: fountain,
+        records: records as any, structure: {} as any, annotations: [], approvedSpans: [],
+      });
+      const introCliche = result.issues.filter(i => i.rule === 'CHARACTER_INTRO_CLICHE');
+      assert.ok(introCliche.length >= 1, 'Should detect CHARACTER_INTRO_CLICHE for stock character descriptions');
+      assert.ok(introCliche[0].severity === 'minor');
+    });
+
+    it('originalityPass detects SENSORY_MONOTONE for purely visual screenplay', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 25+ action lines, none with sound or tactile words
+      const actionLines = Array.from({ length: 25 }, () =>
+        `A figure moves across the frame. Objects are visible. The scene continues.`,
+      ).join('\n');
+      const fountain = `INT. SC0 - DAY\n${actionLines}\n\nINT. SC1 - DAY\n${actionLines}\n`;
+      const records = [makeRec(0), makeRec(1), makeRec(2), makeRec(3), makeRec(4)];
+      const result = await originalityPass({
+        fountain, original: fountain,
+        records: records as any, structure: {} as any, annotations: [], approvedSpans: [],
+      });
+      const sensory = result.issues.filter(i => i.rule === 'SENSORY_MONOTONE');
+      assert.ok(sensory.length >= 1, 'Should detect SENSORY_MONOTONE when screenplay has no sound/tactile cues');
+      assert.ok(sensory[0].severity === 'minor');
+    });
+
+    it('originalityPass does NOT fire SENSORY_MONOTONE when sound/tactile cues present', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // Action lines with deliberate sound/tactile words throughout
+      const actionLines = Array.from({ length: 25 }, (_, i) =>
+        i % 5 === 0
+          ? `The door creaks. Cold air rushes in. A distant hum.`
+          : `A figure moves. Objects visible. Light changes.`,
+      ).join('\n');
+      const fountain = `INT. SC0 - DAY\n${actionLines}\n\nINT. SC1 - DAY\n${actionLines}\n`;
+      const records = [makeRec(0), makeRec(1), makeRec(2), makeRec(3), makeRec(4)];
+      const result = await originalityPass({
+        fountain, original: fountain,
+        records: records as any, structure: {} as any, annotations: [], approvedSpans: [],
+      });
+      const sensory = result.issues.filter(i => i.rule === 'SENSORY_MONOTONE');
+      assert.ok(sensory.length === 0, 'Should NOT fire when sensory cues are present');
+    });
+  });
+
   it('showrunner fires for set_up_payoff scene with no SEED_CLUE or PAYOFF_SETUP op', async () => {
     const { showrunnerCritic } = await import('./server/nvm/room/critics/showrunner.ts');
     const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {

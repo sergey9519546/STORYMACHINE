@@ -1,6 +1,9 @@
 // Wave 137 — Pass 10: Originality
 // Checks for clichés, generic scene descriptions, and predictable outcomes.
 // Wave 137 additions: emotion-naming in action lines (show-don't-tell violation).
+// Wave 149 additions: arc predictability (resolution telegraphed too early),
+// character introduction clichés, and sensory monotone (scenes lacking
+// concrete sensory grounding).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -167,6 +170,112 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
           suggestedFix: `Show the emotional state through a specific physical behavior or concrete action instead of naming it (e.g., replace "${match[0]}" with what the character does)`,
         });
       }
+    }
+  }
+
+  // ── Wave 149: Arc predictability, intro clichés, sensory monotone ───────────
+
+  // ARC_TELEGRAPHED: The resolution of the central conflict is telegraphed in
+  // the opening third through dialogue that names the ending explicitly.
+  // We detect phrases that describe the protagonist's final state too early.
+  const telegraphPhrases = [
+    'everything will work out', 'it\'ll all be okay', 'i know we\'ll make it',
+    'we\'re going to be fine', 'this will all be worth it', 'you\'ll see',
+    'i promise it gets better', 'we always figure it out', 'love conquers all',
+    'good always wins', 'justice will prevail', 'the truth always comes out',
+    'you can\'t fight fate', 'destiny will find a way',
+  ];
+  if (records.length >= 5) {
+    const openingThirdEnd = Math.floor(records.length / 3);
+    // Only scan fountain lines corresponding to the opening act
+    // Approximate by taking the first 40% of fountain lines
+    const fountainLines40pct = Math.floor(lines.length * 0.40);
+    let telegraphCount = 0;
+    for (let i = 0; i < fountainLines40pct; i++) {
+      const lower = lines[i].toLowerCase();
+      for (const phrase of telegraphPhrases) {
+        if (lower.includes(phrase)) {
+          telegraphCount++;
+          if (telegraphCount === 1) {
+            issues.push({
+              location: `Line ${i + 1} (opening act)`,
+              rule: 'ARC_TELEGRAPHED',
+              description: `Opening act contains a phrase that telegraphs the resolution: "${phrase}" — the audience knows where this ends before the conflict begins`,
+              severity: 'major',
+              suggestedFix: 'Remove or complicate early declarations of how things will end. Let the resolution remain genuinely uncertain until the climax earns it',
+            });
+          }
+          break;
+        }
+      }
+      if (telegraphCount >= 2) break;
+    }
+    void openingThirdEnd; // used for guard
+  }
+
+  // CHARACTER_INTRO_CLICHE: A character's first appearance uses stock shorthand
+  // instead of a specific, world-revealing detail. These introductions describe
+  // people via their social role or appearance stereotype rather than a singular action.
+  const introCliches = [
+    /\b(in his|in her|in their)\s+(mid|late|early)[\s-]*(twenties|thirties|forties|fifties)\b/i,
+    /\bstrikingly (beautiful|handsome|attractive)\b/i,
+    /\b(no-nonsense|take-charge|straight-laced)\b/i,
+    /\bhard-boiled\b/i,
+    /\bworld-weary\b/i,
+    /\bby-the-book\b/i,
+    /\bunassuming (young|old)?\s*(man|woman|person)\b/i,
+    /\ba man who has seen (it all|too much|better days)\b/i,
+    /\bwho doesn't take (no|any) (shit|nonsense|guff)\b/i,
+  ];
+  let introClicheCount = 0;
+  for (let i = 0; i < lines.length && introClicheCount < 2; i++) {
+    for (const re of introCliches) {
+      if (re.test(lines[i])) {
+        introClicheCount++;
+        issues.push({
+          location: `Line ${i + 1}`,
+          rule: 'CHARACTER_INTRO_CLICHE',
+          description: `Character introduced with stock description: "${lines[i].trim().slice(0, 70)}" — a generic label instead of a specific, character-revealing moment`,
+          severity: 'minor',
+          suggestedFix: 'Introduce characters through a specific action, object, or sensory detail that only they could have. What is the single image that defines them?',
+        });
+        break;
+      }
+    }
+  }
+
+  // SENSORY_MONOTONE: The screenplay relies almost entirely on visual description
+  // with no sound, smell, texture, or temperature. Scenes that omit non-visual
+  // sensory cues feel flat and disembodied.
+  // We detect this by checking action lines: if the script has many action lines
+  // but none reference sound/smell/touch/temperature words, it's visually-only.
+  if (records.length >= 5) {
+    const soundWords = /\b(sound|noise|silence|quiet|loud|ring|crack|thud|rumble|whisper|echo|hum|scrape|clatter|hiss|creak|bang|snap|roar|murmur|buzz|drip|splash|footstep|heartbeat)\b/i;
+    const tactileWords = /\b(cold|warm|hot|rough|smooth|wet|dry|sharp|soft|hard|heavy|light|sticky|slippery|tight|loose|texture|grip|pressure|pain|sting|itch|numb)\b/i;
+
+    let actionLineCount = 0;
+    let sensoryCueCount = 0;
+    let inDialogue2 = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDialogue2 = false; continue; }
+      if (/^(INT\.|EXT\.)/i.test(t)) { inDialogue2 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(t)) { inDialogue2 = true; continue; }
+      if (inDialogue2) continue;
+      if (t.startsWith('(') && t.endsWith(')')) continue;
+      actionLineCount++;
+      if (soundWords.test(t) || tactileWords.test(t)) sensoryCueCount++;
+    }
+
+    const sensoryRatio = actionLineCount > 0 ? sensoryCueCount / actionLineCount : 1;
+    if (actionLineCount >= 20 && sensoryRatio < 0.05) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'SENSORY_MONOTONE',
+        description: `Only ${Math.round(sensoryRatio * 100)}% of action lines (${sensoryCueCount}/${actionLineCount}) contain sound or tactile cues — the screenplay is purely visual, missing the texture that makes scenes physically felt`,
+        severity: 'minor',
+        suggestedFix: 'Add at least one non-visual sensory detail per scene: a sound, a temperature, a texture. What does this world feel like, not just look like?',
+      });
     }
   }
 
