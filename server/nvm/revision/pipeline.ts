@@ -1,5 +1,5 @@
-// Wave 130 — The 13-Pass Revision Pipeline
-// Runs the compiled Fountain screenplay through 13 sequential revision passes.
+// Wave 134 — The 14-Pass Revision Pipeline
+// Runs the compiled Fountain screenplay through 14 sequential revision passes.
 // Each pass diagnoses a layer, marks weak spots, and rewrites (LLM or stub).
 // Approved spans are threaded through every pass unchanged.
 //
@@ -17,6 +17,7 @@
 // 11. payoff           — orphan clues, payoff timing
 // 12. voice            — tonal consistency, register mismatch
 // 13. theme            — theme resonance gaps, unresolved theme in Act 3
+// 14. relationship-arc — static/monotone relationships, idle emotional engine
 
 import type { CompiledScreenplay, SceneAnnotation } from '../screenplay/compile.ts';
 import type { StructureState } from '../screenplay/structure.ts';
@@ -37,6 +38,7 @@ import { originalityPass }  from './passes/originality.ts';
 import { payoffPass }       from './passes/payoff.ts';
 import { voicePass }        from './passes/voice.ts';
 import { themePass }        from './passes/theme.ts';
+import { relationshipArcPass } from './passes/relationship-arc.ts';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -118,6 +120,7 @@ export async function runRevisionPipeline(
     { name: 'payoff',        fn: payoffPass },
     { name: 'voice',         fn: voicePass },
     { name: 'theme',         fn: themePass },
+    { name: 'relationship-arc', fn: relationshipArcPass },
   ];
 
   const passResults: PassResult[] = [];

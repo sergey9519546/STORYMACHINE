@@ -18,7 +18,8 @@ export type PassName =
   | 'originality'
   | 'payoff'
   | 'voice'
-  | 'theme';
+  | 'theme'
+  | 'relationship-arc';
 
 export interface ApprovedSpan {
   /** 1-based line number (inclusive) */

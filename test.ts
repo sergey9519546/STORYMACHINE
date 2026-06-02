@@ -8719,14 +8719,14 @@ describe('NVM — 12-Pass Revision Pipeline (Wave 39)', () => {
 
   // ── Pipeline integration tests ────────────────────────────────────────────
 
-  it('pipeline: runRevisionPipeline runs all 13 passes', async () => {
+  it('pipeline: runRevisionPipeline runs all 14 passes', async () => {
     const commits: StoryCommit[] = [];
     const records = buildScreenplayMemory(commits);
     const structure = analyzeStructure(records, commits);
     const compiled = compileScreenplay(commits, emptyState(), records, structure, 'TEST');
 
     const result = await runRevisionPipeline(compiled, records, structure, []);
-    assert.equal(result.passResults.length, 13, 'all 13 passes ran');
+    assert.equal(result.passResults.length, 14, 'all 14 passes ran');
     assert.ok(typeof result.totalIssuesFound === 'number', 'totalIssuesFound is number');
     assert.ok(typeof result.passesWithChanges === 'number', 'passesWithChanges is number');
     assert.ok(typeof result.finalFountain === 'string', 'finalFountain is string');
@@ -8743,7 +8743,7 @@ describe('NVM — 12-Pass Revision Pipeline (Wave 39)', () => {
     const result = await runRevisionPipeline(compiled, records, structure);
     const expectedOrder = [
       'structure', 'causality', 'intention', 'belief', 'conflict',
-      'character-arc', 'dialogue', 'rhythm', 'pacing', 'originality', 'payoff', 'voice', 'theme',
+      'character-arc', 'dialogue', 'rhythm', 'pacing', 'originality', 'payoff', 'voice', 'theme', 'relationship-arc',
     ];
     const actualOrder = result.passResults.map(p => p.pass);
     assert.deepEqual(actualOrder, expectedOrder, 'passes run in correct order');
@@ -8757,7 +8757,7 @@ describe('NVM — 12-Pass Revision Pipeline (Wave 39)', () => {
 
     const approvedSpans = [{ startLine: 1, endLine: 3, reason: 'title page' }];
     const result = await runRevisionPipeline(compiled, records, structure, approvedSpans);
-    assert.equal(result.passResults.length, 13, 'all 13 passes complete with approved spans');
+    assert.equal(result.passResults.length, 14, 'all 14 passes complete with approved spans');
   });
 
   it('pipeline: totalIssuesFound = sum of per-pass issue counts', async () => {
@@ -9684,7 +9684,7 @@ describe('Wave 70 — revision rewrite storyContext enrichment', () => {
 
     // runRevisionPipeline accepts storyContext as 6th param — if types are wrong, tsc fails
     const result = await runRevisionPipeline(compiled, records, structure, [], undefined, ctx);
-    assert.ok(result.passResults.length === 0 || result.passResults.length === 13,
+    assert.ok(result.passResults.length === 0 || result.passResults.length === 14,
       'Pipeline handles empty fountain gracefully');
   });
 });
@@ -14920,6 +14920,86 @@ describe('Wave 132 — evaluateRewrite truncation/length guard', () => {
     const revised = 'y'.repeat(1000);
     const verdict = evaluateRewrite(revised, original.length, undefined);
     assert.equal(verdict.accept, true);
+  });
+
+});
+
+// ── Wave 134 — Relationship Arc Pass (Pass 14) ───────────────────────────────
+
+import { relationshipArcPass } from './server/nvm/revision/passes/relationship-arc.ts';
+
+describe('Wave 134 — Relationship Arc Pass', () => {
+
+  it('flags NO_RELATIONSHIP_MOVEMENT when a 5+ scene story has zero shifts', async () => {
+    const records: ScreenplaySceneRecord[] = Array.from({ length: 6 }, (_, i) =>
+      makeSceneRecord({ sceneIdx: i, slug: `INT. ROOM ${i}`, relationshipShifts: [] }));
+    const result = await relationshipArcPass(makeMinimalInput({ records }));
+    assert.ok(
+      result.issues.some(i => i.rule === 'NO_RELATIONSHIP_MOVEMENT'),
+      'static multi-scene story should flag idle emotional engine',
+    );
+  });
+
+  it('flags MONOTONE_RELATIONSHIP when a pair only ever warms', async () => {
+    const records: ScreenplaySceneRecord[] = Array.from({ length: 4 }, (_, i) =>
+      makeSceneRecord({
+        sceneIdx: i, slug: `INT. ROOM ${i}`,
+        relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.2 }],
+      }));
+    const result = await relationshipArcPass(makeMinimalInput({ records }));
+    assert.ok(
+      result.issues.some(i => i.rule === 'MONOTONE_RELATIONSHIP'),
+      'one-directional bond should flag monotone',
+    );
+  });
+
+  it('does NOT flag monotone when a pair has a reversal', async () => {
+    const records: ScreenplaySceneRecord[] = [
+      makeSceneRecord({ sceneIdx: 0, relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.3 }] }),
+      makeSceneRecord({ sceneIdx: 1, relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.3 }] }),
+      makeSceneRecord({ sceneIdx: 2, relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: -0.4 }] }),
+    ];
+    const result = await relationshipArcPass(makeMinimalInput({ records }));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'MONOTONE_RELATIONSHIP'),
+      'bond with a reversal should not be flagged monotone',
+    );
+  });
+
+  it('flags STATIC_RELATIONSHIP when shifts cancel to zero net', async () => {
+    const records: ScreenplaySceneRecord[] = [
+      makeSceneRecord({ sceneIdx: 0, relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.3 }] }),
+      makeSceneRecord({ sceneIdx: 1, relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: -0.3 }] }),
+      makeSceneRecord({ sceneIdx: 2, relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.0 }] }),
+    ];
+    const result = await relationshipArcPass(makeMinimalInput({ records }));
+    // net trust = 0 across 3 shifts → static (runs in place)
+    assert.ok(
+      result.issues.some(i => i.rule === 'STATIC_RELATIONSHIP'),
+      'net-zero recurring relationship should flag static',
+    );
+  });
+
+  it('passes a healthy relationship with net movement and a reversal', async () => {
+    const records: ScreenplaySceneRecord[] = [
+      makeSceneRecord({ sceneIdx: 0, relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.4 }] }),
+      makeSceneRecord({ sceneIdx: 1, relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: -0.2 }] }),
+      makeSceneRecord({ sceneIdx: 2, relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.5 }] }),
+    ];
+    const result = await relationshipArcPass(makeMinimalInput({ records }));
+    // has reversal (not monotone) AND net +0.7 (not static)
+    assert.equal(result.issues.length, 0, 'healthy evolving bond should pass clean');
+  });
+
+  it('memory builder populates relationshipShifts from SHIFT_RELATIONSHIP ops', () => {
+    const commits = [makeScreenplayCommit(0, [
+      { op: 'SHIFT_RELATIONSHIP', pair: ['bob', 'alice'], delta: { dimension: 'trust', amount: -0.5, reason: 'betrayal' } },
+    ])];
+    const records = buildScreenplayMemory(commits);
+    assert.equal(records[0].relationshipShifts?.length, 1);
+    // pair key is sorted alphabetically
+    assert.equal(records[0].relationshipShifts?.[0].pairKey, 'alice|bob');
+    assert.equal(records[0].relationshipShifts?.[0].amount, -0.5);
   });
 
 });

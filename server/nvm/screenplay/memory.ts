@@ -52,6 +52,11 @@ export interface ScreenplaySceneRecord {
   suspenseDelta: number;
   /** Total curiosity delta */
   curiosityDelta: number;
+  /** Relationship shifts in this scene (from SHIFT_RELATIONSHIP ops). Each entry
+   *  is a sorted pair key + signed amount, used by the relationship-arc pass.
+   *  The builder always populates this; optional only so legacy/test fixtures that
+   *  predate the field still typecheck. Consumers should treat absence as []. */
+  relationshipShifts?: Array<{ pairKey: string; dimension: string; amount: number }>;
   /** createdAt timestamp */
   createdAt: number;
 }
@@ -116,6 +121,19 @@ export function annotateCommit(commit: StoryCommit): ScreenplaySceneRecord {
     negativeEmotions.length > emotionOps.length / 2 ? 'negative' :
     emotionOps.length > 0 ? 'positive' : 'neutral';
 
+  // ── Relationship shifts ───────────────────────────────────────────────────
+  const relationshipShifts: ScreenplaySceneRecord['relationshipShifts'] = [];
+  for (const o of ops) {
+    if (o.op !== 'SHIFT_RELATIONSHIP') continue;
+    const rel = o as Extract<StoryOp, { op: 'SHIFT_RELATIONSHIP' }>;
+    const pair = rel.pair;
+    if (!Array.isArray(pair) || pair.length < 2) continue;
+    const pairKey = [pair[0], pair[1]].sort().join('|');
+    const amount = typeof rel.delta?.amount === 'number' && isFinite(rel.delta.amount) ? rel.delta.amount : 0;
+    const dimension = typeof rel.delta?.dimension === 'string' ? rel.delta.dimension : 'affinity';
+    relationshipShifts.push({ pairKey, dimension, amount });
+  }
+
   // ── Clock detection ───────────────────────────────────────────────────────
   const clockOpsLocal = ops.filter(o => o.op === 'RAISE_CLOCK');
   const clockRaised = clockOpsLocal.length > 0;
@@ -149,6 +167,7 @@ export function annotateCommit(commit: StoryCommit): ScreenplaySceneRecord {
     clockDelta,
     suspenseDelta,
     curiosityDelta,
+    relationshipShifts,
     createdAt: commit.createdAt,
   };
 }
