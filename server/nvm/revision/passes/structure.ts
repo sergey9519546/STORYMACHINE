@@ -207,6 +207,91 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 165: Protagonist passivity at climax, dark night absent, Act 2 dead zone ──
+
+  // PROTAGONIST_PASSIVITY_CLIMAX: The peak-suspense scene in the climax zone (last 30%)
+  // shows no protagonist engagement — neutral emotion, no clock pressure, no discovery.
+  // The protagonist is watching rather than choosing at the story's peak moment.
+  if (n >= 8) {
+    const climaxZoneStart = Math.floor(n * 0.7);
+    let peakScene = -1;
+    let peakSuspense = -Infinity;
+    for (let i = climaxZoneStart; i < n; i++) {
+      if (records[i].suspenseDelta > peakSuspense) {
+        peakSuspense = records[i].suspenseDelta;
+        peakScene = i;
+      }
+    }
+    if (peakScene >= 0 && peakSuspense > 1.5) {
+      const rec = records[peakScene];
+      const isPassive =
+        rec.emotionalShift === 'neutral' &&
+        !rec.clockRaised &&
+        (rec.seededClueIds?.length ?? 0) === 0;
+      if (isPassive) {
+        issues.push({
+          location: `Scene ${peakScene} (climax peak)`,
+          rule: 'PROTAGONIST_PASSIVITY_CLIMAX',
+          description: `Peak-intensity climax scene (suspense ${peakSuspense.toFixed(1)}) shows no protagonist engagement — neutral emotion, no clock pressure, no discovery. The protagonist is absent from their own story's highest moment.`,
+          severity: 'critical',
+          suggestedFix: 'Give the protagonist a decisive choice or irreversible action at the story\'s peak: a sacrifice, a confrontation, or a revelation they must act on immediately',
+        });
+      }
+    }
+  }
+
+  // DARK_NIGHT_ABSENT: In the 65%-85% zone, no scene has a negative emotional shift
+  // combined with meaningful suspense. The "all is lost" / "dark night of the soul"
+  // beat is missing — the protagonist never hits bottom before the climax, so the
+  // final push feels unearned.
+  if (n >= 8) {
+    const darkNightStart = Math.floor(n * 0.65);
+    const darkNightEnd = Math.floor(n * 0.85);
+    const darkZone = records.slice(darkNightStart, darkNightEnd);
+    if (darkZone.length >= 2) {
+      const hasDarkNight = darkZone.some(r =>
+        r.emotionalShift === 'negative' && r.suspenseDelta > 1,
+      );
+      if (!hasDarkNight) {
+        issues.push({
+          location: `Scenes ${darkNightStart}–${darkNightEnd} (pre-climax zone)`,
+          rule: 'DARK_NIGHT_ABSENT',
+          description: `No scene in the pre-climax zone (${Math.round(darkNightStart / n * 100)}%–${Math.round(darkNightEnd / n * 100)}%) carries a negative emotional shift with meaningful suspense — the protagonist never hits their lowest point before the final push`,
+          severity: 'major',
+          suggestedFix: 'Insert an "all is lost" beat in this zone: a failure, a betrayal, or a moment where all hope seems gone. The climax lands harder after the protagonist has been broken.',
+        });
+      }
+    }
+  }
+
+  // ACT2_DEAD_ZONE: The middle portion of Act 2 (40%-60% of scenes) has an average
+  // suspense delta lower than both the flanking Act 2 sections (25%-40% and 60%-75%).
+  // The classic mid-Act-2 sag — energy dips before the second-half escalation.
+  if (n >= 10) {
+    const act2Start = Math.floor(n * 0.25);
+    const midStart = Math.floor(n * 0.4);
+    const midEnd = Math.floor(n * 0.6);
+    const act2End = Math.floor(n * 0.75);
+    const earlyAct2 = records.slice(act2Start, midStart);
+    const midAct2 = records.slice(midStart, midEnd);
+    const lateAct2 = records.slice(midEnd, act2End);
+    if (earlyAct2.length >= 1 && midAct2.length >= 2 && lateAct2.length >= 1) {
+      const avg = (arr: typeof records) => arr.reduce((s, r) => s + r.suspenseDelta, 0) / arr.length;
+      const earlyAvg = avg(earlyAct2);
+      const midAvg = avg(midAct2);
+      const lateAvg = avg(lateAct2);
+      if (midAvg < earlyAvg * 0.7 && midAvg < lateAvg * 0.7) {
+        issues.push({
+          location: `Scenes ${midStart}–${midEnd} (mid-Act 2)`,
+          rule: 'ACT2_DEAD_ZONE',
+          description: `Mid-Act-2 suspense avg (${midAvg.toFixed(1)}) is less than 70% of both early-Act-2 (${earlyAvg.toFixed(1)}) and late-Act-2 (${lateAvg.toFixed(1)}) — the classic mid-story energy sag. The story loses momentum before the second-half escalation.`,
+          severity: 'major',
+          suggestedFix: 'Inject a complication, reversal, or discovery into the dead zone: a new obstacle, a false ally, or a ticking-clock development that prevents the story from settling.',
+        });
+      }
+    }
+  }
+
   // ── Rewrite ───────────────────────────────────────────────────────────────
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'structure', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;

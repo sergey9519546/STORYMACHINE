@@ -12039,6 +12039,146 @@ He sits down in the chair.
     });
   });
 
+  // ── Wave 165: Structure pass enhancements ─────────────────────────────────
+  describe('Wave 165 — structurePass: protagonist passivity at climax, dark night absent, act2 dead zone', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const baseStructure = {
+      completionPercent: 50, actPosition: 'act2a' as const,
+      midpointPressure: 2, tightestScene: 7, reversalCount: 2,
+    };
+
+    // ── PROTAGONIST_PASSIVITY_CLIMAX ─────────────────────────────────────────
+    it('structurePass detects PROTAGONIST_PASSIVITY_CLIMAX when climax peak has no engagement', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // 8 scenes; climaxZoneStart = floor(8*0.7) = 5
+      // Scene 6 has highest suspense in zone (3) but is entirely passive
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, {
+          suspenseDelta: i === 6 ? 3 : 1,
+          emotionalShift: 'neutral',
+          clockRaised: false,
+          seededClueIds: [],
+        }),
+      );
+      const result = await structurePass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: baseStructure as any,
+        annotations: [], approvedSpans: [],
+      });
+      const passivity = result.issues.filter(i => i.rule === 'PROTAGONIST_PASSIVITY_CLIMAX');
+      assert.ok(passivity.length >= 1, `Expected PROTAGONIST_PASSIVITY_CLIMAX; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(passivity[0].severity === 'critical');
+    });
+
+    it('structurePass does NOT fire PROTAGONIST_PASSIVITY_CLIMAX when climax peak has positive shift', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, {
+          suspenseDelta: i === 6 ? 3 : 1,
+          emotionalShift: i === 6 ? 'positive' : 'neutral',
+          clockRaised: false,
+          seededClueIds: [],
+        }),
+      );
+      const result = await structurePass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: baseStructure as any,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'PROTAGONIST_PASSIVITY_CLIMAX'),
+        'Should NOT fire when climax peak has a positive emotional shift',
+      );
+    });
+
+    // ── DARK_NIGHT_ABSENT ────────────────────────────────────────────────────
+    it('structurePass detects DARK_NIGHT_ABSENT when pre-climax zone has no negative-shift scene', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // 10 scenes; dark night zone = floor(10*0.65)=6 to floor(10*0.85)=8
+      // All scenes in zone are emotionally neutral
+      const records = Array.from({ length: 10 }, (_, i) =>
+        makeRec(i, { emotionalShift: 'neutral', suspenseDelta: i >= 8 ? 3 : 1.5 }),
+      );
+      const result = await structurePass({
+        fountain: blankFountain(10), original: blankFountain(10),
+        records: records as any, structure: baseStructure as any,
+        annotations: [], approvedSpans: [],
+      });
+      const darkNight = result.issues.filter(i => i.rule === 'DARK_NIGHT_ABSENT');
+      assert.ok(darkNight.length >= 1, `Expected DARK_NIGHT_ABSENT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(darkNight[0].severity === 'major');
+    });
+
+    it('structurePass does NOT fire DARK_NIGHT_ABSENT when a low-point scene exists in pre-climax zone', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // 10 scenes; scene 7 is in dark night zone (65%-85% = scenes 6-8) and is negative
+      const records = Array.from({ length: 10 }, (_, i) =>
+        makeRec(i, {
+          emotionalShift: i === 7 ? 'negative' : 'neutral',
+          suspenseDelta: i === 7 ? 2 : 1.5,
+        }),
+      );
+      const result = await structurePass({
+        fountain: blankFountain(10), original: blankFountain(10),
+        records: records as any, structure: baseStructure as any,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'DARK_NIGHT_ABSENT'),
+        'Should NOT fire when a negative-shift scene exists in the pre-climax zone',
+      );
+    });
+
+    // ── ACT2_DEAD_ZONE ───────────────────────────────────────────────────────
+    it('structurePass detects ACT2_DEAD_ZONE when mid-Act-2 suspense sags below flanking sections', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // 10 scenes; act2Start=2, midStart=4, midEnd=6, act2End=7
+      // earlyAct2=[2,3] suspense=3; midAct2=[4,5] suspense=1; lateAct2=[6] suspense=3
+      // mid (1) < early*0.7 (2.1) AND mid (1) < late*0.7 (2.1) → fires
+      const records = Array.from({ length: 10 }, (_, i) => {
+        let suspenseDelta = 1.5;
+        if (i === 2 || i === 3) suspenseDelta = 3;  // early act2
+        if (i === 4 || i === 5) suspenseDelta = 1;  // mid act2 dead zone
+        if (i === 6) suspenseDelta = 3;              // late act2
+        return makeRec(i, { suspenseDelta });
+      });
+      const result = await structurePass({
+        fountain: blankFountain(10), original: blankFountain(10),
+        records: records as any, structure: baseStructure as any,
+        annotations: [], approvedSpans: [],
+      });
+      const deadZone = result.issues.filter(i => i.rule === 'ACT2_DEAD_ZONE');
+      assert.ok(deadZone.length >= 1, `Expected ACT2_DEAD_ZONE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(deadZone[0].severity === 'major');
+    });
+
+    it('structurePass does NOT fire ACT2_DEAD_ZONE when mid-Act-2 suspense matches flanking sections', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // All sections have similar suspense — no dead zone
+      const records = Array.from({ length: 10 }, (_, i) =>
+        makeRec(i, { suspenseDelta: 2 }),
+      );
+      const result = await structurePass({
+        fountain: blankFountain(10), original: blankFountain(10),
+        records: records as any, structure: baseStructure as any,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'ACT2_DEAD_ZONE'),
+        'Should NOT fire when mid-Act-2 suspense is comparable to flanking sections',
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
