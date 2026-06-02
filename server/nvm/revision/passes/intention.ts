@@ -276,6 +276,102 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 171: GOAL_INVERSION_ABSENT ───────────────────────────────────────
+  // Dramatic irony of pursuit: at no point does the protagonist's active
+  // pursuit (a proactive scene — clock raised or clue planted) directly
+  // produce the opposite of its intended effect (a negative emotional shift
+  // or a relationship loss in that same scene). When every proactive scene
+  // pays off cleanly, the protagonist's drive never backfires — there is no
+  // dramatic irony baked into the pursuit itself, and the story feels too
+  // frictionless. Requires 6+ scenes and at least 2 proactive scenes.
+  if (n >= 6) {
+    const proactiveScenes = records.filter(
+      r => r.clockRaised || (r.seededClueIds?.length ?? 0) > 0,
+    );
+    if (proactiveScenes.length >= 2) {
+      const hasInversion = proactiveScenes.some(r => {
+        const negEmotion = r.emotionalShift === 'negative';
+        const hasNegRelShift = (r.relationshipShifts ?? []).some(s => s.amount < -0.3);
+        return negEmotion || hasNegRelShift;
+      });
+      if (!hasInversion) {
+        issues.push({
+          location: 'Character intention layer',
+          rule: 'GOAL_INVERSION_ABSENT',
+          description: `The protagonist has ${proactiveScenes.length} proactive scenes but none of them backfire — pursuing the goal never produces a negative emotional shift or a relationship loss. The pursuit is frictionless, with no dramatic irony built into the wanting itself`,
+          severity: 'major',
+          suggestedFix: 'Add a scene where the protagonist actively pursues their goal and the pursuit itself makes things worse — they win the battle but lose an ally, or get what they asked for and regret it. The goal should bite back',
+        });
+      }
+    }
+  }
+
+  // ── Wave 171: PASSIVE_ACT3_INTENTION ──────────────────────────────────────
+  // In Act 3 (the final 25% of scenes), the protagonist initiates nothing:
+  // no clock raised, no clue planted across the entire act. They are carried
+  // to the climax rather than choosing it. This is distinct from
+  // CLIMAX_WITHOUT_CHOICE (which checks scene purpose/dramatic turn) — this
+  // checks raw agency signals. Requires 8+ scenes and a non-empty Act 3.
+  if (n >= 8) {
+    const act3Start = Math.floor(n * 0.75);
+    const act3Records = records.slice(act3Start);
+    if (act3Records.length >= 2) {
+      const act3Proactive = act3Records.filter(
+        r => r.clockRaised || (r.seededClueIds?.length ?? 0) > 0,
+      ).length;
+      if (act3Proactive === 0) {
+        issues.push({
+          location: `Act 3 (Scenes ${act3Start}–${n - 1})`,
+          rule: 'PASSIVE_ACT3_INTENTION',
+          description: `Across all ${act3Records.length} Act 3 scenes the protagonist initiates no action — no clock raised, no clue planted. They are carried to the ending rather than choosing it; the climax happens to them instead of being driven by them`,
+          severity: 'critical',
+          suggestedFix: 'Give the protagonist at least one decisive proactive beat in Act 3: they set the final trap, force the confrontation, or make the irreversible move that triggers the climax. The ending must be something they cause, not something they merely survive',
+        });
+      }
+    }
+  }
+
+  // ── Wave 171: ENTROPY_SPIKE_MISPLACED ─────────────────────────────────────
+  // The story's single highest-entropy scene — the moment of maximum narrative
+  // momentum (suspense + relationship turbulence + clue density) — lands in
+  // Act 1 (the first 25%) rather than near the climax. When the most
+  // informationally dense moment is in the setup, the story front-loads its
+  // peak and has nowhere to build toward. Requires 8+ scenes.
+  if (n >= 8) {
+    const entropyOf = (r: PassInput['records'][number]): number => {
+      const suspense = Math.max(0, r.suspenseDelta);
+      const relTurbulence = (r.relationshipShifts ?? []).reduce(
+        (sum, s) => sum + Math.abs(s.amount), 0,
+      );
+      const clueDensity = (r.seededClueIds?.length ?? 0) + (r.payoffSetupIds?.length ?? 0);
+      const emotionWeight = r.emotionalShift !== 'neutral' ? 1 : 0;
+      return suspense + relTurbulence * 2 + clueDensity + emotionWeight;
+    };
+
+    let peakIdx = 0;
+    let peakEntropy = -Infinity;
+    for (let i = 0; i < records.length; i++) {
+      const e = entropyOf(records[i]);
+      if (e > peakEntropy) {
+        peakEntropy = e;
+        peakIdx = i;
+      }
+    }
+
+    const act1End = Math.floor(n * 0.25);
+    // Only meaningful if the peak actually carries momentum (entropy > 2) and
+    // there is a genuine spread (peak isn't trivially flat across the story).
+    if (peakIdx < act1End && peakEntropy > 2) {
+      issues.push({
+        location: `Scene ${peakIdx} (${records[peakIdx].slug})`,
+        rule: 'ENTROPY_SPIKE_MISPLACED',
+        description: `The story's highest-momentum scene (Scene ${peakIdx}, entropy ${peakEntropy.toFixed(1)}) lands in Act 1 rather than near the climax — the most informationally dense moment is in the setup, so the story front-loads its peak and has nowhere left to build`,
+        severity: 'major',
+        suggestedFix: 'Redistribute momentum so the entropy peak lands in the back half: dial down the Act 1 spike, or escalate the climax so the densest concentration of suspense, relationship turns, and revelations arrives when the stakes are highest',
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'intention', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

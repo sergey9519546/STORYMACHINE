@@ -12902,6 +12902,140 @@ He sits down in the chair.
     });
   });
 
+  describe('Wave 171 — intentionPass: goal inversion, passive act3 intention, misplaced entropy spike', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const noAnnotations = (n: number) => Array.from({ length: n }, () => ({ revelation: false } as any));
+
+    // ── GOAL_INVERSION_ABSENT ─────────────────────────────────────────────────
+    it('intentionPass detects GOAL_INVERSION_ABSENT when no proactive scene backfires', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 6 scenes; scenes 1 and 3 are proactive (clockRaised), none have negative
+      // emotion or a negative relationship shift — the pursuit never bites back.
+      const records = Array.from({ length: 6 }, (_, i) =>
+        (i === 1 || i === 3)
+          ? makeRec(i, { clockRaised: true, emotionalShift: 'positive' })
+          : makeRec(i),
+      );
+      const result = await intentionPass({
+        fountain: blankFountain(6), original: blankFountain(6),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(6), approvedSpans: [],
+      });
+      const inv = result.issues.filter(i => i.rule === 'GOAL_INVERSION_ABSENT');
+      assert.ok(inv.length >= 1, `Should detect GOAL_INVERSION_ABSENT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(inv[0].severity === 'major');
+    });
+
+    it('intentionPass does NOT fire GOAL_INVERSION_ABSENT when a proactive scene backfires', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // scene 3 is proactive AND damages a relationship — the goal bites back.
+      const records = Array.from({ length: 6 }, (_, i) =>
+        i === 1
+          ? makeRec(i, { clockRaised: true, emotionalShift: 'positive' })
+          : i === 3
+          ? makeRec(i, { clockRaised: true, relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: -0.6 }] })
+          : makeRec(i),
+      );
+      const result = await intentionPass({
+        fountain: blankFountain(6), original: blankFountain(6),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(6), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'GOAL_INVERSION_ABSENT'),
+        'Should NOT fire when a proactive scene produces a relationship loss',
+      );
+    });
+
+    // ── PASSIVE_ACT3_INTENTION ────────────────────────────────────────────────
+    it('intentionPass detects PASSIVE_ACT3_INTENTION when protagonist initiates nothing in Act 3', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 8 scenes: act3Start = floor(8*0.75) = 6, so Act 3 = scenes 6,7.
+      // Earlier scenes are proactive; Act 3 has no clock raised, no clue planted.
+      const records = Array.from({ length: 8 }, (_, i) =>
+        i < 6
+          ? makeRec(i, { clockRaised: true })
+          : makeRec(i),
+      );
+      const result = await intentionPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(8), approvedSpans: [],
+      });
+      const passive = result.issues.filter(i => i.rule === 'PASSIVE_ACT3_INTENTION');
+      assert.ok(passive.length >= 1, `Should detect PASSIVE_ACT3_INTENTION; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(passive[0].severity === 'critical');
+    });
+
+    it('intentionPass does NOT fire PASSIVE_ACT3_INTENTION when protagonist acts in Act 3', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      const records = Array.from({ length: 8 }, (_, i) =>
+        i < 6
+          ? makeRec(i, { clockRaised: true })
+          : i === 7
+          ? makeRec(i, { seededClueIds: ['final_trap'] })
+          : makeRec(i),
+      );
+      const result = await intentionPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(8), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'PASSIVE_ACT3_INTENTION'),
+        'Should NOT fire when the protagonist plants a clue in Act 3',
+      );
+    });
+
+    // ── ENTROPY_SPIKE_MISPLACED ───────────────────────────────────────────────
+    it('intentionPass detects ENTROPY_SPIKE_MISPLACED when peak momentum lands in Act 1', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 8 scenes: act1End = floor(8*0.25) = 2. Scene 0 has by far the highest
+      // entropy (high suspense + relationship turbulence); rest are flat.
+      const records = Array.from({ length: 8 }, (_, i) =>
+        i === 0
+          ? makeRec(i, { suspenseDelta: 5, relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.8 }] })
+          : makeRec(i),
+      );
+      const result = await intentionPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(8), approvedSpans: [],
+      });
+      const spike = result.issues.filter(i => i.rule === 'ENTROPY_SPIKE_MISPLACED');
+      assert.ok(spike.length >= 1, `Should detect ENTROPY_SPIKE_MISPLACED; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(spike[0].severity === 'major');
+    });
+
+    it('intentionPass does NOT fire ENTROPY_SPIKE_MISPLACED when peak momentum lands near the climax', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // Peak entropy scene is index 6 (back half) — correctly placed.
+      const records = Array.from({ length: 8 }, (_, i) =>
+        i === 6
+          ? makeRec(i, { suspenseDelta: 5, relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.8 }] })
+          : makeRec(i),
+      );
+      const result = await intentionPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(8), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'ENTROPY_SPIKE_MISPLACED'),
+        'Should NOT fire when the entropy peak lands in the back half',
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
