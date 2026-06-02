@@ -1,5 +1,7 @@
 // Wave 39 — Pass 5: Conflict
 // Checks conflict escalation: flat arc, missing opposition, collisions not detonated.
+// Wave 144 additions: escalation plateau (peak then stalls), confrontation quality,
+// and conflict fatigue (reversals too frequent causing audience whiplash).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -68,6 +70,92 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'major',
         suggestedFix: 'Accelerate the final act with shorter scenes and higher-stakes confrontations',
       });
+    }
+  }
+
+  // ── Wave 144: Escalation plateau & confrontation quality ──────────────────
+
+  // ESCALATION_PLATEAU: Suspense builds to a peak mid-story then plateaus or
+  // drops instead of continuing to rise toward climax. The conflict peaked too
+  // early and can't be recaptured.
+  if (records.length >= 8) {
+    const mid = Math.floor(records.length / 2);
+    const firstHalf = records.slice(0, mid);
+    const secondHalf = records.slice(mid);
+
+    const firstHalfMax = Math.max(...firstHalf.map(r => r.suspenseDelta), 0);
+    const secondHalfAvg = secondHalf.length > 0
+      ? secondHalf.reduce((s, r) => s + r.suspenseDelta, 0) / secondHalf.length
+      : 0;
+
+    // If suspense peaks in first half but second half average is lower, it's plateaued
+    if (firstHalfMax > 3 && secondHalfAvg < firstHalfMax * 0.7) {
+      issues.push({
+        location: 'Mid-story conflict',
+        rule: 'ESCALATION_PLATEAU',
+        description: `Conflict peaks at suspense ${firstHalfMax.toFixed(1)} in the first half but averages only ${secondHalfAvg.toFixed(1)} in the second half — escalation plateaus instead of building`,
+        severity: 'major',
+        suggestedFix: 'Either reduce the mid-story peak so the final act can surpass it, or add new complications in the second half that drive suspense even higher',
+      });
+    }
+  }
+
+  // CONFRONTATION_AVOIDANCE: Characters in conflict (negative relationship shifts)
+  // but never meet in a scene with dialogue — they avoid direct confrontation.
+  // This weakens the conflict's narrative impact.
+  if (records.length >= 5) {
+    const hasNegativeShifts = records.some(r => {
+      const negativeShifts = (r.relationshipShifts ?? []).filter(s => s.amount < -0.5);
+      return negativeShifts.length > 0;
+    });
+
+    if (hasNegativeShifts) {
+      // Check if any scene with negative shift also has dialogue highlights (confrontation)
+      const hasDirectConfrontation = records.some(r => {
+        const negativeShifts = (r.relationshipShifts ?? []).filter(s => s.amount < -0.5);
+        const hasDialogue = (r.dialogueHighlights ?? []).length > 0;
+        return negativeShifts.length > 0 && hasDialogue;
+      });
+
+      if (!hasDirectConfrontation) {
+        issues.push({
+          location: 'Relationship conflict',
+          rule: 'CONFRONTATION_AVOIDANCE',
+          description: `Characters have negative relationship shifts but never appear in a scene together with dialogue — the conflict is stated but not enacted on stage`,
+          severity: 'major',
+          suggestedFix: 'Add a direct confrontation scene where conflicted characters face each other and their tension becomes verbal or physical action',
+        });
+      }
+    }
+  }
+
+  // CONFLICT_FATIGUE: Too many reversals in quick succession (3+ reversals in
+  // consecutive or near-consecutive scenes) causes audience whiplash — tension
+  // oscillates too rapidly without settling, exhausting the viewer.
+  if (records.length >= 8) {
+    let reversalStreak = 0;
+    let streakStart = -1;
+    for (let i = 0; i < records.length; i++) {
+      const r = records[i];
+      const isReversal = r.suspenseDelta < -1;
+      if (isReversal) {
+        if (reversalStreak === 0) streakStart = i;
+        reversalStreak++;
+      } else if (i > streakStart + 1 && reversalStreak < 3) {
+        // Break the streak if too much non-reversal space
+        reversalStreak = 0;
+      }
+
+      if (reversalStreak === 3) {
+        issues.push({
+          location: `Scenes ${streakStart}–${i}`,
+          rule: 'CONFLICT_FATIGUE',
+          description: `Three reversals in quick succession (Scenes ${streakStart}-${i}) — the audience experiences whiplash from rapid oscillation without settling`,
+          severity: 'minor',
+          suggestedFix: 'Space reversals further apart or let one reversal settle with a scene of consequence before introducing the next',
+        });
+        reversalStreak = 0; // reset to avoid duplicate fires
+      }
     }
   }
 

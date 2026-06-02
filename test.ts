@@ -10336,6 +10336,100 @@ describe('Wave 79 — payoff timing, clock magnitude, pacing weights, showrunner
       'Should fire when multiple significant clock raises have no reversal');
   });
 
+  // ── Wave 144 additions: escalation & confrontation quality ──────────────────
+
+  it('conflictPass detects ESCALATION_PLATEAU when suspense peaks mid-story then drops', async () => {
+    const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+    const makeRec = (idx: number, suspense: number): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose: 'dialogue',
+      dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+      emotionalShift: 'neutral', suspenseDelta: suspense,
+      dialogueHighlights: [], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [],
+      readerStateAnnotation: null,
+      relationshipShifts: [],
+    });
+    const records = [
+      makeRec(0, 1), makeRec(1, 1.5), makeRec(2, 2), makeRec(3, 3.5), // first half peaks at 3.5
+      makeRec(4, 2), makeRec(5, 1.5), makeRec(6, 1), makeRec(7, 0.8), // second half averages ~1.3
+    ];
+    const result = await conflictPass({
+      fountain: Array.from({ length: 8 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+      original: Array.from({ length: 8 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+      records: records as unknown as Parameters<typeof conflictPass>[0]['records'],
+      structure: { actPosition: 'act2b' as const, completionPercent: 60, totalClockPressure: 10, midpointPressure: 3, reversalCount: 0, tightestScene: 3, avgSuspensePerScene: 1.5, escalating: false, reversalDensity: 0, approachingClimax: false, openClues: 0, revelationCount: 0 } as unknown as Parameters<typeof conflictPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const plateau = result.issues.filter(i => i.rule === 'ESCALATION_PLATEAU');
+    assert.ok(plateau.length >= 1, 'Should detect ESCALATION_PLATEAU for suspense peak mid-story');
+    assert.ok(plateau[0].severity === 'major');
+  });
+
+  it('conflictPass detects CONFRONTATION_AVOIDANCE when conflict exists but no direct scene', async () => {
+    const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+    const makeRec = (idx: number, hasShift: boolean, hasDialogue: boolean): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose: 'dialogue',
+      dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+      emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: hasDialogue ? ['alice: hello'] : [],
+      unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [],
+      readerStateAnnotation: null,
+      relationshipShifts: hasShift ? [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -1.5 }] : [],
+    });
+    const records = [
+      makeRec(0, false, true),
+      makeRec(1, true, false), // conflict without dialogue
+      makeRec(2, true, false), // conflict without dialogue
+      makeRec(3, false, true),
+      makeRec(4, false, true),
+    ];
+    const result = await conflictPass({
+      fountain: Array.from({ length: 5 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+      original: Array.from({ length: 5 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+      records: records as unknown as Parameters<typeof conflictPass>[0]['records'],
+      structure: { actPosition: 'act2b' as const, completionPercent: 60, totalClockPressure: 5, midpointPressure: 2, reversalCount: 0, tightestScene: 1, avgSuspensePerScene: 1, escalating: false, reversalDensity: 0, approachingClimax: false, openClues: 0, revelationCount: 0 } as unknown as Parameters<typeof conflictPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const avoid = result.issues.filter(i => i.rule === 'CONFRONTATION_AVOIDANCE');
+    assert.ok(avoid.length >= 1, 'Should detect CONFRONTATION_AVOIDANCE when conflict lacks direct scene');
+    assert.ok(avoid[0].severity === 'major');
+  });
+
+  it('conflictPass detects CONFLICT_FATIGUE for 3 reversals in quick succession', async () => {
+    const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+    const makeRec = (idx: number, suspense: number): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `SC${idx}`, purpose: 'dialogue',
+      dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+      emotionalShift: 'neutral', suspenseDelta: suspense,
+      dialogueHighlights: [], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [],
+      readerStateAnnotation: null,
+      relationshipShifts: [],
+    });
+    const records = [
+      makeRec(0, 2), makeRec(1, 2.5),
+      makeRec(2, -1.5), // reversal
+      makeRec(3, -1.2), // reversal
+      makeRec(4, -1.5), // reversal (3rd → fires)
+      makeRec(5, 1.5), makeRec(6, 1.5),
+      makeRec(7, 2), makeRec(8, 2),
+    ];
+    const result = await conflictPass({
+      fountain: Array.from({ length: 9 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+      original: Array.from({ length: 9 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+      records: records as unknown as Parameters<typeof conflictPass>[0]['records'],
+      structure: { actPosition: 'act2b' as const, completionPercent: 60, totalClockPressure: 10, midpointPressure: 3, reversalCount: 3, tightestScene: 4, avgSuspensePerScene: 1.5, escalating: false, reversalDensity: 0.33, approachingClimax: false, openClues: 1, revelationCount: 0 } as unknown as Parameters<typeof conflictPass>[0]['structure'],
+      annotations: [],
+      approvedSpans: [],
+    });
+    const fatigue = result.issues.filter(i => i.rule === 'CONFLICT_FATIGUE');
+    assert.ok(fatigue.length >= 1, 'Should detect CONFLICT_FATIGUE for 3 quick reversals');
+    assert.ok(fatigue[0].severity === 'minor');
+  });
+
   // ── showrunner Gate 1b ─────────────────────────────────────────────────────
 
   it('showrunner fires for set_up_payoff scene with no SEED_CLUE or PAYOFF_SETUP op', async () => {
