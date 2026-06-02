@@ -12179,6 +12179,147 @@ He sits down in the chair.
     });
   });
 
+  // ── Wave 166: Causality pass enhancements ─────────────────────────────────
+  describe("Wave 166 — causalityPass: Chekhov's gun, consequence delay, revelation front-loading", async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const noAnnotations = (n: number) => Array.from({ length: n }, () => ({ revelation: false } as any));
+
+    // ── CHEKHOV_GUN_UNFIRED ──────────────────────────────────────────────────
+    it("causalityPass detects CHEKHOV_GUN_UNFIRED when 2+ early clues have no payoff", async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // 6 scenes; midpoint=3; records[1] seeds 'gun' and 'letter'; no payoffs anywhere
+      const records = [
+        makeRec(0),
+        makeRec(1, { seededClueIds: ['gun', 'letter'] }),
+        makeRec(2),
+        makeRec(3),
+        makeRec(4),
+        makeRec(5),
+      ];
+      const result = await causalityPass({
+        fountain: blankFountain(6), original: blankFountain(6),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(6), approvedSpans: [],
+      });
+      const unfired = result.issues.filter(i => i.rule === 'CHEKHOV_GUN_UNFIRED');
+      assert.ok(unfired.length >= 1, `Expected CHEKHOV_GUN_UNFIRED; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(unfired[0].severity === 'major');
+    });
+
+    it("causalityPass does NOT fire CHEKHOV_GUN_UNFIRED when all early clues are paid off", async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      const records = [
+        makeRec(0),
+        makeRec(1, { seededClueIds: ['gun', 'letter'] }),
+        makeRec(2),
+        makeRec(3),
+        makeRec(4),
+        makeRec(5, { payoffSetupIds: ['gun', 'letter'] }),
+      ];
+      const result = await causalityPass({
+        fountain: blankFountain(6), original: blankFountain(6),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(6), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'CHEKHOV_GUN_UNFIRED'),
+        'Should NOT fire when all seeded clues have corresponding payoffs',
+      );
+    });
+
+    // ── CONSEQUENCE_DELAY_EXCESSIVE ──────────────────────────────────────────
+    it('causalityPass detects CONSEQUENCE_DELAY_EXCESSIVE when cause-effect gap is 5+ scenes', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // 10 scenes; scene 0 raises clock; scenes 1-4 all neutral with no shifts;
+      // scene 5 has first relationship shift — 5-scene gap triggers the check
+      const records = Array.from({ length: 10 }, (_, i) =>
+        makeRec(i, {
+          clockRaised: i === 0,
+          emotionalShift: 'neutral',
+          suspenseDelta: 1,
+          relationshipShifts: i === 5 ? [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.6 }] : [],
+        }),
+      );
+      const result = await causalityPass({
+        fountain: blankFountain(10), original: blankFountain(10),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(10), approvedSpans: [],
+      });
+      const delay = result.issues.filter(i => i.rule === 'CONSEQUENCE_DELAY_EXCESSIVE');
+      assert.ok(delay.length >= 1, `Expected CONSEQUENCE_DELAY_EXCESSIVE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(delay[0].severity === 'minor');
+    });
+
+    it('causalityPass does NOT fire CONSEQUENCE_DELAY_EXCESSIVE when consequence arrives quickly', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // scene 0 raises clock; scene 1 has immediate relationship shift — 1-scene gap
+      const records = Array.from({ length: 10 }, (_, i) =>
+        makeRec(i, {
+          clockRaised: i === 0,
+          emotionalShift: 'neutral',
+          suspenseDelta: 1,
+          relationshipShifts: i === 1 ? [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.6 }] : [],
+        }),
+      );
+      const result = await causalityPass({
+        fountain: blankFountain(10), original: blankFountain(10),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(10), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'CONSEQUENCE_DELAY_EXCESSIVE'),
+        'Should NOT fire when consequence arrives within 4 scenes of cause',
+      );
+    });
+
+    // ── REVELATION_FRONT_LOADING ─────────────────────────────────────────────
+    it('causalityPass detects REVELATION_FRONT_LOADING when 3+ revelations cluster in first half', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // 8 scenes; midpoint=4; scenes 0,1,2 all have revelations (3 of 3 in first half)
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, {
+          revelation: i < 3 ? `truth about scene ${i}` : null,
+        }),
+      );
+      const result = await causalityPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(8), approvedSpans: [],
+      });
+      const frontLoaded = result.issues.filter(i => i.rule === 'REVELATION_FRONT_LOADING');
+      assert.ok(frontLoaded.length >= 1, `Expected REVELATION_FRONT_LOADING; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(frontLoaded[0].severity === 'major');
+    });
+
+    it('causalityPass does NOT fire REVELATION_FRONT_LOADING when revelations are distributed across the story', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // 8 scenes; midpoint=4; revelations at scenes 2, 5, 7 (1 in first half, 2 in second)
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, {
+          revelation: (i === 2 || i === 5 || i === 7) ? `truth ${i}` : null,
+        }),
+      );
+      const result = await causalityPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(8), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'REVELATION_FRONT_LOADING'),
+        'Should NOT fire when revelations are distributed across both halves',
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

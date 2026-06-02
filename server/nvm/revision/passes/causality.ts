@@ -268,6 +268,90 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 166: Chekhov's gun, consequence delay, revelation front-loading ──────
+
+  // CHEKHOV_GUN_UNFIRED: 2+ clues seeded in the first half of the story have no
+  // corresponding payoff (no payoffSetupId matching the clue ID) anywhere in the
+  // story. The gun was displayed but never fired.
+  if (records.length >= 6) {
+    const midpoint = Math.floor(records.length * 0.5);
+    const earlyClues = new Set<string>();
+    for (let i = 0; i < midpoint; i++) {
+      for (const clue of records[i].seededClueIds ?? []) {
+        earlyClues.add(clue);
+      }
+    }
+    if (earlyClues.size > 0) {
+      const allPayoffs = new Set<string>();
+      for (const r of records) {
+        for (const pid of r.payoffSetupIds ?? []) allPayoffs.add(pid);
+      }
+      const unfiredClues = [...earlyClues].filter(c => !allPayoffs.has(c));
+      if (unfiredClues.length >= 2) {
+        issues.push({
+          location: `Scenes 0–${midpoint - 1} (setup zone)`,
+          rule: 'CHEKHOV_GUN_UNFIRED',
+          description: `${unfiredClues.length} clue(s) seeded in the first half (${unfiredClues.slice(0, 3).join(', ')}) have no matching payoff anywhere in the story — Chekhov's gun shown but never fired`,
+          severity: 'major',
+          suggestedFix: 'Either fire the gun: add a payoff scene that calls back each planted clue. Or remove the clue from Act 1 if you don\'t intend to resolve it.',
+        });
+      }
+    }
+  }
+
+  // CONSEQUENCE_DELAY_EXCESSIVE: A high-action scene (clock raised or clue planted)
+  // has its first narrative consequence 5+ scenes later. Cause and effect separated
+  // by that many scenes lose their causal connection for the audience.
+  if (records.length >= 10) {
+    for (let i = 0; i < records.length - 5; i++) {
+      const r = records[i];
+      const isActionScene = r.clockRaised || (r.seededClueIds?.length ?? 0) > 0;
+      if (!isActionScene) continue;
+
+      let firstConsequenceAt = -1;
+      for (let j = i + 1; j < records.length; j++) {
+        const next = records[j];
+        const hasConsequence =
+          (next.relationshipShifts?.length ?? 0) > 0 ||
+          next.suspenseDelta > 1.5 ||
+          next.emotionalShift !== 'neutral';
+        if (hasConsequence) { firstConsequenceAt = j; break; }
+      }
+
+      if (firstConsequenceAt >= i + 5) {
+        issues.push({
+          location: `Scenes ${i}–${firstConsequenceAt}`,
+          rule: 'CONSEQUENCE_DELAY_EXCESSIVE',
+          description: `Scene ${i} raises the stakes (clock/clue) but the first narrative consequence doesn't arrive until Scene ${firstConsequenceAt} — ${firstConsequenceAt - i} scenes of delay. Cause and effect are too far apart to feel connected.`,
+          severity: 'minor',
+          suggestedFix: 'Add a ripple effect in Scene ${i + 1} or ${i + 2}: an emotional reaction, a relationship shift, or an escalation that shows the action landing immediately',
+        });
+        break; // one flag per pass
+      }
+    }
+  }
+
+  // REVELATION_FRONT_LOADING: More than 60% of all revelations (scenes where the
+  // narrative delivers a major story truth) land in the first half. The second half
+  // is informationally starved — it can only react to what was already revealed.
+  {
+    const revelationScenes = records.filter(r => r.revelation !== null);
+    if (revelationScenes.length >= 3 && records.length >= 6) {
+      const midpoint = Math.floor(records.length * 0.5);
+      const firstHalfRevCount = revelationScenes.filter(r => r.sceneIdx < midpoint).length;
+      const ratio = firstHalfRevCount / revelationScenes.length;
+      if (ratio > 0.6) {
+        issues.push({
+          location: `Scenes 0–${midpoint - 1} (first half)`,
+          rule: 'REVELATION_FRONT_LOADING',
+          description: `${firstHalfRevCount} of ${revelationScenes.length} revelations (${Math.round(ratio * 100)}%) land in the first half — the second act is informationally starved and can only react to what was already revealed`,
+          severity: 'major',
+          suggestedFix: 'Redistribute revelations: reserve at least one major revelation for the climax zone, one for the Act 2 midpoint, and one for late Act 2 to keep the audience receiving new information throughout',
+        });
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'causality', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
