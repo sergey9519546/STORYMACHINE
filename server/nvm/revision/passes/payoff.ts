@@ -4,6 +4,9 @@
 // Wave 140 additions: setup without consequence (clues planted multiple times
 // but never affecting plot/character decisions) and consequence-delayed payoff
 // (payoff occurs too long after setup, breaking the audience's memory arc).
+// Wave 154 additions: clustered payoffs (too many resolved in one scene),
+// payoff before climax (all loops closed too early, deflating the ending), and
+// setup imbalance (clue plants concentrated in one act with no early seeding).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -163,6 +166,69 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
           suggestedFix: `Add a callback or reminder of "${clueId}" 1-2 scenes before its payoff to rebuild audience memory`,
         });
       }
+    }
+  }
+
+  // ── Wave 154: Clustered payoffs, premature resolution, setup imbalance ───────
+
+  // CLUSTERED_PAYOFFS: 3+ distinct setups all paid off in a single scene. When
+  // too many loops close at once, the audience can't register each resolution —
+  // the payoffs blur together and individual impact is lost.
+  if (payoffInfo.size >= 3) {
+    const payoffsByScene = new Map<number, string[]>();
+    for (const [setupId, payoffScene] of payoffInfo) {
+      if (!payoffsByScene.has(payoffScene)) payoffsByScene.set(payoffScene, []);
+      payoffsByScene.get(payoffScene)!.push(setupId);
+    }
+    for (const [scene, setupIds] of payoffsByScene) {
+      if (setupIds.length >= 3) {
+        issues.push({
+          location: `Scene ${scene}`,
+          rule: 'CLUSTERED_PAYOFFS',
+          description: `${setupIds.length} separate setups (${setupIds.slice(0, 3).join(', ')}${setupIds.length > 3 ? '…' : ''}) all pay off in Scene ${scene} — resolutions blur together and lose individual impact`,
+          severity: 'minor',
+          suggestedFix: 'Distribute payoffs across multiple scenes so each resolution lands distinctly. A cascade of simultaneous reveals reads as contrived convenience',
+        });
+        break; // one flag per pass
+      }
+    }
+  }
+
+  // PAYOFF_BEFORE_CLIMAX: Every planted clue is resolved before the final 20% of
+  // the story. When all loops close early, the climax has no open questions left
+  // to drive it — the ending becomes a formality rather than a culmination.
+  if (clueInfo.size >= 2 && payoffInfo.size >= clueInfo.size && records.length >= 8) {
+    const climaxZoneStart = Math.floor(records.length * 0.8);
+    const allResolvedEarly = [...payoffInfo.values()].every(scene => scene < climaxZoneStart);
+    // Only fire if every clue was actually paid off and they all landed before the climax zone
+    const allCluesResolved = [...clueInfo.keys()].every(id => payoffInfo.has(id));
+    if (allResolvedEarly && allCluesResolved && (structure.actPosition === 'act3' || structure.completionPercent >= 70)) {
+      const lastPayoff = Math.max(...payoffInfo.values());
+      issues.push({
+        location: `Last payoff at Scene ${lastPayoff} (climax zone starts Scene ${climaxZoneStart})`,
+        rule: 'PAYOFF_BEFORE_CLIMAX',
+        description: `All ${clueInfo.size} setups are resolved by Scene ${lastPayoff}, before the climax zone (Scene ${climaxZoneStart}+) — the climax has no unanswered questions left to drive it`,
+        severity: 'major',
+        suggestedFix: 'Hold at least one significant payoff for the climax itself. The biggest reveal or resolution should coincide with the story\'s peak, not precede it',
+      });
+    }
+  }
+
+  // SETUP_FRONT_GAP: Clues are planted but none appear in the first 25% of the
+  // story. Late-seeded setups can't build the long-arc anticipation that makes
+  // payoffs satisfying — the best setups are planted before the audience knows
+  // they matter.
+  if (clueInfo.size >= 2 && records.length >= 8) {
+    const act1End = Math.floor(records.length * 0.25);
+    const earliestPlant = Math.min(...[...clueInfo.values()].map(c => c.plantedAt));
+    if (earliestPlant >= act1End) {
+      issues.push({
+        location: `Earliest clue planted at Scene ${earliestPlant} (Act 1 ends ~Scene ${act1End})`,
+        rule: 'SETUP_FRONT_GAP',
+        description: `No clues are planted in Act 1 (first ${act1End} scenes) — the earliest setup appears at Scene ${earliestPlant}. Late seeding can't build the long-arc anticipation that makes payoffs feel earned`,
+        severity: 'minor',
+        suggestedFix: 'Plant at least one clue in Act 1, ideally disguised as an incidental detail, so its later payoff rewards the attentive viewer',
+      });
     }
   }
 

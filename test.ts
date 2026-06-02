@@ -11543,6 +11543,117 @@ He sits down in the chair.
     });
   });
 
+  // ── Wave 154: Payoff pass enhancements ────────────────────────────────────
+  describe('Wave 154 — payoffPass: clustered payoffs, premature resolution, setup gap', async () => {
+    const baseStructure = {
+      actPosition: 'act3' as const, completionPercent: 85, totalClockPressure: 5,
+      midpointPressure: 2, reversalCount: 1, tightestScene: 6, avgSuspensePerScene: 1.5,
+      escalating: true, reversalDensity: 0.1, approachingClimax: true,
+      openClues: 0, revelationCount: 1,
+    };
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+
+    it('payoffPass detects CLUSTERED_PAYOFFS when 3+ setups resolve in one scene', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      const records = [
+        makeRec(0, { seededClueIds: ['c1'] }),
+        makeRec(1, { seededClueIds: ['c2'] }),
+        makeRec(2, { seededClueIds: ['c3'] }),
+        makeRec(3),
+        makeRec(4),
+        makeRec(5),
+        makeRec(6),
+        makeRec(7, { payoffSetupIds: ['c1', 'c2', 'c3'] }), // all 3 pay off here
+      ];
+      const result = await payoffPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any, structure: baseStructure as any, annotations: [], approvedSpans: [],
+      });
+      const clustered = result.issues.filter(i => i.rule === 'CLUSTERED_PAYOFFS');
+      assert.ok(clustered.length >= 1, 'Should detect CLUSTERED_PAYOFFS for 3+ payoffs in one scene');
+      assert.ok(clustered[0].severity === 'minor');
+    });
+
+    it('payoffPass detects PAYOFF_BEFORE_CLIMAX when all clues resolve early', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // 10 scenes, climax zone starts at scene 8. All payoffs land by scene 5.
+      const records = [
+        makeRec(0, { seededClueIds: ['c1'] }),
+        makeRec(1, { seededClueIds: ['c2'] }),
+        makeRec(2),
+        makeRec(3, { payoffSetupIds: ['c1'] }),
+        makeRec(4),
+        makeRec(5, { payoffSetupIds: ['c2'] }), // last payoff well before climax zone
+        makeRec(6),
+        makeRec(7),
+        makeRec(8),
+        makeRec(9),
+      ];
+      const result = await payoffPass({
+        fountain: blankFountain(10), original: blankFountain(10),
+        records: records as any, structure: baseStructure as any, annotations: [], approvedSpans: [],
+      });
+      const premature = result.issues.filter(i => i.rule === 'PAYOFF_BEFORE_CLIMAX');
+      assert.ok(premature.length >= 1, 'Should detect PAYOFF_BEFORE_CLIMAX when all loops close early');
+      assert.ok(premature[0].severity === 'major');
+    });
+
+    it('payoffPass detects SETUP_FRONT_GAP when no clue planted in Act 1', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // 8 scenes, Act 1 ends ~scene 2. Earliest plant at scene 4.
+      const records = [
+        makeRec(0),
+        makeRec(1),
+        makeRec(2),
+        makeRec(3),
+        makeRec(4, { seededClueIds: ['c1'] }), // first plant — too late
+        makeRec(5, { seededClueIds: ['c2'] }),
+        makeRec(6),
+        makeRec(7),
+      ];
+      const result = await payoffPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any,
+        structure: { ...baseStructure, completionPercent: 60, actPosition: 'act2b' as const } as any,
+        annotations: [], approvedSpans: [],
+      });
+      const gap = result.issues.filter(i => i.rule === 'SETUP_FRONT_GAP');
+      assert.ok(gap.length >= 1, 'Should detect SETUP_FRONT_GAP when no clue planted in Act 1');
+      assert.ok(gap[0].severity === 'minor');
+    });
+
+    it('payoffPass does NOT fire SETUP_FRONT_GAP when a clue is planted early', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      const records = [
+        makeRec(0, { seededClueIds: ['c1'] }), // early plant
+        makeRec(1),
+        makeRec(2),
+        makeRec(3),
+        makeRec(4, { seededClueIds: ['c2'] }),
+        makeRec(5),
+        makeRec(6),
+        makeRec(7),
+      ];
+      const result = await payoffPass({
+        fountain: blankFountain(8), original: blankFountain(8),
+        records: records as any,
+        structure: { ...baseStructure, completionPercent: 60, actPosition: 'act2b' as const } as any,
+        annotations: [], approvedSpans: [],
+      });
+      const gap = result.issues.filter(i => i.rule === 'SETUP_FRONT_GAP');
+      assert.ok(gap.length === 0, 'Should NOT fire when a clue is planted in Act 1');
+    });
+  });
+
   it('showrunner fires for set_up_payoff scene with no SEED_CLUE or PAYOFF_SETUP op', async () => {
     const { showrunnerCritic } = await import('./server/nvm/room/critics/showrunner.ts');
     const ir: import('./server/nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR = {
