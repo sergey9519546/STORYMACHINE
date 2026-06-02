@@ -232,6 +232,90 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 170: Opening-word repetition, sensory imbalance, near-word repeat ──
+
+  // OPENING_WORD_REPETITION: More than 40% of action lines begin with the same
+  // word. A screenplay where nearly half the lines start with "He" or "She" or
+  // "The" reads as repetitive at the sentence level, not just in content.
+  if (actionLines.length >= 8) {
+    const firstWords = new Map<string, number>();
+    for (const line of actionLines) {
+      const first = (line.text.split(/\s+/)[0] ?? '').toLowerCase();
+      if (first) firstWords.set(first, (firstWords.get(first) ?? 0) + 1);
+    }
+    const [topWord, topCount] = [...firstWords.entries()].sort((a, b) => b[1] - a[1])[0] ?? ['', 0];
+    if (topCount / actionLines.length > 0.4) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'OPENING_WORD_REPETITION',
+        description: `${topCount} of ${actionLines.length} action lines (${Math.round(topCount / actionLines.length * 100)}%) begin with "${topWord}" — the prose rhythm is anchored to a single sentence-opening pattern`,
+        severity: 'minor',
+        suggestedFix: 'Vary sentence openings: start some lines with the object, some with a location, some with a sound. "He walks to the door" → "The door takes two steps to reach."',
+      });
+    }
+  }
+
+  // SENSORY_IMBALANCE: 10+ action lines with no sound descriptors anywhere.
+  // Great screenplay prose engages at least two senses — purely visual action
+  // strips the cinematic world of its acoustic dimension.
+  if (actionLines.length >= 10) {
+    const soundWords = [
+      'silence','silent','quiet','loud','deafening','faint','distant','snap','creak','rumble',
+      'hiss','click','thud','slam','crack','whisper','roar','buzz','ring','drip','squeak',
+      'screech','bang','boom','clatter','grunt','echo','muffled','rattle','scrape','tick',
+      'whoosh','clang','chime','howl','moan','wail','shriek','murmur','clamor','din',
+    ];
+    const hasSoundLine = actionLines.some(l => {
+      const lower = l.text.toLowerCase();
+      return soundWords.some(w => lower.includes(w));
+    });
+    if (!hasSoundLine) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'SENSORY_IMBALANCE',
+        description: `${actionLines.length} action lines contain no sound descriptors — the screenplay world is purely visual. Film is also audio.`,
+        severity: 'minor',
+        suggestedFix: 'Add at least one sound cue to the action lines: a creak, silence, a distant hum, or a sharp click that anchors the audience in the acoustic space',
+      });
+    }
+  }
+
+  // NEAR_WORD_REPEAT: A content word (6+ letters, not a stopword) appears 4+
+  // times within any 5-line window of action. Tight repetition in a small
+  // area signals vocabulary strain — the writer is cycling the same word.
+  if (actionLines.length >= 8) {
+    const RHYTHM_STOPWORDS = new Set([
+      'about','after','again','against','along','also','another','around','away','back',
+      'before','between','beyond','could','every','first','going','having','itself','might',
+      'never','nothing','other','place','really','still','their','there','these','those',
+      'through','under','until','where','which','while','would','without','within',
+    ]);
+    const windowSize = 5;
+    outer: for (let i = 0; i <= actionLines.length - windowSize; i++) {
+      const windowLines = actionLines.slice(i, i + windowSize);
+      const wordFreq = new Map<string, number>();
+      for (const line of windowLines) {
+        for (const raw of line.text.toLowerCase().split(/\W+/)) {
+          if (raw.length >= 6 && !RHYTHM_STOPWORDS.has(raw)) {
+            wordFreq.set(raw, (wordFreq.get(raw) ?? 0) + 1);
+          }
+        }
+      }
+      for (const [word, count] of wordFreq) {
+        if (count >= 4) {
+          issues.push({
+            location: `Lines ${windowLines[0].lineNum}–${windowLines[windowLines.length - 1].lineNum}`,
+            rule: 'NEAR_WORD_REPEAT',
+            description: `"${word}" appears ${count} times within a ${windowSize}-line window — tight repetition of the same content word signals vocabulary strain`,
+            severity: 'minor',
+            suggestedFix: `Vary the vocabulary: replace 2-3 of the "${word}" occurrences with synonyms or rephrase the action to eliminate the repetition`,
+          });
+          break outer;
+        }
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'rhythm', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

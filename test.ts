@@ -12776,6 +12776,132 @@ He sits down in the chair.
     });
   });
 
+  // ── Wave 170: Rhythm pass enhancements ────────────────────────────────────
+  describe('Wave 170 — rhythmPass: opening-word repetition, sensory imbalance, near-word repeat', async () => {
+    // ── OPENING_WORD_REPETITION ───────────────────────────────────────────────
+    it('rhythmPass detects OPENING_WORD_REPETITION when >40% of action lines start with same word', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      // 10 action lines; 5 start with "He" (50% > 40%)
+      const lines = [
+        'He walks to the window.', 'He turns around slowly.', 'He looks at his watch.',
+        'He picks up the phone.', 'He pauses by the door.',
+        'Alice crosses the room.', 'The light flickers once.', 'She opens the drawer.',
+        'Rain hits the glass.', 'Footsteps echo outside.',
+      ];
+      const fountain = `INT. OFFICE - DAY\n\n${lines.join('\n')}\n`;
+      const { issues } = await rhythmPass({
+        fountain, records: [] as any, approvedSpans: [],
+        storyContext: undefined as any, priorPassResults: [],
+      });
+      assert.ok(
+        issues.some(i => i.rule === 'OPENING_WORD_REPETITION'),
+        `Expected OPENING_WORD_REPETITION; got: ${issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    it('rhythmPass does NOT fire OPENING_WORD_REPETITION when first words are varied', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      const lines = [
+        'He walks to the window.', 'She turns around slowly.', 'Alice looks at her watch.',
+        'The phone rings twice.', 'Outside rain hammers the glass.',
+        'Bob crosses the room quickly.', 'Sunlight cuts through the blinds.',
+        'Footsteps echo in the hall.', 'The door swings open.',  'Carol freezes.',
+      ];
+      const fountain = `INT. OFFICE - DAY\n\n${lines.join('\n')}\n`;
+      const { issues } = await rhythmPass({
+        fountain, records: [] as any, approvedSpans: [],
+        storyContext: undefined as any, priorPassResults: [],
+      });
+      assert.ok(
+        !issues.some(i => i.rule === 'OPENING_WORD_REPETITION'),
+        'Should NOT fire when action line openings are varied',
+      );
+    });
+
+    // ── SENSORY_IMBALANCE ─────────────────────────────────────────────────────
+    it('rhythmPass detects SENSORY_IMBALANCE when 10+ action lines have no sound descriptors', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      // 10 purely visual action lines — no sound words
+      const lines = Array.from({ length: 10 }, (_, i) =>
+        `She moves across the room to position number ${i + 1}.`,
+      );
+      const fountain = `INT. OFFICE - DAY\n\n${lines.join('\n')}\n`;
+      const { issues } = await rhythmPass({
+        fountain, records: [] as any, approvedSpans: [],
+        storyContext: undefined as any, priorPassResults: [],
+      });
+      assert.ok(
+        issues.some(i => i.rule === 'SENSORY_IMBALANCE'),
+        `Expected SENSORY_IMBALANCE; got: ${issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    it('rhythmPass does NOT fire SENSORY_IMBALANCE when action lines include sound descriptors', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      const lines = [
+        ...Array.from({ length: 9 }, (_, i) => `She moves to position ${i + 1}.`),
+        'A sharp click breaks the silence.',  // sound word present
+      ];
+      const fountain = `INT. OFFICE - DAY\n\n${lines.join('\n')}\n`;
+      const { issues } = await rhythmPass({
+        fountain, records: [] as any, approvedSpans: [],
+        storyContext: undefined as any, priorPassResults: [],
+      });
+      assert.ok(
+        !issues.some(i => i.rule === 'SENSORY_IMBALANCE'),
+        'Should NOT fire when at least one action line contains a sound descriptor',
+      );
+    });
+
+    // ── NEAR_WORD_REPEAT ─────────────────────────────────────────────────────
+    it('rhythmPass detects NEAR_WORD_REPEAT when a content word appears 4+ times in 5-line window', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      // "window" appears 4 times in the first 5 action lines
+      const lines = [
+        'He walks to the window.',
+        'She looks through the window.',
+        'The window reflects the street below.',
+        'He opens the window slowly.',
+        'Something moves past the window.',
+        'She steps back into the room.',
+        'The clock on the wall ticks.',
+        'He sits at the desk again.',
+      ];
+      const fountain = `INT. OFFICE - DAY\n\n${lines.join('\n')}\n`;
+      const { issues } = await rhythmPass({
+        fountain, records: [] as any, approvedSpans: [],
+        storyContext: undefined as any, priorPassResults: [],
+      });
+      assert.ok(
+        issues.some(i => i.rule === 'NEAR_WORD_REPEAT'),
+        `Expected NEAR_WORD_REPEAT; got: ${issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    it('rhythmPass does NOT fire NEAR_WORD_REPEAT when content words are varied across lines', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      const lines = [
+        'He crosses to the window.',
+        'She examines the photograph.',
+        'The clock reads midnight exactly.',
+        'He reaches for his jacket.',
+        'She unlocks the cabinet carefully.',
+        'He reads through the contract.',
+        'She places the folder down.',
+        'He picks up the briefcase.',
+      ];
+      const fountain = `INT. OFFICE - DAY\n\n${lines.join('\n')}\n`;
+      const { issues } = await rhythmPass({
+        fountain, records: [] as any, approvedSpans: [],
+        storyContext: undefined as any, priorPassResults: [],
+      });
+      assert.ok(
+        !issues.some(i => i.rule === 'NEAR_WORD_REPEAT'),
+        'Should NOT fire when content words are varied across the action lines',
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
