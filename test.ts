@@ -13914,6 +13914,106 @@ He sits down in the chair.
     });
   });
 
+  describe('Wave 180 — causalityPass: revelation without reaction, reaction without cause, clock without payoff', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const noAnnotations = (n: number) => Array.from({ length: n }, () => ({ revelation: false } as any));
+    const causeInput = (records: any[], n: number) => ({
+      fountain: blankFountain(n), original: blankFountain(n),
+      records: records as any, structure: {} as any, annotations: noAnnotations(n), approvedSpans: [],
+    });
+
+    // ── REVELATION_WITHOUT_REACTION ───────────────────────────────────────────
+    it('causalityPass detects REVELATION_WITHOUT_REACTION when a revelation lands flat', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // Scene 2 reveals; scene 3 shows no causal ripple
+      const records = Array.from({ length: 6 }, (_, i) =>
+        i === 2 ? makeRec(i, { revelation: 'the letter was forged' }) : makeRec(i),
+      );
+      const result = await causalityPass(causeInput(records, 6));
+      const rev = result.issues.filter(i => i.rule === 'REVELATION_WITHOUT_REACTION');
+      assert.ok(rev.length >= 1, `Should detect REVELATION_WITHOUT_REACTION; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(rev[0].severity === 'minor');
+    });
+
+    it('causalityPass does NOT fire REVELATION_WITHOUT_REACTION when the next scene responds', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      const records = Array.from({ length: 6 }, (_, i) =>
+        i === 2
+          ? makeRec(i, { revelation: 'the letter was forged' })
+          : i === 3
+          ? makeRec(i, { emotionalShift: 'negative' })
+          : makeRec(i),
+      );
+      const result = await causalityPass(causeInput(records, 6));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'REVELATION_WITHOUT_REACTION'),
+        'Should NOT fire when the scene after a revelation shows a reaction',
+      );
+    });
+
+    // ── REACTION_WITHOUT_CAUSE ────────────────────────────────────────────────
+    it('causalityPass detects REACTION_WITHOUT_CAUSE when a downturn has no trigger', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // Scene 3 turns negative; scenes 1,2 and scene 3 itself carry no cause
+      const records = Array.from({ length: 6 }, (_, i) =>
+        makeRec(i, { emotionalShift: i === 3 ? 'negative' : 'neutral' }),
+      );
+      const result = await causalityPass(causeInput(records, 6));
+      const reaction = result.issues.filter(i => i.rule === 'REACTION_WITHOUT_CAUSE');
+      assert.ok(reaction.length >= 1, `Should detect REACTION_WITHOUT_CAUSE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(reaction[0].severity === 'minor');
+    });
+
+    it('causalityPass does NOT fire REACTION_WITHOUT_CAUSE when a prior scene sets up the downturn', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      const records = Array.from({ length: 6 }, (_, i) =>
+        i === 2
+          ? makeRec(i, { suspenseDelta: 2 })
+          : makeRec(i, { emotionalShift: i === 3 ? 'negative' : 'neutral' }),
+      );
+      const result = await causalityPass(causeInput(records, 6));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'REACTION_WITHOUT_CAUSE'),
+        'Should NOT fire when a preceding scene raises suspense before the downturn',
+      );
+    });
+
+    // ── CLOCK_RAISED_WITHOUT_PAYOFF ───────────────────────────────────────────
+    it('causalityPass detects CLOCK_RAISED_WITHOUT_PAYOFF when the deadline never discharges', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      const records = Array.from({ length: 6 }, (_, i) =>
+        makeRec(i, { clockRaised: i === 1 }),
+      );
+      const result = await causalityPass(causeInput(records, 6));
+      const clock = result.issues.filter(i => i.rule === 'CLOCK_RAISED_WITHOUT_PAYOFF');
+      assert.ok(clock.length >= 1, `Should detect CLOCK_RAISED_WITHOUT_PAYOFF; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(clock[0].severity === 'major');
+    });
+
+    it('causalityPass does NOT fire CLOCK_RAISED_WITHOUT_PAYOFF when a later scene discharges it', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      const records = Array.from({ length: 6 }, (_, i) =>
+        i === 4
+          ? makeRec(i, { suspenseDelta: 3 })
+          : makeRec(i, { clockRaised: i === 1 }),
+      );
+      const result = await causalityPass(causeInput(records, 6));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'CLOCK_RAISED_WITHOUT_PAYOFF'),
+        'Should NOT fire when a later scene pays off the raised clock',
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

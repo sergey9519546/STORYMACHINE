@@ -352,6 +352,94 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 180: Revelation without reaction, reaction without cause, clock without payoff ──
+
+  // REVELATION_WITHOUT_REACTION: A revelation lands but the very next scene shows
+  // no causal ripple — neutral emotion, no relationship shift, no change in
+  // suspense. The truth is delivered and the story moves on as if nothing
+  // happened. Distinct from belief's REVELATION_ISOLATED (dialogue presence);
+  // this checks the downstream causal response.
+  if (records.length >= 4) {
+    for (let i = 0; i < records.length - 1; i++) {
+      const curr = records[i];
+      if (curr.revelation === null) continue;
+      const next = records[i + 1];
+      const noReaction =
+        next.emotionalShift === 'neutral' &&
+        (next.relationshipShifts?.length ?? 0) === 0 &&
+        next.suspenseDelta <= 1;
+      if (noReaction) {
+        issues.push({
+          location: `Scene ${i} → Scene ${i + 1}`,
+          rule: 'REVELATION_WITHOUT_REACTION',
+          description: `Scene ${i} delivers a revelation but the next scene shows no causal ripple — neutral emotion, no relationship shift, no change in suspense. The truth lands and the story carries on as if nothing was learned.`,
+          severity: 'minor',
+          suggestedFix: 'Let the revelation change something immediately: a character recalibrates, a relationship shifts, or the stakes rise. Information that alters nothing wasn\'t worth revealing.',
+        });
+        break;
+      }
+    }
+  }
+
+  // REACTION_WITHOUT_CAUSE: A scene carries a negative emotional shift but
+  // neither it nor the two scenes before it contain any on-page trigger (no
+  // negative relationship shift, no suspense rise, no revelation, no clock). The
+  // character's collapse has no visible cause. Distinct from UNMOTIVATED_DECISION
+  // (which keys on decisions, not raw emotion).
+  for (let i = 2; i < records.length; i++) {
+    const curr = records[i];
+    if (curr.emotionalShift !== 'negative') continue;
+    const selfCause =
+      curr.revelation !== null ||
+      curr.suspenseDelta > 1.5 ||
+      curr.clockRaised ||
+      (curr.relationshipShifts ?? []).some(s => s.amount < 0);
+    if (selfCause) continue;
+    let priorCause = false;
+    for (let j = Math.max(0, i - 2); j < i; j++) {
+      const p = records[j];
+      if (
+        p.emotionalShift === 'negative' ||
+        p.suspenseDelta > 1.5 ||
+        p.revelation !== null ||
+        p.clockRaised ||
+        (p.relationshipShifts ?? []).some(s => s.amount < 0)
+      ) { priorCause = true; break; }
+    }
+    if (!priorCause) {
+      issues.push({
+        location: `Scene ${i} (${curr.slug})`,
+        rule: 'REACTION_WITHOUT_CAUSE',
+        description: `Scene ${i} turns emotionally negative but neither it nor the two preceding scenes contain any trigger — no setback, no bad news, no souring relationship, no rising threat. The downturn has no on-page cause.`,
+        severity: 'minor',
+        suggestedFix: 'Give the negative turn a visible cause in this scene or just before it: a piece of bad news, a betrayal, a failure, or a threat that justifies the shift in mood.',
+      });
+      break;
+    }
+  }
+
+  // CLOCK_RAISED_WITHOUT_PAYOFF: A ticking clock is raised somewhere in the story
+  // but no scene ever discharges it — there is no high-suspense beat, climax, or
+  // resolution anywhere. The deadline is established and then quietly forgotten,
+  // so the pressure it promised never pays off.
+  if (records.length >= 6) {
+    const anyClock = records.some(r => r.clockRaised);
+    if (anyClock) {
+      const hasPayoff = records.some(r =>
+        r.suspenseDelta > 2 || r.purpose === 'climax' || r.purpose === 'resolution',
+      );
+      if (!hasPayoff) {
+        issues.push({
+          location: 'Clock / deadline arc',
+          rule: 'CLOCK_RAISED_WITHOUT_PAYOFF',
+          description: 'A ticking clock is raised but the story never discharges it — no scene reaches a suspense peak, climax, or resolution. The deadline is established and then forgotten, so its pressure never pays off.',
+          severity: 'major',
+          suggestedFix: 'Fire the clock: build to a scene where the deadline forces a confrontation or a decisive choice, then show the outcome. A clock that never runs out is a promise the story breaks.',
+        });
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'causality', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
