@@ -372,6 +372,106 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 188: Entropy arc flat, intention convergence absent, entropy cliff ──
+
+  // Shared entropy helper (same formula as ENTROPY_SPIKE_MISPLACED, scoped here)
+  const w188Entropy = (r: typeof records[0]): number => {
+    const s = Math.max(0, r.suspenseDelta);
+    const t = (r.relationshipShifts ?? []).reduce(
+      (sum: number, x: { amount: number }) => sum + Math.abs(x.amount), 0,
+    );
+    const c = (r.seededClueIds?.length ?? 0) + (r.payoffSetupIds?.length ?? 0);
+    const em = r.emotionalShift !== 'neutral' ? 1 : 0;
+    return s + t * 2 + c + em;
+  };
+
+  // ESCALATION_ENTROPY_FLAT: The composite narrative entropy (suspense + relational
+  // turbulence×2 + clue density + emotion weight) of Act 2b (50%–75%) is no higher
+  // than Act 2a (25%–50%). The story's complexity and momentum stall in the second
+  // half of the conflict zone instead of building toward the climax. Distinct from
+  // ESCALATION_REVERSED (structure pass, raw suspense) and SECOND_ACT_INVERSION
+  // (structure pass, raw suspense); this tracks composite narrative heat.
+  if (n >= 10) {
+    const act2aStart = Math.floor(n * 0.25);
+    const act2bStart = Math.floor(n * 0.5);
+    const act2bEnd   = Math.floor(n * 0.75);
+    const act2aRecs  = records.slice(act2aStart, act2bStart);
+    const act2bRecs  = records.slice(act2bStart, act2bEnd);
+    if (act2aRecs.length >= 2 && act2bRecs.length >= 2) {
+      const avgE = (recs: typeof records) =>
+        recs.reduce((s, r) => s + w188Entropy(r), 0) / recs.length;
+      const avgAct2a = avgE(act2aRecs);
+      const avgAct2b = avgE(act2bRecs);
+      if (avgAct2a > 1.5 && avgAct2b <= avgAct2a) {
+        issues.push({
+          location: `Act 2 (Scenes ${act2aStart}–${act2bEnd - 1})`,
+          rule: 'ESCALATION_ENTROPY_FLAT',
+          description: `Act 2a (Scenes ${act2aStart}–${act2bStart - 1}) has average narrative entropy ${avgAct2a.toFixed(1)} but Act 2b (Scenes ${act2bStart}–${act2bEnd - 1}) drops to ${avgAct2b.toFixed(1)} — the composite momentum (suspense + relational turbulence + clue density) fails to build across the conflict zone.`,
+          severity: 'major',
+          suggestedFix: 'Escalate Act 2b: add a revelation, deepen a relationship rupture, or raise a new clock. The second half of the conflict zone must be denser with narrative event than the first — the audience should feel the story accelerating, not plateauing.',
+        });
+      }
+    }
+  }
+
+  // INTENTION_CONVERGENCE_ABSENT: The story has both seeded clues (the protagonist
+  // plants things for future resolution) and a raised clock (external deadline) but
+  // no scene combines both — proactive intention and urgent pressure run on separate
+  // tracks and never converge. Real climaxes occur when a character's plan meets an
+  // unavoidable deadline in the same scene. Requires 8+ scenes.
+  if (n >= 8) {
+    const hasSeededClues = records.some(r => (r.seededClueIds?.length ?? 0) > 0);
+    const hasClockRaised = records.some(r => r.clockRaised);
+    if (hasSeededClues && hasClockRaised) {
+      const hasConvergence = records.some(r =>
+        (r.seededClueIds?.length ?? 0) > 0 && r.clockRaised,
+      );
+      if (!hasConvergence) {
+        issues.push({
+          location: 'Plot intention layer',
+          rule: 'INTENTION_CONVERGENCE_ABSENT',
+          description: 'The story seeds clues and raises a deadline but no scene combines both — proactive intention and external urgency never meet in the same beat. The story lacks the convergence moment where a character\'s plan collides with an unavoidable deadline.',
+          severity: 'major',
+          suggestedFix: 'Design a scene where the protagonist plants a trap, seeds a clue, or commits to a plan while simultaneously under active deadline pressure. This convergence creates the "point of no return" that defines dramatic peaks.',
+        });
+      }
+    }
+  }
+
+  // ENTROPY_CLIFF: Three or more consecutive high-entropy scenes (entropy > 2.0)
+  // are immediately followed by two consecutive zero-entropy scenes (entropy < 0.5).
+  // The story hits a cliff — maximum intensity with no transitional de-escalation.
+  // A proper denouement should descend gradually through a reckoning or aftershock;
+  // a cliff drops the audience without the emotional processing that makes the peak
+  // feel earned. Distinct from ENTROPY_SPIKE_MISPLACED (peak placement) — this
+  // catches a sudden collapse anywhere in the story.
+  if (n >= 8) {
+    let highRun = 0;
+    let highStart = -1;
+    for (let i = 0; i < records.length; i++) {
+      const e = w188Entropy(records[i]);
+      if (e > 2.0) {
+        if (highRun === 0) highStart = i;
+        highRun++;
+      } else {
+        if (highRun >= 3 && e < 0.5 && i + 1 < records.length) {
+          const nextE = w188Entropy(records[i + 1]);
+          if (nextE < 0.5) {
+            issues.push({
+              location: `Scenes ${highStart}–${i + 1}`,
+              rule: 'ENTROPY_CLIFF',
+              description: `${highRun} high-momentum scenes (Scenes ${highStart}–${i - 1}, entropy > 2.0) are followed by an immediate dead drop (Scenes ${i}–${i + 1}, entropy < 0.5) — the story loses all narrative momentum in two steps instead of de-escalating through a measured denouement.`,
+              severity: 'minor',
+              suggestedFix: 'Add 1-2 transitional scenes between the peak and the quiet ending: show the aftershock, the reckoning, or the changed world before the narrative fully relaxes. The audience needs to process the climax before the story goes quiet.',
+            });
+            break;
+          }
+        }
+        highRun = 0;
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'intention', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

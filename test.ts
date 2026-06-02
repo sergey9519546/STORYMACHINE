@@ -14130,6 +14130,107 @@ He sits down in the chair.
     });
   });
 
+  describe('Wave 188 — intentionPass: entropy arc flat, intention convergence, entropy cliff', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const intentInput = (records: any[]) => ({
+      fountain: blankFountain(records.length), original: blankFountain(records.length),
+      records: records as any, structure: {} as any, annotations: [], approvedSpans: [],
+    });
+
+    // ESCALATION_ENTROPY_FLAT — fires
+    it('ESCALATION_ENTROPY_FLAT fires when Act 2b entropy is no higher than Act 2a', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // n=12: act2a=[3,4,5] suspense=2.0 (entropy=2.0), act2b=[6,7,8] suspense=0.8 (entropy=0.8)
+      const records = Array.from({ length: 12 }, (_, i) => makeRec(i, {
+        suspenseDelta: (i >= 3 && i < 6) ? 2.0 : (i >= 6 && i < 9) ? 0.8 : 1.0,
+      }));
+      const result = await intentionPass(intentInput(records));
+      assert.ok(
+        result.issues.some(i => i.rule === 'ESCALATION_ENTROPY_FLAT'),
+        `Expected ESCALATION_ENTROPY_FLAT, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // ESCALATION_ENTROPY_FLAT — no-fire
+    it('ESCALATION_ENTROPY_FLAT does not fire when Act 2b entropy exceeds Act 2a', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      const records = Array.from({ length: 12 }, (_, i) => makeRec(i, {
+        suspenseDelta: (i >= 3 && i < 6) ? 2.0 : (i >= 6 && i < 9) ? 2.5 : 1.0,
+      }));
+      const result = await intentionPass(intentInput(records));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'ESCALATION_ENTROPY_FLAT'),
+        `Expected no ESCALATION_ENTROPY_FLAT, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // INTENTION_CONVERGENCE_ABSENT — fires
+    it('INTENTION_CONVERGENCE_ABSENT fires when clues and clock never share a scene', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      const records = Array.from({ length: 10 }, (_, i) => makeRec(i, {
+        seededClueIds: i === 2 ? ['clue1'] : [],
+        clockRaised: i === 5,
+      }));
+      const result = await intentionPass(intentInput(records));
+      assert.ok(
+        result.issues.some(i => i.rule === 'INTENTION_CONVERGENCE_ABSENT'),
+        `Expected INTENTION_CONVERGENCE_ABSENT, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // INTENTION_CONVERGENCE_ABSENT — no-fire
+    it('INTENTION_CONVERGENCE_ABSENT does not fire when a scene has both clue and clock', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      const records = Array.from({ length: 10 }, (_, i) => makeRec(i, {
+        seededClueIds: i === 3 ? ['clue1'] : [],
+        clockRaised: i === 3 || i === 6, // scene 3 has both → convergence
+      }));
+      const result = await intentionPass(intentInput(records));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'INTENTION_CONVERGENCE_ABSENT'),
+        `Expected no INTENTION_CONVERGENCE_ABSENT, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // ENTROPY_CLIFF — fires
+    it('ENTROPY_CLIFF fires when three high-entropy scenes drop to two zero-entropy scenes', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // records 0,1,2: entropy=3 (suspenseDelta=3)
+      // records 3,4: entropy=0 (suspenseDelta=0, everything default/neutral)
+      const records = Array.from({ length: 8 }, (_, i) => makeRec(i, {
+        suspenseDelta: i < 3 ? 3 : i < 5 ? 0 : 1,
+      }));
+      const result = await intentionPass(intentInput(records));
+      assert.ok(
+        result.issues.some(i => i.rule === 'ENTROPY_CLIFF'),
+        `Expected ENTROPY_CLIFF, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+
+    // ENTROPY_CLIFF — no-fire
+    it('ENTROPY_CLIFF does not fire when the high-run transition stays above 0.5', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // records 0,1,2: entropy=3; records 3,4: entropy=1 (not <0.5 — no cliff)
+      const records = Array.from({ length: 8 }, (_, i) => makeRec(i, {
+        suspenseDelta: i < 3 ? 3 : 1,
+      }));
+      const result = await intentionPass(intentInput(records));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'ENTROPY_CLIFF'),
+        `Expected no ENTROPY_CLIFF, got: ${result.issues.map(i => i.rule).join(', ')}`,
+      );
+    });
+  });
+
   describe('Wave 187 — causalityPass: consequence chain break, clock ghost, positive shift orphan', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
