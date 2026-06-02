@@ -347,6 +347,85 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 189: Velocity drop, climax runway, resolution bloat ─────────────
+
+  // SCENE_VELOCITY_DROP: The average scene length in the second half exceeds the
+  // first-half average by more than 30%. A story that gets slower as stakes rise
+  // deprives the climax of kinetic energy — the screenplay should tighten, not expand.
+  if (records.length >= 8) {
+    const halfIdx = Math.floor(records.length / 2);
+    let firstHalfSum = 0;
+    for (let i = 0; i < halfIdx; i++) firstHalfSum += sceneLengths.get(i) ?? 0;
+    let secondHalfSum = 0;
+    for (let i = halfIdx; i < records.length; i++) secondHalfSum += sceneLengths.get(i) ?? 0;
+    const avgFirstHalf = firstHalfSum / halfIdx;
+    const avgSecondHalf = secondHalfSum / (records.length - halfIdx);
+    if (avgFirstHalf > 0 && avgSecondHalf > avgFirstHalf * 1.3) {
+      issues.push({
+        location: 'Scene velocity',
+        rule: 'SCENE_VELOCITY_DROP',
+        severity: 'minor',
+        description: `The second half averages ${Math.round(avgSecondHalf)} lines per scene vs ${Math.round(avgFirstHalf)} in the first half — the story decelerates toward the climax instead of accelerating.`,
+        suggestedFix: 'Trim scenes in the second half to tighten the approach to climax. The story should accelerate as stakes rise, not expand and dilate.',
+      });
+    }
+  }
+
+  // CLIMAX_RUNWAY_OVERLONG: The three scenes immediately before the Act 3 climax peak
+  // are all above average length — the screenplay lingers in the approach rather than
+  // snapping into the climax. A long runway dilutes urgency.
+  if (records.length >= 8) {
+    const climaxPeakZoneStart = Math.floor(records.length * 0.75);
+    let climaxPeakIdx = -1;
+    let maxClimaxPeak = -Infinity;
+    for (let i = climaxPeakZoneStart; i < records.length; i++) {
+      if (records[i].suspenseDelta > maxClimaxPeak) {
+        maxClimaxPeak = records[i].suspenseDelta;
+        climaxPeakIdx = i;
+      }
+    }
+    if (climaxPeakIdx >= 3) {
+      const runwayLens = [
+        sceneLengths.get(climaxPeakIdx - 3) ?? 0,
+        sceneLengths.get(climaxPeakIdx - 2) ?? 0,
+        sceneLengths.get(climaxPeakIdx - 1) ?? 0,
+      ];
+      if (runwayLens.every(l => l > avgLength)) {
+        issues.push({
+          location: `Scenes ${climaxPeakIdx - 3}–${climaxPeakIdx - 1} (climax runway)`,
+          rule: 'CLIMAX_RUNWAY_OVERLONG',
+          severity: 'minor',
+          description: `The three scenes before the climax (Scenes ${climaxPeakIdx - 3}–${climaxPeakIdx - 1}) are all above average length — the approach to the climax sprawls rather than snapping.`,
+          suggestedFix: 'Cut at least one pre-climax scene to a sharp, punchy beat. The runway should tighten, not sprawl.',
+        });
+      }
+    }
+  }
+
+  // RESOLUTION_SCENE_BLOAT: The final two scenes are both above average length and
+  // both low-tension — the denouement lingers beyond its emotional function.
+  // A tight resolution lands harder than an extended one.
+  if (records.length >= 6) {
+    const lastTwoIdx = records.length - 1;
+    const secondToLastIdx = records.length - 2;
+    const lastTwoLen = sceneLengths.get(lastTwoIdx) ?? 0;
+    const secondToLastLen = sceneLengths.get(secondToLastIdx) ?? 0;
+    if (
+      lastTwoLen > 0 && secondToLastLen > 0 &&
+      lastTwoLen > avgLength && secondToLastLen > avgLength &&
+      records[lastTwoIdx].suspenseDelta < 1.5 &&
+      records[secondToLastIdx].suspenseDelta < 1.5
+    ) {
+      issues.push({
+        location: `Scenes ${secondToLastIdx}–${lastTwoIdx} (resolution)`,
+        rule: 'RESOLUTION_SCENE_BLOAT',
+        severity: 'minor',
+        description: `The final two scenes (Scenes ${secondToLastIdx}–${lastTwoIdx}) are both above average length and both low-tension — the resolution drags rather than releasing.`,
+        suggestedFix: 'Trim the resolution to its essential emotional beats. A tight denouement lands harder than an extended one.',
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'pacing', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

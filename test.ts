@@ -15176,6 +15176,124 @@ Running now, she turns the corner.
     });
   });
 
+  describe('Wave 189 — pacingPass: velocity drop, climax runway, resolution bloat', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const noAnnotations = (n: number) => Array.from({ length: n }, () => ({ revelation: false } as any));
+    function makeFountainWithLengths(sceneLinesArray: number[]): string {
+      return sceneLinesArray.map((len, i) => {
+        const body = Array.from({ length: len }, (_, j) => `Scene ${i} action line ${j + 1}.`).join('\n');
+        return `INT. SC${i} - DAY\n\n${body}\n`;
+      }).join('\n');
+    }
+
+    // ── SCENE_VELOCITY_DROP ────────────────────────────────────────────────────
+    it('pacingPass detects SCENE_VELOCITY_DROP when second half scenes are much longer', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // avgFirst=(3+7+3+7)/4=5; avgSecond=(9+11+4+4)/4=7; 7>5*1.3=6.5 → fires
+      const sceneLens = [3, 7, 3, 7, 9, 11, 4, 4];
+      const records = Array.from({ length: 8 }, (_, i) => makeRec(i));
+      const result = await pacingPass({
+        fountain: makeFountainWithLengths(sceneLens),
+        original: '', records: records as any, structure: {} as any,
+        annotations: noAnnotations(8), approvedSpans: [],
+      });
+      const drop = result.issues.filter(i => i.rule === 'SCENE_VELOCITY_DROP');
+      assert.ok(drop.length >= 1, `Should detect SCENE_VELOCITY_DROP; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(drop[0].severity === 'minor');
+    });
+
+    it('pacingPass does NOT fire SCENE_VELOCITY_DROP when first half is longer', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // avgFirst=(12+14+12+14)/4=13; avgSecond=(6+8+6+8)/4=7; 7>13*1.3=16.9? No
+      const sceneLens = [12, 14, 12, 14, 6, 8, 6, 8];
+      const records = Array.from({ length: 8 }, (_, i) => makeRec(i));
+      const result = await pacingPass({
+        fountain: makeFountainWithLengths(sceneLens),
+        original: '', records: records as any, structure: {} as any,
+        annotations: noAnnotations(8), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'SCENE_VELOCITY_DROP'),
+        'Should NOT fire when first-half scenes are longer than second-half',
+      );
+    });
+
+    // ── CLIMAX_RUNWAY_OVERLONG ─────────────────────────────────────────────────
+    it('pacingPass detects CLIMAX_RUNWAY_OVERLONG when 3 pre-climax scenes exceed average length', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // avg=(4+6+5+7+16+16+16+5)/8=9.375; scenes 4,5,6 are all 16>avg; peak at scene 7
+      const sceneLens = [4, 6, 5, 7, 16, 16, 16, 5];
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, { suspenseDelta: i === 7 ? 5 : 1 }),
+      );
+      const result = await pacingPass({
+        fountain: makeFountainWithLengths(sceneLens),
+        original: '', records: records as any, structure: {} as any,
+        annotations: noAnnotations(8), approvedSpans: [],
+      });
+      const runway = result.issues.filter(i => i.rule === 'CLIMAX_RUNWAY_OVERLONG');
+      assert.ok(runway.length >= 1, `Should detect CLIMAX_RUNWAY_OVERLONG; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(runway[0].severity === 'minor');
+    });
+
+    it('pacingPass does NOT fire CLIMAX_RUNWAY_OVERLONG when a runway scene is short', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // avg=(4+6+5+7+3+16+16+5)/8=7.75; scene4=3<avg → runway not all above avg
+      const sceneLens = [4, 6, 5, 7, 3, 16, 16, 5];
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec(i, { suspenseDelta: i === 7 ? 5 : 1 }),
+      );
+      const result = await pacingPass({
+        fountain: makeFountainWithLengths(sceneLens),
+        original: '', records: records as any, structure: {} as any,
+        annotations: noAnnotations(8), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'CLIMAX_RUNWAY_OVERLONG'),
+        'Should NOT fire when one runway scene is below average length',
+      );
+    });
+
+    // ── RESOLUTION_SCENE_BLOAT ─────────────────────────────────────────────────
+    it('pacingPass detects RESOLUTION_SCENE_BLOAT when final two scenes are overlong and flat', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // avg=(5+7+6+8+12+12)/6=8.33; scenes 4,5 both=12>avg, suspense=1<1.5 → fires
+      const sceneLens = [5, 7, 6, 8, 12, 12];
+      const records = Array.from({ length: 6 }, (_, i) => makeRec(i));
+      const result = await pacingPass({
+        fountain: makeFountainWithLengths(sceneLens),
+        original: '', records: records as any, structure: {} as any,
+        annotations: noAnnotations(6), approvedSpans: [],
+      });
+      const bloat = result.issues.filter(i => i.rule === 'RESOLUTION_SCENE_BLOAT');
+      assert.ok(bloat.length >= 1, `Should detect RESOLUTION_SCENE_BLOAT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(bloat[0].severity === 'minor');
+    });
+
+    it('pacingPass does NOT fire RESOLUTION_SCENE_BLOAT when the final scene is short', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // avg=(8+9+8+9+12+5)/6=8.5; last scene=5<avg → not both above avg
+      const sceneLens = [8, 9, 8, 9, 12, 5];
+      const records = Array.from({ length: 6 }, (_, i) => makeRec(i));
+      const result = await pacingPass({
+        fountain: makeFountainWithLengths(sceneLens),
+        original: '', records: records as any, structure: {} as any,
+        annotations: noAnnotations(6), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'RESOLUTION_SCENE_BLOAT'),
+        'Should NOT fire when the final scene is shorter than average',
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
