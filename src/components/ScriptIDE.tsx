@@ -164,6 +164,12 @@ export default function ScriptIDE({
   // P9: inline copilot persona (custom ghost-text voice/specialty).
   const [copilotPersona, setCopilotPersona] = useState<string>(() => lsGet("copilot_persona") || "default");
   const [personaList, setPersonaList] = useState<Array<{ id: string; name: string; description: string }>>([]);
+  // P4: real-time collaboration room.
+  const [collabRoom, setCollabRoom] = useState<string | undefined>(undefined);
+  const [collabUserName, setCollabUserName] = useState<string>(() => lsGet("collab_username") || "Writer");
+  const [collabInput, setCollabInput] = useState("");
+  const [collabNameInput, setCollabNameInput] = useState("");
+  const [showCollabBar, setShowCollabBar] = useState(false);
 
   // ── Refs ────────────────────────────────────────────────────────────────────
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1020,6 +1026,77 @@ export default function ScriptIDE({
           })()}
         </div>
 
+        {/* P4: collaboration join/leave bar */}
+        <div className="px-4 py-1.5 border-b-2 border-black bg-gray-50 flex items-center gap-2 flex-wrap">
+          {collabRoom ? (
+            <>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-green-700">Live</span>
+              <span className="text-[11px] font-mono text-gray-700 bg-green-100 border border-green-400 px-2 py-0.5 rounded">
+                Room: {collabRoom}
+              </span>
+              <span className="text-[11px] text-gray-500">as {collabUserName}</span>
+              <button
+                onClick={() => setCollabRoom(undefined)}
+                className="text-[11px] font-bold text-red-600 border-2 border-red-600 px-2 py-0.5 hover:bg-red-50"
+              >
+                Leave
+              </button>
+            </>
+          ) : showCollabBar ? (
+            <>
+              <input
+                value={collabNameInput}
+                onChange={e => setCollabNameInput(e.target.value)}
+                placeholder="Your name"
+                className="text-[11px] font-mono border-2 border-black px-2 py-0.5 w-28 focus:outline-none"
+              />
+              <input
+                value={collabInput}
+                onChange={e => setCollabInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && collabInput.trim()) {
+                    const name = collabNameInput.trim() || collabUserName;
+                    lsSet("collab_username", name);
+                    setCollabUserName(name);
+                    setCollabRoom(collabInput.trim());
+                    setShowCollabBar(false);
+                    setCollabInput("");
+                  }
+                }}
+                placeholder="Room ID (share with co-writer)"
+                className="text-[11px] font-mono border-2 border-black px-2 py-0.5 w-52 focus:outline-none"
+              />
+              <button
+                onClick={() => {
+                  if (!collabInput.trim()) return;
+                  const name = collabNameInput.trim() || collabUserName;
+                  lsSet("collab_username", name);
+                  setCollabUserName(name);
+                  setCollabRoom(collabInput.trim());
+                  setShowCollabBar(false);
+                  setCollabInput("");
+                }}
+                className="text-[11px] font-bold border-2 border-black px-2 py-0.5 hover:bg-black hover:text-white"
+              >
+                Join
+              </button>
+              <button
+                onClick={() => setShowCollabBar(false)}
+                className="text-[11px] text-gray-500 border-2 border-gray-300 px-2 py-0.5 hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => { setCollabNameInput(collabUserName); setShowCollabBar(true); }}
+              className="text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-black"
+            >
+              + Collaborate
+            </button>
+          )}
+        </div>
+
         <div
           className="flex-1 relative overflow-hidden bg-white"
           aria-busy={engineState.isAnalyzing ? "true" : "false"}
@@ -1042,6 +1119,8 @@ export default function ScriptIDE({
               characters: characters.map(c => c.name),
               persona: copilotPersona,
             }}
+            collabRoom={collabRoom}
+            collabUserName={collabUserName}
             isDarkMode={isDarkMode}
           />
 

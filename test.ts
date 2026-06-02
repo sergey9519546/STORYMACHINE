@@ -11955,6 +11955,25 @@ describe('lib/prompts', () => {
     assert.equal(getPrompt('../secret'), '');
     assert.equal(getPrompt('foo/bar'), '');
   });
+
+  it('M3: all 5 new scriptide prompt files exist and have no unresolved placeholders after interpolation', () => {
+    const names = ['scriptide-worldbuild', 'scriptide-dialogue', 'scriptide-tension', 'scriptide-clean-action', 'scriptide-character'];
+    for (const name of names) {
+      assert.ok(hasPrompt(name), `prompt file ${name} missing`);
+    }
+    const wb = getPrompt('scriptide-worldbuild', { contextBlock: '', bibleBlock: '', profilesBlock: '', beat: 'A man walks in.' });
+    assert.ok(!wb.includes('{{'), 'worldbuild: no unresolved placeholders');
+    assert.ok(wb.includes('A man walks in.'), 'worldbuild: beat variable injected');
+    const dlg = getPrompt('scriptide-dialogue', { contextBlock: '', bibleBlock: '', dialogue: 'Hello.', profiles: '[]' });
+    assert.ok(!dlg.includes('{{'), 'dialogue: no unresolved placeholders');
+    const tension = getPrompt('scriptide-tension', { contextBlock: '', bibleBlock: '', profilesBlock: '', scene: 'Dark room.' });
+    assert.ok(!tension.includes('{{'), 'tension: no unresolved placeholders');
+    const ca = getPrompt('scriptide-clean-action', { genreHint: '', text: 'We pan to the door.' });
+    assert.ok(!ca.includes('{{'), 'clean-action: no unresolved placeholders');
+    const char = getPrompt('scriptide-character', { bibleBlock: '', name: 'Bob', ghost: 'loss', lie: 'false', want: 'escape', need: 'truth' });
+    assert.ok(!char.includes('{{'), 'character: no unresolved placeholders');
+    assert.ok(char.includes('Bob'), 'character: name variable injected');
+  });
 });
 
 // ── P4: Yjs collaboration server — room id parsing ────────────────────────────
@@ -14386,5 +14405,128 @@ describe('Wave 123 — continuityCritic: severity maps from finding.severity', (
     assert.equal(intCrit!.severity, 92, 'block-severity finding maps to critic severity 92');
     assert.equal(intCrit!.attentionBid, 95, 'block-severity finding maps to attentionBid 95');
     assert.notEqual(intCrit!.severity, 80, 'old hardcoded severity 80 is replaced');
+  });
+});
+
+// ── Wave 124 (cleanup) — P2 Export Pipeline: src/lib/ implementations ─────────
+// parseFountain / fountainToFdx / fountainToPdf / fountainToDocx already imported above.
+
+import { exportScreenplay } from './server/nvm/export/index.ts';
+
+const EXPORT_SAMPLE = `Title: THE LAST EXIT
+Credit: Written by
+Author: STORYMACHINE
+
+INT. WAREHOUSE - NIGHT
+
+Alice steps into the dark. Rain hammers the tin roof above her.
+
+ALICE
+We need to talk about what happened.
+
+BOB
+(quietly)
+There's nothing to say.
+
+EXT. ROOFTOP - LATER
+
+The city sprawls below, indifferent to it all.
+
+CUT TO:
+
+> THE END <
+`;
+
+describe('Wave 124 (cleanup) — parseFountain (src/lib)', () => {
+  it('identifies scene headings, action, character cues and dialogue', () => {
+    const blocks = parseFountain(EXPORT_SAMPLE);
+    const types = blocks.map(b => b.type);
+    assert.ok(types.includes('scene_heading'), 'has scene_heading');
+    assert.ok(types.includes('action'), 'has action');
+    assert.ok(types.includes('character'), 'has character');
+    assert.ok(types.includes('dialogue'), 'has dialogue');
+    assert.ok(types.includes('parenthetical'), 'has parenthetical');
+    assert.ok(types.includes('transition'), 'has transition (CUT TO:)');
+    assert.ok(types.includes('centered'), 'has centered (> THE END <)');
+  });
+
+  it('includes lineNumber on every block', () => {
+    const blocks = parseFountain(EXPORT_SAMPLE);
+    assert.ok(blocks.every(b => typeof b.lineNumber === 'number' && b.lineNumber > 0), 'all blocks have lineNumber > 0');
+  });
+
+  it('parses a forced scene heading (leading dot)', () => {
+    const blocks = parseFountain('.A BLACK VOID\n\nNothing.\n');
+    const heading = blocks.find(b => b.type === 'scene_heading');
+    assert.ok(heading, 'forced heading parsed');
+    assert.ok(heading!.text.includes('A BLACK VOID'), 'forced heading text contains the heading content');
+  });
+});
+
+describe('Wave 124 (cleanup) — fountainToFdx (src/lib)', () => {
+  it('produces a valid FinalDraft document with mapped paragraph types', () => {
+    const fdx = fountainToFdx(EXPORT_SAMPLE, 'THE LAST EXIT');
+    assert.ok(fdx.startsWith('<?xml'), 'has XML declaration');
+    assert.ok(fdx.includes('<FinalDraft'), 'has FinalDraft root');
+    assert.ok(fdx.includes('Scene Heading') || fdx.includes('SceneHeading'), 'maps scene heading');
+    assert.ok(fdx.includes('Character') || fdx.includes('character'), 'maps character');
+    assert.ok(fdx.includes('Dialogue') || fdx.includes('dialogue'), 'maps dialogue');
+  });
+
+  it('escapes XML-unsafe characters from script content', () => {
+    const fdx = fountainToFdx('INT. LAB - DAY\n\nHe muttered <script> & "stuff".\n');
+    assert.ok(!fdx.includes('<script>'), 'raw <script> must not leak into FDX');
+  });
+});
+
+describe('Wave 124 (cleanup) — fountainToPdf (src/lib)', () => {
+  it('emits a structurally valid PDF (header + EOF)', () => {
+    const pdf = Buffer.from(fountainToPdf(EXPORT_SAMPLE));
+    const s = pdf.toString('latin1');
+    assert.ok(s.startsWith('%PDF-'), 'PDF header present');
+    assert.ok(s.includes('%%EOF'), 'EOF marker present');
+  });
+
+  it('paginates long content into multiple pages', () => {
+    const long = 'INT. ROOM - DAY\n\n' + Array.from({ length: 200 }, (_, i) => `Action line number ${i} happens here.`).join('\n\n');
+    const pdf = Buffer.from(fountainToPdf(long));
+    const s = pdf.toString('latin1');
+    const pageCount = (s.match(/\/Type \/Page[^s]/g) ?? []).length;
+    assert.ok(pageCount >= 2, `expected multiple pages, got ${pageCount}`);
+  });
+});
+
+describe('Wave 124 (cleanup) — fountainToDocx (src/lib)', () => {
+  it('produces a zip archive (PK magic bytes) with real content', () => {
+    const docx = Buffer.from(fountainToDocx(EXPORT_SAMPLE));
+    assert.equal(docx.subarray(0, 2).toString('latin1'), 'PK', 'DOCX has ZIP magic bytes');
+    assert.ok(docx.length > 1000, 'DOCX has substantial content');
+  });
+});
+
+describe('Wave 124 (cleanup) — exportScreenplay dispatch (server/nvm/export)', () => {
+  it('fountain passthrough returns the original text', () => {
+    const r = exportScreenplay(EXPORT_SAMPLE, 'fountain');
+    assert.equal(r.extension, 'fountain');
+    assert.equal(r.data.toString('utf-8'), EXPORT_SAMPLE);
+  });
+
+  it('pdf result has correct mime + magic bytes', () => {
+    const r = exportScreenplay(EXPORT_SAMPLE, 'pdf');
+    assert.equal(r.mimeType, 'application/pdf');
+    assert.ok(r.data.subarray(0, 5).toString('latin1').startsWith('%PDF'), 'PDF magic bytes');
+  });
+
+  it('fdx result has xml mime and FinalDraft root', () => {
+    const r = exportScreenplay(EXPORT_SAMPLE, 'fdx');
+    assert.equal(r.extension, 'fdx');
+    assert.ok(r.data.toString('utf-8').includes('<FinalDraft'));
+  });
+
+  it('docx result has the zip magic bytes (PK) and ooxml mime', () => {
+    const r = exportScreenplay(EXPORT_SAMPLE, 'docx');
+    assert.equal(r.mimeType, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    assert.equal(r.data.subarray(0, 2).toString('latin1'), 'PK');
+    assert.ok(r.data.length > 1000, 'docx has real content');
   });
 });

@@ -374,18 +374,12 @@ router.post('/api/scriptide/world-build', aiLimiter, asyncHandler(async (req, re
   })();
   const response = await generateContent({
     model: modelForTask('WORLDBUILD'),
-    contents: `SYSTEM ROLE: You are a master screenwriter and world-builder. Your task is to generate or expand a scene based on the user's beat outline.
-
-OBJECTIVE: Write visceral, evocative action lines and scene descriptions that establish mood, time, and place.
-
-STRICT CONSTRAINTS:
-1. FORMAT: Output strictly in Fountain syntax.
-2. NO CAMERA DIRECTIONS: You are strictly forbidden from using camera terminology (e.g., "We see", "Pan to", "Close up", "Wide shot", "Angle on"). Describe the environment and the action as it happens in the world, not through a lens.
-3. SENSORY WRITING: Focus on lighting, sound, texture, and kinetic movement. Use active verbs. Avoid "is/are" where possible.
-4. ECONOMY: Keep action blocks to 4 lines maximum. Break up text to control the reader's pacing.
-${contextBlock}${bibleBlock}${wbProfiles}
-INPUT: ${sanitizeForPrompt(beat, 8000)}
-OUTPUT: Generate the Scene Heading and Action lines.`,
+    contents: getPrompt('scriptide-worldbuild', {
+      contextBlock,
+      bibleBlock,
+      profilesBlock: wbProfiles,
+      beat: sanitizeForPrompt(beat, 8000),
+    }),
   }, { label: 'world-build', timeoutMs: 30_000 });
   res.json({ result: response.text ?? '' });
 }));
@@ -425,19 +419,12 @@ router.post('/api/scriptide/refine-dialogue', aiLimiter, asyncHandler(async (req
   })();
   const response = await generateContent({
     model: modelForTask('DIALOGUE'),
-    contents: `SYSTEM ROLE: You are an expert dialogue doctor, specializing in subtext, character voice, and dramatic irony.
-
-OBJECTIVE: Analyze the provided dialogue and rewrite it to remove "on-the-nose" exposition.
-
-INSTRUCTIONS:
-1. Identify the 'Want' and the 'Obstacle' in the scene.
-2. Rewrite the dialogue so the characters are fighting for their 'Want' indirectly.
-3. Differentiate voices based on provided psychological profiles.
-4. Add brief, behavior-revealing parentheticals only if absolutely necessary.
-${dlgContextBlock}${dlgBibleBlock}
-INPUT DIALOGUE: ${sanitizeForPrompt(dialogue, 8000)}
-CHARACTER PROFILES: ${JSON.stringify(profiles)}
-OUTPUT: Provide 2 alternative versions of the dialogue exchange, explaining the subtextual strategy used in each.`,
+    contents: getPrompt('scriptide-dialogue', {
+      contextBlock: dlgContextBlock,
+      bibleBlock: dlgBibleBlock,
+      dialogue: sanitizeForPrompt(dialogue, 8000),
+      profiles: JSON.stringify(profiles),
+    }),
   }, { label: 'refine-dialogue', timeoutMs: 30_000 });
   res.json({ result: response.text ?? '' });
 }));
@@ -456,18 +443,12 @@ router.post('/api/scriptide/analyze-tension', aiLimiter, asyncHandler(async (req
   })();
   const response = await generateContent({
     model: modelForTask('ANALYSIS'),
-    contents: `SYSTEM ROLE: You are a structural script consultant influenced by Hitchcock's theory of suspense.
-
-OBJECTIVE: Analyze the provided scene and identify opportunities to heighten psychological stakes.
-
-ANALYSIS CRITERIA:
-1. Information Asymmetry: Who knows more? Suggest a way to give the audience a piece of information the characters lack.
-2. The Ticking Clock: Is there a time constraint? If not, suggest a micro-deadline.
-3. The Dilemma: Are the choices too easy? Propose a "best bad choice" scenario.
-4. Pacing: Suggest where to slow down to build dread, or speed up to simulate panic.
-${tnContextBlock}${tnBibleBlock}${tnProfiles}
-INPUT SCENE: ${sanitizeForPrompt(scene, 8000)}
-OUTPUT: A bulleted diagnostic report with 3 actionable suggestions. Where a character's want, lie, or wound is relevant, ground the suggestion in it.`,
+    contents: getPrompt('scriptide-tension', {
+      contextBlock: tnContextBlock,
+      bibleBlock: tnBibleBlock,
+      profilesBlock: tnProfiles,
+      scene: sanitizeForPrompt(scene, 8000),
+    }),
   }, { label: 'analyze-tension', timeoutMs: 30_000 });
   res.json({ result: response.text ?? '' });
 }));
@@ -479,11 +460,10 @@ router.post('/api/scriptide/clean-action', aiLimiter, asyncHandler(async (req, r
   const caGenreHint = caGenre ? `\nGENRE: ${sanitizeForPrompt(caGenre, 80)} — match the established tone when choosing action verbs.\n` : '';
   const response = await generateContent({
     model: modelForTask('ACTION'),
-    contents: `SYSTEM ROLE: You are a strict script editor enforcing a "Semantic Firewall".
-OBJECTIVE: Rewrite the following action block — remove all camera directions and technical jargon. Describe what happens in the world, not what the camera does.
-${caGenreHint}
-INPUT: ${sanitizeForPrompt(text, 8000)}
-OUTPUT: Just the rewritten action text, nothing else.`,
+    contents: getPrompt('scriptide-clean-action', {
+      genreHint: caGenreHint,
+      text: sanitizeForPrompt(text, 8000),
+    }),
   }, { label: 'clean-action', timeoutMs: 30_000 });
   res.json({ result: response.text ?? '' });
 }));
@@ -508,24 +488,14 @@ router.post('/api/scriptide/character-profile', aiLimiter, asyncHandler(async (r
 
   const response = await generateContent({
     model: modelForTask('CHARACTER'),
-    contents: `SYSTEM ROLE: You are a character designer specializing in psychological realism and "Show, Don't Tell".
-
-OBJECTIVE: Generate a visceral physical description of a character based on their psychological profile. Reflect internal state through external details.
-
-INSTRUCTIONS:
-1. DO NOT mention the Ghost, Lie, Want, or Need directly.
-2. Focus on: Posture, micro-expressions, clothing wear-and-tear, grooming habits, and how they occupy space.
-3. Use sensory details.
-4. Keep it to 2-3 evocative paragraphs.
-${cpBibleBlock}
-CHARACTER PROFILE:
-Name: ${name}
-Ghost (Trauma): ${ghost}
-Lie (False Belief): ${lie}
-Want (External Goal): ${want}
-Need (Internal Truth): ${need}
-
-OUTPUT: A visceral character description.`,
+    contents: getPrompt('scriptide-character', {
+      bibleBlock: cpBibleBlock,
+      name,
+      ghost,
+      lie,
+      want,
+      need,
+    }),
   }, { label: 'character-profile', timeoutMs: 30_000 });
   res.json({ result: response.text ?? '' });
 }));
@@ -680,4 +650,35 @@ router.post('/api/characters/import', gameLimiter, asyncHandler(async (req, res)
   } catch (err) {
     res.status(400).json({ error: (err as Error).message });
   }
+}));
+
+// ── P2: Professional export pipeline — PDF / FDX / DOCX / Fountain ────────────
+// Accepts the current Fountain script and returns a downloadable file in the
+// requested industry format. One parser feeds all renderers (server/nvm/export).
+const EXPORT_FORMATS = new Set(['pdf', 'fdx', 'docx', 'fountain']);
+
+router.post('/api/scriptide/export', gameLimiter, asyncHandler(async (req, res) => {
+  const body = req.body as { fountain?: unknown; format?: unknown; filename?: unknown };
+  const fountain = typeof body.fountain === 'string' ? body.fountain : '';
+  const format = typeof body.format === 'string' ? body.format.toLowerCase() : '';
+  if (!fountain.trim()) {
+    res.status(400).json({ error: 'body.fountain (non-empty string) is required' });
+    return;
+  }
+  if (!EXPORT_FORMATS.has(format)) {
+    res.status(400).json({ error: `body.format must be one of: ${[...EXPORT_FORMATS].join(', ')}` });
+    return;
+  }
+  // Cap input size to keep export bounded (500k chars ≈ a very long feature).
+  const capped = fountain.substring(0, 500_000);
+  const safeName = (typeof body.filename === 'string' ? body.filename : 'screenplay')
+    .replace(/[^A-Za-z0-9_\-]/g, '_').substring(0, 80) || 'screenplay';
+
+  const { exportScreenplay } = await import('../nvm/export/index.ts');
+  const result = await exportScreenplay(capped, format as 'pdf' | 'fdx' | 'docx' | 'fountain');
+
+  res.setHeader('Content-Type', result.mimeType);
+  res.setHeader('Content-Disposition', `attachment; filename="${safeName}.${result.extension}"`);
+  res.setHeader('Content-Length', String(result.data.length));
+  res.send(result.data);
 }));
