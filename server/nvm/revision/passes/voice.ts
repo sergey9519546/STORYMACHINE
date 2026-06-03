@@ -512,6 +512,86 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 193: Pronoun opener excess, Act 2 tonal collapse, parenthetical excess ─
+
+  // PRONOUN_OPENER_EXCESS: More than 40% of action lines begin with a third-person
+  // pronoun (He, She, They, It). Pronoun-led sentences create referential ambiguity
+  // (who is "he"?) and a mechanically uniform rhythm — the prose drums the same
+  // subject-verb beat without relief. Requires 10+ action lines.
+  if (actionOnlyLines.length >= 10) {
+    const pronounStartRe = /^(he|she|they|it)\b/i;
+    const pronounCount = actionOnlyLines.filter(l => pronounStartRe.test(l)).length;
+    if (pronounCount / actionOnlyLines.length > 0.4) {
+      issues.push({
+        location: 'Action line openings',
+        rule: 'PRONOUN_OPENER_EXCESS',
+        severity: 'minor',
+        description: `${pronounCount} of ${actionOnlyLines.length} action lines (${Math.round(pronounCount / actionOnlyLines.length * 100)}%) begin with a third-person pronoun ("He", "She", "They", "It") — referential ambiguity and rhythmic monotony result from pronoun-heavy openers.`,
+        suggestedFix: 'Vary sentence openings: start some lines with the character name, some with the object or environment, some with a verb phrase. Let the camera choose the subject by varying what the line opens with.',
+      });
+    }
+  }
+
+  // TONAL_REGISTER_COLLAPSE_ACT2: All Act 2 scenes (25–75% of story) share the
+  // same emotional register. The mid-story has no tonal variation between Act 2a
+  // and Act 2b — characters exist in the same affective state for the entire
+  // second act with no modulation. Distinct from VOICE_TOO_UNIFORM (whole story);
+  // this catches a sag specifically in the middle. Requires 8+ records and 4+
+  // Act 2 scenes.
+  if (records.length >= 8) {
+    const act2ToneStart = Math.floor(records.length * 0.25);
+    const act2ToneEnd = Math.floor(records.length * 0.75);
+    const act2Recs = records.slice(act2ToneStart, act2ToneEnd);
+    if (act2Recs.length >= 4) {
+      const act2Tones = new Set(act2Recs.map(r => r.emotionalShift));
+      if (act2Tones.size === 1) {
+        const [tone] = act2Tones;
+        issues.push({
+          location: `Act 2 (Scenes ${act2ToneStart}–${act2ToneEnd - 1})`,
+          rule: 'TONAL_REGISTER_COLLAPSE_ACT2',
+          severity: 'minor',
+          description: `All ${act2Recs.length} Act 2 scenes carry the same emotional register ("${tone}") — the middle of the story has no tonal modulation. Act 2a and Act 2b blur into a single undifferentiated stretch.`,
+          suggestedFix: 'Give Act 2 tonal shape: a moment of false hope or dark comedy in Act 2a, a turn toward crisis in Act 2b. The midpoint should feel like a register shift, not just a midpoint.',
+        });
+      }
+    }
+  }
+
+  // PARENTHETICAL_EXCESS: More than 30% of dialogue character cues are immediately
+  // followed by a parenthetical direction. Parentheticals over-direct actors —
+  // they signal that the screenwriter doesn't trust their own dialogue to carry
+  // tone. Requires 8+ character cues.
+  {
+    let charCueCount = 0;
+    let parentheticalCount = 0;
+    let awaitParenthetical = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { awaitParenthetical = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { awaitParenthetical = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) {
+        charCueCount++;
+        awaitParenthetical = true;
+        continue;
+      }
+      if (awaitParenthetical && /^\(/.test(t)) {
+        parentheticalCount++;
+        awaitParenthetical = false;
+        continue;
+      }
+      awaitParenthetical = false;
+    }
+    if (charCueCount >= 8 && parentheticalCount / charCueCount > 0.3) {
+      issues.push({
+        location: 'Dialogue parentheticals',
+        rule: 'PARENTHETICAL_EXCESS',
+        severity: 'minor',
+        description: `${parentheticalCount} of ${charCueCount} dialogue cues (${Math.round(parentheticalCount / charCueCount * 100)}%) are followed by a parenthetical — over-directing actors signals the dialogue alone cannot carry its intended tone.`,
+        suggestedFix: 'Remove parentheticals and rewrite the dialogue so the tone is evident from the words. Reserve parentheticals for genuine tonal ambiguity that the text alone cannot resolve.',
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'voice', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

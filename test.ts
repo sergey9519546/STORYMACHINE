@@ -15687,6 +15687,176 @@ Running now, she turns the corner.
     });
   });
 
+  describe('Wave 193 — voicePass: pronoun opener excess, Act 2 tonal collapse, parenthetical excess', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const voiceInput = (fountain: string, n: number) => ({
+      fountain, original: fountain,
+      records: Array.from({ length: n }, (_, i) => makeRec(i)) as any,
+      structure: {} as any, annotations: [], approvedSpans: [],
+    });
+
+    // ── PRONOUN_OPENER_EXCESS ─────────────────────────────────────────────────
+    it('voicePass detects PRONOUN_OPENER_EXCESS when >40% of action lines start with He/She/They/It', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 5 of 10 lines start with a pronoun (50% > 40%)
+      const actions = [
+        'He opens the door.', 'She crosses to the window.',
+        'The rain falls outside.', 'They sit across from each other.',
+        'A chair scrapes the floor.', 'It lands on the table.',
+        'Dust settles on the sill.', 'She picks up the envelope.',
+        'A clock ticks.', 'He stares at the floor.',
+      ];
+      const fountain = `INT. ROOM - DAY\n\n${actions.join('\n')}\n`;
+      const result = await voicePass(voiceInput(fountain, 1));
+      const pronoun = result.issues.filter(i => i.rule === 'PRONOUN_OPENER_EXCESS');
+      assert.ok(pronoun.length >= 1, `Should detect PRONOUN_OPENER_EXCESS; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(pronoun[0].severity === 'minor');
+    });
+
+    it('voicePass does NOT fire PRONOUN_OPENER_EXCESS when sentence openings are varied', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // Only 2 of 10 start with pronouns (20% < 40%)
+      const actions = [
+        'The door swings open.', 'Light cuts across the floor.',
+        'Maria crosses to the window.', 'She pauses.',
+        'Rain streaks the glass.', 'A clock ticks on the wall.',
+        'The envelope lies on the table.', 'Dust settles on the sill.',
+        'He picks it up.', 'Footsteps approach from the hall.',
+      ];
+      const fountain = `INT. ROOM - DAY\n\n${actions.join('\n')}\n`;
+      const result = await voicePass(voiceInput(fountain, 1));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'PRONOUN_OPENER_EXCESS'),
+        'Should NOT fire when action lines open with varied subjects',
+      );
+    });
+
+    // ── TONAL_REGISTER_COLLAPSE_ACT2 ──────────────────────────────────────────
+    it('voicePass detects TONAL_REGISTER_COLLAPSE_ACT2 when all Act 2 scenes share one register', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // act2=[2..5]; all negative; act1=[0,1] positive; act3=[6,7] positive
+      const fountain = Array.from({ length: 8 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+      const records = Array.from({ length: 8 }, (_, i) => makeRec(i, {
+        emotionalShift: (i >= 2 && i <= 5) ? 'negative' : 'positive',
+      }));
+      const result = await voicePass({ fountain, original: fountain, records: records as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      const collapse = result.issues.filter(i => i.rule === 'TONAL_REGISTER_COLLAPSE_ACT2');
+      assert.ok(collapse.length >= 1, `Should detect TONAL_REGISTER_COLLAPSE_ACT2; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(collapse[0].severity === 'minor');
+    });
+
+    it('voicePass does NOT fire TONAL_REGISTER_COLLAPSE_ACT2 when Act 2 has tonal variety', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // act2=[2..5]: alternating positive/negative
+      const fountain = Array.from({ length: 8 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+      const records = Array.from({ length: 8 }, (_, i) => makeRec(i, {
+        emotionalShift: i % 2 === 0 ? 'positive' : 'negative',
+      }));
+      const result = await voicePass({ fountain, original: fountain, records: records as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'TONAL_REGISTER_COLLAPSE_ACT2'),
+        'Should NOT fire when Act 2 scenes alternate between different emotional registers',
+      );
+    });
+
+    // ── PARENTHETICAL_EXCESS ──────────────────────────────────────────────────
+    it('voicePass detects PARENTHETICAL_EXCESS when >30% of dialogue cues have parentheticals', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 10 character cues, 5 with parentheticals (50% > 30%)
+      const fountain = `INT. ROOM - DAY
+
+ALICE
+(bitterly)
+I never said that.
+
+BOB
+(suspicious)
+Then who did?
+
+ALICE
+(quietly)
+No one you know.
+
+BOB
+Enough.
+
+ALICE
+(angry)
+Don't walk away.
+
+BOB
+Fine.
+
+ALICE
+Fine.
+
+BOB
+(sighing)
+This is pointless.
+
+ALICE
+Completely.
+
+BOB
+Goodnight.
+`;
+      const result = await voicePass(voiceInput(fountain, 1));
+      const paren = result.issues.filter(i => i.rule === 'PARENTHETICAL_EXCESS');
+      assert.ok(paren.length >= 1, `Should detect PARENTHETICAL_EXCESS; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(paren[0].severity === 'minor');
+    });
+
+    it('voicePass does NOT fire PARENTHETICAL_EXCESS when parentheticals are rare', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 10 character cues, 1 parenthetical (10% < 30%)
+      const fountain = `INT. ROOM - DAY
+
+ALICE
+I never said that.
+
+BOB
+Then who did?
+
+ALICE
+No one you know.
+
+BOB
+Enough.
+
+ALICE
+Don't walk away.
+
+BOB
+Fine.
+
+ALICE
+Fine.
+
+BOB
+(sighing)
+This is pointless.
+
+ALICE
+Completely.
+
+BOB
+Goodnight.
+`;
+      const result = await voicePass(voiceInput(fountain, 1));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'PARENTHETICAL_EXCESS'),
+        'Should NOT fire when parentheticals are used sparingly',
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
