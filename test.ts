@@ -15857,6 +15857,138 @@ Goodnight.
     });
   });
 
+  describe('Wave 207 — rhythmPass: conjunction opener excess, then-chain, exclamation in action', async () => {
+    const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+
+    it('CONJUNCTION_OPENER_EXCESS fires when >30% of action lines open with a conjunction', async () => {
+      const fountain207a = `
+INT. ALLEY - NIGHT
+
+But she reaches the corner first.
+The guard swings around with his flashlight cutting hard arcs through the dark.
+And she presses into the shadows, arms flat against the cold brick.
+He calls out, then stops.
+But the darkness holds her still and quiet.
+She counts to ten in her head, each second stretched tight.
+And she moves again toward the fire exit.
+The wind clicks a loose chain against the fence somewhere above her.
+Or she imagines it does and keeps moving anyway.
+He rounds the corner and disappears into the other end of the alley.
+`;
+      const result207a = await rhythmPass({ fountain: fountain207a, original: fountain207a, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        result207a.issues.some(i => i.rule === 'CONJUNCTION_OPENER_EXCESS'),
+        'Should fire CONJUNCTION_OPENER_EXCESS when 5/10 action lines begin with And/But/Or/So/Yet',
+      );
+    });
+
+    it('CONJUNCTION_OPENER_EXCESS does NOT fire when conjunction openers are within tolerance', async () => {
+      const fountain207b = `
+INT. OFFICE - DAY
+
+She sets the folder on the desk.
+He leans back in his chair and looks at her.
+But she stays standing near the door.
+She slides the folder toward him with one finger.
+He doesn't open it.
+She watches him for a moment then looks away.
+He finally reaches for the folder.
+She folds her arms.
+He opens it and reads the first page.
+She waits.
+`;
+      const result207b = await rhythmPass({ fountain: fountain207b, original: fountain207b, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        !result207b.issues.some(i => i.rule === 'CONJUNCTION_OPENER_EXCESS'),
+        'Should NOT fire when only 1/10 action lines begin with a conjunction (10%)',
+      );
+    });
+
+    it('THEN_CHAIN fires when >25% of action lines begin with "Then" or "And then"', async () => {
+      const fountain207c = `
+INT. KITCHEN - MORNING
+
+She opens the cabinet and takes out two cups.
+He sets the kettle on the stove with a quiet click.
+She fills the cups with water.
+Then he turns and looks at her directly for the first time.
+She puts down the cups and waits.
+He crosses to the window and stays there.
+Then she picks up her keys from the counter.
+He doesn't move or speak.
+She takes her coat from the hook.
+Then she leaves without saying anything at all.
+`;
+      const result207c = await rhythmPass({ fountain: fountain207c, original: fountain207c, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        result207c.issues.some(i => i.rule === 'THEN_CHAIN'),
+        'Should fire THEN_CHAIN when 3/10 action lines begin with "Then" (30%)',
+      );
+    });
+
+    it('THEN_CHAIN does NOT fire when "Then" openers are within tolerance', async () => {
+      const fountain207d = `
+INT. LIBRARY - AFTERNOON
+
+He pulls the book from the shelf.
+She watches from the reading table.
+He carries it to the table and sits down.
+She slides a bookmark across to him without looking up.
+He opens the book to the marked page and reads silently.
+She goes back to her own notes.
+Then he closes the book.
+She glances up.
+He sets the book aside.
+She turns back to her work.
+`;
+      const result207d = await rhythmPass({ fountain: fountain207d, original: fountain207d, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        !result207d.issues.some(i => i.rule === 'THEN_CHAIN'),
+        'Should NOT fire when only 1/10 action lines begin with "Then" (10%)',
+      );
+    });
+
+    it('EXCLAMATION_IN_ACTION fires when 3 or more action lines end with "!"', async () => {
+      const fountain207e = `
+INT. STADIUM - DAY
+
+He catches the pass!
+She breaks through the line!
+The crowd roars.
+He dives for the end zone!
+The referee throws the flag.
+She raises both arms.
+He slams the ball against the turf hard.
+The score is tied with two seconds left on the clock.
+`;
+      const result207e = await rhythmPass({ fountain: fountain207e, original: fountain207e, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        result207e.issues.some(i => i.rule === 'EXCLAMATION_IN_ACTION'),
+        'Should fire EXCLAMATION_IN_ACTION when 3 action lines end with "!"',
+      );
+    });
+
+    it('EXCLAMATION_IN_ACTION does NOT fire when fewer than 3 action lines end with "!"', async () => {
+      const fountain207f = `
+INT. BOXING GYM - NIGHT
+
+He wraps his hands slowly, knuckle by knuckle.
+She stands across the ring and watches.
+He steps through the ropes and settles into his stance.
+She shakes her head.
+He throws a left jab at the heavy bag!
+The bag swings back and he catches it.
+She picks up her gloves from the bench.
+He pauses and looks at her.
+`;
+      const result207f = await rhythmPass({ fountain: fountain207f, original: fountain207f, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(
+        !result207f.issues.some(i => i.rule === 'EXCLAMATION_IN_ACTION'),
+        'Should NOT fire when only 1 action line ends with "!" (fewer than 3)',
+      );
+    });
+  });
+
   describe('Wave 206 — payoffPass: setup burst, mid-story payoff void, clue drought', async () => {
     const makeRec206 = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

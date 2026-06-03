@@ -372,6 +372,68 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 207: Conjunction opener excess, then-chain, exclamation in action ──
+
+  // CONJUNCTION_OPENER_EXCESS: More than 30% of action lines begin with a
+  // coordinating conjunction (And, But, Or, So, Yet). An occasional conjunction-
+  // opener creates emphasis; when they dominate, the action reads like a breathless
+  // list or interior monologue rather than the cinematic present tense a screenplay
+  // requires. Distinct from OPENING_WORD_REPETITION (any word at >40%): this
+  // targets the coordinating-conjunction pattern specifically. Requires 8+ lines.
+  if (actionLines.length >= 8) {
+    const conjRe207 = /^(And|But|Or|So|Yet)\b/i;
+    const conjCount207 = actionLines.filter(l => conjRe207.test(l.text.trim())).length;
+    const conjRatio207 = conjCount207 / actionLines.length;
+    if (conjRatio207 > 0.30) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'CONJUNCTION_OPENER_EXCESS',
+        severity: 'minor',
+        description: `${conjCount207} of ${actionLines.length} action lines (${Math.round(conjRatio207 * 100)}%) begin with a coordinating conjunction (And, But, Or, So, Yet) — the action reads like a breathless list rather than present-tense cinematic description.`,
+        suggestedFix: "Reserve conjunction openers for single moments of emphasis. 'But she hesitates.' works once; a scene where half the lines start with And/But/Or reads as literary exercise, not screenplay.",
+      });
+    }
+  }
+
+  // THEN_CHAIN: More than 25% of action lines begin with "Then" or "And then" —
+  // the weakest narrative connector. "Then A. Then B. Then C." sequences events
+  // without causality; the action feels like stage directions lifted from a
+  // production report. Distinct from CONJUNCTION_OPENER_EXCESS (And/But/Or/So/Yet).
+  // Requires 8+ action lines.
+  if (actionLines.length >= 8) {
+    const thenRe207 = /^(Then|And then)\b/i;
+    const thenCount207 = actionLines.filter(l => thenRe207.test(l.text.trim())).length;
+    const thenRatio207 = thenCount207 / actionLines.length;
+    if (thenRatio207 > 0.25) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'THEN_CHAIN',
+        severity: 'minor',
+        description: `${thenCount207} of ${actionLines.length} action lines (${Math.round(thenRatio207 * 100)}%) begin with "Then" — sequencing without causality. "Then she runs. Then he follows." is a list of events, not a scene.`,
+        suggestedFix: "Replace 'Then' with cause: instead of 'Then she turns,' write 'The sound makes her turn' or 'She can't hold still any longer.' Every beat should follow from the last because of something — not merely after it.",
+      });
+    }
+  }
+
+  // EXCLAMATION_IN_ACTION: Three or more action lines end with '!'. Exclamation
+  // marks in action prose are a tell of over-writing: the screenplay annotates
+  // that something is exciting instead of writing action that IS exciting. The
+  // reader feels the writer's enthusiasm rather than the scene's tension. Distinct
+  // from dialogue exclamation checks in voice.ts — this fires solely on action
+  // description. Requires 8+ action lines.
+  if (actionLines.length >= 8) {
+    const exclCount207 = actionLines.filter(l => l.text.trim().endsWith('!')).length;
+    if (exclCount207 >= 3) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'EXCLAMATION_IN_ACTION',
+        severity: 'minor',
+        description: `${exclCount207} action lines end with '!' — the screenplay annotates excitement instead of writing it. Exclamation marks in action prose signal the writer's enthusiasm, not the scene's tension.`,
+        suggestedFix: "Remove the exclamation marks and rewrite each line to make the action itself urgent: sharper verbs, shorter sentences, concrete physical consequence. 'He catches the pass!' → 'He catches it. Barely.'",
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'rhythm', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
