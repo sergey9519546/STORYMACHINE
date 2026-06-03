@@ -15402,6 +15402,153 @@ Running now, she turns the corner.
     });
   });
 
+  describe('Wave 191 — originalityPass: passive voice overload, interior monologue leak, repeated location', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: ['establish_world', 'introduce_conflict', 'raise_stakes', 'revelation', 'climax', 'resolution'][idx % 6],
+      dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: idx % 2 === 0 ? 'positive' : 'negative', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const origInput = (fountain: string, n: number) => ({
+      fountain, original: fountain,
+      records: Array.from({ length: n }, (_, i) => makeRec(i)) as any,
+      structure: {} as any, annotations: [], approvedSpans: [],
+    });
+
+    // ── PASSIVE_VOICE_OVERLOAD ────────────────────────────────────────────────
+    it('originalityPass detects PASSIVE_VOICE_OVERLOAD when >25% of action lines are passive', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 12 action lines, 5 passive (42% > 25%)
+      const actions = [
+        'The file was placed on the desk.',
+        'Maria opens her laptop.',
+        'The report was handed to him early.',
+        'John crosses to the window.',
+        'A note was dropped by the door.',
+        'She pulls out a pen.',
+        'The window was sealed from outside.',
+        'He picks up his coffee.',
+        'Papers were stacked along the wall.',
+        'She straightens her jacket.',
+        'He types a memo.',
+        'She closes the folder.',
+      ];
+      const fountain = `INT. OFFICE - DAY\n\n${actions.join('\n')}\n`;
+      const result = await originalityPass(origInput(fountain, 2));
+      const passive = result.issues.filter(i => i.rule === 'PASSIVE_VOICE_OVERLOAD');
+      assert.ok(passive.length >= 1, `Should detect PASSIVE_VOICE_OVERLOAD; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(passive[0].severity === 'minor');
+    });
+
+    it('originalityPass does NOT fire PASSIVE_VOICE_OVERLOAD when action lines are active', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const actions = [
+        'Maria places the file on the desk.',
+        'She opens her laptop.',
+        'He delivers the report to reception.',
+        'John crosses to the window.',
+        'Someone drops a note by the door.',
+        'She pulls out a pen.',
+        'They seal the window from outside.',
+        'He picks up his coffee.',
+        'Papers cover the wall shelf.',
+        'She straightens her jacket.',
+        'He types a memo.',
+        'She closes the folder.',
+      ];
+      const fountain = `INT. OFFICE - DAY\n\n${actions.join('\n')}\n`;
+      const result = await originalityPass(origInput(fountain, 2));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'PASSIVE_VOICE_OVERLOAD'),
+        'Should NOT fire when action lines use active constructions',
+      );
+    });
+
+    // ── INTERIOR_MONOLOGUE_LEAK ───────────────────────────────────────────────
+    it('originalityPass detects INTERIOR_MONOLOGUE_LEAK when >15% of action lines describe thoughts', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 10 action lines, 3 interior (30% > 15%)
+      const actions = [
+        'She walks along the path.',
+        'He thinks about what she said.',
+        'A breeze moves through the trees.',
+        'She wonders if it matters.',
+        'He stops near the bench.',
+        'Light filters through the branches.',
+        'She considers leaving for good.',
+        'He looks at the water.',
+        'A bird lands nearby.',
+        'She picks up her bag.',
+      ];
+      const fountain = `INT. PARK - DAY\n\n${actions.join('\n')}\n`;
+      const result = await originalityPass(origInput(fountain, 2));
+      const leak = result.issues.filter(i => i.rule === 'INTERIOR_MONOLOGUE_LEAK');
+      assert.ok(leak.length >= 1, `Should detect INTERIOR_MONOLOGUE_LEAK; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(leak[0].severity === 'minor');
+    });
+
+    it('originalityPass does NOT fire INTERIOR_MONOLOGUE_LEAK when lines are observable', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const actions = [
+        'She walks along the path.',
+        'He stops near the bench.',
+        'A breeze moves through the trees.',
+        'She picks up a stone.',
+        'He looks at the water.',
+        'Light filters through the branches.',
+        'A bird lands nearby.',
+        'She sets the stone back down.',
+        'He turns and walks away.',
+        'She follows at a distance.',
+      ];
+      const fountain = `INT. PARK - DAY\n\n${actions.join('\n')}\n`;
+      const result = await originalityPass(origInput(fountain, 2));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'INTERIOR_MONOLOGUE_LEAK'),
+        'Should NOT fire when action lines describe only observable behavior',
+      );
+    });
+
+    // ── REPEATED_LOCATION_EXCESS ──────────────────────────────────────────────
+    it('originalityPass detects REPEATED_LOCATION_EXCESS when one location dominates scenes', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 6 scenes: 3 in INT. KITCHEN (50% >= 40%), 3 varied → fires
+      const fountain = [
+        'INT. KITCHEN - DAY\n\nAction line one.\n',
+        'INT. HALLWAY - NIGHT\n\nAction line two.\n',
+        'INT. KITCHEN - NIGHT\n\nAction line three.\n',
+        'EXT. GARDEN - DAY\n\nAction line four.\n',
+        'INT. KITCHEN - MORNING\n\nAction line five.\n',
+        'EXT. STREET - DAY\n\nAction line six.\n',
+      ].join('\n');
+      const result = await originalityPass(origInput(fountain, 6));
+      const repeated = result.issues.filter(i => i.rule === 'REPEATED_LOCATION_EXCESS');
+      assert.ok(repeated.length >= 1, `Should detect REPEATED_LOCATION_EXCESS; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(repeated[0].severity === 'minor');
+    });
+
+    it('originalityPass does NOT fire REPEATED_LOCATION_EXCESS when locations are varied', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 6 unique locations — no location appears more than once
+      const fountain = [
+        'INT. KITCHEN - DAY\n\nLine one.\n',
+        'INT. HALLWAY - NIGHT\n\nLine two.\n',
+        'EXT. GARDEN - DAY\n\nLine three.\n',
+        'INT. BEDROOM - MORNING\n\nLine four.\n',
+        'EXT. STREET - NIGHT\n\nLine five.\n',
+        'INT. OFFICE - DAY\n\nLine six.\n',
+      ].join('\n');
+      const result = await originalityPass(origInput(fountain, 6));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'REPEATED_LOCATION_EXCESS'),
+        'Should NOT fire when each scene uses a different location',
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

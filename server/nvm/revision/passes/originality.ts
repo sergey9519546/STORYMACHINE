@@ -446,6 +446,99 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 191: Passive voice overload, interior monologue leak, repeated location ─
+
+  // PASSIVE_VOICE_OVERLOAD: More than 25% of action lines use passive-voice
+  // constructions ("was placed", "were told", "was sealed"). Passive prose drains
+  // kinetic energy — the subject should perform the action, not receive it.
+  // Requires 10+ action lines.
+  {
+    const passiveRe = /(was|were)\s+[a-z]{2,}ed\b/i;
+    let pvActionN = 0;
+    let pvPassiveN = 0;
+    let pvInDlg = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { pvInDlg = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { pvInDlg = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { pvInDlg = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (pvInDlg) continue;
+      pvActionN++;
+      if (passiveRe.test(t)) pvPassiveN++;
+    }
+    if (pvActionN >= 10 && pvPassiveN / pvActionN > 0.25) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'PASSIVE_VOICE_OVERLOAD',
+        severity: 'minor',
+        description: `${pvPassiveN} of ${pvActionN} action lines (${Math.round(pvPassiveN / pvActionN * 100)}%) use passive construction ("was placed", "were told") — passive prose distances the audience from the action and drains its kinetic force.`,
+        suggestedFix: 'Rewrite passive lines as active: "The door was closed by Maria" → "Maria closes the door." The subject should perform the verb, not receive it.',
+      });
+    }
+  }
+
+  // INTERIOR_MONOLOGUE_LEAK: More than 15% of action lines describe invisible
+  // internal states — thoughts, imaginings, recollections. Screenplay action lines
+  // must describe only what the camera can capture; thought-describing directions
+  // give the director nothing to shoot and put the author's interiority on screen
+  // rather than the character's behavior. Requires 8+ action lines.
+  {
+    const interiorRe = /\b(thinks?\s+(?:about|of|that|over)|wonders?\s+(?:if|whether|about)|considers?\s+(?:this|that|the|a|an|\w+ing)\b|imagines?\b|ponders?\b|recalls?\s+(?:when|that|the|a|her|his|their)|remembers?\s+(?:when|that|the|a|her|his|their))\b/i;
+    let imActionN = 0;
+    let imInteriorN = 0;
+    let imInDlg = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { imInDlg = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { imInDlg = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { imInDlg = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (imInDlg) continue;
+      imActionN++;
+      if (interiorRe.test(t)) imInteriorN++;
+    }
+    if (imActionN >= 8 && imInteriorN / imActionN > 0.15) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'INTERIOR_MONOLOGUE_LEAK',
+        severity: 'minor',
+        description: `${imInteriorN} of ${imActionN} action lines (${Math.round(imInteriorN / imActionN * 100)}%) describe invisible internal states — thoughts, wonderings, recollections. The camera cannot render what a character thinks.`,
+        suggestedFix: 'Externalize the interiority: find a physical action, gesture, or prop interaction that makes the internal state filmable. Show the thought through behavior, not narration.',
+      });
+    }
+  }
+
+  // REPEATED_LOCATION_EXCESS: A single normalized location appears in 3 or more
+  // scenes and constitutes 40%+ of all scene headings. The story returns
+  // obsessively to one space without spatial or visual variety.
+  // Requires 6+ records.
+  if (records.length >= 6) {
+    const slugCounts = new Map<string, number>();
+    const slugLinesList = lines.filter(l => /^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(l.trim()));
+    for (const slug of slugLinesList) {
+      const normalized = slug.trim().toLowerCase()
+        .replace(/\s*-\s*(day|night|continuous|later|dawn|dusk|morning|evening|afternoon|sunset|sunrise)\s*$/i, '')
+        .trim();
+      slugCounts.set(normalized, (slugCounts.get(normalized) ?? 0) + 1);
+    }
+    const totalSlugsCount = slugLinesList.length;
+    if (totalSlugsCount > 0) {
+      for (const [loc, count] of slugCounts) {
+        if (count >= 3 && count / totalSlugsCount >= 0.4) {
+          issues.push({
+            location: `Setting: ${loc}`,
+            rule: 'REPEATED_LOCATION_EXCESS',
+            severity: 'minor',
+            description: `The location "${loc}" appears in ${count} of ${totalSlugsCount} scenes (${Math.round(count / totalSlugsCount * 100)}%) — the story returns to one space with no visual or spatial variety.`,
+            suggestedFix: 'Vary the settings. Even small location shifts signal narrative movement and give the director different visual vocabulary for the same dramatic tension.',
+          });
+          break;
+        }
+      }
+    }
+  }
+
   // ── Limit total issues to avoid overwhelming output ───────────────────────
   // Clichés (minor) are pushed first and would crowd out the higher-severity
   // structural findings (UNIFORM_SCENE_PURPOSES is major) under a naive slice.
