@@ -673,6 +673,77 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 204: Punctuation flatline, staccato overuse, pronoun-I overload ────
+
+  // PUNCTUATION_FLATLINE: More than 85% of all dialogue lines end with a period
+  // AND no line ends with '!'. Every character speaks in the same flat declarative
+  // register — no urgency, no burst, no surprise. Emotional range lives in
+  // punctuation as well as words; a script where everything ends with a full stop
+  // runs on a single monotone emotional note. Requires 12+ dialogue lines.
+  if (dialogue.length >= 12) {
+    let periodCount204 = 0;
+    let bangCount204 = 0;
+    for (const d of dialogue) {
+      const t204 = d.line.trim();
+      if (t204.endsWith('.')) periodCount204++;
+      if (t204.endsWith('!')) bangCount204++;
+    }
+    const periodRatio204 = periodCount204 / dialogue.length;
+    if (periodRatio204 > 0.85 && bangCount204 === 0) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'PUNCTUATION_FLATLINE',
+        severity: 'minor',
+        description: `${periodCount204} of ${dialogue.length} dialogue lines (${Math.round(periodRatio204 * 100)}%) end with a period and none end with '!' — every character speaks in the same flat declarative register. Emotional range lives in punctuation as well as words.`,
+        suggestedFix:
+          "Vary terminal punctuation to signal register: '!' for urgency or surprise, '--' for interruption or trailing off, fragments without punctuation for staccato impact. A script where everything ends with a period sounds emotionally flattened.",
+      });
+    }
+  }
+
+  // DIALOGUE_STACCATO_OVERUSE: More than 65% of all dialogue lines are five words
+  // or fewer. Punchy short lines are powerful — but only by contrast. When nearly
+  // every line is a one-breath fragment, no character gets to develop a thought.
+  // The script reads like telegrams rather than speech, and all emotional weight
+  // collapses into monotone brevity. Requires 12+ dialogue lines.
+  if (dialogue.length >= 12) {
+    const staccatoCount204 = dialogue.filter(d => {
+      const wordCount204 = d.line.trim().split(/\s+/).filter(w => w.length > 0).length;
+      return wordCount204 <= 5;
+    }).length;
+    const staccatoRatio204 = staccatoCount204 / dialogue.length;
+    if (staccatoRatio204 > 0.65) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_STACCATO_OVERUSE',
+        severity: 'minor',
+        description: `${staccatoCount204} of ${dialogue.length} dialogue lines (${Math.round(staccatoRatio204 * 100)}%) are five words or fewer — punchy brevity overwhelms the dialogue. No character gets to develop a complete thought.`,
+        suggestedFix:
+          'Balance short lines with some longer, more developed speeches. Characters under pressure can still form sentences; the weight of a short line only lands when surrounded by longer ones.',
+      });
+    }
+  }
+
+  // PRONOUN_I_OVERLOAD: More than 60% of all dialogue lines across all speakers
+  // begin with the first-person pronoun "I" (including contractions I'm, I'll, I'd,
+  // I've). When most sentences center on the speaker's own perspective, nobody is
+  // listening — the dialogue becomes a simultaneous monologue of ego. Characters
+  // with a distinct voice address the world, not just themselves. Requires 10+ lines.
+  if (dialogue.length >= 10) {
+    const iStartCount204 = dialogue.filter(d => /^I\b/.test(d.line.trim())).length;
+    const iStartRatio204 = iStartCount204 / dialogue.length;
+    if (iStartRatio204 > 0.60) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'PRONOUN_I_OVERLOAD',
+        severity: 'minor',
+        description: `${iStartCount204} of ${dialogue.length} dialogue lines (${Math.round(iStartRatio204 * 100)}%) begin with "I" — most characters are talking about themselves rather than engaging with each other. The dialogue is a chorus of ego, not a conversation.`,
+        suggestedFix:
+          'Vary sentence openers: start lines with the other character\'s name, an action verb ("Take it."), a declarative about the world ("This changes everything."), or a question. When every line begins with "I", no one is listening.',
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'dialogue', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

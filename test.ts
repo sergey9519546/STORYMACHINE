@@ -15857,6 +15857,323 @@ Goodnight.
     });
   });
 
+  describe('Wave 204 — dialoguePass: punctuation flatline, staccato overuse, pronoun-I overload', async () => {
+    const blankRec204 = (): any => ({
+      commitId: 'c0', sceneIdx: 0, slug: 'INT. ROOM - DAY',
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+    });
+    const dlgInput204 = (fountain: string) => ({
+      fountain, original: fountain, records: [blankRec204()],
+      structure: {} as any, annotations: [], approvedSpans: [],
+    });
+
+    // ── PUNCTUATION_FLATLINE ──────────────────────────────────────────────────
+    it('dialoguePass detects PUNCTUATION_FLATLINE when >85% of lines end with period and none with "!"', async () => {
+      // 12 dialogue lines, all ending in period, no '!', all >5 words, none start "I"
+      const fountain = `INT. OFFICE - DAY
+
+The room is quiet.
+
+ALICE
+The numbers came back from the lab today.
+
+BOB
+They confirmed everything we suspected about him.
+
+ALICE
+We should bring this to the board soon.
+
+BOB
+The board will want more evidence first.
+
+She walks to the window.
+
+ALICE
+There is enough here to start the process.
+
+BOB
+Maybe the timing could not be any worse.
+
+ALICE
+We have waited long enough for this moment.
+
+BOB
+Then we move forward with the plan tomorrow.
+
+He closes the folder.
+
+ALICE
+The others need to know what happened here.
+
+BOB
+They will find out soon enough themselves.
+
+ALICE
+We cannot keep them in the dark forever.
+
+BOB
+For now we keep this between the two of us.
+`;
+      const result = await dialoguePass(dlgInput204(fountain));
+      const issues = result.issues.filter(i => i.rule === 'PUNCTUATION_FLATLINE');
+      assert.ok(issues.length >= 1, `Should detect PUNCTUATION_FLATLINE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(issues[0].severity === 'minor');
+    });
+
+    it('dialoguePass does NOT fire PUNCTUATION_FLATLINE when some lines end with "!"', async () => {
+      const fountain = `INT. OFFICE - DAY
+
+The room is quiet.
+
+ALICE
+The numbers came back from the lab today!
+
+BOB
+They confirmed everything we suspected about him.
+
+ALICE
+We should bring this to the board soon!
+
+BOB
+The board will want more evidence first.
+
+She walks to the window.
+
+ALICE
+There is enough here to start the process.
+
+BOB
+Maybe the timing could not be any worse!
+
+ALICE
+We have waited long enough for this moment.
+
+BOB
+Then we move forward with the plan tomorrow.
+
+He closes the folder.
+
+ALICE
+The others need to know what happened here.
+
+BOB
+They will find out soon enough themselves.
+
+ALICE
+We cannot keep them in the dark forever.
+
+BOB
+For now we keep this between the two of us.
+`;
+      const result = await dialoguePass(dlgInput204(fountain));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'PUNCTUATION_FLATLINE'),
+        'Should NOT fire when some dialogue lines end with "!"',
+      );
+    });
+
+    // ── DIALOGUE_STACCATO_OVERUSE ─────────────────────────────────────────────
+    it('dialoguePass detects DIALOGUE_STACCATO_OVERUSE when >65% of lines are five words or fewer', async () => {
+      // 12 dialogue lines, all <=5 words; varied punctuation to avoid flatline
+      const fountain = `INT. ALLEY - NIGHT
+
+They press against the wall.
+
+ALICE
+Get down now!
+
+BOB
+They saw us.
+
+ALICE
+Move to the back.
+
+BOB
+The door is locked.
+
+He tries the handle.
+
+ALICE
+Break the window!
+
+BOB
+Too much noise.
+
+ALICE
+We have no choice.
+
+BOB
+Wait for my signal.
+
+She crouches low.
+
+ALICE
+The guard is coming.
+
+BOB
+Hold your position.
+
+ALICE
+He turned away now.
+
+BOB
+Move move move!
+`;
+      const result = await dialoguePass(dlgInput204(fountain));
+      const issues = result.issues.filter(i => i.rule === 'DIALOGUE_STACCATO_OVERUSE');
+      assert.ok(issues.length >= 1, `Should detect DIALOGUE_STACCATO_OVERUSE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(issues[0].severity === 'minor');
+    });
+
+    it('dialoguePass does NOT fire DIALOGUE_STACCATO_OVERUSE when lines are developed sentences', async () => {
+      const fountain = `INT. ALLEY - NIGHT
+
+They press against the wall.
+
+ALICE
+We need to get down before they spot us!
+
+BOB
+They already saw us when we crossed the street.
+
+ALICE
+Then we move toward the back exit quietly.
+
+BOB
+The back door has been locked since this morning.
+
+He tries the handle.
+
+ALICE
+We could break the window if we move fast!
+
+BOB
+That would make far too much noise for comfort.
+
+ALICE
+We really do not have any other choice now.
+
+BOB
+Just wait for my signal before you do anything.
+
+She crouches low.
+
+ALICE
+The guard is coming around the corner toward us.
+
+BOB
+Hold your position and do not make a sound.
+
+ALICE
+He finally turned away from our hiding spot.
+
+BOB
+Now we move quickly before he comes back around!
+`;
+      const result = await dialoguePass(dlgInput204(fountain));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'DIALOGUE_STACCATO_OVERUSE'),
+        'Should NOT fire when most lines are developed sentences',
+      );
+    });
+
+    // ── PRONOUN_I_OVERLOAD ────────────────────────────────────────────────────
+    it('dialoguePass detects PRONOUN_I_OVERLOAD when >60% of lines begin with "I"', async () => {
+      // 10 dialogue lines, 7 begin with "I" (70%)
+      const fountain = `INT. CORRIDOR - DAY
+
+The hallway stretches ahead.
+
+ALICE
+I walked the entire length of the corridor.
+
+BOB
+The lights were already off when we arrived.
+
+ALICE
+I checked every single door along the way.
+
+BOB
+I saw nothing out of place down there.
+
+She kneels by the mat.
+
+ALICE
+I found the spare key under the mat.
+
+BOB
+That is where they always seem to leave it.
+
+ALICE
+I opened the safe without any real trouble.
+
+BOB
+I think the documents were right where we expected.
+
+He pockets the drive.
+
+ALICE
+I copied everything onto the backup drive.
+
+ALICE
+I left long before anyone even noticed me there.
+`;
+      const result = await dialoguePass(dlgInput204(fountain));
+      const issues = result.issues.filter(i => i.rule === 'PRONOUN_I_OVERLOAD');
+      assert.ok(issues.length >= 1, `Should detect PRONOUN_I_OVERLOAD; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(issues[0].severity === 'minor');
+    });
+
+    it('dialoguePass does NOT fire PRONOUN_I_OVERLOAD when openers are varied', async () => {
+      const fountain = `INT. CORRIDOR - DAY
+
+The hallway stretches ahead.
+
+ALICE
+The corridor ran the entire length of the floor.
+
+BOB
+The lights were already off when we arrived.
+
+ALICE
+Every single door along the way was checked.
+
+BOB
+Nothing seemed out of place down there.
+
+She kneels by the mat.
+
+ALICE
+The spare key was hidden under the mat.
+
+BOB
+That is where they always seem to leave it.
+
+ALICE
+The safe opened without any real trouble.
+
+BOB
+Those documents were right where we expected.
+
+He pockets the drive.
+
+ALICE
+Everything went onto the backup drive cleanly.
+
+BOB
+Nobody even noticed us leaving the building.
+`;
+      const result = await dialoguePass(dlgInput204(fountain));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'PRONOUN_I_OVERLOAD'),
+        'Should NOT fire when dialogue openers are varied',
+      );
+    });
+  });
+
   describe('Wave 203 — relationshipArcPass: third-act escalation absent, rapid reconciliation, payoff abandoned', async () => {
     const makeRec203 = (idx: number, overrides: any = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
