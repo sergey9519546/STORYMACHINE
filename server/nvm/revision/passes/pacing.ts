@@ -426,6 +426,94 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 200: Compression spiral, Act 2 dead weight, late expansion ─────────
+
+  // SCENE_COMPRESSION_SPIRAL: Five consecutive scenes each shorter than the
+  // previous — a spiral that depletes page space before the climax. Even when
+  // global variance is healthy, a sustained unbroken compression run strands
+  // the story below the line-count floor it needs to land the climax.
+  if (records.length >= 8) {
+    const orderedLens200 = Array.from({ length: records.length }, (_, i) => sceneLengths.get(i) ?? 0);
+    let spiralStart = -1;
+    for (let i = 0; i + 4 < orderedLens200.length; i++) {
+      if (
+        orderedLens200[i] > 0 &&
+        orderedLens200[i + 1] < orderedLens200[i] &&
+        orderedLens200[i + 2] < orderedLens200[i + 1] &&
+        orderedLens200[i + 3] < orderedLens200[i + 2] &&
+        orderedLens200[i + 4] < orderedLens200[i + 3]
+      ) {
+        spiralStart = i;
+        break;
+      }
+    }
+    if (spiralStart >= 0) {
+      issues.push({
+        location: `Scenes ${spiralStart}–${spiralStart + 4}`,
+        rule: 'SCENE_COMPRESSION_SPIRAL',
+        severity: 'major',
+        description: `Scenes ${spiralStart}–${spiralStart + 4} are each shorter than the last — a five-scene compression spiral that depletes page space before the climax. The story has no recovery or re-expansion within this run.`,
+        suggestedFix: 'Break the spiral by expanding at least one mid-sequence scene with a set-piece, confrontation, or character beat. The story needs room to breathe before the climax.',
+      });
+    }
+  }
+
+  // ACT2_DEAD_WEIGHT: Three or more Act 2 scenes that are both below average
+  // length and dramatically inert — no revelation, no rising tension, no
+  // relationship shift. These scenes pad runtime without advancing story; the
+  // audience feels the story idling at the moment it should be escalating.
+  if (records.length >= 8) {
+    const act2DwStart = Math.floor(records.length * 0.25);
+    const act2DwEnd = Math.floor(records.length * 0.75);
+    let deadWeightCount = 0;
+    for (let i = act2DwStart; i < act2DwEnd; i++) {
+      const r = records[i];
+      const lineLen = sceneLengths.get(i) ?? 0;
+      if (
+        lineLen > 0 && lineLen < avgLength &&
+        r.revelation === null &&
+        !r.clockRaised &&
+        r.suspenseDelta < 1 &&
+        (r.relationshipShifts ?? []).every((s: any) => Math.abs(s.amount) < 0.3)
+      ) {
+        deadWeightCount++;
+      }
+    }
+    if (deadWeightCount >= 3) {
+      issues.push({
+        location: `Act 2 (scenes ${act2DwStart}–${act2DwEnd - 1})`,
+        rule: 'ACT2_DEAD_WEIGHT',
+        severity: 'major',
+        description: `${deadWeightCount} Act 2 scenes are both below average length and dramatically empty — no revelation, no rising tension, no relationship shift. These scenes pad runtime without advancing the story.`,
+        suggestedFix: 'Either cut these scenes or inject a dramatic event into each: a revelation, a rising tension beat, or a meaningful character shift. Every Act 2 scene must change something.',
+      });
+    }
+  }
+
+  // LATE_EXPANSION: Act 3 average scene length exceeds Act 2 average by more
+  // than 15%. As stakes reach their peak, scenes should compress, not expand.
+  // A late expansion dissipates the urgency built through Act 2 and makes the
+  // climax feel padded rather than inevitable.
+  if (records.length >= 8) {
+    const act2LeStart = Math.floor(records.length * 0.25);
+    const act3LeStart = Math.floor(records.length * 0.75);
+    const act2LeRecs = records.slice(act2LeStart, act3LeStart);
+    const act3LeRecs = records.slice(act3LeStart);
+    if (act2LeRecs.length >= 2 && act3LeRecs.length >= 2) {
+      const avgAct2Le = act2LeRecs.reduce((s, _, i) => s + (sceneLengths.get(act2LeStart + i) ?? 0), 0) / act2LeRecs.length;
+      const avgAct3Le = act3LeRecs.reduce((s, _, i) => s + (sceneLengths.get(act3LeStart + i) ?? 0), 0) / act3LeRecs.length;
+      if (avgAct2Le > 0 && avgAct3Le > avgAct2Le * 1.15) {
+        issues.push({
+          location: 'Act 2 vs Act 3 pacing',
+          rule: 'LATE_EXPANSION',
+          severity: 'minor',
+          description: `Act 3 averages ${Math.round(avgAct3Le)} lines per scene vs ${Math.round(avgAct2Le)} in Act 2 — the story expands when it should contract. A late expansion dissipates the urgency built through Act 2.`,
+          suggestedFix: 'Tighten Act 3 scenes as stakes peak. Reserve expansion only for the climax itself, then snap into a lean denouement.',
+        });
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'pacing', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

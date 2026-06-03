@@ -15857,6 +15857,135 @@ Goodnight.
     });
   });
 
+  describe('Wave 200 — pacingPass: compression spiral, act2 dead weight, late expansion', async () => {
+    function makeFountainLens200(lens: number[]): string {
+      return lens.map((len, i) => {
+        const body = Array.from({ length: len }, (_, j) => `Line ${j + 1} of scene ${i}.`).join('\n');
+        return `INT. SC${i} - DAY\n\n${body}\n`;
+      }).join('\n');
+    }
+    const makeRec200 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 1,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const noAnn200 = (n: number) => Array.from({ length: n }, () => ({ revelation: false } as any));
+
+    // ── SCENE_COMPRESSION_SPIRAL ──────────────────────────────────────────────
+    it('pacingPass detects SCENE_COMPRESSION_SPIRAL for 5 consecutive shrinking scenes', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // scenes 0-4 = 20,15,14,11,8 each < previous → spiral fires at i=0
+      const lens = [20, 15, 14, 11, 8, 5, 8, 10, 12];
+      const records = Array.from({ length: 9 }, (_, i) => makeRec200(i));
+      const result = await pacingPass({
+        fountain: makeFountainLens200(lens), original: '',
+        records: records as any, structure: {} as any,
+        annotations: noAnn200(9), approvedSpans: [],
+      });
+      const spiral = result.issues.filter(i => i.rule === 'SCENE_COMPRESSION_SPIRAL');
+      assert.ok(spiral.length >= 1, `Should detect SCENE_COMPRESSION_SPIRAL; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(spiral[0].severity === 'major');
+    });
+
+    it('pacingPass does NOT fire SCENE_COMPRESSION_SPIRAL when spiral is broken mid-run', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // scene 4=12 > scene 3=9 → spiral breaks; longest run is 4 not 5
+      const lens = [20, 15, 14, 9, 12, 5, 8, 10, 12];
+      const records = Array.from({ length: 9 }, (_, i) => makeRec200(i));
+      const result = await pacingPass({
+        fountain: makeFountainLens200(lens), original: '',
+        records: records as any, structure: {} as any,
+        annotations: noAnn200(9), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'SCENE_COMPRESSION_SPIRAL'),
+        'Should NOT fire when no 5-scene window is strictly decreasing',
+      );
+    });
+
+    // ── ACT2_DEAD_WEIGHT ──────────────────────────────────────────────────────
+    it('pacingPass detects ACT2_DEAD_WEIGHT for 3+ empty act-2 scenes', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // n=8, act2=[2,6); scenes 2,3,4 are short+empty; scene 5 has suspenseDelta=1
+      // avg=(3+14+3+3+5+4+6+5)/8=5.375; scene1 sd=2 prevents OVERLONG_LOW_TENSION
+      const lens = [3, 14, 3, 3, 5, 4, 6, 5];
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec200(i, {
+          suspenseDelta: i === 1 ? 2 : i <= 4 ? 0 : 1,
+        }),
+      );
+      const result = await pacingPass({
+        fountain: makeFountainLens200(lens), original: '',
+        records: records as any, structure: {} as any,
+        annotations: noAnn200(8), approvedSpans: [],
+      });
+      const dw = result.issues.filter(i => i.rule === 'ACT2_DEAD_WEIGHT');
+      assert.ok(dw.length >= 1, `Should detect ACT2_DEAD_WEIGHT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(dw[0].severity === 'major');
+    });
+
+    it('pacingPass does NOT fire ACT2_DEAD_WEIGHT when act-2 scenes have dramatic events', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // same lengths but scenes 2+3 get clockRaised/revelation → only 1 empty scene
+      const lens = [3, 14, 3, 3, 5, 4, 6, 5];
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec200(i, {
+          suspenseDelta: i === 1 ? 2 : i <= 4 ? 0 : 1,
+          clockRaised: i === 2,
+          revelation: i === 3 ? 'plot point' : null,
+        }),
+      );
+      const result = await pacingPass({
+        fountain: makeFountainLens200(lens), original: '',
+        records: records as any, structure: {} as any,
+        annotations: noAnn200(8), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'ACT2_DEAD_WEIGHT'),
+        'Should NOT fire when most act-2 scenes contain a dramatic event',
+      );
+    });
+
+    // ── LATE_EXPANSION ────────────────────────────────────────────────────────
+    it('pacingPass detects LATE_EXPANSION when act 3 scenes are much longer than act 2', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // n=8, act2=[2,6)=4,5,3,4 avg=4; act3=[6,8)=12,12 avg=12; 12>4*1.15=4.6 → fires
+      // records 4,6,7 sd=2 to prevent MIDPOINT_COLLAPSE & RESOLUTION_SCENE_BLOAT
+      const lens = [9, 10, 4, 5, 3, 4, 12, 12];
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec200(i, { suspenseDelta: [4, 6].includes(i) ? 2 : i === 7 ? 2 : 1 }),
+      );
+      const result = await pacingPass({
+        fountain: makeFountainLens200(lens), original: '',
+        records: records as any, structure: {} as any,
+        annotations: noAnn200(8), approvedSpans: [],
+      });
+      const late = result.issues.filter(i => i.rule === 'LATE_EXPANSION');
+      assert.ok(late.length >= 1, `Should detect LATE_EXPANSION; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(late[0].severity === 'minor');
+    });
+
+    it('pacingPass does NOT fire LATE_EXPANSION when act 3 is not disproportionately longer', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // n=8, act2=[2,6)=8,6,6,7 avg=6.75; act3=[6,8)=8,6 avg=7; 7>6.75*1.15=7.76? No
+      const lens = [4, 18, 8, 6, 6, 7, 8, 6];
+      const records = Array.from({ length: 8 }, (_, i) => makeRec200(i));
+      const result = await pacingPass({
+        fountain: makeFountainLens200(lens), original: '',
+        records: records as any, structure: {} as any,
+        annotations: noAnn200(8), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'LATE_EXPANSION'),
+        'Should NOT fire when act-3 average is within 15% of act-2 average',
+      );
+    });
+  });
+
   describe('Wave 199 — beliefPass: midpoint void, single revelation, revelation delayed', async () => {
     const makeRec199 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
