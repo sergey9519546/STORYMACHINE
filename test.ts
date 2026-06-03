@@ -15857,6 +15857,164 @@ Goodnight.
     });
   });
 
+  describe('Wave 208 — themePass: consecutive resonant surfeit, first-act resolution, subplot isolation', async () => {
+    const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+
+    const makeRec208 = (idx: number, extra: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'action', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      seededClueIds: [], payoffSetupIds: [], dialogueHighlights: [],
+      relationshipShifts: [], unresolvedClues: [],
+      ...extra,
+    });
+
+    const minFountain208 = 'INT. SCENE - DAY\n\nAction.\n';
+
+    it('THEME_CONSECUTIVE_RESONANT_SURFEIT fires when 5+ consecutive scenes all carry the theme', async () => {
+      // 10 records; resonant at indices 2–7 (run of 6), plus 9. Max run = 6 ≥ 5.
+      const records208a = [
+        makeRec208(0),
+        makeRec208(1),
+        makeRec208(2, { dialogueHighlights: ['loyalty above all'] }),
+        makeRec208(3, { dialogueHighlights: ['loyalty is tested'] }),
+        makeRec208(4, { dialogueHighlights: ['loyalty matters'] }),
+        makeRec208(5, { dialogueHighlights: ['loyalty questioned'], emotionalShift: 'negative', suspenseDelta: -2 }),
+        makeRec208(6, { dialogueHighlights: ['loyalty regained'] }),
+        makeRec208(7, { dialogueHighlights: ['loyalty proven'], emotionalShift: 'negative', suspenseDelta: 3 }),
+        makeRec208(8),
+        makeRec208(9, { dialogueHighlights: ['loyalty endures'], emotionalShift: 'positive' }),
+      ];
+      const result208a = await themePass({
+        fountain: minFountain208, original: minFountain208,
+        records: records208a, structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'loyalty' },
+      });
+      assert.ok(
+        result208a.issues.some(i => i.rule === 'THEME_CONSECUTIVE_RESONANT_SURFEIT'),
+        'Should fire THEME_CONSECUTIVE_RESONANT_SURFEIT when 6 consecutive scenes all carry the theme',
+      );
+    });
+
+    it('THEME_CONSECUTIVE_RESONANT_SURFEIT does NOT fire when the longest resonant run is under 5', async () => {
+      // 10 records; resonant at 0–3 (run of 4), silent at 4–5, resonant at 6–9 (run of 4). Max run = 4.
+      const records208b = [
+        makeRec208(0, { dialogueHighlights: ['loyalty opens'] }),
+        makeRec208(1, { dialogueHighlights: ['loyalty builds'] }),
+        makeRec208(2, { dialogueHighlights: ['loyalty challenged'], emotionalShift: 'negative' }),
+        makeRec208(3, { dialogueHighlights: ['loyalty holds'] }),
+        makeRec208(4),
+        makeRec208(5),
+        makeRec208(6, { dialogueHighlights: ['loyalty returns'] }),
+        makeRec208(7, { dialogueHighlights: ['loyalty climax'], emotionalShift: 'negative', suspenseDelta: 3 }),
+        makeRec208(8, { dialogueHighlights: ['loyalty settled'] }),
+        makeRec208(9, { dialogueHighlights: ['loyalty endures'], emotionalShift: 'positive' }),
+      ];
+      const result208b = await themePass({
+        fountain: minFountain208, original: minFountain208,
+        records: records208b, structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'loyalty' },
+      });
+      assert.ok(
+        !result208b.issues.some(i => i.rule === 'THEME_CONSECUTIVE_RESONANT_SURFEIT'),
+        'Should NOT fire when the longest consecutive run of resonant scenes is exactly 4',
+      );
+    });
+
+    it('THEME_FIRST_ACT_RESOLUTION fires when Act 1 answers the theme before testing it', async () => {
+      // 8 records; Act 1 = indices 0–1. Scene 1 resonant with positive, no clock, suspenseDelta≥0.
+      // No act1 scene with negative shift → fires.
+      const records208c = [
+        makeRec208(0),
+        makeRec208(1, { dialogueHighlights: ['loyalty prevails'], emotionalShift: 'positive', suspenseDelta: 0 }),
+        makeRec208(2, { dialogueHighlights: ['loyalty tested'] }),
+        makeRec208(3, { dialogueHighlights: ['loyalty broken'], emotionalShift: 'negative' }),
+        makeRec208(4),
+        makeRec208(5, { dialogueHighlights: ['loyalty costs'] }),
+        makeRec208(6, { dialogueHighlights: ['loyalty earned'], emotionalShift: 'negative', suspenseDelta: 3 }),
+        makeRec208(7, { dialogueHighlights: ['loyalty wins'], emotionalShift: 'positive' }),
+      ];
+      const result208c = await themePass({
+        fountain: minFountain208, original: minFountain208,
+        records: records208c, structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'loyalty' },
+      });
+      assert.ok(
+        result208c.issues.some(i => i.rule === 'THEME_FIRST_ACT_RESOLUTION'),
+        'Should fire THEME_FIRST_ACT_RESOLUTION when Act 1 has a positive, unthreatened thematic scene with no challenge',
+      );
+    });
+
+    it('THEME_FIRST_ACT_RESOLUTION does NOT fire when the Act 1 thematic scene is neutral rather than resolved', async () => {
+      // Same structure but scene 1 has emotionalShift='neutral' — no easy answer.
+      const records208d = [
+        makeRec208(0),
+        makeRec208(1, { dialogueHighlights: ['loyalty questioned'], emotionalShift: 'neutral', suspenseDelta: 0 }),
+        makeRec208(2, { dialogueHighlights: ['loyalty tested'] }),
+        makeRec208(3, { dialogueHighlights: ['loyalty broken'], emotionalShift: 'negative' }),
+        makeRec208(4),
+        makeRec208(5, { dialogueHighlights: ['loyalty costs'] }),
+        makeRec208(6, { dialogueHighlights: ['loyalty earned'], emotionalShift: 'negative', suspenseDelta: 3 }),
+        makeRec208(7, { dialogueHighlights: ['loyalty wins'], emotionalShift: 'positive' }),
+      ];
+      const result208d = await themePass({
+        fountain: minFountain208, original: minFountain208,
+        records: records208d, structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'loyalty' },
+      });
+      assert.ok(
+        !result208d.issues.some(i => i.rule === 'THEME_FIRST_ACT_RESOLUTION'),
+        'Should NOT fire when the Act 1 thematic scene is emotionally neutral rather than positively resolved',
+      );
+    });
+
+    it('THEME_SUBPLOT_ISOLATION fires when theme only appears in revelation/exposition scenes', async () => {
+      // 8 records; all 5 resonant scenes have revelation set; 2 action scenes (dramaticTurn!='nothing') are silent.
+      const records208e = [
+        makeRec208(0, { revelation: 'loyalty above all', emotionalShift: 'neutral' }),
+        makeRec208(1, { dramaticTurn: 'reversal' }),  // action, silent
+        makeRec208(2, { revelation: 'loyalty is tested' }),
+        makeRec208(3, { dramaticTurn: 'decision' }),  // action, silent
+        makeRec208(4, { revelation: 'loyalty costs', emotionalShift: 'negative' }),
+        makeRec208(5),
+        makeRec208(6, { revelation: 'loyalty earned', emotionalShift: 'negative', suspenseDelta: 3 }),
+        makeRec208(7, { revelation: 'loyalty wins', emotionalShift: 'positive' }),
+      ];
+      const result208e = await themePass({
+        fountain: minFountain208, original: minFountain208,
+        records: records208e, structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'loyalty' },
+      });
+      assert.ok(
+        result208e.issues.some(i => i.rule === 'THEME_SUBPLOT_ISOLATION'),
+        'Should fire THEME_SUBPLOT_ISOLATION when every resonant scene is a revelation/exposition scene',
+      );
+    });
+
+    it('THEME_SUBPLOT_ISOLATION does NOT fire when at least one action scene carries the theme', async () => {
+      // Same setup but scene 2 carries theme via dialogueHighlights (revelation=null).
+      const records208f = [
+        makeRec208(0, { revelation: 'loyalty above all', emotionalShift: 'neutral' }),
+        makeRec208(1, { dramaticTurn: 'reversal' }),
+        makeRec208(2, { dialogueHighlights: ['loyalty matters'], revelation: null }),
+        makeRec208(3, { dramaticTurn: 'decision' }),
+        makeRec208(4, { revelation: 'loyalty costs', emotionalShift: 'negative' }),
+        makeRec208(5),
+        makeRec208(6, { revelation: 'loyalty earned', emotionalShift: 'negative', suspenseDelta: 3 }),
+        makeRec208(7, { revelation: 'loyalty wins', emotionalShift: 'positive' }),
+      ];
+      const result208f = await themePass({
+        fountain: minFountain208, original: minFountain208,
+        records: records208f, structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'loyalty' },
+      });
+      assert.ok(
+        !result208f.issues.some(i => i.rule === 'THEME_SUBPLOT_ISOLATION'),
+        'Should NOT fire when at least one resonant scene has revelation=null (action scene carries theme)',
+      );
+    });
+  });
+
   describe('Wave 207 — rhythmPass: conjunction opener excess, then-chain, exclamation in action', async () => {
     const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
 

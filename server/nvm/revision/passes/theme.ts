@@ -499,6 +499,91 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         });
       }
     }
+
+    // ── Wave 208: Consecutive resonant surfeit, first-act resolution, subplot isolation ──
+
+    // THEME_CONSECUTIVE_RESONANT_SURFEIT: Five or more consecutive scenes all carry
+    // thematic language — a saturation wall that trains the audience to stop registering
+    // the theme. Theme lands hardest when it has silence between its hits. A run of five
+    // or more consecutive resonant scenes collapses the signal into wallpaper.
+    if (records.length >= 8 && resonantScenes.length >= 5) {
+      let maxRun208 = 0;
+      let currentRun208 = 0;
+      let maxRunStart208 = 0;
+      let currentRunStart208 = 0;
+      for (let i = 0; i < records.length; i++) {
+        const isRes208 = sceneHasResonance(sceneTexts.get(records[i].sceneIdx) ?? '', expandedKeywords);
+        if (isRes208) {
+          if (currentRun208 === 0) currentRunStart208 = i;
+          currentRun208++;
+          if (currentRun208 > maxRun208) { maxRun208 = currentRun208; maxRunStart208 = currentRunStart208; }
+        } else {
+          currentRun208 = 0;
+        }
+      }
+      if (maxRun208 >= 5) {
+        const runEnd208 = Math.min(maxRunStart208 + maxRun208 - 1, records.length - 1);
+        issues.push({
+          location: `Scenes ${records[maxRunStart208].sceneIdx}–${records[runEnd208].sceneIdx}`,
+          rule: 'THEME_CONSECUTIVE_RESONANT_SURFEIT',
+          severity: 'minor',
+          description: `${maxRun208} consecutive scenes all carry the theme "${themeRaw}" with no breathing room — thematic saturation desensitizes the audience. Theme lands hardest when it has silence between its hits; without rest, the resonance becomes ambient noise.`,
+          suggestedFix: `Break the run with 1–2 theme-silent scenes inside that stretch: pure plot or action scenes that let the thematic statement settle before the next invocation. Rhythm requires rest; the audience must feel the theme's absence before the next hit registers.`,
+        });
+      }
+    }
+
+    // THEME_FIRST_ACT_RESOLUTION: Act 1 contains a thematically resonant scene with
+    // a positive, unthreatened emotional outcome — the story delivers a comfortable
+    // answer to its central question before the question has been dramatized. A theme
+    // resolved before it is tested carries no weight; the audience has received the
+    // thesis without enduring the antithesis.
+    if (records.length >= 8) {
+      const act1End208 = Math.floor(records.length * 0.25);
+      const act1Recs208 = records.slice(0, act1End208);
+      if (act1Recs208.length >= 2) {
+        const act1ResonantEasy208 = act1Recs208.some(r =>
+          sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords) &&
+          r.emotionalShift === 'positive' &&
+          !r.clockRaised &&
+          r.suspenseDelta >= 0,
+        );
+        const act1HasChallenge208 = act1Recs208.some(r =>
+          sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords) &&
+          r.emotionalShift === 'negative',
+        );
+        if (act1ResonantEasy208 && !act1HasChallenge208) {
+          issues.push({
+            location: `Act 1 (scenes 0–${act1End208 - 1})`,
+            rule: 'THEME_FIRST_ACT_RESOLUTION',
+            severity: 'major',
+            description: `Act 1 contains a thematically resonant scene with a positive, unchallenged outcome — the story answers "${themeRaw}" before the question has been tested through drama. A thesis delivered before the antithesis is a lecture, not a story.`,
+            suggestedFix: `The opening thematic beat should POSE the question, not answer it. Replace the comfortable thematic moment with one that plants the theme at cost: a moment where its value is desired but not yet earned, already under threat, or complicated by what it costs.`,
+          });
+        }
+      }
+    }
+
+    // THEME_SUBPLOT_ISOLATION: All thematically resonant scenes are revelation or
+    // exposition scenes (where a character delivers information); no pure dramatic-action
+    // scene carries the theme. The theme lives in speeches and explanations rather than
+    // in kinetic physical choice. Great theme is dramatized, not announced.
+    if (records.length >= 8 && resonantScenes.length >= 3) {
+      const actionScenes208 = records.filter(r => r.revelation === null && r.dramaticTurn !== 'nothing');
+      if (actionScenes208.length >= 2) {
+        const allResonantHaveRevelation208 = resonantScenes.every(r => r.revelation !== null);
+        const noActionSceneResonant208 = !resonantScenes.some(r => r.revelation === null);
+        if (allResonantHaveRevelation208 && noActionSceneResonant208) {
+          issues.push({
+            location: 'Thematic placement',
+            rule: 'THEME_SUBPLOT_ISOLATION',
+            severity: 'minor',
+            description: `Every thematically resonant scene in "${themeRaw}" is a revelation or exposition scene. No scene of pure dramatic action carries the theme — it is spoken about rather than embodied through physical, kinetic choice.`,
+            suggestedFix: `Move at least one thematic beat into a scene of pure dramatic action: a confrontation, escape, or decisive physical choice where the theme is enacted rather than articulated. Great theme lives in what characters DO, not what they SAY about what they believe.`,
+          });
+        }
+      }
+    }
   }
 
   const { revised, usedLLM } = await rewritePass({
