@@ -450,6 +450,73 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 211: Revelation Act 3 void, late deception plant, belief resolution absent ──
+
+  // REVELATION_ACT3_VOID: Act 3 (last 25%) carries no witnessed revelations at all,
+  // despite 3+ revelations landing in the first 75%. The story's climax zone delivers
+  // no new truth — every discovery has already happened and the audience enters the
+  // final act with complete information. A climax without revelation can feel like
+  // execution rather than discovery: the protagonist acts on knowledge they already have,
+  // without the galvanising moment of finding out something new.
+  if (records.length >= 8 && witnessedBeliefs.length >= 3) {
+    const act3RevStart211 = Math.floor(records.length * 0.75);
+    const inAct3Rev211 = witnessedBeliefs.filter(w => w.sceneIdx >= act3RevStart211).length;
+    if (inAct3Rev211 === 0 && witnessedBeliefs.length - inAct3Rev211 >= 2) {
+      issues.push({
+        location: `Act 3 (Scenes ${act3RevStart211}–${records.length - 1}) — revelation zone`,
+        rule: 'REVELATION_ACT3_VOID',
+        severity: 'minor',
+        description: `${witnessedBeliefs.length} revelations land in the first 75% of the story but none reach Act 3 — the climax delivers no new discovery. The audience enters the final act with complete information and watches execution rather than revelation.`,
+        suggestedFix: 'Move at least one revelation into Act 3, or engineer a new one: a truth that the protagonist learns in the climax that recontextualises everything — the revelation that makes the final choice inevitable rather than obvious.',
+      });
+    }
+  }
+
+  // LATE_DECEPTION_PLANT: A deception is set up (told belief contradicted by a later
+  // witnessed revelation) but the false belief is planted in the final 40% of the
+  // story — too close to its own revelation to have had time to mislead the audience.
+  // A deception needs distance between the lie and its unmasking; a lie introduced in
+  // the final act and immediately exposed is a twist, not a slow burn.
+  if (records.length >= 8) {
+    const lateCutoff211 = Math.floor(records.length * 0.6);
+    const lateToldBeliefs = toldBeliefs.filter(told => told.sceneIdx >= lateCutoff211);
+    for (const told211 of lateToldBeliefs) {
+      const contradiction211 = witnessedBeliefs.find(w =>
+        w.sceneIdx > told211.sceneIdx && sharedWords(w.proposition, told211.proposition) >= 2,
+      );
+      if (contradiction211) {
+        issues.push({
+          location: `Scene ${told211.sceneIdx} (${told211.slug})`,
+          rule: 'LATE_DECEPTION_PLANT',
+          severity: 'minor',
+          description: `A deception is introduced at Scene ${told211.sceneIdx} (${Math.round(told211.sceneIdx / records.length * 100)}% through the story) and contradicted by a revelation at Scene ${contradiction211.sceneIdx} — the lie is planted and exposed in the same act. The audience has no time to be genuinely misled.`,
+          suggestedFix: 'Move the false belief into Act 1 or early Act 2 so it has time to settle before the revelation overturns it. Effective deception requires the audience to carry the lie long enough to believe it — at least half the story.',
+        });
+        break;
+      }
+    }
+  }
+
+  // BELIEF_RESOLUTION_ABSENT: The story has a developed belief/revelation arc (2+
+  // witnessed revelations) but none occur in the final 20% — the closing section
+  // delivers no truth. The belief layer's arc closes before the climax, leaving
+  // the story's ending informationally static. The audience's final impression is
+  // of action without discovery — the last thing they see is characters executing
+  // on knowledge they already had, not characters finding out something that matters.
+  if (records.length >= 8 && witnessedBeliefs.length >= 2) {
+    const finalZoneStart211 = Math.floor(records.length * 0.8);
+    const inFinalZone211 = witnessedBeliefs.filter(w => w.sceneIdx >= finalZoneStart211).length;
+    if (inFinalZone211 === 0) {
+      issues.push({
+        location: `Final zone (Scenes ${finalZoneStart211}–${records.length - 1}) — revelation`,
+        rule: 'BELIEF_RESOLUTION_ABSENT',
+        severity: 'major',
+        description: `${witnessedBeliefs.length} revelations land across the story but none reach the final 20% — the closing scenes deliver no new discovery. The belief arc resolves before the climax; the ending is informationally static.`,
+        suggestedFix: 'Ensure the story\'s climax or denouement delivers at least one witnessed revelation — a truth that changes the audience\'s understanding of everything that happened. The final revelation is the story\'s last word on what was real.',
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'belief', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

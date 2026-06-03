@@ -15857,6 +15857,167 @@ Goodnight.
     });
   });
 
+  describe('Wave 211 — beliefPass: revelation act3 void, late deception plant, belief resolution absent', async () => {
+    const makeRec211 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 1,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput211 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nA.\n', original: 'INT. SC - DAY\nA.\n',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('REVELATION_ACT3_VOID fires when act 3 carries no witnessed revelations despite 3+ in act 1/2', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // n=10: act3RevStart=floor(10*0.75)=7; revelations at scenes 0,3,6 — none in scenes 7-9
+      const records = [
+        makeRec211(0, { revelation: 'murder weapon discovered hidden near bridge' }),
+        makeRec211(1, { dialogueHighlights: ['alice: murder weapon was hidden near bridge there'] }),
+        makeRec211(2),
+        makeRec211(3, { revelation: 'detective found second clue about suspect location' }),
+        makeRec211(4, { dialogueHighlights: ['bob: detective found evidence about location earlier'] }),
+        makeRec211(5),
+        makeRec211(6, {
+          revelation: 'third truth about betrayal between partners discovered',
+          dialogueHighlights: ['carol: detective found evidence location about matter'],
+        }),
+        makeRec211(7),
+        makeRec211(8),
+        makeRec211(9),
+      ];
+      const result = await beliefPass(makeInput211(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'REVELATION_ACT3_VOID'),
+        'Should fire when 3 revelations land before act 3 and none reach the final 25%',
+      );
+    });
+
+    it('REVELATION_ACT3_VOID does not fire when at least one revelation lands in act 3', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // Add revelation at scene 7 (act3 starts at 7 for n=10) — inAct3Rev becomes 1
+      const records = [
+        makeRec211(0, { revelation: 'murder weapon discovered hidden near bridge' }),
+        makeRec211(1, { dialogueHighlights: ['alice: murder weapon was hidden near bridge there'] }),
+        makeRec211(2),
+        makeRec211(3, { revelation: 'detective found second clue about suspect location' }),
+        makeRec211(4, { dialogueHighlights: ['bob: detective found evidence about location earlier'] }),
+        makeRec211(5),
+        makeRec211(6, {
+          revelation: 'third truth about betrayal between partners discovered',
+          dialogueHighlights: ['carol: detective found evidence location about matter'],
+        }),
+        makeRec211(7, { revelation: 'fourth truth discovered about relationship betrayal' }),
+        makeRec211(8),
+        makeRec211(9),
+      ];
+      const result = await beliefPass(makeInput211(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'REVELATION_ACT3_VOID'),
+        'Should NOT fire when at least one revelation lands in the final 25%',
+      );
+    });
+
+    it('LATE_DECEPTION_PLANT fires when a false belief is planted and exposed within the same act', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // n=10, lateCutoff=floor(10*0.6)=6; told@6 shares 4 words with witnessed@8
+      // DECEPTION_WITHOUT_CONSEQUENCE exempt: contradiction.sceneIdx(8) >= records.length-2(8)
+      const records = [
+        makeRec211(0, { dialogueHighlights: ['bob: evidence clearly shows the robbery happened'] }),
+        makeRec211(1),
+        makeRec211(2),
+        makeRec211(3),
+        makeRec211(4, { revelation: 'trust found between loyal partners established' }),
+        makeRec211(5, { dialogueHighlights: ['carol: trust found partners clear'] }),
+        makeRec211(6, { dialogueHighlights: ['alice: trust always present between loyal partners friends'] }),
+        makeRec211(7),
+        makeRec211(8, {
+          revelation: 'trust broken deceit between loyal partners betrayed',
+          dialogueHighlights: ['bob: trust broken between partners betrayed indeed'],
+        }),
+        makeRec211(9),
+      ];
+      const result = await beliefPass(makeInput211(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'LATE_DECEPTION_PLANT'),
+        'Should fire when a told belief planted at 60%+ through the story is overturned by a revelation in the same act',
+      );
+    });
+
+    it('LATE_DECEPTION_PLANT does not fire when no told belief in the final 40% is contradicted', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // Remove told belief at scene 6 — lateToldBeliefs is now empty (told@8 has no later revelation)
+      const records = [
+        makeRec211(0, { dialogueHighlights: ['bob: evidence clearly shows the robbery happened'] }),
+        makeRec211(1),
+        makeRec211(2),
+        makeRec211(3),
+        makeRec211(4, { revelation: 'trust found between loyal partners established' }),
+        makeRec211(5, { dialogueHighlights: ['carol: trust found partners clear'] }),
+        makeRec211(6),
+        makeRec211(7),
+        makeRec211(8, {
+          revelation: 'trust broken deceit between loyal partners betrayed',
+          dialogueHighlights: ['bob: trust broken between partners betrayed indeed'],
+        }),
+        makeRec211(9),
+      ];
+      const result = await beliefPass(makeInput211(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'LATE_DECEPTION_PLANT'),
+        'Should NOT fire when no told belief planted in the final 40% is overturned by a later revelation',
+      );
+    });
+
+    it('BELIEF_RESOLUTION_ABSENT fires when no revelation lands in the final 20% of the story', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // n=8, finalZoneStart=floor(8*0.8)=6; 2 revelations at scenes 1,4 — none in scenes 6-7
+      // Only 2 witnessed beliefs keeps REVELATION_ACT3_VOID (requires >=3) from co-firing
+      const records = [
+        makeRec211(0, { dialogueHighlights: ['alice: power corrupts those who show weakness always'] }),
+        makeRec211(1, { revelation: 'truth found between loyal friends confirmed matter' }),
+        makeRec211(2, { dialogueHighlights: ['bob: truth found between loyal friends matter always'] }),
+        makeRec211(3),
+        makeRec211(4, { revelation: 'second truth about matter discovered between friends' }),
+        makeRec211(5, { dialogueHighlights: ['carol: matter discovered truth about between friends'], suspenseDelta: 2 }),
+        makeRec211(6),
+        makeRec211(7),
+      ];
+      const result = await beliefPass(makeInput211(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'BELIEF_RESOLUTION_ABSENT'),
+        'Should fire when 2+ revelations exist but none land in the final 20% of the story',
+      );
+    });
+
+    it('BELIEF_RESOLUTION_ABSENT does not fire when a revelation lands in the final 20%', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // Add revelation at scene 6 (finalZoneStart=6 for n=8) using unrelated vocabulary
+      // to prevent LATE_DECEPTION_PLANT cross-fire with told@5
+      const records = [
+        makeRec211(0, { dialogueHighlights: ['alice: power corrupts those who show weakness always'] }),
+        makeRec211(1, { revelation: 'truth found between loyal friends confirmed matter' }),
+        makeRec211(2, { dialogueHighlights: ['bob: truth found between loyal friends matter always'] }),
+        makeRec211(3),
+        makeRec211(4, { revelation: 'second truth about matter discovered between friends' }),
+        makeRec211(5, { dialogueHighlights: ['carol: matter discovered truth about between friends'], suspenseDelta: 2 }),
+        makeRec211(6, { revelation: 'courage under pressure reveals character strength shown' }),
+        makeRec211(7),
+      ];
+      const result = await beliefPass(makeInput211(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'BELIEF_RESOLUTION_ABSENT'),
+        'Should NOT fire when at least one revelation lands in the final 20% of the story',
+      );
+    });
+  });
+
   describe('Wave 210 — conflictPass: positive spiral trap, reversal symmetry break, antagonist force only', async () => {
     const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
 
