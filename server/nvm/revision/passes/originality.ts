@@ -539,6 +539,96 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 201: Simile overload, dialogue dominance, adverb oversaturation ────
+
+  // SIMILE_OVERLOAD: More than 25% of action lines contain a simile construction
+  // ("like X", "as though", "as if"). Simile-heavy prose signals a writer who
+  // lacks confidence in direct statement — reaching for comparison instead of
+  // finding the precise image. Requires 10+ action lines.
+  {
+    const simileRe = /\b(like\s+[a-z]|as\s+though\b|as\s+if\b)/i;
+    let slActionN = 0;
+    let slSimileN = 0;
+    let slInDlg = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { slInDlg = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { slInDlg = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { slInDlg = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (slInDlg) continue;
+      slActionN++;
+      if (simileRe.test(t)) slSimileN++;
+    }
+    if (slActionN >= 10 && slSimileN / slActionN > 0.25) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'SIMILE_OVERLOAD',
+        severity: 'minor',
+        description: `${slSimileN} of ${slActionN} action lines (${Math.round(slSimileN / slActionN * 100)}%) use a simile ("like X", "as if", "as though") — florid, over-written prose that signals a lack of confidence in direct statement.`,
+        suggestedFix: 'Find the precise verb or image that makes the simile unnecessary. "She moved like water" → "She flowed." Direct, specific language is stronger than comparison.',
+      });
+    }
+  }
+
+  // DIALOGUE_DOMINANCE: Dialogue lines constitute more than 70% of all content
+  // lines (dialogue + action). A screenplay heavy with talk and light on action
+  // is telling where it should show — characters explain what should be
+  // dramatized through behavior and staging. Requires 15+ content lines.
+  {
+    let ddDialogueN = 0;
+    let ddActionN = 0;
+    let ddInDlg = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { ddInDlg = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { ddInDlg = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { ddInDlg = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (ddInDlg) { ddDialogueN++; } else { ddActionN++; }
+    }
+    const ddTotal = ddDialogueN + ddActionN;
+    if (ddTotal >= 15 && ddDialogueN / ddTotal > 0.7) {
+      issues.push({
+        location: 'Script dialogue/action balance',
+        rule: 'DIALOGUE_DOMINANCE',
+        severity: 'major',
+        description: `${ddDialogueN} of ${ddTotal} content lines (${Math.round(ddDialogueN / ddTotal * 100)}%) are dialogue — the script tells where it should show. Heavy dialogue substitutes explanation for dramatized action.`,
+        suggestedFix: 'Convert at least a third of expository dialogue into physical action, environmental detail, or visual behavior. What do these characters do that makes the same point without saying it?',
+      });
+    }
+  }
+
+  // ADVERB_OVERSATURATION: More than 20% of action lines contain an adverb
+  // ending in "-ly". Adverbs in action indicate weak verbs — the writer reaches
+  // for a modifier rather than finding the precise, energetic verb.
+  // Requires 10+ action lines.
+  {
+    const adverbRe = /\b[a-z]{4,}ly\b/i;
+    let aoActionN = 0;
+    let aoAdverbN = 0;
+    let aoInDlg = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { aoInDlg = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { aoInDlg = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { aoInDlg = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (aoInDlg) continue;
+      aoActionN++;
+      if (adverbRe.test(t)) aoAdverbN++;
+    }
+    if (aoActionN >= 10 && aoAdverbN / aoActionN > 0.2) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'ADVERB_OVERSATURATION',
+        severity: 'minor',
+        description: `${aoAdverbN} of ${aoActionN} action lines (${Math.round(aoAdverbN / aoActionN * 100)}%) contain an "-ly" adverb — a signal of weak verbs. The writer is reaching for modifiers rather than finding the precise verb.`,
+        suggestedFix: 'Find the stronger verb that makes the adverb unnecessary: "walks quickly" → "strides"; "speaks quietly" → "murmurs". Precise verbs are sharper than verb+adverb.',
+      });
+    }
+  }
+
   // ── Limit total issues to avoid overwhelming output ───────────────────────
   // Clichés (minor) are pushed first and would crowd out the higher-severity
   // structural findings (UNIFORM_SCENE_PURPOSES is major) under a naive slice.

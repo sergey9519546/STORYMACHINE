@@ -15857,6 +15857,164 @@ Goodnight.
     });
   });
 
+  describe('Wave 201 — originalityPass: simile overload, dialogue dominance, adverb oversaturation', async () => {
+    const makeRec201 = (idx: number): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: ['establish_world', 'introduce_conflict', 'raise_stakes', 'revelation', 'climax', 'resolution'][idx % 6],
+      dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0,
+      emotionalShift: idx % 2 === 0 ? 'positive' : 'negative', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+    });
+    const origInput201 = (fountain: string, n: number) => ({
+      fountain, original: fountain,
+      records: Array.from({ length: n }, (_, i) => makeRec201(i)) as any,
+      structure: {} as any, annotations: [], approvedSpans: [],
+    });
+
+    // ── SIMILE_OVERLOAD ───────────────────────────────────────────────────────
+    it('originalityPass detects SIMILE_OVERLOAD when >25% of action lines use simile constructions', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 12 action lines, 4 similes (33% > 25%)
+      const actions = [
+        'She moved like water through the crowd.',
+        'He checked the lock.',
+        'The light shifted like the last hour before dusk.',
+        'Maria took a step back.',
+        'It glittered like broken glass on the floor.',
+        'John crossed to the window.',
+        'She spoke like she had nowhere else to be.',
+        'He opened the drawer.',
+        'Papers covered the desk.',
+        'She reached for the phone.',
+        'He pulled on his coat.',
+        'She closed the door.',
+      ];
+      const fountain = `INT. OFFICE - DAY\n\n${actions.join('\n')}\n`;
+      const result = await originalityPass(origInput201(fountain, 2));
+      const simile = result.issues.filter(i => i.rule === 'SIMILE_OVERLOAD');
+      assert.ok(simile.length >= 1, `Should detect SIMILE_OVERLOAD; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(simile[0].severity === 'minor');
+    });
+
+    it('originalityPass does NOT fire SIMILE_OVERLOAD when simile density is low', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 12 action lines, 0 similes
+      const actions = [
+        'She moved through the crowd.',
+        'He checked the lock.',
+        'The light shifted in the room.',
+        'Maria took a step back.',
+        'Something glittered on the floor.',
+        'John crossed to the window.',
+        'She chose her words carefully.',
+        'He opened the drawer.',
+        'Papers covered the desk.',
+        'She reached for the phone.',
+        'He pulled on his coat.',
+        'She closed the door.',
+      ];
+      const fountain = `INT. OFFICE - DAY\n\n${actions.join('\n')}\n`;
+      const result = await originalityPass(origInput201(fountain, 2));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'SIMILE_OVERLOAD'),
+        'Should NOT fire when fewer than 25% of action lines use simile constructions',
+      );
+    });
+
+    // ── DIALOGUE_DOMINANCE ────────────────────────────────────────────────────
+    it('originalityPass detects DIALOGUE_DOMINANCE when >70% of content lines are dialogue', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 2 action lines + 14 dialogue lines = 87% dialogue > 70%
+      const fountain = [
+        'INT. ROOM - DAY\n\nHe waits.\n',
+        'ALICE\nWe need to figure this out.\n\nBOB\nI agree completely.\n\nALICE\nSo what do we do?\n\nBOB\nI have no idea.\n\nALICE\nThen we ask for help.\n\nBOB\nFrom whom?\n\nALICE\nAnyone who will listen.\n',
+        'INT. HALLWAY - DAY\n\nShe turns.\n',
+        'CAROL\nDid you hear all of that?\n\nDAN\nEvery word.\n\nCAROL\nAnd what do you think?\n\nDAN\nI think we are in trouble.\n\nCAROL\nThen we need a plan.\n\nDAN\nYes. Immediately.\n\nCAROL\nThen we start now.\n',
+      ].join('\n');
+      const result = await originalityPass(origInput201(fountain, 2));
+      const dom = result.issues.filter(i => i.rule === 'DIALOGUE_DOMINANCE');
+      assert.ok(dom.length >= 1, `Should detect DIALOGUE_DOMINANCE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(dom[0].severity === 'major');
+    });
+
+    it('originalityPass does NOT fire DIALOGUE_DOMINANCE when action is substantial', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 12 action lines, 0 dialogue = 0% dialogue < 70%
+      const actions = [
+        'She walks along the path.',
+        'He stops near the bench.',
+        'A breeze moves through the trees.',
+        'She watches him.',
+        'He checks his watch.',
+        'Light filters through the leaves.',
+        'She approaches slowly.',
+        'He turns to face her.',
+        'They stand in silence.',
+        'She reaches out her hand.',
+        'He takes it.',
+        'They walk together.',
+      ];
+      const fountain = `INT. PARK - DAY\n\n${actions.join('\n')}\n`;
+      const result = await originalityPass(origInput201(fountain, 2));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'DIALOGUE_DOMINANCE'),
+        'Should NOT fire when action lines form the majority of content',
+      );
+    });
+
+    // ── ADVERB_OVERSATURATION ─────────────────────────────────────────────────
+    it('originalityPass detects ADVERB_OVERSATURATION when >20% of action lines use -ly adverbs', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 12 action lines, 4 with -ly adverbs (33% > 20%)
+      const actions = [
+        'She walked slowly toward him.',
+        'He opened the door.',
+        'They quietly slipped through.',
+        'She watched carefully from the corner.',
+        'He spoke loudly in the hall.',
+        'She set down the tray.',
+        'He crossed to the window.',
+        'She leaned on the counter.',
+        'He picked up his coat.',
+        'A light flickered.',
+        'She reached for the folder.',
+        'He checked his phone.',
+      ];
+      const fountain = `INT. OFFICE - DAY\n\n${actions.join('\n')}\n`;
+      const result = await originalityPass(origInput201(fountain, 2));
+      const adv = result.issues.filter(i => i.rule === 'ADVERB_OVERSATURATION');
+      assert.ok(adv.length >= 1, `Should detect ADVERB_OVERSATURATION; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(adv[0].severity === 'minor');
+    });
+
+    it('originalityPass does NOT fire ADVERB_OVERSATURATION when adverb density is low', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 12 action lines, 0 adverbs
+      const actions = [
+        'She moved toward him.',
+        'He opened the door.',
+        'They slipped through.',
+        'She watched from the corner.',
+        'He spoke to the room.',
+        'She set down the tray.',
+        'He crossed to the window.',
+        'She leaned on the counter.',
+        'He picked up his coat.',
+        'A light flickered.',
+        'She reached for the folder.',
+        'He checked his phone.',
+      ];
+      const fountain = `INT. OFFICE - DAY\n\n${actions.join('\n')}\n`;
+      const result = await originalityPass(origInput201(fountain, 2));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'ADVERB_OVERSATURATION'),
+        'Should NOT fire when fewer than 20% of action lines use -ly adverbs',
+      );
+    });
+  });
+
   describe('Wave 200 — pacingPass: compression spiral, act2 dead weight, late expansion', async () => {
     function makeFountainLens200(lens: number[]): string {
       return lens.map((len, i) => {
