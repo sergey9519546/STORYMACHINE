@@ -497,6 +497,82 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 209: Cold open inert, denouement overlong, pre-climax lull ──────────
+
+  // COLD_OPEN_INERT: The screenplay's first scene delivers no narrative hook —
+  // no revelation, no planted clue, no clock pressure, no relationship shift,
+  // and low suspense. The audience's first impression of the story has nothing
+  // to hold onto; they arrive in a scene that simply exists rather than
+  // beginning the story's central question. Distinct from MISSING_INCITING_INCIDENT
+  // (which audits all of Act 1): this fires specifically on the opening scene itself.
+  if (n >= 8) {
+    const first209 = records[0];
+    const isInert209 =
+      first209.revelation === null &&
+      (first209.seededClueIds?.length ?? 0) === 0 &&
+      !first209.clockRaised &&
+      (first209.relationshipShifts?.length ?? 0) === 0 &&
+      first209.suspenseDelta <= 1;
+    if (isInert209) {
+      issues.push({
+        location: 'Scene 0 (cold open)',
+        rule: 'COLD_OPEN_INERT',
+        severity: 'minor',
+        description: `The screenplay's first scene has no narrative hook — no revelation, clue, clock pressure, or relationship shift, and low suspense (${first209.suspenseDelta.toFixed(1)}). The audience's first impression contains nothing to orient them toward the story's central question.`,
+        suggestedFix: 'Open with a scene that immediately signals what is at stake: plant a clue, reveal an inciting tension, establish a ticking clock, or begin a relationship in jeopardy. The first scene earns the audience\'s attention by beginning the story, not introducing the setting.',
+      });
+    }
+  }
+
+  // DENOUEMENT_OVERLONG: The story's climax peak (highest-suspense scene in the
+  // final 30%) is followed by three or more additional scenes. An extended
+  // denouement — more scenes than Act 1 typically offers — dissipates the
+  // climax's emotional impact and allows the audience to disengage before the
+  // screenplay finishes. Distinct from UNRESOLVED_ENDING (still high suspense at
+  // the end) and ACT3_SCENE_EXCESS (whole-act vs whole-Act-1 count).
+  if (n >= 12) {
+    const climaxZoneD209 = Math.floor(n * 0.7);
+    let peakD209 = -1;
+    let peakSusD209 = -Infinity;
+    for (let i = climaxZoneD209; i < n; i++) {
+      if (records[i].suspenseDelta > peakSusD209) {
+        peakSusD209 = records[i].suspenseDelta;
+        peakD209 = i;
+      }
+    }
+    if (peakD209 >= 0 && peakSusD209 > 2 && n - 1 - peakD209 >= 3) {
+      issues.push({
+        location: `Scenes ${peakD209 + 1}–${n - 1} (post-climax)`,
+        rule: 'DENOUEMENT_OVERLONG',
+        severity: 'minor',
+        description: `The climax peak (Scene ${peakD209}, suspense ${peakSusD209.toFixed(1)}) is followed by ${n - 1 - peakD209} more scenes — the denouement is longer than most Act 1s. Extended aftermath dilutes the climax by giving the audience time to disengage before the screenplay ends.`,
+        suggestedFix: 'Compress the post-climax into no more than 2 scenes: one scene of immediate consequence (what changed), one scene of new equilibrium (the world after). Land and leave — a long denouement signals unconfidence in the climax\'s finality.',
+      });
+    }
+  }
+
+  // PRE_CLIMAX_LULL: The two scenes immediately preceding the climax zone (last 30%)
+  // both have low suspense — the approach to the climax is flat. A story should build
+  // toward its climax, not arrive at it from a valley. When the pre-climax approach
+  // is inert, the escalation into the climax feels abrupt and unmotivated rather than
+  // earned through rising pressure.
+  if (n >= 10) {
+    const preClimaxEnd209 = Math.floor(n * 0.7);
+    if (preClimaxEnd209 >= 2) {
+      const sceneA209 = records[preClimaxEnd209 - 2];
+      const sceneB209 = records[preClimaxEnd209 - 1];
+      if (sceneA209.suspenseDelta < 1 && sceneB209.suspenseDelta < 1) {
+        issues.push({
+          location: `Scenes ${preClimaxEnd209 - 2}–${preClimaxEnd209 - 1} (pre-climax approach)`,
+          rule: 'PRE_CLIMAX_LULL',
+          severity: 'major',
+          description: `The two scenes before the climax zone (Scenes ${preClimaxEnd209 - 2} and ${preClimaxEnd209 - 1}) both have low suspense (${sceneA209.suspenseDelta.toFixed(1)} and ${sceneB209.suspenseDelta.toFixed(1)}) — the story enters its final act from a valley rather than a rising wave.`,
+          suggestedFix: 'Build the pre-climax approach: raise the stakes in the two scenes before the climax zone through a complication, a failed attempt, or a tightening deadline. The climax lands hardest when it arrives as the peak of already-rising pressure, not as an abrupt acceleration from flat.',
+        });
+      }
+    }
+  }
+
   // ── Rewrite ───────────────────────────────────────────────────────────────
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'structure', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;

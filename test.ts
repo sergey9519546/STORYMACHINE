@@ -15857,6 +15857,177 @@ Goodnight.
     });
   });
 
+  describe('Wave 209 — structurePass: cold open inert, denouement overlong, pre-climax lull', async () => {
+    const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+
+    const baseStructure209 = {
+      actPosition: 'act3' as const, completionPercent: 95, totalClockPressure: 8,
+      midpointPressure: 2, reversalCount: 2, tightestScene: null,
+      avgSuspensePerScene: 2, escalating: true, reversalDensity: 0.2,
+      approachingClimax: true, openClues: 0, revelationCount: 3,
+    };
+    const makeRec209 = (idx: number, extra: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'action', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 2,
+      seededClueIds: [], payoffSetupIds: [], dialogueHighlights: [],
+      relationshipShifts: [], unresolvedClues: [],
+      ...extra,
+    });
+    const blankFountain209 = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+
+    it('COLD_OPEN_INERT fires when the first scene has no hook and low suspense', async () => {
+      // Scene 0 is entirely inert; scene 1 provides the inciting event (clockRaised) so
+      // MISSING_INCITING_INCIDENT does not also fire.
+      const records209a = [
+        makeRec209(0, { suspenseDelta: 0.5 }),  // inert — no clue, no clock, no relShift, no revelation
+        makeRec209(1, { clockRaised: true, suspenseDelta: 2 }),
+        makeRec209(2, { revelation: 'discovery', suspenseDelta: 2 }),
+        makeRec209(3, { suspenseDelta: 2 }),
+        makeRec209(4, { suspenseDelta: 2 }),
+        makeRec209(5, { seededClueIds: ['c1'], suspenseDelta: 3 }),
+        makeRec209(6, { clockRaised: true, suspenseDelta: 4 }),
+        makeRec209(7, { purpose: 'resolution', suspenseDelta: 1, emotionalShift: 'positive' }),
+      ];
+      const result209a = await structurePass({
+        fountain: blankFountain209(8), original: blankFountain209(8),
+        records: records209a as any, structure: baseStructure209 as any, annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        result209a.issues.some(i => i.rule === 'COLD_OPEN_INERT'),
+        'Should fire COLD_OPEN_INERT when scene 0 has no revelation, clue, clock, relationship shift, or meaningful suspense',
+      );
+    });
+
+    it('COLD_OPEN_INERT does NOT fire when the first scene plants a clue', async () => {
+      const records209b = [
+        makeRec209(0, { seededClueIds: ['hook'], suspenseDelta: 0.5 }),  // has a clue — not inert
+        makeRec209(1, { clockRaised: true, suspenseDelta: 2 }),
+        makeRec209(2, { revelation: 'discovery', suspenseDelta: 2 }),
+        makeRec209(3, { suspenseDelta: 2 }),
+        makeRec209(4, { suspenseDelta: 2 }),
+        makeRec209(5, { seededClueIds: ['c1'], suspenseDelta: 3 }),
+        makeRec209(6, { clockRaised: true, suspenseDelta: 4 }),
+        makeRec209(7, { purpose: 'resolution', suspenseDelta: 1, emotionalShift: 'positive' }),
+      ];
+      const result209b = await structurePass({
+        fountain: blankFountain209(8), original: blankFountain209(8),
+        records: records209b as any, structure: baseStructure209 as any, annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result209b.issues.some(i => i.rule === 'COLD_OPEN_INERT'),
+        'Should NOT fire when the first scene plants a clue (seededClueIds.length > 0)',
+      );
+    });
+
+    it('DENOUEMENT_OVERLONG fires when 3+ scenes follow the climax peak', async () => {
+      // 12 records; climax peak at index 8 (first scene in climax zone at floor(12*0.7)=8).
+      // Scenes 9, 10, 11 follow — 3 post-climax scenes triggers the check.
+      const records209c = [
+        makeRec209(0,  { clockRaised: true }),
+        makeRec209(1,  { revelation: 'opening discovery', seededClueIds: ['c1'] }),
+        makeRec209(2,  {}),
+        makeRec209(3,  { revelation: 'act1 turn', suspenseDelta: 1.5 }),
+        makeRec209(4,  { revelation: 'midpoint discovery', suspenseDelta: 1.5 }),
+        makeRec209(5,  { seededClueIds: ['c2'] }),
+        makeRec209(6,  { suspenseDelta: 2 }),
+        makeRec209(7,  { emotionalShift: 'negative', suspenseDelta: 2.5, seededClueIds: ['c3'] }),
+        makeRec209(8,  { clockRaised: true, suspenseDelta: 4 }),  // climax peak — 3 scenes follow
+        makeRec209(9,  { emotionalShift: 'negative', clockRaised: true, revelation: 'consequence', suspenseDelta: 1.5 }),
+        makeRec209(10, { revelation: 'aftermath', suspenseDelta: 1 }),
+        makeRec209(11, { purpose: 'resolution', suspenseDelta: 0.5 }),
+      ];
+      const result209c = await structurePass({
+        fountain: blankFountain209(12), original: blankFountain209(12),
+        records: records209c as any, structure: baseStructure209 as any, annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        result209c.issues.some(i => i.rule === 'DENOUEMENT_OVERLONG'),
+        'Should fire DENOUEMENT_OVERLONG when 3 scenes follow the climax peak (n=12, peak at index 8)',
+      );
+    });
+
+    it('DENOUEMENT_OVERLONG does NOT fire when the climax peak is near the end', async () => {
+      // Same 12-scene setup but climax peak moves to index 9 — only 2 scenes follow.
+      const records209d = [
+        makeRec209(0,  { clockRaised: true }),
+        makeRec209(1,  { revelation: 'opening discovery', seededClueIds: ['c1'] }),
+        makeRec209(2,  {}),
+        makeRec209(3,  { revelation: 'act1 turn', suspenseDelta: 1.5 }),
+        makeRec209(4,  { revelation: 'midpoint discovery', suspenseDelta: 1.5 }),
+        makeRec209(5,  { seededClueIds: ['c2'] }),
+        makeRec209(6,  { suspenseDelta: 2 }),
+        makeRec209(7,  { emotionalShift: 'negative', suspenseDelta: 2.5, seededClueIds: ['c3'] }),
+        makeRec209(8,  { clockRaised: true, suspenseDelta: 3 }),
+        makeRec209(9,  { emotionalShift: 'negative', clockRaised: true, revelation: 'consequence', suspenseDelta: 4 }),  // peak at 9 — only 2 follow
+        makeRec209(10, { revelation: 'aftermath', suspenseDelta: 1 }),
+        makeRec209(11, { purpose: 'resolution', suspenseDelta: 0.5 }),
+      ];
+      const result209d = await structurePass({
+        fountain: blankFountain209(12), original: blankFountain209(12),
+        records: records209d as any, structure: baseStructure209 as any, annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result209d.issues.some(i => i.rule === 'DENOUEMENT_OVERLONG'),
+        'Should NOT fire when only 2 scenes follow the climax peak (n-1-peakScene = 2 < 3)',
+      );
+    });
+
+    it('PRE_CLIMAX_LULL fires when both pre-climax scenes have low suspense', async () => {
+      // 12 records; climax zone starts at floor(12*0.7)=8; pre-climax scenes are 6 and 7.
+      // Both set to suspenseDelta=0.5 — flat approach into the climax.
+      const records209e = [
+        makeRec209(0,  { clockRaised: true }),
+        makeRec209(1,  { revelation: 'opening', seededClueIds: ['c1'] }),
+        makeRec209(2,  {}),
+        makeRec209(3,  { revelation: 'act1 boundary', suspenseDelta: 1.5 }),
+        makeRec209(4,  { revelation: 'midpoint discovery', suspenseDelta: 1.5 }),
+        makeRec209(5,  { seededClueIds: ['c2'] }),
+        makeRec209(6,  { suspenseDelta: 0.5 }),  // PRE_CLIMAX_LULL sceneA — flat
+        makeRec209(7,  { suspenseDelta: 0.5 }),  // PRE_CLIMAX_LULL sceneB — flat
+        makeRec209(8,  { clockRaised: true, suspenseDelta: 3 }),
+        makeRec209(9,  { emotionalShift: 'negative', clockRaised: true, revelation: 'consequence', suspenseDelta: 4 }),
+        makeRec209(10, { revelation: 'aftermath', suspenseDelta: 1 }),
+        makeRec209(11, { purpose: 'resolution', suspenseDelta: 0.5 }),
+      ];
+      const result209e = await structurePass({
+        fountain: blankFountain209(12), original: blankFountain209(12),
+        records: records209e as any, structure: baseStructure209 as any, annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        result209e.issues.some(i => i.rule === 'PRE_CLIMAX_LULL'),
+        'Should fire PRE_CLIMAX_LULL when both scenes before the climax zone have suspenseDelta < 1',
+      );
+    });
+
+    it('PRE_CLIMAX_LULL does NOT fire when the second pre-climax scene has meaningful suspense', async () => {
+      // Same setup but scene 7 has suspenseDelta=1.5 — only one scene is flat.
+      const records209f = [
+        makeRec209(0,  { clockRaised: true }),
+        makeRec209(1,  { revelation: 'opening', seededClueIds: ['c1'] }),
+        makeRec209(2,  {}),
+        makeRec209(3,  { revelation: 'act1 boundary', suspenseDelta: 1.5 }),
+        makeRec209(4,  { revelation: 'midpoint discovery', suspenseDelta: 1.5 }),
+        makeRec209(5,  { seededClueIds: ['c2'] }),
+        makeRec209(6,  { suspenseDelta: 0.5 }),  // flat
+        makeRec209(7,  { suspenseDelta: 1.5 }),  // building — NOT flat
+        makeRec209(8,  { clockRaised: true, suspenseDelta: 3 }),
+        makeRec209(9,  { emotionalShift: 'negative', clockRaised: true, revelation: 'consequence', suspenseDelta: 4 }),
+        makeRec209(10, { revelation: 'aftermath', suspenseDelta: 1 }),
+        makeRec209(11, { purpose: 'resolution', suspenseDelta: 0.5 }),
+      ];
+      const result209f = await structurePass({
+        fountain: blankFountain209(12), original: blankFountain209(12),
+        records: records209f as any, structure: baseStructure209 as any, annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result209f.issues.some(i => i.rule === 'PRE_CLIMAX_LULL'),
+        'Should NOT fire when the second pre-climax scene has suspenseDelta >= 1 (only one flat scene)',
+      );
+    });
+  });
+
   describe('Wave 208 — themePass: consecutive resonant surfeit, first-act resolution, subplot isolation', async () => {
     const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
 
