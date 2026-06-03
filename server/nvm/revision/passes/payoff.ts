@@ -382,6 +382,85 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 206: Setup burst, mid-story payoff void, clue drought ──────────────
+
+  // SETUP_BURST: A single scene plants 4+ distinct clues at once. The mirror of
+  // CLUSTERED_PAYOFFS on the setup side — too many questions raised in one beat
+  // overloads the audience and reads as a clumsy info-dump rather than organic
+  // seeding. Good setup distributes its questions so each one registers.
+  {
+    for (const r of records) {
+      const seeded206 = new Set((r.seededClueIds ?? r.unresolvedClues) ?? []);
+      if (seeded206.size >= 4) {
+        issues.push({
+          location: `Scene ${r.sceneIdx} (${r.slug})`,
+          rule: 'SETUP_BURST',
+          severity: 'minor',
+          description: `Scene ${r.sceneIdx} plants ${seeded206.size} distinct clues at once — too many questions raised in a single beat overloads the audience and reads as an info-dump rather than organic seeding.`,
+          suggestedFix: 'Distribute the setups across several scenes so each planted question has room to register. A scene that seeds four mysteries simultaneously teaches the audience to stop tracking any of them.',
+        });
+        break; // one flag per pass
+      }
+    }
+  }
+
+  // MIDSTORY_PAYOFF_VOID: Payoffs land in both Act 1 (first 25%) and Act 3 (final
+  // 25%) but none in the entire middle 50% — a "barbell" resolution distribution.
+  // The middle act delivers no thread closure, so the long conflict zone feels
+  // like dead air between the opening hook and the finale. Distinct from
+  // PAYOFF_RATE_DECLINE (Act 2 has payoffs, Act 3 none). Requires 8+ scenes, 2+ payoffs.
+  if (records.length >= 8 && payoffInfo.size >= 2) {
+    const midStart206 = Math.floor(records.length * 0.25);
+    const midEnd206 = Math.floor(records.length * 0.75);
+    const payoffScenes206 = [...payoffInfo.values()];
+    const inAct1_206 = payoffScenes206.some(s => s < midStart206);
+    const inAct3_206 = payoffScenes206.some(s => s >= midEnd206);
+    const inMiddle206 = payoffScenes206.some(s => s >= midStart206 && s < midEnd206);
+    if (inAct1_206 && inAct3_206 && !inMiddle206) {
+      issues.push({
+        location: `Middle (Scenes ${midStart206}–${midEnd206 - 1})`,
+        rule: 'MIDSTORY_PAYOFF_VOID',
+        severity: 'minor',
+        description: `Payoffs land in Act 1 and Act 3 but none in the entire middle 50% (Scenes ${midStart206}–${midEnd206 - 1}) — the conflict zone delivers no thread closure, leaving a long stretch of dead air between the opening hook and the finale.`,
+        suggestedFix: 'Resolve at least one planted thread in the middle act. A mid-story payoff rewards the audience\'s patience, raises new questions, and keeps the long second act from feeling like stalling.',
+      });
+    }
+  }
+
+  // CLUE_DROUGHT: The longest interior gap between consecutive setup/payoff events
+  // spans 5+ scenes (4+ scenes with no plant and no payoff between two events).
+  // The setup/payoff engine goes idle for a long stretch in the middle of an
+  // otherwise active mystery architecture — momentum stalls between the events
+  // that bracket the gap. Requires 8+ scenes and 3+ total clue events.
+  if (records.length >= 8) {
+    const eventScenes206 = new Set<number>();
+    for (const info of clueInfo.values()) eventScenes206.add(info.plantedAt);
+    for (const s of payoffInfo.values()) eventScenes206.add(s);
+    const sorted206 = [...eventScenes206].sort((a, b) => a - b);
+    if (sorted206.length >= 3) {
+      let maxGap206 = 0;
+      let gapStart206 = -1;
+      let gapEnd206 = -1;
+      for (let i = 1; i < sorted206.length; i++) {
+        const gap206 = sorted206[i] - sorted206[i - 1];
+        if (gap206 > maxGap206) {
+          maxGap206 = gap206;
+          gapStart206 = sorted206[i - 1];
+          gapEnd206 = sorted206[i];
+        }
+      }
+      if (maxGap206 >= 5) {
+        issues.push({
+          location: `Scenes ${gapStart206}–${gapEnd206}`,
+          rule: 'CLUE_DROUGHT',
+          severity: 'minor',
+          description: `The setup/payoff engine goes idle for ${maxGap206 - 1} consecutive scenes (between Scene ${gapStart206} and Scene ${gapEnd206}) — no clue is planted and no thread resolves across the longest interior gap. The mystery architecture stalls in the middle of an otherwise active story.`,
+          suggestedFix: 'Seed a small clue or resolve a minor thread within the dead stretch. A drip of setup/payoff activity keeps the mystery engine warm so the audience stays engaged between major beats.',
+        });
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'payoff', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

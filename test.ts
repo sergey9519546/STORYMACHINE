@@ -15857,6 +15857,124 @@ Goodnight.
     });
   });
 
+  describe('Wave 206 — payoffPass: setup burst, mid-story payoff void, clue drought', async () => {
+    const makeRec206 = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain206 = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const baseStructure206 = {
+      completionPercent: 50, actPosition: 'act2a' as const,
+      openClues: 0, reversalCount: 1, midpointPressure: 2, tightestScene: null,
+    };
+    const payoffInput206 = (records: any[]) => ({
+      fountain: blankFountain206(records.length), original: blankFountain206(records.length),
+      records: records as any, structure: baseStructure206 as any, annotations: [], approvedSpans: [],
+    });
+
+    // ── SETUP_BURST ───────────────────────────────────────────────────────────
+    it('payoffPass detects SETUP_BURST when one scene plants 4+ distinct clues', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      const records = [
+        makeRec206(0),
+        makeRec206(1),
+        makeRec206(2, { seededClueIds: ['c1', 'c2', 'c3', 'c4'] }),
+        makeRec206(3),
+        makeRec206(4),
+        makeRec206(5),
+      ];
+      const result = await payoffPass(payoffInput206(records));
+      const issues = result.issues.filter(i => i.rule === 'SETUP_BURST');
+      assert.ok(issues.length >= 1, `Should detect SETUP_BURST; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(issues[0].severity === 'minor');
+    });
+
+    it('payoffPass does NOT fire SETUP_BURST when clues are spread across scenes', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      const records = [
+        makeRec206(0, { seededClueIds: ['c1', 'c2'] }),
+        makeRec206(1, { seededClueIds: ['c3', 'c4'] }),
+        makeRec206(2),
+        makeRec206(3),
+        makeRec206(4),
+        makeRec206(5),
+      ];
+      const result = await payoffPass(payoffInput206(records));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'SETUP_BURST'),
+        'Should NOT fire when no single scene seeds 4+ clues',
+      );
+    });
+
+    // ── MIDSTORY_PAYOFF_VOID ──────────────────────────────────────────────────
+    it('payoffPass detects MIDSTORY_PAYOFF_VOID when payoffs bracket an empty middle', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // n=8, mid=[2,6). Payoffs at scene 1 (Act 1) and scene 7 (Act 3); none in middle.
+      const records = Array.from({ length: 8 }, (_, i) => {
+        if (i === 1) return makeRec206(i, { payoffSetupIds: ['p1'] });
+        if (i === 7) return makeRec206(i, { payoffSetupIds: ['p2'] });
+        return makeRec206(i);
+      });
+      const result = await payoffPass(payoffInput206(records));
+      const issues = result.issues.filter(i => i.rule === 'MIDSTORY_PAYOFF_VOID');
+      assert.ok(issues.length >= 1, `Should detect MIDSTORY_PAYOFF_VOID; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(issues[0].severity === 'minor');
+    });
+
+    it('payoffPass does NOT fire MIDSTORY_PAYOFF_VOID when a payoff lands in the middle', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      const records = Array.from({ length: 8 }, (_, i) => {
+        if (i === 1) return makeRec206(i, { payoffSetupIds: ['p1'] });
+        if (i === 4) return makeRec206(i, { payoffSetupIds: ['p3'] }); // middle payoff
+        if (i === 7) return makeRec206(i, { payoffSetupIds: ['p2'] });
+        return makeRec206(i);
+      });
+      const result = await payoffPass(payoffInput206(records));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'MIDSTORY_PAYOFF_VOID'),
+        'Should NOT fire when the middle act resolves a thread',
+      );
+    });
+
+    // ── CLUE_DROUGHT ──────────────────────────────────────────────────────────
+    it('payoffPass detects CLUE_DROUGHT when the setup/payoff engine goes idle for a long stretch', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // n=10, clue events at scenes 1, 2, 8 → max gap 6 (scenes 3-7 dry)
+      const records = Array.from({ length: 10 }, (_, i) => {
+        if (i === 1) return makeRec206(i, { seededClueIds: ['c1'] });
+        if (i === 2) return makeRec206(i, { seededClueIds: ['c2'] });
+        if (i === 8) return makeRec206(i, { seededClueIds: ['c3'] });
+        return makeRec206(i);
+      });
+      const result = await payoffPass(payoffInput206(records));
+      const issues = result.issues.filter(i => i.rule === 'CLUE_DROUGHT');
+      assert.ok(issues.length >= 1, `Should detect CLUE_DROUGHT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(issues[0].severity === 'minor');
+    });
+
+    it('payoffPass does NOT fire CLUE_DROUGHT when clue events are evenly distributed', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // n=10, clue events at scenes 1, 3, 5, 7 → max gap 2
+      const records = Array.from({ length: 10 }, (_, i) => {
+        if (i === 1) return makeRec206(i, { seededClueIds: ['c1'] });
+        if (i === 3) return makeRec206(i, { seededClueIds: ['c2'] });
+        if (i === 5) return makeRec206(i, { seededClueIds: ['c3'] });
+        if (i === 7) return makeRec206(i, { seededClueIds: ['c4'] });
+        return makeRec206(i);
+      });
+      const result = await payoffPass(payoffInput206(records));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'CLUE_DROUGHT'),
+        'Should NOT fire when clue events are spread evenly across the story',
+      );
+    });
+  });
+
   describe('Wave 205 — intentionPass: proactive opening absent, agency frontloaded, stakes never personal', async () => {
     const makeRec205 = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
