@@ -15857,6 +15857,112 @@ Goodnight.
     });
   });
 
+  describe('Wave 197 — causalityPass: causal act1 void, act3 discharge absent, motivation reversal', async () => {
+    const makeRec197 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput197 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nA.\n', original: 'INT. SC - DAY\nA.\n',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('CAUSAL_ACT1_VOID fires when act1 has no clues, clock, or relationship signals', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // 8 records: none in act1 (records 0-1) plant any causal thread
+      const records = Array.from({ length: 8 }, (_, i) => makeRec197(i));
+      const result = await causalityPass(makeInput197(records));
+      assert.ok(result.issues.some((i: any) => i.rule === 'CAUSAL_ACT1_VOID'),
+        'Should fire when act1 has no clues, clock, or relationship shifts');
+    });
+
+    it('CAUSAL_ACT1_VOID does not fire when act1 contains a causal signal', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // records[0] raises a clock — act1 is causally active
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec197(i, i === 0 ? { clockRaised: true } : {}),
+      );
+      const result = await causalityPass(makeInput197(records));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'CAUSAL_ACT1_VOID'),
+        'Should NOT fire when act1 contains a clock raise');
+    });
+
+    it('ACT3_DISCHARGE_ABSENT fires when seeds exist but act3 has no payoffs or revelations', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // Seeds in record 0, payoff in record 4 (act2), act3 (records 6-7) has nothing
+      const records = [
+        makeRec197(0, { seededClueIds: ['clue1'] }),
+        makeRec197(1),
+        makeRec197(2),
+        makeRec197(3, { suspenseDelta: -2 }),
+        makeRec197(4, { payoffSetupIds: ['clue1'] }),
+        makeRec197(5),
+        makeRec197(6),
+        makeRec197(7),
+      ];
+      const result = await causalityPass(makeInput197(records));
+      assert.ok(result.issues.some((i: any) => i.rule === 'ACT3_DISCHARGE_ABSENT'),
+        'Should fire when seeds exist but act3 has no payoffs or revelations');
+    });
+
+    it('ACT3_DISCHARGE_ABSENT does not fire when act3 contains a revelation', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // Same setup but final scene has a revelation
+      const records = [
+        makeRec197(0, { seededClueIds: ['clue1'] }),
+        makeRec197(1),
+        makeRec197(2),
+        makeRec197(3, { suspenseDelta: -2 }),
+        makeRec197(4, { payoffSetupIds: ['clue1'] }),
+        makeRec197(5),
+        makeRec197(6),
+        makeRec197(7, { revelation: 'the truth emerges' }),
+      ];
+      const result = await causalityPass(makeInput197(records));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'ACT3_DISCHARGE_ABSENT'),
+        'Should NOT fire when act3 contains a revelation');
+    });
+
+    it('MOTIVATION_REVERSAL_UNCAUSED fires when same-pair positive then negative shift has no cause', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // record 1: alice|bob +0.6; record 2: nothing; record 3: alice|bob -0.6
+      const records = [
+        makeRec197(0),
+        makeRec197(1, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.6 }] }),
+        makeRec197(2),
+        makeRec197(3, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: -0.6 }] }),
+        makeRec197(4),
+        makeRec197(5),
+      ];
+      const result = await causalityPass(makeInput197(records));
+      assert.ok(result.issues.some((i: any) => i.rule === 'MOTIVATION_REVERSAL_UNCAUSED'),
+        'Should fire when a positive then negative same-pair shift has no triggering event');
+    });
+
+    it('MOTIVATION_REVERSAL_UNCAUSED does not fire when a clock raise explains the reversal', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // Same flip but record 2 has clockRaised — an intervening cause exists
+      const records = [
+        makeRec197(0),
+        makeRec197(1, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.6 }] }),
+        makeRec197(2, { clockRaised: true }),
+        makeRec197(3, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: -0.6 }] }),
+        makeRec197(4),
+        makeRec197(5),
+      ];
+      const result = await causalityPass(makeInput197(records));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'MOTIVATION_REVERSAL_UNCAUSED'),
+        'Should NOT fire when a clock raise intervenes between the positive and negative shift');
+    });
+  });
+
   describe('Wave 196 — characterArcPass: opening void, catharsis absent, bookend identical', async () => {
     const makeRec196 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

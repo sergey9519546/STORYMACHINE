@@ -532,6 +532,93 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 197: Causal Act1 void, Act3 discharge absent, motivation reversal ──
+
+  // CAUSAL_ACT1_VOID: The entire Act 1 (first 25%) contains no causal signal —
+  // no seeded clue, no clock raised, no significant relationship shift (≥0.3).
+  // The opening establishes no threads to develop. Act 2 begins with nothing
+  // to complicate and Act 3 has nothing to resolve.
+  if (records.length >= 8) {
+    const causalAct1End = Math.floor(records.length * 0.25);
+    const act1CausalRecs = records.slice(0, causalAct1End);
+    if (act1CausalRecs.length >= 2) {
+      const hasAct1Signal = act1CausalRecs.some(r =>
+        (r.seededClueIds?.length ?? 0) > 0 ||
+        r.clockRaised ||
+        (r.relationshipShifts ?? []).some((s: any) => Math.abs(s.amount) >= 0.3),
+      );
+      if (!hasAct1Signal) {
+        issues.push({
+          location: `Act 1 (Scenes 0–${causalAct1End - 1})`,
+          rule: 'CAUSAL_ACT1_VOID',
+          description: `Act 1 (${act1CausalRecs.length} scenes) plants no clues, raises no clock, and creates no significant relationship shift — the story opens without establishing any causal threads for Acts 2 and 3 to develop`,
+          severity: 'major',
+          suggestedFix: 'Act 1 must launch at least one causal thread: plant a clue that foreshadows the climax, raise a clock that creates urgency, or create a relationship shift that the protagonist must resolve. Without a thread to pull, the rest of the story has no tension to escalate.',
+        });
+      }
+    }
+  }
+
+  // ACT3_DISCHARGE_ABSENT: Clues are seeded somewhere in the story but Act 3
+  // (last 25%) contains no payoffs and no revelations — the seeded material is
+  // never discharged in the final act. The climax fires no guns.
+  if (records.length >= 8) {
+    const hasAnySeeds = records.some(r => (r.seededClueIds?.length ?? 0) > 0);
+    if (hasAnySeeds) {
+      const act3DischargeStart = Math.floor(records.length * 0.75);
+      const act3Discharge = records.slice(act3DischargeStart);
+      const hasAct3Discharge = act3Discharge.some(r =>
+        r.revelation !== null || (r.payoffSetupIds?.length ?? 0) > 0,
+      );
+      if (!hasAct3Discharge) {
+        issues.push({
+          location: `Act 3 (Scenes ${act3DischargeStart}–${records.length - 1})`,
+          rule: 'ACT3_DISCHARGE_ABSENT',
+          description: `Clues are seeded in the story but Act 3 contains no payoffs and no revelations — the planted material is never discharged in the final act. The climax fires no guns.`,
+          severity: 'major',
+          suggestedFix: 'Move at least one payoff (payoffSetupId) or revelation into Act 3. The final act must fire the guns that Act 1 displayed — the seeded material exists to create a moment of recognition and resolution at the climax.',
+        });
+      }
+    }
+  }
+
+  // MOTIVATION_REVERSAL_UNCAUSED: A positive relationship shift (≥0.4) for a pair
+  // is followed within 2 scenes by a negative shift (≤-0.4) for the same pair with
+  // no triggering event in between — no revelation, clock raise, or crisis explains
+  // the sudden reversal. Trust evaporating without cause undermines relational logic.
+  if (records.length >= 6) {
+    let motivRevFired = false;
+    for (let i = 0; i < records.length - 1 && !motivRevFired; i++) {
+      const shiftsA = records[i].relationshipShifts ?? [];
+      for (const shiftA of shiftsA) {
+        if (motivRevFired || shiftA.amount < 0.4) continue;
+        for (let j = i + 1; j <= Math.min(i + 2, records.length - 1) && !motivRevFired; j++) {
+          const shiftsB = records[j].relationshipShifts ?? [];
+          for (const shiftB of shiftsB) {
+            if (shiftB.pairKey !== shiftA.pairKey || shiftB.amount > -0.4) continue;
+            let hasCause = false;
+            for (let k = i; k <= j; k++) {
+              if (records[k].revelation !== null ||
+                  records[k].clockRaised ||
+                  records[k].suspenseDelta > 2) { hasCause = true; break; }
+            }
+            if (!hasCause) {
+              issues.push({
+                location: `Scenes ${i}–${j} (pair: ${shiftA.pairKey})`,
+                rule: 'MOTIVATION_REVERSAL_UNCAUSED',
+                description: `The relationship for pair "${shiftA.pairKey}" shifts from +${shiftA.amount.toFixed(2)} (positive) to ${shiftB.amount.toFixed(2)} (negative) across Scenes ${i}–${j} with no triggering event — no revelation, clock raise, or crisis explains the sudden reversal`,
+                severity: 'minor',
+                suggestedFix: 'Add a visible cause for the relational flip: a discovery, a betrayal detail, or a confrontation that makes the reversal inevitable rather than arbitrary. Sudden reversals need earned catalysts.',
+              });
+              motivRevFired = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'causality', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
