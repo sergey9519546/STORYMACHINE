@@ -472,6 +472,84 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 205: Proactive opening absent, agency frontloaded, stakes never personal ──
+
+  // PROACTIVE_OPENING_ABSENT: Across the entire first quarter (Act 1) the
+  // protagonist initiates nothing — no clock raised, no clue planted. The story
+  // opens with a passive protagonist; the inciting situation is something that
+  // happens to them rather than something they set in motion. Distinct from
+  // PASSIVE_ACT3_INTENTION (final act) and PROTAGONIST_REACTIVE_DOMINANCE (Act 2,
+  // requires sustained high-stakes pressure). Requires 8+ scenes.
+  if (n >= 8) {
+    const act1End205 = Math.floor(n * 0.25);
+    const act1Recs205 = records.slice(0, act1End205);
+    if (act1Recs205.length >= 2) {
+      const act1Proactive205 = act1Recs205.filter(
+        r => r.clockRaised || (r.seededClueIds?.length ?? 0) > 0,
+      ).length;
+      if (act1Proactive205 === 0) {
+        issues.push({
+          location: `Act 1 (Scenes 0–${act1End205 - 1})`,
+          rule: 'PROACTIVE_OPENING_ABSENT',
+          severity: 'major',
+          description: `Across all ${act1Recs205.length} Act 1 scenes the protagonist initiates no action — no clock raised, no clue planted. The story opens with a passive protagonist; the inciting situation happens to them rather than being set in motion by their own choice.`,
+          suggestedFix: 'Give the protagonist at least one proactive beat in Act 1: a decision, a plan begun, a question they choose to chase. The audience must see the protagonist want something and move toward it before the world complicates that want.',
+        });
+      }
+    }
+  }
+
+  // AGENCY_FRONTLOADED: The protagonist takes proactive action in the first half
+  // (2+ proactive scenes) but goes entirely passive across the whole second half
+  // — no clock raised, no clue planted from the midpoint onward. Their initiative
+  // burns out exactly when the story should be accelerating toward the climax.
+  // Distinct from PASSIVE_ACT3_INTENTION (final 25% only). Requires 8+ scenes.
+  if (n >= 8) {
+    const half205 = Math.floor(n * 0.5);
+    let firstHalfProactive205 = 0;
+    let secondHalfProactive205 = 0;
+    for (let i = 0; i < n; i++) {
+      const isPro205 = records[i].clockRaised || (records[i].seededClueIds?.length ?? 0) > 0;
+      if (isPro205) {
+        if (i < half205) firstHalfProactive205++;
+        else secondHalfProactive205++;
+      }
+    }
+    if (firstHalfProactive205 >= 2 && secondHalfProactive205 === 0) {
+      issues.push({
+        location: `Second half (Scenes ${half205}–${n - 1})`,
+        rule: 'AGENCY_FRONTLOADED',
+        severity: 'minor',
+        description: `The protagonist initiates ${firstHalfProactive205} proactive beats in the first half but none in the second half — their agency burns out at the midpoint, exactly when the story should be accelerating toward the climax.`,
+        suggestedFix: 'Redistribute the protagonist\'s initiative: hold back at least one proactive beat for the back half. The drive toward the goal should intensify after the midpoint, not evaporate.',
+      });
+    }
+  }
+
+  // STAKES_NEVER_PERSONAL: The story raises an external clock (a deadline,
+  // ticking pressure) but no scene ever pairs that pressure with an emotional or
+  // relationship shift — the stakes stay purely mechanical and never become
+  // personal. A deadline only matters dramatically when it threatens something
+  // the protagonist feels or someone they care about. Distinct from
+  // INTENTION_CONVERGENCE_ABSENT (clock + planted clue). Requires 6+ scenes.
+  if (n >= 6) {
+    const hasClock205 = records.some(r => r.clockRaised);
+    if (hasClock205) {
+      const hasPersonalStakes205 = records.some(
+        r => r.clockRaised && (r.emotionalShift !== 'neutral' || (r.relationshipShifts?.length ?? 0) > 0),
+      );
+      if (!hasPersonalStakes205) {
+        issues.push({
+          location: 'Stakes layer',
+          rule: 'STAKES_NEVER_PERSONAL',
+          severity: 'minor',
+          description: 'The story raises an external clock but no scene ever pairs that deadline with an emotional or relationship shift — the stakes stay purely mechanical. A ticking clock only matters dramatically when it threatens something the protagonist feels or someone they love.',
+          suggestedFix: 'Tie the deadline to a personal cost: in at least one clock-raising scene, show what the protagonist stands to lose emotionally or relationally if the clock runs out. External pressure becomes dramatic only when it endangers something internal.',
+        });
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'intention', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

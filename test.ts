@@ -15857,6 +15857,111 @@ Goodnight.
     });
   });
 
+  describe('Wave 205 — intentionPass: proactive opening absent, agency frontloaded, stakes never personal', async () => {
+    const makeRec205 = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain205 = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const intentInput205 = (records: any[]) => ({
+      fountain: blankFountain205(records.length), original: blankFountain205(records.length),
+      records: records as any, structure: {} as any,
+      annotations: Array.from({ length: records.length }, () => ({ revelation: false } as any)),
+      approvedSpans: [],
+    });
+
+    // ── PROACTIVE_OPENING_ABSENT ──────────────────────────────────────────────
+    it('intentionPass detects PROACTIVE_OPENING_ABSENT when Act 1 has no proactive scenes', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // n=8, act1=[0,1]; both non-proactive. Later scenes proactive to avoid all-passive cross-checks.
+      const records = Array.from({ length: 8 }, (_, i) =>
+        (i === 4 || i === 6)
+          ? makeRec205(i, { clockRaised: true })
+          : makeRec205(i),
+      );
+      const result = await intentionPass(intentInput205(records));
+      const issues = result.issues.filter(i => i.rule === 'PROACTIVE_OPENING_ABSENT');
+      assert.ok(issues.length >= 1, `Should detect PROACTIVE_OPENING_ABSENT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(issues[0].severity === 'major');
+    });
+
+    it('intentionPass does NOT fire PROACTIVE_OPENING_ABSENT when Act 1 has a proactive scene', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // n=8, scene 0 proactive (clockRaised) → act1 has agency
+      const records = Array.from({ length: 8 }, (_, i) =>
+        (i === 0 || i === 4 || i === 6)
+          ? makeRec205(i, { clockRaised: true })
+          : makeRec205(i),
+      );
+      const result = await intentionPass(intentInput205(records));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'PROACTIVE_OPENING_ABSENT'),
+        'Should NOT fire when Act 1 contains a proactive scene',
+      );
+    });
+
+    // ── AGENCY_FRONTLOADED ────────────────────────────────────────────────────
+    it('intentionPass detects AGENCY_FRONTLOADED when proactive scenes vanish in the second half', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // n=8, half=4. Scenes 1,2 proactive (first half); scenes 4-7 none.
+      const records = Array.from({ length: 8 }, (_, i) =>
+        (i === 1 || i === 2)
+          ? makeRec205(i, { clockRaised: true })
+          : makeRec205(i),
+      );
+      const result = await intentionPass(intentInput205(records));
+      const issues = result.issues.filter(i => i.rule === 'AGENCY_FRONTLOADED');
+      assert.ok(issues.length >= 1, `Should detect AGENCY_FRONTLOADED; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(issues[0].severity === 'minor');
+    });
+
+    it('intentionPass does NOT fire AGENCY_FRONTLOADED when proactive action continues in second half', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // n=8, proactive at 1,2 (first half) AND 5 (second half)
+      const records = Array.from({ length: 8 }, (_, i) =>
+        (i === 1 || i === 2 || i === 5)
+          ? makeRec205(i, { clockRaised: true })
+          : makeRec205(i),
+      );
+      const result = await intentionPass(intentInput205(records));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'AGENCY_FRONTLOADED'),
+        'Should NOT fire when the second half contains a proactive scene',
+      );
+    });
+
+    // ── STAKES_NEVER_PERSONAL ─────────────────────────────────────────────────
+    it('intentionPass detects STAKES_NEVER_PERSONAL when the clock never pairs with emotion or relationship', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // n=6, scene 2 raises a clock but stays emotionally neutral with no rel shift
+      const records = Array.from({ length: 6 }, (_, i) =>
+        i === 2 ? makeRec205(i, { clockRaised: true, emotionalShift: 'neutral' }) : makeRec205(i),
+      );
+      const result = await intentionPass(intentInput205(records));
+      const issues = result.issues.filter(i => i.rule === 'STAKES_NEVER_PERSONAL');
+      assert.ok(issues.length >= 1, `Should detect STAKES_NEVER_PERSONAL; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(issues[0].severity === 'minor');
+    });
+
+    it('intentionPass does NOT fire STAKES_NEVER_PERSONAL when a clock scene carries emotional weight', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // n=6, scene 2 raises a clock AND shifts emotion → stakes become personal
+      const records = Array.from({ length: 6 }, (_, i) =>
+        i === 2 ? makeRec205(i, { clockRaised: true, emotionalShift: 'negative' }) : makeRec205(i),
+      );
+      const result = await intentionPass(intentInput205(records));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'STAKES_NEVER_PERSONAL'),
+        'Should NOT fire when a clock-raising scene carries emotional weight',
+      );
+    });
+  });
+
   describe('Wave 204 — dialoguePass: punctuation flatline, staccato overuse, pronoun-I overload', async () => {
     const blankRec204 = (): any => ({
       commitId: 'c0', sceneIdx: 0, slug: 'INT. ROOM - DAY',
