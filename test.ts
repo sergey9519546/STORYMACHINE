@@ -15857,6 +15857,164 @@ Goodnight.
     });
   });
 
+  describe('Wave 210 — conflictPass: positive spiral trap, reversal symmetry break, antagonist force only', async () => {
+    const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+
+    const baseConf210 = {
+      actPosition: 'act3' as const, completionPercent: 90, totalClockPressure: 6,
+      midpointPressure: 2, reversalCount: 2, tightestScene: null,
+      avgSuspensePerScene: 2, escalating: true, reversalDensity: 0.15,
+      approachingClimax: false, openClues: 0, revelationCount: 2,
+    };
+    const makeRec210 = (idx: number, extra: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'action', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 2,
+      seededClueIds: [], payoffSetupIds: [], dialogueHighlights: [],
+      relationshipShifts: [], unresolvedClues: [],
+      ...extra,
+    });
+    const blankF210 = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+
+    it('POSITIVE_SPIRAL_TRAP fires when 4+ consecutive scenes all have positive emotional shifts', async () => {
+      // Scenes 4–7 all positive (run of 4). Reversal at scene 2 and clock at scene 0/5
+      // prevent other checks from firing.
+      const records210a = [
+        makeRec210(0, { clockRaised: true }),
+        makeRec210(1, {}),
+        makeRec210(2, { suspenseDelta: -2, emotionalShift: 'negative' }),
+        makeRec210(3, {}),
+        makeRec210(4, { emotionalShift: 'positive', clockRaised: true }),
+        makeRec210(5, { emotionalShift: 'positive' }),
+        makeRec210(6, { emotionalShift: 'positive' }),
+        makeRec210(7, { emotionalShift: 'positive' }),
+      ];
+      const result210a = await conflictPass({
+        fountain: blankF210(8), original: blankF210(8),
+        records: records210a as any, structure: baseConf210 as any, annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        result210a.issues.some(i => i.rule === 'POSITIVE_SPIRAL_TRAP'),
+        'Should fire POSITIVE_SPIRAL_TRAP when 4 consecutive scenes all carry positive emotional shifts',
+      );
+    });
+
+    it('POSITIVE_SPIRAL_TRAP does NOT fire when the positive run is broken at 3 consecutive scenes', async () => {
+      // Scenes 4–6 positive (run of 3), scene 7 neutral — max run = 3 < 4.
+      const records210b = [
+        makeRec210(0, { clockRaised: true }),
+        makeRec210(1, {}),
+        makeRec210(2, { suspenseDelta: -2, emotionalShift: 'negative' }),
+        makeRec210(3, {}),
+        makeRec210(4, { emotionalShift: 'positive', clockRaised: true }),
+        makeRec210(5, { emotionalShift: 'positive' }),
+        makeRec210(6, { emotionalShift: 'positive' }),
+        makeRec210(7, { emotionalShift: 'neutral' }),
+      ];
+      const result210b = await conflictPass({
+        fountain: blankF210(8), original: blankF210(8),
+        records: records210b as any, structure: baseConf210 as any, annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result210b.issues.some(i => i.rule === 'POSITIVE_SPIRAL_TRAP'),
+        'Should NOT fire when the longest positive run is exactly 3 (< 4)',
+      );
+    });
+
+    it('REVERSAL_SYMMETRY_BREAK fires when Act 2a has 2+ reversals but Act 2b has none', async () => {
+      // n=10; Act 2a=[2,3,4] has reversals at 2 and 4; Act 2b=[5,6] has none.
+      const records210c = [
+        makeRec210(0,  { clockRaised: true }),
+        makeRec210(1,  {}),
+        makeRec210(2,  { suspenseDelta: -2, emotionalShift: 'negative' }),
+        makeRec210(3,  { emotionalShift: 'negative' }),
+        makeRec210(4,  { suspenseDelta: -2 }),
+        makeRec210(5,  {}),
+        makeRec210(6,  { clockRaised: true, relationshipShifts: [{ pairKey: 'AB', dimension: 'trust', amount: -0.3 }] }),
+        makeRec210(7,  { suspenseDelta: 3.5 }),
+        makeRec210(8,  { suspenseDelta: -1.5, emotionalShift: 'negative' }),
+        makeRec210(9,  { emotionalShift: 'positive' }),
+      ];
+      const result210c = await conflictPass({
+        fountain: blankF210(10), original: blankF210(10),
+        records: records210c as any, structure: baseConf210 as any, annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        result210c.issues.some(i => i.rule === 'REVERSAL_SYMMETRY_BREAK'),
+        'Should fire REVERSAL_SYMMETRY_BREAK when Act 2a has ≥2 reversals but Act 2b has zero',
+      );
+    });
+
+    it('REVERSAL_SYMMETRY_BREAK does NOT fire when Act 2b also contains a reversal', async () => {
+      // Same setup but scene 6 changed to include a reversal (suspenseDelta=-1.5).
+      const records210d = [
+        makeRec210(0,  { clockRaised: true }),
+        makeRec210(1,  {}),
+        makeRec210(2,  { suspenseDelta: -2, emotionalShift: 'negative' }),
+        makeRec210(3,  { emotionalShift: 'negative' }),
+        makeRec210(4,  { suspenseDelta: -2 }),
+        makeRec210(5,  {}),
+        makeRec210(6,  { clockRaised: true, suspenseDelta: -1.5, relationshipShifts: [{ pairKey: 'AB', dimension: 'trust', amount: -0.3 }] }),
+        makeRec210(7,  { suspenseDelta: 3.5 }),
+        makeRec210(8,  { suspenseDelta: -1.5, emotionalShift: 'negative' }),
+        makeRec210(9,  { emotionalShift: 'positive' }),
+      ];
+      const result210d = await conflictPass({
+        fountain: blankF210(10), original: blankF210(10),
+        records: records210d as any, structure: baseConf210 as any, annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result210d.issues.some(i => i.rule === 'REVERSAL_SYMMETRY_BREAK'),
+        'Should NOT fire when Act 2b contains at least one reversal',
+      );
+    });
+
+    it('ANTAGONIST_FORCE_ONLY fires when 2+ reversals exist but no negative relationship shifts', async () => {
+      // Reversals at scenes 2 and 4; no relationship shifts anywhere.
+      const records210e = [
+        makeRec210(0, { clockRaised: true }),
+        makeRec210(1, {}),
+        makeRec210(2, { suspenseDelta: -2, emotionalShift: 'negative' }),
+        makeRec210(3, { emotionalShift: 'negative' }),
+        makeRec210(4, { suspenseDelta: -1.5 }),
+        makeRec210(5, { clockRaised: true }),
+        makeRec210(6, { suspenseDelta: 3 }),
+        makeRec210(7, { suspenseDelta: 4, clockRaised: true }),
+      ];
+      const result210e = await conflictPass({
+        fountain: blankF210(8), original: blankF210(8),
+        records: records210e as any, structure: baseConf210 as any, annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        result210e.issues.some(i => i.rule === 'ANTAGONIST_FORCE_ONLY'),
+        'Should fire ANTAGONIST_FORCE_ONLY when 2+ reversals exist but zero scenes carry a negative relationship shift',
+      );
+    });
+
+    it('ANTAGONIST_FORCE_ONLY does NOT fire when at least one scene carries a negative relationship shift', async () => {
+      // Same setup but scene 5 adds a negative relationship shift.
+      const records210f = [
+        makeRec210(0, { clockRaised: true }),
+        makeRec210(1, {}),
+        makeRec210(2, { suspenseDelta: -2, emotionalShift: 'negative' }),
+        makeRec210(3, { emotionalShift: 'negative' }),
+        makeRec210(4, { suspenseDelta: -1.5 }),
+        makeRec210(5, { clockRaised: true, relationshipShifts: [{ pairKey: 'AB', dimension: 'trust', amount: -0.4 }] }),
+        makeRec210(6, { suspenseDelta: 3 }),
+        makeRec210(7, { suspenseDelta: 4, clockRaised: true }),
+      ];
+      const result210f = await conflictPass({
+        fountain: blankF210(8), original: blankF210(8),
+        records: records210f as any, structure: baseConf210 as any, annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result210f.issues.some(i => i.rule === 'ANTAGONIST_FORCE_ONLY'),
+        'Should NOT fire when at least one scene has a negative relationship shift (interpersonal conflict exists)',
+      );
+    });
+  });
+
   describe('Wave 209 — structurePass: cold open inert, denouement overlong, pre-climax lull', async () => {
     const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
 

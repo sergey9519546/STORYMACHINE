@@ -448,6 +448,82 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 210: Positive spiral trap, reversal symmetry break, antagonist force only ──
+
+  // POSITIVE_SPIRAL_TRAP: Four or more consecutive scenes all carry a positive
+  // emotional shift — an unbroken winning streak with no setback, reversal, or
+  // doubt. A protagonist winning continuously for too long removes stakes and
+  // transforms conflict into a montage. The audience stops fearing loss when
+  // loss has been absent for four scenes in a row.
+  if (records.length >= 8) {
+    let posRun210 = 0;
+    let maxPosRun210 = 0;
+    let posRunStart210 = 0;
+    let maxPosRunStart210 = 0;
+    for (let i = 0; i < records.length; i++) {
+      if (records[i].emotionalShift === 'positive') {
+        if (posRun210 === 0) posRunStart210 = i;
+        posRun210++;
+        if (posRun210 > maxPosRun210) { maxPosRun210 = posRun210; maxPosRunStart210 = posRunStart210; }
+      } else {
+        posRun210 = 0;
+      }
+    }
+    if (maxPosRun210 >= 4) {
+      const runEnd210 = Math.min(maxPosRunStart210 + maxPosRun210 - 1, records.length - 1);
+      issues.push({
+        location: `Scenes ${records[maxPosRunStart210].sceneIdx}–${records[runEnd210].sceneIdx}`,
+        rule: 'POSITIVE_SPIRAL_TRAP',
+        severity: 'minor',
+        description: `${maxPosRun210} consecutive scenes all end on a positive emotional shift — the protagonist wins continuously with no setback for ${maxPosRun210} scenes. Stakes evaporate when loss is absent for this long.`,
+        suggestedFix: 'Break the winning streak with a reversal, a cost, or a doubt: a scene where the protagonist\'s progress is complicated or reversed. Sustained victories reduce tension — the audience must fear loss to care about the next scene.',
+      });
+    }
+  }
+
+  // REVERSAL_SYMMETRY_BREAK: Act 2a (25%–50%) contains two or more reversals
+  // but Act 2b (50%–75%) contains none. The conflict's second half goes silent
+  // exactly when it should be pressing hardest toward the climax. This is the
+  // mid-story version of ANTAGONIST_VANISH: the opposition is active in the
+  // first half of the conflict zone but passive in the second.
+  if (records.length >= 10) {
+    const act2aStart210 = Math.floor(records.length * 0.25);
+    const act2Split210  = Math.floor(records.length * 0.5);
+    const act2bEnd210   = Math.floor(records.length * 0.75);
+    const reversalsAct2a = records.slice(act2aStart210, act2Split210).filter(r => r.suspenseDelta < -1).length;
+    const reversalsAct2b = records.slice(act2Split210, act2bEnd210).filter(r => r.suspenseDelta < -1).length;
+    if (reversalsAct2a >= 2 && reversalsAct2b === 0) {
+      issues.push({
+        location: `Act 2 (Scenes ${act2aStart210}–${act2bEnd210 - 1})`,
+        rule: 'REVERSAL_SYMMETRY_BREAK',
+        severity: 'minor',
+        description: `Act 2a (Scenes ${act2aStart210}–${act2Split210 - 1}) delivers ${reversalsAct2a} reversals but Act 2b (Scenes ${act2Split210}–${act2bEnd210 - 1}) has none — the conflict's second half goes passive when it should be escalating. The approach to the climax has no oppositional momentum.`,
+        suggestedFix: 'Add at least one reversal in Act 2b: a setback, a plan failure, or an antagonist action that raises the cost before the climax. The protagonist must enter the final act under active pressure, not from a lull.',
+      });
+    }
+  }
+
+  // ANTAGONIST_FORCE_ONLY: The story's conflict is entirely external — multiple
+  // reversals (plot-level setbacks) but zero scenes with any negative relationship
+  // shift. The antagonist creates plot obstacles but the characters never wound
+  // each other. Conflict that operates only through external force, with no
+  // interpersonal friction, produces thriller plotting without emotional dimension.
+  if (records.length >= 8) {
+    const reversalCount210 = records.filter(r => r.suspenseDelta < -1).length;
+    const negRelShiftScenes210 = records.filter(r =>
+      (r.relationshipShifts ?? []).some(s => s.amount < 0),
+    ).length;
+    if (reversalCount210 >= 2 && negRelShiftScenes210 === 0) {
+      issues.push({
+        location: 'Conflict architecture',
+        rule: 'ANTAGONIST_FORCE_ONLY',
+        severity: 'minor',
+        description: `${reversalCount210} reversals occur but no scene carries a negative relationship shift — all conflict is external plot force with zero interpersonal damage. Characters never wound each other; they only absorb external obstacles.`,
+        suggestedFix: 'Add at least one scene where the conflict damages a relationship: a betrayal, a broken trust, or an accusation that shifts how two characters stand in relation to each other. External opposition without interpersonal cost produces plot without drama.',
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'conflict', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
