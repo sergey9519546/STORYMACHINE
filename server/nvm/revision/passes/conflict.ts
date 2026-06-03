@@ -377,6 +377,77 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 195: Midpoint absent, Act 3 deflation, frequency drop ───────────
+
+  // CONFLICT_MIDPOINT_ABSENT: The midpoint scene (floor(n*0.5)) and its ±1
+  // neighbors carry no conflict signal — no clock, no reversal, no negative
+  // relational shift. The structural pivot has no dramatic tension: the story
+  // changes gear in a vacuum.
+  if (records.length >= 8) {
+    const midIdxConf = Math.floor(records.length * 0.5);
+    const windowLow = Math.max(0, midIdxConf - 1);
+    const windowHigh = Math.min(records.length - 1, midIdxConf + 1);
+    const midpointWindow = records.slice(windowLow, windowHigh + 1);
+    const hasMidpointConflict = midpointWindow.some(r =>
+      r.clockRaised ||
+      r.suspenseDelta < -1 ||
+      (r.relationshipShifts ?? []).some((s: any) => s.amount < -0.3),
+    );
+    if (!hasMidpointConflict) {
+      issues.push({
+        location: `Scenes ${windowLow}–${windowHigh} (midpoint ±1)`,
+        rule: 'CONFLICT_MIDPOINT_ABSENT',
+        description: `The midpoint and adjacent scenes (Scenes ${windowLow}–${windowHigh}) carry no conflict signal — no clock, no reversal, no negative relationship shift. The structural pivot has no dramatic tension.`,
+        severity: 'major',
+        suggestedFix: 'Add a conflict beat to the midpoint zone: raise a clock, introduce a reversal, or create a relational rupture. The midpoint is where the story shifts gear — it should feel dramatic, not inert.',
+      });
+    }
+  }
+
+  // CONFLICT_ACT3_DEFLATION: Act 3 (last 25%) average suspense is significantly
+  // lower than the second half of Act 2 (50%–75%). Conflict deflates before the
+  // climax instead of crescendoing — the audience loses urgency at the finish line.
+  if (records.length >= 8) {
+    const act3StartConf = Math.floor(records.length * 0.75);
+    const act2bStartConf = Math.floor(records.length * 0.5);
+    const act2bRecs = records.slice(act2bStartConf, act3StartConf);
+    const act3Recs = records.slice(act3StartConf);
+    if (act2bRecs.length >= 2 && act3Recs.length >= 2) {
+      const act2bAvgConf = act2bRecs.reduce((s: number, r: any) => s + r.suspenseDelta, 0) / act2bRecs.length;
+      const act3AvgConf = act3Recs.reduce((s: number, r: any) => s + r.suspenseDelta, 0) / act3Recs.length;
+      if (act2bAvgConf > 0 && act3AvgConf < act2bAvgConf * 0.6) {
+        issues.push({
+          location: `Act 3 (Scenes ${act3StartConf}–${records.length - 1})`,
+          rule: 'CONFLICT_ACT3_DEFLATION',
+          description: `Act 3 average suspense (${act3AvgConf.toFixed(1)}) is significantly below late Act 2 (${act2bAvgConf.toFixed(1)}) — conflict deflates before the climax instead of crescendoing`,
+          severity: 'major',
+          suggestedFix: 'Increase conflict intensity in the final act: escalate the antagonist\'s threat, raise a secondary clock, or force characters into their most consequential confrontation yet. The climax must be the peak.',
+        });
+      }
+    }
+  }
+
+  // CONFLICT_FREQUENCY_DROP: The proportion of conflict-event scenes (reversals
+  // or negative relationship shifts) falls from the first third to the final third.
+  // The story becomes less dramatically active as it approaches its end — the
+  // inverse of escalation. Requires 9+ scenes to have three meaningful thirds.
+  if (records.length >= 9) {
+    const confThird = Math.floor(records.length / 3);
+    const isConflictEvent = (r: any) =>
+      r.suspenseDelta < -1 || (r.relationshipShifts ?? []).some((s: any) => s.amount < -0.3);
+    const firstThirdFreq = records.slice(0, confThird).filter(isConflictEvent).length / confThird;
+    const lastThirdFreq = records.slice(records.length - confThird).filter(isConflictEvent).length / confThird;
+    if (firstThirdFreq > lastThirdFreq && firstThirdFreq >= 0.4) {
+      issues.push({
+        location: 'Conflict frequency arc',
+        rule: 'CONFLICT_FREQUENCY_DROP',
+        description: `Conflict events (reversals + negative shifts) occur in ${Math.round(firstThirdFreq * 100)}% of first-third scenes but only ${Math.round(lastThirdFreq * 100)}% of final-third scenes — the story becomes less dramatic as it approaches its end`,
+        severity: 'minor',
+        suggestedFix: 'Spread conflict events evenly or escalate them toward the finale. The final third needs at least as many dramatic events as the opening — the climax arc must have its own conflict pulse.',
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'conflict', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

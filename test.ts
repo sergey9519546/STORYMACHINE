@@ -15857,6 +15857,130 @@ Goodnight.
     });
   });
 
+  describe('Wave 195 — conflictPass: midpoint absent, act3 deflation, frequency drop', async () => {
+    const makeRec195 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 1,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      ...overrides,
+    });
+    const baseStructure195 = {
+      escalating: true, reversalDensity: 0.1, openClues: 0,
+      approachingClimax: false, avgSuspensePerScene: 1,
+    };
+    const makeInput195 = (records: any[]) => ({
+      fountain: 'INT. TEST - DAY\nA.\n', original: 'INT. TEST - DAY\nA.\n',
+      records: records as any, structure: baseStructure195 as any,
+      storyContext: {} as any, annotations: [], approvedSpans: [],
+    });
+
+    it('CONFLICT_MIDPOINT_ABSENT fires when midpoint zone has no conflict signal', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 8 records: only records 0 and 7 have clock (act1 hook + second-half coverage)
+      // midpoint window [3,4,5] has no clock, no reversal, no negative shift
+      const records = [
+        makeRec195(0, { clockRaised: true }),
+        makeRec195(1), makeRec195(2), makeRec195(3),
+        makeRec195(4), makeRec195(5), makeRec195(6),
+        makeRec195(7, { clockRaised: true }),
+      ];
+      const result = await conflictPass(makeInput195(records));
+      assert.ok(result.issues.some((i: any) => i.rule === 'CONFLICT_MIDPOINT_ABSENT'),
+        'Should fire when midpoint ±1 window carries no conflict signal');
+    });
+
+    it('CONFLICT_MIDPOINT_ABSENT does not fire when midpoint scene has a conflict signal', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // midpoint scene (record 4) has clockRaised — conflict signal present
+      const records = [
+        makeRec195(0, { clockRaised: true }),
+        makeRec195(1), makeRec195(2), makeRec195(3),
+        makeRec195(4, { clockRaised: true }),
+        makeRec195(5), makeRec195(6),
+        makeRec195(7, { clockRaised: true }),
+      ];
+      const result = await conflictPass(makeInput195(records));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'CONFLICT_MIDPOINT_ABSENT'),
+        'Should NOT fire when midpoint zone carries a conflict signal');
+    });
+
+    it('CONFLICT_ACT3_DEFLATION fires when act3 suspense drops far below late act2', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 8 records: act2b (records 4-5) high suspense, act3 (records 6-7) near zero
+      const records = [
+        makeRec195(0, { clockRaised: true, suspenseDelta: 1 }),
+        makeRec195(1, { suspenseDelta: 1 }),
+        makeRec195(2, { suspenseDelta: 1 }),
+        makeRec195(3, { suspenseDelta: 1 }),
+        makeRec195(4, { suspenseDelta: 4, clockRaised: true }),
+        makeRec195(5, { suspenseDelta: 4 }),
+        makeRec195(6, { suspenseDelta: 0 }),
+        makeRec195(7, { suspenseDelta: 0 }),
+      ];
+      const result = await conflictPass(makeInput195(records));
+      assert.ok(result.issues.some((i: any) => i.rule === 'CONFLICT_ACT3_DEFLATION'),
+        'Should fire when act3 suspense is <60% of late act2 average');
+    });
+
+    it('CONFLICT_ACT3_DEFLATION does not fire when act3 suspense meets or exceeds act2b', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // act2b low, act3 high — conflict escalates into finale
+      const records = [
+        makeRec195(0, { clockRaised: true, suspenseDelta: 1 }),
+        makeRec195(1, { suspenseDelta: 1 }),
+        makeRec195(2, { suspenseDelta: 1 }),
+        makeRec195(3, { suspenseDelta: 1 }),
+        makeRec195(4, { clockRaised: true, suspenseDelta: 1 }),
+        makeRec195(5, { suspenseDelta: 1 }),
+        makeRec195(6, { suspenseDelta: 4 }),
+        makeRec195(7, { suspenseDelta: 4 }),
+      ];
+      const result = await conflictPass(makeInput195(records));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'CONFLICT_ACT3_DEFLATION'),
+        'Should NOT fire when act3 suspense is high relative to act2b');
+    });
+
+    it('CONFLICT_FREQUENCY_DROP fires when conflict events cluster in the opening third', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 9 records: first third (0-2) all reversals, last third (6-8) calm except record 7
+      const records = [
+        makeRec195(0, { suspenseDelta: -2, clockRaised: true }),
+        makeRec195(1, { suspenseDelta: -2 }),
+        makeRec195(2, { suspenseDelta: -2 }),
+        makeRec195(3),
+        makeRec195(4, { clockRaised: true }),
+        makeRec195(5),
+        makeRec195(6),
+        makeRec195(7, { suspenseDelta: -2 }),
+        makeRec195(8),
+      ];
+      const result = await conflictPass(makeInput195(records));
+      assert.ok(result.issues.some((i: any) => i.rule === 'CONFLICT_FREQUENCY_DROP'),
+        'Should fire when first-third conflict frequency far exceeds last-third frequency');
+    });
+
+    it('CONFLICT_FREQUENCY_DROP does not fire when conflict events increase toward the end', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 9 records: first third calm, last third all reversals — escalating pattern
+      const records = [
+        makeRec195(0, { clockRaised: true }),
+        makeRec195(1),
+        makeRec195(2),
+        makeRec195(3),
+        makeRec195(4, { clockRaised: true }),
+        makeRec195(5),
+        makeRec195(6, { suspenseDelta: -2 }),
+        makeRec195(7, { suspenseDelta: -2 }),
+        makeRec195(8, { suspenseDelta: -2 }),
+      ];
+      const result = await conflictPass(makeInput195(records));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'CONFLICT_FREQUENCY_DROP'),
+        'Should NOT fire when conflict events escalate toward the finale');
+    });
+  });
+
   describe('Wave 194 — themePass: act2 desert, resolution silent, density inversion', async () => {
     const blankFountain194 = (n: number) =>
       Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
