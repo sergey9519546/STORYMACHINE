@@ -15857,6 +15857,134 @@ Goodnight.
     });
   });
 
+  describe('Wave 198 — structurePass: act3 scene excess, tension drop abrupt, act1 revelation absent', async () => {
+    const makeRec198 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const baseStr198 = {
+      escalating: true, completionPercent: 80, actPosition: 'act3',
+      midpointPressure: 2, tightestScene: null, reversalCount: 1,
+      revelationCount: 3, avgSuspensePerScene: 1, approachingClimax: false,
+    };
+    const makeInput198 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nA.\n', original: 'INT. SC - DAY\nA.\n',
+      records: records as any, structure: baseStr198 as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('ACT3_SCENE_EXCESS fires when act3 has more scenes than act1', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // 9 records: act1 = records 0-1 (2 scenes), act3 = records 6-8 (3 scenes)
+      const records = [
+        makeRec198(0, { seededClueIds: ['c1'] }),
+        makeRec198(1),
+        makeRec198(2, { suspenseDelta: 2 }),
+        makeRec198(3, { revelation: 'x' }),
+        makeRec198(4),
+        makeRec198(5, { emotionalShift: 'negative', suspenseDelta: 2 }),
+        makeRec198(6, { suspenseDelta: 2, clockRaised: true }),
+        makeRec198(7),
+        makeRec198(8, { revelation: 'y' }),
+      ];
+      const result = await structurePass(makeInput198(records));
+      assert.ok(result.issues.some((i: any) => i.rule === 'ACT3_SCENE_EXCESS'),
+        'Should fire when act3 has more scenes than act1');
+    });
+
+    it('ACT3_SCENE_EXCESS does not fire when act1 and act3 have equal scene counts', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // 8 records: act1 = records 0-1 (2 scenes), act3 = records 6-7 (2 scenes)
+      const records = [
+        makeRec198(0, { seededClueIds: ['c1'] }),
+        makeRec198(1),
+        makeRec198(2, { suspenseDelta: 2 }),
+        makeRec198(3, { revelation: 'x' }),
+        makeRec198(4),
+        makeRec198(5, { emotionalShift: 'negative', suspenseDelta: 2 }),
+        makeRec198(6, { suspenseDelta: 2, clockRaised: true }),
+        makeRec198(7, { revelation: 'y' }),
+      ];
+      const result = await structurePass(makeInput198(records));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'ACT3_SCENE_EXCESS'),
+        'Should NOT fire when act3 scene count equals act1 scene count');
+    });
+
+    it('TENSION_DROP_ABRUPT fires when climax peak is immediately followed by a flat non-resolution scene', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // 6 records: peak at record 4 (suspense 3), abrupt drop to 0 at record 5 (dialogue)
+      const records = [
+        makeRec198(0, { clockRaised: true }),
+        makeRec198(1, { suspenseDelta: 2 }),
+        makeRec198(2),
+        makeRec198(3),
+        makeRec198(4, { suspenseDelta: 3 }),
+        makeRec198(5, { suspenseDelta: 0, purpose: 'dialogue' }),
+      ];
+      const result = await structurePass(makeInput198(records));
+      assert.ok(result.issues.some((i: any) => i.rule === 'TENSION_DROP_ABRUPT'),
+        'Should fire when climax peak drops abruptly to flat non-resolution scene');
+    });
+
+    it('TENSION_DROP_ABRUPT does not fire when the scene after the peak is a resolution beat', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // Same setup but final scene is marked as resolution — expected landing
+      const records = [
+        makeRec198(0, { clockRaised: true }),
+        makeRec198(1, { suspenseDelta: 2 }),
+        makeRec198(2),
+        makeRec198(3),
+        makeRec198(4, { suspenseDelta: 3 }),
+        makeRec198(5, { suspenseDelta: 0, purpose: 'resolution' }),
+      ];
+      const result = await structurePass(makeInput198(records));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'TENSION_DROP_ABRUPT'),
+        'Should NOT fire when the scene after the peak is a resolution beat');
+    });
+
+    it('ACT1_REVELATION_ABSENT fires when story has 3+ revelations but none in act1', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // 8 records: revelations at records 3, 5, 7; none in act1 (records 0-1)
+      const records = [
+        makeRec198(0, { clockRaised: true }),
+        makeRec198(1),
+        makeRec198(2, { suspenseDelta: 2 }),
+        makeRec198(3, { revelation: 'midpoint truth' }),
+        makeRec198(4),
+        makeRec198(5, { revelation: 'late act2 reveal', emotionalShift: 'negative', suspenseDelta: 2 }),
+        makeRec198(6, { suspenseDelta: 2, clockRaised: true }),
+        makeRec198(7, { revelation: 'climax reveal' }),
+      ];
+      const result = await structurePass(makeInput198(records));
+      assert.ok(result.issues.some((i: any) => i.rule === 'ACT1_REVELATION_ABSENT'),
+        'Should fire when 3+ revelations exist but none land in act1');
+    });
+
+    it('ACT1_REVELATION_ABSENT does not fire when act1 contains a revelation', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // Same setup but record 0 also has a revelation
+      const records = [
+        makeRec198(0, { clockRaised: true, revelation: 'opening reveal' }),
+        makeRec198(1),
+        makeRec198(2, { suspenseDelta: 2 }),
+        makeRec198(3, { revelation: 'midpoint truth' }),
+        makeRec198(4),
+        makeRec198(5, { revelation: 'late act2 reveal', emotionalShift: 'negative', suspenseDelta: 2 }),
+        makeRec198(6, { suspenseDelta: 2, clockRaised: true }),
+        makeRec198(7, { revelation: 'climax reveal' }),
+      ];
+      const result = await structurePass(makeInput198(records));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'ACT1_REVELATION_ABSENT'),
+        'Should NOT fire when act1 contains a revelation');
+    });
+  });
+
   describe('Wave 197 — causalityPass: causal act1 void, act3 discharge absent, motivation reversal', async () => {
     const makeRec197 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

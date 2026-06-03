@@ -427,6 +427,76 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 198: Act 3 excess, tension abrupt drop, Act 1 revelation absent ──
+
+  // ACT3_SCENE_EXCESS: Act 3 (from 75% to end) has more scenes than Act 1
+  // (from 0 to 25%). The resolution is longer than the setup — narrative weight
+  // is inverted. A prolonged resolution dilutes the climax's impact by dwelling
+  // past its emotional conclusion rather than landing and leaving.
+  if (n >= 8) {
+    const act1SceneCount = Math.floor(n * 0.25);
+    const act3SceneStart = Math.floor(n * 0.75);
+    const act3SceneCount = n - act3SceneStart;
+    if (act3SceneCount > act1SceneCount) {
+      issues.push({
+        location: `Act 1 (${act1SceneCount} scenes) vs Act 3 (${act3SceneCount} scenes)`,
+        rule: 'ACT3_SCENE_EXCESS',
+        description: `Act 3 has ${act3SceneCount} scenes while Act 1 has only ${act1SceneCount} — the resolution takes longer than the setup. Extended resolutions undercut the climax's finality by making the aftermath longer than the premise.`,
+        severity: 'minor',
+        suggestedFix: 'Trim Act 3 to match or be shorter than Act 1. The denouement should be crisp: show the new equilibrium, land the emotional note, and leave. Resolution scenes that outlast the setup are usually filling silence, not delivering story.',
+      });
+    }
+  }
+
+  // TENSION_DROP_ABRUPT: The highest-suspense scene in the climax zone (last 30%,
+  // suspenseDelta > 2) is immediately followed by a scene that is neither a
+  // resolution beat nor carries any suspense (< 0.5). The tension collapses too
+  // sharply — the story needs at least one landing-beat between peak and silence.
+  if (n >= 6) {
+    const climaxZoneActual = Math.floor(n * 0.7);
+    let dropPeakScene = -1;
+    let dropPeakSuspense = -Infinity;
+    for (let i = climaxZoneActual; i < n; i++) {
+      if (records[i].suspenseDelta > dropPeakSuspense) {
+        dropPeakSuspense = records[i].suspenseDelta;
+        dropPeakScene = i;
+      }
+    }
+    if (dropPeakScene >= 0 && dropPeakScene < n - 1 && dropPeakSuspense > 2) {
+      const afterPeak = records[dropPeakScene + 1];
+      if (afterPeak.suspenseDelta < 0.5 && afterPeak.purpose !== 'resolution') {
+        issues.push({
+          location: `Scene ${dropPeakScene} → Scene ${dropPeakScene + 1}`,
+          rule: 'TENSION_DROP_ABRUPT',
+          description: `The climax peak (Scene ${dropPeakScene}, suspense ${dropPeakSuspense.toFixed(1)}) is immediately followed by a flat, non-resolution scene (suspense ${afterPeak.suspenseDelta.toFixed(1)}) — the tension collapses without a landing beat`,
+          severity: 'major',
+          suggestedFix: 'Insert a transitional beat between the climax and resolution: a moment of consequence, a brief silence with emotional weight, or a reaction scene that lets the audience breathe down from the peak before the story settles.',
+        });
+      }
+    }
+  }
+
+  // ACT1_REVELATION_ABSENT: The story contains 3+ revelations but none land in
+  // Act 1 (first 25%). All revelations are held back — the audience enters Act 2
+  // with no anchoring discovery. Without at least one Act 1 revelation to frame
+  // the situation, the setup is all mystery and no orientation.
+  if (n >= 8) {
+    const totalRevs198 = records.filter(r => r.revelation !== null).length;
+    if (totalRevs198 >= 3) {
+      const act1RevEnd = Math.floor(n * 0.25);
+      const act1HasRev = records.slice(0, act1RevEnd).some(r => r.revelation !== null);
+      if (!act1HasRev) {
+        issues.push({
+          location: `Act 1 (Scenes 0–${act1RevEnd - 1})`,
+          rule: 'ACT1_REVELATION_ABSENT',
+          description: `The story has ${totalRevs198} revelations but none land in Act 1 — the audience enters the conflict without any anchoring discovery. All revelation is held back, leaving the setup informationally dark.`,
+          severity: 'minor',
+          suggestedFix: 'Give the audience at least one revelation in Act 1: an early truth about the situation, a character\'s past, or a fact that frames the stakes. The opening should orient the audience toward what the story is about — not just pose questions.',
+        });
+      }
+    }
+  }
+
   // ── Rewrite ───────────────────────────────────────────────────────────────
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'structure', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
