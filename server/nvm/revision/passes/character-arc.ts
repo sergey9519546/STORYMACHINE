@@ -444,6 +444,66 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 196: Opening void, catharsis absent, bookend identical ───────────
+
+  // ARC_OPENING_VOID: The opening two scenes are both emotionally neutral and
+  // contain no revelations. Without an emotional baseline in the opening, the arc
+  // has no departure point — the audience cannot track a journey that never establishes
+  // where it starts.
+  if (records.length >= 6) {
+    const openA = records[0];
+    const openB = records[1];
+    if (openA.emotionalShift === 'neutral' && openB.emotionalShift === 'neutral' &&
+        openA.revelation === null && openB.revelation === null) {
+      issues.push({
+        location: 'Scenes 0–1 (opening)',
+        rule: 'ARC_OPENING_VOID',
+        description: 'The opening two scenes are emotionally neutral with no revelation — the story begins without establishing the protagonist\'s emotional baseline. The arc has no departure point to measure transformation against.',
+        severity: 'minor',
+        suggestedFix: 'Give the protagonist a distinct emotional state in the opening scene — joy, fear, contentment, or dread — so the arc has a clearly felt starting point. The audience must know where the character is before they can feel where they end up.',
+      });
+    }
+  }
+
+  // ARC_CATHARSIS_ABSENT: The story contains 2+ negative emotional scenes
+  // (struggle, loss) but no scene combines positive emotional shift with a
+  // revelation — the arc accumulates suffering without a cathartic insight moment.
+  // Transformation requires both the positive turn and the insight that causes it.
+  if (records.length >= 8) {
+    const negativeCount = records.filter(r => r.emotionalShift === 'negative').length;
+    if (negativeCount >= 2) {
+      const hasCatharticMoment = records.some(r =>
+        r.emotionalShift === 'positive' && r.revelation !== null,
+      );
+      if (!hasCatharticMoment) {
+        issues.push({
+          location: 'Character arc — catharsis',
+          rule: 'ARC_CATHARSIS_ABSENT',
+          description: `The story has ${negativeCount} negative emotional scenes (struggle) but no scene delivers both a positive emotional shift AND a revelation — the arc accumulates cost without a cathartic insight that transforms it`,
+          severity: 'major',
+          suggestedFix: 'Add a scene where the protagonist achieves clarity at the moment of emotional uplift: a revelation that arrives during or just before a positive turn. Catharsis requires insight, not just resolution.',
+        });
+      }
+    }
+  }
+
+  // ARC_BOOKEND_IDENTICAL: The first scene and the final scene share the same
+  // non-neutral emotional shift. The story returns to its emotional starting point —
+  // no net transformation is registered between the opening and the closing frame.
+  if (records.length >= 6) {
+    const firstShiftB = records[0].emotionalShift ?? 'neutral';
+    const lastShiftB = records[records.length - 1].emotionalShift ?? 'neutral';
+    if (firstShiftB !== 'neutral' && lastShiftB !== 'neutral' && firstShiftB === lastShiftB) {
+      issues.push({
+        location: `Scene 0 → Scene ${records.length - 1}`,
+        rule: 'ARC_BOOKEND_IDENTICAL',
+        description: `The story opens and closes with the same emotional register (${firstShiftB}) — the first and final scenes are emotionally identical. The character returns to where they started rather than arriving somewhere new.`,
+        severity: 'minor',
+        suggestedFix: 'The final scene should register a different emotional state from the opening — even if the protagonist returns to the same place physically, they must feel differently about it. The closing frame is the evidence of transformation.',
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'character-arc', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

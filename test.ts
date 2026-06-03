@@ -15857,6 +15857,129 @@ Goodnight.
     });
   });
 
+  describe('Wave 196 — characterArcPass: opening void, catharsis absent, bookend identical', async () => {
+    const makeRec196 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const baseStructure196 = {
+      escalating: true, reversalDensity: 0.1, openClues: 0,
+      approachingClimax: false, avgSuspensePerScene: 1,
+      revelationCount: 1, completionPercent: 50,
+    };
+    const simpleFountain = 'INT. SC - DAY\nA.\n';
+    const makeInput196 = (records: any[]) => ({
+      fountain: simpleFountain, original: simpleFountain,
+      records: records as any, structure: baseStructure196 as any,
+      storyContext: {} as any, annotations: [], approvedSpans: [],
+    });
+
+    it('ARC_OPENING_VOID fires when the first two scenes are neutral with no revelation', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // 6 records: opening two are neutral with no revelations
+      const records = [
+        makeRec196(0),
+        makeRec196(1),
+        makeRec196(2, { emotionalShift: 'positive' }),
+        makeRec196(3, { emotionalShift: 'negative' }),
+        makeRec196(4, { emotionalShift: 'positive' }),
+        makeRec196(5, { emotionalShift: 'negative' }),
+      ];
+      const result = await characterArcPass(makeInput196(records));
+      assert.ok(result.issues.some((i: any) => i.rule === 'ARC_OPENING_VOID'),
+        'Should fire when opening two scenes are emotionally neutral with no revelations');
+    });
+
+    it('ARC_OPENING_VOID does not fire when the first scene has an emotional shift', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // First scene has positive shift — emotional baseline established
+      const records = [
+        makeRec196(0, { emotionalShift: 'positive' }),
+        makeRec196(1),
+        makeRec196(2, { emotionalShift: 'negative' }),
+        makeRec196(3),
+        makeRec196(4, { emotionalShift: 'positive' }),
+        makeRec196(5, { emotionalShift: 'negative' }),
+      ];
+      const result = await characterArcPass(makeInput196(records));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'ARC_OPENING_VOID'),
+        'Should NOT fire when the opening scene has a distinct emotional register');
+    });
+
+    it('ARC_CATHARSIS_ABSENT fires when struggle exists but no positive revelation moment', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // 8 records: negative scenes exist but no positive+revelation pair
+      const records = [
+        makeRec196(0, { emotionalShift: 'positive' }),
+        makeRec196(1, { emotionalShift: 'negative' }),
+        makeRec196(2, { emotionalShift: 'negative' }),
+        makeRec196(3),
+        makeRec196(4, { emotionalShift: 'positive' }),
+        makeRec196(5, { emotionalShift: 'negative' }),
+        makeRec196(6),
+        makeRec196(7, { emotionalShift: 'positive' }),
+      ];
+      const result = await characterArcPass(makeInput196(records));
+      assert.ok(result.issues.some((i: any) => i.rule === 'ARC_CATHARSIS_ABSENT'),
+        'Should fire when 2+ negative scenes exist but no positive-plus-revelation moment');
+    });
+
+    it('ARC_CATHARSIS_ABSENT does not fire when a positive scene includes a revelation', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // Record 4 has positive shift AND revelation — cathartic moment present
+      const records = [
+        makeRec196(0, { emotionalShift: 'positive' }),
+        makeRec196(1, { emotionalShift: 'negative' }),
+        makeRec196(2, { emotionalShift: 'negative' }),
+        makeRec196(3),
+        makeRec196(4, { emotionalShift: 'positive', revelation: 'the truth finally revealed' }),
+        makeRec196(5, { emotionalShift: 'negative' }),
+        makeRec196(6),
+        makeRec196(7, { emotionalShift: 'positive' }),
+      ];
+      const result = await characterArcPass(makeInput196(records));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'ARC_CATHARSIS_ABSENT'),
+        'Should NOT fire when a positive emotional scene is paired with a revelation');
+    });
+
+    it('ARC_BOOKEND_IDENTICAL fires when first and final scene share the same non-neutral tone', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // records[0] and records[5] both negative — story returns to start
+      const records = [
+        makeRec196(0, { emotionalShift: 'negative' }),
+        makeRec196(1),
+        makeRec196(2, { emotionalShift: 'positive' }),
+        makeRec196(3),
+        makeRec196(4, { emotionalShift: 'positive' }),
+        makeRec196(5, { emotionalShift: 'negative' }),
+      ];
+      const result = await characterArcPass(makeInput196(records));
+      assert.ok(result.issues.some((i: any) => i.rule === 'ARC_BOOKEND_IDENTICAL'),
+        'Should fire when first and final scenes share the same non-neutral emotional register');
+    });
+
+    it('ARC_BOOKEND_IDENTICAL does not fire when first and final scenes differ emotionally', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // records[0] negative, records[5] positive — clear emotional transformation
+      const records = [
+        makeRec196(0, { emotionalShift: 'negative' }),
+        makeRec196(1),
+        makeRec196(2, { emotionalShift: 'negative' }),
+        makeRec196(3),
+        makeRec196(4, { emotionalShift: 'positive' }),
+        makeRec196(5, { emotionalShift: 'positive' }),
+      ];
+      const result = await characterArcPass(makeInput196(records));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'ARC_BOOKEND_IDENTICAL'),
+        'Should NOT fire when final scene differs emotionally from the opening');
+    });
+  });
+
   describe('Wave 195 — conflictPass: midpoint absent, act3 deflation, frequency drop', async () => {
     const makeRec195 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
