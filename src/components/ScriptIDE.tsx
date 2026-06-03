@@ -441,8 +441,23 @@ export default function ScriptIDE({
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
     let actionLines = 0;
-    let wordCount = scriptText.trim().split(/\s+/).length;
-    if (scriptText.trim() === "") wordCount = 0;
+
+    // ⚡ Bolt Performance Optimization:
+    // Replaced scriptText.trim().split(/\s+/).length with a zero-allocation
+    // character code loop. This avoids large intermediate array allocations
+    // and garbage collection spikes during high-frequency keystroke renders.
+    let wordCount = 0;
+    let inWord = false;
+    for (let i = 0; i < scriptText.length; i++) {
+      if (scriptText.charCodeAt(i) > 32) {
+        if (!inWord) {
+          inWord = true;
+          wordCount++;
+        }
+      } else {
+        inWord = false;
+      }
+    }
 
     blocks.forEach((block) => {
       if (block.type === "character") {
