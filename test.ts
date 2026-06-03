@@ -15857,6 +15857,128 @@ Goodnight.
     });
   });
 
+  describe('Wave 194 — themePass: act2 desert, resolution silent, density inversion', async () => {
+    const blankFountain194 = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const themeCtx194 = { theme: 'loyalty and betrayal define us', genre: 'drama' };
+    const makeRec194 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      dialogueHighlights: [], revelation: null,
+      emotionalShift: 'neutral', suspenseDelta: 0,
+      relationshipShifts: [], clockRaised: false, clockDelta: 0,
+      purpose: 'dialogue', dramaticTurn: 'nothing',
+      seededClueIds: [], payoffSetupIds: [],
+      ...overrides,
+    });
+
+    it('THEME_ACT2_DESERT fires when act2 has fewer than 30% resonant scenes', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // 8 records: only record 0 and 7 have theme; act2 (records 2-5) is barren
+      const records = [
+        makeRec194(0, { dialogueHighlights: ['loyalty above everything'] }),
+        makeRec194(1), makeRec194(2), makeRec194(3),
+        makeRec194(4), makeRec194(5), makeRec194(6),
+        makeRec194(7, { dialogueHighlights: ['loyalty endures'] }),
+      ];
+      const result = await themePass({
+        fountain: blankFountain194(8), original: blankFountain194(8),
+        records: records as any, structure: {} as any, storyContext: themeCtx194,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(result.issues.some((i: any) => i.rule === 'THEME_ACT2_DESERT'),
+        'Should fire when act2 has 0% resonant scenes');
+    });
+
+    it('THEME_ACT2_DESERT does not fire when act2 has sufficient resonance', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // 8 records: all scenes carry theme
+      const records = Array.from({ length: 8 }, (_, i) =>
+        makeRec194(i, { dialogueHighlights: ['loyalty defines everything'] }),
+      );
+      const result = await themePass({
+        fountain: blankFountain194(8), original: blankFountain194(8),
+        records: records as any, structure: {} as any, storyContext: themeCtx194,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(!result.issues.some((i: any) => i.rule === 'THEME_ACT2_DESERT'),
+        'Should NOT fire when all act2 scenes resonate');
+    });
+
+    it('THEME_RESOLUTION_SILENT fires when the final scene has no thematic language', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // 4 records: records 0-2 carry theme, record 3 (final) is silent
+      const records = [
+        makeRec194(0, { dialogueHighlights: ['loyalty above everything'] }),
+        makeRec194(1, { dialogueHighlights: ['betrayal cuts deep'] }),
+        makeRec194(2, { dialogueHighlights: ['loyalty endures'] }),
+        makeRec194(3),
+      ];
+      const result = await themePass({
+        fountain: blankFountain194(4), original: blankFountain194(4),
+        records: records as any, structure: {} as any, storyContext: themeCtx194,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(result.issues.some((i: any) => i.rule === 'THEME_RESOLUTION_SILENT'),
+        'Should fire when final scene carries no thematic language');
+    });
+
+    it('THEME_RESOLUTION_SILENT does not fire when the final scene carries the theme', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // 4 records: all carry theme, including the final scene
+      const records = [
+        makeRec194(0, { dialogueHighlights: ['loyalty above everything'] }),
+        makeRec194(1, { dialogueHighlights: ['betrayal cuts deep'] }),
+        makeRec194(2, { dialogueHighlights: ['loyalty endures'] }),
+        makeRec194(3, { dialogueHighlights: ['loyalty is all we have'] }),
+      ];
+      const result = await themePass({
+        fountain: blankFountain194(4), original: blankFountain194(4),
+        records: records as any, structure: {} as any, storyContext: themeCtx194,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(!result.issues.some((i: any) => i.rule === 'THEME_RESOLUTION_SILENT'),
+        'Should NOT fire when final scene is thematically resonant');
+    });
+
+    it('THEME_DENSITY_INVERSION fires when first half has more resonant scenes than second', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // 8 records: first half (0-3) all resonant, second half (4-7) all silent
+      const records = [
+        makeRec194(0, { dialogueHighlights: ['loyalty above everything'] }),
+        makeRec194(1, { dialogueHighlights: ['betrayal is real'] }),
+        makeRec194(2, { dialogueHighlights: ['loyalty endures'] }),
+        makeRec194(3, { dialogueHighlights: ['betrayal costs us'] }),
+        makeRec194(4), makeRec194(5), makeRec194(6), makeRec194(7),
+      ];
+      const result = await themePass({
+        fountain: blankFountain194(8), original: blankFountain194(8),
+        records: records as any, structure: {} as any, storyContext: themeCtx194,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(result.issues.some((i: any) => i.rule === 'THEME_DENSITY_INVERSION'),
+        'Should fire when first-half resonance density exceeds second-half');
+    });
+
+    it('THEME_DENSITY_INVERSION does not fire when second half has more resonant scenes', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // 8 records: first half (0-3) all silent, second half (4-7) all resonant
+      const records = [
+        makeRec194(0), makeRec194(1), makeRec194(2), makeRec194(3),
+        makeRec194(4, { dialogueHighlights: ['loyalty above everything'] }),
+        makeRec194(5, { dialogueHighlights: ['betrayal is real'] }),
+        makeRec194(6, { dialogueHighlights: ['loyalty endures'] }),
+        makeRec194(7, { dialogueHighlights: ['betrayal costs us'] }),
+      ];
+      const result = await themePass({
+        fountain: blankFountain194(8), original: blankFountain194(8),
+        records: records as any, structure: {} as any, storyContext: themeCtx194,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(!result.issues.some((i: any) => i.rule === 'THEME_DENSITY_INVERSION'),
+        'Should NOT fire when second half carries more thematic scenes');
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

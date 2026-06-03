@@ -427,6 +427,78 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         }
       }
     }
+
+    // THEME_ACT2_DESERT: Act 2 (25%–75% of scenes) has fewer than 30% thematically
+    // resonant scenes — the middle of the story, where the theme is tested and
+    // complicated, is an empty desert. The theme is present in the opening and
+    // closing but the long middle section abandons the central question.
+    if (records.length >= 6) {
+      const act2DesertStart = Math.floor(records.length * 0.25);
+      const act2DesertEnd = Math.floor(records.length * 0.75);
+      const act2DesertRecs = records.slice(act2DesertStart, act2DesertEnd);
+      if (act2DesertRecs.length >= 3) {
+        const resonantInAct2 = act2DesertRecs.filter(r =>
+          sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        ).length;
+        if (resonantInAct2 / act2DesertRecs.length < 0.3) {
+          issues.push({
+            location: `Act 2 (scenes ${act2DesertStart}–${act2DesertEnd - 1})`,
+            rule: 'THEME_ACT2_DESERT',
+            description:
+              `Only ${resonantInAct2} of ${act2DesertRecs.length} Act 2 scenes (${Math.round(resonantInAct2 / act2DesertRecs.length * 100)}%) carry the theme "${themeRaw}" — the middle of the story is thematically inert`,
+            severity: 'major',
+            suggestedFix:
+              `Act 2 is where the theme is tested and complicated. Add thematic resonance to at least every third Act 2 scene: a choice, image, or line of dialogue that ties back to "${themeRaw}" while the plot escalates.`,
+          });
+        }
+      }
+    }
+
+    // THEME_RESOLUTION_SILENT: The final scene — the screenplay's last word — contains
+    // no thematic language. The denouement resolves the plot but leaves the central
+    // question unanswered in the audience's final impression.
+    if (records.length >= 4) {
+      const finalRec = records[records.length - 1];
+      const finalText = sceneTexts.get(finalRec.sceneIdx) ?? '';
+      if (!sceneHasResonance(finalText, expandedKeywords)) {
+        issues.push({
+          location: `Scene ${finalRec.sceneIdx} (final scene)`,
+          rule: 'THEME_RESOLUTION_SILENT',
+          description:
+            `The final scene contains no language related to the theme "${themeRaw}" — the screenplay ends on a plot beat rather than a thematic one`,
+          severity: 'major',
+          suggestedFix:
+            `The last scene should echo the theme one final time: a callback line, a closing image, or a character's action that answers "${themeRaw}". The audience's final impression should be thematic, not transactional.`,
+        });
+      }
+    }
+
+    // THEME_DENSITY_INVERSION: The proportion of thematically resonant scenes is
+    // higher in the first half than the second. Theme should escalate toward the
+    // climax, not retreat from it. Distinct from THEME_FRONT_LOADED (which tracks
+    // keyword-hit density); this counts whether scenes carry ANY resonance at all.
+    if (records.length >= 8) {
+      const halfIdxDens = Math.floor(records.length / 2);
+      const firstHalfResonant = records.slice(0, halfIdxDens).filter(r =>
+        sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+      ).length;
+      const secondHalfResonant = records.slice(halfIdxDens).filter(r =>
+        sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+      ).length;
+      const firstHalfRatioDens = firstHalfResonant / halfIdxDens;
+      const secondHalfRatioDens = secondHalfResonant / (records.length - halfIdxDens);
+      if (firstHalfRatioDens > secondHalfRatioDens && firstHalfRatioDens > 0.3) {
+        issues.push({
+          location: 'Thematic distribution',
+          rule: 'THEME_DENSITY_INVERSION',
+          description:
+            `Thematic resonance is denser in the first half (${Math.round(firstHalfRatioDens * 100)}% of scenes carry the theme) than the second (${Math.round(secondHalfRatioDens * 100)}%) — the theme builds early then retreats`,
+          severity: 'minor',
+          suggestedFix:
+            `Redistribute thematic touchpoints so the second half carries at least as many resonant scenes as the first. The theme should be escalating toward the climax, not retreating from it.`,
+        });
+      }
+    }
   }
 
   const { revised, usedLLM } = await rewritePass({
