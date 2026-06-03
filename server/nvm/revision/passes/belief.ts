@@ -391,6 +391,65 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 199: Midpoint void, single revelation, revelation delayed ────────
+
+  // BELIEF_MIDPOINT_VOID: The midpoint zone (40%–60%) carries no told beliefs
+  // and no witnessed revelations. The structural pivot has no belief/deception
+  // activity — the story shifts gear without any information exchange to motivate
+  // the transition.
+  if (records.length >= 8) {
+    const beliefMidStart = Math.floor(records.length * 0.4);
+    const beliefMidEnd = Math.floor(records.length * 0.6);
+    const midBelRecs = records.slice(beliefMidStart, beliefMidEnd);
+    if (midBelRecs.length >= 2) {
+      const hasMidBelief = midBelRecs.some(r =>
+        r.dialogueHighlights.length > 0 || r.revelation !== null,
+      );
+      if (!hasMidBelief) {
+        issues.push({
+          location: `Midpoint zone (Scenes ${beliefMidStart}–${beliefMidEnd - 1})`,
+          rule: 'BELIEF_MIDPOINT_VOID',
+          description: `The midpoint zone (Scenes ${beliefMidStart}–${beliefMidEnd - 1}) contains no told beliefs and no revelations — the story's structural pivot has no information exchange to motivate it`,
+          severity: 'minor',
+          suggestedFix: 'Add at least one belief beat to the midpoint zone: a character asserting something important, or a scene that witnesses a key truth. The midpoint is where the story\'s question becomes most urgent — it should carry a belief beat.',
+        });
+      }
+    }
+  }
+
+  // SINGLE_REVELATION_STORY: Across 8+ scenes, there is exactly one witnessed
+  // revelation. A single fact witnessed in the whole story is insufficient —
+  // the audience has only one anchor point in the deception layer. Characters
+  // assert freely and the story confirms almost nothing.
+  if (records.length >= 8 && witnessedBeliefs.length === 1) {
+    issues.push({
+      location: 'Revelation layer',
+      rule: 'SINGLE_REVELATION_STORY',
+      description: `The entire story contains exactly one witnessed revelation across ${records.length} scenes — almost everything is asserted and almost nothing is confirmed. The belief layer has a single anchor point and no arc.`,
+      severity: 'minor',
+      suggestedFix: 'Add at least one more revelation: a scene where the audience directly witnesses a truth rather than hearing a character assert it. Multiple revelations create a discovery arc — the audience\'s understanding of the world updates and deepens across the story.',
+    });
+  }
+
+  // REVELATION_DELAYED: Two or more told beliefs exist (characters assert things
+  // in dialogue) but the first witnessed revelation occurs past the story's
+  // midpoint. The audience spends the first half taking characters at their word
+  // with no confirmation or contradiction — building unearned trust (or suspicion)
+  // that should be interrogated much earlier.
+  if (records.length >= 6 && toldBeliefs.length >= 2 && witnessedBeliefs.length >= 1) {
+    const firstRevIdx = witnessedBeliefs[0].sceneIdx;
+    const midpointThreshold = records.length * 0.5;
+    if (firstRevIdx > midpointThreshold) {
+      issues.push({
+        location: `First revelation at Scene ${firstRevIdx}`,
+        rule: 'REVELATION_DELAYED',
+        description: `Characters make assertions from the start but the first witnessed fact doesn't arrive until Scene ${firstRevIdx} — ${Math.round(firstRevIdx / records.length * 100)}% through the story. The audience spends the first half with no witnessed verification of what they're being told.`,
+        severity: 'major',
+        suggestedFix: 'Move the first revelation before the midpoint. An early witnessed fact grounds the audience in what is objectively true, giving them a reference point to measure the characters\' assertions against.',
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'belief', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

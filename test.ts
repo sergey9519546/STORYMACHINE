@@ -15857,6 +15857,132 @@ Goodnight.
     });
   });
 
+  describe('Wave 199 — beliefPass: midpoint void, single revelation, revelation delayed', async () => {
+    const makeRec199 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput199 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nA.\n', original: 'INT. SC - DAY\nA.\n',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('BELIEF_MIDPOINT_VOID fires when the midpoint zone has no beliefs or revelations', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 10 records: belief in record 0 and revelation in records 2 and 9; midpoint [4-5] empty
+      const records = [
+        makeRec199(0, { dialogueHighlights: ['alice: trust defines loyalty'] }),
+        makeRec199(1),
+        makeRec199(2, { revelation: 'early fact' }),
+        makeRec199(3),
+        makeRec199(4),
+        makeRec199(5),
+        makeRec199(6),
+        makeRec199(7),
+        makeRec199(8),
+        makeRec199(9, { revelation: 'final fact' }),
+      ];
+      const result = await beliefPass(makeInput199(records));
+      assert.ok(result.issues.some((i: any) => i.rule === 'BELIEF_MIDPOINT_VOID'),
+        'Should fire when midpoint zone carries no told beliefs or revelations');
+    });
+
+    it('BELIEF_MIDPOINT_VOID does not fire when midpoint zone carries a belief', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // Record 4 (in midpoint) has a told belief
+      const records = [
+        makeRec199(0, { dialogueHighlights: ['alice: trust defines loyalty'] }),
+        makeRec199(1),
+        makeRec199(2, { revelation: 'early fact' }),
+        makeRec199(3),
+        makeRec199(4, { dialogueHighlights: ['bob: things are not as they seem'] }),
+        makeRec199(5),
+        makeRec199(6),
+        makeRec199(7),
+        makeRec199(8),
+        makeRec199(9, { revelation: 'final fact' }),
+      ];
+      const result = await beliefPass(makeInput199(records));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'BELIEF_MIDPOINT_VOID'),
+        'Should NOT fire when midpoint zone contains a told belief');
+    });
+
+    it('SINGLE_REVELATION_STORY fires when the story has exactly one witnessed revelation', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 8 records: one revelation total, two told beliefs
+      const records = [
+        makeRec199(0, { dialogueHighlights: ['alice: loyalty matters'] }),
+        makeRec199(1),
+        makeRec199(2, { dialogueHighlights: ['bob: trust was never there'] }),
+        makeRec199(3),
+        makeRec199(4, { revelation: 'only one truth witnessed' }),
+        makeRec199(5),
+        makeRec199(6),
+        makeRec199(7),
+      ];
+      const result = await beliefPass(makeInput199(records));
+      assert.ok(result.issues.some((i: any) => i.rule === 'SINGLE_REVELATION_STORY'),
+        'Should fire when story has exactly one witnessed revelation across 8+ scenes');
+    });
+
+    it('SINGLE_REVELATION_STORY does not fire when story has two or more revelations', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 8 records: two revelations
+      const records = [
+        makeRec199(0, { dialogueHighlights: ['alice: loyalty matters'] }),
+        makeRec199(1),
+        makeRec199(2, { revelation: 'first truth' }),
+        makeRec199(3),
+        makeRec199(4),
+        makeRec199(5),
+        makeRec199(6, { revelation: 'second truth' }),
+        makeRec199(7),
+      ];
+      const result = await beliefPass(makeInput199(records));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'SINGLE_REVELATION_STORY'),
+        'Should NOT fire when story has two or more witnessed revelations');
+    });
+
+    it('REVELATION_DELAYED fires when the first revelation arrives after the midpoint', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 6 records: told beliefs at 0 and 1, first revelation at record 4 (67% in)
+      const records = [
+        makeRec199(0, { dialogueHighlights: ['alice: the key exists here'] }),
+        makeRec199(1, { dialogueHighlights: ['bob: we know the truth already'] }),
+        makeRec199(2),
+        makeRec199(3),
+        makeRec199(4, { revelation: 'delayed discovery' }),
+        makeRec199(5),
+      ];
+      const result = await beliefPass(makeInput199(records));
+      assert.ok(result.issues.some((i: any) => i.rule === 'REVELATION_DELAYED'),
+        'Should fire when first revelation occurs past the story midpoint');
+    });
+
+    it('REVELATION_DELAYED does not fire when the first revelation arrives before the midpoint', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // First revelation at record 2 (33% in, before midpoint at 50%)
+      const records = [
+        makeRec199(0, { dialogueHighlights: ['alice: the key exists here'] }),
+        makeRec199(1, { dialogueHighlights: ['bob: we know the truth already'] }),
+        makeRec199(2, { revelation: 'early discovery' }),
+        makeRec199(3),
+        makeRec199(4),
+        makeRec199(5),
+      ];
+      const result = await beliefPass(makeInput199(records));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'REVELATION_DELAYED'),
+        'Should NOT fire when first revelation arrives before the midpoint');
+    });
+  });
+
   describe('Wave 198 — structurePass: act3 scene excess, tension drop abrupt, act1 revelation absent', async () => {
     const makeRec198 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
