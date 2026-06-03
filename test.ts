@@ -15549,6 +15549,144 @@ Running now, she turns the corner.
     });
   });
 
+  describe('Wave 192 — relationshipArcPass: protagonist freeze, Act 1 void, cluster spike', async () => {
+    const makeRec = (idx: number, relShifts: any[] = []): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`, purpose: 'dialogue',
+      dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+      emotionalShift: 'neutral', suspenseDelta: 1, dialogueHighlights: [],
+      unresolvedClues: [], seededClueIds: [], payoffSetupIds: [], visualBeats: [],
+      relationshipShifts: relShifts,
+    });
+    const relInput = (records: any[], n: number) => ({
+      fountain: Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+      original: Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join(''),
+      records: records as any, structure: {} as any, annotations: [], approvedSpans: [],
+    });
+
+    // ── PROTAGONIST_RELATIONSHIP_FREEZE ───────────────────────────────────────
+    it('relationshipArcPass detects PROTAGONIST_RELATIONSHIP_FREEZE when protagonist bonds cancel out', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // alice is in 3 pairs (protagonist); her net=0.1; bob|carol net=0.6
+      const records = [
+        makeRec(0),
+        makeRec(1, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.5 }]),
+        makeRec(2, [{ pairKey: 'alice|carol', dimension: 'affinity', amount: 0.3 }]),
+        makeRec(3, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.4 }]),
+        makeRec(4, [{ pairKey: 'bob|carol', dimension: 'affinity', amount: 0.6 }]),
+        makeRec(5, [{ pairKey: 'alice|carol', dimension: 'affinity', amount: -0.3 }]),
+        makeRec(6, [{ pairKey: 'alice|dan', dimension: 'affinity', amount: -0.2 }]),
+        makeRec(7, [{ pairKey: 'alice|dan', dimension: 'affinity', amount: 0.2 }]),
+      ];
+      const result = await relationshipArcPass(relInput(records, 8));
+      const freeze = result.issues.filter(i => i.rule === 'PROTAGONIST_RELATIONSHIP_FREEZE');
+      assert.ok(freeze.length >= 1, `Should detect PROTAGONIST_RELATIONSHIP_FREEZE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(freeze[0].severity === 'major');
+    });
+
+    it('relationshipArcPass does NOT fire PROTAGONIST_RELATIONSHIP_FREEZE when protagonist has a clear arc', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // alice|bob net=1.2 (strong positive arc); carol|dan net=-0.9 (counterpoint)
+      const records = [
+        makeRec(0),
+        makeRec(1, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.5 }]),
+        makeRec(2, [{ pairKey: 'carol|dan', dimension: 'affinity', amount: -0.6 }]),
+        makeRec(3, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.4 }]),
+        makeRec(4, [{ pairKey: 'carol|dan', dimension: 'affinity', amount: -0.3 }]),
+        makeRec(5, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.3 }]),
+        makeRec(6),
+        makeRec(7),
+      ];
+      const result = await relationshipArcPass(relInput(records, 8));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'PROTAGONIST_RELATIONSHIP_FREEZE'),
+        'Should NOT fire when the protagonist has a strong net relational arc',
+      );
+    });
+
+    // ── RELATIONSHIP_ACT1_VOID ────────────────────────────────────────────────
+    it('relationshipArcPass detects RELATIONSHIP_ACT1_VOID when no shifts occur in Act 1', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // act1End=2; records[0,1] have no shifts; shifts begin at record[2]
+      const records = [
+        makeRec(0),
+        makeRec(1),
+        makeRec(2, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.5 }]),
+        makeRec(3, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.3 }]),
+        makeRec(4, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.4 }]),
+        makeRec(5),
+        makeRec(6, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: -0.3 }]),
+        makeRec(7),
+      ];
+      const result = await relationshipArcPass(relInput(records, 8));
+      const void1 = result.issues.filter(i => i.rule === 'RELATIONSHIP_ACT1_VOID');
+      assert.ok(void1.length >= 1, `Should detect RELATIONSHIP_ACT1_VOID; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(void1[0].severity === 'minor');
+    });
+
+    it('relationshipArcPass does NOT fire RELATIONSHIP_ACT1_VOID when Act 1 has a shift', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // records[1] has a shift inside Act 1 → act1HasShift=true
+      const records = [
+        makeRec(0),
+        makeRec(1, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.3 }]),
+        makeRec(2, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.5 }]),
+        makeRec(3, [{ pairKey: 'carol|dan', dimension: 'affinity', amount: -0.4 }]),
+        makeRec(4),
+        makeRec(5, [{ pairKey: 'carol|dan', dimension: 'affinity', amount: -0.3 }]),
+        makeRec(6),
+        makeRec(7),
+      ];
+      const result = await relationshipArcPass(relInput(records, 8));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'RELATIONSHIP_ACT1_VOID'),
+        'Should NOT fire when at least one relationship shift occurs in Act 1',
+      );
+    });
+
+    // ── CLUSTER_SHIFT_SCENE ───────────────────────────────────────────────────
+    it('relationshipArcPass detects CLUSTER_SHIFT_SCENE when one scene shifts 3+ pairs at once', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // records[2] shifts 3 different pairs simultaneously
+      const records = [
+        makeRec(0),
+        makeRec(1, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.5 }]),
+        makeRec(2, [
+          { pairKey: 'alice|bob', dimension: 'affinity', amount: -0.3 },
+          { pairKey: 'bob|carol', dimension: 'trust', amount: -0.4 },
+          { pairKey: 'alice|carol', dimension: 'affinity', amount: 0.2 },
+        ]),
+        makeRec(3),
+        makeRec(4, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.3 }]),
+        makeRec(5),
+      ];
+      const result = await relationshipArcPass(relInput(records, 6));
+      const cluster = result.issues.filter(i => i.rule === 'CLUSTER_SHIFT_SCENE');
+      assert.ok(cluster.length >= 1, `Should detect CLUSTER_SHIFT_SCENE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(cluster[0].severity === 'minor');
+    });
+
+    it('relationshipArcPass does NOT fire CLUSTER_SHIFT_SCENE when no scene shifts more than 2 pairs', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // max 2 pairs per scene — never 3
+      const records = [
+        makeRec(0),
+        makeRec(1, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.5 }]),
+        makeRec(2, [
+          { pairKey: 'alice|bob', dimension: 'affinity', amount: -0.3 },
+          { pairKey: 'bob|carol', dimension: 'trust', amount: 0.4 },
+        ]),
+        makeRec(3, [{ pairKey: 'alice|carol', dimension: 'affinity', amount: 0.3 }]),
+        makeRec(4, [{ pairKey: 'alice|bob', dimension: 'affinity', amount: 0.2 }]),
+        makeRec(5),
+      ];
+      const result = await relationshipArcPass(relInput(records, 6));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'CLUSTER_SHIFT_SCENE'),
+        'Should NOT fire when no single scene shifts more than two pairs at once',
+      );
+    });
+  });
+
   describe('Wave 162 — themePass: midpoint silent, accelerating density absent, act3 dialectic', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

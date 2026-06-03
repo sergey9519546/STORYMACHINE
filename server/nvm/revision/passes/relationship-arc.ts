@@ -358,6 +358,82 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
     }
   }
 
+  // ── Wave 192: Protagonist freeze, Act 1 void, cluster spike ─────────────────
+
+  // PROTAGONIST_RELATIONSHIP_FREEZE: The protagonist (character appearing in the
+  // most pairKeys) has a near-zero net relational arc (|net| < 0.2) while at
+  // least one secondary pair has substantial movement (|net| ≥ 0.4). The central
+  // character's relationships neither grow nor decay — surrounding relational
+  // activity has no impact on the protagonist's bonds.
+  if (records.length >= 8 && pairStats.size >= 2 && totalShifts >= 4) {
+    const charPairCount = new Map<string, number>();
+    for (const key of pairStats.keys()) {
+      const [a, b] = key.split('|');
+      charPairCount.set(a, (charPairCount.get(a) ?? 0) + 1);
+      charPairCount.set(b, (charPairCount.get(b) ?? 0) + 1);
+    }
+    let protagonistChar = '';
+    let maxPairAppear = 0;
+    for (const [char, cnt] of charPairCount) {
+      if (cnt > maxPairAppear) { maxPairAppear = cnt; protagonistChar = char; }
+    }
+    if (protagonistChar) {
+      const protagonistNet = [...pairStats.entries()]
+        .filter(([key]) => key.split('|').includes(protagonistChar))
+        .reduce((sum, [, st]) => sum + st.shifts.reduce((s, x) => s + x.amount, 0), 0);
+      const otherPairHasMovement = [...pairStats.entries()]
+        .filter(([key]) => !key.split('|').includes(protagonistChar))
+        .some(([, st]) => Math.abs(st.shifts.reduce((s, x) => s + x.amount, 0)) >= 0.4);
+      if (Math.abs(protagonistNet) < 0.2 && otherPairHasMovement) {
+        issues.push({
+          location: `${protagonistChar} (protagonist relationships)`,
+          rule: 'PROTAGONIST_RELATIONSHIP_FREEZE',
+          severity: 'major',
+          description: `${protagonistChar}'s relationships have a near-zero net arc (${protagonistNet.toFixed(2)}) while secondary pairs show substantial movement — the protagonist's bonds neither grow nor decay despite surrounding relational activity.`,
+          suggestedFix: "Give the protagonist a clear relational trajectory: at least one bond that meaningfully warms or sours across the story. The protagonist's relational stasis makes the surrounding relational drama feel disconnected from the central character.",
+        });
+      }
+    }
+  }
+
+  // RELATIONSHIP_ACT1_VOID: No relationship shifts occur in the first quarter of
+  // the story. The story establishes no relational baseline — the audience doesn't
+  // know where characters stand before complications arrive. All relational drama
+  // begins cold, in medias res, without earned context. Requires 8+ records.
+  if (records.length >= 8) {
+    const act1RelEnd = Math.floor(records.length * 0.25);
+    const act1HasShift = records.slice(0, act1RelEnd).some(r => (r.relationshipShifts ?? []).length > 0);
+    if (!act1HasShift) {
+      issues.push({
+        location: 'Act 1 relationships',
+        rule: 'RELATIONSHIP_ACT1_VOID',
+        severity: 'minor',
+        description: `No relationship shifts occur in the first ${act1RelEnd} scenes — Act 1 establishes no relational baseline. The audience doesn't know where characters stand before the complications arrive.`,
+        suggestedFix: 'Plant at least one relationship shift in Act 1 — even a small warmth or tension. The audience needs to see where characters begin so they can measure how far they have traveled by the end.',
+      });
+    }
+  }
+
+  // CLUSTER_SHIFT_SCENE: A single scene contains simultaneous shifts for 3 or
+  // more distinct character pairs. A "relationship explosion" scene where every
+  // bond simultaneously moves strains dramatic plausibility — relationship changes
+  // should build organically, not erupt in a single moment. Requires 6+ records.
+  if (records.length >= 6) {
+    for (const r of records) {
+      const pairsShifted = new Set((r.relationshipShifts ?? []).map(s => s.pairKey));
+      if (pairsShifted.size >= 3) {
+        issues.push({
+          location: `Scene ${r.sceneIdx} (${r.slug})`,
+          rule: 'CLUSTER_SHIFT_SCENE',
+          severity: 'minor',
+          description: `Scene ${r.sceneIdx} simultaneously shifts ${pairsShifted.size} different character pairs — a "relationship explosion" where every bond moves at once. This strains plausibility and dilutes the impact of each individual shift.`,
+          suggestedFix: 'Distribute the relationship shifts across multiple scenes. Let each shift land separately so the audience can absorb and register it before the next one arrives.',
+        });
+        break;
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({
     fountain, issues, passName: 'relationship-arc', approvedSpans,
     storyContext: input.storyContext, priorPassResults: input.priorPassResults,
