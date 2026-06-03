@@ -15857,6 +15857,111 @@ Goodnight.
     });
   });
 
+  describe('Wave 203 — relationshipArcPass: third-act escalation absent, rapid reconciliation, payoff abandoned', async () => {
+    const makeRec203 = (idx: number, overrides: any = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'establish_world', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0,
+      emotionalShift: 'neutral', suspenseDelta: 0,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...overrides,
+    });
+    const relInput203 = (recs: any[]) => ({
+      fountain: 'INT. SC0 - DAY\n\nOpening scene.\n',
+      original: 'INT. SC0 - DAY\n\nOpening scene.\n',
+      records: recs as any,
+      structure: {} as any, annotations: [], approvedSpans: [],
+    });
+
+    // ── RELATIONSHIP_THIRD_ACT_ESCALATION_ABSENT ─────────────────────────────
+    it('relationshipArcPass detects RELATIONSHIP_THIRD_ACT_ESCALATION_ABSENT when no shifts in Act 3', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // n=8, shifts at scenes 0(+0.5), 2(-0.3), 4(+0.6); act3=[6,7] empty
+      const recs = Array.from({ length: 8 }, (_, i) => makeRec203(i));
+      recs[0] = makeRec203(0, { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'power', amount: 0.5 }] });
+      recs[1] = makeRec203(1, { suspenseDelta: 2 }); // prevent UNEARNED_REVERSAL at scene 2
+      recs[2] = makeRec203(2, { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'power', amount: -0.3 }] });
+      recs[4] = makeRec203(4, { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'power', amount: 0.6 }] });
+      const result = await relationshipArcPass(relInput203(recs));
+      const issues = result.issues.filter(i => i.rule === 'RELATIONSHIP_THIRD_ACT_ESCALATION_ABSENT');
+      assert.ok(issues.length >= 1, `Should detect RELATIONSHIP_THIRD_ACT_ESCALATION_ABSENT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(issues[0].severity === 'major');
+    });
+
+    it('relationshipArcPass does NOT fire RELATIONSHIP_THIRD_ACT_ESCALATION_ABSENT when Act 3 has a shift', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // n=8, same as above but add shift at scene 6 (in act3)
+      const recs = Array.from({ length: 8 }, (_, i) => makeRec203(i));
+      recs[0] = makeRec203(0, { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'power', amount: 0.5 }] });
+      recs[1] = makeRec203(1, { suspenseDelta: 2 });
+      recs[2] = makeRec203(2, { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'power', amount: -0.3 }] });
+      recs[4] = makeRec203(4, { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'power', amount: 0.6 }] });
+      recs[6] = makeRec203(6, { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'power', amount: 0.2 }] });
+      const result = await relationshipArcPass(relInput203(recs));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'RELATIONSHIP_THIRD_ACT_ESCALATION_ABSENT'),
+        'Should NOT fire when Act 3 contains a relationship shift',
+      );
+    });
+
+    // ── RAPID_RECONCILIATION ─────────────────────────────────────────────────
+    it('relationshipArcPass detects RAPID_RECONCILIATION when a pair heals within 2 scenes with no tension', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // n=6, rupture at scene 1 (-0.6), recovery at scene 2 (+0.8), dist=1, no intermediate tension
+      const recs = Array.from({ length: 6 }, (_, i) => makeRec203(i));
+      recs[1] = makeRec203(1, { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'power', amount: -0.6 }] });
+      recs[2] = makeRec203(2, { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'power', amount: 0.8 }] });
+      const result = await relationshipArcPass(relInput203(recs));
+      const issues = result.issues.filter(i => i.rule === 'RAPID_RECONCILIATION');
+      assert.ok(issues.length >= 1, `Should detect RAPID_RECONCILIATION; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(issues[0].severity === 'minor');
+    });
+
+    it('relationshipArcPass does NOT fire RAPID_RECONCILIATION when recovery is spaced 4 scenes away', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // n=6, rupture at scene 1 (-0.6), recovery at scene 5 (+0.8), dist=4 > 2
+      const recs = Array.from({ length: 6 }, (_, i) => makeRec203(i));
+      recs[1] = makeRec203(1, { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'power', amount: -0.6 }] });
+      recs[4] = makeRec203(4, { suspenseDelta: 2 }); // prevent UNEARNED_REVERSAL
+      recs[5] = makeRec203(5, { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'power', amount: 0.8 }] });
+      const result = await relationshipArcPass(relInput203(recs));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'RAPID_RECONCILIATION'),
+        'Should NOT fire when recovery is 4 scenes after rupture',
+      );
+    });
+
+    // ── RELATIONSHIP_PAYOFF_ABANDONED ─────────────────────────────────────────
+    it('relationshipArcPass detects RELATIONSHIP_PAYOFF_ABANDONED when strong early arc vanishes in final 40%', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // n=10, shifts at scenes 0(+0.5),1(-0.2),3(+0.6) → net=0.9>=0.8 in first 60%; none in scenes 6-9
+      const recs = Array.from({ length: 10 }, (_, i) => makeRec203(i));
+      recs[0] = makeRec203(0, { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'power', amount: 0.5 }] });
+      recs[1] = makeRec203(1, { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'power', amount: -0.2 }] });
+      recs[3] = makeRec203(3, { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'power', amount: 0.6 }] });
+      const result = await relationshipArcPass(relInput203(recs));
+      const issues = result.issues.filter(i => i.rule === 'RELATIONSHIP_PAYOFF_ABANDONED');
+      assert.ok(issues.length >= 1, `Should detect RELATIONSHIP_PAYOFF_ABANDONED; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(issues[0].severity === 'major');
+    });
+
+    it('relationshipArcPass does NOT fire RELATIONSHIP_PAYOFF_ABANDONED when arc continues into final act', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // n=10, same early shifts plus one at scene 7 (in final 40% = scenes 6-9)
+      const recs = Array.from({ length: 10 }, (_, i) => makeRec203(i));
+      recs[0] = makeRec203(0, { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'power', amount: 0.5 }] });
+      recs[1] = makeRec203(1, { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'power', amount: -0.2 }] });
+      recs[3] = makeRec203(3, { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'power', amount: 0.6 }] });
+      recs[7] = makeRec203(7, { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'power', amount: 0.2 }] });
+      const result = await relationshipArcPass(relInput203(recs));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'RELATIONSHIP_PAYOFF_ABANDONED'),
+        'Should NOT fire when arc has a shift in the final 40%',
+      );
+    });
+  });
+
   describe('Wave 202 — voicePass: question overload, speech tag inflation, mono-speaker dominance', async () => {
     const makeRec202 = (idx: number): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

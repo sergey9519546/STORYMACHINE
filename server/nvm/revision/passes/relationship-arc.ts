@@ -434,6 +434,90 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
     }
   }
 
+  // ── Wave 203: Third-act void, rapid reconciliation, payoff abandoned ────────
+
+  // RELATIONSHIP_THIRD_ACT_ESCALATION_ABSENT: The story accumulates relational
+  // activity (≥3 total shifts) but none of it occurs in Act 3 (final 25%).
+  // The climax has no relational dimension — character bonds go silent at the
+  // story's highest-stakes moment, leaving the emotional resolution hollow.
+  if (records.length >= 8 && totalShifts >= 3) {
+    const act3Start203 = Math.floor(records.length * 0.75);
+    const hasAct3Shift = records
+      .slice(act3Start203)
+      .some(r => (r.relationshipShifts ?? []).length > 0);
+    if (!hasAct3Shift) {
+      issues.push({
+        location: `Act 3 (Scenes ${act3Start203}–${records.length - 1})`,
+        rule: 'RELATIONSHIP_THIRD_ACT_ESCALATION_ABSENT',
+        severity: 'major',
+        description: `The story accumulates ${totalShifts} relationship shifts but none occur in Act 3 (Scene ${act3Start203} onward). The climax has no relational dimension — character bonds go silent at the story's highest-stakes moment.`,
+        suggestedFix:
+          'Add at least one relationship shift during the climax: a trust break under pressure, a reconciliation, or a power inversion. The audience needs to feel how the bonds resolve, not just how the plot resolves.',
+      });
+    }
+  }
+
+  // RAPID_RECONCILIATION: A pair suffers a large negative shift (≤ −0.5) and
+  // then receives a large positive shift (≥ +0.5) within 2 scenes, with no
+  // tension build-up (suspenseDelta < 1) in the intermediate scene(s). The
+  // wound heals before the audience has time to feel it. Rupture and
+  // reconciliation this compressed read as implausible emotional whiplash.
+  if (records.length >= 6) {
+    for (const [pairKey, stats] of pairStats) {
+      let fired203rr = false;
+      for (let i = 0; i + 1 < stats.shifts.length && !fired203rr; i++) {
+        const rupture203 = stats.shifts[i];
+        const recovery203 = stats.shifts[i + 1];
+        const dist203 = recovery203.sceneIdx - rupture203.sceneIdx;
+        if (rupture203.amount <= -0.5 && recovery203.amount >= 0.5 && dist203 <= 2) {
+          let maxSuspense203 = 0;
+          for (let s = rupture203.sceneIdx + 1; s < recovery203.sceneIdx; s++) {
+            const ir = records[s];
+            if (ir && ir.suspenseDelta > maxSuspense203) maxSuspense203 = ir.suspenseDelta;
+          }
+          if (maxSuspense203 < 1) {
+            const [a, b] = pairKey.split('|');
+            issues.push({
+              location: `${a} ↔ ${b} (Scenes ${rupture203.sceneIdx}–${recovery203.sceneIdx})`,
+              rule: 'RAPID_RECONCILIATION',
+              severity: 'minor',
+              description: `The bond between ${a} and ${b} ruptures (${rupture203.amount.toFixed(1)}) at Scene ${rupture203.sceneIdx} and reconciles (${recovery203.amount.toFixed(1)}) just ${dist203} scene(s) later with no tension in between — the wound heals before the audience can feel it.`,
+              suggestedFix:
+                'Let the rupture breathe: insert 2–3 scenes of genuine consequence before the reconciliation. The characters should earn their way back to each other through difficulty — not simply reset.',
+            });
+            fired203rr = true;
+          }
+        }
+      }
+    }
+  }
+
+  // RELATIONSHIP_PAYOFF_ABANDONED: A pair builds strong relational momentum
+  // (|net| ≥ 0.8 across ≥2 early shifts in the first 60% of the story) but
+  // has zero shifts in the final 40%. The arc promises a resolution it never
+  // delivers — the relational engine cuts out before the ending it earned.
+  if (records.length >= 8) {
+    const earlyZone203 = Math.floor(records.length * 0.6);
+    for (const [pairKey, stats] of pairStats) {
+      const earlyShifts203 = stats.shifts.filter(s => s.sceneIdx < earlyZone203);
+      const lateShifts203 = stats.shifts.filter(s => s.sceneIdx >= earlyZone203);
+      if (earlyShifts203.length >= 2 && lateShifts203.length === 0) {
+        const earlyNet203 = earlyShifts203.reduce((s, x) => s + x.amount, 0);
+        if (Math.abs(earlyNet203) >= 0.8) {
+          const [a, b] = pairKey.split('|');
+          issues.push({
+            location: `${a} ↔ ${b} (last shift: Scene ${earlyShifts203[earlyShifts203.length - 1].sceneIdx})`,
+            rule: 'RELATIONSHIP_PAYOFF_ABANDONED',
+            severity: 'major',
+            description: `The relationship between ${a} and ${b} builds a net arc of ${earlyNet203.toFixed(2)} in the first 60% of the story, then vanishes — no shifts occur in the final 40%. The relational engine cuts out before the ending it promised.`,
+            suggestedFix:
+              'Return to this relationship in the final act. Even one beat that acknowledges the accumulated weight — a confrontation, a quiet resolution, or a moment of acknowledgment — prevents the arc from reading as abandoned.',
+          });
+        }
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({
     fountain, issues, passName: 'relationship-arc', approvedSpans,
     storyContext: input.storyContext, priorPassResults: input.priorPassResults,
