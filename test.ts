@@ -15857,6 +15857,136 @@ Goodnight.
     });
   });
 
+  describe('Wave 202 — voicePass: question overload, speech tag inflation, mono-speaker dominance', async () => {
+    const makeRec202 = (idx: number): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: ['establish_world', 'introduce_conflict'][idx % 2],
+      dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0,
+      emotionalShift: idx % 2 === 0 ? 'positive' : 'negative', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+    });
+    const voiceInput202 = (fountain: string, n: number) => ({
+      fountain, original: fountain,
+      records: Array.from({ length: n }, (_, i) => makeRec202(i)) as any,
+      structure: {} as any, annotations: [], approvedSpans: [],
+    });
+
+    // ── QUESTION_MARK_OVERLOAD ────────────────────────────────────────────────
+    it('voicePass detects QUESTION_MARK_OVERLOAD when >35% of dialogue lines end with "?"', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 12 dialogue lines, 6 questions (50% > 35%)
+      const fountain = `INT. ROOM - DAY\n\nShe sits.\n\nALICE\nWhere have you been?\n\nBOB\nAround.\n\nALICE\nWhy didn't you call?\n\nBOB\nI was busy.\n\nALICE\nBusy with what?\n\nBOB\nWork.\n\nALICE\nAll night?\n\nBOB\nYes.\n\nALICE\nDo you think I'm stupid?\n\nBOB\nNo.\n\nALICE\nThen why are you lying?\n\nBOB\nI don't know what you want.\n`;
+      const result = await voicePass(voiceInput202(fountain, 2));
+      const qOverload = result.issues.filter(i => i.rule === 'QUESTION_MARK_OVERLOAD');
+      assert.ok(qOverload.length >= 1, `Should detect QUESTION_MARK_OVERLOAD; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(qOverload[0].severity === 'minor');
+    });
+
+    it('voicePass does NOT fire QUESTION_MARK_OVERLOAD when questions are infrequent', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 12 dialogue lines, 2 questions (17% < 35%)
+      const fountain = `INT. ROOM - DAY\n\nShe sits.\n\nALICE\nWhere have you been?\n\nBOB\nI've been working late.\n\nALICE\nYou look tired.\n\nBOB\nI'm fine.\n\nALICE\nAre you sure?\n\nBOB\nYes. I'm positive.\n\nALICE\nOkay. I believe you.\n\nBOB\nThank you. I appreciate that.\n\nALICE\nLet's have dinner.\n\nBOB\nThat sounds good.\n\nALICE\nWe can talk then.\n\nBOB\nI'd like that.\n`;
+      const result = await voicePass(voiceInput202(fountain, 2));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'QUESTION_MARK_OVERLOAD'),
+        'Should NOT fire when fewer than 35% of dialogue lines end with "?"',
+      );
+    });
+
+    // ── SPEECH_TAG_INFLATION ──────────────────────────────────────────────────
+    it('voicePass detects SPEECH_TAG_INFLATION when >20% of action lines contain speech-quality verbs', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 12 action lines, 3 with speech tags (25% > 20%)
+      const actions = [
+        'The wall is cold and smooth.',
+        'He growled something under his breath.',
+        'Nothing moves in the corridor.',
+        'She whispered his name into the dark.',
+        'The door was stuck.',
+        'He pulled hard on the handle.',
+        'She hissed a warning from the doorway.',
+        'A sound from below — footsteps.',
+        'The stairwell was empty.',
+        'Footsteps on the stairs.',
+        'A hand on his arm.',
+        'The door swings open.',
+      ];
+      const fountain = `INT. CORRIDOR - NIGHT\n\n${actions.join('\n')}\n`;
+      const result = await voicePass(voiceInput202(fountain, 2));
+      const tags = result.issues.filter(i => i.rule === 'SPEECH_TAG_INFLATION');
+      assert.ok(tags.length >= 1, `Should detect SPEECH_TAG_INFLATION; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(tags[0].severity === 'minor');
+    });
+
+    it('voicePass does NOT fire SPEECH_TAG_INFLATION when action lines use physical verbs', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 12 action lines, 0 speech tags
+      const actions = [
+        'The wall is cold and smooth.',
+        'He checked the lock on the door.',
+        'Nothing moves in the corridor.',
+        'She moved to the far end.',
+        'The door was stuck.',
+        'He pulled hard on the handle.',
+        'She held up one hand.',
+        'A sound from below — footsteps.',
+        'The stairwell was empty.',
+        'Footsteps on the stairs.',
+        'A hand on his arm.',
+        'The door swings open.',
+      ];
+      const fountain = `INT. CORRIDOR - NIGHT\n\n${actions.join('\n')}\n`;
+      const result = await voicePass(voiceInput202(fountain, 2));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'SPEECH_TAG_INFLATION'),
+        'Should NOT fire when action lines describe physical behavior rather than voice quality',
+      );
+    });
+
+    // ── MONO_SPEAKER_DOMINANCE ────────────────────────────────────────────────
+    it('voicePass detects MONO_SPEAKER_DOMINANCE when one character delivers >50% of all dialogue', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // MARCUS=12 lines, JENNY=2, TOM=3 → MARCUS=70.6% > 50%
+      const fountain = [
+        'INT. BOARDROOM - DAY\n\nThey gather.\n',
+        'MARCUS\nWe need to address this situation now.\n\nMARCUS\nThe company has been losing money.\n',
+        'MARCUS\nI have a plan to fix this.\n\nJENNY\nWhat kind of plan?\n',
+        'MARCUS\nWe cut department budgets by thirty percent.\n\nMARCUS\nThen we restructure the senior team.\n',
+        'MARCUS\nI spoke to the lawyers already.\n\nJENNY\nThat seems drastic.\n',
+        'MARCUS\nIt is drastic. That is the point.\n\nMARCUS\nSometimes you must break things.\n',
+        'MARCUS\nI have done this before.\n\nTOM\nIs this legal?\n',
+        'MARCUS\nOf course it is legal.\n\nTOM\nAnd the staff?\n',
+        'MARCUS\nThat is handled.\n\nTOM\nOkay.\n',
+        'MARCUS\nGood. We move forward now.\n\nMARCUS\nI will send the plan tonight.\n',
+      ].join('\n');
+      const result = await voicePass(voiceInput202(fountain, 2));
+      const mono = result.issues.filter(i => i.rule === 'MONO_SPEAKER_DOMINANCE');
+      assert.ok(mono.length >= 1, `Should detect MONO_SPEAKER_DOMINANCE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.ok(mono[0].severity === 'minor');
+    });
+
+    it('voicePass does NOT fire MONO_SPEAKER_DOMINANCE when dialogue is distributed among speakers', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // ALICE=6, BOB=6, CAROL=5 → max=35% < 50%
+      const fountain = [
+        'INT. OFFICE - DAY\n\nThey sit.\n',
+        'ALICE\nWe have a problem.\n\nBOB\nI know. I have seen the numbers.\n\nCAROL\nWhat are we going to do?\n',
+        'ALICE\nWe need to meet with the client.\n\nBOB\nCan we do that by Friday?\n\nCAROL\nI can set it up.\n',
+        'ALICE\nGood. Let me know when confirmed.\n\nBOB\nI will send the invites today.\n\nCAROL\nShould we bring the report?\n',
+        'ALICE\nYes. All of it.\n\nBOB\nUnderstood.\n\nCAROL\nI will have everything ready.\n',
+        'ALICE\nThank you both.\n\nBOB\nOf course.\n\nCAROL\nNo problem.\n',
+        'ALICE\nLet us reconvene tomorrow.\n\nBOB\nDone.\n',
+      ].join('\n');
+      const result = await voicePass(voiceInput202(fountain, 2));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'MONO_SPEAKER_DOMINANCE'),
+        'Should NOT fire when no single character exceeds 50% of dialogue lines',
+      );
+    });
+  });
+
   describe('Wave 201 — originalityPass: simile overload, dialogue dominance, adverb oversaturation', async () => {
     const makeRec201 = (idx: number): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

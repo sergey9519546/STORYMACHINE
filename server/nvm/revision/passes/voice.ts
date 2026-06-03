@@ -592,6 +592,96 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 202: Question overload, speech tag inflation, mono-speaker dominance ─
+
+  // QUESTION_MARK_OVERLOAD: More than 35% of dialogue lines end with a question
+  // mark. Characters that ask more than they declare stall the story in
+  // interrogative mode — dramatic tension comes from assertion and commitment,
+  // not circles of inquiry. Requires 10+ dialogue lines.
+  {
+    const qmDlgLines: string[] = [];
+    let qmInDlg = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { qmInDlg = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { qmInDlg = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { qmInDlg = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (qmInDlg) { qmDlgLines.push(t); } else { qmInDlg = false; }
+    }
+    if (qmDlgLines.length >= 10) {
+      const qCount = qmDlgLines.filter(l => l.endsWith('?')).length;
+      if (qCount / qmDlgLines.length > 0.35) {
+        issues.push({
+          location: 'Dialogue',
+          rule: 'QUESTION_MARK_OVERLOAD',
+          severity: 'minor',
+          description: `${qCount} of ${qmDlgLines.length} dialogue lines (${Math.round(qCount / qmDlgLines.length * 100)}%) end with a question — the script stalls in interrogative mode. Dramatic tension comes from assertion and commitment, not from circles of inquiry.`,
+          suggestedFix: 'Convert most questions into declarative statements or provocative assertions. Characters who commit to positions create dramatic forward motion; characters who only ask stall it.',
+        });
+      }
+    }
+  }
+
+  // SPEECH_TAG_INFLATION: More than 20% of action lines contain a speech-quality
+  // verb ("whispered", "growled", "hissed", "shouted"). In screenplay, the
+  // character cue + dialogue carries delivery — tagging the speech in action
+  // smuggles a stage direction and wastes a line on an acting note rather than
+  // a filmable image. Requires 8+ action lines.
+  if (actionOnlyLines.length >= 8) {
+    const speechTagRe = /\b(whispered?|growled?|hissed?|shouted?|barked?|snapped?|muttered?|bellowed?|scoffed?|sneered?|snarled?|yelped?|shrieked?|screeched?|drawled?|croaked?|stammered?)\b/i;
+    const speechTagCount = actionOnlyLines.filter(l => speechTagRe.test(l)).length;
+    if (speechTagCount / actionOnlyLines.length > 0.2) {
+      issues.push({
+        location: 'Action line speech tags',
+        rule: 'SPEECH_TAG_INFLATION',
+        severity: 'minor',
+        description: `${speechTagCount} of ${actionOnlyLines.length} action lines (${Math.round(speechTagCount / actionOnlyLines.length * 100)}%) contain a speech-quality verb ("whispered", "growled", "hissed") — novel-habit direction that acts as an acting note instead of showing a filmable image.`,
+        suggestedFix: 'Remove speech-quality tags from action lines. Let the dialogue do its work, or add a parenthetical if tone is genuinely ambiguous. Use the saved line for something the camera can record.',
+      });
+    }
+  }
+
+  // MONO_SPEAKER_DOMINANCE: A single character delivers more than 50% of all
+  // dialogue lines when 3+ speaking characters are present. When one voice
+  // monopolizes the script, all others become reactive instruments rather than
+  // agents — the story collapses into a monologue with commentary.
+  // Requires 15+ dialogue lines and 3+ characters.
+  {
+    const speakerCounts = new Map<string, number>();
+    let msdInDlg = false;
+    let msdChar = '';
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { msdInDlg = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { msdInDlg = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) {
+        msdChar = t.replace(/\s*\(.*?\)\s*$/, '').trim();
+        msdInDlg = true;
+        continue;
+      }
+      if (/^\(/.test(t)) continue;
+      if (msdInDlg && msdChar) {
+        speakerCounts.set(msdChar, (speakerCounts.get(msdChar) ?? 0) + 1);
+      } else { msdInDlg = false; }
+    }
+    const msdTotal = [...speakerCounts.values()].reduce((s, v) => s + v, 0);
+    if (msdTotal >= 15 && speakerCounts.size >= 3) {
+      for (const [char, count] of speakerCounts) {
+        if (count / msdTotal > 0.5) {
+          issues.push({
+            location: `Character: ${char}`,
+            rule: 'MONO_SPEAKER_DOMINANCE',
+            severity: 'minor',
+            description: `${char} delivers ${count} of ${msdTotal} dialogue lines (${Math.round(count / msdTotal * 100)}%) — one voice monopolizes the script with ${speakerCounts.size - 1} other character(s) reduced to reactive instruments.`,
+            suggestedFix: `Redistribute dialogue so each major character has agency and a distinct function. ${char}'s dominance suggests others exist only to prompt ${char}'s speeches.`,
+          });
+          break;
+        }
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'voice', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
