@@ -434,6 +434,81 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 221: Prose-cadence signal-processing — flow blocking, length ramp,
+  //    intra-clause cadence. These treat the action-line word-count series as a signal
+  //    and read its flow, trend, and internal punctuation rather than per-line features. ──
+
+  // PROSE_RHYTHM_BLOCKING (minor): action-line lengths cross their mean in fewer than 25%
+  // of transitions WHILE the variance is genuinely high — long and short lines are sorted
+  // into blocks (a wall of long description, then a run of fragments) instead of alternating.
+  // Distinct from MONOTONOUS_RHYTHM (which fires on LOW variance): here the variance is
+  // healthy but the arrangement is blocked, so the page reads as slabs rather than a pulse.
+  if (actionLines.length >= 8) {
+    const cov221 = avgWords > 0 ? Math.sqrt(wordCounts.reduce((s, w) => s + (w - avgWords) ** 2, 0) / wordCounts.length) / avgWords : 0;
+    let crossings221 = 0, transitions221 = 0, prevSign221 = 0;
+    for (const w of wordCounts) {
+      const sign221 = w > avgWords ? 1 : w < avgWords ? -1 : 0;
+      if (sign221 !== 0) {
+        if (prevSign221 !== 0) { transitions221++; if (sign221 !== prevSign221) crossings221++; }
+        prevSign221 = sign221;
+      }
+    }
+    const crossRate221 = transitions221 > 0 ? crossings221 / transitions221 : 1;
+    if (cov221 >= 0.3 && transitions221 >= 6 && crossRate221 < 0.25) {
+      issues.push({
+        location: 'Action-line rhythm',
+        rule: 'PROSE_RHYTHM_BLOCKING',
+        severity: 'minor',
+        description: `Action lines vary in length (coefficient ${cov221.toFixed(2)}) but cross their average in only ${Math.round(crossRate221 * 100)}% of transitions — long and short lines are sorted into blocks rather than alternated. The page reads as a slab of dense description followed by a slab of fragments, not as a pulse.`,
+        suggestedFix: 'Interleave long and short action lines instead of grouping them: drop a one-beat fragment into the middle of a dense passage, and expand a single line within a run of staccato. Rhythm comes from frequent alternation, not from one long block of each.',
+      });
+    }
+  }
+
+  // PROSE_LENGTH_RAMP (minor): action-line length trends upward across the script (positive
+  // normalised regression slope) — the description thickens as the story advances. As scenes
+  // should quicken toward the climax, prose should tighten, not sprawl; a rising line-length
+  // trend signals action writing that loses discipline and energy as it goes.
+  if (actionLines.length >= 8) {
+    const nW221 = wordCounts.length;
+    const meanIdx221 = (nW221 - 1) / 2;
+    let cov221b = 0, varIdx221 = 0;
+    for (let i = 0; i < nW221; i++) {
+      cov221b += (i - meanIdx221) * (wordCounts[i] - avgWords);
+      varIdx221 += (i - meanIdx221) ** 2;
+    }
+    const slope221 = varIdx221 > 0 ? cov221b / varIdx221 : 0;
+    const slopeNorm221 = avgWords > 0 ? slope221 / avgWords : 0;
+    if (slopeNorm221 > 0.06) {
+      issues.push({
+        location: 'Action-line length trend',
+        rule: 'PROSE_LENGTH_RAMP',
+        severity: 'minor',
+        description: `Action lines grow steadily longer across the script (normalised slope +${(slopeNorm221 * 100).toFixed(0)}% per line) — the description thickens as the story advances. Prose should tighten toward the climax, not sprawl; a rising length trend bleeds energy out of the action writing exactly where it should be sharpest.`,
+        suggestedFix: 'Tighten the later action lines: as stakes rise, cut description to its sharpest verbs and shortest beats. The prose cadence should accelerate alongside the story, with the leanest writing reserved for the climax.',
+      });
+    }
+  }
+
+  // INTRACLAUSE_CADENCE_ABSENT (minor): the action lines are long enough to support internal
+  // rhythm, yet almost none use a comma, dash, or semicolon to shape a breath mid-line. Every
+  // line is a single flat clause. Internal punctuation is how prose controls caesura and pace
+  // within a sentence; its total absence makes even varied-length lines read as a monotone.
+  if (actionLines.length >= 10 && avgWords >= 9) {
+    const internalPunctRe221 = /[,;]|--|—|–/;
+    const cadencedLines221 = actionLines.filter(l => internalPunctRe221.test(l.text)).length;
+    const cadenceRatio221 = cadencedLines221 / actionLines.length;
+    if (cadenceRatio221 < 0.1) {
+      issues.push({
+        location: 'Action description',
+        rule: 'INTRACLAUSE_CADENCE_ABSENT',
+        severity: 'minor',
+        description: `Only ${cadencedLines221} of ${actionLines.length} action lines use any internal punctuation (comma, dash, semicolon) despite averaging ${Math.round(avgWords)} words — nearly every line is a single unbroken clause. Without mid-line caesura the prose has no internal breath; it reads as a stack of flat declaratives regardless of length.`,
+        suggestedFix: 'Shape breath within lines: use a comma to set up a beat before a turn ("He reaches the door, stops."), a dash for an interruption, a semicolon to weld two images. Internal punctuation is how action writing controls pace inside a sentence, not just between them.',
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'rhythm', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

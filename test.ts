@@ -15857,6 +15857,92 @@ Goodnight.
     });
   });
 
+  describe('Wave 221 — rhythmPass: prose rhythm blocking, prose length ramp, intra-clause cadence absent (prose-cadence signal-processing)', async () => {
+    // Distinct words so action lines don't trip word-repetition rules.
+    const POOL221 = ['amber', 'breeze', 'candle', 'dapple', 'ember', 'fathom', 'glisten', 'harbor', 'ivory', 'jangle', 'kindle', 'lantern', 'marble', 'nestle', 'opal', 'pewter', 'quiver', 'ripple', 'saffron', 'thistle'];
+    const wline221 = (n: number, offset = 0) =>
+      Array.from({ length: n }, (_, k) => POOL221[(offset + k) % POOL221.length]).join(' ') + '.';
+    const wlineComma221 = (n: number, offset = 0) => {
+      const words = Array.from({ length: n }, (_, k) => POOL221[(offset + k) % POOL221.length]);
+      const half = Math.floor(n / 2);
+      return words.slice(0, half).join(' ') + ', ' + words.slice(half).join(' ') + '.';
+    };
+    const makeTextInput221 = (actionLines: string[]) => {
+      const fountain = 'INT. ROOM - DAY\n\n' + actionLines.join('\n') + '\n';
+      return {
+        fountain, original: fountain,
+        records: [] as any, structure: {} as any,
+        storyContext: {} as any, annotations: [] as any,
+        approvedSpans: [],
+      };
+    };
+
+    it('PROSE_RHYTHM_BLOCKING fires when long and short lines are grouped into blocks', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      // 5 long lines (12 words) then 5 short lines (3 words) → high variance, single crossing
+      const lines = [
+        ...Array.from({ length: 5 }, (_, i) => wline221(12, i)),
+        ...Array.from({ length: 5 }, (_, i) => wline221(3, i + 5)),
+      ];
+      const result = await rhythmPass(makeTextInput221(lines));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'PROSE_RHYTHM_BLOCKING'),
+        'Should fire when high-variance line lengths rarely cross their mean',
+      );
+    });
+
+    it('PROSE_RHYTHM_BLOCKING does not fire when long and short lines alternate', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      const lines = Array.from({ length: 10 }, (_, i) => wline221(i % 2 === 0 ? 12 : 3, i));
+      const result = await rhythmPass(makeTextInput221(lines));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'PROSE_RHYTHM_BLOCKING'),
+        'Should NOT fire when line lengths alternate frequently around the mean',
+      );
+    });
+
+    it('PROSE_LENGTH_RAMP fires when action lines grow steadily longer', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      const lines = Array.from({ length: 10 }, (_, i) => wline221(i + 2, i));
+      const result = await rhythmPass(makeTextInput221(lines));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'PROSE_LENGTH_RAMP'),
+        'Should fire when action-line length trends upward across the script',
+      );
+    });
+
+    it('PROSE_LENGTH_RAMP does not fire when action lines shorten or hold steady', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      const lines = Array.from({ length: 10 }, (_, i) => wline221(11 - i, i));
+      const result = await rhythmPass(makeTextInput221(lines));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'PROSE_LENGTH_RAMP'),
+        'Should NOT fire when the prose tightens (lines get shorter) toward the end',
+      );
+    });
+
+    it('INTRACLAUSE_CADENCE_ABSENT fires when long lines have no internal punctuation', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      // 10 lines of 11 words each, no commas/dashes
+      const lines = Array.from({ length: 10 }, (_, i) => wline221(11, i));
+      const result = await rhythmPass(makeTextInput221(lines));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'INTRACLAUSE_CADENCE_ABSENT'),
+        'Should fire when long action lines never use internal punctuation',
+      );
+    });
+
+    it('INTRACLAUSE_CADENCE_ABSENT does not fire when lines use commas for cadence', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      const lines = Array.from({ length: 10 }, (_, i) => wlineComma221(11, i));
+      const result = await rhythmPass(makeTextInput221(lines));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'INTRACLAUSE_CADENCE_ABSENT'),
+        'Should NOT fire when action lines shape breath with internal punctuation',
+      );
+    });
+  });
+
   describe('Wave 220 — relationshipArcPass: star topology, amplitude decay, threads siloed (relational network physics)', async () => {
     const makeRec220 = (idx: number, shifts: any[] = []): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
