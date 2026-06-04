@@ -441,8 +441,21 @@ export default function ScriptIDE({
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
     let actionLines = 0;
-    let wordCount = scriptText.trim().split(/\s+/).length;
-    if (scriptText.trim() === "") wordCount = 0;
+    // ⚡ Bolt Performance Optimization:
+    // Replaced O(N) allocation-heavy .split(/\s+/) with a zero-allocation character code loop.
+    // This avoids creating large string arrays during keystroke renders.
+    let wordCount = 0;
+    let inWord = false;
+    for (let i = 0; i < scriptText.length; i++) {
+      if (scriptText.charCodeAt(i) > 32) {
+        if (!inWord) {
+          wordCount++;
+          inWord = true;
+        }
+      } else {
+        inWord = false;
+      }
+    }
 
     blocks.forEach((block) => {
       if (block.type === "character") {
@@ -592,15 +605,18 @@ export default function ScriptIDE({
   // ── Key handler ──────────────────────────────────────────────────────────────
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const cursor = e.currentTarget.selectionStart;
-    const textBeforeCursor = scriptText.substring(0, cursor);
-    const lines = textBeforeCursor.split("\n");
-    const currentLine = lines[lines.length - 1];
+    // ⚡ Bolt Performance Optimization:
+    // Avoid string allocation from .slice() and array allocation from .split("\n").
+    // We use .lastIndexOf to find the current line bounds directly.
+    const lastNewlineIdx = scriptText.lastIndexOf("\n", cursor - 1);
+    const currentLineStart = lastNewlineIdx === -1 ? 0 : lastNewlineIdx + 1;
+    const currentLine = scriptText.slice(currentLineStart, cursor);
 
     if (e.key === "i" || e.key === "I") {
       if (currentLine === "") {
         e.preventDefault();
         const newText =
-          scriptText.substring(0, cursor) + "INT. " + scriptText.substring(cursor);
+          scriptText.slice(0, cursor) + "INT. " + scriptText.slice(cursor);
         setScriptText(newText);
         setTimeout(() => {
           if (editorRef.current) {
@@ -614,7 +630,7 @@ export default function ScriptIDE({
       if (currentLine === "") {
         e.preventDefault();
         const newText =
-          scriptText.substring(0, cursor) + "EXT. " + scriptText.substring(cursor);
+          scriptText.slice(0, cursor) + "EXT. " + scriptText.slice(cursor);
         setScriptText(newText);
         setTimeout(() => {
           if (editorRef.current) {
@@ -649,9 +665,9 @@ export default function ScriptIDE({
         );
         if (matchingChar) {
           const newText =
-            scriptText.substring(0, cursor - trimmedLine.length) +
+            scriptText.slice(0, cursor - trimmedLine.length) +
             matchingChar.name.toUpperCase() +
-            scriptText.substring(cursor);
+            scriptText.slice(cursor);
           setScriptText(newText);
           const newCursor = cursor + (matchingChar.name.length - trimmedLine.length);
           setTimeout(() => {
@@ -669,32 +685,32 @@ export default function ScriptIDE({
 
       if (currentLine.trim() === "") {
         newText =
-          scriptText.substring(0, cursor) +
+          scriptText.slice(0, cursor) +
           "          " +
-          scriptText.substring(cursor);
+          scriptText.slice(cursor);
         newCursor = cursor + 10;
       } else if (
         currentLine.startsWith("          ") &&
         !currentLine.startsWith("            ")
       ) {
         newText =
-          scriptText.substring(0, cursor - currentLine.length) +
+          scriptText.slice(0, cursor - currentLine.length) +
           "            (" +
           currentLine.trim() +
           ")" +
-          scriptText.substring(cursor);
+          scriptText.slice(cursor);
         newCursor = cursor + 4;
       } else if (currentLine.startsWith("            (")) {
         newText =
-          scriptText.substring(0, cursor - currentLine.length) +
+          scriptText.slice(0, cursor - currentLine.length) +
           "                                        " +
           currentLine.replace(/[()]/g, "").trim() +
           ":" +
-          scriptText.substring(cursor);
+          scriptText.slice(cursor);
         newCursor = cursor + 30;
       } else {
         newText =
-          scriptText.substring(0, cursor) + "    " + scriptText.substring(cursor);
+          scriptText.slice(0, cursor) + "    " + scriptText.slice(cursor);
         newCursor = cursor + 4;
       }
 
@@ -712,8 +728,8 @@ export default function ScriptIDE({
   const submitActionModal = (skip = false) => {
     if (!editorRef.current) return;
     const { cursor } = actionModal;
-    const textBefore = scriptText.substring(0, cursor);
-    const textAfter = scriptText.substring(cursor);
+    const textBefore = scriptText.slice(0, cursor);
+    const textAfter = scriptText.slice(cursor);
 
     let insertion = "\n";
     if (!skip && actionInput.trim()) {
@@ -737,10 +753,14 @@ export default function ScriptIDE({
   // ── Navigation ───────────────────────────────────────────────────────────────
   const handleNavigate = (lineIndex: number) => {
     if (!editorRef.current) return;
-    const lines = scriptText.split("\n");
+    // ⚡ Bolt Performance Optimization:
+    // Replaced allocation-heavy .split("\n") with zero-allocation .indexOf() loop.
+    // Computes absolute character offset without generating intermediate arrays.
     let charCount = 0;
     for (let i = 0; i < lineIndex; i++) {
-      charCount += lines[i].length + 1;
+      const nextNewline = scriptText.indexOf("\n", charCount);
+      if (nextNewline === -1) break;
+      charCount = nextNewline + 1;
     }
     editorRef.current.focus();
     editorRef.current.setSelectionRange(charCount, charCount);
@@ -775,8 +795,8 @@ export default function ScriptIDE({
   const handleApplySuggestion = (suggestion: string) => {
     if (!editorRef.current) return;
     const cursor = editorRef.current.selectionStart;
-    const textBefore = scriptText.substring(0, cursor);
-    const textAfter = scriptText.substring(cursor);
+    const textBefore = scriptText.slice(0, cursor);
+    const textAfter = scriptText.slice(cursor);
     const newText = `${textBefore}\n${suggestion}\n${textAfter}`;
     setScriptText(newText);
     triggerAnalysis(newText);
