@@ -15857,6 +15857,158 @@ Goodnight.
     });
   });
 
+  describe('Wave 213 — characterArcPass: arc positive only, late turn unsupported, midpoint emotional void', async () => {
+    const makeRec213 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 1,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput213 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: 'INT. SC - DAY\nAction line.\n',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('ARC_POSITIVE_ONLY fires when every non-neutral scene is positive with zero negative scenes', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // n=8; positives at 0,2,4,6; neutrals at 1,3,5,7 — no negatives anywhere
+      // ARC_EMOTIONAL_MONOTONE: positive=4, neutral=4 → 50% dominant < 90% → won't fire
+      // ARC_STALL_IN_ACT2: act2 scenes 2-5 has positives at 2,4 → not all neutral → won't fire
+      // ARC_LATE_TURN_UNSUPPORTED: no prior negatives → hasPriorNegative=false → won't fire
+      const records = [
+        makeRec213(0, { emotionalShift: 'positive' }),
+        makeRec213(1),
+        makeRec213(2, { emotionalShift: 'positive' }),
+        makeRec213(3),
+        makeRec213(4, { emotionalShift: 'positive' }),
+        makeRec213(5),
+        makeRec213(6, { emotionalShift: 'positive' }),
+        makeRec213(7),
+      ];
+      const result = await characterArcPass(makeInput213(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'ARC_POSITIVE_ONLY'),
+        'Should fire when ≥3 non-neutral scenes exist and none are negative',
+      );
+    });
+
+    it('ARC_POSITIVE_ONLY does not fire when at least one negative scene exists', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // scene4 flipped to negative (negCount=1>0); revelation at scene5 prevents
+      // ARC_LATE_TURN_UNSUPPORTED by providing a revelation in the window before scene6
+      const records = [
+        makeRec213(0, { emotionalShift: 'positive' }),
+        makeRec213(1),
+        makeRec213(2, { emotionalShift: 'positive' }),
+        makeRec213(3),
+        makeRec213(4, { emotionalShift: 'negative' }),
+        makeRec213(5, { revelation: 'courage discovered in the face of loss here' }),
+        makeRec213(6, { emotionalShift: 'positive' }),
+        makeRec213(7),
+      ];
+      const result = await characterArcPass(makeInput213(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'ARC_POSITIVE_ONLY'),
+        'Should NOT fire when at least one negative scene breaks the all-positive pattern',
+      );
+    });
+
+    it('ARC_LATE_TURN_UNSUPPORTED fires when a final-act positive turn has no preceding revelation', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // n=8; negative@0 satisfies hasPriorNegative; positive@6 in final act (finalStart=6)
+      // scenes 4,5,6 all have revelation=null → check window [4,6] finds nothing → fires
+      // ARC_STALL_IN_ACT2: act2 scenes 2-5 has positive@2 → not all neutral → won't fire
+      // ARC_POSITIVE_ONLY: negCount=1>0 → won't fire
+      const records = [
+        makeRec213(0, { emotionalShift: 'negative' }),
+        makeRec213(1),
+        makeRec213(2, { emotionalShift: 'positive' }),
+        makeRec213(3),
+        makeRec213(4),
+        makeRec213(5),
+        makeRec213(6, { emotionalShift: 'positive' }),
+        makeRec213(7),
+      ];
+      const result = await characterArcPass(makeInput213(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'ARC_LATE_TURN_UNSUPPORTED'),
+        'Should fire when a final-act positive turn has no revelation in the prior two scenes',
+      );
+    });
+
+    it('ARC_LATE_TURN_UNSUPPORTED does not fire when a revelation precedes the final-act positive turn', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // revelation at scene5 falls inside the window [max(0,6-2),6]=[4,6] → hasReveal=true
+      const records = [
+        makeRec213(0, { emotionalShift: 'negative' }),
+        makeRec213(1),
+        makeRec213(2, { emotionalShift: 'positive' }),
+        makeRec213(3),
+        makeRec213(4),
+        makeRec213(5, { revelation: 'the truth about the past finally surfaces here' }),
+        makeRec213(6, { emotionalShift: 'positive' }),
+        makeRec213(7),
+      ];
+      const result = await characterArcPass(makeInput213(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'ARC_LATE_TURN_UNSUPPORTED'),
+        'Should NOT fire when a revelation within two scenes before the final-act turn exists',
+      );
+    });
+
+    it('ARC_MIDPOINT_EMOTIONAL_VOID fires when the midpoint zone is all neutral while act 2 has emotion', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // n=10; midZone=scenes[4,5] all neutral; act2 has positive@2 and negative@6 (outside midZone)
+      // ARC_CATHARSIS_ABSENT: negCount=2 but scene8 has positive+revelation → won't fire
+      // ARC_LATE_TURN_UNSUPPORTED: scene8=positive; scene8 revelation in window [6,8] → won't fire
+      // ARC_RESOLUTION_ABSENT: act2 negCount=1 (scene6) < 2 → won't fire
+      const records = [
+        makeRec213(0, { emotionalShift: 'negative' }),
+        makeRec213(1),
+        makeRec213(2, { emotionalShift: 'positive' }),
+        makeRec213(3),
+        makeRec213(4),
+        makeRec213(5),
+        makeRec213(6, { emotionalShift: 'negative' }),
+        makeRec213(7),
+        makeRec213(8, { emotionalShift: 'positive', revelation: 'hard-won clarity emerges at last' }),
+        makeRec213(9),
+      ];
+      const result = await characterArcPass(makeInput213(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'ARC_MIDPOINT_EMOTIONAL_VOID'),
+        'Should fire when the midpoint zone (40%–60%) is all neutral while act 2 has emotional charge elsewhere',
+      );
+    });
+
+    it('ARC_MIDPOINT_EMOTIONAL_VOID does not fire when the midpoint zone contains an emotional shift', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // scene4 flipped to positive → midZone has emotion → hasMidEmotion213=true → rule skipped
+      const records = [
+        makeRec213(0, { emotionalShift: 'negative' }),
+        makeRec213(1),
+        makeRec213(2, { emotionalShift: 'positive' }),
+        makeRec213(3),
+        makeRec213(4, { emotionalShift: 'positive' }),
+        makeRec213(5),
+        makeRec213(6, { emotionalShift: 'negative' }),
+        makeRec213(7),
+        makeRec213(8, { emotionalShift: 'positive', revelation: 'hard-won clarity emerges at last' }),
+        makeRec213(9),
+      ];
+      const result = await characterArcPass(makeInput213(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'ARC_MIDPOINT_EMOTIONAL_VOID'),
+        'Should NOT fire when at least one midpoint scene carries a non-neutral emotional shift',
+      );
+    });
+  });
+
   describe('Wave 212 — causalityPass: setup-payoff imbalance, act2 causal desert, causal midpoint void', async () => {
     const makeRec212 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

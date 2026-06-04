@@ -504,6 +504,72 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 213 ──────────────────────────────────────────────────────────────────
+  // ARC_POSITIVE_ONLY (minor, n≥8): every non-neutral scene is positive; zero negative
+  if (records.length >= 8) {
+    const nonNeutral213 = records.filter((r: any) => r.emotionalShift !== 'neutral');
+    const negCount213 = records.filter((r: any) => r.emotionalShift === 'negative').length;
+    if (nonNeutral213.length >= 3 && negCount213 === 0) {
+      issues.push({
+        location: 'Full story',
+        rule: 'ARC_POSITIVE_ONLY',
+        severity: 'minor',
+        description: 'Every emotionally charged scene trends positive — no scene registers a negative shift. The story lacks resistance and genuine setback; the protagonist\'s journey reads as an unbroken ascent rather than a dramatic arc.',
+        suggestedFix: 'Introduce at least one scene where the protagonist suffers a genuine reversal, loss, or failure. Transformation requires contrast; without a negative beat the positive resolution carries no emotional weight.',
+      });
+    }
+  }
+
+  // ARC_LATE_TURN_UNSUPPORTED (major, n≥8): a positive shift in the final 25% is not
+  // preceded by a revelation in the same scene or the two scenes immediately before it.
+  // Guard: story must have at least one negative scene before the final act to ensure
+  // the positive turn is a genuine reversal rather than the story's only emotion.
+  if (records.length >= 8) {
+    const finalStart213 = Math.floor(records.length * 0.75);
+    const hasPriorNegative213 = records.slice(0, finalStart213).some((r: any) => r.emotionalShift === 'negative');
+    if (hasPriorNegative213) {
+      for (let i213 = finalStart213; i213 < records.length; i213++) {
+        if (records[i213].emotionalShift !== 'positive') continue;
+        const windowStart213 = Math.max(0, i213 - 2);
+        const hasReveal213 = records.slice(windowStart213, i213 + 1).some((r: any) => r.revelation !== null);
+        if (!hasReveal213) {
+          issues.push({
+            location: `Scene ${i213}`,
+            rule: 'ARC_LATE_TURN_UNSUPPORTED',
+            severity: 'major',
+            description: `Scene ${i213} delivers a positive emotional turn in the final act, but no revelation or disclosure event appears in that scene or the two preceding scenes. The uplift feels unearned — the protagonist changes without cause.`,
+            suggestedFix: 'Plant a revelation — a discovered truth, a confession, an irreversible choice — in the two scenes before this positive turn. The structural shift must be motivated by new information, not narrative convenience.',
+          });
+          break;
+        }
+      }
+    }
+  }
+
+  // ARC_MIDPOINT_EMOTIONAL_VOID (minor, n≥10): scenes 40%-60% are all neutral while
+  // the broader act-2 (25%-75%) contains at least one non-neutral scene elsewhere.
+  // Guard: midZone must contain ≥2 scenes so a minimal story doesn't false-fire.
+  if (records.length >= 10) {
+    const midEmoStart213 = Math.floor(records.length * 0.4);
+    const midEmoEnd213 = Math.floor(records.length * 0.6);
+    const act2EmoStart213 = Math.floor(records.length * 0.25);
+    const act2EmoEnd213 = Math.floor(records.length * 0.75);
+    const midZone213 = records.slice(midEmoStart213, midEmoEnd213);
+    const act2Zone213 = records.slice(act2EmoStart213, act2EmoEnd213);
+    const hasMidEmotion213 = midZone213.some((r: any) => r.emotionalShift !== 'neutral');
+    const act2HasEmotion213 = act2Zone213.some((r: any) => r.emotionalShift !== 'neutral');
+    if (midZone213.length >= 2 && act2HasEmotion213 && !hasMidEmotion213) {
+      issues.push({
+        location: `Scenes ${midEmoStart213}–${midEmoEnd213 - 1}`,
+        rule: 'ARC_MIDPOINT_EMOTIONAL_VOID',
+        severity: 'minor',
+        description: `The midpoint zone (scenes ${midEmoStart213}–${midEmoEnd213 - 1}) contains no emotional shifts — every scene reads as neutral — while the surrounding act-2 carries emotional charge. The structural centre of the story is emotionally inert.`,
+        suggestedFix: 'The midpoint is classically the moment of maximum commitment or maximum reversal. Give at least one midpoint scene a clear positive or negative emotional register to anchor the story\'s emotional centre of gravity.',
+      });
+    }
+  }
+  // ── End Wave 213 ──────────────────────────────────────────────────────────────
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'character-arc', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
