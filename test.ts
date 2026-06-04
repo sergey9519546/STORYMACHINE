@@ -15857,6 +15857,91 @@ Goodnight.
     });
   });
 
+  describe('Wave 218 — pacingPass: deceleration trend, page-space inequality, rhythmic alternation absent (pacing signal-processing)', async () => {
+    // Build a fountain where scene i has lens[i] action lines (each weighted +1).
+    const buildPacingFountain218 = (lens: number[]) =>
+      lens.map((L, i) =>
+        `INT. SC${i} - DAY\n` + Array.from({ length: L }, () => 'The room stays quiet and still.').join('\n'),
+      ).join('\n\n') + '\n';
+    const makeRec218 = (idx: number): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 1, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+    });
+    const makeInput218 = (lens: number[]) => {
+      const fountain = buildPacingFountain218(lens);
+      const records = lens.map((_, i) => makeRec218(i));
+      return {
+        fountain, original: fountain,
+        records: records as any, structure: {} as any,
+        storyContext: {} as any, annotations: records.map(() => null) as any,
+        approvedSpans: [],
+      };
+    };
+
+    it('PACE_DECELERATION_TREND fires when scene lengths trend upward across the story', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // Monotonically lengthening scenes → strong positive slope
+      const result = await pacingPass(makeInput218([2, 3, 4, 5, 6, 7, 8, 9, 10, 11]));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'PACE_DECELERATION_TREND'),
+        'Should fire when normalised length slope exceeds 6% of average per scene',
+      );
+    });
+
+    it('PACE_DECELERATION_TREND does not fire when scene lengths quicken toward the climax', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // Monotonically shortening scenes → negative slope
+      const result = await pacingPass(makeInput218([11, 10, 9, 8, 7, 6, 5, 4, 3, 2]));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'PACE_DECELERATION_TREND'),
+        'Should NOT fire when the pace accelerates (scenes get shorter) toward the end',
+      );
+    });
+
+    it('PAGE_SPACE_INEQUALITY fires when a few scenes hoard the page space', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // Nine tiny scenes and one enormous one → high Gini
+      const result = await pacingPass(makeInput218([1, 1, 1, 1, 1, 1, 1, 1, 1, 50]));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'PAGE_SPACE_INEQUALITY'),
+        'Should fire when the Gini coefficient of scene lengths exceeds 0.5',
+      );
+    });
+
+    it('PAGE_SPACE_INEQUALITY does not fire when page space is evenly distributed', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      const result = await pacingPass(makeInput218([5, 6, 5, 7, 6, 5, 6, 7, 5, 6]));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'PAGE_SPACE_INEQUALITY'),
+        'Should NOT fire when scene lengths are roughly even',
+      );
+    });
+
+    it('RHYTHMIC_ALTERNATION_ABSENT fires when long and short scenes are grouped, not alternated', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // A block of long scenes then a block of short scenes → single mean-crossing
+      const result = await pacingPass(makeInput218([10, 10, 10, 10, 10, 2, 2, 2, 2, 2]));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'RHYTHMIC_ALTERNATION_ABSENT'),
+        'Should fire when scene lengths rarely cross their mean despite large swings',
+      );
+    });
+
+    it('RHYTHMIC_ALTERNATION_ABSENT does not fire when scene lengths alternate around the mean', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // Long/short alternation → frequent mean-crossings
+      const result = await pacingPass(makeInput218([9, 2, 9, 2, 9, 2, 9, 2, 9, 2]));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'RHYTHMIC_ALTERNATION_ABSENT'),
+        'Should NOT fire when long and short scenes alternate frequently',
+      );
+    });
+  });
+
   describe('Wave 217 — originalityPass: action opener monotony, distinctive word echo, scene shape templating (freshness physics)', async () => {
     const makeTextInput217 = (fountain: string) => ({
       fountain, original: fountain,

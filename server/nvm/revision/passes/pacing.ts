@@ -514,6 +514,90 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 218: Pacing signal-processing — trend slope, distribution inequality,
+  //    oscillation rate. Three orthogonal measures of the whole scene-length sequence
+  //    that variance and act-average comparisons cannot capture. ──
+  if (records.length >= 8) {
+    const orderedLens218 = Array.from({ length: records.length }, (_, i) => sceneLengths.get(i) ?? 0);
+    const n218 = orderedLens218.length;
+
+    // PACE_DECELERATION_TREND (major): the least-squares slope of scene length against
+    // scene index, normalised by average length, is positive beyond 6% per scene — the
+    // story systematically lengthens its scenes across the WHOLE arc. Distinct from
+    // LATE_EXPANSION (which compares Act 2 vs Act 3 averages): a global upward trend can
+    // exist even when the act averages look similar. As stakes rise scenes should quicken.
+    {
+      const meanIdx218 = (n218 - 1) / 2;
+      let cov218 = 0, varIdx218 = 0;
+      for (let i = 0; i < n218; i++) {
+        cov218 += (i - meanIdx218) * (orderedLens218[i] - avgLength);
+        varIdx218 += (i - meanIdx218) ** 2;
+      }
+      const slope218 = varIdx218 > 0 ? cov218 / varIdx218 : 0;
+      const slopeNorm218 = slope218 / avgLength;
+      if (slopeNorm218 > 0.06) {
+        issues.push({
+          location: 'Whole-story pacing trend',
+          rule: 'PACE_DECELERATION_TREND',
+          severity: 'major',
+          description: `Scene length trends upward across the entire story (normalised slope +${(slopeNorm218 * 100).toFixed(0)}% of average per scene) — the pace systematically decelerates as the story advances. Scenes should quicken toward the climax, not stretch; a rising length trend bleeds urgency out of the back half.`,
+          suggestedFix: 'Reverse the trend: tighten later scenes so the average scene gets shorter as stakes rise. The audience should feel the cutting accelerate toward the climax — the scene-length curve is one of the strongest implicit signals of momentum.',
+        });
+      }
+    }
+
+    // PAGE_SPACE_INEQUALITY (minor): the Gini coefficient of scene lengths exceeds 0.5 —
+    // a few scenes hoard most of the page space while the rest are starved. The story
+    // budgets its runtime unevenly, which reads as a handful of set-pieces stranded among
+    // undernourished connective scenes. A distribution measure, orthogonal to variance.
+    {
+      let absDiffSum218 = 0;
+      for (let i = 0; i < n218; i++) {
+        for (let j = 0; j < n218; j++) absDiffSum218 += Math.abs(orderedLens218[i] - orderedLens218[j]);
+      }
+      const gini218 = avgLength > 0 ? absDiffSum218 / (2 * n218 * n218 * avgLength) : 0;
+      if (gini218 > 0.5) {
+        issues.push({
+          location: 'Page-space distribution',
+          rule: 'PAGE_SPACE_INEQUALITY',
+          severity: 'minor',
+          description: `Scene lengths have a Gini coefficient of ${gini218.toFixed(2)} — page space is concentrated in a few scenes while the rest are starved. The story spends its runtime unevenly, reading as a handful of bloated set-pieces among undernourished connective tissue.`,
+          suggestedFix: 'Redistribute page space: trim the dominant scenes and give the starved ones enough room to land their beat. A healthier length distribution keeps the audience from feeling the story lurch between feast and famine.',
+        });
+      }
+    }
+
+    // RHYTHMIC_ALTERNATION_ABSENT (minor): scene lengths cross their own mean in fewer
+    // than 25% of transitions — the pacing stays on one side of the average for long
+    // stretches (a block of long scenes, then a block of short) instead of alternating
+    // breath and sprint. Distinct from ENERGY_MONOTONE (low variance): a story can have
+    // large length swings yet still fail to ALTERNATE, sitting high then sitting low.
+    {
+      let crossings218 = 0, transitions218 = 0;
+      let prevSign218 = 0;
+      for (let i = 0; i < n218; i++) {
+        const sign218 = orderedLens218[i] > avgLength ? 1 : orderedLens218[i] < avgLength ? -1 : 0;
+        if (sign218 !== 0) {
+          if (prevSign218 !== 0) {
+            transitions218++;
+            if (sign218 !== prevSign218) crossings218++;
+          }
+          prevSign218 = sign218;
+        }
+      }
+      const crossRate218 = transitions218 > 0 ? crossings218 / transitions218 : 1;
+      if (transitions218 >= 6 && crossRate218 < 0.25) {
+        issues.push({
+          location: 'Pacing rhythm',
+          rule: 'RHYTHMIC_ALTERNATION_ABSENT',
+          severity: 'minor',
+          description: `Scene lengths cross their average in only ${Math.round(crossRate218 * 100)}% of transitions — the pacing sits on one side of the mean for long stretches (a block of long scenes, then a block of short) rather than alternating. Even with large swings, the rhythm never breathes in and out.`,
+          suggestedFix: 'Interleave long and short scenes rather than grouping them: follow an expansive scene with a clipped one and vice versa. Rhythmic pacing comes from frequent alternation around the mean, not from one long deceleration or acceleration.',
+        });
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'pacing', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
