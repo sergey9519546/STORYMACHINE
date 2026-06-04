@@ -15857,6 +15857,115 @@ Goodnight.
     });
   });
 
+  describe('Wave 219 — payoffPass: concurrent thread overload, resolution crammed at end, anticipation window decay (tension-debt physics)', async () => {
+    const makeRec219 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 1, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput219 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: 'INT. SC - DAY\nAction line.\n',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+    // Build n scenes, then apply plant/payoff specs keyed by scene index.
+    const build219 = (n: number, plants: Record<number, string[]>, payoffs: Record<number, string[]>) => {
+      const records = Array.from({ length: n }, (_, i) => makeRec219(i));
+      for (const [s, ids] of Object.entries(plants)) records[+s].seededClueIds = ids;
+      for (const [s, ids] of Object.entries(payoffs)) records[+s].payoffSetupIds = ids;
+      return records;
+    };
+
+    it('CONCURRENT_THREAD_OVERLOAD fires when many threads are held open simultaneously', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // 6 clues planted at scenes 0-5 before any payoff → 6 concurrent open threads
+      const records = build219(12,
+        { 0: ['c0'], 1: ['c1'], 2: ['c2'], 3: ['c3'], 4: ['c4'], 5: ['c5'] },
+        { 6: ['c0'], 7: ['c1'], 8: ['c2'], 9: ['c3'], 10: ['c4'], 11: ['c5'] },
+      );
+      const result = await payoffPass(makeInput219(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'CONCURRENT_THREAD_OVERLOAD'),
+        'Should fire when peak concurrent open threads exceeds 5',
+      );
+    });
+
+    it('CONCURRENT_THREAD_OVERLOAD does not fire when threads close as new ones open', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // 6 clues, each closed before the next pile-up → peak concurrency stays at 2
+      const records = build219(12,
+        { 0: ['c0'], 1: ['c1'], 3: ['c2'], 5: ['c3'], 7: ['c4'], 9: ['c5'] },
+        { 2: ['c0'], 4: ['c1'], 6: ['c2'], 8: ['c3'], 10: ['c4'], 11: ['c5'] },
+      );
+      const result = await payoffPass(makeInput219(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'CONCURRENT_THREAD_OVERLOAD'),
+        'Should NOT fire when the story closes threads as it opens new ones',
+      );
+    });
+
+    it('RESOLUTION_CRAMMED_AT_END fires when most payoffs land in the final 15%', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // n=12, final 15% = scenes 10-11; 3 of 5 payoffs land there
+      const records = build219(12,
+        { 0: ['c0'], 1: ['c1'], 2: ['c2'], 3: ['c3'], 4: ['c4'] },
+        { 10: ['c0', 'c1'], 11: ['c2'], 5: ['c3'], 6: ['c4'] },
+      );
+      const result = await payoffPass(makeInput219(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'RESOLUTION_CRAMMED_AT_END'),
+        'Should fire when 60%+ of payoffs land in the final 15% of scenes',
+      );
+    });
+
+    it('RESOLUTION_CRAMMED_AT_END does not fire when payoffs are distributed', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // Payoffs spread across scenes 3,5,7,9,11 → only one in the final 15%
+      const records = build219(12,
+        { 0: ['c0'], 1: ['c1'], 2: ['c2'], 3: ['c3'], 4: ['c4'] },
+        { 3: ['c0'], 5: ['c1'], 7: ['c2'], 9: ['c3'], 11: ['c4'] },
+      );
+      const result = await payoffPass(makeInput219(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'RESOLUTION_CRAMMED_AT_END'),
+        'Should NOT fire when payoffs are paced across the whole arc',
+      );
+    });
+
+    it('ANTICIPATION_WINDOW_DECAY fires when late setups have far shorter fuses than early ones', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // Early clues: long gaps (8); late clues: gap 1 → late avg < half early avg
+      const records = build219(12,
+        { 0: ['c0'], 1: ['c1'], 6: ['c2'], 7: ['c3'] },
+        { 8: ['c0', 'c3'], 9: ['c1'], 7: ['c2'] },
+      );
+      const result = await payoffPass(makeInput219(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'ANTICIPATION_WINDOW_DECAY'),
+        'Should fire when later-planted clues are paid off on much shorter fuses',
+      );
+    });
+
+    it('ANTICIPATION_WINDOW_DECAY does not fire when fuse lengths stay consistent', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // Gaps roughly equal across early and late clues
+      const records = build219(12,
+        { 0: ['c0'], 1: ['c1'], 6: ['c2'], 7: ['c3'] },
+        { 3: ['c0'], 5: ['c1'], 10: ['c2'], 11: ['c3'] },
+      );
+      const result = await payoffPass(makeInput219(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'ANTICIPATION_WINDOW_DECAY'),
+        'Should NOT fire when setup→payoff gaps stay consistent across the story',
+      );
+    });
+  });
+
   describe('Wave 218 — pacingPass: deceleration trend, page-space inequality, rhythmic alternation absent (pacing signal-processing)', async () => {
     // Build a fountain where scene i has lens[i] action lines (each weighted +1).
     const buildPacingFountain218 = (lens: number[]) =>

@@ -461,6 +461,82 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 219: Tension-debt physics — concurrent open threads, end-loaded resolution,
+  //    anticipation-window trend. These model the setup/payoff ledger as a running debt
+  //    curve rather than as isolated plant/pay events. ──
+
+  // CONCURRENT_THREAD_OVERLOAD (major): the running count of simultaneously-open threads
+  // (planted but not yet paid off) peaks above 5. Distinct from CLUE_GLUT (cumulative
+  // total): a story can plant many clues safely if it closes them as it goes, but holding
+  // 6+ unresolved questions open AT ONCE overloads the audience's working memory — they
+  // lose track of which thread is which, and each individual payoff loses its charge.
+  if (clueInfo.size >= 6 && records.length >= 8) {
+    let open219 = 0, peak219 = 0, peakScene219 = 0;
+    for (let s = 0; s < records.length; s++) {
+      for (const info of clueInfo.values()) if (info.plantedAt === s) open219++;
+      for (const ps of payoffInfo.values()) if (ps === s) open219--;
+      if (open219 > peak219) { peak219 = open219; peakScene219 = s; }
+    }
+    if (peak219 > 5) {
+      issues.push({
+        location: `Scene ${peakScene219} (peak open threads)`,
+        rule: 'CONCURRENT_THREAD_OVERLOAD',
+        severity: 'major',
+        description: `At Scene ${peakScene219} the story holds ${peak219} planted-but-unresolved threads open simultaneously — the audience is asked to track ${peak219} live questions at once. Beyond roughly five concurrent threads, individual mysteries blur together and each eventual payoff loses its charge.`,
+        suggestedFix: 'Close some threads before opening new ones: pay off or fold together a few of the early clues so the concurrent open-thread count stays manageable. Suspense comes from a few sharp questions held in focus, not from a dozen blurred ones.',
+      });
+    }
+  }
+
+  // RESOLUTION_CRAMMED_AT_END (major): 60%+ of all payoffs land in the final 15% of the
+  // story. Distinct from CLUSTERED_PAYOFFS (3+ in a single scene) and PAYOFF_RATE_DECLINE
+  // (Act 3 has zero): this catches resolution that is technically distributed across the
+  // last few scenes but still crammed into the ending — a story that defers nearly all its
+  // bookkeeping to a closing info-dump rather than pacing reveals across the arc.
+  if (payoffInfo.size >= 4 && records.length >= 8) {
+    const endZoneStart219 = Math.floor(records.length * 0.85);
+    const latePayoffs219 = [...payoffInfo.values()].filter(s => s >= endZoneStart219).length;
+    const lateShare219 = latePayoffs219 / payoffInfo.size;
+    if (lateShare219 >= 0.6) {
+      issues.push({
+        location: `Final 15% (Scenes ${endZoneStart219}–${records.length - 1})`,
+        rule: 'RESOLUTION_CRAMMED_AT_END',
+        severity: 'major',
+        description: `${latePayoffs219} of ${payoffInfo.size} payoffs (${Math.round(lateShare219 * 100)}%) land in the final 15% of the story — resolution is crammed into the ending rather than paced across the arc. A closing run of back-to-back reveals reads as an info-dump and denies most payoffs the scene-space to land.`,
+        suggestedFix: 'Pull several payoffs earlier so reveals are distributed: let mid-story scenes close some loops while the ending reserves only the one or two largest. A satisfying climax resolves the central thread, not the entire backlog at once.',
+      });
+    }
+  }
+
+  // ANTICIPATION_WINDOW_DECAY (minor): setup→payoff gaps shrink across the story — the
+  // later-planted clues are paid off on far shorter fuses than the earlier ones. The story
+  // gives its opening setups long, satisfying anticipation arcs but resolves its late
+  // setups almost reflexively, so the back half never plants anything with room to breathe.
+  {
+    const resolved219 = [...clueInfo.entries()]
+      .filter(([id]) => payoffInfo.has(id))
+      .map(([id, info]) => ({ plant: info.plantedAt, gap: (payoffInfo.get(id) ?? info.plantedAt) - info.plantedAt }))
+      .filter(x => x.gap > 0)
+      .sort((a, b) => a.plant - b.plant);
+    if (resolved219.length >= 4) {
+      const half219 = Math.floor(resolved219.length / 2);
+      const earlyHalf219 = resolved219.slice(0, half219);
+      const lateHalf219 = resolved219.slice(resolved219.length - half219);
+      const avgGap219 = (arr: Array<{ gap: number }>) => arr.reduce((s, x) => s + x.gap, 0) / arr.length;
+      const earlyAvg219 = avgGap219(earlyHalf219);
+      const lateAvg219 = avgGap219(lateHalf219);
+      if (earlyAvg219 > 0 && lateAvg219 < 0.5 * earlyAvg219) {
+        issues.push({
+          location: 'Anticipation-window trend',
+          rule: 'ANTICIPATION_WINDOW_DECAY',
+          severity: 'minor',
+          description: `Setup→payoff gaps shrink across the story: early clues wait ${earlyAvg219.toFixed(1)} scenes for their payoff, late clues only ${lateAvg219.toFixed(1)}. The back half resolves its setups almost reflexively, so nothing planted late gets the long fuse that makes a payoff feel earned.`,
+          suggestedFix: 'Give late setups room to breathe too: plant at least one back-half clue several scenes before it pays off, rather than seeding and resolving in quick succession. A late long-fuse setup keeps the anticipation engine running into the climax.',
+        });
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'payoff', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
