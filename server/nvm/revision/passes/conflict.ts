@@ -524,6 +524,85 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 214: Conflict-dynamics physics — pressure rhythm, mass distribution,
+  //    reversal-magnitude trend. These reason over a per-scene conflict signal vector
+  //    (see computeConflictDynamics) rather than single suspenseDelta thresholds. ──
+  const conflictDyn214 = computeConflictDynamics(records);
+
+  // UNRELIEVED_TENSION_ASCENT (major, n≥10): the dual of ESCALATION_PLATEAU. A long
+  // run of consecutive scenes that each ADD external pressure with no release valve
+  // among them. Relentless monotonic escalation with no beat of relief exhausts the
+  // audience as surely as no escalation bores them — drama needs systole and diastole.
+  if (records.length >= 10) {
+    let run214 = 0, maxRun214 = 0, runStart214 = 0, maxRunStart214 = 0;
+    for (let i = 0; i < conflictDyn214.length; i++) {
+      const escalating = conflictDyn214[i].escalation > 0;
+      const isRelief = conflictDyn214[i].release > 1;
+      if (escalating && !isRelief) {
+        if (run214 === 0) runStart214 = i;
+        run214++;
+        if (run214 > maxRun214) { maxRun214 = run214; maxRunStart214 = runStart214; }
+      } else {
+        run214 = 0;
+      }
+    }
+    if (maxRun214 >= 6) {
+      const runEnd214 = maxRunStart214 + maxRun214 - 1;
+      issues.push({
+        location: `Scenes ${records[maxRunStart214].sceneIdx}–${records[runEnd214].sceneIdx}`,
+        rule: 'UNRELIEVED_TENSION_ASCENT',
+        severity: 'major',
+        description: `${maxRun214} consecutive scenes each add external pressure (rising suspense or a tightening clock) with no release valve between them — the tension climbs monotonically for ${maxRun214} scenes without a single beat of relief. Unbroken escalation flattens into noise; the audience cannot register a rise it is never allowed to fall from.`,
+        suggestedFix: 'Insert a release beat inside the run: a reversal that briefly drops the pressure, a moment of false safety, or a small victory that the audience can exhale on before the next surge. Tension is felt as contrast — give the line a trough so the next peak reads as a climb.',
+      });
+    }
+  }
+
+  // CONFLICT_CONCENTRATION_SPIKE (major, n≥10): the story carries substantial total
+  // conflict mass, but a single scene holds 60%+ of it while the rest is dead air.
+  // The drama is one explosion in an empty field rather than a sustained engagement —
+  // a structural signature of a story that front-loads or dumps its entire conflict
+  // into one set-piece instead of threading opposition through the whole arc.
+  if (records.length >= 10) {
+    const masses214 = conflictDyn214.map(d => d.mass);
+    const totalMass214 = masses214.reduce((a, b) => a + b, 0);
+    const maxMass214 = Math.max(...masses214);
+    const spikeIdx214 = masses214.indexOf(maxMass214);
+    if (totalMass214 >= 6 && maxMass214 >= 0.6 * totalMass214) {
+      issues.push({
+        location: `Scene ${records[spikeIdx214].sceneIdx}`,
+        rule: 'CONFLICT_CONCENTRATION_SPIKE',
+        severity: 'major',
+        description: `Scene ${records[spikeIdx214].sceneIdx} holds ${Math.round((maxMass214 / totalMass214) * 100)}% of the story's entire conflict mass — the opposition detonates in a single scene while the rest of the arc is dramatically inert. Conflict concentrated this heavily reads as an isolated set-piece, not a sustained pressure on the protagonist.`,
+        suggestedFix: 'Distribute the conflict: seed smaller oppositional beats across the surrounding scenes so the spike is the crest of a wave, not a lone spike in flat water. A story sustains tension by keeping pressure present, not by discharging it all at once.',
+      });
+    }
+  }
+
+  // REVERSAL_MAGNITUDE_DECAY (major, n≥10): reversals exist in both the opening and
+  // closing thirds, but their MAGNITUDE shrinks — the biggest setback is early and the
+  // late reversals are at least half as large or smaller. Stakes that deflate toward
+  // the climax invert the dramatic gradient: each blow should land harder than the last,
+  // not softer. This is a magnitude-aware check that "are there reversals" cannot catch.
+  if (records.length >= 10) {
+    const third214 = Math.floor(records.length / 3);
+    const firstThirdRev214 = conflictDyn214.slice(0, third214).filter(d => d.isReversal).map(d => d.reversalMag);
+    const lastThirdRev214 = conflictDyn214.slice(records.length - third214).filter(d => d.isReversal).map(d => d.reversalMag);
+    if (firstThirdRev214.length > 0 && lastThirdRev214.length > 0) {
+      const firstMax214 = Math.max(...firstThirdRev214);
+      const lastMax214 = Math.max(...lastThirdRev214);
+      if (firstMax214 >= 2 * lastMax214) {
+        issues.push({
+          location: 'Reversal magnitude arc',
+          rule: 'REVERSAL_MAGNITUDE_DECAY',
+          severity: 'major',
+          description: `The story's largest early reversal swings by ${firstMax214.toFixed(1)} but its largest late reversal swings by only ${lastMax214.toFixed(1)} — the setbacks shrink as the story approaches its climax. The dramatic gradient is inverted: the protagonist's hardest blow lands first and the stakes deflate toward the end.`,
+          suggestedFix: 'Escalate reversal magnitude toward the finale: the climax-adjacent setback should be the largest, most costly reversal in the story. Reorder or deepen the late reversals so each blow lands harder than the one before — a deflating stakes curve drains the climax of consequence.',
+        });
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'conflict', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
@@ -536,4 +615,43 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
       ? 'Conflict pass: escalation is healthy'
       : `Conflict pass: ${issues.length} issue(s) — ${usedLLM ? 'rewritten' : 'flagged (stub mode)'}`,
   };
+}
+
+/** Per-scene conflict signal vector used by the Wave 214 conflict-dynamics checks.
+ *  Conflict is modelled as a pressure system: each scene either ADDS external pressure
+ *  (rising suspense, a tightening clock), RELEASES it (a reversal that drops suspense),
+ *  or inflicts INTERPERSONAL damage (a relationship deteriorating). Decomposing the
+ *  signals this way lets the checks reason about the rhythm of escalation and release,
+ *  the spatial distribution of conflict mass, and the trend of reversal magnitude —
+ *  none of which are visible from a single suspenseDelta threshold. */
+interface SceneConflictSignal {
+  /** External pressure added this scene: rising suspense + tightening clock */
+  escalation: number;
+  /** Tension released this scene: a drop in suspense (a reversal/relief valve) */
+  release: number;
+  /** Interpersonal damage magnitude: summed |amount| of negative relationship shifts */
+  interpersonal: number;
+  /** Total conflict magnitude concentrated in this scene */
+  mass: number;
+  /** Whether this scene is a genuine reversal (suspense drops by more than 1) */
+  isReversal: boolean;
+  /** Magnitude of the reversal (|suspenseDelta|) when this scene is a reversal, else 0 */
+  reversalMag: number;
+}
+
+function computeConflictDynamics(records: PassInput['records']): SceneConflictSignal[] {
+  return records.map((r: any) => {
+    const sd = r.suspenseDelta ?? 0;
+    const cd = r.clockDelta ?? 0;
+    const negRel = ((r.relationshipShifts ?? []) as Array<{ amount: number }>)
+      .filter(s => s.amount < 0)
+      .reduce((a, s) => a + Math.abs(s.amount), 0);
+    const escalation = Math.max(sd, 0) + Math.max(cd, 0);
+    const release = Math.max(-sd, 0);
+    const interpersonal = negRel;
+    const mass = escalation + 2 * interpersonal;
+    const isReversal = sd < -1;
+    const reversalMag = isReversal ? Math.abs(sd) : 0;
+    return { escalation, release, interpersonal, mass, isReversal, reversalMag };
+  });
 }

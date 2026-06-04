@@ -15857,6 +15857,105 @@ Goodnight.
     });
   });
 
+  describe('Wave 214 — conflictPass: unrelieved tension ascent, conflict concentration spike, reversal magnitude decay (conflict-dynamics physics)', async () => {
+    const makeRec214 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 1,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput214 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: 'INT. SC - DAY\nAction line.\n',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('UNRELIEVED_TENSION_ASCENT fires on a long run of escalation with no release valve', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // n=10; every scene adds external pressure (default suspenseDelta=1>0), none releases
+      // → run of 10 ≥ 6 → fires
+      const records = Array.from({ length: 10 }, (_, i) => makeRec214(i));
+      const result = await conflictPass(makeInput214(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'UNRELIEVED_TENSION_ASCENT'),
+        'Should fire when 6+ consecutive scenes escalate with no release beat',
+      );
+    });
+
+    it('UNRELIEVED_TENSION_ASCENT does not fire when release valves break the run', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // Two release beats (suspenseDelta=-2) at scenes 3 and 7 split the runs to ≤3 each → no fire
+      const records = Array.from({ length: 10 }, (_, i) => makeRec214(i));
+      records[3].suspenseDelta = -2;
+      records[7].suspenseDelta = -2;
+      const result = await conflictPass(makeInput214(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'UNRELIEVED_TENSION_ASCENT'),
+        'Should NOT fire when release valves keep every escalation run under 6 scenes',
+      );
+    });
+
+    it('CONFLICT_CONCENTRATION_SPIKE fires when one scene holds the majority of conflict mass', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // n=10; calm scenes (suspenseDelta=0) except scene5 detonates: huge suspense + a
+      // severe relationship rupture → scene5 mass dominates ≥60% of the total
+      const records = Array.from({ length: 10 }, (_, i) => makeRec214(i, { suspenseDelta: 0 }));
+      records[5] = makeRec214(5, {
+        suspenseDelta: 12,
+        relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: -1.0 }],
+      });
+      const result = await conflictPass(makeInput214(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'CONFLICT_CONCENTRATION_SPIKE'),
+        'Should fire when a single scene carries 60%+ of total conflict mass',
+      );
+    });
+
+    it('CONFLICT_CONCENTRATION_SPIKE does not fire when conflict mass is distributed', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // Conflict spread across scenes 2,4,6,8 (suspenseDelta=3 each) → max share 25% < 60%
+      const records = Array.from({ length: 10 }, (_, i) => makeRec214(i, { suspenseDelta: 0 }));
+      for (const i of [2, 4, 6, 8]) records[i].suspenseDelta = 3;
+      const result = await conflictPass(makeInput214(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'CONFLICT_CONCENTRATION_SPIKE'),
+        'Should NOT fire when conflict mass is spread evenly across multiple scenes',
+      );
+    });
+
+    it('REVERSAL_MAGNITUDE_DECAY fires when reversals shrink toward the climax', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // n=10, thirds at 3; big early reversal (scene1, |8|), small late reversal (scene8, |2|)
+      // firstMax=8 ≥ 2*lastMax=4 → fires
+      const records = Array.from({ length: 10 }, (_, i) => makeRec214(i));
+      records[1].suspenseDelta = -8;
+      records[8].suspenseDelta = -2;
+      const result = await conflictPass(makeInput214(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'REVERSAL_MAGNITUDE_DECAY'),
+        'Should fire when the largest early reversal is ≥2× the largest late reversal',
+      );
+    });
+
+    it('REVERSAL_MAGNITUDE_DECAY does not fire when reversals grow toward the climax', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // Escalating stakes: small early reversal (scene1, |3|), big late reversal (scene8, |8|)
+      // firstMax=3 < 2*lastMax=16 → no fire
+      const records = Array.from({ length: 10 }, (_, i) => makeRec214(i));
+      records[1].suspenseDelta = -3;
+      records[8].suspenseDelta = -8;
+      const result = await conflictPass(makeInput214(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'REVERSAL_MAGNITUDE_DECAY'),
+        'Should NOT fire when late reversals are as large or larger than early ones',
+      );
+    });
+  });
+
   describe('Wave 213 — characterArcPass: uncontested ascent, unsupported late turn, midpoint inertia (multi-signal arc dynamics)', async () => {
     const makeRec213 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
