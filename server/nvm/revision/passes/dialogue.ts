@@ -77,6 +77,17 @@ function extractQuestionSubjects(question: string): string[] {
     .slice(0, 5);
 }
 
+/** Extract the salient content words from any dialogue line (stopwords + short words
+ *  removed). Shared by the Wave 215 conversational-dynamics checks to measure turn-to-turn
+ *  responsiveness and overall lexical diversity. */
+function dialogueContentWords(line: string): string[] {
+  return line
+    .replace(/[^a-zA-Z\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 3 && !STOPWORDS_Q.has(w.toLowerCase()))
+    .map(w => w.toLowerCase());
+}
+
 /** Map each fountain line number (0-based) to a 0-based scene index via sluglines */
 function buildLineToSceneMap(fountain: string): number[] {
   const lines = fountain.split('\n');
@@ -741,6 +752,90 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         suggestedFix:
           'Vary sentence openers: start lines with the other character\'s name, an action verb ("Take it."), a declarative about the world ("This changes everything."), or a question. When every line begins with "I", no one is listening.',
       });
+    }
+  }
+
+  // ── Wave 215: Conversational dynamics — responsiveness, lexical diversity, cadence.
+  //    Three information-theoretic measures of dialogue as a system rather than as a bag
+  //    of independent surface features: do turns engage each other, is the vocabulary
+  //    rich, and does the line-length rhythm vary. ──
+
+  // NON_RESPONSIVE_EXCHANGE (major): a run of 4+ consecutive cross-speaker turns where
+  // each line shares zero content words with the line it answers. Both speakers say
+  // something substantive, but about unrelated things — the scene is a set of parallel
+  // monologues, not a conversation. Generalises QUESTION_DODGE (which is question-only)
+  // to the entire exchange and requires sustained, not isolated, non-responsiveness.
+  if (dialogue.length >= 10) {
+    let nonRespRun215 = 0, maxNonResp215 = 0, runStartLine215 = 0, maxRunStartLine215 = 0;
+    for (let i = 1; i < dialogue.length; i++) {
+      if (dialogue[i].speaker === dialogue[i - 1].speaker) { nonRespRun215 = 0; continue; }
+      const priorWords215 = new Set(dialogueContentWords(dialogue[i - 1].line));
+      const replyWords215 = dialogueContentWords(dialogue[i].line);
+      // Only judge turns where both speakers said something substantive.
+      if (priorWords215.size === 0 || replyWords215.length === 0) { nonRespRun215 = 0; continue; }
+      const engages215 = replyWords215.some(w => priorWords215.has(w));
+      if (!engages215) {
+        if (nonRespRun215 === 0) runStartLine215 = dialogue[i - 1].lineNum;
+        nonRespRun215++;
+        if (nonRespRun215 > maxNonResp215) { maxNonResp215 = nonRespRun215; maxRunStartLine215 = runStartLine215; }
+      } else {
+        nonRespRun215 = 0;
+      }
+    }
+    if (maxNonResp215 >= 4) {
+      issues.push({
+        location: `Dialogue from line ${maxRunStartLine215}`,
+        rule: 'NON_RESPONSIVE_EXCHANGE',
+        severity: 'major',
+        description: `${maxNonResp215} consecutive speaker exchanges share no content words — each character answers with something substantive but unrelated to what was just said. The dialogue is a set of parallel monologues; nobody is listening to anybody.`,
+        suggestedFix: 'Make each line engage the previous one: pick up a word, a claim, or an image the other character just used and push against it. Even a deliberate non-sequitur should be visibly ignoring something specific, not floating free of the exchange.',
+      });
+    }
+  }
+
+  // DIALOGUE_LEXICAL_POVERTY (minor): the content-word type-token ratio (unique/total)
+  // across all dialogue falls below 0.45 over a substantial sample. The characters
+  // recycle a tiny vocabulary — the script circles a few hundred words and every line
+  // sounds drawn from the same shallow pool. Vocabulary breadth is a primary marker of
+  // alive, specific dialogue.
+  if (dialogue.length >= 10) {
+    const allContent215: string[] = [];
+    for (const d of dialogue) allContent215.push(...dialogueContentWords(d.line));
+    if (allContent215.length >= 30) {
+      const uniqueContent215 = new Set(allContent215).size;
+      const ttr215 = uniqueContent215 / allContent215.length;
+      if (ttr215 < 0.45) {
+        issues.push({
+          location: 'Dialogue throughout',
+          rule: 'DIALOGUE_LEXICAL_POVERTY',
+          severity: 'minor',
+          description: `The dialogue's content-word type-token ratio is ${ttr215.toFixed(2)} (${uniqueContent215} unique words across ${allContent215.length}) — characters recycle a very small vocabulary. Lexical variety is what makes each line feel newly minted; a ratio this low makes the script sound like it is circling a handful of words.`,
+          suggestedFix: 'Widen the vocabulary: replace repeated abstractions with concrete, specific nouns and verbs drawn from each character\'s own world and expertise. Specificity of word choice is what separates distinct, living dialogue from interchangeable filler.',
+        });
+      }
+    }
+  }
+
+  // CADENCE_MONOTONY (minor): the coefficient of variation of dialogue line lengths
+  // (in words) is below 0.35 — nearly every line is the same length. Unlike
+  // CHARACTER_VOICE_UNIFORMITY (which compares speakers' means to each other), this
+  // measures the rhythmic texture of the dialogue as a whole. Real speech alternates
+  // clipped ripostes with longer reaches; a metronomic line length drains the rhythm.
+  if (dialogue.length >= 12) {
+    const wordCounts215 = dialogue.map(d => d.line.trim().split(/\s+/).filter(w => w.length > 0).length);
+    const meanLen215 = wordCounts215.reduce((a, b) => a + b, 0) / wordCounts215.length;
+    if (meanLen215 >= 3) {
+      const variance215 = wordCounts215.reduce((a, l) => a + (l - meanLen215) ** 2, 0) / wordCounts215.length;
+      const cov215 = Math.sqrt(variance215) / meanLen215;
+      if (cov215 < 0.35) {
+        issues.push({
+          location: 'Dialogue throughout',
+          rule: 'CADENCE_MONOTONY',
+          severity: 'minor',
+          description: `Dialogue line length varies by a coefficient of only ${cov215.toFixed(2)} around a mean of ${meanLen215.toFixed(1)} words — nearly every line runs the same length. The dialogue marches in metronomic lockstep with no rhythmic dynamics.`,
+          suggestedFix: 'Break the metronome: follow a long, searching speech with a two-word riposte, or a clipped exchange with a sudden confession. Rhythm — the alternation of short and long — is half of how dialogue conveys emotion and shifting power.',
+        });
+      }
     }
   }
 

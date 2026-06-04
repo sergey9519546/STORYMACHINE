@@ -15857,6 +15857,155 @@ Goodnight.
     });
   });
 
+  describe('Wave 215 — dialoguePass: non-responsive exchange, lexical poverty, cadence monotony (conversational dynamics)', async () => {
+    // Build a fountain from [speaker, line] turns so each turn parses to one dialogue line.
+    const buildDialogueFountain215 = (turns: Array<[string, string]>) =>
+      'INT. ROOM - DAY\n\n' + turns.map(([s, l]) => `${s}\n${l}\n`).join('\n');
+    const makeInput215 = (turns: Array<[string, string]>) => {
+      const fountain = buildDialogueFountain215(turns);
+      return {
+        fountain, original: fountain,
+        records: [] as any, structure: {} as any,
+        storyContext: {} as any, annotations: [] as any,
+        approvedSpans: [],
+      };
+    };
+
+    it('NON_RESPONSIVE_EXCHANGE fires when consecutive turns share no content words', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 10 alternating turns, each about a wholly unrelated subject → 9 non-responsive
+      // transitions in a row → run ≥ 4 → fires
+      const turns: Array<[string, string]> = [
+        ['ALICE', 'Mountains towered above frozen northern valleys.'],
+        ['BOB', 'Quarterly accountants filed annual taxes yesterday.'],
+        ['ALICE', 'Penguins migrated across southern frozen oceans.'],
+        ['BOB', 'Carburetors require expensive replacement gaskets soon.'],
+        ['ALICE', 'Shakespeare authored numerous celebrated tragedies.'],
+        ['BOB', 'Volcanoes disrupted busy airline departure schedules.'],
+        ['ALICE', 'Bakers kneaded fresh sourdough overnight downstairs.'],
+        ['BOB', 'Telescopes magnified extremely distant spiral galaxies.'],
+        ['ALICE', 'Gardeners pruned wildly overgrown suburban hedges.'],
+        ['BOB', 'Investors panicked during sudden market downturns.'],
+      ];
+      const result = await dialoguePass(makeInput215(turns));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'NON_RESPONSIVE_EXCHANGE'),
+        'Should fire when 4+ consecutive cross-speaker turns share no content words',
+      );
+    });
+
+    it('NON_RESPONSIVE_EXCHANGE does not fire when each turn engages the previous one', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // Each line shares a content word with the line it answers → every transition responsive
+      const turns: Array<[string, string]> = [
+        ['ALICE', 'Where are the missing financial documents?'],
+        ['BOB', 'Those documents stayed inside locked cabinets.'],
+        ['ALICE', 'Which cabinets hold the legal folders?'],
+        ['BOB', 'Legal folders contain the signed contracts.'],
+        ['ALICE', 'Were the contracts mailed before deadline?'],
+        ['BOB', 'The deadline passed without any warning.'],
+        ['ALICE', 'What warning reached the company directors?'],
+        ['BOB', 'Directors approved the final annual budget.'],
+        ['ALICE', 'The budget funded brand new equipment.'],
+        ['BOB', 'Equipment arrived during early winter storms.'],
+      ];
+      const result = await dialoguePass(makeInput215(turns));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'NON_RESPONSIVE_EXCHANGE'),
+        'Should NOT fire when consecutive turns share content words (responsive exchange)',
+      );
+    });
+
+    it('DIALOGUE_LEXICAL_POVERTY fires when characters recycle a tiny vocabulary', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 10 lines drawn from a 3-word pool → ~50 content tokens, 3 unique → TTR ≈ 0.06
+      const turns: Array<[string, string]> = Array.from({ length: 10 }, (_, i) =>
+        [i % 2 === 0 ? 'ALICE' : 'BOB', 'Money power control money power.'] as [string, string],
+      );
+      const result = await dialoguePass(makeInput215(turns));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'DIALOGUE_LEXICAL_POVERTY'),
+        'Should fire when the content-word type-token ratio falls below 0.45',
+      );
+    });
+
+    it('DIALOGUE_LEXICAL_POVERTY does not fire when the vocabulary is rich', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 10 lines of largely unique content words → TTR near 1.0
+      const turns: Array<[string, string]> = [
+        ['ALICE', 'The ancient lighthouse guarded treacherous coastal rocks.'],
+        ['BOB', 'Migrating swallows vanished beyond distant autumn horizons.'],
+        ['ALICE', 'Grandmother baked cinnamon pastries every quiet morning.'],
+        ['BOB', 'Engineers calibrated satellites orbiting faraway frozen planets.'],
+        ['ALICE', 'Raging wildfires consumed thousands of forested acres.'],
+        ['BOB', 'Violinists rehearsed symphonies inside marble concert auditoriums.'],
+        ['ALICE', 'Detectives uncovered forged documents beneath dusty floorboards.'],
+        ['BOB', 'Retreating glaciers exposed ancient warming polar regions.'],
+        ['ALICE', 'Merchants traded exotic spices along scorching desert routes.'],
+        ['BOB', 'Astronomers photographed comets streaking through midnight skies.'],
+      ];
+      const result = await dialoguePass(makeInput215(turns));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'DIALOGUE_LEXICAL_POVERTY'),
+        'Should NOT fire when the dialogue draws on a wide, varied vocabulary',
+      );
+    });
+
+    it('CADENCE_MONOTONY fires when every line runs the same length', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 12 lines, each exactly 7 words → coefficient of variation 0 → fires
+      const seven: string[] = [
+        'She quietly closed the heavy wooden door.',
+        'He never wanted to leave this town.',
+        'They walked along the empty midnight shoreline.',
+        'Nobody answered the phone that cold evening.',
+        'We hid the letters beneath loose floorboards.',
+        'You promised to return before the storm.',
+        'The children gathered around the dying fire.',
+        'Smoke drifted slowly across the silent valley.',
+        'Her hands trembled holding the faded photograph.',
+        'Rain fell steadily upon the tin roof.',
+        'He counted every coin inside the jar.',
+        'Morning light crept beneath the wooden shutters.',
+      ];
+      const turns: Array<[string, string]> = seven.map((l, i) =>
+        [i % 2 === 0 ? 'ALICE' : 'BOB', l] as [string, string],
+      );
+      const result = await dialoguePass(makeInput215(turns));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'CADENCE_MONOTONY'),
+        'Should fire when line-length coefficient of variation is below 0.35',
+      );
+    });
+
+    it('CADENCE_MONOTONY does not fire when line lengths vary widely', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 12 lines with lengths [2,9,3,11,2,8,4,10,3,9,2,8] → high coefficient of variation
+      const varied: string[] = [
+        'Get out.',
+        'I have been waiting right here for three hours.',
+        'Close the door.',
+        'You never once considered how any of this truly affects me.',
+        'Stop it.',
+        'We should have left this place long ago.',
+        'I do not believe you.',
+        'Everything we built together has finally come crashing down today.',
+        'Just go away.',
+        'She quietly walked across the empty parking lot outside.',
+        'No more.',
+        'Nothing about this situation makes any sense anymore.',
+      ];
+      const turns: Array<[string, string]> = varied.map((l, i) =>
+        [i % 2 === 0 ? 'ALICE' : 'BOB', l] as [string, string],
+      );
+      const result = await dialoguePass(makeInput215(turns));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'CADENCE_MONOTONY'),
+        'Should NOT fire when line lengths alternate between short and long',
+      );
+    });
+  });
+
   describe('Wave 214 — conflictPass: unrelieved tension ascent, conflict concentration spike, reversal magnitude decay (conflict-dynamics physics)', async () => {
     const makeRec214 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
