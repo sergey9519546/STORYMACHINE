@@ -619,6 +619,74 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 212: Setup-payoff imbalance, act2 causal desert, causal midpoint void ──
+
+  // SETUP_PAYOFF_IMBALANCE: The story seeds five or more distinct causal threads
+  // but closes only one or none via payoffs. Every seeded clue is a promissory
+  // note; when seeds outnumber payoffs 5-to-1 or worse, the audience carries a
+  // compounding load of unfulfilled promises and the ending feels structurally
+  // incomplete regardless of how satisfying the drama is.
+  if (records.length >= 8) {
+    const totalSeedCount212 = records.reduce((s: number, r: any) => s + (r.seededClueIds?.length ?? 0), 0);
+    const totalPayoffCount212 = records.reduce((s: number, r: any) => s + (r.payoffSetupIds?.length ?? 0), 0);
+    if (totalSeedCount212 >= 5 && totalPayoffCount212 <= 1) {
+      issues.push({
+        location: 'Setup/payoff distribution',
+        rule: 'SETUP_PAYOFF_IMBALANCE',
+        severity: 'minor',
+        description: `${totalSeedCount212} causal threads are seeded across the story but only ${totalPayoffCount212} payoff(s) close them — the story plants ${totalSeedCount212} guns and fires almost none. The audience accumulates a growing load of unfulfilled promises.`,
+        suggestedFix: 'Audit the seeded clues and add payoff scenes that close each major thread. Alternatively, cut threads you don\'t intend to resolve — every seeded clue is a promise, and every unfired gun is a broken one.',
+      });
+    }
+  }
+
+  if (records.length >= 10) {
+    const isCausal212 = (r: any): boolean =>
+      r.revelation !== null ||
+      (r.payoffSetupIds?.length ?? 0) > 0 ||
+      r.clockRaised ||
+      (r.seededClueIds?.length ?? 0) > 0 ||
+      (r.relationshipShifts ?? []).some((s: any) => Math.abs(s.amount) >= 0.3);
+
+    // ACT2_CAUSAL_DESERT: The entire Act 2 (25%–75%) contains no causal event —
+    // no revelation, payoff, seed, clock raise, or significant relationship shift
+    // (≥0.3). A causally dead Act 2 means the protagonist simply waits for Act 3
+    // to arrive — no discovery, no escalation, no reversal — and the audience
+    // feels the story treading water through its longest section.
+    const act2DesertStart212 = Math.floor(records.length * 0.25);
+    const act2DesertEnd212 = Math.floor(records.length * 0.75);
+    const act2DesertRecs212 = records.slice(act2DesertStart212, act2DesertEnd212);
+    if (!act2DesertRecs212.some(isCausal212)) {
+      issues.push({
+        location: `Act 2 (Scenes ${act2DesertStart212}–${act2DesertEnd212 - 1})`,
+        rule: 'ACT2_CAUSAL_DESERT',
+        severity: 'major',
+        description: `Act 2 (Scenes ${act2DesertStart212}–${act2DesertEnd212 - 1}, ${act2DesertRecs212.length} scenes) contains no revelation, payoff, planted clue, raised clock, or significant relationship shift — the story's longest structural section is causally inert. Nothing is planted, escalated, or discovered across the entire middle act.`,
+        suggestedFix: 'Act 2 must be the engine of complication. Plant clues, raise clocks, shift relationships, or deliver a mid-story revelation in each act-2 sequence. The protagonist should be discovering, failing, and adapting across the middle — not waiting for Act 3.',
+      });
+    }
+
+    // CAUSAL_MIDPOINT_VOID: The structural midpoint zone (40%–60%) has no causal
+    // event while Act 2 as a whole does have causal content — the pivot point is
+    // specifically dead. The midpoint is the gear-change of a well-crafted story:
+    // the protagonist's goal transforms, the dominant threat shifts, or a major
+    // alliance forms. Without a causal signal at the 40%–60% zone, Act 2 drifts
+    // from one half to the other with no felt turning point. Only fires when act2
+    // has content elsewhere (otherwise ACT2_CAUSAL_DESERT already covers it).
+    const midVoidStart212 = Math.floor(records.length * 0.4);
+    const midVoidEnd212 = Math.floor(records.length * 0.6);
+    const midVoidRecs212 = records.slice(midVoidStart212, midVoidEnd212);
+    if (midVoidRecs212.length >= 2 && act2DesertRecs212.some(isCausal212) && !midVoidRecs212.some(isCausal212)) {
+      issues.push({
+        location: `Midpoint zone (Scenes ${midVoidStart212}–${midVoidEnd212 - 1})`,
+        rule: 'CAUSAL_MIDPOINT_VOID',
+        severity: 'major',
+        description: `The structural midpoint (Scenes ${midVoidStart212}–${midVoidEnd212 - 1}) contains no revelation, payoff, planted clue, raised clock, or significant relationship shift — the story's pivot has no felt gear-change. Act 2 has causal activity around the midpoint but not at it.`,
+        suggestedFix: 'Plant a causal event at the 40%–60% zone: a revelation that reframes the goal, a clock that raises urgency, or a relationship shift that transforms the alliance map. The midpoint event makes the second half of Act 2 feel like a higher-stakes story than the first.',
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'causality', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

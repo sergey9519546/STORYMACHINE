@@ -15857,6 +15857,159 @@ Goodnight.
     });
   });
 
+  describe('Wave 212 — causalityPass: setup-payoff imbalance, act2 causal desert, causal midpoint void', async () => {
+    const makeRec212 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 1,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput212 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nA.\n', original: 'INT. SC - DAY\nA.\n',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('SETUP_PAYOFF_IMBALANCE fires when 5+ seeds exist but only 1 payoff closes them', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // n=10: seed in act1 scene0; 4 seeds in act2/act3 scenes 5-8; 1 payoff at scene7
+      // CHEKHOV_GUN_UNFIRED: only 1 unfired early seed ('setup-a1' is paid off) → <2 → won't fire
+      const records = [
+        makeRec212(0, { seededClueIds: ['setup-a1'] }),
+        makeRec212(1),
+        makeRec212(2),
+        makeRec212(3),
+        makeRec212(4),
+        makeRec212(5, { seededClueIds: ['seed-b'] }),
+        makeRec212(6, { seededClueIds: ['seed-c'] }),
+        makeRec212(7, { seededClueIds: ['seed-d'], payoffSetupIds: ['setup-a1'] }),
+        makeRec212(8, { seededClueIds: ['seed-e'] }),
+        makeRec212(9),
+      ];
+      const result = await causalityPass(makeInput212(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'SETUP_PAYOFF_IMBALANCE'),
+        'Should fire when 5+ clues are seeded but only 1 payoff closes them',
+      );
+    });
+
+    it('SETUP_PAYOFF_IMBALANCE does not fire when payoffs close enough threads', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // Add second payoff at scene8 → totalPayoffs=2 > 1 → won't fire
+      const records = [
+        makeRec212(0, { seededClueIds: ['setup-a1'] }),
+        makeRec212(1),
+        makeRec212(2),
+        makeRec212(3),
+        makeRec212(4),
+        makeRec212(5, { seededClueIds: ['seed-b'] }),
+        makeRec212(6, { seededClueIds: ['seed-c'] }),
+        makeRec212(7, { seededClueIds: ['seed-d'], payoffSetupIds: ['setup-a1'] }),
+        makeRec212(8, { seededClueIds: ['seed-e'], payoffSetupIds: ['seed-b'] }),
+        makeRec212(9),
+      ];
+      const result = await causalityPass(makeInput212(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'SETUP_PAYOFF_IMBALANCE'),
+        'Should NOT fire when 2 or more payoffs close the seeded threads',
+      );
+    });
+
+    it('ACT2_CAUSAL_DESERT fires when the entire act 2 contains no causal event', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // n=10: seed in act1 (scene0), payoff in act3 (scene7); act2 scenes 2-6 all neutral
+      // CAUSAL_MIDPOINT_VOID won't fire: act2 is entirely empty (guard: act2HasContent=false)
+      const records = [
+        makeRec212(0, { seededClueIds: ['causal-seed'] }),
+        makeRec212(1),
+        makeRec212(2),
+        makeRec212(3),
+        makeRec212(4),
+        makeRec212(5),
+        makeRec212(6),
+        makeRec212(7, { payoffSetupIds: ['causal-seed'] }),
+        makeRec212(8),
+        makeRec212(9),
+      ];
+      const result = await causalityPass(makeInput212(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'ACT2_CAUSAL_DESERT'),
+        'Should fire when the entire act 2 (25%–75%) has no revelation, seed, payoff, clock, or rel shift',
+      );
+    });
+
+    it('ACT2_CAUSAL_DESERT does not fire when act 2 contains a seed', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // Add a seed at scene4 (act2 midpoint) → act2 has content
+      const records = [
+        makeRec212(0, { seededClueIds: ['causal-seed'] }),
+        makeRec212(1),
+        makeRec212(2),
+        makeRec212(3),
+        makeRec212(4, { seededClueIds: ['act2-seed'] }),
+        makeRec212(5),
+        makeRec212(6),
+        makeRec212(7, { payoffSetupIds: ['causal-seed'] }),
+        makeRec212(8),
+        makeRec212(9),
+      ];
+      const result = await causalityPass(makeInput212(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'ACT2_CAUSAL_DESERT'),
+        'Should NOT fire when act 2 contains at least one causal event',
+      );
+    });
+
+    it('CAUSAL_MIDPOINT_VOID fires when the midpoint zone has no causal event but act 2 does', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // n=10: act2 has revelation@2 and payoff@6; midpoint [4,5] empty; act3 has revelation@7
+      // Rel shift (amount=0.3) at scenes 3 and 8 satisfy REVELATION_WITHOUT_REACTION
+      const records = [
+        makeRec212(0, { seededClueIds: ['clue-x'] }),
+        makeRec212(1),
+        makeRec212(2, { revelation: 'early truth discovered here' }),
+        makeRec212(3, { relationshipShifts: [{ pairKey: 'alice-bob', dimension: 'trust', amount: 0.3 }] }),
+        makeRec212(4),
+        makeRec212(5),
+        makeRec212(6, { payoffSetupIds: ['clue-x'] }),
+        makeRec212(7, { revelation: 'final act truth revealed now' }),
+        makeRec212(8, { relationshipShifts: [{ pairKey: 'alice-bob', dimension: 'trust', amount: 0.3 }] }),
+        makeRec212(9),
+      ];
+      const result = await causalityPass(makeInput212(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'CAUSAL_MIDPOINT_VOID'),
+        'Should fire when midpoint zone (40%–60%) is causally empty while act 2 has content elsewhere',
+      );
+    });
+
+    it('CAUSAL_MIDPOINT_VOID does not fire when the midpoint zone contains a causal event', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // Add seed at scene4 (in midpoint zone [4,5]) → hasMidCausal=true
+      const records = [
+        makeRec212(0, { seededClueIds: ['clue-x'] }),
+        makeRec212(1),
+        makeRec212(2, { revelation: 'early truth discovered here' }),
+        makeRec212(3, { relationshipShifts: [{ pairKey: 'alice-bob', dimension: 'trust', amount: 0.3 }] }),
+        makeRec212(4, { seededClueIds: ['mid-seed'] }),
+        makeRec212(5),
+        makeRec212(6, { payoffSetupIds: ['clue-x'] }),
+        makeRec212(7, { revelation: 'final act truth revealed now' }),
+        makeRec212(8, { relationshipShifts: [{ pairKey: 'alice-bob', dimension: 'trust', amount: 0.3 }] }),
+        makeRec212(9),
+      ];
+      const result = await causalityPass(makeInput212(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'CAUSAL_MIDPOINT_VOID'),
+        'Should NOT fire when the midpoint zone contains at least one causal event',
+      );
+    });
+  });
+
   describe('Wave 211 — beliefPass: revelation act3 void, late deception plant, belief resolution absent', async () => {
     const makeRec211 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
