@@ -15857,6 +15857,139 @@ Goodnight.
     });
   });
 
+  describe('Wave 220 — relationshipArcPass: star topology, amplitude decay, threads siloed (relational network physics)', async () => {
+    const makeRec220 = (idx: number, shifts: any[] = []): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 1, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: shifts, seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+    });
+    const makeInput220 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: 'INT. SC - DAY\nAction line.\n',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+    const sh = (pairKey: string, amount: number, dimension = 'trust') => ({ pairKey, dimension, amount });
+
+    it('RELATIONSHIP_STAR_TOPOLOGY fires when every pair routes through one hub character', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // alice is in all three pairs; bob, carol, dave have no lateral bonds
+      const records = [
+        makeRec220(0, [sh('alice|bob', 0.5)]),
+        makeRec220(1, [sh('alice|carol', 0.5)]),
+        makeRec220(2, [sh('alice|dave', 0.5)]),
+        makeRec220(3),
+        makeRec220(4),
+        makeRec220(5),
+      ];
+      const result = await relationshipArcPass(makeInput220(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'RELATIONSHIP_STAR_TOPOLOGY'),
+        'Should fire when all shifting pairs share a single common node',
+      );
+    });
+
+    it('RELATIONSHIP_STAR_TOPOLOGY does not fire when the cast has lateral bonds', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // A triangle: alice|bob, alice|carol, bob|carol → no universal hub
+      const records = [
+        makeRec220(0, [sh('alice|bob', 0.5)]),
+        makeRec220(1, [sh('alice|carol', 0.5)]),
+        makeRec220(2, [sh('bob|carol', 0.5)]),
+        makeRec220(3),
+        makeRec220(4),
+        makeRec220(5),
+      ];
+      const result = await relationshipArcPass(makeInput220(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'RELATIONSHIP_STAR_TOPOLOGY'),
+        'Should NOT fire when secondary characters relate to each other, not only the hub',
+      );
+    });
+
+    it('RELATIONSHIP_AMPLITUDE_DECAY fires when a pair swings hard early then barely moves', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // alice|bob magnitudes: 0.8, 0.7 (early) then 0.2, 0.1 (late) → late avg < half early
+      const records = [
+        makeRec220(0, [sh('alice|bob', 0.8)]),
+        makeRec220(1, [sh('alice|bob', 0.7)]),
+        makeRec220(2, [sh('alice|bob', 0.2)]),
+        makeRec220(3, [sh('alice|bob', 0.1)]),
+        makeRec220(4),
+        makeRec220(5),
+        makeRec220(6),
+        makeRec220(7),
+      ];
+      const result = await relationshipArcPass(makeInput220(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'RELATIONSHIP_AMPLITUDE_DECAY'),
+        'Should fire when a pair\'s later shift magnitudes are below half its early ones',
+      );
+    });
+
+    it('RELATIONSHIP_AMPLITUDE_DECAY does not fire when shift magnitudes hold steady', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const records = [
+        makeRec220(0, [sh('alice|bob', 0.5)]),
+        makeRec220(1, [sh('alice|bob', 0.5)]),
+        makeRec220(2, [sh('alice|bob', 0.5)]),
+        makeRec220(3, [sh('alice|bob', 0.5)]),
+        makeRec220(4),
+        makeRec220(5),
+        makeRec220(6),
+        makeRec220(7),
+      ];
+      const result = await relationshipArcPass(makeInput220(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'RELATIONSHIP_AMPLITUDE_DECAY'),
+        'Should NOT fire when a pair sustains its shift magnitude across the story',
+      );
+    });
+
+    it('RELATIONSHIP_THREADS_SILOED fires when no scene advances two pairs at once', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // alice|bob moves in scenes 0,2; alice|carol in scenes 4,6 — never together
+      const records = [
+        makeRec220(0, [sh('alice|bob', 0.5)]),
+        makeRec220(1),
+        makeRec220(2, [sh('alice|bob', -0.4)]),
+        makeRec220(3),
+        makeRec220(4, [sh('alice|carol', 0.5)]),
+        makeRec220(5),
+        makeRec220(6, [sh('alice|carol', -0.4)]),
+        makeRec220(7),
+      ];
+      const result = await relationshipArcPass(makeInput220(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'RELATIONSHIP_THREADS_SILOED'),
+        'Should fire when two relationships never shift in the same scene',
+      );
+    });
+
+    it('RELATIONSHIP_THREADS_SILOED does not fire when two pairs shift in the same scene', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // Scene 0 advances both pairs together → threads intersect
+      const records = [
+        makeRec220(0, [sh('alice|bob', 0.5), sh('alice|carol', -0.5)]),
+        makeRec220(1),
+        makeRec220(2, [sh('alice|bob', -0.4)]),
+        makeRec220(3),
+        makeRec220(4, [sh('alice|carol', 0.5)]),
+        makeRec220(5),
+        makeRec220(6),
+        makeRec220(7),
+      ];
+      const result = await relationshipArcPass(makeInput220(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'RELATIONSHIP_THREADS_SILOED'),
+        'Should NOT fire when at least one scene advances two relationships together',
+      );
+    });
+  });
+
   describe('Wave 219 — payoffPass: concurrent thread overload, resolution crammed at end, anticipation window decay (tension-debt physics)', async () => {
     const makeRec219 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

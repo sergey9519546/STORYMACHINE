@@ -518,6 +518,79 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
     }
   }
 
+  // ── Wave 220: Relational network & trajectory physics — graph topology, within-pair
+  //    amplitude trend, temporal co-occurrence. These read the relationship set as a
+  //    graph and as a set of trajectories rather than pair-by-pair in isolation. ──
+
+  // RELATIONSHIP_STAR_TOPOLOGY (minor): every shifting pair shares one common node — the
+  // relational graph is a star centred on a single character. The supporting cast has no
+  // lateral bonds with EACH OTHER; everyone only relates to the hub. Ensembles feel alive
+  // when secondary characters have relationships that move independently of the lead.
+  if (pairStats.size >= 3) {
+    const nodeInPairs220 = new Map<string, number>();
+    for (const pk of pairStats.keys()) {
+      for (const node of new Set(pk.split('|'))) {
+        nodeInPairs220.set(node, (nodeInPairs220.get(node) ?? 0) + 1);
+      }
+    }
+    const [hubNode220, hubCount220] = [...nodeInPairs220.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (hubCount220 === pairStats.size) {
+      issues.push({
+        location: `Relational graph (hub: ${hubNode220})`,
+        rule: 'RELATIONSHIP_STAR_TOPOLOGY',
+        severity: 'minor',
+        description: `All ${pairStats.size} shifting relationships route through a single character (${hubNode220}) — the relational graph is a star with no lateral bonds. The supporting cast moves only in relation to the lead and never with each other, which makes the ensemble feel like satellites rather than a world.`,
+        suggestedFix: `Give at least two secondary characters a relationship that shifts independently of ${hubNode220}: an alliance, a rivalry, a betrayal that the protagonist isn't part of. Lateral bonds turn a hub-and-spoke cast into a living ensemble.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_AMPLITUDE_DECAY (minor): a single pair's shift magnitudes shrink over
+  // time — big early swings, negligible late ones. The bond's volatility dissipates before
+  // the climax, so its most consequential beats are spent early and the relationship coasts
+  // into the finale. Distinct from RELATIONSHIP_VELOCITY_COLLAPSE (shift COUNT drops to
+  // zero) — here the shifts keep coming but their magnitude fades.
+  for (const [pairKey, stats] of pairStats) {
+    if (stats.shifts.length >= 4) {
+      const mags220 = stats.shifts.map(s => Math.abs(s.amount));
+      const half220 = Math.floor(mags220.length / 2);
+      const earlyAvg220 = mags220.slice(0, half220).reduce((s, m) => s + m, 0) / half220;
+      const lateAvg220 = mags220.slice(mags220.length - half220).reduce((s, m) => s + m, 0) / half220;
+      if (earlyAvg220 > 0 && lateAvg220 < 0.5 * earlyAvg220) {
+        const [a, b] = pairKey.split('|');
+        issues.push({
+          location: `${a} ↔ ${b}`,
+          rule: 'RELATIONSHIP_AMPLITUDE_DECAY',
+          severity: 'minor',
+          description: `The bond between ${a} and ${b} swings hard early (avg magnitude ${earlyAvg220.toFixed(2)}) but barely moves later (avg ${lateAvg220.toFixed(2)}) — its volatility dissipates before the climax. The relationship spends its biggest beats early and coasts into the finale on fumes.`,
+          suggestedFix: `Reserve a high-magnitude beat for this pair late in the story — a final reckoning that outweighs the early turbulence. A relationship's most consequential shift should land near the climax, not be exhausted in the opening movement.`,
+        });
+        break; // one flag per pass to avoid noise
+      }
+    }
+  }
+
+  // RELATIONSHIP_THREADS_SILOED (minor): two or more relationships move across the story,
+  // but no single scene ever advances two different pairs at once. The relational threads
+  // run in separate lanes and never intersect — the story misses the dramatic irony of one
+  // bond strengthening as another frays in the same room. Requires 2+ pairs and 4+ shifts.
+  if (pairStats.size >= 2 && totalShifts >= 4) {
+    let anyCoOccurrence220 = false;
+    for (const r of records) {
+      const pairsInScene220 = new Set((r.relationshipShifts ?? []).map(s => s.pairKey));
+      if (pairsInScene220.size >= 2) { anyCoOccurrence220 = true; break; }
+    }
+    if (!anyCoOccurrence220) {
+      issues.push({
+        location: 'Relational threading',
+        rule: 'RELATIONSHIP_THREADS_SILOED',
+        severity: 'minor',
+        description: `The story tracks ${pairStats.size} relationships but never moves two of them in the same scene — each bond advances in its own isolated lane. The relational threads never intersect, so the story forgoes the dramatic irony of one relationship deepening exactly as another fractures in the same moment.`,
+        suggestedFix: 'Stage at least one scene where two relationships shift together: a confrontation that draws one pair closer while pushing another apart. Relationships gain dimension when they collide in the same dramatic space rather than taking turns.',
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({
     fountain, issues, passName: 'relationship-arc', approvedSpans,
     storyContext: input.storyContext, priorPassResults: input.priorPassResults,
