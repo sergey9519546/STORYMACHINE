@@ -573,6 +573,96 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 222: Structural-physics — global event gap, suspense center-of-mass,
+  //    try/fail oscillation count. These read the whole dramatic-event sequence as a
+  //    structured signal rather than checking individual act-zone proportions. ──
+  {
+    const isDramaticEvent222 = (r: any): boolean =>
+      r.suspenseDelta < -1 ||
+      r.revelation !== null ||
+      r.clockRaised === true ||
+      (r.relationshipShifts ?? []).some((s: any) => Math.abs(s.amount) >= 0.3);
+
+    // DRAMATIC_VACUUM_STRETCH (major): the single longest consecutive run of scenes with
+    // NO dramatic event (reversal, revelation, clock raise, or major relationship shift)
+    // exceeds a quarter of the story. Distinct from ACT2_DEAD_ZONE (act-2-specific): a long
+    // inert stretch can straddle an act boundary and slip past every zone-bounded check
+    // while still leaving the audience adrift for a fifth or more of the runtime.
+    if (n >= 8) {
+      let curGap222 = 0, maxGap222 = 0, gapEnd222 = 0;
+      for (let i = 0; i < n; i++) {
+        if (isDramaticEvent222(records[i])) {
+          curGap222 = 0;
+        } else {
+          curGap222++;
+          if (curGap222 > maxGap222) { maxGap222 = curGap222; gapEnd222 = i; }
+        }
+      }
+      const vacuumThreshold222 = Math.max(4, Math.floor(n * 0.25));
+      if (maxGap222 > vacuumThreshold222) {
+        const gapStart222 = gapEnd222 - maxGap222 + 1;
+        issues.push({
+          location: `Scenes ${gapStart222}–${gapEnd222}`,
+          rule: 'DRAMATIC_VACUUM_STRETCH',
+          severity: 'major',
+          description: `Scenes ${gapStart222}–${gapEnd222} form a run of ${maxGap222} consecutive scenes with no dramatic event — no reversal, revelation, clock, or major relationship shift across ${Math.round(maxGap222 / n * 100)}% of the story. This vacuum straddles the act structure and leaves the audience without a catalytic beat for a sustained stretch.`,
+          suggestedFix: 'Inject a dramatic event into the middle of this run: a reversal, a revelation, or a relationship rupture that re-orients the story. No quarter of the runtime should pass without at least one beat that changes the protagonist\'s situation.',
+        });
+      }
+    }
+
+    // TENSION_FRONTLOADED_COM (major): the centre of mass of suspense (each scene's index
+    // weighted by its positive suspense) sits in the front 45% of the story. The dramatic
+    // energy is structurally front-loaded — its weight peaks early and thins toward the
+    // climax. A single principled scalar over the whole suspense curve, distinct from the
+    // act-zone comparisons elsewhere.
+    if (n >= 8) {
+      let massSum222 = 0, weightedIdxSum222 = 0;
+      for (let i = 0; i < n; i++) {
+        const mass222 = Math.max(records[i].suspenseDelta ?? 0, 0);
+        massSum222 += mass222;
+        weightedIdxSum222 += i * mass222;
+      }
+      if (massSum222 > 0) {
+        const comPos222 = (weightedIdxSum222 / massSum222) / (n - 1);
+        if (comPos222 < 0.45) {
+          issues.push({
+            location: 'Suspense distribution',
+            rule: 'TENSION_FRONTLOADED_COM',
+            severity: 'major',
+            description: `The centre of mass of the story's suspense sits at ${Math.round(comPos222 * 100)}% of the runtime — well into the front half. The dramatic energy is structurally front-loaded: tension peaks early and thins toward the climax, so the back half coasts downhill from a high it already spent.`,
+            suggestedFix: 'Shift suspense mass later: temper the early peaks and build the largest tension beats into the final third. The weight of the story\'s pressure should accumulate toward the climax, not be discharged in the opening movement.',
+          });
+        }
+      }
+    }
+
+    // TRY_FAIL_RHYTHM_ABSENT (major): the suspense curve has at most one prominent local
+    // maximum (a scene whose suspense strictly exceeds both neighbours and reaches ≥2). Great
+    // structure is built from try/fail cycles — repeated rise-and-collapse of tension — each
+    // of which registers as a peak. A curve with one bump or none is a single arc with no
+    // internal oscillation, the structural signature of a story that never makes the
+    // protagonist try, fail, and try again. Requires 10+ scenes.
+    if (n >= 10) {
+      let peakCount222 = 0;
+      for (let i = 1; i < n - 1; i++) {
+        const s222 = records[i].suspenseDelta ?? 0;
+        if (s222 >= 2 && s222 > (records[i - 1].suspenseDelta ?? 0) && s222 > (records[i + 1].suspenseDelta ?? 0)) {
+          peakCount222++;
+        }
+      }
+      if (peakCount222 <= 1) {
+        issues.push({
+          location: 'Suspense oscillation',
+          rule: 'TRY_FAIL_RHYTHM_ABSENT',
+          severity: 'major',
+          description: `The suspense curve has only ${peakCount222} prominent peak${peakCount222 === 1 ? '' : 's'} across ${n} scenes — the story is a single arc with no internal oscillation. Structure is built from try/fail cycles, each a rise and collapse of tension; a curve this smooth means the protagonist never visibly tries, fails, and re-commits.`,
+          suggestedFix: 'Build at least two or three distinct try/fail cycles into the structure: let the protagonist mount an effort that spikes tension, have it collapse, then mount another. Each peak-and-trough is a unit of dramatic momentum; one smooth hump is not a structure.',
+        });
+      }
+    }
+  }
+
   // ── Rewrite ───────────────────────────────────────────────────────────────
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'structure', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;

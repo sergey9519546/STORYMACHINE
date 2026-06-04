@@ -15857,6 +15857,102 @@ Goodnight.
     });
   });
 
+  describe('Wave 222 — structurePass: dramatic vacuum stretch, tension frontloaded COM, try-fail rhythm absent (structural physics)', async () => {
+    const makeRec222 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput222 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: 'INT. SC - DAY\nAction line.\n',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('DRAMATIC_VACUUM_STRETCH fires when a long run of scenes has no dramatic event', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // n=12; events only at scenes 0 and 11 → 10-scene vacuum in between
+      const records = Array.from({ length: 12 }, (_, i) =>
+        makeRec222(i, (i === 0 || i === 11) ? { revelation: 'a truth surfaces' } : {}),
+      );
+      const result = await structurePass(makeInput222(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'DRAMATIC_VACUUM_STRETCH'),
+        'Should fire when the longest event-free run exceeds a quarter of the story',
+      );
+    });
+
+    it('DRAMATIC_VACUUM_STRETCH does not fire when dramatic events are distributed', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // Events every ~3 scenes → no gap exceeds the threshold
+      const eventScenes = new Set([0, 3, 6, 9, 11]);
+      const records = Array.from({ length: 12 }, (_, i) =>
+        makeRec222(i, eventScenes.has(i) ? { revelation: 'a truth surfaces' } : {}),
+      );
+      const result = await structurePass(makeInput222(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'DRAMATIC_VACUUM_STRETCH'),
+        'Should NOT fire when dramatic events recur often enough to break up the gaps',
+      );
+    });
+
+    it('TENSION_FRONTLOADED_COM fires when suspense mass is concentrated early', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // Suspense at scenes 0-3, none later → centre of mass in the front
+      const records = Array.from({ length: 10 }, (_, i) =>
+        makeRec222(i, { suspenseDelta: i <= 3 ? 5 : 0 }),
+      );
+      const result = await structurePass(makeInput222(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'TENSION_FRONTLOADED_COM'),
+        'Should fire when the suspense centre of mass sits before 45% of the runtime',
+      );
+    });
+
+    it('TENSION_FRONTLOADED_COM does not fire when suspense builds toward the climax', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // Suspense at scenes 6-9 → centre of mass in the back
+      const records = Array.from({ length: 10 }, (_, i) =>
+        makeRec222(i, { suspenseDelta: i >= 6 ? 5 : 0 }),
+      );
+      const result = await structurePass(makeInput222(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'TENSION_FRONTLOADED_COM'),
+        'Should NOT fire when suspense mass accumulates toward the back half',
+      );
+    });
+
+    it('TRY_FAIL_RHYTHM_ABSENT fires when the suspense curve is a single hump', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // One bump at scene 6, flat elsewhere → a single peak
+      const records = Array.from({ length: 12 }, (_, i) =>
+        makeRec222(i, { suspenseDelta: i === 6 ? 4 : 0 }),
+      );
+      const result = await structurePass(makeInput222(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'TRY_FAIL_RHYTHM_ABSENT'),
+        'Should fire when the suspense curve has at most one prominent peak',
+      );
+    });
+
+    it('TRY_FAIL_RHYTHM_ABSENT does not fire when suspense oscillates across multiple cycles', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // Peaks at scenes 2, 5, 8 → three try/fail cycles
+      const profile = [0, 1, 3, 1, 0, 3, 1, 0, 3, 1, 0, 0];
+      const records = Array.from({ length: 12 }, (_, i) => makeRec222(i, { suspenseDelta: profile[i] }));
+      const result = await structurePass(makeInput222(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'TRY_FAIL_RHYTHM_ABSENT'),
+        'Should NOT fire when the suspense curve has multiple prominent peaks',
+      );
+    });
+  });
+
   describe('Wave 221 — rhythmPass: prose rhythm blocking, prose length ramp, intra-clause cadence absent (prose-cadence signal-processing)', async () => {
     // Distinct words so action lines don't trip word-repetition rules.
     const POOL221 = ['amber', 'breeze', 'candle', 'dapple', 'ember', 'fathom', 'glisten', 'harbor', 'ivory', 'jangle', 'kindle', 'lantern', 'marble', 'nestle', 'opal', 'pewter', 'quiver', 'ripple', 'saffron', 'thistle'];
