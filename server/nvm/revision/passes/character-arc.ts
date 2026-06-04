@@ -504,41 +504,58 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
     }
   }
 
-  // ── Wave 213 ──────────────────────────────────────────────────────────────────
-  // ARC_POSITIVE_ONLY (minor, n≥8): every non-neutral scene is positive; zero negative
+  // ── Wave 213: Arc dynamics — multi-signal narrative physics ─────────────────────
+  // Rather than counting the emotionalShift enum in isolation, these three checks
+  // reason over a per-scene signal vector that fuses the emotional, relational, and
+  // causal axes (see computeArcDynamics). A bare "sad" scene with no relational cost
+  // and no rising threat no longer counts as genuine adversity; a relationship that
+  // silently breaks DOES. This makes the checks resistant to token gaming and lets
+  // them distinguish emotional conflict from relational conflict from causal motivation.
+  const arcDyn213 = computeArcDynamics(records);
+
+  // ARC_UNCONTESTED_ASCENT (minor, n≥8): the protagonist accumulates real positive
+  // movement (emotional uplift and/or relational gain) while the cumulative adversity
+  // index across BOTH the emotional and relational axes stays near zero. The journey
+  // is an unbroken rise that is never meaningfully contested on any dramatic axis.
   if (records.length >= 8) {
-    const nonNeutral213 = records.filter((r: any) => r.emotionalShift !== 'neutral');
-    const negCount213 = records.filter((r: any) => r.emotionalShift === 'negative').length;
-    if (nonNeutral213.length >= 3 && negCount213 === 0) {
+    const totalTriumph213 = arcDyn213.reduce((acc, d) => acc + d.triumph, 0);
+    const totalAdversity213 = arcDyn213.reduce((acc, d) => acc + d.adversity, 0);
+    const triumphScenes213 = arcDyn213.filter(d => d.triumph > 0).length;
+    if (triumphScenes213 >= 3 && totalTriumph213 >= 3 && totalAdversity213 < 0.5) {
       issues.push({
         location: 'Full story',
-        rule: 'ARC_POSITIVE_ONLY',
+        rule: 'ARC_UNCONTESTED_ASCENT',
         severity: 'minor',
-        description: 'Every emotionally charged scene trends positive — no scene registers a negative shift. The story lacks resistance and genuine setback; the protagonist\'s journey reads as an unbroken ascent rather than a dramatic arc.',
-        suggestedFix: 'Introduce at least one scene where the protagonist suffers a genuine reversal, loss, or failure. Transformation requires contrast; without a negative beat the positive resolution carries no emotional weight.',
+        description: `The protagonist's arc registers ${totalTriumph213.toFixed(1)} units of positive movement (across ${triumphScenes213} scenes) but only ${totalAdversity213.toFixed(1)} units of adversity across the emotional AND relational axes combined — no setback, no relational loss, no genuine cost. The journey is an unbroken ascent that is never dramatically contested.`,
+        suggestedFix: 'Introduce real opposition along at least one axis: a scene of emotional defeat, OR a relationship that deteriorates (a negative SHIFT_RELATIONSHIP), OR a mounting clock that threatens the gains. Contrast is what gives the eventual triumph its weight — an uncontested rise reads as wish-fulfilment, not transformation.',
       });
     }
   }
 
-  // ARC_LATE_TURN_UNSUPPORTED (major, n≥8): a positive shift in the final 25% is not
-  // preceded by a revelation in the same scene or the two scenes immediately before it.
-  // Guard: story must have at least one negative scene before the final act to ensure
-  // the positive turn is a genuine reversal rather than the story's only emotion.
+  // ARC_LATE_TURN_UNSUPPORTED (major, n≥8): a final-act positive turn whose emotional
+  // SWING (the climb from the local trough in the preceding window) is significant, yet
+  // no proportionate CATALYST appears in the support window. A catalyst is any genuine
+  // causal force — a revelation, a payoff firing, a major relationship shift (|amount|≥0.3),
+  // or a suspense resolution (suspenseDelta<0). A big turn with a trivial cause is the defect,
+  // not merely an absent revelation. Guard: prior adversity must exist so the turn is a real
+  // reversal rather than the story's only emotional note.
   if (records.length >= 8) {
     const finalStart213 = Math.floor(records.length * 0.75);
-    const hasPriorNegative213 = records.slice(0, finalStart213).some((r: any) => r.emotionalShift === 'negative');
-    if (hasPriorNegative213) {
+    const hasPriorAdversity213 = arcDyn213.slice(0, finalStart213).some(d => d.adversity > 0);
+    if (hasPriorAdversity213) {
       for (let i213 = finalStart213; i213 < records.length; i213++) {
-        if (records[i213].emotionalShift !== 'positive') continue;
-        const windowStart213 = Math.max(0, i213 - 2);
-        const hasReveal213 = records.slice(windowStart213, i213 + 1).some((r: any) => r.revelation !== null);
-        if (!hasReveal213) {
+        if (arcDyn213[i213].state <= 0) continue; // only positive emotional turns
+        const troughStart213 = Math.max(0, i213 - 3);
+        const priorTrough213 = Math.min(...arcDyn213.slice(troughStart213, i213).map(d => d.state));
+        const swing213 = arcDyn213[i213].state - priorTrough213;
+        const support213 = Math.max(...arcDyn213.slice(Math.max(0, i213 - 2), i213 + 1).map(d => d.catalyst));
+        if (swing213 >= 1 && support213 === 0) {
           issues.push({
             location: `Scene ${i213}`,
             rule: 'ARC_LATE_TURN_UNSUPPORTED',
             severity: 'major',
-            description: `Scene ${i213} delivers a positive emotional turn in the final act, but no revelation or disclosure event appears in that scene or the two preceding scenes. The uplift feels unearned — the protagonist changes without cause.`,
-            suggestedFix: 'Plant a revelation — a discovered truth, a confession, an irreversible choice — in the two scenes before this positive turn. The structural shift must be motivated by new information, not narrative convenience.',
+            description: `Scene ${i213} delivers a positive emotional turn with a swing of ${swing213} (climbing from a trough of ${priorTrough213}), but the support window carries zero causal catalyst — no revelation, no payoff, no major relationship shift, and no suspense resolution motivates the change. The protagonist transforms without cause.`,
+            suggestedFix: 'Motivate the turn with a real catalyst in the two scenes before it: a discovered truth (revelation), a planted setup paying off, a relationship decisively shifting (|amount| ≥ 0.3), or a clock/threat resolving. The magnitude of the emotional swing must be matched by the magnitude of its cause.',
           });
           break;
         }
@@ -546,25 +563,30 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
     }
   }
 
-  // ARC_MIDPOINT_EMOTIONAL_VOID (minor, n≥10): scenes 40%-60% are all neutral while
-  // the broader act-2 (25%-75%) contains at least one non-neutral scene elsewhere.
-  // Guard: midZone must contain ≥2 scenes so a minimal story doesn't false-fire.
+  // ARC_MIDPOINT_INERT (minor, n≥10): the structural midpoint (40%–60%) is classically
+  // the point of maximum emotional VELOCITY — the great reversal or the great commitment.
+  // This fires when emotional velocity (the absolute scene-to-scene change in emotional
+  // state) flatlines through the midpoint while act 2 carries velocity on either side.
+  // Unlike a naive "all neutral" check, a midpoint that holds a CONSTANT non-neutral tone
+  // (e.g. uniformly positive — no turn) still reads as inert, and this catches it.
   if (records.length >= 10) {
-    const midEmoStart213 = Math.floor(records.length * 0.4);
-    const midEmoEnd213 = Math.floor(records.length * 0.6);
-    const act2EmoStart213 = Math.floor(records.length * 0.25);
-    const act2EmoEnd213 = Math.floor(records.length * 0.75);
-    const midZone213 = records.slice(midEmoStart213, midEmoEnd213);
-    const act2Zone213 = records.slice(act2EmoStart213, act2EmoEnd213);
-    const hasMidEmotion213 = midZone213.some((r: any) => r.emotionalShift !== 'neutral');
-    const act2HasEmotion213 = act2Zone213.some((r: any) => r.emotionalShift !== 'neutral');
-    if (midZone213.length >= 2 && act2HasEmotion213 && !hasMidEmotion213) {
+    const midStart213 = Math.floor(records.length * 0.4);
+    const midEnd213 = Math.floor(records.length * 0.6);
+    const act2Start213 = Math.floor(records.length * 0.25);
+    const act2End213 = Math.floor(records.length * 0.75);
+    const velocity213 = arcDyn213.map((d, i) => i === 0 ? 0 : Math.abs(d.state - arcDyn213[i - 1].state));
+    const midVelocity213 = velocity213.slice(midStart213, midEnd213).reduce((a, v) => a + v, 0);
+    const act2OutsideVelocity213 =
+      velocity213.slice(act2Start213, midStart213).reduce((a, v) => a + v, 0) +
+      velocity213.slice(midEnd213, act2End213).reduce((a, v) => a + v, 0);
+    const midZoneLen213 = midEnd213 - midStart213;
+    if (midZoneLen213 >= 2 && act2OutsideVelocity213 > 0 && midVelocity213 === 0) {
       issues.push({
-        location: `Scenes ${midEmoStart213}–${midEmoEnd213 - 1}`,
-        rule: 'ARC_MIDPOINT_EMOTIONAL_VOID',
+        location: `Scenes ${midStart213}–${midEnd213 - 1}`,
+        rule: 'ARC_MIDPOINT_INERT',
         severity: 'minor',
-        description: `The midpoint zone (scenes ${midEmoStart213}–${midEmoEnd213 - 1}) contains no emotional shifts — every scene reads as neutral — while the surrounding act-2 carries emotional charge. The structural centre of the story is emotionally inert.`,
-        suggestedFix: 'The midpoint is classically the moment of maximum commitment or maximum reversal. Give at least one midpoint scene a clear positive or negative emotional register to anchor the story\'s emotional centre of gravity.',
+        description: `The midpoint zone (scenes ${midStart213}–${midEnd213 - 1}) registers zero emotional velocity — the emotional state never turns — while act 2 on either side carries ${act2OutsideVelocity213} units of movement. The structural centre of the story, where the great reversal belongs, is dramatically static.`,
+        suggestedFix: 'Engineer a true turn at the midpoint: drive the emotional state in one direction and then reverse it, or commit the protagonist irrevocably so the register flips. The midpoint must be the pivot of the arc, not a plateau — a held tone, even a positive one, is still a flat line through the story\'s spine.',
       });
     }
   }
@@ -582,6 +604,44 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       ? 'Character-arc pass: arcs are complete'
       : `Character-arc pass: ${issues.length} issue(s) — ${usedLLM ? 'rewritten' : 'flagged (stub mode)'}`,
   };
+}
+
+/** Per-scene narrative signal vector used by the Wave 213 arc-dynamics checks.
+ *  Each scene is decomposed onto orthogonal dramatic axes so the checks can reason
+ *  about emotional movement, relational movement, and causal motivation independently
+ *  rather than collapsing everything onto a single emotionalShift enum. */
+interface SceneArcSignal {
+  /** Emotional state of the scene: +1 positive, 0 neutral, -1 negative */
+  state: number;
+  /** Positive movement: emotional uplift + cumulative positive relationship gain */
+  triumph: number;
+  /** Adversity: emotional defeat + cumulative relational loss (absolute magnitude) */
+  adversity: number;
+  /** Causal force capable of motivating an emotional turn: revelation, payoff firing,
+   *  a major relationship shift (|amount| ≥ 0.3), or a suspense resolution. */
+  catalyst: number;
+}
+
+function computeArcDynamics(records: PassInput['records']): SceneArcSignal[] {
+  return records.map((r: any) => {
+    const rel = (r.relationshipShifts ?? []) as Array<{ amount: number }>;
+    const relGain = rel.filter(s => s.amount > 0).reduce((a, s) => a + s.amount, 0);
+    const relLoss = rel.filter(s => s.amount < 0).reduce((a, s) => a + Math.abs(s.amount), 0);
+    const state = r.emotionalShift === 'positive' ? 1 : r.emotionalShift === 'negative' ? -1 : 0;
+
+    const triumph = (state > 0 ? 1 : 0) + relGain;
+    const adversity = (state < 0 ? 1 : 0) + relLoss;
+
+    const bigRelShift = rel.some(s => Math.abs(s.amount) >= 0.3);
+    const suspenseResolved = (r.suspenseDelta ?? 0) < 0;
+    const catalyst =
+      (r.revelation !== null && r.revelation !== undefined ? 1 : 0) +
+      ((r.payoffSetupIds?.length ?? 0) > 0 ? 1 : 0) +
+      (bigRelShift ? 1 : 0) +
+      (suspenseResolved ? 1 : 0);
+
+    return { state, triumph, adversity, catalyst };
+  });
 }
 
 function dominantShift(records: PassInput['records']): string {
