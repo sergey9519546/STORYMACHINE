@@ -15857,6 +15857,151 @@ Goodnight.
     });
   });
 
+  describe('Wave 217 — originalityPass: action opener monotony, distinctive word echo, scene shape templating (freshness physics)', async () => {
+    const makeTextInput217 = (fountain: string) => ({
+      fountain, original: fountain,
+      records: [] as any, structure: {} as any,
+      storyContext: {} as any, annotations: [] as any,
+      approvedSpans: [],
+    });
+    const makeRec217 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeRecInput217 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: 'INT. SC - DAY\nAction line.\n',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('ACTION_OPENER_MONOTONY fires when most action lines begin with the same word', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 10 action lines, 5 begin with "He" → 50% > 35%
+      const fountain = [
+        'INT. ROOM - DAY',
+        '',
+        'He opens the door.',
+        'He crosses to the window.',
+        'He stares at the street.',
+        'He lights a match.',
+        'He waits for the signal.',
+        'The phone rings twice.',
+        'A car passes outside.',
+        'Rain taps the glass.',
+        'Smoke curls upward.',
+        'Silence fills the room.',
+      ].join('\n');
+      const result = await originalityPass(makeTextInput217(fountain));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'ACTION_OPENER_MONOTONY'),
+        'Should fire when one opener word exceeds 35% of action lines',
+      );
+    });
+
+    it('ACTION_OPENER_MONOTONY does not fire when action openers vary', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const fountain = [
+        'INT. ROOM - DAY',
+        '',
+        'He opens the door.',
+        'She crosses the room.',
+        'Rain taps the window.',
+        'Smoke curls upward.',
+        'Thunder rolls outside.',
+        'Marcus lights a match.',
+        'Nobody answers him.',
+        'Footsteps echo below.',
+        'The clock ticks.',
+        'Wind rattles the shutters.',
+      ].join('\n');
+      const result = await originalityPass(makeTextInput217(fountain));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'ACTION_OPENER_MONOTONY'),
+        'Should NOT fire when no single opener word dominates',
+      );
+    });
+
+    it('DISTINCTIVE_WORD_ECHO fires when a distinctive word repeats in close proximity', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // "shadows" appears in 4 of 5 consecutive action lines
+      const fountain = [
+        'INT. ALLEY - NIGHT',
+        '',
+        'Shadows pool beneath the streetlamp.',
+        'The shadows lengthen across the brick.',
+        'He fears the shadows ahead.',
+        'Deeper shadows swallow the corner.',
+        'A cat darts past.',
+      ].join('\n');
+      const result = await originalityPass(makeTextInput217(fountain));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'DISTINCTIVE_WORD_ECHO'),
+        'Should fire when a 5+ letter content word repeats 4+ times within six action lines',
+      );
+    });
+
+    it('DISTINCTIVE_WORD_ECHO does not fire when distinctive words are not repeated', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const fountain = [
+        'INT. ALLEY - NIGHT',
+        '',
+        'Shadows pool beneath the streetlamp.',
+        'The fog drifts across the brick.',
+        'He fears the silence ahead.',
+        'Deeper darkness swallows the corner.',
+        'A cat darts past.',
+      ].join('\n');
+      const result = await originalityPass(makeTextInput217(fountain));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'DISTINCTIVE_WORD_ECHO'),
+        'Should NOT fire when no distinctive word repeats four times in proximity',
+      );
+    });
+
+    it('SCENE_SHAPE_TEMPLATING fires when most scenes share one structural signature despite varied purposes', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 10 scenes, all neutral + dialogue + no reversal + no rel shift → identical shape,
+      // but purposes vary so UNIFORM_SCENE_PURPOSES cannot catch it
+      const purposes = ['dialogue', 'revelation', 'conflict', 'setup', 'climax'];
+      const records = Array.from({ length: 10 }, (_, i) =>
+        makeRec217(i, { purpose: purposes[i % purposes.length], dialogueHighlights: ['alice: speaks'] }),
+      );
+      const result = await originalityPass(makeRecInput217(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'SCENE_SHAPE_TEMPLATING'),
+        'Should fire when 60%+ of scenes share an identical structural shape signature',
+      );
+    });
+
+    it('SCENE_SHAPE_TEMPLATING does not fire when scene shapes vary structurally', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // Diversify emotion, dialogue-presence, reversals, and relationship shifts
+      const records = [
+        makeRec217(0, { emotionalShift: 'neutral', dialogueHighlights: ['a: x'] }),
+        makeRec217(1, { emotionalShift: 'positive' }),
+        makeRec217(2, { emotionalShift: 'negative', suspenseDelta: -2 }),
+        makeRec217(3, { emotionalShift: 'neutral', dialogueHighlights: ['b: y'], relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: -0.4 }] }),
+        makeRec217(4, { emotionalShift: 'positive', dialogueHighlights: ['c: z'] }),
+        makeRec217(5, { emotionalShift: 'negative', suspenseDelta: -2 }),
+        makeRec217(6, { emotionalShift: 'neutral', relationshipShifts: [{ pairKey: 'a|c', dimension: 'power', amount: 0.5 }] }),
+        makeRec217(7, { emotionalShift: 'positive', dialogueHighlights: ['a: w'] }),
+        makeRec217(8, { emotionalShift: 'negative', dialogueHighlights: ['b: v'] }),
+        makeRec217(9, { emotionalShift: 'neutral' }),
+      ];
+      const result = await originalityPass(makeRecInput217(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'SCENE_SHAPE_TEMPLATING'),
+        'Should NOT fire when scenes are built from varied structural shapes',
+      );
+    });
+  });
+
   describe('Wave 216 — intentionPass: agency entropy collapse, agency without consequence, commitment ramp inversion (agency physics)', async () => {
     const makeRec216 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

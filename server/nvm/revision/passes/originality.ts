@@ -629,6 +629,126 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 217: Freshness physics — opener entropy, local lexical echo, scene-shape
+  //    templating. Three higher-order measures of prose/structural sameness that the
+  //    per-feature ratio checks above cannot see. ──
+
+  // Classify action lines once (non-slug, non-cue, non-parenthetical, outside dialogue).
+  const actionLines217: string[] = [];
+  {
+    let inDlg217 = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg217 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg217 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg217 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg217) continue;
+      actionLines217.push(t);
+    }
+  }
+
+  // ACTION_OPENER_MONOTONY (minor): more than 35% of action lines begin with the same
+  // word. Distinct from OPENING_CONJUNCTION_OVERUSE (conjunctions only) — this catches
+  // subject-pronoun anaphora ("He… He… He…"), the most common signature of unrevised
+  // prose, where every line marches out of the same grammatical gate.
+  if (actionLines217.length >= 10) {
+    const openerCounts217 = new Map<string, number>();
+    for (const t of actionLines217) {
+      const first217 = t.replace(/^[^a-zA-Z]+/, '').split(/\s+/)[0]?.toLowerCase() ?? '';
+      if (first217) openerCounts217.set(first217, (openerCounts217.get(first217) ?? 0) + 1);
+    }
+    if (openerCounts217.size > 0) {
+      const [topOpener217, topCount217] = [...openerCounts217.entries()].sort((a, b) => b[1] - a[1])[0];
+      const share217 = topCount217 / actionLines217.length;
+      if (share217 > 0.35) {
+        issues.push({
+          location: 'Action lines throughout',
+          rule: 'ACTION_OPENER_MONOTONY',
+          severity: 'minor',
+          description: `${topCount217} of ${actionLines217.length} action lines (${Math.round(share217 * 100)}%) begin with the same word ("${topOpener217}") — the prose marches out of the same grammatical gate line after line. Repeated openers flatten rhythm and betray unrevised description.`,
+          suggestedFix: 'Vary how action lines begin: lead with the object, an adverbial phrase, a sound, or a dependent clause. When every line opens on the same subject pronoun, the description reads as a list rather than a scene.',
+        });
+      }
+    }
+  }
+
+  // DISTINCTIVE_WORD_ECHO (minor): a distinctive content word (5+ letters, not a function
+  // word) appears 4+ times within a window of 6 consecutive action lines — a conspicuous
+  // local echo. Unlike the global cliché list, this catches a writer's own unintentional
+  // word-repetition tic ("shadows" in four straight paragraphs) that no fixed dictionary
+  // could anticipate.
+  if (actionLines217.length >= 5) {
+    const ECHO_STOP217 = new Set([
+      'there','their','about','would','could','should','these','those','where','which',
+      'while','after','before','again','still','being','because','through','around',
+      'every','other','another','really','almost','against','toward','behind',
+    ]);
+    const wordPositions217 = new Map<string, number[]>();
+    for (let li = 0; li < actionLines217.length; li++) {
+      const seen217 = new Set<string>();
+      for (const w of actionLines217[li].toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/)) {
+        if (w.length >= 5 && !ECHO_STOP217.has(w) && !seen217.has(w)) {
+          // count once per line so a single line repeating a word isn't an "echo"
+          seen217.add(w);
+          if (!wordPositions217.has(w)) wordPositions217.set(w, []);
+          wordPositions217.get(w)!.push(li);
+        }
+      }
+    }
+    let echoWord217 = '';
+    let echoCount217 = 0;
+    for (const [w, positions] of wordPositions217) {
+      if (positions.length < 4) continue;
+      // sliding window: 4 occurrences spanning ≤5 action lines (a 6-line window)
+      for (let k = 0; k + 3 < positions.length; k++) {
+        if (positions[k + 3] - positions[k] <= 5) {
+          const localCount217 = positions.filter(p => p >= positions[k] && p <= positions[k] + 5).length;
+          if (localCount217 > echoCount217) { echoCount217 = localCount217; echoWord217 = w; }
+          break;
+        }
+      }
+    }
+    if (echoWord217) {
+      issues.push({
+        location: 'Action description',
+        rule: 'DISTINCTIVE_WORD_ECHO',
+        severity: 'minor',
+        description: `The word "${echoWord217}" appears ${echoCount217} times within a span of six action lines — a conspicuous local echo. Repeating a distinctive word in close proximity makes the prose feel unrevised and draws the eye to the repetition rather than the image.`,
+        suggestedFix: `Replace all but one instance of "${echoWord217}" with a specific synonym or a different concrete image. A distinctive word should land once; its power dissolves on the third and fourth repetition.`,
+      });
+    }
+  }
+
+  // SCENE_SHAPE_TEMPLATING (major): 60%+ of scenes share an identical structural shape
+  // signature — same emotional register, same dialogue-presence, same reversal-presence,
+  // same relationship-movement. Distinct from UNIFORM_SCENE_PURPOSES (purpose label only):
+  // scenes can carry varied purpose tags yet still be built from the same beat machine.
+  // This catches formulaic construction that purpose-variety alone conceals.
+  if (records.length >= 8) {
+    const shapeCounts217 = new Map<string, number>();
+    for (const r of records) {
+      const sig217 = [
+        r.emotionalShift ?? 'neutral',
+        (r.dialogueHighlights?.length ?? 0) > 0 ? 'D' : '-',
+        r.suspenseDelta < -1 ? 'R' : '-',
+        (r.relationshipShifts?.length ?? 0) > 0 ? 'S' : '-',
+      ].join('|');
+      shapeCounts217.set(sig217, (shapeCounts217.get(sig217) ?? 0) + 1);
+    }
+    const [domSig217, domCount217] = [...shapeCounts217.entries()].sort((a, b) => b[1] - a[1])[0];
+    const domShare217 = domCount217 / records.length;
+    if (domShare217 > 0.6 && shapeCounts217.size >= 1) {
+      issues.push({
+        location: 'Scene construction',
+        rule: 'SCENE_SHAPE_TEMPLATING',
+        severity: 'major',
+        description: `${domCount217} of ${records.length} scenes (${Math.round(domShare217 * 100)}%) share an identical structural shape (${domSig217}: emotion·dialogue·reversal·relationship) — the scenes are stamped from one template. Even where purpose labels vary, the underlying beat machine repeats, and the story acquires a mechanical sameness.`,
+        suggestedFix: 'Vary the architecture of scenes, not just their labels: alternate dialogue-driven beats with silent action, pair some scenes with a reversal and others with a relationship shift, and let the emotional register move. Structural variety is what keeps a story from feeling assembly-lined.',
+      });
+    }
+  }
+
   // ── Limit total issues to avoid overwhelming output ───────────────────────
   // Clichés (minor) are pushed first and would crowd out the higher-severity
   // structural findings (UNIFORM_SCENE_PURPOSES is major) under a naive slice.
