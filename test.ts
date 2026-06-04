@@ -15857,6 +15857,111 @@ Goodnight.
     });
   });
 
+  describe('Wave 216 — intentionPass: agency entropy collapse, agency without consequence, commitment ramp inversion (agency physics)', async () => {
+    const makeRec216 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput216 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: 'INT. SC - DAY\nAction line.\n',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('AGENCY_ENTROPY_COLLAPSE fires when one character carries nearly all tracked intention', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 10 intention-bearing lines: 9 alice, 1 bob → normalised entropy ≈ 0.47 < 0.5
+      const records = Array.from({ length: 10 }, (_, i) =>
+        makeRec216(i, { dialogueHighlights: [`${i === 9 ? 'bob' : 'alice'}: pursues a hidden goal`] }),
+      );
+      const result = await intentionPass(makeInput216(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'AGENCY_ENTROPY_COLLAPSE'),
+        'Should fire when normalised agency entropy falls below 0.5',
+      );
+    });
+
+    it('AGENCY_ENTROPY_COLLAPSE does not fire when intention is shared across characters', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 10 lines: 5 alice, 5 bob → normalised entropy 1.0
+      const records = Array.from({ length: 10 }, (_, i) =>
+        makeRec216(i, { dialogueHighlights: [`${i % 2 === 0 ? 'alice' : 'bob'}: pursues a hidden goal`] }),
+      );
+      const result = await intentionPass(makeInput216(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'AGENCY_ENTROPY_COLLAPSE'),
+        'Should NOT fire when agency is distributed evenly across characters',
+      );
+    });
+
+    it('AGENCY_WITHOUT_CONSEQUENCE fires when proactive beats produce no downstream effect', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 3 proactive scenes (seed clues at 1,3,5) never paid off; all scenes inert afterward
+      const records = Array.from({ length: 10 }, (_, i) => makeRec216(i));
+      records[1].seededClueIds = ['a'];
+      records[3].seededClueIds = ['b'];
+      records[5].seededClueIds = ['c'];
+      const result = await intentionPass(makeInput216(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'AGENCY_WITHOUT_CONSEQUENCE'),
+        'Should fire when 75%+ of proactive beats have no payoff and no downstream movement',
+      );
+    });
+
+    it('AGENCY_WITHOUT_CONSEQUENCE does not fire when proactive beats land', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // Each proactive beat is answered: scene2 suspense rise, scene4 rel shift, scene6 revelation
+      const records = Array.from({ length: 10 }, (_, i) => makeRec216(i));
+      records[1].seededClueIds = ['a'];
+      records[3].seededClueIds = ['b'];
+      records[5].seededClueIds = ['c'];
+      records[2].suspenseDelta = 2;
+      records[4].relationshipShifts = [{ pairKey: 'alice|bob', dimension: 'trust', amount: -0.4 }];
+      records[6].revelation = 'the consequence of the planted clue surfaces';
+      const result = await intentionPass(makeInput216(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'AGENCY_WITHOUT_CONSEQUENCE'),
+        'Should NOT fire when proactive beats are answered by downstream consequence',
+      );
+    });
+
+    it('COMMITMENT_RAMP_INVERSION fires when proactive density decays toward the climax', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // n=12, thirds=4; opening third 3 proactive (density 0.75), final third 1 (density 0.25)
+      const records = Array.from({ length: 12 }, (_, i) => makeRec216(i));
+      records[0].seededClueIds = ['p0'];
+      records[1].seededClueIds = ['p1'];
+      records[2].seededClueIds = ['p2'];
+      records[8].seededClueIds = ['p8'];
+      const result = await intentionPass(makeInput216(records));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'COMMITMENT_RAMP_INVERSION'),
+        'Should fire when final-third proactive density is below half the opening-third density',
+      );
+    });
+
+    it('COMMITMENT_RAMP_INVERSION does not fire when proactive density rises toward the climax', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // Rising commitment: opening third 1 proactive (0.25), final third 3 (0.75)
+      const records = Array.from({ length: 12 }, (_, i) => makeRec216(i));
+      records[0].seededClueIds = ['p0'];
+      records[9].seededClueIds = ['p9'];
+      records[10].seededClueIds = ['p10'];
+      records[11].seededClueIds = ['p11'];
+      const result = await intentionPass(makeInput216(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'COMMITMENT_RAMP_INVERSION'),
+        'Should NOT fire when the protagonist intensifies initiative toward the climax',
+      );
+    });
+  });
+
   describe('Wave 215 — dialoguePass: non-responsive exchange, lexical poverty, cadence monotony (conversational dynamics)', async () => {
     // Build a fountain from [speaker, line] turns so each turn parses to one dialogue line.
     const buildDialogueFountain215 = (turns: Array<[string, string]>) =>

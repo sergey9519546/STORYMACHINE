@@ -550,6 +550,106 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 216: Agency physics — distribution entropy, effort↔consequence coupling,
+  //    commitment density ramp. These treat intention as a measurable quantity with a
+  //    distribution, a causal yield, and a trajectory rather than a per-scene flag. ──
+
+  // AGENCY_ENTROPY_COLLAPSE (major): the normalised Shannon entropy of intention-bearing
+  // dialogue (who is given tracked beliefs/goals, drawn from dialogueHighlights) falls
+  // below 0.5. A single character carries almost all of the story's legible intention
+  // while everyone else is a prop with no inner agenda. Distinct from the dialogue pass's
+  // SPEAKER_MONOPOLY (raw fountain line count) — this measures concentration of AGENCY,
+  // not of word count.
+  {
+    const intentCounts216 = new Map<string, number>();
+    let totalHL216 = 0;
+    for (const r of records) {
+      for (const d of (r.dialogueHighlights ?? [])) {
+        const m216 = d.match(/^(\w+):/);
+        if (m216) {
+          const c216 = m216[1].toLowerCase();
+          intentCounts216.set(c216, (intentCounts216.get(c216) ?? 0) + 1);
+          totalHL216++;
+        }
+      }
+    }
+    if (intentCounts216.size >= 2 && totalHL216 >= 8) {
+      let entropy216 = 0;
+      for (const cnt of intentCounts216.values()) {
+        const p216 = cnt / totalHL216;
+        entropy216 -= p216 * Math.log2(p216);
+      }
+      const normEntropy216 = entropy216 / Math.log2(intentCounts216.size);
+      if (normEntropy216 < 0.5) {
+        const dominant216 = [...intentCounts216.entries()].sort((a, b) => b[1] - a[1])[0];
+        issues.push({
+          location: 'Intention distribution',
+          rule: 'AGENCY_ENTROPY_COLLAPSE',
+          severity: 'major',
+          description: `Intention is concentrated in one character: ${dominant216[0].toUpperCase()} carries ${dominant216[1]} of ${totalHL216} intention-bearing lines (normalised agency entropy ${normEntropy216.toFixed(2)}). The rest of the cast has no legible agenda — they are reactive furniture around a single willing agent.`,
+          suggestedFix: 'Give at least one other character a tracked want that competes with the protagonist\'s: a belief they act on, a goal they pursue on-screen. Drama is the collision of intentions; with only one agent there is nothing to collide.',
+        });
+      }
+    }
+  }
+
+  // AGENCY_WITHOUT_CONSEQUENCE (major): the protagonist is proactive in 3+ scenes
+  // (raises a clock or plants a clue) but 75%+ of those efforts are inert — the seeded
+  // clue is never paid off AND the next two scenes register no suspense rise, no
+  // relationship shift, and no revelation. Proactivity that the story never answers is
+  // busy-work; agency only reads as agency when the world visibly responds to it.
+  if (n >= 6) {
+    const proactiveIdx216: number[] = [];
+    for (let i = 0; i < n; i++) {
+      if (records[i].clockRaised || (records[i].seededClueIds?.length ?? 0) > 0) proactiveIdx216.push(i);
+    }
+    if (proactiveIdx216.length >= 3) {
+      const allPayoffs216 = new Set<string>();
+      for (const r of records) for (const p of (r.payoffSetupIds ?? [])) allPayoffs216.add(p);
+      let inert216 = 0;
+      for (const i of proactiveIdx216) {
+        const seedPaidOff216 = (records[i].seededClueIds ?? []).some(s => allPayoffs216.has(s));
+        const window216 = records.slice(i + 1, i + 3);
+        const downstream216 = window216.some(r =>
+          r.suspenseDelta > 1 || (r.relationshipShifts?.length ?? 0) > 0 || r.revelation !== null,
+        );
+        if (!seedPaidOff216 && !downstream216) inert216++;
+      }
+      const inertRatio216 = inert216 / proactiveIdx216.length;
+      if (inertRatio216 >= 0.75) {
+        issues.push({
+          location: 'Agency layer',
+          rule: 'AGENCY_WITHOUT_CONSEQUENCE',
+          severity: 'major',
+          description: `${inert216} of ${proactiveIdx216.length} proactive beats produce no consequence — the protagonist raises clocks and plants clues, but those efforts are never paid off and the scenes that follow register no suspense, no relationship change, and no revelation. The protagonist acts into a vacuum.`,
+          suggestedFix: 'Make each proactive beat land: pay off the planted clue later, or let the very next scenes show the world reacting — a rise in pressure, a relationship altered, a truth surfaced. Agency without consequence is indistinguishable from inertia.',
+        });
+      }
+    }
+  }
+
+  // COMMITMENT_RAMP_INVERSION (major): proactive density in the final third is positive
+  // but less than half the proactive density of the opening third — the protagonist's
+  // initiative is measurably decaying as the climax approaches. Distinct from
+  // AGENCY_FRONTLOADED (which requires the back half to be exactly zero); this catches a
+  // declining commitment ramp even while the protagonist is still nominally active.
+  if (n >= 9) {
+    const third216 = Math.floor(n / 3);
+    const proDensity216 = (recs: PassInput['records']) =>
+      recs.filter(r => r.clockRaised || (r.seededClueIds?.length ?? 0) > 0).length / recs.length;
+    const firstDensity216 = proDensity216(records.slice(0, third216));
+    const lastDensity216 = proDensity216(records.slice(n - third216));
+    if (firstDensity216 > 0 && lastDensity216 > 0 && lastDensity216 < 0.5 * firstDensity216) {
+      issues.push({
+        location: `Commitment ramp (opening third vs final third)`,
+        rule: 'COMMITMENT_RAMP_INVERSION',
+        severity: 'major',
+        description: `Proactive density falls from ${(firstDensity216 * 100).toFixed(0)}% of opening-third scenes to ${(lastDensity216 * 100).toFixed(0)}% of final-third scenes — the protagonist's initiative is decaying toward the climax instead of intensifying. The commitment ramp runs backwards.`,
+        suggestedFix: 'The drive toward the goal should escalate, not fade: load more proactive beats into the final third than the opening. As the stakes peak, the protagonist must be pushing hardest, not coasting on early momentum.',
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'intention', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
