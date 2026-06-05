@@ -441,8 +441,23 @@ export default function ScriptIDE({
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
     let actionLines = 0;
-    let wordCount = scriptText.trim().split(/\s+/).length;
-    if (scriptText.trim() === "") wordCount = 0;
+
+    // ⚡ Bolt Performance Optimization:
+    // Replaced large O(N) array allocation (`split(/\s+/)`) with a zero-allocation loop
+    let wordCount = 0;
+    if (scriptText.length > 0) {
+      let inWord = false;
+      for (let j = 0; j < scriptText.length; j++) {
+        if (scriptText.charCodeAt(j) > 32) {
+          if (!inWord) {
+            wordCount++;
+            inWord = true;
+          }
+        } else {
+          inWord = false;
+        }
+      }
+    }
 
     blocks.forEach((block) => {
       if (block.type === "character") {
@@ -593,8 +608,11 @@ export default function ScriptIDE({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const cursor = e.currentTarget.selectionStart;
     const textBeforeCursor = scriptText.substring(0, cursor);
-    const lines = textBeforeCursor.split("\n");
-    const currentLine = lines[lines.length - 1];
+
+    // ⚡ Bolt Performance Optimization:
+    // Avoid large array allocation via string split in high-frequency key handler
+    const lastNewlineIndex = textBeforeCursor.lastIndexOf("\n");
+    const currentLine = lastNewlineIndex === -1 ? textBeforeCursor : textBeforeCursor.substring(lastNewlineIndex + 1);
 
     if (e.key === "i" || e.key === "I") {
       if (currentLine === "") {
@@ -737,11 +755,24 @@ export default function ScriptIDE({
   // ── Navigation ───────────────────────────────────────────────────────────────
   const handleNavigate = (lineIndex: number) => {
     if (!editorRef.current) return;
-    const lines = scriptText.split("\n");
+
+    // ⚡ Bolt Performance Optimization:
+    // Replaced large O(N) array allocation (`split("\n")`) with zero-allocation `indexOf` loop
     let charCount = 0;
-    for (let i = 0; i < lineIndex; i++) {
-      charCount += lines[i].length + 1;
+    if (lineIndex > 0) {
+      let linesFound = 0;
+      let index = -1;
+      while (linesFound < lineIndex) {
+        index = scriptText.indexOf("\n", index + 1);
+        if (index === -1) {
+          charCount = scriptText.length;
+          break;
+        }
+        linesFound++;
+      }
+      if (index !== -1) charCount = index + 1;
     }
+
     editorRef.current.focus();
     editorRef.current.setSelectionRange(charCount, charCount);
 
