@@ -7,16 +7,33 @@ export async function analyzeScriptBlock(
   externalSignal?: AbortSignal,
 ): Promise<EngineState> {
   // Parse scriptText into ScriptBlocks — pure JS, no AI needed here
-  const lines = scriptText.split('\n');
-  const scriptBlocks: ScriptBlock[] = lines.map((line, index) => {
-    let type: ScriptBlock["type"] = "action";
-    if (line.match(/^(INT\.|EXT\.|INT\/EXT\.)/i)) type = "scene_heading";
-    else if (line.match(/^[A-Z\s]+(\(V\.O\.\)|\(O\.S\.\))?$/) && line.trim().length > 0) type = "character";
-    else if (line.match(/^\(.*\)$/)) type = "parenthetical";
-    else if (line.match(/^(CUT TO:|FADE OUT\.|FADE IN:)/i)) type = "transition";
-    else if (index > 0 && lines[index - 1].match(/^[A-Z\s]+(\(V\.O\.\)|\(O\.S\.\))?$/)) type = "dialogue";
-    return { id: `block-${Date.now()}-${index}`, type, text: line };
-  }).filter(b => b.text.trim().length > 0);
+  const scriptBlocks: ScriptBlock[] = [];
+  let start = 0;
+  let index = 0;
+  let prevLine = "";
+  const now = Date.now();
+
+  while (start <= scriptText.length) {
+    let end = scriptText.indexOf('\n', start);
+    if (end === -1) end = scriptText.length;
+    const line = scriptText.slice(start, end);
+
+    if (line.trim().length > 0) {
+      let type: ScriptBlock["type"] = "action";
+      if (line.match(/^(INT\.|EXT\.|INT\/EXT\.)/i)) type = "scene_heading";
+      else if (line.match(/^[A-Z\s]+(\(V\.O\.\)|\(O\.S\.\))?$/)) type = "character";
+      else if (line.match(/^\(.*\)$/)) type = "parenthetical";
+      else if (line.match(/^(CUT TO:|FADE OUT\.|FADE IN:)/i)) type = "transition";
+      else if (index > 0 && prevLine.match(/^[A-Z\s]+(\(V\.O\.\)|\(O\.S\.\))?$/)) type = "dialogue";
+
+      scriptBlocks.push({ id: `block-${now}-${index}`, type, text: line });
+    }
+
+    prevLine = line;
+    index++;
+    if (end === scriptText.length) break;
+    start = end + 1;
+  }
 
   // All AI work (Gemini analysis, image generation, audio generation) happens server-side.
   // Combine the caller's abort signal (for cancellation) with a 60s timeout guard.
