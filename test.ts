@@ -17897,6 +17897,142 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 239 — beliefPass: told-belief Act 3 surge, revelation-belief propagation absent, sole asserter', async () => {
+    const makeRec239 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput239 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: '...',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('TOLD_BELIEF_ACT3_SURGE fires when 3+ told beliefs land in Act 3 and exceed 40% of total', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 12 scenes; act3Start = floor(12*0.75)=9; told beliefs: 2 early + 4 in Act 3 (scenes 9,10,11,9)
+      // act3 count = 4, total = 6 → 66% > 40% and count >= 3 → fires
+      const records239a = [
+        makeRec239(0, { dialogueHighlights: ['alice: the witness lied about everything here'] }),
+        makeRec239(1),
+        makeRec239(2, { dialogueHighlights: ['bob: evidence points away from real suspect'] }),
+        makeRec239(3), makeRec239(4), makeRec239(5), makeRec239(6), makeRec239(7), makeRec239(8),
+        makeRec239(9, { dialogueHighlights: ['alice: detective knows about hidden documents now'] }),
+        makeRec239(10, { dialogueHighlights: ['bob: the judge was bribed before trial began'] }),
+        makeRec239(11, { dialogueHighlights: ['alice: informant turned sides against everyone involved', 'carol: money trail leads back to prosecutor office'] }),
+      ];
+      const result239a = await beliefPass(makeInput239(records239a));
+      const surge = result239a.issues.filter(i => i.rule === 'TOLD_BELIEF_ACT3_SURGE');
+      assert.ok(surge.length >= 1, 'Should detect TOLD_BELIEF_ACT3_SURGE when Act 3 holds 40%+ of all told beliefs');
+      assert.strictEqual(surge[0].severity, 'minor');
+    });
+
+    it('TOLD_BELIEF_ACT3_SURGE does NOT fire when told beliefs are distributed evenly', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 12 scenes; told beliefs in scenes 0,2,4,6,8,10 → act3 (≥9): scene 10 only → 1/6 = 16% < 40%
+      const records239b = [
+        makeRec239(0, { dialogueHighlights: ['alice: vault was empty before robbery night'] }),
+        makeRec239(1),
+        makeRec239(2, { dialogueHighlights: ['bob: guard left post early that evening'] }),
+        makeRec239(3),
+        makeRec239(4, { dialogueHighlights: ['alice: insider had access codes already'] }),
+        makeRec239(5),
+        makeRec239(6, { dialogueHighlights: ['carol: alarm was disabled remotely overnight'] }),
+        makeRec239(7),
+        makeRec239(8, { dialogueHighlights: ['bob: security tapes were wiped before morning'] }),
+        makeRec239(9),
+        makeRec239(10, { dialogueHighlights: ['alice: manager knew about plan all along'] }),
+        makeRec239(11),
+      ];
+      const result239b = await beliefPass(makeInput239(records239b));
+      const surge = result239b.issues.filter(i => i.rule === 'TOLD_BELIEF_ACT3_SURGE');
+      assert.strictEqual(surge.length, 0, 'Should NOT fire when told beliefs are distributed across all acts');
+    });
+
+    it('REVELATION_BELIEF_PROPAGATION_ABSENT fires when no revelation triggers subsequent told beliefs', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 10 scenes; revelations at scenes 3,6 about "vault money"; told beliefs at scenes 0,1
+      // about "shadow motive" — no shared vocabulary between revelations and subsequent told beliefs
+      const records239c = [
+        makeRec239(0, { dialogueHighlights: ['alice: shadow motive drives entire conspiracy here'] }),
+        makeRec239(1, { dialogueHighlights: ['bob: shadow funding comes from offshore accounts'] }),
+        makeRec239(2),
+        makeRec239(3, { revelation: 'vault was raided by outside crew overnight' }),
+        makeRec239(4, { dialogueHighlights: ['carol: leadership believes shadow stays hidden forever'] }),
+        makeRec239(5),
+        makeRec239(6, { revelation: 'guard left door unlocked for outside crew intentionally' }),
+        makeRec239(7, { dialogueHighlights: ['alice: shadow network extends into government deeply'] }),
+        makeRec239(8), makeRec239(9),
+      ];
+      const result239c = await beliefPass(makeInput239(records239c));
+      const prop = result239c.issues.filter(i => i.rule === 'REVELATION_BELIEF_PROPAGATION_ABSENT');
+      assert.ok(prop.length >= 1, 'Should detect REVELATION_BELIEF_PROPAGATION_ABSENT when revelations do not propagate into told beliefs');
+      assert.strictEqual(prop[0].severity, 'minor');
+    });
+
+    it('REVELATION_BELIEF_PROPAGATION_ABSENT does NOT fire when a revelation propagates into a told belief', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // Revelation at scene 3 about "vault crew"; told belief at scene 5 mentions "vault crew" → propagates
+      const records239d = [
+        makeRec239(0, { dialogueHighlights: ['alice: guard left post before shift ended'] }),
+        makeRec239(1, { dialogueHighlights: ['bob: manager knew about plan already'] }),
+        makeRec239(2),
+        makeRec239(3, { revelation: 'vault crew planned raid weeks before robbery night' }),
+        makeRec239(4),
+        makeRec239(5, { dialogueHighlights: ['carol: vault crew must have had inside help clearly'] }),
+        makeRec239(6),
+        makeRec239(7, { revelation: 'insider disabled alarm for vault crew that evening' }),
+        makeRec239(8), makeRec239(9),
+      ];
+      const result239d = await beliefPass(makeInput239(records239d));
+      const prop = result239d.issues.filter(i => i.rule === 'REVELATION_BELIEF_PROPAGATION_ABSENT');
+      assert.strictEqual(prop.length, 0, 'Should NOT fire when a revelation shares vocabulary with a subsequent told belief');
+    });
+
+    it('SOLE_ASSERTER fires when only one character makes told-belief assertions', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 8 scenes; all dialogueHighlights prefixed with "alice:" only
+      const records239e = [
+        makeRec239(0, { dialogueHighlights: ['alice: vault door was open before arrival time'] }),
+        makeRec239(1, { dialogueHighlights: ['alice: guard never checked credentials that morning'] }),
+        makeRec239(2),
+        makeRec239(3, { dialogueHighlights: ['alice: manager left keys inside the office overnight'] }),
+        makeRec239(4, { dialogueHighlights: ['alice: alarm code was written on desk calendar'] }),
+        makeRec239(5),
+        makeRec239(6),
+        makeRec239(7),
+      ];
+      const result239e = await beliefPass(makeInput239(records239e));
+      const sole = result239e.issues.filter(i => i.rule === 'SOLE_ASSERTER');
+      assert.ok(sole.length >= 1, 'Should detect SOLE_ASSERTER when only one character appears in dialogueHighlights');
+      assert.strictEqual(sole[0].severity, 'minor');
+    });
+
+    it('SOLE_ASSERTER does NOT fire when multiple characters make assertions', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 8 scenes; beliefs from both alice and bob
+      const records239f = [
+        makeRec239(0, { dialogueHighlights: ['alice: vault door was open before arrival time'] }),
+        makeRec239(1, { dialogueHighlights: ['bob: guard never checked credentials that morning'] }),
+        makeRec239(2),
+        makeRec239(3, { dialogueHighlights: ['alice: manager left keys inside the office overnight'] }),
+        makeRec239(4, { dialogueHighlights: ['bob: alarm code was written on desk calendar clearly'] }),
+        makeRec239(5),
+        makeRec239(6),
+        makeRec239(7),
+      ];
+      const result239f = await beliefPass(makeInput239(records239f));
+      const sole = result239f.issues.filter(i => i.rule === 'SOLE_ASSERTER');
+      assert.strictEqual(sole.length, 0, 'Should NOT fire when multiple characters make belief assertions');
+    });
+  });
+
   describe('Wave 238 — voicePass: negation saturation, conditional overload, dialogue flat punctuation', async () => {
     it('NEGATION_SATURATION fires when >40% of dialogue lines contain negation words', async () => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');

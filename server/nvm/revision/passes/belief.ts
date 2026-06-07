@@ -602,6 +602,75 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 239: TOLD_BELIEF_ACT3_SURGE ─────────────────────────────────────
+  // 3+ told beliefs land in Act 3 (final 25%) and account for 40%+ of all told
+  // beliefs — new assertions flood the climax act. Characters should execute on
+  // prior beliefs in Act 3, not introduce new ones. An Act 3 surge signals that
+  // the story is cramming exposition into the climax rather than earlier acts.
+  // Requires 10+ records and 5+ total told beliefs.
+  if (records.length >= 10 && toldBeliefs.length >= 5) {
+    const act3Start239 = Math.floor(records.length * 0.75);
+    const act3ToldBeliefs239 = toldBeliefs.filter(t => t.sceneIdx >= act3Start239);
+    if (act3ToldBeliefs239.length >= 3 && act3ToldBeliefs239.length / toldBeliefs.length > 0.4) {
+      issues.push({
+        location: `Act 3 told beliefs (Scenes ${act3Start239}–${records.length - 1})`,
+        rule: 'TOLD_BELIEF_ACT3_SURGE',
+        severity: 'minor',
+        description: `${act3ToldBeliefs239.length} of ${toldBeliefs.length} told beliefs (${Math.round(act3ToldBeliefs239.length / toldBeliefs.length * 100)}%) land in Act 3 — the story is introducing new assertions in the climax rather than paying off established ones. Act 3 should execute on prior beliefs, not plant new ones.`,
+        suggestedFix: 'Move Act 3 belief assertions into Act 1 or Act 2 so the audience carries them through the build. Reserve Act 3 for witnessed revelations and consequence — not new propositions.',
+      });
+    }
+  }
+
+  // ── Wave 239: REVELATION_BELIEF_PROPAGATION_ABSENT ───────────────────────
+  // Witnessed revelations exist but none of them triggers any subsequent told
+  // belief that shares vocabulary — the discovery layer is disconnected from
+  // the assertion layer. Characters witness truths but never change what they
+  // say or claim afterward. A revelation that doesn't propagate into subsequent
+  // dialogue is informationally inert: the story discovered something but no
+  // character adjusted their worldview. Requires 8+ records and 2+ revelations.
+  if (records.length >= 8 && witnessedBeliefs.length >= 2) {
+    const anyRevPropagates239 = witnessedBeliefs.some(w =>
+      toldBeliefs.some(t => t.sceneIdx > w.sceneIdx && sharedWords(t.proposition, w.proposition) >= 2),
+    );
+    if (!anyRevPropagates239) {
+      issues.push({
+        location: 'Revelation/belief propagation layer',
+        rule: 'REVELATION_BELIEF_PROPAGATION_ABSENT',
+        severity: 'minor',
+        description: `${witnessedBeliefs.length} witnessed revelations occur across the story but none of them trigger any subsequent told belief with shared vocabulary — characters discover truths but never adjust what they assert. The revelation layer is disconnected from the dialogue belief layer.`,
+        suggestedFix: 'After each key revelation, have a character articulate what they now believe — a line of dialogue that shows the discovery changed their understanding. A revelation that isn\'t reflected in subsequent assertions has no epistemic impact.',
+      });
+    }
+  }
+
+  // ── Wave 239: SOLE_ASSERTER ───────────────────────────────────────────────
+  // Only one unique character ever makes told-belief assertions across the story.
+  // BELIEF_ASYMMETRY flags the case where one character dominates 3:1 over
+  // another — this catches the starker case where only ONE character appears in
+  // the belief layer at all. The deception/belief layer becomes a monologue;
+  // all other characters receive or react without ever asserting their own beliefs.
+  // Requires 6+ records and 4+ total told beliefs.
+  if (records.length >= 6 && toldBeliefs.length >= 4) {
+    const assertingChars239 = new Set<string>();
+    for (const r of records) {
+      for (const h of r.dialogueHighlights) {
+        const colonIdx = h.indexOf(':');
+        if (colonIdx > -1) assertingChars239.add(h.slice(0, colonIdx).trim());
+      }
+    }
+    if (assertingChars239.size === 1) {
+      const soloChar239 = [...assertingChars239][0];
+      issues.push({
+        location: 'Belief assertion distribution',
+        rule: 'SOLE_ASSERTER',
+        severity: 'minor',
+        description: `Only one character ("${soloChar239}") makes told-belief assertions across all ${records.length} scenes — the belief/deception layer is a monologue. All other characters remain belief-silent, never articulating their own propositions or claims.`,
+        suggestedFix: 'Give at least one other character a belief assertion — a claim, a misreading of events, or a lie of their own. A multi-voice belief layer creates conflict and reveals character; a single asserter creates lecture.',
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'belief', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
