@@ -517,6 +517,91 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 225: DECEPTION_SETUP_VOID ───────────────────────────────────────
+  // Two or more told beliefs planted in the first 40% of the story are
+  // "orphaned" — no witnessed revelation at any point shares enough vocabulary
+  // to confirm or contradict them. Early-planted propositions are promises: the
+  // audience internalises them and waits for the story to address them. When
+  // those promises are never redeemed — neither confirmed nor overturned — the
+  // Act 1 belief layer is hollow. Requires 8+ records and 2+ told beliefs.
+  if (records.length >= 8 && toldBeliefs.length >= 2) {
+    const earlyBelCutoff225 = Math.floor(records.length * 0.4);
+    const earlyToldBeliefs225 = toldBeliefs.filter(t => t.sceneIdx <= earlyBelCutoff225);
+    if (earlyToldBeliefs225.length >= 2) {
+      const earlyOrphans225 = earlyToldBeliefs225.filter(told =>
+        !witnessedBeliefs.some(w => sharedWords(w.proposition, told.proposition) >= 2),
+      );
+      if (earlyOrphans225.length >= 2) {
+        const sample225 = earlyOrphans225.slice(0, 2)
+          .map(t => `"${t.proposition.slice(0, 45)}${t.proposition.length > 45 ? '…' : ''}"`)
+          .join('; ');
+        issues.push({
+          location: `Act 1 belief layer (Scenes 0–${earlyBelCutoff225})`,
+          rule: 'DECEPTION_SETUP_VOID',
+          severity: 'major',
+          description: `${earlyOrphans225.length} told beliefs planted in the first 40% of the story are never confirmed or contradicted by any witnessed revelation — early-planted propositions (${sample225}) are promises to the audience that the story never redeems.`,
+          suggestedFix: `Every early-planted assertion should be paid off: a scene that confirms it (validating the audience) or one that overturns it (delivering the twist they were waiting for). An unresolved early belief is a broken contract with the audience.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 225: BELIEF_FRONT_LOADED_REVELATIONS ────────────────────────────
+  // More than 70% of witnessed revelations land in the first half of the story.
+  // The audience exhausts its major discoveries before the midpoint — Act 2b
+  // and Act 3 are informationally dry. The climax plays out against complete
+  // audience knowledge, draining the final act of the discovery energy that
+  // galvanises dramatic resolution. Distinct from REVELATION_BACK_WEIGHTED
+  // (its inverse). Requires 8+ records and 3+ revelations.
+  if (records.length >= 8 && witnessedBeliefs.length >= 3) {
+    const midpoint225 = Math.floor(records.length * 0.5);
+    const firstHalfRevs225 = witnessedBeliefs.filter(w => w.sceneIdx < midpoint225).length;
+    const frontRatio225 = firstHalfRevs225 / witnessedBeliefs.length;
+    if (frontRatio225 > 0.7) {
+      issues.push({
+        location: 'Revelation distribution',
+        rule: 'BELIEF_FRONT_LOADED_REVELATIONS',
+        severity: 'major',
+        description: `${firstHalfRevs225} of ${witnessedBeliefs.length} revelations (${Math.round(frontRatio225 * 100)}%) occur in the first half — the story exhausts its discoveries before the midpoint. Act 2b and Act 3 have nothing left to reveal, leaving the climax informationally static.`,
+        suggestedFix: `Reserve at least one major revelation for the second half — preferably the Act 2b turning point or the climax. The revelation that recontextualises everything lands hardest when placed close to the end.`,
+      });
+    }
+  }
+
+  // ── Wave 225: REVELATION_AFTERMATH_ABSENT ────────────────────────────────
+  // 60%+ of witnessed revelations have no downstream reaction in the two scenes
+  // that follow — no relationship shift, no change in suspense, no new clue
+  // planted. The story discovers things without dramatising their impact.
+  // A revelation without an aftermath is a fact delivered in a vacuum, not a
+  // dramatic event. Requires 8+ records and 2+ revelations.
+  if (records.length >= 8 && witnessedBeliefs.length >= 2) {
+    const unreactedRevs225 = witnessedBeliefs.filter(w => {
+      if (w.sceneIdx >= records.length - 2) return false; // too close to end, exempt
+      let hasReaction = false;
+      for (let k = w.sceneIdx + 1; k <= Math.min(w.sceneIdx + 2, records.length - 1); k++) {
+        const followup = records[k];
+        if (followup &&
+            ((followup.relationshipShifts?.length ?? 0) > 0 ||
+             followup.suspenseDelta !== 0 ||
+             (followup.seededClueIds?.length ?? 0) > 0)) {
+          hasReaction = true;
+          break;
+        }
+      }
+      return !hasReaction;
+    });
+    const aftermathGapRatio225 = unreactedRevs225.length / witnessedBeliefs.length;
+    if (aftermathGapRatio225 >= 0.6) {
+      issues.push({
+        location: 'Revelation aftermath',
+        rule: 'REVELATION_AFTERMATH_ABSENT',
+        severity: 'minor',
+        description: `${unreactedRevs225.length} of ${witnessedBeliefs.length} revelations (${Math.round(aftermathGapRatio225 * 100)}%) have no downstream reaction in the following two scenes — no relationship shift, no suspense change, no new clue planted. The story discovers things without dramatising their impact.`,
+        suggestedFix: `Every revelation should create a ripple. In the scene after the discovery: a relationship cracks, stakes rise, or a new question is planted. A revelation with no aftermath is a fact in a vacuum — give it consequence.`,
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'belief', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

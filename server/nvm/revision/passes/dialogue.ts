@@ -839,6 +839,106 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 227: DIALOGUE_MIRROR_SYNDROME ────────────────────────────────────
+  // A "mirror response" ends with '?' AND shares ≥2 content words with the line
+  // it immediately answers (different speaker). "I found the briefcase." → "You
+  // found the briefcase?" The responder confirms comprehension but contributes
+  // nothing new: no counter-claim, no challenge, no redirect. When ≥3 such
+  // responses occur, the exchange has become a reflection surface rather than a
+  // collision of minds. Requires 10+ dialogue lines.
+  if (dialogue.length >= 10) {
+    let mirrorCount227 = 0;
+    for (let i = 1; i < dialogue.length; i++) {
+      if (dialogue[i].speaker === dialogue[i - 1].speaker) continue;
+      if (!dialogue[i].line.trim().endsWith('?')) continue;
+      const priorWords227 = new Set(dialogueContentWords(dialogue[i - 1].line));
+      if (priorWords227.size < 2) continue;
+      const replyWords227 = dialogueContentWords(dialogue[i].line);
+      const echoCount227 = replyWords227.filter(w => priorWords227.has(w)).length;
+      if (echoCount227 >= 2) mirrorCount227++;
+    }
+    if (mirrorCount227 >= 3) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_MIRROR_SYNDROME',
+        severity: 'minor',
+        description: `${mirrorCount227} responses echo ≥2 content words from the line they answer back as a question — the "mirror" pattern. The responder demonstrates comprehension but adds nothing: "I found the key." / "You found the key?" contributes no new information, tension, or direction to the exchange.`,
+        suggestedFix: `Replace mirror-question responses with genuine reactions: a challenge, a counter-claim, a qualification, or a redirect that pushes the scene forward. Every line should advance the exchange rather than confirm the previous one.`,
+      });
+    }
+  }
+
+  // ── Wave 227: IMPERATIVE_DOMINANCE ────────────────────────────────────────
+  // One major character delivers ≥60% of their lines as imperatives (commands
+  // starting with a base verb: Get, Go, Stop, Come, Take, Give, Tell, Find…).
+  // Imperative-dominant characters have no register other than authority — they
+  // issue orders and never reveal vulnerability, doubt, or desire. A character
+  // who only commands is a plot function, not a person. Requires 10+ lines for
+  // the character in question, and 12+ total dialogue lines.
+  if (dialogue.length >= 12) {
+    const imperativeRe227 = /^(get|go|stop|come|take|give|tell|find|run|leave|stay|move|wait|help|turn|put|show|make|open|close|hold|keep|try|bring|send|call|talk|speak|write|read|sit|stand|walk|follow|check|watch|ask|answer|remember|forget|think|consider|understand|realize|learn|count|pick|push|pull|throw|catch|break|hit|cut|kill|save|start|finish|drop|raise|lower|join|leave)\b/i;
+    const fillerRe227 = /^(well|look|listen|i mean|you know|okay|ok|so|now|see|right)\s*,/i;
+    const impCounts227 = new Map<string, { total: number; imperative: number }>();
+    for (const d of dialogue) {
+      if (!impCounts227.has(d.speaker)) impCounts227.set(d.speaker, { total: 0, imperative: 0 });
+      const s227 = impCounts227.get(d.speaker)!;
+      s227.total++;
+      if (imperativeRe227.test(d.line.trim()) && !fillerRe227.test(d.line.trim())) s227.imperative++;
+    }
+    for (const [speaker, counts] of impCounts227) {
+      if (counts.total >= 10 && counts.imperative / counts.total >= 0.6) {
+        issues.push({
+          location: `Character: ${speaker}`,
+          rule: 'IMPERATIVE_DOMINANCE',
+          severity: 'minor',
+          description: `${speaker} delivers ${counts.imperative} of ${counts.total} dialogue lines (${Math.round(counts.imperative / counts.total * 100)}%) as imperative commands — the character has no register other than authority. Characters who only issue orders never reveal vulnerability, uncertainty, or desire.`,
+          suggestedFix: `Break ${speaker}'s command register: give them at least one line that asks rather than orders, reveals a fear, concedes something, or expresses a wish. A character who only commands is a plot function, not a person.`,
+        });
+        break; // one flag per pass
+      }
+    }
+  }
+
+  // ── Wave 227: LAST_ACT_EXPOSITION_SPIKE ───────────────────────────────────
+  // Act 3 dialogue carries a higher proportion of expository "as-you-know" lines
+  // (AS_YOU_KNOW_RE and TRAIT_LABELING_RE) than Act 1. By Act 3, characters should
+  // be acting on what they know, not explaining it for the first time. Exposition
+  // in the climax signals retroactive plot-plugging — the story is filling in
+  // information that should have been established long before.
+  // Requires 8+ records, 6+ dialogue lines, ≥2 act3 expository lines.
+  if (records.length >= 8 && dialogue.length >= 6) {
+    const expLineToScene227 = buildLineToSceneMap(fountain);
+    const n227 = records.length;
+    const act1End227 = Math.floor(n227 * 0.25);
+    const act3Start227 = Math.floor(n227 * 0.75);
+    let act1TotalDlg227 = 0, act1ExpDlg227 = 0;
+    let act3TotalDlg227 = 0, act3ExpDlg227 = 0;
+    for (const d of dialogue) {
+      const si227 = expLineToScene227[d.lineNum - 1] ?? 0;
+      const isExp227 = AS_YOU_KNOW_RE.test(d.line) || TRAIT_LABELING_RE.test(d.line);
+      if (si227 < act1End227) {
+        act1TotalDlg227++;
+        if (isExp227) act1ExpDlg227++;
+      } else if (si227 >= act3Start227) {
+        act3TotalDlg227++;
+        if (isExp227) act3ExpDlg227++;
+      }
+    }
+    if (act3ExpDlg227 >= 2 && act3TotalDlg227 >= 3 && act1TotalDlg227 >= 2) {
+      const act1Ratio227 = act1ExpDlg227 / act1TotalDlg227;
+      const act3Ratio227 = act3ExpDlg227 / act3TotalDlg227;
+      if (act3Ratio227 > act1Ratio227 && act3Ratio227 >= 0.3) {
+        issues.push({
+          location: `Act 3 dialogue (scenes ${act3Start227}–${n227 - 1})`,
+          rule: 'LAST_ACT_EXPOSITION_SPIKE',
+          severity: 'major',
+          description: `Act 3 carries ${act3ExpDlg227} of ${act3TotalDlg227} dialogue lines (${Math.round(act3Ratio227 * 100)}%) using expository patterns ("as you know", trait labels) vs. ${Math.round(act1Ratio227 * 100)}% in Act 1. Exposition in the climax is retroactive plot-plugging — characters explaining things that should have been established long before.`,
+          suggestedFix: `Move expository dialogue to Act 1 or early Act 2. By Act 3, characters should be acting on what they know, not explaining it. Revelation belongs at the structural pivot, not at the climax.`,
+        });
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'dialogue', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

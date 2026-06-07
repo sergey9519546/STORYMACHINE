@@ -15857,6 +15857,470 @@ Goodnight.
     });
   });
 
+  describe('Wave 227 — dialoguePass: mirror syndrome, imperative dominance, last-act exposition spike', async () => {
+    const makeRec227 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, dialogueHighlights: [],
+      revelation: null, relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+
+    it('dialoguePass detects DIALOGUE_MIRROR_SYNDROME when responses echo the prior line as a question 3+ times', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 3 mirror responses: each response echoes ≥2 content words from prior line and ends with '?'
+      const fountain227a = `INT. SC0 - DAY
+An office meeting.
+
+ALICE
+I found the hidden briefcase outside.
+BOB
+You found the briefcase outside?
+ALICE
+There is secret money inside the case.
+BOB
+Secret money inside the case?
+ALICE
+And there is a signed contract between them.
+BOB
+A signed contract between them?
+ALICE
+The evidence confirms the suspect clearly.
+BOB
+The evidence confirms it?
+ALICE
+That means someone tampered with everything.
+BOB
+Someone tampered with everything here?
+`;
+      const records227a = [makeRec227(0)];
+      const result227a = await dialoguePass({
+        fountain: fountain227a, original: fountain227a,
+        records: records227a as any, structure: {} as any,
+        annotations: [null] as any, approvedSpans: [],
+      });
+      const mirror = result227a.issues.filter(i => i.rule === 'DIALOGUE_MIRROR_SYNDROME');
+      assert.ok(mirror.length >= 1, 'Should detect DIALOGUE_MIRROR_SYNDROME when 3+ responses echo prior line as question');
+      assert.strictEqual(mirror[0].severity, 'minor');
+    });
+
+    it('dialoguePass does NOT fire DIALOGUE_MIRROR_SYNDROME when responses are substantive reactions', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // Responses address the prior line but don't echo content words back as questions
+      const fountain227b = `INT. SC0 - DAY
+An office meeting.
+
+ALICE
+I found the hidden briefcase outside.
+BOB
+What was inside it exactly?
+ALICE
+There is money inside the case somewhere.
+BOB
+That changes everything we planned carefully.
+ALICE
+And there is a signed contract between people.
+BOB
+That implicates several senior officials directly.
+ALICE
+The evidence confirms the original suspicion.
+BOB
+Then we should contact authorities immediately.
+ALICE
+I agree this requires urgent attention.
+BOB
+Let us proceed with great caution.
+`;
+      const records227b = [makeRec227(0)];
+      const result227b = await dialoguePass({
+        fountain: fountain227b, original: fountain227b,
+        records: records227b as any, structure: {} as any,
+        annotations: [null] as any, approvedSpans: [],
+      });
+      const mirror = result227b.issues.filter(i => i.rule === 'DIALOGUE_MIRROR_SYNDROME');
+      assert.strictEqual(mirror.length, 0, 'Should NOT fire when responses are substantive and non-mirroring');
+    });
+
+    it('dialoguePass detects IMPERATIVE_DOMINANCE when a character delivers ≥60% of lines as commands', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // BOSS has 12 lines: 9 imperatives (75%) and 3 non-imperatives
+      const fountain227c = `INT. SC0 - DAY
+The boardroom.
+
+BOSS
+Get out of here right now.
+Stop what you are doing.
+Leave this building immediately.
+Move away from the window.
+Bring me those documents tonight.
+Give me your phone.
+Tell me everything.
+Come back here tomorrow.
+Find the missing file.
+What do you mean by that statement.
+I need to understand this situation.
+Perhaps we should consider alternatives.
+`;
+      const records227c = [makeRec227(0)];
+      const result227c = await dialoguePass({
+        fountain: fountain227c, original: fountain227c,
+        records: records227c as any, structure: {} as any,
+        annotations: [null] as any, approvedSpans: [],
+      });
+      const impDom = result227c.issues.filter(i => i.rule === 'IMPERATIVE_DOMINANCE');
+      assert.ok(impDom.length >= 1, 'Should detect IMPERATIVE_DOMINANCE when character delivers 75% imperative commands');
+      assert.strictEqual(impDom[0].severity, 'minor');
+    });
+
+    it('dialoguePass does NOT fire IMPERATIVE_DOMINANCE when a character uses varied speech types', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // BOSS has 12 lines: only 4 imperatives (33%), 8 are questions/declarations
+      const fountain227d = `INT. SC0 - DAY
+The boardroom.
+
+BOSS
+What do you think about this plan.
+I believe we need more time here.
+Get out of here right now.
+Perhaps we should reconsider this approach.
+Do you understand what I am saying.
+I am not sure this will work.
+Leave this building immediately.
+We need to discuss this more carefully.
+I wonder what you are thinking right now.
+Perhaps there is another way forward here.
+Go find the missing files please.
+I think we can solve this together.
+`;
+      const records227d = [makeRec227(0)];
+      const result227d = await dialoguePass({
+        fountain: fountain227d, original: fountain227d,
+        records: records227d as any, structure: {} as any,
+        annotations: [null] as any, approvedSpans: [],
+      });
+      const impDom = result227d.issues.filter(i => i.rule === 'IMPERATIVE_DOMINANCE');
+      assert.strictEqual(impDom.length, 0, 'Should NOT fire when character uses a mix of speech types');
+    });
+
+    it('dialoguePass detects LAST_ACT_EXPOSITION_SPIKE when Act 3 has more exposition than Act 1', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 8 records; act1End=2 (scenes 0-1), act3Start=6 (scenes 6-7)
+      // Act 1: 3 normal dialogue lines (0 expository)
+      // Act 3: 4 lines, 3 with AS_YOU_KNOW patterns (75% expository)
+      const fountain227e = [
+        'INT. SC0 - DAY\nMorning.\n\nALICE\nI found something important.\n\nBOB\nTell me what you think.\n',
+        'INT. SC1 - DAY\nLater.\n\nALICE\nWe need to move forward.\n',
+        'INT. SC2 - DAY\nMidday.\n\nBOB\nThe plan progresses well.\n',
+        'INT. SC3 - DAY\nAfternoon.\n\nALICE\nStay focused on the goal.\n',
+        'INT. SC4 - DAY\nEvening.\n\nBOB\nKeep pushing forward.\n',
+        'INT. SC5 - DAY\nNight.\n\nALICE\nWe are almost there.\n',
+        'INT. SC6 - DAY\nClimax.\n\nALICE\nAs you know, the killer came from inside.\nAs I told you before, the weapon was planted.\nYou already know about the hidden evidence here.\n',
+        'INT. SC7 - DAY\nDenouement.\n\nBOB\nAs we discussed earlier, you were completely right.\n',
+      ].join('\n');
+      const records227e = Array.from({ length: 8 }, (_, i) => makeRec227(i));
+      const result227e = await dialoguePass({
+        fountain: fountain227e, original: fountain227e,
+        records: records227e as any, structure: {} as any,
+        annotations: records227e.map(() => null) as any, approvedSpans: [],
+      });
+      const lastActExp = result227e.issues.filter(i => i.rule === 'LAST_ACT_EXPOSITION_SPIKE');
+      assert.ok(lastActExp.length >= 1, 'Should detect LAST_ACT_EXPOSITION_SPIKE when Act 3 has more exposition than Act 1');
+      assert.strictEqual(lastActExp[0].severity, 'major');
+    });
+
+    it('dialoguePass does NOT fire LAST_ACT_EXPOSITION_SPIKE when Act 1 has more exposition than Act 3', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // Act 1: exposition lines; Act 3: clean action dialogue
+      const fountain227f = [
+        'INT. SC0 - DAY\nMorning.\n\nALICE\nAs you know, this whole situation started last year.\nAs I told you before, we cannot trust anyone here.\n',
+        'INT. SC1 - DAY\nLater.\n\nBOB\nYou already know about the arrangement we made.\n',
+        'INT. SC2 - DAY\nMidday.\n\nALICE\nLet us proceed then.\n',
+        'INT. SC3 - DAY\nAfternoon.\n\nBOB\nAgreed completely.\n',
+        'INT. SC4 - DAY\nEvening.\n\nALICE\nNow we act.\n',
+        'INT. SC5 - DAY\nNight.\n\nBOB\nThe door opens.\n',
+        'INT. SC6 - DAY\nClimax.\n\nALICE\nWe move now.\n\nBOB\nRight behind you.\n',
+        'INT. SC7 - DAY\nDenouement.\n\nALICE\nIt is over.\n\nBOB\nFinally.\n',
+      ].join('\n');
+      const records227f = Array.from({ length: 8 }, (_, i) => makeRec227(i));
+      const result227f = await dialoguePass({
+        fountain: fountain227f, original: fountain227f,
+        records: records227f as any, structure: {} as any,
+        annotations: records227f.map(() => null) as any, approvedSpans: [],
+      });
+      const lastActExp = result227f.issues.filter(i => i.rule === 'LAST_ACT_EXPOSITION_SPIKE');
+      assert.strictEqual(lastActExp.length, 0, 'Should NOT fire when Act 1 carries more exposition than Act 3');
+    });
+  });
+
+  describe('Wave 226 — causalityPass: causal density inversion, escalation plateau, antagonist second-half silent', async () => {
+    const makeRec226 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput226 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: '...',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any,
+      annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('causalityPass detects CAUSAL_DENSITY_INVERSION when first half has ≥3× the causal events of second half', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // 12 scenes: first half (0-5) has 4 causal events; second half (6-11) has 1
+      const records226a = [
+        makeRec226(0, { seededClueIds: ['clue-a'] }),               // causal
+        makeRec226(1, { clockRaised: true }),                        // causal
+        makeRec226(2, { revelation: 'the suspect was here early' }), // causal
+        makeRec226(3, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: -0.4 }] }), // causal
+        makeRec226(4),
+        makeRec226(5),
+        makeRec226(6),
+        makeRec226(7),
+        makeRec226(8, { seededClueIds: ['clue-b'] }),                // only causal in second half
+        makeRec226(9),
+        makeRec226(10),
+        makeRec226(11),
+      ];
+      const result226a = await causalityPass(makeInput226(records226a));
+      const densityInv = result226a.issues.filter(i => i.rule === 'CAUSAL_DENSITY_INVERSION');
+      assert.ok(densityInv.length >= 1, 'Should detect CAUSAL_DENSITY_INVERSION when first half has 4× the causal events');
+      assert.strictEqual(densityInv[0].severity, 'major');
+    });
+
+    it('causalityPass does NOT fire CAUSAL_DENSITY_INVERSION when causal events are balanced across halves', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // 12 scenes: 3 causal events in first half, 3 in second half
+      const records226b = [
+        makeRec226(0, { seededClueIds: ['clue-a'] }),
+        makeRec226(1, { clockRaised: true }),
+        makeRec226(2, { revelation: 'something discovered' }),
+        makeRec226(3), makeRec226(4), makeRec226(5),
+        makeRec226(6, { seededClueIds: ['clue-b'] }),
+        makeRec226(7, { clockRaised: true }),
+        makeRec226(8, { revelation: 'another discovery' }),
+        makeRec226(9), makeRec226(10), makeRec226(11),
+      ];
+      const result226b = await causalityPass(makeInput226(records226b));
+      const densityInv = result226b.issues.filter(i => i.rule === 'CAUSAL_DENSITY_INVERSION');
+      assert.strictEqual(densityInv.length, 0, 'Should NOT fire CAUSAL_DENSITY_INVERSION when both halves have equal causal events');
+    });
+
+    it('causalityPass detects ESCALATION_PLATEAU when suspense peaks do not increase over the story arc', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // 3 peaks: 3.0, 2.5, 2.0 — last peak (2.0) ≤ first peak (3.0) → fires
+      const records226c = [
+        makeRec226(0), makeRec226(1),
+        makeRec226(2, { suspenseDelta: 3.0 }),   // first peak
+        makeRec226(3), makeRec226(4),
+        makeRec226(5, { suspenseDelta: 2.5 }),   // second peak
+        makeRec226(6), makeRec226(7),
+        makeRec226(8, { suspenseDelta: 2.0 }),   // final peak — same as first, no escalation
+        makeRec226(9),
+      ];
+      const result226c = await causalityPass(makeInput226(records226c));
+      const plateau = result226c.issues.filter(i => i.rule === 'ESCALATION_PLATEAU');
+      assert.ok(plateau.length >= 1, 'Should detect ESCALATION_PLATEAU when peaks plateau or decline across the arc');
+      assert.strictEqual(plateau[0].severity, 'major');
+    });
+
+    it('causalityPass does NOT fire ESCALATION_PLATEAU when peaks escalate across the arc', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // 3 peaks: 2.0, 2.5, 3.5 — last peak (3.5) > first peak (2.0) → no fire
+      const records226d = [
+        makeRec226(0), makeRec226(1),
+        makeRec226(2, { suspenseDelta: 2.0 }),   // first peak
+        makeRec226(3), makeRec226(4),
+        makeRec226(5, { suspenseDelta: 2.5 }),   // growing
+        makeRec226(6), makeRec226(7),
+        makeRec226(8, { suspenseDelta: 3.5 }),   // climax peak — highest
+        makeRec226(9),
+      ];
+      const result226d = await causalityPass(makeInput226(records226d));
+      const plateau = result226d.issues.filter(i => i.rule === 'ESCALATION_PLATEAU');
+      assert.strictEqual(plateau.length, 0, 'Should NOT fire ESCALATION_PLATEAU when peaks escalate to a climax high');
+    });
+
+    it('causalityPass detects ANTAGONIST_SECOND_HALF_SILENT when antagonist disappears after Act 1', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // 10 scenes: antagonistic pressure (≤-0.4) at scene 1 (first 40%); none in scenes 4-9
+      const records226e = [
+        makeRec226(0),
+        makeRec226(1, { relationshipShifts: [{ pairKey: 'hero|villain', dimension: 'trust', amount: -0.5 }] }),
+        makeRec226(2),
+        makeRec226(3),
+        // scenes 4-9: no antagonistic pressure (act1End226 = floor(10*0.4) = 4, so slice starts here)
+        makeRec226(4), makeRec226(5), makeRec226(6), makeRec226(7), makeRec226(8), makeRec226(9),
+      ];
+      const result226e = await causalityPass(makeInput226(records226e));
+      const antagonistSilent = result226e.issues.filter(i => i.rule === 'ANTAGONIST_SECOND_HALF_SILENT');
+      assert.ok(antagonistSilent.length >= 1, 'Should detect ANTAGONIST_SECOND_HALF_SILENT when antagonist drops out after Act 1');
+      assert.strictEqual(antagonistSilent[0].severity, 'minor');
+    });
+
+    it('causalityPass does NOT fire ANTAGONIST_SECOND_HALF_SILENT when antagonist is active in the second half', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // Antagonist at scene 1 (Act 1) AND scene 7 (second half, >40%) → no fire
+      const records226f = [
+        makeRec226(0),
+        makeRec226(1, { relationshipShifts: [{ pairKey: 'hero|villain', dimension: 'trust', amount: -0.5 }] }),
+        makeRec226(2), makeRec226(3), makeRec226(4), makeRec226(5), makeRec226(6),
+        makeRec226(7, { relationshipShifts: [{ pairKey: 'hero|villain', dimension: 'trust', amount: -0.6 }] }),
+        makeRec226(8), makeRec226(9),
+      ];
+      const result226f = await causalityPass(makeInput226(records226f));
+      const antagonistSilent = result226f.issues.filter(i => i.rule === 'ANTAGONIST_SECOND_HALF_SILENT');
+      assert.strictEqual(antagonistSilent.length, 0, 'Should NOT fire when antagonist remains active in the second half');
+    });
+  });
+
+  describe('Wave 225 — beliefPass: deception setup void, front-loaded revelations, revelation aftermath absent', async () => {
+    const makeRec225 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput225 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: '...',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('beliefPass detects DECEPTION_SETUP_VOID when early told beliefs have no corresponding witnessed revelation', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 10 scenes; told beliefs about "money vault" at scenes 0,1,2 (first 40%=scenes 0-3)
+      // No witnessed revelation about "money vault" anywhere → 3 early orphaned beliefs → fires
+      const records225a = [
+        makeRec225(0, { dialogueHighlights: ['alice: money missing from vault already'] }),
+        makeRec225(1, { dialogueHighlights: ['bob: money never reached vault destination'] }),
+        makeRec225(2, { dialogueHighlights: ['alice: vault money stolen by insider person'] }),
+        makeRec225(3),
+        makeRec225(4),
+        makeRec225(5),
+        makeRec225(6),
+        makeRec225(7),
+        makeRec225(8),
+        makeRec225(9),
+      ];
+      const result225a = await beliefPass(makeInput225(records225a));
+      const setupVoid = result225a.issues.filter(i => i.rule === 'DECEPTION_SETUP_VOID');
+      assert.ok(setupVoid.length >= 1, 'Should detect DECEPTION_SETUP_VOID when early told beliefs are never addressed');
+      assert.strictEqual(setupVoid[0].severity, 'major');
+    });
+
+    it('beliefPass does NOT fire DECEPTION_SETUP_VOID when early told beliefs are addressed by a revelation', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 10 scenes; told beliefs about "money vault" at scenes 0,1 → revelation about "money vault" at scene 6
+      const records225b = [
+        makeRec225(0, { dialogueHighlights: ['alice: money missing from vault already'] }),
+        makeRec225(1, { dialogueHighlights: ['bob: money never reached vault destination'] }),
+        makeRec225(2),
+        makeRec225(3),
+        makeRec225(4),
+        makeRec225(5),
+        makeRec225(6, { revelation: 'money was diverted from vault to offshore account' }),
+        makeRec225(7),
+        makeRec225(8),
+        makeRec225(9),
+      ];
+      const result225b = await beliefPass(makeInput225(records225b));
+      const setupVoid = result225b.issues.filter(i => i.rule === 'DECEPTION_SETUP_VOID');
+      assert.strictEqual(setupVoid.length, 0, 'Should NOT fire when early told beliefs are addressed by a revelation');
+    });
+
+    it('beliefPass detects BELIEF_FRONT_LOADED_REVELATIONS when >70% of revelations land in the first half', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 10 scenes; revelations at scenes 1,2,3 (first half=0-4), none after midpoint → 3/3 = 100% > 70%
+      const records225c = [
+        makeRec225(0),
+        makeRec225(1, { revelation: 'the killer was inside the house all along' }),
+        makeRec225(2, { revelation: 'the safe was empty before robbery night' }),
+        makeRec225(3, { revelation: 'witness lied about seeing anyone leave building' }),
+        makeRec225(4),
+        makeRec225(5),
+        makeRec225(6),
+        makeRec225(7),
+        makeRec225(8),
+        makeRec225(9),
+      ];
+      const result225c = await beliefPass(makeInput225(records225c));
+      const frontLoaded = result225c.issues.filter(i => i.rule === 'BELIEF_FRONT_LOADED_REVELATIONS');
+      assert.ok(frontLoaded.length >= 1, 'Should detect BELIEF_FRONT_LOADED_REVELATIONS when revelations are front-loaded');
+      assert.strictEqual(frontLoaded[0].severity, 'major');
+    });
+
+    it('beliefPass does NOT fire BELIEF_FRONT_LOADED_REVELATIONS when revelations are distributed across both halves', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 10 scenes; revelations at scenes 1, 5, 8 → 1 in first half, 2 in second → 33% < 70%
+      const records225d = [
+        makeRec225(0),
+        makeRec225(1, { revelation: 'the killer was seen leaving early' }),
+        makeRec225(2),
+        makeRec225(3),
+        makeRec225(4),
+        makeRec225(5, { revelation: 'the safe contained forged documents' }),
+        makeRec225(6),
+        makeRec225(7),
+        makeRec225(8, { revelation: 'the witness was paid to stay silent' }),
+        makeRec225(9),
+      ];
+      const result225d = await beliefPass(makeInput225(records225d));
+      const frontLoaded = result225d.issues.filter(i => i.rule === 'BELIEF_FRONT_LOADED_REVELATIONS');
+      assert.strictEqual(frontLoaded.length, 0, 'Should NOT fire when revelations are distributed across both halves');
+    });
+
+    it('beliefPass detects REVELATION_AFTERMATH_ABSENT when most revelations have no downstream reaction', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 10 scenes; revelations at scenes 2, 5, 7; none of the following scenes have reaction
+      // scenes 3,4 → flat (no suspense, no relShifts, no clues)
+      // scenes 6 → flat
+      // scenes 8,9 → flat (but scene 7 is at idx 7, and 7 < 10-2=8, so it's checked)
+      const records225e = [
+        makeRec225(0), makeRec225(1),
+        makeRec225(2, { revelation: 'the body was moved after midnight clearly' }),
+        makeRec225(3, { suspenseDelta: 0, relationshipShifts: [] }),
+        makeRec225(4, { suspenseDelta: 0 }),
+        makeRec225(5, { revelation: 'fingerprints found on the murder weapon confirmed' }),
+        makeRec225(6, { suspenseDelta: 0, relationshipShifts: [] }),
+        makeRec225(7, { revelation: 'witness saw suspect near scene that night' }),
+        makeRec225(8, { suspenseDelta: 0, relationshipShifts: [] }),
+        makeRec225(9, { suspenseDelta: 0 }),
+      ];
+      const result225e = await beliefPass(makeInput225(records225e));
+      const aftermath = result225e.issues.filter(i => i.rule === 'REVELATION_AFTERMATH_ABSENT');
+      assert.ok(aftermath.length >= 1, 'Should detect REVELATION_AFTERMATH_ABSENT when revelations have no downstream reaction');
+      assert.strictEqual(aftermath[0].severity, 'minor');
+    });
+
+    it('beliefPass does NOT fire REVELATION_AFTERMATH_ABSENT when revelations are followed by reactions', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // revelations at scenes 2 and 5; each followed by a reactive scene
+      const records225f = [
+        makeRec225(0), makeRec225(1),
+        makeRec225(2, { revelation: 'the body was moved after midnight' }),
+        makeRec225(3, { suspenseDelta: 2 }),                 // reaction: rising tension
+        makeRec225(4),
+        makeRec225(5, { revelation: 'fingerprints confirmed the suspect' }),
+        makeRec225(6, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: -0.5 }] }), // reaction
+        makeRec225(7), makeRec225(8), makeRec225(9),
+      ];
+      const result225f = await beliefPass(makeInput225(records225f));
+      const aftermath = result225f.issues.filter(i => i.rule === 'REVELATION_AFTERMATH_ABSENT');
+      assert.strictEqual(aftermath.length, 0, 'Should NOT fire when revelations are followed by reactive scenes');
+    });
+  });
+
   describe('Wave 224 — voicePass: sentence fragment starvation, scene opener cadence lock, dialogue cadence monoculture', async () => {
     // Builds a fountain with `n` scenes; each scene has one action line per entry in `sceneActionLines`.
     // Character dialogue is added in every scene to give characters lines, but kept minimal to avoid

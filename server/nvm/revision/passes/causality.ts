@@ -687,6 +687,86 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 226: CAUSAL_DENSITY_INVERSION ────────────────────────────────────
+  // The first half contains ≥3× more causal events than the second half —
+  // the story front-loads its engine and loses momentum. All causal types are
+  // counted: planted clues, clock raises, revelations, and significant
+  // relationship shifts (≥|0.3|). Distinct from REVELATION_FRONT_LOADING
+  // (revelations only) and ACT3_DISCHARGE_ABSENT (Act 3 only). Requires 10+ scenes
+  // and ≥4 first-half events so the imbalance is meaningful.
+  if (records.length >= 10) {
+    const isCausalEvent226 = (r: typeof records[0]): boolean =>
+      r.revelation !== null ||
+      r.clockRaised ||
+      (r.seededClueIds?.length ?? 0) > 0 ||
+      (r.relationshipShifts ?? []).some((s: any) => Math.abs(s.amount) >= 0.3);
+    const midpoint226 = Math.floor(records.length * 0.5);
+    const firstHalfCount226 = records.slice(0, midpoint226).filter(isCausalEvent226).length;
+    const secondHalfCount226 = records.slice(midpoint226).filter(isCausalEvent226).length;
+    if (firstHalfCount226 >= 4 && secondHalfCount226 > 0 && firstHalfCount226 >= secondHalfCount226 * 3) {
+      issues.push({
+        location: 'Causal event distribution',
+        rule: 'CAUSAL_DENSITY_INVERSION',
+        severity: 'major',
+        description: `The first half contains ${firstHalfCount226} causal events (seeds, clocks, revelations, relationship shifts) vs. ${secondHalfCount226} in the second half (${firstHalfCount226}:${secondHalfCount226} ratio). The story fires its causal engine early and loses momentum — the second half has no new threads to pull, no clocks left to expire, no revelation left to land.`,
+        suggestedFix: `Move at least two causal events into the second half: a new clock that activates at the midpoint, a late-breaking revelation, or a relationship shift that reorders the alliance map near the climax.`,
+      });
+    }
+  }
+
+  // ── Wave 226: ESCALATION_PLATEAU ──────────────────────────────────────────
+  // The story has 3+ suspense peaks (suspenseDelta ≥ 2) but their values don't
+  // escalate over the arc — the final peak is no higher than the first. Effective
+  // dramatic structure requires each successive high-pressure scene to be more
+  // intense than the last. When peaks plateau, the audience stops expecting things
+  // to get worse, and the climax can't deliver a felt sense of maximum stakes.
+  // Requires 8+ records and 3+ peaks.
+  if (records.length >= 8) {
+    const peaks226 = records.filter((r: any) => r.suspenseDelta >= 2);
+    if (peaks226.length >= 3) {
+      const firstPeak226 = peaks226[0].suspenseDelta;
+      const lastPeak226 = peaks226[peaks226.length - 1].suspenseDelta;
+      if (lastPeak226 <= firstPeak226) {
+        issues.push({
+          location: 'Suspense escalation arc',
+          rule: 'ESCALATION_PLATEAU',
+          severity: 'major',
+          description: `The story has ${peaks226.length} suspense peaks (≥2.0) but the final peak (${lastPeak226.toFixed(1)}) is no higher than the first (${firstPeak226.toFixed(1)}) — danger plateaus rather than escalating. The climax cannot feel like the most intense moment when earlier peaks were equally or more intense.`,
+          suggestedFix: `Calibrate peak heights to escalate across the arc: reserve the story's highest suspense value for the climax. Each successive tension scene should spike slightly higher than its predecessor, so the audience experiences a felt crescendo.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 226: ANTAGONIST_SECOND_HALF_SILENT ───────────────────────────────
+  // An antagonistic force creates significant negative pressure in the first 40%
+  // (negative relationship shift ≤-0.4) but then disappears — no such shift
+  // appears in the remaining 60%. The opposition that defined Act 1 goes quiet
+  // exactly when the protagonist needs to be pushed hardest. Distinct from
+  // GOAL_WITHOUT_OPPOSITION (which fires when there is NO opposition anywhere
+  // in the story); this catches a second-half retreat of an established threat.
+  // Requires 10+ records.
+  if (records.length >= 10) {
+    const act1End226 = Math.floor(records.length * 0.4);
+    const hasAct1Antagonism226 = records.slice(0, act1End226).some((r: any) =>
+      (r.relationshipShifts ?? []).some((s: any) => s.amount <= -0.4),
+    );
+    if (hasAct1Antagonism226) {
+      const hasLaterAntagonism226 = records.slice(act1End226).some((r: any) =>
+        (r.relationshipShifts ?? []).some((s: any) => s.amount <= -0.4),
+      );
+      if (!hasLaterAntagonism226) {
+        issues.push({
+          location: 'Antagonist causal presence',
+          rule: 'ANTAGONIST_SECOND_HALF_SILENT',
+          severity: 'minor',
+          description: `An antagonistic force creates significant negative relationship tension in the first 40% of the story but then disappears — no scene in the remaining 60% carries a strong negative shift (≤-0.4). The opposition goes quiet exactly when the protagonist needs to be pushed hardest.`,
+          suggestedFix: `Re-engage the antagonist in Act 2-3: a confrontation that escalates, a new threat vector, or a relationship betrayal that makes the final act feel like a climax rather than an unchallenged march to resolution.`,
+        });
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'causality', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
