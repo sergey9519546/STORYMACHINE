@@ -441,8 +441,21 @@ export default function ScriptIDE({
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
     let actionLines = 0;
-    let wordCount = scriptText.trim().split(/\s+/).length;
-    if (scriptText.trim() === "") wordCount = 0;
+    let wordCount = 0;
+    const trimmedText = scriptText.trim();
+    if (trimmedText !== "") {
+      let inWord = false;
+      for (let i = 0; i < trimmedText.length; i++) {
+        if (trimmedText.charCodeAt(i) > 32) {
+          if (!inWord) {
+            inWord = true;
+            wordCount++;
+          }
+        } else {
+          inWord = false;
+        }
+      }
+    }
 
     blocks.forEach((block) => {
       if (block.type === "character") {
@@ -592,9 +605,9 @@ export default function ScriptIDE({
   // ── Key handler ──────────────────────────────────────────────────────────────
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const cursor = e.currentTarget.selectionStart;
-    const textBeforeCursor = scriptText.substring(0, cursor);
-    const lines = textBeforeCursor.split("\n");
-    const currentLine = lines[lines.length - 1];
+    const textBeforeCursor = scriptText.slice(0, cursor);
+    const lastNewlineIdx = textBeforeCursor.lastIndexOf("\n");
+    const currentLine = lastNewlineIdx === -1 ? textBeforeCursor : textBeforeCursor.slice(lastNewlineIdx + 1);
 
     if (e.key === "i" || e.key === "I") {
       if (currentLine === "") {
@@ -737,10 +750,14 @@ export default function ScriptIDE({
   // ── Navigation ───────────────────────────────────────────────────────────────
   const handleNavigate = (lineIndex: number) => {
     if (!editorRef.current) return;
-    const lines = scriptText.split("\n");
     let charCount = 0;
-    for (let i = 0; i < lineIndex; i++) {
-      charCount += lines[i].length + 1;
+    let currentLine = 0;
+    for (let i = 0; i < scriptText.length; i++) {
+      if (currentLine === lineIndex) break;
+      if (scriptText.charCodeAt(i) === 10) { // \n
+        currentLine++;
+      }
+      charCount++;
     }
     editorRef.current.focus();
     editorRef.current.setSelectionRange(charCount, charCount);

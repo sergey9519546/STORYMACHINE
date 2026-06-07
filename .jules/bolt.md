@@ -4,3 +4,7 @@
 ## 2024-05-19 - [O(N) Rendering Latency Bottleneck in Fountain Highlighting]
 **Learning:** Found an unexpected O(N^2) memory scaling issue caused by `text.split("\n")` being mapped into a massive dictionary (`lineClasses`) and then mapped *again* to create React elements. This double-allocation strategy causes measurable frame stuttering when typing in large scripts since it executes completely synchronously on the main thread during high-frequency render events.
 **Action:** When parsing hierarchical document structures to flat nodes (like text lines), always prefer mapping directly over the parsed AST (e.g. `blocks`) to generate React Elements instead of building intermediate hash maps or re-splitting raw strings.
+
+## 2024-05-20 - [O(N) Allocation Latency in Keystroke Events]
+**Learning:** Found multiple instances where `String.prototype.split("\n")` and `String.prototype.split(/\s+/)` were being called inside high-frequency event handlers (like `handleKeyDown`, `handleNavigate`) and derived state (`wordCount`) on every keystroke. These operations create large intermediate arrays for long scripts, causing noticeable garbage collection spikes and UI stutter.
+**Action:** Replaced `split()` calls with zero-allocation character code loops (`charCodeAt`) and `indexOf`/`lastIndexOf`/`slice` string methods to prevent array allocations during high-frequency render and key events.
