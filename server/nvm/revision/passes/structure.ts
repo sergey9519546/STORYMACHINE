@@ -663,6 +663,78 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 236: Purpose monoculture, clock raised late, Act 2 revelation absent ──
+
+  // PURPOSE_MONOCULTURE (minor, ≥8 scenes): More than 70% of scenes share the
+  // same purpose label. A well-structured story rotates through different scene
+  // purposes — setup, character development, reversal, climax, resolution — each
+  // serving a different structural function. When one purpose dominates, the script
+  // repeats the same structural register for scene after scene with no variation in
+  // narrative intent. Distinct from SETUP_RESOLUTION_IMBALANCE (setup vs payoff
+  // ratio): this fires on any single purpose that crowds out all others.
+  if (n >= 8) {
+    const purposeCounts236 = new Map<string, number>();
+    for (const r of records) {
+      purposeCounts236.set(r.purpose, (purposeCounts236.get(r.purpose) ?? 0) + 1);
+    }
+    if (purposeCounts236.size >= 2) {
+      const [domPurpose236, domCount236] = [...purposeCounts236.entries()].sort((a, b) => b[1] - a[1])[0];
+      if (domCount236 / n > 0.7) {
+        issues.push({
+          location: 'Scene purpose distribution',
+          rule: 'PURPOSE_MONOCULTURE',
+          severity: 'minor',
+          description: `${domCount236} of ${n} scenes (${Math.round(domCount236 / n * 100)}%) carry the same purpose "${domPurpose236}" — the script repeats the same structural register with no variation in narrative intent. Stories need setup, escalation, reversal, character moments, and resolution woven together.`,
+          suggestedFix: `Replace some "${domPurpose236}" scenes with different structural functions: a reversal, a character-moment that reframes the protagonist's motivation, or a setup scene that plants future payoffs. Varied purposes keep the audience oriented to where the story is in its arc.`,
+        });
+      }
+    }
+  }
+
+  // CLOCK_RAISED_LATE (minor, ≥8 scenes): The first ticking-clock or deadline
+  // scene (clockRaised === true) comes after the halfway point. A clock is the
+  // engine of dramatic pressure; when no deadline is established until the second
+  // half, the story's opening operates in a pressure vacuum — the audience doesn't
+  // know what the stakes of time are. Distinct from MISSING_INCITING_INCIDENT
+  // (which checks for clock in Act 1 as one of several possible inciting elements):
+  // this fires whenever the first clock appears past 50% regardless of other events.
+  if (n >= 8) {
+    const firstClockIdx236 = records.findIndex((r: any) => r.clockRaised === true);
+    if (firstClockIdx236 > Math.floor(n * 0.5)) {
+      issues.push({
+        location: `Scene ${firstClockIdx236} (first clock)`,
+        rule: 'CLOCK_RAISED_LATE',
+        severity: 'minor',
+        description: `The story's first ticking clock or deadline appears at Scene ${firstClockIdx236} — ${Math.round(firstClockIdx236 / n * 100)}% through the story, after the halfway point. Without a deadline established in the first half, the opening lacks urgency; the audience doesn't feel the cost of time.`,
+        suggestedFix: 'Introduce a clock or deadline before the midpoint: a looming event, an expiring window, or a countdown that the protagonist must beat. Even an implied deadline changes the tension of every scene that precedes the climax.',
+      });
+    }
+  }
+
+  // ACT2_REVELATION_ABSENT (minor, ≥10 scenes): Act 2 (25%–75%) contains zero
+  // revelations, but the story has 2+ revelations elsewhere (Act 1 or Act 3).
+  // The middle act should deliver new information that reframes the protagonist's
+  // understanding — the dramatic engine of Act 2 is progressively raising the
+  // informational stakes. When all revelations cluster at the ends, Act 2 becomes
+  // pure action with no discovery, and the audience stops learning while watching.
+  if (n >= 10) {
+    const act2Start236 = Math.floor(n * 0.25);
+    const act2End236   = Math.floor(n * 0.75);
+    const totalRevs236 = records.filter((r: any) => r.revelation !== null).length;
+    if (totalRevs236 >= 2) {
+      const act2Revs236 = records.slice(act2Start236, act2End236).filter((r: any) => r.revelation !== null).length;
+      if (act2Revs236 === 0) {
+        issues.push({
+          location: `Act 2 (Scenes ${act2Start236}–${act2End236 - 1})`,
+          rule: 'ACT2_REVELATION_ABSENT',
+          severity: 'minor',
+          description: `Act 2 (Scenes ${act2Start236}–${act2End236 - 1}) contains no revelations despite ${totalRevs236} total revelations elsewhere. The middle act's dramatic engine is discovery — progressively raising the informational stakes. An Act 2 with no revelations is pure action; the audience stops learning while watching.`,
+          suggestedFix: "Plant at least one revelation in Act 2: a truth about the antagonist, a new dimension of the protagonist's situation, or information that reframes everything the audience thought they knew about the central conflict.",
+        });
+      }
+    }
+  }
+
   // ── Rewrite ───────────────────────────────────────────────────────────────
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'structure', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;

@@ -17897,6 +17897,102 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 236 — structurePass: purpose monoculture, clock raised late, Act 2 revelation absent', async () => {
+    const makeRec236 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput236 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: 'INT. SC - DAY\nAction line.\n',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('PURPOSE_MONOCULTURE fires when >70% of scenes share the same purpose', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // 8 scenes: 7 x 'dialogue', 1 x 'climax' → 87.5% dominant
+      const records236a = Array.from({ length: 8 }, (_, i) =>
+        makeRec236(i, { purpose: i < 7 ? 'dialogue' : 'climax' }),
+      );
+      const result = await structurePass(makeInput236(records236a));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'PURPOSE_MONOCULTURE'),
+        'Should fire when one purpose exceeds 70% of scenes',
+      );
+    });
+
+    it('PURPOSE_MONOCULTURE does NOT fire when purposes are varied', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // 8 scenes with 4 different purposes, max 2/8 = 25% per purpose
+      const purposes = ['dialogue', 'dialogue', 'development', 'development', 'climax', 'character_moment', 'turning_point', 'resolution'];
+      const records236b = Array.from({ length: 8 }, (_, i) => makeRec236(i, { purpose: purposes[i] }));
+      const result = await structurePass(makeInput236(records236b));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'PURPOSE_MONOCULTURE'),
+        'Should NOT fire when no single purpose exceeds 70%',
+      );
+    });
+
+    it('CLOCK_RAISED_LATE fires when first clock appears after 50% of scenes', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // 8 scenes, clock only at index 5 (62.5%) → after 50% threshold (index 4)
+      const records236c = Array.from({ length: 8 }, (_, i) =>
+        makeRec236(i, i === 5 ? { clockRaised: true } : {}),
+      );
+      const result = await structurePass(makeInput236(records236c));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'CLOCK_RAISED_LATE'),
+        'Should fire when first clock appears past the halfway point',
+      );
+    });
+
+    it('CLOCK_RAISED_LATE does NOT fire when first clock appears before 50%', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // 8 scenes, clock at index 2 (25%) → before 50% threshold
+      const records236d = Array.from({ length: 8 }, (_, i) =>
+        makeRec236(i, i === 2 ? { clockRaised: true } : {}),
+      );
+      const result = await structurePass(makeInput236(records236d));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'CLOCK_RAISED_LATE'),
+        'Should NOT fire when clock appears before the midpoint',
+      );
+    });
+
+    it('ACT2_REVELATION_ABSENT fires when Act 2 has no revelations but 2+ exist elsewhere', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // 10 scenes; revelations only at 0 and 9 (Act 1 and Act 3 tails)
+      // Act 2 = scenes 2-6 (floor(10*0.25)=2 to floor(10*0.75)=7, exclusive)
+      const records236e = Array.from({ length: 10 }, (_, i) =>
+        makeRec236(i, (i === 0 || i === 9) ? { revelation: 'a truth surfaces' } : {}),
+      );
+      const result = await structurePass(makeInput236(records236e));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'ACT2_REVELATION_ABSENT'),
+        'Should fire when Act 2 has no revelations despite 2+ existing elsewhere',
+      );
+    });
+
+    it('ACT2_REVELATION_ABSENT does NOT fire when at least one revelation lands in Act 2', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // 10 scenes; revelation at index 4 (in Act 2) and index 9
+      const records236f = Array.from({ length: 10 }, (_, i) =>
+        makeRec236(i, (i === 4 || i === 9) ? { revelation: 'a truth surfaces' } : {}),
+      );
+      const result = await structurePass(makeInput236(records236f));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'ACT2_REVELATION_ABSENT'),
+        'Should NOT fire when at least one revelation is in Act 2',
+      );
+    });
+  });
+
   describe('Wave 222 — structurePass: dramatic vacuum stretch, tension frontloaded COM, try-fail rhythm absent (structural physics)', async () => {
     const makeRec222 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
