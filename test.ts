@@ -15857,6 +15857,376 @@ Goodnight.
     });
   });
 
+  describe('Wave 224 — voicePass: sentence fragment starvation, scene opener cadence lock, dialogue cadence monoculture', async () => {
+    // Builds a fountain with `n` scenes; each scene has one action line per entry in `sceneActionLines`.
+    // Character dialogue is added in every scene to give characters lines, but kept minimal to avoid
+    // triggering EXCLAMATION_OVERUSE, QUESTION_MARK_OVERLOAD, etc.
+    const buildVoiceFountain224 = (sceneData: Array<{ action: string; char?: string; dialogue?: string }>) =>
+      sceneData.map((s, i) =>
+        `INT. SC${i} - DAY\n${s.action}\n${s.char ? `${s.char}\n${s.dialogue ?? 'A line.'}\n` : ''}`,
+      ).join('\n');
+
+    const makeRec224 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, dialogueHighlights: [],
+      revelation: null, relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+
+    it('voicePass detects SENTENCE_FRAGMENT_STARVATION when no action lines are short declarative fragments', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 14 action lines, all 6+ words — zero fragments (≤ 4 words)
+      const lines224a = [
+        'The detective crosses the rain-slicked street carefully.',
+        'A figure moves through the shadows of the alley.',
+        'She picks up the phone and dials the number slowly.',
+        'He opens the briefcase and examines its contents.',
+        'The crowd disperses quickly into the evening darkness.',
+        'She reads the letter twice before setting it down.',
+        'The clock on the wall ticks loudly in the silence.',
+        'He adjusts his collar and walks toward the exit door.',
+        'A car passes through the intersection without stopping.',
+        'She pours another drink and stares out the window.',
+        'The rain begins to fall across the empty parking lot.',
+        'He closes the folder and slides it across the table.',
+        'The camera pans slowly across the abandoned warehouse.',
+        'She steps outside into the cold morning air at last.',
+      ];
+      const fountain224a = `INT. SC0 - DAY\n${lines224a.join('\n')}\n`;
+      const records224a = [makeRec224(0)];
+      const result224a = await voicePass({
+        fountain: fountain224a, original: fountain224a,
+        records: records224a as any, structure: {} as any,
+        annotations: [null] as any, approvedSpans: [],
+      });
+      const frag = result224a.issues.filter(i => i.rule === 'SENTENCE_FRAGMENT_STARVATION');
+      assert.ok(frag.length >= 1, 'Should detect SENTENCE_FRAGMENT_STARVATION when no action lines are fragments');
+      assert.strictEqual(frag[0].severity, 'minor');
+    });
+
+    it('voicePass does NOT fire SENTENCE_FRAGMENT_STARVATION when fragment lines exceed the threshold', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 14 action lines with 2 fragments (≥ 4% threshold satisfied)
+      const lines224b = [
+        'The detective crosses the rain-slicked street.',
+        'Nothing moves.',                                  // fragment ≤ 4 words
+        'She picks up the phone and dials slowly.',
+        'He opens the briefcase and examines it.',
+        'The crowd disperses into the evening dark.',
+        'Silence.',                                        // fragment ≤ 4 words
+        'The clock ticks loudly in the silence.',
+        'He adjusts his collar and approaches.',
+        'A car passes through the intersection.',
+        'She pours another drink quietly.',
+        'The rain begins to fall across the lot.',
+        'He closes the folder and slides it over.',
+        'The camera pans across the warehouse.',
+        'She steps outside into the cold air.',
+      ];
+      const fountain224b = `INT. SC0 - DAY\n${lines224b.join('\n')}\n`;
+      const records224b = [makeRec224(0)];
+      const result224b = await voicePass({
+        fountain: fountain224b, original: fountain224b,
+        records: records224b as any, structure: {} as any,
+        annotations: [null] as any, approvedSpans: [],
+      });
+      const frag = result224b.issues.filter(i => i.rule === 'SENTENCE_FRAGMENT_STARVATION');
+      assert.strictEqual(frag.length, 0, 'Should NOT fire when enough fragment lines are present');
+    });
+
+    it('voicePass detects SCENE_OPENER_CADENCE_LOCK when all scenes open with an article', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 10 scenes, each first action line starts with "The ..." (>60% article openers)
+      const sceneData224c = Array.from({ length: 10 }, (_, i) => ({
+        action: `The ${['room fills with smoke', 'door swings open', 'phone rings again', 'window reflects moonlight', 'hallway stretches ahead', 'camera pans slowly', 'crowd surges forward', 'light flickers once', 'figure turns around', 'silence returns now'][i]}.`,
+      }));
+      const fountain224c = sceneData224c.map((s, i) => `INT. SC${i} - DAY\n${s.action}\n`).join('\n');
+      const records224c = Array.from({ length: 10 }, (_, i) => makeRec224(i));
+      const result224c = await voicePass({
+        fountain: fountain224c, original: fountain224c,
+        records: records224c as any, structure: {} as any,
+        annotations: records224c.map(() => null) as any, approvedSpans: [],
+      });
+      const openerLock = result224c.issues.filter(i => i.rule === 'SCENE_OPENER_CADENCE_LOCK');
+      assert.ok(openerLock.length >= 1, 'Should detect SCENE_OPENER_CADENCE_LOCK when all scenes open with articles');
+      assert.strictEqual(openerLock[0].severity, 'minor');
+    });
+
+    it('voicePass does NOT fire SCENE_OPENER_CADENCE_LOCK when scene openers are varied', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 10 scenes, mixed openers: articles, verbs, names, pronouns
+      const openers224d = [
+        'The room fills with smoke.',
+        'Rain hammers the window.',
+        'ALICE drops her bag.',
+        'Darkness swallows everything.',
+        'The phone rings once.',
+        'Footsteps echo down the hall.',
+        'She turns to face him.',
+        'Wind rattles the shutters.',
+        'A figure moves in the shadows.',
+        'Silence returns at last.',
+      ];
+      const fountain224d = openers224d.map((a, i) => `INT. SC${i} - DAY\n${a}\n`).join('\n');
+      const records224d = Array.from({ length: 10 }, (_, i) => makeRec224(i));
+      const result224d = await voicePass({
+        fountain: fountain224d, original: fountain224d,
+        records: records224d as any, structure: {} as any,
+        annotations: records224d.map(() => null) as any, approvedSpans: [],
+      });
+      const openerLock = result224d.issues.filter(i => i.rule === 'SCENE_OPENER_CADENCE_LOCK');
+      assert.strictEqual(openerLock.length, 0, 'Should NOT fire when scene openers vary in syntactic type');
+    });
+
+    it('voicePass detects DIALOGUE_CADENCE_MONOCULTURE when all major characters speak at the same cadence', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 3 characters, each with ~8-word lines — means: ~7.8, ~8.0, ~8.2 → range ≤ 2.5, center ~8
+      // Use 12 lines per character, each exactly 8 words, with 12+ unique vocab words per character
+      const aliceLines224e = [
+        'I walked across the bridge last Tuesday morning.',   // 8
+        'The meeting felt strange but nobody spoke aloud.',   // 8
+        'Perhaps we should consider leaving before nightfall.',// 7 - close enough
+        'She handed over the documents without looking back.', // 8
+        'Every decision carries weight you cannot anticipate.', // 8
+        'I understand the risk but we have no choice.',       // 9 - slight variance
+        'The garden looked different under afternoon light.',  // 8 - wait, 7 words
+        'Trust nobody until they have proven themselves worthy.', // 8
+        'I packed my things and moved before the dawn.',      // 9
+        'The answer arrived three days later by post.',       // 8
+        'We agreed to meet at the fountain near noon.',       // 9
+        'I still believe the outcome could have changed things.',// 9
+      ];
+      const bobLines224e = [
+        'That plan sounds risky but I will consider it.',    // 9
+        'Nobody told me about the meeting until today.',     // 8
+        'I checked the records twice and found nothing odd.',// 9
+        'Her explanation made sense given what happened.',   // 7
+        'I stayed late reviewing documents from the archive.',// 8
+        'The problem appears deeper than anyone first thought.',// 8
+        'I asked twice but received no clear answer.',       // 8
+        'We should report this finding before the review.',  // 8
+        'The analysis revealed patterns nobody had noticed.',// 7
+        'I confirmed the data matches all our prior records.',// 9
+        'Nobody from the committee responded to my letter.', // 8
+        'I remain convinced this decision will prove costly.',// 8
+      ];
+      const carolLines224e = [
+        'I believe the situation requires immediate attention.',// 8
+        'The report contains errors nobody has corrected.',  // 8
+        'I worked through the night reviewing every detail.', // 8
+        'That approach ignores the context we established.', // 8
+        'I read the transcript and found several mistakes.',  // 8
+        'The evidence points toward a different conclusion.', // 8
+        'I checked every source before filing this report.', // 8
+        'Our assumptions were flawed from the very beginning.',// 8
+        'I cannot accept that answer without further proof.', // 8
+        'The committee overlooked several critical findings.', // 8
+        'I raised this concern three times without response.', // 8
+        'The outcome confirms what I suspected from the start.',// 9
+      ];
+      // Build fountain with full character blocks for ALICE, BOB, CAROL
+      const buildCharBlock = (name: string, lines: string[]) =>
+        lines.map(l => `${name}\n${l}\n`).join('\n');
+      const fountain224e = `INT. SC0 - DAY\nAn office.\n${buildCharBlock('ALICE', aliceLines224e)}\n` +
+        `INT. SC1 - DAY\nA hallway.\n${buildCharBlock('BOB', bobLines224e)}\n` +
+        `INT. SC2 - DAY\nA boardroom.\n${buildCharBlock('CAROL', carolLines224e)}\n`;
+      const records224e = [makeRec224(0), makeRec224(1), makeRec224(2)];
+      const result224e = await voicePass({
+        fountain: fountain224e, original: fountain224e,
+        records: records224e as any, structure: {} as any,
+        annotations: records224e.map(() => null) as any, approvedSpans: [],
+      });
+      const monoculture = result224e.issues.filter(i => i.rule === 'DIALOGUE_CADENCE_MONOCULTURE');
+      assert.ok(monoculture.length >= 1, 'Should detect DIALOGUE_CADENCE_MONOCULTURE when all major characters have identical cadence');
+      assert.strictEqual(monoculture[0].severity, 'minor');
+    });
+
+    it('voicePass does NOT fire DIALOGUE_CADENCE_MONOCULTURE when characters have distinct cadence ranges', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // ALICE: short punchy ~3-word lines; BOB: long rambling ~14-word lines; CAROL: medium ~8
+      // range = 14 - 3 = 11 > 2.5 → should NOT fire
+      const buildCharBlock2 = (name: string, lines: string[]) =>
+        lines.map(l => `${name}\n${l}\n`).join('\n');
+      const aliceShort = Array.from({ length: 12 }, (_, i) =>
+        ['Wrong.', 'Get out.', 'Not now.', 'Stop it.', 'Tell me.', 'Trust nobody.', 'Run now.', 'Wait here.', 'Leave fast.', 'Forget this.', 'No chance.', 'Move along.'][i],
+      );
+      const bobLong = Array.from({ length: 12 }, (_, i) =>
+        [
+          'I have been reviewing these documents for the past three weeks and I find the results deeply troubling.',
+          'The situation as I understand it requires a more thorough examination before we can draw any firm conclusions.',
+          'We should consider every possible angle here before making a decision that could affect all of us permanently.',
+          'The evidence I have gathered suggests a pattern of behavior that goes back much further than anyone suspected.',
+          'I think the most important thing right now is to maintain our composure and proceed with extreme caution here.',
+          'Every piece of information we have received so far points toward a conclusion that nobody wants to acknowledge.',
+          'We need to take the time to understand exactly what happened before we rush into any kind of response.',
+          'The analysis I conducted over the weekend revealed several inconsistencies that I believe warrant further investigation.',
+          'I want everyone in this room to understand that the stakes here are higher than they may initially appear.',
+          'Before we make any final decisions I think we owe it to ourselves to consider all available alternatives carefully.',
+          'The report contains numerous errors and omissions that suggest whoever wrote it was not fully informed of the facts.',
+          'I have spoken to several witnesses and their accounts differ significantly from the official version of these events.',
+        ][i],
+      );
+      const carolMed = Array.from({ length: 12 }, (_, i) =>
+        ['I reviewed the records and found several problems worth addressing carefully.',
+          'The timeline does not match what we were told by the original investigators.',
+          'I believe we need more information before drawing any firm conclusions here.',
+          'The evidence suggests something happened that nobody has fully explained yet.',
+          'I want to understand the full context before making any recommendation.',
+          'We should proceed carefully and document every step of this investigation.',
+          'I checked the dates and they confirm the sequence we discussed earlier.',
+          'The discrepancy is significant enough to warrant a more thorough review.',
+          'I raised this issue three weeks ago and received no satisfactory response.',
+          'The pattern I see here is consistent with what we found in the prior case.',
+          'I would like more time to review these materials before the next meeting.',
+          'The conclusion seems premature given how much we still do not understand.',
+        ][i],
+      );
+      const fountain224f = `INT. SC0 - DAY\nAn office.\n${buildCharBlock2('ALICE', aliceShort)}\n` +
+        `INT. SC1 - DAY\nA hallway.\n${buildCharBlock2('BOB', bobLong)}\n` +
+        `INT. SC2 - DAY\nA boardroom.\n${buildCharBlock2('CAROL', carolMed)}\n`;
+      const records224f = [makeRec224(0), makeRec224(1), makeRec224(2)];
+      const result224f = await voicePass({
+        fountain: fountain224f, original: fountain224f,
+        records: records224f as any, structure: {} as any,
+        annotations: records224f.map(() => null) as any, approvedSpans: [],
+      });
+      const monoculture = result224f.issues.filter(i => i.rule === 'DIALOGUE_CADENCE_MONOCULTURE');
+      assert.strictEqual(monoculture.length, 0, 'Should NOT fire when characters have clearly distinct cadence ranges');
+    });
+  });
+
+  describe('Wave 223 — themePass: silent stretch, poles never costaged, resonance emotionally inert', async () => {
+    const makeRec223 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput223 = (records: any[], fountain: string) => ({
+      fountain, original: fountain,
+      records: records as any, structure: {} as any,
+      storyContext: { theme: 'trust and betrayal' } as any,
+      annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('themePass detects THEME_SILENT_STRETCH when a long consecutive run of theme-silent scenes exceeds the threshold', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // Scenes 0-1 resonant (trust), scenes 2-8 silent (7-scene run), scenes 9-11 resonant
+      // threshold = max(4, floor(12*0.25)) = 4; maxRun = 7 > 4 → fires
+      const resonantText = (i: number) => `INT. SC${i} - DAY\ntrust holds the alliance.\n`;
+      const silentText   = (i: number) => `INT. SC${i} - DAY\nA quiet morning. Nothing unusual.\n`;
+      const fountain223a = [
+        resonantText(0), resonantText(1),
+        silentText(2), silentText(3), silentText(4), silentText(5), silentText(6), silentText(7), silentText(8),
+        resonantText(9), resonantText(10), resonantText(11),
+      ].join('\n');
+      const records223a = [
+        makeRec223(0, { emotionalShift: 'positive', suspenseDelta: 1 }),
+        makeRec223(1, { emotionalShift: 'negative', suspenseDelta: -2 }),
+        ...Array.from({ length: 7 }, (_, k) => makeRec223(k + 2)),
+        makeRec223(9,  { emotionalShift: 'positive' }),
+        makeRec223(10, { emotionalShift: 'neutral' }),
+        makeRec223(11, { emotionalShift: 'neutral' }),
+      ];
+      const result223a = await themePass(makeInput223(records223a, fountain223a));
+      const stretch = result223a.issues.filter(i => i.rule === 'THEME_SILENT_STRETCH');
+      assert.ok(stretch.length >= 1, 'Should detect THEME_SILENT_STRETCH with a 7-scene theme-silent run in a 12-scene story');
+      assert.strictEqual(stretch[0].severity, 'major');
+    });
+
+    it('themePass does NOT fire THEME_SILENT_STRETCH when theme-silent scenes are evenly distributed', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // Alternating resonant/silent: max run = 1 ≤ threshold(4) → no fire
+      const makeScene223 = (i: number, resonant: boolean) =>
+        `INT. SC${i} - DAY\n${resonant ? 'trust holds.' : 'A quiet day.'}\n`;
+      const fountain223b = Array.from({ length: 12 }, (_, i) => makeScene223(i, i % 2 === 0)).join('\n');
+      const records223b = Array.from({ length: 12 }, (_, i) =>
+        makeRec223(i, i % 2 === 0 ? { emotionalShift: 'positive', suspenseDelta: 1 } : {}),
+      );
+      // ensure one negative resonant scene to suppress THEME_NO_DIALECTIC
+      records223b[2] = makeRec223(2, { emotionalShift: 'negative', suspenseDelta: -2 });
+      const result223b = await themePass(makeInput223(records223b, fountain223b));
+      const stretch = result223b.issues.filter(i => i.rule === 'THEME_SILENT_STRETCH');
+      assert.strictEqual(stretch.length, 0, 'Should NOT fire THEME_SILENT_STRETCH when silent runs are only 1 scene long');
+    });
+
+    it('themePass detects THEME_POLES_NEVER_COSTAGED when no scene contains both thematic poles simultaneously', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // 6 scenes: odd scenes have 'trust', even scenes have 'betrayal' — no co-occurrence
+      const makeScene223p = (i: number) =>
+        `INT. SC${i} - DAY\n${i % 2 === 0 ? 'trust in each other.' : 'betrayal complete.'}\n`;
+      const fountain223c = Array.from({ length: 6 }, (_, i) => makeScene223p(i)).join('\n');
+      const records223c = [
+        makeRec223(0, { emotionalShift: 'positive', suspenseDelta: 1 }),
+        makeRec223(1, { emotionalShift: 'negative', suspenseDelta: -2 }),
+        makeRec223(2, { emotionalShift: 'neutral' }),
+        makeRec223(3, { emotionalShift: 'neutral' }),
+        makeRec223(4, { emotionalShift: 'positive' }),
+        makeRec223(5, { emotionalShift: 'neutral' }),
+      ];
+      const result223c = await themePass(makeInput223(records223c, fountain223c));
+      const poles = result223c.issues.filter(i => i.rule === 'THEME_POLES_NEVER_COSTAGED');
+      assert.ok(poles.length >= 1, 'Should detect THEME_POLES_NEVER_COSTAGED when poles never share a scene');
+      assert.strictEqual(poles[0].severity, 'minor');
+    });
+
+    it('themePass does NOT fire THEME_POLES_NEVER_COSTAGED when at least one scene contains both thematic poles', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // Scene 0 has both 'trust' and 'betrayal' — poles costaged
+      const makeScene223q = (i: number) =>
+        i === 0
+          ? `INT. SC${i} - DAY\ntrust shatters under betrayal.\n`
+          : `INT. SC${i} - DAY\n${i % 2 === 0 ? 'trust endures.' : 'betrayal resurfaces.'}\n`;
+      const fountain223d = Array.from({ length: 6 }, (_, i) => makeScene223q(i)).join('\n');
+      const records223d = [
+        makeRec223(0, { emotionalShift: 'negative', suspenseDelta: -2 }),
+        makeRec223(1, { emotionalShift: 'positive' }),
+        makeRec223(2, { emotionalShift: 'neutral' }),
+        makeRec223(3, { emotionalShift: 'neutral' }),
+        makeRec223(4, { emotionalShift: 'positive' }),
+        makeRec223(5, { emotionalShift: 'neutral' }),
+      ];
+      const result223d = await themePass(makeInput223(records223d, fountain223d));
+      const poles = result223d.issues.filter(i => i.rule === 'THEME_POLES_NEVER_COSTAGED');
+      assert.strictEqual(poles.length, 0, 'Should NOT fire THEME_POLES_NEVER_COSTAGED when a scene stages both poles');
+    });
+
+    it('themePass detects THEME_RESONANCE_EMOTIONALLY_INERT when all resonant scenes carry flat emotional charge', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // 5 resonant scenes all emotionally flat (neutral shift, zero suspense)
+      const fountain223e = Array.from({ length: 5 }, (_, i) => `INT. SC${i} - DAY\ntrust endures.\n`).join('\n');
+      const records223e = Array.from({ length: 5 }, (_, i) =>
+        makeRec223(i, { emotionalShift: 'neutral', suspenseDelta: 0 }),
+      );
+      const result223e = await themePass(makeInput223(records223e, fountain223e));
+      const inert = result223e.issues.filter(i => i.rule === 'THEME_RESONANCE_EMOTIONALLY_INERT');
+      assert.ok(inert.length >= 1, 'Should detect THEME_RESONANCE_EMOTIONALLY_INERT when all resonant scenes are emotionally flat');
+      assert.strictEqual(inert[0].severity, 'minor');
+    });
+
+    it('themePass does NOT fire THEME_RESONANCE_EMOTIONALLY_INERT when at least one resonant scene carries emotional stakes', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // Scene 2 has suspenseDelta=2 — theme coincides with rising tension
+      const fountain223f = Array.from({ length: 5 }, (_, i) => `INT. SC${i} - DAY\ntrust endures.\n`).join('\n');
+      const records223f = [
+        makeRec223(0, { emotionalShift: 'neutral', suspenseDelta: 0 }),
+        makeRec223(1, { emotionalShift: 'neutral', suspenseDelta: 0 }),
+        makeRec223(2, { emotionalShift: 'neutral', suspenseDelta: 2 }), // stakes here
+        makeRec223(3, { emotionalShift: 'neutral', suspenseDelta: 0 }),
+        makeRec223(4, { emotionalShift: 'negative', suspenseDelta: -2 }),
+      ];
+      const result223f = await themePass(makeInput223(records223f, fountain223f));
+      const inert = result223f.issues.filter(i => i.rule === 'THEME_RESONANCE_EMOTIONALLY_INERT');
+      assert.strictEqual(inert.length, 0, 'Should NOT fire THEME_RESONANCE_EMOTIONALLY_INERT when a resonant scene has rising tension');
+    });
+  });
+
   describe('Wave 222 — structurePass: dramatic vacuum stretch, tension frontloaded COM, try-fail rhythm absent (structural physics)', async () => {
     const makeRec222 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

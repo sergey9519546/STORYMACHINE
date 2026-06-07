@@ -682,6 +682,99 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 224: SENTENCE_FRAGMENT_STARVATION ────────────────────────────────
+  // Great screenplay action uses fragments — "The door. Open." — for rhythm and
+  // urgency. If fewer than 4% of action lines are short declarative fragments
+  // (≤ 4 words), the prose is verbose and non-cinematic: every sentence is a
+  // complete clause, denying the reader the staccato rhythm that drives visual
+  // energy. Requires 10+ action lines.
+  if (actionOnlyLines.length >= 10) {
+    const fragmentLines224 = actionOnlyLines.filter(l => {
+      const words = l.trim().split(/\s+/).filter(w => w.length > 0);
+      return words.length >= 1 && words.length <= 4 && !l.trim().endsWith('?');
+    });
+    const fragmentRate224 = fragmentLines224.length / actionOnlyLines.length;
+    if (fragmentRate224 < 0.04) {
+      issues.push({
+        location: 'Action line rhythm',
+        rule: 'SENTENCE_FRAGMENT_STARVATION',
+        severity: 'minor',
+        description: `Only ${fragmentLines224.length} of ${actionOnlyLines.length} action lines (${Math.round(fragmentRate224 * 100)}%) are short declarative fragments (≤ 4 words) — the prose has no staccato rhythm. Every sentence is a full clause; the urgency of fragment shots ("The door. Open. Silence.") is entirely absent.`,
+        suggestedFix: `Introduce short declarative fragments at moments of tension, revelation, or visual punctuation. A two-word action line can carry more weight than a sentence: "Nothing moves." reads louder than "Nobody in the room is moving at all."`,
+      });
+    }
+  }
+
+  // ── Wave 224: SCENE_OPENER_CADENCE_LOCK ───────────────────────────────────
+  // Every scene should announce itself differently. When more than 60% of scenes
+  // open their first action line with the same syntactic type — all articles
+  // ("The...", "A...") or all pronouns ("He...", "She...") — the script enters
+  // each scene identically. This robs individual scenes of their own momentum
+  // and makes the read feel mechanically assembled. Requires 8+ scenes.
+  if (records.length >= 8) {
+    const openerLines224: string[] = [];
+    const fountainLines224 = fountain.split('\n');
+    let inSceneOpener224 = false;
+    for (const line of fountainLines224) {
+      const t224 = line.trim();
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t224)) { inSceneOpener224 = true; continue; }
+      if (!t224) continue;
+      if (inSceneOpener224) {
+        if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t224)) { inSceneOpener224 = false; continue; }
+        openerLines224.push(t224);
+        inSceneOpener224 = false;
+      }
+    }
+    if (openerLines224.length >= 6) {
+      const articleRe224 = /^(the|a|an)\b/i;
+      const pronounRe224 = /^(he|she|they|it)\b/i;
+      const articleCount224 = openerLines224.filter(l => articleRe224.test(l)).length;
+      const pronounCount224 = openerLines224.filter(l => pronounRe224.test(l)).length;
+      const articleRate224 = articleCount224 / openerLines224.length;
+      const pronounRate224 = pronounCount224 / openerLines224.length;
+      if (articleRate224 > 0.6 || pronounRate224 > 0.6) {
+        const dominantType224 = articleRate224 >= pronounRate224
+          ? 'article ("The...", "A...")'
+          : 'pronoun ("He...", "She...", "They...")';
+        const dominantCount224 = articleRate224 >= pronounRate224 ? articleCount224 : pronounCount224;
+        issues.push({
+          location: 'Scene openings',
+          rule: 'SCENE_OPENER_CADENCE_LOCK',
+          severity: 'minor',
+          description: `${dominantCount224} of ${openerLines224.length} scene-opening action lines begin with an ${dominantType224} — every scene enters with the same syntactic cadence. The camera arrives identically each time, stripping each scene of its own momentum and urgency.`,
+          suggestedFix: `Vary how scenes announce themselves: start some with an action verb ("Rain hammers the window."), some with an environment detail, some with a character name. The opening line of an action block is the scene's handshake with the reader — make each one distinct.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 224: DIALOGUE_CADENCE_MONOCULTURE ────────────────────────────────
+  // Voice is not just vocabulary — it is cadence. A character who speaks in
+  // 3-word sentences sounds completely different from one who speaks in 15-word
+  // ones. When all major characters converge on the same mean line-length, they
+  // become indistinguishable by rhythm alone, even if their vocabulary differs.
+  // Requires 3+ major characters (≥5 lines, ≥10 vocab words); fires when all
+  // character means fall within a ±2.5-word band centered between 5–14 words.
+  if (majorChars.length >= 3) {
+    const means224 = majorChars.map(([name, p]) => {
+      const mean = p.wordCountsPerLine.reduce((s, v) => s + v, 0) / Math.max(p.wordCountsPerLine.length, 1);
+      return { name, mean };
+    });
+    const minMean224 = Math.min(...means224.map(m => m.mean));
+    const maxMean224 = Math.max(...means224.map(m => m.mean));
+    const bandCenter224 = (minMean224 + maxMean224) / 2;
+    if (maxMean224 - minMean224 <= 2.5 && bandCenter224 >= 5 && bandCenter224 <= 14) {
+      const summary224 = means224.map(m => `${m.name} (${m.mean.toFixed(1)} wpl)`).join(', ');
+      issues.push({
+        location: 'Character dialogue cadences',
+        rule: 'DIALOGUE_CADENCE_MONOCULTURE',
+        severity: 'minor',
+        description: `All ${majorChars.length} major characters speak in nearly identical line-length cadences (${summary224}; spread: ${(maxMean224 - minMean224).toFixed(1)} words). No character is rhythmically short and punchy; none is long and ruminative — every voice occupies the same comfortable middle register.`,
+        suggestedFix: `Give characters distinct speech rhythms: let one speak in short staccato bursts (3–5 words), another in longer sweeping sentences (10–15 words). Cadence is characterization — the tempo of how a person speaks is as distinctive as what they say.`,
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'voice', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

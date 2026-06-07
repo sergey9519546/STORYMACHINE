@@ -584,6 +584,84 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         }
       }
     }
+
+    // ── Wave 223: THEME_SILENT_STRETCH ────────────────────────────────────────
+    // A long consecutive run of theme-silent scenes creates a dead zone where
+    // the audience forgets what the story is about. We compute the maximum
+    // unbroken run of theme-silent scenes; if it exceeds 25% of the script
+    // (or 4, whichever is larger) the theme has a structural hole.
+    if (records.length >= 8 && resonantScenes.length >= 2) {
+      const stretchThreshold223 = Math.max(4, Math.floor(records.length * 0.25));
+      const resonantIdxSet223 = new Set(resonantScenes.map(r => r.sceneIdx));
+      let maxRun223 = 0;
+      let run223 = 0;
+      let stretchStart223 = -1;
+      let runStart223 = 0;
+      for (let i = 0; i < records.length; i++) {
+        if (!resonantIdxSet223.has(records[i].sceneIdx)) {
+          if (run223 === 0) runStart223 = i;
+          run223++;
+          if (run223 > maxRun223) { maxRun223 = run223; stretchStart223 = runStart223; }
+        } else {
+          run223 = 0;
+        }
+      }
+      if (maxRun223 > stretchThreshold223) {
+        issues.push({
+          location: `Scenes ${stretchStart223}–${stretchStart223 + maxRun223 - 1}`,
+          rule: 'THEME_SILENT_STRETCH',
+          severity: 'major',
+          description: `A consecutive run of ${maxRun223} theme-silent scenes (${stretchThreshold223} allowed for a ${records.length}-scene story) creates a thematic dead zone — the audience loses the story's meaning for an extended stretch before the theme returns.`,
+          suggestedFix: `Break the silent stretch by inserting thematic language into at least one of these scenes: a character's choice that embodies or resists "${themeRaw}", a visual metaphor, or a line of dialogue that touches the core tension.`,
+        });
+      }
+    }
+
+    // ── Wave 223: THEME_POLES_NEVER_COSTAGED ──────────────────────────────────
+    // Complex themes have multiple dimensions (e.g. "trust vs betrayal" has
+    // 'trust' and 'betrayal' as poles). If no single scene contains language
+    // from at least two keyword groups simultaneously, the poles exist in
+    // isolation — the theme is never dramatized as a live collision of competing
+    // values within a single scene, which is where thematic resonance lives.
+    if (keywords.length >= 2 && resonantScenes.length >= 3) {
+      const anyCostaged223 = resonantScenes.some(r => {
+        const text223 = sceneTexts.get(r.sceneIdx) ?? '';
+        let groupsHit223 = 0;
+        for (const forms of expandedKeywords) {
+          if (forms.some(f => text223.includes(f))) groupsHit223++;
+        }
+        return groupsHit223 >= 2;
+      });
+      if (!anyCostaged223) {
+        issues.push({
+          location: 'Thematic placement',
+          rule: 'THEME_POLES_NEVER_COSTAGED',
+          severity: 'minor',
+          description: `The theme "${themeRaw}" has ${keywords.length} keyword groups but no single scene contains language from two or more of them simultaneously. The theme's poles are never staged in tension — each dimension appears in isolation, diluting the central conflict.`,
+          suggestedFix: `Write at least one scene that dramatizes the collision of both thematic poles — a moment where "${keywords[0]}" and "${keywords[1]}" are in active opposition within the same scene, forcing a character to embody or choose between them.`,
+        });
+      }
+    }
+
+    // ── Wave 223: THEME_RESONANCE_EMOTIONALLY_INERT ───────────────────────────
+    // Theme only truly lands when it coincides with emotional stakes. If every
+    // thematically resonant scene is emotionally flat — neutral emotional shift
+    // AND zero suspense delta — the audience registers the theme intellectually
+    // but never feels it. Theme must be dramatized at moments of genuine heat.
+    if (resonantScenes.length >= 3) {
+      const hasChargedResonance223 = resonantScenes.some(r =>
+        r.emotionalShift !== 'neutral' || r.suspenseDelta > 0,
+      );
+      if (!hasChargedResonance223) {
+        issues.push({
+          location: 'Thematic placement',
+          rule: 'THEME_RESONANCE_EMOTIONALLY_INERT',
+          severity: 'minor',
+          description: `All ${resonantScenes.length} thematically resonant scenes for "${themeRaw}" carry flat emotional charge (neutral shift, zero suspense delta). Theme is acknowledged but never felt — it needs at least one scene where thematic resonance coincides with genuine stakes.`,
+          suggestedFix: `Move thematic beats into scenes of emotional heat: a breakthrough, a loss, a rising tension moment. The theme lands hardest when a character's world changes as they confront what the story is about.`,
+        });
+      }
+    }
   }
 
   const { revised, usedLLM } = await rewritePass({
