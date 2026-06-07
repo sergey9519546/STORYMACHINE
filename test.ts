@@ -17897,6 +17897,176 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 238 — voicePass: negation saturation, conditional overload, dialogue flat punctuation', async () => {
+    it('NEGATION_SATURATION fires when >40% of dialogue lines contain negation words', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 12 dialogue lines, 10 with negation words → 83%
+      const f238a = [
+        'INT. ROOM - DAY', '',
+        'ALICE', "No, I won't do it.",
+        'BOB', "You can't stop me.",
+        'ALICE', "I don't think that's right.",
+        'BOB', "It isn't even possible.",
+        'ALICE', 'Nothing will change. Not tonight.',
+        'BOB', "She can't be trusted. Nobody can.",
+        'ALICE', "That isn't what I said.",
+        'BOB', 'I wasn\'t there when it happened.',
+        'ALICE', "It's not my fault.",
+        'BOB', "Don't be absurd. Never.",
+        'ALICE', "I'll be fine.",
+        'BOB', 'Of course it matters.',
+      ].join('\n');
+      const result = await voicePass({
+        fountain: f238a, original: f238a,
+        records: [] as any, structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'NEGATION_SATURATION'),
+        `Expected NEGATION_SATURATION, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`,
+      );
+    });
+
+    it('NEGATION_SATURATION does NOT fire when ≤40% of dialogue lines have negation words', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 10 dialogue lines, only 1 with negation → 10%
+      const f238b = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'Tell me everything you know.',
+        'BOB', 'It happened yesterday at noon.',
+        'ALICE', 'Who was there with you.',
+        'BOB', 'Just me and the others.',
+        'ALICE', 'What did you see.',
+        'BOB', 'I saw the whole thing clearly.',
+        'ALICE', 'Good. Let us keep moving forward.',
+        'BOB', "No, I can't do that.",
+        'ALICE', 'Interesting. Go on.',
+        'BOB', 'Right. As I was saying.',
+      ].join('\n');
+      const result = await voicePass({
+        fountain: f238b, original: f238b,
+        records: [] as any, structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'NEGATION_SATURATION'),
+        'Should NOT fire when ≤40% of dialogue lines have negation words',
+      );
+    });
+
+    it('CONDITIONAL_OVERLOAD fires when >30% of action lines contain conditionals', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 10 action lines, 5 with conditional constructions → 50%
+      const f238c = [
+        'INT. ROOM - DAY', '',
+        'If she moves, he will know.',
+        'Alice waits by the door.',
+        'If the signal drops, they lose contact.',
+        'He checks the window latch.',
+        'Unless she speaks now, it passes.',
+        'The clock ticks.',
+        'In case anyone calls, he was out.',
+        'She reaches for the handle.',
+        'If the lights cut, they are trapped.',
+        'The floor creaks.',
+      ].join('\n');
+      const result = await voicePass({
+        fountain: f238c, original: f238c,
+        records: [] as any, structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'CONDITIONAL_OVERLOAD'),
+        `Expected CONDITIONAL_OVERLOAD, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`,
+      );
+    });
+
+    it('CONDITIONAL_OVERLOAD does NOT fire when ≤30% of action lines contain conditionals', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 10 action lines, only 1 with conditional → 10%
+      const f238d = [
+        'INT. ROOM - DAY', '',
+        'Alice stands by the window.',
+        'The clock on the wall shows noon.',
+        'She crosses to the table and sits.',
+        'Bob enters from the hallway.',
+        'If she moves, he notices.',
+        'Alice checks the drawer.',
+        'He takes a seat opposite her.',
+        'The room is silent.',
+        'She sets the folder down carefully.',
+        'Bob opens his notebook.',
+      ].join('\n');
+      const result = await voicePass({
+        fountain: f238d, original: f238d,
+        records: [] as any, structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'CONDITIONAL_OVERLOAD'),
+        'Should NOT fire when ≤30% of action lines have conditionals',
+      );
+    });
+
+    it('DIALOGUE_FLAT_PUNCTUATION fires when >85% of dialogue lines end with a period and <5% are ? or !', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 12 dialogue lines, all ending with period, none with ? or !
+      const f238e = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'Tell me what happened.',
+        'BOB', 'It started three days ago.',
+        'ALICE', 'I see. Go on.',
+        'BOB', 'We met at the warehouse.',
+        'ALICE', 'That makes sense.',
+        'BOB', 'He was already there.',
+        'ALICE', 'Interesting. What next.',
+        'BOB', 'We made the exchange.',
+        'ALICE', 'Good. And then.',
+        'BOB', 'He left immediately after.',
+        'ALICE', 'Right. We know the rest.',
+        'BOB', 'I think so.',
+      ].join('\n');
+      const result = await voicePass({
+        fountain: f238e, original: f238e,
+        records: [] as any, structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'DIALOGUE_FLAT_PUNCTUATION'),
+        `Expected DIALOGUE_FLAT_PUNCTUATION, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`,
+      );
+    });
+
+    it('DIALOGUE_FLAT_PUNCTUATION does NOT fire when dialogue has question marks', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 12 dialogue lines, 2 ending with ? → 16.7% question rate > 5%
+      const f238f = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'Tell me what happened.',
+        'BOB', 'It started three days ago.',
+        'ALICE', 'What exactly did you see?',
+        'BOB', 'We met at the warehouse.',
+        'ALICE', 'And who was there?',
+        'BOB', 'He was already there.',
+        'ALICE', 'Good. And what then.',
+        'BOB', 'We made the exchange.',
+        'ALICE', 'Right. Understood.',
+        'BOB', 'He left afterward.',
+        'ALICE', 'Clear enough.',
+        'BOB', 'I think so.',
+      ].join('\n');
+      const result = await voicePass({
+        fountain: f238f, original: f238f,
+        records: [] as any, structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'DIALOGUE_FLAT_PUNCTUATION'),
+        'Should NOT fire when dialogue includes question marks',
+      );
+    });
+  });
+
   describe('Wave 237 — themePass: revelation decoupled, clock resonance absent, relationship-shift decoupled', async () => {
     const makeRec237 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

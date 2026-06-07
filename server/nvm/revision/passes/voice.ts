@@ -775,6 +775,99 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 238: Negation saturation, conditional overload, dialogue flat punctuation ──
+
+  // NEGATION_SATURATION (minor, ≥10 dialogue lines): More than 40% of dialogue
+  // lines contain a negation word (no, not, never, can't, won't, don't, isn't,
+  // aren't, etc.). Dialogue dominated by negation is dialogue dominated by refusal
+  // — characters say no more than they say yes, orbiting around what they will
+  // not do rather than what they want. Drama requires forward-reaching desire;
+  // negation saturation creates a texture of blocked energy rather than driven
+  // intent. Distinct from QUESTION_MARK_OVERLOAD (inquiry without commitment).
+  {
+    const negDlgLines238: string[] = [];
+    let negInDlg238 = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { negInDlg238 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { negInDlg238 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { negInDlg238 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (negInDlg238) negDlgLines238.push(t);
+      else negInDlg238 = false;
+    }
+    if (negDlgLines238.length >= 10) {
+      const negRe238 = /\b(no\b|not\b|never\b|can't|won't|don't|isn't|aren't|wasn't|weren't|couldn't|wouldn't|shouldn't|shan't|mustn't|nothing|nobody|nowhere|neither|nor)\b/i;
+      const negCount238 = negDlgLines238.filter(l => negRe238.test(l)).length;
+      if (negCount238 / negDlgLines238.length > 0.4) {
+        issues.push({
+          location: 'Dialogue negation density',
+          rule: 'NEGATION_SATURATION',
+          severity: 'minor',
+          description: `${negCount238} of ${negDlgLines238.length} dialogue lines (${Math.round(negCount238 / negDlgLines238.length * 100)}%) contain a negation word ("no", "not", "never", "can't", "won't", etc.) — the dialogue is dominated by refusal. Characters spend more time denying than reaching toward desire. Drama requires forward-directed want, not denial orbits.`,
+          suggestedFix: "Rebalance by converting negation lines to active desire: 'I won't go back' → 'I'm moving forward no matter what.' Refusal is dramatic only when it costs something; negation as default register is avoidance, not conflict.",
+        });
+      }
+    }
+  }
+
+  // CONDITIONAL_OVERLOAD (minor, ≥8 action lines): More than 30% of action lines
+  // contain a conditional construction ("if ", "unless ", "in case", "as long as",
+  // "assuming"). Conditional action prose speculates instead of asserting — the
+  // camera cannot film a hypothetical. Every "if" in an action line introduces a
+  // subjunctive that undermines the declarative, present-tense certainty of
+  // cinematic prose. Distinct from QUALIFIER_OVERLOAD (hedging adverbs) and
+  // DECLARATIVE_PILE (absence of subordinating clauses in rhythm pass): this fires
+  // when action lines are conditional hypotheticals rather than visual assertions.
+  if (actionOnlyLines.length >= 8) {
+    const conditionalRe238 = /\bif\s|\bunless\s|\bin case\b|\bas long as\b|\bassuming\b/i;
+    const condCount238 = actionOnlyLines.filter(l => conditionalRe238.test(l)).length;
+    if (condCount238 / actionOnlyLines.length > 0.3) {
+      issues.push({
+        location: 'Action line conditionality',
+        rule: 'CONDITIONAL_OVERLOAD',
+        severity: 'minor',
+        description: `${condCount238} of ${actionOnlyLines.length} action lines (${Math.round(condCount238 / actionOnlyLines.length * 100)}%) contain a conditional construction ("if", "unless", "in case") — the camera cannot film hypotheticals. Conditional action lines introduce speculation where the prose should assert the visual present tense.`,
+        suggestedFix: "Rewrite conditional action lines into declarations: 'If she moves, he'll know' → 'She freezes. He watches.' Commit to what is happening in the scene, not what might happen under conditions. Conditionals belong in dialogue, not action prose.",
+      });
+    }
+  }
+
+  // DIALOGUE_FLAT_PUNCTUATION (minor, ≥10 dialogue lines): More than 85% of
+  // dialogue lines end with a period, while fewer than 5% end with ? and fewer
+  // than 5% end with !. Uniformly period-terminated dialogue has no punctuation-
+  // based tonal texture — all exchanges are flat declaratives with no questions
+  // or exclamatory beats to vary the emotional pitch. Real conversation has
+  // punctuation variety; bloodless prose uses periods by default.
+  {
+    const flatDlg238: string[] = [];
+    let fpInDlg238 = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { fpInDlg238 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { fpInDlg238 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { fpInDlg238 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (fpInDlg238) flatDlg238.push(t);
+      else fpInDlg238 = false;
+    }
+    if (flatDlg238.length >= 10) {
+      const periodCount238 = flatDlg238.filter(l => l.endsWith('.')).length;
+      const questionCount238 = flatDlg238.filter(l => l.endsWith('?')).length;
+      const exclaimCount238 = flatDlg238.filter(l => l.endsWith('!')).length;
+      const periodRate238 = periodCount238 / flatDlg238.length;
+      if (periodRate238 > 0.85 && questionCount238 / flatDlg238.length < 0.05 && exclaimCount238 / flatDlg238.length < 0.05) {
+        issues.push({
+          location: 'Dialogue punctuation texture',
+          rule: 'DIALOGUE_FLAT_PUNCTUATION',
+          severity: 'minor',
+          description: `${periodCount238} of ${flatDlg238.length} dialogue lines (${Math.round(periodRate238 * 100)}%) end with a period, with only ${questionCount238} questions and ${exclaimCount238} exclamations — the dialogue is punctuationally flat. Uniformly period-terminated dialogue reads as scripted and bloodless; real conversation has tonal pitch variation.`,
+          suggestedFix: `Introduce punctuation variety: convert some declarative responses to genuine questions, add exclamatory beats at moments of shock or urgency. Punctuation is the cadence of breath — uniform periods strip dialogue of its pulse. Even two or three questions per page change the register dramatically.`,
+        });
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'voice', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
