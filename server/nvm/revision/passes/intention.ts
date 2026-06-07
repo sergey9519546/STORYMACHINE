@@ -650,6 +650,105 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 230: Secondary intention vacuum, proactive overclustering, reactive goal adoption ──
+
+  // SECONDARY_INTENTION_VACUUM (minor, n≥8): The story has ≥3 proactive acts
+  // (clock raised or clue planted) but ALL tracked intentions collapse to a single
+  // character — every dialogue highlight belongs to one speaker. The protagonist's
+  // agency exists in a social vacuum where no other character is demonstrably
+  // pursuing anything. Complements AGENCY_ENTROPY_COLLAPSE (which requires ≥2
+  // distinct speakers to even compute entropy); this catches the extreme collapse
+  // where the secondary cast has zero legible goal-bearing dialogue.
+  if (n >= 8) {
+    const proactiveCount230 = records.filter(
+      r => r.clockRaised || (r.seededClueIds?.length ?? 0) > 0,
+    ).length;
+    if (proactiveCount230 >= 3) {
+      const charIds230 = new Set<string>();
+      let totalHL230 = 0;
+      for (const r of records) {
+        for (const d of (r.dialogueHighlights ?? [])) {
+          const m = d.match(/^(\w+):/);
+          if (m) {
+            charIds230.add(m[1]);
+            totalHL230++;
+          }
+        }
+      }
+      if (totalHL230 >= 4 && charIds230.size === 1) {
+        const [onlyChar230] = charIds230;
+        issues.push({
+          location: 'Intention distribution',
+          rule: 'SECONDARY_INTENTION_VACUUM',
+          severity: 'minor',
+          description: `All ${totalHL230} intention-bearing dialogue highlights belong to a single character (${onlyChar230.toUpperCase()}) — the rest of the cast has no tracked goals or beliefs. The protagonist's agency exists in a social vacuum where no other character is demonstrably pursuing anything.`,
+          suggestedFix: 'Give at least one secondary character a legible intention: a belief they act on, a goal that competes with or complements the protagonist\'s. Drama is the collision of visible desires — a cast of props around one willing agent flattens the conflict field.',
+        });
+      }
+    }
+  }
+
+  // PROACTIVE_OVERCLUSTERING (minor, n≥10): The protagonist's proactive acts (≥3)
+  // are all clustered within a tight zone spanning ≤20% of the story, while ≥50%
+  // of scenes are passive. All initiative arrives in one burst — the protagonist is
+  // active for one chapter and passive for everything else before and after it.
+  if (n >= 10) {
+    const proactiveIdxs230: number[] = [];
+    for (let i = 0; i < n; i++) {
+      if (records[i].clockRaised || (records[i].seededClueIds?.length ?? 0) > 0) {
+        proactiveIdxs230.push(i);
+      }
+    }
+    if (proactiveIdxs230.length >= 3) {
+      const firstPro230 = proactiveIdxs230[0];
+      const lastPro230 = proactiveIdxs230[proactiveIdxs230.length - 1];
+      const span230 = lastPro230 - firstPro230;
+      const passiveScenes230 = n - proactiveIdxs230.length;
+      if (span230 <= Math.floor(n * 0.2) && passiveScenes230 / n >= 0.5) {
+        issues.push({
+          location: `Proactive cluster (Scenes ${firstPro230}–${lastPro230})`,
+          rule: 'PROACTIVE_OVERCLUSTERING',
+          severity: 'minor',
+          description: `All ${proactiveIdxs230.length} proactive scenes are clustered within a ${span230}-scene span (Scenes ${firstPro230}–${lastPro230}, ≤20% of the story). The protagonist's initiative arrives in one burst and is absent for the rest of the arc — initiative must be threaded throughout, not discharged all at once.`,
+          suggestedFix: 'Redistribute proactive beats across the full arc: move some earlier to establish agency from the outset, and reserve at least one for the final act to drive the climax. The protagonist must be continuously willing, not intermittently active.',
+        });
+      }
+    }
+  }
+
+  // REACTIVE_GOAL_ADOPTION (minor, n≥6): All proactive acts (≥2) are immediately
+  // preceded by or coincident with a negative trigger — a reversal (suspenseDelta < -1)
+  // in the prior scene, or a negative emotional shift in the same or prior scene.
+  // The protagonist only acts when forced by adversity; they never initiate from
+  // autonomous desire. True protagonism requires at least one proactive beat born
+  // from internal want, not external push.
+  if (n >= 6) {
+    const proactiveItems230: number[] = [];
+    for (let i = 0; i < n; i++) {
+      if (records[i].clockRaised || (records[i].seededClueIds?.length ?? 0) > 0) {
+        proactiveItems230.push(i);
+      }
+    }
+    if (proactiveItems230.length >= 2) {
+      const allReactive230 = proactiveItems230.every(idx => {
+        const selfNeg230 = records[idx].emotionalShift === 'negative';
+        const priorReversal230 = idx > 0 && records[idx - 1].suspenseDelta < -1;
+        const priorNeg230 = idx > 0 && records[idx - 1].emotionalShift === 'negative';
+        return selfNeg230 || priorReversal230 || priorNeg230;
+      });
+      if (allReactive230) {
+        issues.push({
+          location: 'Intention layer — protagonist drive',
+          rule: 'REACTIVE_GOAL_ADOPTION',
+          severity: 'minor',
+          description: `All ${proactiveItems230.length} proactive acts follow immediately after a negative trigger (reversal or negative emotional beat) — the protagonist only acts when forced by adversity, never from autonomous desire. True protagonism requires at least one proactive move born from internal want.`,
+          suggestedFix: 'Add at least one proactive scene where the protagonist initiates from their own desire rather than in response to a setback — a choice made from hope, curiosity, or ambition. Reactive protagonism reduces the character to a rubber ball: the story bounces them rather than watching them run.',
+        });
+      }
+    }
+  }
+  // ── End Wave 230 ─────────────────────────────────────────────────────────────
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'intention', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

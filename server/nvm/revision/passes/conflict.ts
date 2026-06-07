@@ -603,6 +603,94 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 229: Reversal tempo flatline, telegraphed antagonist, positive resolution too early ──
+
+  // REVERSAL_TEMPO_FLATLINE (minor, n≥10): Reversal-level conflict events exist but
+  // their average interval exceeds 40% of the total scene count — the conflict pulse
+  // is so slow that narrative momentum stalls between beats. Unlike
+  // CONFLICT_FREQUENCY_DROP (which compares thirds), this measures absolute spacing
+  // rhythm and fires when events are chronically far apart regardless of distribution.
+  if (records.length >= 10) {
+    const conflictEventIdxs229: number[] = [];
+    for (let i = 0; i < records.length; i++) {
+      const r = records[i];
+      if (r.suspenseDelta < -1 ||
+          (r.relationshipShifts ?? []).some((s: any) => s.amount < -0.4)) {
+        conflictEventIdxs229.push(i);
+      }
+    }
+    if (conflictEventIdxs229.length >= 2) {
+      const gaps229: number[] = [];
+      for (let j = 1; j < conflictEventIdxs229.length; j++) {
+        gaps229.push(conflictEventIdxs229[j] - conflictEventIdxs229[j - 1]);
+      }
+      const avgGap229 = gaps229.reduce((a, b) => a + b, 0) / gaps229.length;
+      const gapThreshold229 = records.length * 0.4;
+      if (avgGap229 > gapThreshold229) {
+        issues.push({
+          location: 'Conflict rhythm',
+          rule: 'REVERSAL_TEMPO_FLATLINE',
+          severity: 'minor',
+          description: `Conflict events are spaced an average of ${avgGap229.toFixed(1)} scenes apart (threshold: ${gapThreshold229.toFixed(1)}) — the narrative pulse is so slow that dramatic momentum stalls. The story has ${conflictEventIdxs229.length} conflict beats across ${records.length} scenes.`,
+          suggestedFix: 'Reduce the interval between conflict events: add micro-reversals, raise a clock between major beats, or introduce small relational friction to keep pressure present. A conflict rhythm of one beat every 3–4 scenes sustains tension.',
+        });
+      }
+    }
+  }
+
+  // ANTAGONIST_TELEGRAPHED (minor, n≥10): Every deep reversal (suspenseDelta < -2)
+  // is immediately preceded by a clock raise in the prior scene — the antagonist only
+  // strikes after a warning. Real opposition needs unpredictable strikes: a reversal
+  // with no advance warning creates genuine dread that telegraphed attacks cannot.
+  if (records.length >= 10) {
+    const deepReversals229 = records
+      .map((r: any, i: number) => ({ r, i }))
+      .filter(({ r }: any) => r.suspenseDelta < -2);
+    if (deepReversals229.length >= 2) {
+      const allTelegraphed229 = deepReversals229.every(({ i }: any) =>
+        i > 0 && records[i - 1].clockRaised,
+      );
+      if (allTelegraphed229) {
+        issues.push({
+          location: 'Conflict — reversal pattern',
+          rule: 'ANTAGONIST_TELEGRAPHED',
+          severity: 'minor',
+          description: `Every reversal (${deepReversals229.length} events, suspenseDelta < -2) is immediately preceded by a clock raise — the antagonist only strikes after a warning. Permanently telegraphed attacks eliminate genuine shock from the conflict.`,
+          suggestedFix: 'Remove the preceding clock raise from at least one reversal, or introduce a strike where the prior scene carried no threat signal. Unpredictable antagonist action creates dread; telegraphed opposition only builds anxiety.',
+        });
+      }
+    }
+  }
+
+  // POSITIVE_RESOLUTION_TOO_EARLY (major, n≥8): The story's most significant
+  // positive relationship shift (largest-magnitude, ≥0.4) occurs before the 60%
+  // mark. The central reconciliation front-loads the emotional reward — the final
+  // act has nowhere left to go. The structural complement to INTERPERSONAL_PEAK_TOO_EARLY.
+  if (records.length >= 8) {
+    const posShiftScenes229: Array<{ sceneIdx: number; recIdx: number; amount: number }> = [];
+    for (let i = 0; i < records.length; i++) {
+      for (const shift of (records[i].relationshipShifts ?? []) as Array<{ amount: number }>) {
+        if (shift.amount >= 0.4) {
+          posShiftScenes229.push({ sceneIdx: records[i].sceneIdx, recIdx: i, amount: shift.amount });
+        }
+      }
+    }
+    if (posShiftScenes229.length >= 3) {
+      const peakPos229 = posShiftScenes229.reduce((best, s) => s.amount > best.amount ? s : best);
+      const earlyZone229 = Math.floor(records.length * 0.6);
+      if (peakPos229.recIdx < earlyZone229) {
+        issues.push({
+          location: `Scene ${peakPos229.sceneIdx} (relational peak resolution)`,
+          rule: 'POSITIVE_RESOLUTION_TOO_EARLY',
+          severity: 'major',
+          description: `The story's most significant positive relationship shift (+${peakPos229.amount.toFixed(2)}) occurs at Scene ${peakPos229.sceneIdx} — ${Math.round(peakPos229.recIdx / records.length * 100)}% through the story, before the 60% mark. The central reconciliation arrives too early; the final act has nowhere left to go emotionally.`,
+          suggestedFix: 'Reserve the most significant positive relationship shift for the climax or resolution zone (60%+). Let the characters earn their reconciliation at the story\'s peak — the audience must be made to wait for the reward they sense is coming.',
+        });
+      }
+    }
+  }
+  // ── End Wave 229 ─────────────────────────────────────────────────────────────
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'conflict', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

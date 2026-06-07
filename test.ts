@@ -15857,6 +15857,449 @@ Goodnight.
     });
   });
 
+  describe('Wave 230 — intentionPass: secondary intention vacuum, proactive overclustering, reactive goal adoption', async () => {
+    const makeRec230 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, dialogueHighlights: [],
+      revelation: null, purpose: 'development', dramaticTurn: '',
+      seededClueIds: [], payoffSetupIds: [], relationshipShifts: [],
+      ...overrides,
+    });
+
+    it('SECONDARY_INTENTION_VACUUM fires when all highlights belong to one character', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 8 scenes; 3 proactive acts; 4 highlights all from 'alice'
+      const records230a = [
+        makeRec230(0, { clockRaised: true, dialogueHighlights: ['alice: wants the truth'] }),
+        makeRec230(1, { dialogueHighlights: ['alice: fears exposure'] }),
+        makeRec230(2, { seededClueIds: ['clue1'], dialogueHighlights: ['alice: plans to escape'] }),
+        makeRec230(3),
+        makeRec230(4, { clockRaised: true, dialogueHighlights: ['alice: resolves to fight'] }),
+        makeRec230(5),
+        makeRec230(6),
+        makeRec230(7),
+      ];
+      const fountain230a = records230a.map(r => `INT. SC${r.sceneIdx} - DAY\nALICE\nLine.\nBOB\nOther line.`).join('\n');
+      const result = await intentionPass({
+        fountain: fountain230a, original: fountain230a,
+        records: records230a,
+        structure: { escalating: true, reversalCount: 1, actPosition: 'act2', reversalDensity: 1, revelationCount: 0, completionPercent: 60, approachingClimax: false },
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'SECONDARY_INTENTION_VACUUM');
+      assert.ok(match.length >= 1, `Expected SECONDARY_INTENTION_VACUUM, got: ${JSON.stringify(result.issues.map((i:any)=>i.rule))}`);
+    });
+
+    it('SECONDARY_INTENTION_VACUUM does NOT fire when a secondary has tracked intentions', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      const records230b = [
+        makeRec230(0, { clockRaised: true, dialogueHighlights: ['alice: wants justice'] }),
+        makeRec230(1, { dialogueHighlights: ['bob: fears discovery'] }),
+        makeRec230(2, { seededClueIds: ['clue1'] }),
+        makeRec230(3),
+        makeRec230(4, { clockRaised: true }),
+        makeRec230(5),
+        makeRec230(6, { dialogueHighlights: ['alice: plans escape', 'bob: plans deception'] }),
+        makeRec230(7),
+      ];
+      const fountain230b = records230b.map(r => `INT. SC${r.sceneIdx} - DAY\nALICE\nLine.\nBOB\nOther.`).join('\n');
+      const result = await intentionPass({
+        fountain: fountain230b, original: fountain230b,
+        records: records230b,
+        structure: { escalating: true, reversalCount: 1, actPosition: 'act2', reversalDensity: 1, revelationCount: 0, completionPercent: 60, approachingClimax: false },
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'SECONDARY_INTENTION_VACUUM');
+      assert.strictEqual(match.length, 0, 'Should NOT fire when secondary character has tracked intentions');
+    });
+
+    it('PROACTIVE_OVERCLUSTERING fires when all proactive acts are in a tight cluster', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 10 scenes; 3 proactive acts all in scenes 4,5,6 (span=2, 20% of 10=2.0 — span≤2 and passive=7/10=70%)
+      const records230c = Array.from({ length: 10 }, (_, i) =>
+        makeRec230(i, {
+          clockRaised: [4, 5, 6].includes(i),
+          seededClueIds: i === 5 ? ['clue1'] : [],
+        }),
+      );
+      const fountain230c = records230c.map(r => `INT. SC${r.sceneIdx} - DAY\nALICE\nLine.`).join('\n');
+      const result = await intentionPass({
+        fountain: fountain230c, original: fountain230c,
+        records: records230c,
+        structure: { escalating: false, reversalCount: 0, actPosition: 'act2', reversalDensity: 0, revelationCount: 0, completionPercent: 70, approachingClimax: false },
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'PROACTIVE_OVERCLUSTERING');
+      assert.ok(match.length >= 1, `Expected PROACTIVE_OVERCLUSTERING, got: ${JSON.stringify(result.issues.map((i:any)=>i.rule))}`);
+    });
+
+    it('PROACTIVE_OVERCLUSTERING does NOT fire when proactive acts are spread out', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 10 scenes; proactive acts at 0, 4, 9 — span of 9 (90% of 10)
+      const records230d = Array.from({ length: 10 }, (_, i) =>
+        makeRec230(i, { clockRaised: [0, 4, 9].includes(i) }),
+      );
+      const fountain230d = records230d.map(r => `INT. SC${r.sceneIdx} - DAY\nALICE\nLine.`).join('\n');
+      const result = await intentionPass({
+        fountain: fountain230d, original: fountain230d,
+        records: records230d,
+        structure: { escalating: true, reversalCount: 1, actPosition: 'act2', reversalDensity: 1, revelationCount: 0, completionPercent: 80, approachingClimax: false },
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'PROACTIVE_OVERCLUSTERING');
+      assert.strictEqual(match.length, 0, 'Should NOT fire when proactive acts are spread across the arc');
+    });
+
+    it('REACTIVE_GOAL_ADOPTION fires when all proactive acts follow negative triggers', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 6 scenes; proactive acts at scenes 2 and 4, both preceded by negative-shift scenes
+      const records230e = [
+        makeRec230(0),
+        makeRec230(1, { emotionalShift: 'negative' }),       // negative trigger
+        makeRec230(2, { clockRaised: true }),                // proactive act after negative
+        makeRec230(3, { suspenseDelta: -2 }),                // reversal trigger
+        makeRec230(4, { seededClueIds: ['clue1'] }),         // proactive act after reversal
+        makeRec230(5),
+      ];
+      const fountain230e = records230e.map(r => `INT. SC${r.sceneIdx} - DAY\nALICE\nLine.`).join('\n');
+      const result = await intentionPass({
+        fountain: fountain230e, original: fountain230e,
+        records: records230e,
+        structure: { escalating: false, reversalCount: 1, actPosition: 'act2', reversalDensity: 1, revelationCount: 0, completionPercent: 50, approachingClimax: false },
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'REACTIVE_GOAL_ADOPTION');
+      assert.ok(match.length >= 1, `Expected REACTIVE_GOAL_ADOPTION, got: ${JSON.stringify(result.issues.map((i:any)=>i.rule))}`);
+    });
+
+    it('REACTIVE_GOAL_ADOPTION does NOT fire when at least one proactive act is autonomous', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 6 scenes; proactive act at scene 1 (neutral prior) = autonomous
+      const records230f = [
+        makeRec230(0, { emotionalShift: 'neutral' }),
+        makeRec230(1, { clockRaised: true }),                // autonomous proactive act
+        makeRec230(2, { suspenseDelta: -2 }),
+        makeRec230(3, { seededClueIds: ['clue1'] }),         // reactive proactive act
+        makeRec230(4),
+        makeRec230(5),
+      ];
+      const fountain230f = records230f.map(r => `INT. SC${r.sceneIdx} - DAY\nALICE\nLine.`).join('\n');
+      const result = await intentionPass({
+        fountain: fountain230f, original: fountain230f,
+        records: records230f,
+        structure: { escalating: true, reversalCount: 1, actPosition: 'act2', reversalDensity: 1, revelationCount: 0, completionPercent: 50, approachingClimax: false },
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'REACTIVE_GOAL_ADOPTION');
+      assert.strictEqual(match.length, 0, 'Should NOT fire when at least one proactive act is autonomous');
+    });
+  });
+
+  describe('Wave 229 — conflictPass: reversal tempo flatline, telegraphed antagonist, positive resolution too early', async () => {
+    const makeRec229 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, dialogueHighlights: [],
+      revelation: null, purpose: 'development', dramaticTurn: '',
+      seededClueIds: [], payoffSetupIds: [], relationshipShifts: [],
+      ...overrides,
+    });
+
+    it('REVERSAL_TEMPO_FLATLINE fires when conflict events are spaced too far apart', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 10 scenes; conflict events only at scenes 0 and 8 → gap of 8 scenes, threshold 10*0.4=4
+      const records229a = [
+        makeRec229(0, { suspenseDelta: -2 }),
+        makeRec229(1), makeRec229(2), makeRec229(3), makeRec229(4),
+        makeRec229(5), makeRec229(6), makeRec229(7),
+        makeRec229(8, { suspenseDelta: -2 }),
+        makeRec229(9),
+      ];
+      const result = await conflictPass({
+        fountain: records229a.map(r => `INT. SC${r.sceneIdx} - DAY\nAction line.`).join('\n'),
+        original: '', records: records229a,
+        structure: { escalating: true, avgSuspensePerScene: 0, reversalDensity: 2, openClues: 0, completionPercent: 90, approachingClimax: false },
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'REVERSAL_TEMPO_FLATLINE');
+      assert.ok(match.length >= 1, `Expected REVERSAL_TEMPO_FLATLINE, got: ${JSON.stringify(result.issues.map((i:any)=>i.rule))}`);
+    });
+
+    it('REVERSAL_TEMPO_FLATLINE does NOT fire when conflict events are closely spaced', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 10 scenes; conflict events at 1,3,5,7 → average gap of 2, threshold 4
+      const records229b = Array.from({ length: 10 }, (_, i) =>
+        makeRec229(i, { suspenseDelta: [1, 3, 5, 7].includes(i) ? -2 : 0 }),
+      );
+      const result = await conflictPass({
+        fountain: records229b.map(r => `INT. SC${r.sceneIdx} - DAY\nAction line.`).join('\n'),
+        original: '', records: records229b,
+        structure: { escalating: true, avgSuspensePerScene: 1, reversalDensity: 4, openClues: 0, completionPercent: 90, approachingClimax: false },
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'REVERSAL_TEMPO_FLATLINE');
+      assert.strictEqual(match.length, 0, 'Should NOT fire when conflict events are closely spaced');
+    });
+
+    it('ANTAGONIST_TELEGRAPHED fires when every deep reversal follows a clock raise', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 10 scenes; reversals at 3 and 7, both preceded by clockRaised at 2 and 6
+      const records229c = [
+        makeRec229(0), makeRec229(1),
+        makeRec229(2, { clockRaised: true }),
+        makeRec229(3, { suspenseDelta: -3 }),
+        makeRec229(4), makeRec229(5),
+        makeRec229(6, { clockRaised: true }),
+        makeRec229(7, { suspenseDelta: -3 }),
+        makeRec229(8), makeRec229(9),
+      ];
+      const result = await conflictPass({
+        fountain: records229c.map(r => `INT. SC${r.sceneIdx} - DAY\nAction line.`).join('\n'),
+        original: '', records: records229c,
+        structure: { escalating: true, avgSuspensePerScene: 0.5, reversalDensity: 2, openClues: 0, completionPercent: 80, approachingClimax: false },
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'ANTAGONIST_TELEGRAPHED');
+      assert.ok(match.length >= 1, `Expected ANTAGONIST_TELEGRAPHED, got: ${JSON.stringify(result.issues.map((i:any)=>i.rule))}`);
+    });
+
+    it('ANTAGONIST_TELEGRAPHED does NOT fire when at least one reversal is unpredicted', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 10 scenes; reversal at 3 (preceded by clock), reversal at 7 (NOT preceded by clock)
+      const records229d = [
+        makeRec229(0), makeRec229(1),
+        makeRec229(2, { clockRaised: true }),
+        makeRec229(3, { suspenseDelta: -3 }),
+        makeRec229(4), makeRec229(5), makeRec229(6),
+        makeRec229(7, { suspenseDelta: -3 }),  // no preceding clockRaised
+        makeRec229(8), makeRec229(9),
+      ];
+      const result = await conflictPass({
+        fountain: records229d.map(r => `INT. SC${r.sceneIdx} - DAY\nAction line.`).join('\n'),
+        original: '', records: records229d,
+        structure: { escalating: true, avgSuspensePerScene: 0.5, reversalDensity: 2, openClues: 0, completionPercent: 80, approachingClimax: false },
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'ANTAGONIST_TELEGRAPHED');
+      assert.strictEqual(match.length, 0, 'Should NOT fire when at least one reversal is unpredicted');
+    });
+
+    it('POSITIVE_RESOLUTION_TOO_EARLY fires when the biggest positive shift is before 60%', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 8 scenes; ≥3 positive shifts; biggest (+0.8) at scene 3 (recIdx=3, 37% of 8) — before 60% mark (recIdx 4)
+      const records229e = [
+        makeRec229(0, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.4 }] }),
+        makeRec229(1),
+        makeRec229(2, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.5 }] }),
+        makeRec229(3, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.8 }] }),
+        makeRec229(4),
+        makeRec229(5, { emotionalShift: 'negative' }),
+        makeRec229(6, { emotionalShift: 'negative' }),
+        makeRec229(7, { emotionalShift: 'negative' }),
+      ];
+      const result = await conflictPass({
+        fountain: records229e.map(r => `INT. SC${r.sceneIdx} - DAY\nAction line.`).join('\n'),
+        original: '', records: records229e,
+        structure: { escalating: false, avgSuspensePerScene: 0, reversalDensity: 0, openClues: 0, completionPercent: 90, approachingClimax: false },
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'POSITIVE_RESOLUTION_TOO_EARLY');
+      assert.ok(match.length >= 1, `Expected POSITIVE_RESOLUTION_TOO_EARLY, got: ${JSON.stringify(result.issues.map((i:any)=>i.rule))}`);
+    });
+
+    it('POSITIVE_RESOLUTION_TOO_EARLY does NOT fire when biggest positive shift is after 60%', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 8 scenes; biggest positive shift at scene 6 (recIdx=6, 75%) — after 60% mark
+      const records229f = [
+        makeRec229(0, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.4 }] }),
+        makeRec229(1),
+        makeRec229(2, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.4 }] }),
+        makeRec229(3, { emotionalShift: 'negative' }),
+        makeRec229(4, { emotionalShift: 'negative' }),
+        makeRec229(5, { emotionalShift: 'negative' }),
+        makeRec229(6, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.9 }] }),
+        makeRec229(7, { emotionalShift: 'positive' }),
+      ];
+      const result = await conflictPass({
+        fountain: records229f.map(r => `INT. SC${r.sceneIdx} - DAY\nAction line.`).join('\n'),
+        original: '', records: records229f,
+        structure: { escalating: true, avgSuspensePerScene: 0.5, reversalDensity: 1, openClues: 0, completionPercent: 90, approachingClimax: false },
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'POSITIVE_RESOLUTION_TOO_EARLY');
+      assert.strictEqual(match.length, 0, 'Should NOT fire when biggest positive shift is in the resolution zone');
+    });
+  });
+
+  describe('Wave 228 — characterArcPass: protagonist untested socially, midpoint relational void, final-act character static', async () => {
+    const makeRec228 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, dialogueHighlights: [],
+      revelation: null, purpose: 'development', dramaticTurn: '',
+      seededClueIds: [], payoffSetupIds: [], relationshipShifts: [],
+      ...overrides,
+    });
+
+    it('ARC_PROTAGONIST_UNTESTED_SOCIALLY fires when protagonist has only positive relationship shifts', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // 8 records; ALICE appears most (8 cues). All her relationship shifts are positive.
+      const fountain228a = [
+        'INT. SC0 - DAY', 'ALICE', 'Hello.', 'ALICE', 'Yes.',
+        'INT. SC1 - DAY', 'ALICE', 'Okay.', 'BOB', 'Sure.',
+        'INT. SC2 - DAY', 'ALICE', 'Fine.', 'BOB', 'Good.',
+        'INT. SC3 - DAY', 'ALICE', 'Thanks.', 'BOB', 'Always.',
+        'INT. SC4 - DAY', 'ALICE', 'Great.', 'BOB', 'Indeed.',
+        'INT. SC5 - DAY', 'ALICE', 'Right.', 'BOB', 'Right.',
+        'INT. SC6 - DAY', 'ALICE', 'Done.', 'BOB', 'Done.',
+        'INT. SC7 - DAY', 'ALICE', 'Farewell.', 'BOB', 'Farewell.',
+      ].join('\n');
+      const records228a = [
+        makeRec228(0, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.4 }] }),
+        makeRec228(1),
+        makeRec228(2, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.3 }] }),
+        makeRec228(3),
+        makeRec228(4, { emotionalShift: 'positive' }),
+        makeRec228(5, { emotionalShift: 'positive' }),
+        makeRec228(6, { emotionalShift: 'positive' }),
+        makeRec228(7, { emotionalShift: 'positive' }),
+      ];
+      const result = await characterArcPass({
+        fountain: fountain228a, original: fountain228a,
+        records: records228a,
+        structure: { revelationCount: 0, completionPercent: 90, approachingClimax: false },
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'ARC_PROTAGONIST_UNTESTED_SOCIALLY');
+      assert.ok(match.length >= 1, `Expected ARC_PROTAGONIST_UNTESTED_SOCIALLY, got: ${JSON.stringify(result.issues.map((i:any)=>i.rule))}`);
+    });
+
+    it('ARC_PROTAGONIST_UNTESTED_SOCIALLY does NOT fire when protagonist has a negative shift', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      const fountain228b = [
+        'INT. SC0 - DAY', 'ALICE', 'We begin.', 'BOB', 'Indeed.',
+        'INT. SC1 - DAY', 'ALICE', 'Progress.', 'BOB', 'Good.',
+        'INT. SC2 - DAY', 'ALICE', 'Alliance.', 'BOB', 'Confirmed.',
+        'INT. SC3 - DAY', 'ALICE', 'Trouble.', 'BOB', 'Betrayal.',
+        'INT. SC4 - DAY', 'ALICE', 'Crisis.', 'BOB', 'Gone.',
+        'INT. SC5 - DAY', 'ALICE', 'Loss.', 'BOB', 'Away.',
+        'INT. SC6 - DAY', 'ALICE', 'Recovery.', 'BOB', 'Distant.',
+        'INT. SC7 - DAY', 'ALICE', 'Resolution.', 'BOB', 'Resolved.',
+      ].join('\n');
+      const records228b = [
+        makeRec228(0, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.4 }] }),
+        makeRec228(1),
+        makeRec228(2, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.3 }] }),
+        makeRec228(3, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: -0.5 }] }),
+        makeRec228(4, { emotionalShift: 'negative' }),
+        makeRec228(5),
+        makeRec228(6),
+        makeRec228(7, { emotionalShift: 'positive' }),
+      ];
+      const result = await characterArcPass({
+        fountain: fountain228b, original: fountain228b,
+        records: records228b,
+        structure: { revelationCount: 1, completionPercent: 90, approachingClimax: false },
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'ARC_PROTAGONIST_UNTESTED_SOCIALLY');
+      assert.strictEqual(match.length, 0, 'Should NOT fire when protagonist has a negative relationship shift');
+    });
+
+    it('ARC_MIDPOINT_RELATIONAL_VOID fires when midpoint zone has no relationship shifts or revelations', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // 10 records; scenes 4–5 (40%–60%) are empty of relational dynamics
+      const fountain228c = Array.from({ length: 10 }, (_, i) =>
+        `INT. SC${i} - DAY\nALICE\nLine ${i}.\nBOB\nReply ${i}.`).join('\n');
+      const records228c = Array.from({ length: 10 }, (_, i) =>
+        makeRec228(i, {
+          // place relationship shifts ONLY outside the 40%-60% midpoint zone (scenes 4-5)
+          relationshipShifts: (i < 4 || i >= 6)
+            ? [{ pairKey: 'alice|bob', dimension: 'trust', amount: i < 4 ? 0.3 : -0.3 }]
+            : [],
+          revelation: null,
+        }),
+      );
+      const result = await characterArcPass({
+        fountain: fountain228c, original: fountain228c,
+        records: records228c,
+        structure: { revelationCount: 0, completionPercent: 90, approachingClimax: false },
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'ARC_MIDPOINT_RELATIONAL_VOID');
+      assert.ok(match.length >= 1, `Expected ARC_MIDPOINT_RELATIONAL_VOID, got: ${JSON.stringify(result.issues.map((i:any)=>i.rule))}`);
+    });
+
+    it('ARC_MIDPOINT_RELATIONAL_VOID does NOT fire when midpoint has a revelation', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      const fountain228d = Array.from({ length: 10 }, (_, i) =>
+        `INT. SC${i} - DAY\nALICE\nLine ${i}.\nBOB\nReply ${i}.`).join('\n');
+      const records228d = Array.from({ length: 10 }, (_, i) =>
+        makeRec228(i, {
+          revelation: i === 4 ? 'The truth is revealed' : null,
+          emotionalShift: i % 3 === 0 ? 'positive' : i % 3 === 1 ? 'negative' : 'neutral',
+        }),
+      );
+      const result = await characterArcPass({
+        fountain: fountain228d, original: fountain228d,
+        records: records228d,
+        structure: { revelationCount: 1, completionPercent: 90, approachingClimax: false },
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'ARC_MIDPOINT_RELATIONAL_VOID');
+      assert.strictEqual(match.length, 0, 'Should NOT fire when midpoint zone contains a revelation');
+    });
+
+    it('ARC_FINAL_ACT_CHARACTER_STATIC fires when Act 3 has no relationship shifts', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // 8 records; Act 3 = scenes 6–7 (75%+), but only 2 scenes — need 8 with act3 >= 3
+      // Use 12 records so act3Start=9 and act3 has scenes 9,10,11 (3 scenes)
+      const fountain228e = Array.from({ length: 12 }, (_, i) =>
+        `INT. SC${i} - DAY\nALICE\nLine ${i}.\nBOB\nReply ${i}.`).join('\n');
+      const records228e = Array.from({ length: 12 }, (_, i) =>
+        makeRec228(i, {
+          // relationship shifts only in Act 1 and 2 (scenes 0–8), none in Act 3 (9–11)
+          relationshipShifts: i < 9
+            ? [{ pairKey: 'alice|bob', dimension: 'trust', amount: i < 5 ? 0.3 : -0.3 }]
+            : [],
+          emotionalShift: i < 9 ? (i % 2 === 0 ? 'positive' : 'negative') : 'neutral',
+        }),
+      );
+      const result = await characterArcPass({
+        fountain: fountain228e, original: fountain228e,
+        records: records228e,
+        structure: { revelationCount: 1, completionPercent: 90, approachingClimax: false },
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'ARC_FINAL_ACT_CHARACTER_STATIC');
+      assert.ok(match.length >= 1, `Expected ARC_FINAL_ACT_CHARACTER_STATIC, got: ${JSON.stringify(result.issues.map((i:any)=>i.rule))}`);
+    });
+
+    it('ARC_FINAL_ACT_CHARACTER_STATIC does NOT fire when Act 3 has a relationship shift', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      const fountain228f = Array.from({ length: 12 }, (_, i) =>
+        `INT. SC${i} - DAY\nALICE\nLine ${i}.\nBOB\nReply ${i}.`).join('\n');
+      const records228f = Array.from({ length: 12 }, (_, i) =>
+        makeRec228(i, {
+          relationshipShifts: i === 10
+            ? [{ pairKey: 'alice|bob', dimension: 'trust', amount: -0.5 }]
+            : [],
+          emotionalShift: i < 9 ? (i % 2 === 0 ? 'positive' : 'negative') : 'neutral',
+          revelation: i === 9 ? 'Final truth' : null,
+        }),
+      );
+      const result = await characterArcPass({
+        fountain: fountain228f, original: fountain228f,
+        records: records228f,
+        structure: { revelationCount: 1, completionPercent: 90, approachingClimax: false },
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'ARC_FINAL_ACT_CHARACTER_STATIC');
+      assert.strictEqual(match.length, 0, 'Should NOT fire when Act 3 contains a relationship shift');
+    });
+  });
+
   describe('Wave 227 — dialoguePass: mirror syndrome, imperative dominance, last-act exposition spike', async () => {
     const makeRec227 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

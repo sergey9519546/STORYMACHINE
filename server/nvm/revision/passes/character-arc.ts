@@ -592,6 +592,93 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
   }
   // ── End Wave 213 ──────────────────────────────────────────────────────────────
 
+  // ── Wave 228: Protagonist social invulnerability, midpoint relational void, final-act stasis ──
+
+  // ARC_PROTAGONIST_UNTESTED_SOCIALLY (minor, n≥8): The protagonist (highest
+  // fountain cue count) participates in ≥2 relationship shifts but every single
+  // one is positive — they gain socially without ever paying a relational cost.
+  // No betrayal, no estrangement, no alliance lost across the whole story.
+  if (records.length >= 8) {
+    const cueCounts228 = new Map<string, number>();
+    for (const line228 of fountain.split('\n')) {
+      const t228 = line228.trim();
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}$/.test(t228) &&
+          !/^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END|ACT|MIDPOINT|SCENE)/i.test(t228)) {
+        const charName228 = t228.replace(/\s*\(.*?\)\s*$/, '').toLowerCase().trim();
+        if (charName228 !== 'narrator' && charName228 !== 'v.o.' && charName228 !== 'o.s.') {
+          cueCounts228.set(charName228, (cueCounts228.get(charName228) ?? 0) + 1);
+        }
+      }
+    }
+    const protagonist228 = [...cueCounts228.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+    if (protagonist228 !== undefined) {
+      const protRelShifts228 = records.flatMap(r =>
+        (r.relationshipShifts ?? []).filter((s: any) =>
+          s.pairKey.toLowerCase().split('|').includes(protagonist228),
+        ),
+      );
+      if (protRelShifts228.length >= 2 && protRelShifts228.every((s: any) => s.amount > 0)) {
+        issues.push({
+          location: `Character: ${protagonist228.toUpperCase()}`,
+          rule: 'ARC_PROTAGONIST_UNTESTED_SOCIALLY',
+          severity: 'minor',
+          description: `The protagonist (${protagonist228.toUpperCase()}) participates in ${protRelShifts228.length} relationship shifts but every one is positive — they gain socially without ever paying a relational cost. No betrayal, no estrangement, no alliance lost. The character's social arc is an unbroken rise.`,
+          suggestedFix: 'Give the protagonist at least one negative relationship shift: a trusted ally who withdraws support, a bond that fractures under pressure, or a connection that costs them something real. Relational loss is what makes the eventual gains meaningful.',
+        });
+      }
+    }
+  }
+
+  // ARC_MIDPOINT_RELATIONAL_VOID (major, n≥10): The structural midpoint zone
+  // (40%–60%) contains no relationship shifts and no revelations. The fulcrum
+  // where arcs must reverse is empty of character dynamics. Distinct from
+  // ARC_MIDPOINT_INERT (which checks emotional velocity) — this fires when the
+  // relational and revelation axes are both flat, so the midpoint has no
+  // interpersonal event to pivot on.
+  if (records.length >= 10) {
+    const midStart228 = Math.floor(records.length * 0.4);
+    const midEnd228 = Math.floor(records.length * 0.6);
+    const midRecords228 = records.slice(midStart228, midEnd228);
+    if (midRecords228.length >= 2) {
+      const hasMidRelOrRev228 = midRecords228.some((r: any) =>
+        (r.relationshipShifts ?? []).length > 0 || r.revelation !== null,
+      );
+      if (!hasMidRelOrRev228) {
+        issues.push({
+          location: `Midpoint zone (Scenes ${midStart228}–${midEnd228 - 1})`,
+          rule: 'ARC_MIDPOINT_RELATIONAL_VOID',
+          severity: 'major',
+          description: `Scenes ${midStart228}–${midEnd228 - 1} (the structural midpoint, 40%–60%) contain no relationship shifts and no revelations. The story's fulcrum — where arcs must reverse — is empty of interpersonal events. Nothing changes between characters at the moment the story needs its central pivot.`,
+          suggestedFix: 'Plant a relationship-altering event or revelation in the midpoint zone: a disclosure that shifts an alliance, a secret exposed, or a relationship that decisively changes direction. The midpoint must carry the weight of the story\'s central dramatic reversal.',
+        });
+      }
+    }
+  }
+
+  // ARC_FINAL_ACT_CHARACTER_STATIC (major, n≥8): Act 3 (final 25%) has ≥3
+  // scenes but contains zero relationship shifts. The resolution phase ends
+  // without any relational conclusion — characters leave the story in the same
+  // relational positions they entered Act 3. The arc does not close; it stops.
+  if (records.length >= 8) {
+    const act3Start228 = Math.floor(records.length * 0.75);
+    const act3Records228 = records.slice(act3Start228);
+    if (act3Records228.length >= 3) {
+      const hasAct3RelShift228 = act3Records228.some((r: any) =>
+        (r.relationshipShifts ?? []).length > 0,
+      );
+      if (!hasAct3RelShift228) {
+        issues.push({
+          location: `Act 3 (Scenes ${act3Start228}–${records.length - 1})`,
+          rule: 'ARC_FINAL_ACT_CHARACTER_STATIC',
+          severity: 'major',
+          description: `Act 3 (scenes ${act3Start228}–${records.length - 1}, ${act3Records228.length} scenes) contains no relationship shifts — the resolution phase ends without any relational conclusion. Characters leave the story in the same relational positions they held at the start of Act 3.`,
+          suggestedFix: 'The final act must contain at least one relationship shift that closes the story\'s central relational arc: a reconciliation, a final estrangement, an alliance confirmed or broken. A resolution without a relational event is hollow.',
+        });
+      }
+    }
+  }
+  // ── End Wave 228 ─────────────────────────────────────────────────────────────
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'character-arc', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
