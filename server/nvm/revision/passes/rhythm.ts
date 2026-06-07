@@ -509,6 +509,75 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 235: Declarative pile, simultaneous-action absent, motion-verb overload ──
+
+  // DECLARATIVE_PILE (minor, ≥10 lines): More than 70% of action lines are flat
+  // declaratives — no internal punctuation (comma, dash, semicolon) and no
+  // subordinating conjunction (when, while, until, before, after, because, although,
+  // though, unless). Pure declaratives sequence events without temporal layering,
+  // causality, or simultaneity. The action reads as a stage manager's beat list
+  // rather than cinematic description. Distinct from INTRACLAUSE_CADENCE_ABSENT
+  // (which fires on avg word count ≥ 9 with <10% punctuated lines): this fires
+  // regardless of line length when the grammatical structure is uniformly flat.
+  if (actionLines.length >= 10) {
+    const subordRe235 = /\b(when|while|until|before|after|because|although|though|unless)\b/i;
+    const internalPunct235 = /[,;]|--|—|–/;
+    const flatCount235 = actionLines.filter(
+      l => !internalPunct235.test(l.text) && !subordRe235.test(l.text),
+    ).length;
+    if (flatCount235 / actionLines.length > 0.7) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'DECLARATIVE_PILE',
+        severity: 'minor',
+        description: `${flatCount235} of ${actionLines.length} action lines (${Math.round(flatCount235 / actionLines.length * 100)}%) are flat declaratives with no internal punctuation and no subordinating clause. Pure declarative sequences ("She enters. He looks. She leaves.") have no temporal layering, no causality signal, and no simultaneity — the action reads as a beat list rather than cinematic prose.`,
+        suggestedFix: "Introduce structural variety: \"As she opens the door, he rises.\" layers two actions. \"Before he can speak, she's gone.\" uses cause and sequence. \"He watches, unable to move.\" uses a comma and hanging modifier. Even one varied structure per page breaks the declarative monotone.",
+      });
+    }
+  }
+
+  // SIMULTANEOUS_ACTION_ABSENT (minor, ≥12 lines): No action line uses a
+  // simultaneous-action marker ("while", "even as", "at the same time").
+  // Simultaneity is a key visual grammar of film — two things happening at once
+  // in the frame. A 12+-line scene where every action is strictly sequential
+  // misses the spatial and temporal depth that makes description cinematic.
+  // Distinct from DECLARATIVE_PILE (grammatical structure): this fires on the
+  // semantic absence of simultaneous-action language even when grammar is varied.
+  if (actionLines.length >= 12) {
+    const simultRe235 = /\bwhile\b|\beven as\b|\bat the same time\b/i;
+    const hasSimult235 = actionLines.some(l => simultRe235.test(l.text));
+    if (!hasSimult235) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'SIMULTANEOUS_ACTION_ABSENT',
+        severity: 'minor',
+        description: `${actionLines.length} action lines contain no simultaneous-action language ("while", "even as", "at the same time") — every action is strictly sequential. Film captures two things happening at once in the frame; a scene with no simultaneity misses the visual layering that distinguishes screenplay from a prose sequence of events.`,
+        suggestedFix: 'Add at least one simultaneous layer: "While he talks, she reads the room." or "Even as he smiles, his hands are shaking." Simultaneous action creates visual depth and reveals character through contradiction.',
+      });
+    }
+  }
+
+  // MOTION_VERB_OVERLOAD (minor, ≥8 lines): More than 50% of action lines are
+  // dominated by locomotion verbs (walks, runs, enters, crosses, moves, turns,
+  // approaches, steps, etc.). A scene built primarily around physical movement —
+  // characters located and directed rather than experienced — is choreography,
+  // not drama. Distinct from FILLER_GESTURE_EXCESS (small gestures like nods/
+  // shrugs): this fires on large-scale locomotion verbs that position bodies in
+  // space without grounding the reader in the emotional reality of the scene.
+  if (actionLines.length >= 8) {
+    const motionVerbRe235 = /\b(walks?|runs?|moves?|crosses?|enters?|exits?|goes|comes?|turns?|reaches?|steps?|approaches?|leaves?|follows?|leads?|rushes?|hurries?|strides?|races?)\b/i;
+    const motionCount235 = actionLines.filter(l => motionVerbRe235.test(l.text)).length;
+    if (motionCount235 / actionLines.length > 0.5) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'MOTION_VERB_OVERLOAD',
+        severity: 'minor',
+        description: `${motionCount235} of ${actionLines.length} action lines (${Math.round(motionCount235 / actionLines.length * 100)}%) are built around locomotion verbs (walks, enters, crosses, approaches…). The scene is choreography — characters are positioned and directed rather than experienced. Without emotional grounding, sensory texture, or world-building between the movements, the action reads like a blocking rehearsal script.`,
+        suggestedFix: 'Balance motion with perception, emotion, and world detail: instead of three consecutive "walks/crosses/turns" lines, insert what the character notices, what the space costs them, or what the movement reveals. Movement gains meaning from the environment and inner life surrounding it.',
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'rhythm', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

@@ -15857,6 +15857,162 @@ Goodnight.
     });
   });
 
+  describe('Wave 235 — rhythmPass: declarative pile, simultaneous-action absent, motion-verb overload', async () => {
+    const makeFountain235 = (lines: string[]) =>
+      'INT. ROOM - DAY\n\n' + lines.join('\n') + '\n';
+
+    it('DECLARATIVE_PILE fires when >70% of action lines are flat declaratives', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      // All 10 lines: no comma, no dash, no subordinating conjunction → 100% flat
+      const lines235a = [
+        'Alice checks the door handle.',
+        'Bob reads the label on the canister.',
+        'She grips the metal rail.',
+        'The old clock ticks on the shelf.',
+        'He stacks the folders.',
+        'The overhead light dims.',
+        'She scans the countertop.',
+        'He opens the wide drawer.',
+        'The snap of the latch rings out.',
+        'She faces the window.',
+      ];
+      const f235a = makeFountain235(lines235a);
+      const result = await rhythmPass({
+        fountain: f235a, original: f235a,
+        records: [] as any, structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'DECLARATIVE_PILE');
+      assert.ok(match.length >= 1, `Expected DECLARATIVE_PILE, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('DECLARATIVE_PILE does NOT fire when many lines have subordinating clauses or punctuation', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      // 4 of 10 lines are flat declaratives → 40% < 70%
+      const lines235b = [
+        'When she opens the door, light floods in.',
+        'Bob reads the final paragraph before he speaks.',
+        'She grips the metal railing, steadying herself.',
+        'The old clock ticks.',
+        'He stacks the folders.',
+        'Although the room seems quiet, unease settles.',
+        'She turns while he watches from the corner.',
+        'He opens the lower drawer.',
+        'The bolt snaps.',
+        'After she checks it, she steps aside.',
+      ];
+      const f235b = makeFountain235(lines235b);
+      const result = await rhythmPass({
+        fountain: f235b, original: f235b,
+        records: [] as any, structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'DECLARATIVE_PILE');
+      assert.strictEqual(match.length, 0, 'Should NOT fire when many lines have subordinating clauses');
+    });
+
+    it('SIMULTANEOUS_ACTION_ABSENT fires when 12+ action lines lack simultaneous markers', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      // 12 lines, no "while", "even as", or "at the same time"
+      const lines235c = [
+        'Alice checks the door.',
+        'Bob reads the lengthy crime report.',
+        'She grips.',
+        'The old lock snaps open.',
+        'He steps into the hallway.',
+        'She drops the envelope on the counter.',
+        'Bob stares at his watch.',
+        'He crosses to the window on the far side.',
+        'She reaches.',
+        'Alice looks at the stain on the floor.',
+        'He backs toward the door.',
+        'She closes her eyes.',
+      ];
+      const f235c = makeFountain235(lines235c);
+      const result = await rhythmPass({
+        fountain: f235c, original: f235c,
+        records: [] as any, structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'SIMULTANEOUS_ACTION_ABSENT');
+      assert.ok(match.length >= 1, `Expected SIMULTANEOUS_ACTION_ABSENT, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('SIMULTANEOUS_ACTION_ABSENT does NOT fire when at least one line uses "while"', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      // 12 lines, first line has "while" → simultaneous marker present
+      const lines235d = [
+        'Alice checks the door while Bob watches.',
+        'She reads the report before she speaks.',
+        'He grips the railing.',
+        'The old lock snaps open.',
+        'Bob crosses the hallway.',
+        'She drops the letter on the counter.',
+        'He stares at the window.',
+        'Alice takes a step back.',
+        'She reaches for the latch.',
+        'He turns to face the room.',
+        'She closes the folder.',
+        'Bob checks the schedule.',
+      ];
+      const f235d = makeFountain235(lines235d);
+      const result = await rhythmPass({
+        fountain: f235d, original: f235d,
+        records: [] as any, structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'SIMULTANEOUS_ACTION_ABSENT');
+      assert.strictEqual(match.length, 0, 'Should NOT fire when a line uses "while"');
+    });
+
+    it('MOTION_VERB_OVERLOAD fires when >50% of action lines contain locomotion verbs', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      // 9 lines, 8 contain locomotion verbs → ~89%
+      const lines235e = [
+        'Alice walks to the far end.',
+        'Bob crosses the long empty hallway.',
+        'She enters the back storeroom alone.',
+        'He runs toward the emergency exit.',
+        'She turns and moves toward the far door.',
+        'Bob approaches the counter with caution.',
+        'He leaves.',
+        'She follows the narrow gravel path down to the cliff edge.',
+        'A crow screams in the sudden silence.',
+      ];
+      const f235e = makeFountain235(lines235e);
+      const result = await rhythmPass({
+        fountain: f235e, original: f235e,
+        records: [] as any, structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'MOTION_VERB_OVERLOAD');
+      assert.ok(match.length >= 1, `Expected MOTION_VERB_OVERLOAD, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('MOTION_VERB_OVERLOAD does NOT fire when ≤50% of action lines contain locomotion verbs', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      // 8 lines, only 1 has a locomotion verb → 12.5%
+      const lines235f = [
+        'The desk holds a battered old leather ledger.',
+        'She reads.',
+        'Afternoon light catches the dust on the wide wooden shelves.',
+        'He opens the bottom drawer.',
+        'Alice walks past.',
+        'The old clock on the mantle shows half past three.',
+        'He stares.',
+        'Bob checks the handwritten schedule on the corkboard.',
+      ];
+      const f235f = makeFountain235(lines235f);
+      const result = await rhythmPass({
+        fountain: f235f, original: f235f,
+        records: [] as any, structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'MOTION_VERB_OVERLOAD');
+      assert.strictEqual(match.length, 0, 'Should NOT fire when ≤50% of lines have locomotion verbs');
+    });
+  });
+
   describe('Wave 234 — relationshipArcPass: pair dimension monotone, first-impression contradiction, resolution void', async () => {
     const makeRec234 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
