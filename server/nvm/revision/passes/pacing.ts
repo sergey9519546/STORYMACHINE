@@ -598,6 +598,87 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 232: Pacing spike scene, peak length misplaced, act-transition jolt ──
+
+  // PACING_SPIKE_SCENE (major, n≥6): A single scene is ≥2.5× the average scene
+  // length, dominating the story's page space like a structural monster. Distinct
+  // from LONG_SCENE (which fires per scene beyond a relative threshold) and
+  // PAGE_SPACE_INEQUALITY (global distribution) — this fires specifically when one
+  // scene's length is more than 2.5× the average, creating an extreme outlier.
+  if (records.length >= 6 && avgLength > 0) {
+    let spikeIdx232 = -1;
+    let spikeLen232 = 0;
+    for (let i = 0; i < records.length; i++) {
+      const len = sceneLengths.get(i) ?? 0;
+      if (len > spikeLen232) { spikeLen232 = len; spikeIdx232 = i; }
+    }
+    if (spikeIdx232 >= 0 && spikeLen232 >= 2.5 * avgLength) {
+      issues.push({
+        location: `Scene ${spikeIdx232} (${records[spikeIdx232]?.slug ?? ''})`,
+        rule: 'PACING_SPIKE_SCENE',
+        severity: 'major',
+        description: `Scene ${spikeIdx232} is ${spikeLen232} weighted lines — ${(spikeLen232 / avgLength).toFixed(1)}× the story average (${Math.round(avgLength)}). One scene dominates the story's page space, creating a structural imbalance where all surrounding scenes are dwarfed by a single set-piece.`,
+        suggestedFix: 'Break the oversized scene into 2-3 shorter ones, or trim it down to match the surrounding density. A pacing spike signals a scene that was never edited — every scene should earn its length relative to its dramatic weight.',
+      });
+    }
+  }
+
+  // PEAK_LENGTH_MISPLACED (minor, n≥8): The story's longest scene is in Act 1
+  // (first 25%) — the most expansive moment front-loads the setup rather than
+  // the climax. Scene length signals importance to the audience; the opening
+  // should be lean and propulsive, not the most expensive real estate in the script.
+  if (records.length >= 8 && avgLength > 0) {
+    const act1EndPk232 = Math.floor(records.length * 0.25);
+    let maxLen232 = 0;
+    let maxIdx232 = -1;
+    for (let i = 0; i < records.length; i++) {
+      const len = sceneLengths.get(i) ?? 0;
+      if (len > maxLen232) { maxLen232 = len; maxIdx232 = i; }
+    }
+    if (maxIdx232 >= 0 && maxIdx232 < act1EndPk232 && maxLen232 >= avgLength * 1.5) {
+      issues.push({
+        location: `Scene ${maxIdx232} (${records[maxIdx232]?.slug ?? ''})`,
+        rule: 'PEAK_LENGTH_MISPLACED',
+        severity: 'minor',
+        description: `The story's longest scene (Scene ${maxIdx232}, ${maxLen232} lines, ${(maxLen232 / avgLength).toFixed(1)}× avg) is in Act 1 (first 25%). The most expansive real estate is in the setup rather than the climax — opening scenes should be crisp and propulsive, not the story's structural crown.`,
+        suggestedFix: 'Trim the Act 1 scene to its essentials, then expand the climax zone with the reclaimed page space. The longest scene should be where the stakes are highest, not where the world is being introduced.',
+      });
+    }
+  }
+
+  // ACT_TRANSITION_JOLT (minor, n≥8): The scene immediately crossing an act
+  // boundary (Act 1→2 at 25%, or Act 2→3 at 75%) changes in length by more than
+  // 1.5× the average — a step-change in pacing at the structural seam. Gear shifts
+  // at act transitions should be gradual; a sudden jump or drop at the act line
+  // signals a tonal splice rather than a deliberate structural transition.
+  if (records.length >= 8 && avgLength > 0) {
+    const joltThreshold232 = avgLength * 1.5;
+    const actBoundaries232 = [
+      Math.floor(records.length * 0.25),
+      Math.floor(records.length * 0.75),
+    ];
+    for (const boundary232 of actBoundaries232) {
+      if (boundary232 <= 0 || boundary232 >= records.length) continue;
+      const lenBefore = sceneLengths.get(boundary232 - 1) ?? 0;
+      const lenAfter = sceneLengths.get(boundary232) ?? 0;
+      if (lenBefore > 0 && lenAfter > 0) {
+        const delta232 = Math.abs(lenAfter - lenBefore);
+        if (delta232 >= joltThreshold232) {
+          const dir232 = lenAfter > lenBefore ? 'expands' : 'contracts';
+          issues.push({
+            location: `Act boundary (Scene ${boundary232 - 1} → ${boundary232})`,
+            rule: 'ACT_TRANSITION_JOLT',
+            severity: 'minor',
+            description: `At the act boundary (Scene ${boundary232 - 1} to ${boundary232}) the scene length ${dir232} by ${delta232.toFixed(0)} lines — a sudden step-change of ${(delta232 / avgLength).toFixed(1)}× the average. Act transitions should shift gear gradually; a pacing jolt at the structural seam reads as a tonal splice rather than a deliberate transition.`,
+            suggestedFix: 'Smooth the transition: add a bridging scene at similar length to the crossing point, or compress the discrepancy across 2-3 scenes rather than one step. Act transitions should feel like a gear shift, not a gear break.',
+          });
+          break; // one flag per pass
+        }
+      }
+    }
+  }
+  // ── End Wave 232 ─────────────────────────────────────────────────────────────
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'pacing', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

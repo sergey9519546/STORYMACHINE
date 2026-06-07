@@ -15857,6 +15857,298 @@ Goodnight.
     });
   });
 
+  describe('Wave 232 — pacingPass: pacing spike scene, peak length misplaced, act-transition jolt', async () => {
+    const makeRec232 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 1, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, dialogueHighlights: [],
+      revelation: null, purpose: 'development', dramaticTurn: '',
+      seededClueIds: [], payoffSetupIds: [], relationshipShifts: [],
+      ...overrides,
+    });
+
+    it('PACING_SPIKE_SCENE fires when one scene is ≥2.5× the average length', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // 6 scenes: first 5 are ~3 lines each, scene 2 has 20 action lines → spike
+      const normalScene = (i: number) =>
+        `INT. SC${i} - DAY\nAction line one.\nALICE\nBrief dialogue.\n`;
+      const spikeScene =
+        `INT. SC2 - DAY\n` + Array.from({ length: 20 }, (_, k) => `Action line ${k+1}.`).join('\n') + '\n';
+      const fountain232a = [
+        normalScene(0), normalScene(1), spikeScene, normalScene(3), normalScene(4), normalScene(5),
+      ].join('\n');
+      const records232a = Array.from({ length: 6 }, (_, i) => makeRec232(i, { suspenseDelta: 1 + i * 0.2 }));
+      const result = await pacingPass({
+        fountain: fountain232a, original: fountain232a,
+        records: records232a,
+        structure: { escalating: true, avgSuspensePerScene: 1.5, reversalDensity: 0, openClues: 0, completionPercent: 70, approachingClimax: false },
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'PACING_SPIKE_SCENE');
+      assert.ok(match.length >= 1, `Expected PACING_SPIKE_SCENE, got: ${JSON.stringify(result.issues.map((i:any)=>i.rule))}`);
+    });
+
+    it('PACING_SPIKE_SCENE does NOT fire when all scenes have comparable lengths', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      const evenScene = (i: number) =>
+        `INT. SC${i} - DAY\nAction line one.\nAction line two.\nALICE\nDialogue here.\n`;
+      const fountain232b = Array.from({ length: 6 }, (_, i) => evenScene(i)).join('\n');
+      const records232b = Array.from({ length: 6 }, (_, i) => makeRec232(i));
+      const result = await pacingPass({
+        fountain: fountain232b, original: fountain232b,
+        records: records232b,
+        structure: { escalating: true, avgSuspensePerScene: 1, reversalDensity: 0, openClues: 0, completionPercent: 70, approachingClimax: false },
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'PACING_SPIKE_SCENE');
+      assert.strictEqual(match.length, 0, 'Should NOT fire when all scenes have similar lengths');
+    });
+
+    it('PEAK_LENGTH_MISPLACED fires when the longest scene is in Act 1', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // 8 scenes: scene 0 (Act 1) is very long, rest are short
+      const longScene =
+        `INT. SC0 - DAY\n` + Array.from({ length: 20 }, (_, k) => `Opening action ${k+1}.`).join('\n') + '\n';
+      const shortScene = (i: number) => `INT. SC${i} - DAY\nAction.\nALICE\nLine.\n`;
+      const fountain232c = [longScene, ...Array.from({ length: 7 }, (_, i) => shortScene(i + 1))].join('\n');
+      const records232c = Array.from({ length: 8 }, (_, i) => makeRec232(i));
+      const result = await pacingPass({
+        fountain: fountain232c, original: fountain232c,
+        records: records232c,
+        structure: { escalating: true, avgSuspensePerScene: 1, reversalDensity: 0, openClues: 0, completionPercent: 80, approachingClimax: true },
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'PEAK_LENGTH_MISPLACED');
+      assert.ok(match.length >= 1, `Expected PEAK_LENGTH_MISPLACED, got: ${JSON.stringify(result.issues.map((i:any)=>i.rule))}`);
+    });
+
+    it('PEAK_LENGTH_MISPLACED does NOT fire when the longest scene is in Act 3', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // 8 scenes: scene 7 (Act 3) is very long, Act 1 scenes are short
+      const shortScene = (i: number) => `INT. SC${i} - DAY\nAction.\nALICE\nLine.\n`;
+      const climaxScene =
+        `INT. SC7 - DAY\n` + Array.from({ length: 20 }, (_, k) => `Climax action ${k+1}.`).join('\n') + '\n';
+      const fountain232d = [...Array.from({ length: 7 }, (_, i) => shortScene(i)), climaxScene].join('\n');
+      const records232d = Array.from({ length: 8 }, (_, i) => makeRec232(i, {
+        purpose: i === 7 ? 'climax' : 'development',
+        suspenseDelta: i === 7 ? 5 : 1,
+      }));
+      const result = await pacingPass({
+        fountain: fountain232d, original: fountain232d,
+        records: records232d,
+        structure: { escalating: true, avgSuspensePerScene: 2, reversalDensity: 1, openClues: 0, completionPercent: 90, approachingClimax: true },
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'PEAK_LENGTH_MISPLACED');
+      assert.strictEqual(match.length, 0, 'Should NOT fire when the longest scene is in Act 3');
+    });
+
+    it('ACT_TRANSITION_JOLT fires when scene length jumps dramatically at an act boundary', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // 8 scenes: scene 1 (last of Act1) is short, scene 2 (first of Act2 at 25%) is very long
+      // Act1/Act2 boundary at floor(8*0.25)=2. Scene 1 is short, scene 2 is very long.
+      const shortSc = (i: number) => `INT. SC${i} - DAY\nAction.\nALICE\nLine.\n`;
+      const longSc = (i: number) =>
+        `INT. SC${i} - DAY\n` + Array.from({ length: 18 }, (_, k) => `Long action ${k+1}.`).join('\n') + '\n';
+      const fountain232e = [
+        shortSc(0), shortSc(1), longSc(2), shortSc(3),
+        shortSc(4), shortSc(5), shortSc(6), shortSc(7),
+      ].join('\n');
+      const records232e = Array.from({ length: 8 }, (_, i) => makeRec232(i));
+      const result = await pacingPass({
+        fountain: fountain232e, original: fountain232e,
+        records: records232e,
+        structure: { escalating: true, avgSuspensePerScene: 1, reversalDensity: 0, openClues: 0, completionPercent: 80, approachingClimax: false },
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'ACT_TRANSITION_JOLT');
+      assert.ok(match.length >= 1, `Expected ACT_TRANSITION_JOLT, got: ${JSON.stringify(result.issues.map((i:any)=>i.rule))}`);
+    });
+
+    it('ACT_TRANSITION_JOLT does NOT fire when act boundary lengths are gradual', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // 8 scenes: all roughly the same length → no jolt at any boundary
+      const evenSc = (i: number) =>
+        `INT. SC${i} - DAY\nAction one.\nAction two.\nALICE\nDialogue.\n`;
+      const fountain232f = Array.from({ length: 8 }, (_, i) => evenSc(i)).join('\n');
+      const records232f = Array.from({ length: 8 }, (_, i) => makeRec232(i));
+      const result = await pacingPass({
+        fountain: fountain232f, original: fountain232f,
+        records: records232f,
+        structure: { escalating: true, avgSuspensePerScene: 1, reversalDensity: 0, openClues: 0, completionPercent: 80, approachingClimax: false },
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'ACT_TRANSITION_JOLT');
+      assert.strictEqual(match.length, 0, 'Should NOT fire when act boundary pacing is gradual');
+    });
+  });
+
+  describe('Wave 231 — originalityPass: purpose bookend repeat, I-dominance, Act 3 action drought', async () => {
+    const makeRec231 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, dialogueHighlights: [],
+      revelation: null, purpose: 'development', dramaticTurn: '',
+      seededClueIds: [], payoffSetupIds: [], relationshipShifts: [],
+      ...overrides,
+    });
+
+    it('PURPOSE_BOOKEND_REPEAT fires when Act 1 and Act 3 share the same dominant purpose', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 8 records: Act1 = scenes 0-1 (establish_world x2), Act3 = scenes 6-7 (establish_world x2)
+      const records231a = [
+        makeRec231(0, { purpose: 'establish_world' }),
+        makeRec231(1, { purpose: 'establish_world' }),
+        makeRec231(2, { purpose: 'raise_stakes' }),
+        makeRec231(3, { purpose: 'complicate' }),
+        makeRec231(4, { purpose: 'revelation' }),
+        makeRec231(5, { purpose: 'climax' }),
+        makeRec231(6, { purpose: 'establish_world' }),
+        makeRec231(7, { purpose: 'establish_world' }),
+      ];
+      const fountain231a = records231a.map(r => `INT. SC${r.sceneIdx} - DAY\nAction line.\nALICE\nDialogue.\nBOB\nReply.`).join('\n');
+      const result = await originalityPass({
+        fountain: fountain231a, original: fountain231a,
+        records: records231a,
+        structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'PURPOSE_BOOKEND_REPEAT');
+      assert.ok(match.length >= 1, `Expected PURPOSE_BOOKEND_REPEAT, got: ${JSON.stringify(result.issues.map((i:any)=>i.rule))}`);
+    });
+
+    it('PURPOSE_BOOKEND_REPEAT does NOT fire when Act 1 and Act 3 have different dominant purposes', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const records231b = [
+        makeRec231(0, { purpose: 'establish_world' }),
+        makeRec231(1, { purpose: 'establish_world' }),
+        makeRec231(2, { purpose: 'raise_stakes' }),
+        makeRec231(3, { purpose: 'complicate' }),
+        makeRec231(4, { purpose: 'revelation' }),
+        makeRec231(5, { purpose: 'climax' }),
+        makeRec231(6, { purpose: 'resolution' }),
+        makeRec231(7, { purpose: 'resolution' }),
+      ];
+      const fountain231b = records231b.map(r => `INT. SC${r.sceneIdx} - DAY\nAction line.\nALICE\nDialogue.\nBOB\nReply.`).join('\n');
+      const result = await originalityPass({
+        fountain: fountain231b, original: fountain231b,
+        records: records231b,
+        structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'PURPOSE_BOOKEND_REPEAT');
+      assert.strictEqual(match.length, 0, 'Should NOT fire when Act 1 and Act 3 have different dominant purposes');
+    });
+
+    it('DIALOGUE_I_DOMINANCE fires when >40% of dialogue lines start with "I"', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 12 dialogue lines: 10 start with "I" (83%)
+      const fountain231c = [
+        'INT. OFFICE - DAY',
+        'A quiet office space.',
+        'ALICE', 'I want to leave.', 'BOB', 'I think we should stay.',
+        'ALICE', 'I know what you mean.', 'BOB', 'I told you already.',
+        'ALICE', 'I feel like we are stuck.', 'BOB', 'I do not agree.',
+        'ALICE', 'We can do this.', 'BOB', 'Let us try.',
+        'ALICE', 'I believe in us.', 'BOB', 'I understand.',
+        'ALICE', 'I will not give up.', 'BOB', 'I respect that.',
+      ].join('\n');
+      const records231c = [makeRec231(0)];
+      const result = await originalityPass({
+        fountain: fountain231c, original: fountain231c,
+        records: records231c,
+        structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'DIALOGUE_I_DOMINANCE');
+      assert.ok(match.length >= 1, `Expected DIALOGUE_I_DOMINANCE, got: ${JSON.stringify(result.issues.map((i:any)=>i.rule))}`);
+    });
+
+    it('DIALOGUE_I_DOMINANCE does NOT fire when I-starts are below 40%', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 12 dialogue lines: only 3 start with "I" (25%)
+      const fountain231d = [
+        'INT. PARK - DAY',
+        'Trees rustle in the wind.',
+        'ALICE', 'You were there last night.',
+        'BOB', 'We both know what happened.',
+        'ALICE', 'Tell me what you saw.',
+        'BOB', 'I heard something unusual.',
+        'ALICE', 'That changes things.',
+        'BOB', 'Not necessarily.',
+        'ALICE', 'Think about it carefully.',
+        'BOB', 'She was not alone.',
+        'ALICE', 'Are you certain?',
+        'BOB', 'I am.',
+      ].join('\n');
+      const records231d = [makeRec231(0)];
+      const result = await originalityPass({
+        fountain: fountain231d, original: fountain231d,
+        records: records231d,
+        structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'DIALOGUE_I_DOMINANCE');
+      assert.strictEqual(match.length, 0, 'Should NOT fire when I-start rate is below 40%');
+    });
+
+    it('ACT3_ACTION_DROUGHT fires when Act 3 has far fewer action lines per scene than Act 1', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 8 scenes: Act1 (scenes 0-1) has rich action, Act3 (scenes 6-7) is dialogue-only
+      const act1Scene = (i: number) => [
+        `INT. WAREHOUSE SC${i} - DAY`,
+        'Boxes stacked ceiling-high. Dust in shafts of amber light.',
+        'A chain drags across concrete. Boots squelch through puddles.',
+        'The conveyor belt grinds and stops. A mechanical hiss.',
+        'ALICE', 'Are you ready?',
+      ].join('\n');
+      const act3Scene = (i: number) => [
+        `INT. OFFICE SC${i} - DAY`,
+        'ALICE', 'I see it now.', 'BOB', 'Yes.', 'ALICE', 'Everything makes sense.', 'BOB', 'Finally.',
+      ].join('\n');
+      const midScene = (i: number) => [
+        `INT. CORRIDOR SC${i} - DAY`,
+        'She walks. He follows.',
+        'ALICE', 'Keep moving.',
+      ].join('\n');
+      const fountain231e = [
+        act1Scene(0), act1Scene(1),
+        midScene(2), midScene(3), midScene(4), midScene(5),
+        act3Scene(6), act3Scene(7),
+      ].join('\n');
+      const records231e = Array.from({ length: 8 }, (_, i) =>
+        makeRec231(i, { purpose: i < 2 ? 'establish_world' : i >= 6 ? 'resolution' : 'development' }),
+      );
+      const result = await originalityPass({
+        fountain: fountain231e, original: fountain231e,
+        records: records231e,
+        structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'ACT3_ACTION_DROUGHT');
+      assert.ok(match.length >= 1, `Expected ACT3_ACTION_DROUGHT, got: ${JSON.stringify(result.issues.map((i:any)=>i.rule))}`);
+    });
+
+    it('ACT3_ACTION_DROUGHT does NOT fire when Act 3 has comparable action density to Act 1', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const richScene = (i: number) => [
+        `INT. ROOM SC${i} - DAY`,
+        'Heavy silence fills the space.', 'Shadows move across the floor.', 'A clock ticks.',
+        'ALICE', 'Now.', 'BOB', 'Ready.',
+      ].join('\n');
+      const fountain231f = Array.from({ length: 8 }, (_, i) => richScene(i)).join('\n');
+      const records231f = Array.from({ length: 8 }, (_, i) => makeRec231(i));
+      const result = await originalityPass({
+        fountain: fountain231f, original: fountain231f,
+        records: records231f,
+        structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'ACT3_ACTION_DROUGHT');
+      assert.strictEqual(match.length, 0, 'Should NOT fire when Act 3 action density is comparable to Act 1');
+    });
+  });
+
   describe('Wave 230 — intentionPass: secondary intention vacuum, proactive overclustering, reactive goal adoption', async () => {
     const makeRec230 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

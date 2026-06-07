@@ -749,6 +749,119 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 231: Purpose bookend repeat, I-dominance in dialogue, Act 3 action drought ──
+
+  // PURPOSE_BOOKEND_REPEAT (minor, n≥8): The dominant purpose in Act 1 (first 25%)
+  // matches the dominant purpose in Act 3 (last 25%). The story's functional register
+  // at the start mirrors the end rather than contrasting — the opening setup and the
+  // resolution wear the same structural label. Distinct from ARC_BOOKEND_IDENTICAL
+  // (character-arc pass, emotional register) — this flags functional identity.
+  if (records.length >= 8) {
+    const act1EndBk231 = Math.floor(records.length * 0.25);
+    const act3StartBk231 = Math.floor(records.length * 0.75);
+    const countPurposes231 = (recs: typeof records) => {
+      const map = new Map<string, number>();
+      for (const r of recs) map.set(r.purpose, (map.get(r.purpose) ?? 0) + 1);
+      return [...map.entries()].sort((a, b) => b[1] - a[1]);
+    };
+    const act1Purposes231 = countPurposes231(records.slice(0, act1EndBk231));
+    const act3Purposes231 = countPurposes231(records.slice(act3StartBk231));
+    if (act1Purposes231.length > 0 && act3Purposes231.length > 0) {
+      const [act1DomPurpose231, act1DomCount231] = act1Purposes231[0];
+      const [act3DomPurpose231, act3DomCount231] = act3Purposes231[0];
+      if (act1DomPurpose231 === act3DomPurpose231 && act1DomCount231 >= 2 && act3DomCount231 >= 2) {
+        issues.push({
+          location: 'Act 1 / Act 3 structure',
+          rule: 'PURPOSE_BOOKEND_REPEAT',
+          severity: 'minor',
+          description: `Act 1 and Act 3 share the same dominant scene purpose ("${act1DomPurpose231}") — the story's opening functional register mirrors its closing rather than contrasting with it. The resolution wears the same structural label as the setup.`,
+          suggestedFix: 'Vary the dominant purpose between the first and final acts: if Act 1 establishes the world, Act 3 should resolve, transform, or transcend it — not recapitulate the same function. The ending should feel structurally distinct from the beginning.',
+        });
+      }
+    }
+  }
+
+  // DIALOGUE_I_DOMINANCE (minor, ≥12 dialogue lines): More than 40% of all dialogue
+  // lines across every character begin with "I" (as a word). When nearly half of
+  // every spoken line is self-referential, the dialogue register collapses into a
+  // monotone of interior report — characters constantly state their own feelings,
+  // wants, and histories rather than engaging with the world or each other.
+  {
+    let totalDlgLines231 = 0;
+    let iDomCount231 = 0;
+    let inDlg231 = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg231 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg231 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg231 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg231) {
+        totalDlgLines231++;
+        if (/^I\b/i.test(t)) iDomCount231++;
+      }
+    }
+    if (totalDlgLines231 >= 12 && iDomCount231 / totalDlgLines231 > 0.4) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_I_DOMINANCE',
+        severity: 'minor',
+        description: `${iDomCount231} of ${totalDlgLines231} dialogue lines (${Math.round(iDomCount231 / totalDlgLines231 * 100)}%) begin with "I" — the dialogue is overwhelmingly self-referential. Characters constantly report their own feelings and history rather than engaging with each other or reacting to the world.`,
+        suggestedFix: 'Vary dialogue openings: begin lines with "You", "We", a question, a command, or an observation. When every line starts with "I", characters are monologuing rather than conversing — each line becomes a personal statement delivered to the air.',
+      });
+    }
+  }
+
+  // ACT3_ACTION_DROUGHT (minor, n≥8): Act 3 (last 25%) has significantly fewer action
+  // lines per scene than Act 1 (first 25%). The resolution rushes past in dialogue
+  // while the setup was visually rich — the ending under-delivers on physical specificity
+  // at the moment when the visual register should be at its most concentrated.
+  if (records.length >= 8) {
+    const act1EndAct231 = Math.floor(records.length * 0.25);
+    const act3StartAct231 = Math.floor(records.length * 0.75);
+    // build a lineToScene map using slug headings
+    const lineToScene231: number[] = [];
+    let sceneIdx231 = -1;
+    for (const line of lines) {
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(line.trim())) sceneIdx231++;
+      lineToScene231.push(sceneIdx231);
+    }
+    const actionLinesPerScene231 = new Map<number, number>();
+    let inDlg231b = false;
+    for (let li = 0; li < lines.length; li++) {
+      const t = lines[li].trim();
+      if (!t) { inDlg231b = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg231b = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg231b = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg231b) continue;
+      const si231 = lineToScene231[li] ?? -1;
+      if (si231 >= 0) {
+        actionLinesPerScene231.set(si231, (actionLinesPerScene231.get(si231) ?? 0) + 1);
+      }
+    }
+    const avgAct231 = (startIdx: number, endIdx: number): number => {
+      let total = 0; let count = 0;
+      for (let s = startIdx; s < endIdx; s++) {
+        total += actionLinesPerScene231.get(s) ?? 0;
+        count++;
+      }
+      return count > 0 ? total / count : 0;
+    };
+    const act1AvgAction231 = avgAct231(0, act1EndAct231);
+    const act3AvgAction231 = avgAct231(act3StartAct231, records.length);
+    if (act1AvgAction231 >= 3 && act3AvgAction231 < act1AvgAction231 * 0.5) {
+      issues.push({
+        location: `Act 3 (Scenes ${act3StartAct231}–${records.length - 1})`,
+        rule: 'ACT3_ACTION_DROUGHT',
+        severity: 'minor',
+        description: `Act 3 averages ${act3AvgAction231.toFixed(1)} action lines per scene while Act 1 averaged ${act1AvgAction231.toFixed(1)} — the resolution rushes past in dialogue with half the visual specificity of the setup. The ending under-delivers physically at the moment the visual register should be most concentrated.`,
+        suggestedFix: 'Add physical specificity to Act 3 scenes: concrete actions, specific objects, stage pictures that show the story\'s resolution rather than telling it. The climax and denouement should be as visually specific as the world-building, not thinner.',
+      });
+    }
+  }
+  // ── End Wave 231 ─────────────────────────────────────────────────────────────
+
   // ── Limit total issues to avoid overwhelming output ───────────────────────
   // Clichés (minor) are pushed first and would crowd out the higher-severity
   // structural findings (UNIFORM_SCENE_PURPOSES is major) under a naive slice.
