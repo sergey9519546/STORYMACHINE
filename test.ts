@@ -15857,6 +15857,321 @@ Goodnight.
     });
   });
 
+  describe('Wave 234 — relationshipArcPass: pair dimension monotone, first-impression contradiction, resolution void', async () => {
+    const makeRec234 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, dialogueHighlights: [],
+      revelation: null, purpose: 'development', dramaticTurn: '',
+      seededClueIds: [], payoffSetupIds: [], relationshipShifts: [],
+      ...overrides,
+    });
+    const rs234 = (pair: string, dim: string, amount: number) =>
+      ({ pairKey: pair, dimension: dim, amount });
+
+    it('PAIR_DIMENSION_MONOTONE fires when a pair has 4+ shifts all on the same dimension', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const records234a = [
+        makeRec234(0, { relationshipShifts: [rs234('alice|bob', 'trust', 0.3)] }),
+        makeRec234(1, { relationshipShifts: [rs234('alice|bob', 'trust', -0.4)] }),
+        makeRec234(2, { relationshipShifts: [rs234('alice|bob', 'trust', 0.2)] }),
+        makeRec234(3, { relationshipShifts: [rs234('alice|bob', 'trust', -0.1)] }),
+        makeRec234(4, { emotionalShift: 'positive' }),
+        makeRec234(5),
+        makeRec234(6),
+        makeRec234(7),
+      ];
+      const fountain234a = records234a.map(r => `INT. SC${r.sceneIdx} - DAY\nALICE\nLine.\nBOB\nReply.`).join('\n');
+      const result = await relationshipArcPass({
+        fountain: fountain234a, original: fountain234a,
+        records: records234a,
+        structure: { completionPercent: 80 } as any,
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'PAIR_DIMENSION_MONOTONE');
+      assert.ok(match.length >= 1, `Expected PAIR_DIMENSION_MONOTONE, got: ${JSON.stringify(result.issues.map((i:any)=>i.rule))}`);
+    });
+
+    it('PAIR_DIMENSION_MONOTONE does NOT fire when a pair uses multiple dimensions', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const records234b = [
+        makeRec234(0, { relationshipShifts: [rs234('alice|bob', 'trust', 0.3)] }),
+        makeRec234(1, { relationshipShifts: [rs234('alice|bob', 'power', -0.4)] }),
+        makeRec234(2, { emotionalShift: 'negative' }),
+        makeRec234(3, { relationshipShifts: [rs234('alice|bob', 'loyalty', 0.2)] }),
+        makeRec234(4, { emotionalShift: 'positive' }),
+        makeRec234(5), makeRec234(6), makeRec234(7),
+      ];
+      const fountain234b = records234b.map(r => `INT. SC${r.sceneIdx} - DAY\nALICE\nLine.\nBOB\nReply.`).join('\n');
+      const result = await relationshipArcPass({
+        fountain: fountain234b, original: fountain234b,
+        records: records234b,
+        structure: { completionPercent: 80 } as any,
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'PAIR_DIMENSION_MONOTONE');
+      assert.strictEqual(match.length, 0, 'Should NOT fire when pair uses multiple relationship dimensions');
+    });
+
+    it('RELATIONSHIP_FIRST_IMPRESSION_CONTRADICTION fires when first shift is positive but net is negative', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // 4 shifts: +0.5, -0.4, -0.5, -0.3 → net = -0.7
+      const records234c = [
+        makeRec234(0, { relationshipShifts: [rs234('alice|bob', 'trust', 0.5)] }),
+        makeRec234(1, { emotionalShift: 'negative' }),
+        makeRec234(2, { relationshipShifts: [rs234('alice|bob', 'trust', -0.4)] }),
+        makeRec234(3, { emotionalShift: 'negative' }),
+        makeRec234(4, { relationshipShifts: [rs234('alice|bob', 'trust', -0.5)] }),
+        makeRec234(5),
+        makeRec234(6, { relationshipShifts: [rs234('alice|bob', 'trust', -0.3)] }),
+        makeRec234(7),
+      ];
+      const fountain234c = records234c.map(r => `INT. SC${r.sceneIdx} - DAY\nALICE\nLine.\nBOB\nReply.`).join('\n');
+      const result = await relationshipArcPass({
+        fountain: fountain234c, original: fountain234c,
+        records: records234c,
+        structure: { completionPercent: 85 } as any,
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'RELATIONSHIP_FIRST_IMPRESSION_CONTRADICTION');
+      assert.ok(match.length >= 1, `Expected RELATIONSHIP_FIRST_IMPRESSION_CONTRADICTION, got: ${JSON.stringify(result.issues.map((i:any)=>i.rule))}`);
+    });
+
+    it('RELATIONSHIP_FIRST_IMPRESSION_CONTRADICTION does NOT fire when first shift is weak', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // first shift is 0.2 (below 0.4 threshold)
+      const records234d = [
+        makeRec234(0, { relationshipShifts: [rs234('alice|bob', 'trust', 0.2)] }),
+        makeRec234(1, { emotionalShift: 'negative' }),
+        makeRec234(2, { relationshipShifts: [rs234('alice|bob', 'trust', -0.4)] }),
+        makeRec234(3),
+        makeRec234(4, { relationshipShifts: [rs234('alice|bob', 'trust', -0.5)] }),
+        makeRec234(5),
+        makeRec234(6, { relationshipShifts: [rs234('alice|bob', 'trust', -0.3)] }),
+        makeRec234(7),
+      ];
+      const fountain234d = records234d.map(r => `INT. SC${r.sceneIdx} - DAY\nALICE\nLine.\nBOB\nReply.`).join('\n');
+      const result = await relationshipArcPass({
+        fountain: fountain234d, original: fountain234d,
+        records: records234d,
+        structure: { completionPercent: 85 } as any,
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'RELATIONSHIP_FIRST_IMPRESSION_CONTRADICTION');
+      assert.strictEqual(match.length, 0, 'Should NOT fire when first shift is below the threshold');
+    });
+
+    it('RELATIONSHIP_RESOLUTION_VOID fires when Act 3 has shifts but none are positive', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      // 8 scenes; Act3 = 6-7; scene 6 has negative shift, no positive shifts in Act3
+      const records234e = [
+        makeRec234(0, { relationshipShifts: [rs234('alice|bob', 'trust', 0.3)] }),
+        makeRec234(1, { emotionalShift: 'negative' }),
+        makeRec234(2, { relationshipShifts: [rs234('alice|carol', 'power', 0.2)] }),
+        makeRec234(3, { emotionalShift: 'positive' }),
+        makeRec234(4, { relationshipShifts: [rs234('alice|bob', 'trust', 0.4)] }),
+        makeRec234(5),
+        makeRec234(6, { relationshipShifts: [rs234('alice|bob', 'trust', -0.6)] }),  // Act3 negative
+        makeRec234(7, { emotionalShift: 'negative' }),
+      ];
+      const fountain234e = records234e.map(r => `INT. SC${r.sceneIdx} - DAY\nALICE\nLine.\nBOB\nReply.\nCAROL\nAlso.`).join('\n');
+      const result = await relationshipArcPass({
+        fountain: fountain234e, original: fountain234e,
+        records: records234e,
+        structure: { completionPercent: 90 } as any,
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'RELATIONSHIP_RESOLUTION_VOID');
+      assert.ok(match.length >= 1, `Expected RELATIONSHIP_RESOLUTION_VOID, got: ${JSON.stringify(result.issues.map((i:any)=>i.rule))}`);
+    });
+
+    it('RELATIONSHIP_RESOLUTION_VOID does NOT fire when Act 3 has a positive shift', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const records234f = [
+        makeRec234(0, { relationshipShifts: [rs234('alice|bob', 'trust', 0.3)] }),
+        makeRec234(1, { emotionalShift: 'negative' }),
+        makeRec234(2, { relationshipShifts: [rs234('alice|carol', 'power', 0.2)] }),
+        makeRec234(3, { emotionalShift: 'negative' }),
+        makeRec234(4, { relationshipShifts: [rs234('alice|bob', 'trust', -0.5)] }),
+        makeRec234(5),
+        makeRec234(6, { relationshipShifts: [rs234('alice|bob', 'trust', -0.4)] }),
+        makeRec234(7, { relationshipShifts: [rs234('alice|bob', 'trust', 0.6)] }),  // positive resolution
+      ];
+      const fountain234f = records234f.map(r => `INT. SC${r.sceneIdx} - DAY\nALICE\nLine.\nBOB\nReply.\nCAROL\nAlso.`).join('\n');
+      const result = await relationshipArcPass({
+        fountain: fountain234f, original: fountain234f,
+        records: records234f,
+        structure: { completionPercent: 90 } as any,
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'RELATIONSHIP_RESOLUTION_VOID');
+      assert.strictEqual(match.length, 0, 'Should NOT fire when Act 3 has a positive relationship shift');
+    });
+  });
+
+  describe('Wave 233 — payoffPass: payoff orphan rate, post-climax cluster, setup-payoff gap uniformity', async () => {
+    const makeRec233 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 1, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, dialogueHighlights: [],
+      revelation: null, purpose: 'development', dramaticTurn: '',
+      seededClueIds: [], payoffSetupIds: [], relationshipShifts: [],
+      ...overrides,
+    });
+
+    it('PAYOFF_ORPHAN_RATE fires when >50% of planted clues are never paid off', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // 4 clues planted; only 1 paid off → 75% orphan rate
+      const records233a = [
+        makeRec233(0, { seededClueIds: ['c1', 'c2'] }),
+        makeRec233(1, { seededClueIds: ['c3', 'c4'] }),
+        makeRec233(2, { payoffSetupIds: ['c1'] }),  // only c1 paid off
+        makeRec233(3),
+        makeRec233(4),
+        makeRec233(5),
+        makeRec233(6),
+        makeRec233(7),
+      ];
+      const fountain233a = records233a.map(r => `INT. SC${r.sceneIdx} - DAY\nAction line.`).join('\n');
+      const result = await payoffPass({
+        fountain: fountain233a, original: fountain233a,
+        records: records233a,
+        structure: { openClues: 3, completionPercent: 80 } as any,
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'PAYOFF_ORPHAN_RATE');
+      assert.ok(match.length >= 1, `Expected PAYOFF_ORPHAN_RATE, got: ${JSON.stringify(result.issues.map((i:any)=>i.rule))}`);
+    });
+
+    it('PAYOFF_ORPHAN_RATE does NOT fire when most clues are paid off', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // 4 clues; 3 paid off → 25% orphan rate
+      const records233b = [
+        makeRec233(0, { seededClueIds: ['c1', 'c2'] }),
+        makeRec233(1, { seededClueIds: ['c3', 'c4'] }),
+        makeRec233(2, { payoffSetupIds: ['c1'] }),
+        makeRec233(3, { payoffSetupIds: ['c2'] }),
+        makeRec233(4, { payoffSetupIds: ['c3'] }),
+        makeRec233(5),
+        makeRec233(6),
+        makeRec233(7),
+      ];
+      const fountain233b = records233b.map(r => `INT. SC${r.sceneIdx} - DAY\nAction line.`).join('\n');
+      const result = await payoffPass({
+        fountain: fountain233b, original: fountain233b,
+        records: records233b,
+        structure: { openClues: 1, completionPercent: 80 } as any,
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'PAYOFF_ORPHAN_RATE');
+      assert.strictEqual(match.length, 0, 'Should NOT fire when most clues are paid off');
+    });
+
+    it('PAYOFF_POST_CLIMAX_CLUSTER fires when 2+ payoffs land in the final 20%', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // 10 scenes; 3 payoffs; all 3 in scenes 8-9 (final 20% = scenes 8+)
+      const records233c = [
+        makeRec233(0, { seededClueIds: ['x1'] }),
+        makeRec233(1, { seededClueIds: ['x2'] }),
+        makeRec233(2, { seededClueIds: ['x3'] }),
+        makeRec233(3),
+        makeRec233(4),
+        makeRec233(5),
+        makeRec233(6),
+        makeRec233(7),
+        makeRec233(8, { payoffSetupIds: ['x1'] }),
+        makeRec233(9, { payoffSetupIds: ['x2', 'x3'] }),
+      ];
+      const fountain233c = records233c.map(r => `INT. SC${r.sceneIdx} - DAY\nAction.`).join('\n');
+      const result = await payoffPass({
+        fountain: fountain233c, original: fountain233c,
+        records: records233c,
+        structure: { openClues: 0, completionPercent: 90 } as any,
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'PAYOFF_POST_CLIMAX_CLUSTER');
+      assert.ok(match.length >= 1, `Expected PAYOFF_POST_CLIMAX_CLUSTER, got: ${JSON.stringify(result.issues.map((i:any)=>i.rule))}`);
+    });
+
+    it('PAYOFF_POST_CLIMAX_CLUSTER does NOT fire when payoffs are distributed earlier', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // 10 scenes; payoffs in scenes 3, 5, 8 — only 1 in final 20%
+      const records233d = [
+        makeRec233(0, { seededClueIds: ['y1'] }),
+        makeRec233(1, { seededClueIds: ['y2'] }),
+        makeRec233(2, { seededClueIds: ['y3'] }),
+        makeRec233(3, { payoffSetupIds: ['y1'] }),
+        makeRec233(4),
+        makeRec233(5, { payoffSetupIds: ['y2'] }),
+        makeRec233(6),
+        makeRec233(7),
+        makeRec233(8, { payoffSetupIds: ['y3'] }),
+        makeRec233(9),
+      ];
+      const fountain233d = records233d.map(r => `INT. SC${r.sceneIdx} - DAY\nAction.`).join('\n');
+      const result = await payoffPass({
+        fountain: fountain233d, original: fountain233d,
+        records: records233d,
+        structure: { openClues: 0, completionPercent: 90 } as any,
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'PAYOFF_POST_CLIMAX_CLUSTER');
+      assert.strictEqual(match.length, 0, 'Should NOT fire when payoffs are distributed across the arc');
+    });
+
+    it('SETUP_PAYOFF_GAP_UNIFORMITY fires when all setup→payoff gaps are the same', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // 4 resolved setups all with gap=2: plant at 0→payoff 2, plant 2→payoff 4, plant 4→payoff 6, plant 6→payoff 8
+      const records233e = [
+        makeRec233(0, { seededClueIds: ['z1'] }),
+        makeRec233(1),
+        makeRec233(2, { seededClueIds: ['z2'], payoffSetupIds: ['z1'] }),
+        makeRec233(3),
+        makeRec233(4, { seededClueIds: ['z3'], payoffSetupIds: ['z2'] }),
+        makeRec233(5),
+        makeRec233(6, { seededClueIds: ['z4'], payoffSetupIds: ['z3'] }),
+        makeRec233(7),
+        makeRec233(8, { payoffSetupIds: ['z4'] }),
+        makeRec233(9),
+      ];
+      const fountain233e = records233e.map(r => `INT. SC${r.sceneIdx} - DAY\nAction.`).join('\n');
+      const result = await payoffPass({
+        fountain: fountain233e, original: fountain233e,
+        records: records233e,
+        structure: { openClues: 0, completionPercent: 90 } as any,
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'SETUP_PAYOFF_GAP_UNIFORMITY');
+      assert.ok(match.length >= 1, `Expected SETUP_PAYOFF_GAP_UNIFORMITY, got: ${JSON.stringify(result.issues.map((i:any)=>i.rule))}`);
+    });
+
+    it('SETUP_PAYOFF_GAP_UNIFORMITY does NOT fire when gap lengths vary', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // gaps: 1, 1, 2, 6 → max-min=5 → doesn't fire
+      const records233f = [
+        makeRec233(0, { seededClueIds: ['w1'] }),
+        makeRec233(1, { seededClueIds: ['w2'], payoffSetupIds: ['w1'] }),
+        makeRec233(2, { seededClueIds: ['w3'] }),
+        makeRec233(3, { seededClueIds: ['w4'], payoffSetupIds: ['w2'] }),
+        makeRec233(4, { payoffSetupIds: ['w3'] }),
+        makeRec233(5),
+        makeRec233(6),
+        makeRec233(7),
+        makeRec233(8),
+        makeRec233(9, { payoffSetupIds: ['w4'] }),
+      ];
+      const fountain233f = records233f.map(r => `INT. SC${r.sceneIdx} - DAY\nAction.`).join('\n');
+      const result = await payoffPass({
+        fountain: fountain233f, original: fountain233f,
+        records: records233f,
+        structure: { openClues: 0, completionPercent: 90 } as any,
+        annotations: [], approvedSpans: [],
+      });
+      const match = result.issues.filter((i: any) => i.rule === 'SETUP_PAYOFF_GAP_UNIFORMITY');
+      assert.strictEqual(match.length, 0, 'Should NOT fire when setup→payoff gap lengths vary significantly');
+    });
+  });
+
   describe('Wave 232 — pacingPass: pacing spike scene, peak length misplaced, act-transition jolt', async () => {
     const makeRec232 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

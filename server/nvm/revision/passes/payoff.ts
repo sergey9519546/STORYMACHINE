@@ -537,6 +537,75 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 233: Payoff orphan rate, post-climax cluster, gap uniformity ────────
+
+  // PAYOFF_ORPHAN_RATE (minor, clues≥4): More than 50% of planted clues are
+  // never paid off — the setup engine leaks. The audience is asked to hold
+  // mysteries that the story never resolves. Distinct from ORPHAN_CLUE (flags
+  // each individual orphan) — this fires when the RATE of abandonment is high,
+  // indicating a systemic failure of the payoff architecture.
+  if (clueInfo.size >= 4) {
+    const orphanCount233 = [...clueInfo.keys()].filter(id => !payoffInfo.has(id)).length;
+    const orphanRate233 = orphanCount233 / clueInfo.size;
+    if (orphanRate233 > 0.5) {
+      issues.push({
+        location: 'Setup/payoff ledger',
+        rule: 'PAYOFF_ORPHAN_RATE',
+        severity: 'minor',
+        description: `${orphanCount233} of ${clueInfo.size} planted clues (${Math.round(orphanRate233 * 100)}%) are never paid off — the majority of the story's setup investments go unrewarded. A high orphan rate depletes the audience's trust in the setup engine.`,
+        suggestedFix: 'Either pay off the orphaned clues, or fold them into a shared payoff scene that resolves multiple threads at once. The audience remembers what the story promised — they need resolution, not abandonment.',
+      });
+    }
+  }
+
+  // PAYOFF_POST_CLIMAX_CLUSTER (minor, payoffs≥3, n≥8): 2+ payoffs land after
+  // the climax zone (final 20% of the story). Payoffs in the falling action arrive
+  // after dramatic energy has already dissipated — they feel like afterthoughts
+  // rather than earned revelations. Distinct from RESOLUTION_CRAMMED_AT_END (which
+  // checks the final 15% for >60% of all payoffs) — this fires on any 2+ late
+  // post-climax payoffs regardless of total proportion.
+  if (payoffInfo.size >= 3 && records.length >= 8) {
+    const postClimaxStart233 = Math.floor(records.length * 0.8);
+    const postPayoffs233 = [...payoffInfo.values()].filter(s => s >= postClimaxStart233).length;
+    if (postPayoffs233 >= 2) {
+      issues.push({
+        location: `Final 20% (Scenes ${postClimaxStart233}–${records.length - 1})`,
+        rule: 'PAYOFF_POST_CLIMAX_CLUSTER',
+        severity: 'minor',
+        description: `${postPayoffs233} payoffs land after Scene ${postClimaxStart233} (post-climax zone) — reveals that arrive in the falling action feel like afterthoughts. The dramatic energy is already spent when these payoffs land.`,
+        suggestedFix: 'Move late payoffs earlier — into the climax or its approach. Resolution in the falling action delays satisfaction without building tension; the audience needs rewards to land while they still care.',
+      });
+    }
+  }
+
+  // SETUP_PAYOFF_GAP_UNIFORMITY (minor, ≥4 resolved setups): All resolved
+  // setup→payoff gaps are within 1 scene of each other. Every clue has the
+  // same fuse — the story resolves its mysteries on a metronomic schedule.
+  // The audience can predict exactly when the next reveal arrives. Some clues
+  // should have short fuses (quick gratification) and others long fuses
+  // (sustained anticipation). Uniform gaps make every reveal feel scheduled.
+  {
+    const resolvedGaps233 = [...clueInfo.entries()]
+      .filter(([id]) => payoffInfo.has(id))
+      .map(([id, info]) => (payoffInfo.get(id) ?? info.plantedAt) - info.plantedAt)
+      .filter(g => g > 0);
+    if (resolvedGaps233.length >= 4) {
+      const minGap233 = Math.min(...resolvedGaps233);
+      const maxGap233 = Math.max(...resolvedGaps233);
+      const avgGap233 = resolvedGaps233.reduce((a, b) => a + b, 0) / resolvedGaps233.length;
+      if (maxGap233 - minGap233 <= 1 && avgGap233 <= 4) {
+        issues.push({
+          location: 'Setup/payoff timing',
+          rule: 'SETUP_PAYOFF_GAP_UNIFORMITY',
+          severity: 'minor',
+          description: `All ${resolvedGaps233.length} resolved setups have gap lengths within 1 scene of each other (range: ${minGap233}–${maxGap233} scenes, avg ${avgGap233.toFixed(1)}) — every clue has the same fuse. The audience can predict exactly when the next reveal arrives.`,
+          suggestedFix: 'Vary the fuse lengths: give some clues a 1–2 scene payoff (quick gratification) and others a 5+ scene arc (sustained anticipation). Variety in gap length makes each payoff feel perfectly timed rather than metronomic.',
+        });
+      }
+    }
+  }
+  // ── End Wave 233 ─────────────────────────────────────────────────────────────
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'payoff', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

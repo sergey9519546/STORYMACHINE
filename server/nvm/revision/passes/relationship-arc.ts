@@ -591,6 +591,79 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
     }
   }
 
+  // ── Wave 234: Pair dimension monotone, first-impression contradiction, resolution void ──
+
+  // PAIR_DIMENSION_MONOTONE (minor): A pair with ≥3 shifts uses the same dimension
+  // in every single shift — the relationship operates on only one axis. Real bonds
+  // move on multiple dimensions (trust, power, loyalty, affection). When one pair's
+  // entire arc plays out as "trust only" or "power only," the relationship feels
+  // one-dimensional. Distinct from SINGLE_REGISTER_CONFLICT (conflict pass, global
+  // all-pairs) — this fires per-pair for any single relationship that is dimensionally locked.
+  for (const [pairKey, stats] of pairStats) {
+    if (stats.shifts.length >= 4 && stats.netByDimension.size === 1) {
+      const [a234, b234] = pairKey.split('|');
+      const [onlyDim234] = stats.netByDimension.keys();
+      issues.push({
+        location: `${a234} ↔ ${b234}`,
+        rule: 'PAIR_DIMENSION_MONOTONE',
+        severity: 'minor',
+        description: `The relationship between ${a234} and ${b234} has ${stats.shifts.length} shifts but all operate on the same dimension ("${onlyDim234}") — the bond is dimensionally locked. Real relationships move on multiple axes: trust, power, loyalty, affection. A single-axis arc feels thin and predictable.`,
+        suggestedFix: `Introduce at least one shift on a second dimension between ${a234} and ${b234}: if all shifts have been about trust, add a scene that moves their power balance or tests their loyalty. Multi-axis bonds feel lived-in rather than schematic.`,
+      });
+      break; // one flag per pass
+    }
+  }
+
+  // RELATIONSHIP_FIRST_IMPRESSION_CONTRADICTION (minor): A pair whose first shift
+  // is highly positive (≥0.4) but whose total net trajectory ends negative (≤-0.2).
+  // The story promises warmth and then systematically destroys the relationship —
+  // a structural pattern that can be powerful if earned, but often signals an
+  // underwritten deterioration. Requires ≥4 shifts in the pair.
+  for (const [pairKey, stats] of pairStats) {
+    if (stats.shifts.length >= 4) {
+      const firstAmount234 = stats.shifts[0].amount;
+      const net234 = stats.shifts.reduce((s: number, x: any) => s + x.amount, 0);
+      if (firstAmount234 >= 0.4 && net234 <= -0.2) {
+        const [a234, b234] = pairKey.split('|');
+        issues.push({
+          location: `${a234} ↔ ${b234}`,
+          rule: 'RELATIONSHIP_FIRST_IMPRESSION_CONTRADICTION',
+          severity: 'minor',
+          description: `The relationship between ${a234} and ${b234} opens with a strong positive shift (+${firstAmount234.toFixed(2)}) but ends with a net negative trajectory (${net234.toFixed(2)}) — the story hooks the audience with warmth and then systematically deteriorates the bond. This arc requires explicit earned turning points to feel justified rather than arbitrary.`,
+          suggestedFix: `Make the deterioration feel inevitable by adding a clear cause: a scene of betrayal, a moment of fundamental incompatibility, or a choice that makes the collapse legible. A positive opening raises the audience's investment — its betrayal must be earned.`,
+        });
+        break;
+      }
+    }
+  }
+
+  // RELATIONSHIP_RESOLUTION_VOID (major, ≥2 pairs, n≥8): No pair has a positive
+  // shift anywhere in Act 3 (final 25%). The story enters its resolution phase
+  // with all relational movement either absent or negative — no bond is brought
+  // to a positive conclusion in the finale. Distinct from THIRD_ACT_VOID (no shifts
+  // at all) — this fires when shifts exist in Act 3 but none resolve positively.
+  if (pairStats.size >= 2 && records.length >= 8) {
+    const act3Start234 = Math.floor(records.length * 0.75);
+    const hasAnyShiftInAct3 = records.slice(act3Start234).some(r =>
+      (r.relationshipShifts ?? []).length > 0,
+    );
+    if (hasAnyShiftInAct3) {
+      const hasPosResolution234 = records.slice(act3Start234).some(r =>
+        (r.relationshipShifts ?? []).some((s: any) => s.amount > 0),
+      );
+      if (!hasPosResolution234) {
+        issues.push({
+          location: `Act 3 (Scenes ${act3Start234}–${records.length - 1})`,
+          rule: 'RELATIONSHIP_RESOLUTION_VOID',
+          severity: 'major',
+          description: `Act 3 contains relationship shifts but none are positive — the story's resolution phase ends without any relational closure. All Act 3 relational movement is negative or zero; no bond is brought to a positive conclusion in the finale.`,
+          suggestedFix: 'Give at least one pair a positive shift in Act 3: a reconciliation, a trust restored, or an alliance confirmed. The resolution must deliver at least one relational landing that feels earned after the preceding conflict.',
+        });
+      }
+    }
+  }
+  // ── End Wave 234 ─────────────────────────────────────────────────────────────
+
   const { revised, usedLLM } = await rewritePass({
     fountain, issues, passName: 'relationship-arc', approvedSpans,
     storyContext: input.storyContext, priorPassResults: input.priorPassResults,
