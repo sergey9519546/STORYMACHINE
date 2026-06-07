@@ -17897,6 +17897,136 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 237 — themePass: revelation decoupled, clock resonance absent, relationship-shift decoupled', async () => {
+    const makeRec237 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 1.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput237 = (records: any[]) => ({
+      fountain: records.map((r: any) => `${r.slug}\nAction line.\n`).join('\n'),
+      original: records.map((r: any) => `${r.slug}\nAction line.\n`).join('\n'),
+      records: records as any, structure: {} as any,
+      storyContext: { theme: 'betrayal destroys trust' },
+      annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('THEME_REVELATION_DECOUPLED fires when all revelation scenes lack thematic language', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // Scenes 0,1 resonant (theme word in dialogue); scenes 2,3,4 have revelations but no theme words
+      const records237a = [
+        makeRec237(0, { dialogueHighlights: ['the betrayal runs deep'], emotionalShift: 'negative' }),
+        makeRec237(1, { dialogueHighlights: ['trust was broken long ago'] }),
+        makeRec237(2, { revelation: 'A secret location is found.' }),
+        makeRec237(3, { revelation: 'The safe is empty.' }),
+        makeRec237(4, { revelation: 'Someone left early that night.', emotionalShift: 'negative', suspenseDelta: 2 }),
+        makeRec237(5, { dialogueHighlights: ['betrayal scars everyone'] }),
+      ];
+      const result = await themePass(makeInput237(records237a));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'THEME_REVELATION_DECOUPLED'),
+        `Expected THEME_REVELATION_DECOUPLED, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`,
+      );
+    });
+
+    it('THEME_REVELATION_DECOUPLED does NOT fire when at least one revelation carries thematic language', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // Scene 2 revelation contains 'betrayal' → resonant
+      const records237b = [
+        makeRec237(0, { dialogueHighlights: ['trust was everything'], emotionalShift: 'negative' }),
+        makeRec237(1, { dialogueHighlights: ['betrayal is the wound'] }),
+        makeRec237(2, { revelation: 'The betrayal had been planned from the start.' }),
+        makeRec237(3, { revelation: 'The safe is empty.' }),
+        makeRec237(4, { revelation: 'Someone left early.', suspenseDelta: 2 }),
+        makeRec237(5, { dialogueHighlights: ['trust rebuilt slowly'] }),
+      ];
+      const result = await themePass(makeInput237(records237b));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'THEME_REVELATION_DECOUPLED'),
+        'Should NOT fire when at least one revelation carries thematic language',
+      );
+    });
+
+    it('THEME_CLOCK_RESONANCE_ABSENT fires when clock scenes all lack thematic language', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // Scenes 0,1 resonant; scenes 2,3 have clockRaised but no theme words
+      const records237c = [
+        makeRec237(0, { dialogueHighlights: ['the betrayal cost everything'], emotionalShift: 'negative' }),
+        makeRec237(1, { dialogueHighlights: ['trust is the real casualty'] }),
+        makeRec237(2, { clockRaised: true }),
+        makeRec237(3, { clockRaised: true, suspenseDelta: 2 }),
+        makeRec237(4, {}),
+        makeRec237(5, { dialogueHighlights: ['betrayal echoes forward'] }),
+      ];
+      const result = await themePass(makeInput237(records237c));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'THEME_CLOCK_RESONANCE_ABSENT'),
+        `Expected THEME_CLOCK_RESONANCE_ABSENT, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`,
+      );
+    });
+
+    it('THEME_CLOCK_RESONANCE_ABSENT does NOT fire when at least one clock scene carries thematic language', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // Scene 2 has clockRaised AND theme word in dialogue
+      const records237d = [
+        makeRec237(0, { dialogueHighlights: ['the betrayal cost everything'], emotionalShift: 'negative' }),
+        makeRec237(1, { dialogueHighlights: ['trust was the first casualty'] }),
+        makeRec237(2, { clockRaised: true, dialogueHighlights: ['the betrayal cannot be undone in time'] }),
+        makeRec237(3, { clockRaised: true, suspenseDelta: 2 }),
+        makeRec237(4, {}),
+        makeRec237(5, { dialogueHighlights: ['trust rebuilt', 'betrayal fades'] }),
+      ];
+      const result = await themePass(makeInput237(records237d));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'THEME_CLOCK_RESONANCE_ABSENT'),
+        'Should NOT fire when at least one clock scene carries thematic language',
+      );
+    });
+
+    it('THEME_RELATIONSHIP_SHIFT_DECOUPLED fires when all relationship-shift scenes lack thematic language', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const rs237 = (pair: string, amt: number) => ({ pairKey: pair, dimension: 'power', amount: amt });
+      // Scenes 0,1 resonant; scenes 2,3,4 have relationship shifts but no theme words
+      const records237e = [
+        makeRec237(0, { dialogueHighlights: ['betrayal is the wound that never heals'], emotionalShift: 'negative' }),
+        makeRec237(1, { dialogueHighlights: ['trust collapses slowly'] }),
+        makeRec237(2, { relationshipShifts: [rs237('alice|bob', -0.5)] }),
+        makeRec237(3, { relationshipShifts: [rs237('alice|bob', 0.3)], suspenseDelta: 2 }),
+        makeRec237(4, { relationshipShifts: [rs237('bob|carol', -0.4)] }),
+        makeRec237(5, { dialogueHighlights: ['betrayal scars the bond'] }),
+      ];
+      const result = await themePass(makeInput237(records237e));
+      assert.ok(
+        result.issues.some((i: any) => i.rule === 'THEME_RELATIONSHIP_SHIFT_DECOUPLED'),
+        `Expected THEME_RELATIONSHIP_SHIFT_DECOUPLED, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`,
+      );
+    });
+
+    it('THEME_RELATIONSHIP_SHIFT_DECOUPLED does NOT fire when at least one relationship-shift scene carries thematic language', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const rs237 = (pair: string, amt: number) => ({ pairKey: pair, dimension: 'power', amount: amt });
+      // Scene 2 has both relationship shift AND theme word
+      const records237f = [
+        makeRec237(0, { dialogueHighlights: ['betrayal is the wound'], emotionalShift: 'negative' }),
+        makeRec237(1, { dialogueHighlights: ['trust runs thin'] }),
+        makeRec237(2, { relationshipShifts: [rs237('alice|bob', -0.5)], dialogueHighlights: ['betrayal cracks the bond'] }),
+        makeRec237(3, { relationshipShifts: [rs237('alice|bob', 0.3)], suspenseDelta: 2 }),
+        makeRec237(4, { relationshipShifts: [rs237('bob|carol', -0.4)] }),
+        makeRec237(5, { dialogueHighlights: ['trust returns to those who stayed'] }),
+      ];
+      const result = await themePass(makeInput237(records237f));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'THEME_RELATIONSHIP_SHIFT_DECOUPLED'),
+        'Should NOT fire when at least one relationship-shift scene carries thematic language',
+      );
+    });
+  });
+
   describe('Wave 236 — structurePass: purpose monoculture, clock raised late, Act 2 revelation absent', async () => {
     const makeRec236 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

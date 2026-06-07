@@ -662,6 +662,84 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         });
       }
     }
+
+    // ── Wave 237: Revelation decoupled, clock resonance absent, relationship-shift decoupled ──
+
+    // THEME_REVELATION_DECOUPLED (minor, ≥6 scenes, ≥3 revelations): Revelation
+    // scenes — the story's moments of maximum information delivery — carry no
+    // thematic language. Revelations should resonate with the theme because they
+    // answer questions the theme raises. When all revelations are "plot only," the
+    // story's information architecture is structurally disconnected from its
+    // central question. Distinct from THEME_SUBPLOT_ISOLATION (which flags when
+    // ALL resonant scenes contain revelations): this fires when ALL revelation
+    // scenes are thematically silent.
+    if (records.length >= 6) {
+      const revScenes237 = records.filter((r: any) => r.revelation !== null);
+      if (revScenes237.length >= 3) {
+        const anyRevResonant237 = revScenes237.some((r: any) =>
+          sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        );
+        if (!anyRevResonant237) {
+          issues.push({
+            location: 'Revelation scenes',
+            rule: 'THEME_REVELATION_DECOUPLED',
+            severity: 'minor',
+            description: `${revScenes237.length} revelation scenes carry no thematic language related to "${themeRaw}" — the story's information architecture is structurally disconnected from its central question. Revelations should answer questions the theme raises, not just advance the plot.`,
+            suggestedFix: `Rewrite at least one revelation so it delivers its payload in terms of the theme: the truth revealed should complicate or crystallize what the story is ultimately about, not just change the plot. A revelation decoupled from the theme is a puzzle piece that doesn't fit.`,
+          });
+        }
+      }
+    }
+
+    // THEME_CLOCK_RESONANCE_ABSENT (minor, ≥6 scenes, ≥2 clock scenes): Scenes
+    // where a ticking clock or deadline is raised never carry thematic language.
+    // Clock scenes represent maximum urgency — the question of what is worth paying
+    // the cost of time. When clocks and theme are decoupled, the story's urgency
+    // has no thematic meaning; the protagonist is racing against a deadline that
+    // has nothing to do with what the story is about.
+    if (records.length >= 6) {
+      const clockScenes237 = records.filter((r: any) => r.clockRaised === true);
+      if (clockScenes237.length >= 2) {
+        const anyClockResonant237 = clockScenes237.some((r: any) =>
+          sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        );
+        if (!anyClockResonant237) {
+          issues.push({
+            location: 'Clock/deadline scenes',
+            rule: 'THEME_CLOCK_RESONANCE_ABSENT',
+            severity: 'minor',
+            description: `${clockScenes237.length} clock-raised scenes carry no thematic language related to "${themeRaw}" — the story's urgency is structurally decoupled from its central question. When the deadline has nothing to do with the theme, the pressure feels mechanical rather than meaningful.`,
+            suggestedFix: `Rewrite at least one clock scene so the deadline stakes the theme: the cost of running out of time should be a thematic cost — a betrayal that can't be undone, a trust that will expire. The audience should feel that BOTH the plot and the central question are on the clock.`,
+          });
+        }
+      }
+    }
+
+    // THEME_RELATIONSHIP_SHIFT_DECOUPLED (minor, ≥6 scenes, ≥3 relShift scenes):
+    // Scenes where a character relationship shifts significantly carry no thematic
+    // language. Relationship shifts are the primary vehicle for theme in drama —
+    // they are the story's emotional architecture. When relationship changes are
+    // thematically silent, the human connections that carry the emotional weight
+    // are disconnected from the story's declared central question.
+    if (records.length >= 6) {
+      const relShiftScenes237 = records.filter((r: any) =>
+        (r.relationshipShifts ?? []).length > 0,
+      );
+      if (relShiftScenes237.length >= 3) {
+        const anyRelResonant237 = relShiftScenes237.some((r: any) =>
+          sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        );
+        if (!anyRelResonant237) {
+          issues.push({
+            location: 'Relationship-shift scenes',
+            rule: 'THEME_RELATIONSHIP_SHIFT_DECOUPLED',
+            severity: 'minor',
+            description: `${relShiftScenes237.length} relationship-shift scenes carry no thematic language related to "${themeRaw}" — the story's emotional architecture is disconnected from its central question. Relationship changes should dramatize the theme, not exist in a parallel track.`,
+            suggestedFix: `Rewrite at least one relationship-shift scene so the shift expresses the theme: if the theme is betrayal, make the relationship crack along a line of trust; if loyalty, make the bond tested on precisely those terms. The theme lives in what characters do to each other.`,
+          });
+        }
+      }
+    }
   }
 
   const { revised, usedLLM } = await rewritePass({
