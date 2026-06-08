@@ -17897,6 +17897,115 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 256 — characterArcPass: relational dimension monotony, emotional flatline, negative-only arc', async () => {
+    const makeRec256 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput256 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: '...',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('ARC_SINGLE_DIMENSION fires when all relationship shifts use one dimension', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // 6 records; 4 shifts all on 'trust'
+      const records256a = [
+        makeRec256(0, { relationshipShifts: [{ pairKey: 'A|B', dimension: 'trust', amount: 0.3 }] }),
+        makeRec256(1, { relationshipShifts: [{ pairKey: 'A|B', dimension: 'trust', amount: -0.2 }] }),
+        makeRec256(2),
+        makeRec256(3, { relationshipShifts: [{ pairKey: 'C|D', dimension: 'trust', amount: 0.4 }] }),
+        makeRec256(4, { relationshipShifts: [{ pairKey: 'C|D', dimension: 'trust', amount: -0.3 }] }),
+        makeRec256(5),
+      ];
+      const result256a = await characterArcPass(makeInput256(records256a));
+      const dim = result256a.issues.filter((i: any) => i.rule === 'ARC_SINGLE_DIMENSION');
+      assert.ok(dim.length >= 1, `Should detect ARC_SINGLE_DIMENSION, got: ${JSON.stringify(result256a.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(dim[0].severity, 'minor');
+    });
+
+    it('ARC_SINGLE_DIMENSION does NOT fire when shifts span multiple dimensions', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      const records256b = [
+        makeRec256(0, { relationshipShifts: [{ pairKey: 'A|B', dimension: 'trust', amount: 0.3 }] }),
+        makeRec256(1, { relationshipShifts: [{ pairKey: 'A|B', dimension: 'power', amount: -0.2 }] }),
+        makeRec256(2),
+        makeRec256(3, { relationshipShifts: [{ pairKey: 'C|D', dimension: 'intimacy', amount: 0.4 }] }),
+        makeRec256(4, { relationshipShifts: [{ pairKey: 'C|D', dimension: 'trust', amount: -0.3 }] }),
+        makeRec256(5),
+      ];
+      const result256b = await characterArcPass(makeInput256(records256b));
+      const dim = result256b.issues.filter((i: any) => i.rule === 'ARC_SINGLE_DIMENSION');
+      assert.strictEqual(dim.length, 0, 'Should NOT fire when shifts span multiple dimensions');
+    });
+
+    it('ARC_EMOTIONAL_FLATLINE fires when ≥80% of scenes are neutral', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // 10 records; 9 neutral, 1 positive → 90%
+      const records256c = Array.from({ length: 10 }, (_, i) => makeRec256(i, {
+        emotionalShift: i === 5 ? 'positive' : 'neutral',
+      }));
+      const result256c = await characterArcPass(makeInput256(records256c));
+      const flat = result256c.issues.filter((i: any) => i.rule === 'ARC_EMOTIONAL_FLATLINE');
+      assert.ok(flat.length >= 1, `Should detect ARC_EMOTIONAL_FLATLINE, got: ${JSON.stringify(result256c.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(flat[0].severity, 'major');
+    });
+
+    it('ARC_EMOTIONAL_FLATLINE does NOT fire when scenes carry varied emotion', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // 10 records; 5 neutral, alternating positive/negative → 50% neutral
+      const records256d = Array.from({ length: 10 }, (_, i) => makeRec256(i, {
+        emotionalShift: i % 2 === 0 ? 'neutral' : (i % 4 === 1 ? 'positive' : 'negative'),
+      }));
+      const result256d = await characterArcPass(makeInput256(records256d));
+      const flat = result256d.issues.filter((i: any) => i.rule === 'ARC_EMOTIONAL_FLATLINE');
+      assert.strictEqual(flat.length, 0, 'Should NOT fire when emotion is varied');
+    });
+
+    it('ARC_NEGATIVE_ONLY fires when all non-neutral scenes are negative', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // 8 records; 3 negative, rest neutral, no positive — but keep neutral <80% to avoid flatline
+      const records256e = [
+        makeRec256(0, { emotionalShift: 'negative' }),
+        makeRec256(1, { emotionalShift: 'negative' }),
+        makeRec256(2, { emotionalShift: 'neutral' }),
+        makeRec256(3, { emotionalShift: 'negative' }),
+        makeRec256(4, { emotionalShift: 'neutral' }),
+        makeRec256(5, { emotionalShift: 'negative' }),
+        makeRec256(6, { emotionalShift: 'neutral' }),
+        makeRec256(7, { emotionalShift: 'negative' }),
+      ];
+      const result256e = await characterArcPass(makeInput256(records256e));
+      const neg = result256e.issues.filter((i: any) => i.rule === 'ARC_NEGATIVE_ONLY');
+      assert.ok(neg.length >= 1, `Should detect ARC_NEGATIVE_ONLY, got: ${JSON.stringify(result256e.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(neg[0].severity, 'minor');
+    });
+
+    it('ARC_NEGATIVE_ONLY does NOT fire when a positive beat exists', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      const records256f = [
+        makeRec256(0, { emotionalShift: 'negative' }),
+        makeRec256(1, { emotionalShift: 'negative' }),
+        makeRec256(2, { emotionalShift: 'neutral' }),
+        makeRec256(3, { emotionalShift: 'positive' }),
+        makeRec256(4, { emotionalShift: 'neutral' }),
+        makeRec256(5, { emotionalShift: 'negative' }),
+        makeRec256(6, { emotionalShift: 'neutral' }),
+        makeRec256(7, { emotionalShift: 'negative' }),
+      ];
+      const result256f = await characterArcPass(makeInput256(records256f));
+      const neg = result256f.issues.filter((i: any) => i.rule === 'ARC_NEGATIVE_ONLY');
+      assert.strictEqual(neg.length, 0, 'Should NOT fire when a positive emotional beat exists');
+    });
+  });
+
   describe('Wave 255 — dialoguePass: ellipsis overuse, tag-question overuse, exclamation overuse', async () => {
     const dInput255 = (fountain: string) => ({ fountain, original: fountain, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
 

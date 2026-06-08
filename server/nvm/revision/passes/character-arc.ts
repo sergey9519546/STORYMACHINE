@@ -9,6 +9,8 @@
 // Wave 153 additions: arc monotone (emotional state never varies mid-story),
 // late introduction (major character first appears past the midpoint), and
 // emotional whiplash (rapid alternating emotional shifts without grounding).
+// Wave 256 additions: relational dimension monotony (all shifts on one axis),
+// emotional flatline (≥80% neutral scenes), negative-only arc (no positive beat).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -763,6 +765,74 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
   // ── End Wave 242 ─────────────────────────────────────────────────────────────
 
   // ── End Wave 228 ─────────────────────────────────────────────────────────────
+
+  // ── Wave 256: Relational dimension monotony, emotional flatline, negative-only arc ──
+
+  // ARC_SINGLE_DIMENSION (minor, n≥6, ≥4 shifts): Every relationship shift across
+  // the story moves on the same single dimension (e.g. only 'trust', never 'power'
+  // or 'intimacy'). Relationships are multi-dimensional — people gain power as they
+  // lose intimacy, earn trust while ceding control. A cast whose bonds only ever
+  // move on one axis is relationally thin: the same note struck again and again
+  // instead of a chord. Requires 4+ total shifts carrying a dimension field.
+  if (records.length >= 6) {
+    const dimensions256 = new Set<string>();
+    let shiftCount256 = 0;
+    for (const r of records) {
+      for (const s of (r.relationshipShifts ?? []) as Array<{ dimension?: string }>) {
+        shiftCount256++;
+        if (s.dimension) dimensions256.add(s.dimension);
+      }
+    }
+    if (shiftCount256 >= 4 && dimensions256.size === 1) {
+      const [onlyDim256] = dimensions256;
+      issues.push({
+        location: 'Relational dimension coverage',
+        rule: 'ARC_SINGLE_DIMENSION',
+        severity: 'minor',
+        description: `All ${shiftCount256} relationship shifts in the story move on a single dimension ("${onlyDim256}") — the relational world only ever changes along one axis. Relationships are multi-dimensional: trust, power, and intimacy move independently and often in opposition. A cast that only shifts on one note reads as relationally flat.`,
+        suggestedFix: `Vary the relational dimensions: let one pair gain power while losing intimacy, another earn trust while ceding control. A relationship that moves on multiple axes at once — closer but more wary, allied but resentful — is what makes a cast feel three-dimensional.`,
+      });
+    }
+  }
+
+  // ARC_EMOTIONAL_FLATLINE (major, n≥8): 80% or more of all scenes carry a neutral
+  // emotionalShift — the story has almost no emotional texture. Characters move
+  // through events without registering feeling, so the audience has nothing to feel
+  // alongside them. Distinct from FLAT_CHARACTER_ARC (same opening/closing tone) and
+  // arc monotone (a non-neutral state that never varies); this catches the absence
+  // of emotional signal altogether — a story told in affectless reportage.
+  if (records.length >= 8) {
+    const neutralCount256 = records.filter(r => r.emotionalShift === 'neutral').length;
+    const neutralRatio256 = neutralCount256 / records.length;
+    if (neutralRatio256 >= 0.8) {
+      issues.push({
+        location: 'Emotional texture',
+        rule: 'ARC_EMOTIONAL_FLATLINE',
+        severity: 'major',
+        description: `${neutralCount256} of ${records.length} scenes (${Math.round(neutralRatio256 * 100)}%) carry a neutral emotional tone — the story has almost no emotional texture. Characters pass through events without registering feeling, so the audience is given nothing to feel with them. The narrative reads as affectless reportage rather than lived experience.`,
+        suggestedFix: 'Inject emotional shifts across the arc: let scenes land as victories, losses, fears, or relief. Every significant beat should leave a character (and the audience) feeling something — a story with no emotional signal is a sequence of events, not a drama.',
+      });
+    }
+  }
+
+  // ARC_NEGATIVE_ONLY (minor, n≥8, ≥3 non-neutral scenes): Every non-neutral
+  // emotional beat in the story is negative — there is not a single positive scene
+  // anywhere. Unrelieved downward emotion gives the audience no contrast and nothing
+  // to lose: despair only lands against the memory of hope. A story pitched entirely
+  // in the minor key flattens into monotone bleakness. Distinct from ARC_POSITIVE_
+  // MIDPOINT_ABSENT (relational, midpoint-only); this is the emotional arc end-to-end.
+  if (records.length >= 8) {
+    const nonNeutral256 = records.filter(r => r.emotionalShift !== 'neutral');
+    if (nonNeutral256.length >= 3 && nonNeutral256.every(r => r.emotionalShift === 'negative')) {
+      issues.push({
+        location: 'Emotional arc polarity',
+        rule: 'ARC_NEGATIVE_ONLY',
+        severity: 'minor',
+        description: `All ${nonNeutral256.length} emotionally charged scenes in the story are negative — there is not a single positive beat anywhere. Unrelieved downward emotion gives the audience no contrast: despair only registers against the memory of hope, and a story told entirely in the minor key flattens into monotone bleakness.`,
+        suggestedFix: 'Plant at least one or two positive emotional beats — a small victory, a moment of connection, a flash of hope — even (especially) in a tragedy. The darkness deepens when it follows light; without contrast, relentless bleakness numbs rather than moves.',
+      });
+    }
+  }
 
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'character-arc', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
