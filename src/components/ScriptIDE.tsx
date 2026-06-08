@@ -441,8 +441,21 @@ export default function ScriptIDE({
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
     let actionLines = 0;
-    let wordCount = scriptText.trim().split(/\s+/).length;
-    if (scriptText.trim() === "") wordCount = 0;
+
+    // ⚡ Bolt Performance Optimization:
+    // Replaced scriptText.trim().split(/\s+/) with a zero-allocation word counter.
+    let wordCount = 0;
+    let inWord = false;
+    for (let i = 0; i < scriptText.length; i++) {
+      if (scriptText.charCodeAt(i) > 32) {
+        if (!inWord) {
+          wordCount++;
+          inWord = true;
+        }
+      } else {
+        inWord = false;
+      }
+    }
 
     blocks.forEach((block) => {
       if (block.type === "character") {
@@ -592,9 +605,12 @@ export default function ScriptIDE({
   // ── Key handler ──────────────────────────────────────────────────────────────
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const cursor = e.currentTarget.selectionStart;
-    const textBeforeCursor = scriptText.substring(0, cursor);
-    const lines = textBeforeCursor.split("\n");
-    const currentLine = lines[lines.length - 1];
+
+    // ⚡ Bolt Performance Optimization:
+    // Avoid splitting the entire preceding string just to get the current line.
+    // Use lastIndexOf and slice for a zero-allocation substring extraction.
+    const lastNewlineIdx = scriptText.lastIndexOf("\n", cursor - 1);
+    const currentLine = scriptText.slice(lastNewlineIdx + 1, cursor);
 
     if (e.key === "i" || e.key === "I") {
       if (currentLine === "") {
@@ -737,11 +753,22 @@ export default function ScriptIDE({
   // ── Navigation ───────────────────────────────────────────────────────────────
   const handleNavigate = (lineIndex: number) => {
     if (!editorRef.current) return;
-    const lines = scriptText.split("\n");
+
+    // ⚡ Bolt Performance Optimization:
+    // Replaced scriptText.split('\n') with a while-loop and indexOf to find the
+    // character offset for the target line without allocating an array.
     let charCount = 0;
-    for (let i = 0; i < lineIndex; i++) {
-      charCount += lines[i].length + 1;
+    let currentLineIdx = 0;
+    while (currentLineIdx < lineIndex) {
+      const nextNewline = scriptText.indexOf("\n", charCount);
+      if (nextNewline === -1) {
+        charCount = scriptText.length;
+        break;
+      }
+      charCount = nextNewline + 1;
+      currentLineIdx++;
     }
+
     editorRef.current.focus();
     editorRef.current.setSelectionRange(charCount, charCount);
 
