@@ -6,6 +6,9 @@
 // Wave 155 additions: deus ex machina (late revelation closing the plot with no
 // setup), suspense spike without cause (sudden danger with no escalation), and
 // goal-conflict absence (protagonist goal never opposed by another force).
+// Wave 254 additions: clue-seed cluster (3+ clues planted in one scene), payoff
+// without setup (callback to an unseeded thread), and suspense plateau flatline
+// (4+ consecutive scenes of flat tension).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -849,6 +852,87 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `Scenes ${i - 2}–${i} swing emotional polarity (${a240.emotionalShift}→${b240.emotionalShift}→${c240.emotionalShift}) but neither reversal is motivated by an on-page causal event — no revelation, clue, clock, or relationship shift drives the mood flips. The tone whiplashes without cause.`,
           suggestedFix: 'Anchor each emotional reversal to a concrete cause: a discovery that darkens the mood, a relationship repair that lifts it. Uncaused tonal swings read as inconsistency; motivated ones read as drama.',
+        });
+        break;
+      }
+    }
+  }
+
+  // ── Wave 254: CLUE_SEED_CLUSTER ───────────────────────────────────────────
+  // A single scene plants three or more distinct clues at once. Each seeded clue
+  // is a thread the audience is asked to hold; launching three or more in one
+  // scene overloads working memory and dilutes every individual setup — none of
+  // them registers as the one that matters. Distinct from SETUP_PAYOFF_IMBALANCE
+  // (global seed/payoff ratio) and CHEKHOV_GUN_UNFIRED (unpaid seeds); this is a
+  // local density spike — too many guns mounted on the wall in a single beat.
+  // Requires 4+ records.
+  if (records.length >= 4) {
+    for (const r of records) {
+      if ((r.seededClueIds?.length ?? 0) >= 3) {
+        issues.push({
+          location: `Scene ${r.sceneIdx} (${r.slug})`,
+          rule: 'CLUE_SEED_CLUSTER',
+          severity: 'minor',
+          description: `Scene ${r.sceneIdx} plants ${r.seededClueIds!.length} distinct clues at once (${r.seededClueIds!.slice(0, 3).join(', ')}${r.seededClueIds!.length > 3 ? ', …' : ''}) — too many threads launched in a single beat. The audience can't tell which setup matters, and each one registers more faintly for being crowded.`,
+          suggestedFix: 'Distribute the setups across several scenes so each clue lands with its own moment of attention. A clue planted alone is remembered; three planted together blur into background detail.',
+        });
+        break;
+      }
+    }
+  }
+
+  // ── Wave 254: PAYOFF_WITHOUT_SETUP ────────────────────────────────────────
+  // A scene fires a payoff (payoffSetupId) whose referenced setup id was never
+  // seeded in any earlier scene. The callback lands on nothing — the audience is
+  // asked to recognise a thread that was never planted, so the "payoff" produces
+  // no flash of recognition. Distinct from REVELATION_WITHOUT_SETUP (revelation-
+  // keyed); this checks the explicit payoff→seed id linkage. Requires 4+ records.
+  if (records.length >= 4) {
+    let payoffOrphanFired254 = false;
+    for (let i = 0; i < records.length && !payoffOrphanFired254; i++) {
+      for (const pid of records[i].payoffSetupIds ?? []) {
+        const seededBefore254 = records
+          .slice(0, i)
+          .some(prev => (prev.seededClueIds ?? []).includes(pid));
+        if (!seededBefore254) {
+          issues.push({
+            location: `Scene ${i} (${records[i].slug})`,
+            rule: 'PAYOFF_WITHOUT_SETUP',
+            severity: 'major',
+            description: `Scene ${i} fires a payoff for "${pid}" but that thread was never seeded in any earlier scene — the callback lands on nothing. A payoff only delivers its flash of recognition when the audience was first shown the seed.`,
+            suggestedFix: `Plant "${pid}" earlier: add a setup scene in Act 1 or Act 2 that seeds the clue this payoff calls back to. A payoff without a prior setup is a punchline with no joke.`,
+          });
+          payoffOrphanFired254 = true;
+          break;
+        }
+      }
+    }
+  }
+
+  // ── Wave 254: SUSPENSE_PLATEAU_FLATLINE ───────────────────────────────────
+  // Four or more consecutive scenes hold suspense essentially flat (|suspenseDelta|
+  // ≤ 0.5). Tension neither rises nor falls for an extended stretch — the story
+  // flatlines. Distinct from ACT2_CAUSAL_DESERT (no causal events of any kind) and
+  // CONSEQUENCE_CHAIN_BREAK (two flat scenes after a peak); this fires on a
+  // sustained run of tensionless scenes regardless of other causal activity.
+  // Requires 8+ records.
+  if (records.length >= 8) {
+    let runStart254 = 0;
+    let runLen254 = 0;
+    for (let i = 0; i < records.length; i++) {
+      if (Math.abs(records[i].suspenseDelta ?? 0) <= 0.5) {
+        if (runLen254 === 0) runStart254 = i;
+        runLen254++;
+      } else {
+        runLen254 = 0;
+      }
+      if (runLen254 >= 4) {
+        issues.push({
+          location: `Scenes ${runStart254}–${i}`,
+          rule: 'SUSPENSE_PLATEAU_FLATLINE',
+          severity: 'minor',
+          description: `Scenes ${runStart254}–${i} hold suspense essentially flat (|delta| ≤ 0.5 for ${runLen254} consecutive scenes) — tension neither rises nor falls across the stretch. The story flatlines; the audience's sense of forward pressure goes slack.`,
+          suggestedFix: 'Break the plateau with a deliberate move on the suspense curve: raise a clock, deliver a setback, or release built tension at a turning point. A flat tension line over four-plus scenes reads as the story idling.',
         });
         break;
       }

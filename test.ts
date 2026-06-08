@@ -17897,6 +17897,115 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 254 — causalityPass: clue-seed cluster, payoff without setup, suspense plateau flatline', async () => {
+    const makeRec254 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput254 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: '...',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('CLUE_SEED_CLUSTER fires when one scene plants 3+ clues', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      const records254a = [
+        makeRec254(0),
+        makeRec254(1, { seededClueIds: ['clueA', 'clueB', 'clueC'] }),
+        makeRec254(2), makeRec254(3),
+      ];
+      const result254a = await causalityPass(makeInput254(records254a));
+      const cluster = result254a.issues.filter((i: any) => i.rule === 'CLUE_SEED_CLUSTER');
+      assert.ok(cluster.length >= 1, `Should detect CLUE_SEED_CLUSTER, got: ${JSON.stringify(result254a.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(cluster[0].severity, 'minor');
+    });
+
+    it('CLUE_SEED_CLUSTER does NOT fire when clues are spread across scenes', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      const records254b = [
+        makeRec254(0, { seededClueIds: ['clueA'] }),
+        makeRec254(1, { seededClueIds: ['clueB'] }),
+        makeRec254(2, { seededClueIds: ['clueC'] }),
+        makeRec254(3),
+      ];
+      const result254b = await causalityPass(makeInput254(records254b));
+      const cluster = result254b.issues.filter((i: any) => i.rule === 'CLUE_SEED_CLUSTER');
+      assert.strictEqual(cluster.length, 0, 'Should NOT fire when clues are spread one-per-scene');
+    });
+
+    it('PAYOFF_WITHOUT_SETUP fires when a payoff references an unseeded thread', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // payoff "ghost" at scene 2 was never seeded earlier
+      const records254c = [
+        makeRec254(0, { seededClueIds: ['realThread'] }),
+        makeRec254(1),
+        makeRec254(2, { payoffSetupIds: ['ghost'] }),
+        makeRec254(3),
+      ];
+      const result254c = await causalityPass(makeInput254(records254c));
+      const orphan = result254c.issues.filter((i: any) => i.rule === 'PAYOFF_WITHOUT_SETUP');
+      assert.ok(orphan.length >= 1, `Should detect PAYOFF_WITHOUT_SETUP, got: ${JSON.stringify(result254c.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(orphan[0].severity, 'major');
+    });
+
+    it('PAYOFF_WITHOUT_SETUP does NOT fire when the payoff thread was seeded earlier', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      const records254d = [
+        makeRec254(0, { seededClueIds: ['realThread'] }),
+        makeRec254(1),
+        makeRec254(2, { payoffSetupIds: ['realThread'] }),
+        makeRec254(3),
+      ];
+      const result254d = await causalityPass(makeInput254(records254d));
+      const orphan = result254d.issues.filter((i: any) => i.rule === 'PAYOFF_WITHOUT_SETUP');
+      assert.strictEqual(orphan.length, 0, 'Should NOT fire when the payoff thread was seeded in an earlier scene');
+    });
+
+    it('SUSPENSE_PLATEAU_FLATLINE fires when 4+ consecutive scenes hold flat suspense', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // 8 scenes; scenes 2-5 all flat (delta 0); rest have movement
+      const records254e = [
+        makeRec254(0, { suspenseDelta: 2 }),
+        makeRec254(1, { suspenseDelta: 2 }),
+        makeRec254(2, { suspenseDelta: 0 }),
+        makeRec254(3, { suspenseDelta: 0.3 }),
+        makeRec254(4, { suspenseDelta: -0.2 }),
+        makeRec254(5, { suspenseDelta: 0 }),
+        makeRec254(6, { suspenseDelta: 2 }),
+        makeRec254(7, { suspenseDelta: 2 }),
+      ];
+      const result254e = await causalityPass(makeInput254(records254e));
+      const flat = result254e.issues.filter((i: any) => i.rule === 'SUSPENSE_PLATEAU_FLATLINE');
+      assert.ok(flat.length >= 1, `Should detect SUSPENSE_PLATEAU_FLATLINE, got: ${JSON.stringify(result254e.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(flat[0].severity, 'minor');
+    });
+
+    it('SUSPENSE_PLATEAU_FLATLINE does NOT fire when suspense moves regularly', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // 8 scenes; no run of 4 flat scenes — movement at least every 3rd scene
+      const records254f = [
+        makeRec254(0, { suspenseDelta: 2 }),
+        makeRec254(1, { suspenseDelta: 0 }),
+        makeRec254(2, { suspenseDelta: 0 }),
+        makeRec254(3, { suspenseDelta: 2 }),
+        makeRec254(4, { suspenseDelta: 0 }),
+        makeRec254(5, { suspenseDelta: 0 }),
+        makeRec254(6, { suspenseDelta: 2 }),
+        makeRec254(7, { suspenseDelta: 0 }),
+      ];
+      const result254f = await causalityPass(makeInput254(records254f));
+      const flat = result254f.issues.filter((i: any) => i.rule === 'SUSPENSE_PLATEAU_FLATLINE');
+      assert.strictEqual(flat.length, 0, 'Should NOT fire when no run of 4 flat scenes exists');
+    });
+  });
+
   describe('Wave 253 — beliefPass: revelation Act 2a desert, belief echo chamber, adjacent deception payoff', async () => {
     const makeRec253 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
