@@ -17897,6 +17897,126 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 259 — originalityPass: copula action dominance, filtering-verb overuse, directorial intrusion', async () => {
+    const oInput259 = (fountain: string) => ({ fountain, original: fountain, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+
+    it('COPULA_ACTION_DOMINANCE fires when >45% of action lines lean on a copula', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 12 action lines, 8 with copula
+      const f259a = [
+        'INT. ROOM - DAY', '',
+        'The room is dark.',
+        'There are shadows on the wall.',
+        'The window is open.',
+        'A chair is overturned.',
+        'The floor was wet.',
+        'Papers are scattered everywhere.',
+        'The clock was broken.',
+        'The air is cold.',
+        'She crosses the room.',
+        'He grabs the keys.',
+        'They climb the stairs.',
+        'She opens the drawer.',
+      ].join('\n');
+      const result259a = await originalityPass(oInput259(f259a));
+      assert.ok(result259a.issues.some((i: any) => i.rule === 'COPULA_ACTION_DOMINANCE'), `Expected COPULA_ACTION_DOMINANCE, got: ${JSON.stringify(result259a.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('COPULA_ACTION_DOMINANCE does NOT fire when action lines use active verbs', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const f259b = [
+        'INT. ROOM - DAY', '',
+        'She crosses the room.',
+        'He grabs the keys.',
+        'They climb the stairs.',
+        'She opens the drawer.',
+        'He slams the door.',
+        'She pockets the note.',
+        'He bolts down the hall.',
+        'She kicks the chair aside.',
+        'He scans the floor.',
+        'She rips the page out.',
+        'He hurls the cup.',
+        'She vaults the railing.',
+      ].join('\n');
+      const result259b = await originalityPass(oInput259(f259b));
+      assert.ok(!result259b.issues.some((i: any) => i.rule === 'COPULA_ACTION_DOMINANCE'), 'Should NOT fire when action lines use active verbs');
+    });
+
+    it('FILTERING_VERB_OVERUSE fires when >25% of action lines filter perception', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 12 action lines, 5 with filtering verbs
+      const f259c = [
+        'INT. ROOM - DAY', '',
+        'She sees the door swing open.',
+        'He hears footsteps in the hall.',
+        'She watches the car pull away.',
+        'He feels the cold metal.',
+        'She looks at the photograph.',
+        'He crosses the room.',
+        'She grabs the keys.',
+        'They climb the stairs.',
+        'He opens the drawer.',
+        'She pockets the note.',
+        'He slams the door.',
+        'She rips the page out.',
+      ].join('\n');
+      const result259c = await originalityPass(oInput259(f259c));
+      assert.ok(result259c.issues.some((i: any) => i.rule === 'FILTERING_VERB_OVERUSE'), `Expected FILTERING_VERB_OVERUSE, got: ${JSON.stringify(result259c.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('FILTERING_VERB_OVERUSE does NOT fire when images are presented directly', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const f259d = [
+        'INT. ROOM - DAY', '',
+        'The door swings open.',
+        'Footsteps echo in the hall.',
+        'The car pulls away.',
+        'Cold metal glints.',
+        'The photograph lies face up.',
+        'He crosses the room.',
+        'She grabs the keys.',
+        'They climb the stairs.',
+        'He opens the drawer.',
+        'She watches the road.',
+        'He slams the door.',
+        'She rips the page out.',
+      ].join('\n');
+      const result259d = await originalityPass(oInput259(f259d));
+      assert.ok(!result259d.issues.some((i: any) => i.rule === 'FILTERING_VERB_OVERUSE'), 'Should NOT fire when images are presented directly');
+    });
+
+    it('DIRECTORIAL_INTRUSION fires when 3+ action lines embed camera directions', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const f259e = [
+        'INT. ROOM - DAY', '',
+        'ANGLE ON the hallway door.',
+        'She steps forward.',
+        'CLOSE ON her trembling hands.',
+        'He looks up.',
+        'PAN ACROSS the empty desks.',
+        'The lights flicker.',
+      ].join('\n');
+      const result259e = await originalityPass(oInput259(f259e));
+      assert.ok(result259e.issues.some((i: any) => i.rule === 'DIRECTORIAL_INTRUSION'), `Expected DIRECTORIAL_INTRUSION, got: ${JSON.stringify(result259e.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('DIRECTORIAL_INTRUSION does NOT fire when prose carries the emphasis', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const f259f = [
+        'INT. ROOM - DAY', '',
+        'The hallway door looms.',
+        'She steps forward.',
+        'Her hands tremble. Just her hands.',
+        'He looks up.',
+        'Empty desks stretch into the dark.',
+        'The lights flicker.',
+      ].join('\n');
+      const result259f = await originalityPass(oInput259(f259f));
+      assert.ok(!result259f.issues.some((i: any) => i.rule === 'DIRECTORIAL_INTRUSION'), 'Should NOT fire when prose carries the emphasis');
+    });
+  });
+
   describe('Wave 258 — intentionPass: proactive midpoint void, proactive desert run, revelation without proactive', async () => {
     const makeRec258 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

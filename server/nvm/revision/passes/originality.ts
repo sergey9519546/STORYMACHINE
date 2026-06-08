@@ -7,6 +7,8 @@
 // Wave 163 additions: scene purpose monotone in Act 3 (no functional variety in
 // the final act), reaction shot overuse (>30% of action lines are terse reactions),
 // and emotional arc plateau (all scenes neutral — no emotional peaks or valleys).
+// Wave 259 additions: copula action dominance (linking-verb staging), filtering-
+// verb overuse (perception framing), and directorial intrusion (camera/shot calls).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -964,6 +966,107 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
   }
 
   // ── End Wave 245 ─────────────────────────────────────────────────────────────
+
+  // ── Wave 259: Copula action dominance, filtering-verb overuse, directorial intrusion ──
+
+  // COPULA_ACTION_DOMINANCE (minor, ≥10 action lines): More than 45% of action
+  // lines lean on a copula ("is/are/was/were") as their spine instead of an active
+  // verb. Screenplay action is present-tense and kinetic — "She slams the door",
+  // not "The door is slammed" or "There is a door". Copula-driven description
+  // stages a static tableau; active verbs make the page move. Distinct from
+  // GERUND_OPENER_DOMINANCE (participial openers) and COGNITION_IN_ACTION (mental
+  // verbs); this targets the inert linking-verb habit.
+  {
+    let actionLines259 = 0;
+    let copulaLines259 = 0;
+    let inDlg259 = false;
+    const copulaRe259 = /\b(is|are|was|were|isn'?t|aren'?t|wasn'?t|weren'?t)\b/i;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg259 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg259 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg259 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg259) continue;
+      actionLines259++;
+      if (copulaRe259.test(t)) copulaLines259++;
+    }
+    if (actionLines259 >= 10 && copulaLines259 / actionLines259 > 0.45) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'COPULA_ACTION_DOMINANCE',
+        severity: 'minor',
+        description: `${copulaLines259} of ${actionLines259} action lines (${Math.round(copulaLines259 / actionLines259 * 100)}%) lean on a linking verb ("is/are/was/were") rather than an active verb — the action prose stages a static tableau. "There is a man at the window" describes a photograph; "A man watches from the window" describes a scene in motion.`,
+        suggestedFix: 'Recast copula sentences around active verbs. Cut expletive openers ("There is", "It was") and let the subject act: not "The room is dark and cold" but "Cold seeps through the dark room." Active verbs give the page forward momentum.',
+      });
+    }
+  }
+
+  // FILTERING_VERB_OVERUSE (minor, ≥10 action lines): More than 25% of action
+  // lines filter the image through a character's perception ("she sees", "he
+  // hears", "she watches", "he feels") instead of presenting it directly. Filtering
+  // puts a pane of glass between the audience and the event — "She sees the car
+  // explode" is weaker than "The car explodes." Distinct from COGNITION_IN_ACTION
+  // (interior thought verbs); this targets sensory-perception framing.
+  {
+    let actionLinesFilt259 = 0;
+    let filterLines259 = 0;
+    let inDlgFilt259 = false;
+    const filterRe259 = /\b(sees?|saw|hears?|heard|watches?|watched|feels?|felt|looks? at|listens?|listened|observes?|observed)\b/i;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlgFilt259 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlgFilt259 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlgFilt259 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlgFilt259) continue;
+      actionLinesFilt259++;
+      if (filterRe259.test(t)) filterLines259++;
+    }
+    if (actionLinesFilt259 >= 10 && filterLines259 / actionLinesFilt259 > 0.25) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'FILTERING_VERB_OVERUSE',
+        severity: 'minor',
+        description: `${filterLines259} of ${actionLinesFilt259} action lines (${Math.round(filterLines259 / actionLinesFilt259 * 100)}%) filter the image through a character's perception ("she sees", "he hears", "she watches") rather than presenting it directly. Filtering verbs put a pane of glass between the audience and the event — the camera already shows what the character sees; saying so twice weakens the image.`,
+        suggestedFix: 'Cut the perception verb and show the thing itself: not "She sees the door creak open" but "The door creaks open." Reserve "she sees" for the rare beat where the act of watching — not the thing watched — is the point.',
+      });
+    }
+  }
+
+  // DIRECTORIAL_INTRUSION (minor, ≥3 occurrences): Action lines embed explicit
+  // camera and editing directions ("ANGLE ON", "CLOSE ON", "WE SEE", "PAN",
+  // "ZOOM", "DOLLY", "TRACKING", "CAMERA"). A spec script directs the reader's
+  // eye through prose, not through shot calls — naming the lens is the director's
+  // job, and overt camera direction dates the page and breaks immersion. Counts
+  // occurrences across action lines (sluglines and transitions excluded).
+  {
+    let directorialCount259 = 0;
+    let firstDirLine259 = -1;
+    let inDlgDir259 = false;
+    const directorialRe259 = /\b(ANGLE ON|CLOSE ON|CLOSE-?UP|WIDE ON|WE SEE|WE HEAR|PAN (TO|ACROSS|UP|DOWN|LEFT|RIGHT)|ZOOM (IN|OUT)|DOLLY|TRACKING SHOT|CRANE SHOT|THE CAMERA|PUSH IN|RACK FOCUS)\b/;
+    for (let i = 0; i < lines.length; i++) {
+      const t = lines[i].trim();
+      if (!t) { inDlgDir259 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlgDir259 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlgDir259 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlgDir259) continue;
+      if (directorialRe259.test(t)) {
+        directorialCount259++;
+        if (firstDirLine259 < 0) firstDirLine259 = i + 1;
+      }
+    }
+    if (directorialCount259 >= 3) {
+      issues.push({
+        location: `Action lines (first at line ${firstDirLine259})`,
+        rule: 'DIRECTORIAL_INTRUSION',
+        severity: 'minor',
+        description: `${directorialCount259} action lines embed explicit camera or editing directions ("ANGLE ON", "WE SEE", "PAN", "ZOOM", "CLOSE ON"). A spec script directs the reader's eye through prose, not shot calls — naming the lens is the director's job. Overt camera direction dates the page and pulls the reader out of the story.`,
+        suggestedFix: 'Translate camera direction into prose emphasis. Instead of "CLOSE ON the trembling hand", write a line that isolates it: "Her hand trembles. Just her hand." White space and sentence focus do the camera\'s work without claiming the director\'s chair.',
+      });
+    }
+  }
 
   // ── Limit total issues to avoid overwhelming output ───────────────────────
   // Clichés (minor) are pushed first and would crowd out the higher-severity
