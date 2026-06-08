@@ -939,6 +939,77 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 241: DIALOGUE_SELF_CORRECTION_ABSENT ────────────────────────────
+  // No dialogue line contains a mid-speech self-correction marker ("I mean",
+  // "actually,", "wait,", "no—", etc.) across ≥15 total lines. Distinct from
+  // INTERRUPTION_VOID (which fires when no line ENDS with a trailing dash or
+  // ellipsis — cut-off by another speaker). This fires when speech is never
+  // SELF-interrupted — no character restarts, qualifies mid-stream, or catches
+  // themselves. Real speech under pressure is full of self-correction; its
+  // complete absence makes dialogue feel over-composed, written at a desk
+  // rather than spoken in a scene.
+  if (dialogue.length >= 15) {
+    const selfCorrectRe241 = /\b(I mean|actually,|wait[,—]|no—|—I |—wait|well,|or rather|I meant|correction,|—no)\b/i;
+    const hasSelfCorrect241 = dialogue.some(d => selfCorrectRe241.test(d.line));
+    if (!hasSelfCorrect241) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_SELF_CORRECTION_ABSENT',
+        severity: 'minor',
+        description: `${dialogue.length} dialogue lines contain no mid-speech self-correction ("I mean", "actually,", "wait—", "no—"). Real speech is full of self-interruption and course-correction; its complete absence makes dialogue feel over-written — composed lines delivered at lecterns, not words spoken under pressure.`,
+        suggestedFix: "Add 2-3 moments of spoken self-correction: a character who starts a sentence and redirects it (\"I need to — look, just listen.\"), one who qualifies mid-stream (\"He was wrong, actually, he was terrified\"), one who catches themselves. Self-correction reveals character under pressure and makes speech sound live.",
+      });
+    }
+  }
+
+  // ── Wave 241: SPEAKER_PAIR_MONOPOLY ──────────────────────────────────────
+  // Two speakers account for ≥85% of all dialogue lines when ≥4 unique speakers
+  // are present and ≥16 total lines exist. Distinct from SPEAKER_MONOPOLY
+  // (which fires when ONE speaker ≥55%): this fires when the dominant PAIR
+  // monopolises the verbal space while a larger ensemble looks on silently.
+  // An ensemble that only observes is set dressing — every speaking role must
+  // have something to say that only they would say.
+  if (dialogue.length >= 16) {
+    const speakerCounts241 = new Map<string, number>();
+    for (const d of dialogue) {
+      speakerCounts241.set(d.speaker, (speakerCounts241.get(d.speaker) ?? 0) + 1);
+    }
+    if (speakerCounts241.size >= 4) {
+      const sorted241 = [...speakerCounts241.entries()].sort((a, b) => b[1] - a[1]);
+      const topTwo241 = sorted241[0][1] + sorted241[1][1];
+      const pairRatio241 = topTwo241 / dialogue.length;
+      if (pairRatio241 >= 0.85) {
+        issues.push({
+          location: 'Dialogue speaker distribution',
+          rule: 'SPEAKER_PAIR_MONOPOLY',
+          severity: 'minor',
+          description: `Two characters ("${sorted241[0][0]}" and "${sorted241[1][0]}") deliver ${topTwo241} of ${dialogue.length} lines (${Math.round(pairRatio241 * 100)}%) while ${speakerCounts241.size - 2} other speakers are nearly silent. With ${speakerCounts241.size} speaking roles in the script, the remaining ensemble exists as functional props rather than verbal agents.`,
+          suggestedFix: `Give the silent characters a verbal stake: a challenge, a doubt, an observation that complicates the scene. An ensemble that only listens is set dressing; every speaking role should carry a line that only they would deliver.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 241: DIALOGUE_RETROSPECTIVE_FLOOD ────────────────────────────────
+  // More than 55% of dialogue lines contain common past-tense verbs — characters
+  // spend more time recounting history than acting in the present moment.
+  // Retrospective-dominant dialogue turns scenes into debriefs: characters
+  // explain what happened rather than making things happen. Film is present tense;
+  // extended past-tense dialogue is a news report, not a scene. Requires ≥12 lines.
+  if (dialogue.length >= 12) {
+    const pastTenseRe241 = /\b(was|were|had|did|went|said|told|thought|knew|came|saw|heard|felt|made|took|got|found|left|seemed|looked|happened|turned|tried|started|kept|called|helped|lived|worked|used|changed|died|moved|returned|asked|wanted|needed|gave|sent|brought|caught|held|meant|ran|sat|stood|spoke|walked|became|began)\b/i;
+    const retroCount241 = dialogue.filter(d => pastTenseRe241.test(d.line)).length;
+    if (retroCount241 / dialogue.length > 0.55) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_RETROSPECTIVE_FLOOD',
+        severity: 'minor',
+        description: `${retroCount241} of ${dialogue.length} dialogue lines (${Math.round(retroCount241 / dialogue.length * 100)}%) contain past-tense verbs — characters spend more time recounting history than acting in the present. Retrospective dialogue turns scenes into debriefs rather than live events.`,
+        suggestedFix: "Shift the balance toward present-tense confrontation: characters should want things, force each other's choices, and reveal information in the moment — not explain what happened before. When backstory is necessary, interrupt it with present-tense stakes: \"She left me. Right now, tonight — that's what matters.\"",
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'dialogue', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

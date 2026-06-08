@@ -17897,6 +17897,1138 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 252 — voicePass: present progressive overuse, action pronoun flood, dialogue monosyllable dominance', async () => {
+    it('PRESENT_PROGRESSIVE_OVERUSE fires when >40% of action lines use progressive form', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const f252a = [
+        'INT. OFFICE - DAY', '',
+        'She is walking to the door.',
+        'He is looking out the window.',
+        'She is talking on the phone.',
+        'He is moving slowly across the room.',
+        'She is watching him leave.',
+        'He is running toward the exit.',
+        'They are standing in silence.',
+        'The clock ticks on the wall.',
+      ].join('\n');
+      const result = await voicePass({ fountain: f252a, original: f252a, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(result.issues.some((i: any) => i.rule === 'PRESENT_PROGRESSIVE_OVERUSE'), `Expected PRESENT_PROGRESSIVE_OVERUSE, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('PRESENT_PROGRESSIVE_OVERUSE does NOT fire when ≤40% of action lines are progressive', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const f252b = [
+        'INT. OFFICE - DAY', '',
+        'She walks to the door.',
+        'He looks out the window.',
+        'She is talking on the phone.',
+        'He moves quickly forward.',
+        'She watches him leave.',
+        'He runs to the exit.',
+        'They stand in silence.',
+        'The clock ticks.',
+      ].join('\n');
+      const result = await voicePass({ fountain: f252b, original: f252b, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(!result.issues.some((i: any) => i.rule === 'PRESENT_PROGRESSIVE_OVERUSE'), 'Should NOT fire when ≤40% progressive');
+    });
+
+    it('ACTION_PRONOUN_FLOOD fires when >55% of action lines start with a pronoun', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const f252c = [
+        'INT. ROOM - DAY', '',
+        'He opens the door.',
+        'She sits down across from him.',
+        'They look at each other.',
+        'He reaches for the phone.',
+        'She turns away from the window.',
+        'He checks the back exit.',
+        'They leave together.',
+        'It falls to the floor.',
+      ].join('\n');
+      const result = await voicePass({ fountain: f252c, original: f252c, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(result.issues.some((i: any) => i.rule === 'ACTION_PRONOUN_FLOOD'), `Expected ACTION_PRONOUN_FLOOD, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('ACTION_PRONOUN_FLOOD does NOT fire when ≤55% of action lines start with a pronoun', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const f252d = [
+        'INT. ROOM - DAY', '',
+        'MARTINEZ opens the door.',
+        'The phone rings twice.',
+        'SARAH sits at the table.',
+        'He checks the window.',
+        'A clock ticks on the wall.',
+        'JONES crosses the room.',
+        'Morning light fills the space.',
+        'DAVIS enters from the hallway.',
+      ].join('\n');
+      const result = await voicePass({ fountain: f252d, original: f252d, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(!result.issues.some((i: any) => i.rule === 'ACTION_PRONOUN_FLOOD'), 'Should NOT fire when ≤55% pronoun starters');
+    });
+
+    it('DIALOGUE_MONOSYLLABLE_DOMINANCE fires when >65% of dialogue words are monosyllabic', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const f252e = [
+        'INT. ROOM - DAY', '',
+        'BOB', 'Go now. Do it.',
+        'AMY', 'No, not yet.',
+        'BOB', 'Why not? Go on.',
+        'AMY', 'I can not go.',
+        'BOB', 'Yes you can. Try.',
+        'AMY', 'It is too bad.',
+        'BOB', 'No way. Go.',
+        'AMY', 'But why not?',
+        'BOB', 'Run now. Go.',
+        'AMY', 'OK. I go now.',
+      ].join('\n');
+      const result = await voicePass({ fountain: f252e, original: f252e, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(result.issues.some((i: any) => i.rule === 'DIALOGUE_MONOSYLLABLE_DOMINANCE'), `Expected DIALOGUE_MONOSYLLABLE_DOMINANCE, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('DIALOGUE_MONOSYLLABLE_DOMINANCE does NOT fire when dialogue has polysyllabic variety', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const f252f = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'The investigation has revealed something extraordinary about the situation.',
+        'BOB', 'Extraordinary is an understatement given the implications.',
+        'ALICE', 'The photographs demonstrate the perpetrator was absolutely here.',
+        'BOB', 'Completely unprecedented in my professional experience.',
+        'ALICE', 'Understand the magnitude of what we have discovered together.',
+        'BOB', 'Remarkable. The consequences will be catastrophic and permanent.',
+        'ALICE', 'Precisely. We must proceed cautiously and methodically.',
+        'BOB', 'Absolutely. The investigation continues regardless.',
+        'ALICE', 'Authorization has been granted by the superintendent.',
+        'BOB', 'Outstanding. We will proceed immediately with the examination.',
+      ].join('\n');
+      const result = await voicePass({ fountain: f252f, original: f252f, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(!result.issues.some((i: any) => i.rule === 'DIALOGUE_MONOSYLLABLE_DOMINANCE'), 'Should NOT fire when dialogue has polysyllabic variety');
+    });
+  });
+
+  describe('Wave 251 — themePass: final scene silent, positive shift silent, resonance clustering', async () => {
+    const makeRec251 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput251 = (records: any[], fountain: string) => ({
+      fountain, original: fountain,
+      records: records as any, structure: {} as any,
+      storyContext: { theme: 'trust and betrayal' } as any,
+      annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('THEME_FINAL_SCENE_SILENT fires when the final scene contains no thematic language', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const resonant = (i: number) => `INT. SC${i} - DAY\nThe trust between them holds firm.\n`;
+      const silent   = (i: number) => `INT. SC${i} - DAY\nThe contract is signed. Nothing more.\n`;
+      const fountain251a = [resonant(0), resonant(1), resonant(2), resonant(3), resonant(4), silent(5)].join('\n');
+      const records251a = Array.from({ length: 6 }, (_, i) => makeRec251(i));
+      const result = await themePass(makeInput251(records251a, fountain251a));
+      assert.ok(result.issues.some((i: any) => i.rule === 'THEME_FINAL_SCENE_SILENT'), `Expected THEME_FINAL_SCENE_SILENT, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('THEME_FINAL_SCENE_SILENT does NOT fire when the final scene contains thematic language', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const resonant = (i: number) => `INT. SC${i} - DAY\nThe trust between them holds firm.\n`;
+      const fountain251b = Array.from({ length: 6 }, (_, i) => resonant(i)).join('\n');
+      const records251b = Array.from({ length: 6 }, (_, i) => makeRec251(i));
+      const result = await themePass(makeInput251(records251b, fountain251b));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'THEME_FINAL_SCENE_SILENT'), 'Should NOT fire when final scene has thematic language');
+    });
+
+    it('THEME_POSITIVE_SHIFT_SILENT fires when all positive-shift scenes lack thematic language', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // Scene 0 resonant+neutral; scenes 2,3 silent+positive; scenes 4,5 resonant+neutral
+      const makeScene = (i: number, resonant: boolean) =>
+        `INT. SC${i} - DAY\n${resonant ? 'trust endures here.' : 'The meeting goes well.'}\n`;
+      const fountain251c = [makeScene(0,true), makeScene(1,true), makeScene(2,false), makeScene(3,false), makeScene(4,true), makeScene(5,true)].join('\n');
+      const records251c = [
+        makeRec251(0), makeRec251(1),
+        makeRec251(2, { emotionalShift: 'positive' }),
+        makeRec251(3, { emotionalShift: 'positive' }),
+        makeRec251(4), makeRec251(5),
+      ];
+      const result = await themePass(makeInput251(records251c, fountain251c));
+      assert.ok(result.issues.some((i: any) => i.rule === 'THEME_POSITIVE_SHIFT_SILENT'), `Expected THEME_POSITIVE_SHIFT_SILENT, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('THEME_POSITIVE_SHIFT_SILENT does NOT fire when at least one positive-shift scene is thematically resonant', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const makeScene = (i: number, resonant: boolean) =>
+        `INT. SC${i} - DAY\n${resonant ? 'trust is restored between them.' : 'The meeting proceeds.'}\n`;
+      // Scene 2 is positive AND resonant
+      const fountain251d = [makeScene(0,true), makeScene(1,true), makeScene(2,true), makeScene(3,false), makeScene(4,true), makeScene(5,true)].join('\n');
+      const records251d = [
+        makeRec251(0), makeRec251(1),
+        makeRec251(2, { emotionalShift: 'positive' }),
+        makeRec251(3, { emotionalShift: 'positive' }),
+        makeRec251(4), makeRec251(5),
+      ];
+      const result = await themePass(makeInput251(records251d, fountain251d));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'THEME_POSITIVE_SHIFT_SILENT'), 'Should NOT fire when a positive-shift scene is thematically resonant');
+    });
+
+    it('THEME_RESONANCE_CLUSTERING fires when 65%+ of resonant scenes cluster in one act zone', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // 8 records; scenes 2,3,4,5 resonant (Act 2: sceneIdx 2-5 = 4/5 resonant = 80%)
+      const makeScene251e = (i: number, resonant: boolean) =>
+        `INT. SC${i} - DAY\n${resonant ? 'trust shapes every decision here.' : 'A quiet day. Nothing unusual.'}\n`;
+      const fountain251e = Array.from({ length: 8 }, (_, i) => makeScene251e(i, i >= 2 && i <= 6)).join('\n');
+      const records251e = Array.from({ length: 8 }, (_, i) => makeRec251(i));
+      const result = await themePass(makeInput251(records251e, fountain251e));
+      assert.ok(result.issues.some((i: any) => i.rule === 'THEME_RESONANCE_CLUSTERING'), `Expected THEME_RESONANCE_CLUSTERING, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('THEME_RESONANCE_CLUSTERING does NOT fire when resonant scenes are distributed across acts', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // 8 records; resonant at 0,2,5,7 — spread across Act1, Act2, Act3
+      const makeScene251f = (i: number) =>
+        `INT. SC${i} - DAY\n${[0,2,5,7].includes(i) ? 'trust shapes every decision.' : 'A quiet scene.'}\n`;
+      const fountain251f = Array.from({ length: 8 }, (_, i) => makeScene251f(i)).join('\n');
+      const records251f = Array.from({ length: 8 }, (_, i) => makeRec251(i));
+      const result = await themePass(makeInput251(records251f, fountain251f));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'THEME_RESONANCE_CLUSTERING'), 'Should NOT fire when resonant scenes are spread across acts');
+    });
+  });
+
+  describe('Wave 250 — structurePass: curiosity void, Act 3 purpose monotone, Act 2b suspense decay', async () => {
+    const makeRec250 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 1, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput250 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: '...',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any,
+      annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('STRUCTURE_CURIOSITY_VOID fires when no scene raises curiosityDelta above 1', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      const records250a = Array.from({ length: 8 }, (_, i) => makeRec250(i, { curiosityDelta: 0 }));
+      const result = await structurePass(makeInput250(records250a));
+      assert.ok(result.issues.some((i: any) => i.rule === 'STRUCTURE_CURIOSITY_VOID'), `Expected STRUCTURE_CURIOSITY_VOID, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(result.issues.find((i: any) => i.rule === 'STRUCTURE_CURIOSITY_VOID')?.severity, 'minor');
+    });
+
+    it('STRUCTURE_CURIOSITY_VOID does NOT fire when at least one scene has curiosityDelta > 1', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      const records250b = Array.from({ length: 8 }, (_, i) => makeRec250(i, { curiosityDelta: i === 3 ? 2 : 0 }));
+      const result = await structurePass(makeInput250(records250b));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'STRUCTURE_CURIOSITY_VOID'), 'Should NOT fire when a scene has curiosityDelta > 1');
+    });
+
+    it('ACT3_PURPOSE_MONOTONE fires when all Act 3 scenes share the same purpose', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // 12 records; Act3 = scenes 9-11 (floor(12*0.75)=9); all 'confrontation'
+      const records250c = Array.from({ length: 12 }, (_, i) =>
+        makeRec250(i, { purpose: i >= 9 ? 'confrontation' : (i % 2 === 0 ? 'development' : 'revelation') }),
+      );
+      const result = await structurePass(makeInput250(records250c));
+      assert.ok(result.issues.some((i: any) => i.rule === 'ACT3_PURPOSE_MONOTONE'), `Expected ACT3_PURPOSE_MONOTONE, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('ACT3_PURPOSE_MONOTONE does NOT fire when Act 3 scenes have varied purposes', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      const act3Purposes = ['confrontation', 'revelation', 'resolution'];
+      const records250d = Array.from({ length: 12 }, (_, i) =>
+        makeRec250(i, { purpose: i >= 9 ? act3Purposes[i - 9] : 'development' }),
+      );
+      const result = await structurePass(makeInput250(records250d));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'ACT3_PURPOSE_MONOTONE'), 'Should NOT fire when Act 3 has varied purposes');
+    });
+
+    it('ACT2B_SUSPENSE_DECAY fires when Act 2b average suspense is lower than Act 2a', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // 10 records; act2a(2-4) suspense=3.0; act2b(5-6) suspense=1.0 → decay > 0.5
+      const records250e = Array.from({ length: 10 }, (_, i) => {
+        let sd = 1;
+        if (i >= 2 && i < 5) sd = 3;
+        else if (i >= 5 && i < 7) sd = 1;
+        return makeRec250(i, { suspenseDelta: sd });
+      });
+      const result = await structurePass(makeInput250(records250e));
+      assert.ok(result.issues.some((i: any) => i.rule === 'ACT2B_SUSPENSE_DECAY'), `Expected ACT2B_SUSPENSE_DECAY, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('ACT2B_SUSPENSE_DECAY does NOT fire when Act 2b suspense matches or exceeds Act 2a', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // act2a(2-4) suspense=2.0; act2b(5-6) suspense=2.5 → no decay
+      const records250f = Array.from({ length: 10 }, (_, i) => {
+        let sd = 1;
+        if (i >= 2 && i < 5) sd = 2;
+        else if (i >= 5 && i < 7) sd = 2.5;
+        return makeRec250(i, { suspenseDelta: sd });
+      });
+      const result = await structurePass(makeInput250(records250f));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'ACT2B_SUSPENSE_DECAY'), 'Should NOT fire when Act 2b suspense does not decay below Act 2a');
+    });
+  });
+
+  describe('Wave 249 — rhythmPass: short line poverty, visual texture absent, spatial anchor absent', async () => {
+    it('SHORT_LINE_POVERTY fires when no action line has ≤3 words across ≥12 action lines', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      const lines249a = Array.from({ length: 12 }, (_, i) => `She crosses to the window and looks out at the street.`);
+      const f249a = ['INT. OFFICE - DAY', '', ...lines249a].join('\n');
+      const result = await rhythmPass({ fountain: f249a, original: f249a, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(result.issues.some((i: any) => i.rule === 'SHORT_LINE_POVERTY'), `Expected SHORT_LINE_POVERTY, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('SHORT_LINE_POVERTY does NOT fire when at least one action line has ≤3 words', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      const f249b = [
+        'INT. OFFICE - DAY', '',
+        'She crosses to the window and looks out at the street.',
+        'He stands near the door.',
+        'She opens the drawer.',
+        'He checks the files on the shelf.',
+        'She walks toward the exit.',
+        'He closes the blinds.',
+        'She picks up the phone.',
+        'He sets it down.',
+        'She turns away.',
+        'He sighs deeply.',
+        'She stops.',
+        'Dead silence.',
+      ].join('\n');
+      const result = await rhythmPass({ fountain: f249b, original: f249b, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(!result.issues.some((i: any) => i.rule === 'SHORT_LINE_POVERTY'), 'Should NOT fire when a ≤3-word action line exists');
+    });
+
+    it('VISUAL_TEXTURE_ABSENT fires when no action line contains a texture descriptor', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      const f249c = [
+        'INT. OFFICE - DAY', '',
+        'The desk sits by the window.',
+        'A lamp stands in the corner.',
+        'Papers are stacked near the edge.',
+        'The door stands open.',
+        'A chair faces the desk.',
+        'Files are arranged on the shelf.',
+        'A calendar hangs on the wall.',
+        'The carpet covers the floor.',
+        'A plant grows near the window.',
+        'The clock ticks on the wall.',
+      ].join('\n');
+      const result = await rhythmPass({ fountain: f249c, original: f249c, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(result.issues.some((i: any) => i.rule === 'VISUAL_TEXTURE_ABSENT'), `Expected VISUAL_TEXTURE_ABSENT, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('VISUAL_TEXTURE_ABSENT does NOT fire when at least one action line has a texture word', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      const f249d = [
+        'INT. OFFICE - DAY', '',
+        'The worn desk sits by the window.',
+        'A lamp stands in the corner.',
+        'Papers are stacked near the edge.',
+        'The door stands open.',
+        'A chair faces the desk.',
+        'Files are arranged on the shelf.',
+        'A calendar hangs on the wall.',
+        'The carpet covers the floor.',
+        'A plant grows near the window.',
+        'The clock ticks on the wall.',
+      ].join('\n');
+      const result = await rhythmPass({ fountain: f249d, original: f249d, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(!result.issues.some((i: any) => i.rule === 'VISUAL_TEXTURE_ABSENT'), 'Should NOT fire when texture word is present');
+    });
+
+    it('SPATIAL_ANCHOR_ABSENT fires when no action line contains a spatial anchor phrase', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      const f249e = [
+        'INT. ROOM - DAY', '',
+        'Alice enters the room.',
+        'She moves toward Bob.',
+        'Bob turns and sees her.',
+        'She picks up the folder.',
+        'Bob watches her carefully.',
+        'She hands him the documents.',
+        'Bob reads the first page.',
+        'Alice waits in silence.',
+      ].join('\n');
+      const result = await rhythmPass({ fountain: f249e, original: f249e, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(result.issues.some((i: any) => i.rule === 'SPATIAL_ANCHOR_ABSENT'), `Expected SPATIAL_ANCHOR_ABSENT, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('SPATIAL_ANCHOR_ABSENT does NOT fire when at least one action line has a spatial anchor', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      const f249f = [
+        'INT. ROOM - DAY', '',
+        'Alice enters the room.',
+        'She moves to Bob who stands by the window.',
+        'Bob turns and sees her.',
+        'She picks up the folder.',
+        'Bob watches her carefully.',
+        'She hands him the documents.',
+        'Bob reads the first page.',
+        'Alice waits in silence.',
+      ].join('\n');
+      const result = await rhythmPass({ fountain: f249f, original: f249f, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(!result.issues.some((i: any) => i.rule === 'SPATIAL_ANCHOR_ABSENT'), 'Should NOT fire when spatial anchor phrase is present');
+    });
+  });
+
+  describe('Wave 248 — relationshipArcPass: pair velocity spike, Act 1 relational desert, multi-pair climax convergence', async () => {
+    const makeRec248 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput248 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: '...',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any,
+      annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('PAIR_VELOCITY_SPIKE fires when a pair accumulates ≥3 shifts within a 3-scene window', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const records248a = [
+        makeRec248(0), makeRec248(1),
+        makeRec248(2, { relationshipShifts: [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: 0.3 }] }),
+        makeRec248(3, { relationshipShifts: [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: -0.4 }] }),
+        makeRec248(4, { relationshipShifts: [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: 0.2 }] }),
+        makeRec248(5), makeRec248(6), makeRec248(7),
+      ];
+      const result = await relationshipArcPass(makeInput248(records248a));
+      assert.ok(result.issues.some((i: any) => i.rule === 'PAIR_VELOCITY_SPIKE'), `Expected PAIR_VELOCITY_SPIKE, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('PAIR_VELOCITY_SPIKE does NOT fire when shifts are spread out', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const records248b = [
+        makeRec248(0),
+        makeRec248(1, { relationshipShifts: [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: 0.3 }] }),
+        makeRec248(2), makeRec248(3),
+        makeRec248(4, { relationshipShifts: [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: -0.4 }] }),
+        makeRec248(5), makeRec248(6),
+        makeRec248(7, { relationshipShifts: [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: 0.2 }] }),
+      ];
+      const result = await relationshipArcPass(makeInput248(records248b));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'PAIR_VELOCITY_SPIKE'), 'Should NOT fire when shifts are spaced across scenes');
+    });
+
+    it('RELATIONSHIP_ACT1_DESERT fires when no pair has a shift in the first 25% of scenes', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const records248c = [
+        makeRec248(0), makeRec248(1),
+        makeRec248(2, { relationshipShifts: [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: 0.3 }] }),
+        makeRec248(3, { relationshipShifts: [{ pairKey: 'CAROL|DAN', dimension: 'power', amount: -0.2 }] }),
+        makeRec248(4), makeRec248(5), makeRec248(6), makeRec248(7), makeRec248(8), makeRec248(9),
+      ];
+      const result = await relationshipArcPass(makeInput248(records248c));
+      assert.ok(result.issues.some((i: any) => i.rule === 'RELATIONSHIP_ACT1_DESERT'), `Expected RELATIONSHIP_ACT1_DESERT, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('RELATIONSHIP_ACT1_DESERT does NOT fire when Act 1 has a relationship shift', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const records248d = [
+        makeRec248(0, { relationshipShifts: [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: 0.3 }] }),
+        makeRec248(1),
+        makeRec248(2, { relationshipShifts: [{ pairKey: 'CAROL|DAN', dimension: 'power', amount: -0.2 }] }),
+        makeRec248(3), makeRec248(4), makeRec248(5), makeRec248(6), makeRec248(7), makeRec248(8), makeRec248(9),
+      ];
+      const result = await relationshipArcPass(makeInput248(records248d));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'RELATIONSHIP_ACT1_DESERT'), 'Should NOT fire when Act 1 has a relational event');
+    });
+
+    it('MULTI_PAIR_CLIMAX_CONVERGENCE fires when 3+ pairs all resolve in the same Act 3 window', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const records248e = [
+        makeRec248(0),
+        makeRec248(1, { relationshipShifts: [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: 0.3 }] }),
+        makeRec248(2, { relationshipShifts: [{ pairKey: 'CAROL|DAN', dimension: 'power', amount: -0.2 }] }),
+        makeRec248(3, { relationshipShifts: [{ pairKey: 'EVE|FRANK', dimension: 'affinity', amount: 0.1 }] }),
+        makeRec248(4), makeRec248(5),
+        makeRec248(6, { relationshipShifts: [
+          { pairKey: 'ALICE|BOB', dimension: 'trust', amount: -0.5 },
+          { pairKey: 'CAROL|DAN', dimension: 'power', amount: 0.3 },
+          { pairKey: 'EVE|FRANK', dimension: 'affinity', amount: -0.4 },
+        ]}),
+        makeRec248(7),
+      ];
+      const result = await relationshipArcPass(makeInput248(records248e));
+      assert.ok(result.issues.some((i: any) => i.rule === 'MULTI_PAIR_CLIMAX_CONVERGENCE'), `Expected MULTI_PAIR_CLIMAX_CONVERGENCE, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('MULTI_PAIR_CLIMAX_CONVERGENCE does NOT fire when pair final shifts are spread across Act 3', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const records248f = [
+        makeRec248(0), makeRec248(1), makeRec248(2),
+        makeRec248(3, { relationshipShifts: [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: -0.5 }] }),
+        makeRec248(4), makeRec248(5),
+        makeRec248(6, { relationshipShifts: [{ pairKey: 'CAROL|DAN', dimension: 'power', amount: 0.3 }] }),
+        makeRec248(7, { relationshipShifts: [{ pairKey: 'EVE|FRANK', dimension: 'affinity', amount: -0.2 }] }),
+        makeRec248(8), makeRec248(9),
+        makeRec248(10, { relationshipShifts: [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: 0.2 }] }),
+      ];
+      const result = await relationshipArcPass(makeInput248(records248f));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'MULTI_PAIR_CLIMAX_CONVERGENCE'), 'Should NOT fire when pair final shifts are staggered');
+    });
+  });
+
+  describe('Wave 247 — payoffPass: setup Act 3 surge, payoff single-scene dump, setup desert Act 2b', async () => {
+    const makeRec247 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput247 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: '...',
+      records: records as any, structure: { completionPercent: 50, actPosition: 'act2a' } as any,
+      storyContext: {} as any,
+      annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('SETUP_ACT3_SURGE fires when 40%+ of clues are planted in Act 3', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // 8 records; 5 clues total; 2 in Act 3 (scenes 6-7 = floor(8*0.75)=6)
+      const records247a = [
+        makeRec247(0, { seededClueIds: ['c1', 'c2'] }),
+        makeRec247(1),
+        makeRec247(2, { seededClueIds: ['c3'] }),
+        makeRec247(3), makeRec247(4), makeRec247(5),
+        makeRec247(6, { seededClueIds: ['c4', 'c5'] }),
+        makeRec247(7),
+      ];
+      const result = await payoffPass(makeInput247(records247a));
+      assert.ok(result.issues.some((i: any) => i.rule === 'SETUP_ACT3_SURGE'), `Expected SETUP_ACT3_SURGE, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('SETUP_ACT3_SURGE does NOT fire when clues are planted early', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // 5 clues all in Act 1-2 (scenes 0-4)
+      const records247b = [
+        makeRec247(0, { seededClueIds: ['c1', 'c2'] }),
+        makeRec247(1, { seededClueIds: ['c3'] }),
+        makeRec247(2, { seededClueIds: ['c4', 'c5'] }),
+        makeRec247(3), makeRec247(4), makeRec247(5), makeRec247(6), makeRec247(7),
+      ];
+      const result = await payoffPass(makeInput247(records247b));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'SETUP_ACT3_SURGE'), 'Should NOT fire when clues are planted in Acts 1-2');
+    });
+
+    it('PAYOFF_SINGLE_SCENE_DUMP fires when >50% of payoffs land in one scene', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // 4 payoffs total; 3 land in scene 5 (75% > 50%)
+      const records247c = [
+        makeRec247(0, { seededClueIds: ['c1', 'c2', 'c3', 'c4'] }),
+        makeRec247(1), makeRec247(2), makeRec247(3), makeRec247(4),
+        makeRec247(5, { payoffSetupIds: ['c1', 'c2', 'c3'] }),
+        makeRec247(6), makeRec247(7), makeRec247(8),
+        makeRec247(9, { payoffSetupIds: ['c4'] }),
+      ];
+      const result = await payoffPass(makeInput247(records247c));
+      assert.ok(result.issues.some((i: any) => i.rule === 'PAYOFF_SINGLE_SCENE_DUMP'), `Expected PAYOFF_SINGLE_SCENE_DUMP, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('PAYOFF_SINGLE_SCENE_DUMP does NOT fire when payoffs are distributed', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // 4 payoffs spread one per scene
+      const records247d = [
+        makeRec247(0, { seededClueIds: ['c1', 'c2', 'c3', 'c4'] }),
+        makeRec247(1), makeRec247(2),
+        makeRec247(3, { payoffSetupIds: ['c1'] }),
+        makeRec247(4, { payoffSetupIds: ['c2'] }),
+        makeRec247(5, { payoffSetupIds: ['c3'] }),
+        makeRec247(6),
+        makeRec247(7, { payoffSetupIds: ['c4'] }),
+      ];
+      const result = await payoffPass(makeInput247(records247d));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'PAYOFF_SINGLE_SCENE_DUMP'), 'Should NOT fire when payoffs are evenly distributed');
+    });
+
+    it('SETUP_DESERT_ACT2B fires when no clues are planted in Act 2b (50%-75%)', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // 10 records; Act2b = scenes 5-6 (floor(10*0.5)=5, floor(10*0.75)=7); all 3 clues in Act 1
+      const records247e = [
+        makeRec247(0, { seededClueIds: ['c1', 'c2', 'c3'] }),
+        makeRec247(1), makeRec247(2), makeRec247(3), makeRec247(4),
+        makeRec247(5), makeRec247(6), makeRec247(7), makeRec247(8), makeRec247(9),
+      ];
+      const result = await payoffPass(makeInput247(records247e));
+      assert.ok(result.issues.some((i: any) => i.rule === 'SETUP_DESERT_ACT2B'), `Expected SETUP_DESERT_ACT2B, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('SETUP_DESERT_ACT2B does NOT fire when at least one clue is planted in Act 2b', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // clue c3 planted in scene 5 (Act 2b)
+      const records247f = [
+        makeRec247(0, { seededClueIds: ['c1', 'c2'] }),
+        makeRec247(1), makeRec247(2), makeRec247(3), makeRec247(4),
+        makeRec247(5, { seededClueIds: ['c3'] }),
+        makeRec247(6), makeRec247(7), makeRec247(8), makeRec247(9),
+      ];
+      const result = await payoffPass(makeInput247(records247f));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'SETUP_DESERT_ACT2B'), 'Should NOT fire when a clue is planted in Act 2b');
+    });
+  });
+
+  describe('Wave 246 — pacingPass: Act 2 pacing valley, climax scene undersized, midpoint bloat', async () => {
+    const makeRec246 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 1, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeScene246 = (idx: number, lines: number) =>
+      `INT. SC${idx} - DAY\n` + Array.from({ length: lines }, (_, k) => `Action line ${k + 1}.`).join('\n') + '\n';
+
+    it('ACT2_PACING_VALLEY fires when 3+ consecutive Act 2 scenes are each below 60% of average length', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // 10 scenes; Act2 = scenes 2-6; scenes 2,3,4 each have 2 lines (valley below 60% of avg≈8)
+      const f246a = [
+        makeScene246(0,10), makeScene246(1,10),
+        makeScene246(2,2), makeScene246(3,2), makeScene246(4,2),
+        makeScene246(5,10), makeScene246(6,10),
+        makeScene246(7,10), makeScene246(8,10), makeScene246(9,10),
+      ].join('\n');
+      const records246a = Array.from({ length: 10 }, (_, i) => makeRec246(i));
+      const result = await pacingPass({ fountain: f246a, original: f246a, records: records246a, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(result.issues.some((i: any) => i.rule === 'ACT2_PACING_VALLEY'), `Expected ACT2_PACING_VALLEY, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('ACT2_PACING_VALLEY does NOT fire when Act 2 scene lengths are uniform', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      const f246b = Array.from({ length: 10 }, (_, i) => makeScene246(i, 8)).join('\n');
+      const records246b = Array.from({ length: 10 }, (_, i) => makeRec246(i));
+      const result = await pacingPass({ fountain: f246b, original: f246b, records: records246b, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(!result.issues.some((i: any) => i.rule === 'ACT2_PACING_VALLEY'), 'Should NOT fire when Act 2 scenes have uniform length');
+    });
+
+    it('CLIMAX_SCENE_UNDERSIZED fires when the peak suspense scene is among the shortest', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // 8 scenes; scene 5 has peak suspense but only 2 lines; others have 8
+      const f246c = Array.from({ length: 8 }, (_, i) => makeScene246(i, i === 5 ? 2 : 8)).join('\n');
+      const records246c = Array.from({ length: 8 }, (_, i) => makeRec246(i, { suspenseDelta: i === 5 ? 5 : 1 }));
+      const result = await pacingPass({ fountain: f246c, original: f246c, records: records246c, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(result.issues.some((i: any) => i.rule === 'CLIMAX_SCENE_UNDERSIZED'), `Expected CLIMAX_SCENE_UNDERSIZED, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('CLIMAX_SCENE_UNDERSIZED does NOT fire when the peak suspense scene is the longest', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // Scene 5 has peak suspense AND is the longest (20 lines)
+      const f246d = Array.from({ length: 8 }, (_, i) => makeScene246(i, i === 5 ? 20 : 8)).join('\n');
+      const records246d = Array.from({ length: 8 }, (_, i) => makeRec246(i, { suspenseDelta: i === 5 ? 5 : 1 }));
+      const result = await pacingPass({ fountain: f246d, original: f246d, records: records246d, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(!result.issues.some((i: any) => i.rule === 'CLIMAX_SCENE_UNDERSIZED'), 'Should NOT fire when peak suspense scene is among the longest');
+    });
+
+    it('MIDPOINT_BLOAT fires when the midpoint scene is ≥2.5× the average length', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      // 8 scenes; midpoint = scene 4 (floor(8*0.5)=4); scene 4 has 20 lines; others 4
+      const f246e = Array.from({ length: 8 }, (_, i) => makeScene246(i, i === 4 ? 20 : 4)).join('\n');
+      const records246e = Array.from({ length: 8 }, (_, i) => makeRec246(i));
+      const result = await pacingPass({ fountain: f246e, original: f246e, records: records246e, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(result.issues.some((i: any) => i.rule === 'MIDPOINT_BLOAT'), `Expected MIDPOINT_BLOAT, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('MIDPOINT_BLOAT does NOT fire when the midpoint scene is a normal length', async () => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      const f246f = Array.from({ length: 8 }, (_, i) => makeScene246(i, 8)).join('\n');
+      const records246f = Array.from({ length: 8 }, (_, i) => makeRec246(i));
+      const result = await pacingPass({ fountain: f246f, original: f246f, records: records246f, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(!result.issues.some((i: any) => i.rule === 'MIDPOINT_BLOAT'), 'Should NOT fire when midpoint scene has normal length');
+    });
+  });
+
+  describe('Wave 245 — originalityPass: gerund opener dominance, scene slug time monotone, cognition in action', async () => {
+    it('GERUND_OPENER_DOMINANCE fires when >45% of action lines start with a gerund', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const f245a = [
+        'INT. OFFICE - DAY', '',
+        'Running toward the door, she reaches the handle.',
+        'Checking the window, he sees them approaching.',
+        'Looking at the files, she notices the discrepancy.',
+        'Crossing to the desk, Bob finds the folder.',
+        'Holding the evidence, she faces him.',
+        'Turning away, he considers his options.',
+        'Alice walks to the exit.',
+        'Bob checks the entrance.',
+        'She sets the folder down.',
+        'He picks up the phone.',
+      ].join('\n');
+      const result = await originalityPass({ fountain: f245a, original: f245a, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(result.issues.some((i: any) => i.rule === 'GERUND_OPENER_DOMINANCE'), `Expected GERUND_OPENER_DOMINANCE, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('GERUND_OPENER_DOMINANCE does NOT fire when ≤45% of action lines start with a gerund', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const f245b = [
+        'INT. OFFICE - DAY', '',
+        'Running toward the door, she grabs the handle.',
+        'Checking the window, he pauses.',
+        'Alice walks to the exit slowly.',
+        'Bob checks the main entrance now.',
+        'She sets the folder on the surface.',
+        'He picks up the phone and dials.',
+        'The clock ticks steadily on the wall.',
+        'Alice crosses to the window carefully.',
+        'Bob opens the door.',
+        'She pauses at the threshold.',
+      ].join('\n');
+      const result = await originalityPass({ fountain: f245b, original: f245b, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(!result.issues.some((i: any) => i.rule === 'GERUND_OPENER_DOMINANCE'), 'Should NOT fire when ≤45% gerund openers');
+    });
+
+    it('SCENE_SLUG_TIME_MONOTONE fires when all scene sluglines use the same time indicator', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const f245c = Array.from({ length: 6 }, (_, i) => `INT. SC${i} - DAY\nAlice crosses to the window.\n`).join('\n');
+      const result = await originalityPass({ fountain: f245c, original: f245c, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(result.issues.some((i: any) => i.rule === 'SCENE_SLUG_TIME_MONOTONE'), `Expected SCENE_SLUG_TIME_MONOTONE, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('SCENE_SLUG_TIME_MONOTONE does NOT fire when scene sluglines have mixed time indicators', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const times = ['DAY', 'NIGHT', 'DAY', 'NIGHT', 'DAY', 'NIGHT'];
+      const f245d = times.map((t, i) => `INT. SC${i} - ${t}\nAlice crosses to the window.\n`).join('\n');
+      const result = await originalityPass({ fountain: f245d, original: f245d, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(!result.issues.some((i: any) => i.rule === 'SCENE_SLUG_TIME_MONOTONE'), 'Should NOT fire when time indicators are mixed');
+    });
+
+    it('COGNITION_IN_ACTION fires when >30% of action lines use cognition verbs', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const f245e = [
+        'INT. OFFICE - DAY', '',
+        'She realizes the door is unlocked.',
+        'He wonders where she has gone.',
+        'She decides to leave immediately.',
+        'He notices the files are missing.',
+        'She remembers the entry code now.',
+        'Alice walks toward the exit.',
+        'Bob checks the window frame.',
+        'She sets down her bag.',
+        'He picks up the phone slowly.',
+        'The door closes behind her.',
+      ].join('\n');
+      const result = await originalityPass({ fountain: f245e, original: f245e, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(result.issues.some((i: any) => i.rule === 'COGNITION_IN_ACTION'), `Expected COGNITION_IN_ACTION, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('COGNITION_IN_ACTION does NOT fire when ≤30% of action lines use cognition verbs', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      const f245f = [
+        'INT. OFFICE - DAY', '',
+        'She opens the door.',
+        'He crosses to the window.',
+        'She picks up the folder.',
+        'He dials the phone.',
+        'She realizes he has left.',
+        'Alice walks toward the exit.',
+        'Bob checks the drawer.',
+        'She sets down her bag.',
+        'He closes the window slowly.',
+        'The door swings shut.',
+      ].join('\n');
+      const result = await originalityPass({ fountain: f245f, original: f245f, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(!result.issues.some((i: any) => i.rule === 'COGNITION_IN_ACTION'), 'Should NOT fire when ≤30% cognition verbs');
+    });
+  });
+
+  describe('Wave 244 — intentionPass: proactive Act 3 void, intention discovery absent, goal pivot absent', async () => {
+    const makeRec244 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput244 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: '...',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any,
+      annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('PROACTIVE_ACT3_VOID fires when Act 3 contains no proactive acts', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 8 records; Act3 = scenes 6-7; scenes 0-3 have proactive acts; 6,7 do not
+      const records244a = Array.from({ length: 8 }, (_, i) => makeRec244(i, {
+        clockRaised: i < 4 ? true : false,
+        seededClueIds: [],
+      }));
+      const result = await intentionPass(makeInput244(records244a));
+      assert.ok(result.issues.some((i: any) => i.rule === 'PROACTIVE_ACT3_VOID'), `Expected PROACTIVE_ACT3_VOID, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('PROACTIVE_ACT3_VOID does NOT fire when Act 3 has at least one proactive act', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // Scene 6 (Act 3) raises a clock
+      const records244b = Array.from({ length: 8 }, (_, i) => makeRec244(i, { clockRaised: i === 6 }));
+      const result = await intentionPass(makeInput244(records244b));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'PROACTIVE_ACT3_VOID'), 'Should NOT fire when Act 3 has a proactive act');
+    });
+
+    it('INTENTION_DISCOVERY_ABSENT fires when protagonist is proactive but Act 3 has no revelation', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 8 records; 3 proactive acts; no revelation in Act 3 (scenes 6-7)
+      const records244c = Array.from({ length: 8 }, (_, i) => makeRec244(i, {
+        clockRaised: i < 3,
+        revelation: i === 2 ? 'the letter was forged' : null,
+      }));
+      const result = await intentionPass(makeInput244(records244c));
+      assert.ok(result.issues.some((i: any) => i.rule === 'INTENTION_DISCOVERY_ABSENT'), `Expected INTENTION_DISCOVERY_ABSENT, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('INTENTION_DISCOVERY_ABSENT does NOT fire when Act 3 contains a revelation', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 3 proactive acts AND revelation in Act 3 (scene 6)
+      const records244d = Array.from({ length: 8 }, (_, i) => makeRec244(i, {
+        clockRaised: i < 3,
+        revelation: i === 6 ? 'the answer was here all along' : null,
+      }));
+      const result = await intentionPass(makeInput244(records244d));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'INTENTION_DISCOVERY_ABSENT'), 'Should NOT fire when Act 3 has a revelation');
+    });
+
+    it('GOAL_PIVOT_ABSENT fires when all 4+ proactive acts use only one modality', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 10 records; 4 proactive acts all clockRaised=true, none with seededClueIds
+      const records244e = Array.from({ length: 10 }, (_, i) => makeRec244(i, {
+        clockRaised: i < 4,
+        seededClueIds: [],
+      }));
+      const result = await intentionPass(makeInput244(records244e));
+      assert.ok(result.issues.some((i: any) => i.rule === 'GOAL_PIVOT_ABSENT'), `Expected GOAL_PIVOT_ABSENT, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('GOAL_PIVOT_ABSENT does NOT fire when proactive acts mix both modalities', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 10 records; 4 proactive acts: 2 clock-raising, 2 clue-planting
+      const records244f = Array.from({ length: 10 }, (_, i) => makeRec244(i, {
+        clockRaised: i === 1 || i === 3,
+        seededClueIds: i === 5 || i === 7 ? ['clue-x'] : [],
+      }));
+      const result = await intentionPass(makeInput244(records244f));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'GOAL_PIVOT_ABSENT'), 'Should NOT fire when both modalities are used');
+    });
+  });
+
+  describe('Wave 243 — conflictPass: conflict recovery too fast, single pair conflict, conflict purpose monotone', async () => {
+    const makeRec243 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput243 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: '...',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any,
+      annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('CONFLICT_RECOVERY_TOO_FAST fires when all deep reversals recover within 2 scenes', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 8 records; 2 deep reversals each immediately followed by positive recovery
+      const records243a = [
+        makeRec243(0),
+        makeRec243(1, { suspenseDelta: -2.0 }),
+        makeRec243(2, { suspenseDelta: 1.5 }),
+        makeRec243(3),
+        makeRec243(4, { suspenseDelta: -2.5 }),
+        makeRec243(5, { suspenseDelta: 1.2 }),
+        makeRec243(6), makeRec243(7),
+      ];
+      const result = await conflictPass(makeInput243(records243a));
+      assert.ok(result.issues.some((i: any) => i.rule === 'CONFLICT_RECOVERY_TOO_FAST'), `Expected CONFLICT_RECOVERY_TOO_FAST, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('CONFLICT_RECOVERY_TOO_FAST does NOT fire when at least one reversal lingers', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // Scene 1 deep reversal; scenes 2,3 neutral (no recovery within 2); scene 4 deep reversal; scene 5 recovery
+      const records243b = [
+        makeRec243(0),
+        makeRec243(1, { suspenseDelta: -2.0 }),
+        makeRec243(2, { suspenseDelta: 0 }),
+        makeRec243(3, { suspenseDelta: 0 }),
+        makeRec243(4, { suspenseDelta: -2.5 }),
+        makeRec243(5, { suspenseDelta: 1.5 }),
+        makeRec243(6), makeRec243(7),
+      ];
+      const result = await conflictPass(makeInput243(records243b));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'CONFLICT_RECOVERY_TOO_FAST'), 'Should NOT fire when at least one reversal is allowed to linger');
+    });
+
+    it('SINGLE_PAIR_CONFLICT fires when only one pair carries all negative relationship shifts', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 2 pairs; only ALICE|BOB has negative shift; CAROL|DAN has positive only
+      const records243c = [
+        makeRec243(0), makeRec243(1),
+        makeRec243(2, { relationshipShifts: [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: -0.5 }] }),
+        makeRec243(3, { relationshipShifts: [{ pairKey: 'CAROL|DAN', dimension: 'affinity', amount: 0.4 }] }),
+        makeRec243(4), makeRec243(5), makeRec243(6), makeRec243(7),
+      ];
+      const result = await conflictPass(makeInput243(records243c));
+      assert.ok(result.issues.some((i: any) => i.rule === 'SINGLE_PAIR_CONFLICT'), `Expected SINGLE_PAIR_CONFLICT, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('SINGLE_PAIR_CONFLICT does NOT fire when multiple pairs carry negative shifts', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // Both pairs have negative shifts
+      const records243d = [
+        makeRec243(0), makeRec243(1),
+        makeRec243(2, { relationshipShifts: [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: -0.5 }] }),
+        makeRec243(3, { relationshipShifts: [{ pairKey: 'CAROL|DAN', dimension: 'affinity', amount: -0.4 }] }),
+        makeRec243(4), makeRec243(5), makeRec243(6), makeRec243(7),
+      ];
+      const result = await conflictPass(makeInput243(records243d));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'SINGLE_PAIR_CONFLICT'), 'Should NOT fire when multiple pairs have negative shifts');
+    });
+
+    it('CONFLICT_PURPOSE_MONOTONE fires when all conflict scenes share the same purpose label', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 3 conflict scenes (suspenseDelta < -1), all purpose='confrontation'
+      const records243e = [
+        makeRec243(0),
+        makeRec243(1, { suspenseDelta: -2, purpose: 'confrontation' }),
+        makeRec243(2),
+        makeRec243(3, { suspenseDelta: -1.5, purpose: 'confrontation' }),
+        makeRec243(4),
+        makeRec243(5, { suspenseDelta: -2.5, purpose: 'confrontation' }),
+        makeRec243(6), makeRec243(7),
+      ];
+      const result = await conflictPass(makeInput243(records243e));
+      assert.ok(result.issues.some((i: any) => i.rule === 'CONFLICT_PURPOSE_MONOTONE'), `Expected CONFLICT_PURPOSE_MONOTONE, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('CONFLICT_PURPOSE_MONOTONE does NOT fire when conflict scenes have varied purposes', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      const records243f = [
+        makeRec243(0),
+        makeRec243(1, { suspenseDelta: -2, purpose: 'confrontation' }),
+        makeRec243(2),
+        makeRec243(3, { suspenseDelta: -1.5, purpose: 'revelation' }),
+        makeRec243(4),
+        makeRec243(5, { suspenseDelta: -2.5, purpose: 'crisis' }),
+        makeRec243(6), makeRec243(7),
+      ];
+      const result = await conflictPass(makeInput243(records243f));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'CONFLICT_PURPOSE_MONOTONE'), 'Should NOT fire when conflict scenes have different purposes');
+    });
+  });
+
+  describe('Wave 242 — characterArcPass: Act 1 relational desert, positive midpoint absent, revelation unincorporated', async () => {
+    const makeRec242 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput242 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: '...',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any,
+      annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('ARC_ACT1_RELATIONAL_DESERT fires when no pair shifts in the first 25% of scenes', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // 10 records; 2 pairs; shifts only in scenes 3,4 (Act 2); Act1=scenes 0,1
+      const records242a = [
+        makeRec242(0), makeRec242(1),
+        makeRec242(2),
+        makeRec242(3, { relationshipShifts: [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: 0.3 }] }),
+        makeRec242(4, { relationshipShifts: [{ pairKey: 'CAROL|DAN', dimension: 'power', amount: -0.2 }] }),
+        makeRec242(5), makeRec242(6), makeRec242(7), makeRec242(8), makeRec242(9),
+      ];
+      const result = await characterArcPass(makeInput242(records242a));
+      assert.ok(result.issues.some((i: any) => i.rule === 'ARC_ACT1_RELATIONAL_DESERT'), `Expected ARC_ACT1_RELATIONAL_DESERT, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('ARC_ACT1_RELATIONAL_DESERT does NOT fire when Act 1 has a relationship shift', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      const records242b = [
+        makeRec242(0, { relationshipShifts: [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: 0.3 }] }),
+        makeRec242(1),
+        makeRec242(2, { relationshipShifts: [{ pairKey: 'CAROL|DAN', dimension: 'power', amount: -0.2 }] }),
+        makeRec242(3), makeRec242(4), makeRec242(5), makeRec242(6), makeRec242(7), makeRec242(8), makeRec242(9),
+      ];
+      const result = await characterArcPass(makeInput242(records242b));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'ARC_ACT1_RELATIONAL_DESERT'), 'Should NOT fire when Act 1 has a relational event');
+    });
+
+    it('ARC_POSITIVE_MIDPOINT_ABSENT fires when the midpoint zone has no positive relationship shift', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // 10 records; midpoint = scenes 4-5 (floor(10*0.4)=4 to floor(10*0.6)=6); only negative shifts
+      const records242c = Array.from({ length: 10 }, (_, i) => makeRec242(i, {
+        relationshipShifts: (i === 4 || i === 5)
+          ? [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: -0.3 }]
+          : [],
+      }));
+      const result = await characterArcPass(makeInput242(records242c));
+      assert.ok(result.issues.some((i: any) => i.rule === 'ARC_POSITIVE_MIDPOINT_ABSENT'), `Expected ARC_POSITIVE_MIDPOINT_ABSENT, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('ARC_POSITIVE_MIDPOINT_ABSENT does NOT fire when midpoint zone has a positive shift', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      const records242d = Array.from({ length: 10 }, (_, i) => makeRec242(i, {
+        relationshipShifts: i === 4
+          ? [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: 0.5 }]
+          : [],
+      }));
+      const result = await characterArcPass(makeInput242(records242d));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'ARC_POSITIVE_MIDPOINT_ABSENT'), 'Should NOT fire when midpoint has a positive shift');
+    });
+
+    it('ARC_REVELATION_UNINCORPORATED fires when revelations are never followed by a relationship shift', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // 8 records; 2 revelations (scenes 1,4); no relationship shifts anywhere
+      const records242e = Array.from({ length: 8 }, (_, i) => makeRec242(i, {
+        revelation: (i === 1 || i === 4) ? 'the letter was forged' : null,
+      }));
+      const result = await characterArcPass(makeInput242(records242e));
+      assert.ok(result.issues.some((i: any) => i.rule === 'ARC_REVELATION_UNINCORPORATED'), `Expected ARC_REVELATION_UNINCORPORATED, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('ARC_REVELATION_UNINCORPORATED does NOT fire when a revelation is followed by a relationship shift', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // Revelation at scene 1; relationship shift at scene 2 (within 2 scenes)
+      const records242f = Array.from({ length: 8 }, (_, i) => makeRec242(i, {
+        revelation: (i === 1 || i === 4) ? 'the letter was forged' : null,
+        relationshipShifts: i === 2 ? [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: -0.4 }] : [],
+      }));
+      const result = await characterArcPass(makeInput242(records242f));
+      assert.ok(!result.issues.some((i: any) => i.rule === 'ARC_REVELATION_UNINCORPORATED'), 'Should NOT fire when a revelation is followed by a relationship shift within 2 scenes');
+    });
+  });
+
+  describe('Wave 241 — dialoguePass: self-correction absent, speaker pair monopoly, retrospective flood', async () => {
+    it('DIALOGUE_SELF_CORRECTION_ABSENT fires when no dialogue line contains a self-correction marker', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 15 dialogue lines, none with self-correction
+      const speakers = ['ALICE', 'BOB'];
+      const lines241a = [
+        'INT. ROOM - DAY', '',
+        ...Array.from({ length: 15 }, (_, i) => [speakers[i % 2], `Tell me what you know about it.`]).flat(),
+      ];
+      const f241a = lines241a.join('\n');
+      const result = await dialoguePass({ fountain: f241a, original: f241a, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(result.issues.some((i: any) => i.rule === 'DIALOGUE_SELF_CORRECTION_ABSENT'), `Expected DIALOGUE_SELF_CORRECTION_ABSENT, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('DIALOGUE_SELF_CORRECTION_ABSENT does NOT fire when at least one line has a self-correction', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      const speakers = ['ALICE', 'BOB'];
+      const lines241b = [
+        'INT. ROOM - DAY', '',
+        ...Array.from({ length: 14 }, (_, i) => [speakers[i % 2], 'Tell me what you know.']).flat(),
+        'ALICE', 'I mean, actually, let me start over.',
+      ];
+      const f241b = lines241b.join('\n');
+      const result = await dialoguePass({ fountain: f241b, original: f241b, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(!result.issues.some((i: any) => i.rule === 'DIALOGUE_SELF_CORRECTION_ABSENT'), 'Should NOT fire when at least one self-correction exists');
+    });
+
+    it('SPEAKER_PAIR_MONOPOLY fires when two speakers deliver ≥85% of dialogue with ≥4 speakers present', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 16 lines: ALICE=8, BOB=6, CAROL=1, DAN=1 → top-2=14/16=87.5%
+      const f241c = [
+        'INT. ROOM - DAY', '',
+        ...Array.from({ length: 8 }, () => ['ALICE', 'I want to explain what happened here.']).flat(),
+        ...Array.from({ length: 6 }, () => ['BOB', 'That is not what I remember at all.']).flat(),
+        'CAROL', 'Excuse me.',
+        'DAN', 'Right.',
+      ].join('\n');
+      const result = await dialoguePass({ fountain: f241c, original: f241c, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(result.issues.some((i: any) => i.rule === 'SPEAKER_PAIR_MONOPOLY'), `Expected SPEAKER_PAIR_MONOPOLY, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('SPEAKER_PAIR_MONOPOLY does NOT fire when dialogue is distributed across speakers', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 16 lines: ALICE=4, BOB=4, CAROL=4, DAN=4 → top-2=8/16=50%
+      const f241d = [
+        'INT. ROOM - DAY', '',
+        ...Array.from({ length: 4 }, () => ['ALICE', 'I see what you mean.']).flat(),
+        ...Array.from({ length: 4 }, () => ['BOB', 'Tell me more about it.']).flat(),
+        ...Array.from({ length: 4 }, () => ['CAROL', 'That seems important to me.']).flat(),
+        ...Array.from({ length: 4 }, () => ['DAN', 'I agree with that view.']).flat(),
+      ].join('\n');
+      const result = await dialoguePass({ fountain: f241d, original: f241d, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(!result.issues.some((i: any) => i.rule === 'SPEAKER_PAIR_MONOPOLY'), 'Should NOT fire when dialogue is evenly distributed');
+    });
+
+    it('DIALOGUE_RETROSPECTIVE_FLOOD fires when >55% of dialogue lines contain past-tense verbs', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 12 lines, 8 with past tense verbs
+      const f241e = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'She told me everything that happened.',
+        'BOB', 'He left before I arrived home.',
+        'ALICE', 'They were there when I came back.',
+        'BOB', 'She said the same thing to me.',
+        'ALICE', 'I walked to the door and looked.',
+        'BOB', 'He had been there for hours.',
+        'ALICE', 'They went upstairs and found nothing.',
+        'BOB', 'She heard the noise and ran away.',
+        'ALICE', 'Good morning.',
+        'BOB', 'Ready today.',
+        'ALICE', 'Plans are set.',
+        'BOB', 'Clear day.',
+      ].join('\n');
+      const result = await dialoguePass({ fountain: f241e, original: f241e, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(result.issues.some((i: any) => i.rule === 'DIALOGUE_RETROSPECTIVE_FLOOD'), `Expected DIALOGUE_RETROSPECTIVE_FLOOD, got: ${JSON.stringify(result.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('DIALOGUE_RETROSPECTIVE_FLOOD does NOT fire when dialogue is mostly present-tense', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 12 lines, no past tense verbs from the regex list
+      const f241f = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'I plan to meet him this evening.',
+        'BOB', 'She drives downtown every morning.',
+        'ALICE', 'What time does he arrive today.',
+        'BOB', 'The office closes at six sharp.',
+        'ALICE', 'I expect this to finish soon.',
+        'BOB', 'She speaks clearly under pressure.',
+        'ALICE', 'Everything changes if we act quickly.',
+        'BOB', 'He opens the drawer and reaches in.',
+        'ALICE', 'I see the papers on the desk.',
+        'BOB', 'She carries the report to him.',
+        'ALICE', 'He signs his name.',
+        'BOB', 'I agree with your view here.',
+      ].join('\n');
+      const result = await dialoguePass({ fountain: f241f, original: f241f, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(!result.issues.some((i: any) => i.rule === 'DIALOGUE_RETROSPECTIVE_FLOOD'), 'Should NOT fire when dialogue is mostly present-tense');
+    });
+  });
+
   describe('Wave 240 — causalityPass: curiosity open loop, revelation without curiosity, emotional whiplash', async () => {
     const makeRec240 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

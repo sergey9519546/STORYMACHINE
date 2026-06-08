@@ -862,6 +862,109 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
   }
   // ── End Wave 231 ─────────────────────────────────────────────────────────────
 
+  // ── Wave 245: Gerund opener dominance, scene slug time monotone, cognition in action ──
+
+  // GERUND_OPENER_DOMINANCE (minor, ≥10 action lines): More than 45% of action
+  // lines start with a gerund (present participle: -ing form). "Running through
+  // the hall...", "Checking the locks...", "Staring at the screen..." —
+  // participial-dominant action prose lacks the subject-verb authority of
+  // "She runs the hall" or "He checks every lock." Gerund openers float;
+  // declarative subjects with active verbs drive. This is complementary to
+  // CONJUNCTION_OPENER_EXCESS (rhythm.ts, which checks for "and/but/so" openers)
+  // and distinct from GERUND_FRAGMENT (rhythm.ts, which checks for verb-phrase
+  // fragments following a comma).
+  {
+    let actionLinesOrig245 = 0;
+    let gerundOpeners245 = 0;
+    let inDlgOrig245 = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlgOrig245 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlgOrig245 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlgOrig245 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlgOrig245) continue;
+      actionLinesOrig245++;
+      if (/^[A-Z]?[a-z]*ing\s/i.test(t) || /^[A-Z][a-z]+ing\s/.test(t)) gerundOpeners245++;
+    }
+    if (actionLinesOrig245 >= 10 && gerundOpeners245 / actionLinesOrig245 > 0.45) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'GERUND_OPENER_DOMINANCE',
+        severity: 'minor',
+        description: `${gerundOpeners245} of ${actionLinesOrig245} action lines (${Math.round(gerundOpeners245 / actionLinesOrig245 * 100)}%) start with a gerund (-ing form) — the action prose is participial-dominant. "Running to the door" floats; "She runs to the door" drives. Gerund-heavy action loses the subject-verb authority that makes description feel commanded rather than observed.`,
+        suggestedFix: 'Replace at least half the gerund openers with subject-first, active-verb sentences. Lead with the agent: "She grabs the report" not "Grabbing the report, she..." Reserve gerund openers for background action and simultaneous events, not the primary verb of each line.',
+      });
+    }
+  }
+
+  // SCENE_SLUG_TIME_MONOTONE (minor, ≥6 scenes): All scene sluglines with an
+  // explicit time indicator use the same one (all "DAY" or all "NIGHT" or all
+  // "CONTINUOUS"). A story that never changes its visual time register has no
+  // cinematographic variety — there is no chiaroscuro between golden-hour
+  // warmth and 3 AM fluorescence, no circadian rhythm to the drama. Requires
+  // both that time indicators are present AND that they are all the same.
+  {
+    const timeRe245 = /\b(DAY|NIGHT|DAWN|DUSK|MORNING|EVENING|AFTERNOON|CONTINUOUS|LATER|MOMENTS LATER)\b/;
+    const timeValues245 = new Set<string>();
+    let slugCount245 = 0;
+    for (const line of lines) {
+      const t = line.trim();
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) {
+        slugCount245++;
+        const match245 = t.match(timeRe245);
+        if (match245) timeValues245.add(match245[1].toUpperCase());
+      }
+    }
+    if (slugCount245 >= 6 && timeValues245.size === 1) {
+      const [onlyTime245] = timeValues245;
+      issues.push({
+        location: 'Scene slugline register',
+        rule: 'SCENE_SLUG_TIME_MONOTONE',
+        severity: 'minor',
+        description: `All ${slugCount245} scene sluglines use the same time indicator ("${onlyTime245}") — the story exists in one unbroken visual register. No shift from DAY to NIGHT, no circadian rhythm to the drama. Light is character; a story that never changes time of day is shot entirely under one flat lighting condition.`,
+        suggestedFix: `Vary the time register: let scenes take place at different times of day, with each shift earning its new visual quality. A DAY scene and a NIGHT scene of the same location carry different emotional charge — use that charge deliberately.`,
+      });
+    }
+  }
+
+  // COGNITION_IN_ACTION (minor, ≥10 action lines): More than 30% of action lines
+  // contain cognition verbs (realizes, remembers, wonders, decides, thinks,
+  // notices, understands, imagines, considers, reflects). A camera cannot capture
+  // what a character thinks; action lines must describe observable behaviour.
+  // Cognition verbs are prose-novel habits imported into screenplay format —
+  // they tell the reader what's happening inside a character's head in a form
+  // that would require narration or internal monologue to reach the screen.
+  // Distinct from ACTION_EMOTION_NAMING_RE (which checks "is/was + emotion adj"):
+  // this fires on cognition verbs regardless of adjacent emotion adjectives.
+  {
+    let actionLinesCog245 = 0;
+    let cogCount245 = 0;
+    let inDlgCog245 = false;
+    const cogRe245 = /\b(realizes?|remembers?|wonders?|decides?|thinks?|notices?|understands?|imagines?|considers?|reflects?|recognizes?|comprehends?|perceives?|contemplates?|deliberates?)\b/i;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlgCog245 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlgCog245 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlgCog245 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlgCog245) continue;
+      actionLinesCog245++;
+      if (cogRe245.test(t)) cogCount245++;
+    }
+    if (actionLinesCog245 >= 10 && cogCount245 / actionLinesCog245 > 0.3) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'COGNITION_IN_ACTION',
+        severity: 'minor',
+        description: `${cogCount245} of ${actionLinesCog245} action lines (${Math.round(cogCount245 / actionLinesCog245 * 100)}%) use cognition verbs (realizes, remembers, wonders, decides, etc.) — the screenplay describes interior thought states that a camera cannot photograph. Action lines must describe observable behaviour, not mental events.`,
+        suggestedFix: "Translate cognition into behaviour: instead of \"She realizes he lied\", write \"She stops. Looks at the receipt again. Sets it down slowly.\" The physical action encodes the realisation. Let the audience do the cognitive work from what they see.",
+      });
+    }
+  }
+
+  // ── End Wave 245 ─────────────────────────────────────────────────────────────
+
   // ── Limit total issues to avoid overwhelming output ───────────────────────
   // Clichés (minor) are pushed first and would crowd out the higher-severity
   // structural findings (UNIFORM_SCENE_PURPOSES is major) under a naive slice.

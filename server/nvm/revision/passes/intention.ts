@@ -747,6 +747,85 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
       }
     }
   }
+  // ── Wave 244: Proactive Act 3 void, intention discovery absent, goal pivot absent ──
+
+  // PROACTIVE_ACT3_VOID (minor, n≥8): Act 3 (last 25%) contains zero proactive
+  // acts — no clockRaised, no seededClueIds. The protagonist stops driving in the
+  // final act: they react to the climax rather than engineering it. A passive Act 3
+  // protagonist is a passenger in their own resolution. Distinct from
+  // PROACTIVE_OVERCLUSTERING (which fires when all acts cluster in a burst): this
+  // fires specifically when the final act is initiative-free.
+  if (n >= 8) {
+    const act3Start244 = Math.floor(n * 0.75);
+    const act3Records244 = records.slice(act3Start244);
+    if (act3Records244.length >= 2) {
+      const hasAct3Proactive244 = act3Records244.some(r =>
+        r.clockRaised || (r.seededClueIds?.length ?? 0) > 0,
+      );
+      if (!hasAct3Proactive244) {
+        issues.push({
+          location: `Act 3 (Scenes ${act3Start244}–${n - 1})`,
+          rule: 'PROACTIVE_ACT3_VOID',
+          severity: 'minor',
+          description: `Act 3 (scenes ${act3Start244}–${n - 1}, ${act3Records244.length} scenes) contains no proactive acts — no clocks raised, no clues planted. The protagonist stops initiating in the final act, reacting to a climax rather than engineering one.`,
+          suggestedFix: "Give the protagonist at least one proactive move in Act 3: a decisive action, a gambit, or a piece of evidence planted. The climax should feel like the culmination of the protagonist's agency — a choice they made, not a situation they endured.",
+        });
+      }
+    }
+  }
+
+  // INTENTION_DISCOVERY_ABSENT (minor, n≥8, ≥3 proactive acts): The story has
+  // ≥3 proactive acts (protagonist drives events) but no revelation occurs in
+  // Act 3 (last 25%). The protagonist's goal-pursuit never produces a discovery
+  // in the climax zone — they chase without finding. A story where all discoveries
+  // land before the climax means the protagonist enters Act 3 with complete
+  // information, reducing the resolution to execution rather than revelation.
+  if (n >= 8) {
+    const proactiveCount244 = records.filter(r =>
+      r.clockRaised || (r.seededClueIds?.length ?? 0) > 0,
+    ).length;
+    if (proactiveCount244 >= 3) {
+      const act3Start244b = Math.floor(n * 0.75);
+      const hasAct3Rev244 = records.slice(act3Start244b).some(r => r.revelation !== null);
+      if (!hasAct3Rev244) {
+        issues.push({
+          location: `Act 3 (Scenes ${act3Start244b}–${n - 1}) — discovery layer`,
+          rule: 'INTENTION_DISCOVERY_ABSENT',
+          severity: 'minor',
+          description: `The story has ${proactiveCount244} proactive acts but no revelation lands in Act 3 (Scenes ${act3Start244b}–${n - 1}) — the protagonist's goal-pursuit produces no discovery in the climax zone. All discoveries precede the resolution; Act 3 is execution without revelation.`,
+          suggestedFix: "Engineer at least one discovery in Act 3: a truth the protagonist's pursuit finally uncovers, a consequence of their initiative that transforms the climax. The resolution should be earned by discovery, not just by effort.",
+        });
+      }
+    }
+  }
+
+  // GOAL_PIVOT_ABSENT (minor, n≥10, ≥4 proactive acts): The story has ≥4
+  // proactive acts but ALL of them are the same type — either all clockRaised
+  // (no clue-planting) or all seededClueIds (no clock-raising). The protagonist's
+  // goal-pursuit strategy never adapts — they use only one tool throughout.
+  // An agent who never changes strategy in the face of failure is inflexible rather
+  // than determined. Requires both signals to be present in the records array.
+  if (n >= 10) {
+    const proactiveActs244 = records.filter(r =>
+      r.clockRaised || (r.seededClueIds?.length ?? 0) > 0,
+    );
+    if (proactiveActs244.length >= 4) {
+      const hasClockAct244 = proactiveActs244.some(r => r.clockRaised === true);
+      const hasClueAct244 = proactiveActs244.some(r => (r.seededClueIds?.length ?? 0) > 0);
+      if (!hasClockAct244 || !hasClueAct244) {
+        const onlyType244 = !hasClockAct244 ? 'clue-planting' : 'clock-raising';
+        issues.push({
+          location: 'Intention strategy layer',
+          rule: 'GOAL_PIVOT_ABSENT',
+          severity: 'minor',
+          description: `All ${proactiveActs244.length} proactive acts use only ${onlyType244} — the protagonist's strategy never adapts. An agent who pursues goals with only one modality is predictable; genuine goal-pursuit requires adapting method when the situation changes.`,
+          suggestedFix: `Introduce at least one proactive act using the other strategy: if the protagonist only raises clocks, give them a scene where they plant a clue or gather evidence; if they only plant clues, give them a scene where they escalate a deadline. Strategy variety reveals tactical intelligence.`,
+        });
+      }
+    }
+  }
+  // ── End Wave 244 ─────────────────────────────────────────────────────────────
+
   // ── End Wave 230 ─────────────────────────────────────────────────────────────
 
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'intention', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });

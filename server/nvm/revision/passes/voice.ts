@@ -868,6 +868,99 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 252: Present progressive overuse, action pronoun flood, monosyllable dominance ──
+
+  // PRESENT_PROGRESSIVE_OVERUSE (minor, ≥8 action lines): More than 40% of action
+  // lines use a present progressive construction ("is/are/was/were + -ing" verb).
+  // "She is walking to the door." "He is looking out the window." The progressive
+  // implies ongoing duration rather than decisive action — screenwriting prefers
+  // "She walks to the door" for its directness and authority. Present progressive
+  // in action is a prose-novel habit; it makes the screenplay feel like a long
+  // description of a dream rather than a present-tense event unfolding.
+  if (actionOnlyLines.length >= 8) {
+    const progressiveRe252 = /\b(is|are|was|were|am)\s+\w+ing\b/i;
+    const progCount252 = actionOnlyLines.filter(l => progressiveRe252.test(l)).length;
+    if (progCount252 / actionOnlyLines.length > 0.4) {
+      issues.push({
+        location: 'Action line verb tense',
+        rule: 'PRESENT_PROGRESSIVE_OVERUSE',
+        severity: 'minor',
+        description: `${progCount252} of ${actionOnlyLines.length} action lines (${Math.round(progCount252 / actionOnlyLines.length * 100)}%) use a present progressive construction ("is/are/was + -ing") — "She is walking" instead of "She walks." Progressive constructions imply ongoing duration; direct present tense asserts cinematic now.`,
+        suggestedFix: 'Convert progressive to simple present: "He is running" → "He runs." "She is watching" → "She watches." The simple present is the natural verb form of screenplay action; it places the reader inside the scene happening, not observing it from a distance.',
+      });
+    }
+  }
+
+  // ACTION_PRONOUN_FLOOD (minor, ≥8 action lines): More than 55% of action lines
+  // begin with a pronoun (he/she/they/it/we/you). OPENING_WORD_REPETITION in
+  // rhythm.ts fires when >40% start with the SAME word — this fires when
+  // a MIX of pronouns (he/she alternating) collectively dominates, still creating
+  // a "pronoun parade" where characters are never named or described, just tracked
+  // by gender marker. Names and physical descriptors carry more cinematic presence
+  // than pronoun referents; pronoun-flooding makes the action feel anonymous.
+  {
+    const pronounStartRe252 = /^(he|she|they|it|we|you|him|her|them|his|their)\b/i;
+    const pronounStartCount252 = actionOnlyLines.filter(l => pronounStartRe252.test(l)).length;
+    if (actionOnlyLines.length >= 8 && pronounStartCount252 / actionOnlyLines.length > 0.55) {
+      issues.push({
+        location: 'Action line openings',
+        rule: 'ACTION_PRONOUN_FLOOD',
+        severity: 'minor',
+        description: `${pronounStartCount252} of ${actionOnlyLines.length} action lines (${Math.round(pronounStartCount252 / actionOnlyLines.length * 100)}%) begin with a pronoun — the action is a pronoun parade ("he..., she..., they...") where characters are tracked by reference marker rather than presence. Pronoun-dominant action makes characters feel anonymous and interchangeable.`,
+        suggestedFix: "Vary action openers: use character names, physical descriptors, or object-first sentences. \"He closes the door\" → \"MARTINEZ closes the door.\" or \"The door closes behind him.\" Names command attention; pronouns are invisible.",
+      });
+    }
+  }
+
+  // DIALOGUE_MONOSYLLABLE_DOMINANCE (minor, ≥10 dialogue lines): More than 65%
+  // of all words across all dialogue lines are monosyllabic (1-3 letters). When
+  // nearly every word has only one syllable, the dialogue register is tonally flat —
+  // no polysyllabic words means no variety in verbal weight or register. Characters
+  // all speak in short, punchy monosyllables; the dialogue loses the verbal texture
+  // of varied word weight. Distinct from DIALOGUE_STACCATO_OVERUSE (which checks
+  // line LENGTH) — this checks WORD-LEVEL syllable distribution.
+  {
+    const monoAllWords252: string[] = [];
+    let monoInDlg252 = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { monoInDlg252 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { monoInDlg252 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { monoInDlg252 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (monoInDlg252) {
+        monoAllWords252.push(...t.split(/\s+/).filter(w => w.length > 0));
+      } else {
+        monoInDlg252 = false;
+      }
+    }
+    const dlgLineCount252 = (() => {
+      let count = 0; let inD = false;
+      for (const line of allLines) {
+        const t = line.trim();
+        if (!t) { inD = false; continue; }
+        if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inD = false; continue; }
+        if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inD = true; continue; }
+        if (/^\(/.test(t)) continue;
+        if (inD) count++;
+        else inD = false;
+      }
+      return count;
+    })();
+    if (dlgLineCount252 >= 10 && monoAllWords252.length >= 20) {
+      const monoCount252 = monoAllWords252.filter(w => w.replace(/[^a-zA-Z]/g, '').length <= 3).length;
+      if (monoCount252 / monoAllWords252.length > 0.65) {
+        issues.push({
+          location: 'Dialogue word-level texture',
+          rule: 'DIALOGUE_MONOSYLLABLE_DOMINANCE',
+          severity: 'minor',
+          description: `${monoCount252} of ${monoAllWords252.length} dialogue words (${Math.round(monoCount252 / monoAllWords252.length * 100)}%) are monosyllabic — the dialogue's verbal texture is tonally flat. When almost every word has one syllable, conversation loses the weight variation that distinguishes heightened speech from casual talk.`,
+          suggestedFix: "Introduce some polysyllabic vocabulary at key moments: a character who speaks with unexpected precision, a term that shows education or context. Even one or two longer words per exchange changes the verbal texture: 'That's bad' vs 'That's catastrophic.' Weight matters.",
+        });
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'voice', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

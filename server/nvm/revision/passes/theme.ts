@@ -740,6 +740,88 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         }
       }
     }
+
+    // ── Wave 251: Final scene silent, positive shift silent, resonance clustering ──
+
+    // THEME_FINAL_SCENE_SILENT (minor, ≥6 scenes, expandedKeywords≥2): The story's
+    // final scene carries no thematic language. The last image the audience receives
+    // is thematically mute — they exit with the plot's conclusion but no sense of
+    // what the story was ultimately about. The final scene is the theme's last chance
+    // to speak; silence there leaves the story's central question unanswered at the
+    // moment of maximum receptivity.
+    if (records.length >= 6 && expandedKeywords.length >= 2) {
+      const lastRec251 = records[records.length - 1];
+      const lastSceneText251 = sceneTexts.get(lastRec251.sceneIdx) ?? '';
+      if (lastSceneText251 && !sceneHasResonance(lastSceneText251, expandedKeywords)) {
+        issues.push({
+          location: `Final scene (Scene ${lastRec251.sceneIdx})`,
+          rule: 'THEME_FINAL_SCENE_SILENT',
+          severity: 'minor',
+          description: `The story's final scene carries no thematic language related to "${themeRaw}" — the closing moment is thematically mute. The last image the audience receives contains no trace of the central question the story raised.`,
+          suggestedFix: `Weave at least one thematic word or image into the final scene: an echo of the opening theme statement, a visual symbol that completes the metaphor, or a line of dialogue that rephrases the central question as an answer. The final scene is the theme's last word.`,
+        });
+      }
+    }
+
+    // THEME_POSITIVE_SHIFT_SILENT (minor, ≥6 scenes, ≥2 positive shifts): All
+    // scenes with positive emotional shifts are thematically silent — the theme is
+    // present only in conflict, never in resolution or relief. The story uses theme
+    // as a weapon rather than a lens. Distinct from THEME_RESONANCE_EMOTIONALLY_INERT
+    // (which fires when resonant scenes carry no emotional shift): this fires when
+    // positive-shift scenes are the thematically silent ones — theme speaks in pain
+    // but not in release.
+    if (records.length >= 6) {
+      const posShiftScenes251 = records.filter((r: any) => r.emotionalShift === 'positive');
+      if (posShiftScenes251.length >= 2) {
+        const anyPosResonant251 = posShiftScenes251.some((r: any) =>
+          sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        );
+        if (!anyPosResonant251) {
+          issues.push({
+            location: 'Positive emotional shift scenes',
+            rule: 'THEME_POSITIVE_SHIFT_SILENT',
+            severity: 'minor',
+            description: `${posShiftScenes251.length} scenes with positive emotional shifts carry no thematic language — the theme is present only in conflict and loss, never in moments of relief or resolution. The story's warmth is disconnected from its central question.`,
+            suggestedFix: `Let the theme breathe in at least one positive scene: a moment of joy or connection that speaks to what the story is fundamentally about. If the theme is trust, let a scene of reconciliation carry that word or its symbol. Theme needs to live in hope as well as despair.`,
+          });
+        }
+      }
+    }
+
+    // THEME_RESONANCE_CLUSTERING (minor, ≥6 scenes, ≥4 resonant): More than 65%
+    // of all thematically resonant scenes cluster within a single act zone
+    // (Act 1: 0–25%, Act 2: 25–75%, or Act 3: 75–100%). The theme speaks loudly
+    // in one zone and falls silent everywhere else — an uneven distribution that
+    // leaves the audience without thematic guidance during large stretches of the
+    // story. Distinct from THEME_OPENING_SILENCE (which fires when Act 1 has no
+    // theme) — this fires when ALL acts have theme but most of it piles up in one.
+    if (records.length >= 6) {
+      const resonantRecords251 = records.filter((r: any) =>
+        sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+      );
+      if (resonantRecords251.length >= 4) {
+        const zones251 = [
+          { name: 'Act 1', start: 0, end: Math.floor(records.length * 0.25) },
+          { name: 'Act 2', start: Math.floor(records.length * 0.25), end: Math.floor(records.length * 0.75) },
+          { name: 'Act 3', start: Math.floor(records.length * 0.75), end: records.length },
+        ];
+        for (const zone251 of zones251) {
+          const zoneResonant251 = resonantRecords251.filter(
+            (r: any) => r.sceneIdx >= zone251.start && r.sceneIdx < zone251.end,
+          ).length;
+          if (zoneResonant251 / resonantRecords251.length > 0.65) {
+            issues.push({
+              location: `Theme clustering in ${zone251.name}`,
+              rule: 'THEME_RESONANCE_CLUSTERING',
+              severity: 'minor',
+              description: `${zoneResonant251} of ${resonantRecords251.length} thematically resonant scenes (${Math.round(zoneResonant251 / resonantRecords251.length * 100)}%) cluster in ${zone251.name} — the theme speaks loudly in one act and falls almost silent in the rest. The audience loses thematic orientation during large stretches of the story.`,
+              suggestedFix: `Redistribute thematic resonance across all three acts: let the theme surface at the opening (planting), the midpoint (complicating), and the finale (resolving). Each act should carry at least one moment where the story's central question is visible.`,
+            });
+            break;
+          }
+        }
+      }
+    }
   }
 
   const { revised, usedLLM } = await rewritePass({

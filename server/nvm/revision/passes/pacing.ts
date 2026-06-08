@@ -677,6 +677,93 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
       }
     }
   }
+  // ── Wave 246: Act 2 pacing valley, climax scene undersized, midpoint bloat ──
+
+  // ACT2_PACING_VALLEY (minor, n≥10): Three or more consecutive Act 2 scenes
+  // (25%–75% window) are each below 60% of the average scene length — a sustained
+  // compression valley in the story's middle. Unlike RESOLUTION_BREVITY (end-only)
+  // and pacing compression spiral (overall trend), this fires when a localized
+  // compression pocket appears mid-story, suggesting a sequence of scenes that
+  // were under-written or collapsed into narrative shorthand.
+  if (records.length >= 10 && avgLength > 0) {
+    const act2Start246 = Math.floor(records.length * 0.25);
+    const act2End246 = Math.floor(records.length * 0.75);
+    const threshold246 = avgLength * 0.6;
+    let streak246 = 0;
+    let streakStart246 = -1;
+    for (let i = act2Start246; i < act2End246; i++) {
+      const len246 = sceneLengths.get(i) ?? 0;
+      if (len246 > 0 && len246 < threshold246) {
+        if (streak246 === 0) streakStart246 = i;
+        streak246++;
+        if (streak246 >= 3) {
+          issues.push({
+            location: `Act 2 valley (Scenes ${streakStart246}–${i})`,
+            rule: 'ACT2_PACING_VALLEY',
+            severity: 'minor',
+            description: `Scenes ${streakStart246}–${i} (Act 2) are each below 60% of the average scene length (avg ${Math.round(avgLength)} lines) — a sustained compression valley in the story's middle. Three or more consecutive under-written scenes create a pacing trough where the story loses physical presence.`,
+            suggestedFix: 'Expand at least one of the valley scenes with a concrete dramatic beat: a new complication, a character reaction, or a piece of world detail. Compression pockets in Act 2 are where narrative momentum quietly dies — the story needs something to sustain forward pull here.',
+          });
+          break;
+        }
+      } else {
+        streak246 = 0;
+      }
+    }
+  }
+
+  // CLIMAX_SCENE_UNDERSIZED (minor, n≥8): The scene with the story's peak
+  // suspense (highest suspenseDelta across all records) is in the bottom 30%
+  // of all scene lengths — the most intense moment is among the shortest scenes.
+  // The climax should be the most substantial scene on the page; an undersized
+  // climax delivers maximum tension in minimum space, spending the story's most
+  // charged moment in a flash rather than giving it room to breathe.
+  if (records.length >= 8 && avgLength > 0) {
+    let peakIdx246 = 0;
+    let peakDelta246 = -Infinity;
+    for (let i = 0; i < records.length; i++) {
+      if (records[i].suspenseDelta > peakDelta246) {
+        peakDelta246 = records[i].suspenseDelta;
+        peakIdx246 = i;
+      }
+    }
+    if (peakDelta246 > 1) {
+      const peakLen246 = sceneLengths.get(peakIdx246) ?? 0;
+      const sortedLens246 = [...lengths].sort((a, b) => a - b);
+      const p30246 = sortedLens246[Math.floor(sortedLens246.length * 0.3)] ?? 0;
+      if (peakLen246 > 0 && peakLen246 <= p30246) {
+        issues.push({
+          location: `Scene ${peakIdx246} (peak suspense, ${peakLen246} lines)`,
+          rule: 'CLIMAX_SCENE_UNDERSIZED',
+          severity: 'minor',
+          description: `The story's peak suspense scene (Scene ${peakIdx246}, suspenseDelta ${peakDelta246.toFixed(1)}) is ${peakLen246} lines — in the bottom 30% of all scene lengths. The most intense moment is among the shortest. The climax deserves the most space; an undersized peak scene spends the story's central dramatic charge in a flash.`,
+          suggestedFix: 'Expand the climax scene: more character reaction, more physical consequence, more time inside the highest-stakes moment. The scene that carries the story\'s maximum tension should feel weightier than the setup scenes surrounding it — let the audience live in the peak longer.',
+        });
+      }
+    }
+  }
+
+  // MIDPOINT_BLOAT (minor, n≥8): The scene closest to the story's structural
+  // midpoint (50%) is ≥2.5× the average scene length. The pivot scene is the
+  // story's most expensive real estate — an oversized midpoint signals a
+  // "pivot dump," where the reversal is over-written rather than landing cleanly.
+  // Distinct from PACING_SPIKE_SCENE (any scene ≥2.5× avg) — this fires
+  // specifically when the bloated scene is at the story's structural midpoint.
+  if (records.length >= 8 && avgLength > 0) {
+    const midIdx246 = Math.floor(records.length * 0.5);
+    const midLen246 = sceneLengths.get(midIdx246) ?? 0;
+    if (midLen246 >= 2.5 * avgLength) {
+      issues.push({
+        location: `Scene ${midIdx246} (structural midpoint, ${midLen246} lines)`,
+        rule: 'MIDPOINT_BLOAT',
+        severity: 'minor',
+        description: `The structural midpoint scene (Scene ${midIdx246}) is ${midLen246} lines — ${(midLen246 / avgLength).toFixed(1)}× the story average (${Math.round(avgLength)}). An oversized midpoint signals a "pivot dump": the reversal is over-explained rather than landing with the velocity a structural pivot requires.`,
+        suggestedFix: 'Trim the midpoint scene to its essential reversal. The moment where the story\'s direction changes should feel clean and inevitable — not exhaustive. What you remove from the midpoint goes into building the climax instead.',
+      });
+    }
+  }
+  // ── End Wave 246 ─────────────────────────────────────────────────────────────
+
   // ── End Wave 232 ─────────────────────────────────────────────────────────────
 
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'pacing', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });

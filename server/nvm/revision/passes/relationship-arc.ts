@@ -662,6 +662,92 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
       }
     }
   }
+  // ── Wave 248: Pair velocity spike, Act 1 relational desert, multi-pair climax convergence ──
+
+  // PAIR_VELOCITY_SPIKE (minor, n≥8): A pair accumulates ≥3 shifts within any
+  // 3-scene window — the relationship changes violently in a short burst. Rapid-fire
+  // multi-shift windows suggest relationship changes were written in a hurry rather
+  // than earned through sustained dramatic pressure. Even when each individual shift
+  // is plausible, three shifts in three consecutive scenes compress what should be
+  // an arc into a sprint. Distinct from RELATIONSHIP_VELOCITY_COLLAPSE (second-half
+  // slowdown) — this catches a sudden burst of change, the opposite failure.
+  if (records.length >= 8) {
+    for (const [pairKey248, stats248] of pairStats) {
+      if (stats248.shifts.length < 3) continue;
+      for (let i = 0; i + 2 < stats248.shifts.length; i++) {
+        const windowEnd248 = stats248.shifts[i + 2].sceneIdx;
+        const windowStart248 = stats248.shifts[i].sceneIdx;
+        if (windowEnd248 - windowStart248 <= 2) {
+          const [a248, b248] = pairKey248.split('|');
+          issues.push({
+            location: `${a248} ↔ ${b248} (Scenes ${windowStart248}–${windowEnd248})`,
+            rule: 'PAIR_VELOCITY_SPIKE',
+            severity: 'minor',
+            description: `The relationship between ${a248} and ${b248} accumulates ${3} shifts in a ${windowEnd248 - windowStart248 + 1}-scene window (Scenes ${windowStart248}–${windowEnd248}) — the bond changes more in a 3-scene burst than most relationships change in an entire arc. Rapid-fire relationship shifts feel imposed rather than earned.`,
+            suggestedFix: `Space the shifts for ${a248} and ${b248}: let each change settle and generate a consequence before the next arrives. A relationship that moves on three fronts simultaneously has no time to dramatise the cost of each shift.`,
+          });
+          break;
+        }
+      }
+    }
+  }
+
+  // RELATIONSHIP_ACT1_DESERT (major, n≥10, ≥2 pairs): No pair has any
+  // relationship shift in Act 1 (first 25%). The setup establishes characters
+  // without establishing their relational world — the audience enters Act 2
+  // with no sense of who trusts, fears, or opposes whom. The interpersonal
+  // landscape is defined by what characters DO to each other; an Act 1 without
+  // any relational events is an ensemble of strangers, not a cast.
+  // Distinct from NO_RELATIONSHIP_MOVEMENT (no shifts at all in the whole story)
+  // and STATIC_COAPPEAR (pair with co-appearances but never a shift).
+  if (records.length >= 10 && pairStats.size >= 2) {
+    const act1End248 = Math.floor(records.length * 0.25);
+    const hasAct1Shift248 = records.slice(0, act1End248).some(r =>
+      (r.relationshipShifts ?? []).length > 0,
+    );
+    if (!hasAct1Shift248) {
+      issues.push({
+        location: `Act 1 (Scenes 0–${act1End248 - 1}) — relationship layer`,
+        rule: 'RELATIONSHIP_ACT1_DESERT',
+        severity: 'major',
+        description: `Act 1 (the first ${act1End248} scenes) contains no relationship shifts — the setup introduces characters but leaves the relational world blank. The audience enters Act 2 with no established bonds, rivalries, or alliances to invest in or see tested.`,
+        suggestedFix: 'Plant at least one relationship shift in Act 1: a gesture of trust that will later be betrayed, a rivalry established, or an alliance formed. Characters who share no relational event in the setup are strangers to each other and to the audience.',
+      });
+    }
+  }
+
+  // MULTI_PAIR_CLIMAX_CONVERGENCE (minor, n≥8, ≥3 pairs): More than 2 pairs each
+  // have their chronologically final shift in the same 3-scene window in Act 3
+  // (last 25%). All relationships resolve simultaneously — a relational pileup
+  // that dilutes every individual arc's landing. Each pair's resolution needs its
+  // own dramatic space; when every bond concludes in the same handful of scenes,
+  // no single arc can receive the weight it deserves.
+  if (records.length >= 8 && pairStats.size >= 3) {
+    const act3Start248 = Math.floor(records.length * 0.75);
+    const finalShiftScenes248: number[] = [];
+    for (const stats248 of pairStats.values()) {
+      if (stats248.shifts.length === 0) continue;
+      const lastShiftIdx248 = stats248.shifts[stats248.shifts.length - 1].sceneIdx;
+      if (lastShiftIdx248 >= act3Start248) {
+        finalShiftScenes248.push(lastShiftIdx248);
+      }
+    }
+    if (finalShiftScenes248.length >= 3) {
+      const minFinal248 = Math.min(...finalShiftScenes248);
+      const maxFinal248 = Math.max(...finalShiftScenes248);
+      if (maxFinal248 - minFinal248 <= 2) {
+        issues.push({
+          location: `Act 3 relational convergence (Scenes ${minFinal248}–${maxFinal248})`,
+          rule: 'MULTI_PAIR_CLIMAX_CONVERGENCE',
+          severity: 'minor',
+          description: `${finalShiftScenes248.length} relationship pairs each complete their final shift within a ${maxFinal248 - minFinal248 + 1}-scene window in Act 3 (Scenes ${minFinal248}–${maxFinal248}) — every arc resolves simultaneously. A relational pileup in the climax dilutes every individual bond's landing; none can receive the dramatic weight it deserves.`,
+          suggestedFix: 'Stagger the relational resolutions: let each significant pair have its own closing moment, spaced across Act 3. The final scene between two characters should stand out in the audience\'s memory; when all pairs close simultaneously, none of them does.',
+        });
+      }
+    }
+  }
+  // ── End Wave 248 ─────────────────────────────────────────────────────────────
+
   // ── End Wave 234 ─────────────────────────────────────────────────────────────
 
   const { revised, usedLLM } = await rewritePass({

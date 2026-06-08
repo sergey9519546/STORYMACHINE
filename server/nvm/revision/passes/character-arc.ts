@@ -677,6 +677,91 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
       }
     }
   }
+  // ── Wave 242: Act 1 relational desert, midpoint positive absent, revelation unincorporated ──
+
+  // ARC_ACT1_RELATIONAL_DESERT (major, n≥10, ≥2 pairs): No pair has any
+  // relationship shift in Act 1 (first 25%) of the story. The setup act establishes
+  // characters but not their relational world — the audience enters Act 2 with no
+  // sense of who trusts, opposes, or relies on whom. The interpersonal landscape
+  // is defined by what characters DO to each other; an Act 1 with no relational
+  // events is a collection of individuals, not a cast.
+  {
+    const allPairs242 = new Set<string>();
+    for (const r of records) for (const s of (r.relationshipShifts ?? [])) allPairs242.add((s as any).pairKey);
+    if (records.length >= 10 && allPairs242.size >= 2) {
+    const act1End242 = Math.floor(records.length * 0.25);
+    const hasAct1Shift242 = records.slice(0, act1End242).some(r =>
+      (r.relationshipShifts ?? []).length > 0,
+    );
+    if (!hasAct1Shift242) {
+      issues.push({
+        location: `Act 1 (Scenes 0–${act1End242 - 1}) — relational layer`,
+        rule: 'ARC_ACT1_RELATIONAL_DESERT',
+        severity: 'major',
+        description: `Act 1 (the first ${act1End242} scenes) contains no relationship shifts — the setup establishes characters but leaves the relational world blank. The audience enters Act 2 with no established bonds, rivalries, or trust patterns to invest in.`,
+        suggestedFix: 'Plant at least one relationship shift in Act 1: a gesture of trust, a moment of friction, or an alliance formed under pressure. The audience invests in relationships they have seen move; characters who meet without reacting to each other are strangers throughout.',
+      });
+    }
+  }
+  }
+
+  // ARC_POSITIVE_MIDPOINT_ABSENT (minor, n≥10): The midpoint zone (40%–60%)
+  // contains no positive relationship shift. All midpoint relational movement is
+  // negative or absent — the structural pivot carries only downward pressure.
+  // The midpoint is the story's fulcrum; a fulcrum with no positive energy means
+  // no "false dawn" — no moment of hope before the Act 2b collapse. The tonal arc
+  // becomes simply "bad, then worse, then resolution" with no emotional contrast
+  // at the structural centre.
+  if (records.length >= 10) {
+    const midStart242 = Math.floor(records.length * 0.4);
+    const midEnd242 = Math.floor(records.length * 0.6);
+    const midRecords242 = records.slice(midStart242, midEnd242);
+    if (midRecords242.length >= 2) {
+      const hasMidPosShift242 = midRecords242.some(r =>
+        (r.relationshipShifts ?? []).some((s: any) => s.amount > 0),
+      );
+      if (!hasMidPosShift242) {
+        issues.push({
+          location: `Midpoint zone (Scenes ${midStart242}–${midEnd242 - 1})`,
+          rule: 'ARC_POSITIVE_MIDPOINT_ABSENT',
+          severity: 'minor',
+          description: `The midpoint zone (Scenes ${midStart242}–${midEnd242 - 1}) contains no positive relationship shift — the structural pivot carries only negative or absent relational movement. Without a "false dawn" at the midpoint, the story has no emotional contrast at its centre: just a continuous descent from Act 1 into Act 3.`,
+          suggestedFix: "Add a positive relational beat at the midpoint: a trust restored, a new alliance forming, an unexpected warmth between adversaries. Even a small positive shift at the fulcrum creates the 'peak before the collapse' that gives Act 2b its emotional weight.",
+        });
+      }
+    }
+  }
+
+  // ARC_REVELATION_UNINCORPORATED (minor, n≥8, ≥2 revelations): Two or more
+  // witnessed revelations occur but none of them is followed by a relationship
+  // shift in the same scene or within 2 scenes. Characters discover truths that
+  // don't change their relationships — personal revelations leave no interpersonal
+  // trace. Discovery without consequence is characterologically inert: if what the
+  // protagonist learns doesn't affect who they trust or fear or love, why does it
+  // matter to the story's relational arc?
+  if (records.length >= 8) {
+    const revRecs242 = records.filter(r => r.revelation !== null);
+    if (revRecs242.length >= 2) {
+      const allRevsUnincorporated242 = revRecs242.every(revR => {
+        const revIdx242 = records.indexOf(revR);
+        for (let k = revIdx242; k <= Math.min(revIdx242 + 2, records.length - 1); k++) {
+          if ((records[k].relationshipShifts ?? []).length > 0) return false;
+        }
+        return true;
+      });
+      if (allRevsUnincorporated242) {
+        issues.push({
+          location: 'Revelation → relational consequence',
+          rule: 'ARC_REVELATION_UNINCORPORATED',
+          severity: 'minor',
+          description: `${revRecs242.length} witnessed revelations occur but none is followed by a relationship shift within 2 scenes — personal discoveries leave no interpersonal trace. What characters learn doesn't change who they trust, fear, or love.`,
+          suggestedFix: "After each revelation, show its relational consequence: the trust that breaks, the alliance that shifts, the estrangement that crystallises. A discovery that doesn't alter any relationship is characterologically inert — it's information the protagonist carries but never acts on.",
+        });
+      }
+    }
+  }
+  // ── End Wave 242 ─────────────────────────────────────────────────────────────
+
   // ── End Wave 228 ─────────────────────────────────────────────────────────────
 
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'character-arc', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });

@@ -578,6 +578,72 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 249: Short line poverty, visual texture absent, spatial anchor absent ──
+
+  // SHORT_LINE_POVERTY (minor, ≥12 action lines): Not a single action line is
+  // ≤3 words — the prose has no punchy impact beats at all. Distinct from
+  // STACCATO_FRAGMENTATION (which fires when there are TOO MANY consecutive
+  // very-short lines): this fires when there are ZERO short lines, meaning the
+  // screenwriter never used the single-word or two-word line as a dramatic tool.
+  // "She runs. He falls. Bang." — the very short line is one of screenwriting's
+  // most powerful instruments for landing a moment; its complete absence means
+  // every beat gets equal weight, which means no beat gets weight at all.
+  if (actionLines.length >= 12) {
+    const hasShortLine249 = actionLines.some(l => countWords(l.text) <= 3);
+    if (!hasShortLine249) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'SHORT_LINE_POVERTY',
+        severity: 'minor',
+        description: `${actionLines.length} action lines contain no line of 3 words or fewer — the prose has no punchy impact beats. The very-short line is one of screenwriting's most powerful tools: "She stops." "He's gone." "Silence." When everything runs at similar length, nothing can land with maximum impact.`,
+        suggestedFix: 'Introduce at least 2-3 impact lines of 1-3 words at your key dramatic beats. Not every action needs a full sentence. "She fires." — done. "Empty." — done. Short lines create a beat the reader cannot rush past.',
+      });
+    }
+  }
+
+  // VISUAL_TEXTURE_ABSENT (minor, ≥10 action lines): No action line contains a
+  // texture or material descriptor (rough, smooth, worn, cracked, rusty, dusty,
+  // tattered, stained, polished, weathered, gleaming, etc.). The visual world of
+  // the screenplay has no tactile dimension — nothing has a surface. Tactile
+  // adjectives are what make described objects feel real rather than generic;
+  // their complete absence gives the visual world a catalogue-entry quality.
+  if (actionLines.length >= 10) {
+    const textureRe249 = /\b(rough|smooth|worn|cracked|rusty|dusty|tattered|stained|polished|weathered|gleaming|faded|scratched|dirty|grimy|shiny|damp|frayed|peeling|battered|chipped|spotless|pristine|scarred|pocked|matte|glossy|grainy|gritty|velvet|silky|coarse|brittle)\b/i;
+    const hasTexture249 = actionLines.some(l => textureRe249.test(l.text));
+    if (!hasTexture249) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'VISUAL_TEXTURE_ABSENT',
+        severity: 'minor',
+        description: `${actionLines.length} action lines contain no texture or material descriptor — the screenplay world has no tactile surface. Nothing is rough, worn, cracked, gleaming, or stained. Texture words are what make described objects feel real; their absence gives the visual world a blank, set-photograph quality.`,
+        suggestedFix: 'Add at least 2-3 texture descriptors to the action: the worn armrest, the cracked plastic casing, the polished floor that reflects the overhead light. Texture is how the world tells the audience how old it is, how it has been used, and what it costs to be in it.',
+      });
+    }
+  }
+
+  // SPATIAL_ANCHOR_ABSENT (minor, ≥8 action lines): No action line contains a
+  // spatial anchor phrase that locates action within a specific part of the scene
+  // ("in the corner", "by the window", "at the table", "across the room",
+  // "against the wall", "near the door", "through the hallway", "on the floor",
+  // "behind the desk", "from above", "to the left", "overhead"). Without
+  // spatial anchors, characters move through featureless space — the audience
+  // cannot build a mental map of the scene's geography. Distinct from
+  // LOCATION_MONOTONE (which fires when scenes are all in the same location):
+  // this fires when WITHIN scenes there is no spatial grounding.
+  if (actionLines.length >= 8) {
+    const spatialRe249 = /\b(in the corner|by the window|at the table|across the room|against the wall|near the door|through the hall|on the floor|behind the desk|from above|to the left|to the right|overhead|in the doorway|on the stairs|beside the|in front of the|at the far end|in the centre|at the back|in the background)\b/i;
+    const hasSpatial249 = actionLines.some(l => spatialRe249.test(l.text));
+    if (!hasSpatial249) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'SPATIAL_ANCHOR_ABSENT',
+        severity: 'minor',
+        description: `${actionLines.length} action lines contain no spatial anchor phrase — characters move through featureless space. Without "across the room", "by the window", "against the wall", the audience cannot build a mental map of the scene's geography. Every action floats in an unlocated void.`,
+        suggestedFix: 'Anchor each significant action to a specific part of the space: not "she crosses to him" but "she crosses to him at the far window." Spatial specificity is what turns an abstract description into a scene the audience can see.',
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'rhythm', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

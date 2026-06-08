@@ -689,6 +689,99 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
       }
     }
   }
+  // ── Wave 243: Conflict recovery too fast, single-pair conflict, conflict purpose monotone ──
+
+  // CONFLICT_RECOVERY_TOO_FAST (minor, n≥8): Every scene with deep negative
+  // tension (suspenseDelta < -1.5) is followed within 2 scenes by a clear
+  // recovery (suspenseDelta > 1.0). All damage heals before it can accumulate.
+  // The story never allows a wound to linger — each crisis is resolved so quickly
+  // that pressure never builds, and the audience stops believing the setbacks
+  // are permanent. Requires ≥2 deep reversals.
+  if (records.length >= 8) {
+    const deepReversals243 = records
+      .map((r: any, i: number) => ({ r, i }))
+      .filter(({ r }: any) => r.suspenseDelta < -1.5);
+    if (deepReversals243.length >= 2) {
+      const allRecoverFast243 = deepReversals243.every(({ i }: any) => {
+        for (let k = i + 1; k <= Math.min(i + 2, records.length - 1); k++) {
+          if (records[k].suspenseDelta > 1.0) return true;
+        }
+        return false;
+      });
+      if (allRecoverFast243) {
+        issues.push({
+          location: 'Conflict recovery rhythm',
+          rule: 'CONFLICT_RECOVERY_TOO_FAST',
+          severity: 'minor',
+          description: `Every deep negative tension spike (suspenseDelta < -1.5) recovers with a positive beat (>1.0) within 2 scenes — all ${deepReversals243.length} setbacks heal before they can accumulate. The audience stops believing the reversals are permanent because the story refuses to let damage linger.`,
+          suggestedFix: 'Let at least one wound stay open for 3-4 scenes before relief arrives. When every crisis resolves immediately, pressure never builds to an unbearable level — the climax can\'t feel like the worst moment if every prior moment of danger was fixed by the next scene.',
+        });
+      }
+    }
+  }
+
+  // SINGLE_PAIR_CONFLICT (minor, n≥8): All negative relationship shifts
+  // (amount < -0.3) involve only one pair, while ≥2 total pairs are tracked.
+  // The antagonistic load is carried by a single feud; every other relationship
+  // in the story remains frictionless. Conflict that lives in only one pair
+  // lacks the multi-front pressure that forces genuine crisis. Distinct from
+  // GOAL_WITHOUT_OPPOSITION (which fires when there's NO opposition) — this
+  // fires when opposition exists but is limited to one pair.
+  {
+    const allActivePairs243 = new Set<string>();
+    for (const r of records) for (const s of (r.relationshipShifts ?? [])) allActivePairs243.add((s as any).pairKey);
+    if (records.length >= 8 && allActivePairs243.size >= 2) {
+      const conflictingPairs243 = new Set<string>();
+      for (const r of records) {
+        for (const shift of (r.relationshipShifts ?? []) as Array<{ pairKey: string; amount: number }>) {
+          if (shift.amount < -0.3) conflictingPairs243.add(shift.pairKey);
+        }
+      }
+      if (conflictingPairs243.size === 1) {
+        const [onlyPair243] = conflictingPairs243;
+        issues.push({
+          location: `Conflict: ${onlyPair243}`,
+          rule: 'SINGLE_PAIR_CONFLICT',
+          severity: 'minor',
+          description: `All negative relationship shifts (amount < -0.3) involve the same pair ("${onlyPair243}") — the entire antagonistic load of the story is carried by one feud. Every other relationship remains frictionless. Multi-front conflict creates genuine crisis; a single-pair conflict is a dispute, not a war.`,
+          suggestedFix: 'Introduce negative pressure in at least one other relationship: a second rivalry, a loyalty strained by a third party, or an alliance under stress. Protagonists under pressure on multiple fronts simultaneously face more complex, higher-stakes choices.',
+        });
+      }
+    }
+  }
+
+  // CONFLICT_PURPOSE_MONOTONE (minor, n≥8): All scenes carrying strong conflict
+  // signals (suspenseDelta < -1 OR any relationship shift ≤ -0.3) share the same
+  // purpose label — the story can only deliver antagonistic pressure in one
+  // structural mode. Three or more such scenes all labelled "confrontation" (or
+  // any single label) suggests the conflict register is locked: every crisis looks
+  // the same. Requires ≥3 conflict events with the same purpose.
+  if (records.length >= 8) {
+    const conflictScenePurposes243 = records
+      .filter(r =>
+        r.suspenseDelta < -1 ||
+        (r.relationshipShifts ?? []).some((s: any) => s.amount <= -0.3),
+      )
+      .map(r => r.purpose);
+    if (conflictScenePurposes243.length >= 3) {
+      const purposeMap243 = new Map<string, number>();
+      for (const p of conflictScenePurposes243) {
+        purposeMap243.set(p, (purposeMap243.get(p) ?? 0) + 1);
+      }
+      const [domPurpose243, domCount243] = [...purposeMap243.entries()].sort((a, b) => b[1] - a[1])[0];
+      if (domCount243 === conflictScenePurposes243.length) {
+        issues.push({
+          location: 'Conflict scene purpose register',
+          rule: 'CONFLICT_PURPOSE_MONOTONE',
+          severity: 'minor',
+          description: `All ${domCount243} conflict scenes (suspenseDelta < -1 or strong negative shift) share the same purpose label ("${domPurpose243}") — the story delivers antagonistic pressure in only one structural mode. Every conflict scene looks the same at the functional level.`,
+          suggestedFix: `Vary the structural vessel for conflict: not every crisis needs to be a "${domPurpose243}". A revelation scene can carry as much antagonistic load as a confrontation; a character-development scene can contain the story's sharpest friction. Varied conflict modes keep the audience from predicting the next crisis shape.`,
+        });
+      }
+    }
+  }
+  // ── End Wave 243 ─────────────────────────────────────────────────────────────
+
   // ── End Wave 229 ─────────────────────────────────────────────────────────────
 
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'conflict', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });

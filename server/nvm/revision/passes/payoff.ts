@@ -604,6 +604,75 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
       }
     }
   }
+  // ── Wave 247: Setup Act 3 surge, payoff single-scene dump, setup desert Act 2b ──
+
+  // SETUP_ACT3_SURGE (minor, clues≥3, n≥8): 40%+ of all planted clues are
+  // seeded in Act 3 (last 25%). New clues planted in the climax act create
+  // obligations the story can never fulfill — seeds without growing room.
+  // A clue planted in Act 3 can pay off at most 1-2 scenes later; the audience
+  // has no time to carry it. Distinct from LATE_CLUE_PLANTING (which fires on
+  // individual clues planted late) — this fires when the PROPORTION of late
+  // planting is high, indicating a systemic Act 3 exposition habit.
+  if (clueInfo.size >= 3 && records.length >= 8) {
+    const act3Start247 = Math.floor(records.length * 0.75);
+    const act3Clues247 = [...clueInfo.values()].filter(c => c.plantedAt >= act3Start247).length;
+    if (act3Clues247 / clueInfo.size >= 0.4) {
+      issues.push({
+        location: `Act 3 setup layer (Scenes ${act3Start247}–${records.length - 1})`,
+        rule: 'SETUP_ACT3_SURGE',
+        severity: 'minor',
+        description: `${act3Clues247} of ${clueInfo.size} planted clues (${Math.round(act3Clues247 / clueInfo.size * 100)}%) are seeded in Act 3 — the story is planting new obligations in its climax act. Clues seeded after the 75% mark have no growing room; the audience barely has time to register them before the resolution arrives.`,
+        suggestedFix: 'Move Act 3 clue plants into Act 1 or Act 2, where they have time to settle into the audience\'s memory before the payoff arrives. A well-timed clue is planted early enough to be almost forgotten — and then remembered at exactly the right moment.',
+      });
+    }
+  }
+
+  // PAYOFF_SINGLE_SCENE_DUMP (minor, payoffs≥4): More than 50% of all payoffs
+  // land in a single scene — the story fires all its setups simultaneously.
+  // One revelation per scene creates organic discovery; a simultaneous dump
+  // overwhelms the audience. Each payoff dilutes all the others when they
+  // arrive together; distributed revelations let each one land with full weight.
+  if (payoffInfo.size >= 4) {
+    const payoffByScene247 = new Map<number, number>();
+    for (const sceneIdx247 of payoffInfo.values()) {
+      payoffByScene247.set(sceneIdx247, (payoffByScene247.get(sceneIdx247) ?? 0) + 1);
+    }
+    const [maxScene247, maxCount247] = [...payoffByScene247.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (maxCount247 / payoffInfo.size > 0.5) {
+      issues.push({
+        location: `Scene ${maxScene247} (payoff dump)`,
+        rule: 'PAYOFF_SINGLE_SCENE_DUMP',
+        severity: 'minor',
+        description: `${maxCount247} of ${payoffInfo.size} payoffs (${Math.round(maxCount247 / payoffInfo.size * 100)}%) land in a single scene (Scene ${maxScene247}) — the story fires all its setups simultaneously. Each reveal dilutes the others when they arrive together; none can land with full weight.`,
+        suggestedFix: 'Distribute payoffs across 3-4 separate scenes. Give each revelation room to breathe: a scene to absorb it, a character reaction, a shift in what the audience now knows. A payoff dump feels like a delivery, not a discovery.',
+      });
+    }
+  }
+
+  // SETUP_DESERT_ACT2B (minor, clues≥3, n≥10): No planted clues appear in
+  // the second half of Act 2 (50%–75% of the story). The run-up to the climax
+  // stops seeding new threads — the story enters Act 3 without fresh lines to
+  // pull. Act 2b is where the protagonist should be generating new information
+  // and obligations for the climax to resolve. A clue desert here means Act 3
+  // has nothing new to harvest.
+  if (clueInfo.size >= 3 && records.length >= 10) {
+    const act2bStart247 = Math.floor(records.length * 0.5);
+    const act2bEnd247 = Math.floor(records.length * 0.75);
+    const hasAct2bClue247 = [...clueInfo.values()].some(
+      c => c.plantedAt >= act2bStart247 && c.plantedAt < act2bEnd247,
+    );
+    if (!hasAct2bClue247) {
+      issues.push({
+        location: `Act 2b (Scenes ${act2bStart247}–${act2bEnd247 - 1}) — setup layer`,
+        rule: 'SETUP_DESERT_ACT2B',
+        severity: 'minor',
+        description: `No clues are planted in the second half of Act 2 (Scenes ${act2bStart247}–${act2bEnd247 - 1}). The run-up to the climax generates no new threads. Act 3 has nothing fresh to resolve — only the setups established earlier, which are already in the audience's fading memory.`,
+        suggestedFix: 'Plant at least one clue in Act 2b: a detail planted close enough to the climax to feel urgent, far enough to be surprising when it pays off. The Act 2b setup is the fuel for Act 3\'s discoveries.',
+      });
+    }
+  }
+  // ── End Wave 247 ─────────────────────────────────────────────────────────────
+
   // ── End Wave 233 ─────────────────────────────────────────────────────────────
 
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'payoff', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });

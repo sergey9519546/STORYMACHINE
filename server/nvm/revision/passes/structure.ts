@@ -735,6 +735,80 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 250: Curiosity void, Act 3 purpose monotone, Act 2b suspense decay ──
+
+  // STRUCTURE_CURIOSITY_VOID (minor, n≥8): No scene raises curiosityDelta above 1
+  // across the entire story. The structure poses no strong questions — no moment
+  // of mystery, hook, or withheld revelation pulls the audience forward. Distinct
+  // from CAUSAL: CURIOSITY_OPEN_LOOP (which fires when spikes exist but are never
+  // answered); this fires when the structure NEVER CREATES a curiosity spike at all.
+  // A story that never makes the audience want to know something is a story that
+  // doesn't invite investment.
+  if (n >= 8) {
+    const hasCuriosity250 = records.some((r: any) => (r.curiosityDelta ?? 0) > 1);
+    if (!hasCuriosity250) {
+      issues.push({
+        location: 'Structure — curiosity layer',
+        rule: 'STRUCTURE_CURIOSITY_VOID',
+        severity: 'minor',
+        description: `No scene in the entire story raises curiosity above 1 — the structure poses no strong questions to the audience. Without moments of mystery, unanswered hooks, or deliberately withheld information, the story is a report, not a puzzle. The audience watches without wondering.`,
+        suggestedFix: 'Engineer at least 2-3 curiosity spikes: a question the story opens but delays answering, an anomaly the audience notices before a character does, or an unexplained event planted early that the second half pays off. Curiosity is the structural glue that holds the audience to their seat between scenes.',
+      });
+    }
+  }
+
+  // ACT3_PURPOSE_MONOTONE (minor, n≥8): Act 3 (last 25%) has ≥3 scenes but
+  // they all share the same purpose label. The resolution wears one structural
+  // costume throughout — every scene in the finale serves the same narrative
+  // function. Distinct from PURPOSE_MONOCULTURE (whole-story) and SETUP_RESOLUTION_
+  // IMBALANCE (setup vs payoff ratio): this fires specifically when the ACT 3
+  // scenes are functionally undifferentiated.
+  if (n >= 8) {
+    const act3Start250 = Math.floor(n * 0.75);
+    const act3Recs250 = records.slice(act3Start250);
+    if (act3Recs250.length >= 3) {
+      const act3Purposes250 = new Set(act3Recs250.map((r: any) => r.purpose));
+      if (act3Purposes250.size === 1) {
+        const [onlyPurpose250] = act3Purposes250;
+        issues.push({
+          location: `Act 3 (Scenes ${act3Start250}–${n - 1}) — purpose layer`,
+          rule: 'ACT3_PURPOSE_MONOTONE',
+          severity: 'minor',
+          description: `Act 3 (${act3Recs250.length} scenes) is entirely composed of "${onlyPurpose250}" scenes — every scene in the resolution wears the same structural label. A resolution needs variety: the confrontation, the aftermath, the final beat. When all scenes serve the same function, the finale is a single extended register rather than a structured landing.`,
+          suggestedFix: `Differentiate Act 3 scenes: not every scene should be "${onlyPurpose250}". The climax needs a confrontation, a consequence, and a denouement — each serving a distinct purpose. Build in a scene of revelation, a scene of relational closure, and a scene that marks the new equilibrium.`,
+        });
+      }
+    }
+  }
+
+  // ACT2B_SUSPENSE_DECAY (minor, n≥10): Average suspenseDelta in Act 2b (50%–75%)
+  // is lower than in Act 2a (25%–50%). The engine slows before the climax instead
+  // of building. Act 2b should be the pressure cooker — where the protagonist's
+  // situation deteriorates and the antagonistic force reaches maximum strength.
+  // When Act 2b has lower average suspense than Act 2a, the story runs out of
+  // pressure just when it needs the most.
+  if (n >= 10) {
+    const act2aStart250 = Math.floor(n * 0.25);
+    const act2bStart250 = Math.floor(n * 0.5);
+    const act2bEnd250  = Math.floor(n * 0.75);
+    const avgSuspense250 = (recs: typeof records) => {
+      if (recs.length === 0) return 0;
+      return recs.reduce((s: number, r: any) => s + (r.suspenseDelta ?? 0), 0) / recs.length;
+    };
+    const act2aAvg250 = avgSuspense250(records.slice(act2aStart250, act2bStart250));
+    const act2bAvg250 = avgSuspense250(records.slice(act2bStart250, act2bEnd250));
+    if (act2bAvg250 < act2aAvg250 - 0.5) {
+      issues.push({
+        location: `Act 2b (Scenes ${act2bStart250}–${act2bEnd250 - 1})`,
+        rule: 'ACT2B_SUSPENSE_DECAY',
+        severity: 'minor',
+        description: `Act 2b (Scenes ${act2bStart250}–${act2bEnd250 - 1}) averages ${act2bAvg250.toFixed(2)} suspenseDelta vs ${act2aAvg250.toFixed(2)} in Act 2a — the story loses pressure in the run-up to the climax instead of building it. Act 2b should be the pressure cooker; a falling suspense average here signals a pre-climax stall.`,
+        suggestedFix: "Build Act 2b pressure: introduce a new threat, escalate an existing one, or reveal a complication that makes the protagonist's situation measurably worse. The scene just before the climax should feel like the most impossible situation yet — not a recovery.",
+      });
+    }
+  }
+  // ── End Wave 250 ─────────────────────────────────────────────────────────────
+
   // ── Rewrite ───────────────────────────────────────────────────────────────
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'structure', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
