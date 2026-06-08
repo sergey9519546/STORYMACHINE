@@ -441,8 +441,23 @@ export default function ScriptIDE({
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
     let actionLines = 0;
-    let wordCount = scriptText.trim().split(/\s+/).length;
-    if (scriptText.trim() === "") wordCount = 0;
+
+    // ⚡ Bolt Optimization: Replace text.split(/\s+/) with a zero-allocation charCodeAt loop
+    // to prevent intermediate array creation and O(N) allocation on every keystroke.
+    let wordCount = 0;
+    let inWord = false;
+    for (let i = 0; i < scriptText.length; i++) {
+      const code = scriptText.charCodeAt(i);
+      // Spaces, tabs, and newlines (<= 32 covers standard ASCII whitespace)
+      if (code <= 32) {
+        if (inWord) inWord = false;
+      } else {
+        if (!inWord) {
+          wordCount++;
+          inWord = true;
+        }
+      }
+    }
 
     blocks.forEach((block) => {
       if (block.type === "character") {
@@ -592,9 +607,12 @@ export default function ScriptIDE({
   // ── Key handler ──────────────────────────────────────────────────────────────
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const cursor = e.currentTarget.selectionStart;
-    const textBeforeCursor = scriptText.substring(0, cursor);
-    const lines = textBeforeCursor.split("\n");
-    const currentLine = lines[lines.length - 1];
+
+    // ⚡ Bolt Optimization: Zero-allocation line extraction.
+    // Replaced scriptText.substring(0, cursor).split("\n") with lastIndexOf and slice
+    // to avoid creating a massive array of lines on every keystroke.
+    const lastNewlineIdx = scriptText.lastIndexOf("\n", cursor - 1);
+    const currentLine = scriptText.slice(lastNewlineIdx + 1, cursor);
 
     if (e.key === "i" || e.key === "I") {
       if (currentLine === "") {
@@ -737,11 +755,18 @@ export default function ScriptIDE({
   // ── Navigation ───────────────────────────────────────────────────────────────
   const handleNavigate = (lineIndex: number) => {
     if (!editorRef.current) return;
-    const lines = scriptText.split("\n");
+
+    // ⚡ Bolt Optimization: Zero-allocation cursor positioning.
+    // Avoids scriptText.split('\n') which scales poorly with large scripts.
     let charCount = 0;
-    for (let i = 0; i < lineIndex; i++) {
-      charCount += lines[i].length + 1;
+    let currentLine = 0;
+    while (currentLine < lineIndex) {
+      const nextNewline = scriptText.indexOf('\n', charCount);
+      if (nextNewline === -1) break;
+      charCount = nextNewline + 1;
+      currentLine++;
     }
+
     editorRef.current.focus();
     editorRef.current.setSelectionRange(charCount, charCount);
 
