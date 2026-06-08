@@ -6,6 +6,8 @@
 // Wave 150 additions: talking heads (no physical beats in long dialogue runs),
 // over-parenthetical (excessive direction undermining actors), and deadlock
 // dialogue (same argument cycling without escalation).
+// Wave 255 additions: ellipsis overuse (trailing-off tic), tag-question overuse
+// (confirmation-seeking dialogue), and exclamation overuse (everyone shouts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1006,6 +1008,72 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${retroCount241} of ${dialogue.length} dialogue lines (${Math.round(retroCount241 / dialogue.length * 100)}%) contain past-tense verbs — characters spend more time recounting history than acting in the present. Retrospective dialogue turns scenes into debriefs rather than live events.`,
         suggestedFix: "Shift the balance toward present-tense confrontation: characters should want things, force each other's choices, and reveal information in the moment — not explain what happened before. When backstory is necessary, interrupt it with present-tense stakes: \"She left me. Right now, tonight — that's what matters.\"",
+      });
+    }
+  }
+
+  // ── Wave 255: ELLIPSIS_OVERUSE ────────────────────────────────────────────
+  // More than 35% of dialogue lines contain an ellipsis ("..." or "…"). An
+  // occasional trailing-off marks hesitation or a thought left unfinished; on
+  // more than a third of lines it becomes a tic that makes every character sound
+  // tentative, wistful, and verbally identical. Distinct from PUNCTUATION_FLATLINE
+  // (period-dominant) and INTERRUPTION_VOID (no trailing dashes); this targets the
+  // ellipsis specifically. Requires 12+ dialogue lines.
+  if (dialogue.length >= 12) {
+    const ellipsisRe255 = /\.\.\.|…/;
+    const ellipsisCount255 = dialogue.filter(d => ellipsisRe255.test(d.line)).length;
+    const ellipsisRatio255 = ellipsisCount255 / dialogue.length;
+    if (ellipsisRatio255 > 0.35) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'ELLIPSIS_OVERUSE',
+        severity: 'minor',
+        description: `${ellipsisCount255} of ${dialogue.length} dialogue lines (${Math.round(ellipsisRatio255 * 100)}%) contain an ellipsis ("…") — a trailing-off tic that makes every character sound tentative and wistful. Overused, the ellipsis flattens distinct voices into the same hesitant register.`,
+        suggestedFix: 'Reserve the ellipsis for the rare line where a thought genuinely dies on the lips. Let most lines land on a firm period or break off on a dash when another character cuts in — decisive punctuation gives dialogue spine.',
+      });
+    }
+  }
+
+  // ── Wave 255: TAG_QUESTION_OVERUSE ────────────────────────────────────────
+  // More than 25% of dialogue lines end with a confirmation-seeking tag question
+  // ("…isn't it?", "…right?", "…you know?", "…don't you?"). Tag questions hand
+  // the floor back to the other speaker and signal a character fishing for
+  // agreement rather than asserting. A constant stream of them makes everyone
+  // sound insecure and the dialogue sound like it's negotiating its own validity.
+  // Distinct from QUESTION_DOMINANCE (any question) and RHETORICAL_QUESTION_FLOOD
+  // (one speaker, consecutive). Requires 10+ dialogue lines.
+  if (dialogue.length >= 10) {
+    const tagQuestionRe255 = /\b(is(n'?t)? it|are(n'?t)? (you|they|we)|do(n'?t)? (you|they|we)|does(n'?t)? (he|she|it)|right|ok(ay)?|you know|would(n'?t)? you|wo(n'?t)? you|have(n'?t)? (you|we|they)|was(n'?t)? (it|he|she)|ca(n'?t)? (you|we|they)|huh|eh|yeah)\s*\?$/i;
+    const tagCount255 = dialogue.filter(d => tagQuestionRe255.test(d.line.trim())).length;
+    const tagRatio255 = tagCount255 / dialogue.length;
+    if (tagCount255 >= 3 && tagRatio255 > 0.25) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'TAG_QUESTION_OVERUSE',
+        severity: 'minor',
+        description: `${tagCount255} of ${dialogue.length} dialogue lines (${Math.round(tagRatio255 * 100)}%) end with a confirmation-seeking tag question ("…right?", "…isn't it?", "…you know?") — characters keep fishing for agreement instead of asserting. The constant tag makes everyone sound insecure and the dialogue sound like it's negotiating its own validity.`,
+        suggestedFix: 'Convert most tags into flat assertions and let other characters supply the pushback themselves. Save the tag question for the beat where a character genuinely needs the other to commit — a manipulator closing a deal, a doubter seeking reassurance.',
+      });
+    }
+  }
+
+  // ── Wave 255: EXCLAMATION_OVERUSE ─────────────────────────────────────────
+  // More than 35% of dialogue lines end with an exclamation mark. When most lines
+  // shout, none of them land — sustained high volume has no contrast to make any
+  // single outburst register, and the dialogue reads as melodrama. This is the
+  // mirror image of PUNCTUATION_FLATLINE (which fires on period-only monotone with
+  // zero exclamations); here the register is pinned at maximum intensity instead.
+  // Requires 12+ dialogue lines.
+  if (dialogue.length >= 12) {
+    const bangCount255 = dialogue.filter(d => d.line.trim().endsWith('!')).length;
+    const bangRatio255 = bangCount255 / dialogue.length;
+    if (bangRatio255 > 0.35) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'EXCLAMATION_OVERUSE',
+        severity: 'minor',
+        description: `${bangCount255} of ${dialogue.length} dialogue lines (${Math.round(bangRatio255 * 100)}%) end with an exclamation mark — the dialogue is pinned at maximum volume. When most lines shout, none of them land: sustained intensity has no contrast to make any single outburst register, and the scene reads as melodrama.`,
+        suggestedFix: 'Strip exclamation marks back to the two or three moments that truly earn them. Real force comes from contrast — a quiet, flat line beside a sudden shout hits harder than a page of shouting. Let restraint set up the explosion.',
       });
     }
   }

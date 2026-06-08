@@ -17897,6 +17897,138 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 255 — dialoguePass: ellipsis overuse, tag-question overuse, exclamation overuse', async () => {
+    const dInput255 = (fountain: string) => ({ fountain, original: fountain, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+
+    it('ELLIPSIS_OVERUSE fires when >35% of dialogue lines contain an ellipsis', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 12 lines, 6 with ellipsis → 50%
+      const f255a = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'I was going to say something...',
+        'BOB', 'But you never finish...',
+        'ALICE', 'It is just that... I wonder.',
+        'BOB', 'We should talk about it later.',
+        'ALICE', 'Maybe... maybe not.',
+        'BOB', 'Tell me what you need from me.',
+        'ALICE', 'I don\'t know... it is complicated.',
+        'BOB', 'Everything is complicated with you.',
+        'ALICE', 'If only you understood...',
+        'BOB', 'I am trying my best here.',
+        'ALICE', 'Are you, though...',
+        'BOB', 'Let us just go home.',
+      ].join('\n');
+      const result255a = await dialoguePass(dInput255(f255a));
+      assert.ok(result255a.issues.some((i: any) => i.rule === 'ELLIPSIS_OVERUSE'), `Expected ELLIPSIS_OVERUSE, got: ${JSON.stringify(result255a.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('ELLIPSIS_OVERUSE does NOT fire when few lines use ellipsis', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 12 lines, 1 with ellipsis → 8%
+      const f255b = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'Tell me everything you know.',
+        'BOB', 'It happened at noon yesterday.',
+        'ALICE', 'Who else was in the room.',
+        'BOB', 'Only the two of us were there.',
+        'ALICE', 'Then you saw what he did.',
+        'BOB', 'I saw the whole thing clearly.',
+        'ALICE', 'Good. We can use that.',
+        'BOB', 'Well... I am not so sure.',
+        'ALICE', 'We have no other choice now.',
+        'BOB', 'Fine. Let us proceed carefully.',
+        'ALICE', 'Meet me at the dock tonight.',
+        'BOB', 'I will be there on time.',
+      ].join('\n');
+      const result255b = await dialoguePass(dInput255(f255b));
+      assert.ok(!result255b.issues.some((i: any) => i.rule === 'ELLIPSIS_OVERUSE'), 'Should NOT fire when few lines use ellipsis');
+    });
+
+    it('TAG_QUESTION_OVERUSE fires when >25% of dialogue lines end with a tag question', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 10 lines, 4 tag questions → 40%
+      const f255c = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'You came here to help me, right?',
+        'BOB', 'I always do what I can.',
+        'ALICE', 'It is the right thing, isn\'t it?',
+        'BOB', 'We have been over this before.',
+        'ALICE', 'You trust me, don\'t you?',
+        'BOB', 'Of course I trust you.',
+        'ALICE', 'Then we move tonight, okay?',
+        'BOB', 'Let me think it over first.',
+        'ALICE', 'There is no time to waste.',
+        'BOB', 'I understand the stakes here.',
+      ].join('\n');
+      const result255c = await dialoguePass(dInput255(f255c));
+      assert.ok(result255c.issues.some((i: any) => i.rule === 'TAG_QUESTION_OVERUSE'), `Expected TAG_QUESTION_OVERUSE, got: ${JSON.stringify(result255c.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('TAG_QUESTION_OVERUSE does NOT fire when few lines are tag questions', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 10 lines, 1 tag question → 10%
+      const f255d = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'We move at dawn.',
+        'BOB', 'I will ready the car.',
+        'ALICE', 'Bring the documents with you.',
+        'BOB', 'They are already packed.',
+        'ALICE', 'Good work on this.',
+        'BOB', 'It was nothing special.',
+        'ALICE', 'You did well, didn\'t you?',
+        'BOB', 'I suppose I did.',
+        'ALICE', 'Now we wait for the signal.',
+        'BOB', 'I hate the waiting part.',
+      ].join('\n');
+      const result255d = await dialoguePass(dInput255(f255d));
+      assert.ok(!result255d.issues.some((i: any) => i.rule === 'TAG_QUESTION_OVERUSE'), 'Should NOT fire when few lines are tag questions');
+    });
+
+    it('EXCLAMATION_OVERUSE fires when >35% of dialogue lines end with an exclamation', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 12 lines, 6 ending with '!' → 50%
+      const f255e = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'Get out of here now!',
+        'BOB', 'You cannot make me!',
+        'ALICE', 'I said move it!',
+        'BOB', 'This is insane.',
+        'ALICE', 'Listen to me!',
+        'BOB', 'I am listening.',
+        'ALICE', 'Then do something!',
+        'BOB', 'I am trying my best.',
+        'ALICE', 'Try harder!',
+        'BOB', 'Give me a moment.',
+        'ALICE', 'We have no time.',
+        'BOB', 'Fine, let us go.',
+      ].join('\n');
+      const result255e = await dialoguePass(dInput255(f255e));
+      assert.ok(result255e.issues.some((i: any) => i.rule === 'EXCLAMATION_OVERUSE'), `Expected EXCLAMATION_OVERUSE, got: ${JSON.stringify(result255e.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('EXCLAMATION_OVERUSE does NOT fire when few lines end with an exclamation', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 12 lines, 1 ending with '!' → 8%
+      const f255f = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'We should leave soon.',
+        'BOB', 'I agree with that.',
+        'ALICE', 'The roads will be clear.',
+        'BOB', 'Let us take the back way.',
+        'ALICE', 'That is wise.',
+        'BOB', 'I packed the maps already.',
+        'ALICE', 'Good thinking on that.',
+        'BOB', 'We make a decent team.',
+        'ALICE', 'Watch out!',
+        'BOB', 'I see it. We are fine.',
+        'ALICE', 'That was close.',
+        'BOB', 'Let us keep moving.',
+      ].join('\n');
+      const result255f = await dialoguePass(dInput255(f255f));
+      assert.ok(!result255f.issues.some((i: any) => i.rule === 'EXCLAMATION_OVERUSE'), 'Should NOT fire when few lines end with an exclamation');
+    });
+  });
+
   describe('Wave 254 — causalityPass: clue-seed cluster, payoff without setup, suspense plateau flatline', async () => {
     const makeRec254 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
