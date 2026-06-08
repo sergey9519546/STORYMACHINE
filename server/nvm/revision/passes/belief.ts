@@ -7,6 +7,9 @@
 // Wave 159 additions: revelation isolated (discovery happens with no character
 // reaction in dialogue), told-belief domination (>70% tell vs show), and
 // belief asymmetry (one character dominates the deception layer 3:1 or more).
+// Wave 253 additions: revelation Act 2a desert (no discovery in the first
+// complication zone), belief echo chamber (same unverified claim repeated 3+
+// scenes), adjacent deception payoff (lie and unmasking in neighbouring scenes).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -668,6 +671,86 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         description: `Only one character ("${soloChar239}") makes told-belief assertions across all ${records.length} scenes — the belief/deception layer is a monologue. All other characters remain belief-silent, never articulating their own propositions or claims.`,
         suggestedFix: 'Give at least one other character a belief assertion — a claim, a misreading of events, or a lie of their own. A multi-voice belief layer creates conflict and reveals character; a single asserter creates lecture.',
       });
+    }
+  }
+
+  // ── Wave 253: REVELATION_ACT2A_DESERT ────────────────────────────────────
+  // Act 2a (25%–50%) carries no witnessed revelations, despite the story having
+  // 3+ revelations overall. The first complication zone — where the protagonist
+  // begins testing the world and the audience expects their understanding to
+  // start updating — delivers no discovery. Revelations cluster in Act 1 and
+  // Act 2b/3 but skip the early-middle, leaving a discovery valley right where
+  // the story should be building momentum. Requires 8+ records and 3+ revelations.
+  if (records.length >= 8 && witnessedBeliefs.length >= 3) {
+    const act2aStart253 = Math.floor(records.length * 0.25);
+    const act2aEnd253 = Math.floor(records.length * 0.5);
+    const inAct2a253 = witnessedBeliefs.filter(w => w.sceneIdx >= act2aStart253 && w.sceneIdx < act2aEnd253).length;
+    if (inAct2a253 === 0) {
+      issues.push({
+        location: `Act 2a (Scenes ${act2aStart253}–${act2aEnd253 - 1}) — revelation zone`,
+        rule: 'REVELATION_ACT2A_DESERT',
+        severity: 'minor',
+        description: `${witnessedBeliefs.length} revelations land across the story but none occur in Act 2a (Scenes ${act2aStart253}–${act2aEnd253 - 1}) — the first complication zone delivers no discovery. The audience's understanding stops updating just as the protagonist starts testing the world.`,
+        suggestedFix: 'Plant a revelation in Act 2a: an early consequence of the protagonist\'s first moves that reveals something they (and the audience) did not know. The first complication should teach the protagonist that the world is more complicated than they assumed.',
+      });
+    }
+  }
+
+  // ── Wave 253: BELIEF_ECHO_CHAMBER ────────────────────────────────────────
+  // The same proposition is asserted in dialogue across 3+ separate scenes —
+  // sharing significant vocabulary — but is never confirmed or contradicted by
+  // any witnessed revelation. The story repeats an unverified claim instead of
+  // developing it: the audience hears the same assertion again and again with no
+  // resolution, mistaking repetition for emphasis. Distinct from EXPOSITION_DUMP
+  // (consecutive told-only scenes) and SINGLE_SCENE_BELIEF_OVERLOAD (one packed
+  // scene); this is one claim echoing across the whole story unanswered.
+  // Requires 6+ records and 3+ told beliefs.
+  if (records.length >= 6 && toldBeliefs.length >= 3) {
+    for (const anchor253 of toldBeliefs) {
+      const echoes253 = toldBeliefs.filter(t => sharedWords(t.proposition, anchor253.proposition) >= 2);
+      // echoes253 includes the anchor itself when it shares words with itself;
+      // require 3+ distinct scenes asserting the same proposition cluster.
+      const echoScenes253 = new Set(echoes253.map(e => e.sceneIdx));
+      if (echoScenes253.size >= 3) {
+        const witnessedResolves253 = witnessedBeliefs.some(w => sharedWords(w.proposition, anchor253.proposition) >= 2);
+        if (!witnessedResolves253) {
+          const scenesList253 = [...echoScenes253].sort((a, b) => a - b);
+          issues.push({
+            location: `Scenes ${scenesList253.join(', ')} — repeated assertion`,
+            rule: 'BELIEF_ECHO_CHAMBER',
+            severity: 'minor',
+            description: `The proposition "${anchor253.proposition.slice(0, 50)}${anchor253.proposition.length > 50 ? '…' : ''}" is asserted across ${echoScenes253.size} separate scenes (${scenesList253.join(', ')}) but no witnessed revelation ever confirms or contradicts it — the story repeats an unverified claim instead of resolving it. Repetition is being mistaken for emphasis.`,
+            suggestedFix: 'Either pay the claim off with a witnessed scene that proves or disproves it, or cut the repetitions down to a single clear assertion. A belief that is restated three times without resolution reads as the story circling rather than advancing.',
+          });
+          break;
+        }
+      }
+    }
+  }
+
+  // ── Wave 253: ADJACENT_DECEPTION_PAYOFF ──────────────────────────────────
+  // A told belief is contradicted by a witnessed revelation in the very next
+  // scene (gap of exactly one). The deception and its unmasking sit shoulder to
+  // shoulder — the audience is handed a lie and shown the truth before they have
+  // any chance to act on the false belief. A deception needs breathing room to
+  // mislead; planting and exposing it in adjacent scenes makes it a non-event.
+  // Distinct from LATE_DECEPTION_PLANT (about position in the story); this is
+  // about the gap between setup and payoff anywhere. Requires 6+ records.
+  if (records.length >= 6) {
+    for (const told253 of toldBeliefs) {
+      const adjacentReveal253 = witnessedBeliefs.find(w =>
+        w.sceneIdx === told253.sceneIdx + 1 && sharedWords(w.proposition, told253.proposition) >= 2,
+      );
+      if (adjacentReveal253) {
+        issues.push({
+          location: `Scene ${told253.sceneIdx} (${told253.slug}) → Scene ${adjacentReveal253.sceneIdx}`,
+          rule: 'ADJACENT_DECEPTION_PAYOFF',
+          severity: 'minor',
+          description: `A belief asserted at Scene ${told253.sceneIdx} is contradicted by a witnessed revelation in the very next scene (Scene ${adjacentReveal253.sceneIdx}) — the lie and its unmasking are adjacent. The audience never has time to act on the false belief, so the deception has no dramatic payoff.`,
+          suggestedFix: 'Put distance between the deception and its revelation. Let the false belief drive at least two or three scenes of action before the truth surfaces — the cost of the lie is paid in everything the characters do while they still believe it.',
+        });
+        break;
+      }
     }
   }
 

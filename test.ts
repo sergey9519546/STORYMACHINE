@@ -17897,6 +17897,120 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 253 — beliefPass: revelation Act 2a desert, belief echo chamber, adjacent deception payoff', async () => {
+    const makeRec253 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput253 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: '...',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('REVELATION_ACT2A_DESERT fires when no revelation lands in Act 2a despite 3+ revelations overall', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 12 scenes; act2a = floor(12*0.25)=3 .. floor(12*0.5)=6 (scenes 3,4,5)
+      // revelations at scenes 1, 2, 9 — none in 3..5 → fires
+      const records253a = [
+        makeRec253(0), makeRec253(1, { revelation: 'the vault was already empty that morning' }),
+        makeRec253(2, { revelation: 'the guard had been paid to look away' }),
+        makeRec253(3), makeRec253(4), makeRec253(5), makeRec253(6), makeRec253(7), makeRec253(8),
+        makeRec253(9, { revelation: 'the manager planned the whole robbery himself' }),
+        makeRec253(10), makeRec253(11),
+      ];
+      const result253a = await beliefPass(makeInput253(records253a));
+      const desert = result253a.issues.filter((i: any) => i.rule === 'REVELATION_ACT2A_DESERT');
+      assert.ok(desert.length >= 1, `Should detect REVELATION_ACT2A_DESERT, got: ${JSON.stringify(result253a.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(desert[0].severity, 'minor');
+    });
+
+    it('REVELATION_ACT2A_DESERT does NOT fire when a revelation lands in Act 2a', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 12 scenes; revelations at 1, 4, 9 — scene 4 is in act2a (3..5) → no fire
+      const records253b = [
+        makeRec253(0), makeRec253(1, { revelation: 'the vault was already empty that morning' }),
+        makeRec253(2), makeRec253(3),
+        makeRec253(4, { revelation: 'the guard had been paid to look away' }),
+        makeRec253(5), makeRec253(6), makeRec253(7), makeRec253(8),
+        makeRec253(9, { revelation: 'the manager planned the whole robbery himself' }),
+        makeRec253(10), makeRec253(11),
+      ];
+      const result253b = await beliefPass(makeInput253(records253b));
+      const desert = result253b.issues.filter((i: any) => i.rule === 'REVELATION_ACT2A_DESERT');
+      assert.strictEqual(desert.length, 0, 'Should NOT fire when a revelation lands in Act 2a');
+    });
+
+    it('BELIEF_ECHO_CHAMBER fires when the same unverified proposition is asserted across 3+ scenes', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 6 scenes; same proposition ("vault robbery night") asserted at 0, 2, 4; never witnessed
+      const records253c = [
+        makeRec253(0, { dialogueHighlights: ['alice: vault robbery happened that night clearly'] }),
+        makeRec253(1),
+        makeRec253(2, { dialogueHighlights: ['bob: vault robbery occurred late that night'] }),
+        makeRec253(3),
+        makeRec253(4, { dialogueHighlights: ['carol: vault robbery took place that night again'] }),
+        makeRec253(5),
+      ];
+      const result253c = await beliefPass(makeInput253(records253c));
+      const echo = result253c.issues.filter((i: any) => i.rule === 'BELIEF_ECHO_CHAMBER');
+      assert.ok(echo.length >= 1, `Should detect BELIEF_ECHO_CHAMBER, got: ${JSON.stringify(result253c.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(echo[0].severity, 'minor');
+    });
+
+    it('BELIEF_ECHO_CHAMBER does NOT fire when assertions carry distinct vocabulary', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 6 scenes; 3 told beliefs but each distinct — no cluster of 3 sharing 2+ words
+      const records253d = [
+        makeRec253(0, { dialogueHighlights: ['alice: chamber stood entirely empty beforehand'] }),
+        makeRec253(1),
+        makeRec253(2, { dialogueHighlights: ['bob: guard departed station before midnight'] }),
+        makeRec253(3),
+        makeRec253(4, { dialogueHighlights: ['carol: manager understood scheme thoroughly already'] }),
+        makeRec253(5),
+      ];
+      const result253d = await beliefPass(makeInput253(records253d));
+      const echo = result253d.issues.filter((i: any) => i.rule === 'BELIEF_ECHO_CHAMBER');
+      assert.strictEqual(echo.length, 0, 'Should NOT fire when assertions carry distinct vocabulary');
+    });
+
+    it('ADJACENT_DECEPTION_PAYOFF fires when a told belief is contradicted in the very next scene', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 6 scenes; told at scene 2, contradicting revelation at scene 3 (gap 1)
+      const records253e = [
+        makeRec253(0), makeRec253(1),
+        makeRec253(2, { dialogueHighlights: ['alice: the witness fabricated entire alibi story'] }),
+        makeRec253(3, { revelation: 'witness fabricated alibi to protect real killer' }),
+        makeRec253(4), makeRec253(5),
+      ];
+      const result253e = await beliefPass(makeInput253(records253e));
+      const adj = result253e.issues.filter((i: any) => i.rule === 'ADJACENT_DECEPTION_PAYOFF');
+      assert.ok(adj.length >= 1, `Should detect ADJACENT_DECEPTION_PAYOFF, got: ${JSON.stringify(result253e.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(adj[0].severity, 'minor');
+    });
+
+    it('ADJACENT_DECEPTION_PAYOFF does NOT fire when setup and revelation are spaced apart', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 6 scenes; told at scene 1, contradicting revelation at scene 4 (gap 3) → not adjacent
+      const records253f = [
+        makeRec253(0),
+        makeRec253(1, { dialogueHighlights: ['alice: the witness fabricated entire alibi story'] }),
+        makeRec253(2), makeRec253(3),
+        makeRec253(4, { revelation: 'witness fabricated alibi to protect real killer' }),
+        makeRec253(5),
+      ];
+      const result253f = await beliefPass(makeInput253(records253f));
+      const adj = result253f.issues.filter((i: any) => i.rule === 'ADJACENT_DECEPTION_PAYOFF');
+      assert.strictEqual(adj.length, 0, 'Should NOT fire when setup and revelation are spaced apart');
+    });
+  });
+
   describe('Wave 252 — voicePass: present progressive overuse, action pronoun flood, dialogue monosyllable dominance', async () => {
     it('PRESENT_PROGRESSIVE_OVERUSE fires when >40% of action lines use progressive form', async () => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
