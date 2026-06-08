@@ -17897,6 +17897,71 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 260 — pacingPass: opening scene bloat, Act 1 overextended, short-scene flood', async () => {
+    const makeRec260 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 1, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeScene260 = (idx: number, linesN: number) =>
+      `INT. SC${idx} - DAY\n` + Array.from({ length: linesN }, (_, k) => `Action line ${k + 1}.`).join('\n') + '\n';
+    const run260 = async (fountain: string, count: number) => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      const records = Array.from({ length: count }, (_, i) => makeRec260(i));
+      return pacingPass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('OPENING_SCENE_BLOAT fires when the first scene is >=2.5x average length', async () => {
+      // 10 scenes; scene 0 = 30 lines, rest = 5 lines → avg ≈ 7.5, scene0 = 4x avg
+      const f260a = [makeScene260(0, 30), ...Array.from({ length: 9 }, (_, i) => makeScene260(i + 1, 5))].join('\n');
+      const result260a = await run260(f260a, 10);
+      assert.ok(result260a.issues.some((i: any) => i.rule === 'OPENING_SCENE_BLOAT'), `Expected OPENING_SCENE_BLOAT, got: ${JSON.stringify(result260a.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('OPENING_SCENE_BLOAT does NOT fire when the first scene is normal length', async () => {
+      const f260b = Array.from({ length: 10 }, (_, i) => makeScene260(i, 8)).join('\n');
+      const result260b = await run260(f260b, 10);
+      assert.ok(!result260b.issues.some((i: any) => i.rule === 'OPENING_SCENE_BLOAT'), 'Should NOT fire when the first scene is normal length');
+    });
+
+    it('ACT1_OVEREXTENDED fires when Act 1 consumes >40% of total lines', async () => {
+      // 12 scenes; act1 = scenes 0,1,2 (floor(12*0.25)=3); scenes 0-2 = 30 lines each, rest = 3 lines
+      // act1 = 90 lines, rest = 9*3 = 27, total = 117 → act1 = 77% > 40%
+      const f260c = [
+        makeScene260(0, 30), makeScene260(1, 30), makeScene260(2, 30),
+        ...Array.from({ length: 9 }, (_, i) => makeScene260(i + 3, 3)),
+      ].join('\n');
+      const result260c = await run260(f260c, 12);
+      assert.ok(result260c.issues.some((i: any) => i.rule === 'ACT1_OVEREXTENDED'), `Expected ACT1_OVEREXTENDED, got: ${JSON.stringify(result260c.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('ACT1_OVEREXTENDED does NOT fire when page budget is balanced', async () => {
+      const f260d = Array.from({ length: 12 }, (_, i) => makeScene260(i, 8)).join('\n');
+      const result260d = await run260(f260d, 12);
+      assert.ok(!result260d.issues.some((i: any) => i.rule === 'ACT1_OVEREXTENDED'), 'Should NOT fire when page budget is balanced');
+    });
+
+    it('SHORT_SCENE_FLOOD fires when >60% of scenes are undersized', async () => {
+      // 10 scenes; 8 scenes = 2 lines, 2 scenes = 30 lines → avg ≈ 7.6; short threshold ≈ 4.6; 8/10 = 80% short
+      const f260e = [
+        ...Array.from({ length: 8 }, (_, i) => makeScene260(i, 2)),
+        makeScene260(8, 30), makeScene260(9, 30),
+      ].join('\n');
+      const result260e = await run260(f260e, 10);
+      assert.ok(result260e.issues.some((i: any) => i.rule === 'SHORT_SCENE_FLOOD'), `Expected SHORT_SCENE_FLOOD, got: ${JSON.stringify(result260e.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('SHORT_SCENE_FLOOD does NOT fire when scene lengths are uniform', async () => {
+      const f260f = Array.from({ length: 10 }, (_, i) => makeScene260(i, 8)).join('\n');
+      const result260f = await run260(f260f, 10);
+      assert.ok(!result260f.issues.some((i: any) => i.rule === 'SHORT_SCENE_FLOOD'), 'Should NOT fire when scene lengths are uniform');
+    });
+  });
+
   describe('Wave 259 — originalityPass: copula action dominance, filtering-verb overuse, directorial intrusion', async () => {
     const oInput259 = (fountain: string) => ({ fountain, original: fountain, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
 

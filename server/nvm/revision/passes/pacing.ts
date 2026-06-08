@@ -8,6 +8,8 @@
 // lines than average), midpoint collapse (midpoint scene is too brief and flat
 // to function as structural pivot), resolution too brief (final scene ends
 // before the audience can experience the emotional release).
+// Wave 260 additions: opening scene bloat (overlong first scene), Act 1 overextended
+// (setup hogs >40% of pages), short-scene flood (>60% of scenes undersized).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -765,6 +767,79 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
   // ── End Wave 246 ─────────────────────────────────────────────────────────────
 
   // ── End Wave 232 ─────────────────────────────────────────────────────────────
+
+  // ── Wave 260: Opening scene bloat, Act 1 overextended, short-scene flood ──
+
+  // OPENING_SCENE_BLOAT (minor, n≥8): The first scene (Scene 0) is ≥2.5× the
+  // average scene length — an overlong opening. The first scene must hook fast and
+  // earn the audience's attention before spending it; a bloated opener front-loads
+  // setup and atmosphere before anyone is invested. Distinct from MIDPOINT_BLOAT
+  // (structural midpoint) and PACING_SPIKE_SCENE (any scene); this isolates the
+  // first-impression scene, where overlength is most costly.
+  if (records.length >= 8) {
+    const openLen260 = sceneLengths.get(0) ?? 0;
+    if (openLen260 >= 2.5 * avgLength) {
+      issues.push({
+        location: `Scene 0 (opening, ${openLen260} lines)`,
+        rule: 'OPENING_SCENE_BLOAT',
+        severity: 'minor',
+        description: `The opening scene is ${openLen260} lines — ${(openLen260 / avgLength).toFixed(1)}× the story average (${Math.round(avgLength)}). An overlong first scene front-loads setup and atmosphere before the audience is invested. The opening must hook fast: it earns attention before it can spend it.`,
+        suggestedFix: 'Trim the opening to its sharpest hook. Start as late into the first scene as possible, cut throat-clearing exposition, and let the world reveal itself across later scenes. The first scene is a promise, not an encyclopedia.',
+      });
+    }
+  }
+
+  // ACT1_OVEREXTENDED (minor, n≥10): Act 1 (first 25% of scenes) consumes more
+  // than 40% of the script's total line count — the setup act hogs the page and
+  // delays the inciting incident and Act 2. A proportionally oversized Act 1 means
+  // the audience waits too long for the story to actually start. Distinct from the
+  // per-scene bloat checks; this is a zone-aggregate page-budget measure.
+  if (records.length >= 10) {
+    const act1End260 = Math.floor(records.length * 0.25);
+    if (act1End260 >= 2) {
+      let act1Lines260 = 0;
+      let totalLines260 = 0;
+      for (const [idx, len] of sceneLengths) {
+        totalLines260 += len;
+        if (idx < act1End260) act1Lines260 += len;
+      }
+      const act1Ratio260 = totalLines260 > 0 ? act1Lines260 / totalLines260 : 0;
+      if (act1Ratio260 > 0.4) {
+        issues.push({
+          location: `Act 1 (Scenes 0–${act1End260 - 1}) — page budget`,
+          rule: 'ACT1_OVEREXTENDED',
+          severity: 'minor',
+          description: `Act 1 (the first ${act1End260} of ${records.length} scenes) consumes ${Math.round(act1Ratio260 * 100)}% of the script's total lines — the setup act hogs the page and delays the inciting incident. The audience waits too long for the story to actually begin while Act 1 over-establishes.`,
+          suggestedFix: 'Compress the setup. Move exposition into later scenes where it can ride on action, and bring the inciting incident forward. Act 1 should be the leanest act — enough to establish the world and the want, then straight into complication.',
+        });
+      }
+    }
+  }
+
+  // SHORT_SCENE_FLOOD (minor, n≥10): More than 60% of scenes run below 60% of the
+  // average length — the story is dominated by undersized scenes and reads as choppy,
+  // fragmentary, never settling into a beat. (The few longer scenes pull the average
+  // up, so a majority falling well below it signals a script of fragments punctuated
+  // by occasional set-pieces.) Distinct from ACT2_PACING_VALLEY (a local consecutive
+  // run) and PAGE_SPACE_INEQUALITY (Gini concentration); this is a global proportion
+  // of starved scenes.
+  if (records.length >= 10) {
+    const shortThreshold260 = avgLength * 0.6;
+    let shortCount260 = 0;
+    for (const len of lengths) {
+      if (len > 0 && len < shortThreshold260) shortCount260++;
+    }
+    const shortRatio260 = shortCount260 / lengths.length;
+    if (shortRatio260 > 0.6) {
+      issues.push({
+        location: 'Scene-length distribution',
+        rule: 'SHORT_SCENE_FLOOD',
+        severity: 'minor',
+        description: `${shortCount260} of ${lengths.length} scenes (${Math.round(shortRatio260 * 100)}%) run below 60% of the average length — the story is dominated by undersized scenes. The script reads as choppy and fragmentary, a stream of fragments punctuated by a few set-pieces, never settling long enough for a beat to develop.`,
+        suggestedFix: 'Consolidate fragments: merge adjacent micro-scenes that share a location or beat, and let the surviving scenes breathe. A few of the short scenes are surely doing real work — invest the page space there instead of scattering it across many thin ones.',
+      });
+    }
+  }
 
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'pacing', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
