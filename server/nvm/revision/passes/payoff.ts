@@ -7,6 +7,8 @@
 // Wave 154 additions: clustered payoffs (too many resolved in one scene),
 // payoff before climax (all loops closed too early, deflating the ending), and
 // setup imbalance (clue plants concentrated in one act with no early seeding).
+// Wave 261 additions: payoff precedes setup (causal inversion), payoff gap excessive
+// (forgotten long fuse), and payoff front-loaded (resolutions cashed out too early).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -674,6 +676,81 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
   // ── End Wave 247 ─────────────────────────────────────────────────────────────
 
   // ── End Wave 233 ─────────────────────────────────────────────────────────────
+
+  // ── Wave 261: Payoff precedes setup, payoff gap excessive, payoff front-loaded ──
+
+  // PAYOFF_PRECEDES_SETUP (major): A setup is paid off in an EARLIER scene than the
+  // one where its clue is first planted — the resolution arrives before the audience
+  // has been shown the thread. This is a causal/continuity inversion: the answer is
+  // delivered before the question is posed. Distinct from DANGLING_PAYOFF (no setup
+  // anywhere) and PAYOFF_TOO_QUICK (positive gap of 0–1); this fires on a negative
+  // gap, where plant and payoff are out of order.
+  {
+    let precedesFired261 = false;
+    for (const [setupId, payoffScene] of payoffInfo) {
+      const info261 = clueInfo.get(setupId);
+      if (info261 && payoffScene < info261.plantedAt) {
+        issues.push({
+          location: `Payoff Scene ${payoffScene} → setup Scene ${info261.plantedAt}`,
+          rule: 'PAYOFF_PRECEDES_SETUP',
+          severity: 'major',
+          description: `The payoff for "${setupId}" lands in Scene ${payoffScene}, but its setup isn't planted until Scene ${info261.plantedAt} — the resolution arrives before the audience is shown the thread. The answer is delivered before the question is posed, inverting cause and effect.`,
+          suggestedFix: `Reorder the timeline so "${setupId}" is seeded before it pays off. Either move the setup scene earlier than Scene ${payoffScene}, or move the payoff later than Scene ${info261.plantedAt}. A payoff only lands when the audience has already been holding the question.`,
+        });
+        precedesFired261 = true;
+        break;
+      }
+    }
+    void precedesFired261;
+  }
+
+  // PAYOFF_GAP_EXCESSIVE (minor, n≥10): A clue's plant-to-payoff gap spans 60% or
+  // more of the entire story — so much time passes that the audience has likely
+  // forgotten the setup by the time it pays off. A long fuse builds anticipation
+  // only if the clue is occasionally reinforced; an unreinforced clue stretched
+  // across most of the runtime simply fades. Distinct from SETUP_PAYOFF_GAP_
+  // UNIFORMITY (metronomic gaps) and PAYOFF_TOO_QUICK (gap too small); this fires
+  // on a single over-long fuse.
+  if (records.length >= 10) {
+    const gapThreshold261 = records.length * 0.6;
+    for (const [setupId, payoffScene] of payoffInfo) {
+      const info261b = clueInfo.get(setupId);
+      if (info261b) {
+        const gap261 = payoffScene - info261b.plantedAt;
+        if (gap261 >= gapThreshold261) {
+          issues.push({
+            location: `Clue "${setupId}" (Scene ${info261b.plantedAt} → Scene ${payoffScene})`,
+            rule: 'PAYOFF_GAP_EXCESSIVE',
+            severity: 'minor',
+            description: `The clue "${setupId}" is planted in Scene ${info261b.plantedAt} and not paid off until Scene ${payoffScene} — a gap of ${gap261} scenes, spanning ${Math.round(gap261 / records.length * 100)}% of the story. Across that span the audience has likely forgotten the setup, so the payoff lands without the flash of recognition that makes it satisfying.`,
+            suggestedFix: `Reinforce "${setupId}" at least once in the middle stretch — a callback, a reminder, a recontextualisation — so the thread stays warm in the audience's memory. A long fuse only works if it visibly keeps burning.`,
+          });
+          break;
+        }
+      }
+    }
+  }
+
+  // PAYOFF_FRONT_LOADED (minor, payoffs≥3, n≥8): More than 60% of all payoffs land
+  // in the first half of the story — the resolution engine discharges early and the
+  // back half has little left to pay off. The audience's investments are cashed out
+  // before the climax, draining the late story of the recognition-and-reward beats
+  // that make a finale satisfying. Distinct from PAYOFF_POST_CLIMAX_CLUSTER (its
+  // late-skewed inverse) and PAYOFF_SINGLE_SCENE_DUMP (one-scene concentration).
+  if (payoffInfo.size >= 3 && records.length >= 8) {
+    const midpoint261 = Math.floor(records.length * 0.5);
+    const firstHalfPayoffs261 = [...payoffInfo.values()].filter(s => s < midpoint261).length;
+    const frontRatio261 = firstHalfPayoffs261 / payoffInfo.size;
+    if (frontRatio261 > 0.6) {
+      issues.push({
+        location: 'Payoff distribution',
+        rule: 'PAYOFF_FRONT_LOADED',
+        severity: 'minor',
+        description: `${firstHalfPayoffs261} of ${payoffInfo.size} payoffs (${Math.round(frontRatio261 * 100)}%) land in the first half of the story — the resolution engine discharges early. The audience's investments are cashed out before the climax, leaving the finale with little to reward and the back half informationally spent.`,
+        suggestedFix: 'Reserve at least one or two major payoffs for the climax and its approach. The most satisfying reveals are the ones the audience has waited longest for — hold the biggest threads until the end rather than resolving them in Act 1 and Act 2a.',
+      });
+    }
+  }
 
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'payoff', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;

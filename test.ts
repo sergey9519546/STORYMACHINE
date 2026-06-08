@@ -17897,6 +17897,119 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 261 — payoffPass: payoff precedes setup, payoff gap excessive, payoff front-loaded', async () => {
+    const makeRec261 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput261 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: '...',
+      records: records as any, structure: { completionPercent: 50, actPosition: 'act2a' } as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('PAYOFF_PRECEDES_SETUP fires when a payoff lands before its setup', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // payoff for 'x' at scene 2, but 'x' is first seeded at scene 5
+      const records261a = [
+        makeRec261(0), makeRec261(1),
+        makeRec261(2, { payoffSetupIds: ['x'] }),
+        makeRec261(3), makeRec261(4),
+        makeRec261(5, { seededClueIds: ['x'] }),
+      ];
+      const result261a = await payoffPass(makeInput261(records261a));
+      const inv = result261a.issues.filter((i: any) => i.rule === 'PAYOFF_PRECEDES_SETUP');
+      assert.ok(inv.length >= 1, `Should detect PAYOFF_PRECEDES_SETUP, got: ${JSON.stringify(result261a.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(inv[0].severity, 'major');
+    });
+
+    it('PAYOFF_PRECEDES_SETUP does NOT fire when setup precedes payoff', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      const records261b = [
+        makeRec261(0, { seededClueIds: ['x'] }),
+        makeRec261(1), makeRec261(2), makeRec261(3),
+        makeRec261(4, { payoffSetupIds: ['x'] }),
+        makeRec261(5),
+      ];
+      const result261b = await payoffPass(makeInput261(records261b));
+      const inv = result261b.issues.filter((i: any) => i.rule === 'PAYOFF_PRECEDES_SETUP');
+      assert.strictEqual(inv.length, 0, 'Should NOT fire when setup precedes payoff');
+    });
+
+    it('PAYOFF_GAP_EXCESSIVE fires when a plant-to-payoff gap spans 60%+ of the story', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // 10 scenes; clue 'x' planted scene 0, paid scene 9 → gap 9 >= 6
+      const records261c = [
+        makeRec261(0, { seededClueIds: ['x'] }),
+        makeRec261(1), makeRec261(2), makeRec261(3), makeRec261(4),
+        makeRec261(5), makeRec261(6), makeRec261(7), makeRec261(8),
+        makeRec261(9, { payoffSetupIds: ['x'] }),
+      ];
+      const result261c = await payoffPass(makeInput261(records261c));
+      const gap = result261c.issues.filter((i: any) => i.rule === 'PAYOFF_GAP_EXCESSIVE');
+      assert.ok(gap.length >= 1, `Should detect PAYOFF_GAP_EXCESSIVE, got: ${JSON.stringify(result261c.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(gap[0].severity, 'minor');
+    });
+
+    it('PAYOFF_GAP_EXCESSIVE does NOT fire when the fuse is moderate', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // gap of 3 scenes (< 6)
+      const records261d = [
+        makeRec261(0, { seededClueIds: ['x'] }),
+        makeRec261(1), makeRec261(2),
+        makeRec261(3, { payoffSetupIds: ['x'] }),
+        makeRec261(4), makeRec261(5), makeRec261(6), makeRec261(7), makeRec261(8), makeRec261(9),
+      ];
+      const result261d = await payoffPass(makeInput261(records261d));
+      const gap = result261d.issues.filter((i: any) => i.rule === 'PAYOFF_GAP_EXCESSIVE');
+      assert.strictEqual(gap.length, 0, 'Should NOT fire when the plant-to-payoff gap is moderate');
+    });
+
+    it('PAYOFF_FRONT_LOADED fires when >60% of payoffs land in the first half', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // 10 scenes; 4 payoffs, 3 in first half (scenes 2,3,4), 1 in second (scene 8)
+      const records261e = [
+        makeRec261(0, { seededClueIds: ['a'] }),
+        makeRec261(1, { seededClueIds: ['b'] }),
+        makeRec261(2, { seededClueIds: ['c'], payoffSetupIds: ['a'] }),
+        makeRec261(3, { payoffSetupIds: ['b'] }),
+        makeRec261(4, { payoffSetupIds: ['c'] }),
+        makeRec261(5, { seededClueIds: ['d'] }),
+        makeRec261(6), makeRec261(7),
+        makeRec261(8, { payoffSetupIds: ['d'] }),
+        makeRec261(9),
+      ];
+      const result261e = await payoffPass(makeInput261(records261e));
+      const front = result261e.issues.filter((i: any) => i.rule === 'PAYOFF_FRONT_LOADED');
+      assert.ok(front.length >= 1, `Should detect PAYOFF_FRONT_LOADED, got: ${JSON.stringify(result261e.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(front[0].severity, 'minor');
+    });
+
+    it('PAYOFF_FRONT_LOADED does NOT fire when payoffs are balanced across halves', async () => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      // 10 scenes; 4 payoffs, 2 first half (scenes 2,3), 2 second half (scenes 7,8)
+      const records261f = [
+        makeRec261(0, { seededClueIds: ['a'] }),
+        makeRec261(1, { seededClueIds: ['b'] }),
+        makeRec261(2, { seededClueIds: ['c'], payoffSetupIds: ['a'] }),
+        makeRec261(3, { seededClueIds: ['d'], payoffSetupIds: ['b'] }),
+        makeRec261(4), makeRec261(5), makeRec261(6),
+        makeRec261(7, { payoffSetupIds: ['c'] }),
+        makeRec261(8, { payoffSetupIds: ['d'] }),
+        makeRec261(9),
+      ];
+      const result261f = await payoffPass(makeInput261(records261f));
+      const front = result261f.issues.filter((i: any) => i.rule === 'PAYOFF_FRONT_LOADED');
+      assert.strictEqual(front.length, 0, 'Should NOT fire when payoffs are balanced across halves');
+    });
+  });
+
   describe('Wave 260 — pacingPass: opening scene bloat, Act 1 overextended, short-scene flood', async () => {
     const makeRec260 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
