@@ -17897,6 +17897,100 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 258 — intentionPass: proactive midpoint void, proactive desert run, revelation without proactive', async () => {
+    const makeRec258 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput258 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: '...',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('PROACTIVE_MIDPOINT_VOID fires when the midpoint zone has no proactive act', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 10 records; midpoint = scenes 4-5 (floor(10*0.4)=4 .. floor(10*0.6)=6); proactive only at 0,8
+      const records258a = Array.from({ length: 10 }, (_, i) => makeRec258(i, {
+        clockRaised: i === 0 || i === 8,
+      }));
+      const result258a = await intentionPass(makeInput258(records258a));
+      const voidIss = result258a.issues.filter((i: any) => i.rule === 'PROACTIVE_MIDPOINT_VOID');
+      assert.ok(voidIss.length >= 1, `Should detect PROACTIVE_MIDPOINT_VOID, got: ${JSON.stringify(result258a.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(voidIss[0].severity, 'minor');
+    });
+
+    it('PROACTIVE_MIDPOINT_VOID does NOT fire when the midpoint has a proactive act', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      const records258b = Array.from({ length: 10 }, (_, i) => makeRec258(i, {
+        clockRaised: i === 0 || i === 4 || i === 8,
+      }));
+      const result258b = await intentionPass(makeInput258(records258b));
+      const voidIss = result258b.issues.filter((i: any) => i.rule === 'PROACTIVE_MIDPOINT_VOID');
+      assert.strictEqual(voidIss.length, 0, 'Should NOT fire when the midpoint has a proactive act');
+    });
+
+    it('PROACTIVE_DESERT_RUN fires when 4+ consecutive scenes are passive in an active story', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 8 records; proactive at 0,7; scenes 1-6 passive (6-run > 4)
+      const records258c = Array.from({ length: 8 }, (_, i) => makeRec258(i, {
+        seededClueIds: (i === 0 || i === 7) ? ['c'] : [],
+      }));
+      const result258c = await intentionPass(makeInput258(records258c));
+      const desert = result258c.issues.filter((i: any) => i.rule === 'PROACTIVE_DESERT_RUN');
+      assert.ok(desert.length >= 1, `Should detect PROACTIVE_DESERT_RUN, got: ${JSON.stringify(result258c.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(desert[0].severity, 'minor');
+    });
+
+    it('PROACTIVE_DESERT_RUN does NOT fire when the protagonist initiates regularly', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 8 records; proactive every 3rd scene → no run of 4 passive
+      const records258d = Array.from({ length: 8 }, (_, i) => makeRec258(i, {
+        seededClueIds: (i % 3 === 0) ? ['c'] : [],
+      }));
+      const result258d = await intentionPass(makeInput258(records258d));
+      const desert = result258d.issues.filter((i: any) => i.rule === 'PROACTIVE_DESERT_RUN');
+      assert.strictEqual(desert.length, 0, 'Should NOT fire when there is no 4-scene passive run');
+    });
+
+    it('REVELATION_WITHOUT_PROACTIVE fires when no revelation is preceded by initiative', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 8 records; revelations at 5,7; proactive only at scene 0 (far from any revelation window)
+      const records258e = [
+        makeRec258(0, { clockRaised: true }),
+        makeRec258(1), makeRec258(2), makeRec258(3), makeRec258(4),
+        makeRec258(5, { revelation: 'the truth' }),
+        makeRec258(6),
+        makeRec258(7, { revelation: 'another truth' }),
+      ];
+      const result258e = await intentionPass(makeInput258(records258e));
+      const unearned = result258e.issues.filter((i: any) => i.rule === 'REVELATION_WITHOUT_PROACTIVE');
+      assert.ok(unearned.length >= 1, `Should detect REVELATION_WITHOUT_PROACTIVE, got: ${JSON.stringify(result258e.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(unearned[0].severity, 'minor');
+    });
+
+    it('REVELATION_WITHOUT_PROACTIVE does NOT fire when a revelation is earned by initiative', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // revelation at scene 5 preceded by proactive act at scene 4 (within 2 scenes)
+      const records258f = [
+        makeRec258(0), makeRec258(1), makeRec258(2), makeRec258(3),
+        makeRec258(4, { seededClueIds: ['lead'] }),
+        makeRec258(5, { revelation: 'the truth' }),
+        makeRec258(6),
+        makeRec258(7, { revelation: 'another truth' }),
+      ];
+      const result258f = await intentionPass(makeInput258(records258f));
+      const unearned = result258f.issues.filter((i: any) => i.rule === 'REVELATION_WITHOUT_PROACTIVE');
+      assert.strictEqual(unearned.length, 0, 'Should NOT fire when at least one revelation is preceded by a proactive act');
+    });
+  });
+
   describe('Wave 257 — conflictPass: conflict Act 3 absent, reconciliation absent, conflict opening void', async () => {
     const makeRec257 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

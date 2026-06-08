@@ -7,6 +7,9 @@
 // in Act 2 with no initiation), intention dropout (character introduced in Act 1
 // dialogue vanishes from second half), want/fear collision absent (no scene shows
 // the protagonist gaining something while losing a relationship, or vice versa).
+// Wave 258 additions: proactive midpoint void (initiative dead at the pivot),
+// proactive desert run (4+ passive scenes in an active story), revelation without
+// proactive (discoveries unearned by the protagonist's initiative).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -827,6 +830,100 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
   // ── End Wave 244 ─────────────────────────────────────────────────────────────
 
   // ── End Wave 230 ─────────────────────────────────────────────────────────────
+
+  // ── Wave 258: Proactive midpoint void, proactive desert run, revelation without proactive ──
+
+  // A proactive act = the protagonist initiates: a clock raised or a clue planted.
+  // Shared by the three Wave 258 checks.
+  const isProactive258 = (r: any): boolean =>
+    r.clockRaised === true || (r.seededClueIds?.length ?? 0) > 0;
+
+  // PROACTIVE_MIDPOINT_VOID (minor, n≥10): The midpoint zone (40%–60%) contains
+  // no proactive act, while the protagonist does initiate elsewhere. Initiative
+  // collapses precisely at the structural pivot — the moment the protagonist's
+  // goal should transform and their drive intensify. Distinct from PROACTIVE_
+  // OPENING_ABSENT (Act 1), AGENCY_FRONTLOADED (whole second half), and PROACTIVE_
+  // ACT3_VOID (Act 3); this isolates a dead spot at the fulcrum.
+  if (n >= 10) {
+    const midStart258 = Math.floor(n * 0.4);
+    const midEnd258 = Math.floor(n * 0.6);
+    const midRecs258 = records.slice(midStart258, midEnd258);
+    if (midRecs258.length >= 2) {
+      const midProactive258 = midRecs258.some(isProactive258);
+      const outsideProactive258 =
+        records.slice(0, midStart258).some(isProactive258) ||
+        records.slice(midEnd258).some(isProactive258);
+      if (!midProactive258 && outsideProactive258) {
+        issues.push({
+          location: `Midpoint zone (Scenes ${midStart258}–${midEnd258 - 1})`,
+          rule: 'PROACTIVE_MIDPOINT_VOID',
+          severity: 'minor',
+          description: `The midpoint zone (Scenes ${midStart258}–${midEnd258 - 1}) contains no proactive act — no clock raised, no clue planted — though the protagonist initiates elsewhere. Initiative collapses at the structural pivot, exactly where the protagonist's goal should transform and their drive intensify.`,
+          suggestedFix: 'Give the protagonist a decisive proactive beat at the midpoint: a plan launched, a deadline set, a piece of evidence pursued. The midpoint is the gear-change — the protagonist should seize the wheel there, not drift through it.',
+        });
+      }
+    }
+  }
+
+  // PROACTIVE_DESERT_RUN (minor, n≥8, ≥2 proactive acts total): A run of four or
+  // more consecutive scenes in which the protagonist initiates nothing, inside a
+  // story that is otherwise active. An extended passive stretch reads as the
+  // protagonist surrendering the wheel: events happen around them while they wait.
+  // Distinct from the zone-specific voids; this fires on any sustained run.
+  if (n >= 8) {
+    const totalProactive258 = records.filter(isProactive258).length;
+    if (totalProactive258 >= 2) {
+      let runStart258 = 0;
+      let runLen258 = 0;
+      for (let i = 0; i < n; i++) {
+        if (!isProactive258(records[i])) {
+          if (runLen258 === 0) runStart258 = i;
+          runLen258++;
+        } else {
+          runLen258 = 0;
+        }
+        if (runLen258 >= 4) {
+          issues.push({
+            location: `Scenes ${runStart258}–${i}`,
+            rule: 'PROACTIVE_DESERT_RUN',
+            severity: 'minor',
+            description: `Scenes ${runStart258}–${i} form a run of ${runLen258} consecutive scenes in which the protagonist initiates nothing — no clock raised, no clue planted — inside an otherwise active story. An extended passive stretch reads as the protagonist surrendering the wheel: events happen around them while they wait.`,
+            suggestedFix: 'Break the passive run with at least one proactive beat: a choice that commits the protagonist to a course, a deadline they impose, a lead they decide to chase. A protagonist who goes four scenes without initiating becomes a spectator in their own story.',
+          });
+          break;
+        }
+      }
+    }
+  }
+
+  // REVELATION_WITHOUT_PROACTIVE (minor, n≥8, ≥2 revelations): No witnessed
+  // revelation is preceded by a proactive act within the two scenes before it
+  // (inclusive of the revelation scene). Every discovery falls into the
+  // protagonist's lap rather than being earned by their initiative — they learn
+  // truths passively. Distinct from INTENTION_DISCOVERY_ABSENT (Act 3 revelation
+  // presence); this couples discovery to effort across the whole story.
+  if (n >= 8) {
+    const revRecs258 = records
+      .map((r: any, i: number) => ({ r, i }))
+      .filter(({ r }: any) => r.revelation !== null);
+    if (revRecs258.length >= 2) {
+      const anyEarned258 = revRecs258.some(({ i }: any) => {
+        for (let k = Math.max(0, i - 2); k <= i; k++) {
+          if (isProactive258(records[k])) return true;
+        }
+        return false;
+      });
+      if (!anyEarned258) {
+        issues.push({
+          location: 'Discovery / initiative coupling',
+          rule: 'REVELATION_WITHOUT_PROACTIVE',
+          severity: 'minor',
+          description: `None of the story's ${revRecs258.length} revelations is preceded by a proactive act within the two scenes before it — every discovery arrives without the protagonist's initiative driving it. The truths fall into their lap; they learn passively rather than uncovering anything through their own effort.`,
+          suggestedFix: "Make at least one major discovery the consequence of the protagonist's action: a clue they chose to chase, a deadline that forced a confrontation, an investigation they launched. A revelation that the protagonist earned lands harder than one the plot simply hands them.",
+        });
+      }
+    }
+  }
 
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'intention', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
