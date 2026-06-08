@@ -17897,6 +17897,128 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 240 — causalityPass: curiosity open loop, revelation without curiosity, emotional whiplash', async () => {
+    const makeRec240 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput240 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: '...',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any,
+      annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('CURIOSITY_OPEN_LOOP fires when curiosity spikes have no downstream revelation', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // 8 scenes; curiosity spikes (curiosityDelta>=2) at scenes 1 and 3; no revelation anywhere
+      const records240a = [
+        makeRec240(0),
+        makeRec240(1, { curiosityDelta: 3 }),
+        makeRec240(2),
+        makeRec240(3, { curiosityDelta: 2 }),
+        makeRec240(4), makeRec240(5), makeRec240(6), makeRec240(7),
+      ];
+      const result240a = await causalityPass(makeInput240(records240a));
+      const openLoop = result240a.issues.filter(i => i.rule === 'CURIOSITY_OPEN_LOOP');
+      assert.ok(openLoop.length >= 1, 'Should detect CURIOSITY_OPEN_LOOP when curiosity spikes are never paid off by a revelation');
+      assert.strictEqual(openLoop[0].severity, 'major');
+    });
+
+    it('CURIOSITY_OPEN_LOOP does NOT fire when a revelation follows the first curiosity spike', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // curiosity spikes at scenes 1 and 3; revelation at scene 5 (after first spike) closes the loop
+      const records240b = [
+        makeRec240(0),
+        makeRec240(1, { curiosityDelta: 3 }),
+        makeRec240(2),
+        makeRec240(3, { curiosityDelta: 2 }),
+        makeRec240(4),
+        makeRec240(5, { revelation: 'the missing money was hidden in the vault all along' }),
+        makeRec240(6), makeRec240(7),
+      ];
+      const result240b = await causalityPass(makeInput240(records240b));
+      const openLoop = result240b.issues.filter(i => i.rule === 'CURIOSITY_OPEN_LOOP');
+      assert.strictEqual(openLoop.length, 0, 'Should NOT fire when a revelation follows the first curiosity spike');
+    });
+
+    it('REVELATION_WITHOUT_CURIOSITY fires when revelations land but no scene ever raises curiosity', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // 8 scenes; 2 revelations (scenes 3,6); suspense active (scene 2); curiosity never raised
+      const records240c = [
+        makeRec240(0),
+        makeRec240(1),
+        makeRec240(2, { suspenseDelta: 2 }),
+        makeRec240(3, { revelation: 'the will named a second beneficiary nobody knew' }),
+        makeRec240(4),
+        makeRec240(5),
+        makeRec240(6, { revelation: 'the lawyer forged the original signature pages' }),
+        makeRec240(7),
+      ];
+      const result240c = await causalityPass(makeInput240(records240c));
+      const noCuriosity = result240c.issues.filter(i => i.rule === 'REVELATION_WITHOUT_CURIOSITY');
+      assert.ok(noCuriosity.length >= 1, 'Should detect REVELATION_WITHOUT_CURIOSITY when revelations land with no curiosity build');
+      assert.strictEqual(noCuriosity[0].severity, 'minor');
+    });
+
+    it('REVELATION_WITHOUT_CURIOSITY does NOT fire when curiosity is raised somewhere', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // 2 revelations, suspense active, AND curiosity raised at scene 1 (below spike threshold to avoid open-loop)
+      const records240d = [
+        makeRec240(0),
+        makeRec240(1, { curiosityDelta: 1 }),
+        makeRec240(2, { suspenseDelta: 2 }),
+        makeRec240(3, { revelation: 'the will named a second beneficiary nobody knew' }),
+        makeRec240(4),
+        makeRec240(5),
+        makeRec240(6, { revelation: 'the lawyer forged the original signature pages' }),
+        makeRec240(7),
+      ];
+      const result240d = await causalityPass(makeInput240(records240d));
+      const noCuriosity = result240d.issues.filter(i => i.rule === 'REVELATION_WITHOUT_CURIOSITY');
+      assert.strictEqual(noCuriosity.length, 0, 'Should NOT fire when at least one scene raises curiosity');
+    });
+
+    it('EMOTIONAL_WHIPLASH fires when emotional polarity oscillates with no causal pivot', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // 6 scenes; scenes 1-3 oscillate positive→negative→positive; pivots (2,3) have no causal event
+      const records240e = [
+        makeRec240(0),
+        makeRec240(1, { emotionalShift: 'positive' }),
+        makeRec240(2, { emotionalShift: 'negative' }),
+        makeRec240(3, { emotionalShift: 'positive' }),
+        makeRec240(4),
+        makeRec240(5),
+      ];
+      const result240e = await causalityPass(makeInput240(records240e));
+      const whiplash = result240e.issues.filter(i => i.rule === 'EMOTIONAL_WHIPLASH');
+      assert.ok(whiplash.length >= 1, 'Should detect EMOTIONAL_WHIPLASH when mood oscillates without a causal pivot');
+      assert.strictEqual(whiplash[0].severity, 'minor');
+    });
+
+    it('EMOTIONAL_WHIPLASH does NOT fire when the oscillation is motivated by a causal event', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // Same oscillation but scene 2 (the down-pivot) carries a revelation → motivated → no fire
+      const records240f = [
+        makeRec240(0),
+        makeRec240(1, { emotionalShift: 'positive' }),
+        makeRec240(2, { emotionalShift: 'negative', revelation: 'the partner had been lying about the alibi' }),
+        makeRec240(3, { emotionalShift: 'positive' }),
+        makeRec240(4),
+        makeRec240(5),
+      ];
+      const result240f = await causalityPass(makeInput240(records240f));
+      const whiplash = result240f.issues.filter(i => i.rule === 'EMOTIONAL_WHIPLASH');
+      assert.strictEqual(whiplash.length, 0, 'Should NOT fire when a causal event motivates the emotional reversal');
+    });
+  });
+
   describe('Wave 239 — beliefPass: told-belief Act 3 surge, revelation-belief propagation absent, sole asserter', async () => {
     const makeRec239 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

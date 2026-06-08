@@ -767,6 +767,94 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 240: CURIOSITY_OPEN_LOOP ─────────────────────────────────────────
+  // Two or more scenes raise curiosity sharply (curiosityDelta ≥ 2) but no
+  // witnessed revelation ever follows the first such spike. The story poses
+  // strong questions — hooks that promise an answer — and then never delivers a
+  // witnessed truth that closes the loop. Curiosity is a forward-promise: a
+  // spike with no downstream revelation is an open loop the audience carries to
+  // the credits unresolved. Distinct from CLOCK_RAISED_WITHOUT_PAYOFF (deadline
+  // pressure) and from belief's CURIOSITY checks. Requires 8+ records.
+  if (records.length >= 8) {
+    const curiositySpikes240 = records.filter((r: any) => (r.curiosityDelta ?? 0) >= 2);
+    if (curiositySpikes240.length >= 2) {
+      const firstSpikeIdx240 = curiositySpikes240[0].sceneIdx;
+      const anyRevAfterSpike240 = records.some(
+        (r: any) => r.sceneIdx > firstSpikeIdx240 && r.revelation !== null,
+      );
+      if (!anyRevAfterSpike240) {
+        issues.push({
+          location: `Curiosity loop (first spike at Scene ${firstSpikeIdx240})`,
+          rule: 'CURIOSITY_OPEN_LOOP',
+          severity: 'major',
+          description: `${curiositySpikes240.length} scenes raise curiosity sharply (the story poses strong questions) but no witnessed revelation ever follows the first spike at Scene ${firstSpikeIdx240}. Every question the story plants is left open — the audience is hooked and then abandoned.`,
+          suggestedFix: 'Pay off at least one curiosity spike with a witnessed revelation later in the story. A question raised is a contract: the audience leans in expecting the answer, and a story that never delivers one feels like a tease, not a mystery.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 240: REVELATION_WITHOUT_CURIOSITY ────────────────────────────────
+  // The story delivers 2+ witnessed revelations and its reader-state layer is
+  // demonstrably active (at least one scene moves suspense), yet no scene ever
+  // raises curiosity (every curiosityDelta ≤ 0). The audience is handed answers
+  // to questions it was never invited to ask. A revelation only lands when the
+  // audience has been made to want it; revelations with no prior curiosity
+  // build feel like information delivery, not discovery. The suspense-active
+  // guard ensures the absence of curiosity is a real authorial gap, not just an
+  // empty ledger. Requires 8+ records and 2+ revelations.
+  if (records.length >= 8) {
+    const revCount240 = records.filter((r: any) => r.revelation !== null).length;
+    const suspenseActive240 = records.some((r: any) => (r.suspenseDelta ?? 0) !== 0);
+    const anyCuriosityRaised240 = records.some((r: any) => (r.curiosityDelta ?? 0) > 0);
+    if (revCount240 >= 2 && suspenseActive240 && !anyCuriosityRaised240) {
+      issues.push({
+        location: 'Curiosity / revelation coupling',
+        rule: 'REVELATION_WITHOUT_CURIOSITY',
+        severity: 'minor',
+        description: `The story delivers ${revCount240} witnessed revelations and actively moves suspense, but no scene ever raises curiosity — the audience is handed answers to questions it was never invited to ask. Revelations land as information delivery rather than earned discovery.`,
+        suggestedFix: 'Before each major revelation, plant a curiosity hook: a question, an anomaly, a withheld detail that makes the audience want to know. A revelation is only satisfying if the audience was made to crave the answer first.',
+      });
+    }
+  }
+
+  // ── Wave 240: EMOTIONAL_WHIPLASH ──────────────────────────────────────────
+  // Three consecutive scenes oscillate in emotional polarity (positive →
+  // negative → positive, or the reverse) where neither flip is motivated by an
+  // on-page causal event — no revelation, no planted clue, no clock raise, no
+  // significant relationship shift in the two pivot scenes. The mood swings back
+  // and forth with no cause, which reads as tonal randomness rather than a
+  // dramatic arc. Distinct from EMOTIONAL_MONOTONY (three identical tones): this
+  // catches uncaused oscillation, the opposite failure. Requires 5+ records.
+  if (records.length >= 5) {
+    const isCausalPivot240 = (r: any): boolean =>
+      r.revelation !== null ||
+      r.clockRaised === true ||
+      (r.seededClueIds?.length ?? 0) > 0 ||
+      (r.relationshipShifts ?? []).some((s: any) => Math.abs(s.amount) >= 0.3);
+    for (let i = 2; i < records.length; i++) {
+      const a240 = records[i - 2];
+      const b240 = records[i - 1];
+      const c240 = records[i];
+      const oscillates240 =
+        a240.emotionalShift !== 'neutral' &&
+        b240.emotionalShift !== 'neutral' &&
+        c240.emotionalShift !== 'neutral' &&
+        a240.emotionalShift === c240.emotionalShift &&
+        a240.emotionalShift !== b240.emotionalShift;
+      if (oscillates240 && !isCausalPivot240(b240) && !isCausalPivot240(c240)) {
+        issues.push({
+          location: `Scenes ${i - 2}–${i}`,
+          rule: 'EMOTIONAL_WHIPLASH',
+          severity: 'minor',
+          description: `Scenes ${i - 2}–${i} swing emotional polarity (${a240.emotionalShift}→${b240.emotionalShift}→${c240.emotionalShift}) but neither reversal is motivated by an on-page causal event — no revelation, clue, clock, or relationship shift drives the mood flips. The tone whiplashes without cause.`,
+          suggestedFix: 'Anchor each emotional reversal to a concrete cause: a discovery that darkens the mood, a relationship repair that lifts it. Uncaused tonal swings read as inconsistency; motivated ones read as drama.',
+        });
+        break;
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'causality', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
