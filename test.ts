@@ -17897,6 +17897,127 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 257 — conflictPass: conflict Act 3 absent, reconciliation absent, conflict opening void', async () => {
+    const makeRec257 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput257 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: '...',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('CONFLICT_ACT3_ABSENT fires when Act 3 has no conflict but earlier acts do', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 8 records; act3Start = floor(8*0.75)=6; conflict in scenes 1,3 (negative shifts), none at 6,7
+      const records257a = [
+        makeRec257(0),
+        makeRec257(1, { relationshipShifts: [{ pairKey: 'A|B', dimension: 'trust', amount: -0.5 }] }),
+        makeRec257(2),
+        makeRec257(3, { suspenseDelta: -2 }),
+        makeRec257(4), makeRec257(5),
+        makeRec257(6), makeRec257(7),
+      ];
+      const result257a = await conflictPass(makeInput257(records257a));
+      const abs = result257a.issues.filter((i: any) => i.rule === 'CONFLICT_ACT3_ABSENT');
+      assert.ok(abs.length >= 1, `Should detect CONFLICT_ACT3_ABSENT, got: ${JSON.stringify(result257a.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(abs[0].severity, 'major');
+    });
+
+    it('CONFLICT_ACT3_ABSENT does NOT fire when Act 3 carries conflict', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      const records257b = [
+        makeRec257(0),
+        makeRec257(1, { relationshipShifts: [{ pairKey: 'A|B', dimension: 'trust', amount: -0.5 }] }),
+        makeRec257(2),
+        makeRec257(3, { suspenseDelta: -2 }),
+        makeRec257(4), makeRec257(5),
+        makeRec257(6, { suspenseDelta: -2 }),
+        makeRec257(7),
+      ];
+      const result257b = await conflictPass(makeInput257(records257b));
+      const abs = result257b.issues.filter((i: any) => i.rule === 'CONFLICT_ACT3_ABSENT');
+      assert.strictEqual(abs.length, 0, 'Should NOT fire when Act 3 carries conflict');
+    });
+
+    it('RECONCILIATION_ABSENT fires when 2+ broken pairs never recover', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // pairs A|B and C|D both rupture (≤ -0.4), neither ever gets a positive shift later
+      const records257c = [
+        makeRec257(0),
+        makeRec257(1, { relationshipShifts: [{ pairKey: 'A|B', dimension: 'trust', amount: -0.5 }] }),
+        makeRec257(2, { relationshipShifts: [{ pairKey: 'C|D', dimension: 'power', amount: -0.6 }] }),
+        makeRec257(3, { relationshipShifts: [{ pairKey: 'A|B', dimension: 'trust', amount: -0.2 }] }),
+        makeRec257(4), makeRec257(5),
+        makeRec257(6, { suspenseDelta: -2 }),
+        makeRec257(7),
+      ];
+      const result257c = await conflictPass(makeInput257(records257c));
+      const rec = result257c.issues.filter((i: any) => i.rule === 'RECONCILIATION_ABSENT');
+      assert.ok(rec.length >= 1, `Should detect RECONCILIATION_ABSENT, got: ${JSON.stringify(result257c.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(rec[0].severity, 'minor');
+    });
+
+    it('RECONCILIATION_ABSENT does NOT fire when a broken pair reconciles', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // A|B ruptures then recovers (+0.4); C|D ruptures and stays broken → at least one reconciled
+      const records257d = [
+        makeRec257(0),
+        makeRec257(1, { relationshipShifts: [{ pairKey: 'A|B', dimension: 'trust', amount: -0.5 }] }),
+        makeRec257(2, { relationshipShifts: [{ pairKey: 'C|D', dimension: 'power', amount: -0.6 }] }),
+        makeRec257(3),
+        makeRec257(4, { relationshipShifts: [{ pairKey: 'A|B', dimension: 'trust', amount: 0.4 }] }),
+        makeRec257(5),
+        makeRec257(6, { suspenseDelta: -2 }),
+        makeRec257(7),
+      ];
+      const result257d = await conflictPass(makeInput257(records257d));
+      const rec = result257d.issues.filter((i: any) => i.rule === 'RECONCILIATION_ABSENT');
+      assert.strictEqual(rec.length, 0, 'Should NOT fire when at least one broken pair reconciles');
+    });
+
+    it('CONFLICT_OPENING_VOID fires when Act 1 is frictionless but conflict exists later', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 8 records; act1End = floor(8*0.25)=2; scenes 0,1 frictionless; conflict at scene 3
+      const records257e = [
+        makeRec257(0),
+        makeRec257(1),
+        makeRec257(2, { relationshipShifts: [{ pairKey: 'A|B', dimension: 'trust', amount: -0.5 }] }),
+        makeRec257(3, { suspenseDelta: -2 }),
+        makeRec257(4), makeRec257(5),
+        makeRec257(6, { suspenseDelta: -2 }),
+        makeRec257(7),
+      ];
+      const result257e = await conflictPass(makeInput257(records257e));
+      const voidIss = result257e.issues.filter((i: any) => i.rule === 'CONFLICT_OPENING_VOID');
+      assert.ok(voidIss.length >= 1, `Should detect CONFLICT_OPENING_VOID, got: ${JSON.stringify(result257e.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(voidIss[0].severity, 'minor');
+    });
+
+    it('CONFLICT_OPENING_VOID does NOT fire when Act 1 carries conflict', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      const records257f = [
+        makeRec257(0, { suspenseDelta: -2 }),
+        makeRec257(1),
+        makeRec257(2, { relationshipShifts: [{ pairKey: 'A|B', dimension: 'trust', amount: -0.5 }] }),
+        makeRec257(3, { suspenseDelta: -2 }),
+        makeRec257(4), makeRec257(5),
+        makeRec257(6, { suspenseDelta: -2 }),
+        makeRec257(7),
+      ];
+      const result257f = await conflictPass(makeInput257(records257f));
+      const voidIss = result257f.issues.filter((i: any) => i.rule === 'CONFLICT_OPENING_VOID');
+      assert.strictEqual(voidIss.length, 0, 'Should NOT fire when Act 1 carries conflict');
+    });
+  });
+
   describe('Wave 256 — characterArcPass: relational dimension monotony, emotional flatline, negative-only arc', async () => {
     const makeRec256 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

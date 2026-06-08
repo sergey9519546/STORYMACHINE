@@ -5,6 +5,8 @@
 // Wave 158 additions: threat amnesia (clock established but forgotten in second half),
 // antagonist vanish (all reversals in first 60%, none after), and single-register
 // conflict (all relationship shifts use the same dimension — one-axis drama).
+// Wave 257 additions: conflict Act 3 absent (climax without struggle), reconciliation
+// absent (no broken bond ever repairs), and conflict opening void (frictionless Act 1).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -783,6 +785,94 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
   // ── End Wave 243 ─────────────────────────────────────────────────────────────
 
   // ── End Wave 229 ─────────────────────────────────────────────────────────────
+
+  // ── Wave 257: Conflict Act 3 absent, reconciliation absent, conflict opening void ──
+
+  // A scene carries a conflict signal when it has deep negative tension OR any
+  // strong negative relationship shift. Shared by the three Wave 257 checks.
+  const isConflictScene257 = (r: any): boolean =>
+    (r.suspenseDelta ?? 0) < -1 ||
+    (r.relationshipShifts ?? []).some((s: any) => s.amount <= -0.3);
+
+  // CONFLICT_ACT3_ABSENT (major, n≥8): The story carries conflict in its first
+  // 75% but Act 3 (final 25%) has no conflict signal at all — the climax act
+  // resolves without struggle. The protagonist coasts to the ending with no
+  // antagonistic pressure in the very stretch that should hold the story's
+  // hardest opposition. Only fires when conflict exists earlier (otherwise
+  // GOAL_WITHOUT_OPPOSITION already covers the conflictless case).
+  if (records.length >= 8) {
+    const act3Start257 = Math.floor(records.length * 0.75);
+    const earlyConflict257 = records.slice(0, act3Start257).some(isConflictScene257);
+    const act3Conflict257 = records.slice(act3Start257).some(isConflictScene257);
+    if (earlyConflict257 && !act3Conflict257) {
+      issues.push({
+        location: `Act 3 (Scenes ${act3Start257}–${records.length - 1}) — conflict layer`,
+        rule: 'CONFLICT_ACT3_ABSENT',
+        severity: 'major',
+        description: `The story carries conflict through its first 75% but Act 3 (Scenes ${act3Start257}–${records.length - 1}) has no conflict signal — no deep tension drop, no strong negative relationship shift. The climax act resolves without struggle; the protagonist coasts to the ending in the stretch that should hold the story's fiercest opposition.`,
+        suggestedFix: 'Load the final act with its hardest opposition: the antagonist\'s last and strongest move, a betrayal that lands at the worst moment, a setback that makes victory seem impossible. The climax must be the point of maximum pressure, not its release.',
+      });
+    }
+  }
+
+  // RECONCILIATION_ABSENT (minor, n≥8, ≥2 broken pairs): Two or more pairs suffer
+  // a strong relational rupture (a shift ≤ -0.4) but not one of them ever recovers
+  // with a later positive shift (≥ +0.3). Every broken bond stays broken — the
+  // story fractures relationships and never repairs a single one. While some
+  // ruptures should be permanent, a cast in which nobody ever reconciles offers no
+  // relational catharsis. Distinct from CONFLICT_RECOVERY_TOO_FAST (suspense, and
+  // its opposite failure); this is the relational-repair arc end to end.
+  if (records.length >= 8) {
+    const brokenPairs257 = new Map<string, number>(); // pairKey → scene index of rupture
+    for (let i = 0; i < records.length; i++) {
+      for (const s of (records[i].relationshipShifts ?? []) as Array<{ pairKey: string; amount: number }>) {
+        if (s.amount <= -0.4 && !brokenPairs257.has(s.pairKey)) brokenPairs257.set(s.pairKey, i);
+      }
+    }
+    if (brokenPairs257.size >= 2) {
+      const anyReconciled257 = [...brokenPairs257.entries()].some(([pairKey, ruptureIdx]) => {
+        for (let j = ruptureIdx + 1; j < records.length; j++) {
+          if ((records[j].relationshipShifts ?? []).some((s: any) => s.pairKey === pairKey && s.amount >= 0.3)) {
+            return true;
+          }
+        }
+        return false;
+      });
+      if (!anyReconciled257) {
+        issues.push({
+          location: 'Relational repair arc',
+          rule: 'RECONCILIATION_ABSENT',
+          severity: 'minor',
+          description: `${brokenPairs257.size} relationships suffer a strong rupture (shift ≤ -0.4) but not one of them ever recovers with a later positive shift — every broken bond stays broken. The story fractures relationships and repairs none, leaving the cast with no relational catharsis.`,
+          suggestedFix: 'Let at least one broken relationship find its way back — a reconciliation, a hard-won forgiveness, an alliance reforged in the climax. Not every rupture must heal, but a story where none do denies the audience the release that comes from a bond restored.',
+        });
+      }
+    }
+  }
+
+  // CONFLICT_OPENING_VOID (minor, n≥8): Act 1 (first 25%) contains no conflict
+  // signal while conflict exists later — the story opens frictionless and the
+  // inciting tension arrives late. An opening with no friction gives the audience
+  // nothing to lean into; the dramatic question should be posed, and resisted,
+  // from the first act. Distinct from causality's CAUSAL_ACT1_VOID (any causal
+  // thread); this fires specifically on the absence of opposition in the opening.
+  if (records.length >= 8) {
+    const act1End257 = Math.floor(records.length * 0.25);
+    const act1Recs257 = records.slice(0, act1End257);
+    if (act1Recs257.length >= 2) {
+      const act1Conflict257 = act1Recs257.some(isConflictScene257);
+      const laterConflict257 = records.slice(act1End257).some(isConflictScene257);
+      if (!act1Conflict257 && laterConflict257) {
+        issues.push({
+          location: `Act 1 (Scenes 0–${act1End257 - 1}) — conflict layer`,
+          rule: 'CONFLICT_OPENING_VOID',
+          severity: 'minor',
+          description: `Act 1 (the first ${act1End257} scenes) contains no conflict signal — no tension drop, no negative relationship shift — yet the story develops conflict later. The opening is frictionless and the inciting opposition arrives late, giving the audience nothing to lean into from the start.`,
+          suggestedFix: 'Pose the dramatic question early and let something resist it in Act 1: a friction between characters, an obstacle that bites, a threat that announces itself. An opening with no opposition reads as preamble; the conflict should be felt before the first act ends.',
+        });
+      }
+    }
+  }
 
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'conflict', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
