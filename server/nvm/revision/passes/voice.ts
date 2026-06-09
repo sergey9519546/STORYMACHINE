@@ -12,6 +12,10 @@
 // Wave 266 additions: stative verb overload (>35% action lines open with state verb),
 // dialogue hedging opener (>25% of dialogue lines begin with a hedging phrase),
 // abstract subject opening (>30% of action lines begin with an abstract noun subject).
+// Wave 280 additions: intensifier adverb flood in dialogue (>30% of lines contain an
+// intensifier), monochrome verb vocabulary in action lines (single common verb in >25%
+// of lines, ≥12 lines), scene heading repetition (>60% of scenes share the same
+// location, ≥8 records).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1037,6 +1041,104 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         description: `${abstractSubjectCount266} of ${actionOnlyLines.length} action lines (${Math.round(abstractSubjectCount266 / actionOnlyLines.length * 100)}%) open with an abstract noun subject ("Silence fills...", "Fear grips...", "Tension builds...") — the screenplay names emotional and temporal states instead of showing what creates them. The camera cannot record silence or tension directly; it can only record what silence and tension look like.`,
         suggestedFix: "Replace abstract subjects with concrete ones: 'Silence fills the room' → 'Nobody speaks. Nobody moves.' 'Tension builds' → 'ALICE grips the table edge.' Give the camera a person, an object, or an action — not a named state.",
       });
+    }
+  }
+
+  // ── Wave 280: Intensifier flood, monochrome verbs, scene heading repetition ──
+
+  // INTENSIFIER_FLOOD (minor, ≥8 dialogue lines): More than 30% of dialogue lines
+  // contain an intensifier adverb ("really", "very", "totally", "absolutely",
+  // "literally", "extremely", "incredibly", etc.). Dialogue loaded with intensifiers
+  // performs emotion through amplification rather than precise word choice — the adverb
+  // signals that the noun or adjective it modifies is not the right word. Characters who
+  // say "really angry" instead of "furious" are telling the audience how to feel rather
+  // than choosing language precise enough to generate that feeling independently.
+  {
+    const intensDlgLines280: string[] = [];
+    let intensInDlg280 = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { intensInDlg280 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { intensInDlg280 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { intensInDlg280 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (intensInDlg280) intensDlgLines280.push(t);
+      else intensInDlg280 = false;
+    }
+    if (intensDlgLines280.length >= 8) {
+      const intensRe280 = /\b(really|very|totally|absolutely|literally|extremely|incredibly|terribly|awfully|insanely|ridiculously)\b/i;
+      const intensCount280 = intensDlgLines280.filter(l => intensRe280.test(l)).length;
+      if (intensCount280 / intensDlgLines280.length > 0.3) {
+        issues.push({
+          location: 'Dialogue',
+          rule: 'INTENSIFIER_FLOOD',
+          severity: 'minor',
+          description: `${intensCount280} of ${intensDlgLines280.length} dialogue lines (${Math.round(intensCount280 / intensDlgLines280.length * 100)}%) contain an intensifier adverb ("really", "very", "absolutely", "literally", "extremely") — the dialogue performs emotion through amplification rather than specific, charged language. An intensifier always signals that the word it modifies is not precise enough.`,
+          suggestedFix: `Remove intensifiers and find the precise word: "really angry" → "furious"; "very scared" → "terrified"; "absolutely certain" → "certain." The right noun or adjective never needs reinforcement; when you reach for an intensifier, reach for a better word instead.`,
+        });
+      }
+    }
+  }
+
+  // MONOCHROME_VERBS (minor, ≥12 action lines): A single common action verb appears
+  // in more than 25% of all action lines. When one verb dominates the action prose
+  // ("walks", "moves", "looks", "turns"), every action reads identically — the screenplay
+  // loses the specificity that makes individual movements cinematic and characterizing.
+  // Distinct from ADVERB_CRUTCH (adverbs patching weak verbs) and VOICE_TOO_UNIFORM
+  // (scene-level lexical similarity): this fires on verb-level repetition across the
+  // whole script.
+  if (actionOnlyLines.length >= 12) {
+    const commonVerbList280 = ['walk', 'move', 'look', 'turn', 'run', 'cross', 'open', 'close', 'reach', 'pull', 'grab', 'take', 'get', 'go', 'come', 'sit', 'stand', 'enter', 'leave', 'pick'];
+    const verbLineCounts280 = new Map<string, number>();
+    for (const verb280 of commonVerbList280) {
+      const verbRe280 = new RegExp(`\\b${verb280}s?\\b`, 'i');
+      const cnt280 = actionOnlyLines.filter(l => verbRe280.test(l)).length;
+      if (cnt280 > 0) verbLineCounts280.set(verb280, cnt280);
+    }
+    if (verbLineCounts280.size > 0) {
+      const maxVerbCount280 = Math.max(...verbLineCounts280.values());
+      if (maxVerbCount280 / actionOnlyLines.length > 0.25) {
+        const topVerb280 = [...verbLineCounts280.entries()].sort((a, b) => b[1] - a[1])[0][0];
+        issues.push({
+          location: 'Action line verbs',
+          rule: 'MONOCHROME_VERBS',
+          severity: 'minor',
+          description: `The verb "${topVerb280}" (and its inflected forms) appears in ${maxVerbCount280} of ${actionOnlyLines.length} action lines (${Math.round(maxVerbCount280 / actionOnlyLines.length * 100)}%) — the screenplay's action vocabulary is impoverished. When a single verb dominates, every movement reads identically; the prose loses the specificity that makes individual actions cinematic and characterizing.`,
+          suggestedFix: `Replace repetitions of "${topVerb280}" with precise, varied verbs suited to each character and moment: "walks" could be "saunters", "marches", "shuffles", "strides", or "trudges" depending on emotional state. Each action verb is a miniature characterization; when all actions share the same word, all characters move as one.`,
+        });
+      }
+    }
+  }
+
+  // SCENE_HEADING_REPETITION (minor, ≥8 records): More than 60% of scene headings
+  // reference the same location. When a single location dominates the scene headings,
+  // the screenplay's visual universe is restricted — the story never leaves the same
+  // room. Cinema uses spatial variety to modulate pace, atmosphere, and power dynamics;
+  // a screenplay confined to one location signals a limited visual imagination or a
+  // stage play adapted without cinematographic thinking. Distinct from TONAL_WHIPLASH
+  // (too much variety) and VOICE_TOO_UNIFORM (lexical sameness): this tracks physical
+  // location variety as a dimension of cinematic voice.
+  if (records.length >= 8) {
+    const locationCounts280 = new Map<string, number>();
+    for (const r of records) {
+      const locMatch280 = r.slug.match(/^(?:INT\.|EXT\.|INT\/EXT\.|I\/E\.)\s+([^-]+)/i);
+      if (locMatch280) {
+        const loc280 = locMatch280[1].trim().toUpperCase();
+        locationCounts280.set(loc280, (locationCounts280.get(loc280) ?? 0) + 1);
+      }
+    }
+    if (locationCounts280.size > 0) {
+      const maxLocCount280 = Math.max(...locationCounts280.values());
+      if (maxLocCount280 / records.length > 0.6) {
+        const topLoc280 = [...locationCounts280.entries()].sort((a, b) => b[1] - a[1])[0][0];
+        issues.push({
+          location: 'Scene headings',
+          rule: 'SCENE_HEADING_REPETITION',
+          severity: 'minor',
+          description: `${maxLocCount280} of ${records.length} scenes (${Math.round(maxLocCount280 / records.length * 100)}%) are set in "${topLoc280}" — the screenplay's visual universe is restricted to a single dominant location. Cinema uses spatial variety to modulate pace, atmosphere, and the physical expression of power; a story that never leaves one room forfeits these tools.`,
+          suggestedFix: `Introduce more physical locations or significantly differentiate revisits to "${topLoc280}" through time-of-day, staging, or set condition. Even minor spatial changes (INT. OFFICE vs INT. HALLWAY OUTSIDE OFFICE) expand the visual vocabulary. If the single-location constraint is intentional (bottle episode), ensure the staging varies enough to create spatial rhythm.`,
+        });
+      }
     }
   }
 

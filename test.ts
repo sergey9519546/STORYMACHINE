@@ -17897,6 +17897,137 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 280 — voicePass: intensifier flood, monochrome verbs, scene heading repetition', async () => {
+    const makeRec280 = (idx: number, slug = `INT. OFFICE - DAY`): any => ({
+      sceneIdx: idx, slug,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+    });
+
+    it('INTENSIFIER_FLOOD fires when >30% of dialogue lines contain intensifiers', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const f280a = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'This is really important to me.',
+        'BOB', 'The situation is serious.',
+        'ALICE', 'I am absolutely certain we must go.',
+        'BOB', 'We have no time left.',
+        'ALICE', 'It is extremely dangerous out there.',
+        'BOB', 'I know the risks.',
+        'ALICE', 'We literally have no choice.',
+        'BOB', 'Fine. We go.',
+        'ALICE', 'The plan remains unchanged.',
+        'BOB', 'Understood.',
+      ].join('\n');
+      const recs280a = Array.from({ length: 2 }, (_, i) => makeRec280(i));
+      const result280a = await voicePass({ fountain: f280a, original: f280a, records: recs280a as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(result280a.issues.some((i: any) => i.rule === 'INTENSIFIER_FLOOD'), `Expected INTENSIFIER_FLOOD, got: ${JSON.stringify(result280a.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('INTENSIFIER_FLOOD does NOT fire when ≤30% of dialogue lines contain intensifiers', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const f280b = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'This matters to me.',
+        'BOB', 'The situation is serious.',
+        'ALICE', 'I am certain we must go.',
+        'BOB', 'We have no time.',
+        'ALICE', 'It is dangerous out there.',
+        'BOB', 'I know the risks.',
+        'ALICE', 'We have no choice.',
+        'BOB', 'Fine.',
+        'ALICE', 'Really, we must leave now.',
+        'BOB', 'Understood.',
+      ].join('\n');
+      const recs280b = Array.from({ length: 2 }, (_, i) => makeRec280(i));
+      const result280b = await voicePass({ fountain: f280b, original: f280b, records: recs280b as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(!result280b.issues.some((i: any) => i.rule === 'INTENSIFIER_FLOOD'), 'Should NOT fire when ≤30% of dialogue lines have intensifiers');
+    });
+
+    it('MONOCHROME_VERBS fires when a single verb appears in >25% of action lines', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 12 action lines, 4 with "walks" = 33% > 25%
+      const f280c = [
+        'INT. PARK - DAY', '',
+        'He walks to the bench.',
+        'She sits down beside him.',
+        'He walks toward the fountain.',
+        'A bird flies past.',
+        'He walks along the path.',
+        'She checks her phone.',
+        'He walks back slowly.',
+        'The sun is low.',
+        'She rises from the bench.',
+        'He stops at the gate.',
+        'She follows behind him.',
+        'The park empties out.',
+      ].join('\n');
+      const recs280c = Array.from({ length: 2 }, (_, i) => makeRec280(i, `INT. PARK - DAY`));
+      const result280c = await voicePass({ fountain: f280c, original: f280c, records: recs280c as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(result280c.issues.some((i: any) => i.rule === 'MONOCHROME_VERBS'), `Expected MONOCHROME_VERBS, got: ${JSON.stringify(result280c.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('MONOCHROME_VERBS does NOT fire when no single verb exceeds 25% of action lines', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 12 action lines, each with a different verb - "walks" only once = 8%
+      const f280d = [
+        'INT. PARK - DAY', '',
+        'He walks to the bench.',
+        'She sprints toward the gate.',
+        'A dog charges across the grass.',
+        'The bird circles overhead.',
+        'She ducks behind a tree.',
+        'He vaults over the railing.',
+        'The crowd scatters in panic.',
+        'She shoves through the turnstile.',
+        'He rolls under the bench.',
+        'The siren wails across the park.',
+        'She scrambles to her feet.',
+        'He bolts for the exit.',
+      ].join('\n');
+      const recs280d = Array.from({ length: 2 }, (_, i) => makeRec280(i, `INT. PARK - DAY`));
+      const result280d = await voicePass({ fountain: f280d, original: f280d, records: recs280d as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(!result280d.issues.some((i: any) => i.rule === 'MONOCHROME_VERBS'), 'Should NOT fire when verb distribution is varied');
+    });
+
+    it('SCENE_HEADING_REPETITION fires when >60% of scenes share the same location', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 8 records, 6 in OFFICE (75% > 60%), 2 elsewhere
+      const recs280e = [
+        makeRec280(0, 'INT. OFFICE - DAY'),
+        makeRec280(1, 'INT. OFFICE - DAY'),
+        makeRec280(2, 'INT. OFFICE - DAY'),
+        makeRec280(3, 'EXT. STREET - NIGHT'),
+        makeRec280(4, 'INT. OFFICE - DAY'),
+        makeRec280(5, 'INT. OFFICE - DAY'),
+        makeRec280(6, 'INT. HALLWAY - DAY'),
+        makeRec280(7, 'INT. OFFICE - DAY'),
+      ];
+      const result280e = await voicePass({ fountain: '', original: '', records: recs280e as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(result280e.issues.some((i: any) => i.rule === 'SCENE_HEADING_REPETITION'), `Expected SCENE_HEADING_REPETITION, got: ${JSON.stringify(result280e.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('SCENE_HEADING_REPETITION does NOT fire when no location exceeds 60% of scenes', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      // 8 records, OFFICE 4/8 = 50% ≤ 60%
+      const recs280f = [
+        makeRec280(0, 'INT. OFFICE - DAY'),
+        makeRec280(1, 'INT. OFFICE - DAY'),
+        makeRec280(2, 'EXT. STREET - NIGHT'),
+        makeRec280(3, 'INT. WAREHOUSE - NIGHT'),
+        makeRec280(4, 'INT. OFFICE - DAY'),
+        makeRec280(5, 'EXT. ROOFTOP - DAY'),
+        makeRec280(6, 'INT. OFFICE - DAY'),
+        makeRec280(7, 'INT. HALLWAY - DAY'),
+      ];
+      const result280f = await voicePass({ fountain: '', original: '', records: recs280f as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(!result280f.issues.some((i: any) => i.rule === 'SCENE_HEADING_REPETITION'), 'Should NOT fire when no location exceeds 60% of scenes');
+    });
+  });
+
   describe('Wave 279 — themePass: dramatic-turn decoupled, negative-shift silent, suspense cluster silent', async () => {
     const makeRec279 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
