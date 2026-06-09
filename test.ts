@@ -17897,6 +17897,113 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 276 — relationshipArcPass: midpoint freeze, net-zero majority, depth gap', async () => {
+    const makeRec276 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 1, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runRA276 = async (records: any[]) => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('RELATIONSHIP_MIDPOINT_FREEZE fires when no shifts occur in the middle 50% zone', async () => {
+      // n=10; shifts at scenes 0,1 (Act 1) and 7,8 (Act 3); none in [2,6] (middle 50%)
+      const recs276a = Array.from({ length: 10 }, (_, i) => makeRec276(i, {
+        ...(i === 0 ? { relationshipShifts: [{ pairKey: 'A|B', dimension: 'trust', amount: 0.5 }] } : {}),
+        ...(i === 1 ? { relationshipShifts: [{ pairKey: 'A|B', dimension: 'trust', amount: 0.4 }] } : {}),
+        ...(i === 7 ? { relationshipShifts: [{ pairKey: 'C|D', dimension: 'trust', amount: -0.3 }] } : {}),
+        ...(i === 8 ? { relationshipShifts: [{ pairKey: 'C|D', dimension: 'trust', amount: -0.4 }] } : {}),
+      }));
+      const result276a = await runRA276(recs276a);
+      const freeze276a = result276a.issues.filter((i: any) => i.rule === 'RELATIONSHIP_MIDPOINT_FREEZE');
+      assert.ok(freeze276a.length >= 1, `Should detect RELATIONSHIP_MIDPOINT_FREEZE, got: ${JSON.stringify(result276a.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(freeze276a[0].severity, 'minor');
+    });
+
+    it('RELATIONSHIP_MIDPOINT_FREEZE does NOT fire when a shift occurs in the middle zone', async () => {
+      // n=10; same as fire test but scene 4 (in middle zone [2,6]) also has a shift
+      const recs276b = Array.from({ length: 10 }, (_, i) => makeRec276(i, {
+        ...(i === 0 ? { relationshipShifts: [{ pairKey: 'A|B', dimension: 'trust', amount: 0.5 }] } : {}),
+        ...(i === 1 ? { relationshipShifts: [{ pairKey: 'A|B', dimension: 'trust', amount: 0.4 }] } : {}),
+        ...(i === 4 ? { relationshipShifts: [{ pairKey: 'A|B', dimension: 'trust', amount: 0.2 }] } : {}),
+        ...(i === 7 ? { relationshipShifts: [{ pairKey: 'C|D', dimension: 'trust', amount: -0.3 }] } : {}),
+      }));
+      const result276b = await runRA276(recs276b);
+      const freeze276b = result276b.issues.filter((i: any) => i.rule === 'RELATIONSHIP_MIDPOINT_FREEZE');
+      assert.strictEqual(freeze276b.length, 0, 'Should NOT fire RELATIONSHIP_MIDPOINT_FREEZE when a middle-zone shift exists');
+    });
+
+    it('PAIR_NET_ZERO_MAJORITY fires when more than 60% of pairs have near-zero net', async () => {
+      // n=8; 3 pairs each with perfectly cancelling shifts → all net=0 → 3/3=100% > 60%
+      const recs276c = Array.from({ length: 8 }, (_, i) => makeRec276(i, {
+        ...(i === 1 ? { relationshipShifts: [{ pairKey: 'P|Q', dimension: 'trust', amount: 0.3 }] } : {}),
+        ...(i === 2 ? { relationshipShifts: [{ pairKey: 'P|Q', dimension: 'trust', amount: -0.3 }] } : {}),
+        ...(i === 3 ? { relationshipShifts: [{ pairKey: 'R|S', dimension: 'trust', amount: 0.2 }] } : {}),
+        ...(i === 4 ? { relationshipShifts: [{ pairKey: 'R|S', dimension: 'trust', amount: -0.2 }] } : {}),
+        ...(i === 5 ? { relationshipShifts: [{ pairKey: 'T|U', dimension: 'trust', amount: -0.4 }] } : {}),
+        ...(i === 6 ? { relationshipShifts: [{ pairKey: 'T|U', dimension: 'trust', amount: 0.4 }] } : {}),
+      }));
+      const result276c = await runRA276(recs276c);
+      const nzm276c = result276c.issues.filter((i: any) => i.rule === 'PAIR_NET_ZERO_MAJORITY');
+      assert.ok(nzm276c.length >= 1, `Should detect PAIR_NET_ZERO_MAJORITY, got: ${JSON.stringify(result276c.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(nzm276c[0].severity, 'minor');
+    });
+
+    it('PAIR_NET_ZERO_MAJORITY does NOT fire when most pairs have a clear directional arc', async () => {
+      // n=8; 3 pairs: P|Q net=+0.9, R|S net=-0.6, T|U net=0 → only 1/3=33% net-zero
+      const recs276d = Array.from({ length: 8 }, (_, i) => makeRec276(i, {
+        ...(i === 1 ? { relationshipShifts: [{ pairKey: 'P|Q', dimension: 'trust', amount: 0.5 }] } : {}),
+        ...(i === 2 ? { relationshipShifts: [{ pairKey: 'P|Q', dimension: 'trust', amount: 0.4 }] } : {}),
+        ...(i === 3 ? { relationshipShifts: [{ pairKey: 'R|S', dimension: 'trust', amount: -0.6 }] } : {}),
+        ...(i === 5 ? { relationshipShifts: [{ pairKey: 'T|U', dimension: 'trust', amount: 0.1 }] } : {}),
+        ...(i === 6 ? { relationshipShifts: [{ pairKey: 'T|U', dimension: 'trust', amount: -0.1 }] } : {}),
+      }));
+      const result276d = await runRA276(recs276d);
+      const nzm276d = result276d.issues.filter((i: any) => i.rule === 'PAIR_NET_ZERO_MAJORITY');
+      assert.strictEqual(nzm276d.length, 0, 'Should NOT fire PAIR_NET_ZERO_MAJORITY when ≤60% of pairs are net-zero');
+    });
+
+    it('RELATIONSHIP_DEPTH_GAP fires when one pair has 3× or more shifts than the second pair', async () => {
+      // n=8; M|N: 6 shifts, X|Y: 2 shifts → 6 >= 3×2 → fires
+      const recs276e = Array.from({ length: 8 }, (_, i) => makeRec276(i, {
+        ...(i === 0 ? { relationshipShifts: [{ pairKey: 'M|N', dimension: 'trust', amount: 0.4 }] } : {}),
+        ...(i === 1 ? { relationshipShifts: [{ pairKey: 'M|N', dimension: 'trust', amount: 0.3 }] } : {}),
+        ...(i === 2 ? { relationshipShifts: [{ pairKey: 'M|N', dimension: 'trust', amount: -0.3 }] } : {}),
+        ...(i === 3 ? { relationshipShifts: [{ pairKey: 'X|Y', dimension: 'trust', amount: 0.3 }] } : {}),
+        ...(i === 4 ? { relationshipShifts: [{ pairKey: 'M|N', dimension: 'trust', amount: 0.5 }] } : {}),
+        ...(i === 5 ? { relationshipShifts: [{ pairKey: 'M|N', dimension: 'trust', amount: -0.2 }] } : {}),
+        ...(i === 6 ? { relationshipShifts: [{ pairKey: 'M|N', dimension: 'trust', amount: 0.4 }] } : {}),
+        ...(i === 7 ? { relationshipShifts: [{ pairKey: 'X|Y', dimension: 'trust', amount: -0.3 }] } : {}),
+      }));
+      const result276e = await runRA276(recs276e);
+      const dg276e = result276e.issues.filter((i: any) => i.rule === 'RELATIONSHIP_DEPTH_GAP');
+      assert.ok(dg276e.length >= 1, `Should detect RELATIONSHIP_DEPTH_GAP, got: ${JSON.stringify(result276e.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(dg276e[0].severity, 'minor');
+    });
+
+    it('RELATIONSHIP_DEPTH_GAP does NOT fire when pairs are comparably developed', async () => {
+      // n=8; M|N: 4 shifts, X|Y: 3 shifts → 4/3 < 3 → no fire
+      const recs276f = Array.from({ length: 8 }, (_, i) => makeRec276(i, {
+        ...(i === 0 ? { relationshipShifts: [{ pairKey: 'M|N', dimension: 'trust', amount: 0.4 }] } : {}),
+        ...(i === 1 ? { relationshipShifts: [{ pairKey: 'M|N', dimension: 'trust', amount: 0.3 }] } : {}),
+        ...(i === 2 ? { relationshipShifts: [{ pairKey: 'X|Y', dimension: 'trust', amount: 0.3 }] } : {}),
+        ...(i === 4 ? { relationshipShifts: [{ pairKey: 'M|N', dimension: 'trust', amount: -0.3 }] } : {}),
+        ...(i === 5 ? { relationshipShifts: [{ pairKey: 'X|Y', dimension: 'trust', amount: -0.4 }] } : {}),
+        ...(i === 6 ? { relationshipShifts: [{ pairKey: 'M|N', dimension: 'trust', amount: 0.2 }] } : {}),
+        ...(i === 7 ? { relationshipShifts: [{ pairKey: 'X|Y', dimension: 'trust', amount: 0.2 }] } : {}),
+      }));
+      const result276f = await runRA276(recs276f);
+      const dg276f = result276f.issues.filter((i: any) => i.rule === 'RELATIONSHIP_DEPTH_GAP');
+      assert.strictEqual(dg276f.length, 0, 'Should NOT fire RELATIONSHIP_DEPTH_GAP when pairs are comparably developed');
+    });
+  });
+
   describe('Wave 275 — payoffPass: Act 2a payoff void, late-majority clue seeding, setup/payoff act skew', async () => {
     const makeRecP275 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

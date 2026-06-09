@@ -16,6 +16,9 @@
 // relationship velocity collapse (shifts in first half but none in second half).
 // Wave 262 additions: pair oscillation (signs flip 3+ times), single-scene arc (all
 // of a pair's shifts in one scene), weak-shift dominance (frequent but tiny shifts).
+// Wave 276 additions: midpoint freeze (middle 50% relationally silent), net-zero
+// majority (>60% of pairs cancel out their own shifts), depth gap (one pair gets
+// 3× more shifts than the second most active pair).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -827,6 +830,75 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         });
         break;
       }
+    }
+  }
+
+  // ── Wave 276: Midpoint freeze, net-zero majority, depth gap ─────────────────
+
+  // RELATIONSHIP_MIDPOINT_FREEZE (minor, n≥10, totalShifts≥4): No relationship
+  // shifts occur in the middle 50% of the story (25%–75%). All relational activity
+  // is confined to the bookend acts. The long conflict zone, where interpersonal
+  // pressure should peak, is relationally silent — the middle act neither deepens
+  // nor disrupts any bond, making its dramatic events feel consequence-free for
+  // the characters who should be most affected.
+  if (records.length >= 10 && totalShifts >= 4) {
+    const midStart276 = Math.floor(records.length * 0.25);
+    const midEnd276 = Math.floor(records.length * 0.75);
+    const hasMiddleShift276 = records.slice(midStart276, midEnd276).some(r =>
+      (r.relationshipShifts ?? []).length > 0,
+    );
+    if (!hasMiddleShift276) {
+      issues.push({
+        location: `Middle act (Scenes ${midStart276}–${midEnd276 - 1})`,
+        rule: 'RELATIONSHIP_MIDPOINT_FREEZE',
+        severity: 'minor',
+        description: `No relationship shifts occur in the middle 50% of the story (Scenes ${midStart276}–${midEnd276 - 1}) — all relational activity is confined to the bookend acts. The long conflict zone, where pressure on bonds should peak, is relationally silent.`,
+        suggestedFix: 'Plant at least one relationship shift in the middle act: a betrayal under pressure, an alliance tested by competing loyalties, or a trust shift driven by Act 2 reversals. The story\'s central conflict should leave marks on its central relationships.',
+      });
+    }
+  }
+
+  // PAIR_NET_ZERO_MAJORITY (minor, n≥8, pairs≥3): More than 60% of all pairs
+  // have a near-zero net trajectory (|net| < 0.15) — the majority of the story's
+  // bonds spin their wheels. Each individual pair may have multiple shifts, but they
+  // cancel out, covering no relational distance. Distinct from STATIC_RELATIONSHIP
+  // (per-pair) and NO_RELATIONSHIP_MOVEMENT (zero shifts globally) — this fires
+  // when a systemic proportion of relationships neutralise themselves.
+  if (records.length >= 8 && pairStats.size >= 3) {
+    const netZeroCount276 = [...pairStats.values()].filter(
+      stats => Math.abs(stats.shifts.reduce((s, x) => s + x.amount, 0)) < 0.15,
+    ).length;
+    if (netZeroCount276 / pairStats.size > 0.6) {
+      issues.push({
+        location: 'Relational world',
+        rule: 'PAIR_NET_ZERO_MAJORITY',
+        severity: 'minor',
+        description: `${netZeroCount276} of ${pairStats.size} relationships (${Math.round(netZeroCount276 / pairStats.size * 100)}%) have a near-zero net trajectory — the majority of bonds spin their wheels. When most pairs cancel out their own shifts, the ensemble generates relational noise without covering any relational distance.`,
+        suggestedFix: 'Give at least two pairs a clear directional arc that sticks: a net warming or net souring the audience can track from beginning to end. Net-zero relationships are the ones audiences forget — ensure each major bond lands somewhere different from where it started.',
+      });
+    }
+  }
+
+  // RELATIONSHIP_DEPTH_GAP (minor, n≥8, pairs≥2): The most-shifted pair has 4+
+  // shifts and ≥3× the shift count of the second most active pair. One bond
+  // dominates all relational scene-energy while supporting relationships are
+  // barely sketched — the relational world lacks balance. Distinct from
+  // SINGLE_PAIR_RELATIONSHIP (all shifts in one pair, others zero) — this fires
+  // when a second pair exists but is dramatically outpaced.
+  if (records.length >= 8 && pairStats.size >= 2) {
+    const sortedByShifts276 = [...pairStats.entries()].sort((a, b) => b[1].shifts.length - a[1].shifts.length);
+    const topShifts276 = sortedByShifts276[0][1].shifts.length;
+    const secondShifts276 = sortedByShifts276[1][1].shifts.length;
+    if (topShifts276 >= 4 && secondShifts276 > 0 && topShifts276 >= 3 * secondShifts276) {
+      const [topKey276] = sortedByShifts276[0];
+      const [a276, b276] = topKey276.split('|');
+      issues.push({
+        location: `${a276} ↔ ${b276} (${topShifts276} shifts vs ${secondShifts276} for next pair)`,
+        rule: 'RELATIONSHIP_DEPTH_GAP',
+        severity: 'minor',
+        description: `The relationship between ${a276} and ${b276} receives ${topShifts276} shifts while the next most active pair receives only ${secondShifts276} — a ${Math.round(topShifts276 / secondShifts276)}× gap. One bond dominates all the relational scene-energy, leaving supporting relationships sketched rather than dramatised.`,
+        suggestedFix: 'Redistribute relationship development: give secondary pairs two or three more active beats so their arcs feel substantive alongside the central bond. The ensemble\'s relational world gains depth when secondary bonds receive enough movement to feel like characters, not props.',
+      });
     }
   }
 
