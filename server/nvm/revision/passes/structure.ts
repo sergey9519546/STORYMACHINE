@@ -7,6 +7,9 @@
 // Wave 152 additions: revelation drought (long sequences without any revelation
 // or clue), false climax (peak suspense scene not near climax position), and
 // act symmetry imbalance (Act 1 and Act 3 wildly mismatched in scene count).
+// Wave 264 additions: revelation clustered (≥3 revelations in ≤4-scene window),
+// Act 1 curiosity absent (no curiosity spike in Act 1 when story has 2+ elsewhere),
+// Act 1 purpose single (all Act 1 scenes share one purpose).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -808,6 +811,75 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     }
   }
   // ── End Wave 250 ─────────────────────────────────────────────────────────────
+
+  // ── Wave 264: Revelation clustered, Act 1 curiosity absent, Act 1 purpose single ──
+
+  // REVELATION_CLUSTERED (minor, n≥8, ≥3 revelations): All revelations occur
+  // within a 4-scene window — the story concentrates its discoveries into a
+  // single burst rather than distributing them for sustained mystery. Clustered
+  // revelations create an exposition dump and rob each discovery of individual
+  // weight. Distinct from REVELATION_DROUGHT (long absence) and ACT2/ACT1
+  // revelation checks (zone-specific absence).
+  if (n >= 8) {
+    const revScenes264 = records
+      .map((r: any, i: number) => r.revelation !== null ? i : -1)
+      .filter((i: number) => i >= 0);
+    if (revScenes264.length >= 3) {
+      const span264 = revScenes264[revScenes264.length - 1] - revScenes264[0];
+      if (span264 <= 3) {
+        issues.push({
+          location: `Scenes ${revScenes264[0]}–${revScenes264[revScenes264.length - 1]} (revelation cluster)`,
+          rule: 'REVELATION_CLUSTERED',
+          severity: 'minor',
+          description: `All ${revScenes264.length} revelations occur within a ${span264 + 1}-scene window (Scenes ${revScenes264[0]}–${revScenes264[revScenes264.length - 1]}) — the story dumps all its discoveries in a single burst. Clustered revelations rob each discovery of individual weight and create an exposition dump rather than sustained mystery.`,
+          suggestedFix: 'Distribute revelations across the story: plant one in Act 1 to hook the audience, one in Act 2 to deepen the situation, and one near Act 3 to recontextualise everything. Spacing allows each revelation to breathe and reframe the scenes that follow it.',
+        });
+      }
+    }
+  }
+
+  // ACT1_CURIOSITY_ABSENT (minor, n≥10): No Act 1 scene raises curiosityDelta
+  // above 0.5 while the story has ≥2 curiosity spikes elsewhere. The opening
+  // generates no audience questions despite later mystery — the premise is
+  // announced without anticipation, squandering the hook opportunity of Act 1.
+  if (n >= 10) {
+    const act1End264 = Math.floor(n * 0.25);
+    const storyCurious264 = records.filter((r: any) => (r.curiosityDelta ?? 0) > 0.5).length;
+    if (storyCurious264 >= 2) {
+      const act1Curious264 = records.slice(0, act1End264).filter((r: any) => (r.curiosityDelta ?? 0) > 0.5).length;
+      if (act1Curious264 === 0) {
+        issues.push({
+          location: `Act 1 (Scenes 0–${act1End264 - 1})`,
+          rule: 'ACT1_CURIOSITY_ABSENT',
+          severity: 'minor',
+          description: `No Act 1 scene raises curiosity above 0.5 despite ${storyCurious264} curiosity spikes later in the story. The opening generates no audience questions — the premise is announced without mystery. The hook opportunity of Act 1 is surrendered; the audience has nothing to wonder about during the setup.`,
+          suggestedFix: 'Plant a curiosity spike in Act 1: an anomaly, a withheld identity, an unexplained event, or a question the story raises but deliberately delays answering. The first act should make the audience lean forward wondering what comes next.',
+        });
+      }
+    }
+  }
+
+  // ACT1_PURPOSE_SINGLE (minor, n≥8): Act 1 (first 25%) has ≥3 scenes but all
+  // share the same purpose label — the opening wears one structural costume
+  // throughout. Distinct from ACT3_PURPOSE_MONOTONE (Act 3 specific) and
+  // PURPOSE_MONOCULTURE (whole story dominant purpose).
+  if (n >= 8) {
+    const act1End264b = Math.floor(n * 0.25);
+    const act1Recs264 = records.slice(0, act1End264b);
+    if (act1Recs264.length >= 3) {
+      const act1Purposes264 = new Set(act1Recs264.map((r: any) => r.purpose));
+      if (act1Purposes264.size === 1) {
+        const [singlePurpose264] = act1Purposes264;
+        issues.push({
+          location: `Act 1 (Scenes 0–${act1End264b - 1})`,
+          rule: 'ACT1_PURPOSE_SINGLE',
+          severity: 'minor',
+          description: `Act 1 (${act1Recs264.length} scenes) is entirely composed of "${singlePurpose264}" scenes — the opening wears one structural label throughout. A well-crafted Act 1 moves through setup, incitement, and character introduction, each scene serving a different narrative function.`,
+          suggestedFix: `Differentiate Act 1 structurally: not every opening scene should be "${singlePurpose264}". Mix a world-establishment scene, a character-moment, and an inciting event so each scene advances the setup differently. Structural variety in Act 1 ensures the audience is oriented before the conflict begins.`,
+        });
+      }
+    }
+  }
 
   // ── Rewrite ───────────────────────────────────────────────────────────────
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'structure', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });

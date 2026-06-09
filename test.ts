@@ -17897,6 +17897,90 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 264 — structurePass: revelation clustered, Act 1 curiosity absent, Act 1 purpose single', async () => {
+    const makeRec264 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 1, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput264 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: '...',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any,
+      annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('REVELATION_CLUSTERED fires when ≥3 revelations occur within a 4-scene window', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      const records264a = [
+        makeRec264(0), makeRec264(1),
+        makeRec264(2, { revelation: 'truth about killer' }),
+        makeRec264(3, { revelation: 'motive revealed' }),
+        makeRec264(4, { revelation: 'identity exposed' }),
+        makeRec264(5), makeRec264(6), makeRec264(7),
+      ];
+      const result264a = await structurePass(makeInput264(records264a));
+      assert.ok(result264a.issues.some((i: any) => i.rule === 'REVELATION_CLUSTERED'), `Expected REVELATION_CLUSTERED, got: ${JSON.stringify(result264a.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('REVELATION_CLUSTERED does NOT fire when revelations are spread across more than 4 scenes', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      const records264b = [
+        makeRec264(0), makeRec264(1, { revelation: 'truth about killer' }),
+        makeRec264(2), makeRec264(3),
+        makeRec264(4, { revelation: 'motive revealed' }),
+        makeRec264(5), makeRec264(6),
+        makeRec264(7, { revelation: 'identity exposed' }),
+      ];
+      const result264b = await structurePass(makeInput264(records264b));
+      assert.ok(!result264b.issues.some((i: any) => i.rule === 'REVELATION_CLUSTERED'), 'Should NOT fire when revelations span more than 4 scenes');
+    });
+
+    it('ACT1_CURIOSITY_ABSENT fires when Act 1 has no curiosity spike but story has ≥2 elsewhere', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // n=12: Act1 = scenes 0-2 (floor(12*0.25)=3)
+      const records264c = Array.from({ length: 12 }, (_, i) =>
+        makeRec264(i, { curiosityDelta: (i === 5 || i === 9) ? 1.5 : 0 }),
+      );
+      const result264c = await structurePass(makeInput264(records264c));
+      assert.ok(result264c.issues.some((i: any) => i.rule === 'ACT1_CURIOSITY_ABSENT'), `Expected ACT1_CURIOSITY_ABSENT, got: ${JSON.stringify(result264c.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('ACT1_CURIOSITY_ABSENT does NOT fire when Act 1 contains a curiosity spike', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      const records264d = Array.from({ length: 12 }, (_, i) =>
+        makeRec264(i, { curiosityDelta: (i === 1 || i === 5 || i === 9) ? 1.5 : 0 }),
+      );
+      const result264d = await structurePass(makeInput264(records264d));
+      assert.ok(!result264d.issues.some((i: any) => i.rule === 'ACT1_CURIOSITY_ABSENT'), 'Should NOT fire when Act 1 has a curiosity spike');
+    });
+
+    it('ACT1_PURPOSE_SINGLE fires when all Act 1 scenes share the same purpose', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      // n=12: Act1 = scenes 0-2 (floor(12*0.25)=3), all 'establish_world'
+      const records264e = Array.from({ length: 12 }, (_, i) =>
+        makeRec264(i, { purpose: i < 3 ? 'establish_world' : (i % 2 === 0 ? 'development' : 'confrontation') }),
+      );
+      const result264e = await structurePass(makeInput264(records264e));
+      assert.ok(result264e.issues.some((i: any) => i.rule === 'ACT1_PURPOSE_SINGLE'), `Expected ACT1_PURPOSE_SINGLE, got: ${JSON.stringify(result264e.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('ACT1_PURPOSE_SINGLE does NOT fire when Act 1 scenes have varied purposes', async () => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      const purposes264f = ['establish_world', 'character_moment', 'inciting_event'];
+      const records264f = Array.from({ length: 12 }, (_, i) =>
+        makeRec264(i, { purpose: i < 3 ? purposes264f[i] : 'development' }),
+      );
+      const result264f = await structurePass(makeInput264(records264f));
+      assert.ok(!result264f.issues.some((i: any) => i.rule === 'ACT1_PURPOSE_SINGLE'), 'Should NOT fire when Act 1 has varied purposes');
+    });
+  });
+
   describe('Wave 263 — rhythmPass: question in action, simile excess, color absence', async () => {
     it('QUESTION_IN_ACTION fires when ≥2 action lines end with "?"', async () => {
       const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
