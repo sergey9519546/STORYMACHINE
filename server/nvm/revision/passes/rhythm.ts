@@ -8,6 +8,10 @@
 // Wave 263 additions: question in action (rhetorical '?' breaks cinematic
 // objectivity), simile excess (≥3 simile markers — literary register intrusion),
 // color absence (no color word in 12+ action lines — monochrome visual world).
+// Wave 277 additions: body-part overload (>40% of action lines fixate on isolated
+// body parts), single-sentence flood (all 12+ action lines are exactly one
+// sentence — no multi-clause variation), ellipsis chain (≥3 action lines trail
+// off with '...' — prose avoids committing to a definitive description).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -698,6 +702,68 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${actionLines.length} action lines contain no color reference — the visual world is rendered without color. Film is a visual medium; color is one of the cinematographer's primary expressive tools. A scene description with no color information presents a monochrome world and gives the director nothing to work from visually.`,
         suggestedFix: 'Introduce at least one color reference in the action: the red exit sign, the grey concrete walls, the yellow stain on the ceiling. Color is not decoration — it is the screenplay\'s instruction to the visual department about the emotional temperature of the scene.',
+      });
+    }
+  }
+
+  // ── Wave 277: Body-part overload, single-sentence flood, ellipsis chain ──────
+
+  // BODY_PART_OVERLOAD (minor, ≥8 action lines): More than 40% of action lines
+  // contain a body-part reference (hands, eyes, jaw, chest, fingers…). A scene
+  // built primarily from isolated body-part movements has no spatial context — it
+  // reads as a disconnected close-up reel. When the majority of action zooms to
+  // body parts, characters become floating anatomy rather than people grounded in
+  // a physical world. Distinct from OVER_DESCRIPTION (stacking adjectives on one
+  // character intro) — this fires on the PROPORTION of body-part-centric action.
+  if (actionLines.length >= 8) {
+    const bodyPartRe277 = /\b(hand|hands|eye|eyes|face|arm|arms|leg|legs|foot|feet|finger|fingers|mouth|lip|lips|shoulder|shoulders|head|neck|chest|back|knee|knees|fist|fists|jaw|thumb|wrist|elbow|hip|hips|toe|toes|brow|brows|hair|cheek|cheeks|chin|throat|forehead|temple|temples)\b/i;
+    const bodyPartCount277 = actionLines.filter(l => bodyPartRe277.test(l.text)).length;
+    if (bodyPartCount277 / actionLines.length > 0.4) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'BODY_PART_OVERLOAD',
+        severity: 'minor',
+        description: `${bodyPartCount277} of ${actionLines.length} action lines (${Math.round(bodyPartCount277 / actionLines.length * 100)}%) centre on an isolated body part — the scene reads as a disconnected close-up reel. Characters become floating anatomy with no spatial context or physical world surrounding them.`,
+        suggestedFix: 'Alternate body-part beats with spatial action, environmental detail, and cause-and-effect beats. "His jaw tightened" tells us little; "He looked at the contract, jaw tightening as he reached the clause at the bottom" places the body in the world.',
+      });
+    }
+  }
+
+  // SINGLE_SENTENCE_FLOOD (minor, ≥12 action lines, avgWords≥7): Every action
+  // line is a single declarative sentence — no line contains more than one
+  // sentence. Multi-sentence lines create rhythmic variety and temporal layering
+  // within a beat. Their complete absence means the prose sounds identical at
+  // every scale: short action and long action both end at the same grammatical
+  // boundary. A single well-placed two-sentence line signals a different kind of
+  // moment. Distinct from MONOTONOUS_RHYTHM (word-count uniformity) — this fires
+  // on sentence-count uniformity, even when word counts vary.
+  if (actionLines.length >= 12 && avgWords >= 7) {
+    const multiSentCount277 = actionLines.filter(l => countSentences(l.text) > 1).length;
+    if (multiSentCount277 === 0) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'SINGLE_SENTENCE_FLOOD',
+        severity: 'minor',
+        description: `All ${actionLines.length} action lines are single-sentence — the prose has no multi-clause variation. When every beat ends at the same grammatical boundary, different types of moments receive identical structural weight. Multi-sentence action lines signal a different pace, a different complexity, or a held breath after an impact.`,
+        suggestedFix: 'Introduce at least 2-3 two-sentence action lines at key moments: "She opens the file. Nothing makes sense." or "He stands. Three seconds. Four." A second sentence after the first creates a reaction beat built into the description.',
+      });
+    }
+  }
+
+  // ELLIPSIS_CHAIN (minor, ≥8 action lines): Three or more action lines end with
+  // '...' — the screenplay trails into hesitation. An action line that does not
+  // commit to describing what happens is not an action line: it is the author
+  // leaving a blank. One trailing ellipsis can suggest ambient ambiguity; three
+  // or more suggests the writer is avoiding the work of deciding what occurs.
+  if (actionLines.length >= 8) {
+    const ellipsisCount277 = actionLines.filter(l => l.text.trim().endsWith('...')).length;
+    if (ellipsisCount277 >= 3) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'ELLIPSIS_CHAIN',
+        severity: 'minor',
+        description: `${ellipsisCount277} action lines end with '...' — the screenplay trails into hesitation. Action prose must describe what is seen and heard; an ellipsis-ended action line defers the description and leaves the audience (and the crew) with nothing. Three or more trailing ellipses indicate a pattern of avoidance.`,
+        suggestedFix: "Commit to the action: replace each trailing ellipsis with a specific physical description of what is seen, heard, or done. If a beat is genuinely ambiguous, describe the visible surface: 'She looks at him. Something passes between them.' — the ambiguity is in the meaning, not the description.",
       });
     }
   }

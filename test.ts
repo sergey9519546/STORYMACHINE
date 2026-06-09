@@ -17897,6 +17897,136 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 277 — rhythmPass: body-part overload, single-sentence flood, ellipsis chain', async () => {
+    const rInput277 = (fountain: string) => ({
+      fountain, original: fountain, records: [] as any, structure: {} as any,
+      annotations: [], approvedSpans: [],
+    });
+    const runR277 = async (fountain: string) => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass(rInput277(fountain));
+    };
+
+    it('BODY_PART_OVERLOAD fires when more than 40% of action lines reference isolated body parts', async () => {
+      // 8 action lines; 5 reference body parts (62.5% > 40%)
+      const f277a = [
+        'INT. OFFICE - DAY', '',
+        'Her hands trembled on the desk beside him.',
+        'He reached for the doorknob slowly across the room.',
+        'His eyes narrowed in deep suspicion at the figure.',
+        'She folded her arms tightly across her chest.',
+        'His jaw tightened as he read the report.',
+        'She moved toward the window across the office.',
+        'His fingers moved slowly to the button on the wall.',
+        'She turned quickly away from him and the light.',
+      ].join('\n');
+      const result277a = await runR277(f277a);
+      const bpo277a = result277a.issues.filter((i: any) => i.rule === 'BODY_PART_OVERLOAD');
+      assert.ok(bpo277a.length >= 1, `Should detect BODY_PART_OVERLOAD, got: ${JSON.stringify(result277a.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(bpo277a[0].severity, 'minor');
+    });
+
+    it('BODY_PART_OVERLOAD does NOT fire when body-part lines are 40% or fewer', async () => {
+      // 8 action lines; only 2 reference body parts (25% ≤ 40%)
+      const f277b = [
+        'INT. OFFICE - DAY', '',
+        'She walks to the window and opens it.',
+        'He picks up the coffee and takes a sip.',
+        'The room fills with early morning sunlight.',
+        'Outside the traffic noise rises steadily.',
+        'She checks the time and picks up her bag.',
+        'His jaw tightened as he read the first line.',
+        'The stack of papers sits in the corner.',
+        'Neither of them speaks for a long moment.',
+      ].join('\n');
+      const result277b = await runR277(f277b);
+      const bpo277b = result277b.issues.filter((i: any) => i.rule === 'BODY_PART_OVERLOAD');
+      assert.strictEqual(bpo277b.length, 0, 'Should NOT fire BODY_PART_OVERLOAD when body-part lines are ≤40%');
+    });
+
+    it('SINGLE_SENTENCE_FLOOD fires when all 12+ action lines are exactly one sentence', async () => {
+      // 12 action lines, each ending with a single '.', avgWords ≈ 9
+      const f277c = [
+        'INT. WAREHOUSE - NIGHT', '',
+        'Alice walks through the dark warehouse completely alone.',
+        'The overhead lights flicker and then go dark.',
+        'She stops near the central storage rack now.',
+        'A strange sound echoes from somewhere in the distance.',
+        'She pulls her phone out slowly from her pocket.',
+        'The screen casts a pale blue light ahead.',
+        'She turns slowly around and scans the whole room.',
+        'Her breath fogs in the cold and damp air.',
+        'The exit sign glows red at the very far end.',
+        'She decides to walk toward the distant exit sign.',
+        'A shadow passes quickly behind the storage racks there.',
+        'She freezes completely still near the center of room.',
+      ].join('\n');
+      const result277c = await runR277(f277c);
+      const ssf277c = result277c.issues.filter((i: any) => i.rule === 'SINGLE_SENTENCE_FLOOD');
+      assert.ok(ssf277c.length >= 1, `Should detect SINGLE_SENTENCE_FLOOD, got: ${JSON.stringify(result277c.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(ssf277c[0].severity, 'minor');
+    });
+
+    it('SINGLE_SENTENCE_FLOOD does NOT fire when at least one action line has multiple sentences', async () => {
+      // Same 12 lines but one has two sentences → not a complete flood
+      const f277d = [
+        'INT. WAREHOUSE - NIGHT', '',
+        'Alice walks through the dark warehouse completely alone.',
+        'The overhead lights flicker and then go dark.',
+        'She stops near the central storage rack now.',
+        'A strange sound echoes from somewhere in the distance.',
+        'She pulls her phone out. She checks the screen.',
+        'The screen casts a pale blue light ahead.',
+        'She turns slowly around and scans the whole room.',
+        'Her breath fogs in the cold and damp air.',
+        'The exit sign glows red at the very far end.',
+        'She decides to walk toward the distant exit sign.',
+        'A shadow passes quickly behind the storage racks there.',
+        'She freezes completely still near the center of room.',
+      ].join('\n');
+      const result277d = await runR277(f277d);
+      const ssf277d = result277d.issues.filter((i: any) => i.rule === 'SINGLE_SENTENCE_FLOOD');
+      assert.strictEqual(ssf277d.length, 0, 'Should NOT fire SINGLE_SENTENCE_FLOOD when at least one multi-sentence line exists');
+    });
+
+    it('ELLIPSIS_CHAIN fires when 3 or more action lines trail off with ellipses', async () => {
+      // 8 action lines; 3 end with '...'
+      const f277e = [
+        'INT. HALLWAY - DAY', '',
+        'She pauses outside the door without entering.',
+        'He reaches slowly for the handle there...',
+        'She hesitates, not sure whether to enter...',
+        'There was something in the way he looked at her...',
+        'He finally steps back from the door frame.',
+        'She opens the door slowly and walks inside.',
+        'The room beyond is completely empty tonight.',
+        'The echo hangs quietly in the still cold air.',
+      ].join('\n');
+      const result277e = await runR277(f277e);
+      const ec277e = result277e.issues.filter((i: any) => i.rule === 'ELLIPSIS_CHAIN');
+      assert.ok(ec277e.length >= 1, `Should detect ELLIPSIS_CHAIN, got: ${JSON.stringify(result277e.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(ec277e[0].severity, 'minor');
+    });
+
+    it('ELLIPSIS_CHAIN does NOT fire when fewer than 3 action lines end with ellipses', async () => {
+      // 8 action lines; only 1 ends with '...'
+      const f277f = [
+        'INT. HALLWAY - DAY', '',
+        'She pauses outside the door without entering.',
+        'He reaches slowly for the handle...',
+        'She opens the door and steps inside.',
+        'The door is made of old dark polished wood.',
+        'He finally steps back from the doorway.',
+        'She enters and looks around the small room.',
+        'The room beyond is completely empty tonight.',
+        'The echo hangs quietly in the cold air.',
+      ].join('\n');
+      const result277f = await runR277(f277f);
+      const ec277f = result277f.issues.filter((i: any) => i.rule === 'ELLIPSIS_CHAIN');
+      assert.strictEqual(ec277f.length, 0, 'Should NOT fire ELLIPSIS_CHAIN when fewer than 3 lines end with ellipses');
+    });
+  });
+
   describe('Wave 276 — relationshipArcPass: midpoint freeze, net-zero majority, depth gap', async () => {
     const makeRec276 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
