@@ -13,6 +13,9 @@
 // Wave 162 additions: theme midpoint silent (structural pivot has no theme voice),
 // theme accelerating density absent (theme fades instead of amplifying toward climax),
 // theme dialectic in Act 3 absent (Act 2 challenges the theme but Act 3 only affirms).
+// Wave 265 additions: clue scenes decoupled (≥2 clue-planting scenes with no theme),
+// curiosity scenes decoupled (≥2 curiosity spikes with no theme), payoff scenes
+// decoupled (≥2 payoff scenes with no theme).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -736,6 +739,80 @@ export async function themePass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `${relShiftScenes237.length} relationship-shift scenes carry no thematic language related to "${themeRaw}" — the story's emotional architecture is disconnected from its central question. Relationship changes should dramatize the theme, not exist in a parallel track.`,
             suggestedFix: `Rewrite at least one relationship-shift scene so the shift expresses the theme: if the theme is betrayal, make the relationship crack along a line of trust; if loyalty, make the bond tested on precisely those terms. The theme lives in what characters do to each other.`,
+          });
+        }
+      }
+    }
+
+    // ── Wave 265: Clue decoupled, curiosity decoupled, payoff decoupled ──────────
+
+    // THEME_CLUE_DECOUPLED (minor, ≥6 scenes, ≥2 clue-planting scenes): All scenes
+    // that plant story clues (seededClueIds present) carry no thematic language.
+    // The mystery architecture is disconnected from the central question — planted
+    // clues point to plot mechanics but carry no thematic meaning. Distinct from
+    // THEME_REVELATION_DECOUPLED (revelation scenes) and THEME_SUBPLOT_ISOLATION
+    // (all resonant scenes have revelation).
+    if (records.length >= 6) {
+      const clueScenes265 = records.filter((r: any) => (r.seededClueIds?.length ?? 0) > 0);
+      if (clueScenes265.length >= 2) {
+        const anyClueResonant265 = clueScenes265.some((r: any) =>
+          sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        );
+        if (!anyClueResonant265) {
+          issues.push({
+            location: 'Clue-planting scenes',
+            rule: 'THEME_CLUE_DECOUPLED',
+            severity: 'minor',
+            description: `${clueScenes265.length} clue-planting scenes carry no thematic language related to "${themeRaw}" — the mystery architecture is structurally disconnected from the central question. Planted clues should carry thematic weight: what is being discovered should connect to what the story is about.`,
+            suggestedFix: `Rewrite at least one clue-planting scene so the clue speaks to the theme: if the theme is betrayal, the clue should be evidence of a betrayal; if trust, what's found should complicate trust. Plant evidence of the theme, not just evidence of the crime.`,
+          });
+        }
+      }
+    }
+
+    // THEME_CURIOSITY_DECOUPLED (minor, ≥8 scenes, ≥2 curiosity-raising scenes):
+    // All scenes that spike curiosity (curiosityDelta > 1) carry no thematic language.
+    // The moments that pose story questions are thematically mute — the audience
+    // wonders about plot mechanics, not about the story's central question. Distinct
+    // from THEME_REVELATION_DECOUPLED (revelation scenes carry no theme) and
+    // STRUCTURE_CURIOSITY_VOID (no curiosity spikes exist at all).
+    if (records.length >= 8) {
+      const curiosityScenes265 = records.filter((r: any) => (r.curiosityDelta ?? 0) > 1);
+      if (curiosityScenes265.length >= 2) {
+        const anyCuriousResonant265 = curiosityScenes265.some((r: any) =>
+          sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        );
+        if (!anyCuriousResonant265) {
+          issues.push({
+            location: 'High-curiosity scenes',
+            rule: 'THEME_CURIOSITY_DECOUPLED',
+            severity: 'minor',
+            description: `${curiosityScenes265.length} scenes that spike audience curiosity (curiosityDelta > 1) carry no thematic language related to "${themeRaw}" — the hook moments are thematically mute. The audience wonders about plot mechanics, not about the story's central question. Questions created by the story should point toward its theme.`,
+            suggestedFix: `Embed the theme into the story's hook moments: each curiosity spike should pose a question that is ultimately about "${themeRaw}". The audience's wondering should be guided by the theme — not just "what happens next?" but "what does it mean to trust, or to betray?"`,
+          });
+        }
+      }
+    }
+
+    // THEME_PAYOFF_DECOUPLED (minor, ≥8 scenes, ≥2 payoff scenes): All scenes
+    // that pay off earlier setups (payoffSetupIds present) carry no thematic language.
+    // Payoff moments are the story's peaks of consequence — when they're thematically
+    // silent, the dramatic revelations of the story don't answer the central question.
+    // Distinct from THEME_RESOLUTION_SILENT (final scene) and THEME_CLIMAX_SCENE_SILENT
+    // (Act 3 peak): payoff scenes can appear anywhere and this fires regardless of act.
+    if (records.length >= 8) {
+      const payoffScenes265 = records.filter((r: any) => (r.payoffSetupIds?.length ?? 0) > 0);
+      if (payoffScenes265.length >= 2) {
+        const anyPayoffResonant265 = payoffScenes265.some((r: any) =>
+          sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        );
+        if (!anyPayoffResonant265) {
+          issues.push({
+            location: 'Payoff scenes',
+            rule: 'THEME_PAYOFF_DECOUPLED',
+            severity: 'minor',
+            description: `${payoffScenes265.length} scenes that pay off story setups carry no thematic language related to "${themeRaw}" — the moments of dramatic consequence are thematically silent. Payoffs should answer not just "what happens?" but "what does it mean?" in terms of the story's central question.`,
+            suggestedFix: `Rewrite at least one payoff scene to resonate with the theme: the revelation or consequence should speak directly to "${themeRaw}". A setup planted in terms of the theme should pay off in terms of the theme. If the setup asked a plot question, the payoff should also answer the thematic one.`,
           });
         }
       }

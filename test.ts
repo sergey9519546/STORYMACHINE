@@ -17897,6 +17897,115 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 265 — themePass: clue decoupled, curiosity decoupled, payoff decoupled', async () => {
+    const makeRec265 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput265 = (records: any[], fountain: string) => ({
+      fountain, original: fountain,
+      records: records as any, structure: {} as any,
+      storyContext: { theme: 'trust and betrayal' } as any,
+      annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+    const res265 = (i: number) => `INT. SC${i} - DAY\nThe trust between them holds.\n`;
+    const sil265 = (i: number) => `INT. SC${i} - DAY\nThey proceed carefully.\n`;
+
+    it('THEME_CLUE_DECOUPLED fires when all clue-planting scenes are thematically silent', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const f265a = [res265(0), sil265(1), res265(2), sil265(3), res265(4), res265(5)].join('\n');
+      const records265a = [
+        makeRec265(0), makeRec265(1, { seededClueIds: ['clue-a'] }),
+        makeRec265(2), makeRec265(3, { seededClueIds: ['clue-b'] }),
+        makeRec265(4), makeRec265(5),
+      ];
+      const result265a = await themePass(makeInput265(records265a, f265a));
+      assert.ok(result265a.issues.some((i: any) => i.rule === 'THEME_CLUE_DECOUPLED'), `Expected THEME_CLUE_DECOUPLED, got: ${JSON.stringify(result265a.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('THEME_CLUE_DECOUPLED does NOT fire when at least one clue scene carries thematic language', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const f265b = [res265(0), res265(1), res265(2), sil265(3), res265(4), res265(5)].join('\n');
+      const records265b = [
+        makeRec265(0), makeRec265(1, { seededClueIds: ['clue-a'] }),
+        makeRec265(2), makeRec265(3, { seededClueIds: ['clue-b'] }),
+        makeRec265(4), makeRec265(5),
+      ];
+      const result265b = await themePass(makeInput265(records265b, f265b));
+      assert.ok(!result265b.issues.some((i: any) => i.rule === 'THEME_CLUE_DECOUPLED'), 'Should NOT fire when a clue scene resonates with the theme');
+    });
+
+    it('THEME_CURIOSITY_DECOUPLED fires when all high-curiosity scenes are thematically silent', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const f265c = [
+        res265(0), sil265(1), res265(2), res265(3),
+        sil265(4), res265(5), res265(6), sil265(7),
+      ].join('\n');
+      const records265c = [
+        makeRec265(0), makeRec265(1, { curiosityDelta: 2 }),
+        makeRec265(2), makeRec265(3),
+        makeRec265(4, { curiosityDelta: 2 }), makeRec265(5),
+        makeRec265(6), makeRec265(7),
+      ];
+      const result265c = await themePass(makeInput265(records265c, f265c));
+      assert.ok(result265c.issues.some((i: any) => i.rule === 'THEME_CURIOSITY_DECOUPLED'), `Expected THEME_CURIOSITY_DECOUPLED, got: ${JSON.stringify(result265c.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('THEME_CURIOSITY_DECOUPLED does NOT fire when a curiosity spike carries thematic language', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const f265d = [
+        res265(0), res265(1), res265(2), res265(3),
+        sil265(4), res265(5), res265(6), sil265(7),
+      ].join('\n');
+      const records265d = [
+        makeRec265(0), makeRec265(1, { curiosityDelta: 2 }),
+        makeRec265(2), makeRec265(3),
+        makeRec265(4, { curiosityDelta: 2 }), makeRec265(5),
+        makeRec265(6), makeRec265(7),
+      ];
+      const result265d = await themePass(makeInput265(records265d, f265d));
+      assert.ok(!result265d.issues.some((i: any) => i.rule === 'THEME_CURIOSITY_DECOUPLED'), 'Should NOT fire when a curiosity spike is in a resonant scene');
+    });
+
+    it('THEME_PAYOFF_DECOUPLED fires when all payoff scenes are thematically silent', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const f265e = [
+        res265(0), sil265(1), res265(2), res265(3),
+        sil265(4), res265(5), res265(6), res265(7),
+      ].join('\n');
+      const records265e = [
+        makeRec265(0), makeRec265(1, { payoffSetupIds: ['setup-a'] }),
+        makeRec265(2), makeRec265(3),
+        makeRec265(4, { payoffSetupIds: ['setup-b'] }), makeRec265(5),
+        makeRec265(6), makeRec265(7),
+      ];
+      const result265e = await themePass(makeInput265(records265e, f265e));
+      assert.ok(result265e.issues.some((i: any) => i.rule === 'THEME_PAYOFF_DECOUPLED'), `Expected THEME_PAYOFF_DECOUPLED, got: ${JSON.stringify(result265e.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('THEME_PAYOFF_DECOUPLED does NOT fire when at least one payoff scene carries thematic language', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const f265f = [
+        res265(0), res265(1), res265(2), res265(3),
+        sil265(4), res265(5), res265(6), res265(7),
+      ].join('\n');
+      const records265f = [
+        makeRec265(0), makeRec265(1, { payoffSetupIds: ['setup-a'] }),
+        makeRec265(2), makeRec265(3),
+        makeRec265(4, { payoffSetupIds: ['setup-b'] }), makeRec265(5),
+        makeRec265(6), makeRec265(7),
+      ];
+      const result265f = await themePass(makeInput265(records265f, f265f));
+      assert.ok(!result265f.issues.some((i: any) => i.rule === 'THEME_PAYOFF_DECOUPLED'), 'Should NOT fire when a payoff scene resonates with the theme');
+    });
+  });
+
   describe('Wave 264 — structurePass: revelation clustered, Act 1 curiosity absent, Act 1 purpose single', async () => {
     const makeRec264 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
