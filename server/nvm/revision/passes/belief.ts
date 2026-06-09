@@ -10,6 +10,9 @@
 // Wave 253 additions: revelation Act 2a desert (no discovery in the first
 // complication zone), belief echo chamber (same unverified claim repeated 3+
 // scenes), adjacent deception payoff (lie and unmasking in neighbouring scenes).
+// Wave 267 additions: belief front loaded (all told beliefs in first half only),
+// revelation final act only (all discoveries confined to the final quarter),
+// told belief clustering (3+ assertions in a single scene).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -748,6 +751,81 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `A belief asserted at Scene ${told253.sceneIdx} is contradicted by a witnessed revelation in the very next scene (Scene ${adjacentReveal253.sceneIdx}) — the lie and its unmasking are adjacent. The audience never has time to act on the false belief, so the deception has no dramatic payoff.`,
           suggestedFix: 'Put distance between the deception and its revelation. Let the false belief drive at least two or three scenes of action before the truth surfaces — the cost of the lie is paid in everything the characters do while they still believe it.',
+        });
+        break;
+      }
+    }
+  }
+
+  // ── Wave 267: BELIEF_FRONT_LOADED ─────────────────────────────────────────
+  // All told beliefs cluster in the first half of the story — none appear
+  // in the second half. The story front-loads its deception layer and then
+  // abandons it: the second half has no competing assertions, no misdirection,
+  // no characters holding beliefs the audience can see as false. This strips
+  // dramatic irony from the climax, where the audience most needs to be ahead
+  // of (or misled by) the characters.
+  // Requires 6+ records and 4+ told beliefs.
+  if (records.length >= 6 && toldBeliefs.length >= 4) {
+    const midpoint267 = Math.floor(records.length / 2);
+    const secondHalfTold267 = toldBeliefs.filter(t => t.sceneIdx >= midpoint267);
+    if (secondHalfTold267.length === 0) {
+      issues.push({
+        location: `First half only (scenes 0–${midpoint267 - 1})`,
+        rule: 'BELIEF_FRONT_LOADED',
+        severity: 'minor',
+        description: `All ${toldBeliefs.length} told beliefs appear in the first half of the story (scenes 0–${midpoint267 - 1}); the second half has none. The deception layer is exhausted before the climax — the audience knows what every character believes long before the resolution, removing dramatic irony from the story's most consequential moments.`,
+        suggestedFix: 'Plant at least one new told belief in the second half — a misleading claim voiced near the climax, a false assumption a character holds into the final act. Late misdirection sustains dramatic irony and makes the resolution feel earned rather than mechanical.',
+      });
+    }
+  }
+
+  // ── Wave 267: REVELATION_FINAL_ACT_ONLY ───────────────────────────────────
+  // All witnessed revelations are confined to the final quarter of the story.
+  // Earlier acts have zero revelations: no moment where a character discovers
+  // something true, no scene where the audience is shown the reality beneath
+  // surface claims. Every revealed truth is deferred to the end, making the
+  // intermediate acts feel provisional and dramatically inert.
+  // Distinct from REVELATION_ACT2A_DESERT (Act 2a specifically); this flags
+  // the entire three-act desert before the final quarter.
+  // Requires 8+ records and 2+ witnessed beliefs.
+  if (records.length >= 8 && witnessedBeliefs.length >= 2) {
+    const finalActStart267 = Math.floor(records.length * 0.75);
+    const earlyRevelations267 = witnessedBeliefs.filter(w => w.sceneIdx < finalActStart267);
+    if (earlyRevelations267.length === 0) {
+      issues.push({
+        location: `Final quarter only (scene ${finalActStart267}+)`,
+        rule: 'REVELATION_FINAL_ACT_ONLY',
+        severity: 'minor',
+        description: `All ${witnessedBeliefs.length} witnessed revelations are confined to the final quarter (scene ${finalActStart267}+). No earlier scene reveals a truth — every moment of discovery is deferred to the end. Acts 1 through 3a feel like setup without payoff, and the climax becomes overloaded with back-to-back discoveries the audience has no time to process.`,
+        suggestedFix: 'Distribute at least one discovery earlier — a partial truth revealed mid-story raises the stakes for everything that follows and gives the climax room to breathe. A revelation in Act 2 creates a new problem; a revelation saved for Act 4 only closes an existing one.',
+      });
+    }
+  }
+
+  // ── Wave 267: TOLD_BELIEF_CLUSTERING ──────────────────────────────────────
+  // A single scene contains 3 or more distinct told beliefs — multiple
+  // characters asserting multiple propositions in the same scene. The scene
+  // becomes a belief-dump: the audience is handed several competing or
+  // reinforcing assertions at once, with no room to process any of them.
+  // Each told belief needs space to register; packing three into one scene
+  // dilutes each. Distinct from EXPOSITION_DUMP (consecutive told-only scenes)
+  // and SINGLE_SCENE_BELIEF_OVERLOAD (5+ assertions); this catches the
+  // 3–4 assertion range before the more severe threshold.
+  // Requires 6+ records and 3+ told beliefs.
+  if (records.length >= 6 && toldBeliefs.length >= 3) {
+    const byScene267 = new Map<number, number>();
+    for (const t of toldBeliefs) {
+      byScene267.set(t.sceneIdx, (byScene267.get(t.sceneIdx) ?? 0) + 1);
+    }
+    for (const [sceneIdx267, count267] of byScene267) {
+      if (count267 >= 3 && count267 < 5) {
+        const slug267 = toldBeliefs.find(t => t.sceneIdx === sceneIdx267)?.slug ?? `scene ${sceneIdx267}`;
+        issues.push({
+          location: `Scene ${sceneIdx267} (${slug267})`,
+          rule: 'TOLD_BELIEF_CLUSTERING',
+          severity: 'minor',
+          description: `Scene ${sceneIdx267} (${slug267}) contains ${count267} separate told beliefs — ${count267} distinct propositions asserted in the same scene. The scene becomes a belief-dump: the audience cannot process each claim before the next arrives, and none of the assertions carry the dramatic weight they need.`,
+          suggestedFix: 'Distribute the beliefs across separate scenes. One scene, one central assertion — let each claim land and drive character behaviour before the next is introduced. Reserve multi-belief scenes for deliberate moments of information overload.',
         });
         break;
       }

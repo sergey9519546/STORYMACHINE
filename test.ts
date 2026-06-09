@@ -17897,6 +17897,118 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 267 — beliefPass: belief front loaded, revelation final act only, told belief clustering', async () => {
+    const makeRec267 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput267 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: '...',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('BELIEF_FRONT_LOADED fires when all told beliefs cluster in the first half only', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 8 scenes; midpoint = 4; 4 told beliefs only in scenes 0-3, none in 4-7
+      const records267a = [
+        makeRec267(0, { dialogueHighlights: ['alice: the vault was looted before the heist began'] }),
+        makeRec267(1, { dialogueHighlights: ['bob: marcus planned the theft from the very beginning'] }),
+        makeRec267(2, { dialogueHighlights: ['carol: the police were bribed to ignore all the alarms'] }),
+        makeRec267(3, { dialogueHighlights: ['dave: the documents were forged several months earlier'] }),
+        makeRec267(4), makeRec267(5), makeRec267(6), makeRec267(7),
+      ];
+      const result267a = await beliefPass(makeInput267(records267a));
+      const fl = result267a.issues.filter((i: any) => i.rule === 'BELIEF_FRONT_LOADED');
+      assert.ok(fl.length >= 1, `Should detect BELIEF_FRONT_LOADED, got: ${JSON.stringify(result267a.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(fl[0].severity, 'minor');
+    });
+
+    it('BELIEF_FRONT_LOADED does NOT fire when a told belief appears in the second half', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 8 scenes; told beliefs at scenes 0, 1, 2, 5 — scene 5 is in the second half (>=4)
+      const records267b = [
+        makeRec267(0, { dialogueHighlights: ['alice: the vault was looted before the heist began'] }),
+        makeRec267(1, { dialogueHighlights: ['bob: marcus planned the theft from the very beginning'] }),
+        makeRec267(2, { dialogueHighlights: ['carol: the police were bribed to ignore all the alarms'] }),
+        makeRec267(3), makeRec267(4),
+        makeRec267(5, { dialogueHighlights: ['dave: the documents were forged several months earlier'] }),
+        makeRec267(6), makeRec267(7),
+      ];
+      const result267b = await beliefPass(makeInput267(records267b));
+      const fl = result267b.issues.filter((i: any) => i.rule === 'BELIEF_FRONT_LOADED');
+      assert.strictEqual(fl.length, 0, 'Should NOT fire when a told belief appears in the second half');
+    });
+
+    it('REVELATION_FINAL_ACT_ONLY fires when all revelations are confined to the final quarter', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 8 scenes; finalActStart = floor(8*0.75)=6; revelations only at scenes 6 and 7
+      const records267c = [
+        makeRec267(0), makeRec267(1), makeRec267(2), makeRec267(3),
+        makeRec267(4), makeRec267(5),
+        makeRec267(6, { revelation: 'the witness had been lying about the alibi all along' }),
+        makeRec267(7, { revelation: 'the detective was the actual suspect from the start' }),
+      ];
+      const result267c = await beliefPass(makeInput267(records267c));
+      const rfo = result267c.issues.filter((i: any) => i.rule === 'REVELATION_FINAL_ACT_ONLY');
+      assert.ok(rfo.length >= 1, `Should detect REVELATION_FINAL_ACT_ONLY, got: ${JSON.stringify(result267c.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(rfo[0].severity, 'minor');
+    });
+
+    it('REVELATION_FINAL_ACT_ONLY does NOT fire when a revelation appears before the final quarter', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 8 scenes; revelations at scenes 3 and 7 — scene 3 is before finalActStart (6)
+      const records267d = [
+        makeRec267(0), makeRec267(1), makeRec267(2),
+        makeRec267(3, { revelation: 'the witness had been lying about the alibi all along' }),
+        makeRec267(4), makeRec267(5), makeRec267(6),
+        makeRec267(7, { revelation: 'the detective was the actual suspect from the start' }),
+      ];
+      const result267d = await beliefPass(makeInput267(records267d));
+      const rfo = result267d.issues.filter((i: any) => i.rule === 'REVELATION_FINAL_ACT_ONLY');
+      assert.strictEqual(rfo.length, 0, 'Should NOT fire when a revelation appears before the final quarter');
+    });
+
+    it('TOLD_BELIEF_CLUSTERING fires when a single scene contains 3 told beliefs', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 6 scenes; scene 2 has 3 told beliefs — triggers the 3-assertion cluster
+      const records267e = [
+        makeRec267(0), makeRec267(1),
+        makeRec267(2, { dialogueHighlights: [
+          'alice: the safe was completely empty when we arrived',
+          'bob: the guard had been paid to look the other way',
+          'carol: the documents were forged before the initial meeting',
+        ]}),
+        makeRec267(3), makeRec267(4), makeRec267(5),
+      ];
+      const result267e = await beliefPass(makeInput267(records267e));
+      const tbc = result267e.issues.filter((i: any) => i.rule === 'TOLD_BELIEF_CLUSTERING');
+      assert.ok(tbc.length >= 1, `Should detect TOLD_BELIEF_CLUSTERING, got: ${JSON.stringify(result267e.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(tbc[0].severity, 'minor');
+    });
+
+    it('TOLD_BELIEF_CLUSTERING does NOT fire when no scene has 3+ told beliefs', async () => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      // 6 scenes; told beliefs spread one per scene across scenes 0-3
+      const records267f = [
+        makeRec267(0, { dialogueHighlights: ['alice: the safe was completely empty when we arrived'] }),
+        makeRec267(1, { dialogueHighlights: ['bob: the guard had been paid to look the other way'] }),
+        makeRec267(2, { dialogueHighlights: ['carol: the documents were forged before the initial meeting'] }),
+        makeRec267(3, { dialogueHighlights: ['dave: the alibi was planted by the detective himself'] }),
+        makeRec267(4), makeRec267(5),
+      ];
+      const result267f = await beliefPass(makeInput267(records267f));
+      const tbc = result267f.issues.filter((i: any) => i.rule === 'TOLD_BELIEF_CLUSTERING');
+      assert.strictEqual(tbc.length, 0, 'Should NOT fire when no scene has 3+ told beliefs');
+    });
+  });
+
   describe('Wave 266 — voicePass: stative verb overload, dialogue hedging opener, abstract subject opening', async () => {
     it('STATIVE_VERB_OVERLOAD fires when >35% of action lines begin with a stative verb', async () => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
