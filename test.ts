@@ -17897,6 +17897,123 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 271 — conflictPass: conflict Act 2b void, interpersonal conflict only, pair density gap', async () => {
+    const makeRec271 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput271 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: '...',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+    const negShift271 = (pairKey: string, amount = -0.5) => ({ pairKey, dimension: 'trust', amount });
+
+    it('CONFLICT_ACT2B_VOID fires when Act 2b (50-75%) has no conflict while other zones do', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 12 scenes; act2b = slice(6,9) = scenes 6,7,8; conflict at 1, 3, 10, 11; none in 6-8
+      const records271a = [
+        makeRec271(0),
+        makeRec271(1, { suspenseDelta: -1.5 }),
+        makeRec271(2),
+        makeRec271(3, { relationshipShifts: [negShift271('alice-bob')] }),
+        makeRec271(4), makeRec271(5), makeRec271(6), makeRec271(7), makeRec271(8),
+        makeRec271(9),
+        makeRec271(10, { suspenseDelta: -2 }),
+        makeRec271(11, { relationshipShifts: [negShift271('alice-bob')] }),
+      ];
+      const result271a = await conflictPass(makeInput271(records271a));
+      const void271 = result271a.issues.filter((i: any) => i.rule === 'CONFLICT_ACT2B_VOID');
+      assert.ok(void271.length >= 1, `Should detect CONFLICT_ACT2B_VOID, got: ${JSON.stringify(result271a.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(void271[0].severity, 'minor');
+    });
+
+    it('CONFLICT_ACT2B_VOID does NOT fire when conflict exists in Act 2b', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 12 scenes; conflict at scene 7 (in act2b = 6..8) → no fire
+      const records271b = [
+        makeRec271(0),
+        makeRec271(1, { suspenseDelta: -1.5 }),
+        makeRec271(2), makeRec271(3), makeRec271(4), makeRec271(5), makeRec271(6),
+        makeRec271(7, { suspenseDelta: -1.8 }),
+        makeRec271(8), makeRec271(9),
+        makeRec271(10, { suspenseDelta: -2 }),
+        makeRec271(11),
+      ];
+      const result271b = await conflictPass(makeInput271(records271b));
+      const void271 = result271b.issues.filter((i: any) => i.rule === 'CONFLICT_ACT2B_VOID');
+      assert.strictEqual(void271.length, 0, 'Should NOT fire when conflict exists in Act 2b');
+    });
+
+    it('INTERPERSONAL_CONFLICT_ONLY fires when all conflict is interpersonal with no tension reversals', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 6 scenes; 3 neg rel shifts, suspenseDelta all 0 (no reversal < -1)
+      const records271c = [
+        makeRec271(0, { relationshipShifts: [negShift271('alice-bob')] }),
+        makeRec271(1),
+        makeRec271(2, { relationshipShifts: [negShift271('alice-carol')] }),
+        makeRec271(3),
+        makeRec271(4, { relationshipShifts: [negShift271('bob-carol')] }),
+        makeRec271(5),
+      ];
+      const result271c = await conflictPass(makeInput271(records271c));
+      const ico = result271c.issues.filter((i: any) => i.rule === 'INTERPERSONAL_CONFLICT_ONLY');
+      assert.ok(ico.length >= 1, `Should detect INTERPERSONAL_CONFLICT_ONLY, got: ${JSON.stringify(result271c.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(ico[0].severity, 'minor');
+    });
+
+    it('INTERPERSONAL_CONFLICT_ONLY does NOT fire when at least one tension reversal exists', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 6 scenes; 3 neg rel shifts AND one suspenseDelta < -1
+      const records271d = [
+        makeRec271(0, { relationshipShifts: [negShift271('alice-bob')] }),
+        makeRec271(1, { suspenseDelta: -1.5 }),
+        makeRec271(2, { relationshipShifts: [negShift271('alice-carol')] }),
+        makeRec271(3),
+        makeRec271(4, { relationshipShifts: [negShift271('bob-carol')] }),
+        makeRec271(5),
+      ];
+      const result271d = await conflictPass(makeInput271(records271d));
+      const ico = result271d.issues.filter((i: any) => i.rule === 'INTERPERSONAL_CONFLICT_ONLY');
+      assert.strictEqual(ico.length, 0, 'Should NOT fire when at least one tension reversal exists');
+    });
+
+    it('CONFLICT_PAIR_DENSITY_GAP fires when one pair has 3x more conflict events than others', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 6 scenes; alice-bob: 3 neg events, alice-carol: 1, bob-carol: 1 → 3×
+      const records271e = [
+        makeRec271(0, { relationshipShifts: [negShift271('alice-bob'), negShift271('alice-carol')] }),
+        makeRec271(1, { relationshipShifts: [negShift271('alice-bob')] }),
+        makeRec271(2, { relationshipShifts: [negShift271('alice-bob'), negShift271('bob-carol')] }),
+        makeRec271(3), makeRec271(4), makeRec271(5),
+      ];
+      const result271e = await conflictPass(makeInput271(records271e));
+      const pdg = result271e.issues.filter((i: any) => i.rule === 'CONFLICT_PAIR_DENSITY_GAP');
+      assert.ok(pdg.length >= 1, `Should detect CONFLICT_PAIR_DENSITY_GAP, got: ${JSON.stringify(result271e.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(pdg[0].severity, 'minor');
+    });
+
+    it('CONFLICT_PAIR_DENSITY_GAP does NOT fire when conflict is evenly distributed across pairs', async () => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      // 6 scenes; alice-bob: 2 events, alice-carol: 2, bob-carol: 1 → 2× (not 3×)
+      const records271f = [
+        makeRec271(0, { relationshipShifts: [negShift271('alice-bob'), negShift271('alice-carol')] }),
+        makeRec271(1, { relationshipShifts: [negShift271('alice-bob'), negShift271('alice-carol')] }),
+        makeRec271(2, { relationshipShifts: [negShift271('bob-carol')] }),
+        makeRec271(3), makeRec271(4), makeRec271(5),
+      ];
+      const result271f = await conflictPass(makeInput271(records271f));
+      const pdg = result271f.issues.filter((i: any) => i.rule === 'CONFLICT_PAIR_DENSITY_GAP');
+      assert.strictEqual(pdg.length, 0, 'Should NOT fire when conflict is evenly distributed across pairs');
+    });
+  });
+
   describe('Wave 270 — characterArcPass: positive-only arc, shift concentration, late relational void', async () => {
     const makeRec270 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

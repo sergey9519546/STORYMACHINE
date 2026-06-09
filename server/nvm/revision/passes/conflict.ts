@@ -6,6 +6,8 @@
 // antagonist vanish (all reversals in first 60%, none after), and single-register
 // conflict (all relationship shifts use the same dimension — one-axis drama).
 // Wave 257 additions: conflict Act 3 absent (climax without struggle), reconciliation
+// Wave 271 additions: conflict Act 2b void (dark-night zone empty), interpersonal
+// conflict only (zero external reversals), conflict pair density gap (one pair 3× others).
 // absent (no broken bond ever repairs), and conflict opening void (frictionless Act 1).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
@@ -869,6 +871,93 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `Act 1 (the first ${act1End257} scenes) contains no conflict signal — no tension drop, no negative relationship shift — yet the story develops conflict later. The opening is frictionless and the inciting opposition arrives late, giving the audience nothing to lean into from the start.`,
           suggestedFix: 'Pose the dramatic question early and let something resist it in Act 1: a friction between characters, an obstacle that bites, a threat that announces itself. An opening with no opposition reads as preamble; the conflict should be felt before the first act ends.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 271: CONFLICT_ACT2B_VOID ─────────────────────────────────────────
+  // Act 2b (the 50-75% zone, the "dark night" stretch before the final push)
+  // has no conflict signal while overall conflict exists. The zone that should
+  // hold the protagonist's lowest moment and the antagonist's strongest move
+  // is empty. The story has tension in the opening half and in the climax, but
+  // the bridge between them — where stakes should be at their heaviest — is
+  // inert. Distinct from CONFLICT_MIDPOINT_ABSENT (midpoint ±1 window only)
+  // and CONFLICT_ACT3_DEFLATION (comparing averages, not checking for void).
+  // Requires 10+ records and 2+ overall conflict scenes.
+  if (records.length >= 10) {
+    const act2bStart271 = Math.floor(records.length * 0.5);
+    const act2bEnd271 = Math.floor(records.length * 0.75);
+    const overallConflict271 = records.filter(isConflictScene257).length;
+    if (overallConflict271 >= 2) {
+      const act2bConflict271 = records.slice(act2bStart271, act2bEnd271).filter(isConflictScene257).length;
+      if (act2bConflict271 === 0) {
+        issues.push({
+          location: `Act 2b (scenes ${act2bStart271}–${act2bEnd271 - 1}) — conflict layer`,
+          rule: 'CONFLICT_ACT2B_VOID',
+          severity: 'minor',
+          description: `The Act 2b zone (scenes ${act2bStart271}–${act2bEnd271 - 1}) has no conflict signal — no tension drop, no negative relationship shift — while the first half and climax both carry conflict. The stretch that should hold the protagonist's lowest moment and the antagonist's strongest move is inert; the bridge to the climax has no dramatic engine.`,
+          suggestedFix: 'Put the story\'s hardest moment in Act 2b: a betrayal that isolates the protagonist, a failure that seems final, a revelation that reframes everything. The "dark night" zone needs the story\'s highest conflict density, not its lowest.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 271: INTERPERSONAL_CONFLICT_ONLY ─────────────────────────────────
+  // The story carries 3+ scenes with negative relationship shifts but no scene
+  // delivers an atmospheric tension reversal (suspenseDelta < -1). All conflict
+  // is interpersonal — characters wound each other — but nothing external
+  // threatens them: no plot reversals, no danger, no external pressure. The
+  // mirror of ANTAGONIST_FORCE_ONLY (which fires when all conflict is external
+  // with no interpersonal dimension). A story without any plot reversal can
+  // read as a domestic chamber drama even when the subject demands external
+  // stakes. Requires 6+ records.
+  if (records.length >= 6) {
+    const negRelShiftScenes271 = records.filter(r =>
+      ((r.relationshipShifts as any[] ?? [])).some((s: any) => s.amount <= -0.3),
+    );
+    if (negRelShiftScenes271.length >= 3) {
+      const hasSuspenseReversal271 = records.some(r => (r.suspenseDelta ?? 0) < -1);
+      if (!hasSuspenseReversal271) {
+        issues.push({
+          location: 'Conflict architecture',
+          rule: 'INTERPERSONAL_CONFLICT_ONLY',
+          severity: 'minor',
+          description: `${negRelShiftScenes271.length} scenes carry negative relationship shifts but no scene delivers a tension reversal (suspenseDelta < -1) — all conflict is interpersonal with zero external plot pressure. Characters wound each other but nothing external threatens them; the story has friction without danger.`,
+          suggestedFix: 'Add at least one scene where external circumstances create a reversal: a plan that fails, a threat that arrives unexpectedly, a deadline that bites. External pressure transforms interpersonal friction from a slow burn into unavoidable confrontation with genuine stakes.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 271: CONFLICT_PAIR_DENSITY_GAP ───────────────────────────────────
+  // Three or more pairs are involved in negative relationship shifts, but one
+  // pair accumulates at least 3× as many negative conflict events as the next
+  // most active pair. The conflict load is unevenly distributed — one feud
+  // dominates while others exist as background friction that never escalates.
+  // Distinct from SINGLE_PAIR_CONFLICT (only one pair with any conflict); this
+  // fires when multiple pairs have conflict but one pair crushes all others.
+  // Requires 6+ records and 3+ pairs with negative shifts.
+  if (records.length >= 6) {
+    const pairNegCounts271 = new Map<string, number>();
+    for (const r of records) {
+      for (const s of (r.relationshipShifts as any[] ?? []) as Array<{ pairKey: string; amount: number }>) {
+        if (s.amount <= -0.3) {
+          pairNegCounts271.set(s.pairKey, (pairNegCounts271.get(s.pairKey) ?? 0) + 1);
+        }
+      }
+    }
+    if (pairNegCounts271.size >= 3) {
+      const sorted271 = [...pairNegCounts271.entries()].sort((a, b) => b[1] - a[1]);
+      const dominantCount271 = sorted271[0][1];
+      const secondCount271 = sorted271[1][1];
+      if (dominantCount271 >= 3 * secondCount271) {
+        issues.push({
+          location: `Conflict distribution — "${sorted271[0][0]}" dominant`,
+          rule: 'CONFLICT_PAIR_DENSITY_GAP',
+          severity: 'minor',
+          description: `"${sorted271[0][0]}" accumulates ${dominantCount271} negative conflict events — at least 3× more than any other pair (next: ${secondCount271}). While ${pairNegCounts271.size} pairs carry conflict, one feud so dominates the dramatic load that all others register as background noise. The antagonistic architecture collapses into a single overwhelming dispute.`,
+          suggestedFix: 'Raise the conflict stakes in at least one secondary pair so it approaches the dominant pair\'s density. Layered conflict — two or three pairs with comparably high friction — creates a richer dramatic web than a single dominant feud surrounded by quiet bystanders.',
         });
       }
     }
