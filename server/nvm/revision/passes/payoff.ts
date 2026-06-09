@@ -9,6 +9,9 @@
 // setup imbalance (clue plants concentrated in one act with no early seeding).
 // Wave 261 additions: payoff precedes setup (causal inversion), payoff gap excessive
 // (forgotten long fuse), and payoff front-loaded (resolutions cashed out too early).
+// Wave 275 additions: Act 2a payoff void (early conflict zone never closes any loops),
+// late-majority clue seeding (>60% of clues planted in second half), and
+// setup/payoff act skew (planting and harvesting engines operate in separate acts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -748,6 +751,78 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${firstHalfPayoffs261} of ${payoffInfo.size} payoffs (${Math.round(frontRatio261 * 100)}%) land in the first half of the story — the resolution engine discharges early. The audience's investments are cashed out before the climax, leaving the finale with little to reward and the back half informationally spent.`,
         suggestedFix: 'Reserve at least one or two major payoffs for the climax and its approach. The most satisfying reveals are the ones the audience has waited longest for — hold the biggest threads until the end rather than resolving them in Act 1 and Act 2a.',
+      });
+    }
+  }
+
+  // ── Wave 275: Act 2a payoff void, late-majority clue seeding, setup/payoff act skew ──
+
+  // PAYOFF_ACT2A_VOID (minor, n≥10, payoffs≥3): No payoffs land in Act 2a (25%–50%
+  // of the story). The early conflict zone delivers no thread closure — a long stretch
+  // of pure escalation without any payoff depletes the audience's patience. At least one
+  // resolution mid-first-half resets the tension baseline and proves the setup engine active.
+  if (records.length >= 10 && payoffInfo.size >= 3) {
+    const act2aStart275 = Math.floor(records.length * 0.25);
+    const act2aEnd275 = Math.floor(records.length * 0.5);
+    const hasAct2aPayoff275 = [...payoffInfo.values()].some(s => s >= act2aStart275 && s < act2aEnd275);
+    if (!hasAct2aPayoff275) {
+      issues.push({
+        location: `Act 2a (Scenes ${act2aStart275}–${act2aEnd275 - 1})`,
+        rule: 'PAYOFF_ACT2A_VOID',
+        severity: 'minor',
+        description: `No setups are paid off in Act 2a (Scenes ${act2aStart275}–${act2aEnd275 - 1}) — the early conflict zone delivers no thread closure. A long stretch of pure escalation without any payoff depletes the audience's patience before the midpoint.`,
+        suggestedFix: 'Resolve at least one planted thread in Act 2a to reward the audience\'s investment and signal that the setup engine is active. A mid-first-half payoff resets the tension baseline and earns the right to raise it again.',
+      });
+    }
+  }
+
+  // CLUE_SEED_LATE_MAJORITY (minor, n≥10, clues≥4): More than 60% of planted clues
+  // are seeded in the second half of the story (after the midpoint). Distinct from
+  // SETUP_ACT3_SURGE (last 25% only) — this fires on any second-half majority including
+  // Act 2b-heavy planting. Late-seeded clues can't build the long anticipation arcs that
+  // make payoffs feel earned; the audience carries them only briefly before resolution.
+  if (records.length >= 10 && clueInfo.size >= 4) {
+    const midpoint275 = Math.floor(records.length * 0.5);
+    const lateClues275 = [...clueInfo.values()].filter(c => c.plantedAt >= midpoint275).length;
+    if (lateClues275 / clueInfo.size > 0.6) {
+      issues.push({
+        location: 'Setup distribution',
+        rule: 'CLUE_SEED_LATE_MAJORITY',
+        severity: 'minor',
+        description: `${lateClues275} of ${clueInfo.size} planted clues (${Math.round(lateClues275 / clueInfo.size * 100)}%) are seeded in the second half of the story — the majority of the setup engine's work starts after the midpoint. Late-seeded clues can't build the long anticipation arcs that make payoffs feel earned.`,
+        suggestedFix: 'Move at least two clue plants into the first half. Setups planted early can pay off at any point, building sustained anticipation; setups planted late arrive too close to their resolutions to create genuine surprise.',
+      });
+    }
+  }
+
+  // SETUP_PAYOFF_ACT_SKEW (minor, n≥8, clues≥3, payoffs≥2): The act that concentrates
+  // the most setups has zero payoffs in it, AND the act that concentrates the most payoffs
+  // has zero setups — the planting and harvesting engines operate in completely separate act
+  // zones. A story where all setups live in one act and all payoffs in another lacks the
+  // interleaved cause-and-effect texture that creates organic narrative momentum.
+  if (records.length >= 8 && clueInfo.size >= 3 && payoffInfo.size >= 2) {
+    const zoneSetups275 = [0, 0, 0, 0];
+    const zonePayoffs275 = [0, 0, 0, 0];
+    for (const info of clueInfo.values()) {
+      const pct275 = info.plantedAt / records.length;
+      const zone275 = pct275 < 0.25 ? 0 : pct275 < 0.5 ? 1 : pct275 < 0.75 ? 2 : 3;
+      zoneSetups275[zone275]++;
+    }
+    for (const ps275 of payoffInfo.values()) {
+      const pct275b = ps275 / records.length;
+      const zone275b = pct275b < 0.25 ? 0 : pct275b < 0.5 ? 1 : pct275b < 0.75 ? 2 : 3;
+      zonePayoffs275[zone275b]++;
+    }
+    const topSetup275 = zoneSetups275.indexOf(Math.max(...zoneSetups275));
+    const topPayoff275 = zonePayoffs275.indexOf(Math.max(...zonePayoffs275));
+    if (topSetup275 !== topPayoff275 && zonePayoffs275[topSetup275] === 0 && zoneSetups275[topPayoff275] === 0) {
+      const zoneNames275 = ['Act 1', 'Act 2a', 'Act 2b', 'Act 3'];
+      issues.push({
+        location: 'Setup/payoff act distribution',
+        rule: 'SETUP_PAYOFF_ACT_SKEW',
+        severity: 'minor',
+        description: `The act with the most setups (${zoneNames275[topSetup275]}: ${zoneSetups275[topSetup275]} setups) has zero payoffs, and the act with the most payoffs (${zoneNames275[topPayoff275]}: ${zonePayoffs275[topPayoff275]} payoffs) has zero setups — the planting and harvesting engines operate in completely separate acts. Setup and payoff divorced from each other reduce the sense of earned resolution.`,
+        suggestedFix: 'Introduce at least one payoff in the act where most setups are planted, or plant at least one clue in the act where most payoffs arrive. Interleaving setups and payoffs within the same act zone creates a more organic sense of cause-and-effect progression.',
       });
     }
   }

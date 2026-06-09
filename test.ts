@@ -17897,6 +17897,103 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 275 — payoffPass: Act 2a payoff void, late-majority clue seeding, setup/payoff act skew', async () => {
+    const makeRecP275 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 1, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runP275 = async (records: any[], structureOverrides: any = {}) => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: '', original: '', records,
+        structure: { actPosition: 'act2', completionPercent: 50, openClues: 0, ...structureOverrides } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    it('PAYOFF_ACT2A_VOID fires when no payoffs land in Act 2a (scenes 25%-50%)', async () => {
+      // n=10, act2a=[2,4]; 3 clues at scene 0, payoffs at 1, 7, 8 — none in [2,4]
+      const recs275a = Array.from({ length: 10 }, (_, i) => makeRecP275(i, {
+        ...(i === 0 ? { seededClueIds: ['av-a', 'av-b', 'av-c'] } : {}),
+        ...(i === 1 ? { payoffSetupIds: ['av-a'] } : {}),
+        ...(i === 7 ? { payoffSetupIds: ['av-b'] } : {}),
+        ...(i === 8 ? { payoffSetupIds: ['av-c'] } : {}),
+      }));
+      const result275a = await runP275(recs275a);
+      const void275a = result275a.issues.filter((i: any) => i.rule === 'PAYOFF_ACT2A_VOID');
+      assert.ok(void275a.length >= 1, `Should detect PAYOFF_ACT2A_VOID, got: ${JSON.stringify(result275a.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(void275a[0].severity, 'minor');
+    });
+
+    it('PAYOFF_ACT2A_VOID does NOT fire when a payoff lands in Act 2a', async () => {
+      // n=10, act2a=[2,4]; payoffs at 3 (in act2a), 7, 8 → has act2a payoff
+      const recs275b = Array.from({ length: 10 }, (_, i) => makeRecP275(i, {
+        ...(i === 0 ? { seededClueIds: ['av2-a', 'av2-b', 'av2-c'] } : {}),
+        ...(i === 3 ? { payoffSetupIds: ['av2-a'] } : {}),
+        ...(i === 7 ? { payoffSetupIds: ['av2-b'] } : {}),
+        ...(i === 8 ? { payoffSetupIds: ['av2-c'] } : {}),
+      }));
+      const result275b = await runP275(recs275b);
+      const void275b = result275b.issues.filter((i: any) => i.rule === 'PAYOFF_ACT2A_VOID');
+      assert.strictEqual(void275b.length, 0, 'Should NOT fire PAYOFF_ACT2A_VOID when Act 2a has a payoff');
+    });
+
+    it('CLUE_SEED_LATE_MAJORITY fires when more than 60% of clues are seeded in the second half', async () => {
+      // n=10, midpoint=5; 1 clue at scene 1 (early), 3 clues at scene 5 (late) → 3/4=75% late
+      const recs275c = Array.from({ length: 10 }, (_, i) => makeRecP275(i, {
+        ...(i === 1 ? { seededClueIds: ['lm-a'] } : {}),
+        ...(i === 5 ? { seededClueIds: ['lm-b', 'lm-c', 'lm-d'] } : {}),
+      }));
+      const result275c = await runP275(recs275c);
+      const lm275c = result275c.issues.filter((i: any) => i.rule === 'CLUE_SEED_LATE_MAJORITY');
+      assert.ok(lm275c.length >= 1, `Should detect CLUE_SEED_LATE_MAJORITY, got: ${JSON.stringify(result275c.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(lm275c[0].severity, 'minor');
+    });
+
+    it('CLUE_SEED_LATE_MAJORITY does NOT fire when no more than 60% of clues are late-seeded', async () => {
+      // n=10, midpoint=5; 2 clues at scenes 1,2 (early), 2 at scenes 6,7 (late) → 2/4=50%
+      const recs275d = Array.from({ length: 10 }, (_, i) => makeRecP275(i, {
+        ...(i === 1 ? { seededClueIds: ['lm2-a'] } : {}),
+        ...(i === 2 ? { seededClueIds: ['lm2-b'] } : {}),
+        ...(i === 6 ? { seededClueIds: ['lm2-c'] } : {}),
+        ...(i === 7 ? { seededClueIds: ['lm2-d'] } : {}),
+      }));
+      const result275d = await runP275(recs275d);
+      const lm275d = result275d.issues.filter((i: any) => i.rule === 'CLUE_SEED_LATE_MAJORITY');
+      assert.strictEqual(lm275d.length, 0, 'Should NOT fire CLUE_SEED_LATE_MAJORITY when late clues ≤60%');
+    });
+
+    it('SETUP_PAYOFF_ACT_SKEW fires when setups and payoffs operate in completely separate act zones', async () => {
+      // n=8; 3 clues in Act 1 (zone 0, scenes 0); 2 payoffs in Act 3 (zone 3, scenes 6-7)
+      const recs275e = Array.from({ length: 8 }, (_, i) => makeRecP275(i, {
+        ...(i === 0 ? { seededClueIds: ['sk-a', 'sk-b', 'sk-c'] } : {}),
+        ...(i === 6 ? { payoffSetupIds: ['sk-a'] } : {}),
+        ...(i === 7 ? { payoffSetupIds: ['sk-b'] } : {}),
+      }));
+      const result275e = await runP275(recs275e);
+      const skew275e = result275e.issues.filter((i: any) => i.rule === 'SETUP_PAYOFF_ACT_SKEW');
+      assert.ok(skew275e.length >= 1, `Should detect SETUP_PAYOFF_ACT_SKEW, got: ${JSON.stringify(result275e.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(skew275e[0].severity, 'minor');
+    });
+
+    it('SETUP_PAYOFF_ACT_SKEW does NOT fire when setups and payoffs share the same dominant act zone', async () => {
+      // n=8; 3 clues in Act 2b (zone 2), 2 payoffs also landing in Act 2b (zone 2)
+      const recs275f = Array.from({ length: 8 }, (_, i) => makeRecP275(i, {
+        ...(i === 4 ? { seededClueIds: ['sk2-a'] } : {}),
+        ...(i === 5 ? { seededClueIds: ['sk2-b', 'sk2-c'], payoffSetupIds: ['sk2-a'] } : {}),
+        ...(i === 6 ? { payoffSetupIds: ['sk2-b'] } : {}),
+      }));
+      const result275f = await runP275(recs275f);
+      const skew275f = result275f.issues.filter((i: any) => i.rule === 'SETUP_PAYOFF_ACT_SKEW');
+      assert.strictEqual(skew275f.length, 0, 'Should NOT fire SETUP_PAYOFF_ACT_SKEW when setups and payoffs share the dominant act zone');
+    });
+  });
+
   describe('Wave 274 — pacingPass: Act 3 page overrun, long-scene flood, Act 2 page weight', async () => {
     const makeRec274 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
