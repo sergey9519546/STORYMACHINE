@@ -17897,6 +17897,119 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 268 — causalityPass: curiosity front loaded, payoff back loaded, clock single scene', async () => {
+    const makeRec268 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput268 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: '...',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('CURIOSITY_FRONT_LOADED fires when all curiosity spikes are in the first half', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // 8 scenes; midpoint=4; curiosity spikes at scenes 0, 1, 2 (all < 4), none in 4-7
+      const records268a = [
+        makeRec268(0, { curiosityDelta: 2 }),
+        makeRec268(1, { curiosityDelta: 2.5 }),
+        makeRec268(2, { curiosityDelta: 1.8 }),
+        makeRec268(3), makeRec268(4), makeRec268(5), makeRec268(6), makeRec268(7),
+      ];
+      const result268a = await causalityPass(makeInput268(records268a));
+      const cfl = result268a.issues.filter((i: any) => i.rule === 'CURIOSITY_FRONT_LOADED');
+      assert.ok(cfl.length >= 1, `Should detect CURIOSITY_FRONT_LOADED, got: ${JSON.stringify(result268a.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(cfl[0].severity, 'minor');
+    });
+
+    it('CURIOSITY_FRONT_LOADED does NOT fire when a curiosity spike appears in the second half', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // 8 scenes; curiosity spikes at 1, 3, 5 — scene 5 is in second half (>=4)
+      const records268b = [
+        makeRec268(0),
+        makeRec268(1, { curiosityDelta: 2 }),
+        makeRec268(2),
+        makeRec268(3, { curiosityDelta: 1.8 }),
+        makeRec268(4),
+        makeRec268(5, { curiosityDelta: 2.2 }),
+        makeRec268(6), makeRec268(7),
+      ];
+      const result268b = await causalityPass(makeInput268(records268b));
+      const cfl = result268b.issues.filter((i: any) => i.rule === 'CURIOSITY_FRONT_LOADED');
+      assert.strictEqual(cfl.length, 0, 'Should NOT fire when a curiosity spike appears in the second half');
+    });
+
+    it('PAYOFF_BACK_LOADED fires when all payoff scenes are in the second half', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // 8 scenes; midpoint=4; payoffs only at scenes 5 and 7 (both >= 4)
+      const records268c = [
+        makeRec268(0, { seededClueIds: ['clue-a'] }),
+        makeRec268(1, { seededClueIds: ['clue-b'] }),
+        makeRec268(2), makeRec268(3), makeRec268(4),
+        makeRec268(5, { payoffSetupIds: ['clue-a'] }),
+        makeRec268(6),
+        makeRec268(7, { payoffSetupIds: ['clue-b'] }),
+      ];
+      const result268c = await causalityPass(makeInput268(records268c));
+      const pbl = result268c.issues.filter((i: any) => i.rule === 'PAYOFF_BACK_LOADED');
+      assert.ok(pbl.length >= 1, `Should detect PAYOFF_BACK_LOADED, got: ${JSON.stringify(result268c.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(pbl[0].severity, 'minor');
+    });
+
+    it('PAYOFF_BACK_LOADED does NOT fire when a payoff scene appears in the first half', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // 8 scenes; payoffs at scenes 2 and 6 — scene 2 is in the first half (<4)
+      const records268d = [
+        makeRec268(0, { seededClueIds: ['clue-a'] }),
+        makeRec268(1),
+        makeRec268(2, { payoffSetupIds: ['clue-a'] }),
+        makeRec268(3, { seededClueIds: ['clue-b'] }),
+        makeRec268(4), makeRec268(5),
+        makeRec268(6, { payoffSetupIds: ['clue-b'] }),
+        makeRec268(7),
+      ];
+      const result268d = await causalityPass(makeInput268(records268d));
+      const pbl = result268d.issues.filter((i: any) => i.rule === 'PAYOFF_BACK_LOADED');
+      assert.strictEqual(pbl.length, 0, 'Should NOT fire when a payoff scene appears in the first half');
+    });
+
+    it('CLOCK_SINGLE_SCENE fires when only one scene raises a clock in a long story', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // 8 scenes; exactly one scene (scene 3) raises a clock
+      const records268e = [
+        makeRec268(0), makeRec268(1), makeRec268(2),
+        makeRec268(3, { clockRaised: true }),
+        makeRec268(4), makeRec268(5), makeRec268(6), makeRec268(7),
+      ];
+      const result268e = await causalityPass(makeInput268(records268e));
+      const css = result268e.issues.filter((i: any) => i.rule === 'CLOCK_SINGLE_SCENE');
+      assert.ok(css.length >= 1, `Should detect CLOCK_SINGLE_SCENE, got: ${JSON.stringify(result268e.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(css[0].severity, 'minor');
+    });
+
+    it('CLOCK_SINGLE_SCENE does NOT fire when two or more scenes raise clocks', async () => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      // 8 scenes; two scenes (2 and 5) raise clocks
+      const records268f = [
+        makeRec268(0), makeRec268(1),
+        makeRec268(2, { clockRaised: true }),
+        makeRec268(3), makeRec268(4),
+        makeRec268(5, { clockRaised: true }),
+        makeRec268(6), makeRec268(7),
+      ];
+      const result268f = await causalityPass(makeInput268(records268f));
+      const css = result268f.issues.filter((i: any) => i.rule === 'CLOCK_SINGLE_SCENE');
+      assert.strictEqual(css.length, 0, 'Should NOT fire when two or more scenes raise clocks');
+    });
+  });
+
   describe('Wave 267 — beliefPass: belief front loaded, revelation final act only, told belief clustering', async () => {
     const makeRec267 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

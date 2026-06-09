@@ -9,6 +9,9 @@
 // Wave 254 additions: clue-seed cluster (3+ clues planted in one scene), payoff
 // without setup (callback to an unseeded thread), and suspense plateau flatline
 // (4+ consecutive scenes of flat tension).
+// Wave 268 additions: curiosity front loaded (all mystery spikes in first half),
+// payoff back loaded (all callbacks deferred to second half),
+// clock single scene (only one deadline raised in a long story).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -936,6 +939,78 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         });
         break;
       }
+    }
+  }
+
+  // ── Wave 268: CURIOSITY_FRONT_LOADED ──────────────────────────────────────
+  // Three or more strong curiosity spikes (curiosityDelta > 1) all appear in
+  // the first half of the story; the second half raises no new questions.
+  // The story exhausts its mystery-raising impulse early and coasts on answers
+  // — but answers only satisfy if there are still open questions creating forward
+  // pull. A second half with no curiosity spikes feels like a lecture on a topic
+  // the audience already asked about.
+  // Requires 8+ records and 3+ curiosity spikes.
+  if (records.length >= 8) {
+    const midpoint268 = Math.floor(records.length / 2);
+    const curiousSpikes268 = records.filter((r: any) => (r.curiosityDelta ?? 0) > 1);
+    if (curiousSpikes268.length >= 3) {
+      const secondHalfSpikes268 = curiousSpikes268.filter((r: any) => r.sceneIdx >= midpoint268);
+      if (secondHalfSpikes268.length === 0) {
+        issues.push({
+          location: `First half only (scenes 0–${midpoint268 - 1})`,
+          rule: 'CURIOSITY_FRONT_LOADED',
+          severity: 'minor',
+          description: `All ${curiousSpikes268.length} curiosity spikes occur in the first half (scenes 0–${midpoint268 - 1}); the second half raises no new questions. The story front-loads its mystery and then pivots to pure resolution — but sustained reader curiosity requires open questions throughout, not just in the opening act.`,
+          suggestedFix: 'Plant at least one new question or revelation-hook in the second half — a complication that raises a mystery just as earlier ones resolve. Curiosity sustains forward pull; exhausting it at the midpoint leaves the climax carrying only momentum, not genuine suspense.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 268: PAYOFF_BACK_LOADED ──────────────────────────────────────────
+  // All scenes that fire a callback (payoffSetupIds not empty) appear in the
+  // second half of the story; the first half plants setups but delivers no
+  // earlier payoffs. Effective structure staggers payoffs — some minor callbacks
+  // appear mid-story to reward patience and signal that setups matter. A story
+  // that defers every payoff to the final act trains the audience to disengage
+  // during setup because nothing they see pays off until the very end.
+  // Requires 8+ records and 2+ payoff scenes.
+  if (records.length >= 8) {
+    const midpoint268b = Math.floor(records.length / 2);
+    const payoffScenes268 = records.filter((r: any) => (r.payoffSetupIds?.length ?? 0) > 0);
+    if (payoffScenes268.length >= 2) {
+      const firstHalfPayoffs268 = payoffScenes268.filter((r: any) => r.sceneIdx < midpoint268b);
+      if (firstHalfPayoffs268.length === 0) {
+        const payoffIdxList268 = payoffScenes268.map((r: any) => r.sceneIdx).join(', ');
+        issues.push({
+          location: `Second half only (payoffs at scenes ${payoffIdxList268})`,
+          rule: 'PAYOFF_BACK_LOADED',
+          severity: 'minor',
+          description: `All ${payoffScenes268.length} payoff scenes are in the second half (scenes ${payoffIdxList268}); the first half delivers no callbacks despite its setups. The audience is asked to hold every thread until the end — a story that never pays off anything before the final act trains readers to disengage during setup.`,
+          suggestedFix: 'Allow at least one early payoff — a minor callback that confirms the setups are live. Staggered payoffs signal that no planted detail will be forgotten, keeping the audience alert through the middle acts.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 268: CLOCK_SINGLE_SCENE ──────────────────────────────────────────
+  // In a story long enough to support layered pressure (8+ scenes), only one
+  // scene raises a clock. A single deadline is a blunt instrument — it creates
+  // one source of urgency that characters can simply wait out. Effective
+  // thrillers and dramas layer multiple clocks so that every act generates its
+  // own forward pressure. A story this long with a single clock either feels
+  // underpressured or leans its entire urgency on one over-weighted moment.
+  // Requires 8+ records.
+  if (records.length >= 8) {
+    const clockScenes268 = records.filter((r: any) => r.clockRaised === true);
+    if (clockScenes268.length === 1) {
+      issues.push({
+        location: `Scene ${clockScenes268[0].sceneIdx} (${clockScenes268[0].slug}) — sole clock`,
+        rule: 'CLOCK_SINGLE_SCENE',
+        severity: 'minor',
+        description: `Only one scene (Scene ${clockScenes268[0].sceneIdx}) raises a clock across a ${records.length}-scene story. A single deadline creates a single source of urgency that characters can wait out; once that scene passes, all clock pressure evaporates. A story this long benefits from layered deadlines — separate ticking clocks in different acts.`,
+        suggestedFix: 'Add at least one more clock: a secondary deadline that begins where the first ends, or a nested ticking clock within a single act. Layered urgency keeps the story in forward motion even after the most immediate threat is resolved or defused.',
+      });
     }
   }
 
