@@ -13,6 +13,9 @@
 // Wave 267 additions: belief front loaded (all told beliefs in first half only),
 // revelation final act only (all discoveries confined to the final quarter),
 // told belief clustering (3+ assertions in a single scene).
+// Wave 281 additions: revelation drama vacuum (all revelations in emotionally flat scenes),
+// Act 2b belief void (no beliefs or revelations in 50%–75% escalation zone),
+// told belief final scene (final scene ends on an unresolved assertion).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -829,6 +832,83 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         });
         break;
       }
+    }
+  }
+
+  // ── Wave 281: Revelation drama vacuum, Act 2b void, told belief final scene ───
+
+  // REVELATION_DRAMA_VACUUM (minor, n≥8, ≥2 revelations): None of the witnessed
+  // revelations occurs in a scene with high suspense (suspenseDelta > 1) or a
+  // non-neutral emotional shift. Every truth is revealed in a flat, inert scene —
+  // the discovery carries no dramatic heat. Revelations land with maximum impact
+  // when the audience is already emotionally activated; a truth dropped into a
+  // calm, neutral scene fails to reverberate. Distinct from REVELATION_ISOLATED
+  // (no dialogue) and REVELATION_AFTERMATH_ABSENT (no consequence downstream).
+  if (records.length >= 8 && witnessedBeliefs.length >= 2) {
+    const anyDramaticReveal281 = witnessedBeliefs.some(w => {
+      const r = records.find(rec => rec.sceneIdx === w.sceneIdx);
+      return r && (r.suspenseDelta > 1 || r.emotionalShift !== 'neutral');
+    });
+    if (!anyDramaticReveal281) {
+      issues.push({
+        location: 'Revelation scenes',
+        rule: 'REVELATION_DRAMA_VACUUM',
+        severity: 'minor',
+        description: `${witnessedBeliefs.length} witnessed revelation(s) occur across the story but none land in a scene with rising suspense (suspenseDelta > 1) or non-neutral emotional charge — every truth is revealed in a flat, inert scene. Revelations deliver maximum impact when they arrive at moments of dramatic heat; a truth discovered in an emotionally inert scene fails to reverberate.`,
+        suggestedFix: 'Move at least one revelation into a scene of dramatic heat — a moment of rising suspense, emotional crisis, or direct confrontation. The audience registers a truth more deeply when they are already emotionally activated at the moment of discovery.',
+      });
+    }
+  }
+
+  // BELIEF_ACT2B_VOID (minor, n≥8, ≥2 Act 2b scenes): Act 2b (50%–75% of the
+  // story) contains no told beliefs and no witnessed revelations. The escalation
+  // zone is informationally inert. Act 2b is where the protagonist should be
+  // learning and asserting their way toward the climax, with the story's tension
+  // tightening through competing claims and newly discovered truths. A void of
+  // belief content in Act 2b signals a structural information vacuum at precisely
+  // the moment where dramatic momentum should be building. Distinct from
+  // BELIEF_MIDPOINT_VOID (40%–60%): this covers the later escalation phase.
+  if (records.length >= 8) {
+    const act2bStart281 = Math.floor(records.length * 0.5);
+    const act2bEnd281 = Math.floor(records.length * 0.75);
+    const act2bRecs281 = records.slice(act2bStart281, act2bEnd281);
+    if (act2bRecs281.length >= 2) {
+      const hasAct2bBelief281 = act2bRecs281.some(r =>
+        r.dialogueHighlights.length > 0 || r.revelation !== null,
+      );
+      if (!hasAct2bBelief281) {
+        issues.push({
+          location: `Act 2b (Scenes ${act2bStart281}–${act2bEnd281 - 1})`,
+          rule: 'BELIEF_ACT2B_VOID',
+          severity: 'minor',
+          description: `Act 2b (Scenes ${act2bStart281}–${act2bEnd281 - 1}) contains no told beliefs and no witnessed revelations — the story's escalation zone is informationally inert. Characters should be learning and asserting toward the climax; a belief void in Act 2b means the story coasts through its own build phase with no information exchange.`,
+          suggestedFix: 'Plant at least one belief beat in Act 2b: a character asserts a key proposition that will be tested in the climax, or a partial revelation narrows the audience\'s uncertainty. Act 2b is where the story\'s informational tension should be at its tightest before the final break.',
+        });
+      }
+    }
+  }
+
+  // TOLD_BELIEF_FINAL_SCENE (minor, n≥5): The final scene contains a character
+  // assertion (told belief with 4+ words) but no witnessed revelation. A story
+  // whose last word is an unresolved assertion leaves the audience holding an open
+  // proposition — the closing scene ends on a claim that is never witnessed as true.
+  // Final scenes should close on demonstrated truth (witnessed) rather than asserted
+  // truth (claimed). Distinct from BELIEF_RESOLUTION_ABSENT (no revelations in
+  // final 20%): this fires even when there is exactly one told belief in the finale.
+  if (records.length >= 5) {
+    const finalRec281 = records[records.length - 1];
+    const finalHasToldBelief281 = finalRec281.dialogueHighlights.some((h: string) => {
+      const colonIdx = h.indexOf(':');
+      return colonIdx > -1 && h.slice(colonIdx + 1).trim().split(/\s+/).length >= 4;
+    });
+    if (finalHasToldBelief281 && finalRec281.revelation === null) {
+      issues.push({
+        location: `Scene ${finalRec281.sceneIdx} (${finalRec281.slug}) — final scene`,
+        rule: 'TOLD_BELIEF_FINAL_SCENE',
+        severity: 'minor',
+        description: `The final scene contains a character assertion (told belief) with no accompanying revelation — the story ends with an unverified claim. The last word the story speaks to the audience is a character asserting something that is never shown to be true; the story closes on a proposition rather than a truth.`,
+        suggestedFix: 'Either add a witnessed revelation to the final scene that confirms or contradicts the assertion, or move the told belief earlier and let the closing scene demonstrate truth through action or direct discovery. A story ends most satisfyingly when its final truth is shown, not claimed.',
+      });
     }
   }
 

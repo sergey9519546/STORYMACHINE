@@ -17897,6 +17897,117 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 281 — beliefPass: revelation drama vacuum, Act 2b void, told belief final scene', async () => {
+    const makeRec281 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runB281 = async (records: any[]) => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('REVELATION_DRAMA_VACUUM fires when all revelations are in emotionally flat scenes', async () => {
+      const recs281a = [
+        makeRec281(0, { dialogueHighlights: ['alice: something happened here'] }),
+        makeRec281(1, { revelation: 'the key was hidden in the drawer' }), // flat: neutral, suspense=0
+        makeRec281(2),
+        makeRec281(3),
+        makeRec281(4, { revelation: 'the letter was never sent' }), // flat: neutral, suspense=0
+        makeRec281(5),
+        makeRec281(6),
+        makeRec281(7),
+      ];
+      const result281a = await runB281(recs281a);
+      const fired281a = result281a.issues.filter((i: any) => i.rule === 'REVELATION_DRAMA_VACUUM');
+      assert.strictEqual(fired281a.length, 1, 'Should fire REVELATION_DRAMA_VACUUM when all revelations are in flat scenes');
+    });
+
+    it('REVELATION_DRAMA_VACUUM does NOT fire when a revelation is in a high-suspense scene', async () => {
+      const recs281b = [
+        makeRec281(0, { dialogueHighlights: ['alice: something happened here'] }),
+        makeRec281(1, { revelation: 'the key was hidden', suspenseDelta: 2 }), // high suspense
+        makeRec281(2),
+        makeRec281(3),
+        makeRec281(4, { revelation: 'the letter was never sent' }), // flat
+        makeRec281(5),
+        makeRec281(6),
+        makeRec281(7),
+      ];
+      const result281b = await runB281(recs281b);
+      const fired281b = result281b.issues.filter((i: any) => i.rule === 'REVELATION_DRAMA_VACUUM');
+      assert.strictEqual(fired281b.length, 0, 'Should NOT fire REVELATION_DRAMA_VACUUM when a revelation is in a dramatic scene');
+    });
+
+    it('BELIEF_ACT2B_VOID fires when Act 2b has no told beliefs or revelations', async () => {
+      // n=8: Act 2b = scenes[4..5] (floor(8*0.5)=4, floor(8*0.75)=6)
+      const recs281c = [
+        makeRec281(0, { dialogueHighlights: ['alice: trust is everything'] }), // Act 1 belief
+        makeRec281(1, { revelation: 'alice lied' }),                            // Act 1 revelation
+        makeRec281(2, { dialogueHighlights: ['bob: she deceived us all'] }),    // Act 2a belief
+        makeRec281(3, { revelation: 'the plan was fake' }),                     // Act 2a revelation
+        makeRec281(4),  // Act 2b — empty
+        makeRec281(5),  // Act 2b — empty
+        makeRec281(6, { dialogueHighlights: ['carol: we have to go'] }),        // Act 3 belief
+        makeRec281(7, { revelation: 'the exit was clear' }),                    // Act 3 revelation
+      ];
+      const result281c = await runB281(recs281c);
+      const fired281c = result281c.issues.filter((i: any) => i.rule === 'BELIEF_ACT2B_VOID');
+      assert.strictEqual(fired281c.length, 1, 'Should fire BELIEF_ACT2B_VOID when Act 2b is informationally inert');
+    });
+
+    it('BELIEF_ACT2B_VOID does NOT fire when Act 2b contains a revelation', async () => {
+      // n=8: Act 2b = scenes[4..5]
+      const recs281d = [
+        makeRec281(0, { dialogueHighlights: ['alice: trust is everything'] }),
+        makeRec281(1, { revelation: 'alice lied' }),
+        makeRec281(2, { dialogueHighlights: ['bob: she deceived us all'] }),
+        makeRec281(3),
+        makeRec281(4),
+        makeRec281(5, { revelation: 'the plan was revealed in Act 2b' }), // Act 2b revelation
+        makeRec281(6, { dialogueHighlights: ['carol: we have to go'] }),
+        makeRec281(7),
+      ];
+      const result281d = await runB281(recs281d);
+      const fired281d = result281d.issues.filter((i: any) => i.rule === 'BELIEF_ACT2B_VOID');
+      assert.strictEqual(fired281d.length, 0, 'Should NOT fire BELIEF_ACT2B_VOID when Act 2b has a revelation');
+    });
+
+    it('TOLD_BELIEF_FINAL_SCENE fires when final scene has an unresolved told belief', async () => {
+      const recs281e = [
+        makeRec281(0, { revelation: 'the door was unlocked' }),
+        makeRec281(1, { dialogueHighlights: ['alice: we were never safe'] }),
+        makeRec281(2),
+        makeRec281(3),
+        makeRec281(4, { dialogueHighlights: ['bob: everything will be fine now'] }), // final scene: told belief, no revelation
+      ];
+      const result281e = await runB281(recs281e);
+      const fired281e = result281e.issues.filter((i: any) => i.rule === 'TOLD_BELIEF_FINAL_SCENE');
+      assert.strictEqual(fired281e.length, 1, 'Should fire TOLD_BELIEF_FINAL_SCENE when the last scene ends on an assertion');
+    });
+
+    it('TOLD_BELIEF_FINAL_SCENE does NOT fire when final scene also has a revelation', async () => {
+      const recs281f = [
+        makeRec281(0, { revelation: 'the door was unlocked' }),
+        makeRec281(1, { dialogueHighlights: ['alice: we were never safe'] }),
+        makeRec281(2),
+        makeRec281(3),
+        makeRec281(4, {
+          dialogueHighlights: ['bob: everything will be fine now'],
+          revelation: 'they escaped at last', // revelation closes the scene
+        }),
+      ];
+      const result281f = await runB281(recs281f);
+      const fired281f = result281f.issues.filter((i: any) => i.rule === 'TOLD_BELIEF_FINAL_SCENE');
+      assert.strictEqual(fired281f.length, 0, 'Should NOT fire TOLD_BELIEF_FINAL_SCENE when the final scene has a revelation');
+    });
+  });
+
   describe('Wave 280 — voicePass: intensifier flood, monochrome verbs, scene heading repetition', async () => {
     const makeRec280 = (idx: number, slug = `INT. OFFICE - DAY`): any => ({
       sceneIdx: idx, slug,
