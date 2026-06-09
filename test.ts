@@ -17897,6 +17897,91 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 274 — pacingPass: Act 3 page overrun, long-scene flood, Act 2 page weight', async () => {
+    const makeRec274 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 1, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeScene274 = (idx: number, linesN: number) =>
+      `INT. SC${idx} - DAY\n` + Array.from({ length: linesN }, (_, k) => `Action line ${k + 1}.`).join('\n') + '\n';
+    const run274 = async (fountain: string, count: number) => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      const records = Array.from({ length: count }, (_, i) => makeRec274(i));
+      return pacingPass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ACT3_PAGE_OVERRUN fires when Act 3 consumes more than 35% of total pages', async () => {
+      // 8 scenes; act3=scenes 6-7; 6 short (3 lines) + 2 very long (25 lines)
+      // act3 = 50/(18+50)=74% > 35%
+      const f274a = [
+        ...Array.from({ length: 6 }, (_, i) => makeScene274(i, 3)),
+        makeScene274(6, 25), makeScene274(7, 25),
+      ].join('\n');
+      const result274a = await run274(f274a, 8);
+      const overrun = result274a.issues.filter((i: any) => i.rule === 'ACT3_PAGE_OVERRUN');
+      assert.ok(overrun.length >= 1, `Should detect ACT3_PAGE_OVERRUN, got: ${JSON.stringify(result274a.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(overrun[0].severity, 'minor');
+    });
+
+    it('ACT3_PAGE_OVERRUN does NOT fire when Act 3 is proportionally sized', async () => {
+      // 8 equal scenes of 10 lines → act3 = 20/80 = 25% < 35%
+      const f274b = Array.from({ length: 8 }, (_, i) => makeScene274(i, 10)).join('\n');
+      const result274b = await run274(f274b, 8);
+      const overrun = result274b.issues.filter((i: any) => i.rule === 'ACT3_PAGE_OVERRUN');
+      assert.strictEqual(overrun.length, 0, 'Should NOT fire when Act 3 is proportionally sized');
+    });
+
+    it('LONG_SCENE_FLOOD fires when more than 50% of scenes are above 1.5x average length', async () => {
+      // 8 scenes: 5 at 30 lines, 3 at 3 lines → avg≈19.9, 1.5x≈29.8; 5 > 29.8 → 62.5% > 50%
+      const f274c = [
+        ...Array.from({ length: 5 }, (_, i) => makeScene274(i, 30)),
+        ...Array.from({ length: 3 }, (_, i) => makeScene274(i + 5, 3)),
+      ].join('\n');
+      const result274c = await run274(f274c, 8);
+      const flood = result274c.issues.filter((i: any) => i.rule === 'LONG_SCENE_FLOOD');
+      assert.ok(flood.length >= 1, `Should detect LONG_SCENE_FLOOD, got: ${JSON.stringify(result274c.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(flood[0].severity, 'minor');
+    });
+
+    it('LONG_SCENE_FLOOD does NOT fire when fewer than half the scenes are above 1.5x average', async () => {
+      // 8 scenes: 3 at 20 lines, 5 at 5 lines → avg≈10.6, 1.5x≈15.9; 3 > 15.9 → 37.5% < 50%
+      const f274d = [
+        ...Array.from({ length: 3 }, (_, i) => makeScene274(i, 20)),
+        ...Array.from({ length: 5 }, (_, i) => makeScene274(i + 3, 5)),
+      ].join('\n');
+      const result274d = await run274(f274d, 8);
+      const flood = result274d.issues.filter((i: any) => i.rule === 'LONG_SCENE_FLOOD');
+      assert.strictEqual(flood.length, 0, 'Should NOT fire when fewer than half the scenes are above 1.5x average');
+    });
+
+    it('ACT2_PAGE_WEIGHT fires when Act 2 consumes less than 40% of total pages', async () => {
+      // 10 scenes; act2=scenes 2-7; acts 1&3 heavy (25 lines), act2 thin (3 lines)
+      // act2=18/(50+18+50)=15% < 40%
+      const f274e = [
+        makeScene274(0, 25), makeScene274(1, 25),
+        ...Array.from({ length: 6 }, (_, i) => makeScene274(i + 2, 3)),
+        makeScene274(8, 25), makeScene274(9, 25),
+      ].join('\n');
+      const result274e = await run274(f274e, 10);
+      const aw = result274e.issues.filter((i: any) => i.rule === 'ACT2_PAGE_WEIGHT');
+      assert.ok(aw.length >= 1, `Should detect ACT2_PAGE_WEIGHT, got: ${JSON.stringify(result274e.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(aw[0].severity, 'minor');
+    });
+
+    it('ACT2_PAGE_WEIGHT does NOT fire when Act 2 is properly weighted', async () => {
+      // 10 equal scenes of 10 lines → act2 (scenes 2-7) = 60/100 = 60% > 40%
+      const f274f = Array.from({ length: 10 }, (_, i) => makeScene274(i, 10)).join('\n');
+      const result274f = await run274(f274f, 10);
+      const aw = result274f.issues.filter((i: any) => i.rule === 'ACT2_PAGE_WEIGHT');
+      assert.strictEqual(aw.length, 0, 'Should NOT fire when Act 2 is properly weighted');
+    });
+  });
+
   describe('Wave 273 — originalityPass: exclamation in action, parenthetical flood, location repetition', async () => {
     const oInput273 = (fountain: string) => ({
       fountain, original: fountain, records: [] as any, structure: {} as any,

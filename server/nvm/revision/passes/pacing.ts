@@ -10,6 +10,9 @@
 // before the audience can experience the emotional release).
 // Wave 260 additions: opening scene bloat (overlong first scene), Act 1 overextended
 // (setup hogs >40% of pages), short-scene flood (>60% of scenes undersized).
+// Wave 274 additions: Act 3 page overrun (climax act >35% of total pages),
+// long-scene flood (>50% of scenes above 1.5× average), Act 2 page weight
+// (middle act <40% of total pages — underweight complication zone).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -837,6 +840,87 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${shortCount260} of ${lengths.length} scenes (${Math.round(shortRatio260 * 100)}%) run below 60% of the average length — the story is dominated by undersized scenes. The script reads as choppy and fragmentary, a stream of fragments punctuated by a few set-pieces, never settling long enough for a beat to develop.`,
         suggestedFix: 'Consolidate fragments: merge adjacent micro-scenes that share a location or beat, and let the surviving scenes breathe. A few of the short scenes are surely doing real work — invest the page space there instead of scattering it across many thin ones.',
+      });
+    }
+  }
+
+  // ── Wave 274: ACT3_PAGE_OVERRUN ───────────────────────────────────────────
+  // Act 3 (final 25%) consumes more than 35% of the script's total weighted
+  // line count. The climax act is overlong: it takes more page space than the
+  // final act typically earns. A bloated Act 3 often means the resolution
+  // lingers too long after the climactic confrontation — the audience watches
+  // the protagonist process victory/defeat in real time rather than having the
+  // story land its final note and end. Distinct from CLIMAX_SCENE_UNDERSIZED
+  // (one scene); this is a zone-level budget measure.
+  // Requires 8+ records.
+  if (records.length >= 8) {
+    const act3Start274 = Math.floor(records.length * 0.75);
+    let act3Lines274 = 0;
+    let totalLines274 = 0;
+    for (const [idx, len] of sceneLengths) {
+      totalLines274 += len;
+      if (idx >= act3Start274) act3Lines274 += len;
+    }
+    const act3Ratio274 = totalLines274 > 0 ? act3Lines274 / totalLines274 : 0;
+    if (act3Ratio274 > 0.35) {
+      issues.push({
+        location: `Act 3 (Scenes ${act3Start274}–${records.length - 1}) — page budget`,
+        rule: 'ACT3_PAGE_OVERRUN',
+        severity: 'minor',
+        description: `Act 3 (Scenes ${act3Start274}–${records.length - 1}) consumes ${Math.round(act3Ratio274 * 100)}% of total script pages — more than the final act should need. A bloated Act 3 means the resolution lingers: the story keeps spending pages after its dramatic question is answered, and the audience watches denouement instead of experiencing release.`,
+        suggestedFix: 'Compress the resolution. Land the climax, pay its immediate emotional cost in one or two scenes, and end. Every page after the story\'s question is answered is a page the audience is waiting to leave. Act 3 should be the leanest act, not the longest.',
+      });
+    }
+  }
+
+  // ── Wave 274: LONG_SCENE_FLOOD ─────────────────────────────────────────────
+  // More than 50% of scenes are over 1.5× the average length — the script is
+  // dominated by oversized scenes with no brevity to provide contrast or pace
+  // changes. Effective scripts alternate scene lengths: short scenes create
+  // urgency and momentum while long scenes develop atmosphere and character.
+  // A script where most scenes are long reads as monolithic and slow regardless
+  // of how active the content is. The mirror of SHORT_SCENE_FLOOD.
+  // Requires 8+ records.
+  if (records.length >= 8) {
+    const longThreshold274 = avgLength * 1.5;
+    const longCount274 = lengths.filter(l => l > longThreshold274).length;
+    if (longCount274 / lengths.length > 0.50) {
+      issues.push({
+        location: 'Scene-length distribution',
+        rule: 'LONG_SCENE_FLOOD',
+        severity: 'minor',
+        description: `${longCount274} of ${lengths.length} scenes (${Math.round(longCount274 / lengths.length * 100)}%) exceed 1.5× the average length — the script is dominated by oversized scenes. Without shorter scenes to create contrast and momentum, the pace becomes monolithic: no quick beats, no breathing room, every scene settling in for an extended stay.`,
+        suggestedFix: 'Trim at least half the long scenes to a leaner core, and introduce some genuinely short scenes as pace changes. The contrast between a 2-line beat and a 20-line scene creates rhythm that neither alone can — you need brevity to make length feel substantial.',
+      });
+    }
+  }
+
+  // ── Wave 274: ACT2_PAGE_WEIGHT ─────────────────────────────────────────────
+  // Act 2 (the 25-75% zone) consumes less than 40% of total script pages.
+  // Act 2 is the complication engine — it should be the longest act, carrying
+  // the protagonist's journey from inciting incident to climax approach. A
+  // lightweight Act 2 means the complications are rushed, the character
+  // development is thin, and the story skips from setup to resolution with an
+  // underdeveloped middle. Distinct from ACT2_PACING_VALLEY (suspense curve
+  // depression); this is a page-budget distribution measure.
+  // Requires 10+ records.
+  if (records.length >= 10) {
+    const act2Start274 = Math.floor(records.length * 0.25);
+    const act2End274 = Math.floor(records.length * 0.75);
+    let act2Lines274 = 0;
+    let totalLines274b = 0;
+    for (const [idx, len] of sceneLengths) {
+      totalLines274b += len;
+      if (idx >= act2Start274 && idx < act2End274) act2Lines274 += len;
+    }
+    const act2Ratio274 = totalLines274b > 0 ? act2Lines274 / totalLines274b : 0;
+    if (act2Ratio274 < 0.40) {
+      issues.push({
+        location: `Act 2 (Scenes ${act2Start274}–${act2End274 - 1}) — page budget`,
+        rule: 'ACT2_PAGE_WEIGHT',
+        severity: 'minor',
+        description: `Act 2 (Scenes ${act2Start274}–${act2End274 - 1}) consumes only ${Math.round(act2Ratio274 * 100)}% of total script pages — the complication engine is underweight. A thin Act 2 means complications are rushed, character development is compressed, and the story moves from setup to resolution without developing its middle. Act 2 should be the heaviest act.`,
+        suggestedFix: 'Expand the complication zone: add scenes that develop the protagonist\'s relationships under pressure, deepen the opposition, and let the consequences of Act 1 decisions unfold. Act 2 earns the climax — compress it and the resolution will feel unearned.',
       });
     }
   }
