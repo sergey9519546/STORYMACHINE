@@ -7,6 +7,9 @@
 // over-parenthetical (excessive direction undermining actors), and deadlock
 // dialogue (same argument cycling without escalation).
 // Wave 255 additions: ellipsis overuse (trailing-off tic), tag-question overuse
+// Wave 269 additions: dialogue question cluster (3+ consecutive questions),
+// dialogue agreement chain (3+ consecutive capitulations),
+// long speech dominance (>50% of lines 15+ words).
 // (confirmation-seeking dialogue), and exclamation overuse (everyone shouts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
@@ -1074,6 +1077,88 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${bangCount255} of ${dialogue.length} dialogue lines (${Math.round(bangRatio255 * 100)}%) end with an exclamation mark — the dialogue is pinned at maximum volume. When most lines shout, none of them land: sustained intensity has no contrast to make any single outburst register, and the scene reads as melodrama.`,
         suggestedFix: 'Strip exclamation marks back to the two or three moments that truly earn them. Real force comes from contrast — a quiet, flat line beside a sudden shout hits harder than a page of shouting. Let restraint set up the explosion.',
+      });
+    }
+  }
+
+  // ── Wave 269: DIALOGUE_QUESTION_CLUSTER ───────────────────────────────────
+  // Three or more consecutive dialogue lines are all questions (ending with
+  // '?'). A dialogue exchange made entirely of questions has no movement —
+  // nobody is answering, asserting, or committing. The scene circles without
+  // advancing. Questions create tension but only if someone eventually provides
+  // an answer, a deflection, or a counter-position; an unbroken run signals
+  // the scene is interrogating itself rather than progressing.
+  // Requires 12+ dialogue lines.
+  if (dialogue.length >= 12) {
+    let qRun269 = 0;
+    let qRunStart269 = 0;
+    for (let i = 0; i < dialogue.length; i++) {
+      if (dialogue[i].line.trim().endsWith('?')) {
+        if (qRun269 === 0) qRunStart269 = i;
+        qRun269++;
+      } else {
+        qRun269 = 0;
+      }
+      if (qRun269 >= 3) {
+        issues.push({
+          location: `Lines ${dialogue[qRunStart269].lineNum}–${dialogue[i].lineNum}`,
+          rule: 'DIALOGUE_QUESTION_CLUSTER',
+          severity: 'minor',
+          description: `${qRun269} consecutive dialogue lines (lines ${dialogue[qRunStart269].lineNum}–${dialogue[i].lineNum}) are all questions — nobody is answering. A dialogue exchange made entirely of questions has no forward movement: nobody asserts, commits, or deflects. The scene interrogates itself rather than advancing.`,
+          suggestedFix: 'Break the question chain with an answer, a deflection, or a flat assertion. Questions create tension only when someone eventually steps forward and commits to a position. One answer changes the scene\'s dynamic; an unbroken question loop signals a stall.',
+        });
+        break;
+      }
+    }
+  }
+
+  // ── Wave 269: DIALOGUE_AGREEMENT_CHAIN ────────────────────────────────────
+  // Three or more consecutive dialogue lines are all agreement responses
+  // ("yes", "right", "exactly", "absolutely", "of course", "agreed", etc.).
+  // A run of pure capitulations means nobody is pushing back, qualifying, or
+  // introducing any friction. Drama lives in resistance; an agreement chain
+  // flattens conflict and signals that the scene is a consensus exercise
+  // rather than a negotiation. Requires 10+ dialogue lines.
+  if (dialogue.length >= 10) {
+    let agreeRun269 = 0;
+    let agreeRunStart269 = 0;
+    for (let i = 0; i < dialogue.length; i++) {
+      if (AGREEMENT_RE.test(dialogue[i].line.trim())) {
+        if (agreeRun269 === 0) agreeRunStart269 = i;
+        agreeRun269++;
+      } else {
+        agreeRun269 = 0;
+      }
+      if (agreeRun269 >= 3) {
+        issues.push({
+          location: `Lines ${dialogue[agreeRunStart269].lineNum}–${dialogue[i].lineNum}`,
+          rule: 'DIALOGUE_AGREEMENT_CHAIN',
+          severity: 'minor',
+          description: `${agreeRun269} consecutive dialogue lines (lines ${dialogue[agreeRunStart269].lineNum}–${dialogue[i].lineNum}) are all agreement responses — no character pushes back, qualifies, or dissents. Drama lives in resistance; an unbroken chain of capitulations flattens all conflict and makes the scene a consensus exercise rather than a negotiation.`,
+          suggestedFix: 'Insert at least one challenge, qualification, or partial disagreement into the agreement run. Even a "Yes, but..." changes the scene\'s dynamic. Pure agreement chains read as the characters talking themselves into something rather than deciding it through conflict.',
+        });
+        break;
+      }
+    }
+  }
+
+  // ── Wave 269: LONG_SPEECH_DOMINANCE ───────────────────────────────────────
+  // More than 50% of all dialogue lines are 15 words or longer. When most
+  // lines are extended speeches, brevity is crowded out — no punchy exchange,
+  // no staccato beat, no rapid-fire cross-talk. The script reads as a series
+  // of orations rather than a conversation. This is the mirror of
+  // DIALOGUE_STACCATO_OVERUSE (which fires when lines are too short); here
+  // every character gets too much floor time, and the cadence collapses into
+  // a single slow register. Requires 12+ dialogue lines.
+  if (dialogue.length >= 12) {
+    const longLineCount269 = dialogue.filter(d => d.line.trim().split(/\s+/).length >= 15).length;
+    if (longLineCount269 / dialogue.length > 0.50) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'LONG_SPEECH_DOMINANCE',
+        severity: 'minor',
+        description: `${longLineCount269} of ${dialogue.length} dialogue lines (${Math.round(longLineCount269 / dialogue.length * 100)}%) are 15 words or longer — the dialogue is dominated by extended speeches. No character delivers a short, punchy response; every turn is a full oration. The cadence collapses into a single slow register with no rhythmic variation.`,
+        suggestedFix: 'Break long speeches into shorter turns, or interrupt them with brief reactions from other characters. Brief lines create urgency and give the impression that characters are reacting to each other rather than reading prepared remarks. Long speeches land harder when they follow a run of short, sharp exchanges.',
       });
     }
   }

@@ -17897,6 +17897,147 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 269 — dialoguePass: dialogue question cluster, agreement chain, long speech dominance', async () => {
+    const dInput269 = (fountain: string) => ({ fountain, original: fountain, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+
+    it('DIALOGUE_QUESTION_CLUSTER fires when 3+ consecutive dialogue lines are questions', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 12 lines; first 4 are all questions
+      const f269a = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'What do you want from me now?',
+        'BOB', 'Why did you come here tonight?',
+        'ALICE', 'Are you trying to trap me here?',
+        'BOB', 'Did you really think I would not notice?',
+        'ALICE', 'I did what I had to do.',
+        'BOB', 'It was not your decision to make.',
+        'ALICE', 'Someone had to take immediate action.',
+        'BOB', 'That is not how we do things.',
+        'ALICE', 'The situation demanded a response.',
+        'BOB', 'You should have consulted me first.',
+        'ALICE', 'There was no time left to wait.',
+        'BOB', 'There is always time for this matter.',
+      ].join('\n');
+      const result269a = await dialoguePass(dInput269(f269a));
+      const qc = result269a.issues.filter((i: any) => i.rule === 'DIALOGUE_QUESTION_CLUSTER');
+      assert.ok(qc.length >= 1, `Should detect DIALOGUE_QUESTION_CLUSTER, got: ${JSON.stringify(result269a.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(qc[0].severity, 'minor');
+    });
+
+    it('DIALOGUE_QUESTION_CLUSTER does NOT fire when questions are not consecutive', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 12 lines; questions at lines 0, 2, 4, 6 — interleaved with statements
+      const f269b = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'What do you want from me now?',
+        'BOB', 'I came here to settle this matter.',
+        'ALICE', 'Why did you come here tonight?',
+        'BOB', 'Because you left me no other choice.',
+        'ALICE', 'Are you trying to trap me here?',
+        'BOB', 'I am trying to protect everyone involved.',
+        'ALICE', 'Did you really think I would not notice?',
+        'BOB', 'I had hoped we could avoid all of this.',
+        'ALICE', 'We cannot pretend nothing happened here.',
+        'BOB', 'Then we deal with it together now.',
+        'ALICE', 'Fine. Tell me everything you know.',
+        'BOB', 'It started three weeks ago at the factory.',
+      ].join('\n');
+      const result269b = await dialoguePass(dInput269(f269b));
+      const qc = result269b.issues.filter((i: any) => i.rule === 'DIALOGUE_QUESTION_CLUSTER');
+      assert.strictEqual(qc.length, 0, 'Should NOT fire when questions are not consecutive');
+    });
+
+    it('DIALOGUE_AGREEMENT_CHAIN fires when 3+ consecutive lines are agreement responses', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 10+ lines; BOB, CAROL, DAVE give 3 consecutive agreement lines in a row
+      const f269c = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'We need everyone to commit to this plan right now.',
+        'BOB', 'Yes.',
+        'CAROL', 'Right.',
+        'DAVE', 'Absolutely.',
+        'ALICE', 'Then we proceed as discussed at midnight sharp.',
+        'BOB', 'I will handle the eastern approach route tonight.',
+        'CAROL', 'And I will cover the northern exit point clearly.',
+        'DAVE', 'Everything is already in position for tonight.',
+        'ALICE', 'Do not be late for the rendezvous point at all.',
+        'BOB', 'We will not fail on this one tonight.',
+      ].join('\n');
+      const result269c = await dialoguePass(dInput269(f269c));
+      const ac = result269c.issues.filter((i: any) => i.rule === 'DIALOGUE_AGREEMENT_CHAIN');
+      assert.ok(ac.length >= 1, `Should detect DIALOGUE_AGREEMENT_CHAIN, got: ${JSON.stringify(result269c.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(ac[0].severity, 'minor');
+    });
+
+    it('DIALOGUE_AGREEMENT_CHAIN does NOT fire when agreements are separated by other lines', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 10+ lines; agreements at lines 1 and 5 — not consecutive
+      const f269d = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'We move at midnight and take the eastern route.',
+        'BOB', 'Yes.',
+        'ALICE', 'Are you certain that is the safest way?',
+        'BOB', 'I have my doubts about the eastern checkpoint.',
+        'ALICE', 'Then we discuss alternatives before we commit.',
+        'BOB', 'Agreed.',
+        'ALICE', 'Good. Let us look at the map again.',
+        'BOB', 'There might be a better route through the valley.',
+        'ALICE', 'Show me what you are thinking here.',
+        'BOB', 'It adds an hour but avoids the checkpoint completely.',
+      ].join('\n');
+      const result269d = await dialoguePass(dInput269(f269d));
+      const ac = result269d.issues.filter((i: any) => i.rule === 'DIALOGUE_AGREEMENT_CHAIN');
+      assert.strictEqual(ac.length, 0, 'Should NOT fire when agreements are separated by other lines');
+    });
+
+    it('LONG_SPEECH_DOMINANCE fires when more than 50% of dialogue lines are 15+ words', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 12 lines; 8 lines are 15+ words (67%)
+      const f269e = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'I have been thinking about this situation for several days and I believe we need to act now before it is too late.',
+        'BOB', 'The circumstances that led us here were entirely beyond our control and we should not blame ourselves for any of it.',
+        'ALICE', 'Perhaps you are right but the consequences of inaction are just as serious as the consequences of acting too quickly here.',
+        'BOB', 'We have to weigh every possible outcome before we commit to a course of action that cannot easily be reversed later.',
+        'ALICE', 'I understand that and I share your caution but the window of opportunity will close if we do not move soon.',
+        'BOB', 'Then let us at least agree on the minimal steps we can take together without exposing ourselves to unnecessary risk.',
+        'ALICE', 'Fair enough.',
+        'BOB', 'Good.',
+        'ALICE', 'I will have the documents ready by tomorrow morning for the review we discussed at the last meeting in detail.',
+        'BOB', 'And I will arrange the necessary contacts to ensure that everything proceeds according to the original plan we agreed on.',
+        'ALICE', 'Perfect.',
+        'BOB', 'Then we are aligned on this specific course of action and we can proceed with confidence knowing the plan is solid.',
+      ].join('\n');
+      const result269e = await dialoguePass(dInput269(f269e));
+      const lsd = result269e.issues.filter((i: any) => i.rule === 'LONG_SPEECH_DOMINANCE');
+      assert.ok(lsd.length >= 1, `Should detect LONG_SPEECH_DOMINANCE, got: ${JSON.stringify(result269e.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(lsd[0].severity, 'minor');
+    });
+
+    it('LONG_SPEECH_DOMINANCE does NOT fire when fewer than half of lines are long speeches', async () => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      // 12 lines; only 3 lines are 15+ words (25%)
+      const f269f = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'We need to talk.',
+        'BOB', 'I know.',
+        'ALICE', 'It cannot wait any longer.',
+        'BOB', 'The situation has changed significantly since our last conversation and I believe we need to reconsider our position entirely.',
+        'ALICE', 'Tell me more.',
+        'BOB', 'New evidence came in.',
+        'ALICE', 'What kind?',
+        'BOB', 'The kind that changes everything.',
+        'ALICE', 'Show me.',
+        'BOB', 'Here.',
+        'ALICE', 'I see what you mean now and I agree that this fundamentally alters the options that are available to us going forward.',
+        'BOB', 'Exactly. So what do we do?',
+      ].join('\n');
+      const result269f = await dialoguePass(dInput269(f269f));
+      const lsd = result269f.issues.filter((i: any) => i.rule === 'LONG_SPEECH_DOMINANCE');
+      assert.strictEqual(lsd.length, 0, 'Should NOT fire when fewer than half of lines are long speeches');
+    });
+  });
+
   describe('Wave 268 — causalityPass: curiosity front loaded, payoff back loaded, clock single scene', async () => {
     const makeRec268 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
