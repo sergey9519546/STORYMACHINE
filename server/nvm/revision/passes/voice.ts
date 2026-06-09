@@ -9,6 +9,9 @@
 // Wave 160 additions: passive action voice (action lines use passive constructions),
 // interior monologue leak (action lines describe character thoughts instead of behavior),
 // qualifier overload (excessive hedging words drain cinematic declarative authority).
+// Wave 266 additions: stative verb overload (>35% action lines open with state verb),
+// dialogue hedging opener (>25% of dialogue lines begin with a hedging phrase),
+// abstract subject opening (>30% of action lines begin with an abstract noun subject).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -958,6 +961,82 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
           suggestedFix: "Introduce some polysyllabic vocabulary at key moments: a character who speaks with unexpected precision, a term that shows education or context. Even one or two longer words per exchange changes the verbal texture: 'That's bad' vs 'That's catastrophic.' Weight matters.",
         });
       }
+    }
+  }
+
+  // ── Wave 266: Stative verb overload, dialogue hedging opener, abstract subject opening ──
+
+  // STATIVE_VERB_OVERLOAD (minor, ≥8 action lines): More than 35% of action lines
+  // begin with a stative verb ("is", "are", "was", "were", "stands", "sits", "lies",
+  // "remains", "appears"). Stative-opening lines describe states rather than events —
+  // "Stands at the window." vs "Crosses to the window." A stative-heavy pattern turns
+  // action prose into tableau descriptions rather than present-tense unfolding. Distinct
+  // from PASSIVE_ACTION_VOICE (passive constructions anywhere in the line) and
+  // DECLARATIVE_PILE (grammatical structure).
+  if (actionOnlyLines.length >= 8) {
+    const stativeStartRe266 = /^(is|are|was|were|stands?|sits?|lies?|lays?|remains?|appears?|exists?|contains?|holds?|rests?|hangs?|leans?)\s/i;
+    const stativeCount266 = actionOnlyLines.filter(l => stativeStartRe266.test(l.trim())).length;
+    if (stativeCount266 / actionOnlyLines.length > 0.35) {
+      issues.push({
+        location: 'Action line openings',
+        rule: 'STATIVE_VERB_OVERLOAD',
+        severity: 'minor',
+        description: `${stativeCount266} of ${actionOnlyLines.length} action lines (${Math.round(stativeCount266 / actionOnlyLines.length * 100)}%) open with a stative verb ("is", "was", "stands", "remains", etc.) — the action prose describes a series of states rather than events. Stative-opening lines produce tableau prose; screenplay action should show present-tense events unfolding.`,
+        suggestedFix: "Convert stative openers to active events: 'Stands at the window' → 'Crosses to the window.' 'Was found in the alley' → 'The body lies in the alley, arms spread.' Replace state-descriptions with the action or image that carries the same information.",
+      });
+    }
+  }
+
+  // DIALOGUE_HEDGING_OPENER (minor, ≥10 dialogue lines): More than 25% of dialogue
+  // lines begin with a hedging opener ("Well,", "I mean,", "Look,", "Listen,",
+  // "Actually,", "Honestly,", "Basically,", "I guess,", "I suppose,"). Dialogue
+  // that consistently opens with hedges pre-apologizes for its content before
+  // delivering it — every utterance softens before it lands. Distinct from
+  // NEGATION_SATURATION (refusal) and QUALIFIER_OVERLOAD (in action lines).
+  {
+    const hedgeDlgLines266: string[] = [];
+    let hedgeDlgIn266 = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { hedgeDlgIn266 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { hedgeDlgIn266 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { hedgeDlgIn266 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (hedgeDlgIn266) hedgeDlgLines266.push(t);
+      else hedgeDlgIn266 = false;
+    }
+    if (hedgeDlgLines266.length >= 10) {
+      const hedgeRe266 = /^(well[,\s]|i mean[,\s]|look[,\s]|listen[,\s]|actually[,\s]|honestly[,\s]|basically[,\s]|you know[,\s]|the thing is[,\s]|i just[,\s]|i guess[,\s]|i suppose[,\s])/i;
+      const hedgeCount266 = hedgeDlgLines266.filter(l => hedgeRe266.test(l)).length;
+      if (hedgeCount266 / hedgeDlgLines266.length > 0.25) {
+        issues.push({
+          location: 'Dialogue openers',
+          rule: 'DIALOGUE_HEDGING_OPENER',
+          severity: 'minor',
+          description: `${hedgeCount266} of ${hedgeDlgLines266.length} dialogue lines (${Math.round(hedgeCount266 / hedgeDlgLines266.length * 100)}%) begin with a hedging opener ("Well,", "Actually,", "I mean,", "Look,", "I guess,") — every utterance is pre-apologized before it lands. Characters who habitually hedge lack the declarative force of committed speech; their words slide past the audience rather than landing.`,
+          suggestedFix: "Cut the hedges and begin dialogue at its point: 'Well, I think maybe you should go' → 'Leave.' Hedging openers are filler — they signal a character apologizing for their content before delivering it. Committed characters begin with their position, not their hesitation.",
+        });
+      }
+    }
+  }
+
+  // ABSTRACT_SUBJECT_OPENING (minor, ≥8 action lines): More than 30% of action
+  // lines open with an abstract noun as subject ("Silence fills the room.",
+  // "Fear grips them.", "Tension builds.", "Time passes."). Abstract subjects
+  // weaken cinematic prose — the camera captures objects and actions, not named
+  // states or emotions. Distinct from INTERIOR_MONOLOGUE_LEAK (character
+  // psychology) and the rhythm pass's ABSTRACT_NOUN_OVERLOAD (anywhere in line).
+  if (actionOnlyLines.length >= 8) {
+    const abstractSubjectRe266 = /^(silence|tension|fear|time|anxiety|grief|sadness|darkness|chaos|love|hate|anger|despair|hope|joy|doubt|confusion|emotion|mood|sorrow|longing|memory|guilt|shame|dread|bitterness|wonder|regret|peace|calm)\b/i;
+    const abstractSubjectCount266 = actionOnlyLines.filter(l => abstractSubjectRe266.test(l.trim())).length;
+    if (abstractSubjectCount266 / actionOnlyLines.length > 0.3) {
+      issues.push({
+        location: 'Action line subjects',
+        rule: 'ABSTRACT_SUBJECT_OPENING',
+        severity: 'minor',
+        description: `${abstractSubjectCount266} of ${actionOnlyLines.length} action lines (${Math.round(abstractSubjectCount266 / actionOnlyLines.length * 100)}%) open with an abstract noun subject ("Silence fills...", "Fear grips...", "Tension builds...") — the screenplay names emotional and temporal states instead of showing what creates them. The camera cannot record silence or tension directly; it can only record what silence and tension look like.`,
+        suggestedFix: "Replace abstract subjects with concrete ones: 'Silence fills the room' → 'Nobody speaks. Nobody moves.' 'Tension builds' → 'ALICE grips the table edge.' Give the camera a person, an object, or an action — not a named state.",
+      });
     }
   }
 

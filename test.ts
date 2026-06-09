@@ -17897,6 +17897,114 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 266 — voicePass: stative verb overload, dialogue hedging opener, abstract subject opening', async () => {
+    it('STATIVE_VERB_OVERLOAD fires when >35% of action lines begin with a stative verb', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const f266a = [
+        'INT. SCENE - DAY', '',
+        'Stands alone at the window.',
+        'Was found in the alley nearby.',
+        'Lies on the floor, arms spread.',
+        'Remains locked from the outside.',
+        'She picks up the envelope.',
+        'He crosses the room quickly.',
+        'The phone rings twice.',
+        'She opens the door.',
+      ].join('\n');
+      const result266a = await voicePass({ fountain: f266a, original: f266a, records: Array.from({ length: 4 }, (_, i) => ({ sceneIdx: i, slug: `SC${i}`, emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, dialogueHighlights: [], revelation: null, relationshipShifts: [], seededClueIds: [], payoffSetupIds: [], unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing' })) as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(result266a.issues.some((i: any) => i.rule === 'STATIVE_VERB_OVERLOAD'), `Expected STATIVE_VERB_OVERLOAD, got: ${JSON.stringify(result266a.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('STATIVE_VERB_OVERLOAD does NOT fire when fewer than 35% of action lines begin with a stative verb', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const f266b = [
+        'INT. SCENE - DAY', '',
+        'She picks up the envelope.',
+        'He crosses the room quickly.',
+        'The phone rings twice.',
+        'She opens the door.',
+        'Stands alone at the window.',
+        'He nods and turns away.',
+        'She moves toward the exit.',
+        'He checks the drawer.',
+      ].join('\n');
+      const result266b = await voicePass({ fountain: f266b, original: f266b, records: Array.from({ length: 4 }, (_, i) => ({ sceneIdx: i, slug: `SC${i}`, emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, dialogueHighlights: [], revelation: null, relationshipShifts: [], seededClueIds: [], payoffSetupIds: [], unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing' })) as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(!result266b.issues.some((i: any) => i.rule === 'STATIVE_VERB_OVERLOAD'), 'Should NOT fire when fewer than 35% of action lines have stative openers');
+    });
+
+    it('DIALOGUE_HEDGING_OPENER fires when >25% of dialogue lines begin with a hedge', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const f266c = [
+        'INT. OFFICE - DAY', '', 'Action line.', '',
+        'ALICE', 'Well, I do not know what to say.',
+        'BOB', 'The situation is serious.',
+        'ALICE', 'Actually, I think we should go.',
+        'BOB', 'We have no time left.',
+        'ALICE', 'I mean, this changes nothing.',
+        'BOB', 'What do you suggest then?',
+        'ALICE', 'The plan remains unchanged.',
+        'BOB', 'Good.',
+        'ALICE', 'We leave at dawn.',
+        'BOB', 'Understood.',
+      ].join('\n');
+      const result266c = await voicePass({ fountain: f266c, original: f266c, records: Array.from({ length: 2 }, (_, i) => ({ sceneIdx: i, slug: `SC${i}`, emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, dialogueHighlights: [], revelation: null, relationshipShifts: [], seededClueIds: [], payoffSetupIds: [], unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing' })) as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(result266c.issues.some((i: any) => i.rule === 'DIALOGUE_HEDGING_OPENER'), `Expected DIALOGUE_HEDGING_OPENER, got: ${JSON.stringify(result266c.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('DIALOGUE_HEDGING_OPENER does NOT fire when fewer than 25% of dialogue lines hedge', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const f266d = [
+        'INT. OFFICE - DAY', '', 'Action line.', '',
+        'ALICE', 'The situation is serious.',
+        'BOB', 'We have no time left.',
+        'ALICE', 'I think we should go.',
+        'BOB', 'What do you suggest?',
+        'ALICE', 'Well, leave at dawn.',
+        'BOB', 'Understood.',
+        'ALICE', 'The plan remains.',
+        'BOB', 'Good.',
+        'ALICE', 'No delays.',
+        'BOB', 'Agreed.',
+      ].join('\n');
+      const result266d = await voicePass({ fountain: f266d, original: f266d, records: Array.from({ length: 2 }, (_, i) => ({ sceneIdx: i, slug: `SC${i}`, emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, dialogueHighlights: [], revelation: null, relationshipShifts: [], seededClueIds: [], payoffSetupIds: [], unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing' })) as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(!result266d.issues.some((i: any) => i.rule === 'DIALOGUE_HEDGING_OPENER'), 'Should NOT fire when fewer than 25% of dialogue lines have hedging openers');
+    });
+
+    it('ABSTRACT_SUBJECT_OPENING fires when >30% of action lines begin with an abstract noun', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const f266e = [
+        'INT. ROOM - DAY', '',
+        'Silence fills the space between them.',
+        'Fear grips them both.',
+        'Tension hangs over the table.',
+        'She walks to the door.',
+        'He picks up the letter.',
+        'The clock reads three.',
+        'She hesitates.',
+        'He sits at the desk.',
+      ].join('\n');
+      const result266e = await voicePass({ fountain: f266e, original: f266e, records: Array.from({ length: 4 }, (_, i) => ({ sceneIdx: i, slug: `SC${i}`, emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, dialogueHighlights: [], revelation: null, relationshipShifts: [], seededClueIds: [], payoffSetupIds: [], unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing' })) as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(result266e.issues.some((i: any) => i.rule === 'ABSTRACT_SUBJECT_OPENING'), `Expected ABSTRACT_SUBJECT_OPENING, got: ${JSON.stringify(result266e.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('ABSTRACT_SUBJECT_OPENING does NOT fire when fewer than 30% of action lines begin with abstract subjects', async () => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      const f266f = [
+        'INT. ROOM - DAY', '',
+        'She walks to the door.',
+        'He picks up the letter.',
+        'The clock reads three.',
+        'Silence fills the room.',
+        'She opens the window.',
+        'He nods and turns away.',
+        'The phone rings.',
+        'She crosses to the chair.',
+      ].join('\n');
+      const result266f = await voicePass({ fountain: f266f, original: f266f, records: Array.from({ length: 4 }, (_, i) => ({ sceneIdx: i, slug: `SC${i}`, emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, dialogueHighlights: [], revelation: null, relationshipShifts: [], seededClueIds: [], payoffSetupIds: [], unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing' })) as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(!result266f.issues.some((i: any) => i.rule === 'ABSTRACT_SUBJECT_OPENING'), 'Should NOT fire when fewer than 30% of action lines have abstract subjects');
+    });
+  });
+
   describe('Wave 265 — themePass: clue decoupled, curiosity decoupled, payoff decoupled', async () => {
     const makeRec265 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
