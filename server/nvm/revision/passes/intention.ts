@@ -10,6 +10,9 @@
 // Wave 258 additions: proactive midpoint void (initiative dead at the pivot),
 // proactive desert run (4+ passive scenes in an active story), revelation without
 // proactive (discoveries unearned by the protagonist's initiative).
+// Wave 272 additions: proactive Act 2a void (25-50% zone initiative-free),
+// proactive late surge (passive first half, burst in second half),
+// payoff without effort (callbacks not preceded by protagonist action).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -920,6 +923,87 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `None of the story's ${revRecs258.length} revelations is preceded by a proactive act within the two scenes before it — every discovery arrives without the protagonist's initiative driving it. The truths fall into their lap; they learn passively rather than uncovering anything through their own effort.`,
           suggestedFix: "Make at least one major discovery the consequence of the protagonist's action: a clue they chose to chase, a deadline that forced a confrontation, an investigation they launched. A revelation that the protagonist earned lands harder than one the plot simply hands them.",
+        });
+      }
+    }
+  }
+
+  // ── Wave 272: PROACTIVE_ACT2A_VOID ────────────────────────────────────────
+  // Act 2a (the 25-50% zone, where the protagonist first starts testing the
+  // world after the inciting event) contains no proactive act — no clock
+  // raised, no clue planted — while the protagonist does initiate elsewhere.
+  // Act 2a is where first moves and early investigations belong; a passive Act
+  // 2a protagonist drifts through the first complication zone without steering.
+  // Distinct from PROACTIVE_OPENING_ABSENT (Act 1), PROACTIVE_MIDPOINT_VOID
+  // (40-60% window), and PROACTIVE_ACT3_VOID (final 25%).
+  // Requires 10+ records and 3+ total proactive acts.
+  if (n >= 10) {
+    const act2aStart272 = Math.floor(n * 0.25);
+    const act2aEnd272 = Math.floor(n * 0.5);
+    const totalProactive272 = records.filter(isProactive258).length;
+    if (totalProactive272 >= 3) {
+      const act2aProactive272 = records.slice(act2aStart272, act2aEnd272).filter(isProactive258).length;
+      if (act2aProactive272 === 0) {
+        issues.push({
+          location: `Act 2a (Scenes ${act2aStart272}–${act2aEnd272 - 1})`,
+          rule: 'PROACTIVE_ACT2A_VOID',
+          severity: 'minor',
+          description: `Act 2a (Scenes ${act2aStart272}–${act2aEnd272 - 1}) contains no proactive act — no clock raised, no clue planted — though the protagonist initiates elsewhere. Act 2a is where the protagonist should start testing and investigating; leaving this entire zone initiative-free means they drift through the first complication zone as a passenger.`,
+          suggestedFix: 'Give the protagonist at least one proactive move in Act 2a: a lead they decide to chase, a deadline they impose, a gambit they launch. The first complication zone should open with the protagonist in motion — their earliest tests of the world establish the audience\'s sense that they can drive events.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 272: PROACTIVE_LATE_SURGE ────────────────────────────────────────
+  // The protagonist is entirely passive in the first half of the story (no
+  // proactive acts in scenes 0 to n/2-1) then suddenly launches 3 or more
+  // proactive acts in the second half. The agency that should be established
+  // from early scenes arrives as a late explosion — the protagonist is reactive
+  // for the entire first half and then overactive in the second, with no
+  // gradual development of drive. The mirror of AGENCY_FRONTLOADED.
+  // Requires 8+ records.
+  if (n >= 8) {
+    const half272 = Math.floor(n * 0.5);
+    const firstHalfPro272 = records.slice(0, half272).filter(isProactive258).length;
+    const secondHalfPro272 = records.slice(half272).filter(isProactive258).length;
+    if (firstHalfPro272 === 0 && secondHalfPro272 >= 3) {
+      issues.push({
+        location: `First half entirely passive (Scenes 0–${half272 - 1})`,
+        rule: 'PROACTIVE_LATE_SURGE',
+        severity: 'minor',
+        description: `The protagonist initiates nothing in the first half (Scenes 0–${half272 - 1}) then launches ${secondHalfPro272} proactive acts in the second half. The agency that should be established gradually arrives as a sudden burst — the protagonist transforms from passive observer to hyperactive driver without buildup. A protagonist's drive should be visible from early scenes.`,
+        suggestedFix: 'Move at least one proactive beat into the first half — even a small act of initiative (a question pursued, a decision made, a deadline set) establishes that the protagonist is a driver from the start. The second-half surge will feel earned when the audience has seen the protagonist act with intention throughout.',
+      });
+    }
+  }
+
+  // ── Wave 272: PAYOFF_WITHOUT_EFFORT ───────────────────────────────────────
+  // Two or more scenes fire payoffs (payoffSetupIds not empty) but none of them
+  // is preceded within the prior 3 scenes by a proactive act. Every callback
+  // the story delivers arrives without the protagonist having worked for it —
+  // they fire planted payoffs without having initiated the work that makes the
+  // payoff feel earned. Distinct from REVELATION_WITHOUT_PROACTIVE (which
+  // couples discovered truths to effort); this couples payoffs to initiative.
+  // Requires 6+ records and 2+ payoff scenes.
+  if (n >= 6) {
+    const payoffRecs272 = records
+      .map((r: any, i: number) => ({ r, i }))
+      .filter(({ r }: any) => (r.payoffSetupIds?.length ?? 0) > 0);
+    if (payoffRecs272.length >= 2) {
+      const anyEarned272 = (payoffRecs272 as Array<{ r: any; i: number }>).some(({ i }) => {
+        for (let k = Math.max(0, i - 3); k <= i; k++) {
+          if (isProactive258(records[k])) return true;
+        }
+        return false;
+      });
+      if (!anyEarned272) {
+        issues.push({
+          location: 'Payoff / effort coupling',
+          rule: 'PAYOFF_WITHOUT_EFFORT',
+          severity: 'minor',
+          description: `${payoffRecs272.length} payoff scenes fire without any of them being preceded by a protagonist initiative within the prior 3 scenes — every callback arrives without the protagonist having worked for it. Payoffs feel earned when they follow visible effort; unearned callbacks read as coincidence rather than consequence.`,
+          suggestedFix: 'Ensure at least one payoff scene is preceded (within 3 scenes) by a proactive act: a clue the protagonist planted, a clock they raised, a lead they pursued. A payoff earned by visible effort lands as satisfying resolution; a payoff that just happens reads as the plot solving itself.',
         });
       }
     }

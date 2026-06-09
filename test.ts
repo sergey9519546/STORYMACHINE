@@ -17897,6 +17897,122 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 272 — intentionPass: proactive Act 2a void, proactive late surge, payoff without effort', async () => {
+    const makeRec272 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput272 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: '...',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('PROACTIVE_ACT2A_VOID fires when Act 2a (25-50%) has no proactive acts', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 12 scenes; act2a = slice(3,6) = scenes 3,4,5; proactive at 0, 7, 9 — none in 3-5
+      const records272a = [
+        makeRec272(0, { clockRaised: true }),
+        makeRec272(1), makeRec272(2), makeRec272(3), makeRec272(4), makeRec272(5), makeRec272(6),
+        makeRec272(7, { seededClueIds: ['clue-a'] }),
+        makeRec272(8),
+        makeRec272(9, { clockRaised: true }),
+        makeRec272(10), makeRec272(11),
+      ];
+      const result272a = await intentionPass(makeInput272(records272a));
+      const av = result272a.issues.filter((i: any) => i.rule === 'PROACTIVE_ACT2A_VOID');
+      assert.ok(av.length >= 1, `Should detect PROACTIVE_ACT2A_VOID, got: ${JSON.stringify(result272a.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(av[0].severity, 'minor');
+    });
+
+    it('PROACTIVE_ACT2A_VOID does NOT fire when a proactive act exists in Act 2a', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 12 scenes; proactive at 0, 4 (scene 4 is in act2a = 3..5), 9
+      const records272b = [
+        makeRec272(0, { clockRaised: true }),
+        makeRec272(1), makeRec272(2), makeRec272(3),
+        makeRec272(4, { seededClueIds: ['clue-a'] }),
+        makeRec272(5), makeRec272(6), makeRec272(7), makeRec272(8),
+        makeRec272(9, { clockRaised: true }),
+        makeRec272(10), makeRec272(11),
+      ];
+      const result272b = await intentionPass(makeInput272(records272b));
+      const av = result272b.issues.filter((i: any) => i.rule === 'PROACTIVE_ACT2A_VOID');
+      assert.strictEqual(av.length, 0, 'Should NOT fire when a proactive act exists in Act 2a');
+    });
+
+    it('PROACTIVE_LATE_SURGE fires when the first half is passive and second half has 3+ proactive acts', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 8 scenes; half=4; first half (0-3) passive; second half (4-7) has 3 proactive acts
+      const records272c = [
+        makeRec272(0), makeRec272(1), makeRec272(2), makeRec272(3),
+        makeRec272(4, { clockRaised: true }),
+        makeRec272(5, { seededClueIds: ['clue-a'] }),
+        makeRec272(6, { clockRaised: true }),
+        makeRec272(7, { seededClueIds: ['clue-b'] }),
+      ];
+      const result272c = await intentionPass(makeInput272(records272c));
+      const ls = result272c.issues.filter((i: any) => i.rule === 'PROACTIVE_LATE_SURGE');
+      assert.ok(ls.length >= 1, `Should detect PROACTIVE_LATE_SURGE, got: ${JSON.stringify(result272c.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(ls[0].severity, 'minor');
+    });
+
+    it('PROACTIVE_LATE_SURGE does NOT fire when a proactive act appears in the first half', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 8 scenes; proactive at scene 1 (in first half) and 5, 6, 7 → no fire
+      const records272d = [
+        makeRec272(0),
+        makeRec272(1, { clockRaised: true }),
+        makeRec272(2), makeRec272(3), makeRec272(4),
+        makeRec272(5, { seededClueIds: ['clue-a'] }),
+        makeRec272(6, { clockRaised: true }),
+        makeRec272(7, { seededClueIds: ['clue-b'] }),
+      ];
+      const result272d = await intentionPass(makeInput272(records272d));
+      const ls = result272d.issues.filter((i: any) => i.rule === 'PROACTIVE_LATE_SURGE');
+      assert.strictEqual(ls.length, 0, 'Should NOT fire when a proactive act appears in the first half');
+    });
+
+    it('PAYOFF_WITHOUT_EFFORT fires when no payoff is preceded by a proactive act within 3 scenes', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 8 scenes; proactive at 0 only; payoffs at 5 and 7 (proactive at 0 is >3 scenes away from both)
+      // payoff at 5: k ranges max(0,5-3)=2 to 5 → scenes 2,3,4,5 all non-proactive → not earned
+      // payoff at 7: k ranges max(0,7-3)=4 to 7 → scenes 4,5,6,7 all non-proactive → not earned
+      const records272e = [
+        makeRec272(0, { clockRaised: true }),
+        makeRec272(1), makeRec272(2), makeRec272(3), makeRec272(4),
+        makeRec272(5, { payoffSetupIds: ['setup-a'] }),
+        makeRec272(6),
+        makeRec272(7, { payoffSetupIds: ['setup-b'] }),
+      ];
+      const result272e = await intentionPass(makeInput272(records272e));
+      const pwe = result272e.issues.filter((i: any) => i.rule === 'PAYOFF_WITHOUT_EFFORT');
+      assert.ok(pwe.length >= 1, `Should detect PAYOFF_WITHOUT_EFFORT, got: ${JSON.stringify(result272e.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(pwe[0].severity, 'minor');
+    });
+
+    it('PAYOFF_WITHOUT_EFFORT does NOT fire when at least one payoff is preceded by a proactive act', async () => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      // 6 scenes; payoff at 4; proactive at 2 (within 3 scenes: k=2,3,4) → earned
+      const records272f = [
+        makeRec272(0), makeRec272(1),
+        makeRec272(2, { clockRaised: true }),
+        makeRec272(3),
+        makeRec272(4, { payoffSetupIds: ['setup-a'] }),
+        makeRec272(5, { payoffSetupIds: ['setup-b'] }),
+      ];
+      const result272f = await intentionPass(makeInput272(records272f));
+      const pwe = result272f.issues.filter((i: any) => i.rule === 'PAYOFF_WITHOUT_EFFORT');
+      assert.strictEqual(pwe.length, 0, 'Should NOT fire when at least one payoff is preceded by a proactive act');
+    });
+  });
+
   describe('Wave 271 — conflictPass: conflict Act 2b void, interpersonal conflict only, pair density gap', async () => {
     const makeRec271 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
