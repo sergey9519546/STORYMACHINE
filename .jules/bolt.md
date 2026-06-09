@@ -4,3 +4,6 @@
 ## 2024-05-19 - [O(N) Rendering Latency Bottleneck in Fountain Highlighting]
 **Learning:** Found an unexpected O(N^2) memory scaling issue caused by `text.split("\n")` being mapped into a massive dictionary (`lineClasses`) and then mapped *again* to create React elements. This double-allocation strategy causes measurable frame stuttering when typing in large scripts since it executes completely synchronously on the main thread during high-frequency render events.
 **Action:** When parsing hierarchical document structures to flat nodes (like text lines), always prefer mapping directly over the parsed AST (e.g. `blocks`) to generate React Elements instead of building intermediate hash maps or re-splitting raw strings.
+## 2024-05-20 - [Zero-Allocation String Processing in Keystroke Handlers]
+**Learning:** High-frequency event handlers attached to large textareas (like `handleKeyDown` in ScriptIDE) trigger costly garbage collection spikes if they parse strings using array-allocating methods like `String.prototype.split('\n')` or `split(/\s+/)` on every keystroke.
+**Action:** Replace text-splitting in hot-paths with zero-allocation alternatives: use `lastIndexOf('\n')` with `.slice()` for line extraction, use loops over `.indexOf('\n')` for navigation offset calculations, and manual `charCodeAt` scanning for word counts.
