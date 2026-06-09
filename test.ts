@@ -17897,6 +17897,82 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 278 — structurePass: Act 2a suspense void, climax purpose absent, emotional arc uniform', async () => {
+    const makeRecS278 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 1, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runS278 = async (records: any[]) => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      return structurePass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ACT2A_SUSPENSE_VOID fires when no Act 2a scene reaches suspenseDelta above 1', async () => {
+      // n=10, act2a=scenes 2-4; all have suspenseDelta=0.5 (≤1)
+      const recs278a = Array.from({ length: 10 }, (_, i) => makeRecS278(i, {
+        suspenseDelta: (i >= 2 && i <= 4) ? 0.5 : 2,
+        ...(i === 0 ? { seededClueIds: ['seed-a'] } : {}),
+      }));
+      const result278a = await runS278(recs278a);
+      const void278a = result278a.issues.filter((i: any) => i.rule === 'ACT2A_SUSPENSE_VOID');
+      assert.ok(void278a.length >= 1, `Should detect ACT2A_SUSPENSE_VOID, got: ${JSON.stringify(result278a.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(void278a[0].severity, 'minor');
+    });
+
+    it('ACT2A_SUSPENSE_VOID does NOT fire when an Act 2a scene has suspenseDelta above 1', async () => {
+      // n=10, scene 3 (in act2a [2,4]) has suspenseDelta=1.5 > 1
+      const recs278b = Array.from({ length: 10 }, (_, i) => makeRecS278(i, {
+        suspenseDelta: (i === 3) ? 1.5 : 0.5,
+      }));
+      const result278b = await runS278(recs278b);
+      const void278b = result278b.issues.filter((i: any) => i.rule === 'ACT2A_SUSPENSE_VOID');
+      assert.strictEqual(void278b.length, 0, 'Should NOT fire ACT2A_SUSPENSE_VOID when Act 2a has tension');
+    });
+
+    it('PURPOSE_CLIMAX_ABSENT fires when no scene carries purpose "climax"', async () => {
+      // n=8, all scenes have purpose='development'
+      const recs278c = Array.from({ length: 8 }, (_, i) => makeRecS278(i));
+      const result278c = await runS278(recs278c);
+      const pca278c = result278c.issues.filter((i: any) => i.rule === 'PURPOSE_CLIMAX_ABSENT');
+      assert.ok(pca278c.length >= 1, `Should detect PURPOSE_CLIMAX_ABSENT, got: ${JSON.stringify(result278c.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(pca278c[0].severity, 'major');
+    });
+
+    it('PURPOSE_CLIMAX_ABSENT does NOT fire when at least one scene carries purpose "climax"', async () => {
+      // n=8, scene 6 has purpose='climax'
+      const recs278d = Array.from({ length: 8 }, (_, i) => makeRecS278(i, {
+        ...(i === 6 ? { purpose: 'climax' } : {}),
+      }));
+      const result278d = await runS278(recs278d);
+      const pca278d = result278d.issues.filter((i: any) => i.rule === 'PURPOSE_CLIMAX_ABSENT');
+      assert.strictEqual(pca278d.length, 0, 'Should NOT fire PURPOSE_CLIMAX_ABSENT when a climax scene exists');
+    });
+
+    it('EMOTIONAL_ARC_UNIFORM fires when more than 70% of scenes share the same emotional register', async () => {
+      // n=8, all 8 scenes have emotionalShift='neutral' → 100% > 70%
+      const recs278e = Array.from({ length: 8 }, (_, i) => makeRecS278(i));
+      const result278e = await runS278(recs278e);
+      const eau278e = result278e.issues.filter((i: any) => i.rule === 'EMOTIONAL_ARC_UNIFORM');
+      assert.ok(eau278e.length >= 1, `Should detect EMOTIONAL_ARC_UNIFORM, got: ${JSON.stringify(result278e.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(eau278e[0].severity, 'minor');
+    });
+
+    it('EMOTIONAL_ARC_UNIFORM does NOT fire when no single register dominates above 70%', async () => {
+      // n=8: 4 neutral, 2 positive, 2 negative → 4/8=50% ≤ 70%
+      const recs278f = Array.from({ length: 8 }, (_, i) => makeRecS278(i, {
+        emotionalShift: i < 4 ? 'neutral' : (i < 6 ? 'positive' : 'negative'),
+      }));
+      const result278f = await runS278(recs278f);
+      const eau278f = result278f.issues.filter((i: any) => i.rule === 'EMOTIONAL_ARC_UNIFORM');
+      assert.strictEqual(eau278f.length, 0, 'Should NOT fire EMOTIONAL_ARC_UNIFORM when emotional variety exists');
+    });
+  });
+
   describe('Wave 277 — rhythmPass: body-part overload, single-sentence flood, ellipsis chain', async () => {
     const rInput277 = (fountain: string) => ({
       fountain, original: fountain, records: [] as any, structure: {} as any,

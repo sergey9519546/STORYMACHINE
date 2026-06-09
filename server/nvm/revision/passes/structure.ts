@@ -10,6 +10,9 @@
 // Wave 264 additions: revelation clustered (≥3 revelations in ≤4-scene window),
 // Act 1 curiosity absent (no curiosity spike in Act 1 when story has 2+ elsewhere),
 // Act 1 purpose single (all Act 1 scenes share one purpose).
+// Wave 278 additions: Act 2a suspense void (Act 2a has no scene with suspenseDelta>1),
+// climax purpose absent (no scene carries purpose='climax'), and emotional arc
+// uniform (>70% of scenes share the same emotionalShift register).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -878,6 +881,74 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
           suggestedFix: `Differentiate Act 1 structurally: not every opening scene should be "${singlePurpose264}". Mix a world-establishment scene, a character-moment, and an inciting event so each scene advances the setup differently. Structural variety in Act 1 ensures the audience is oriented before the conflict begins.`,
         });
       }
+    }
+  }
+
+  // ── Wave 278: Act 2a suspense void, climax purpose absent, emotional arc uniform ──
+
+  // ACT2A_SUSPENSE_VOID (minor, n≥10): No scene in Act 2a (25%–50%) reaches a
+  // suspenseDelta above 1. The first half of the conflict zone is entirely flat.
+  // Early Act 2 should escalate from the inciting incident — the protagonist
+  // should already be in trouble. A void of meaningful tension in Act 2a signals
+  // a failure to engage the conflict before the midpoint. Distinct from ACT2_DEAD_ZONE
+  // (40%–60% flatness) and SECOND_ACT_INVERSION (Act 2b drops below Act 2a):
+  // this fires on Act 2a's absolute absence of tension, not relative comparison.
+  if (n >= 10) {
+    const act2aStart278 = Math.floor(n * 0.25);
+    const act2bStart278 = Math.floor(n * 0.5);
+    const hasAct2aTension278 = records.slice(act2aStart278, act2bStart278).some(r => r.suspenseDelta > 1);
+    if (!hasAct2aTension278) {
+      issues.push({
+        location: `Act 2a (Scenes ${act2aStart278}–${act2bStart278 - 1})`,
+        rule: 'ACT2A_SUSPENSE_VOID',
+        severity: 'minor',
+        description: `No scene in Act 2a (Scenes ${act2aStart278}–${act2bStart278 - 1}) reaches a suspenseDelta above 1 — the first half of the conflict zone is entirely flat. Early Act 2 should escalate from the inciting incident; a void of tension here signals a failure to engage the conflict before the midpoint.`,
+        suggestedFix: 'Raise the stakes in early Act 2: add a complication, a new obstacle, or a ticking-clock moment that pushes suspense above baseline. The conflict should be demonstrably live in Act 2a, not just implied.',
+      });
+    }
+  }
+
+  // PURPOSE_CLIMAX_ABSENT (major, n≥8): No scene carries purpose 'climax'. The
+  // story's structure has no designated climactic moment — it generates suspense
+  // without the author formally committing to which scene is the peak confrontation.
+  // Distinct from PROTAGONIST_PASSIVITY_CLIMAX (which audits the highest-suspense
+  // scene in the climax zone) — this fires when no scene declares itself the
+  // structural climax at all. A story without a climax scene has no clear summit;
+  // the audience has no moment against which all others are measured.
+  if (n >= 8) {
+    const hasClimax278 = records.some(r => r.purpose === 'climax');
+    if (!hasClimax278) {
+      issues.push({
+        location: 'Story structure — climax layer',
+        rule: 'PURPOSE_CLIMAX_ABSENT',
+        severity: 'major',
+        description: `No scene carries purpose "climax" — the structure has no designated highest moment. The story may generate suspense but never formally commits to a climax scene. Without a structural climax, the audience has no clear peak against which all other scenes are measured.`,
+        suggestedFix: "Identify the story's highest-stakes confrontation and designate it as the structural climax: the scene where the central conflict is directly engaged and the protagonist's situation is irrevocably changed. The climax is not just the most intense scene — it is the one the entire story has been building toward.",
+      });
+    }
+  }
+
+  // EMOTIONAL_ARC_UNIFORM (minor, n≥8): More than 70% of scenes share the same
+  // emotionalShift value (all neutral, all positive, or all negative). The
+  // protagonist's emotional trajectory is monotone — no rise, fall, or change
+  // across the story's dramatic events. A complete arc requires the audience to
+  // move with the protagonist through at least two distinct emotional registers.
+  // Distinct from NO_REVERSALS (suspense-based): this fires on emotional-register
+  // uniformity rather than directional suspense uniformity.
+  if (n >= 8) {
+    const emotionCounts278 = new Map<string, number>();
+    for (const r of records) {
+      emotionCounts278.set(r.emotionalShift, (emotionCounts278.get(r.emotionalShift) ?? 0) + 1);
+    }
+    const [topEmotion278, topCount278] = [...emotionCounts278.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (topCount278 / n > 0.7) {
+      issues.push({
+        location: 'Emotional arc',
+        rule: 'EMOTIONAL_ARC_UNIFORM',
+        severity: 'minor',
+        description: `${topCount278} of ${n} scenes (${Math.round(topCount278 / n * 100)}%) carry the same emotional register ("${topEmotion278}") — the protagonist's emotional trajectory is monotone. A full dramatic arc moves the character through distinct emotional phases: hope, fear, loss, recovery, and resolution.`,
+        suggestedFix: 'Vary the emotional register: if the story is uniformly neutral, inject scenes of genuine positive momentum (a win, a connection, a moment of clarity) and scenes of genuine negative pressure (a setback, a cost, a loss). Emotional variety is the mechanism by which the audience empathises with the protagonist across the full arc.',
+      });
     }
   }
 
