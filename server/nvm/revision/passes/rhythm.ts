@@ -5,6 +5,9 @@
 // Wave 151 additions: camera-direction overreach (writer directing the lens),
 // adverb clustering (lazy qualifier density in action lines), and
 // over-description (introducing characters with >4 physical descriptors).
+// Wave 263 additions: question in action (rhetorical '?' breaks cinematic
+// objectivity), simile excess (≥3 simile markers — literary register intrusion),
+// color absence (no color word in 12+ action lines — monochrome visual world).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -640,6 +643,61 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${actionLines.length} action lines contain no spatial anchor phrase — characters move through featureless space. Without "across the room", "by the window", "against the wall", the audience cannot build a mental map of the scene's geography. Every action floats in an unlocated void.`,
         suggestedFix: 'Anchor each significant action to a specific part of the space: not "she crosses to him" but "she crosses to him at the far window." Spatial specificity is what turns an abstract description into a scene the audience can see.',
+      });
+    }
+  }
+
+  // ── Wave 263: Question in action, simile excess, color absence ──
+
+  // QUESTION_IN_ACTION (minor, ≥8 lines): ≥2 action lines end with '?' — rhetorical
+  // questions in action prose break the objective cinematic present tense. The camera
+  // observes; it does not ask. Distinct from EXCLAMATION_IN_ACTION (wrong-energy marker).
+  if (actionLines.length >= 8) {
+    const questionCount263 = actionLines.filter(l => l.text.trim().endsWith('?')).length;
+    if (questionCount263 >= 2) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'QUESTION_IN_ACTION',
+        severity: 'minor',
+        description: `${questionCount263} action lines end with '?' — rhetorical questions in action prose break the objective cinematic present tense. The camera observes; it does not ask. "What does he want?" in an action line imports interior monologue or authorial musing into a form that must describe only what is seen and heard.`,
+        suggestedFix: "Remove question marks from action prose. If the question is about character intent, dramatise it through behavior: instead of 'What is she looking for?' write 'She opens every drawer. Quickly. Not finding it.' Let the audience ask the question; the action only shows what is happening.",
+      });
+    }
+  }
+
+  // SIMILE_EXCESS (minor, ≥10 lines): ≥3 action lines contain simile markers
+  // ("like a", "as if", "as though", "resembles") — simile is a prose fiction
+  // technique that substitutes comparison for direct description. Screenplay
+  // action should present the physical world as itself, not as something else.
+  if (actionLines.length >= 10) {
+    const simileRe263 = /\blike a\b|\bas if\b|\bas though\b|\bresembles\b/i;
+    const simileCount263 = actionLines.filter(l => simileRe263.test(l.text)).length;
+    if (simileCount263 >= 3) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'SIMILE_EXCESS',
+        severity: 'minor',
+        description: `${simileCount263} action lines use simile markers ("like a", "as if", "as though", "resembles") — simile is a prose fiction technique that substitutes comparison for direct description. Screenplay action lines must describe what is seen; repeated similes import a literary register that fights the concrete visual grammar of the form.`,
+        suggestedFix: `Replace similes with specific, direct physical description. Instead of "he moves like a predator," write what is actually visible: "He keeps low. Watching the exits." The camera cannot shoot a simile; it can only shoot what is there.`,
+      });
+    }
+  }
+
+  // COLOR_ABSENCE (minor, ≥12 lines): No color word appears in the action
+  // description — a 12+-line scene with no color information presents a monochrome
+  // world, giving the director and production designer nothing to work from.
+  // Distinct from VISUAL_TEXTURE_ABSENT (which fires on absence of tactile
+  // surface descriptors).
+  if (actionLines.length >= 12) {
+    const colorRe263 = /\b(red|blue|green|yellow|orange|purple|violet|pink|brown|black|white|grey|gray|gold|silver|crimson|scarlet|cobalt|amber|ivory|ebony|beige|teal|azure|emerald|olive|tan|maroon|navy|khaki)\b/i;
+    const hasColor263 = actionLines.some(l => colorRe263.test(l.text));
+    if (!hasColor263) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'COLOR_ABSENCE',
+        severity: 'minor',
+        description: `${actionLines.length} action lines contain no color reference — the visual world is rendered without color. Film is a visual medium; color is one of the cinematographer's primary expressive tools. A scene description with no color information presents a monochrome world and gives the director nothing to work from visually.`,
+        suggestedFix: 'Introduce at least one color reference in the action: the red exit sign, the grey concrete walls, the yellow stain on the ceiling. Color is not decoration — it is the screenplay\'s instruction to the visual department about the emotional temperature of the scene.',
       });
     }
   }

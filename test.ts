@@ -17897,6 +17897,122 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 263 — rhythmPass: question in action, simile excess, color absence', async () => {
+    it('QUESTION_IN_ACTION fires when ≥2 action lines end with "?"', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      const f263a = [
+        'INT. OFFICE - DAY', '',
+        'She enters the empty room.',
+        'What happened here?',
+        'The chairs are overturned.',
+        'Papers scatter across the floor.',
+        'He follows her inside.',
+        'The lights flicker above them.',
+        'Who did this?',
+        'She shakes her head slowly.',
+      ].join('\n');
+      const result263a = await rhythmPass({ fountain: f263a, original: f263a, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(result263a.issues.some((i: any) => i.rule === 'QUESTION_IN_ACTION'), `Expected QUESTION_IN_ACTION, got: ${JSON.stringify(result263a.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('QUESTION_IN_ACTION does NOT fire when fewer than 2 action lines end with "?"', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      const f263b = [
+        'INT. OFFICE - DAY', '',
+        'She enters the empty room.',
+        'The chairs are overturned.',
+        'Papers scatter across the floor.',
+        'He follows her inside.',
+        'The lights flicker above them.',
+        'She shakes her head slowly.',
+        'He moves toward the window.',
+        'She looks at the closed door.',
+      ].join('\n');
+      const result263b = await rhythmPass({ fountain: f263b, original: f263b, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(!result263b.issues.some((i: any) => i.rule === 'QUESTION_IN_ACTION'), 'Should NOT fire when fewer than 2 action lines end with "?"');
+    });
+
+    it('SIMILE_EXCESS fires when ≥3 action lines contain simile markers', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      const f263c = [
+        'INT. WAREHOUSE - NIGHT', '',
+        'He moves like a shadow through the space.',
+        'She watches from the doorway.',
+        'The stacked crates rise high.',
+        'He stops near the center.',
+        'She calls to him quietly.',
+        'The echo rings as if from another world.',
+        'He turns slowly to face her.',
+        'She approaches with caution.',
+        'As though startled, he raises his hands.',
+        'She holds her ground.',
+      ].join('\n');
+      const result263c = await rhythmPass({ fountain: f263c, original: f263c, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(result263c.issues.some((i: any) => i.rule === 'SIMILE_EXCESS'), `Expected SIMILE_EXCESS, got: ${JSON.stringify(result263c.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('SIMILE_EXCESS does NOT fire when fewer than 3 action lines have simile markers', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      const f263d = [
+        'INT. WAREHOUSE - NIGHT', '',
+        'He moves like a shadow through the space.',
+        'She watches from the doorway.',
+        'The stacked crates rise high.',
+        'He stops near the center.',
+        'She calls to him quietly.',
+        'The echo rings across the room.',
+        'He turns slowly to face her.',
+        'She approaches with caution.',
+        'He lowers his hands.',
+        'She steps back.',
+      ].join('\n');
+      const result263d = await rhythmPass({ fountain: f263d, original: f263d, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(!result263d.issues.some((i: any) => i.rule === 'SIMILE_EXCESS'), 'Should NOT fire when fewer than 3 simile markers');
+    });
+
+    it('COLOR_ABSENCE fires when ≥12 action lines contain no color word', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      const lines263e = [
+        'She enters the room and closes the door.',
+        'He stands near the window.',
+        'The desk sits in the corner.',
+        'Papers cover every surface.',
+        'He picks up a folder.',
+        'She watches him carefully.',
+        'The clock ticks on the wall.',
+        'He sets the folder down.',
+        'She moves toward the exit.',
+        'He blocks her path.',
+        'They face each other.',
+        'Neither speaks.',
+      ];
+      const f263e = ['INT. OFFICE - DAY', '', ...lines263e].join('\n');
+      const result263e = await rhythmPass({ fountain: f263e, original: f263e, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(result263e.issues.some((i: any) => i.rule === 'COLOR_ABSENCE'), `Expected COLOR_ABSENCE, got: ${JSON.stringify(result263e.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('COLOR_ABSENCE does NOT fire when at least one action line contains a color word', async () => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      const lines263f = [
+        'She enters the room and closes the door.',
+        'He stands near the window.',
+        'The red exit sign glows above the door.',
+        'Papers cover every surface.',
+        'He picks up a folder.',
+        'She watches him carefully.',
+        'The clock ticks on the wall.',
+        'He sets the folder down.',
+        'She moves toward the exit.',
+        'He blocks her path.',
+        'They face each other.',
+        'Neither speaks.',
+      ];
+      const f263f = ['INT. OFFICE - DAY', '', ...lines263f].join('\n');
+      const result263f = await rhythmPass({ fountain: f263f, original: f263f, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
+      assert.ok(!result263f.issues.some((i: any) => i.rule === 'COLOR_ABSENCE'), 'Should NOT fire when a color word is present');
+    });
+  });
+
   describe('Wave 262 — relationshipArcPass: pair oscillation, single-scene arc, weak-shift dominance', async () => {
     const makeRec262 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
