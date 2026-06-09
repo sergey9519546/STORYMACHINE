@@ -16,6 +16,9 @@
 // Wave 265 additions: clue scenes decoupled (≥2 clue-planting scenes with no theme),
 // curiosity scenes decoupled (≥2 curiosity spikes with no theme), payoff scenes
 // decoupled (≥2 payoff scenes with no theme).
+// Wave 279 additions: dramatic-turn scenes carry no theme (≥2 turns, n≥8), negative
+// emotional-shift scenes carry no theme (≥2 negative shifts, n≥8), and high-suspense
+// scenes (suspenseDelta > 1) all carry no theme (≥3 scenes, n≥8).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -896,6 +899,80 @@ export async function themePass(input: PassInput): Promise<PassResult> {
             });
             break;
           }
+        }
+      }
+    }
+
+    // ── Wave 279: Dramatic-turn decoupled, negative-shift silent, suspense cluster silent ──
+
+    // THEME_DRAMATIC_TURN_DECOUPLED (minor, n≥8, ≥2 dramatic-turn scenes): All scenes
+    // where a dramatic pivot occurs (dramaticTurn !== 'nothing') carry no thematic
+    // language. Dramatic turns are the story's decisive structural pivots — when every
+    // reversal and revelation is thematically mute, the narrative machinery operates
+    // independently of the central question. The turns steer the plot but never the theme.
+    if (records.length >= 8) {
+      const turnScenes279 = records.filter((r: any) => (r.dramaticTurn ?? 'nothing') !== 'nothing');
+      if (turnScenes279.length >= 2) {
+        const anyTurnResonant279 = turnScenes279.some((r: any) =>
+          sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        );
+        if (!anyTurnResonant279) {
+          issues.push({
+            location: 'Dramatic-turn scenes',
+            rule: 'THEME_DRAMATIC_TURN_DECOUPLED',
+            severity: 'minor',
+            description: `${turnScenes279.length} scenes with a dramatic turn carry no thematic language related to "${themeRaw}" — every narrative pivot is thematically mute. Dramatic turns are the story's decisive moments; when they never carry the theme, reversals change the plot without ever answering the central question.`,
+            suggestedFix: `Rewrite at least one dramatic-turn scene so the reversal speaks to the theme: the pivot should cost the protagonist something related to "${themeRaw}" or reveal a truth about it. A turn that changes the plot AND the thematic stakes is infinitely more resonant.`,
+          });
+        }
+      }
+    }
+
+    // THEME_NEGATIVE_SHIFT_SILENT (minor, n≥8, ≥2 negative-shift scenes): All scenes
+    // with negative emotional shifts carry no thematic language. The story's darkest
+    // moments — where the protagonist loses, fails, or suffers — have no connection
+    // to the central question. Theme should be felt most keenly at the nadir; when
+    // loss and theme are decoupled, the pain has no meaning. Inverse of
+    // THEME_POSITIVE_SHIFT_SILENT (which fires when positive scenes are thematically silent).
+    if (records.length >= 8) {
+      const negScenes279 = records.filter((r: any) => r.emotionalShift === 'negative');
+      if (negScenes279.length >= 2) {
+        const anyNegResonant279 = negScenes279.some((r: any) =>
+          sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        );
+        if (!anyNegResonant279) {
+          issues.push({
+            location: 'Negative emotional shift scenes',
+            rule: 'THEME_NEGATIVE_SHIFT_SILENT',
+            severity: 'minor',
+            description: `${negScenes279.length} scenes with negative emotional shifts carry no thematic language — the story's darkest moments are thematically mute. When loss and the central question are decoupled, the audience feels the pain without understanding its meaning in terms of "${themeRaw}".`,
+            suggestedFix: `Let the theme speak at the story's lowest point: a scene of loss or failure should make explicit what thematic value was sacrificed. If the theme is loyalty, the betrayal should cost that; if courage, the defeat should name what was given up. Pain needs thematic meaning to become drama.`,
+          });
+        }
+      }
+    }
+
+    // THEME_SUSPENSE_CLUSTER_SILENT (minor, n≥8, ≥3 scenes with suspenseDelta > 1): All
+    // high-suspense scenes carry no thematic language. The moments of maximum tension
+    // — where the audience's pulse quickens — have no thematic dimension. Distinct from
+    // THEME_CLOCK_RESONANCE_ABSENT (ticking clocks) and THEME_CLIMAX_SCENE_SILENT (single
+    // peak scene): this checks whether the cluster of high-tension scenes as a group
+    // carries any theme. When all suspense is thematically empty, the story is exciting
+    // but not meaningful.
+    if (records.length >= 8) {
+      const suspenseScenes279 = records.filter((r: any) => (r.suspenseDelta ?? 0) > 1);
+      if (suspenseScenes279.length >= 3) {
+        const anySuspenseResonant279 = suspenseScenes279.some((r: any) =>
+          sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        );
+        if (!anySuspenseResonant279) {
+          issues.push({
+            location: 'High-suspense scenes',
+            rule: 'THEME_SUSPENSE_CLUSTER_SILENT',
+            severity: 'minor',
+            description: `${suspenseScenes279.length} high-suspense scenes (suspenseDelta > 1) carry no thematic language related to "${themeRaw}" — the story's most gripping moments are thematically hollow. Tension that never implicates the central question makes the story exciting but not meaningful.`,
+            suggestedFix: `Weave the theme into at least one high-suspense scene: the thing at stake in the tense moment should connect to "${themeRaw}". If the audience is on the edge of their seat, they should also be questioning what the story is about — the greatest suspense is thematic as well as physical.`,
+          });
         }
       }
     }

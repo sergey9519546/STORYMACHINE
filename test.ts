@@ -17897,6 +17897,106 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 279 — themePass: dramatic-turn decoupled, negative-shift silent, suspense cluster silent', async () => {
+    const makeRec279 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const THEME279 = 'loyalty and trust among allies';
+    // fountain has the theme word in scene 0 so resonance exists for the if-block to run
+    const fountain279 = `INT. SC0 - DAY\nLoyalty matters.\n\nINT. SC1 - DAY\nAction.\n`;
+    const makeInput279 = (records: any[]) => ({
+      fountain: fountain279, original: fountain279, records,
+      structure: {} as any, annotations: [], approvedSpans: [],
+      storyContext: { theme: THEME279 },
+    });
+
+    it('THEME_DRAMATIC_TURN_DECOUPLED fires when ≥2 dramatic-turn scenes carry no theme', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const recs279a = [
+        makeRec279(0, { dialogueHighlights: ['loyalty matters here'] }), // resonant anchor
+        makeRec279(1, { dramaticTurn: 'reversal' }),
+        makeRec279(2, { dramaticTurn: 'revelation' }),
+        makeRec279(3), makeRec279(4), makeRec279(5), makeRec279(6), makeRec279(7),
+      ];
+      const result279a = await themePass(makeInput279(recs279a));
+      const fired279a = result279a.issues.filter(i => i.rule === 'THEME_DRAMATIC_TURN_DECOUPLED');
+      assert.strictEqual(fired279a.length, 1, 'Should fire THEME_DRAMATIC_TURN_DECOUPLED when all turn-scenes have no theme');
+    });
+
+    it('THEME_DRAMATIC_TURN_DECOUPLED does NOT fire when a dramatic-turn scene carries the theme', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const recs279b = [
+        makeRec279(0, { dialogueHighlights: ['loyalty matters here'] }),
+        makeRec279(1, { dramaticTurn: 'reversal', dialogueHighlights: ['a test of loyalty'] }), // resonant turn
+        makeRec279(2, { dramaticTurn: 'revelation' }),
+        makeRec279(3), makeRec279(4), makeRec279(5), makeRec279(6), makeRec279(7),
+      ];
+      const result279b = await themePass(makeInput279(recs279b));
+      const fired279b = result279b.issues.filter(i => i.rule === 'THEME_DRAMATIC_TURN_DECOUPLED');
+      assert.strictEqual(fired279b.length, 0, 'Should NOT fire THEME_DRAMATIC_TURN_DECOUPLED when a turn-scene carries theme');
+    });
+
+    it('THEME_NEGATIVE_SHIFT_SILENT fires when ≥2 negative-shift scenes carry no theme', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const recs279c = [
+        makeRec279(0, { dialogueHighlights: ['loyalty matters here'] }),
+        makeRec279(1, { emotionalShift: 'negative' }),
+        makeRec279(2, { emotionalShift: 'negative' }),
+        makeRec279(3), makeRec279(4), makeRec279(5), makeRec279(6), makeRec279(7),
+      ];
+      const result279c = await themePass(makeInput279(recs279c));
+      const fired279c = result279c.issues.filter(i => i.rule === 'THEME_NEGATIVE_SHIFT_SILENT');
+      assert.strictEqual(fired279c.length, 1, 'Should fire THEME_NEGATIVE_SHIFT_SILENT when negative-shift scenes have no theme');
+    });
+
+    it('THEME_NEGATIVE_SHIFT_SILENT does NOT fire when a negative-shift scene carries the theme', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const recs279d = [
+        makeRec279(0, { dialogueHighlights: ['loyalty matters here'] }),
+        makeRec279(1, { emotionalShift: 'negative', dialogueHighlights: ['loyalty betrayed'] }), // resonant
+        makeRec279(2, { emotionalShift: 'negative' }),
+        makeRec279(3), makeRec279(4), makeRec279(5), makeRec279(6), makeRec279(7),
+      ];
+      const result279d = await themePass(makeInput279(recs279d));
+      const fired279d = result279d.issues.filter(i => i.rule === 'THEME_NEGATIVE_SHIFT_SILENT');
+      assert.strictEqual(fired279d.length, 0, 'Should NOT fire THEME_NEGATIVE_SHIFT_SILENT when a negative-shift scene has theme');
+    });
+
+    it('THEME_SUSPENSE_CLUSTER_SILENT fires when ≥3 high-suspense scenes carry no theme', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const recs279e = [
+        makeRec279(0, { dialogueHighlights: ['loyalty matters here'] }),
+        makeRec279(1, { suspenseDelta: 2 }),
+        makeRec279(2, { suspenseDelta: 3 }),
+        makeRec279(3, { suspenseDelta: 1.5 }),
+        makeRec279(4), makeRec279(5), makeRec279(6), makeRec279(7),
+      ];
+      const result279e = await themePass(makeInput279(recs279e));
+      const fired279e = result279e.issues.filter(i => i.rule === 'THEME_SUSPENSE_CLUSTER_SILENT');
+      assert.strictEqual(fired279e.length, 1, 'Should fire THEME_SUSPENSE_CLUSTER_SILENT when all high-suspense scenes lack theme');
+    });
+
+    it('THEME_SUSPENSE_CLUSTER_SILENT does NOT fire when a high-suspense scene carries the theme', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const recs279f = [
+        makeRec279(0, { dialogueHighlights: ['loyalty matters here'] }),
+        makeRec279(1, { suspenseDelta: 2, dialogueHighlights: ['loyalty under pressure'] }), // resonant
+        makeRec279(2, { suspenseDelta: 3 }),
+        makeRec279(3, { suspenseDelta: 1.5 }),
+        makeRec279(4), makeRec279(5), makeRec279(6), makeRec279(7),
+      ];
+      const result279f = await themePass(makeInput279(recs279f));
+      const fired279f = result279f.issues.filter(i => i.rule === 'THEME_SUSPENSE_CLUSTER_SILENT');
+      assert.strictEqual(fired279f.length, 0, 'Should NOT fire THEME_SUSPENSE_CLUSTER_SILENT when a high-suspense scene has theme');
+    });
+  });
+
   describe('Wave 278 — structurePass: Act 2a suspense void, climax purpose absent, emotional arc uniform', async () => {
     const makeRecS278 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
