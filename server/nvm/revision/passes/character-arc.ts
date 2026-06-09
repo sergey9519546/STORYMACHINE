@@ -10,6 +10,9 @@
 // late introduction (major character first appears past the midpoint), and
 // emotional whiplash (rapid alternating emotional shifts without grounding).
 // Wave 256 additions: relational dimension monotony (all shifts on one axis),
+// Wave 270 additions: positive-only arc (no negative beats, no stakes),
+// shift concentration (all relational movement in 3-scene burst),
+// late relational void (no shifts in final quarter).
 // emotional flatline (≥80% neutral scenes), negative-only arc (no positive beat).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
@@ -831,6 +834,79 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         description: `All ${nonNeutral256.length} emotionally charged scenes in the story are negative — there is not a single positive beat anywhere. Unrelieved downward emotion gives the audience no contrast: despair only registers against the memory of hope, and a story told entirely in the minor key flattens into monotone bleakness.`,
         suggestedFix: 'Plant at least one or two positive emotional beats — a small victory, a moment of connection, a flash of hope — even (especially) in a tragedy. The darkness deepens when it follows light; without contrast, relentless bleakness numbs rather than moves.',
       });
+    }
+  }
+
+  // ── Wave 270: ARC_POSITIVE_ONLY ───────────────────────────────────────────
+  // Every non-neutral emotional beat in the story is positive — there is not
+  // a single negative scene anywhere. The mirror of ARC_NEGATIVE_ONLY: a story
+  // told entirely in the major key has no stakes. When nothing goes wrong, the
+  // audience has nothing to fear for; when every beat is a victory, there is no
+  // cost to the protagonist and the final triumph carries no weight.
+  // Requires 8+ records and 3+ non-neutral scenes.
+  if (records.length >= 8) {
+    const nonNeutral270 = records.filter(r => r.emotionalShift !== 'neutral');
+    if (nonNeutral270.length >= 3 && nonNeutral270.every(r => r.emotionalShift === 'positive')) {
+      issues.push({
+        location: 'Emotional arc polarity',
+        rule: 'ARC_POSITIVE_ONLY',
+        severity: 'minor',
+        description: `All ${nonNeutral270.length} emotionally charged scenes in the story are positive — there is not a single negative beat. A story told entirely in the major key has no stakes: without setbacks, the protagonist's successes are inevitable, and the final triumph carries no emotional weight because nothing was ever lost or risked.`,
+        suggestedFix: 'Plant at least one or two negative emotional beats — a setback, a loss, a moment of genuine failure or despair — even in a comedy. Positive beats land harder when they follow darkness; unbroken positivity reads as conflict-free fantasy rather than earned resolution.',
+      });
+    }
+  }
+
+  // ── Wave 270: ARC_SHIFT_CONCENTRATION ─────────────────────────────────────
+  // Three or more scenes with relationship shifts all cluster within a 3-scene
+  // window (max scene index − min scene index ≤ 2). All relational movement
+  // is packed into one concentrated burst rather than distributed across the
+  // arc. Relationships develop gradually — trust erodes over time, power
+  // accumulates scene by scene; cramming all relational change into a single
+  // stretch compresses what should be a gradual arc into a sudden event.
+  // Requires 8+ records and 3+ distinct scenes with shifts.
+  if (records.length >= 8) {
+    const shiftScenes270 = new Set<number>();
+    for (const r of records) {
+      if ((r.relationshipShifts as any[] ?? []).length > 0) shiftScenes270.add(r.sceneIdx as number);
+    }
+    if (shiftScenes270.size >= 3) {
+      const shiftIdxList270 = [...shiftScenes270].sort((a, b) => a - b);
+      const span270 = shiftIdxList270[shiftIdxList270.length - 1] - shiftIdxList270[0];
+      if (span270 <= 2) {
+        issues.push({
+          location: `Scenes ${shiftIdxList270.join(', ')} — relational concentration`,
+          rule: 'ARC_SHIFT_CONCENTRATION',
+          severity: 'minor',
+          description: `All ${shiftScenes270.size} scenes with relationship shifts are packed within a ${span270 + 1}-scene window (scenes ${shiftIdxList270.join(', ')}). Every relational change the story makes happens in a single concentrated burst — trust, power, and intimacy that should shift gradually across the arc are compressed into one stretch, reading as sudden event rather than organic development.`,
+          suggestedFix: 'Distribute relationship shifts across the full arc. Let early scenes establish the baseline, mid-story scenes strain the relationship, and late scenes either repair or break it permanently. Relational change that accumulates over time reads as earned; concentrated change reads as contrived.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 270: ARC_LATE_RELATIONAL_VOID ────────────────────────────────────
+  // The story has 3+ total relationship shifts but none occur in the final
+  // quarter of the arc. The climax — where relational stakes should peak —
+  // has no relational movement at all. Characters enter the final act with
+  // fully settled relationships and the resolution has no relational cost.
+  // Distinct from ARC_MIDPOINT_RELATIONAL_VOID (midpoint-specific); this
+  // flags the final act specifically.
+  // Requires 8+ records and 3+ total relationship shifts.
+  if (records.length >= 8) {
+    const totalShifts270 = (records as any[]).reduce((acc, r) => acc + ((r.relationshipShifts as any[] ?? []).length), 0);
+    if (totalShifts270 >= 3) {
+      const finalActStart270 = Math.floor(records.length * 0.75);
+      const lateShiftScenes270 = (records as any[]).filter(r => r.sceneIdx >= finalActStart270 && (r.relationshipShifts as any[] ?? []).length > 0);
+      if (lateShiftScenes270.length === 0) {
+        issues.push({
+          location: `Final quarter (scene ${finalActStart270}+) — relational void`,
+          rule: 'ARC_LATE_RELATIONAL_VOID',
+          severity: 'minor',
+          description: `${totalShifts270} relationship shifts occur across the story but none appear in the final quarter (scene ${finalActStart270}+). The climax has no relational movement — characters enter the resolution with fully settled bonds and the outcome costs nothing relationally. The final act confirms rather than completes the character arc.`,
+          suggestedFix: 'Add at least one relationship shift in the final act: a reconciliation, a definitive break, an unexpected alliance. The climax should change at least one relationship permanently — the audience needs to see the relational cost or reward of everything that came before it.',
+        });
+      }
     }
   }
 

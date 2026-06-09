@@ -17897,6 +17897,125 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 270 — characterArcPass: positive-only arc, shift concentration, late relational void', async () => {
+    const makeRec270 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'dialogue', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput270 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: '...',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any, annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+    const shift270 = (pairKey: string, dimension: string, amount: number) => ({ pairKey, dimension, amount });
+
+    it('ARC_POSITIVE_ONLY fires when every non-neutral beat is positive with no negative beats', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // 8 scenes; 4 positive, 4 neutral, zero negative
+      const records270a = [
+        makeRec270(0, { emotionalShift: 'positive' }),
+        makeRec270(1),
+        makeRec270(2, { emotionalShift: 'positive' }),
+        makeRec270(3),
+        makeRec270(4, { emotionalShift: 'positive' }),
+        makeRec270(5),
+        makeRec270(6, { emotionalShift: 'positive' }),
+        makeRec270(7),
+      ];
+      const result270a = await characterArcPass(makeInput270(records270a));
+      const po = result270a.issues.filter((i: any) => i.rule === 'ARC_POSITIVE_ONLY');
+      assert.ok(po.length >= 1, `Should detect ARC_POSITIVE_ONLY, got: ${JSON.stringify(result270a.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(po[0].severity, 'minor');
+    });
+
+    it('ARC_POSITIVE_ONLY does NOT fire when at least one negative beat exists', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // 8 scenes; 3 positive, 1 negative, rest neutral
+      const records270b = [
+        makeRec270(0, { emotionalShift: 'positive' }),
+        makeRec270(1),
+        makeRec270(2, { emotionalShift: 'positive' }),
+        makeRec270(3, { emotionalShift: 'negative' }),
+        makeRec270(4, { emotionalShift: 'positive' }),
+        makeRec270(5),
+        makeRec270(6),
+        makeRec270(7),
+      ];
+      const result270b = await characterArcPass(makeInput270(records270b));
+      const po = result270b.issues.filter((i: any) => i.rule === 'ARC_POSITIVE_ONLY');
+      assert.strictEqual(po.length, 0, 'Should NOT fire when at least one negative beat exists');
+    });
+
+    it('ARC_SHIFT_CONCENTRATION fires when all shift scenes are within a 3-scene window', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // 8 scenes; shifts only at scenes 2, 3, 4 — span=2 → fires
+      const records270c = [
+        makeRec270(0), makeRec270(1),
+        makeRec270(2, { relationshipShifts: [shift270('alice-bob', 'trust', 0.5)] }),
+        makeRec270(3, { relationshipShifts: [shift270('alice-bob', 'power', -0.4)] }),
+        makeRec270(4, { relationshipShifts: [shift270('bob-carol', 'intimacy', 0.3)] }),
+        makeRec270(5), makeRec270(6), makeRec270(7),
+      ];
+      const result270c = await characterArcPass(makeInput270(records270c));
+      const sc = result270c.issues.filter((i: any) => i.rule === 'ARC_SHIFT_CONCENTRATION');
+      assert.ok(sc.length >= 1, `Should detect ARC_SHIFT_CONCENTRATION, got: ${JSON.stringify(result270c.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(sc[0].severity, 'minor');
+    });
+
+    it('ARC_SHIFT_CONCENTRATION does NOT fire when shifts are distributed across the arc', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // 8 scenes; shifts at scenes 0, 3, 7 — span=7 → no fire
+      const records270d = [
+        makeRec270(0, { relationshipShifts: [shift270('alice-bob', 'trust', 0.5)] }),
+        makeRec270(1), makeRec270(2),
+        makeRec270(3, { relationshipShifts: [shift270('alice-bob', 'power', -0.4)] }),
+        makeRec270(4), makeRec270(5), makeRec270(6),
+        makeRec270(7, { relationshipShifts: [shift270('bob-carol', 'intimacy', 0.3)] }),
+      ];
+      const result270d = await characterArcPass(makeInput270(records270d));
+      const sc = result270d.issues.filter((i: any) => i.rule === 'ARC_SHIFT_CONCENTRATION');
+      assert.strictEqual(sc.length, 0, 'Should NOT fire when shifts are distributed across the arc');
+    });
+
+    it('ARC_LATE_RELATIONAL_VOID fires when no shifts appear in the final quarter', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // 8 scenes; finalActStart=6; shifts at scenes 0, 2, 4 — none at 6 or 7
+      const records270e = [
+        makeRec270(0, { relationshipShifts: [shift270('alice-bob', 'trust', 0.5)] }),
+        makeRec270(1),
+        makeRec270(2, { relationshipShifts: [shift270('alice-bob', 'power', -0.4)] }),
+        makeRec270(3),
+        makeRec270(4, { relationshipShifts: [shift270('bob-carol', 'intimacy', 0.3)] }),
+        makeRec270(5), makeRec270(6), makeRec270(7),
+      ];
+      const result270e = await characterArcPass(makeInput270(records270e));
+      const lrv = result270e.issues.filter((i: any) => i.rule === 'ARC_LATE_RELATIONAL_VOID');
+      assert.ok(lrv.length >= 1, `Should detect ARC_LATE_RELATIONAL_VOID, got: ${JSON.stringify(result270e.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(lrv[0].severity, 'minor');
+    });
+
+    it('ARC_LATE_RELATIONAL_VOID does NOT fire when a shift appears in the final quarter', async () => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      // 8 scenes; finalActStart=6; shift at scene 7 (final quarter) → no fire
+      const records270f = [
+        makeRec270(0, { relationshipShifts: [shift270('alice-bob', 'trust', 0.5)] }),
+        makeRec270(1),
+        makeRec270(2, { relationshipShifts: [shift270('alice-bob', 'power', -0.4)] }),
+        makeRec270(3), makeRec270(4), makeRec270(5), makeRec270(6),
+        makeRec270(7, { relationshipShifts: [shift270('bob-carol', 'intimacy', 0.3)] }),
+      ];
+      const result270f = await characterArcPass(makeInput270(records270f));
+      const lrv = result270f.issues.filter((i: any) => i.rule === 'ARC_LATE_RELATIONAL_VOID');
+      assert.strictEqual(lrv.length, 0, 'Should NOT fire when a shift appears in the final quarter');
+    });
+  });
+
   describe('Wave 269 — dialoguePass: dialogue question cluster, agreement chain, long speech dominance', async () => {
     const dInput269 = (fountain: string) => ({ fountain, original: fountain, records: [] as any, structure: {} as any, annotations: [], approvedSpans: [] });
 
