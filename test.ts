@@ -17897,6 +17897,108 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 262 — relationshipArcPass: pair oscillation, single-scene arc, weak-shift dominance', async () => {
+    const makeRec262 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeInput262 = (records: any[]) => ({
+      fountain: 'INT. SC - DAY\nAction line.\n', original: '...',
+      records: records as any, structure: {} as any,
+      storyContext: {} as any,
+      annotations: records.map(() => null) as any,
+      approvedSpans: [],
+    });
+
+    it('PAIR_OSCILLATION fires when a pair sign flips ≥3 times across ≥4 shifts', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const records262a = [
+        makeRec262(0),
+        makeRec262(1, { relationshipShifts: [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: 0.4 }] }),
+        makeRec262(2, { relationshipShifts: [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: -0.4 }] }),
+        makeRec262(3, { relationshipShifts: [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: 0.3 }] }),
+        makeRec262(4, { relationshipShifts: [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: -0.5 }] }),
+        makeRec262(5),
+      ];
+      const result262a = await relationshipArcPass(makeInput262(records262a));
+      assert.ok(result262a.issues.some((i: any) => i.rule === 'PAIR_OSCILLATION'), `Expected PAIR_OSCILLATION, got: ${JSON.stringify(result262a.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('PAIR_OSCILLATION does NOT fire when sign flips are fewer than 3', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const records262b = [
+        makeRec262(0),
+        makeRec262(1, { relationshipShifts: [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: 0.4 }] }),
+        makeRec262(2, { relationshipShifts: [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: 0.3 }] }),
+        makeRec262(3, { relationshipShifts: [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: -0.4 }] }),
+        makeRec262(4, { relationshipShifts: [{ pairKey: 'ALICE|BOB', dimension: 'trust', amount: 0.2 }] }),
+        makeRec262(5),
+      ];
+      const result262b = await relationshipArcPass(makeInput262(records262b));
+      assert.ok(!result262b.issues.some((i: any) => i.rule === 'PAIR_OSCILLATION'), 'Should NOT fire when sign flips are only 2');
+    });
+
+    it('PAIR_SINGLE_SCENE_ARC fires when all ≥3 shifts for a pair occur in the same scene', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const records262c = [
+        makeRec262(0),
+        makeRec262(1, { relationshipShifts: [
+          { pairKey: 'CAROL|DAN', dimension: 'trust', amount: 0.3 },
+          { pairKey: 'CAROL|DAN', dimension: 'power', amount: -0.4 },
+          { pairKey: 'CAROL|DAN', dimension: 'affinity', amount: 0.2 },
+        ]}),
+        makeRec262(2), makeRec262(3), makeRec262(4), makeRec262(5),
+      ];
+      const result262c = await relationshipArcPass(makeInput262(records262c));
+      assert.ok(result262c.issues.some((i: any) => i.rule === 'PAIR_SINGLE_SCENE_ARC'), `Expected PAIR_SINGLE_SCENE_ARC, got: ${JSON.stringify(result262c.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('PAIR_SINGLE_SCENE_ARC does NOT fire when shifts are distributed across scenes', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const records262d = [
+        makeRec262(0, { relationshipShifts: [{ pairKey: 'CAROL|DAN', dimension: 'trust', amount: 0.3 }] }),
+        makeRec262(1, { relationshipShifts: [{ pairKey: 'CAROL|DAN', dimension: 'power', amount: -0.4 }] }),
+        makeRec262(2, { relationshipShifts: [{ pairKey: 'CAROL|DAN', dimension: 'affinity', amount: 0.2 }] }),
+        makeRec262(3), makeRec262(4), makeRec262(5),
+      ];
+      const result262d = await relationshipArcPass(makeInput262(records262d));
+      assert.ok(!result262d.issues.some((i: any) => i.rule === 'PAIR_SINGLE_SCENE_ARC'), 'Should NOT fire when shifts span multiple scenes');
+    });
+
+    it('PAIR_WEAK_SHIFT_DOMINANCE fires when ≥4 shifts all have |amount| < 0.2', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const records262e = [
+        makeRec262(0),
+        makeRec262(1, { relationshipShifts: [{ pairKey: 'EVE|FRANK', dimension: 'trust', amount: 0.1 }] }),
+        makeRec262(2, { relationshipShifts: [{ pairKey: 'EVE|FRANK', dimension: 'trust', amount: -0.05 }] }),
+        makeRec262(3, { relationshipShifts: [{ pairKey: 'EVE|FRANK', dimension: 'trust', amount: 0.15 }] }),
+        makeRec262(4, { relationshipShifts: [{ pairKey: 'EVE|FRANK', dimension: 'trust', amount: -0.1 }] }),
+        makeRec262(5),
+      ];
+      const result262e = await relationshipArcPass(makeInput262(records262e));
+      assert.ok(result262e.issues.some((i: any) => i.rule === 'PAIR_WEAK_SHIFT_DOMINANCE'), `Expected PAIR_WEAK_SHIFT_DOMINANCE, got: ${JSON.stringify(result262e.issues.map((i: any) => i.rule))}`);
+    });
+
+    it('PAIR_WEAK_SHIFT_DOMINANCE does NOT fire when at least one shift has |amount| ≥ 0.2', async () => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const records262f = [
+        makeRec262(0),
+        makeRec262(1, { relationshipShifts: [{ pairKey: 'EVE|FRANK', dimension: 'trust', amount: 0.1 }] }),
+        makeRec262(2, { relationshipShifts: [{ pairKey: 'EVE|FRANK', dimension: 'trust', amount: -0.05 }] }),
+        makeRec262(3, { relationshipShifts: [{ pairKey: 'EVE|FRANK', dimension: 'trust', amount: 0.5 }] }),
+        makeRec262(4, { relationshipShifts: [{ pairKey: 'EVE|FRANK', dimension: 'trust', amount: -0.1 }] }),
+        makeRec262(5),
+      ];
+      const result262f = await relationshipArcPass(makeInput262(records262f));
+      assert.ok(!result262f.issues.some((i: any) => i.rule === 'PAIR_WEAK_SHIFT_DOMINANCE'), 'Should NOT fire when at least one shift has magnitude ≥ 0.2');
+    });
+  });
+
   describe('Wave 261 — payoffPass: payoff precedes setup, payoff gap excessive, payoff front-loaded', async () => {
     const makeRec261 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

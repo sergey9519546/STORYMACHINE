@@ -14,6 +14,8 @@
 // Wave 161 additions: single pair relationship (all shifts involve only one pair),
 // late relationship introduction (pair with 3+ shifts first shifts after midpoint),
 // relationship velocity collapse (shifts in first half but none in second half).
+// Wave 262 additions: pair oscillation (signs flip 3+ times), single-scene arc (all
+// of a pair's shifts in one scene), weak-shift dominance (frequent but tiny shifts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -749,6 +751,84 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
   // ── End Wave 248 ─────────────────────────────────────────────────────────────
 
   // ── End Wave 234 ─────────────────────────────────────────────────────────────
+
+  // ── Wave 262: Pair oscillation, single-scene arc, late introduction ──
+
+  // PAIR_OSCILLATION (minor, ≥4 shifts): A pair's shift signs alternate three or
+  // more times (+,-,+,- …) — the relationship yo-yos between warming and souring
+  // with no settled direction. Distinct from MONOTONE_RELATIONSHIP (all one sign):
+  // this is the opposite failure, a bond that flips so often it never establishes a
+  // trajectory. Constant reversals without escalation read as indecision rather
+  // than dynamism — the audience stops trusting any given state will hold.
+  if (records.length >= 6) {
+    for (const [pairKey262, stats262] of pairStats) {
+      if (stats262.shifts.length < 4) continue;
+      const signs262 = stats262.shifts.map(s => Math.sign(s.amount)).filter(sg => sg !== 0);
+      let flips262 = 0;
+      for (let i = 1; i < signs262.length; i++) {
+        if (signs262[i] !== signs262[i - 1]) flips262++;
+      }
+      if (flips262 >= 3) {
+        const [a262, b262] = pairKey262.split('|');
+        issues.push({
+          location: `${a262} ↔ ${b262}`,
+          rule: 'PAIR_OSCILLATION',
+          severity: 'minor',
+          description: `The relationship between ${a262} and ${b262} reverses direction ${flips262} times across ${stats262.shifts.length} shifts (warming, then souring, then warming again) — the bond yo-yos with no settled trajectory. Constant reversals without escalation read as indecision; the audience stops believing any state will hold.`,
+          suggestedFix: `Give ${a262} and ${b262} a through-line: even a turbulent relationship should trend somewhere. Let each reversal cut deeper or build higher than the last so the oscillation becomes an escalating spiral, not a flat back-and-forth that resets each scene.`,
+        });
+        break;
+      }
+    }
+  }
+
+  // PAIR_SINGLE_SCENE_ARC (minor, ≥3 shifts): A pair's entire shift history (three
+  // or more shifts) occurs within a single scene — the whole relationship arc is
+  // compressed into one beat. Distinct from PAIR_VELOCITY_SPIKE (a 3-scene burst):
+  // this is the extreme case where the bond's every movement lands in the same
+  // scene, then never moves again. An arc that happens all at once isn't an arc;
+  // it's an event the rest of the story doesn't develop.
+  if (records.length >= 6) {
+    for (const [pairKey262b, stats262b] of pairStats) {
+      if (stats262b.shifts.length < 3) continue;
+      const firstScene262b = stats262b.shifts[0].sceneIdx;
+      if (stats262b.shifts.every(s => s.sceneIdx === firstScene262b)) {
+        const [a262b, b262b] = pairKey262b.split('|');
+        issues.push({
+          location: `${a262b} ↔ ${b262b} (Scene ${firstScene262b})`,
+          rule: 'PAIR_SINGLE_SCENE_ARC',
+          severity: 'minor',
+          description: `The entire relationship arc between ${a262b} and ${b262b} (${stats262b.shifts.length} shifts) happens inside a single scene (Scene ${firstScene262b}) — the bond changes completely in one beat and then never moves again. An arc compressed into one scene isn't an arc; it's an event the rest of the story leaves undeveloped.`,
+          suggestedFix: `Distribute the ${a262b}–${b262b} shifts across the story: plant the relationship early, complicate it in the middle, resolve it near the end. A relationship that does all its changing in one scene denies the audience the slow build that makes the change matter.`,
+        });
+        break;
+      }
+    }
+  }
+
+  // PAIR_WEAK_SHIFT_DOMINANCE (minor, ≥4 shifts): A pair shifts frequently (four or
+  // more times) but every shift is tiny (|amount| < 0.2) — the relationship registers
+  // constant micro-adjustments that never accumulate into a felt change. Lots of
+  // motion, no distance covered. Distinct from STATIC_RELATIONSHIP (net cancels to
+  // ~0): here the net can be non-zero, but no single beat is ever strong enough for
+  // the audience to feel the bond move. The relationship fidgets instead of changing.
+  if (records.length >= 6) {
+    for (const [pairKey262c, stats262c] of pairStats) {
+      if (stats262c.shifts.length < 4) continue;
+      const maxMag262c = Math.max(...stats262c.shifts.map(s => Math.abs(s.amount)));
+      if (maxMag262c < 0.2) {
+        const [a262c, b262c] = pairKey262c.split('|');
+        issues.push({
+          location: `${a262c} ↔ ${b262c}`,
+          rule: 'PAIR_WEAK_SHIFT_DOMINANCE',
+          severity: 'minor',
+          description: `The relationship between ${a262c} and ${b262c} shifts ${stats262c.shifts.length} times but no single shift exceeds 0.2 in magnitude — the bond registers constant micro-adjustments that never accumulate into a felt change. There is lots of motion but no distance covered; the relationship fidgets rather than transforming.`,
+          suggestedFix: `Let at least one ${a262c}–${b262c} beat carry real weight: a decisive betrayal, a profound reconciliation, a moment that visibly resets the relationship. A bond made of nothing but tiny tremors never gives the audience a change to register.`,
+        });
+        break;
+      }
+    }
+  }
 
   const { revised, usedLLM } = await rewritePass({
     fountain, issues, passName: 'relationship-arc', approvedSpans,
