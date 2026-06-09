@@ -9,6 +9,9 @@
 // and emotional arc plateau (all scenes neutral — no emotional peaks or valleys).
 // Wave 259 additions: copula action dominance (linking-verb staging), filtering-
 // verb overuse (perception framing), and directorial intrusion (camera/shot calls).
+// Wave 273 additions: exclamation in action (editorial excitement in stage directions),
+// parenthetical flood (>30% of dialogue lines are acting wrench directions),
+// location repetition (>70% of sluglines use the same location).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1065,6 +1068,94 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         description: `${directorialCount259} action lines embed explicit camera or editing directions ("ANGLE ON", "WE SEE", "PAN", "ZOOM", "CLOSE ON"). A spec script directs the reader's eye through prose, not shot calls — naming the lens is the director's job. Overt camera direction dates the page and pulls the reader out of the story.`,
         suggestedFix: 'Translate camera direction into prose emphasis. Instead of "CLOSE ON the trembling hand", write a line that isolates it: "Her hand trembles. Just her hand." White space and sentence focus do the camera\'s work without claiming the director\'s chair.',
       });
+    }
+  }
+
+  // ── Wave 273: EXCLAMATION_IN_ACTION ───────────────────────────────────────
+  // Two or more action lines end with an exclamation mark. Exclamation marks in
+  // stage directions are editorial intrusion — the writer is performing excitement
+  // rather than writing it into the scene. Action prose should present events and
+  // let them speak; an '!' in description tells the reader how to feel rather than
+  // giving them something to feel. A single '!' might be a deliberate stylistic
+  // accent; two or more signals a habit. Requires 8+ action lines.
+  if (actionLines217.length >= 8) {
+    const exclamActionCount273 = actionLines217.filter(t => t.endsWith('!')).length;
+    if (exclamActionCount273 >= 2) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'EXCLAMATION_IN_ACTION',
+        severity: 'minor',
+        description: `${exclamActionCount273} action lines end with "!" — the writer is using exclamation marks in stage directions, editorializing rather than writing. Stage direction should present events; an exclamation mark tells the reader how to feel instead of giving them a scene to react to. When description shouts, it stops trusting the event.`,
+        suggestedFix: 'Remove exclamation marks from action lines. If the scene needs to feel urgent or explosive, write the urgency into the verbs and imagery, not the punctuation. "The car explodes." is stronger than "The car explodes!". The event carries its own charge.',
+      });
+    }
+  }
+
+  // ── Wave 273: PARENTHETICAL_FLOOD ─────────────────────────────────────────
+  // More than 30% of dialogue lines are parenthetical acting wrench directions
+  // ("(beat)", "(laughs)", "(angrily)"). Parentheticals should be rare, used only
+  // when the delivery is genuinely non-obvious from context; overusing them means
+  // the writer does not trust the dialogue or the actor. A page heavy with wrench
+  // directions reads as novice — experienced writers say it once in the words
+  // and let the reading do the rest. Requires 10+ dialogue lines.
+  {
+    let parentheticalCount273 = 0;
+    let dlgLineCount273 = 0;
+    let inDlg273 = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg273 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg273 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg273 = true; continue; }
+      if (!inDlg273) continue;
+      if (/^\(/.test(t)) parentheticalCount273++;
+      else dlgLineCount273++;
+    }
+    if (dlgLineCount273 >= 10 && parentheticalCount273 / dlgLineCount273 > 0.30) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'PARENTHETICAL_FLOOD',
+        severity: 'minor',
+        description: `${parentheticalCount273} parenthetical acting directions appear alongside ${dlgLineCount273} dialogue lines (${Math.round(parentheticalCount273 / dlgLineCount273 * 100)}%) — the writer is over-directing the actors. Parentheticals should be reserved for genuinely non-obvious delivery beats; this density signals a distrust of the dialogue and the cast.`,
+        suggestedFix: 'Strip most parentheticals and let the words carry the delivery. If a line only lands with a specific tone, rewrite the line until it does the work itself. Reserve parentheticals for the rare beats where the written context could genuinely mislead a reader about how the line should land.',
+      });
+    }
+  }
+
+  // ── Wave 273: LOCATION_REPETITION ─────────────────────────────────────────
+  // More than 70% of scene sluglines use the same location name. A story that
+  // returns to one location for most of its scenes has no visual or spatial
+  // variety — the screenplay becomes a stage play in disguise. Distinct from
+  // SCENE_SLUG_TIME_MONOTONE (which tracks time-of-day); this tracks the
+  // spatial world. Location repetition also often signals that the writer is
+  // avoiding the work of staging new environments. Requires 6+ sluglines.
+  {
+    const locationCounts273 = new Map<string, number>();
+    let totalSlugs273 = 0;
+    for (const line of lines) {
+      const t = line.trim();
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) {
+        totalSlugs273++;
+        const locStr273 = t
+          .replace(/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)\s*/i, '')
+          .replace(/\s*[-–]\s*(DAY|NIGHT|DAWN|DUSK|MORNING|EVENING|AFTERNOON|CONTINUOUS|LATER|MOMENTS LATER).*$/i, '')
+          .trim()
+          .toLowerCase();
+        if (locStr273) locationCounts273.set(locStr273, (locationCounts273.get(locStr273) ?? 0) + 1);
+      }
+    }
+    if (totalSlugs273 >= 6 && locationCounts273.size > 0) {
+      const sorted273 = [...locationCounts273.entries()].sort((a, b) => b[1] - a[1]);
+      const topLoc273 = sorted273[0];
+      if (topLoc273[1] / totalSlugs273 > 0.70) {
+        issues.push({
+          location: 'Scene slugline variety',
+          rule: 'LOCATION_REPETITION',
+          severity: 'minor',
+          description: `${topLoc273[1]} of ${totalSlugs273} scenes (${Math.round(topLoc273[1] / totalSlugs273 * 100)}%) use the same location ("${topLoc273[0]}") — the story barely leaves one space. Without spatial variety the screenplay becomes a stage play: the same visual world, the same physical context, the same geography of tension. Distinct locations create distinct emotional registers.`,
+          suggestedFix: 'Move at least a third of the scenes to different locations. Each new space carries its own lighting, sound, scale, and emotional charge — a kitchen confession feels different from a parking-lot confrontation, even with the same dialogue. Let the physical world diversify the story\'s emotional register.',
+        });
+      }
     }
   }
 

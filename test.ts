@@ -17897,6 +17897,140 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 273 — originalityPass: exclamation in action, parenthetical flood, location repetition', async () => {
+    const oInput273 = (fountain: string) => ({
+      fountain, original: fountain, records: [] as any, structure: {} as any,
+      annotations: [], approvedSpans: [],
+    });
+
+    it('EXCLAMATION_IN_ACTION fires when 2+ action lines end with an exclamation mark', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 8+ action lines; 3 end with '!'
+      const f273a = [
+        'INT. ROOM - DAY', '',
+        'She grabs the envelope!',
+        'The room falls silent.',
+        'He tears it open!',
+        'Inside: a single photograph.',
+        'His hands shake!',
+        'She steps back from the table.',
+        'The photograph falls to the floor.',
+        'Neither of them speaks for a long moment.',
+      ].join('\n');
+      const result273a = await originalityPass(oInput273(f273a));
+      const excl = result273a.issues.filter((i: any) => i.rule === 'EXCLAMATION_IN_ACTION');
+      assert.ok(excl.length >= 1, `Should detect EXCLAMATION_IN_ACTION, got: ${JSON.stringify(result273a.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(excl[0].severity, 'minor');
+    });
+
+    it('EXCLAMATION_IN_ACTION does NOT fire when fewer than 2 action lines end with exclamation', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 8+ action lines; only 1 ends with '!'
+      const f273b = [
+        'INT. ROOM - DAY', '',
+        'She grabs the envelope.',
+        'The room falls silent.',
+        'He tears it open!',
+        'Inside: a single photograph.',
+        'His hands are steady.',
+        'She steps back from the table.',
+        'The photograph lies on the floor.',
+        'Neither of them speaks for a long moment.',
+      ].join('\n');
+      const result273b = await originalityPass(oInput273(f273b));
+      const excl = result273b.issues.filter((i: any) => i.rule === 'EXCLAMATION_IN_ACTION');
+      assert.strictEqual(excl.length, 0, 'Should NOT fire when fewer than 2 action lines end with exclamation');
+    });
+
+    it('PARENTHETICAL_FLOOD fires when parentheticals exceed 30% of dialogue lines', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 10 dialogue lines, 4 parentheticals → 40%
+      const f273c = [
+        'INT. ROOM - DAY', '',
+        'ALICE', '(nervous)', 'I need to tell you something important.',
+        'BOB', 'What is it?',
+        'ALICE', '(quietly)', 'It happened two nights ago.',
+        'BOB', 'Go on.',
+        'ALICE', '(turning away)', 'I was there when it all fell apart.',
+        'BOB', 'I had no idea you were there.',
+        'ALICE', '(voice breaking)', 'I could not say anything until now.',
+        'BOB', 'We need to go to the police.',
+        'ALICE', 'I know.',
+        'BOB', 'Tonight.',
+      ].join('\n');
+      const result273c = await originalityPass(oInput273(f273c));
+      const pf = result273c.issues.filter((i: any) => i.rule === 'PARENTHETICAL_FLOOD');
+      assert.ok(pf.length >= 1, `Should detect PARENTHETICAL_FLOOD, got: ${JSON.stringify(result273c.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(pf[0].severity, 'minor');
+    });
+
+    it('PARENTHETICAL_FLOOD does NOT fire when parentheticals are sparse', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 10 dialogue lines, only 1 parenthetical → 10%
+      const f273d = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'I need to tell you something important.',
+        'BOB', 'What is it?',
+        'ALICE', 'It happened two nights ago near the docks.',
+        'BOB', 'Go on.',
+        'ALICE', 'I was there when it all fell apart around us.',
+        'BOB', 'I had no idea you were even in the area.',
+        'ALICE', '(quietly)', 'I could not say anything until now.',
+        'BOB', 'We need to go to the police about this.',
+        'ALICE', 'I know what has to happen next.',
+        'BOB', 'Then we go tonight and tell them everything.',
+      ].join('\n');
+      const result273d = await originalityPass(oInput273(f273d));
+      const pf = result273d.issues.filter((i: any) => i.rule === 'PARENTHETICAL_FLOOD');
+      assert.strictEqual(pf.length, 0, 'Should NOT fire when parentheticals are sparse');
+    });
+
+    it('LOCATION_REPETITION fires when more than 70% of sluglines use the same location', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 6 sluglines; 5 are INT. KITCHEN → 83%
+      const f273e = [
+        'INT. KITCHEN - DAY', '',
+        'She prepares breakfast in silence.',
+        '', 'INT. KITCHEN - NIGHT', '',
+        'The dishes pile up in the sink.',
+        '', 'INT. KITCHEN - DAY', '',
+        'He enters and pours coffee.',
+        '', 'INT. KITCHEN - NIGHT', '',
+        'They argue over the table.',
+        '', 'INT. KITCHEN - MORNING', '',
+        'She stares at the empty chair.',
+        '', 'INT. LIVING ROOM - DAY', '',
+        'The television plays to an empty room.',
+      ].join('\n');
+      const result273e = await originalityPass(oInput273(f273e));
+      const lr = result273e.issues.filter((i: any) => i.rule === 'LOCATION_REPETITION');
+      assert.ok(lr.length >= 1, `Should detect LOCATION_REPETITION, got: ${JSON.stringify(result273e.issues.map((i: any) => i.rule))}`);
+      assert.strictEqual(lr[0].severity, 'minor');
+    });
+
+    it('LOCATION_REPETITION does NOT fire when locations are varied', async () => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      // 6 sluglines with 4 different locations — no single location > 70%
+      const f273f = [
+        'INT. KITCHEN - DAY', '',
+        'She prepares breakfast in silence.',
+        '', 'INT. LIVING ROOM - NIGHT', '',
+        'He watches the news without sound.',
+        '', 'EXT. PARKING LOT - DAY', '',
+        'She unlocks her car and sits inside.',
+        '', 'INT. OFFICE - DAY', '',
+        'Papers cover every surface of the desk.',
+        '', 'INT. KITCHEN - NIGHT', '',
+        'She stares at the phone on the counter.',
+        '', 'EXT. STREET - NIGHT', '',
+        'He walks slowly past the shuttered shops.',
+      ].join('\n');
+      const result273f = await originalityPass(oInput273(f273f));
+      const lr = result273f.issues.filter((i: any) => i.rule === 'LOCATION_REPETITION');
+      assert.strictEqual(lr.length, 0, 'Should NOT fire when locations are varied');
+    });
+  });
+
   describe('Wave 272 — intentionPass: proactive Act 2a void, proactive late surge, payoff without effort', async () => {
     const makeRec272 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
