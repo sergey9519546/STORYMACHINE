@@ -17897,6 +17897,79 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 286 — intentionPass: reactive climax, seed graveyard, purpose monotone', async () => {
+    const makeRec286 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runI286 = async (records: any[]) => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      return intentionPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('INTENTION_REACTIVE_CLIMAX fires when climax has no proactive acts but earlier scenes do', async () => {
+      // 8 scenes: proactive at 0,1; climax zone = last 2 scenes (6,7) — both passive
+      const recs286rc = Array.from({ length: 8 }, (_, i) =>
+        makeRec286(i, { clockRaised: i < 2 })
+      );
+      const res = await runI286(recs286rc);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_REACTIVE_CLIMAX'), 'INTENTION_REACTIVE_CLIMAX should fire');
+    });
+
+    it('INTENTION_REACTIVE_CLIMAX does not fire when climax zone has proactive acts', async () => {
+      // 8 scenes: proactive at 0,1,7 — climax zone covered
+      const recs286nrc = Array.from({ length: 8 }, (_, i) =>
+        makeRec286(i, { clockRaised: i === 0 || i === 1 || i === 7 })
+      );
+      const res = await runI286(recs286nrc);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_REACTIVE_CLIMAX'), 'INTENTION_REACTIVE_CLIMAX should not fire');
+    });
+
+    it('INTENTION_SEED_GRAVEYARD fires when first-half has 3+ seeds and second-half has no payoffs', async () => {
+      const recs286sg = Array.from({ length: 8 }, (_, i) =>
+        makeRec286(i, {
+          seededClueIds: i < 4 && i < 3 ? [`clue-${i}`] : [],
+          payoffSetupIds: [],
+        })
+      );
+      const res = await runI286(recs286sg);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_SEED_GRAVEYARD'), 'INTENTION_SEED_GRAVEYARD should fire');
+    });
+
+    it('INTENTION_SEED_GRAVEYARD does not fire when second half has payoffs', async () => {
+      const recs286nsg = Array.from({ length: 8 }, (_, i) =>
+        makeRec286(i, {
+          seededClueIds: i < 3 ? [`clue-${i}`] : [],
+          payoffSetupIds: i === 6 ? ['setup-6'] : [],
+        })
+      );
+      const res = await runI286(recs286nsg);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_SEED_GRAVEYARD'), 'INTENTION_SEED_GRAVEYARD should not fire');
+    });
+
+    it('INTENTION_PURPOSE_MONOTONE fires when >70% of scenes share the same purpose', async () => {
+      const recs286pm = Array.from({ length: 10 }, (_, i) =>
+        makeRec286(i, { purpose: 'development' })
+      );
+      const res = await runI286(recs286pm);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_PURPOSE_MONOTONE'), 'INTENTION_PURPOSE_MONOTONE should fire');
+    });
+
+    it('INTENTION_PURPOSE_MONOTONE does not fire when purposes are varied', async () => {
+      const purposes = ['development', 'revelation', 'climax', 'development', 'transition', 'revelation', 'development', 'climax', 'transition', 'development'];
+      const recs286npm = Array.from({ length: 10 }, (_, i) =>
+        makeRec286(i, { purpose: purposes[i] })
+      );
+      const res = await runI286(recs286npm);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_PURPOSE_MONOTONE'), 'INTENTION_PURPOSE_MONOTONE should not fire');
+    });
+  });
+
   describe('Wave 285 — conflictPass: conflict suspense decoupled, negative spiral unbroken, conflict resolution premature', async () => {
     const makeRec285 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

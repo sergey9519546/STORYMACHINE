@@ -13,6 +13,9 @@
 // Wave 272 additions: proactive Act 2a void (25-50% zone initiative-free),
 // proactive late surge (passive first half, burst in second half),
 // payoff without effort (callbacks not preceded by protagonist action).
+// Wave 286 additions: reactive climax (climax scene has no proactive markers),
+// seed graveyard (seeded clues with no payoffs in second half),
+// purpose monotone (>70% of scenes share the same purpose).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1006,6 +1009,79 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Ensure at least one payoff scene is preceded (within 3 scenes) by a proactive act: a clue the protagonist planted, a clock they raised, a lead they pursued. A payoff earned by visible effort lands as satisfying resolution; a payoff that just happens reads as the plot solving itself.',
         });
       }
+    }
+  }
+
+  // ── Wave 286: INTENTION_REACTIVE_CLIMAX ──────────────────────────────────
+  // The climax zone (final 15% of scenes) contains no proactive acts, while
+  // the protagonist was proactive at least twice earlier in the story. The
+  // climax should be the story's most decisive moment — where the protagonist
+  // acts rather than reacts. A passive climax squanders all the agency built
+  // through the arc. Requires 6+ records and 2+ proactive scenes before the
+  // climax zone.
+  if (n >= 6) {
+    const climaxStart286 = Math.max(n - Math.ceil(n * 0.15), n - 2);
+    const preClimaxProactive286 = records.slice(0, climaxStart286).filter(isProactive258).length;
+    if (preClimaxProactive286 >= 2) {
+      const climaxProactive286 = records.slice(climaxStart286).filter(isProactive258).length;
+      if (climaxProactive286 === 0) {
+        issues.push({
+          location: `Climax zone (scene ${climaxStart286}+) — no protagonist initiative`,
+          rule: 'INTENTION_REACTIVE_CLIMAX',
+          severity: 'minor',
+          description: `The protagonist is proactive ${preClimaxProactive286} time(s) before the climax but takes no initiative in the final scenes (scene ${climaxStart286}+). The climax — where stakes peak — plays out as pure reaction. A passive climax undermines all the agency built through the arc: the protagonist is acted upon rather than acting.`,
+          suggestedFix: 'Give the protagonist at least one decisive action in the climax: a final gambit, a clock they raise, a choice that changes everything. The climax should be the story\'s most compressed expression of what the protagonist wants and fears — it demands initiative, not passivity.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 286: INTENTION_SEED_GRAVEYARD ───────────────────────────────────
+  // The story plants seeded clues in the first half but the second half
+  // has no payoff scenes (payoffSetupIds empty for all scenes). Seeds are
+  // promises the story makes to the audience; an unanswered promise is
+  // a structural betrayal. Requires 8+ records, 3+ total seeded-clue scenes
+  // in the first half, and 0 payoff scenes in the second half.
+  if (n >= 8) {
+    const half286 = Math.floor(n / 2);
+    const firstHalfSeeds286 = records.slice(0, half286).filter((r: any) => (r.seededClueIds?.length ?? 0) > 0).length;
+    if (firstHalfSeeds286 >= 3) {
+      const secondHalfPayoffs286 = records.slice(half286).filter((r: any) => (r.payoffSetupIds?.length ?? 0) > 0).length;
+      if (secondHalfPayoffs286 === 0) {
+        issues.push({
+          location: `Second half (scenes ${half286}+) — no payoffs`,
+          rule: 'INTENTION_SEED_GRAVEYARD',
+          severity: 'minor',
+          description: `${firstHalfSeeds286} clue-seeding scene(s) appear in the first half but no payoff scene fires in the second half (scenes ${half286}+). Every seeded clue is a promise to the audience; leaving all of them unanswered by the story\'s midpoint and beyond signals the narrative has forgotten its own setup.`,
+          suggestedFix: 'Return to the seeds planted in the first half and pay them off in the second half — ideally with a twist that recontextualizes what was seeded. The payoff does not need to be triumphant; even a tragic resolution of a seeded clue closes the loop. An unresolved seed is a dangling thread.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 286: INTENTION_PURPOSE_MONOTONE ─────────────────────────────────
+  // More than 70% of all scenes share the same purpose value. Purpose
+  // monotony means every scene serves the same structural function —
+  // the story is all development, or all raising stakes, with no variation.
+  // A well-structured story mixes purposes: initiating, development,
+  // revelation, climax, transitional. Monotony collapses the structural
+  // arc into a single repeating beat. Requires 8+ records.
+  if (n >= 8) {
+    const purposeCounts286 = new Map<string, number>();
+    for (const r of records as any[]) {
+      const p286 = r.purpose ?? 'development';
+      purposeCounts286.set(p286, (purposeCounts286.get(p286) ?? 0) + 1);
+    }
+    const maxPurposeCount286 = Math.max(...purposeCounts286.values());
+    if (maxPurposeCount286 / n > 0.70) {
+      const dominantPurpose286 = [...purposeCounts286.entries()].sort((a, b) => b[1] - a[1])[0][0];
+      issues.push({
+        location: 'Scene purposes throughout',
+        rule: 'INTENTION_PURPOSE_MONOTONE',
+        severity: 'minor',
+        description: `${maxPurposeCount286} of ${n} scenes (${Math.round(maxPurposeCount286 / n * 100)}%) share the same purpose ("${dominantPurpose286}"). Purpose monotony signals structural flatness — the story repeats a single function rather than mixing development, revelation, climax, and transition into a varied arc.`,
+        suggestedFix: `Diversify scene purposes: ensure at least one scene each of revelation, climax, and transition alongside the development scenes. A scene tagged "${dominantPurpose286}" should be surrounded by scenes with different purposes to create structural rhythm and signal to the audience that the story is moving forward.`,
+      });
     }
   }
 
