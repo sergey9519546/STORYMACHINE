@@ -17897,6 +17897,123 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 297 — dialoguePass: contraction starvation, apology loop, repeated line', async () => {
+    const runD297 = async (fountain: string) => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CONTRACTION_STARVATION fires when full-forms appear 5+ times with zero contractions', async () => {
+      const lines297cs = [
+        'ALICE\nI am certain about this.',
+        'BOB\nYou are wrong about him.',
+        'ALICE\nIt is too late for that.',
+        'BOB\nWe cannot turn back now.',
+        'ALICE\nI do not believe you.',
+        'BOB\nThat is your choice to make.',
+        'ALICE\nLeave the keys on the table.',
+        'BOB\nTake them yourself.',
+        'ALICE\nFine then.',
+        'BOB\nGood riddance to you.',
+        'ALICE\nWatch the door behind you.',
+        'BOB\nAlways the last word with you.',
+      ].join('\n\n');
+      const res = await runD297(lines297cs);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONTRACTION_STARVATION'), 'CONTRACTION_STARVATION should fire');
+    });
+
+    it('CONTRACTION_STARVATION does not fire when dialogue contains contractions', async () => {
+      const lines297ncs = [
+        "ALICE\nI'm certain about this.",
+        'BOB\nYou are wrong about him.',
+        "ALICE\nIt's too late for that.",
+        'BOB\nWe cannot turn back now.',
+        'ALICE\nI do not believe you.',
+        "BOB\nThat's your choice to make.",
+        'ALICE\nLeave the keys on the table.',
+        'BOB\nTake them yourself.',
+        'ALICE\nFine then.',
+        'BOB\nGood riddance to you.',
+        'ALICE\nWatch the door behind you.',
+        'BOB\nAlways the last word with you.',
+      ].join('\n\n');
+      const res = await runD297(lines297ncs);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONTRACTION_STARVATION'), 'CONTRACTION_STARVATION should not fire');
+    });
+
+    it('APOLOGY_LOOP fires when >20% of dialogue lines contain an apology', async () => {
+      const lines297al = [
+        "ALICE\nI'm sorry about last night.",
+        "BOB\nSorry doesn't fix the window.",
+        'ALICE\nForgive me, I was upset.',
+        "BOB\nMy apologies for shouting back.",
+        "ALICE\nIt won't happen again.",
+        'BOB\nYou said that before.',
+        'ALICE\nThis time is different.',
+        'BOB\nProve it then.',
+        'ALICE\nGive me the chance.',
+        "BOB\nOne chance, that's all.",
+      ].join('\n\n');
+      const res = await runD297(lines297al);
+      assert.ok(res.issues.some((i: any) => i.rule === 'APOLOGY_LOOP'), 'APOLOGY_LOOP should fire');
+    });
+
+    it('APOLOGY_LOOP does not fire when apologies are sparse', async () => {
+      const lines297nal = [
+        "ALICE\nI'm sorry about last night.",
+        "BOB\nThat doesn't fix the window.",
+        'ALICE\nI know what I did.',
+        'BOB\nThen own it for once.',
+        "ALICE\nIt won't happen again.",
+        'BOB\nYou said that before.',
+        'ALICE\nThis time is different.',
+        'BOB\nProve it then.',
+        'ALICE\nGive me the chance.',
+        "BOB\nOne chance, that's all.",
+      ].join('\n\n');
+      const res = await runD297(lines297nal);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'APOLOGY_LOOP'), 'APOLOGY_LOOP should not fire');
+    });
+
+    it('DIALOGUE_REPEATED_LINE fires when a 4+ word line is spoken verbatim 3+ times', async () => {
+      const lines297rl = [
+        "ALICE\nWe need to leave now.",
+        "BOB\nNot until he calls back.",
+        "ALICE\nWe need to leave now.",
+        "BOB\nThe phone could ring any minute.",
+        "ALICE\nWe need to leave now.",
+        "BOB\nFive more minutes, please.",
+        "ALICE\nThe car is already running.",
+        "BOB\nThen turn it off.",
+        "ALICE\nYou are impossible tonight.",
+        "BOB\nAnd you are predictable.",
+        "ALICE\nGet your coat already.",
+        "BOB\nFine, you win this round.",
+      ].join('\n\n');
+      const res = await runD297(lines297rl);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_REPEATED_LINE'), 'DIALOGUE_REPEATED_LINE should fire');
+    });
+
+    it('DIALOGUE_REPEATED_LINE does not fire when no substantive line repeats 3 times', async () => {
+      const lines297nrl = [
+        "ALICE\nWe need to leave now.",
+        "BOB\nNot until he calls back.",
+        "ALICE\nWe really have to go.",
+        "BOB\nThe phone could ring any minute.",
+        "ALICE\nIt's time, grab your things.",
+        "BOB\nFive more minutes, please.",
+        "ALICE\nThe car is already running.",
+        "BOB\nThen turn it off.",
+        "ALICE\nYou are impossible tonight.",
+        "BOB\nAnd you are predictable.",
+        "ALICE\nGet your coat already.",
+        "BOB\nFine, you win this round.",
+      ].join('\n\n');
+      const res = await runD297(lines297nrl);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_REPEATED_LINE'), 'DIALOGUE_REPEATED_LINE should not fire');
+    });
+  });
+
   describe('Wave 296 — causalityPass: clock delta without raise, suspense sawtooth, dramatic turn aftermath void', async () => {
     const makeRec296 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

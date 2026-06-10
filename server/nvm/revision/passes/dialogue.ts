@@ -14,6 +14,9 @@
 // Wave 283 additions: future tense flood (>35% of lines in future tense),
 // conditional overload in dialogue (>30% lines contain if/unless/might/could),
 // opener monotony (single opening word in >30% of substantive lines).
+// Wave 297 additions: contraction starvation (formal full-forms with zero
+// contractions — stilted speech), apology loop ("sorry" in >20% of lines),
+// repeated line (identical substantive line spoken verbatim 3+ times).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1234,6 +1237,77 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
           suggestedFix: `Vary how characters begin their lines. Instead of always starting with "${topOpener283}", let them open with action verbs, questions, names, interjections, or mid-thought fragments. Each opening word signals the character\'s emotional posture; monotony flattens that signal.`,
         });
       }
+    }
+  }
+
+  // ── Wave 297: CONTRACTION_STARVATION ──────────────────────────────────────
+  // The dialogue uses formal full-forms ("do not", "cannot", "I am", "it is")
+  // at least 5 times but contains zero contractions anywhere. Spoken English
+  // contracts by default; dialogue that never does reads as written prose
+  // recited aloud — every character sounds like a formal letter. A single
+  // uncontracted form is emphasis ("I did NOT do that"); systematic absence
+  // is a register error. Requires 12+ dialogue lines.
+  if (dialogue.length >= 12) {
+    const fullFormRe297 = /\b(do not|does not|did not|cannot|can not|will not|would not|should not|could not|is not|are not|was not|were not|have not|has not|had not|I am|you are|we are|they are|it is|that is|there is)\b/i;
+    const contractionRe297 = /\b\w+(n't|'re|'ll|'ve|'d)\b|\b(I'm|it's|that's|there's|he's|she's|what's|who's|let's)\b/i;
+    const fullFormCount297 = dialogue.filter(d => fullFormRe297.test(d.line)).length;
+    const hasAnyContraction297 = dialogue.some(d => contractionRe297.test(d.line));
+    if (fullFormCount297 >= 5 && !hasAnyContraction297) {
+      issues.push({
+        location: 'Dialogue register',
+        rule: 'CONTRACTION_STARVATION',
+        severity: 'minor',
+        description: `${fullFormCount297} dialogue lines use formal full-forms ("do not", "cannot", "I am") and the script contains zero contractions — every character speaks in written-prose register. Spoken English contracts by default; systematic absence of contractions makes all dialogue sound recited rather than spoken, and erases a key tool for distinguishing character voices.`,
+        suggestedFix: 'Contract by default ("don\'t", "can\'t", "I\'m") and reserve full forms for deliberate emphasis: "I did not touch it" lands as insistence precisely because the surrounding dialogue contracts. If one character must speak formally (a lawyer, an aristocrat, a non-native speaker), make that a deliberate contrast against everyone else.',
+      });
+    }
+  }
+
+  // ── Wave 297: APOLOGY_LOOP ────────────────────────────────────────────────
+  // More than 20% of dialogue lines contain an apology ("sorry", "I apologize",
+  // "forgive me", "my apologies"). When characters apologize constantly, the
+  // dialogue becomes a loop of social repair with no one ever standing firm —
+  // apology is deference, and pervasive deference removes the friction that
+  // drama needs. Requires 10+ dialogue lines.
+  if (dialogue.length >= 10) {
+    const apologyRe297 = /\b(sorry|i apologi[zs]e|forgive me|my apologies|i beg your pardon)\b/i;
+    const apologyCount297 = dialogue.filter(d => apologyRe297.test(d.line)).length;
+    if (apologyCount297 / dialogue.length > 0.20) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'APOLOGY_LOOP',
+        severity: 'minor',
+        description: `${apologyCount297} of ${dialogue.length} dialogue lines (${Math.round(apologyCount297 / dialogue.length * 100)}%) contain an apology. Characters who constantly apologize are constantly deferring — the dialogue becomes a loop of social repair in which no one holds their ground. Apology dissolves conflict on contact; a script saturated with it has no sustained friction.`,
+        suggestedFix: 'Cut most apologies and let characters stand behind what they said or did. When an apology must stay, make it costly: a character who never apologizes finally doing so is a scene; a character who apologizes every other line is a tic. Replace reflexive "sorry" with deflection, justification, or silence.',
+      });
+    }
+  }
+
+  // ── Wave 297: DIALOGUE_REPEATED_LINE ─────────────────────────────────────
+  // The same substantive dialogue line (4+ words) is spoken verbatim three or
+  // more times across the script. Unlike DIALOGUE_MIRROR_SYNDROME (adjacent
+  // speakers echoing each other within an exchange), this catches global
+  // copy-paste repetition: a line recurring across scenes word-for-word reads
+  // as a generation or revision artifact unless it is a deliberate refrain.
+  // Requires 12+ dialogue lines.
+  if (dialogue.length >= 12) {
+    const lineCounts297 = new Map<string, number>();
+    for (const d of dialogue) {
+      const norm297 = d.line.trim().toLowerCase().replace(/[^a-z0-9' ]/g, '');
+      if (norm297.split(/\s+/).length >= 4) {
+        lineCounts297.set(norm297, (lineCounts297.get(norm297) ?? 0) + 1);
+      }
+    }
+    const repeated297 = [...lineCounts297.entries()].filter(([, c]) => c >= 3);
+    if (repeated297.length > 0) {
+      const [topLine297, topCount297] = repeated297.sort((a, b) => b[1] - a[1])[0];
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_REPEATED_LINE',
+        severity: 'minor',
+        description: `The line "${topLine297}" is spoken verbatim ${topCount297} times across the script${repeated297.length > 1 ? ` (and ${repeated297.length - 1} other line(s) also repeat 3+ times)` : ''}. A word-for-word recurring line reads as a copy-paste artifact unless it is a deliberate refrain — and a refrain only works when each repetition lands in a transformed context that changes its meaning.`,
+        suggestedFix: 'Either vary the repetitions (same intent, different words — characters rarely phrase a thought identically twice) or make the refrain intentional: repeat the line at structurally significant moments where the changed circumstances give the same words a new meaning. An accidental echo is a flaw; an engineered one is a motif.',
+      });
     }
   }
 
