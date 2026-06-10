@@ -17897,6 +17897,83 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 296 — causalityPass: clock delta without raise, suspense sawtooth, dramatic turn aftermath void', async () => {
+    const makeRec296 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runC296 = async (records: any[]) => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CLOCK_DELTA_WITHOUT_RAISE fires when clockDelta > 1 appears before any clock is raised', async () => {
+      const recs296cd = Array.from({ length: 8 }, (_, i) =>
+        makeRec296(i, {
+          clockDelta: i === 2 ? 2 : 0,
+          clockRaised: i === 5,
+        })
+      );
+      const res = await runC296(recs296cd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_DELTA_WITHOUT_RAISE'), 'CLOCK_DELTA_WITHOUT_RAISE should fire');
+    });
+
+    it('CLOCK_DELTA_WITHOUT_RAISE does not fire when a clock is raised before the delta', async () => {
+      const recs296ncd = Array.from({ length: 8 }, (_, i) =>
+        makeRec296(i, {
+          clockRaised: i === 1,
+          clockDelta: i === 3 ? 2 : 0,
+        })
+      );
+      const res = await runC296(recs296ncd);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_DELTA_WITHOUT_RAISE'), 'CLOCK_DELTA_WITHOUT_RAISE should not fire');
+    });
+
+    it('SUSPENSE_SAWTOOTH fires when suspenseDelta strictly alternates sign for 6+ scenes', async () => {
+      const recs296ss = Array.from({ length: 8 }, (_, i) =>
+        makeRec296(i, { suspenseDelta: i % 2 === 0 ? 2 : -2 })
+      );
+      const res = await runC296(recs296ss);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SUSPENSE_SAWTOOTH'), 'SUSPENSE_SAWTOOTH should fire');
+    });
+
+    it('SUSPENSE_SAWTOOTH does not fire when tension accumulates over consecutive scenes', async () => {
+      const recs296nss = Array.from({ length: 8 }, (_, i) =>
+        makeRec296(i, { suspenseDelta: i < 6 ? 1 : -1 })
+      );
+      const res = await runC296(recs296nss);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SUSPENSE_SAWTOOTH'), 'SUSPENSE_SAWTOOTH should not fire');
+    });
+
+    it('DRAMATIC_TURN_AFTERMATH_VOID fires when a turn is followed by two inert scenes', async () => {
+      const recs296dt = Array.from({ length: 8 }, (_, i) =>
+        makeRec296(i, {
+          dramaticTurn: i === 2 ? 'reversal' : 'nothing',
+          suspenseDelta: i === 3 || i === 4 ? 0 : 1,
+        })
+      );
+      const res = await runC296(recs296dt);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_AFTERMATH_VOID'), 'DRAMATIC_TURN_AFTERMATH_VOID should fire');
+    });
+
+    it('DRAMATIC_TURN_AFTERMATH_VOID does not fire when the turn produces a ripple', async () => {
+      const recs296ndt = Array.from({ length: 8 }, (_, i) =>
+        makeRec296(i, {
+          dramaticTurn: i === 2 ? 'reversal' : 'nothing',
+          emotionalShift: i === 3 ? 'negative' : 'neutral',
+          suspenseDelta: 1,
+        })
+      );
+      const res = await runC296(recs296ndt);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_AFTERMATH_VOID'), 'DRAMATIC_TURN_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 295 — beliefPass: revelation suspense decoupled, revelation density drop, belief opening inert', async () => {
     const makeRec295 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

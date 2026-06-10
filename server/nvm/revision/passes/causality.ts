@@ -15,6 +15,10 @@
 // Wave 282 additions: clock clustering (all clocks in first 40%), revelation
 // cascade (>35% of scenes contain a revelation), emotional positive desert
 // (Act 2 has negative/neutral but never positive while positive exists elsewhere).
+// Wave 296 additions: clock delta without raise (time-pressure effects before any
+// clock is established), suspense sawtooth (tension strictly alternates sign for
+// 6+ scenes without accumulating), dramatic turn aftermath void (a reversal scene
+// followed by two scenes with zero emotional, suspense, or relational ripple).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1088,6 +1092,93 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
           description: `Act 2 (${act2PosRecs282.length} scenes) carries negative and neutral emotional shifts but no positive ones, while at least one scene elsewhere in the story offers a positive shift — the entire middle act has no moment of hope, relief, or partial triumph. An unbroken negative arc through Act 2 makes darkness the default state rather than a dramatic choice.`,
           suggestedFix: 'Plant a brief positive beat in Act 2: a false hope, a moment of connection, a small victory the story then subverts. Contrast is the mechanism by which darkness registers; even one positive scene among many negative ones transforms what follows from grimness into genuine tragedy.',
         });
+      }
+    }
+  }
+
+  // ── Wave 296: CLOCK_DELTA_WITHOUT_RAISE ──────────────────────────────────
+  // A scene registers significant time pressure (clockDelta > 1) before any
+  // clock has been raised anywhere in the story. The audience feels deadline
+  // consequences for a deadline that was never established — a causal
+  // inversion in the urgency layer. Distinct from CLOCK_GHOST (raise followed
+  // by silence) and PAYOFF_WITHOUT_SETUP (clue-level inversion): this fires
+  // on pressure effects preceding their cause. Requires 6+ records.
+  if (records.length >= 6) {
+    for (const r of records as any[]) {
+      if (r.clockRaised) break; // a clock is established — later deltas are caused
+      if ((r.clockDelta ?? 0) > 1) {
+        issues.push({
+          location: `Scene ${r.sceneIdx} (${r.slug})`,
+          rule: 'CLOCK_DELTA_WITHOUT_RAISE',
+          severity: 'minor',
+          description: `Scene ${r.sceneIdx} registers significant time pressure (clockDelta ${r.clockDelta}) but no clock has been raised anywhere before it. The audience is asked to feel a deadline tightening before any deadline exists — urgency consequences arrive before their cause, and the pressure reads as unmotivated haste rather than a closing window.`,
+          suggestedFix: 'Establish the clock before its pressure mounts: a scene where the deadline is set, the threat is announced, or the window is defined. Once the audience knows what time is running out on, every subsequent tightening lands as escalation rather than noise.',
+        });
+        break;
+      }
+    }
+  }
+
+  // ── Wave 296: SUSPENSE_SAWTOOTH ──────────────────────────────────────────
+  // SuspenseDelta strictly alternates sign (positive/negative) for 6+
+  // consecutive scenes. Tension rises and immediately discharges every
+  // single scene — it oscillates without ever accumulating, so the story
+  // never builds toward anything. Distinct from EMOTIONAL_WHIPLASH (which
+  // tracks emotionalShift alternation) and UNEXPLAINED_SUSPENSE_DROP (a
+  // single uncaused discharge): this fires on a sustained oscillation
+  // pattern in the suspense curve itself. Requires 8+ records.
+  if (records.length >= 8) {
+    let sawRun296 = 1;
+    let sawStart296 = 0;
+    for (let i296 = 1; i296 < records.length; i296++) {
+      const prev296 = (records as any[])[i296 - 1].suspenseDelta ?? 0;
+      const cur296 = (records as any[])[i296].suspenseDelta ?? 0;
+      if ((prev296 > 0 && cur296 < 0) || (prev296 < 0 && cur296 > 0)) {
+        if (sawRun296 === 1) sawStart296 = i296 - 1;
+        sawRun296++;
+        if (sawRun296 >= 6) {
+          issues.push({
+            location: `Scenes ${(records as any[])[sawStart296].sceneIdx}–${(records as any[])[i296].sceneIdx} — suspense sawtooth`,
+            rule: 'SUSPENSE_SAWTOOTH',
+            severity: 'minor',
+            description: `Suspense strictly alternates between rising and falling for ${sawRun296} consecutive scenes (${(records as any[])[sawStart296].sceneIdx}–${(records as any[])[i296].sceneIdx}). Tension discharges the moment it builds — every rise is immediately cancelled, so the story oscillates without accumulating toward anything. The audience learns that no tension will ever be sustained, and stops investing in the rises.`,
+            suggestedFix: 'Let tension compound: after a suspense rise, hold or escalate it for at least one more scene before any release. Tension is a debt the story owes the audience — releasing it every scene means the debt never grows large enough for the payoff to matter.',
+          });
+          break;
+        }
+      } else {
+        sawRun296 = 1;
+      }
+    }
+  }
+
+  // ── Wave 296: DRAMATIC_TURN_AFTERMATH_VOID ───────────────────────────────
+  // A scene with a dramatic turn (dramaticTurn !== 'nothing') is followed by
+  // two scenes with neutral emotional shift, no suspense rise, and no
+  // relationship movement — the turn produces zero causal ripple. Distinct
+  // from REVELATION_WITHOUT_REACTION (revelation-specific dialogue reaction)
+  // and ACTION_WITHOUT_CONSEQUENCE (plot-level consequence): this audits the
+  // immediate two-scene wake of any declared dramatic turn across emotional,
+  // suspense, AND relational channels simultaneously. Requires 6+ records.
+  if (records.length >= 6) {
+    for (let i296b = 0; i296b < records.length - 2; i296b++) {
+      const r296 = (records as any[])[i296b];
+      if ((r296.dramaticTurn ?? 'nothing') === 'nothing') continue;
+      const wake296 = (records as any[]).slice(i296b + 1, i296b + 3);
+      const wakeInert296 = wake296.length === 2 && wake296.every((w: any) =>
+        w.emotionalShift === 'neutral' &&
+        (w.suspenseDelta ?? 0) <= 0 &&
+        ((w.relationshipShifts ?? []) as any[]).length === 0,
+      );
+      if (wakeInert296) {
+        issues.push({
+          location: `Scene ${r296.sceneIdx} (dramatic turn: ${r296.dramaticTurn})`,
+          rule: 'DRAMATIC_TURN_AFTERMATH_VOID',
+          severity: 'minor',
+          description: `Scene ${r296.sceneIdx} delivers a dramatic turn ("${r296.dramaticTurn}") but the next two scenes are causally inert — neutral emotion, no suspense rise, no relationship movement. A turn that changes nothing downstream is a turn in name only; the story declares a pivot and then proceeds as if it never happened.`,
+          suggestedFix: 'Let the turn ripple: the scenes immediately after a reversal or revelation should show characters adjusting — an emotional shift, a relationship strained or realigned, suspense climbing as the new situation sinks in. The size of a turn is measured by its wake, not its announcement.',
+        });
+        break;
       }
     }
   }
