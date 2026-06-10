@@ -11,6 +11,9 @@
 // dialogue agreement chain (3+ consecutive capitulations),
 // long speech dominance (>50% of lines 15+ words).
 // (confirmation-seeking dialogue), and exclamation overuse (everyone shouts).
+// Wave 283 additions: future tense flood (>35% of lines in future tense),
+// conditional overload in dialogue (>30% lines contain if/unless/might/could),
+// opener monotony (single opening word in >30% of substantive lines).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1160,6 +1163,77 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         description: `${longLineCount269} of ${dialogue.length} dialogue lines (${Math.round(longLineCount269 / dialogue.length * 100)}%) are 15 words or longer — the dialogue is dominated by extended speeches. No character delivers a short, punchy response; every turn is a full oration. The cadence collapses into a single slow register with no rhythmic variation.`,
         suggestedFix: 'Break long speeches into shorter turns, or interrupt them with brief reactions from other characters. Brief lines create urgency and give the impression that characters are reacting to each other rather than reading prepared remarks. Long speeches land harder when they follow a run of short, sharp exchanges.',
       });
+    }
+  }
+
+  // ── Wave 283: FUTURE_TENSE_FLOOD ─────────────────────────────────────────
+  // More than 35% of dialogue lines contain future-tense constructions.
+  // When characters spend the majority of their dialogue discussing what will
+  // happen rather than what is happening or has happened, the scene loses
+  // present-tense tension — it becomes a planning session rather than a
+  // confrontation. Requires 10+ dialogue lines.
+  if (dialogue.length >= 10) {
+    const futureTenseRe283 = /\b(i will|i'll|we'll|you'll|they'll|he'll|she'll|it'll|going to|gonna|will be|will have|i'm going to|we're going to|you're going to|they're going to)\b/i;
+    const futureCount283 = dialogue.filter(d => futureTenseRe283.test(d.line)).length;
+    if (futureCount283 / dialogue.length > 0.35) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'FUTURE_TENSE_FLOOD',
+        severity: 'minor',
+        description: `${futureCount283} of ${dialogue.length} dialogue lines (${Math.round(futureCount283 / dialogue.length * 100)}%) contain future-tense constructions ("I'll", "going to", "will", etc.). When characters spend most of their dialogue discussing what will happen, the scene loses present-tense urgency — it becomes a planning session rather than a live confrontation.`,
+        suggestedFix: 'Ground characters in the present and past: what do they want right now, what did they just discover, what are they reacting to? Reserve future-tense lines for explicit plans, threats, and promises — sparse use makes them land harder.',
+      });
+    }
+  }
+
+  // ── Wave 283: DIALOGUE_CONDITIONAL_OVERLOAD ──────────────────────────────
+  // More than 30% of dialogue lines contain conditional constructions.
+  // Heavy use of "if", "unless", "might", "could", "would" gives the
+  // dialogue a hedged, tentative quality — characters refuse to commit.
+  // Drama requires commitment; conditional overload reads as characters
+  // who are unwilling to take a stand. Requires 10+ dialogue lines.
+  if (dialogue.length >= 10) {
+    const conditionalRe283 = /\b(if |unless |might |could |would )/i;
+    const condCount283 = dialogue.filter(d => conditionalRe283.test(d.line)).length;
+    if (condCount283 / dialogue.length > 0.30) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_CONDITIONAL_OVERLOAD',
+        severity: 'minor',
+        description: `${condCount283} of ${dialogue.length} dialogue lines (${Math.round(condCount283 / dialogue.length * 100)}%) contain conditional constructions ("if", "unless", "might", "could", "would"). Pervasive hedging makes characters sound uncommitted — they speak in hypotheticals rather than making demands, stating facts, or drawing lines.`,
+        suggestedFix: 'Replace hedged lines with direct statements, demands, or declarations. Reserve conditionals for specific dramatic purposes: ultimatums, genuine uncertainty, or deliberate evasion. Characters who speak in conditionals feel passive; characters who commit feel alive.',
+      });
+    }
+  }
+
+  // ── Wave 283: DIALOGUE_OPENER_MONOTONY ───────────────────────────────────
+  // A single word opens more than 30% of substantive dialogue lines.
+  // When characters constantly begin their lines the same way ("Well,",
+  // "Look,", "I think", "You know"), the dialogue acquires a tic-like
+  // rhythm. Readers notice the repetition as a craft flaw rather than
+  // experiencing the character's voice. Requires 12+ dialogue lines and
+  // 8+ substantive lines (4+ words each).
+  if (dialogue.length >= 12) {
+    const substantive283 = dialogue.filter(d => d.line.trim().split(/\s+/).length >= 4);
+    if (substantive283.length >= 8) {
+      const openerCounts283 = new Map<string, number>();
+      for (const d of substantive283) {
+        const firstWord283 = d.line.trim().split(/\s+/)[0].toLowerCase().replace(/[^a-z']/g, '');
+        if (firstWord283.length > 0) {
+          openerCounts283.set(firstWord283, (openerCounts283.get(firstWord283) ?? 0) + 1);
+        }
+      }
+      const maxOpenerCount283 = Math.max(...openerCounts283.values());
+      if (maxOpenerCount283 / substantive283.length > 0.30) {
+        const topOpener283 = [...openerCounts283.entries()].sort((a, b) => b[1] - a[1])[0][0];
+        issues.push({
+          location: 'Dialogue throughout',
+          rule: 'DIALOGUE_OPENER_MONOTONY',
+          severity: 'minor',
+          description: `The word "${topOpener283}" opens ${maxOpenerCount283} of ${substantive283.length} substantive dialogue lines (${Math.round(maxOpenerCount283 / substantive283.length * 100)}%). Repeated sentence-openers create a tic-like rhythm that reads as a craft flaw — audiences notice the pattern rather than the character's voice.`,
+          suggestedFix: `Vary how characters begin their lines. Instead of always starting with "${topOpener283}", let them open with action verbs, questions, names, interjections, or mid-thought fragments. Each opening word signals the character\'s emotional posture; monotony flattens that signal.`,
+        });
+      }
     }
   }
 

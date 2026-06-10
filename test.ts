@@ -17897,6 +17897,119 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 283 — dialoguePass: future tense flood, conditional overload, opener monotony', async () => {
+    const runD283 = async (fountain: string) => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('FUTURE_TENSE_FLOOD fires when >35% of 10+ dialogue lines use future tense', async () => {
+      const lines283f = [
+        "ALICE\nI'll fix it tomorrow.",
+        "BOB\nWe'll see about that.",
+        "ALICE\nYou'll regret this.",
+        "BOB\nI will make sure it happens.",
+        "ALICE\nThey'll never know.",
+        "BOB\nWe're going to change everything.",
+        "ALICE\nI'm going to leave now.",
+        "BOB\nShe'll find out eventually.",
+        "ALICE\nWe'll be fine.",
+        "BOB\nNot tonight.",
+      ].join('\n\n');
+      const res = await runD283(lines283f);
+      assert.ok(res.issues.some((i: any) => i.rule === 'FUTURE_TENSE_FLOOD'), 'FUTURE_TENSE_FLOOD should fire');
+    });
+
+    it('FUTURE_TENSE_FLOOD does not fire when future tense is ≤35%', async () => {
+      const lines283nf = [
+        "ALICE\nWhat happened here?",
+        "BOB\nI told you already.",
+        "ALICE\nThat's not good enough.",
+        "BOB\nWe'll deal with it later.",
+        "ALICE\nNow is better.",
+        "BOB\nStop pushing.",
+        "ALICE\nI need answers.",
+        "BOB\nYou can't handle them.",
+        "ALICE\nWatch me.",
+        "BOB\nFine.",
+      ].join('\n\n');
+      const res = await runD283(lines283nf);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'FUTURE_TENSE_FLOOD'), 'FUTURE_TENSE_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_CONDITIONAL_OVERLOAD fires when >30% of 10+ lines use conditionals', async () => {
+      const lines283co = [
+        "ALICE\nIf you leave now I won't stop you.",
+        "BOB\nWould you really let me go?",
+        "ALICE\nUnless you have something to say.",
+        "BOB\nI could try to explain.",
+        "ALICE\nIf you could do that.",
+        "BOB\nWould it matter?",
+        "ALICE\nIf you mean it, yes.",
+        "BOB\nSure.",
+        "ALICE\nI see.",
+        "BOB\nOkay.",
+      ].join('\n\n');
+      const res = await runD283(lines283co);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_CONDITIONAL_OVERLOAD'), 'DIALOGUE_CONDITIONAL_OVERLOAD should fire');
+    });
+
+    it('DIALOGUE_CONDITIONAL_OVERLOAD does not fire when conditionals are ≤30%', async () => {
+      const lines283nco = [
+        "ALICE\nGet out.",
+        "BOB\nNo.",
+        "ALICE\nI mean it.",
+        "BOB\nSo do I.",
+        "ALICE\nYou have no idea what you've done.",
+        "BOB\nI know exactly what I did.",
+        "ALICE\nThen own it.",
+        "BOB\nI do.",
+        "ALICE\nProve it.",
+        "BOB\nGive me a chance.",
+      ].join('\n\n');
+      const res = await runD283(lines283nco);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_CONDITIONAL_OVERLOAD'), 'DIALOGUE_CONDITIONAL_OVERLOAD should not fire');
+    });
+
+    it('DIALOGUE_OPENER_MONOTONY fires when single opener dominates >30% of substantive lines', async () => {
+      const lines283om = [
+        "ALICE\nWell I think you should go.",
+        "BOB\nWell that is not happening.",
+        "ALICE\nWell we need to talk about this.",
+        "BOB\nWell I disagree completely.",
+        "ALICE\nWell someone has to decide.",
+        "BOB\nOkay fine then.",
+        "ALICE\nWell are you listening to me.",
+        "BOB\nI hear you loud and clear.",
+        "ALICE\nWell then what is your answer.",
+        "BOB\nWell I have no answer right now.",
+        "ALICE\nThat is not acceptable.",
+        "BOB\nDeal with it.",
+      ].join('\n\n');
+      const res = await runD283(lines283om);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_OPENER_MONOTONY'), 'DIALOGUE_OPENER_MONOTONY should fire');
+    });
+
+    it('DIALOGUE_OPENER_MONOTONY does not fire when openers are varied', async () => {
+      const lines283nom = [
+        "ALICE\nGet out of my house.",
+        "BOB\nYou cannot do this to me.",
+        "ALICE\nWatch me try right now.",
+        "BOB\nAfter everything we have been through.",
+        "ALICE\nBecause of what you did to us.",
+        "BOB\nNothing happened the way you think.",
+        "ALICE\nStop pretending you are innocent.",
+        "BOB\nI am telling you the truth.",
+        "ALICE\nEvery time you say that.",
+        "BOB\nListen to me for once.",
+        "ALICE\nTime is up for excuses.",
+        "BOB\nPlease just hear me out.",
+      ].join('\n\n');
+      const res = await runD283(lines283nom);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_OPENER_MONOTONY'), 'DIALOGUE_OPENER_MONOTONY should not fire');
+    });
+  });
+
   describe('Wave 282 — causalityPass: clock clustering, revelation cascade, emotional positive desert', async () => {
     const makeRec282 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
