@@ -17897,6 +17897,94 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 299 — conflictPass: conflict emotion decoupled, stakes label unbacked, eleventh hour conflict', async () => {
+    const makeRec299 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF299 = async (records: any[]) => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      return conflictPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CONFLICT_EMOTION_DECOUPLED fires when all conflict scenes are emotionally neutral', async () => {
+      const recs299ed = Array.from({ length: 8 }, (_, i) =>
+        makeRec299(i, {
+          relationshipShifts: [1, 3, 5].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: -0.5 }] : [],
+        })
+      );
+      const res = await runCF299(recs299ed);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_EMOTION_DECOUPLED'), 'CONFLICT_EMOTION_DECOUPLED should fire');
+    });
+
+    it('CONFLICT_EMOTION_DECOUPLED does not fire when a conflict scene moves someone emotionally', async () => {
+      const recs299ned = Array.from({ length: 8 }, (_, i) =>
+        makeRec299(i, {
+          relationshipShifts: [1, 3, 5].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: -0.5 }] : [],
+          emotionalShift: i === 3 ? 'negative' : 'neutral',
+        })
+      );
+      const res = await runCF299(recs299ned);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_EMOTION_DECOUPLED'), 'CONFLICT_EMOTION_DECOUPLED should not fire');
+    });
+
+    it('STAKES_LABEL_UNBACKED fires when raise_stakes scenes have no conflict markers', async () => {
+      const recs299sl = Array.from({ length: 8 }, (_, i) =>
+        makeRec299(i, {
+          purpose: [2, 5].includes(i) ? 'raise_stakes' : 'development',
+          suspenseDelta: [2, 5].includes(i) ? 0 : 0.5,
+        })
+      );
+      const res = await runCF299(recs299sl);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STAKES_LABEL_UNBACKED'), 'STAKES_LABEL_UNBACKED should fire');
+    });
+
+    it('STAKES_LABEL_UNBACKED does not fire when a raise_stakes scene is backed by a clock', async () => {
+      const recs299nsl = Array.from({ length: 8 }, (_, i) =>
+        makeRec299(i, {
+          purpose: [2, 5].includes(i) ? 'raise_stakes' : 'development',
+          suspenseDelta: [2, 5].includes(i) ? 0 : 0.5,
+          clockRaised: i === 2,
+        })
+      );
+      const res = await runCF299(recs299nsl);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STAKES_LABEL_UNBACKED'), 'STAKES_LABEL_UNBACKED should not fire');
+    });
+
+    it('ELEVENTH_HOUR_CONFLICT fires when a new conflict pair first appears in the final 10%', async () => {
+      // 10 scenes: A|B conflicts early (1,4); C|D first conflict at scene 9 (final 10%)
+      const recs299eh = Array.from({ length: 10 }, (_, i) =>
+        makeRec299(i, {
+          relationshipShifts:
+            [1, 4].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: -0.5 }]
+            : i === 9 ? [{ pairKey: 'C|D', dimension: 'trust', amount: -0.5 }]
+            : [],
+        })
+      );
+      const res = await runCF299(recs299eh);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ELEVENTH_HOUR_CONFLICT'), 'ELEVENTH_HOUR_CONFLICT should fire');
+    });
+
+    it('ELEVENTH_HOUR_CONFLICT does not fire when all conflict pairs are established earlier', async () => {
+      const recs299neh = Array.from({ length: 10 }, (_, i) =>
+        makeRec299(i, {
+          relationshipShifts:
+            [1, 4].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: -0.5 }]
+            : i === 5 ? [{ pairKey: 'C|D', dimension: 'trust', amount: -0.5 }]
+            : i === 9 ? [{ pairKey: 'A|B', dimension: 'trust', amount: -0.5 }]
+            : [],
+        })
+      );
+      const res = await runCF299(recs299neh);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ELEVENTH_HOUR_CONFLICT'), 'ELEVENTH_HOUR_CONFLICT should not fire');
+    });
+  });
+
   describe('Wave 298 — characterArcPass: dramatic turn monotone, suspense/emotion decoupled, grief skipped', async () => {
     const makeRec298 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

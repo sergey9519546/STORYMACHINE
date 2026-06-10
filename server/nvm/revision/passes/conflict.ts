@@ -12,6 +12,9 @@
 // Wave 285 additions: conflict suspense decoupled (conflict scenes don't drive suspense),
 // negative spiral unbroken (≥4 consecutive negative shifts with no relief),
 // conflict resolution premature (major conflict resolved before final quarter).
+// Wave 299 additions: conflict emotion decoupled (conflict scenes all emotionally
+// neutral), stakes label unbacked (raise_stakes scenes with no conflict markers),
+// eleventh hour conflict (new conflict pair first appears in the final 10%).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1058,6 +1061,84 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
           });
         }
       }
+    }
+  }
+
+  // ── Wave 299: CONFLICT_EMOTION_DECOUPLED ─────────────────────────────────
+  // Scenes carrying negative relationship shifts (conflict scenes) are all
+  // emotionally neutral — the fights leave no mark on anyone's emotional
+  // state. Distinct from CONFLICT_SUSPENSE_DECOUPLED (which audits the
+  // suspense channel): this audits the emotional channel. A confrontation
+  // that changes a relationship but moves no one emotionally reads as a
+  // transaction, not a fight. Requires 8+ records and 3+ conflict scenes.
+  if (records.length >= 8) {
+    const conflictScenes299 = (records as any[]).filter(r =>
+      ((r.relationshipShifts as any[] ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+    );
+    if (conflictScenes299.length >= 3 && conflictScenes299.every(r => r.emotionalShift === 'neutral')) {
+      issues.push({
+        location: 'Conflict scenes — emotionally neutral',
+        rule: 'CONFLICT_EMOTION_DECOUPLED',
+        severity: 'minor',
+        description: `All ${conflictScenes299.length} conflict scenes (negative relationship shifts) carry a neutral emotional shift — relationships fracture but nobody feels anything. A confrontation that changes a bond without moving anyone emotionally reads as a transaction: the audience sees the ledger update but never the cost. Conflict's currency is feeling.`,
+        suggestedFix: 'Let at least one fight land emotionally: the scene where a bond breaks should also be the scene where someone\'s emotional state turns — anger curdling to grief, betrayal hardening to resolve. If a relationship can sour without anyone caring, the audience will conclude the relationship never mattered.',
+      });
+    }
+  }
+
+  // ── Wave 299: STAKES_LABEL_UNBACKED ──────────────────────────────────────
+  // Two or more scenes are tagged with purpose "raise_stakes" but none of
+  // them carries any conflict marker — no negative relationship shift, no
+  // suspense rise, no clock raised. The structure claims stakes are rising
+  // while the scene data shows nothing at risk: the label is unbacked by
+  // dramatic content. Requires 8+ records.
+  if (records.length >= 8) {
+    const stakesScenes299 = (records as any[]).filter(r => r.purpose === 'raise_stakes');
+    if (stakesScenes299.length >= 2) {
+      const anyBacked299 = stakesScenes299.some(r =>
+        (r.suspenseDelta ?? 0) > 0 ||
+        r.clockRaised === true ||
+        ((r.relationshipShifts as any[] ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+      );
+      if (!anyBacked299) {
+        issues.push({
+          location: 'Scenes tagged raise_stakes',
+          rule: 'STAKES_LABEL_UNBACKED',
+          severity: 'minor',
+          description: `${stakesScenes299.length} scenes are tagged "raise_stakes" but none of them shows a suspense rise, a clock raised, or a relationship souring — the structural label claims escalation while the scene data shows nothing newly at risk. Stakes that are declared rather than dramatized leave the audience told the situation is worse without ever feeling it.`,
+          suggestedFix: 'Back each stake-raising scene with a concrete escalation: a deadline introduced, a threat made specific, an ally turned, a cost paid. If a scene cannot show what is newly at risk, retag it honestly as development — a mislabeled scene corrupts the story\'s structural map.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 299: ELEVENTH_HOUR_CONFLICT ─────────────────────────────────────
+  // A conflict pair's first negative shift ever occurs in the final 10% of
+  // the story. A feud introduced this late has no room to escalate, breathe,
+  // or resolve — it exists only to inject artificial tension into the finale.
+  // Distinct from the Act-3-absence checks (which flag missing late conflict):
+  // this flags brand-new conflict arriving too late to mean anything.
+  // Requires 10+ records.
+  if (records.length >= 10) {
+    const firstConflictAt299 = new Map<string, number>();
+    for (const r of records as any[]) {
+      for (const s of ((r.relationshipShifts as any[] ?? []) as Array<{ pairKey: string; amount: number }>)) {
+        if (s.amount <= -0.3 && !firstConflictAt299.has(s.pairKey)) {
+          firstConflictAt299.set(s.pairKey, r.sceneIdx);
+        }
+      }
+    }
+    const lateCutoff299 = Math.floor(records.length * 0.9);
+    const elevenths299 = [...firstConflictAt299.entries()].filter(([, idx]) => idx >= lateCutoff299);
+    if (elevenths299.length > 0 && firstConflictAt299.size > elevenths299.length) {
+      const [latePair299, lateIdx299] = elevenths299[0];
+      issues.push({
+        location: `Scene ${lateIdx299} — first conflict for "${latePair299}"`,
+        rule: 'ELEVENTH_HOUR_CONFLICT',
+        severity: 'minor',
+        description: `The conflict between "${latePair299}" first appears at scene ${lateIdx299} — inside the final 10% of the story. A feud introduced this late has no room to escalate or resolve; it reads as artificial tension injected into the finale rather than a fault line the story has been tracking. Late conflict the audience never saw coming (and never sees settled) leaves the ending cluttered.`,
+        suggestedFix: `Either seed the "${latePair299}" friction earlier — a cold exchange, a competing interest, a small betrayal in Act 2 that makes the late rupture feel inevitable — or cut the late conflict entirely and spend the finale resolving the conflicts the story has already earned.`,
+      });
     }
   }
 
