@@ -17897,6 +17897,73 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 284 — characterArcPass: emotional resolution absent, revelation late cluster, curiosity plateau', async () => {
+    const makeRec284 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCA284 = async (records: any[]) => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ARC_EMOTIONAL_RESOLUTION_ABSENT fires when positive shifts exist but none in final quarter', async () => {
+      const recs284er = Array.from({ length: 8 }, (_, i) =>
+        makeRec284(i, { emotionalShift: i < 3 ? 'positive' : 'negative' })
+      );
+      const res = await runCA284(recs284er);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_EMOTIONAL_RESOLUTION_ABSENT'), 'ARC_EMOTIONAL_RESOLUTION_ABSENT should fire');
+    });
+
+    it('ARC_EMOTIONAL_RESOLUTION_ABSENT does not fire when positive shift exists in final quarter', async () => {
+      const recs284ner = Array.from({ length: 8 }, (_, i) =>
+        makeRec284(i, { emotionalShift: i === 0 || i === 7 ? 'positive' : 'neutral' })
+      );
+      const res = await runCA284(recs284ner);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_EMOTIONAL_RESOLUTION_ABSENT'), 'ARC_EMOTIONAL_RESOLUTION_ABSENT should not fire');
+    });
+
+    it('ARC_REVELATION_LATE_CLUSTER fires when >60% of revelations are in final 25%', async () => {
+      // 8 scenes: final quarter starts at sceneIdx 6; revelations at 5,6,7 → 2/3 in final quarter = 67%
+      const recs284rlc = Array.from({ length: 8 }, (_, i) =>
+        makeRec284(i, { revelation: i >= 5 ? `reveal-${i}` : null })
+      );
+      const res = await runCA284(recs284rlc);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_REVELATION_LATE_CLUSTER'), 'ARC_REVELATION_LATE_CLUSTER should fire');
+    });
+
+    it('ARC_REVELATION_LATE_CLUSTER does not fire when revelations are spread across the story', async () => {
+      const recs284nrlc = Array.from({ length: 8 }, (_, i) =>
+        makeRec284(i, { revelation: i === 1 || i === 4 || i === 7 ? `reveal-${i}` : null })
+      );
+      const res = await runCA284(recs284nrlc);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_REVELATION_LATE_CLUSTER'), 'ARC_REVELATION_LATE_CLUSTER should not fire');
+    });
+
+    it('ARC_CURIOSITY_PLATEAU fires when Act 2b average curiosityDelta is ≤ 0', async () => {
+      // 12 scenes: Act 2b = slice(6,9) → indices 6,7,8 (3 scenes); all -1 → avg = -1 ≤ 0
+      const recs284cp = Array.from({ length: 12 }, (_, i) =>
+        makeRec284(i, { curiosityDelta: i >= 6 && i < 9 ? -1 : 1 })
+      );
+      const res = await runCA284(recs284cp);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_CURIOSITY_PLATEAU'), 'ARC_CURIOSITY_PLATEAU should fire');
+    });
+
+    it('ARC_CURIOSITY_PLATEAU does not fire when Act 2b has positive curiosityDelta', async () => {
+      // 12 scenes: Act 2b = slice(6,9) → indices 6,7,8; all 2 → avg = 2 > 0
+      const recs284ncp = Array.from({ length: 12 }, (_, i) =>
+        makeRec284(i, { curiosityDelta: i >= 6 && i < 9 ? 2 : 0 })
+      );
+      const res = await runCA284(recs284ncp);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_CURIOSITY_PLATEAU'), 'ARC_CURIOSITY_PLATEAU should not fire');
+    });
+  });
+
   describe('Wave 283 — dialoguePass: future tense flood, conditional overload, opener monotony', async () => {
     const runD283 = async (fountain: string) => {
       const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');

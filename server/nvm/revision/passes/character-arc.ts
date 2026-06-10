@@ -14,6 +14,9 @@
 // shift concentration (all relational movement in 3-scene burst),
 // late relational void (no shifts in final quarter).
 // emotional flatline (≥80% neutral scenes), negative-only arc (no positive beat).
+// Wave 284 additions: emotional resolution absent (no positive shift in final quarter
+// despite positive beats existing), revelation late cluster (>60% of revelations
+// in final 25%), curiosity plateau (Act 2b avg curiosityDelta ≤ 0).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -905,6 +908,79 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `${totalShifts270} relationship shifts occur across the story but none appear in the final quarter (scene ${finalActStart270}+). The climax has no relational movement — characters enter the resolution with fully settled bonds and the outcome costs nothing relationally. The final act confirms rather than completes the character arc.`,
           suggestedFix: 'Add at least one relationship shift in the final act: a reconciliation, a definitive break, an unexpected alliance. The climax should change at least one relationship permanently — the audience needs to see the relational cost or reward of everything that came before it.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 284: ARC_EMOTIONAL_RESOLUTION_ABSENT ────────────────────────────
+  // The story has positive emotional shift scenes but none appear in the
+  // final quarter. The arc escalates through the story but never resolves
+  // upward — the climax and resolution have no emotional lift. Even a
+  // tragedy benefits from a moment of positive emotional shift at the
+  // climax (recognition, acceptance, brief triumph) before the ending.
+  // Requires 8+ records and 2+ positive-shift scenes anywhere in the story.
+  if (records.length >= 8) {
+    const posShiftScenes284 = (records as any[]).filter(r => r.emotionalShift === 'positive');
+    if (posShiftScenes284.length >= 2) {
+      const finalStart284 = Math.floor(records.length * 0.75);
+      const finalPosScenes284 = posShiftScenes284.filter(r => r.sceneIdx >= finalStart284);
+      if (finalPosScenes284.length === 0) {
+        issues.push({
+          location: `Final quarter (scene ${finalStart284}+) — no positive emotional shift`,
+          rule: 'ARC_EMOTIONAL_RESOLUTION_ABSENT',
+          severity: 'minor',
+          description: `${posShiftScenes284.length} positive emotional shift scene(s) exist across the story but none occur in the final quarter (scene ${finalStart284}+). The arc never resolves upward — characters enter the climax with established positive capacity but the resolution denies any positive beat. Even in a tragedy, one moment of recognition, relief, or acceptance gives the ending its emotional weight.`,
+          suggestedFix: 'Add at least one positive emotional shift in the final quarter — a brief triumph before the fall, a moment of clarity, a reconciliation, or a character accepting their fate with grace. Emotional resolution does not mean a happy ending; it means the arc completes rather than trailing off.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 284: ARC_REVELATION_LATE_CLUSTER ────────────────────────────────
+  // More than 60% of all revelations occur in the final 25% of the story.
+  // Information is withheld until the climax and then dumped in an
+  // exposition avalanche. This is the opposite of seeding — rather than
+  // planting clues and paying them off, the story hoards all revelations
+  // for a single information flood at the end. Requires 8+ records and
+  // 3+ total revelations.
+  if (records.length >= 8) {
+    const revScenes284 = (records as any[]).filter(r => r.revelation !== null);
+    if (revScenes284.length >= 3) {
+      const finalStart284b = Math.floor(records.length * 0.75);
+      const lateRevScenes284 = revScenes284.filter(r => r.sceneIdx >= finalStart284b);
+      if (lateRevScenes284.length / revScenes284.length > 0.60) {
+        issues.push({
+          location: `Final quarter (scene ${finalStart284b}+) — revelation cluster`,
+          rule: 'ARC_REVELATION_LATE_CLUSTER',
+          severity: 'minor',
+          description: `${lateRevScenes284.length} of ${revScenes284.length} revelation(s) (${Math.round(lateRevScenes284.length / revScenes284.length * 100)}%) occur in the final quarter. Revelations should be seeded throughout the arc to build accumulating understanding; clustering them at the end creates an information avalanche and flattens the earlier acts' dramatic stakes.`,
+          suggestedFix: 'Redistribute revelations across the story: plant the first revelation in Act 1 to hook the audience, escalate with a major revelation at the midpoint, and reserve only the final revelation for the climax. Each revelation should raise new questions, not just answer old ones.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 284: ARC_CURIOSITY_PLATEAU ──────────────────────────────────────
+  // Average curiosityDelta in Act 2b (50–75%) is ≤ 0, meaning audience
+  // curiosity stagnates or actively drops during the second half of Act 2.
+  // Act 2b should be the arc's escalation engine — curiosity should peak
+  // here as the protagonist approaches the climax. A plateau or descent
+  // means the story loses dramatic momentum exactly when it needs to gain
+  // it. Requires 10+ records and 3+ scenes in the Act 2b window.
+  if (records.length >= 10) {
+    const act2bStart284 = Math.floor(records.length * 0.50);
+    const act2bEnd284 = Math.floor(records.length * 0.75);
+    const act2bRecs284 = (records as any[]).slice(act2bStart284, act2bEnd284);
+    if (act2bRecs284.length >= 3) {
+      const avgCuriosity284 = act2bRecs284.reduce((acc: number, r: any) => acc + (r.curiosityDelta ?? 0), 0) / act2bRecs284.length;
+      if (avgCuriosity284 <= 0) {
+        issues.push({
+          location: `Act 2b (scenes ${act2bStart284}–${act2bEnd284}) — curiosity plateau`,
+          rule: 'ARC_CURIOSITY_PLATEAU',
+          severity: 'minor',
+          description: `Average curiosityDelta across Act 2b (scenes ${act2bStart284}–${act2bEnd284}) is ${avgCuriosity284.toFixed(2)} — audience curiosity stagnates or falls during the arc's escalation window. Act 2b should be the engine that drives the audience toward the climax; a plateau or descent here causes dramatic momentum to collapse before the finale.`,
+          suggestedFix: 'Escalate mystery and stakes in Act 2b: introduce new complications, deepen unanswered questions, and raise the cost of failure. Each scene in this window should leave the audience more uncertain about the outcome than the scene before it.',
         });
       }
     }
