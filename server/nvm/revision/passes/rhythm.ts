@@ -12,6 +12,10 @@
 // body parts), single-sentence flood (all 12+ action lines are exactly one
 // sentence — no multi-clause variation), ellipsis chain (≥3 action lines trail
 // off with '...' — prose avoids committing to a definitive description).
+// Wave 291 additions: number word flood (>35% of action lines contain spelled-out
+// numbers — "three", "seven" — diluting concision), prepositional opening dominance
+// (>35% of action lines begin with a preposition), action line word-count floor
+// (all 8+ action lines are ≤5 words — micro-beats with no description depth).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -764,6 +768,67 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${ellipsisCount277} action lines end with '...' — the screenplay trails into hesitation. Action prose must describe what is seen and heard; an ellipsis-ended action line defers the description and leaves the audience (and the crew) with nothing. Three or more trailing ellipses indicate a pattern of avoidance.`,
         suggestedFix: "Commit to the action: replace each trailing ellipsis with a specific physical description of what is seen, heard, or done. If a beat is genuinely ambiguous, describe the visible surface: 'She looks at him. Something passes between them.' — the ambiguity is in the meaning, not the description.",
+      });
+    }
+  }
+
+  // ── Wave 291: NUMBER_WORD_FLOOD ───────────────────────────────────────────
+  // More than 35% of action lines contain spelled-out number words ("one",
+  // "two", "three", "seven", etc.). Sprinkling numbers through action prose
+  // creates a pseudo-precise tone that reads as over-specification — the
+  // writer quantifying detail that should be visual and immediate. One or
+  // two number words ground a scene; a flood signals the writer is measuring
+  // rather than staging. Requires 8+ action lines.
+  if (actionLines.length >= 8) {
+    const numberWordRe291 = /\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand)\b/i;
+    const numberWordCount291 = actionLines.filter(l => numberWordRe291.test(l.text)).length;
+    if (numberWordCount291 / actionLines.length > 0.35) {
+      issues.push({
+        location: 'Action lines — number-word density',
+        rule: 'NUMBER_WORD_FLOOD',
+        severity: 'minor',
+        description: `${numberWordCount291} of ${actionLines.length} action lines (${Math.round(numberWordCount291 / actionLines.length * 100)}%) contain spelled-out number words. A flood of quantified details gives the prose a cataloguing quality — the writer is measuring the world rather than staging it. Numbers should appear when they carry dramatic weight ("three seconds"), not as ambient decoration.`,
+        suggestedFix: 'Cut number words that don\'t carry dramatic weight. "Two guards stand at the door" is fine; "Three paintings and four chairs in two rows" is over-specification. Reserve number words for countdowns, precise costs, and moments where quantity is the point.',
+      });
+    }
+  }
+
+  // ── Wave 291: PREPOSITIONAL_OPENING_DOMINANCE ─────────────────────────────
+  // More than 35% of action lines begin with a preposition or prepositional
+  // phrase ("In the corner", "At the table", "Across the room", "Through the
+  // window"). Prepositional openers are a lazy way to establish spatial context
+  // — they put the location before the action. Over-reliance creates a
+  // catalogue of settings with no sense of which details matter. Requires 8+
+  // action lines.
+  if (actionLines.length >= 8) {
+    const prepRe291 = /^(in |at |on |by |from |through |across |along |over |under |between |behind |beside |among |around |against |above |below |into |onto |upon |within |toward|towards |beneath |beyond |near |inside |outside |throughout )/i;
+    const prepCount291 = actionLines.filter(l => prepRe291.test(l.text.trim())).length;
+    if (prepCount291 / actionLines.length > 0.35) {
+      issues.push({
+        location: 'Action lines — prepositional openers',
+        rule: 'PREPOSITIONAL_OPENING_DOMINANCE',
+        severity: 'minor',
+        description: `${prepCount291} of ${actionLines.length} action lines (${Math.round(prepCount291 / actionLines.length * 100)}%) begin with a prepositional phrase. Starting every line with a location establishes where before it establishes who or what — the prose reads as stage directions from a spatial inventory rather than a camera in motion.`,
+        suggestedFix: 'Lead action lines with characters, objects, or verbs: "She turns" instead of "In the corner, she turns". Reserve prepositional openers for transitions between locations or establishing shots — when every line leads with location, no location stands out.',
+      });
+    }
+  }
+
+  // ── Wave 291: ACTION_LINE_WORD_FLOOR ──────────────────────────────────────
+  // Every action line is 5 words or fewer. Exclusively micro-beats leave no
+  // room for description, texture, or context — the script reads as a storyboard
+  // shot list, not a screenplay. Even a lean, kinetic script benefits from
+  // occasional lines that carry more visual or emotional information. Requires
+  // 8+ action lines.
+  if (actionLines.length >= 8) {
+    const microBeats291 = actionLines.filter(l => countWords(l.text) <= 5).length;
+    if (microBeats291 === actionLines.length) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'ACTION_LINE_WORD_FLOOR',
+        severity: 'minor',
+        description: `All ${actionLines.length} action lines are 5 words or fewer — the script reads as a shot-list storyboard rather than a screenplay. Micro-beats are effective in short bursts but their exclusive use strips all context from the action: no spatial grounding, no texture, no emotional register beyond the bare event.`,
+        suggestedFix: 'Mix micro-beats with fuller lines: use 2-3 word lines for impact moments but surround them with lines that establish context, atmosphere, or consequence. "She runs. The door slams. Outside — silence." works because the long beat ("Outside — silence.") earns the two micro-beats before it.',
       });
     }
   }

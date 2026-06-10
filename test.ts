@@ -17897,6 +17897,159 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 291 — rhythmPass: number word flood, prepositional opening dominance, action line word floor', async () => {
+    const runRH291 = async (fountain: string) => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('NUMBER_WORD_FLOOD fires when >35% of 8+ action lines contain number words', async () => {
+      const fountain291nwf = `INT. ROOM - DAY
+
+Two guards stand at the door.
+
+Three chairs are arranged in a row.
+
+One phone sits on the table.
+
+Four paintings hang on the wall.
+
+She looks at them.
+
+He nods.
+
+Five seconds pass.
+
+Two more guards enter.
+
+He picks up the phone.`;
+      const res = await runRH291(fountain291nwf);
+      assert.ok(res.issues.some((i: any) => i.rule === 'NUMBER_WORD_FLOOD'), 'NUMBER_WORD_FLOOD should fire');
+    });
+
+    it('NUMBER_WORD_FLOOD does not fire when number words are sparse', async () => {
+      const fountain291nnwf = `INT. ROOM - DAY
+
+Guards stand at the door.
+
+Chairs are arranged in a row.
+
+A phone sits on the table.
+
+Paintings hang on the wall.
+
+She looks at them.
+
+He nods and crosses the room.
+
+She picks up the receiver.
+
+He turns to the window.
+
+Two seconds pass.
+
+She speaks first.`;
+      const res = await runRH291(fountain291nnwf);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'NUMBER_WORD_FLOOD'), 'NUMBER_WORD_FLOOD should not fire');
+    });
+
+    it('PREPOSITIONAL_OPENING_DOMINANCE fires when >35% of 8+ action lines start with prepositions', async () => {
+      const fountain291pod = `INT. OFFICE - DAY
+
+In the corner, she waits.
+
+At the table, he reads the file.
+
+Across the room, the door opens.
+
+By the window, a phone rings.
+
+She picks it up.
+
+Through the glass, a figure approaches.
+
+On the desk, papers scatter.
+
+Along the wall, shadows lengthen.
+
+He closes the file.
+
+She hangs up the phone.`;
+      const res = await runRH291(fountain291pod);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PREPOSITIONAL_OPENING_DOMINANCE'), 'PREPOSITIONAL_OPENING_DOMINANCE should fire');
+    });
+
+    it('PREPOSITIONAL_OPENING_DOMINANCE does not fire when openers are varied', async () => {
+      const fountain291npod = `INT. OFFICE - DAY
+
+She crosses to the window.
+
+He opens the file on the desk.
+
+The phone rings once.
+
+She picks it up without looking.
+
+In the corner, a clock ticks.
+
+He closes the folder.
+
+She nods and hands it back.
+
+He takes it without a word.
+
+The door opens slowly.
+
+Both of them turn.`;
+      const res = await runRH291(fountain291npod);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PREPOSITIONAL_OPENING_DOMINANCE'), 'PREPOSITIONAL_OPENING_DOMINANCE should not fire');
+    });
+
+    it('ACTION_LINE_WORD_FLOOR fires when all 8+ action lines are ≤5 words', async () => {
+      const fountain291alf = `INT. ROOM - DAY
+
+She runs.
+
+Door slams.
+
+Glass breaks.
+
+He falls.
+
+Silence.
+
+She stops.
+
+He rises.
+
+She turns away.`;
+      const res = await runRH291(fountain291alf);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_LINE_WORD_FLOOR'), 'ACTION_LINE_WORD_FLOOR should fire');
+    });
+
+    it('ACTION_LINE_WORD_FLOOR does not fire when some action lines exceed 5 words', async () => {
+      const fountain291nalf = `INT. ROOM - DAY
+
+She runs toward the far end of the corridor.
+
+Door slams behind her with a crack.
+
+Glass breaks somewhere below.
+
+He falls back against the wall clutching his arm.
+
+Silence settles over the room like a held breath.
+
+She stops and looks back at where he stood.
+
+He rises slowly with difficulty from the floor.
+
+She turns away from the wreckage they made together.`;
+      const res = await runRH291(fountain291nalf);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_LINE_WORD_FLOOR'), 'ACTION_LINE_WORD_FLOOR should not fire');
+    });
+  });
+
   describe('Wave 290 — relationshipArcPass: opening burst, negative-only majority, shift dimension concentration', async () => {
     const makeRec290 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
