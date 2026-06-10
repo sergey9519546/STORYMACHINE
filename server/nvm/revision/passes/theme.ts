@@ -19,6 +19,8 @@
 // Wave 279 additions: dramatic-turn scenes carry no theme (≥2 turns, n≥8), negative
 // emotional-shift scenes carry no theme (≥2 negative shifts, n≥8), and high-suspense
 // scenes (suspenseDelta > 1) all carry no theme (≥3 scenes, n≥8).
+// Wave 293 additions: revelation scenes carry no theme (≥2 revelations, n≥8), clock-raised
+// scenes carry no theme (≥2 clockRaised, n≥8), payoff scenes carry no theme (≥2 payoffs, n≥8).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -972,6 +974,77 @@ export async function themePass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `${suspenseScenes279.length} high-suspense scenes (suspenseDelta > 1) carry no thematic language related to "${themeRaw}" — the story's most gripping moments are thematically hollow. Tension that never implicates the central question makes the story exciting but not meaningful.`,
             suggestedFix: `Weave the theme into at least one high-suspense scene: the thing at stake in the tense moment should connect to "${themeRaw}". If the audience is on the edge of their seat, they should also be questioning what the story is about — the greatest suspense is thematic as well as physical.`,
+          });
+        }
+      }
+    }
+
+    // ── Wave 293: THEME_REVELATION_SILENT ────────────────────────────────────
+    // All revelation scenes carry no thematic language. Revelations are the
+    // story's information peaks — the moments where hidden truth emerges. When
+    // every revelation is thematically mute, the audience receives facts without
+    // understanding their thematic weight. Requires n≥8 and ≥2 revelation scenes.
+    if (records.length >= 8) {
+      const revScenes293 = records.filter((r: any) => r.revelation !== null);
+      if (revScenes293.length >= 2) {
+        const anyRevResonant293 = revScenes293.some((r: any) =>
+          sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        );
+        if (!anyRevResonant293) {
+          issues.push({
+            location: 'Revelation scenes',
+            rule: 'THEME_REVELATION_SILENT',
+            severity: 'minor',
+            description: `${revScenes293.length} revelation scene(s) carry no thematic language related to "${themeRaw}" — the story's moments of disclosed truth are thematically mute. Revelations should reframe the theme: what is revealed should illuminate what the story is about, not just what happened.`,
+            suggestedFix: `Each revelation should answer a thematic question, not just a plot question. If the theme is betrayal, the revelation should expose what loyalty costs; if it is identity, the truth revealed should force a character to confront who they are. Let "${themeRaw}" resonate in every unmasking.`,
+          });
+        }
+      }
+    }
+
+    // ── Wave 293: THEME_CLOCK_SCENE_SILENT ───────────────────────────────────
+    // All clock-raising scenes carry no thematic language. The story's urgency
+    // engine — the ticking deadlines — never implicates the central theme. When
+    // time pressure is decoupled from the thematic question, the stakes are
+    // mechanical rather than meaningful: the audience fears running out of time
+    // without knowing what the time is for. Requires n≥8 and ≥2 clockRaised scenes.
+    if (records.length >= 8) {
+      const clockScenes293 = records.filter((r: any) => r.clockRaised === true);
+      if (clockScenes293.length >= 2) {
+        const anyClockResonant293 = clockScenes293.some((r: any) =>
+          sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        );
+        if (!anyClockResonant293) {
+          issues.push({
+            location: 'Clock-raising scenes',
+            rule: 'THEME_CLOCK_SCENE_SILENT',
+            severity: 'minor',
+            description: `${clockScenes293.length} clock-raising scene(s) carry no thematic language related to "${themeRaw}" — the story's urgency engine is thematically disconnected. Time pressure without thematic meaning creates mechanical tension: the audience worries about the deadline without understanding what the deadline is for.`,
+            suggestedFix: `Connect the deadline to "${themeRaw}": what thematic value is at stake when the clock expires? If the theme is redemption, the deadline is the last chance for it; if justice, the clock is time running out on the truth. Ticking clocks become unbearable when what they threaten is thematic, not just practical.`,
+          });
+        }
+      }
+    }
+
+    // ── Wave 293: THEME_PAYOFF_SILENT ────────────────────────────────────────
+    // All payoff scenes carry no thematic language. The story's resolution engine
+    // — the moments when planted threads finally resolve — never connects to the
+    // central theme. When payoffs are thematically silent, the audience receives
+    // closure without insight: the loop closes but the meaning is absent.
+    // Requires n≥8 and ≥2 payoff scenes (payoffSetupIds non-empty).
+    if (records.length >= 8) {
+      const payoffScenes293 = records.filter((r: any) => (r.payoffSetupIds?.length ?? 0) > 0);
+      if (payoffScenes293.length >= 2) {
+        const anyPayoffResonant293 = payoffScenes293.some((r: any) =>
+          sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        );
+        if (!anyPayoffResonant293) {
+          issues.push({
+            location: 'Payoff scenes',
+            rule: 'THEME_PAYOFF_SILENT',
+            severity: 'minor',
+            description: `${payoffScenes293.length} payoff scene(s) carry no thematic language related to "${themeRaw}" — the story's resolution moments are thematically empty. Payoffs that close loops without implicating the theme produce satisfaction without meaning: the audience feels the closure but cannot articulate what it was for.`,
+            suggestedFix: `Ensure each payoff answers both a plot question and a thematic question. What does the resolved thread reveal about "${themeRaw}"? A clue paid off should say something about the theme, not just confirm a fact. Thematic payoffs are the difference between a satisfying ending and a meaningful one.`,
           });
         }
       }

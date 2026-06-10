@@ -17897,6 +17897,108 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 293 — themePass: revelation silent, clock scene silent, payoff silent', async () => {
+    const makeRec293 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const THEME293 = 'trust and betrayal among friends';
+    // Scene 0 has the theme word so silentScenes.length < records.length (inner block runs)
+    const fountain293 = `INT. SC0 - DAY\nTrust is fragile here.\n\nINT. SC1 - DAY\nAction.\n`;
+    const makeInput293 = (records: any[]) => ({
+      fountain: fountain293, original: fountain293, records,
+      structure: {} as any, annotations: [], approvedSpans: [],
+      storyContext: { theme: THEME293 },
+    });
+
+    it('THEME_REVELATION_SILENT fires when ≥2 revelation scenes have no theme', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const recs293rs = [
+        makeRec293(0, { dialogueHighlights: ['trust matters here'] }), // resonant anchor
+        makeRec293(1, { revelation: 'the killer is revealed' }),
+        makeRec293(2, { revelation: 'the motive is exposed' }),
+        makeRec293(3), makeRec293(4), makeRec293(5), makeRec293(6), makeRec293(7),
+      ];
+      const res = await themePass(makeInput293(recs293rs));
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_REVELATION_SILENT'), 'THEME_REVELATION_SILENT should fire');
+    });
+
+    it('THEME_REVELATION_SILENT does not fire when a revelation scene carries the theme', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      // scene 1 has revelation AND is scene 1 in fountain (which has "trust" from the fountain text assigned to scene 0)
+      // Actually fountain293 only has SC0 and SC1. sceneTexts is built from fountain sluglines.
+      // SC0 = "Trust is fragile here." SC1 = "Action."
+      // Scene 0 record is resonant (trust in text), scene 1 revelation = "trust is the killer's motive"
+      // But sceneHasResonance checks the fountain text for that scene idx.
+      // We need the fountain to have "trust" for revelation scene's sceneIdx.
+      // Override: build a fountain with trust in scene 1 as well.
+      const fountain293nr = `INT. SC0 - DAY\nTrust is fragile here.\n\nINT. SC1 - DAY\nBetrayal of trust is revealed.\n`;
+      const recs293nrs = [
+        makeRec293(0, { dialogueHighlights: ['trust matters here'] }),
+        makeRec293(1, { revelation: 'a betrayal of trust' }),
+        makeRec293(2, { revelation: 'another revelation' }),
+        makeRec293(3), makeRec293(4), makeRec293(5), makeRec293(6), makeRec293(7),
+      ];
+      const res = await themePass({ ...makeInput293(recs293nrs), fountain: fountain293nr, original: fountain293nr });
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_REVELATION_SILENT'), 'THEME_REVELATION_SILENT should not fire');
+    });
+
+    it('THEME_CLOCK_SCENE_SILENT fires when ≥2 clockRaised scenes have no theme', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const recs293cks = [
+        makeRec293(0, { dialogueHighlights: ['trust matters here'] }), // resonant anchor
+        makeRec293(1, { clockRaised: true }),
+        makeRec293(2, { clockRaised: true }),
+        makeRec293(3), makeRec293(4), makeRec293(5), makeRec293(6), makeRec293(7),
+      ];
+      const res = await themePass(makeInput293(recs293cks));
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CLOCK_SCENE_SILENT'), 'THEME_CLOCK_SCENE_SILENT should fire');
+    });
+
+    it('THEME_CLOCK_SCENE_SILENT does not fire when a clock scene carries the theme', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const fountain293nck = `INT. SC0 - DAY\nTrust is fragile here.\n\nINT. SC1 - DAY\nBetrayal of trust ticks down.\n`;
+      const recs293ncks = [
+        makeRec293(0, { dialogueHighlights: ['trust matters here'] }),
+        makeRec293(1, { clockRaised: true }), // fountain SC1 has "trust"
+        makeRec293(2, { clockRaised: true }),
+        makeRec293(3), makeRec293(4), makeRec293(5), makeRec293(6), makeRec293(7),
+      ];
+      const res = await themePass({ ...makeInput293(recs293ncks), fountain: fountain293nck, original: fountain293nck });
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CLOCK_SCENE_SILENT'), 'THEME_CLOCK_SCENE_SILENT should not fire');
+    });
+
+    it('THEME_PAYOFF_SILENT fires when ≥2 payoff scenes have no theme', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const recs293ps = [
+        makeRec293(0, { dialogueHighlights: ['trust matters here'] }), // resonant anchor
+        makeRec293(1, { payoffSetupIds: ['setup-a'] }),
+        makeRec293(2, { payoffSetupIds: ['setup-b'] }),
+        makeRec293(3), makeRec293(4), makeRec293(5), makeRec293(6), makeRec293(7),
+      ];
+      const res = await themePass(makeInput293(recs293ps));
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_PAYOFF_SILENT'), 'THEME_PAYOFF_SILENT should fire');
+    });
+
+    it('THEME_PAYOFF_SILENT does not fire when a payoff scene carries the theme', async () => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      const fountain293np = `INT. SC0 - DAY\nTrust is fragile here.\n\nINT. SC1 - DAY\nBetrayal of trust finally resolved.\n`;
+      const recs293nps = [
+        makeRec293(0, { dialogueHighlights: ['trust matters here'] }),
+        makeRec293(1, { payoffSetupIds: ['setup-a'] }), // fountain SC1 has "trust"
+        makeRec293(2, { payoffSetupIds: ['setup-b'] }),
+        makeRec293(3), makeRec293(4), makeRec293(5), makeRec293(6), makeRec293(7),
+      ];
+      const res = await themePass({ ...makeInput293(recs293nps), fountain: fountain293np, original: fountain293np });
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_PAYOFF_SILENT'), 'THEME_PAYOFF_SILENT should not fire');
+    });
+  });
+
   describe('Wave 292 — structurePass: Act 3 curiosity spike absent, clock pressure finale absent, opening suspense flatline', async () => {
     const makeRec292 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
