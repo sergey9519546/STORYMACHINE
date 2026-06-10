@@ -18738,60 +18738,38 @@ She turns away from the wreckage they made together.`;
     });
   });
 
-  describe('Wave 287 — originalityPass: passive action dominance, dialogue exclamation flood, slug interior dominance', async () => {
+  describe('Wave 287 — originalityPass: opening wake-up cliché, dialogue exclamation flood, slug interior dominance', async () => {
     const runO287 = async (fountain: string) => {
       const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
       return originalityPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
     };
 
-    it('PASSIVE_ACTION_DOMINANCE fires when >35% of 8+ action lines use passive voice', async () => {
-      const fountain287p = `INT. OFFICE - DAY
+    it('OPENING_WAKE_UP_CLICHE fires when the first scene shows a character waking up', async () => {
+      const fountain287w = `INT. BEDROOM - MORNING
 
-A gunshot is heard.
+The alarm clock blares. Alice's eyes snap open.
 
-A body is seen on the floor.
+She bolts upright in bed.
 
-The window can be heard rattling.
+INT. KITCHEN - DAY
 
-The door is found ajar.
-
-ALICE
-Something is wrong here.
-
-A package is revealed on the desk.
-
-The camera gets taken from her.
-
-Evidence is shown to the detective.
-
-A wallet is found nearby.`;
-      const res = await runO287(fountain287p);
-      assert.ok(res.issues.some((i: any) => i.rule === 'PASSIVE_ACTION_DOMINANCE'), 'PASSIVE_ACTION_DOMINANCE should fire');
+Alice pours coffee with shaking hands.`;
+      const res = await runO287(fountain287w);
+      assert.ok(res.issues.some((i: any) => i.rule === 'OPENING_WAKE_UP_CLICHE'), 'OPENING_WAKE_UP_CLICHE should fire');
     });
 
-    it('PASSIVE_ACTION_DOMINANCE does not fire when action lines are mostly active', async () => {
-      const fountain287np = `INT. OFFICE - DAY
+    it('OPENING_WAKE_UP_CLICHE does not fire when waking happens in a later scene', async () => {
+      const fountain287nw = `INT. WAREHOUSE - NIGHT
 
-A gunshot rings out.
+Alice presses her back against a crate, breathing hard.
 
-Alice drops to the floor.
+Footsteps approach from the dark.
 
-The window rattles in the wind.
+INT. BEDROOM - MORNING
 
-Bob slams the door shut.
-
-ALICE
-Something is wrong here.
-
-A package sits on the desk.
-
-The attacker grabs her camera.
-
-The detective reviews the evidence.
-
-A wallet falls to the floor.`;
-      const res = await runO287(fountain287np);
-      assert.ok(!res.issues.some((i: any) => i.rule === 'PASSIVE_ACTION_DOMINANCE'), 'PASSIVE_ACTION_DOMINANCE should not fire');
+Alice wakes up with a start, the nightmare still on her face.`;
+      const res = await runO287(fountain287nw);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'OPENING_WAKE_UP_CLICHE'), 'OPENING_WAKE_UP_CLICHE should not fire');
     });
 
     it('DIALOGUE_EXCLAMATION_FLOOD fires when >25% of 10+ dialogue lines end with !', async () => {
@@ -18959,7 +18937,7 @@ Scene six.`;
     it('INTENTION_SEED_GRAVEYARD fires when first-half has 3+ seeds and second-half has no payoffs', async () => {
       const recs286sg = Array.from({ length: 8 }, (_, i) =>
         makeRec286(i, {
-          seededClueIds: i < 4 && i < 3 ? [`clue-${i}`] : [],
+          seededClueIds: i < 3 ? [`clue-${i}`] : [],
           payoffSetupIds: [],
         })
       );
@@ -19053,7 +19031,7 @@ Scene six.`;
       // 8 scenes: final quarter = sceneIdx >= 6; dominant pair has 4 events all in first 6 scenes
       const recs285crp = Array.from({ length: 8 }, (_, i) =>
         makeRec285(i, {
-          relationshipShifts: i < 6 && i < 4 ? [{ pairKey: 'X-Y', dimension: 'trust', amount: -0.5 }] : [],
+          relationshipShifts: i < 4 ? [{ pairKey: 'X-Y', dimension: 'trust', amount: -0.5 }] : [],
         })
       );
       const res = await runCF285(recs285crp);

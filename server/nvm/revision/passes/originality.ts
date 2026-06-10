@@ -12,7 +12,7 @@
 // Wave 273 additions: exclamation in action (editorial excitement in stage directions),
 // parenthetical flood (>30% of dialogue lines are acting wrench directions),
 // location repetition (>70% of sluglines use the same location).
-// Wave 287 additions: passive action dominance (>35% of action lines use passive voice),
+// Wave 287 additions: opening wake-up cliché (first scene shows a character waking up),
 // dialogue exclamation flood (>25% of dialogue lines end with !),
 // slug interior dominance (>85% of sluglines are INT. — no exterior world).
 
@@ -1162,31 +1162,31 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
     }
   }
 
-  // ── Wave 287: PASSIVE_ACTION_DOMINANCE ───────────────────────────────────
-  // More than 35% of action lines contain passive-voice constructions.
-  // Passive action lines ("is seen", "can be heard", "gets hit") distance the
-  // audience from the scene: the subject receives rather than acts. Screenplay
-  // action should be active and immediate — things happen TO the reader's eye,
-  // not TO abstract subjects in a detached voice. Requires 8+ action lines.
+  // ── Wave 287: OPENING_WAKE_UP_CLICHE ─────────────────────────────────────
+  // The first scene shows a character waking up — alarm clock, eyes opening,
+  // bolting upright in bed. This is the most notorious opening cliché in
+  // screenwriting: it starts the story at the character's lowest-information,
+  // lowest-stakes moment and signals to readers that the writer began at the
+  // literal beginning of a day rather than the dramatic beginning of a story.
+  // Distinct from the cliché-phrase density check (which counts stock phrases
+  // across the whole script): this is a structural check that fires on a
+  // single occurrence confined to the opening scene. Requires 2+ scenes so a
+  // deliberate single-scene vignette is not penalized.
   {
-    const actionLines287 = lines.filter(l => {
-      const t = l.trim();
-      return t.length > 0 &&
-        !/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/.test(t) &&
-        !/^[A-Z][A-Z\s]{1,30}$/.test(t) &&
-        !/^\(/.test(t) &&
-        !/^(FADE|CUT|DISSOLVE|SMASH|TITLE:|SUPER:)/i.test(t);
-    });
-    if (actionLines287.length >= 8) {
-      const passiveRe287 = /\b(is seen|are seen|was seen|can be heard|is heard|was heard|gets? (hit|shot|killed|caught|found|taken|pulled|pushed|thrown)|is found|was found|are found|is shown|are shown|is revealed|are revealed)\b/i;
-      const passiveCount287 = actionLines287.filter(l => passiveRe287.test(l)).length;
-      if (passiveCount287 / actionLines287.length > 0.35) {
+    const slugIdxs287: number[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(lines[i].trim())) slugIdxs287.push(i);
+    }
+    if (slugIdxs287.length >= 2) {
+      const firstSceneText287 = lines.slice(slugIdxs287[0], slugIdxs287[1]).join('\n');
+      const wakeUpRe287 = /\b(wakes? up|wakes with|waking up|alarm (clock|blares|buzzes|rings|goes off)|eyes (open|flutter open|snap open|blink open)|bolts upright|stirs awake|jolts awake)\b/i;
+      if (wakeUpRe287.test(firstSceneText287)) {
         issues.push({
-          location: 'Action lines — passive voice',
-          rule: 'PASSIVE_ACTION_DOMINANCE',
+          location: 'Opening scene',
+          rule: 'OPENING_WAKE_UP_CLICHE',
           severity: 'minor',
-          description: `${passiveCount287} of ${actionLines287.length} action lines (${Math.round(passiveCount287 / actionLines287.length * 100)}%) use passive voice constructions ("is seen", "can be heard", "gets hit"). Passive action creates distance — it tells the reader that something happened rather than making them feel it happen. Active prose is the foundation of cinematic writing.`,
-          suggestedFix: 'Rewrite passive constructions as active ones: "A gunshot is heard" → "A gunshot cracks". Place the actor before the action, not the recipient. Each line should make the reader\'s eye move forward — passive voice stalls it.',
+          description: 'The story opens with a character waking up — the most common opening cliché in screenwriting. A wake-up opening starts at the character\'s lowest-stakes, lowest-information moment and tells the reader the writer began at the literal start of a day rather than the dramatic start of a story.',
+          suggestedFix: 'Open the story at the latest possible moment before the inciting incident: mid-action, mid-conversation, or mid-problem. If the waking moment is genuinely essential (a nightmare that matters, an unfamiliar room), make the disorientation the point — otherwise cut to the first scene where something is already at stake.',
         });
       }
     }
