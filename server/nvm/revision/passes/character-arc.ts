@@ -17,6 +17,9 @@
 // Wave 284 additions: emotional resolution absent (no positive shift in final quarter
 // despite positive beats existing), revelation late cluster (>60% of revelations
 // in final 25%), curiosity plateau (Act 2b avg curiosityDelta ≤ 0).
+// Wave 298 additions: dramatic turn monotone (3+ turns all the same type), suspense/
+// emotion decoupled (3+ high-suspense scenes all emotionally neutral), grief skipped
+// (every negative shift is cancelled by a positive one in the very next scene).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -981,6 +984,77 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `Average curiosityDelta across Act 2b (scenes ${act2bStart284}–${act2bEnd284}) is ${avgCuriosity284.toFixed(2)} — audience curiosity stagnates or falls during the arc's escalation window. Act 2b should be the engine that drives the audience toward the climax; a plateau or descent here causes dramatic momentum to collapse before the finale.`,
           suggestedFix: 'Escalate mystery and stakes in Act 2b: introduce new complications, deepen unanswered questions, and raise the cost of failure. Each scene in this window should leave the audience more uncertain about the outcome than the scene before it.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 298: ARC_DRAMATIC_TURN_MONOTONE ─────────────────────────────────
+  // The story contains 3+ dramatic turns and every one of them is the same
+  // type (all reversals, all revelations, etc.). A character arc built from
+  // a single kind of turn has one move it keeps repeating — the audience
+  // learns the pattern and pre-empts every pivot. Requires 8+ records and
+  // 3+ scenes with a dramatic turn.
+  if (records.length >= 8) {
+    const turnScenes298 = (records as any[]).filter(r => (r.dramaticTurn ?? 'nothing') !== 'nothing');
+    if (turnScenes298.length >= 3) {
+      const turnTypes298 = new Set(turnScenes298.map(r => r.dramaticTurn));
+      if (turnTypes298.size === 1) {
+        const [onlyTurn298] = turnTypes298;
+        issues.push({
+          location: 'Dramatic turns throughout',
+          rule: 'ARC_DRAMATIC_TURN_MONOTONE',
+          severity: 'minor',
+          description: `All ${turnScenes298.length} dramatic turns in the story are the same type ("${onlyTurn298}"). An arc that pivots the same way every time has one move it keeps repeating — by the second occurrence the audience recognizes the pattern, and by the third they pre-empt it. Turn variety is what keeps an arc unpredictable.`,
+          suggestedFix: `Vary the turn types: if every turn is a "${onlyTurn298}", convert at least one into a different kind of pivot — a revelation instead of a reversal, a choice instead of a discovery, an escalation instead of a collapse. Each type of turn exercises a different audience muscle; using only one exhausts it.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 298: ARC_SUSPENSE_EMOTION_DECOUPLED ─────────────────────────────
+  // Three or more high-suspense scenes (suspenseDelta > 1.5) all carry a
+  // neutral emotional shift — tension peaks but the protagonist is never
+  // emotionally touched by it. Suspense the character doesn't feel is
+  // spectacle, not drama. Distinct from CLIMAX_EMOTIONALLY_FLAT (single
+  // climax-scene audit): this checks the correlation across the whole story's
+  // high-tension scenes. Requires 8+ records.
+  if (records.length >= 8) {
+    const highSusp298 = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 1.5);
+    if (highSusp298.length >= 3 && highSusp298.every(r => r.emotionalShift === 'neutral')) {
+      issues.push({
+        location: 'High-suspense scenes',
+        rule: 'ARC_SUSPENSE_EMOTION_DECOUPLED',
+        severity: 'minor',
+        description: `All ${highSusp298.length} high-suspense scenes (suspenseDelta > 1.5) carry a neutral emotional shift — tension spikes but never registers on the protagonist. Suspense the character does not feel is spectacle: the audience watches danger without watching anyone be changed by it. Tension becomes drama only when it costs or moves someone.`,
+        suggestedFix: 'Let high-tension scenes mark the protagonist emotionally: fear that curdles into a negative shift, survival that releases into a positive one. At minimum, the most suspenseful scene in the story should also move the character — if the bomb under the table changes nothing about how anyone feels, it might as well not be there.',
+      });
+    }
+  }
+
+  // ── Wave 298: ARC_GRIEF_SKIPPED ──────────────────────────────────────────
+  // Every negative emotional shift (3+ of them) is immediately followed by a
+  // positive shift in the very next scene — losses never get a scene to land
+  // before being cancelled. Distinct from EMOTIONAL_WHIPLASH (which requires
+  // a contiguous run of alternations): this fires even when the instant
+  // recoveries are scattered across the story with neutral scenes between
+  // the pairs. Requires 8+ records.
+  if (records.length >= 8) {
+    const negIdxs298: number[] = [];
+    for (let i298 = 0; i298 < records.length - 1; i298++) {
+      if ((records as any[])[i298].emotionalShift === 'negative') negIdxs298.push(i298);
+    }
+    if (negIdxs298.length >= 3) {
+      const allInstantlyRecovered298 = negIdxs298.every(
+        i298 => (records as any[])[i298 + 1].emotionalShift === 'positive',
+      );
+      if (allInstantlyRecovered298) {
+        issues.push({
+          location: 'Negative emotional shifts throughout',
+          rule: 'ARC_GRIEF_SKIPPED',
+          severity: 'minor',
+          description: `All ${negIdxs298.length} negative emotional shifts are cancelled by a positive shift in the very next scene — no loss is ever given a scene to land. When every wound heals immediately, the audience learns that setbacks are weightless: nothing bad will be allowed to matter for more than one scene. Grief skipped is stakes erased.`,
+          suggestedFix: 'After at least one significant loss, hold the negative register for a scene or two before any recovery: show the character living inside the consequence — withdrawn, lashing out, going through the motions. The depth of a low is what gives the eventual rise its height; instant recovery flattens both.',
         });
       }
     }

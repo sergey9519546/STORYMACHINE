@@ -17897,6 +17897,78 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 298 — characterArcPass: dramatic turn monotone, suspense/emotion decoupled, grief skipped', async () => {
+    const makeRec298 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCA298 = async (records: any[]) => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ARC_DRAMATIC_TURN_MONOTONE fires when 3+ turns are all the same type', async () => {
+      const recs298tm = Array.from({ length: 8 }, (_, i) =>
+        makeRec298(i, { dramaticTurn: [1, 3, 5].includes(i) ? 'reversal' : 'nothing' })
+      );
+      const res = await runCA298(recs298tm);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_DRAMATIC_TURN_MONOTONE'), 'ARC_DRAMATIC_TURN_MONOTONE should fire');
+    });
+
+    it('ARC_DRAMATIC_TURN_MONOTONE does not fire when turn types are varied', async () => {
+      const turns298 = ['nothing', 'reversal', 'nothing', 'revelation', 'nothing', 'reversal', 'nothing', 'nothing'];
+      const recs298ntm = Array.from({ length: 8 }, (_, i) =>
+        makeRec298(i, { dramaticTurn: turns298[i] })
+      );
+      const res = await runCA298(recs298ntm);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_DRAMATIC_TURN_MONOTONE'), 'ARC_DRAMATIC_TURN_MONOTONE should not fire');
+    });
+
+    it('ARC_SUSPENSE_EMOTION_DECOUPLED fires when 3+ high-suspense scenes are all emotionally neutral', async () => {
+      const recs298sd = Array.from({ length: 8 }, (_, i) =>
+        makeRec298(i, { suspenseDelta: [2, 4, 6].includes(i) ? 2 : 0.5 })
+      );
+      const res = await runCA298(recs298sd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_SUSPENSE_EMOTION_DECOUPLED'), 'ARC_SUSPENSE_EMOTION_DECOUPLED should fire');
+    });
+
+    it('ARC_SUSPENSE_EMOTION_DECOUPLED does not fire when a high-suspense scene moves the character', async () => {
+      const recs298nsd = Array.from({ length: 8 }, (_, i) =>
+        makeRec298(i, {
+          suspenseDelta: [2, 4, 6].includes(i) ? 2 : 0.5,
+          emotionalShift: i === 4 ? 'negative' : 'neutral',
+        })
+      );
+      const res = await runCA298(recs298nsd);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_SUSPENSE_EMOTION_DECOUPLED'), 'ARC_SUSPENSE_EMOTION_DECOUPLED should not fire');
+    });
+
+    it('ARC_GRIEF_SKIPPED fires when every negative shift is cancelled by the next scene', async () => {
+      // negatives at 1,4,6 each immediately followed by positive at 2,5,7
+      const shifts298 = ['neutral', 'negative', 'positive', 'neutral', 'negative', 'positive', 'negative', 'positive'];
+      const recs298gs = Array.from({ length: 8 }, (_, i) =>
+        makeRec298(i, { emotionalShift: shifts298[i] })
+      );
+      const res = await runCA298(recs298gs);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_GRIEF_SKIPPED'), 'ARC_GRIEF_SKIPPED should fire');
+    });
+
+    it('ARC_GRIEF_SKIPPED does not fire when at least one loss lingers', async () => {
+      // negative at 1 followed by neutral at 2 — the loss gets a scene to land
+      const shifts298n = ['neutral', 'negative', 'neutral', 'neutral', 'negative', 'positive', 'negative', 'positive'];
+      const recs298ngs = Array.from({ length: 8 }, (_, i) =>
+        makeRec298(i, { emotionalShift: shifts298n[i] })
+      );
+      const res = await runCA298(recs298ngs);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_GRIEF_SKIPPED'), 'ARC_GRIEF_SKIPPED should not fire');
+    });
+  });
+
   describe('Wave 297 — dialoguePass: contraction starvation, apology loop, repeated line', async () => {
     const runD297 = async (fountain: string) => {
       const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
