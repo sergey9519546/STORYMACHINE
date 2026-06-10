@@ -13,6 +13,9 @@
 // Wave 274 additions: Act 3 page overrun (climax act >35% of total pages),
 // long-scene flood (>50% of scenes above 1.5× average), Act 2 page weight
 // (middle act <40% of total pages — underweight complication zone).
+// Wave 288 additions: suspense early peak (Act 1 avg suspense > Act 3 avg and Act 3 ≤ 0),
+// curiosity final drop (avg curiosityDelta in final quarter ≤ 0 while overall is positive),
+// curiosity opening flatline (opening avg curiosityDelta ≤ 0 — hook absent).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -922,6 +925,82 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         description: `Act 2 (Scenes ${act2Start274}–${act2End274 - 1}) consumes only ${Math.round(act2Ratio274 * 100)}% of total script pages — the complication engine is underweight. A thin Act 2 means complications are rushed, character development is compressed, and the story moves from setup to resolution without developing its middle. Act 2 should be the heaviest act.`,
         suggestedFix: 'Expand the complication zone: add scenes that develop the protagonist\'s relationships under pressure, deepen the opposition, and let the consequences of Act 1 decisions unfold. Act 2 earns the climax — compress it and the resolution will feel unearned.',
       });
+    }
+  }
+
+  // ── Wave 288: PACING_SUSPENSE_EARLY_PEAK ─────────────────────────────────
+  // Average suspenseDelta in Act 1 (first 25%) exceeds average suspenseDelta
+  // in Act 3 (last 25%), and Act 3's average is ≤ 0. Suspense peaks in the
+  // setup and dissipates before the climax — the story front-loads tension
+  // and coasts to the finish. Requires 10+ records with at least 2 scenes
+  // in both Act 1 and Act 3 windows.
+  if (records.length >= 10) {
+    const act1End288 = Math.floor(records.length * 0.25);
+    const act3Start288 = Math.floor(records.length * 0.75);
+    const act1Recs288 = (records as any[]).slice(0, act1End288);
+    const act3Recs288 = (records as any[]).slice(act3Start288);
+    if (act1Recs288.length >= 2 && act3Recs288.length >= 2) {
+      const act1AvgSusp288 = act1Recs288.reduce((acc: number, r: any) => acc + (r.suspenseDelta ?? 0), 0) / act1Recs288.length;
+      const act3AvgSusp288 = act3Recs288.reduce((acc: number, r: any) => acc + (r.suspenseDelta ?? 0), 0) / act3Recs288.length;
+      if (act1AvgSusp288 > act3AvgSusp288 && act3AvgSusp288 <= 0) {
+        issues.push({
+          location: `Act 1 avg suspense (${act1AvgSusp288.toFixed(1)}) vs Act 3 avg (${act3AvgSusp288.toFixed(1)})`,
+          rule: 'PACING_SUSPENSE_EARLY_PEAK',
+          severity: 'minor',
+          description: `Act 1's average suspenseDelta (${act1AvgSusp288.toFixed(2)}) exceeds Act 3's (${act3AvgSusp288.toFixed(2)}), and the climax zone is flat or declining. Suspense peaks in the setup and dissipates before the resolution — the story front-loads tension and coasts. The audience loses urgency exactly when the story needs them most engaged.`,
+          suggestedFix: 'Redistribute suspense: let Act 1 establish stakes (moderate suspense), Act 2 escalate (rising suspense), and Act 3 peak and resolve (highest then cathartic release). An escalating suspense curve means each act is more urgent than the last.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 288: PACING_CURIOSITY_FINAL_DROP ────────────────────────────────
+  // Average curiosityDelta in the final quarter (75–100%) is ≤ 0 while the
+  // story's overall average curiosityDelta is positive. The mystery engine
+  // shuts off before the payoff — the audience stops wondering just as the
+  // answers arrive. A satisfying finale should sustain or intensify curiosity
+  // until the very last revelation. Requires 10+ records and 3+ scenes in
+  // the final quarter.
+  if (records.length >= 10) {
+    const finalStart288 = Math.floor(records.length * 0.75);
+    const finalRecs288 = (records as any[]).slice(finalStart288);
+    if (finalRecs288.length >= 3) {
+      const overallAvgCuriosity288 = (records as any[]).reduce((acc: number, r: any) => acc + (r.curiosityDelta ?? 0), 0) / records.length;
+      const finalAvgCuriosity288 = finalRecs288.reduce((acc: number, r: any) => acc + (r.curiosityDelta ?? 0), 0) / finalRecs288.length;
+      if (overallAvgCuriosity288 > 0 && finalAvgCuriosity288 <= 0) {
+        issues.push({
+          location: `Final quarter (scenes ${finalStart288}+) — curiosity drop`,
+          rule: 'PACING_CURIOSITY_FINAL_DROP',
+          severity: 'minor',
+          description: `Overall average curiosityDelta is ${overallAvgCuriosity288.toFixed(2)} (positive) but the final quarter drops to ${finalAvgCuriosity288.toFixed(2)} (≤ 0). The mystery engine cuts off before the payoff — the audience stops wondering just as the answers arrive. A finale that resolves curiosity without first intensifying it feels like answers to questions the audience has stopped asking.`,
+          suggestedFix: 'Sustain curiosity into the final act: introduce a late complication, a new question raised by the approaching resolution, or a false resolution that opens a deeper mystery. The answers should arrive to an audience that is still desperately asking.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 288: PACING_CURIOSITY_OPENING_FLATLINE ──────────────────────────
+  // Average curiosityDelta in the opening (first 25%) is ≤ 0. The story
+  // fails to hook the audience in Act 1 — curiosity never builds in setup.
+  // An opening with no curiosity momentum means the audience is given no
+  // reason to ask "what happens next?" before the first act turn. Distinct
+  // from PACING_CURIOSITY_FINAL_DROP (which fires when the final act loses
+  // curiosity after building it); this fires when the opening never builds
+  // curiosity at all. Requires 10+ records and 3+ opening scenes.
+  if (records.length >= 10) {
+    const openingEnd288 = Math.floor(records.length * 0.25);
+    const openingRecs288 = (records as any[]).slice(0, openingEnd288);
+    if (openingRecs288.length >= 3) {
+      const openingAvgCuriosity288 = openingRecs288.reduce((acc: number, r: any) => acc + (r.curiosityDelta ?? 0), 0) / openingRecs288.length;
+      if (openingAvgCuriosity288 <= 0) {
+        issues.push({
+          location: `Opening (scenes 0–${openingEnd288 - 1}) — curiosity flatline`,
+          rule: 'PACING_CURIOSITY_OPENING_FLATLINE',
+          severity: 'minor',
+          description: `Average curiosityDelta across the opening scenes (0–${openingEnd288 - 1}) is ${openingAvgCuriosity288.toFixed(2)} — the story fails to generate curiosity in setup. The audience reaches the Act 1 turn without a question driving them forward. An opening that doesn't raise questions has no hook.`,
+          suggestedFix: 'Plant a question in the first scene: an unexplained action, a mysterious object, a character whose goal is unclear. Every opening scene should make the audience wonder "why?" before it makes them wonder "what next?". Curiosity is the engine of story; start it early.',
+        });
+      }
     }
   }
 

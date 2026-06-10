@@ -17897,6 +17897,75 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 288 — pacingPass: suspense early peak, curiosity final drop, scene count imbalance', async () => {
+    const makeRec288 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0.5,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain288 = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SCENE ${i} - DAY\n\nScene ${i} action line.`).join('\n\n');
+    const runP288 = async (records: any[]) => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      return pacingPass({ fountain: makeFountain288(records.length), original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PACING_SUSPENSE_EARLY_PEAK fires when Act 1 avg suspense > Act 3 avg and Act 3 avg ≤ 0', async () => {
+      // 12 scenes: Act 1 (0-2) high suspense, Act 3 (9-11) negative suspense
+      const recs288sep = Array.from({ length: 12 }, (_, i) =>
+        makeRec288(i, { suspenseDelta: i < 3 ? 3.0 : i >= 9 ? -0.5 : 0.5 })
+      );
+      const res = await runP288(recs288sep);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_SUSPENSE_EARLY_PEAK'), 'PACING_SUSPENSE_EARLY_PEAK should fire');
+    });
+
+    it('PACING_SUSPENSE_EARLY_PEAK does not fire when Act 3 avg suspense is positive', async () => {
+      const recs288nsep = Array.from({ length: 12 }, (_, i) =>
+        makeRec288(i, { suspenseDelta: i < 3 ? 1.0 : i >= 9 ? 2.0 : 0.5 })
+      );
+      const res = await runP288(recs288nsep);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_SUSPENSE_EARLY_PEAK'), 'PACING_SUSPENSE_EARLY_PEAK should not fire');
+    });
+
+    it('PACING_CURIOSITY_FINAL_DROP fires when overall curiosity is positive but final quarter drops to ≤ 0', async () => {
+      // 12 scenes: overall positive (0.5 avg) but final 3 scenes have curiosityDelta = -1
+      const recs288cfd = Array.from({ length: 12 }, (_, i) =>
+        makeRec288(i, { curiosityDelta: i >= 9 ? -1 : 1 })
+      );
+      const res = await runP288(recs288cfd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_CURIOSITY_FINAL_DROP'), 'PACING_CURIOSITY_FINAL_DROP should fire');
+    });
+
+    it('PACING_CURIOSITY_FINAL_DROP does not fire when final quarter maintains positive curiosity', async () => {
+      const recs288ncfd = Array.from({ length: 12 }, (_, i) =>
+        makeRec288(i, { curiosityDelta: 1 })
+      );
+      const res = await runP288(recs288ncfd);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_CURIOSITY_FINAL_DROP'), 'PACING_CURIOSITY_FINAL_DROP should not fire');
+    });
+
+    it('PACING_CURIOSITY_OPENING_FLATLINE fires when opening avg curiosityDelta is ≤ 0', async () => {
+      // 12 scenes: opening (0-2) all have curiosityDelta = -1; overall still positive elsewhere
+      const recs288cof = Array.from({ length: 12 }, (_, i) =>
+        makeRec288(i, { curiosityDelta: i < 3 ? -1 : 1 })
+      );
+      const res = await runP288(recs288cof);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_CURIOSITY_OPENING_FLATLINE'), 'PACING_CURIOSITY_OPENING_FLATLINE should fire');
+    });
+
+    it('PACING_CURIOSITY_OPENING_FLATLINE does not fire when opening has positive curiosityDelta', async () => {
+      const recs288ncof = Array.from({ length: 12 }, (_, i) =>
+        makeRec288(i, { curiosityDelta: 1 })
+      );
+      const res = await runP288(recs288ncof);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_CURIOSITY_OPENING_FLATLINE'), 'PACING_CURIOSITY_OPENING_FLATLINE should not fire');
+    });
+  });
+
   describe('Wave 287 — originalityPass: passive action dominance, dialogue exclamation flood, slug interior dominance', async () => {
     const runO287 = async (fountain: string) => {
       const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
