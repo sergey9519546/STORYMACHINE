@@ -17897,6 +17897,95 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 289 — payoffPass: payoff-revelation disconnect, clue density front collapse, payoff suspense mismatch', async () => {
+    const makeRec289 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runPF289 = async (records: any[]) => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      return payoffPass({ fountain: '', original: '', records, structure: { actPosition: 'act3', completionPercent: 80 } as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PAYOFF_REVELATION_DISCONNECT fires when payoffs have no adjacent revelations', async () => {
+      // 10 scenes: payoffs at 5,6,7 (via payoffSetupIds); no revelations anywhere
+      const recs289prd = Array.from({ length: 10 }, (_, i) =>
+        makeRec289(i, {
+          seededClueIds: i < 3 ? [`clue-${i}`] : [],
+          payoffSetupIds: i >= 5 && i <= 7 ? [`clue-${i - 5}`] : [],
+          revelation: null,
+        })
+      );
+      const res = await runPF289(recs289prd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_DISCONNECT'), 'PAYOFF_REVELATION_DISCONNECT should fire');
+    });
+
+    it('PAYOFF_REVELATION_DISCONNECT does not fire when a payoff scene has a revelation', async () => {
+      const recs289nprd = Array.from({ length: 10 }, (_, i) =>
+        makeRec289(i, {
+          seededClueIds: i < 3 ? [`clue-${i}`] : [],
+          payoffSetupIds: i >= 5 && i <= 7 ? [`clue-${i - 5}`] : [],
+          revelation: i === 6 ? 'the truth revealed' : null,
+        })
+      );
+      const res = await runPF289(recs289nprd);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_DISCONNECT'), 'PAYOFF_REVELATION_DISCONNECT should not fire');
+    });
+
+    it('CLUE_DENSITY_FRONT_COLLAPSE fires when all clues are in the first 20%', async () => {
+      // 10 scenes: all 3 clues planted at sceneIdx 0,1 (both within first 20% = scenes 0-1)
+      const recs289cdfc = Array.from({ length: 10 }, (_, i) =>
+        makeRec289(i, {
+          seededClueIds: i <= 1 ? [`clue-${i}`] : [],
+          payoffSetupIds: i === 8 ? ['clue-0', 'clue-1'] : i === 9 ? ['clue-2'] : [],
+        })
+      );
+      // Add a third clue at scene 1 to reach size>=3
+      recs289cdfc[1].seededClueIds = ['clue-1', 'clue-2'];
+      const res = await runPF289(recs289cdfc);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLUE_DENSITY_FRONT_COLLAPSE'), 'CLUE_DENSITY_FRONT_COLLAPSE should fire');
+    });
+
+    it('CLUE_DENSITY_FRONT_COLLAPSE does not fire when clues are spread across the story', async () => {
+      const recs289ncdfc = Array.from({ length: 10 }, (_, i) =>
+        makeRec289(i, {
+          seededClueIds: i === 1 || i === 4 || i === 7 ? [`clue-${i}`] : [],
+        })
+      );
+      const res = await runPF289(recs289ncdfc);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLUE_DENSITY_FRONT_COLLAPSE'), 'CLUE_DENSITY_FRONT_COLLAPSE should not fire');
+    });
+
+    it('PAYOFF_SUSPENSE_MISMATCH fires when payoff scenes avg suspenseDelta is ≤ 0', async () => {
+      const recs289psm = Array.from({ length: 10 }, (_, i) =>
+        makeRec289(i, {
+          seededClueIds: i < 3 ? [`clue-${i}`] : [],
+          payoffSetupIds: i >= 5 && i <= 7 ? [`clue-${i - 5}`] : [],
+          suspenseDelta: i >= 5 && i <= 7 ? -0.5 : 1,
+        })
+      );
+      const res = await runPF289(recs289psm);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_SUSPENSE_MISMATCH'), 'PAYOFF_SUSPENSE_MISMATCH should fire');
+    });
+
+    it('PAYOFF_SUSPENSE_MISMATCH does not fire when payoff scenes have positive avg suspenseDelta', async () => {
+      const recs289npsm = Array.from({ length: 10 }, (_, i) =>
+        makeRec289(i, {
+          seededClueIds: i < 3 ? [`clue-${i}`] : [],
+          payoffSetupIds: i >= 5 && i <= 7 ? [`clue-${i - 5}`] : [],
+          suspenseDelta: 1.5,
+        })
+      );
+      const res = await runPF289(recs289npsm);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_SUSPENSE_MISMATCH'), 'PAYOFF_SUSPENSE_MISMATCH should not fire');
+    });
+  });
+
   describe('Wave 288 — pacingPass: suspense early peak, curiosity final drop, scene count imbalance', async () => {
     const makeRec288 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

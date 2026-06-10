@@ -12,6 +12,9 @@
 // Wave 275 additions: Act 2a payoff void (early conflict zone never closes any loops),
 // late-majority clue seeding (>60% of clues planted in second half), and
 // setup/payoff act skew (planting and harvesting engines operate in separate acts).
+// Wave 289 additions: payoff-revelation disconnect (payoffs fire without revelations nearby),
+// clue density front-collapse (all clues in first 20%), payoff suspense mismatch
+// (payoff scenes have avg suspenseDelta ≤ 0 despite 3+ payoffs).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -824,6 +827,79 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         description: `The act with the most setups (${zoneNames275[topSetup275]}: ${zoneSetups275[topSetup275]} setups) has zero payoffs, and the act with the most payoffs (${zoneNames275[topPayoff275]}: ${zonePayoffs275[topPayoff275]} payoffs) has zero setups — the planting and harvesting engines operate in completely separate acts. Setup and payoff divorced from each other reduce the sense of earned resolution.`,
         suggestedFix: 'Introduce at least one payoff in the act where most setups are planted, or plant at least one clue in the act where most payoffs arrive. Interleaving setups and payoffs within the same act zone creates a more organic sense of cause-and-effect progression.',
       });
+    }
+  }
+
+  // ── Wave 289: PAYOFF_REVELATION_DISCONNECT ───────────────────────────────
+  // Payoffs fire (payoffSetupIds non-empty) but none of the payoff scenes
+  // have a revelation and none of the adjacent scenes (±1) have a revelation
+  // either. Payoffs should be moments of discovery — the audience should
+  // learn something when a planted thread is resolved. A payoff without a
+  // revelation is a closure without insight. Requires 8+ records and 3+
+  // payoff scenes.
+  if (records.length >= 8 && payoffInfo.size >= 3) {
+    const revelationSceneIdxs289 = new Set<number>(
+      (records as any[]).filter(r => r.revelation !== null).map(r => r.sceneIdx),
+    );
+    const payoffSceneIdxs289 = new Set<number>([...payoffInfo.values()]);
+    const anyRevealed289 = [...payoffSceneIdxs289].some(idx =>
+      revelationSceneIdxs289.has(idx) ||
+      revelationSceneIdxs289.has(idx - 1) ||
+      revelationSceneIdxs289.has(idx + 1),
+    );
+    if (!anyRevealed289) {
+      issues.push({
+        location: 'Payoff scenes — no adjacent revelations',
+        rule: 'PAYOFF_REVELATION_DISCONNECT',
+        severity: 'minor',
+        description: `${payoffInfo.size} payoff scene(s) fire but none of them (or their adjacent scenes) contain a revelation. Payoffs should be moments of discovery — the audience should learn or understand something new when a planted thread resolves. A payoff without insight is closure without meaning.`,
+        suggestedFix: 'Tie each payoff to a revelation: the fulfilled setup reveals a character\'s true motive, confirms a fear, or recontextualizes an earlier event. Even a small revelation — "now we know why that mattered" — elevates a mechanical closure to a resonant one.',
+      });
+    }
+  }
+
+  // ── Wave 289: CLUE_DENSITY_FRONT_COLLAPSE ────────────────────────────────
+  // All planted clues appear in the first 20% of the story. The entire
+  // setup engine exhausts itself in the opening and then falls silent.
+  // Audiences can only hold a limited number of active setups in memory;
+  // front-loading all seeds means they fade before they can pay off.
+  // Requires 8+ records and 3+ seeded clues.
+  if (records.length >= 8 && clueInfo.size >= 3) {
+    const cutoff289 = Math.floor(records.length * 0.20);
+    const earlyClues289 = [...clueInfo.values()].filter(c => c.plantedAt <= cutoff289).length;
+    if (earlyClues289 === clueInfo.size) {
+      issues.push({
+        location: `Opening 20% (scenes 0–${cutoff289}) — all clue plants`,
+        rule: 'CLUE_DENSITY_FRONT_COLLAPSE',
+        severity: 'minor',
+        description: `All ${clueInfo.size} planted clues appear in the first 20% of the story (scenes 0–${cutoff289}) and no new clues are seeded after that. Front-collapsing the entire setup engine means audiences carry all threads for the rest of the story — or forget them entirely before they pay off.`,
+        suggestedFix: 'Distribute clue plants across all four acts: plant 2–3 clues in Act 1, introduce new threads at the midpoint and Act 2b, and reserve one "late plant" for Act 3 that pays off in the climax. This keeps the audience actively processing setups throughout, not just in the opening.',
+      });
+    }
+  }
+
+  // ── Wave 289: PAYOFF_SUSPENSE_MISMATCH ───────────────────────────────────
+  // Payoff scenes have an average suspenseDelta ≤ 0 despite 3+ payoffs firing.
+  // Payoffs should generate suspense — the moment a planted thread resolves
+  // should feel like the stakes rising, not falling. Flat or declining suspense
+  // at the moment of payoff means the resolution lands without tension, and the
+  // audience feels cheated rather than rewarded. Requires 8+ records and 3+
+  // payoff scenes with suspenseDelta data.
+  if (records.length >= 8 && payoffInfo.size >= 3) {
+    const payoffSuspenseScenes289 = [...payoffInfo.values()]
+      .map(idx => (records as any[]).find(r => r.sceneIdx === idx))
+      .filter(Boolean);
+    if (payoffSuspenseScenes289.length >= 3) {
+      const avgPayoffSuspense289 = payoffSuspenseScenes289.reduce((acc: number, r: any) => acc + (r.suspenseDelta ?? 0), 0) / payoffSuspenseScenes289.length;
+      if (avgPayoffSuspense289 <= 0) {
+        issues.push({
+          location: 'Payoff scenes — suspense mismatch',
+          rule: 'PAYOFF_SUSPENSE_MISMATCH',
+          severity: 'minor',
+          description: `${payoffSuspenseScenes289.length} payoff scenes have an average suspenseDelta of ${avgPayoffSuspense289.toFixed(2)} — resolutions arrive without generating tension. Payoffs should be moments of heightened stakes: the audience should feel the cost of the resolution, not just the closure. Flat or declining suspense at payoff time makes the resolution feel deflating rather than cathartic.`,
+          suggestedFix: 'Raise the stakes at each payoff: ensure the resolution is contested (the protagonist must work for it), costly (something is lost even in victory), or revelatory (the payoff recontextualizes what came before). A payoff that arrives without friction is a debt repaid without drama.',
+        });
+      }
     }
   }
 
