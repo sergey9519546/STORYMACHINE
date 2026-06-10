@@ -17897,6 +17897,193 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 294 — voicePass: dialogue interrogative saturation, action adverb flood, character name monotony', async () => {
+    const runV294 = async (fountain: string) => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      return voicePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DIALOGUE_INTERROGATIVE_SATURATION fires when >30% of 10+ dialogue lines end with ?', async () => {
+      const fountain294dis = `INT. ROOM - DAY
+
+ALICE
+What do you want?
+
+BOB
+Why are you here?
+
+ALICE
+Did you tell him?
+
+BOB
+What happened exactly?
+
+ALICE
+Can you explain this?
+
+BOB
+Are you sure about that?
+
+ALICE
+Who told you that?
+
+BOB
+I had no choice.
+
+ALICE
+Why does it matter.
+
+BOB
+It does not.`;
+      const res = await runV294(fountain294dis);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_INTERROGATIVE_SATURATION'), 'DIALOGUE_INTERROGATIVE_SATURATION should fire');
+    });
+
+    it('DIALOGUE_INTERROGATIVE_SATURATION does not fire when questions are sparse', async () => {
+      const fountain294ndis = `INT. ROOM - DAY
+
+ALICE
+Get out of here now.
+
+BOB
+I am not leaving.
+
+ALICE
+You have no right to be here.
+
+BOB
+I have every right.
+
+ALICE
+This is my house.
+
+BOB
+Not any more it is not.
+
+ALICE
+What do you mean?
+
+BOB
+Read the papers.
+
+ALICE
+You cannot be serious.
+
+BOB
+I am completely serious.`;
+      const res = await runV294(fountain294ndis);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_INTERROGATIVE_SATURATION'), 'DIALOGUE_INTERROGATIVE_SATURATION should not fire');
+    });
+
+    it('ACTION_ADVERB_FLOOD fires when >25% of 8+ action lines contain manner adverbs', async () => {
+      const fountain294aaf = `INT. OFFICE - DAY
+
+She slowly crosses to the window.
+
+He quietly closes the door behind him.
+
+She carefully picks up the envelope.
+
+He suddenly turns to face her.
+
+She gently places it on the desk.
+
+He nervously adjusts his tie.
+
+She softly closes her eyes.
+
+He angrily slams the folder shut.
+
+She breathes.`;
+      const res = await runV294(fountain294aaf);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_ADVERB_FLOOD'), 'ACTION_ADVERB_FLOOD should fire');
+    });
+
+    it('ACTION_ADVERB_FLOOD does not fire when adverbs are sparse', async () => {
+      const fountain294naaf = `INT. OFFICE - DAY
+
+She crosses to the window.
+
+He closes the door.
+
+She picks up the envelope.
+
+He turns to face her.
+
+She sets it on the desk.
+
+He straightens his tie.
+
+She exhales.
+
+He slams the folder shut.
+
+She stares at the window.`;
+      const res = await runV294(fountain294naaf);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_ADVERB_FLOOD'), 'ACTION_ADVERB_FLOOD should not fire');
+    });
+
+    it('CHARACTER_NAME_MONOTONY fires when single name opens >50% of 12+ action lines', async () => {
+      const fountain294cnm = `INT. ROOM - DAY
+
+Alice crosses the room.
+
+Alice opens the window.
+
+Alice looks outside.
+
+Alice turns around.
+
+Alice picks up the phone.
+
+Alice dials the number.
+
+Alice waits.
+
+Alice hangs up.
+
+Alice sits down on the floor.
+
+Alice buries her face.
+
+Alice does not move.
+
+Bob enters.`;
+      const res = await runV294(fountain294cnm);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CHARACTER_NAME_MONOTONY'), 'CHARACTER_NAME_MONOTONY should fire');
+    });
+
+    it('CHARACTER_NAME_MONOTONY does not fire when action subjects are varied', async () => {
+      const fountain294ncnm = `INT. ROOM - DAY
+
+Alice crosses the room.
+
+The door slams behind her.
+
+Bob follows close behind.
+
+The phone rings on the desk.
+
+Alice picks it up.
+
+Silence on the other end.
+
+Bob moves to the window.
+
+The curtains flutter in the breeze.
+
+Alice sets the phone down.
+
+Bob turns to face her.
+
+The light shifts as clouds pass.
+
+Both of them wait.`;
+      const res = await runV294(fountain294ncnm);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CHARACTER_NAME_MONOTONY'), 'CHARACTER_NAME_MONOTONY should not fire');
+    });
+  });
+
   describe('Wave 293 — themePass: revelation silent, clock scene silent, payoff silent', async () => {
     const makeRec293 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

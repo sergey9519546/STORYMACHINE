@@ -16,6 +16,9 @@
 // intensifier), monochrome verb vocabulary in action lines (single common verb in >25%
 // of lines, ≥12 lines), scene heading repetition (>60% of scenes share the same
 // location, ≥8 records).
+// Wave 294 additions: dialogue interrogative saturation (>30% of dialogue lines end with ?),
+// action line adverb flood (>25% of action lines contain an adverb before the verb),
+// character name monotony in action (single character name in >50% of action lines).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1137,6 +1140,91 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `${maxLocCount280} of ${records.length} scenes (${Math.round(maxLocCount280 / records.length * 100)}%) are set in "${topLoc280}" — the screenplay's visual universe is restricted to a single dominant location. Cinema uses spatial variety to modulate pace, atmosphere, and the physical expression of power; a story that never leaves one room forfeits these tools.`,
           suggestedFix: `Introduce more physical locations or significantly differentiate revisits to "${topLoc280}" through time-of-day, staging, or set condition. Even minor spatial changes (INT. OFFICE vs INT. HALLWAY OUTSIDE OFFICE) expand the visual vocabulary. If the single-location constraint is intentional (bottle episode), ensure the staging varies enough to create spatial rhythm.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 294: DIALOGUE_INTERROGATIVE_SATURATION ──────────────────────────
+  // More than 30% of dialogue lines end with a question mark. When characters
+  // ask questions constantly, the story's dialogue becomes a cross-examination
+  // rather than a confrontation or declaration. Questions are dramatically
+  // passive — they defer to the other character. A dialogue dominated by
+  // questions has no one taking a stand. Requires 10+ dialogue lines.
+  {
+    const intDlgLines294: string[] = [];
+    let intInDlg294 = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { intInDlg294 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { intInDlg294 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { intInDlg294 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (intInDlg294) intDlgLines294.push(t);
+      else intInDlg294 = false;
+    }
+    if (intDlgLines294.length >= 10) {
+      const qCount294 = intDlgLines294.filter(l => l.trim().endsWith('?')).length;
+      if (qCount294 / intDlgLines294.length > 0.30) {
+        issues.push({
+          location: 'Dialogue interrogatives',
+          rule: 'DIALOGUE_INTERROGATIVE_SATURATION',
+          severity: 'minor',
+          description: `${qCount294} of ${intDlgLines294.length} dialogue lines (${Math.round(qCount294 / intDlgLines294.length * 100)}%) end with a question mark — the dialogue is dominated by interrogation. Characters who only ask questions never take positions; dialogue without declarations, demands, or confrontations reads as evasive and passive.`,
+          suggestedFix: 'Replace questions with declarations, demands, or challenges: "What are you doing here?" → "You shouldn\'t be here." Questions are postponements; statements are stakes. Reserve questions for moments of genuine vulnerability — a character who only questions never reveals what they want.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 294: ACTION_ADVERB_FLOOD ────────────────────────────────────────
+  // More than 25% of action lines contain an adverb immediately before or
+  // after the main verb ("slowly walks", "quickly turns", "silently crosses").
+  // Action adverbs patch weak verbs: "slowly walks" is "shuffles";
+  // "quickly turns" is "spins". A flood of action adverbs indicates a verb
+  // vocabulary problem — the writer is modifying common verbs rather than
+  // selecting precise ones. Requires 8+ action lines.
+  if (actionOnlyLines.length >= 8) {
+    const actionAdverbRe294 = /\b(slowly|quickly|quietly|silently|suddenly|carefully|gently|roughly|softly|harshly|briefly|sharply|firmly|nervously|anxiously|angrily|calmly|rapidly|heavily|lightly)\b/i;
+    const actionAdverbCount294 = actionOnlyLines.filter(l => actionAdverbRe294.test(l)).length;
+    if (actionAdverbCount294 / actionOnlyLines.length > 0.25) {
+      issues.push({
+        location: 'Action line adverbs',
+        rule: 'ACTION_ADVERB_FLOOD',
+        severity: 'minor',
+        description: `${actionAdverbCount294} of ${actionOnlyLines.length} action lines (${Math.round(actionAdverbCount294 / actionOnlyLines.length * 100)}%) contain manner adverbs ("slowly", "quietly", "suddenly", "carefully"). Adverbs patch imprecise verbs — "walks slowly" should be "shuffles"; "turns quickly" should be "spins". An adverb flood signals weak verb vocabulary.`,
+        suggestedFix: 'For each adverb-modified verb pair, find the single precise verb: "silently crosses" → "slips", "roughly grabs" → "seizes", "carefully opens" → "eases open". The right verb never needs an adverb. When you reach for a manner adverb, you have not yet found the right verb.',
+      });
+    }
+  }
+
+  // ── Wave 294: CHARACTER_NAME_MONOTONY ────────────────────────────────────
+  // A single character name appears in more than 50% of all action lines.
+  // The screenplay is written from the perspective of one character who
+  // physically dominates every action beat — other characters become props
+  // in their own scenes. Even in a single-protagonist story, not every action
+  // line needs to name the protagonist. Action without a named subject creates
+  // cinematic space and lets the environment become a character. Requires 12+
+  // action lines.
+  if (actionOnlyLines.length >= 12) {
+    const nameLineMap294 = new Map<string, number>();
+    for (const l of actionOnlyLines) {
+      const words294 = l.trim().split(/\s+/);
+      const firstWord294 = words294[0]?.replace(/[^a-zA-Z]/g, '');
+      if (firstWord294 && firstWord294.length > 1 && /^[A-Z]/.test(firstWord294)) {
+        nameLineMap294.set(firstWord294, (nameLineMap294.get(firstWord294) ?? 0) + 1);
+      }
+    }
+    if (nameLineMap294.size > 0) {
+      const maxNameCount294 = Math.max(...nameLineMap294.values());
+      if (maxNameCount294 / actionOnlyLines.length > 0.50) {
+        const topName294 = [...nameLineMap294.entries()].sort((a, b) => b[1] - a[1])[0][0];
+        issues.push({
+          location: 'Action line subjects',
+          rule: 'CHARACTER_NAME_MONOTONY',
+          severity: 'minor',
+          description: `"${topName294}" opens ${maxNameCount294} of ${actionOnlyLines.length} action lines (${Math.round(maxNameCount294 / actionOnlyLines.length * 100)}%) — one character name dominates the action prose. When every action begins with the same name, supporting characters become props and the physical world disappears. A screenplay is a camera, not a POV diary.`,
+          suggestedFix: `Vary action subjects: use the environment, objects, and other characters as the grammatical subjects of action lines. "The door opens" instead of "${topName294} opens the door"; "Silence fills the room" instead of "${topName294} stands in silence". Distributing action subjects creates spatial depth and cinematic rhythm.`,
         });
       }
     }
