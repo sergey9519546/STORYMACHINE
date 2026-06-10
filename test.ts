@@ -17897,6 +17897,72 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 292 — structurePass: Act 3 curiosity spike absent, clock pressure finale absent, opening suspense flatline', async () => {
+    const makeRec292 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runST292 = async (records: any[]) => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      return structurePass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ACT3_CURIOSITY_SPIKE_ABSENT fires when pre-final quarter has curiosity spike but final quarter does not', async () => {
+      // 12 scenes: curiosityDelta > 1 at scene 3 (pre-final), none in final quarter (9-11)
+      const recs292acsa = Array.from({ length: 12 }, (_, i) =>
+        makeRec292(i, { curiosityDelta: i === 3 ? 2 : 0 })
+      );
+      const res = await runST292(recs292acsa);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACT3_CURIOSITY_SPIKE_ABSENT'), 'ACT3_CURIOSITY_SPIKE_ABSENT should fire');
+    });
+
+    it('ACT3_CURIOSITY_SPIKE_ABSENT does not fire when final quarter has a curiosity spike', async () => {
+      const recs292nacsa = Array.from({ length: 12 }, (_, i) =>
+        makeRec292(i, { curiosityDelta: i === 3 || i === 10 ? 2 : 0 })
+      );
+      const res = await runST292(recs292nacsa);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACT3_CURIOSITY_SPIKE_ABSENT'), 'ACT3_CURIOSITY_SPIKE_ABSENT should not fire');
+    });
+
+    it('CLOCK_PRESSURE_FINALE_ABSENT fires when 2+ early clocks but none in final quarter', async () => {
+      // 10 scenes: clockRaised at 1,2 (pre-final); final quarter (8-9) has none
+      const recs292cpfa = Array.from({ length: 10 }, (_, i) =>
+        makeRec292(i, { clockRaised: i === 1 || i === 2 })
+      );
+      const res = await runST292(recs292cpfa);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_PRESSURE_FINALE_ABSENT'), 'CLOCK_PRESSURE_FINALE_ABSENT should fire');
+    });
+
+    it('CLOCK_PRESSURE_FINALE_ABSENT does not fire when final quarter has a clock event', async () => {
+      const recs292ncpfa = Array.from({ length: 10 }, (_, i) =>
+        makeRec292(i, { clockRaised: i === 1 || i === 2 || i === 9 })
+      );
+      const res = await runST292(recs292ncpfa);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_PRESSURE_FINALE_ABSENT'), 'CLOCK_PRESSURE_FINALE_ABSENT should not fire');
+    });
+
+    it('OPENING_SUSPENSE_FLATLINE fires when first 3 scenes all have suspenseDelta ≤ 0', async () => {
+      const recs292osf = Array.from({ length: 8 }, (_, i) =>
+        makeRec292(i, { suspenseDelta: i < 3 ? -0.5 : 1.0 })
+      );
+      const res = await runST292(recs292osf);
+      assert.ok(res.issues.some((i: any) => i.rule === 'OPENING_SUSPENSE_FLATLINE'), 'OPENING_SUSPENSE_FLATLINE should fire');
+    });
+
+    it('OPENING_SUSPENSE_FLATLINE does not fire when opening scenes have positive suspenseDelta', async () => {
+      const recs292nosf = Array.from({ length: 8 }, (_, i) =>
+        makeRec292(i, { suspenseDelta: 1.0 })
+      );
+      const res = await runST292(recs292nosf);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'OPENING_SUSPENSE_FLATLINE'), 'OPENING_SUSPENSE_FLATLINE should not fire');
+    });
+  });
+
   describe('Wave 291 — rhythmPass: number word flood, prepositional opening dominance, action line word floor', async () => {
     const runRH291 = async (fountain: string) => {
       const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');

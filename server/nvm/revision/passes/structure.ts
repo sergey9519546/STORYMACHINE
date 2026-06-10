@@ -13,6 +13,9 @@
 // Wave 278 additions: Act 2a suspense void (Act 2a has no scene with suspenseDelta>1),
 // climax purpose absent (no scene carries purpose='climax'), and emotional arc
 // uniform (>70% of scenes share the same emotionalShift register).
+// Wave 292 additions: Act 3 curiosity spike absent (final quarter never spikes
+// curiosity), clock pressure finale absent (no clockRaised in final quarter despite
+// earlier clock activity), opening suspense flatline (first 3 scenes all suspenseDelta ≤ 0).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -948,6 +951,76 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${topCount278} of ${n} scenes (${Math.round(topCount278 / n * 100)}%) carry the same emotional register ("${topEmotion278}") — the protagonist's emotional trajectory is monotone. A full dramatic arc moves the character through distinct emotional phases: hope, fear, loss, recovery, and resolution.`,
         suggestedFix: 'Vary the emotional register: if the story is uniformly neutral, inject scenes of genuine positive momentum (a win, a connection, a moment of clarity) and scenes of genuine negative pressure (a setback, a cost, a loss). Emotional variety is the mechanism by which the audience empathises with the protagonist across the full arc.',
+      });
+    }
+  }
+
+  // ── Wave 292: ACT3_CURIOSITY_SPIKE_ABSENT ────────────────────────────────
+  // No scene in the final quarter (75%–100%) has a curiosityDelta above 1,
+  // despite the story having at least one such spike earlier. The climax zone
+  // should be the story's most curious moment — audiences should desperately
+  // want to know how it ends. A finale without any curiosity spike means the
+  // audience already knows (or has stopped wondering) what will happen.
+  // Requires 10+ records and 1+ curiosity spikes (>1) anywhere before the
+  // final quarter.
+  if (n >= 10) {
+    const finalStart292 = Math.floor(n * 0.75);
+    const preFinalSpike292 = records.slice(0, finalStart292).some(r => r.curiosityDelta > 1);
+    if (preFinalSpike292) {
+      const finalSpike292 = records.slice(finalStart292).some(r => r.curiosityDelta > 1);
+      if (!finalSpike292) {
+        issues.push({
+          location: `Final quarter (Scenes ${finalStart292}+) — curiosity flatline`,
+          rule: 'ACT3_CURIOSITY_SPIKE_ABSENT',
+          severity: 'minor',
+          description: `The story generates curiosity spikes (curiosityDelta > 1) before the final quarter but none in the finale (scenes ${finalStart292}+). The climax zone fails to intensify the audience's need to know — entering the resolution without peak curiosity means the answer arrives to an audience that has stopped asking the question.`,
+          suggestedFix: "Introduce a late complication or revelation in the final quarter that reintensifies the audience's central question. The climax should feel like the most urgent answer to the most urgent question — if curiosity flatlines before the finale, the question has been implicitly resolved too early.",
+        });
+      }
+    }
+  }
+
+  // ── Wave 292: CLOCK_PRESSURE_FINALE_ABSENT ───────────────────────────────
+  // The story raises clocks (clockRaised) in earlier acts but no clock is
+  // raised in the final quarter. The ticking deadline engine — which should
+  // peak at the climax — goes silent before the resolution. A story that
+  // establishes time pressure and then abandons it at the finale gives the
+  // audience permission to relax when they should be most tense.
+  // Requires 8+ records and 2+ clockRaised scenes before the final quarter.
+  if (n >= 8) {
+    const finalStart292b = Math.floor(n * 0.75);
+    const earlyClocks292 = records.slice(0, finalStart292b).filter(r => r.clockRaised).length;
+    if (earlyClocks292 >= 2) {
+      const finalClocks292 = records.slice(finalStart292b).filter(r => r.clockRaised).length;
+      if (finalClocks292 === 0) {
+        issues.push({
+          location: `Final quarter (Scenes ${finalStart292b}+) — no clock pressure`,
+          rule: 'CLOCK_PRESSURE_FINALE_ABSENT',
+          severity: 'minor',
+          description: `${earlyClocks292} clock-raising scene(s) appear before the final quarter but the finale (scenes ${finalStart292b}+) has zero clock events. The ticking deadline engine — which should peak at the climax — goes silent before the resolution. Resolving the story without time pressure relaxes the audience when they should be most tense.`,
+          suggestedFix: 'Add a clock event in the final quarter: a deadline arriving, a window closing, a countdown reaching zero. The clocks established in Act 2 should all come due at the climax — their convergence is what makes the finale feel like a reckoning rather than a conclusion.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 292: OPENING_SUSPENSE_FLATLINE ──────────────────────────────────
+  // The first 3 scenes of the story all have suspenseDelta ≤ 0. The opening
+  // fails to generate any tension before the Act 1 turn — the audience is
+  // invited into a world of zero stakes. Even the most character-driven story
+  // needs to establish at least some tension in the opening to signal that
+  // things will get worse. Requires 5+ records (so the check is meaningful).
+  if (n >= 5) {
+    const openingSize292 = Math.min(3, n);
+    const openingRecs292 = records.slice(0, openingSize292);
+    const allFlatOpening292 = openingRecs292.every(r => r.suspenseDelta <= 0);
+    if (allFlatOpening292) {
+      issues.push({
+        location: `Opening scenes (0–${openingSize292 - 1}) — no tension`,
+        rule: 'OPENING_SUSPENSE_FLATLINE',
+        severity: 'minor',
+        description: `The first ${openingSize292} scene(s) all have suspenseDelta ≤ 0 — the story opens with zero tension. A flat opening fails to signal to the audience that stakes exist and things will escalate. Even a slow-burn story needs a tension seed in the opening that promises rising danger ahead.`,
+        suggestedFix: 'Introduce a tension signal in the first scene: an unexplained threat, a simmering conflict, a hint of danger, or a question the protagonist urgently needs answered. The opening establishes the world\'s stakes — if stakes are absent, the audience has no reason to keep watching.',
       });
     }
   }
