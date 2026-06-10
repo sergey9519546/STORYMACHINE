@@ -17897,6 +17897,191 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 287 — originalityPass: passive action dominance, dialogue exclamation flood, slug interior dominance', async () => {
+    const runO287 = async (fountain: string) => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      return originalityPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PASSIVE_ACTION_DOMINANCE fires when >35% of 8+ action lines use passive voice', async () => {
+      const fountain287p = `INT. OFFICE - DAY
+
+A gunshot is heard.
+
+A body is seen on the floor.
+
+The window can be heard rattling.
+
+The door is found ajar.
+
+ALICE
+Something is wrong here.
+
+A package is revealed on the desk.
+
+The camera gets taken from her.
+
+Evidence is shown to the detective.
+
+A wallet is found nearby.`;
+      const res = await runO287(fountain287p);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PASSIVE_ACTION_DOMINANCE'), 'PASSIVE_ACTION_DOMINANCE should fire');
+    });
+
+    it('PASSIVE_ACTION_DOMINANCE does not fire when action lines are mostly active', async () => {
+      const fountain287np = `INT. OFFICE - DAY
+
+A gunshot rings out.
+
+Alice drops to the floor.
+
+The window rattles in the wind.
+
+Bob slams the door shut.
+
+ALICE
+Something is wrong here.
+
+A package sits on the desk.
+
+The attacker grabs her camera.
+
+The detective reviews the evidence.
+
+A wallet falls to the floor.`;
+      const res = await runO287(fountain287np);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PASSIVE_ACTION_DOMINANCE'), 'PASSIVE_ACTION_DOMINANCE should not fire');
+    });
+
+    it('DIALOGUE_EXCLAMATION_FLOOD fires when >25% of 10+ dialogue lines end with !', async () => {
+      const fountain287ef = `INT. ROOM - DAY
+
+ALICE
+Get out!
+
+BOB
+Never!
+
+ALICE
+You have to leave now!
+
+BOB
+I won't do it!
+
+ALICE
+This is insane!
+
+BOB
+I know.
+
+ALICE
+Stop that.
+
+BOB
+Fine.
+
+ALICE
+What did you say.
+
+BOB
+You heard me.`;
+      const res = await runO287(fountain287ef);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_EXCLAMATION_FLOOD'), 'DIALOGUE_EXCLAMATION_FLOOD should fire');
+    });
+
+    it('DIALOGUE_EXCLAMATION_FLOOD does not fire when exclamations are sparse', async () => {
+      const fountain287nef = `INT. ROOM - DAY
+
+ALICE
+What happened here.
+
+BOB
+I came back early.
+
+ALICE
+You should have called.
+
+BOB
+I know.
+
+ALICE
+This changes things.
+
+BOB
+Does it.
+
+ALICE
+Yes it does.
+
+BOB
+I see.
+
+ALICE
+We need to talk.
+
+BOB
+Now.`;
+      const res = await runO287(fountain287nef);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_EXCLAMATION_FLOOD'), 'DIALOGUE_EXCLAMATION_FLOOD should not fire');
+    });
+
+    it('SLUG_INTERIOR_DOMINANCE fires when >85% of 6+ sluglines are INT.', async () => {
+      const fountain287id = `INT. OFFICE - DAY
+
+Scene one.
+
+INT. KITCHEN - NIGHT
+
+Scene two.
+
+INT. BEDROOM - DAY
+
+Scene three.
+
+INT. HALLWAY - NIGHT
+
+Scene four.
+
+INT. LIVING ROOM - DAY
+
+Scene five.
+
+INT. BASEMENT - NIGHT
+
+Scene six.`;
+      const res = await runO287(fountain287id);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SLUG_INTERIOR_DOMINANCE'), 'SLUG_INTERIOR_DOMINANCE should fire');
+    });
+
+    it('SLUG_INTERIOR_DOMINANCE does not fire when exterior scenes are present', async () => {
+      const fountain287nid = `INT. OFFICE - DAY
+
+Scene one.
+
+INT. KITCHEN - NIGHT
+
+Scene two.
+
+EXT. STREET - DAY
+
+Scene three.
+
+INT. BEDROOM - NIGHT
+
+Scene four.
+
+EXT. PARK - DAY
+
+Scene five.
+
+INT. HALLWAY - NIGHT
+
+Scene six.`;
+      const res = await runO287(fountain287nid);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SLUG_INTERIOR_DOMINANCE'), 'SLUG_INTERIOR_DOMINANCE should not fire');
+    });
+  });
+
   describe('Wave 286 — intentionPass: reactive climax, seed graveyard, purpose monotone', async () => {
     const makeRec286 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

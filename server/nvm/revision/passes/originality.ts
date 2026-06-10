@@ -12,6 +12,9 @@
 // Wave 273 additions: exclamation in action (editorial excitement in stage directions),
 // parenthetical flood (>30% of dialogue lines are acting wrench directions),
 // location repetition (>70% of sluglines use the same location).
+// Wave 287 additions: passive action dominance (>35% of action lines use passive voice),
+// dialogue exclamation flood (>25% of dialogue lines end with !),
+// slug interior dominance (>85% of sluglines are INT. — no exterior world).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1156,6 +1159,98 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Move at least a third of the scenes to different locations. Each new space carries its own lighting, sound, scale, and emotional charge — a kitchen confession feels different from a parking-lot confrontation, even with the same dialogue. Let the physical world diversify the story\'s emotional register.',
         });
       }
+    }
+  }
+
+  // ── Wave 287: PASSIVE_ACTION_DOMINANCE ───────────────────────────────────
+  // More than 35% of action lines contain passive-voice constructions.
+  // Passive action lines ("is seen", "can be heard", "gets hit") distance the
+  // audience from the scene: the subject receives rather than acts. Screenplay
+  // action should be active and immediate — things happen TO the reader's eye,
+  // not TO abstract subjects in a detached voice. Requires 8+ action lines.
+  {
+    const actionLines287 = lines.filter(l => {
+      const t = l.trim();
+      return t.length > 0 &&
+        !/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/.test(t) &&
+        !/^[A-Z][A-Z\s]{1,30}$/.test(t) &&
+        !/^\(/.test(t) &&
+        !/^(FADE|CUT|DISSOLVE|SMASH|TITLE:|SUPER:)/i.test(t);
+    });
+    if (actionLines287.length >= 8) {
+      const passiveRe287 = /\b(is seen|are seen|was seen|can be heard|is heard|was heard|gets? (hit|shot|killed|caught|found|taken|pulled|pushed|thrown)|is found|was found|are found|is shown|are shown|is revealed|are revealed)\b/i;
+      const passiveCount287 = actionLines287.filter(l => passiveRe287.test(l)).length;
+      if (passiveCount287 / actionLines287.length > 0.35) {
+        issues.push({
+          location: 'Action lines — passive voice',
+          rule: 'PASSIVE_ACTION_DOMINANCE',
+          severity: 'minor',
+          description: `${passiveCount287} of ${actionLines287.length} action lines (${Math.round(passiveCount287 / actionLines287.length * 100)}%) use passive voice constructions ("is seen", "can be heard", "gets hit"). Passive action creates distance — it tells the reader that something happened rather than making them feel it happen. Active prose is the foundation of cinematic writing.`,
+          suggestedFix: 'Rewrite passive constructions as active ones: "A gunshot is heard" → "A gunshot cracks". Place the actor before the action, not the recipient. Each line should make the reader\'s eye move forward — passive voice stalls it.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 287: DIALOGUE_EXCLAMATION_FLOOD ─────────────────────────────────
+  // More than 25% of dialogue lines end with an exclamation mark. When
+  // every emotion is shouted at the reader, nothing is shouted — the
+  // exclamation mark loses all meaning and the script reads as uniformly
+  // heightened. Real dramatic intensity is built through restraint; a single
+  // exclamation mark in a quiet script lands harder than ten in a loud one.
+  // Requires 10+ dialogue lines.
+  {
+    const dlgLines287: string[] = [];
+    let inDialogue287 = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (/^[A-Z][A-Z\s]{1,30}$/.test(t) && !/^(INT\.|EXT\.|FADE|CUT|DISSOLVE)/.test(t)) {
+        inDialogue287 = true;
+      } else if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) {
+        inDialogue287 = false;
+      } else if (inDialogue287 && t.length > 0 && !/^\(/.test(t)) {
+        dlgLines287.push(t);
+      }
+    }
+    if (dlgLines287.length >= 10) {
+      const exclCount287 = dlgLines287.filter(l => l.endsWith('!')).length;
+      if (exclCount287 / dlgLines287.length > 0.25) {
+        issues.push({
+          location: 'Dialogue exclamation marks',
+          rule: 'DIALOGUE_EXCLAMATION_FLOOD',
+          severity: 'minor',
+          description: `${exclCount287} of ${dlgLines287.length} dialogue lines (${Math.round(exclCount287 / dlgLines287.length * 100)}%) end with an exclamation mark. When every line shouts, no line stands out — the reader becomes numb to the heightened register. Dramatic intensity is achieved through contrast, not volume.`,
+          suggestedFix: 'Reserve exclamation marks for genuine outbursts — a sudden revelation, a direct threat, a moment of pure joy or terror. Remove the mark from lines that are merely emphatic; let the word choice and context carry the weight. Fewer exclamations mean each one lands.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 287: SLUG_INTERIOR_DOMINANCE ────────────────────────────────────
+  // More than 85% of scene sluglines are INT. (interior) — no exterior world.
+  // A screenplay that never ventures outside risks visual monotony: the same
+  // walls, the same lighting conditions, the same sense of confinement. Even
+  // stories that are thematically interior benefit from at least occasional
+  // exterior breaks to signal the world beyond the characters' immediate
+  // environment. Requires 6+ sluglines.
+  {
+    let totalSlugs287 = 0;
+    let intSlugs287 = 0;
+    for (const line of lines) {
+      const t = line.trim();
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) {
+        totalSlugs287++;
+        if (/^INT\./i.test(t)) intSlugs287++;
+      }
+    }
+    if (totalSlugs287 >= 6 && intSlugs287 / totalSlugs287 > 0.85) {
+      issues.push({
+        location: 'Scene slugline INT/EXT balance',
+        rule: 'SLUG_INTERIOR_DOMINANCE',
+        severity: 'minor',
+        description: `${intSlugs287} of ${totalSlugs287} scenes (${Math.round(intSlugs287 / totalSlugs287 * 100)}%) are interior (INT.) — the story never escapes its walls. Without exterior scenes, the visual world is homogeneous: same lighting conditions, same spatial scale, same sensory palette. Even a single exterior scene resets the audience's spatial awareness.`,
+        suggestedFix: 'Move at least one or two scenes outdoors: a confrontation in a parking lot, a phone call on a fire escape, a revelation at dawn. Exterior locations carry different light, sound, and scale — they signal that the story inhabits a world rather than a stage set.',
+      });
     }
   }
 
