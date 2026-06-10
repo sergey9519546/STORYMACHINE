@@ -17897,6 +17897,92 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 303 — payoffPass: clue replant, payoff double fire, thread convergence absent', async () => {
+    const makeRec303 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runPF303 = async (records: any[]) => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      return payoffPass({ fountain: '', original: '', records, structure: { actPosition: 'act2', completionPercent: 50 } as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CLUE_REPLANT fires when the same clue ID is seeded in two scenes', async () => {
+      const recs303cr = Array.from({ length: 8 }, (_, i) =>
+        makeRec303(i, {
+          seededClueIds: i === 1 || i === 3 ? ['clue-a'] : [],
+          payoffSetupIds: i === 6 ? ['clue-a'] : [],
+        })
+      );
+      const res = await runPF303(recs303cr);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLUE_REPLANT'), 'CLUE_REPLANT should fire');
+    });
+
+    it('CLUE_REPLANT does not fire when each clue is seeded once', async () => {
+      const recs303ncr = Array.from({ length: 8 }, (_, i) =>
+        makeRec303(i, {
+          seededClueIds: i === 1 ? ['clue-a'] : i === 3 ? ['clue-b'] : [],
+          payoffSetupIds: i === 6 ? ['clue-a', 'clue-b'] : [],
+        })
+      );
+      const res = await runPF303(recs303ncr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLUE_REPLANT'), 'CLUE_REPLANT should not fire');
+    });
+
+    it('PAYOFF_DOUBLE_FIRE fires when the same setup is paid off in two scenes', async () => {
+      const recs303df = Array.from({ length: 8 }, (_, i) =>
+        makeRec303(i, {
+          seededClueIds: i === 1 ? ['clue-a'] : [],
+          payoffSetupIds: i === 4 || i === 6 ? ['clue-a'] : [],
+        })
+      );
+      const res = await runPF303(recs303df);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_DOUBLE_FIRE'), 'PAYOFF_DOUBLE_FIRE should fire');
+    });
+
+    it('PAYOFF_DOUBLE_FIRE does not fire when each setup pays off once', async () => {
+      const recs303ndf = Array.from({ length: 8 }, (_, i) =>
+        makeRec303(i, {
+          seededClueIds: i === 1 ? ['clue-a'] : [],
+          payoffSetupIds: i === 4 ? ['clue-a'] : [],
+        })
+      );
+      const res = await runPF303(recs303ndf);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_DOUBLE_FIRE'), 'PAYOFF_DOUBLE_FIRE should not fire');
+    });
+
+    it('THREAD_CONVERGENCE_ABSENT fires when 4+ payoffs all resolve in isolation', async () => {
+      const recs303tc = Array.from({ length: 8 }, (_, i) =>
+        makeRec303(i, {
+          seededClueIds: i < 4 ? [`clue-${i}`] : [],
+          payoffSetupIds: i >= 4 ? [`clue-${i - 4}`] : [],
+        })
+      );
+      const res = await runPF303(recs303tc);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THREAD_CONVERGENCE_ABSENT'), 'THREAD_CONVERGENCE_ABSENT should fire');
+    });
+
+    it('THREAD_CONVERGENCE_ABSENT does not fire when one scene resolves two threads', async () => {
+      const recs303ntc = Array.from({ length: 8 }, (_, i) =>
+        makeRec303(i, {
+          seededClueIds: i < 4 ? [`clue-${i}`] : [],
+          payoffSetupIds:
+            i === 5 ? ['clue-0']
+            : i === 6 ? ['clue-1', 'clue-2']
+            : i === 7 ? ['clue-3']
+            : [],
+        })
+      );
+      const res = await runPF303(recs303ntc);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THREAD_CONVERGENCE_ABSENT'), 'THREAD_CONVERGENCE_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 302 — pacingPass: ending on peak, post-release dead air, net tension deficit', async () => {
     const makeRec302 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

@@ -15,6 +15,9 @@
 // Wave 289 additions: payoff-revelation disconnect (payoffs fire without revelations nearby),
 // clue density front-collapse (all clues in first 20%), payoff suspense mismatch
 // (payoff scenes have avg suspenseDelta ≤ 0 despite 3+ payoffs).
+// Wave 303 additions: clue replant (same clue ID seeded in 2+ scenes), payoff double
+// fire (same setup ID resolved in 2+ scenes), thread convergence absent (4+ payoffs
+// all resolving in isolation — threads never braid).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -900,6 +903,85 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Raise the stakes at each payoff: ensure the resolution is contested (the protagonist must work for it), costly (something is lost even in victory), or revelatory (the payoff recontextualizes what came before). A payoff that arrives without friction is a debt repaid without drama.',
         });
       }
+    }
+  }
+
+  // ── Wave 303: CLUE_REPLANT ────────────────────────────────────────────────
+  // The same clue ID is seeded in two or more different scenes. Planting a
+  // setup the audience has already received reads as either a continuity
+  // artifact or the writer not trusting the first plant — and a re-plant
+  // dilutes the original's precision, since the audience can no longer
+  // anchor the payoff to a single moment. (clueInfo records only the first
+  // plant, so this scans the raw records.) Requires 6+ records.
+  if (records.length >= 6) {
+    const plantScenes303 = new Map<string, number[]>();
+    for (const r of records as any[]) {
+      for (const clueId of (r.seededClueIds ?? []) as string[]) {
+        const arr = plantScenes303.get(clueId) ?? [];
+        arr.push(r.sceneIdx);
+        plantScenes303.set(clueId, arr);
+      }
+    }
+    const replanted303 = [...plantScenes303.entries()].filter(([, scenes]) => scenes.length >= 2);
+    if (replanted303.length > 0) {
+      const [clueId303, scenes303] = replanted303[0];
+      issues.push({
+        location: `Clue "${clueId303}" planted at scenes ${scenes303.join(', ')}`,
+        rule: 'CLUE_REPLANT',
+        severity: 'minor',
+        description: `The clue "${clueId303}" is seeded in ${scenes303.length} separate scenes (${scenes303.join(', ')})${replanted303.length > 1 ? `, and ${replanted303.length - 1} other clue(s) are also replanted` : ''}. Planting a setup the audience already holds reads as a continuity artifact or as the writer not trusting the first plant — and it blurs the payoff's anchor, since the resolution can no longer point back to a single charged moment.`,
+        suggestedFix: 'Keep one plant per clue and make it count. If the audience needs a reminder of an early setup, use a glancing callback (a character touching the object, a half-reference in dialogue) rather than a full re-plant — reminders refresh memory without resetting the anticipation clock.',
+      });
+    }
+  }
+
+  // ── Wave 303: PAYOFF_DOUBLE_FIRE ─────────────────────────────────────────
+  // The same setup ID is paid off in two or more different scenes — a thread
+  // resolved twice. The second resolution is dramatically inert (the loop is
+  // already closed) and signals a continuity error in the story's ledger.
+  // (payoffInfo records only the first payoff, so this scans the raw
+  // records.) Requires 6+ records.
+  if (records.length >= 6) {
+    const payoffScenes303 = new Map<string, number[]>();
+    for (const r of records as any[]) {
+      for (const setupId of (r.payoffSetupIds ?? []) as string[]) {
+        const arr = payoffScenes303.get(setupId) ?? [];
+        arr.push(r.sceneIdx);
+        payoffScenes303.set(setupId, arr);
+      }
+    }
+    const doubled303 = [...payoffScenes303.entries()].filter(([, scenes]) => scenes.length >= 2);
+    if (doubled303.length > 0) {
+      const [setupId303, dScenes303] = doubled303[0];
+      issues.push({
+        location: `Setup "${setupId303}" paid off at scenes ${dScenes303.join(', ')}`,
+        rule: 'PAYOFF_DOUBLE_FIRE',
+        severity: 'minor',
+        description: `The setup "${setupId303}" is paid off in ${dScenes303.length} separate scenes (${dScenes303.join(', ')})${doubled303.length > 1 ? `, and ${doubled303.length - 1} other setup(s) also fire twice` : ''}. A thread can only resolve once — the second payoff arrives after the loop is closed, carries no anticipation, and reads as a continuity error in the story's setup ledger.`,
+        suggestedFix: 'Give each setup exactly one payoff scene. If the resolution genuinely has two stages (a partial reveal, then the full truth), model them as two distinct setups — the partial answer becoming its own plant for the final one — so each payoff closes a live loop.',
+      });
+    }
+  }
+
+  // ── Wave 303: THREAD_CONVERGENCE_ABSENT ──────────────────────────────────
+  // The story fires 4+ payoffs and every one resolves in isolation — no
+  // scene ever pays off two threads together. Serially-resolved threads read
+  // as episodic housekeeping; braided resolutions, where one scene answers
+  // multiple plants at once, are what make a climax feel like everything
+  // coming together. Inverse of CLUSTERED_PAYOFFS (too many in one scene).
+  // Requires 8+ records and 4+ distinct payoff scenes.
+  if (records.length >= 8) {
+    const payoffCounts303 = (records as any[]).map(r => ((r.payoffSetupIds ?? []) as string[]).length);
+    const payoffSceneCount303 = payoffCounts303.filter(c => c > 0).length;
+    const totalPayoffs303 = payoffCounts303.reduce((a, b) => a + b, 0);
+    if (totalPayoffs303 >= 4 && payoffSceneCount303 === totalPayoffs303) {
+      issues.push({
+        location: 'Payoff distribution',
+        rule: 'THREAD_CONVERGENCE_ABSENT',
+        severity: 'minor',
+        description: `All ${totalPayoffs303} payoffs resolve one per scene — no scene ever closes two threads together. Strictly serial resolution reads as episodic housekeeping: each loop is filed away on its own, and the story never delivers the moment where separate threads turn out to be one knot. Convergence is what makes a climax feel like everything coming together.`,
+        suggestedFix: 'Braid at least two threads into a single resolution scene — ideally at or near the climax, where one event answers multiple plants at once (the hidden letter that both unmasks the traitor and explains the locked door). Convergent payoffs multiply each other\'s impact; serial ones merely add.',
+      });
     }
   }
 
