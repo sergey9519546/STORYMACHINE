@@ -9,6 +9,9 @@
 // Wave 271 additions: conflict Act 2b void (dark-night zone empty), interpersonal
 // conflict only (zero external reversals), conflict pair density gap (one pair 3× others).
 // absent (no broken bond ever repairs), and conflict opening void (frictionless Act 1).
+// Wave 285 additions: conflict suspense decoupled (conflict scenes don't drive suspense),
+// negative spiral unbroken (≥4 consecutive negative shifts with no relief),
+// conflict resolution premature (major conflict resolved before final quarter).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -959,6 +962,101 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
           description: `"${sorted271[0][0]}" accumulates ${dominantCount271} negative conflict events — at least 3× more than any other pair (next: ${secondCount271}). While ${pairNegCounts271.size} pairs carry conflict, one feud so dominates the dramatic load that all others register as background noise. The antagonistic architecture collapses into a single overwhelming dispute.`,
           suggestedFix: 'Raise the conflict stakes in at least one secondary pair so it approaches the dominant pair\'s density. Layered conflict — two or three pairs with comparably high friction — creates a richer dramatic web than a single dominant feud surrounded by quiet bystanders.',
         });
+      }
+    }
+  }
+
+  // ── Wave 285: CONFLICT_SUSPENSE_DECOUPLED ────────────────────────────────
+  // Scenes with negative relationship shifts (conflict scenes) have no
+  // corresponding suspense lift — their average suspenseDelta is ≤ 0.
+  // Conflict and suspense should reinforce each other; when conflict scenes
+  // produce zero suspense, they feel consequence-free and the audience
+  // disengages. Requires 8+ records and 3+ conflict scenes.
+  if (records.length >= 8) {
+    const conflictScenes285 = (records as any[]).filter(r =>
+      ((r.relationshipShifts as any[] ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+    );
+    if (conflictScenes285.length >= 3) {
+      const avgSuspense285 = conflictScenes285.reduce((acc: number, r: any) => acc + (r.suspenseDelta ?? 0), 0) / conflictScenes285.length;
+      if (avgSuspense285 <= 0) {
+        issues.push({
+          location: 'Conflict scenes — suspense decoupled',
+          rule: 'CONFLICT_SUSPENSE_DECOUPLED',
+          severity: 'minor',
+          description: `${conflictScenes285.length} conflict scene(s) have an average suspenseDelta of ${avgSuspense285.toFixed(2)} — conflict is not generating suspense. When confrontations fail to raise tension, the audience reads them as consequence-free arguments rather than dramatic turning points. Conflict without suspense is noise.`,
+          suggestedFix: 'Raise the stakes in each conflict scene: add a ticking deadline, an unexpected revelation, a power shift, or an irreversible action that could end the relationship. Suspense comes from uncertainty — the audience must believe the worst outcome is possible.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 285: NEGATIVE_SPIRAL_UNBROKEN ───────────────────────────────────
+  // Four or more consecutive scenes have negative emotional shifts with no
+  // neutral or positive break. An unbroken descent exhausts the audience —
+  // they become desensitized to negative beats and stop believing each new
+  // blow matters. Even the darkest stories need a single breath of relief
+  // before the next descent to maintain emotional responsiveness.
+  // Requires 8+ records.
+  if (records.length >= 8) {
+    let spiralLen285 = 0;
+    let maxSpiral285 = 0;
+    let spiralStart285 = -1;
+    let maxSpiralStart285 = -1;
+    for (let i285 = 0; i285 < records.length; i285++) {
+      if ((records as any[])[i285].emotionalShift === 'negative') {
+        if (spiralLen285 === 0) spiralStart285 = i285;
+        spiralLen285++;
+        if (spiralLen285 > maxSpiral285) {
+          maxSpiral285 = spiralLen285;
+          maxSpiralStart285 = spiralStart285;
+        }
+      } else {
+        spiralLen285 = 0;
+      }
+    }
+    if (maxSpiral285 >= 4) {
+      issues.push({
+        location: `Scenes ${maxSpiralStart285}–${maxSpiralStart285 + maxSpiral285 - 1} — negative spiral`,
+        rule: 'NEGATIVE_SPIRAL_UNBROKEN',
+        severity: 'minor',
+        description: `${maxSpiral285} consecutive scenes (${maxSpiralStart285}–${maxSpiralStart285 + maxSpiral285 - 1}) have negative emotional shifts with no neutral or positive break. An unbroken descent desensitizes the audience — each new blow registers with less impact than the last. Even a brief moment of relief or dark humor between negative beats resets the audience's capacity for distress.`,
+        suggestedFix: 'Insert a single neutral or positive beat within the spiral — a small victory, a moment of gallows humor, a character reconnection before the next blow. The beat does not need to resolve anything; it just gives the audience permission to breathe before the next descent.',
+      });
+    }
+  }
+
+  // ── Wave 285: CONFLICT_RESOLUTION_PREMATURE ──────────────────────────────
+  // The dominant conflict pair (most negative shifts) has all of its
+  // negative events in the first 75% of the story, and the final quarter
+  // has no negative shifts from that pair. The central conflict resolves
+  // before the climax — the story continues but the engine is off.
+  // Requires 8+ records and 4+ negative events from the dominant pair.
+  if (records.length >= 8) {
+    const pairNegEvents285 = new Map<string, number[]>();
+    for (const r of records as any[]) {
+      for (const s of ((r.relationshipShifts as any[] ?? []) as Array<{ pairKey: string; amount: number }>)) {
+        if (s.amount <= -0.3) {
+          const arr = pairNegEvents285.get(s.pairKey) ?? [];
+          arr.push(r.sceneIdx);
+          pairNegEvents285.set(s.pairKey, arr);
+        }
+      }
+    }
+    if (pairNegEvents285.size >= 1) {
+      const sorted285 = [...pairNegEvents285.entries()].sort((a, b) => b[1].length - a[1].length);
+      const [dominantPair285, dominantScenes285] = sorted285[0];
+      if (dominantScenes285.length >= 4) {
+        const finalStart285 = Math.floor(records.length * 0.75);
+        const lateEvents285 = dominantScenes285.filter(idx => idx >= finalStart285);
+        if (lateEvents285.length === 0) {
+          issues.push({
+            location: `Dominant conflict pair "${dominantPair285}" — resolves before climax`,
+            rule: 'CONFLICT_RESOLUTION_PREMATURE',
+            severity: 'minor',
+            description: `"${dominantPair285}" drives ${dominantScenes285.length} negative conflict events but none occur in the final quarter (scene ${finalStart285}+). The central conflict resolves before the climax — the story continues but the dramatic engine has already switched off. The final act plays out in the aftermath of a conflict that is already settled.`,
+            suggestedFix: 'Extend the central conflict into the final quarter: add a late reversal, an unexpected re-escalation, or a final confrontation that must be resolved at the climax. The dominant conflict pair should be unresolved until the final act — early resolution steals the climax.',
+          });
+        }
       }
     }
   }

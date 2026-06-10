@@ -17897,6 +17897,82 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 285 — conflictPass: conflict suspense decoupled, negative spiral unbroken, conflict resolution premature', async () => {
+    const makeRec285 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF285 = async (records: any[]) => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      return conflictPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CONFLICT_SUSPENSE_DECOUPLED fires when conflict scenes have avg suspenseDelta ≤ 0', async () => {
+      const recs285csd = Array.from({ length: 8 }, (_, i) =>
+        makeRec285(i, {
+          suspenseDelta: -0.5,
+          relationshipShifts: i < 3 ? [{ pairKey: 'A-B', dimension: 'trust', amount: -0.5 }] : [],
+        })
+      );
+      const res = await runCF285(recs285csd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_SUSPENSE_DECOUPLED'), 'CONFLICT_SUSPENSE_DECOUPLED should fire');
+    });
+
+    it('CONFLICT_SUSPENSE_DECOUPLED does not fire when conflict scenes have positive avg suspenseDelta', async () => {
+      const recs285ncsd = Array.from({ length: 8 }, (_, i) =>
+        makeRec285(i, {
+          suspenseDelta: 1.5,
+          relationshipShifts: i < 3 ? [{ pairKey: 'A-B', dimension: 'trust', amount: -0.5 }] : [],
+        })
+      );
+      const res = await runCF285(recs285ncsd);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_SUSPENSE_DECOUPLED'), 'CONFLICT_SUSPENSE_DECOUPLED should not fire');
+    });
+
+    it('NEGATIVE_SPIRAL_UNBROKEN fires when ≥4 consecutive scenes have negative emotionalShift', async () => {
+      const recs285nsu = Array.from({ length: 8 }, (_, i) =>
+        makeRec285(i, { emotionalShift: i >= 2 && i <= 5 ? 'negative' : 'neutral' })
+      );
+      const res = await runCF285(recs285nsu);
+      assert.ok(res.issues.some((i: any) => i.rule === 'NEGATIVE_SPIRAL_UNBROKEN'), 'NEGATIVE_SPIRAL_UNBROKEN should fire');
+    });
+
+    it('NEGATIVE_SPIRAL_UNBROKEN does not fire when negative runs are broken by neutral/positive', async () => {
+      const recs285nnsu = Array.from({ length: 8 }, (_, i) =>
+        makeRec285(i, { emotionalShift: i % 2 === 0 ? 'negative' : 'neutral' })
+      );
+      const res = await runCF285(recs285nnsu);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'NEGATIVE_SPIRAL_UNBROKEN'), 'NEGATIVE_SPIRAL_UNBROKEN should not fire');
+    });
+
+    it('CONFLICT_RESOLUTION_PREMATURE fires when dominant conflict pair has no events in final quarter', async () => {
+      // 8 scenes: final quarter = sceneIdx >= 6; dominant pair has 4 events all in first 6 scenes
+      const recs285crp = Array.from({ length: 8 }, (_, i) =>
+        makeRec285(i, {
+          relationshipShifts: i < 6 && i < 4 ? [{ pairKey: 'X-Y', dimension: 'trust', amount: -0.5 }] : [],
+        })
+      );
+      const res = await runCF285(recs285crp);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_RESOLUTION_PREMATURE'), 'CONFLICT_RESOLUTION_PREMATURE should fire');
+    });
+
+    it('CONFLICT_RESOLUTION_PREMATURE does not fire when dominant pair has events in final quarter', async () => {
+      // 8 scenes: dominant pair has events at indices 1,2,3,7 (4 events, one in final quarter)
+      const recs285ncrp = Array.from({ length: 8 }, (_, i) =>
+        makeRec285(i, {
+          relationshipShifts: [1, 2, 3, 7].includes(i) ? [{ pairKey: 'X-Y', dimension: 'trust', amount: -0.5 }] : [],
+        })
+      );
+      const res = await runCF285(recs285ncrp);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_RESOLUTION_PREMATURE'), 'CONFLICT_RESOLUTION_PREMATURE should not fire');
+    });
+  });
+
   describe('Wave 284 — characterArcPass: emotional resolution absent, revelation late cluster, curiosity plateau', async () => {
     const makeRec284 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
