@@ -12,6 +12,9 @@
 // Wave 268 additions: curiosity front loaded (all mystery spikes in first half),
 // payoff back loaded (all callbacks deferred to second half),
 // clock single scene (only one deadline raised in a long story).
+// Wave 282 additions: clock clustering (all clocks in first 40%), revelation
+// cascade (>35% of scenes contain a revelation), emotional positive desert
+// (Act 2 has negative/neutral but never positive while positive exists elsewhere).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1011,6 +1014,81 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         description: `Only one scene (Scene ${clockScenes268[0].sceneIdx}) raises a clock across a ${records.length}-scene story. A single deadline creates a single source of urgency that characters can wait out; once that scene passes, all clock pressure evaporates. A story this long benefits from layered deadlines — separate ticking clocks in different acts.`,
         suggestedFix: 'Add at least one more clock: a secondary deadline that begins where the first ends, or a nested ticking clock within a single act. Layered urgency keeps the story in forward motion even after the most immediate threat is resolved or defused.',
       });
+    }
+  }
+
+  // ── Wave 282: Clock clustering, revelation cascade, emotional positive desert ──
+
+  // CLOCK_CLUSTERING (minor, n≥8, ≥3 clocks): All raised clocks appear in the
+  // first 40% of the story. The story front-loads all its urgency architecture;
+  // the final 60% operates under no deadline pressure. Front-loaded clocks create
+  // urgency that dissipates long before the climax — the audience forgets the
+  // deadline by the time the resolution arrives. Distinct from CLOCK_SINGLE_SCENE
+  // (only one clock total) and CLOCK_RAISED_WITHOUT_PAYOFF (no payoff at all).
+  if (records.length >= 8) {
+    const clockScenes282 = records.filter((r: any) => r.clockRaised === true);
+    if (clockScenes282.length >= 3) {
+      const cutoff282 = Math.floor(records.length * 0.4);
+      const allEarly282 = clockScenes282.every((r: any) => r.sceneIdx < cutoff282);
+      if (allEarly282) {
+        issues.push({
+          location: `Clock raises (all in first 40%, scenes 0–${cutoff282 - 1})`,
+          rule: 'CLOCK_CLUSTERING',
+          severity: 'minor',
+          description: `All ${clockScenes282.length} clocks are raised in the first 40% of the story (scenes 0–${cutoff282 - 1}) — the deadline architecture is entirely front-loaded. The final 60% of the story carries no clock pressure; whatever urgency the deadlines created has dissipated long before the climax arrives.`,
+          suggestedFix: 'Distribute clock raises across the full story: let one deadline resolve mid-story and a new, higher-stakes clock replace it. The climax should arrive under a ticking clock that was raised in Act 2, not one that was set and mostly forgotten in Act 1.',
+        });
+      }
+    }
+  }
+
+  // REVELATION_CASCADE (minor, n≥8, ≥4 revelations, >35% of scenes): More than
+  // a third of all scenes contain a witnessed revelation. When the story reveals
+  // a new truth in more than every third scene, revelations lose their individual
+  // impact — the audience becomes habituated to "another reveal" and stops feeling
+  // the surprise each one was designed to deliver. Revelations need surrounding
+  // space of non-revelation scenes for their shock to settle and consequences to
+  // unfold. Distinct from REVELATION_CLUSTERING (three reveals in a 3-scene window):
+  // this fires on global density regardless of distribution.
+  if (records.length >= 8) {
+    const revScenes282 = records.filter((r: any) => r.revelation !== null);
+    if (revScenes282.length >= 4 && revScenes282.length / records.length > 0.35) {
+      issues.push({
+        location: 'Revelation density (global)',
+        rule: 'REVELATION_CASCADE',
+        severity: 'minor',
+        description: `${revScenes282.length} of ${records.length} scenes (${Math.round(revScenes282.length / records.length * 100)}%) contain a witnessed revelation — the story delivers a new truth more than every third scene. Revelation saturation is as damaging as revelation starvation: when surprise is the default mode, the audience stops registering it as surprise.`,
+        suggestedFix: 'Space revelations so each one has room to breathe: allow 3–4 non-revelation scenes between each major discovery. The intervening scenes should show characters absorbing and acting on what they learned, before the next truth arrives and resets the board.',
+      });
+    }
+  }
+
+  // EMOTIONAL_POSITIVE_DESERT (minor, n≥10, ≥4 Act 2 scenes): Act 2 (25%–75%)
+  // contains no positive emotional shift while at least one positive shift exists
+  // elsewhere in the story AND at least one negative shift exists in Act 2.
+  // Drama requires contrast: an unbroken expanse of negative and neutral scenes
+  // through the middle act denies the audience the light against which darkness
+  // registers. A moment of hope, relief, or partial victory in Act 2 makes the
+  // subsequent darkness more devastating — not less. Distinct from the voice pass's
+  // TONAL_REGISTER_COLLAPSE_ACT2 (all Act 2 scenes share one tone): this fires
+  // when Act 2 has tonal variety (negative + neutral) but positivity is absent.
+  if (records.length >= 10) {
+    const posDesertAct2Start282 = Math.floor(records.length * 0.25);
+    const posDesertAct2End282 = Math.floor(records.length * 0.75);
+    const act2PosRecs282 = records.slice(posDesertAct2Start282, posDesertAct2End282);
+    if (act2PosRecs282.length >= 4) {
+      const act2HasPositive282 = act2PosRecs282.some((r: any) => r.emotionalShift === 'positive');
+      const act2HasNegative282 = act2PosRecs282.some((r: any) => r.emotionalShift === 'negative');
+      const storyHasPositive282 = records.some((r: any) => r.emotionalShift === 'positive');
+      if (!act2HasPositive282 && act2HasNegative282 && storyHasPositive282) {
+        issues.push({
+          location: `Act 2 (Scenes ${posDesertAct2Start282}–${posDesertAct2End282 - 1})`,
+          rule: 'EMOTIONAL_POSITIVE_DESERT',
+          severity: 'minor',
+          description: `Act 2 (${act2PosRecs282.length} scenes) carries negative and neutral emotional shifts but no positive ones, while at least one scene elsewhere in the story offers a positive shift — the entire middle act has no moment of hope, relief, or partial triumph. An unbroken negative arc through Act 2 makes darkness the default state rather than a dramatic choice.`,
+          suggestedFix: 'Plant a brief positive beat in Act 2: a false hope, a moment of connection, a small victory the story then subverts. Contrast is the mechanism by which darkness registers; even one positive scene among many negative ones transforms what follows from grimness into genuine tragedy.',
+        });
+      }
     }
   }
 

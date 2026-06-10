@@ -17897,6 +17897,120 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 282 — causalityPass: clock clustering, revelation cascade, emotional positive desert', async () => {
+    const makeRec282 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runC282 = async (records: any[]) => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CLOCK_CLUSTERING fires when all ≥3 clocks appear in the first 40% of the story', async () => {
+      // n=8, cutoff=floor(8*0.4)=3 → first 40% = scenes 0,1,2
+      const recs282a = [
+        makeRec282(0, { clockRaised: true }),
+        makeRec282(1, { clockRaised: true }),
+        makeRec282(2, { clockRaised: true }),
+        makeRec282(3), makeRec282(4), makeRec282(5), makeRec282(6), makeRec282(7),
+      ];
+      const result282a = await runC282(recs282a);
+      const fired282a = result282a.issues.filter((i: any) => i.rule === 'CLOCK_CLUSTERING');
+      assert.strictEqual(fired282a.length, 1, 'Should fire CLOCK_CLUSTERING when all clocks are in the first 40%');
+    });
+
+    it('CLOCK_CLUSTERING does NOT fire when a clock is raised after the 40% mark', async () => {
+      // n=8, cutoff=3; scene 5 >= 3 → not all early
+      const recs282b = [
+        makeRec282(0, { clockRaised: true }),
+        makeRec282(1, { clockRaised: true }),
+        makeRec282(2),
+        makeRec282(3),
+        makeRec282(4),
+        makeRec282(5, { clockRaised: true }), // after cutoff
+        makeRec282(6), makeRec282(7),
+      ];
+      const result282b = await runC282(recs282b);
+      const fired282b = result282b.issues.filter((i: any) => i.rule === 'CLOCK_CLUSTERING');
+      assert.strictEqual(fired282b.length, 0, 'Should NOT fire CLOCK_CLUSTERING when a clock is raised in the second half');
+    });
+
+    it('REVELATION_CASCADE fires when >35% of scenes contain a revelation', async () => {
+      // n=8, 4 revelations = 50% > 35%
+      const recs282c = [
+        makeRec282(0, { revelation: 'truth one' }),
+        makeRec282(1),
+        makeRec282(2, { revelation: 'truth two' }),
+        makeRec282(3),
+        makeRec282(4, { revelation: 'truth three' }),
+        makeRec282(5, { revelation: 'truth four' }),
+        makeRec282(6), makeRec282(7),
+      ];
+      const result282c = await runC282(recs282c);
+      const fired282c = result282c.issues.filter((i: any) => i.rule === 'REVELATION_CASCADE');
+      assert.strictEqual(fired282c.length, 1, 'Should fire REVELATION_CASCADE when >35% of scenes have a revelation');
+    });
+
+    it('REVELATION_CASCADE does NOT fire when ≤35% of scenes contain a revelation', async () => {
+      // n=8, 2 revelations = 25% ≤ 35%
+      const recs282d = [
+        makeRec282(0, { revelation: 'truth one' }),
+        makeRec282(1),
+        makeRec282(2),
+        makeRec282(3),
+        makeRec282(4, { revelation: 'truth two' }),
+        makeRec282(5), makeRec282(6), makeRec282(7),
+      ];
+      const result282d = await runC282(recs282d);
+      const fired282d = result282d.issues.filter((i: any) => i.rule === 'REVELATION_CASCADE');
+      assert.strictEqual(fired282d.length, 0, 'Should NOT fire REVELATION_CASCADE when ≤35% of scenes have a revelation');
+    });
+
+    it('EMOTIONAL_POSITIVE_DESERT fires when Act 2 has negative but never positive while positive exists elsewhere', async () => {
+      // n=10: Act 2 = records.slice(2,7) = indices 2-6
+      const recs282e = [
+        makeRec282(0, { emotionalShift: 'positive' }),  // positive outside Act 2
+        makeRec282(1, { emotionalShift: 'neutral' }),
+        makeRec282(2, { emotionalShift: 'negative' }),  // Act 2 negative
+        makeRec282(3, { emotionalShift: 'neutral' }),
+        makeRec282(4, { emotionalShift: 'negative' }),  // Act 2 negative
+        makeRec282(5, { emotionalShift: 'neutral' }),
+        makeRec282(6, { emotionalShift: 'neutral' }),   // Act 2 end (no positive in Act 2)
+        makeRec282(7, { emotionalShift: 'neutral' }),
+        makeRec282(8, { emotionalShift: 'neutral' }),
+        makeRec282(9, { emotionalShift: 'neutral' }),
+      ];
+      const result282e = await runC282(recs282e);
+      const fired282e = result282e.issues.filter((i: any) => i.rule === 'EMOTIONAL_POSITIVE_DESERT');
+      assert.strictEqual(fired282e.length, 1, 'Should fire EMOTIONAL_POSITIVE_DESERT when Act 2 has no positive shift');
+    });
+
+    it('EMOTIONAL_POSITIVE_DESERT does NOT fire when Act 2 contains a positive shift', async () => {
+      // n=10: record at array index 4 is in Act 2, give it positive
+      const recs282f = [
+        makeRec282(0, { emotionalShift: 'positive' }),
+        makeRec282(1, { emotionalShift: 'neutral' }),
+        makeRec282(2, { emotionalShift: 'negative' }),
+        makeRec282(3, { emotionalShift: 'neutral' }),
+        makeRec282(4, { emotionalShift: 'positive' }),  // positive in Act 2 → no fire
+        makeRec282(5, { emotionalShift: 'negative' }),
+        makeRec282(6, { emotionalShift: 'neutral' }),
+        makeRec282(7, { emotionalShift: 'neutral' }),
+        makeRec282(8, { emotionalShift: 'neutral' }),
+        makeRec282(9, { emotionalShift: 'neutral' }),
+      ];
+      const result282f = await runC282(recs282f);
+      const fired282f = result282f.issues.filter((i: any) => i.rule === 'EMOTIONAL_POSITIVE_DESERT');
+      assert.strictEqual(fired282f.length, 0, 'Should NOT fire EMOTIONAL_POSITIVE_DESERT when Act 2 has a positive shift');
+    });
+  });
+
   describe('Wave 281 — beliefPass: revelation drama vacuum, Act 2b void, told belief final scene', async () => {
     const makeRec281 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
