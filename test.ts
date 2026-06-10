@@ -17897,6 +17897,94 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 304 — relationshipArcPass: shift magnitude uniformity, warmth unfelt, dimension one-way', async () => {
+    const makeRec304 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runRA304 = async (records: any[]) => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('SHIFT_MAGNITUDE_UNIFORMITY fires when all shifts share one magnitude', async () => {
+      const recs304mu = Array.from({ length: 8 }, (_, i) =>
+        makeRec304(i, {
+          relationshipShifts: i < 5 ? [{ pairKey: 'A|B', dimension: 'affinity', amount: i % 2 === 0 ? -0.5 : 0.5 }] : [],
+        })
+      );
+      const res = await runRA304(recs304mu);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SHIFT_MAGNITUDE_UNIFORMITY'), 'SHIFT_MAGNITUDE_UNIFORMITY should fire');
+    });
+
+    it('SHIFT_MAGNITUDE_UNIFORMITY does not fire when magnitudes vary', async () => {
+      const amounts304 = [-0.5, 0.3, -0.7, 0.5, -0.2];
+      const recs304nmu = Array.from({ length: 8 }, (_, i) =>
+        makeRec304(i, {
+          relationshipShifts: i < 5 ? [{ pairKey: 'A|B', dimension: 'affinity', amount: amounts304[i] }] : [],
+        })
+      );
+      const res = await runRA304(recs304nmu);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SHIFT_MAGNITUDE_UNIFORMITY'), 'SHIFT_MAGNITUDE_UNIFORMITY should not fire');
+    });
+
+    it('WARMTH_UNFELT fires when strong positive shifts all land in neutral scenes', async () => {
+      const recs304wu = Array.from({ length: 8 }, (_, i) =>
+        makeRec304(i, {
+          relationshipShifts: [1, 3, 5].includes(i) ? [{ pairKey: 'A|B', dimension: 'affinity', amount: 0.5 }] : [],
+        })
+      );
+      const res = await runRA304(recs304wu);
+      assert.ok(res.issues.some((i: any) => i.rule === 'WARMTH_UNFELT'), 'WARMTH_UNFELT should fire');
+    });
+
+    it('WARMTH_UNFELT does not fire when a warming scene moves someone emotionally', async () => {
+      const recs304nwu = Array.from({ length: 8 }, (_, i) =>
+        makeRec304(i, {
+          relationshipShifts: [1, 3, 5].includes(i) ? [{ pairKey: 'A|B', dimension: 'affinity', amount: 0.5 }] : [],
+          emotionalShift: i === 3 ? 'positive' : 'neutral',
+        })
+      );
+      const res = await runRA304(recs304nwu);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'WARMTH_UNFELT'), 'WARMTH_UNFELT should not fire');
+    });
+
+    it('DIMENSION_ONE_WAY fires when a dimension only ever moves one direction', async () => {
+      // trust falls 4 times across two pairs; affinity moves both ways
+      const recs304ow = Array.from({ length: 8 }, (_, i) =>
+        makeRec304(i, {
+          relationshipShifts:
+            i < 4 ? [{ pairKey: i % 2 === 0 ? 'A|B' : 'C|D', dimension: 'trust', amount: -0.3 }]
+            : i === 5 ? [{ pairKey: 'A|B', dimension: 'affinity', amount: 0.4 }]
+            : i === 6 ? [{ pairKey: 'A|B', dimension: 'affinity', amount: -0.4 }]
+            : [],
+        })
+      );
+      const res = await runRA304(recs304ow);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIMENSION_ONE_WAY'), 'DIMENSION_ONE_WAY should fire');
+    });
+
+    it('DIMENSION_ONE_WAY does not fire when the dimension reverses at least once', async () => {
+      const recs304now = Array.from({ length: 8 }, (_, i) =>
+        makeRec304(i, {
+          relationshipShifts:
+            i < 3 ? [{ pairKey: i % 2 === 0 ? 'A|B' : 'C|D', dimension: 'trust', amount: -0.3 }]
+            : i === 4 ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.4 }]
+            : i === 5 ? [{ pairKey: 'A|B', dimension: 'affinity', amount: 0.4 }]
+            : i === 6 ? [{ pairKey: 'A|B', dimension: 'affinity', amount: -0.4 }]
+            : [],
+        })
+      );
+      const res = await runRA304(recs304now);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIMENSION_ONE_WAY'), 'DIMENSION_ONE_WAY should not fire');
+    });
+  });
+
   describe('Wave 303 — payoffPass: clue replant, payoff double fire, thread convergence absent', async () => {
     const makeRec303 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

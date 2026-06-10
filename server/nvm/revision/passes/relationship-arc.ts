@@ -22,6 +22,10 @@
 // Wave 290 additions: relationship opening burst (all shifts in first 25% — resolved too
 // early), negative-only majority (>60% of pairs have exclusively negative shifts),
 // shift dimension concentration (all shifts across all pairs share a single dimension).
+// Wave 304 additions: shift magnitude uniformity (5+ shifts all with the identical
+// magnitude — generation artifact), warmth unfelt (3+ strong positive shifts all in
+// emotionally neutral scenes), dimension one-way (a dimension with 4+ shifts that
+// only ever moves in one direction story-wide).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -973,6 +977,85 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         description: `All ${totalShifts} relationship shift(s) across ${pairStats.size} pair(s) occur on a single dimension ("${onlyDim290}"). The relational world is one-dimensional — bonds never shift on trust, power, respect, or other axes independently. Real relationships are multi-axial; a monodimensional relational world reads as schematic.`,
         suggestedFix: 'Introduce at least one shift on a different dimension: a scene where affinity stays warm but trust collapses, or where two characters gain mutual respect without warming to each other. The tension between relational axes is where psychological complexity lives.',
       });
+    }
+  }
+
+  // ── Wave 304: SHIFT_MAGNITUDE_UNIFORMITY ─────────────────────────────────
+  // Five or more relationship shifts all have the identical magnitude
+  // (|amount| equal within a small epsilon). Real relational beats vary in
+  // weight — a cold glance is not a betrayal — so uniform magnitudes read
+  // as a mechanical generation artifact: the system stamping the same-sized
+  // shift onto every beat regardless of dramatic weight. Requires 8+ records.
+  if (records.length >= 8 && totalShifts >= 5) {
+    const magnitudes304: number[] = [];
+    for (const stats of pairStats.values()) {
+      for (const s of stats.shifts) magnitudes304.push(Math.abs(s.amount));
+    }
+    const first304 = magnitudes304[0];
+    if (magnitudes304.every(m => Math.abs(m - first304) < 0.001)) {
+      issues.push({
+        location: 'Relationship shift magnitudes',
+        rule: 'SHIFT_MAGNITUDE_UNIFORMITY',
+        severity: 'minor',
+        description: `All ${magnitudes304.length} relationship shifts have the identical magnitude (${first304}). Relational beats carry different dramatic weights — a cold glance, a broken promise, and a betrayal should not move a bond by the same amount. Uniform magnitudes read as a mechanical artifact: every beat stamped with the same-sized shift regardless of what actually happened.`,
+        suggestedFix: 'Scale each shift to its dramatic weight: small frictions and courtesies in the ±0.1–0.2 range, meaningful breaches and gestures around ±0.4, and reserve ±0.7+ for the betrayals and reconciliations the story pivots on. Magnitude variety is what lets the audience feel which moments matter most.',
+      });
+    }
+  }
+
+  // ── Wave 304: WARMTH_UNFELT ──────────────────────────────────────────────
+  // Three or more strong positive shifts (amount ≥ 0.4) all occur in scenes
+  // with a neutral emotional shift — bonds warm but nobody registers it
+  // emotionally. The warm mirror of conflict's CONFLICT_EMOTION_DECOUPLED:
+  // reconciliations and alliances that move the ledger without moving anyone
+  // read as transactions. Requires 8+ records.
+  if (records.length >= 8) {
+    const warmScenes304 = records.filter(r =>
+      ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount >= 0.4),
+    );
+    if (warmScenes304.length >= 3 && warmScenes304.every((r: any) => r.emotionalShift === 'neutral')) {
+      issues.push({
+        location: 'Strong positive shift scenes',
+        rule: 'WARMTH_UNFELT',
+        severity: 'minor',
+        description: `All ${warmScenes304.length} scenes with a strong positive relationship shift (≥ 0.4) carry a neutral emotional shift — bonds warm but nobody feels it. A reconciliation or alliance that updates the relational ledger without registering on anyone emotionally reads as a transaction: the audience is told the relationship improved but never shown the relief, joy, or disarmed surprise that proves it.`,
+        suggestedFix: 'Let at least one warming beat land emotionally: the scene where trust is rebuilt should also be the scene where someone\'s guard visibly drops — a positive emotional shift accompanying the relational one. Warmth the characters don\'t feel is warmth the audience won\'t either.',
+      });
+    }
+  }
+
+  // ── Wave 304: DIMENSION_ONE_WAY ──────────────────────────────────────────
+  // A relationship dimension with 4+ shifts story-wide only ever moves in
+  // one direction — trust only falls, power only concentrates. A dimension
+  // that never reverses is a ratchet, not an arc: the audience learns its
+  // trajectory after two beats and stops attending. Distinct from
+  // MONOTONE_RELATIONSHIP (per-pair direction) and ALL_PAIRS_SAME_DIRECTION
+  // (per-pair nets): this aggregates a single dimension across all pairs.
+  // Requires 8+ records and 2+ distinct dimensions in play.
+  if (records.length >= 8) {
+    const dimShifts304 = new Map<string, number[]>();
+    for (const r of records) {
+      for (const s of ((r.relationshipShifts ?? []) as Array<{ dimension?: string; amount: number }>)) {
+        if (!s.dimension) continue;
+        const arr = dimShifts304.get(s.dimension) ?? [];
+        arr.push(s.amount);
+        dimShifts304.set(s.dimension, arr);
+      }
+    }
+    if (dimShifts304.size >= 2) {
+      for (const [dim304, amounts304] of dimShifts304) {
+        if (amounts304.length >= 4 && (amounts304.every(a => a < 0) || amounts304.every(a => a > 0))) {
+          const dir304 = amounts304[0] < 0 ? 'falls' : 'rises';
+          issues.push({
+            location: `Dimension "${dim304}" (${amounts304.length} shifts)`,
+            rule: 'DIMENSION_ONE_WAY',
+            severity: 'minor',
+            description: `The "${dim304}" dimension shifts ${amounts304.length} times across the story and only ever ${dir304} — no pair, anywhere, ever moves it the other way. A dimension that never reverses is a ratchet, not an arc: after two beats the audience knows its trajectory and stops attending to it.`,
+            suggestedFix: `Give "${dim304}" at least one counter-movement somewhere in the ensemble: a moment where the eroding quality is partially rebuilt (or the growing one dented) before the trend resumes. One reversal is enough to keep the dimension a live question rather than a foregone conclusion.`,
+          });
+          break;
+        }
+      }
     }
   }
 
