@@ -17897,6 +17897,84 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 295 — beliefPass: revelation suspense decoupled, revelation density drop, belief opening inert', async () => {
+    const makeRec295 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runB295 = async (records: any[]) => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('REVELATION_SUSPENSE_DECOUPLED fires when 3+ revelation scenes avg suspenseDelta ≤ 0', async () => {
+      const recs295rsd = Array.from({ length: 10 }, (_, i) =>
+        makeRec295(i, {
+          revelation: i >= 4 && i <= 6 ? `reveal-${i}` : null,
+          suspenseDelta: i >= 4 && i <= 6 ? -0.5 : 1,
+        })
+      );
+      const res = await runB295(recs295rsd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_SUSPENSE_DECOUPLED'), 'REVELATION_SUSPENSE_DECOUPLED should fire');
+    });
+
+    it('REVELATION_SUSPENSE_DECOUPLED does not fire when revelation scenes have positive avg suspenseDelta', async () => {
+      const recs295nrsd = Array.from({ length: 10 }, (_, i) =>
+        makeRec295(i, {
+          revelation: i >= 4 && i <= 6 ? `reveal-${i}` : null,
+          suspenseDelta: 1.5,
+        })
+      );
+      const res = await runB295(recs295nrsd);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_SUSPENSE_DECOUPLED'), 'REVELATION_SUSPENSE_DECOUPLED should not fire');
+    });
+
+    it('REVELATION_DENSITY_DROP fires when first half has >2× more revelations than second half', async () => {
+      // 10 scenes: revelations at 0,1,2 (first half has 3), revelation at 9 (second half has 1)
+      // 3 > 1 * 2 → 1 < 3 * 0.5 = 1.5 → 1 < 1.5 ✓
+      const recs295rdd = Array.from({ length: 10 }, (_, i) =>
+        makeRec295(i, { revelation: i <= 2 || i === 9 ? `reveal-${i}` : null })
+      );
+      const res = await runB295(recs295rdd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_DENSITY_DROP'), 'REVELATION_DENSITY_DROP should fire');
+    });
+
+    it('REVELATION_DENSITY_DROP does not fire when second half has comparable revelations', async () => {
+      // revelations spread evenly: 1,3 in first half; 7,9 in second half
+      const recs295nrdd = Array.from({ length: 10 }, (_, i) =>
+        makeRec295(i, { revelation: [1, 3, 7, 9].includes(i) ? `reveal-${i}` : null })
+      );
+      const res = await runB295(recs295nrdd);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_DENSITY_DROP'), 'REVELATION_DENSITY_DROP should not fire');
+    });
+
+    it('BELIEF_OPENING_INERT fires when opening 25% has no belief content but rest does', async () => {
+      // 8 scenes: opening (0-1) has nothing; scene 4 has a revelation
+      const recs295boi = Array.from({ length: 8 }, (_, i) =>
+        makeRec295(i, { revelation: i === 4 ? 'the truth emerges' : null })
+      );
+      const res = await runB295(recs295boi);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_OPENING_INERT'), 'BELIEF_OPENING_INERT should fire');
+    });
+
+    it('BELIEF_OPENING_INERT does not fire when opening has belief content', async () => {
+      // scene 0 has a dialogueHighlight (told belief) — opening is not inert
+      const recs295nboi = Array.from({ length: 8 }, (_, i) =>
+        makeRec295(i, {
+          dialogueHighlights: i === 0 ? ['ALICE: I know the truth about this'] : [],
+          revelation: i === 5 ? 'truth confirmed' : null,
+        })
+      );
+      const res = await runB295(recs295nboi);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_OPENING_INERT'), 'BELIEF_OPENING_INERT should not fire');
+    });
+  });
+
   describe('Wave 294 — voicePass: dialogue interrogative saturation, action adverb flood, character name monotony', async () => {
     const runV294 = async (fountain: string) => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');

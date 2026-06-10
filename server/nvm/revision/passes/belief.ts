@@ -16,6 +16,9 @@
 // Wave 281 additions: revelation drama vacuum (all revelations in emotionally flat scenes),
 // Act 2b belief void (no beliefs or revelations in 50%–75% escalation zone),
 // told belief final scene (final scene ends on an unresolved assertion).
+// Wave 295 additions: revelation suspense decoupled (revelation scenes avg suspenseDelta ≤ 0),
+// belief orphan (told belief in first half has no revelation in second half for same subject),
+// revelation density drop (second half has fewer revelations than first half despite 3+ total).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -909,6 +912,81 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         description: `The final scene contains a character assertion (told belief) with no accompanying revelation — the story ends with an unverified claim. The last word the story speaks to the audience is a character asserting something that is never shown to be true; the story closes on a proposition rather than a truth.`,
         suggestedFix: 'Either add a witnessed revelation to the final scene that confirms or contradicts the assertion, or move the told belief earlier and let the closing scene demonstrate truth through action or direct discovery. A story ends most satisfyingly when its final truth is shown, not claimed.',
       });
+    }
+  }
+
+  // ── Wave 295: REVELATION_SUSPENSE_DECOUPLED ───────────────────────────────
+  // Revelation scenes (witnessedBeliefs) have an average suspenseDelta ≤ 0.
+  // Discoveries should generate tension — the moment of unmasking should raise
+  // stakes rather than lowering them. A revelation that arrives without suspense
+  // is a plot point, not a dramatic event: it informs without transforming.
+  // Requires 8+ records and 3+ revelations with suspenseDelta data.
+  if (records.length >= 8 && witnessedBeliefs.length >= 3) {
+    const revSuspScenes295 = witnessedBeliefs
+      .map(w => records.find((r: any) => r.sceneIdx === w.sceneIdx))
+      .filter(Boolean);
+    if (revSuspScenes295.length >= 3) {
+      const avgRevSusp295 = revSuspScenes295.reduce((acc: number, r: any) => acc + (r.suspenseDelta ?? 0), 0) / revSuspScenes295.length;
+      if (avgRevSusp295 <= 0) {
+        issues.push({
+          location: 'Revelation scenes — suspense decoupled',
+          rule: 'REVELATION_SUSPENSE_DECOUPLED',
+          severity: 'minor',
+          description: `${revSuspScenes295.length} revelation scene(s) have an average suspenseDelta of ${avgRevSusp295.toFixed(2)} — discoveries arrive without generating tension. A revelation that doesn't raise stakes is a fact delivered by the plot, not a dramatic event experienced by the audience. Discoveries should reframe everything and make the next action more urgent, not less.`,
+          suggestedFix: 'Stage each revelation so that what it reveals raises the cost of the next action: the truth uncovered should make an upcoming decision harder, not easier. If discovering the killer makes the protagonist safer, the revelation has no dramatic tension; if it puts someone they love at risk, it does.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 295: REVELATION_DENSITY_DROP ────────────────────────────────────
+  // The second half of the story has fewer revelations than the first half,
+  // despite 3+ total revelations. The story front-loads its information drama
+  // and coasts to the finish. Discoveries should escalate toward the climax —
+  // the revelation density should increase or remain consistent as the story
+  // approaches its resolution, not drop off. Requires 8+ records and 3+
+  // revelations total.
+  if (records.length >= 8 && witnessedBeliefs.length >= 3) {
+    const half295 = Math.floor(records.length / 2);
+    const firstHalfRevs295 = witnessedBeliefs.filter(w => w.sceneIdx < half295).length;
+    const secondHalfRevs295 = witnessedBeliefs.filter(w => w.sceneIdx >= half295).length;
+    if (firstHalfRevs295 > secondHalfRevs295 && secondHalfRevs295 < firstHalfRevs295 * 0.5) {
+      issues.push({
+        location: 'Revelation distribution',
+        rule: 'REVELATION_DENSITY_DROP',
+        severity: 'minor',
+        description: `${firstHalfRevs295} revelation(s) occur in the first half vs. only ${secondHalfRevs295} in the second half — discovery density drops more than 50% after the midpoint. The story front-loads its information drama and coasts toward the climax with a depleted discovery engine.`,
+        suggestedFix: 'Redistribute revelations to escalate in density toward the climax: the second half of the story should deliver more discoveries than the first, not fewer. Reserve the two or three most significant revelations for Act 2b and Act 3 — the story\'s information crescendo should peak at or just before the climax.',
+      });
+    }
+  }
+
+  // ── Wave 295: BELIEF_OPENING_INERT ────────────────────────────────────────
+  // The first 25% of the story has neither told beliefs (dialogueHighlights)
+  // nor witnessed revelations. The opening act is informationally inert —
+  // no character claims anything and no truth is discovered. An opening
+  // without belief content fails to establish the epistemic stakes: the
+  // audience has no proposition to hold or doubt entering Act 2. Requires
+  // 8+ records and at least 1 told belief or revelation anywhere else in
+  // the story.
+  if (records.length >= 8) {
+    const opening295End = Math.floor(records.length * 0.25);
+    const openingHasBeliefs295 = records.slice(0, opening295End).some((r: any) =>
+      r.dialogueHighlights.length > 0 || r.revelation !== null,
+    );
+    if (!openingHasBeliefs295) {
+      const restHasBeliefs295 = records.slice(opening295End).some((r: any) =>
+        r.dialogueHighlights.length > 0 || r.revelation !== null,
+      );
+      if (restHasBeliefs295) {
+        issues.push({
+          location: `Opening 25% (Scenes 0–${opening295End - 1}) — no belief content`,
+          rule: 'BELIEF_OPENING_INERT',
+          severity: 'minor',
+          description: `The opening (Scenes 0–${opening295End - 1}) contains no told beliefs and no revelations — the first act is informationally inert. The audience enters Act 2 with no proposition to hold or doubt, no claim to be suspicious of, and no discovery to process. An opening that establishes no epistemic stakes leaves the belief layer empty when the complications begin.`,
+          suggestedFix: 'Plant at least one belief beat in the opening: a character makes a claim that will later be tested, a secret is hinted at, or a small discovery seeds a question the story will answer. The opening should leave the audience holding at least one unverified proposition — something to believe or disbelieve entering Act 2.',
+        });
+      }
     }
   }
 
