@@ -16,6 +16,9 @@
 // Wave 286 additions: reactive climax (climax scene has no proactive markers),
 // seed graveyard (seeded clues with no payoffs in second half),
 // purpose monotone (>70% of scenes share the same purpose).
+// Wave 300 additions: curiosity without agency (curiosity spikes never tied to
+// protagonist initiative), turns undriven (no dramatic turn occurs at or right
+// after a proactive act), seeding curiosity flat (clue plants never raise curiosity).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1081,6 +1084,82 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${maxPurposeCount286} of ${n} scenes (${Math.round(maxPurposeCount286 / n * 100)}%) share the same purpose ("${dominantPurpose286}"). Purpose monotony signals structural flatness — the story repeats a single function rather than mixing development, revelation, climax, and transition into a varied arc.`,
         suggestedFix: `Diversify scene purposes: ensure at least one scene each of revelation, climax, and transition alongside the development scenes. A scene tagged "${dominantPurpose286}" should be surrounded by scenes with different purposes to create structural rhythm and signal to the audience that the story is moving forward.`,
+      });
+    }
+  }
+
+  // ── Wave 300: CURIOSITY_WITHOUT_AGENCY ────────────────────────────────────
+  // Curiosity spikes (curiosityDelta > 1) never coincide with — or follow
+  // within one scene of — a proactive act. The mystery deepens by itself;
+  // the protagonist's digging never causes a question to open. Distinct from
+  // REVELATION_WITHOUT_PROACTIVE (which couples answers to effort): this
+  // couples the raising of questions to effort. Requires 8+ records, 3+
+  // curiosity spikes, and at least one proactive act somewhere.
+  if (n >= 8) {
+    const spikes300 = records
+      .map((r: any, i: number) => ({ r, i }))
+      .filter(({ r }: any) => (r.curiosityDelta ?? 0) > 1);
+    const anyProactive300 = records.some(isProactive258);
+    if (spikes300.length >= 3 && anyProactive300) {
+      const anyDriven300 = (spikes300 as Array<{ r: any; i: number }>).some(({ r, i }) =>
+        isProactive258(r) || (i > 0 && isProactive258(records[i - 1])),
+      );
+      if (!anyDriven300) {
+        issues.push({
+          location: 'Curiosity spikes throughout',
+          rule: 'CURIOSITY_WITHOUT_AGENCY',
+          severity: 'minor',
+          description: `${spikes300.length} curiosity spikes occur but none coincides with — or follows — a proactive act by the protagonist. Every question the story opens, it opens by itself: the mystery deepens through coincidence and ambient events rather than through anyone digging. Curiosity earned by initiative binds the audience to the protagonist; curiosity that just happens binds them to nothing.`,
+          suggestedFix: 'Let at least one major question open because the protagonist pried: a clue they chase exposes a deeper mystery, a door they force reveals something they were not meant to see. When investigation causes the question, the audience\'s curiosity and the character\'s drive become the same engine.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 300: TURNS_UNDRIVEN ──────────────────────────────────────────────
+  // The story has 3+ dramatic turns and none occurs in — or within one scene
+  // after — a proactive scene. Every pivot happens TO the protagonist, never
+  // BECAUSE of them: the turns are weather, not consequences. Distinct from
+  // PROTAGONIST_REACTIVE_DOMINANCE (Act-2 zone passivity count): this
+  // correlates the story's declared turns with initiative. Requires 8+
+  // records and at least one proactive act somewhere.
+  if (n >= 8) {
+    const turns300 = records
+      .map((r: any, i: number) => ({ r, i }))
+      .filter(({ r }: any) => (r.dramaticTurn ?? 'nothing') !== 'nothing');
+    const anyProactive300b = records.some(isProactive258);
+    if (turns300.length >= 3 && anyProactive300b) {
+      const anyTurnDriven300 = (turns300 as Array<{ r: any; i: number }>).some(({ r, i }) =>
+        isProactive258(r) || (i > 0 && isProactive258(records[i - 1])),
+      );
+      if (!anyTurnDriven300) {
+        issues.push({
+          location: 'Dramatic turns throughout',
+          rule: 'TURNS_UNDRIVEN',
+          severity: 'minor',
+          description: `All ${turns300.length} dramatic turns occur without a proactive act in or immediately before them — every pivot happens TO the protagonist rather than because of them. Turns that arrive like weather make the protagonist a passenger in their own story: the plot changes direction and the character merely experiences it.`,
+          suggestedFix: 'Tie at least one major turn to the protagonist\'s initiative: the reversal that happens because they pushed too hard, the revelation their investigation forced into the open. A turn the protagonist caused — especially one that backfires — converts plot mechanics into character consequence.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 300: SEEDING_CURIOSITY_FLAT ──────────────────────────────────────
+  // Three or more clue-seeding scenes all have curiosityDelta ≤ 0 — the
+  // story plants threads without making the audience curious about any of
+  // them. A seed the audience doesn't wonder about is a seed they won't
+  // remember at payoff time. Distinct from CLUE_SEED_CLUSTER (spatial
+  // clustering) and the payoff-timing checks: this audits whether planting
+  // generates the curiosity that makes payoffs land. Requires 8+ records.
+  if (n >= 8) {
+    const seedScenes300 = records.filter((r: any) => (r.seededClueIds?.length ?? 0) > 0);
+    if (seedScenes300.length >= 3 && seedScenes300.every((r: any) => (r.curiosityDelta ?? 0) <= 0)) {
+      issues.push({
+        location: 'Clue-seeding scenes',
+        rule: 'SEEDING_CURIOSITY_FLAT',
+        severity: 'minor',
+        description: `All ${seedScenes300.length} clue-seeding scenes have a flat or negative curiosityDelta — the story plants threads without making the audience wonder about any of them. A seed that raises no question is invisible: the audience will not carry it, and the eventual payoff will read as new information rather than a thread resolving.`,
+        suggestedFix: 'Make at least the most important plant conspicuous enough to itch: a detail a character reacts to and then dismisses, an object the camera lingers on a beat too long, a remark that does not quite fit. The audience should notice without understanding — noticing is what converts a plant into a promise.',
       });
     }
   }

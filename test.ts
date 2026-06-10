@@ -17897,6 +17897,90 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 300 — intentionPass: curiosity without agency, turns undriven, seeding curiosity flat', async () => {
+    const makeRec300 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runI300 = async (records: any[]) => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      return intentionPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CURIOSITY_WITHOUT_AGENCY fires when no curiosity spike is tied to a proactive act', async () => {
+      // spikes at 1,2,3; the only proactive act (clock) is at 6 with no spike at/after it
+      const recs300ca = Array.from({ length: 8 }, (_, i) =>
+        makeRec300(i, {
+          curiosityDelta: [1, 2, 3].includes(i) ? 2 : 0,
+          clockRaised: i === 6,
+        })
+      );
+      const res = await runI300(recs300ca);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CURIOSITY_WITHOUT_AGENCY'), 'CURIOSITY_WITHOUT_AGENCY should fire');
+    });
+
+    it('CURIOSITY_WITHOUT_AGENCY does not fire when a spike follows a proactive act', async () => {
+      // spike at 7 directly follows the proactive scene at 6
+      const recs300nca = Array.from({ length: 8 }, (_, i) =>
+        makeRec300(i, {
+          curiosityDelta: [1, 2, 7].includes(i) ? 2 : 0,
+          clockRaised: i === 6,
+        })
+      );
+      const res = await runI300(recs300nca);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CURIOSITY_WITHOUT_AGENCY'), 'CURIOSITY_WITHOUT_AGENCY should not fire');
+    });
+
+    it('TURNS_UNDRIVEN fires when no dramatic turn is tied to a proactive act', async () => {
+      const recs300tu = Array.from({ length: 8 }, (_, i) =>
+        makeRec300(i, {
+          dramaticTurn: [1, 2, 3].includes(i) ? 'reversal' : 'nothing',
+          clockRaised: i === 6,
+        })
+      );
+      const res = await runI300(recs300tu);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TURNS_UNDRIVEN'), 'TURNS_UNDRIVEN should fire');
+    });
+
+    it('TURNS_UNDRIVEN does not fire when a turn follows a proactive act', async () => {
+      const recs300ntu = Array.from({ length: 8 }, (_, i) =>
+        makeRec300(i, {
+          dramaticTurn: [1, 2, 7].includes(i) ? 'reversal' : 'nothing',
+          clockRaised: i === 6,
+        })
+      );
+      const res = await runI300(recs300ntu);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TURNS_UNDRIVEN'), 'TURNS_UNDRIVEN should not fire');
+    });
+
+    it('SEEDING_CURIOSITY_FLAT fires when all clue-seeding scenes have curiosityDelta ≤ 0', async () => {
+      const recs300sf = Array.from({ length: 8 }, (_, i) =>
+        makeRec300(i, {
+          seededClueIds: [1, 3, 5].includes(i) ? [`clue-${i}`] : [],
+          curiosityDelta: 0,
+        })
+      );
+      const res = await runI300(recs300sf);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEEDING_CURIOSITY_FLAT'), 'SEEDING_CURIOSITY_FLAT should fire');
+    });
+
+    it('SEEDING_CURIOSITY_FLAT does not fire when a seeding scene raises curiosity', async () => {
+      const recs300nsf = Array.from({ length: 8 }, (_, i) =>
+        makeRec300(i, {
+          seededClueIds: [1, 3, 5].includes(i) ? [`clue-${i}`] : [],
+          curiosityDelta: i === 3 ? 2 : 0,
+        })
+      );
+      const res = await runI300(recs300nsf);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEEDING_CURIOSITY_FLAT'), 'SEEDING_CURIOSITY_FLAT should not fire');
+    });
+  });
+
   describe('Wave 299 — conflictPass: conflict emotion decoupled, stakes label unbacked, eleventh hour conflict', async () => {
     const makeRec299 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
