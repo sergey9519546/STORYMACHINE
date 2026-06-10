@@ -17897,6 +17897,103 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 290 — relationshipArcPass: opening burst, negative-only majority, shift dimension concentration', async () => {
+    const makeRec290 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runRA290 = async (records: any[]) => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('RELATIONSHIP_OPENING_BURST fires when all shifts are in the first 25%', async () => {
+      // 12 scenes: all 4 shifts at sceneIdx 0,1,2 (first 25% = scenes 0-2)
+      const recs290rob = Array.from({ length: 12 }, (_, i) =>
+        makeRec290(i, {
+          relationshipShifts: i < 3 ? [
+            { pairKey: `A|B`, dimension: 'affinity', amount: -0.5 },
+            { pairKey: `C|D`, dimension: 'affinity', amount: 0.5 },
+          ] : [],
+        })
+      );
+      const res = await runRA290(recs290rob);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_OPENING_BURST'), 'RELATIONSHIP_OPENING_BURST should fire');
+    });
+
+    it('RELATIONSHIP_OPENING_BURST does not fire when shifts are spread across the story', async () => {
+      const recs290nrob = Array.from({ length: 12 }, (_, i) =>
+        makeRec290(i, {
+          relationshipShifts: [1, 4, 7, 10].includes(i) ? [{ pairKey: 'A|B', dimension: 'affinity', amount: -0.3 }] : [],
+        })
+      );
+      const res = await runRA290(recs290nrob);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_OPENING_BURST'), 'RELATIONSHIP_OPENING_BURST should not fire');
+    });
+
+    it('NEGATIVE_ONLY_PAIR_MAJORITY fires when >60% of pairs have exclusively negative shifts', async () => {
+      // 3 pairs: A|B, C|D, E|F — all negative
+      const recs290nom = Array.from({ length: 10 }, (_, i) =>
+        makeRec290(i, {
+          relationshipShifts: i < 3 ? [
+            { pairKey: 'A|B', dimension: 'affinity', amount: -0.5 },
+            { pairKey: 'C|D', dimension: 'affinity', amount: -0.3 },
+            { pairKey: 'E|F', dimension: 'affinity', amount: -0.4 },
+          ] : [],
+        })
+      );
+      const res = await runRA290(recs290nom);
+      assert.ok(res.issues.some((i: any) => i.rule === 'NEGATIVE_ONLY_PAIR_MAJORITY'), 'NEGATIVE_ONLY_PAIR_MAJORITY should fire');
+    });
+
+    it('NEGATIVE_ONLY_PAIR_MAJORITY does not fire when some pairs have positive shifts', async () => {
+      // 3 pairs: A|B negative, C|D positive, E|F mixed → only 1/3 = 33% negative-only
+      const recs290nnom = Array.from({ length: 10 }, (_, i) =>
+        makeRec290(i, {
+          relationshipShifts: i < 3 ? [
+            { pairKey: 'A|B', dimension: 'affinity', amount: -0.5 },
+            { pairKey: 'C|D', dimension: 'affinity', amount: 0.5 },
+            { pairKey: 'E|F', dimension: 'affinity', amount: i === 0 ? -0.3 : 0.3 },
+          ] : [],
+        })
+      );
+      const res = await runRA290(recs290nnom);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'NEGATIVE_ONLY_PAIR_MAJORITY'), 'NEGATIVE_ONLY_PAIR_MAJORITY should not fire');
+    });
+
+    it('SHIFT_DIMENSION_CONCENTRATION fires when all shifts use a single dimension', async () => {
+      // 10 shifts across 2 pairs, all on 'affinity'
+      const recs290sdc = Array.from({ length: 10 }, (_, i) =>
+        makeRec290(i, {
+          relationshipShifts: i < 5 ? [
+            { pairKey: 'A|B', dimension: 'affinity', amount: -0.3 },
+            { pairKey: 'C|D', dimension: 'affinity', amount: 0.3 },
+          ] : [],
+        })
+      );
+      const res = await runRA290(recs290sdc);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SHIFT_DIMENSION_CONCENTRATION'), 'SHIFT_DIMENSION_CONCENTRATION should fire');
+    });
+
+    it('SHIFT_DIMENSION_CONCENTRATION does not fire when shifts use multiple dimensions', async () => {
+      const recs290nsdc = Array.from({ length: 10 }, (_, i) =>
+        makeRec290(i, {
+          relationshipShifts: i < 5 ? [
+            { pairKey: 'A|B', dimension: i % 2 === 0 ? 'affinity' : 'trust', amount: -0.3 },
+            { pairKey: 'C|D', dimension: 'power', amount: 0.3 },
+          ] : [],
+        })
+      );
+      const res = await runRA290(recs290nsdc);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SHIFT_DIMENSION_CONCENTRATION'), 'SHIFT_DIMENSION_CONCENTRATION should not fire');
+    });
+  });
+
   describe('Wave 289 — payoffPass: payoff-revelation disconnect, clue density front collapse, payoff suspense mismatch', async () => {
     const makeRec289 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

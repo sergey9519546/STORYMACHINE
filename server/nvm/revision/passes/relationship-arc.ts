@@ -19,6 +19,9 @@
 // Wave 276 additions: midpoint freeze (middle 50% relationally silent), net-zero
 // majority (>60% of pairs cancel out their own shifts), depth gap (one pair gets
 // 3× more shifts than the second most active pair).
+// Wave 290 additions: relationship opening burst (all shifts in first 25% — resolved too
+// early), negative-only majority (>60% of pairs have exclusively negative shifts),
+// shift dimension concentration (all shifts across all pairs share a single dimension).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -898,6 +901,77 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `The relationship between ${a276} and ${b276} receives ${topShifts276} shifts while the next most active pair receives only ${secondShifts276} — a ${Math.round(topShifts276 / secondShifts276)}× gap. One bond dominates all the relational scene-energy, leaving supporting relationships sketched rather than dramatised.`,
         suggestedFix: 'Redistribute relationship development: give secondary pairs two or three more active beats so their arcs feel substantive alongside the central bond. The ensemble\'s relational world gains depth when secondary bonds receive enough movement to feel like characters, not props.',
+      });
+    }
+  }
+
+  // ── Wave 290: RELATIONSHIP_OPENING_BURST ─────────────────────────────────
+  // All relationship shifts occur in the first 25% of the story. The
+  // relational world is fully established before the audience has had time
+  // to care about any bond, and then freezes for the remaining 75%. This is
+  // the inverse of RELATIONSHIP_VELOCITY_COLLAPSE (which detects second-half
+  // silence); this fires when all relational activity is confined to Act 1.
+  // Requires 10+ records and 4+ total shifts.
+  if (records.length >= 10 && totalShifts >= 4) {
+    const cutoff290 = Math.floor(records.length * 0.25);
+    const burstShifts290 = [...pairStats.values()].reduce(
+      (acc, stats) => acc + stats.shifts.filter(s => s.sceneIdx < cutoff290).length,
+      0,
+    );
+    if (burstShifts290 === totalShifts) {
+      issues.push({
+        location: `Opening 25% (scenes 0–${cutoff290 - 1}) — all relational activity`,
+        rule: 'RELATIONSHIP_OPENING_BURST',
+        severity: 'minor',
+        description: `All ${totalShifts} relationship shift(s) occur in the first 25% of the story (scenes 0–${cutoff290 - 1}) — the relational world is fully established before Act 2 begins and then freezes. Bonds established this early with no further movement read as fixed character traits rather than living relationships.`,
+        suggestedFix: 'Distribute relationship activity across all four acts: use Act 1 to establish bonds, Act 2 to stress-test them, and Act 3 to resolve them. A relationship that only moves at the start has no arc — just a starting position.',
+      });
+    }
+  }
+
+  // ── Wave 290: NEGATIVE_ONLY_PAIR_MAJORITY ────────────────────────────────
+  // More than 60% of all pairs have exclusively negative shifts (every shift
+  // amount < 0). A story where most bonds only deteriorate is tonally
+  // monotone — there is no relational aspiration, no warmth to contrast the
+  // darkness. Even in a tragedy, some bonds improve before they break.
+  // Requires 8+ records and 3+ pairs.
+  if (records.length >= 8 && pairStats.size >= 3) {
+    const negOnlyCount290 = [...pairStats.values()].filter(stats =>
+      stats.shifts.length > 0 && stats.shifts.every(s => s.amount < 0),
+    ).length;
+    if (negOnlyCount290 / pairStats.size > 0.60) {
+      issues.push({
+        location: 'Relational tone',
+        rule: 'NEGATIVE_ONLY_PAIR_MAJORITY',
+        severity: 'minor',
+        description: `${negOnlyCount290} of ${pairStats.size} relationship pairs (${Math.round(negOnlyCount290 / pairStats.size * 100)}%) have exclusively negative shifts — no bond improves at any point. When the entire relational world only deteriorates, there is no warmth to contrast the darkness, and the audience loses the emotional reference points that make tragedy meaningful.`,
+        suggestedFix: 'Give at least one or two pairs a positive shift — a reconciliation scene, a moment of unexpected solidarity, a bond that strengthens under pressure before being tested again. Relational warmth makes the darkness around it feel darker, not lighter.',
+      });
+    }
+  }
+
+  // ── Wave 290: SHIFT_DIMENSION_CONCENTRATION ──────────────────────────────
+  // All relationship shifts across all pairs use the same dimension. The
+  // relational world is one-dimensional: every bond changes only on the
+  // "affinity" axis (or only on "trust", "power", etc.) with no variety.
+  // Real relationships shift on multiple axes — trust moves independently
+  // of affinity, power shifts independently of care. Requires 8+ records
+  // and 5+ total shifts across 2+ pairs.
+  if (records.length >= 8 && totalShifts >= 5 && pairStats.size >= 2) {
+    const allDimensions290 = new Set<string>();
+    for (const r of records) {
+      for (const shift of (r.relationshipShifts ?? []) as Array<{ dimension?: string }>) {
+        if (shift.dimension) allDimensions290.add(shift.dimension);
+      }
+    }
+    if (allDimensions290.size === 1) {
+      const [onlyDim290] = allDimensions290;
+      issues.push({
+        location: 'Relationship shift dimensions',
+        rule: 'SHIFT_DIMENSION_CONCENTRATION',
+        severity: 'minor',
+        description: `All ${totalShifts} relationship shift(s) across ${pairStats.size} pair(s) occur on a single dimension ("${onlyDim290}"). The relational world is one-dimensional — bonds never shift on trust, power, respect, or other axes independently. Real relationships are multi-axial; a monodimensional relational world reads as schematic.`,
+        suggestedFix: 'Introduce at least one shift on a different dimension: a scene where affinity stays warm but trust collapses, or where two characters gain mutual respect without warming to each other. The tension between relational axes is where psychological complexity lives.',
       });
     }
   }
