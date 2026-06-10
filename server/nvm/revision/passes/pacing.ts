@@ -16,6 +16,9 @@
 // Wave 288 additions: suspense early peak (Act 1 avg suspense > Act 3 avg and Act 3 ≤ 0),
 // curiosity final drop (avg curiosityDelta in final quarter ≤ 0 while overall is positive),
 // curiosity opening flatline (opening avg curiosityDelta ≤ 0 — hook absent).
+// Wave 302 additions: ending on peak (final scene is the suspense maximum — no
+// decompression), post-release dead air (3 flat scenes after the biggest tension
+// release), net tension deficit (cumulative suspenseDelta sum is negative).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1001,6 +1004,74 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Plant a question in the first scene: an unexplained action, a mysterious object, a character whose goal is unclear. Every opening scene should make the audience wonder "why?" before it makes them wonder "what next?". Curiosity is the engine of story; start it early.',
         });
       }
+    }
+  }
+
+  // ── Wave 302: ENDING_ON_PEAK ──────────────────────────────────────────────
+  // The final scene carries the highest suspenseDelta in the story and it is
+  // a genuine spike (> 1.5). The story ends at maximum charge with no
+  // decompression — the audience is released mid-breath. Distinct from
+  // RESOLUTION_TOO_BRIEF (page length of the final scene): this audits the
+  // suspense state at the cut to black. Requires 8+ records.
+  if (records.length >= 8) {
+    const finalSusp302 = (records as any[])[records.length - 1].suspenseDelta ?? 0;
+    const maxSusp302 = Math.max(...(records as any[]).map(r => r.suspenseDelta ?? 0));
+    if (finalSusp302 > 1.5 && finalSusp302 >= maxSusp302) {
+      issues.push({
+        location: `Final scene (${(records as any[])[records.length - 1].slug})`,
+        rule: 'ENDING_ON_PEAK',
+        severity: 'minor',
+        description: `The final scene carries the story's highest suspense (suspenseDelta ${finalSusp302}) — the story cuts to black at maximum charge with no decompression. Unless this is a deliberate cliffhanger, ending on the peak denies the audience the exhale that converts tension into satisfaction; they leave keyed-up rather than completed.`,
+        suggestedFix: 'Add a decompression beat after the peak: even half a scene of aftermath — survivors taking stock, a held look, a quiet image that answers the opening — lets the accumulated tension resolve. If a cliffhanger is intended, make the unresolved question explicit so the charge reads as a promise rather than an omission.',
+      });
+    }
+  }
+
+  // ── Wave 302: POST_RELEASE_DEAD_AIR ──────────────────────────────────────
+  // After the story's single biggest tension release (most negative
+  // suspenseDelta, ≤ -1.5), the next three scenes all stay flat or falling
+  // (suspenseDelta ≤ 0). The story deflates and then idles — dead air where
+  // re-escalation should begin. Distinct from ACT2_PACING_VALLEY (zone-based
+  // depression): this anchors on the release event wherever it occurs.
+  // Requires 10+ records with 3+ scenes after the release.
+  if (records.length >= 10) {
+    let minIdx302 = 0;
+    for (let i302 = 1; i302 < records.length; i302++) {
+      if (((records as any[])[i302].suspenseDelta ?? 0) < ((records as any[])[minIdx302].suspenseDelta ?? 0)) minIdx302 = i302;
+    }
+    const minVal302 = (records as any[])[minIdx302].suspenseDelta ?? 0;
+    if (minVal302 <= -1.5 && minIdx302 + 3 < records.length) {
+      const wake302 = (records as any[]).slice(minIdx302 + 1, minIdx302 + 4);
+      if (wake302.every(r => (r.suspenseDelta ?? 0) <= 0)) {
+        issues.push({
+          location: `Scenes ${(records as any[])[minIdx302].sceneIdx}–${(records as any[])[minIdx302 + 3].sceneIdx} — post-release dead air`,
+          rule: 'POST_RELEASE_DEAD_AIR',
+          severity: 'minor',
+          description: `The story's biggest tension release (suspenseDelta ${minVal302} at scene ${(records as any[])[minIdx302].sceneIdx}) is followed by three scenes that all stay flat or falling. After a major discharge the story idles — the audience, having just exhaled, is given nothing new to hold their breath for, and momentum dies exactly where re-escalation should begin.`,
+          suggestedFix: 'Start rebuilding within a scene or two of any major release: a new complication, a consequence of the resolution that opens a fresh problem, a clock that starts ticking. The release should feel like a trough between waves, not the tide going out.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 302: NET_TENSION_DEFICIT ────────────────────────────────────────
+  // The cumulative sum of suspenseDelta across the whole story is negative —
+  // more tension is discharged than is ever built. A net-negative suspense
+  // ledger means the story spends charge it never accumulated; scene-level
+  // releases outweigh scene-level builds and the overall trajectory is a
+  // slow deflation. Requires 8+ records and at least one positive delta
+  // (so an all-zero record set doesn't fire).
+  if (records.length >= 8) {
+    const netSusp302 = (records as any[]).reduce((acc: number, r: any) => acc + (r.suspenseDelta ?? 0), 0);
+    const anyBuild302 = (records as any[]).some(r => (r.suspenseDelta ?? 0) > 0);
+    if (netSusp302 < 0 && anyBuild302) {
+      issues.push({
+        location: 'Suspense ledger (whole story)',
+        rule: 'NET_TENSION_DEFICIT',
+        severity: 'minor',
+        description: `The cumulative suspenseDelta across all ${records.length} scenes is ${netSusp302.toFixed(1)} — the story discharges more tension than it ever builds. A net-negative suspense ledger reads as a long deflation: each release outweighs the builds around it, and by the finale the story is running on charge it never banked.`,
+        suggestedFix: 'Rebalance the ledger: deepen the builds (raise stakes more sharply in escalation scenes) or shrink the releases (partial resolutions that discharge some tension while leaving the core threat intact). Across the whole story, tension built should exceed tension spent until the climax settles the account.',
+      });
     }
   }
 

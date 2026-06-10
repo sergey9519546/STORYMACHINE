@@ -17897,6 +17897,74 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 302 — pacingPass: ending on peak, post-release dead air, net tension deficit', async () => {
+    const makeRec302 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0.5,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain302 = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SCENE ${i} - DAY\n\nScene ${i} action line.`).join('\n\n');
+    const runP302 = async (records: any[]) => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      return pacingPass({ fountain: makeFountain302(records.length), original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ENDING_ON_PEAK fires when the final scene carries the story suspense maximum', async () => {
+      const recs302ep = Array.from({ length: 8 }, (_, i) =>
+        makeRec302(i, { suspenseDelta: i === 7 ? 3 : 0.5 })
+      );
+      const res = await runP302(recs302ep);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ENDING_ON_PEAK'), 'ENDING_ON_PEAK should fire');
+    });
+
+    it('ENDING_ON_PEAK does not fire when the peak occurs before the finale', async () => {
+      const recs302nep = Array.from({ length: 8 }, (_, i) =>
+        makeRec302(i, { suspenseDelta: i === 5 ? 3 : 0.5 })
+      );
+      const res = await runP302(recs302nep);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ENDING_ON_PEAK'), 'ENDING_ON_PEAK should not fire');
+    });
+
+    it('POST_RELEASE_DEAD_AIR fires when 3 flat scenes follow the biggest release', async () => {
+      const deltas302 = [1, 1, 1, 1, -2, 0, 0, 0, 1, 1];
+      const recs302da = Array.from({ length: 10 }, (_, i) =>
+        makeRec302(i, { suspenseDelta: deltas302[i] })
+      );
+      const res = await runP302(recs302da);
+      assert.ok(res.issues.some((i: any) => i.rule === 'POST_RELEASE_DEAD_AIR'), 'POST_RELEASE_DEAD_AIR should fire');
+    });
+
+    it('POST_RELEASE_DEAD_AIR does not fire when tension rebuilds after the release', async () => {
+      const deltas302n = [1, 1, 1, 1, -2, 2, 0, 0, 1, 1];
+      const recs302nda = Array.from({ length: 10 }, (_, i) =>
+        makeRec302(i, { suspenseDelta: deltas302n[i] })
+      );
+      const res = await runP302(recs302nda);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'POST_RELEASE_DEAD_AIR'), 'POST_RELEASE_DEAD_AIR should not fire');
+    });
+
+    it('NET_TENSION_DEFICIT fires when cumulative suspenseDelta is negative', async () => {
+      const recs302td = Array.from({ length: 8 }, (_, i) =>
+        makeRec302(i, { suspenseDelta: i === 0 ? 1 : -0.5 })
+      );
+      const res = await runP302(recs302td);
+      assert.ok(res.issues.some((i: any) => i.rule === 'NET_TENSION_DEFICIT'), 'NET_TENSION_DEFICIT should fire');
+    });
+
+    it('NET_TENSION_DEFICIT does not fire when the suspense ledger is net positive', async () => {
+      const recs302ntd = Array.from({ length: 8 }, (_, i) =>
+        makeRec302(i, { suspenseDelta: 0.5 })
+      );
+      const res = await runP302(recs302ntd);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'NET_TENSION_DEFICIT'), 'NET_TENSION_DEFICIT should not fire');
+    });
+  });
+
   describe('Wave 301 — originalityPass: mirror self-gaze cliché, weather opener crutch, just-a-dream reveal', async () => {
     const runO301 = async (fountain: string) => {
       const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
