@@ -15,6 +15,9 @@
 // Wave 287 additions: opening wake-up cliché (first scene shows a character waking up),
 // dialogue exclamation flood (>25% of dialogue lines end with !),
 // slug interior dominance (>85% of sluglines are INT. — no exterior world).
+// Wave 301 additions: mirror self-gaze cliché (mirror introspection in 2+ scenes),
+// weather opener crutch (3+ scenes open on weather as mood shorthand),
+// just-a-dream reveal (events dismissed as "only a dream").
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1250,6 +1253,89 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${intSlugs287} of ${totalSlugs287} scenes (${Math.round(intSlugs287 / totalSlugs287 * 100)}%) are interior (INT.) — the story never escapes its walls. Without exterior scenes, the visual world is homogeneous: same lighting conditions, same spatial scale, same sensory palette. Even a single exterior scene resets the audience's spatial awareness.`,
         suggestedFix: 'Move at least one or two scenes outdoors: a confrontation in a parking lot, a phone call on a fire escape, a revelation at dawn. Exterior locations carry different light, sound, and scale — they signal that the story inhabits a world rather than a stage set.',
+      });
+    }
+  }
+
+  // ── Wave 301: MIRROR_SELF_GAZE_CLICHE ────────────────────────────────────
+  // A character studies themselves in a mirror in two or more scenes. The
+  // mirror gaze is screenwriting's stock shorthand for introspection and
+  // identity crisis — used once it can work; recurring, it signals the writer
+  // has no other tool for externalizing a character's inner state. Counts
+  // scenes (not lines) containing a mirror-gaze beat.
+  {
+    const mirrorRe301 = /\b(in|into|at) the mirror\b|\bmirror reflects\b|\bstudies (his|her|their) reflection\b|\bstares at (his|her|their) reflection\b/i;
+    let mirrorScenes301 = 0;
+    let inScene301 = false;
+    let sceneHasMirror301 = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) {
+        if (inScene301 && sceneHasMirror301) mirrorScenes301++;
+        inScene301 = true;
+        sceneHasMirror301 = false;
+      } else if (inScene301 && mirrorRe301.test(t)) {
+        sceneHasMirror301 = true;
+      }
+    }
+    if (inScene301 && sceneHasMirror301) mirrorScenes301++;
+    if (mirrorScenes301 >= 2) {
+      issues.push({
+        location: 'Mirror beats across scenes',
+        rule: 'MIRROR_SELF_GAZE_CLICHE',
+        severity: 'minor',
+        description: `${mirrorScenes301} scenes contain a character gazing at themselves in a mirror — screenwriting's stock shorthand for introspection. One mirror beat can land; recurring mirror-gazes signal that the script has a single tool for externalizing inner conflict, and the audience registers the device instead of the emotion.`,
+        suggestedFix: 'Keep at most one mirror beat (or cut them all) and externalize self-confrontation through behavior instead: a character rehearsing what they\'ll say, avoiding a photograph, putting on or stripping off a uniform. Identity crisis shows best in what a character does to be seen — or not seen — by others.',
+      });
+    }
+  }
+
+  // ── Wave 301: WEATHER_OPENER_CRUTCH ──────────────────────────────────────
+  // Three or more scenes open with a weather or atmosphere line ("Rain
+  // hammers the windows.", "Thunder rolls in the distance."). Weather as a
+  // recurring scene-opener is pathetic-fallacy shorthand — mood assigned by
+  // forecast rather than dramatized through character and action. Checks the
+  // first non-empty line after each slugline.
+  {
+    const weatherRe301 = /\b(rain|rains|raining|thunder|lightning|snow|snows|snowing|fog|mist|wind|winds|storm|drizzle|downpour|clouds?|overcast|sleet|hail)\b/i;
+    let weatherOpeners301 = 0;
+    for (let i = 0; i < lines.length; i++) {
+      if (!/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(lines[i].trim())) continue;
+      for (let j = i + 1; j < lines.length; j++) {
+        const t = lines[j].trim();
+        if (!t) continue;
+        if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) break;
+        if (weatherRe301.test(t)) weatherOpeners301++;
+        break;
+      }
+    }
+    if (weatherOpeners301 >= 3) {
+      issues.push({
+        location: 'Scene openings',
+        rule: 'WEATHER_OPENER_CRUTCH',
+        severity: 'minor',
+        description: `${weatherOpeners301} scenes open with a weather or atmosphere line — mood is being assigned by forecast. Recurring weather openers are pathetic-fallacy shorthand: rain for sadness, thunder for dread. The audience reads the device, and the scenes' actual emotional content gets outsourced to the sky.`,
+        suggestedFix: 'Open scenes on character and action; let weather appear only when it materially affects the scene (a storm that strands someone, heat that frays tempers). If atmosphere matters, embed it in behavior — a character shaking out an umbrella says rain and tells us something about them in the same beat.',
+      });
+    }
+  }
+
+  // ── Wave 301: JUST_A_DREAM_REVEAL ────────────────────────────────────────
+  // The script dismisses dramatized events as "just a dream" — the oldest
+  // fake-out in the book. Retroactively cancelling scenes the audience
+  // invested in teaches them not to trust anything they see; the device
+  // spends narrative credibility for one jolt. Fires on a single occurrence
+  // because one is already one too many in most scripts.
+  {
+    const dreamRe301 = /\b(it was (all )?(just |only )?a dream|only a dream|just a dream|wakes? (up )?(gasping|screaming|with a start)[^.]*\.? ?(it was|just) a (dream|nightmare))\b/i;
+    const dreamLine301 = lines.findIndex(l => dreamRe301.test(l));
+    if (dreamLine301 !== -1) {
+      issues.push({
+        location: `Line ${dreamLine301 + 1}`,
+        rule: 'JUST_A_DREAM_REVEAL',
+        severity: 'minor',
+        description: 'The script dismisses dramatized events as "just a dream" — a fake-out that retroactively cancels scenes the audience invested in. Once a story plays this card, viewers learn to withhold belief from everything that follows; the single jolt costs the script its standing credibility.',
+        suggestedFix: 'If the dream content matters, present it honestly as a dream or vision from the start and let its meaning — not its reveal — carry the scene. If it exists only to fake out the audience, cut it and dramatize the fear it represented in the waking story, where consequences are real.',
       });
     }
   }

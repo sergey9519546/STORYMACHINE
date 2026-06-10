@@ -17897,6 +17897,99 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 301 — originalityPass: mirror self-gaze cliché, weather opener crutch, just-a-dream reveal', async () => {
+    const runO301 = async (fountain: string) => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      return originalityPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('MIRROR_SELF_GAZE_CLICHE fires when mirror introspection appears in 2+ scenes', async () => {
+      const fountain301m = `INT. BATHROOM - DAY
+
+Alice stares at the mirror, searching her own face.
+
+INT. DRESSING ROOM - NIGHT
+
+Bob looks into the mirror and straightens his collar.`;
+      const res = await runO301(fountain301m);
+      assert.ok(res.issues.some((i: any) => i.rule === 'MIRROR_SELF_GAZE_CLICHE'), 'MIRROR_SELF_GAZE_CLICHE should fire');
+    });
+
+    it('MIRROR_SELF_GAZE_CLICHE does not fire for a single mirror beat', async () => {
+      const fountain301nm = `INT. BATHROOM - DAY
+
+Alice stares at the mirror, searching her own face.
+
+INT. KITCHEN - NIGHT
+
+Bob pours two glasses of wine.`;
+      const res = await runO301(fountain301nm);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'MIRROR_SELF_GAZE_CLICHE'), 'MIRROR_SELF_GAZE_CLICHE should not fire');
+    });
+
+    it('WEATHER_OPENER_CRUTCH fires when 3+ scenes open on a weather line', async () => {
+      const fountain301w = `EXT. STREET - NIGHT
+
+Rain hammers the empty street.
+
+Alice hurries to the door.
+
+EXT. FIELD - DAY
+
+Thunder rolls across the hills.
+
+Bob watches from the fence.
+
+EXT. HARBOR - DUSK
+
+Fog drifts over the water.
+
+A ship horn sounds far away.`;
+      const res = await runO301(fountain301w);
+      assert.ok(res.issues.some((i: any) => i.rule === 'WEATHER_OPENER_CRUTCH'), 'WEATHER_OPENER_CRUTCH should fire');
+    });
+
+    it('WEATHER_OPENER_CRUTCH does not fire when scenes open on character action', async () => {
+      const fountain301nw = `EXT. STREET - NIGHT
+
+Alice hurries to the door through the rain.
+
+EXT. FIELD - DAY
+
+Bob climbs the fence and drops to the other side.
+
+EXT. HARBOR - DUSK
+
+A ship horn sounds far away.`;
+      const res = await runO301(fountain301nw);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'WEATHER_OPENER_CRUTCH'), 'WEATHER_OPENER_CRUTCH should not fire');
+    });
+
+    it('JUST_A_DREAM_REVEAL fires when events are dismissed as just a dream', async () => {
+      const fountain301d = `INT. WAREHOUSE - NIGHT
+
+Alice backs away from the shadow closing in.
+
+INT. BEDROOM - NIGHT
+
+Alice sits up, breathing hard. It was all just a dream.`;
+      const res = await runO301(fountain301d);
+      assert.ok(res.issues.some((i: any) => i.rule === 'JUST_A_DREAM_REVEAL'), 'JUST_A_DREAM_REVEAL should fire');
+    });
+
+    it('JUST_A_DREAM_REVEAL does not fire when no dream fake-out occurs', async () => {
+      const fountain301nd = `INT. WAREHOUSE - NIGHT
+
+Alice backs away from the shadow closing in.
+
+INT. BEDROOM - NIGHT
+
+Alice sits up, breathing hard, and reaches for the phone.`;
+      const res = await runO301(fountain301nd);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'JUST_A_DREAM_REVEAL'), 'JUST_A_DREAM_REVEAL should not fire');
+    });
+  });
+
   describe('Wave 300 — intentionPass: curiosity without agency, turns undriven, seeding curiosity flat', async () => {
     const makeRec300 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
