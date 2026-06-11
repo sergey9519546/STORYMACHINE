@@ -98,11 +98,16 @@ const renderHighlightedText = (_text: string, blocks: FountainBlock[]) => {
       className = "font-bold uppercase text-orange-500";
     else if (block.type === "lyrics") className = "italic text-zinc-500";
 
-    const blockLines = block.text.split("\n");
-    for (let j = 0; j < blockLines.length; j++) {
-      const lineText = blockLines[j];
+    // ⚡ Bolt Optimization: Use zero-allocation string parsing instead of .split('\n')
+    // This avoids creating temporary string arrays during high-frequency render events
+    let start = 0;
+    while (start <= block.text.length) {
+      let next = block.text.indexOf("\n", start);
+      if (next === -1) next = block.text.length;
+      const lineText = block.text.slice(start, next);
+
       const isLastBlock = i === blocks.length - 1;
-      const isLastLineInBlock = j === blockLines.length - 1;
+      const isLastLineInBlock = next === block.text.length;
 
       result.push(
         <span key={lineIdx} className={className || ""}>
@@ -110,6 +115,8 @@ const renderHighlightedText = (_text: string, blocks: FountainBlock[]) => {
           {!(isLastBlock && isLastLineInBlock) ? "\n" : ""}
         </span>
       );
+
+      start = next + 1;
       lineIdx++;
     }
   }
@@ -441,8 +448,21 @@ export default function ScriptIDE({
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
     let actionLines = 0;
-    let wordCount = scriptText.trim().split(/\s+/).length;
-    if (scriptText.trim() === "") wordCount = 0;
+
+    // ⚡ Bolt Optimization: Zero-allocation word counting
+    // Replaces scriptText.trim().split(/\s+/).length to avoid string allocations
+    let wordCount = 0;
+    let inWord = false;
+    for (let i = 0; i < scriptText.length; i++) {
+      if (scriptText.charCodeAt(i) > 32) {
+        if (!inWord) {
+          wordCount++;
+          inWord = true;
+        }
+      } else {
+        inWord = false;
+      }
+    }
 
     blocks.forEach((block) => {
       if (block.type === "character") {
@@ -593,8 +613,10 @@ export default function ScriptIDE({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const cursor = e.currentTarget.selectionStart;
     const textBeforeCursor = scriptText.substring(0, cursor);
-    const lines = textBeforeCursor.split("\n");
-    const currentLine = lines[lines.length - 1];
+
+    // ⚡ Bolt Optimization: Zero-allocation current line extraction
+    const lastNewlineIdx = textBeforeCursor.lastIndexOf("\n");
+    const currentLine = lastNewlineIdx === -1 ? textBeforeCursor : textBeforeCursor.slice(lastNewlineIdx + 1);
 
     if (e.key === "i" || e.key === "I") {
       if (currentLine === "") {
@@ -737,11 +759,15 @@ export default function ScriptIDE({
   // ── Navigation ───────────────────────────────────────────────────────────────
   const handleNavigate = (lineIndex: number) => {
     if (!editorRef.current) return;
-    const lines = scriptText.split("\n");
+
+    // ⚡ Bolt Optimization: Zero-allocation line navigation
     let charCount = 0;
     for (let i = 0; i < lineIndex; i++) {
-      charCount += lines[i].length + 1;
+      const nextNewline = scriptText.indexOf("\n", charCount);
+      if (nextNewline === -1) break;
+      charCount = nextNewline + 1;
     }
+
     editorRef.current.focus();
     editorRef.current.setSelectionRange(charCount, charCount);
 
