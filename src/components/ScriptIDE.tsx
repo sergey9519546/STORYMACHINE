@@ -788,8 +788,13 @@ export default function ScriptIDE({
     let content = scriptText;
     if (!content.trimStart().startsWith('Title:')) {
       const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-      const titlePage = `Title: Untitled Script\nCredit: Written by\nAuthor: Author\nDraft date: ${today}\n\n`;
-      content = titlePage + content;
+
+      const titleStr = titlePage.title || 'Untitled Script';
+      const authorStr = titlePage.author || 'Author';
+      const contactStr = titlePage.contact ? `\nContact: ${titlePage.contact}` : '';
+
+      const titlePageContent = `Title: ${titleStr}\nCredit: Written by\nAuthor: ${authorStr}\nDraft date: ${today}${contactStr}\n\n`;
+      content = titlePageContent + content;
     }
     const blob = new Blob([content], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
