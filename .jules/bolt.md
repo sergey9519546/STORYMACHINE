@@ -4,3 +4,7 @@
 ## 2024-05-19 - [O(N) Rendering Latency Bottleneck in Fountain Highlighting]
 **Learning:** Found an unexpected O(N^2) memory scaling issue caused by `text.split("\n")` being mapped into a massive dictionary (`lineClasses`) and then mapped *again* to create React elements. This double-allocation strategy causes measurable frame stuttering when typing in large scripts since it executes completely synchronously on the main thread during high-frequency render events.
 **Action:** When parsing hierarchical document structures to flat nodes (like text lines), always prefer mapping directly over the parsed AST (e.g. `blocks`) to generate React Elements instead of building intermediate hash maps or re-splitting raw strings.
+
+## 2026-06-12 - ScriptIDE String Split Performance Optimization
+**Learning:** In high-frequency components handling large strings (like IDEs processing user keystrokes), using `String.prototype.split` results in significant array allocations and triggers unnecessary garbage collection, leading to frame stutters. `lastIndexOf` / `indexOf` combined with `.slice()` can precisely locate lines and substrings without building intermediate arrays. Also, using a fast RegEx loop (`/[^\s]+/g.exec(string)`) is a highly performant and safe way to count words without allocating arrays or breaking Unicode space rules.
+**Action:** When working on text editors or high-throughput rendering pipelines, scan for and eliminate array-allocating string operations. Use zero-allocation methods and pre-compiled regex for string analysis.
