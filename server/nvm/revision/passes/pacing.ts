@@ -19,6 +19,10 @@
 // Wave 302 additions: ending on peak (final scene is the suspense maximum — no
 // decompression), post-release dead air (3 flat scenes after the biggest tension
 // release), net tension deficit (cumulative suspenseDelta sum is negative).
+// Wave 316 additions: revelation scene underweight (revelation-tagged scenes avg
+// below 60% of overall avg length), curiosity midzone gap (midzone avg ≤ 0 while
+// opening was positive), clock scene pacing mismatch (clock-raising scenes avg
+// above 1.5× overall length — urgency undercut by slow page pace).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1072,6 +1076,89 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         description: `The cumulative suspenseDelta across all ${records.length} scenes is ${netSusp302.toFixed(1)} — the story discharges more tension than it ever builds. A net-negative suspense ledger reads as a long deflation: each release outweighs the builds around it, and by the finale the story is running on charge it never banked.`,
         suggestedFix: 'Rebalance the ledger: deepen the builds (raise stakes more sharply in escalation scenes) or shrink the releases (partial resolutions that discharge some tension while leaving the core threat intact). Across the whole story, tension built should exceed tension spent until the climax settles the account.',
       });
+    }
+  }
+
+  // ── Wave 316: REVELATION_SCENE_UNDERWEIGHT, PACING_CURIOSITY_MIDZONE_GAP, CLOCK_SCENE_PACING_MISMATCH ──
+
+  // REVELATION_SCENE_UNDERWEIGHT (minor, n≥8, ≥2 revelation scenes): The
+  // average weighted length of scenes containing a revelation is below 60% of
+  // the overall scene average. Revelations are the weight-bearing moments of
+  // story — being rushed through them in the script's thinnest page space
+  // compresses the most important beats into the least breathing room. Distinct
+  // from COMPRESSED_TURNING_POINT (per-scene, <30% avg, uses annotations);
+  // this audits the aggregate of all revelation-tagged records at 60% threshold.
+  if (records.length >= 8) {
+    const revLengths316: number[] = [];
+    for (let i316 = 0; i316 < records.length; i316++) {
+      if ((records as any[])[i316].revelation) {
+        revLengths316.push(sceneLengths.get(i316) ?? 0);
+      }
+    }
+    if (revLengths316.length >= 2) {
+      const revAvg316 = revLengths316.reduce((s, v) => s + v, 0) / revLengths316.length;
+      if (revAvg316 < avgLength * 0.6) {
+        issues.push({
+          location: `${revLengths316.length} revelation scene(s)`,
+          rule: 'REVELATION_SCENE_UNDERWEIGHT',
+          severity: 'minor',
+          description: `The ${revLengths316.length} revelation scene(s) average ${revAvg316.toFixed(1)} weighted lines — ${Math.round(revAvg316 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). Disclosures are rushed through in the script's thinnest scenes: the moment a truth lands should be given room to breathe, not compressed below the floor of dramatic pause.`,
+          suggestedFix: 'Expand revelation scenes: add a beat of silence before the disclosure, an immediate physical reaction, a consequence that begins in the same scene. A revelation scene should be at least average length — the weight of the moment demands the space.',
+        });
+      }
+    }
+  }
+
+  // PACING_CURIOSITY_MIDZONE_GAP (minor, n≥10, ≥3 midzone scenes): The midzone
+  // (25%–75%) has avg curiosityDelta ≤ 0 while the opening quarter has avg > 0.
+  // The curiosity engine fires in Act 1 setup, then immediately stalls in the
+  // complication zone — questions raised early are never intensified. Distinct
+  // from PACING_CURIOSITY_FINAL_DROP (final quarter collapse after a positive
+  // overall), PACING_CURIOSITY_OPENING_FLATLINE (never builds curiosity at all).
+  if (records.length >= 10) {
+    const midStart316 = Math.floor(records.length * 0.25);
+    const midEnd316 = Math.floor(records.length * 0.75);
+    const openRecs316 = (records as any[]).slice(0, midStart316);
+    const midRecs316 = (records as any[]).slice(midStart316, midEnd316);
+    if (openRecs316.length >= 2 && midRecs316.length >= 3) {
+      const openAvgCuriosity316 = openRecs316.reduce((acc: number, r: any) => acc + (r.curiosityDelta ?? 0), 0) / openRecs316.length;
+      const midAvgCuriosity316 = midRecs316.reduce((acc: number, r: any) => acc + (r.curiosityDelta ?? 0), 0) / midRecs316.length;
+      if (openAvgCuriosity316 > 0 && midAvgCuriosity316 <= 0) {
+        issues.push({
+          location: `Midzone (scenes ${midStart316}–${midEnd316 - 1}) — curiosity gap`,
+          rule: 'PACING_CURIOSITY_MIDZONE_GAP',
+          severity: 'minor',
+          description: `The opening builds curiosity (avg curiosityDelta ${openAvgCuriosity316.toFixed(2)}) but the midzone (scenes ${midStart316}–${midEnd316 - 1}) stalls at ${midAvgCuriosity316.toFixed(2)} — the questions raised in Act 1 are never intensified through the complication zone. An Act 2 that stops deepening the mystery leaves the audience coasting on initial interest, and initial interest decays.`,
+          suggestedFix: 'Sustain curiosity through the midzone: each complication should raise a new question while partially answering the last. The midzone should drive "I need to know" — not a plateau the audience waits through to reach the finale.',
+        });
+      }
+    }
+  }
+
+  // CLOCK_SCENE_PACING_MISMATCH (minor, n≥8, ≥2 clock-raising scenes): Scenes
+  // where clockRaised === true average more than 1.5× the overall scene length.
+  // Clock scenes signal urgency, but if the "time is running out" moments are
+  // the longest scenes in the script, the form contradicts the content.
+  // Distinct from SUSPENSE_LENGTH_DECOUPLING (long scenes not correlating with
+  // high suspense — not clock-specific); this targets the clock-raising mechanism.
+  if (records.length >= 8) {
+    const clockLengths316: number[] = [];
+    for (let i316c = 0; i316c < records.length; i316c++) {
+      if ((records as any[])[i316c].clockRaised === true) {
+        clockLengths316.push(sceneLengths.get(i316c) ?? 0);
+      }
+    }
+    if (clockLengths316.length >= 2) {
+      const clockAvg316 = clockLengths316.reduce((s, v) => s + v, 0) / clockLengths316.length;
+      if (clockAvg316 > avgLength * 1.5) {
+        issues.push({
+          location: `${clockLengths316.length} clock-raising scene(s)`,
+          rule: 'CLOCK_SCENE_PACING_MISMATCH',
+          severity: 'minor',
+          description: `Clock-raising scenes (clockRaised) average ${clockAvg316.toFixed(1)} weighted lines — ${Math.round(clockAvg316 / avgLength * 100)}% of the overall scene average (${avgLength.toFixed(1)}). The moments that announce "time is running out" are the script's slowest-reading sequences: the form contradicts the urgency. A ticking clock should feel fast.`,
+          suggestedFix: 'Compress clock scenes: strip all exposition, cut to the beat that introduces the deadline, and let the consequences unspool in subsequent scenes. Urgency is communicated by brevity — the faster the scene reads, the faster time appears to be moving.',
+        });
+      }
     }
   }
 

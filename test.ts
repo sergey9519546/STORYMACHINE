@@ -19148,6 +19148,78 @@ He looks away.`;
     });
   });
 
+  describe('Wave 316 — pacingPass: revelation scene underweight, curiosity midzone gap, clock scene pacing mismatch', async () => {
+    const makeRec316 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain316 = (lineCounts: number[]) =>
+      lineCounts.map((n, i) =>
+        `INT. SC${i} - DAY\n\n${Array.from({ length: n }, (_, j) => `Action line ${j + 1} for scene ${i}.`).join('\n\n')}`
+      ).join('\n\n');
+    const runP316 = async (records: any[], fountain: string) => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      return pacingPass({ fountain, original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('REVELATION_SCENE_UNDERWEIGHT fires when revelation scenes avg below 60% of overall avg', async () => {
+      const lineCounts316r = [10, 10, 2, 10, 10, 10, 2, 10];
+      const recs316r = Array.from({ length: 8 }, (_, i) =>
+        makeRec316(i, { revelation: [2, 6].includes(i) ? `Disclosure at scene ${i}.` : null })
+      );
+      const res = await runP316(recs316r, makeFountain316(lineCounts316r));
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_SCENE_UNDERWEIGHT'), 'REVELATION_SCENE_UNDERWEIGHT should fire');
+    });
+
+    it('REVELATION_SCENE_UNDERWEIGHT does not fire when revelation scenes are average length', async () => {
+      const lineCounts316nr = [10, 10, 10, 10, 10, 10, 10, 10];
+      const recs316nr = Array.from({ length: 8 }, (_, i) =>
+        makeRec316(i, { revelation: [2, 6].includes(i) ? `Disclosure at scene ${i}.` : null })
+      );
+      const res = await runP316(recs316nr, makeFountain316(lineCounts316nr));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_SCENE_UNDERWEIGHT'), 'REVELATION_SCENE_UNDERWEIGHT should not fire');
+    });
+
+    it('PACING_CURIOSITY_MIDZONE_GAP fires when midzone curiosity stalls after a positive opening', async () => {
+      const recs316mg = Array.from({ length: 10 }, (_, i) =>
+        makeRec316(i, { curiosityDelta: i < 2 ? 2 : 0 })
+      );
+      const res = await runP316(recs316mg, makeFountain316(Array(10).fill(3)));
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_CURIOSITY_MIDZONE_GAP'), 'PACING_CURIOSITY_MIDZONE_GAP should fire');
+    });
+
+    it('PACING_CURIOSITY_MIDZONE_GAP does not fire when midzone sustains curiosity', async () => {
+      const recs316nmg = Array.from({ length: 10 }, (_, i) =>
+        makeRec316(i, { curiosityDelta: i < 2 ? 2 : 1 })
+      );
+      const res = await runP316(recs316nmg, makeFountain316(Array(10).fill(3)));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_CURIOSITY_MIDZONE_GAP'), 'PACING_CURIOSITY_MIDZONE_GAP should not fire');
+    });
+
+    it('CLOCK_SCENE_PACING_MISMATCH fires when clock-raising scenes are far above average length', async () => {
+      const lineCounts316c = [3, 3, 20, 3, 3, 20, 3, 3];
+      const recs316c = Array.from({ length: 8 }, (_, i) =>
+        makeRec316(i, { clockRaised: [2, 5].includes(i) })
+      );
+      const res = await runP316(recs316c, makeFountain316(lineCounts316c));
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_SCENE_PACING_MISMATCH'), 'CLOCK_SCENE_PACING_MISMATCH should fire');
+    });
+
+    it('CLOCK_SCENE_PACING_MISMATCH does not fire when clock scenes match overall average length', async () => {
+      const lineCounts316nc = [5, 5, 5, 5, 5, 5, 5, 5];
+      const recs316nc = Array.from({ length: 8 }, (_, i) =>
+        makeRec316(i, { clockRaised: [2, 5].includes(i) })
+      );
+      const res = await runP316(recs316nc, makeFountain316(lineCounts316nc));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_SCENE_PACING_MISMATCH'), 'CLOCK_SCENE_PACING_MISMATCH should not fire');
+    });
+  });
+
   describe('Wave 315 — originalityPass: body language cliché overuse, slug generic location, flashback crutch', async () => {
     const runO315 = async (fountain: string) => {
       const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
