@@ -17,6 +17,9 @@
 // Wave 297 additions: contraction starvation (formal full-forms with zero
 // contractions — stilted speech), apology loop ("sorry" in >20% of lines),
 // repeated line (identical substantive line spoken verbatim 3+ times).
+// Wave 311 additions: hedge saturation (>30% of lines contain a softener anywhere —
+// "just"/"maybe"/"sort of"/"I think"), filler sound overuse (≥3 lines with a vocalized
+// hesitation — "um"/"uh"/"er"), one-word-line dominance (>35% of lines are a single word).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1307,6 +1310,72 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The line "${topLine297}" is spoken verbatim ${topCount297} times across the script${repeated297.length > 1 ? ` (and ${repeated297.length - 1} other line(s) also repeat 3+ times)` : ''}. A word-for-word recurring line reads as a copy-paste artifact unless it is a deliberate refrain — and a refrain only works when each repetition lands in a transformed context that changes its meaning.`,
         suggestedFix: 'Either vary the repetitions (same intent, different words — characters rarely phrase a thought identically twice) or make the refrain intentional: repeat the line at structurally significant moments where the changed circumstances give the same words a new meaning. An accidental echo is a flaw; an engineered one is a motif.',
+      });
+    }
+  }
+
+  // ── Wave 311: DIALOGUE_HEDGE_SATURATION ───────────────────────────────────
+  // More than 30% of dialogue lines contain a softener/hedge word anywhere in
+  // the line ("just", "maybe", "sort of", "I think", "I guess", "kind of",
+  // "probably"). Pervasive hedging makes every character sound tentative and
+  // unwilling to commit — the dialogue equivalent of qualifying every sentence.
+  // Distinct from FILLER_OPENER_OVERUSE (opener interjections like "Well,") and
+  // DIALOGUE_CONDITIONAL_OVERLOAD (if/unless/might/could/would): this audits
+  // body-wide softener density with a disjoint word set. Requires 10+ lines.
+  if (dialogue.length >= 10) {
+    const hedgeRe311 = /\b(just|maybe|perhaps|probably|somewhat|sort of|kind of|you know|a little|i guess|i suppose|i think|i mean)\b/i;
+    const hedgeCount311 = dialogue.filter(d => hedgeRe311.test(d.line)).length;
+    if (hedgeCount311 / dialogue.length > 0.30) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_HEDGE_SATURATION',
+        severity: 'minor',
+        description: `${hedgeCount311} of ${dialogue.length} dialogue lines (${Math.round(hedgeCount311 / dialogue.length * 100)}%) contain a softener ("just", "maybe", "sort of", "I think"). Pervasive hedging makes every character sound tentative and uncommitted — the dialogue qualifies itself out of any conviction, and no one ever simply states what they want or believe.`,
+        suggestedFix: 'Strip the softeners and let characters commit: "I just think maybe we should probably go" → "We go now." Reserve hedging for characters whose evasiveness is the point, and even then use it sparingly — a single qualifier lands when it is not buried among a dozen others.',
+      });
+    }
+  }
+
+  // ── Wave 311: DIALOGUE_FILLER_SOUND_OVERUSE ──────────────────────────────
+  // Three or more dialogue lines contain a vocalized hesitation sound ("um",
+  // "uh", "er", "erm", "hmm", "uh-huh"). Written-in filler sounds are a blunt
+  // way to signal hesitation that reads as transcription rather than craft;
+  // recurring across the script they become a tic. Distinct from FILLER_OPENER_
+  // OVERUSE (word interjections "Well,"/"Look,"/"Listen,") — the sound set is
+  // disjoint. Requires 8+ dialogue lines.
+  if (dialogue.length >= 8) {
+    const fillerSoundRe311 = /\b(um|uh|erm|hmm|uh-huh|mm-hmm|er)\b/i;
+    const fillerSoundLines311 = dialogue.filter(d => fillerSoundRe311.test(d.line)).length;
+    if (fillerSoundLines311 >= 3) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_FILLER_SOUND_OVERUSE',
+        severity: 'minor',
+        description: `${fillerSoundLines311} dialogue lines contain a vocalized hesitation sound ("um", "uh", "er", "hmm"). Written-in filler sounds signal hesitation by transcription rather than by craft; recurring across the script they read as a verbal tic the page never trims, and they slow every exchange that carries one.`,
+        suggestedFix: 'Cut the filler sounds and convey hesitation through what the character does instead — a beat of silence, an action line, an incomplete sentence. If a stammer is essential to a specific moment, keep one and remove the rest so the one that stays actually registers.',
+      });
+    }
+  }
+
+  // ── Wave 311: DIALOGUE_ONE_WORD_DOMINANCE ─────────────────────────────────
+  // More than 35% of dialogue lines are a single word ("Yes." "No." "What?"
+  // "Stop."). A machine-gun run of one-word lines reads as a chatbot exchange
+  // rather than conversation — no character ever develops a thought, and the
+  // scene becomes a volley of reflexes. Distinct from DIALOGUE_STACCATO_OVERUSE
+  // (≤5-word lines at >65%) and voice's DIALOGUE_MONOSYLLABLE_DOMINANCE
+  // (word character-length): this is a line-level one-word count. Requires
+  // 10+ dialogue lines.
+  if (dialogue.length >= 10) {
+    const oneWordCount311 = dialogue.filter(
+      d => d.line.trim().split(/\s+/).filter(Boolean).length === 1,
+    ).length;
+    if (oneWordCount311 / dialogue.length > 0.35) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_ONE_WORD_DOMINANCE',
+        severity: 'minor',
+        description: `${oneWordCount311} of ${dialogue.length} dialogue lines (${Math.round(oneWordCount311 / dialogue.length * 100)}%) are a single word. A run of one-word lines reads as a reflex volley rather than a conversation — no character develops a thought, builds an argument, or reveals themselves through how they say something.`,
+        suggestedFix: 'Let characters complete thoughts. Reserve one-word lines for genuine punch — a flat "No." after a plea — and surround them with lines that carry intent and subtext. A monosyllable lands hardest when it interrupts speech, not when it is the only register the scene has.',
       });
     }
   }

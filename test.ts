@@ -17897,6 +17897,111 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 311 — dialoguePass: hedge saturation, filler sound overuse, one-word dominance', async () => {
+    const runD311 = async (fountain: string) => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DIALOGUE_HEDGE_SATURATION fires when >30% of lines contain a softener', async () => {
+      const lines311hs = [
+        'ALICE\nI just wanted to talk.',
+        'BOB\nMaybe this can wait.',
+        'ALICE\nI think we should go.',
+        'BOB\nIt is sort of complicated.',
+        'ALICE\nProbably nothing then.',
+        'BOB\nGet your coat.',
+        'ALICE\nThe car is outside.',
+        'BOB\nWe leave at six.',
+        'ALICE\nDoors lock at seven.',
+        'BOB\nUnderstood completely.',
+      ].join('\n\n');
+      const res = await runD311(lines311hs);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_HEDGE_SATURATION'), 'DIALOGUE_HEDGE_SATURATION should fire');
+    });
+
+    it('DIALOGUE_HEDGE_SATURATION does not fire when dialogue is committed', async () => {
+      const lines311nhs = [
+        'ALICE\nWe are leaving now.',
+        'BOB\nNo we are not.',
+        'ALICE\nGet your coat.',
+        'BOB\nMake me.',
+        'ALICE\nThe car is outside.',
+        'BOB\nLet it rust there.',
+        'ALICE\nWe leave at six.',
+        'BOB\nI decide when we leave.',
+        'ALICE\nDoors lock at seven.',
+        'BOB\nThen lock them.',
+      ].join('\n\n');
+      const res = await runD311(lines311nhs);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_HEDGE_SATURATION'), 'DIALOGUE_HEDGE_SATURATION should not fire');
+    });
+
+    it('DIALOGUE_FILLER_SOUND_OVERUSE fires when 3+ lines contain a hesitation sound', async () => {
+      const lines311fs = [
+        'ALICE\nUm, I am not sure about this.',
+        'BOB\nUh, neither am I really.',
+        'ALICE\nWhat do you want to do.',
+        'BOB\nHmm, let me consider it.',
+        'ALICE\nWe do not have all night.',
+        'BOB\nI know that already.',
+        'ALICE\nThen decide.',
+        'BOB\nFine, we go.',
+      ].join('\n\n');
+      const res = await runD311(lines311fs);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_FILLER_SOUND_OVERUSE'), 'DIALOGUE_FILLER_SOUND_OVERUSE should fire');
+    });
+
+    it('DIALOGUE_FILLER_SOUND_OVERUSE does not fire when hesitation sounds are absent', async () => {
+      const lines311nfs = [
+        'ALICE\nI am not sure about this.',
+        'BOB\nNeither am I really.',
+        'ALICE\nWhat do you want to do.',
+        'BOB\nLet me consider it.',
+        'ALICE\nWe do not have all night.',
+        'BOB\nI know that already.',
+        'ALICE\nThen decide.',
+        'BOB\nFine, we go.',
+      ].join('\n\n');
+      const res = await runD311(lines311nfs);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_FILLER_SOUND_OVERUSE'), 'DIALOGUE_FILLER_SOUND_OVERUSE should not fire');
+    });
+
+    it('DIALOGUE_ONE_WORD_DOMINANCE fires when >35% of lines are a single word', async () => {
+      const lines311ow = [
+        'ALICE\nNo.',
+        'BOB\nWhy?',
+        'ALICE\nStop.',
+        'BOB\nWhen?',
+        'ALICE\nNow.',
+        'BOB\nI cannot do this alone tonight.',
+        'ALICE\nThe whole plan depends on you.',
+        'BOB\nYou always say that to me.',
+        'ALICE\nBecause it is true every time.',
+        'BOB\nThen help me carry it.',
+      ].join('\n\n');
+      const res = await runD311(lines311ow);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_ONE_WORD_DOMINANCE'), 'DIALOGUE_ONE_WORD_DOMINANCE should fire');
+    });
+
+    it('DIALOGUE_ONE_WORD_DOMINANCE does not fire when lines develop thoughts', async () => {
+      const lines311now = [
+        'ALICE\nNo, I will not do that.',
+        'BOB\nWhy are you being like this.',
+        'ALICE\nStop pushing me so hard.',
+        'BOB\nWhen will you ever listen.',
+        'ALICE\nNow is not the right time.',
+        'BOB\nI cannot do this alone tonight.',
+        'ALICE\nThe whole plan depends on you.',
+        'BOB\nYou always say that to me.',
+        'ALICE\nBecause it is true every time.',
+        'BOB\nThen help me carry it.',
+      ].join('\n\n');
+      const res = await runD311(lines311now);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_ONE_WORD_DOMINANCE'), 'DIALOGUE_ONE_WORD_DOMINANCE should not fire');
+    });
+  });
+
   describe('Wave 310 — causalityPass: emotion without driver run, clock relief unexplained, dramatic turn cluster', async () => {
     const makeRec310 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
