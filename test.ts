@@ -17897,6 +17897,94 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 313 — conflictPass: curiosity decoupled, magnitude peak early, relentless run', async () => {
+    const makeRec313 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0.5,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF313 = async (records: any[]) => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      return conflictPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CONFLICT_CURIOSITY_DECOUPLED fires when conflict scenes average curiosityDelta ≤ 0', async () => {
+      const recs313cd = Array.from({ length: 8 }, (_, i) =>
+        makeRec313(i, {
+          relationshipShifts: [1, 3, 5].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: -0.5 }] : [],
+          curiosityDelta: [1, 3, 5].includes(i) ? -0.5 : 0.5,
+        })
+      );
+      const res = await runCF313(recs313cd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_CURIOSITY_DECOUPLED'), 'CONFLICT_CURIOSITY_DECOUPLED should fire');
+    });
+
+    it('CONFLICT_CURIOSITY_DECOUPLED does not fire when conflict scenes raise curiosity', async () => {
+      const recs313ncd = Array.from({ length: 8 }, (_, i) =>
+        makeRec313(i, {
+          relationshipShifts: [1, 3, 5].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: -0.5 }] : [],
+          curiosityDelta: [1, 3, 5].includes(i) ? 2 : 0.5,
+        })
+      );
+      const res = await runCF313(recs313ncd);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_CURIOSITY_DECOUPLED'), 'CONFLICT_CURIOSITY_DECOUPLED should not fire');
+    });
+
+    it('CONFLICT_MAGNITUDE_PEAK_EARLY fires when the heaviest distributed conflict is in the first half', async () => {
+      // 12 scenes; conflict at 1 (0.6 — the peak, first half), 7 (0.4), 9 (0.4). total=1.4? need >=1.5.
+      // Use 1 (0.6), 7 (0.5), 9 (0.5) → total 1.6, peak 0.6 < 0.6*1.6=0.96, peakIdx 1 < 6 → fire
+      const recs313mp = Array.from({ length: 12 }, (_, i) =>
+        makeRec313(i, {
+          relationshipShifts:
+            i === 1 ? [{ pairKey: 'A|B', dimension: 'trust', amount: -0.6 }]
+            : i === 7 ? [{ pairKey: 'A|B', dimension: 'trust', amount: -0.5 }]
+            : i === 9 ? [{ pairKey: 'C|D', dimension: 'trust', amount: -0.5 }]
+            : [],
+        })
+      );
+      const res = await runCF313(recs313mp);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_MAGNITUDE_PEAK_EARLY'), 'CONFLICT_MAGNITUDE_PEAK_EARLY should fire');
+    });
+
+    it('CONFLICT_MAGNITUDE_PEAK_EARLY does not fire when the heaviest conflict is in the second half', async () => {
+      const recs313nmp = Array.from({ length: 12 }, (_, i) =>
+        makeRec313(i, {
+          relationshipShifts:
+            i === 1 ? [{ pairKey: 'A|B', dimension: 'trust', amount: -0.4 }]
+            : i === 7 ? [{ pairKey: 'A|B', dimension: 'trust', amount: -0.4 }]
+            : i === 10 ? [{ pairKey: 'C|D', dimension: 'trust', amount: -0.8 }]
+            : [],
+        })
+      );
+      const res = await runCF313(recs313nmp);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_MAGNITUDE_PEAK_EARLY'), 'CONFLICT_MAGNITUDE_PEAK_EARLY should not fire');
+    });
+
+    it('CONFLICT_RELENTLESS_RUN fires when 4+ consecutive scenes carry a negative shift', async () => {
+      const recs313rr = Array.from({ length: 8 }, (_, i) =>
+        makeRec313(i, {
+          relationshipShifts: [2, 3, 4, 5].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: -0.5 }] : [],
+        })
+      );
+      const res = await runCF313(recs313rr);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_RELENTLESS_RUN'), 'CONFLICT_RELENTLESS_RUN should fire');
+    });
+
+    it('CONFLICT_RELENTLESS_RUN does not fire when conflict runs are broken by respite', async () => {
+      const recs313nrr = Array.from({ length: 8 }, (_, i) =>
+        makeRec313(i, {
+          relationshipShifts: [2, 3, 5, 6].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: -0.5 }] : [],
+        })
+      );
+      const res = await runCF313(recs313nrr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_RELENTLESS_RUN'), 'CONFLICT_RELENTLESS_RUN should not fire');
+    });
+  });
+
   describe('Wave 312 — characterArcPass: first half flat, turn emotion absent, curiosity/emotion decoupled', async () => {
     const makeRec312 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

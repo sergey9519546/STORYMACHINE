@@ -15,6 +15,9 @@
 // Wave 299 additions: conflict emotion decoupled (conflict scenes all emotionally
 // neutral), stakes label unbacked (raise_stakes scenes with no conflict markers),
 // eleventh hour conflict (new conflict pair first appears in the final 10%).
+// Wave 313 additions: conflict curiosity decoupled (conflict scenes avg curiosityDelta
+// ≤ 0), conflict magnitude peak early (heaviest relational rupture in the first half,
+// distributed), conflict relentless run (≥4 consecutive scenes with a negative shift).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1138,6 +1141,105 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The conflict between "${latePair299}" first appears at scene ${lateIdx299} — inside the final 10% of the story. A feud introduced this late has no room to escalate or resolve; it reads as artificial tension injected into the finale rather than a fault line the story has been tracking. Late conflict the audience never saw coming (and never sees settled) leaves the ending cluttered.`,
         suggestedFix: `Either seed the "${latePair299}" friction earlier — a cold exchange, a competing interest, a small betrayal in Act 2 that makes the late rupture feel inevitable — or cut the late conflict entirely and spend the finale resolving the conflicts the story has already earned.`,
+      });
+    }
+  }
+
+  // ── Wave 313: CONFLICT_CURIOSITY_DECOUPLED ───────────────────────────────
+  // Conflict scenes (negative relationship shifts) have an average curiosityDelta
+  // of zero or below — confrontations resolve the audience's "what happens next?"
+  // to nothing. Completes the conflict-channel trilogy alongside CONFLICT_SUSPENSE_
+  // DECOUPLED (tension) and CONFLICT_EMOTION_DECOUPLED (feeling): a fight that
+  // raises no question leaves the audience watching an argument with no forward
+  // pull. Requires 8+ records and 3+ conflict scenes.
+  if (records.length >= 8) {
+    const conflictScenes313 = (records as any[]).filter(r =>
+      ((r.relationshipShifts as any[] ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+    );
+    if (conflictScenes313.length >= 3) {
+      const avgCuriosity313 = conflictScenes313.reduce((acc: number, r: any) => acc + (r.curiosityDelta ?? 0), 0) / conflictScenes313.length;
+      if (avgCuriosity313 <= 0) {
+        issues.push({
+          location: 'Conflict scenes — curiosity decoupled',
+          rule: 'CONFLICT_CURIOSITY_DECOUPLED',
+          severity: 'minor',
+          description: `${conflictScenes313.length} conflict scenes have an average curiosityDelta of ${avgCuriosity313.toFixed(2)} — confrontations resolve the audience's "what happens next?" to nothing. A fight should open questions as well as wounds: who will retaliate, what was really meant, what this costs. Conflict that raises no question is an argument with no forward pull.`,
+          suggestedFix: 'End conflict scenes on an open question, not a closed one: a threat half-made, a secret half-revealed, an alliance left uncertain. The audience should leave each confrontation needing the next scene — curiosity is the thread that pulls them through the fight.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 313: CONFLICT_MAGNITUDE_PEAK_EARLY ──────────────────────────────
+  // The scene carrying the heaviest relational conflict (the largest summed
+  // magnitude of negative shifts) falls in the first half of the story, while
+  // conflict is distributed rather than concentrated (the peak holds under 60%
+  // of total conflict mass, so this is not a single-set-piece spike). The
+  // biggest rupture lands in the setup and nothing later surpasses it — the
+  // climax inherits a conflict that already peaked. Distinct from the suspense-
+  // based ESCALATION_PLATEAU/CLIMAX_APPROACH_FLAT and from CONFLICT_CONCENTRATION_
+  // SPIKE (single scene ≥60% of mass). Requires 10+ records and 3+ conflict scenes.
+  if (records.length >= 10) {
+    const mags313 = (records as any[]).map(r =>
+      ((r.relationshipShifts as any[] ?? []) as Array<{ amount: number }>)
+        .filter(s => s.amount < 0)
+        .reduce((acc, s) => acc + Math.abs(s.amount), 0),
+    );
+    const conflictSceneCount313 = mags313.filter(m => m > 0).length;
+    const totalMass313 = mags313.reduce((a, b) => a + b, 0);
+    const peakMass313 = Math.max(...mags313);
+    const peakIdx313 = mags313.indexOf(peakMass313);
+    const half313 = Math.floor(records.length * 0.5);
+    if (
+      conflictSceneCount313 >= 3 &&
+      totalMass313 >= 1.5 &&
+      peakMass313 > 0 &&
+      peakIdx313 < half313 &&
+      peakMass313 < 0.6 * totalMass313
+    ) {
+      issues.push({
+        location: `Scene ${(records as any[])[peakIdx313].sceneIdx} — conflict magnitude peak`,
+        rule: 'CONFLICT_MAGNITUDE_PEAK_EARLY',
+        severity: 'minor',
+        description: `The heaviest relational conflict (magnitude ${peakMass313.toFixed(2)}) falls at Scene ${(records as any[])[peakIdx313].sceneIdx}, in the first half of the story, and nothing later surpasses it. The biggest rupture lands in the setup, so the climax inherits a conflict that already peaked — the back half can only echo a blow the audience has already absorbed.`,
+        suggestedFix: 'Reserve the heaviest rupture for the climax. Either soften the early peak so a later confrontation can exceed it, or escalate the back half — a deeper betrayal, a higher-stakes break — so the relational conflict curve rises toward the ending rather than away from it.',
+      });
+    }
+  }
+
+  // ── Wave 313: CONFLICT_RELENTLESS_RUN ────────────────────────────────────
+  // Four or more consecutive scenes each carry a negative relationship shift,
+  // with no respite scene between them. Unbroken relational conflict exhausts
+  // the audience: with no breather, each new rupture lands softer than the last
+  // and the pressure flattens into noise. Distinct from NEGATIVE_SPIRAL_UNBROKEN
+  // (consecutive negative emotionalShift) and CONFLICT_FATIGUE (rapid reversal
+  // oscillation): this tracks an unbroken run on the relationship-shift channel.
+  // Requires 8+ records.
+  if (records.length >= 8) {
+    const isConflict313 = (r: any) =>
+      ((r.relationshipShifts as any[] ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3);
+    let runC313 = 0;
+    let startC313 = 0;
+    let maxRunC313 = 0;
+    let maxStartC313 = 0;
+    for (let i313 = 0; i313 < records.length; i313++) {
+      if (isConflict313((records as any[])[i313])) {
+        if (runC313 === 0) startC313 = i313;
+        runC313++;
+        if (runC313 > maxRunC313) { maxRunC313 = runC313; maxStartC313 = startC313; }
+      } else {
+        runC313 = 0;
+      }
+    }
+    if (maxRunC313 >= 4) {
+      const s313 = (records as any[])[maxStartC313].sceneIdx;
+      const e313 = (records as any[])[maxStartC313 + maxRunC313 - 1].sceneIdx;
+      issues.push({
+        location: `Scenes ${s313}–${e313} — relentless conflict`,
+        rule: 'CONFLICT_RELENTLESS_RUN',
+        severity: 'minor',
+        description: `${maxRunC313} consecutive scenes (${s313}–${e313}) each carry a negative relationship shift with no respite between them. Unbroken relational conflict exhausts the audience: with no breather, each new rupture lands softer than the last and the mounting pressure flattens into noise rather than building.`,
+        suggestedFix: 'Insert a respite within the run — a scene of détente, a shared moment, a temporary alliance — before resuming the conflict. The contrast lets the next rupture register; relentless souring desensitizes the audience to the very damage the story is trying to make them feel.',
       });
     }
   }
