@@ -19148,6 +19148,94 @@ He looks away.`;
     });
   });
 
+  describe('Wave 317 — payoffPass: payoff emotion decoupled, unresolved clue ratio high, payoff curiosity mismatch', async () => {
+    const makeRec317 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runPay317 = async (records: any[]) => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      return payoffPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PAYOFF_EMOTION_DECOUPLED fires when all payoff scenes are emotionally neutral', async () => {
+      const recs317ed = Array.from({ length: 8 }, (_, i) =>
+        makeRec317(i, {
+          seededClueIds: i < 3 ? [`clue${i}`] : [],
+          payoffSetupIds: [3, 5, 7].includes(i) ? [`clue${[3, 5, 7].indexOf(i)}`] : [],
+          emotionalShift: 'neutral',
+        })
+      );
+      const res = await runPay317(recs317ed);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_EMOTION_DECOUPLED'), 'PAYOFF_EMOTION_DECOUPLED should fire');
+    });
+
+    it('PAYOFF_EMOTION_DECOUPLED does not fire when payoff scenes have emotional shifts', async () => {
+      const recs317ned = Array.from({ length: 8 }, (_, i) =>
+        makeRec317(i, {
+          seededClueIds: i < 3 ? [`clue${i}`] : [],
+          payoffSetupIds: [3, 5, 7].includes(i) ? [`clue${[3, 5, 7].indexOf(i)}`] : [],
+          emotionalShift: [3, 5, 7].includes(i) ? 'positive' : 'neutral',
+        })
+      );
+      const res = await runPay317(recs317ned);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_EMOTION_DECOUPLED'), 'PAYOFF_EMOTION_DECOUPLED should not fire');
+    });
+
+    it('UNRESOLVED_CLUE_RATIO_HIGH fires when 40%+ of planted clues remain open at the end', async () => {
+      const recs317ur = Array.from({ length: 8 }, (_, i) =>
+        makeRec317(i, {
+          seededClueIds: i < 4 ? [`clue${i}`] : [],
+          payoffSetupIds: i === 5 ? ['clue0'] : [],
+          unresolvedClues: i === 7 ? ['clue1', 'clue2', 'clue3'] : [],
+        })
+      );
+      const res = await runPay317(recs317ur);
+      assert.ok(res.issues.some((i: any) => i.rule === 'UNRESOLVED_CLUE_RATIO_HIGH'), 'UNRESOLVED_CLUE_RATIO_HIGH should fire');
+    });
+
+    it('UNRESOLVED_CLUE_RATIO_HIGH does not fire when most clues are resolved', async () => {
+      const recs317nur = Array.from({ length: 8 }, (_, i) =>
+        makeRec317(i, {
+          seededClueIds: i < 4 ? [`clue${i}`] : [],
+          payoffSetupIds: [4, 5, 6, 7].includes(i) ? [`clue${i - 4}`] : [],
+          unresolvedClues: [],
+        })
+      );
+      const res = await runPay317(recs317nur);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'UNRESOLVED_CLUE_RATIO_HIGH'), 'UNRESOLVED_CLUE_RATIO_HIGH should not fire');
+    });
+
+    it('PAYOFF_CURIOSITY_MISMATCH fires when payoff scenes have avg curiosityDelta ≤ 0', async () => {
+      const recs317cm = Array.from({ length: 8 }, (_, i) =>
+        makeRec317(i, {
+          seededClueIds: i < 3 ? [`clue${i}`] : [],
+          payoffSetupIds: [3, 5, 7].includes(i) ? [`clue${[3, 5, 7].indexOf(i)}`] : [],
+          curiosityDelta: 0,
+        })
+      );
+      const res = await runPay317(recs317cm);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CURIOSITY_MISMATCH'), 'PAYOFF_CURIOSITY_MISMATCH should fire');
+    });
+
+    it('PAYOFF_CURIOSITY_MISMATCH does not fire when payoff scenes raise curiosity', async () => {
+      const recs317ncm = Array.from({ length: 8 }, (_, i) =>
+        makeRec317(i, {
+          seededClueIds: i < 3 ? [`clue${i}`] : [],
+          payoffSetupIds: [3, 5, 7].includes(i) ? [`clue${[3, 5, 7].indexOf(i)}`] : [],
+          curiosityDelta: [3, 5, 7].includes(i) ? 1.5 : 0,
+        })
+      );
+      const res = await runPay317(recs317ncm);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CURIOSITY_MISMATCH'), 'PAYOFF_CURIOSITY_MISMATCH should not fire');
+    });
+  });
+
   describe('Wave 316 — pacingPass: revelation scene underweight, curiosity midzone gap, clock scene pacing mismatch', async () => {
     const makeRec316 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

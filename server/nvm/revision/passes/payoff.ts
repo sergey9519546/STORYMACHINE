@@ -18,6 +18,9 @@
 // Wave 303 additions: clue replant (same clue ID seeded in 2+ scenes), payoff double
 // fire (same setup ID resolved in 2+ scenes), thread convergence absent (4+ payoffs
 // all resolving in isolation — threads never braid).
+// Wave 317 additions: payoff emotion decoupled (all payoff scenes emotionally neutral),
+// unresolved clue ratio high (≥40% of seeded clues still open in final scene), payoff
+// curiosity mismatch (payoff scenes avg curiosityDelta ≤ 0 despite 3+ payoffs).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -982,6 +985,73 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         description: `All ${totalPayoffs303} payoffs resolve one per scene — no scene ever closes two threads together. Strictly serial resolution reads as episodic housekeeping: each loop is filed away on its own, and the story never delivers the moment where separate threads turn out to be one knot. Convergence is what makes a climax feel like everything coming together.`,
         suggestedFix: 'Braid at least two threads into a single resolution scene — ideally at or near the climax, where one event answers multiple plants at once (the hidden letter that both unmasks the traitor and explains the locked door). Convergent payoffs multiply each other\'s impact; serial ones merely add.',
       });
+    }
+  }
+
+  // ── Wave 317: PAYOFF_EMOTION_DECOUPLED, UNRESOLVED_CLUE_RATIO_HIGH, PAYOFF_CURIOSITY_MISMATCH ──
+
+  // PAYOFF_EMOTION_DECOUPLED (minor, n≥8, ≥3 payoff scenes): All scenes
+  // containing a payoff (payoffSetupIds.length > 0) have emotionalShift ===
+  // 'neutral'. A payoff that lands in an emotionally flat scene converts the
+  // plot resolution into pure information — the audience gets the answer but
+  // not the feeling. Distinct from PAYOFF_SUSPENSE_MISMATCH (which checks
+  // suspenseDelta); this audits the emotional register, a different signal.
+  if (records.length >= 8) {
+    const payoffScenes317e = (records as any[]).filter(r => ((r.payoffSetupIds ?? []) as string[]).length > 0);
+    if (payoffScenes317e.length >= 3 && payoffScenes317e.every(r => r.emotionalShift === 'neutral')) {
+      issues.push({
+        location: 'Payoff scenes — emotional register',
+        rule: 'PAYOFF_EMOTION_DECOUPLED',
+        severity: 'minor',
+        description: `All ${payoffScenes317e.length} payoff scenes are emotionally neutral — setups are resolved without an emotional response. A payoff scene is a promise redeemed; if the protagonist (and audience) feel nothing in the moment of resolution, the whole setup/payoff machine has produced information rather than experience.`,
+        suggestedFix: 'Ensure each payoff lands in a scene with a genuine emotional shift: relief, grief, triumph, horror. The resolution should cost or reward something felt, not just something known. If a payoff scene is flat, the setup it closes never carried real stakes.',
+      });
+    }
+  }
+
+  // UNRESOLVED_CLUE_RATIO_HIGH (minor, ≥4 seeded clues, n≥8): The final
+  // scene's unresolvedClues contains 40%+ of all planted clue IDs. The story
+  // ends with a majority of its mystery architecture open — not a deliberate
+  // single-thread mystery but unfinished structural work. Distinct from
+  // OPEN_CLUES_AT_END (uses structure.openClues + actPosition === 'epilogue')
+  // and ORPHAN_CLUE (per-clue, requires completionPercent ≥ 70): this uses
+  // the raw records and fires at a systemic 40% threshold.
+  if (clueInfo.size >= 4 && records.length >= 8) {
+    const finalRec317 = (records as any[])[records.length - 1];
+    const finalUnresolved317 = (finalRec317?.unresolvedClues ?? []) as string[];
+    const allClueIds317 = new Set(clueInfo.keys());
+    const openAtEnd317 = finalUnresolved317.filter((id: string) => allClueIds317.has(id)).length;
+    if (openAtEnd317 / clueInfo.size >= 0.4) {
+      issues.push({
+        location: `Final scene — ${openAtEnd317} of ${clueInfo.size} clues unresolved`,
+        rule: 'UNRESOLVED_CLUE_RATIO_HIGH',
+        severity: 'minor',
+        description: `${openAtEnd317} of ${clueInfo.size} planted clue IDs (${Math.round(openAtEnd317 / clueInfo.size * 100)}%) remain unresolved in the final scene — the story ends with most of its mystery architecture open. Unless this is a deliberate serial structure, these are obligations to the audience left unfulfilled. A well-completed story resolves its planted threads before the ending.`,
+        suggestedFix: 'Audit each unresolved clue and either write its payoff scene or cut the setup if it no longer serves the story. If open threads are intentional (anthology, sequel setup), mark them as deliberate thematic questions rather than unanswered plot clues.',
+      });
+    }
+  }
+
+  // PAYOFF_CURIOSITY_MISMATCH (minor, n≥8, ≥3 payoff scenes): Scenes with
+  // payoffs have average curiosityDelta ≤ 0. A payoff scene should sustain or
+  // intensify curiosity — through partial revelation, a new question opened by
+  // the answer, or dramatic irony revealed — not simply extinguish it. A payoff
+  // that leaves the audience no more curious is a full stop where a pivot turn
+  // should be. Distinct from PAYOFF_SUSPENSE_MISMATCH (suspenseDelta) and
+  // PAYOFF_EMOTION_DECOUPLED (emotionalShift).
+  if (records.length >= 8) {
+    const payoffScenes317c = (records as any[]).filter(r => ((r.payoffSetupIds ?? []) as string[]).length > 0);
+    if (payoffScenes317c.length >= 3) {
+      const avgPayoffCuriosity317 = payoffScenes317c.reduce((acc: number, r: any) => acc + (r.curiosityDelta ?? 0), 0) / payoffScenes317c.length;
+      if (avgPayoffCuriosity317 <= 0) {
+        issues.push({
+          location: 'Payoff scenes — curiosity register',
+          rule: 'PAYOFF_CURIOSITY_MISMATCH',
+          severity: 'minor',
+          description: `${payoffScenes317c.length} payoff scenes average a curiosityDelta of ${avgPayoffCuriosity317.toFixed(2)} — resolutions arrive without reopening curiosity. A payoff that answers and closes without raising a new question or revealing a deeper layer kills the audience's forward hunger at exactly the moment it should pivot. The best payoffs land like a new setup.`,
+          suggestedFix: 'Let each payoff open something: the answer to one question should raise another, or the resolution should make the audience wonder "what does this mean for X?" Every payoff is an opportunity to deepen the mystery even as it resolves the immediate thread.',
+        });
+      }
     }
   }
 
