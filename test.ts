@@ -19148,6 +19148,193 @@ He looks away.`;
     });
   });
 
+  describe('Wave 315 — originalityPass: body language cliché overuse, slug generic location, flashback crutch', async () => {
+    const runO315 = async (fountain: string) => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      return originalityPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('BODY_LANGUAGE_CLICHE_OVERUSE fires when >20% of action lines use stock gestures', async () => {
+      const fountain315b = `INT. INTERROGATION ROOM - NIGHT
+
+The detective sits across the table.
+
+The suspect nods slowly.
+
+Papers slide across the table.
+
+The detective shrugs and leans back.
+
+A clock ticks on the wall.
+
+The suspect sighs and looks away.
+
+Fluorescent lights buzz overhead.
+
+The detective taps the folder.
+
+The suspect shifts in the chair.
+
+A door opens behind them.
+
+The suspect grins despite themselves.
+
+Silence fills the room.`;
+      const res = await runO315(fountain315b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BODY_LANGUAGE_CLICHE_OVERUSE'), 'BODY_LANGUAGE_CLICHE_OVERUSE should fire');
+    });
+
+    it('BODY_LANGUAGE_CLICHE_OVERUSE does not fire when action lines use specific physical behaviour', async () => {
+      const fountain315nb = `INT. INTERROGATION ROOM - NIGHT
+
+The detective sits across the table.
+
+Papers slide across the table.
+
+A clock ticks on the wall.
+
+Fluorescent lights buzz overhead.
+
+The detective taps the folder twice.
+
+The suspect shifts in the chair.
+
+A door opens behind them.
+
+Two agents enter.
+
+The door swings shut behind them.
+
+Silence fills the room.
+
+The table edge catches the light.
+
+A photo slides to the center.`;
+      const res = await runO315(fountain315nb);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BODY_LANGUAGE_CLICHE_OVERUSE'), 'BODY_LANGUAGE_CLICHE_OVERUSE should not fire');
+    });
+
+    it('SLUG_GENERIC_LOCATION fires when >60% of sluglines use placeholder names', async () => {
+      const fountain315g = `INT. ROOM - DAY
+
+The meeting begins.
+
+INT. OFFICE - NIGHT
+
+Papers are signed.
+
+EXT. STREET - DAY
+
+A car drives past.
+
+INT. HALLWAY - NIGHT
+
+Footsteps echo.
+
+INT. APARTMENT - DAY
+
+The door opens.
+
+INT. WAREHOUSE - NIGHT
+
+Crates line the walls.
+
+INT. TOKYO IMPERIAL PALACE - DAY
+
+An envoy waits.
+
+EXT. BROOKLYN BRIDGE - NIGHT
+
+Traffic hums below.`;
+      const res = await runO315(fountain315g);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SLUG_GENERIC_LOCATION'), 'SLUG_GENERIC_LOCATION should fire');
+    });
+
+    it('SLUG_GENERIC_LOCATION does not fire when sluglines use specific named locations', async () => {
+      const fountain315ng = `INT. MARA'S REPAIR SHOP - DAY
+
+Tools hang from every hook.
+
+EXT. RIVERSIDE PARK - NIGHT
+
+Ducks float on the dark water.
+
+INT. ROOM - DAY
+
+A phone rings.
+
+INT. FEDERAL COURTHOUSE - MORNING
+
+The gallery fills quickly.
+
+EXT. GOLDEN GATE BRIDGE - DUSK
+
+Fog rolls in from the bay.
+
+INT. OFFICE - NIGHT
+
+The last light clicks off.
+
+INT. DETECTIVE COLE'S APARTMENT - NIGHT
+
+A map covers the wall.
+
+EXT. BROKEN COMPASS BAR - NIGHT
+
+Neon flickers above the door.`;
+      const res = await runO315(fountain315ng);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SLUG_GENERIC_LOCATION'), 'SLUG_GENERIC_LOCATION should not fire');
+    });
+
+    it('FLASHBACK_CRUTCH fires when 4 or more flashback markers appear', async () => {
+      const fountain315f = `INT. APARTMENT - DAY
+
+Marcus stares at an old photograph.
+
+FLASHBACK:
+
+INT. CHILDHOOD HOME - DAY
+
+A boy runs through the yard.
+
+END FLASHBACK.
+
+Marcus puts the photo down.
+
+BACK TO:
+
+INT. APARTMENT - NIGHT
+
+The phone rings.
+
+RETURN TO:
+
+INT. APARTMENT - DAY
+
+Marcus answers.`;
+      const res = await runO315(fountain315f);
+      assert.ok(res.issues.some((i: any) => i.rule === 'FLASHBACK_CRUTCH'), 'FLASHBACK_CRUTCH should fire');
+    });
+
+    it('FLASHBACK_CRUTCH does not fire when fewer than 4 flashback markers are used', async () => {
+      const fountain315nf = `INT. APARTMENT - DAY
+
+Marcus stares at an old photograph.
+
+FLASHBACK:
+
+INT. CHILDHOOD HOME - DAY
+
+A boy runs through the yard.
+
+END FLASHBACK.
+
+Marcus puts the photo down.`;
+      const res = await runO315(fountain315nf);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'FLASHBACK_CRUTCH'), 'FLASHBACK_CRUTCH should not fire');
+    });
+  });
+
   describe('Wave 301 — originalityPass: mirror self-gaze cliché, weather opener crutch, just-a-dream reveal', async () => {
     const runO301 = async (fountain: string) => {
       const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');

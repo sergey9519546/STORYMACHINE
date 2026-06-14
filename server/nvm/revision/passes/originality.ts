@@ -18,6 +18,10 @@
 // Wave 301 additions: mirror self-gaze cliché (mirror introspection in 2+ scenes),
 // weather opener crutch (3+ scenes open on weather as mood shorthand),
 // just-a-dream reveal (events dismissed as "only a dream").
+// Wave 315 additions: body language cliché overuse (>20% of action lines use stock
+// gestures like nods/shrugs/sighs/grins), slug generic location (>60% of sluglines
+// use placeholder names like ROOM/OFFICE/STREET), flashback crutch (≥4 explicit
+// flashback transition markers).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1336,6 +1340,92 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: 'The script dismisses dramatized events as "just a dream" — a fake-out that retroactively cancels scenes the audience invested in. Once a story plays this card, viewers learn to withhold belief from everything that follows; the single jolt costs the script its standing credibility.',
         suggestedFix: 'If the dream content matters, present it honestly as a dream or vision from the start and let its meaning — not its reveal — carry the scene. If it exists only to fake out the audience, cut it and dramatize the fear it represented in the waking story, where consequences are real.',
+      });
+    }
+  }
+
+  // ── Wave 315: BODY_LANGUAGE_CLICHE_OVERUSE, SLUG_GENERIC_LOCATION, FLASHBACK_CRUTCH ──
+
+  // BODY_LANGUAGE_CLICHE_OVERUSE (minor, ≥10 action lines): More than 20% of
+  // action lines use stock body language (nods, shrugs, sighs, smiles, grins,
+  // chuckles, snorts, blinks, rolls eyes, raises eyebrows). These default
+  // gestures are the physical equivalent of emotion-naming — any character in
+  // any story could nod or shrug; the gesture carries no individual texture.
+  // Distinct from REACTION_SHOT_OVERUSE (terse full-line reactions),
+  // EMOTION_NAMING_IN_ACTION (naming emotional states), COGNITION_IN_ACTION
+  // (mental verbs).
+  {
+    let actionLines315b = 0;
+    let bodyClicheCount315 = 0;
+    let inDlg315b = false;
+    const bodyClicheRe315 = /\b(?:nods?|shrugs?|sighs?|smiles?|grins?|chuckles?|snorts?|blinks?|rolls? (?:his|her|their) eyes?|raises? (?:his|her|their|an?) eyebrows?)\b/i;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg315b = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg315b = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg315b = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg315b) continue;
+      actionLines315b++;
+      if (bodyClicheRe315.test(t)) bodyClicheCount315++;
+    }
+    if (actionLines315b >= 10 && bodyClicheCount315 / actionLines315b > 0.2) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'BODY_LANGUAGE_CLICHE_OVERUSE',
+        severity: 'minor',
+        description: `${bodyClicheCount315} of ${actionLines315b} action lines (${Math.round(bodyClicheCount315 / actionLines315b * 100)}%) use stock body language (nods, shrugs, sighs, smiles, rolls eyes, etc.) — the physical vocabulary of a generic screenplay. These default gestures carry no individual texture: any character in any situation could nod or shrug. Physical specificity is character.`,
+        suggestedFix: "Replace stock gestures with specific physical behaviour: instead of \"He nods\", write \"He runs his thumb along the edge of the table, once.\" The idiosyncratic gesture reveals character; the stock gesture merely confirms that an emotion occurred.",
+      });
+    }
+  }
+
+  // SLUG_GENERIC_LOCATION (minor, ≥6 sluglines, >60% generic): More than 60%
+  // of scene sluglines use entirely generic location labels (ROOM, OFFICE,
+  // CAR, HOUSE, BUILDING, STREET, ALLEY, CORRIDOR, HALLWAY, LOBBY, APARTMENT,
+  // BEDROOM, KITCHEN, WAREHOUSE, BASEMENT, ATTIC, ROOFTOP, GARAGE). Generic
+  // labels are placeholders, not places — they give the reader nothing to
+  // inhabit. Distinct from LOCATION_REPETITION and REPEATED_LOCATION_EXCESS
+  // (those fire when the same specific place recurs); this fires when locations
+  // are unnamed and interchangeable as a class.
+  {
+    const slugs315g: string[] = [];
+    const genericLocRe315 = /^(?:INT\.|EXT\.|INT\/EXT\.|I\/E\.)\s+(?:A |THE |AN )?(?:SMALL |LARGE |DARK |EMPTY |OLD |NEW |ABANDONED )?(ROOM|OFFICE|CAR|HOUSE|BUILDING|STREET|ALLEY|CORRIDOR|HALLWAY|LOBBY|APARTMENT|BEDROOM|KITCHEN|WAREHOUSE|BASEMENT|ATTIC|ROOFTOP|GARAGE)\s*[-–]/i;
+    for (const line of lines) {
+      const t = line.trim();
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) slugs315g.push(t);
+    }
+    if (slugs315g.length >= 6) {
+      const genericCount315 = slugs315g.filter(s => genericLocRe315.test(s)).length;
+      if (genericCount315 / slugs315g.length > 0.6) {
+        issues.push({
+          location: 'Scene sluglines',
+          rule: 'SLUG_GENERIC_LOCATION',
+          severity: 'minor',
+          description: `${genericCount315} of ${slugs315g.length} scene sluglines (${Math.round(genericCount315 / slugs315g.length * 100)}%) use generic location labels (ROOM, OFFICE, BUILDING, STREET, etc.) — placeholders rather than places. A screenplay grounds the audience in specific geography: "INT. MARA\'S CLUTTERED REPAIR SHOP - NIGHT" anchors the scene; "INT. ROOM - NIGHT" gives them a void.`,
+          suggestedFix: "Give every location a specific name that carries information: the name of an establishment, a character, or a defining feature. Even a modest space earns texture when named — \"INT. THE BROKEN COMPASS BAR - NIGHT\" is a setting; \"INT. BAR - NIGHT\" is an empty stage.",
+        });
+      }
+    }
+  }
+
+  // FLASHBACK_CRUTCH (minor, ≥4 markers): Four or more explicit flashback
+  // transition markers (FLASHBACK:, BEGIN FLASHBACK:, END FLASHBACK:, BACK TO:,
+  // RETURN TO:) signal a script structured around fragmented memory rather than
+  // present-tense causality. Flashbacks in bulk replace forward-moving story
+  // with accumulated explanation; the audience inhabits the past instead of the
+  // present and forward momentum evaporates. Distinct from JUST_A_DREAM_REVEAL
+  // (fake-out reveals) and OPENING_WAKE_UP_CLICHE (first-scene awakening).
+  {
+    const flashbackRe315 = /^(FLASHBACK[:\.]?|BEGIN FLASHBACK[:\.]?|START FLASHBACK[:\.]?|END FLASHBACK[:\.]?|BACK TO[:\.]?|RETURN TO[:\.]?|FLASH BACK[:\.]?|FLASHBACK TO[:\.]?)/i;
+    const fbCount315 = lines.filter(l => flashbackRe315.test(l.trim())).length;
+    if (fbCount315 >= 4) {
+      issues.push({
+        location: `${fbCount315} flashback markers throughout`,
+        rule: 'FLASHBACK_CRUTCH',
+        severity: 'minor',
+        description: `${fbCount315} explicit flashback transitions (FLASHBACK:, END FLASHBACK, BACK TO:, etc.) signal a script structured around fragmented memory. Flashbacks in bulk replace forward-moving causality with accumulated explanation — the audience experiences events after the fact rather than in the present tense. Sustained use trains the audience that the current scene is provisional.`,
+        suggestedFix: 'Flatten the temporal structure: dramatize as much as possible in present-tense sequence, where actions have immediate consequences. When the past matters, let characters carry it in behaviour rather than revisiting it directly — the scar is more powerful than the wound.',
       });
     }
   }
