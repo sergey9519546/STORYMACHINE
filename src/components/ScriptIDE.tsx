@@ -441,8 +441,18 @@ export default function ScriptIDE({
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
     let actionLines = 0;
-    let wordCount = scriptText.trim().split(/\s+/).length;
-    if (scriptText.trim() === "") wordCount = 0;
+
+    // ⚡ Bolt Performance Optimization:
+    // Avoid splitting the entire script string by spaces into a massive array.
+    // Use regex to count words efficiently with zero array allocations.
+    let wordCount = 0;
+    const trimmedScript = scriptText.trim();
+    if (trimmedScript !== "") {
+      const wordRegex = /[^\s]+/g;
+      while (wordRegex.exec(trimmedScript) !== null) {
+        wordCount++;
+      }
+    }
 
     blocks.forEach((block) => {
       if (block.type === "character") {
@@ -593,8 +603,12 @@ export default function ScriptIDE({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const cursor = e.currentTarget.selectionStart;
     const textBeforeCursor = scriptText.substring(0, cursor);
-    const lines = textBeforeCursor.split("\n");
-    const currentLine = lines[lines.length - 1];
+
+    // ⚡ Bolt Performance Optimization:
+    // Replaced `textBeforeCursor.split("\n")` with zero-allocation `lastIndexOf` to extract current line.
+    // Prevents creating large arrays on every keystroke in large files.
+    const lastNewlineIdx = textBeforeCursor.lastIndexOf("\n");
+    const currentLine = lastNewlineIdx === -1 ? textBeforeCursor : textBeforeCursor.slice(lastNewlineIdx + 1);
 
     if (e.key === "i" || e.key === "I") {
       if (currentLine === "") {
@@ -737,11 +751,22 @@ export default function ScriptIDE({
   // ── Navigation ───────────────────────────────────────────────────────────────
   const handleNavigate = (lineIndex: number) => {
     if (!editorRef.current) return;
-    const lines = scriptText.split("\n");
+
+    // ⚡ Bolt Performance Optimization:
+    // Replaced `scriptText.split("\n")` with zero-allocation `indexOf` loop.
+    // Avoids creating large arrays when clicking on sidebar items for navigation.
     let charCount = 0;
-    for (let i = 0; i < lineIndex; i++) {
-      charCount += lines[i].length + 1;
+    let idx = 0;
+    for (let currentLine = 0; currentLine < lineIndex; currentLine++) {
+      const nextNewline = scriptText.indexOf("\n", idx);
+      if (nextNewline === -1) {
+        charCount += scriptText.length - idx + 1;
+        break;
+      }
+      charCount += (nextNewline - idx) + 1;
+      idx = nextNewline + 1;
     }
+
     editorRef.current.focus();
     editorRef.current.setSelectionRange(charCount, charCount);
 
