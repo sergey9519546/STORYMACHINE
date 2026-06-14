@@ -17897,6 +17897,86 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 306 — structurePass: midpoint emotional flatline, final image weak, act balance extreme', async () => {
+    const makeRec306 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runST306 = async (records: any[]) => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      return structurePass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('MIDPOINT_EMOTIONAL_FLATLINE fires when the midpoint scene is neutral with no suspense', async () => {
+      // 8 scenes: midpoint = idx 4; make it neutral + suspenseDelta 0, others charged
+      const recs306mf = Array.from({ length: 8 }, (_, i) =>
+        makeRec306(i, {
+          suspenseDelta: i === 4 ? 0 : 1.5,
+          emotionalShift: i === 4 ? 'neutral' : 'negative',
+        })
+      );
+      const res = await runST306(recs306mf);
+      assert.ok(res.issues.some((i: any) => i.rule === 'MIDPOINT_EMOTIONAL_FLATLINE'), 'MIDPOINT_EMOTIONAL_FLATLINE should fire');
+    });
+
+    it('MIDPOINT_EMOTIONAL_FLATLINE does not fire when the midpoint carries charge', async () => {
+      const recs306nmf = Array.from({ length: 8 }, (_, i) =>
+        makeRec306(i, {
+          suspenseDelta: i === 4 ? 2 : 0.5,
+          emotionalShift: i === 4 ? 'negative' : 'neutral',
+        })
+      );
+      const res = await runST306(recs306nmf);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'MIDPOINT_EMOTIONAL_FLATLINE'), 'MIDPOINT_EMOTIONAL_FLATLINE should not fire');
+    });
+
+    it('FINAL_IMAGE_WEAK fires when the last scene has no charge on any channel', async () => {
+      const recs306fw = Array.from({ length: 8 }, (_, i) =>
+        makeRec306(i, {
+          suspenseDelta: i === 7 ? 0 : 1.5,
+          emotionalShift: i === 7 ? 'neutral' : 'negative',
+        })
+      );
+      const res = await runST306(recs306fw);
+      assert.ok(res.issues.some((i: any) => i.rule === 'FINAL_IMAGE_WEAK'), 'FINAL_IMAGE_WEAK should fire');
+    });
+
+    it('FINAL_IMAGE_WEAK does not fire when the last scene carries an emotional charge', async () => {
+      const recs306nfw = Array.from({ length: 8 }, (_, i) =>
+        makeRec306(i, {
+          emotionalShift: i === 7 ? 'positive' : 'neutral',
+          suspenseDelta: 0,
+        })
+      );
+      const res = await runST306(recs306nfw);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'FINAL_IMAGE_WEAK'), 'FINAL_IMAGE_WEAK should not fire');
+    });
+
+    it('ACT_BALANCE_EXTREME fires when one act holds >55% of all scenes', async () => {
+      // 12 scenes but make Act 3 dominant: sceneIdx values concentrated in 75-100% zone
+      // n=12 → act3 = sceneIdx >= 9. Put 7 of 12 scenes at idx >= 9 by overriding sceneIdx.
+      const recs306ab = [
+        makeRec306(0), makeRec306(1), makeRec306(2),
+        makeRec306(9), makeRec306(9), makeRec306(10), makeRec306(10),
+        makeRec306(11), makeRec306(11), makeRec306(11), makeRec306(11), makeRec306(11),
+      ];
+      const res = await runST306(recs306ab);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACT_BALANCE_EXTREME'), 'ACT_BALANCE_EXTREME should fire');
+    });
+
+    it('ACT_BALANCE_EXTREME does not fire for a balanced three-act distribution', async () => {
+      // 12 scenes evenly spread so Act 2 (~50%) is largest but not >55%
+      const recs306nab = Array.from({ length: 12 }, (_, i) => makeRec306(i));
+      const res = await runST306(recs306nab);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACT_BALANCE_EXTREME'), 'ACT_BALANCE_EXTREME should not fire');
+    });
+  });
+
   describe('Wave 305 — rhythmPass: dash chain, negation action flood, action parenthesis aside', async () => {
     const runRH305 = async (fountain: string) => {
       const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');

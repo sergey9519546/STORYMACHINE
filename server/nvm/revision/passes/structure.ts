@@ -16,6 +16,9 @@
 // Wave 292 additions: Act 3 curiosity spike absent (final quarter never spikes
 // curiosity), clock pressure finale absent (no clockRaised in final quarter despite
 // earlier clock activity), opening suspense flatline (first 3 scenes all suspenseDelta ≤ 0).
+// Wave 306 additions: midpoint emotional flatline (the central scene is emotionally
+// neutral with no suspense), final image weak (last scene has no emotional/suspense/
+// relational charge), act balance extreme (one act holds >55% of all scenes).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1021,6 +1024,83 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The first ${openingSize292} scene(s) all have suspenseDelta ≤ 0 — the story opens with zero tension. A flat opening fails to signal to the audience that stakes exist and things will escalate. Even a slow-burn story needs a tension seed in the opening that promises rising danger ahead.`,
         suggestedFix: 'Introduce a tension signal in the first scene: an unexplained threat, a simmering conflict, a hint of danger, or a question the protagonist urgently needs answered. The opening establishes the world\'s stakes — if stakes are absent, the audience has no reason to keep watching.',
+      });
+    }
+  }
+
+  // ── Wave 306: MIDPOINT_EMOTIONAL_FLATLINE ────────────────────────────────
+  // The scene at the story's structural midpoint (50%) is emotionally neutral
+  // AND carries no suspense (suspenseDelta ≤ 0). The midpoint is the spine of
+  // the second act — where the protagonist's situation should pivot hardest.
+  // A midpoint that is both emotionally inert and tensionless squanders the
+  // story's central pivot. Distinct from WEAK_MIDPOINT (suspense-magnitude
+  // proxy) and MIDPOINT_REVERSAL_ABSENT (no directional flip): this requires
+  // the midpoint scene to be flat on both the emotional AND suspense channels.
+  // Requires 8+ records.
+  if (n >= 8) {
+    const midIdx306 = Math.floor(n / 2);
+    const midRec306 = records[midIdx306];
+    if (midRec306 && midRec306.emotionalShift === 'neutral' && (midRec306.suspenseDelta ?? 0) <= 0) {
+      issues.push({
+        location: `Midpoint (Scene ${midRec306.sceneIdx})`,
+        rule: 'MIDPOINT_EMOTIONAL_FLATLINE',
+        severity: 'minor',
+        description: `The midpoint scene (Scene ${midRec306.sceneIdx}) is emotionally neutral and carries no suspense (suspenseDelta ${midRec306.suspenseDelta ?? 0}). The midpoint is the second act's spine — the moment the protagonist's situation should pivot hardest, raising the stakes for everything after. A flat, tensionless midpoint leaves the story without a central fulcrum.`,
+        suggestedFix: 'Charge the midpoint: stage a reversal, a revelation, or a point-of-no-return decision that resets the stakes and pushes the protagonist from reaction into action. The audience should feel the story change gears here — emotionally and in tension.',
+      });
+    }
+  }
+
+  // ── Wave 306: FINAL_IMAGE_WEAK ───────────────────────────────────────────
+  // The final scene carries no charge on any channel: neutral emotional shift,
+  // no suspense (≤ 0), and no relationship movement. The last image is what
+  // the audience carries out of the theatre — a final scene that registers on
+  // no channel sends them off with nothing. Distinct from RESOLUTION_TOO_BRIEF
+  // (page length) and UNRESOLVED_ENDING (open loops): this audits the dramatic
+  // charge of the closing beat. Requires 6+ records.
+  if (n >= 6) {
+    const lastRec306 = records[n - 1];
+    const lastInert306 = lastRec306 &&
+      lastRec306.emotionalShift === 'neutral' &&
+      (lastRec306.suspenseDelta ?? 0) <= 0 &&
+      ((lastRec306.relationshipShifts ?? []) as any[]).length === 0;
+    if (lastInert306) {
+      issues.push({
+        location: `Final scene (Scene ${lastRec306.sceneIdx})`,
+        rule: 'FINAL_IMAGE_WEAK',
+        severity: 'minor',
+        description: `The final scene (Scene ${lastRec306.sceneIdx}) carries no charge on any channel — neutral emotion, no suspense, no relationship movement. The last image is what the audience carries out of the theatre; a closing beat that registers on nothing sends them off empty-handed, undercutting whatever the story built.`,
+        suggestedFix: 'Give the final scene a deliberate charge: a last emotional turn (acceptance, grief, hard-won peace), a final relational note (a bond sealed or severed), or a resonant image that answers the opening. The ending does not need spectacle, but it must leave a mark.',
+      });
+    }
+  }
+
+  // ── Wave 306: ACT_BALANCE_EXTREME ────────────────────────────────────────
+  // One of the three acts (Act 1: 0–25%, Act 2: 25–75%, Act 3: 75–100%) holds
+  // more than 55% of all scenes. Act 2 is expected to be the largest (~50%),
+  // so this fires when ANY act is grossly oversized — an Act 1 or Act 3 over
+  // 55% is a severe imbalance, and an Act 2 over 55% means the bookends are
+  // starved. Distinct from the page-weight pacing checks (line counts): this
+  // audits scene-count distribution. Requires 10+ records.
+  if (n >= 10) {
+    const act1Count306 = records.filter(r => r.sceneIdx < n * 0.25).length;
+    const act2Count306 = records.filter(r => r.sceneIdx >= n * 0.25 && r.sceneIdx < n * 0.75).length;
+    const act3Count306 = records.filter(r => r.sceneIdx >= n * 0.75).length;
+    const acts306 = [
+      { name: 'Act 1', count: act1Count306 },
+      { name: 'Act 2', count: act2Count306 },
+      { name: 'Act 3', count: act3Count306 },
+    ];
+    const biggest306 = acts306.reduce((a, b) => (b.count > a.count ? b : a));
+    if (biggest306.count / n > 0.55) {
+      issues.push({
+        location: `${biggest306.name} (${biggest306.count} of ${n} scenes)`,
+        rule: 'ACT_BALANCE_EXTREME',
+        severity: 'minor',
+        description: `${biggest306.name} holds ${biggest306.count} of ${n} scenes (${Math.round(biggest306.count / n * 100)}%) — a severe structural imbalance. ${biggest306.name === 'Act 2' ? 'An oversized Act 2 starves the setup and resolution, leaving the bookends too thin to establish and land the story.' : `An oversized ${biggest306.name} crowds out the complication zone where the story's real work happens.`}`,
+        suggestedFix: biggest306.name === 'Act 2'
+          ? 'Redistribute scenes toward Act 1 and Act 3 so the setup has room to establish stakes and the resolution has room to land. Act 2 should be the largest act but not by starving the others.'
+          : `Move scenes out of ${biggest306.name} into Act 2. The complication zone (Act 2) should be the story's largest act; a bloated ${biggest306.name} signals the setup or resolution is doing work that belongs in the middle.`,
       });
     }
   }
