@@ -19148,6 +19148,88 @@ He looks away.`;
     });
   });
 
+  describe('Wave 318 — relationshipArcPass: curiosity decoupled, positive-only pair majority, Act 2b desert', async () => {
+    const makeRec318 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const shift318 = (pairKey: string, amount: number) => ({ pairKey, dimension: 'trust', amount });
+    const runRA318 = async (records: any[]) => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('RELATIONSHIP_CURIOSITY_DECOUPLED fires when shift scenes have avg curiosityDelta ≤ 0', async () => {
+      const recs318cd = Array.from({ length: 8 }, (_, i) =>
+        makeRec318(i, {
+          relationshipShifts: [2, 3, 4, 5].includes(i) ? [shift318('A|B', 0.5)] : [],
+          curiosityDelta: 0,
+        })
+      );
+      const res = await runRA318(recs318cd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_CURIOSITY_DECOUPLED'), 'RELATIONSHIP_CURIOSITY_DECOUPLED should fire');
+    });
+
+    it('RELATIONSHIP_CURIOSITY_DECOUPLED does not fire when shift scenes raise curiosity', async () => {
+      const recs318ncd = Array.from({ length: 8 }, (_, i) =>
+        makeRec318(i, {
+          relationshipShifts: [2, 3, 4, 5].includes(i) ? [shift318('A|B', 0.5)] : [],
+          curiosityDelta: [2, 3, 4, 5].includes(i) ? 2 : 0,
+        })
+      );
+      const res = await runRA318(recs318ncd);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_CURIOSITY_DECOUPLED'), 'RELATIONSHIP_CURIOSITY_DECOUPLED should not fire');
+    });
+
+    it('POSITIVE_ONLY_PAIR_MAJORITY fires when >60% of pairs have exclusively positive shifts', async () => {
+      const recs318pp = Array.from({ length: 8 }, (_, i) =>
+        makeRec318(i, {
+          relationshipShifts: i === 2 ? [shift318('A|B', 0.5), shift318('C|D', 0.4), shift318('E|F', 0.3), shift318('G|H', 0.6)] : [],
+        })
+      );
+      const res = await runRA318(recs318pp);
+      assert.ok(res.issues.some((i: any) => i.rule === 'POSITIVE_ONLY_PAIR_MAJORITY'), 'POSITIVE_ONLY_PAIR_MAJORITY should fire');
+    });
+
+    it('POSITIVE_ONLY_PAIR_MAJORITY does not fire when most pairs include negative shifts', async () => {
+      const recs318npp = Array.from({ length: 8 }, (_, i) =>
+        makeRec318(i, {
+          relationshipShifts: i === 2
+            ? [shift318('A|B', 0.5), shift318('C|D', -0.4), shift318('E|F', -0.3), shift318('G|H', -0.6)]
+            : [],
+        })
+      );
+      const res = await runRA318(recs318npp);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'POSITIVE_ONLY_PAIR_MAJORITY'), 'POSITIVE_ONLY_PAIR_MAJORITY should not fire');
+    });
+
+    it('RELATIONSHIP_ACT2B_DESERT fires when no shifts occur in the 50%-75% zone', async () => {
+      // 10 records: shifts only in scenes 0-4 (Act 1/2a) and scene 9, none in 5-7 (Act 2b)
+      const recs318a2b = Array.from({ length: 10 }, (_, i) =>
+        makeRec318(i, {
+          relationshipShifts: [2, 3, 9].includes(i) ? [shift318('A|B', 0.5), shift318('C|D', -0.3)] : [],
+        })
+      );
+      const res = await runRA318(recs318a2b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_ACT2B_DESERT'), 'RELATIONSHIP_ACT2B_DESERT should fire');
+    });
+
+    it('RELATIONSHIP_ACT2B_DESERT does not fire when a shift occurs in the 50%-75% zone', async () => {
+      const recs318na2b = Array.from({ length: 10 }, (_, i) =>
+        makeRec318(i, {
+          relationshipShifts: [2, 6, 9].includes(i) ? [shift318('A|B', 0.5), shift318('C|D', -0.3)] : [],
+        })
+      );
+      const res = await runRA318(recs318na2b);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_ACT2B_DESERT'), 'RELATIONSHIP_ACT2B_DESERT should not fire');
+    });
+  });
+
   describe('Wave 317 — payoffPass: payoff emotion decoupled, unresolved clue ratio high, payoff curiosity mismatch', async () => {
     const makeRec317 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

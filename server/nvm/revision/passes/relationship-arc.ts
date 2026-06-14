@@ -25,6 +25,9 @@
 // Wave 304 additions: shift magnitude uniformity (5+ shifts all with the identical
 // magnitude — generation artifact), warmth unfelt (3+ strong positive shifts all in
 // emotionally neutral scenes), dimension one-way (a dimension with 4+ shifts that
+// Wave 318 additions: relationship curiosity decoupled (shift scenes avg curiosityDelta
+// ≤ 0), positive-only pair majority (>60% of pairs have exclusively positive shifts —
+// all-warmth world), relationship Act 2b desert (no shifts in 50%-75% zone).
 // only ever moves in one direction story-wide).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
@@ -1056,6 +1059,75 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
           break;
         }
       }
+    }
+  }
+
+  // ── Wave 318: RELATIONSHIP_CURIOSITY_DECOUPLED, POSITIVE_ONLY_PAIR_MAJORITY, RELATIONSHIP_ACT2B_DESERT ──
+
+  // RELATIONSHIP_CURIOSITY_DECOUPLED (minor, n≥8, ≥3 shift scenes): Scenes
+  // that contain at least one relationship shift have avg curiosityDelta ≤ 0.
+  // When relational dynamics change without raising audience curiosity — about
+  // what the shift means, where the bond is going, what the change reveals —
+  // the shift is processed as a plot update rather than a psychological event.
+  // Distinct from WARMTH_UNFELT (checks emotionalShift, not curiosityDelta)
+  // and SHIFT_MAGNITUDE_UNIFORMITY (magnitude pattern, not curiosity).
+  if (records.length >= 8) {
+    const shiftScenes318 = (records as any[]).filter(r => ((r.relationshipShifts ?? []) as any[]).length > 0);
+    if (shiftScenes318.length >= 3) {
+      const avgShiftCuriosity318 = shiftScenes318.reduce((acc: number, r: any) => acc + (r.curiosityDelta ?? 0), 0) / shiftScenes318.length;
+      if (avgShiftCuriosity318 <= 0) {
+        issues.push({
+          location: 'Relational shift scenes — curiosity register',
+          rule: 'RELATIONSHIP_CURIOSITY_DECOUPLED',
+          severity: 'minor',
+          description: `${shiftScenes318.length} scenes with relationship shifts average a curiosityDelta of ${avgShiftCuriosity318.toFixed(2)} — relational changes arrive without raising curiosity. When a bond shifts but leaves the audience no more curious about where it leads, the change is informational rather than psychological. The audience notes it but doesn't feel propelled by it.`,
+          suggestedFix: 'Let relationship shifts open questions: a trust rupture should make the audience wonder whether it can be repaired; a warming should make them anxious about what threatens it. Each shift should leave the audience leaning forward, not just nodding.',
+        });
+      }
+    }
+  }
+
+  // POSITIVE_ONLY_PAIR_MAJORITY (minor, n≥8, pairs≥3): More than 60% of all
+  // pairs have exclusively positive shifts (every shift.amount > 0). The
+  // relational world is all-warmth, no friction — bonds only ever strengthen.
+  // An ensemble that never experiences relational damage is too harmonious
+  // to sustain dramatic tension. This is the inverse of NEGATIVE_ONLY_PAIR_MAJORITY
+  // (which fires when most pairs are exclusively negative).
+  if (records.length >= 8 && pairStats.size >= 3) {
+    const positiveOnlyCount318 = [...pairStats.values()].filter(
+      stats => stats.shifts.length > 0 && stats.shifts.every(s => s.amount > 0),
+    ).length;
+    if (positiveOnlyCount318 / pairStats.size > 0.6) {
+      issues.push({
+        location: 'Relational world',
+        rule: 'POSITIVE_ONLY_PAIR_MAJORITY',
+        severity: 'minor',
+        description: `${positiveOnlyCount318} of ${pairStats.size} relationships (${Math.round(positiveOnlyCount318 / pairStats.size * 100)}%) have exclusively positive shifts — the relational world is all-warmth, no friction. An ensemble that never experiences bond damage is too harmonious to generate dramatic tension; if all relationships only improve, there is no relational stakes.`,
+        suggestedFix: 'Introduce relational cost: at least one bond should be strained, betrayed, or damaged during the story — even if it ultimately recovers. Warmth earns its meaning through contrast with friction; a story where all bonds only strengthen has no relational stakes.',
+      });
+    }
+  }
+
+  // RELATIONSHIP_ACT2B_DESERT (minor, n≥10, pairs≥2): No relationship shift
+  // occurs in the Act 2b zone (50%–75% of scenes). The story's complication
+  // zone is relationally silent in its second half — the run-up to the climax
+  // generates no bond movement. Distinct from RELATIONSHIP_MIDPOINT_FREEZE
+  // (which fires when the ENTIRE middle 50%, i.e., 25%-75%, is silent; this
+  // fires when only 50%-75% is silent, which can happen when Act 2a has shifts).
+  if (records.length >= 10 && pairStats.size >= 2) {
+    const act2bStart318 = Math.floor(records.length * 0.5);
+    const act2bEnd318 = Math.floor(records.length * 0.75);
+    const hasAct2bShift318 = [...pairStats.values()].some(
+      stats => stats.shifts.some(s => s.sceneIdx >= act2bStart318 && s.sceneIdx < act2bEnd318),
+    );
+    if (!hasAct2bShift318) {
+      issues.push({
+        location: `Act 2b (Scenes ${act2bStart318}–${act2bEnd318 - 1}) — relational silence`,
+        rule: 'RELATIONSHIP_ACT2B_DESERT',
+        severity: 'minor',
+        description: `No relationship shifts occur in Act 2b (Scenes ${act2bStart318}–${act2bEnd318 - 1}) — the complication zone's second half is relationally silent. The run-up to the climax generates no bond movement. Character relationships should be under their maximum pressure in the lead-up to the Act 3 turn; silence here means the climax arrives without relational stakes.`,
+        suggestedFix: 'Plant at least one relationship shift in Act 2b: a trust test under pressure, an alliance strained by competing goals, or a revelation that reframes a bond. The approach to climax should be the most relationally charged zone, not the quietest.',
+      });
     }
   }
 
