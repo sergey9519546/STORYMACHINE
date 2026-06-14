@@ -19,6 +19,10 @@
 // Wave 305 additions: dash chain (≥3 action lines trail off with an em-dash),
 // negation action flood (>25% of action lines describe what does NOT happen),
 // action parenthesis aside (≥3 action lines contain parenthetical asides).
+// Wave 319 additions: suddenly overuse (>20% of action lines contain urgency-
+// announcement adverbs), pronoun opener dominance (>45% of action lines begin
+// with a personal pronoun — combined-category test), physical interiority leak
+// (>25% of action lines describe internal body sensations).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -892,6 +896,71 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${asideCount305} action lines contain parenthetical asides. Parentheses in action prose are a novelist's whisper — author commentary delivered past the scene — and the camera has no equivalent register for them. Each aside pulls the reader out of the visual flow to receive a private footnote.`,
         suggestedFix: 'Unpack each aside: if the parenthetical content matters, promote it to its own sentence; if it is a wink or qualifier, cut it. "She picks up the gun (her father\'s)" becomes "She picks up the gun. Her father\'s." — same information, delivered in the scene instead of beside it.',
+      });
+    }
+  }
+
+  // ── Wave 319: SUDDENLY_OVERUSE, PRONOUN_OPENER_DOMINANCE, PHYSICAL_INTERIORITY_LEAK ──
+
+  // SUDDENLY_OVERUSE (minor, ≥10 action lines): More than 20% of action lines
+  // contain a temporal-urgency adverb ("suddenly", "abruptly", "immediately",
+  // "instantly", "without warning"). These words announce that an action is
+  // surprising instead of writing action that IS surprising — they editorialize
+  // rather than dramatize. Distinct from ADVERB_CLUSTERING (which fires when a
+  // single line has 3+ adverbs); this fires on the proportion of lines each
+  // containing these specific urgency shortcuts.
+  if (actionLines.length >= 10) {
+    const suddenlyRe319 = /\b(suddenly|abruptly|immediately|instantly|without warning)\b/i;
+    const suddenCount319 = actionLines.filter(l => suddenlyRe319.test(l.text)).length;
+    if (suddenCount319 / actionLines.length > 0.2) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'SUDDENLY_OVERUSE',
+        severity: 'minor',
+        description: `${suddenCount319} of ${actionLines.length} action lines (${Math.round(suddenCount319 / actionLines.length * 100)}%) contain urgency-announcement adverbs ("suddenly", "abruptly", "immediately", etc.) — the script tells the reader an action is surprising rather than making it so. "Suddenly the door opens" announces a surprise; "The door opens" delivers one.`,
+        suggestedFix: 'Cut the announcement and trust the action: remove "suddenly/abruptly/immediately" and let the scene\'s rhythm create the effect. Short sentences, a line break before the action, or a concrete sensory trigger does what the adverb was trying to do.',
+      });
+    }
+  }
+
+  // PRONOUN_OPENER_DOMINANCE (minor, ≥12 action lines): More than 45% of
+  // action lines begin with a personal pronoun (He, She, They, His, Her,
+  // Their, It, We). The combined category of pronoun openers creates a
+  // monotone actor-centric rhythm even when no single pronoun individually
+  // dominates. Distinct from OPENING_WORD_REPETITION (which fires when one
+  // specific word exceeds 40% — this fires when the combined pronoun category
+  // exceeds 45%, catching even an even "He/She/They" distribution).
+  if (actionLines.length >= 12) {
+    const pronounRe319 = /^(He|She|They|His|Her|Their|It|We|I)\b/;
+    const pronounCount319 = actionLines.filter(l => pronounRe319.test(l.text.trim())).length;
+    if (pronounCount319 / actionLines.length > 0.45) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'PRONOUN_OPENER_DOMINANCE',
+        severity: 'minor',
+        description: `${pronounCount319} of ${actionLines.length} action lines (${Math.round(pronounCount319 / actionLines.length * 100)}%) begin with a personal pronoun (He, She, They, His, Her, etc.) — the prose is actor-centric to the point of rhythmic monotony. Every beat starts with who is doing it rather than what is happening or where it happens. Without object-first, location-first, or sound-first variation, the scene reads as a character-tracking ledger.`,
+        suggestedFix: 'Vary sentence openings: begin some lines with the object ("The gun slides across the table"), the location ("On the far side of the room"), or the sound ("A car honks twice"). The subject of the sentence can still be the character — but foregrounding the world around them gives the scene spatial depth.',
+      });
+    }
+  }
+
+  // PHYSICAL_INTERIORITY_LEAK (minor, ≥10 action lines): More than 25% of
+  // action lines describe a private internal body sensation (stomach tightens,
+  // heart races, breath catches, knees go weak, chest constricts, throat
+  // closes). These are interoceptive descriptions — felt inside the body —
+  // that a camera cannot photograph. Distinct from COGNITION_IN_ACTION (which
+  // catches mental verbs like "realizes", "wonders"), EMOTION_NAMING_IN_ACTION
+  // in originality.ts (which catches "is sad/scared" emotional labels).
+  if (actionLines.length >= 10) {
+    const interiorityRe319 = /\b(stomach\s+(tightens?|drops?|lurches?|clenches?|knots?)|heart\s+(races?|pounds?|hammers?|lurches?|skips?|sinks?)|chest\s+(tightens?|constricts?|aches?)|breath\s+(catches?|hitches?|shortens?)|throat\s+(tightens?|closes?|constricts?|catches?)|knees?\s+(go|turn|become)\s+(weak|shaky|rubbery)|gut\s+(clenches?|lurches?|drops?|tightens?))\b/i;
+    const interiorCount319 = actionLines.filter(l => interiorityRe319.test(l.text)).length;
+    if (interiorCount319 / actionLines.length > 0.25) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'PHYSICAL_INTERIORITY_LEAK',
+        severity: 'minor',
+        description: `${interiorCount319} of ${actionLines.length} action lines (${Math.round(interiorCount319 / actionLines.length * 100)}%) describe internal body sensations (stomach tightens, heart races, breath catches, etc.) — private physical states that a camera cannot film. These are interoceptive descriptions: the audience sees a face, not a racing heart. The screenplay is reporting what the character feels inside rather than writing what would be visible on screen.`,
+        suggestedFix: "Translate internal sensation into visible behaviour: instead of \"His stomach drops\", write \"He leans against the doorframe. Doesn't speak.\" Let the actor play the interiority through their body and face — the screenplay's job is to give them something to react to, not to narrate the reaction itself.",
       });
     }
   }

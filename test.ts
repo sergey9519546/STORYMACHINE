@@ -19148,6 +19148,193 @@ He looks away.`;
     });
   });
 
+  describe('Wave 319 — rhythmPass: suddenly overuse, pronoun opener dominance, physical interiority leak', async () => {
+    const runR319 = async (fountain: string) => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('SUDDENLY_OVERUSE fires when >20% of action lines contain urgency adverbs', async () => {
+      const fountain319s = `INT. STUDIO APARTMENT - DAY
+
+The room is sparse. A single chair faces the window.
+
+Suddenly the phone rings.
+
+Alice crosses to the table.
+
+She picks it up without thinking.
+
+The voice on the other end is distorted.
+
+She abruptly steps back from the window.
+
+A shadow moves on the wall.
+
+Without warning, the power cuts out.
+
+Alice fumbles for her lighter.
+
+The flame trembles in her hand.
+
+Immediately she presses herself to the wall.
+
+Silence.`;
+      const res = await runR319(fountain319s);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SUDDENLY_OVERUSE'), 'SUDDENLY_OVERUSE should fire');
+    });
+
+    it('SUDDENLY_OVERUSE does not fire when action lines avoid urgency adverbs', async () => {
+      const fountain319ns = `INT. STUDIO APARTMENT - DAY
+
+The room is sparse. A single chair faces the window.
+
+The phone rings.
+
+Alice crosses to the table.
+
+She picks it up without thinking.
+
+The voice on the other end is distorted.
+
+She steps back from the window.
+
+A shadow moves on the wall.
+
+The power cuts out.
+
+Alice fumbles for her lighter.
+
+The flame trembles in her hand.
+
+She presses herself to the wall.
+
+Silence.`;
+      const res = await runR319(fountain319ns);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SUDDENLY_OVERUSE'), 'SUDDENLY_OVERUSE should not fire');
+    });
+
+    it('PRONOUN_OPENER_DOMINANCE fires when >45% of action lines begin with personal pronouns', async () => {
+      const fountain319p = `INT. CONFERENCE ROOM - DAY
+
+He enters and places his briefcase on the table.
+
+She watches him from across the room.
+
+They exchange a look — loaded, brief.
+
+He pulls out a folder.
+
+The documents slide onto the table.
+
+She reaches for them.
+
+He doesn't look up.
+
+Their silence speaks.
+
+The clock on the wall ticks loudly.
+
+They both hear it.
+
+She finally speaks first.
+
+He shrugs.`;
+      const res = await runR319(fountain319p);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PRONOUN_OPENER_DOMINANCE'), 'PRONOUN_OPENER_DOMINANCE should fire');
+    });
+
+    it('PRONOUN_OPENER_DOMINANCE does not fire when action lines use varied subject openers', async () => {
+      const fountain319np = `INT. CONFERENCE ROOM - DAY
+
+The briefcase lands on the table with a thud.
+
+Papers slide across the polished surface.
+
+Two chairs scrape back in unison.
+
+Across the room, a window catches the afternoon light.
+
+Documents fan out on the table.
+
+One sheet catches the draft from the vent.
+
+The clock on the wall ticks loudly.
+
+On the far wall, a whiteboard is covered in notes.
+
+A folder snaps shut.
+
+The lights flicker once.
+
+Silence.
+
+Both sides of the table grow still.`;
+      const res = await runR319(fountain319np);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PRONOUN_OPENER_DOMINANCE'), 'PRONOUN_OPENER_DOMINANCE should not fire');
+    });
+
+    it('PHYSICAL_INTERIORITY_LEAK fires when >25% of action lines describe internal body sensations', async () => {
+      const fountain319i = `INT. HOSPITAL CORRIDOR - NIGHT
+
+Alice walks down the empty corridor.
+
+The fluorescent lights buzz overhead.
+
+Her stomach tightens as she approaches the door.
+
+She presses her hand to the glass.
+
+Inside, the machines blink steadily.
+
+His heart races as he waits for the verdict.
+
+The doctor turns from the chart.
+
+She sets down the clipboard.
+
+Alice's breath catches before the first word.
+
+A trolley wheels past in the distance.
+
+His knees go weak at the news.
+
+He grabs the railing to steady himself.`;
+      const res = await runR319(fountain319i);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PHYSICAL_INTERIORITY_LEAK'), 'PHYSICAL_INTERIORITY_LEAK should fire');
+    });
+
+    it('PHYSICAL_INTERIORITY_LEAK does not fire when action lines describe external observable behaviour', async () => {
+      const fountain319ni = `INT. HOSPITAL CORRIDOR - NIGHT
+
+Alice walks down the empty corridor.
+
+The fluorescent lights buzz overhead.
+
+She slows as she approaches the door.
+
+She presses her hand to the glass.
+
+Inside, the machines blink steadily.
+
+He paces the waiting area for the third time.
+
+The doctor turns from the chart.
+
+She sets down the clipboard.
+
+Alice looks away before the first word lands.
+
+A trolley wheels past in the distance.
+
+He grips the railing with both hands.
+
+He stares at the floor.`;
+      const res = await runR319(fountain319ni);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PHYSICAL_INTERIORITY_LEAK'), 'PHYSICAL_INTERIORITY_LEAK should not fire');
+    });
+  });
+
   describe('Wave 318 — relationshipArcPass: curiosity decoupled, positive-only pair majority, Act 2b desert', async () => {
     const makeRec318 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
