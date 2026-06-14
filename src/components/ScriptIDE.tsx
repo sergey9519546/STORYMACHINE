@@ -98,11 +98,17 @@ const renderHighlightedText = (_text: string, blocks: FountainBlock[]) => {
       className = "font-bold uppercase text-orange-500";
     else if (block.type === "lyrics") className = "italic text-zinc-500";
 
-    const blockLines = block.text.split("\n");
-    for (let j = 0; j < blockLines.length; j++) {
-      const lineText = blockLines[j];
+    // Performance: zero-allocation newline parsing avoids large intermediate arrays during high-frequency renders
+    let startIdx = 0;
+    while (startIdx <= block.text.length) {
+      let nextIdx = block.text.indexOf("\n", startIdx);
+      if (nextIdx === -1) {
+        nextIdx = block.text.length;
+      }
+
+      const lineText = block.text.slice(startIdx, nextIdx);
       const isLastBlock = i === blocks.length - 1;
-      const isLastLineInBlock = j === blockLines.length - 1;
+      const isLastLineInBlock = nextIdx === block.text.length;
 
       result.push(
         <span key={lineIdx} className={className || ""}>
@@ -111,6 +117,8 @@ const renderHighlightedText = (_text: string, blocks: FountainBlock[]) => {
         </span>
       );
       lineIdx++;
+
+      startIdx = nextIdx + 1;
     }
   }
 
@@ -441,8 +449,13 @@ export default function ScriptIDE({
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
     let actionLines = 0;
-    let wordCount = scriptText.trim().split(/\s+/).length;
-    if (scriptText.trim() === "") wordCount = 0;
+
+    // Performance: zero-allocation word count via regex execution loop
+    let wordCount = 0;
+    const wordRegex = /[^\s]+/g;
+    while (wordRegex.exec(scriptText) !== null) {
+      wordCount++;
+    }
 
     blocks.forEach((block) => {
       if (block.type === "character") {
@@ -592,9 +605,11 @@ export default function ScriptIDE({
   // ── Key handler ──────────────────────────────────────────────────────────────
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const cursor = e.currentTarget.selectionStart;
-    const textBeforeCursor = scriptText.substring(0, cursor);
-    const lines = textBeforeCursor.split("\n");
-    const currentLine = lines[lines.length - 1];
+    const textBeforeCursor = scriptText.slice(0, cursor);
+
+    // Performance: zero-allocation lookup of the current line text
+    const lastNewlineIdx = textBeforeCursor.lastIndexOf("\n");
+    const currentLine = textBeforeCursor.slice(lastNewlineIdx + 1);
 
     if (e.key === "i" || e.key === "I") {
       if (currentLine === "") {
@@ -737,11 +752,20 @@ export default function ScriptIDE({
   // ── Navigation ───────────────────────────────────────────────────────────────
   const handleNavigate = (lineIndex: number) => {
     if (!editorRef.current) return;
-    const lines = scriptText.split("\n");
+
+    // Performance: zero-allocation line offset calculation
     let charCount = 0;
-    for (let i = 0; i < lineIndex; i++) {
-      charCount += lines[i].length + 1;
+    let currentLine = 0;
+    while (currentLine < lineIndex) {
+      const nextNewline = scriptText.indexOf("\n", charCount);
+      if (nextNewline === -1) {
+        charCount = scriptText.length;
+        break;
+      }
+      charCount = nextNewline + 1;
+      currentLine++;
     }
+
     editorRef.current.focus();
     editorRef.current.setSelectionRange(charCount, charCount);
 
