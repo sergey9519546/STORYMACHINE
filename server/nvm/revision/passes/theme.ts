@@ -21,6 +21,10 @@
 // scenes (suspenseDelta > 1) all carry no theme (≥3 scenes, n≥8).
 // Wave 293 additions: revelation scenes carry no theme (≥2 revelations, n≥8), clock-raised
 // scenes carry no theme (≥2 clockRaised, n≥8), payoff scenes carry no theme (≥2 payoffs, n≥8).
+// Wave 307 additions: shallow resonance (no resonant scene matches ≥2 distinct theme
+// keywords — theme name-dropped but never explored in depth), quiet scenes only (every
+// resonant scene is emotionally neutral and low-suspense), resonance burst (a single
+// scene holds >50% of all theme keyword occurrences).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1047,6 +1051,80 @@ export async function themePass(input: PassInput): Promise<PassResult> {
             suggestedFix: `Ensure each payoff answers both a plot question and a thematic question. What does the resolved thread reveal about "${themeRaw}"? A clue paid off should say something about the theme, not just confirm a fact. Thematic payoffs are the difference between a satisfying ending and a meaningful one.`,
           });
         }
+      }
+    }
+
+    // ── Wave 307: shallow resonance, quiet scenes only, resonance burst ──────
+    // Local hit accounting over the resonant set (reuses expandedKeywords +
+    // sceneTexts, both in scope here).
+    const distinctKw307 = (text: string) =>
+      expandedKeywords.filter(forms => forms.some(f => text.includes(f))).length;
+    const formHits307 = (text: string) =>
+      expandedKeywords.reduce(
+        (s, forms) => s + forms.reduce((c, f) => c + (f ? text.split(f).length - 1 : 0), 0),
+        0,
+      );
+    const resonant307 = records.filter(r => distinctKw307(sceneTexts.get(r.sceneIdx) ?? '') > 0);
+
+    // THEME_SHALLOW_RESONANCE (minor, ≥3 resonant scenes, ≥2 theme keywords): No
+    // resonant scene matches two or more distinct theme keywords. The theme is
+    // name-dropped a single facet at a time but never explored in depth within a
+    // single beat — the audience never sees two sides of the theme collide in one
+    // scene. Distinct from THEME_SINGLE_KEYWORD_RELIANCE (which audits keyword
+    // proportions across the whole story) — this audits per-scene facet depth.
+    if (resonant307.length >= 3 && expandedKeywords.length >= 2) {
+      const maxDistinct307 = Math.max(
+        ...resonant307.map(r => distinctKw307(sceneTexts.get(r.sceneIdx) ?? '')),
+      );
+      if (maxDistinct307 <= 1) {
+        issues.push({
+          location: 'Thematically resonant scenes',
+          rule: 'THEME_SHALLOW_RESONANCE',
+          severity: 'minor',
+          description: `Across ${resonant307.length} thematically resonant scenes, no single scene touches more than one facet of "${themeRaw}" — the theme is name-dropped one keyword at a time but never explored in depth. Theme lands hardest when two sides of its tension meet in the same beat; one-keyword-per-scene resonance keeps the theme a label rather than a lived idea.`,
+          suggestedFix: `Write at least one scene where multiple facets of "${themeRaw}" collide — where the competing values the theme names are both present and in tension. A scene that holds two sides of the theme at once does more thematic work than a dozen that each gesture at one.`,
+        });
+      }
+    }
+
+    // THEME_QUIET_SCENES_ONLY (minor, ≥3 resonant scenes): Every resonant scene is
+    // emotionally neutral AND low-suspense (suspenseDelta ≤ 1). The theme only ever
+    // surfaces in dramatically inert connective tissue, never in a charged scene.
+    // Distinct from THEME_SUSPENSE_CLUSTER_SILENT (population = high-suspense scenes)
+    // and the emotional-shift-silent checks (population = shifted scenes) — this
+    // audits whether the resonant set as a whole ever lands in a charged scene.
+    if (resonant307.length >= 3) {
+      const allQuiet307 = resonant307.every(
+        (r: any) => r.emotionalShift === 'neutral' && (r.suspenseDelta ?? 0) <= 1,
+      );
+      if (allQuiet307) {
+        issues.push({
+          location: 'Thematically resonant scenes',
+          rule: 'THEME_QUIET_SCENES_ONLY',
+          severity: 'minor',
+          description: `All ${resonant307.length} thematically resonant scenes are emotionally neutral and low-suspense — the theme "${themeRaw}" only ever surfaces in dramatically inert scenes. When theme appears exclusively in quiet connective tissue and never in a charged moment, the audience files it as commentary rather than experiencing it as stakes.`,
+          suggestedFix: `Move at least one thematic beat into a charged scene — a confrontation, a reversal, a moment of real suspense or emotional swing. Theme that surfaces when the stakes are highest fuses idea and feeling; theme confined to calm scenes stays intellectual.`,
+        });
+      }
+    }
+
+    // THEME_RESONANCE_BURST (minor, total hits ≥4, ≥2 resonant scenes): A single
+    // scene holds more than half of all theme keyword occurrences in the story.
+    // The theme is crammed into one moment rather than woven through. Distinct from
+    // THEME_HEAVY_HANDED (a scene with ≥6 hits and >3× the average) — BURST is a
+    // share-of-total measure that fires on concentration even at modest counts.
+    if (resonant307.length >= 2) {
+      const perSceneHits307 = resonant307.map(r => formHits307(sceneTexts.get(r.sceneIdx) ?? ''));
+      const totalHits307 = perSceneHits307.reduce((s, v) => s + v, 0);
+      const maxHits307 = Math.max(...perSceneHits307);
+      if (totalHits307 >= 4 && maxHits307 / totalHits307 > 0.5) {
+        issues.push({
+          location: 'Theme keyword distribution',
+          rule: 'THEME_RESONANCE_BURST',
+          severity: 'minor',
+          description: `A single scene holds ${maxHits307} of ${totalHits307} total theme keyword occurrences (${Math.round(maxHits307 / totalHits307 * 100)}%) for "${themeRaw}" — the theme is concentrated in one burst rather than woven through the story. A theme delivered in a single concentrated dose reads as a thesis statement the rest of the script forgot to dramatize.`,
+          suggestedFix: `Redistribute the theme's language across the story: take the keyword density piled into one scene and spread it so the theme recurs as a thread the audience can track from opening to finale. A theme woven through many scenes accumulates; a theme dumped in one evaporates.`,
+        });
       }
     }
   }

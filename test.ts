@@ -17897,6 +17897,96 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 307 — themePass: shallow resonance, quiet scenes only, resonance burst', async () => {
+    const makeRec307 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const THEME307 = 'trust betrayal courage';
+    const runT307 = async (records: any[]) => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: THEME307 },
+      });
+    };
+
+    it('THEME_SHALLOW_RESONANCE fires when no resonant scene matches 2+ distinct keywords', async () => {
+      const recs307sr = Array.from({ length: 8 }, (_, i) =>
+        makeRec307(i, { dialogueHighlights: [0, 1, 2].includes(i) ? ['the trust matters here'] : [] })
+      );
+      const res = await runT307(recs307sr);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_SHALLOW_RESONANCE'), 'THEME_SHALLOW_RESONANCE should fire');
+    });
+
+    it('THEME_SHALLOW_RESONANCE does not fire when a scene holds two facets at once', async () => {
+      const recs307nsr = Array.from({ length: 8 }, (_, i) =>
+        makeRec307(i, {
+          dialogueHighlights:
+            i === 0 ? ['trust and betrayal collide here']
+            : [1, 2].includes(i) ? ['the trust matters here']
+            : [],
+        })
+      );
+      const res = await runT307(recs307nsr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_SHALLOW_RESONANCE'), 'THEME_SHALLOW_RESONANCE should not fire');
+    });
+
+    it('THEME_QUIET_SCENES_ONLY fires when all resonant scenes are neutral and low-suspense', async () => {
+      const recs307qs = Array.from({ length: 8 }, (_, i) =>
+        makeRec307(i, {
+          dialogueHighlights: [0, 1, 2].includes(i) ? ['the trust matters here'] : [],
+          suspenseDelta: 0.5,
+        })
+      );
+      const res = await runT307(recs307qs);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_QUIET_SCENES_ONLY'), 'THEME_QUIET_SCENES_ONLY should fire');
+    });
+
+    it('THEME_QUIET_SCENES_ONLY does not fire when a resonant scene is charged', async () => {
+      const recs307nqs = Array.from({ length: 8 }, (_, i) =>
+        makeRec307(i, {
+          dialogueHighlights: [0, 1, 2].includes(i) ? ['the trust matters here'] : [],
+          suspenseDelta: i === 0 ? 2 : 0.5,
+        })
+      );
+      const res = await runT307(recs307nqs);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_QUIET_SCENES_ONLY'), 'THEME_QUIET_SCENES_ONLY should not fire');
+    });
+
+    it('THEME_RESONANCE_BURST fires when one scene holds >50% of theme keyword hits', async () => {
+      const recs307rb = Array.from({ length: 8 }, (_, i) =>
+        makeRec307(i, {
+          dialogueHighlights:
+            i === 0 ? ['trust trust trust betrayal']
+            : i === 1 ? ['courage']
+            : [],
+        })
+      );
+      const res = await runT307(recs307rb);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_RESONANCE_BURST'), 'THEME_RESONANCE_BURST should fire');
+    });
+
+    it('THEME_RESONANCE_BURST does not fire when keyword hits are spread evenly', async () => {
+      const recs307nrb = Array.from({ length: 8 }, (_, i) =>
+        makeRec307(i, {
+          dialogueHighlights:
+            i === 0 ? ['trust and betrayal']
+            : i === 1 ? ['courage and trust']
+            : [],
+        })
+      );
+      const res = await runT307(recs307nrb);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_RESONANCE_BURST'), 'THEME_RESONANCE_BURST should not fire');
+    });
+  });
+
   describe('Wave 306 — structurePass: midpoint emotional flatline, final image weak, act balance extreme', async () => {
     const makeRec306 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
