@@ -16,6 +16,9 @@
 // numbers — "three", "seven" — diluting concision), prepositional opening dominance
 // (>35% of action lines begin with a preposition), action line word-count floor
 // (all 8+ action lines are ≤5 words — micro-beats with no description depth).
+// Wave 305 additions: dash chain (≥3 action lines trail off with an em-dash),
+// negation action flood (>25% of action lines describe what does NOT happen),
+// action parenthesis aside (≥3 action lines contain parenthetical asides).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -829,6 +832,66 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `All ${actionLines.length} action lines are 5 words or fewer — the script reads as a shot-list storyboard rather than a screenplay. Micro-beats are effective in short bursts but their exclusive use strips all context from the action: no spatial grounding, no texture, no emotional register beyond the bare event.`,
         suggestedFix: 'Mix micro-beats with fuller lines: use 2-3 word lines for impact moments but surround them with lines that establish context, atmosphere, or consequence. "She runs. The door slams. Outside — silence." works because the long beat ("Outside — silence.") earns the two micro-beats before it.',
+      });
+    }
+  }
+
+  // ── Wave 305: DASH_CHAIN ──────────────────────────────────────────────────
+  // Three or more action lines end with an em-dash or double hyphen — the
+  // prose keeps interrupting itself. The companion tic to ELLIPSIS_CHAIN
+  // (trailing dots): where the ellipsis trails off, the dash breaks off, and
+  // either way the line declines to finish describing what happens. One
+  // mid-action cut can sting; a chain of them is a stylistic stutter.
+  // Requires 8+ action lines.
+  if (actionLines.length >= 8) {
+    const dashCount305 = actionLines.filter(l => /(—|--)\s*$/.test(l.text.trim())).length;
+    if (dashCount305 >= 3) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'DASH_CHAIN',
+        severity: 'minor',
+        description: `${dashCount305} action lines end with an em-dash — the prose keeps breaking off mid-thought. Where a trailing ellipsis hesitates, a trailing dash interrupts; either way the line declines to finish describing what the camera sees. Used once, the cut-off can mirror an on-screen interruption; chained, it becomes a stylistic stutter that withholds description as a habit.`,
+        suggestedFix: 'Reserve the trailing dash for moments when something genuinely cuts the action short — a door slamming, a gunshot, a hard cut — and complete the description everywhere else. If the interruption is real, the next line should show what did the interrupting.',
+      });
+    }
+  }
+
+  // ── Wave 305: NEGATION_ACTION_FLOOD ──────────────────────────────────────
+  // More than 25% of action lines describe what does NOT happen ("He doesn't
+  // move." "Nothing happens." "Nobody answers."). Negative space is
+  // unfilmable: the camera cannot photograph an absence, only the visible
+  // behavior that implies it. A flood of negation means the prose is
+  // narrating around the scene instead of staging it. Requires 8+ action
+  // lines.
+  if (actionLines.length >= 8) {
+    const negationRe305 = /\b(doesn't|don't|does not|do not|didn't|did not|nothing|no one|nobody|never|can't|cannot|won't|will not)\b/i;
+    const negationCount305 = actionLines.filter(l => negationRe305.test(l.text)).length;
+    if (negationCount305 / actionLines.length > 0.25) {
+      issues.push({
+        location: 'Action lines — negation density',
+        rule: 'NEGATION_ACTION_FLOOD',
+        severity: 'minor',
+        description: `${negationCount305} of ${actionLines.length} action lines (${Math.round(negationCount305 / actionLines.length * 100)}%) describe what does NOT happen. The camera cannot photograph an absence — "He doesn't move" gives the frame nothing, while "He stands rigid, hands flat against his thighs" gives it everything. Pervasive negation means the prose narrates around the scene rather than staging it.`,
+        suggestedFix: 'Convert each negation into the visible behavior that implies it: "Nobody answers" → "The phone rings on, six times, seven"; "She doesn\'t react" → "She keeps slicing the onion, the knife perfectly even." Stillness and silence are filmable — but only as concrete, positive images.',
+      });
+    }
+  }
+
+  // ── Wave 305: ACTION_PARENTHESIS_ASIDE ───────────────────────────────────
+  // Three or more action lines contain parenthetical asides "(like this)".
+  // Parentheses in action prose are a novelist's device — a whispered author
+  // commentary the camera has no equivalent for. Distinct from the dialogue
+  // parenthetical checks (wrylies under character cues): this fires on
+  // parentheses embedded inside action description. Requires 8+ action lines.
+  if (actionLines.length >= 8) {
+    const asideCount305 = actionLines.filter(l => /\([^)]{2,}\)/.test(l.text)).length;
+    if (asideCount305 >= 3) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'ACTION_PARENTHESIS_ASIDE',
+        severity: 'minor',
+        description: `${asideCount305} action lines contain parenthetical asides. Parentheses in action prose are a novelist's whisper — author commentary delivered past the scene — and the camera has no equivalent register for them. Each aside pulls the reader out of the visual flow to receive a private footnote.`,
+        suggestedFix: 'Unpack each aside: if the parenthetical content matters, promote it to its own sentence; if it is a wink or qualifier, cut it. "She picks up the gun (her father\'s)" becomes "She picks up the gun. Her father\'s." — same information, delivered in the scene instead of beside it.',
       });
     }
   }

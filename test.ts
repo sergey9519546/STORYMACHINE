@@ -17897,6 +17897,145 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 305 — rhythmPass: dash chain, negation action flood, action parenthesis aside', async () => {
+    const runRH305 = async (fountain: string) => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DASH_CHAIN fires when 3+ action lines trail off with an em-dash', async () => {
+      const fountain305dc = `INT. ROOM - DAY
+
+She reaches for the door—
+
+He steps in from the hall—
+
+The lamp flickers and—
+
+She turns to face him slowly.
+
+He says nothing at first.
+
+The clock ticks on the wall—
+
+She finally exhales.
+
+He crosses to the window.`;
+      const res = await runRH305(fountain305dc);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DASH_CHAIN'), 'DASH_CHAIN should fire');
+    });
+
+    it('DASH_CHAIN does not fire when action lines complete their descriptions', async () => {
+      const fountain305ndc = `INT. ROOM - DAY
+
+She reaches for the door and stops.
+
+He steps in from the hall.
+
+The lamp flickers twice.
+
+She turns to face him slowly.
+
+He says nothing at first.
+
+The clock ticks on the wall.
+
+She finally exhales.
+
+He crosses to the window.`;
+      const res = await runRH305(fountain305ndc);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DASH_CHAIN'), 'DASH_CHAIN should not fire');
+    });
+
+    it('NEGATION_ACTION_FLOOD fires when >25% of action lines describe what does not happen', async () => {
+      const fountain305nf = `INT. ROOM - DAY
+
+He doesn't move from the chair.
+
+Nothing happens for a long moment.
+
+Nobody answers the knock.
+
+She never looks up from the page.
+
+He crosses to the window.
+
+She pours a glass of water.
+
+The radio plays softly.
+
+He checks his watch.`;
+      const res = await runRH305(fountain305nf);
+      assert.ok(res.issues.some((i: any) => i.rule === 'NEGATION_ACTION_FLOOD'), 'NEGATION_ACTION_FLOOD should fire');
+    });
+
+    it('NEGATION_ACTION_FLOOD does not fire when action is mostly positive description', async () => {
+      const fountain305nnf = `INT. ROOM - DAY
+
+He rises from the chair.
+
+The clock chimes once.
+
+She crosses to answer the knock.
+
+She reads the page twice.
+
+He crosses to the window.
+
+She pours a glass of water.
+
+The radio plays softly.
+
+He doesn't check his watch.`;
+      const res = await runRH305(fountain305nnf);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'NEGATION_ACTION_FLOOD'), 'NEGATION_ACTION_FLOOD should not fire');
+    });
+
+    it('ACTION_PARENTHESIS_ASIDE fires when 3+ action lines contain parenthetical asides', async () => {
+      const fountain305pa = `INT. ROOM - DAY
+
+She picks up the gun (her father's old revolver).
+
+He reads the letter (the one she hid).
+
+The dog barks (as it always does).
+
+She crosses to the window.
+
+He pours a drink.
+
+The clock ticks loudly.
+
+She finally speaks.
+
+He looks away.`;
+      const res = await runRH305(fountain305pa);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_PARENTHESIS_ASIDE'), 'ACTION_PARENTHESIS_ASIDE should fire');
+    });
+
+    it('ACTION_PARENTHESIS_ASIDE does not fire when action prose has no parenthetical asides', async () => {
+      const fountain305npa = `INT. ROOM - DAY
+
+She picks up her father's old revolver.
+
+He reads the letter she hid.
+
+The dog barks at the door.
+
+She crosses to the window.
+
+He pours a drink.
+
+The clock ticks loudly.
+
+She finally speaks.
+
+He looks away.`;
+      const res = await runRH305(fountain305npa);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_PARENTHESIS_ASIDE'), 'ACTION_PARENTHESIS_ASIDE should not fire');
+    });
+  });
+
   describe('Wave 304 — relationshipArcPass: shift magnitude uniformity, warmth unfelt, dimension one-way', async () => {
     const makeRec304 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
