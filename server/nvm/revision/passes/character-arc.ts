@@ -20,6 +20,10 @@
 // Wave 298 additions: dramatic turn monotone (3+ turns all the same type), suspense/
 // emotion decoupled (3+ high-suspense scenes all emotionally neutral), grief skipped
 // (every negative shift is cancelled by a positive one in the very next scene).
+// Wave 312 additions: first half emotionally flat (entire first half neutral while the
+// second half carries emotion — late-starting arc), turn emotion absent (≥2 dramatic-turn
+// scenes all emotionally neutral), curiosity/emotion decoupled (≥3 high-curiosity scenes
+// all emotionally neutral — intrigue without investment).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1057,6 +1061,76 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'After at least one significant loss, hold the negative register for a scene or two before any recovery: show the character living inside the consequence — withdrawn, lashing out, going through the motions. The depth of a low is what gives the eventual rise its height; instant recovery flattens both.',
         });
       }
+    }
+  }
+
+  // ── Wave 312: ARC_FIRST_HALF_EMOTIONALLY_FLAT ────────────────────────────
+  // Every scene in the first half (0–50%) is emotionally neutral, while the
+  // second half carries at least two non-neutral beats. The character's
+  // emotional arc does not begin until the back half — the entire setup and
+  // first complication zone play out at a single flat pitch. Distinct from
+  // ARC_STALL_IN_ACT2 (the 25–75% band specifically), ARC_OPENING_VOID (first
+  // two scenes), and ARC_EMOTIONAL_FLATLINE/MONOTONE (whole-story neutrality):
+  // this targets a flat front half that an active back half then contradicts.
+  // Requires 10+ records with a 5+ scene first half.
+  if (records.length >= 10) {
+    const halfIdx312 = Math.floor(records.length * 0.5);
+    const firstHalf312 = (records as any[]).slice(0, halfIdx312);
+    const secondHalf312 = (records as any[]).slice(halfIdx312);
+    if (firstHalf312.length >= 5) {
+      const firstHalfFlat312 = firstHalf312.every(r => r.emotionalShift === 'neutral');
+      const secondHalfCharged312 = secondHalf312.filter(r => r.emotionalShift !== 'neutral').length;
+      if (firstHalfFlat312 && secondHalfCharged312 >= 2) {
+        issues.push({
+          location: `First half (Scenes 0–${halfIdx312 - 1}) — emotionally flat`,
+          rule: 'ARC_FIRST_HALF_EMOTIONALLY_FLAT',
+          severity: 'minor',
+          description: `Every scene in the first half (0–${halfIdx312 - 1}) is emotionally neutral, while the second half carries ${secondHalfCharged312} charged beats — the character's emotional arc does not begin until the back half. The entire setup and early complication zone play out at one flat pitch, so the audience spends half the story with no emotional read on the protagonist.`,
+          suggestedFix: 'Seed emotional movement in the first half: a loss, a hope, a fear, a small win that establishes the protagonist\'s emotional baseline and starts the arc early. A character the audience cannot feel for in the first half is one they have no reason to follow into the second.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 312: ARC_TURN_EMOTION_ABSENT ────────────────────────────────────
+  // Two or more dramatic-turn scenes occur and every one of them is emotionally
+  // neutral — the protagonist pivots without feeling the pivot. A dramatic turn
+  // is a hinge in the character's journey; if it registers no emotional shift,
+  // the turn is plot machinery the character merely processes. Distinct from
+  // ARC_SUSPENSE_EMOTION_DECOUPLED (high-suspense scenes), ARC_DRAMATIC_TURN_
+  // MONOTONE (turn-type sameness), and causality's DRAMATIC_TURN_AFTERMATH_VOID
+  // (downstream ripple): this audits the turn scenes themselves for charge.
+  // Requires 8+ records.
+  if (records.length >= 8) {
+    const turnScenes312 = (records as any[]).filter(r => (r.dramaticTurn ?? 'nothing') !== 'nothing');
+    if (turnScenes312.length >= 2 && turnScenes312.every(r => r.emotionalShift === 'neutral')) {
+      issues.push({
+        location: 'Dramatic-turn scenes',
+        rule: 'ARC_TURN_EMOTION_ABSENT',
+        severity: 'minor',
+        description: `All ${turnScenes312.length} dramatic-turn scenes are emotionally neutral — the protagonist pivots without feeling the pivot. A dramatic turn is a hinge in the character's journey; when it registers no emotional shift, the turn reads as plot machinery the character processes rather than a moment that changes them.`,
+        suggestedFix: 'Let each turn land emotionally on the protagonist: a reversal that wounds, a revelation that frightens or frees, a choice that costs. The size of a turn is measured by how much it moves the person at its center — a turn nobody feels is a turn that did not happen.',
+      });
+    }
+  }
+
+  // ── Wave 312: ARC_CURIOSITY_EMOTION_DECOUPLED ────────────────────────────
+  // Three or more high-curiosity scenes (curiosityDelta > 1) are all emotionally
+  // neutral — the story's most intriguing moments never move the protagonist.
+  // Curiosity engages the audience's head; emotion engages their heart. When the
+  // story's mysteries land only as puzzles and never as feelings, the audience
+  // is interested but not invested. The curiosity analogue of ARC_SUSPENSE_
+  // EMOTION_DECOUPLED (which crosses suspense with emotion). Requires 8+ records.
+  if (records.length >= 8) {
+    const highCuriosity312 = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 1);
+    if (highCuriosity312.length >= 3 && highCuriosity312.every(r => r.emotionalShift === 'neutral')) {
+      issues.push({
+        location: 'High-curiosity scenes',
+        rule: 'ARC_CURIOSITY_EMOTION_DECOUPLED',
+        severity: 'minor',
+        description: `All ${highCuriosity312.length} high-curiosity scenes (curiosityDelta > 1) are emotionally neutral — the story's most intriguing moments never move the protagonist. Curiosity engages the audience's head and emotion their heart; when the mysteries land only as puzzles and never as feelings, the audience stays interested but never becomes invested.`,
+        suggestedFix: 'Fuse intrigue with feeling: the scene that raises the biggest question should also stir the protagonist — dread at what the answer might be, hope that it changes everything, grief at what it implies. A mystery the character cares about is one the audience cares about.',
+      });
     }
   }
 

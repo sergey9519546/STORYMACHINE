@@ -17897,6 +17897,76 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 312 — characterArcPass: first half flat, turn emotion absent, curiosity/emotion decoupled', async () => {
+    const makeRec312 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCA312 = async (records: any[]) => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ARC_FIRST_HALF_EMOTIONALLY_FLAT fires when the first half is neutral and the second half is charged', async () => {
+      const recs312fh = Array.from({ length: 12 }, (_, i) =>
+        makeRec312(i, { emotionalShift: i === 6 ? 'negative' : i === 7 ? 'positive' : 'neutral' })
+      );
+      const res = await runCA312(recs312fh);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_FIRST_HALF_EMOTIONALLY_FLAT'), 'ARC_FIRST_HALF_EMOTIONALLY_FLAT should fire');
+    });
+
+    it('ARC_FIRST_HALF_EMOTIONALLY_FLAT does not fire when the first half carries emotion', async () => {
+      const recs312nfh = Array.from({ length: 12 }, (_, i) =>
+        makeRec312(i, { emotionalShift: i === 2 ? 'negative' : i === 7 ? 'positive' : 'neutral' })
+      );
+      const res = await runCA312(recs312nfh);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_FIRST_HALF_EMOTIONALLY_FLAT'), 'ARC_FIRST_HALF_EMOTIONALLY_FLAT should not fire');
+    });
+
+    it('ARC_TURN_EMOTION_ABSENT fires when all dramatic-turn scenes are emotionally neutral', async () => {
+      const recs312te = Array.from({ length: 8 }, (_, i) =>
+        makeRec312(i, { dramaticTurn: [2, 4].includes(i) ? 'reversal' : 'nothing' })
+      );
+      const res = await runCA312(recs312te);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_TURN_EMOTION_ABSENT'), 'ARC_TURN_EMOTION_ABSENT should fire');
+    });
+
+    it('ARC_TURN_EMOTION_ABSENT does not fire when a turn carries emotional charge', async () => {
+      const recs312nte = Array.from({ length: 8 }, (_, i) =>
+        makeRec312(i, {
+          dramaticTurn: [2, 4].includes(i) ? 'reversal' : 'nothing',
+          emotionalShift: i === 2 ? 'negative' : 'neutral',
+        })
+      );
+      const res = await runCA312(recs312nte);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_TURN_EMOTION_ABSENT'), 'ARC_TURN_EMOTION_ABSENT should not fire');
+    });
+
+    it('ARC_CURIOSITY_EMOTION_DECOUPLED fires when high-curiosity scenes are all neutral', async () => {
+      const recs312ce = Array.from({ length: 8 }, (_, i) =>
+        makeRec312(i, { curiosityDelta: [1, 3, 5].includes(i) ? 2 : 0 })
+      );
+      const res = await runCA312(recs312ce);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_CURIOSITY_EMOTION_DECOUPLED'), 'ARC_CURIOSITY_EMOTION_DECOUPLED should fire');
+    });
+
+    it('ARC_CURIOSITY_EMOTION_DECOUPLED does not fire when a high-curiosity scene moves the character', async () => {
+      const recs312nce = Array.from({ length: 8 }, (_, i) =>
+        makeRec312(i, {
+          curiosityDelta: [1, 3, 5].includes(i) ? 2 : 0,
+          emotionalShift: i === 3 ? 'negative' : 'neutral',
+        })
+      );
+      const res = await runCA312(recs312nce);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_CURIOSITY_EMOTION_DECOUPLED'), 'ARC_CURIOSITY_EMOTION_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 311 — dialoguePass: hedge saturation, filler sound overuse, one-word dominance', async () => {
     const runD311 = async (fountain: string) => {
       const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
