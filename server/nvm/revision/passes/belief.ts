@@ -19,6 +19,9 @@
 // Wave 295 additions: revelation suspense decoupled (revelation scenes avg suspenseDelta ≤ 0),
 // belief orphan (told belief in first half has no revelation in second half for same subject),
 // revelation density drop (second half has fewer revelations than first half despite 3+ total).
+// Wave 309 additions: told belief drought (≥5 consecutive scenes with no assertion or
+// revelation — belief layer silent), assertion void (≥4 revelations but ≤1 told belief),
+// revelation late first (first revelation past midpoint despite early assertions).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -987,6 +990,81 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Plant at least one belief beat in the opening: a character makes a claim that will later be tested, a secret is hinted at, or a small discovery seeds a question the story will answer. The opening should leave the audience holding at least one unverified proposition — something to believe or disbelieve entering Act 2.',
         });
       }
+    }
+  }
+
+  // ── Wave 309: TOLD_BELIEF_DROUGHT ─────────────────────────────────────────
+  // Five or more consecutive scenes contain neither a told belief nor a
+  // revelation — the belief/deception layer goes completely silent for a long
+  // stretch. Nobody asserts anything and nothing is discovered: the epistemic
+  // engine idles. Distinct from EXPOSITION_DUMP (the inverse — too many
+  // consecutive told-only scenes) and the zone-specific voids (MIDPOINT_VOID,
+  // ACT2B_VOID, OPENING_INERT): this catches a belief-silent run anywhere.
+  // Requires 10+ records.
+  if (records.length >= 10) {
+    let run309 = 0;
+    let runStart309 = 0;
+    let maxRun309 = 0;
+    let maxStart309 = 0;
+    for (let i309 = 0; i309 < records.length; i309++) {
+      const r309: any = records[i309];
+      if (r309.dialogueHighlights.length === 0 && r309.revelation === null) {
+        if (run309 === 0) runStart309 = i309;
+        run309++;
+        if (run309 > maxRun309) { maxRun309 = run309; maxStart309 = runStart309; }
+      } else {
+        run309 = 0;
+      }
+    }
+    if (maxRun309 >= 5) {
+      issues.push({
+        location: `Scenes ${maxStart309}–${maxStart309 + maxRun309 - 1} — belief layer silent`,
+        rule: 'TOLD_BELIEF_DROUGHT',
+        severity: 'minor',
+        description: `${maxRun309} consecutive scenes (${maxStart309}–${maxStart309 + maxRun309 - 1}) contain no told beliefs and no revelations — the belief/deception layer goes completely silent. For this stretch no character asserts anything that could be tested and nothing is discovered; the epistemic engine that drives dramatic irony and surprise simply idles.`,
+        suggestedFix: 'Seed the silent stretch with belief activity: a character voicing a conviction the story will later test, a partial discovery that narrows the audience\'s uncertainty, or a lie planted for a future unmasking. Every long scene-run should advance what someone believes or what the audience knows.',
+      });
+    }
+  }
+
+  // ── Wave 309: ASSERTION_VOID ──────────────────────────────────────────────
+  // The story delivers four or more revelations but contains at most one told
+  // belief — truths are discovered, but no character ever asserts a claim that
+  // a revelation could overturn. Without assertions there is no dramatic irony
+  // setup: every revelation lands as raw information rather than as a reversal
+  // of something a character (and the audience) believed. The inverse of
+  // TOLD_BELIEF_DOMINATION (>70% tell). Requires 8+ records.
+  if (records.length >= 8 && witnessedBeliefs.length >= 4 && toldBeliefs.length <= 1) {
+    issues.push({
+      location: 'Belief/revelation layer',
+      rule: 'ASSERTION_VOID',
+      severity: 'minor',
+      description: `The story delivers ${witnessedBeliefs.length} revelations but only ${toldBeliefs.length} told belief(s) — truths are discovered, but almost no character ever asserts a claim a revelation could overturn. Without assertions there is no dramatic irony to invert: each revelation arrives as raw information instead of as the reversal of something a character was sure of.`,
+      suggestedFix: 'Plant assertions ahead of the discoveries: have characters state what they believe — confidently and wrongly — so that later revelations land as reversals. A revelation is only a reversal if someone first committed to the opposite; assertions are the setup that gives discoveries their charge.',
+    });
+  }
+
+  // ── Wave 309: REVELATION_LATE_FIRST ───────────────────────────────────────
+  // The story has 2+ revelations but the FIRST one does not arrive until past
+  // the midpoint, while the first half already carries 2+ told beliefs. The
+  // epistemic layer is active early (characters assert) but the story confirms
+  // or overturns nothing until the back half — the audience holds claims for a
+  // long time with no payoff. Distinct from REVELATION_ACT2A_DESERT (25–50%
+  // zone), REVELATION_BACK_WEIGHTED (≥80% in final quarter), and REVELATION_
+  // FINAL_ACT_ONLY: this audits the onset of the FIRST revelation. Requires
+  // 8+ records.
+  if (records.length >= 8 && witnessedBeliefs.length >= 2) {
+    const midIdx309 = Math.floor(records.length * 0.5);
+    const firstRevIdx309 = Math.min(...witnessedBeliefs.map(w => w.sceneIdx));
+    const firstHalfTold309 = toldBeliefs.filter(t => t.sceneIdx < midIdx309).length;
+    if (firstRevIdx309 >= midIdx309 && firstHalfTold309 >= 2) {
+      issues.push({
+        location: `First revelation at Scene ${firstRevIdx309} (past midpoint ${midIdx309})`,
+        rule: 'REVELATION_LATE_FIRST',
+        severity: 'minor',
+        description: `The first revelation does not arrive until Scene ${firstRevIdx309} — past the midpoint — even though the first half already carries ${firstHalfTold309} told beliefs. The epistemic layer is active early (characters assert) but the story confirms or overturns nothing until the back half, so the audience holds those claims for a long time with no payoff to reward their attention.`,
+        suggestedFix: 'Deliver a revelation in the first half that pays off one of the early assertions — a partial truth, a small unmasking, a confirmation that reframes what came before. An early first revelation teaches the audience that the claims they are tracking will pay off, which keeps them invested.',
+      });
     }
   }
 

@@ -17897,6 +17897,87 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 309 — beliefPass: told belief drought, assertion void, revelation late first', async () => {
+    const makeRec309 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runB309 = async (records: any[]) => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('TOLD_BELIEF_DROUGHT fires when 5+ consecutive scenes have no assertion or revelation', async () => {
+      // 12 scenes: belief activity at 0 and 11; scenes 1-10 all silent (run of 10)
+      const recs309dr = Array.from({ length: 12 }, (_, i) =>
+        makeRec309(i, {
+          dialogueHighlights: i === 0 ? ['ALICE: I know the truth here'] : [],
+          revelation: i === 11 ? 'the truth at last' : null,
+        })
+      );
+      const res = await runB309(recs309dr);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TOLD_BELIEF_DROUGHT'), 'TOLD_BELIEF_DROUGHT should fire');
+    });
+
+    it('TOLD_BELIEF_DROUGHT does not fire when belief activity is well distributed', async () => {
+      const recs309ndr = Array.from({ length: 12 }, (_, i) =>
+        makeRec309(i, {
+          dialogueHighlights: i % 3 === 0 ? ['ALICE: I believe this is true'] : [],
+          revelation: i % 4 === 2 ? 'a discovery' : null,
+        })
+      );
+      const res = await runB309(recs309ndr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TOLD_BELIEF_DROUGHT'), 'TOLD_BELIEF_DROUGHT should not fire');
+    });
+
+    it('ASSERTION_VOID fires when there are 4+ revelations but at most one told belief', async () => {
+      const recs309av = Array.from({ length: 10 }, (_, i) =>
+        makeRec309(i, { revelation: [2, 4, 6, 8].includes(i) ? `reveal-${i}` : null })
+      );
+      const res = await runB309(recs309av);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ASSERTION_VOID'), 'ASSERTION_VOID should fire');
+    });
+
+    it('ASSERTION_VOID does not fire when characters assert beliefs alongside revelations', async () => {
+      const recs309nav = Array.from({ length: 10 }, (_, i) =>
+        makeRec309(i, {
+          revelation: [2, 4, 6, 8].includes(i) ? `reveal-${i}` : null,
+          dialogueHighlights: [1, 3, 5].includes(i) ? ['BOB: I am certain of this'] : [],
+        })
+      );
+      const res = await runB309(recs309nav);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ASSERTION_VOID'), 'ASSERTION_VOID should not fire');
+    });
+
+    it('REVELATION_LATE_FIRST fires when the first revelation arrives past the midpoint after early assertions', async () => {
+      // 10 scenes: told beliefs at 1,2 (first half); first revelation at 7 (past midpoint 5)
+      const recs309lf = Array.from({ length: 10 }, (_, i) =>
+        makeRec309(i, {
+          dialogueHighlights: [1, 2].includes(i) ? ['ALICE: I trust him completely'] : [],
+          revelation: [7, 9].includes(i) ? `reveal-${i}` : null,
+        })
+      );
+      const res = await runB309(recs309lf);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_LATE_FIRST'), 'REVELATION_LATE_FIRST should fire');
+    });
+
+    it('REVELATION_LATE_FIRST does not fire when a revelation arrives in the first half', async () => {
+      const recs309nlf = Array.from({ length: 10 }, (_, i) =>
+        makeRec309(i, {
+          dialogueHighlights: [1, 2].includes(i) ? ['ALICE: I trust him completely'] : [],
+          revelation: [3, 8].includes(i) ? `reveal-${i}` : null,
+        })
+      );
+      const res = await runB309(recs309nlf);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_LATE_FIRST'), 'REVELATION_LATE_FIRST should not fire');
+    });
+  });
+
   describe('Wave 308 — voicePass: dialogue length uniformity, dash interruption flood, shout caps', async () => {
     const runV308 = async (fountain: string) => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
