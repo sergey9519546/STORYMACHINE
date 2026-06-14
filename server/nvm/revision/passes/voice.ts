@@ -19,6 +19,10 @@
 // Wave 294 additions: dialogue interrogative saturation (>30% of dialogue lines end with ?),
 // action line adverb flood (>25% of action lines contain an adverb before the verb),
 // character name monotony in action (single character name in >50% of action lines).
+// Wave 308 additions: dialogue length uniformity (>70% of dialogue lines within a tight
+// word-count band — every speech the same size), em-dash dialogue flood (>30% of dialogue
+// lines contain an interruption dash), ALL-CAPS shout in dialogue (≥3 dialogue lines with
+// a shouted ALL-CAPS word).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1225,6 +1229,83 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `"${topName294}" opens ${maxNameCount294} of ${actionOnlyLines.length} action lines (${Math.round(maxNameCount294 / actionOnlyLines.length * 100)}%) — one character name dominates the action prose. When every action begins with the same name, supporting characters become props and the physical world disappears. A screenplay is a camera, not a POV diary.`,
           suggestedFix: `Vary action subjects: use the environment, objects, and other characters as the grammatical subjects of action lines. "The door opens" instead of "${topName294} opens the door"; "Silence fills the room" instead of "${topName294} stands in silence". Distributing action subjects creates spatial depth and cinematic rhythm.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 308: dialogue length uniformity, dash interruption flood, shout caps ──
+  {
+    const dlg308: string[] = [];
+    let inDlg308 = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg308 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg308 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg308 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg308) dlg308.push(t);
+      else inDlg308 = false;
+    }
+
+    // DIALOGUE_LENGTH_UNIFORMITY (minor, ≥12 dialogue lines): More than 70% of
+    // dialogue lines fall within a 3-word band (±1 word of a common length) —
+    // every speech is essentially the same size. Distinct from DIALOGUE_CADENCE_
+    // MONOCULTURE (per-character mean convergence): this audits the line-level
+    // length distribution across the whole script, and fires even in a
+    // single-character piece. Speech-length variation is a primary tool of
+    // rhythm and characterization; its absence flattens every exchange.
+    if (dlg308.length >= 12) {
+      const wc308 = dlg308.map(l => l.split(/\s+/).filter(Boolean).length);
+      let bestBand308 = 0;
+      for (const c of new Set(wc308)) {
+        const inBand = wc308.filter(w => Math.abs(w - c) <= 1).length;
+        if (inBand > bestBand308) bestBand308 = inBand;
+      }
+      if (bestBand308 / dlg308.length > 0.7) {
+        issues.push({
+          location: 'Dialogue line lengths',
+          rule: 'DIALOGUE_LENGTH_UNIFORMITY',
+          severity: 'minor',
+          description: `${bestBand308} of ${dlg308.length} dialogue lines (${Math.round(bestBand308 / dlg308.length * 100)}%) fall within a 3-word length band — nearly every speech is the same size. Speech-length variation is a primary tool of rhythm and characterization; when every line runs the same length, the dialogue acquires a metronomic sameness and no character's verbal tempo stands out.`,
+          suggestedFix: 'Vary speech lengths deliberately: let a clipped one-word retort sit against a character\'s rambling justification, or break a long speech with a terse interruption. The contrast between a long line and a short one is where rhythm — and character — lives.',
+        });
+      }
+    }
+
+    // DIALOGUE_DASH_INTERRUPTION_FLOOD (minor, ≥10 dialogue lines): More than 30%
+    // of dialogue lines contain an em-dash (or double hyphen) — the characters
+    // constantly interrupt themselves or each other. One dash sharpens a beat;
+    // a flood of them turns every exchange into a pile-up of broken sentences and
+    // signals the writer reaching for the same interruption device repeatedly.
+    // Distinct from rhythm's DASH_CHAIN (action lines ending on a dash).
+    if (dlg308.length >= 10) {
+      const dashCount308 = dlg308.filter(l => /(—|--)/.test(l)).length;
+      if (dashCount308 / dlg308.length > 0.3) {
+        issues.push({
+          location: 'Dialogue interruption dashes',
+          rule: 'DIALOGUE_DASH_INTERRUPTION_FLOOD',
+          severity: 'minor',
+          description: `${dashCount308} of ${dlg308.length} dialogue lines (${Math.round(dashCount308 / dlg308.length * 100)}%) contain an interruption dash. One dash sharpens a moment of cut-off or self-correction; a flood of them turns every exchange into a pile-up of broken sentences, and the device stops signaling anything because it never stops happening.`,
+          suggestedFix: 'Reserve the interruption dash for genuine overlaps and cut-offs that the drama requires, and let most lines complete. If characters are meant to talk over each other constantly, find other ways to show it — overlapping content, non-answers — so the dash regains its force when it does appear.',
+        });
+      }
+    }
+
+    // DIALOGUE_SHOUT_CAPS (minor, ≥3 shout lines): Three or more dialogue lines
+    // contain a shouted ALL-CAPS word ("Get OUT of here"). Caps-shouting is a
+    // blunt substitute for dialogue that conveys intensity through word choice and
+    // context; recurring caps in speech reads as the script yelling at the reader.
+    // Distinct from originality's CAPS_EMPHASIS_OVERUSE (caps in action lines).
+    {
+      const shoutLines308 = dlg308.filter(l => /\b[A-Z]{3,}\b/.test(l));
+      if (shoutLines308.length >= 3) {
+        issues.push({
+          location: 'Dialogue ALL-CAPS shouting',
+          rule: 'DIALOGUE_SHOUT_CAPS',
+          severity: 'minor',
+          description: `${shoutLines308.length} dialogue lines contain a shouted ALL-CAPS word. Caps-shouting is a blunt substitute for intensity that the words and context should carry on their own; recurring caps in speech reads as the script yelling at the reader rather than trusting the scene to land its own force.`,
+          suggestedFix: 'Strip the caps and build intensity through the line itself — sharper word choice, a harder beat, an action line that shows the volume ("Her voice cracks the room"). If emphasis is essential, italics on a single word do the job once; caps used repeatedly just flatten into noise.',
         });
       }
     }

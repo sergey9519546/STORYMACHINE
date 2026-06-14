@@ -17897,6 +17897,209 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 308 — voicePass: dialogue length uniformity, dash interruption flood, shout caps', async () => {
+    const runV308 = async (fountain: string) => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      return voicePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DIALOGUE_LENGTH_UNIFORMITY fires when >70% of dialogue lines share a length band', async () => {
+      // 12 dialogue lines all 4 words long
+      const fountain308lu = `INT. ROOM - DAY
+
+ALICE
+We should leave now.
+
+BOB
+I am not leaving.
+
+ALICE
+You have no choice.
+
+BOB
+There is always choice.
+
+ALICE
+Not this time around.
+
+BOB
+We can still try.
+
+ALICE
+It is too late.
+
+BOB
+Nothing is ever late.
+
+ALICE
+You never understood me.
+
+BOB
+I understood too well.
+
+ALICE
+Then you should leave.
+
+BOB
+Maybe I will then.`;
+      const res = await runV308(fountain308lu);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_LENGTH_UNIFORMITY'), 'DIALOGUE_LENGTH_UNIFORMITY should fire');
+    });
+
+    it('DIALOGUE_LENGTH_UNIFORMITY does not fire when speech lengths vary widely', async () => {
+      const fountain308nlu = `INT. ROOM - DAY
+
+ALICE
+No.
+
+BOB
+I have been thinking about everything you said to me last night and I cannot stop turning it over.
+
+ALICE
+Why.
+
+BOB
+Because it matters more than you could possibly know right now.
+
+ALICE
+Stop.
+
+BOB
+You always do this, you shut down the second a conversation gets anywhere near the truth of things.
+
+ALICE
+That is not fair and you know it.
+
+BOB
+Fair.
+
+ALICE
+I am leaving now before one of us says something we cannot take back ever again.
+
+BOB
+Fine.
+
+BOB
+Go then, walk out like you always do when it gets hard.`;
+      const res = await runV308(fountain308nlu);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_LENGTH_UNIFORMITY'), 'DIALOGUE_LENGTH_UNIFORMITY should not fire');
+    });
+
+    it('DIALOGUE_DASH_INTERRUPTION_FLOOD fires when >30% of dialogue lines contain a dash', async () => {
+      const fountain308df = `INT. ROOM - DAY
+
+ALICE
+I just wanted to—
+
+BOB
+Don't—don't say it.
+
+ALICE
+But you have to listen—
+
+BOB
+I already know what—
+
+ALICE
+You never let me finish a—
+
+BOB
+Fine.
+
+ALICE
+Thank you.
+
+BOB
+Go on then.
+
+ALICE
+It does not matter now.
+
+BOB
+It clearly does.`;
+      const res = await runV308(fountain308df);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_DASH_INTERRUPTION_FLOOD'), 'DIALOGUE_DASH_INTERRUPTION_FLOOD should fire');
+    });
+
+    it('DIALOGUE_DASH_INTERRUPTION_FLOOD does not fire when dashes are sparse', async () => {
+      const fountain308ndf = `INT. ROOM - DAY
+
+ALICE
+I just wanted to talk.
+
+BOB
+Then talk to me.
+
+ALICE
+But you have to listen first.
+
+BOB
+I am listening now.
+
+ALICE
+You never let me finish anything.
+
+BOB
+That is not true at all.
+
+ALICE
+Thank you for nothing.
+
+BOB
+Go on then, say it.
+
+ALICE
+It does not matter now—
+
+BOB
+It clearly does to you.`;
+      const res = await runV308(fountain308ndf);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_DASH_INTERRUPTION_FLOOD'), 'DIALOGUE_DASH_INTERRUPTION_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_SHOUT_CAPS fires when 3+ dialogue lines contain a shouted caps word', async () => {
+      const fountain308sc = `INT. ROOM - DAY
+
+ALICE
+Get OUT of here right now.
+
+BOB
+I said STOP doing that.
+
+ALICE
+You NEVER listen to me.
+
+BOB
+Fine, I am leaving.
+
+ALICE
+Good riddance to you.`;
+      const res = await runV308(fountain308sc);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_SHOUT_CAPS'), 'DIALOGUE_SHOUT_CAPS should fire');
+    });
+
+    it('DIALOGUE_SHOUT_CAPS does not fire when dialogue avoids caps shouting', async () => {
+      const fountain308nsc = `INT. ROOM - DAY
+
+ALICE
+Get out of here right now.
+
+BOB
+I said stop doing that.
+
+ALICE
+You never listen to me.
+
+BOB
+Fine, I am leaving.
+
+ALICE
+Good riddance to you.`;
+      const res = await runV308(fountain308nsc);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_SHOUT_CAPS'), 'DIALOGUE_SHOUT_CAPS should not fire');
+    });
+  });
+
   describe('Wave 307 — themePass: shallow resonance, quiet scenes only, resonance burst', async () => {
     const makeRec307 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
