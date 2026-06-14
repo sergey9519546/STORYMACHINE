@@ -19,6 +19,10 @@
 // clock is established), suspense sawtooth (tension strictly alternates sign for
 // 6+ scenes without accumulating), dramatic turn aftermath void (a reversal scene
 // followed by two scenes with zero emotional, suspense, or relational ripple).
+// Wave 310 additions: emotion without driver run (3+ consecutive non-neutral scenes
+// with no suspense/relational/revelation/clock driver), clock relief unexplained (a
+// clockDelta<0 release with no revelation or payoff to cause it), dramatic turn
+// cluster (3+ dramatic turns within a three-scene window).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1177,6 +1181,97 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `Scene ${r296.sceneIdx} delivers a dramatic turn ("${r296.dramaticTurn}") but the next two scenes are causally inert — neutral emotion, no suspense rise, no relationship movement. A turn that changes nothing downstream is a turn in name only; the story declares a pivot and then proceeds as if it never happened.`,
           suggestedFix: 'Let the turn ripple: the scenes immediately after a reversal or revelation should show characters adjusting — an emotional shift, a relationship strained or realigned, suspense climbing as the new situation sinks in. The size of a turn is measured by its wake, not its announcement.',
+        });
+        break;
+      }
+    }
+  }
+
+  // ── Wave 310: EMOTION_WITHOUT_DRIVER_RUN ─────────────────────────────────
+  // Three or more consecutive scenes carry a non-neutral emotional shift, yet
+  // none of them contains any mechanical driver — no suspense rise, no
+  // relationship movement, no revelation, no clock raised. The emotional curve
+  // swings with nothing on the page to cause it. Distinct from REACTION_WITHOUT_
+  // CAUSE (per-scene, audits the prior scene for a cause) and EMOTIONAL_WHIPLASH
+  // (sign alternation): this flags a sustained run of driverless feeling.
+  // Requires 8+ records.
+  if (records.length >= 8) {
+    const hasDriver310 = (r: any) =>
+      (r.suspenseDelta ?? 0) > 0 ||
+      ((r.relationshipShifts ?? []) as any[]).length > 0 ||
+      r.revelation !== null ||
+      r.clockRaised === true;
+    let run310 = 0;
+    let start310 = 0;
+    for (let i310 = 0; i310 < records.length; i310++) {
+      const r310: any = records[i310];
+      if (r310.emotionalShift !== 'neutral' && !hasDriver310(r310)) {
+        if (run310 === 0) start310 = i310;
+        run310++;
+        if (run310 >= 3) {
+          issues.push({
+            location: `Scenes ${(records as any[])[start310].sceneIdx}–${r310.sceneIdx} — driverless emotion`,
+            rule: 'EMOTION_WITHOUT_DRIVER_RUN',
+            severity: 'minor',
+            description: `${run310} consecutive scenes (${(records as any[])[start310].sceneIdx}–${r310.sceneIdx}) carry a non-neutral emotional shift but none contains any driver — no suspense rise, no relationship movement, no revelation, no clock raised. The emotional curve swings with nothing on the page to cause it; the feelings are asserted rather than earned.`,
+            suggestedFix: 'Give each emotional beat a visible cause: a piece of news, a confrontation, a deadline tightening, a relationship turning. Emotion is the audience\'s reading of consequence — when the consequence is missing, the feeling reads as the script telling them how to feel.',
+          });
+          break;
+        }
+      } else {
+        run310 = 0;
+      }
+    }
+  }
+
+  // ── Wave 310: CLOCK_RELIEF_UNEXPLAINED ───────────────────────────────────
+  // A scene's clock pressure drops (clockDelta < 0) with no revelation and no
+  // payoff in that scene or the next — a deadline relaxes for no visible reason.
+  // The ticking clock is the audience's tension contract; releasing it without
+  // a cause (the bomb defused, the truth found, the deadline met) breaks that
+  // contract silently. Distinct from CLOCK_GHOST (a raise that fades) and
+  // CLOCK_DELTA_WITHOUT_RAISE (pressure before a clock exists): this flags an
+  // uncaused release of established pressure. Requires 6+ records.
+  if (records.length >= 6) {
+    for (let i310b = 0; i310b < records.length; i310b++) {
+      const r310b: any = records[i310b];
+      if ((r310b.clockDelta ?? 0) < 0) {
+        const window310 = [r310b, (records as any[])[i310b + 1]].filter(Boolean);
+        const caused310 = window310.some(w =>
+          w.revelation !== null || ((w.payoffSetupIds ?? []) as any[]).length > 0,
+        );
+        if (!caused310) {
+          issues.push({
+            location: `Scene ${r310b.sceneIdx} (clock relief)`,
+            rule: 'CLOCK_RELIEF_UNEXPLAINED',
+            severity: 'minor',
+            description: `Scene ${r310b.sceneIdx} releases clock pressure (clockDelta ${r310b.clockDelta}) with no revelation or payoff in that scene or the next — the deadline relaxes for no visible reason. A ticking clock is a tension contract with the audience; relieving it without a cause (the bomb defused, the deadline met, the truth found) breaks the contract silently and lets the air out of the scene.`,
+            suggestedFix: 'Tie every drop in time pressure to a concrete cause: the protagonist resolves the threat, buys time through a choice, or discovers the deadline was false. If the clock should stay live, do not relax it — sustained pressure is the point of raising it in the first place.',
+          });
+          break;
+        }
+      }
+    }
+  }
+
+  // ── Wave 310: DRAMATIC_TURN_CLUSTER ──────────────────────────────────────
+  // Three or more dramatic turns fall within a three-scene window. Reversals
+  // and revelations piled this tightly give the audience no time to register
+  // one pivot before the next overwrites it — the turns cannibalize each
+  // other's impact. The dramatic-turn analogue of REVELATION_CASCADE (which
+  // counts revelation density) and distinct from DRAMATIC_TURN_AFTERMATH_VOID
+  // (a single turn with an inert wake). Requires 6+ records.
+  if (records.length >= 6) {
+    for (let i310c = 0; i310c + 2 < records.length; i310c++) {
+      const window310c = (records as any[]).slice(i310c, i310c + 3);
+      const turnCount310 = window310c.filter(r => (r.dramaticTurn ?? 'nothing') !== 'nothing').length;
+      if (turnCount310 >= 3) {
+        issues.push({
+          location: `Scenes ${window310c[0].sceneIdx}–${window310c[2].sceneIdx} — turn cluster`,
+          rule: 'DRAMATIC_TURN_CLUSTER',
+          severity: 'minor',
+          description: `Scenes ${window310c[0].sceneIdx}–${window310c[2].sceneIdx} contain ${turnCount310} dramatic turns in a row — reversals and revelations piled into a three-scene window. The audience gets no time to register one pivot before the next overwrites it, and the turns cannibalize each other's impact instead of compounding it.`,
+          suggestedFix: 'Space the turns out. Let each reversal land and ripple — give the characters (and the audience) a scene to absorb and react before the next pivot. Bank some of the clustered turns for later acts where the story needs a fresh jolt.',
         });
         break;
       }

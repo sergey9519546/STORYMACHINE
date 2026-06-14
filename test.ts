@@ -17897,6 +17897,80 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 310 — causalityPass: emotion without driver run, clock relief unexplained, dramatic turn cluster', async () => {
+    const makeRec310 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runC310 = async (records: any[]) => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('EMOTION_WITHOUT_DRIVER_RUN fires when 3+ consecutive emotional scenes have no driver', async () => {
+      // scenes 3,4,5 non-neutral with suspenseDelta 0 and no other driver
+      const recs310ed = Array.from({ length: 8 }, (_, i) =>
+        makeRec310(i, {
+          emotionalShift: [3, 4, 5].includes(i) ? 'negative' : 'neutral',
+          suspenseDelta: [3, 4, 5].includes(i) ? 0 : 0.5,
+        })
+      );
+      const res = await runC310(recs310ed);
+      assert.ok(res.issues.some((i: any) => i.rule === 'EMOTION_WITHOUT_DRIVER_RUN'), 'EMOTION_WITHOUT_DRIVER_RUN should fire');
+    });
+
+    it('EMOTION_WITHOUT_DRIVER_RUN does not fire when emotional scenes have drivers', async () => {
+      const recs310ned = Array.from({ length: 8 }, (_, i) =>
+        makeRec310(i, {
+          emotionalShift: [3, 4, 5].includes(i) ? 'negative' : 'neutral',
+          suspenseDelta: [3, 4, 5].includes(i) ? 2 : 0.5,
+        })
+      );
+      const res = await runC310(recs310ned);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'EMOTION_WITHOUT_DRIVER_RUN'), 'EMOTION_WITHOUT_DRIVER_RUN should not fire');
+    });
+
+    it('CLOCK_RELIEF_UNEXPLAINED fires when clock pressure drops with no revelation or payoff', async () => {
+      const recs310cr = Array.from({ length: 8 }, (_, i) =>
+        makeRec310(i, { clockDelta: i === 4 ? -2 : 0 })
+      );
+      const res = await runC310(recs310cr);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_RELIEF_UNEXPLAINED'), 'CLOCK_RELIEF_UNEXPLAINED should fire');
+    });
+
+    it('CLOCK_RELIEF_UNEXPLAINED does not fire when the clock relief is caused by a payoff', async () => {
+      const recs310ncr = Array.from({ length: 8 }, (_, i) =>
+        makeRec310(i, {
+          clockDelta: i === 4 ? -2 : 0,
+          payoffSetupIds: i === 4 ? ['clue-a'] : [],
+        })
+      );
+      const res = await runC310(recs310ncr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_RELIEF_UNEXPLAINED'), 'CLOCK_RELIEF_UNEXPLAINED should not fire');
+    });
+
+    it('DRAMATIC_TURN_CLUSTER fires when 3+ dramatic turns fall in a three-scene window', async () => {
+      const recs310dt = Array.from({ length: 8 }, (_, i) =>
+        makeRec310(i, { dramaticTurn: [2, 3, 4].includes(i) ? 'reversal' : 'nothing' })
+      );
+      const res = await runC310(recs310dt);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_CLUSTER'), 'DRAMATIC_TURN_CLUSTER should fire');
+    });
+
+    it('DRAMATIC_TURN_CLUSTER does not fire when dramatic turns are spaced out', async () => {
+      const recs310ndt = Array.from({ length: 8 }, (_, i) =>
+        makeRec310(i, { dramaticTurn: [1, 4, 7].includes(i) ? 'reversal' : 'nothing' })
+      );
+      const res = await runC310(recs310ndt);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_CLUSTER'), 'DRAMATIC_TURN_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 309 — beliefPass: told belief drought, assertion void, revelation late first', async () => {
     const makeRec309 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
