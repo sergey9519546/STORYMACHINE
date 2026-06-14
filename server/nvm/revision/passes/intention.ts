@@ -19,6 +19,9 @@
 // Wave 300 additions: curiosity without agency (curiosity spikes never tied to
 // protagonist initiative), turns undriven (no dramatic turn occurs at or right
 // after a proactive act), seeding curiosity flat (clue plants never raise curiosity).
+// Wave 314 additions: proactive suspense decoupled (proactive scenes' own avg
+// suspenseDelta ≤ 0), proactive global scarcity (<15% of all scenes proactive),
+// stakes raised externally (raise_stakes scenes none of which are proactive).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1160,6 +1163,71 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `All ${seedScenes300.length} clue-seeding scenes have a flat or negative curiosityDelta — the story plants threads without making the audience wonder about any of them. A seed that raises no question is invisible: the audience will not carry it, and the eventual payoff will read as new information rather than a thread resolving.`,
         suggestedFix: 'Make at least the most important plant conspicuous enough to itch: a detail a character reacts to and then dismisses, an object the camera lingers on a beat too long, a remark that does not quite fit. The audience should notice without understanding — noticing is what converts a plant into a promise.',
+      });
+    }
+  }
+
+  // ── Wave 314: PROACTIVE_SUSPENSE_DECOUPLED ───────────────────────────────
+  // Proactive scenes (the protagonist raises a clock or plants a clue) have an
+  // average suspenseDelta of zero or below — the protagonist takes initiative
+  // but the initiative never raises tension. Distinct from AGENCY_WITHOUT_
+  // CONSEQUENCE (which audits the scenes that FOLLOW a proactive beat for a
+  // downstream ripple): this audits the proactive scenes' OWN suspense. Agency
+  // that generates no tension reads as busywork. Requires 8+ records and 3+
+  // proactive scenes.
+  if (n >= 8) {
+    const proactiveScenes314 = records.filter(isProactive258);
+    if (proactiveScenes314.length >= 3) {
+      const avgSusp314 = proactiveScenes314.reduce((acc: number, r: any) => acc + (r.suspenseDelta ?? 0), 0) / proactiveScenes314.length;
+      if (avgSusp314 <= 0) {
+        issues.push({
+          location: 'Proactive scenes — suspense decoupled',
+          rule: 'PROACTIVE_SUSPENSE_DECOUPLED',
+          severity: 'minor',
+          description: `The protagonist's ${proactiveScenes314.length} proactive scenes have an average suspenseDelta of ${avgSusp314.toFixed(2)} — initiative never raises tension. When the protagonist raises a clock or plants a clue and the scene generates no suspense, agency reads as procedure: the audience watches them act without feeling that anything is at risk in the acting.`,
+          suggestedFix: 'Make initiative dangerous: when the protagonist commits to a course, show what it could cost — a risk taken, a door that locks behind them, an enemy alerted. A proactive beat should tighten the screw, not just advance the to-do list.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 314: PROACTIVE_GLOBAL_SCARCITY ──────────────────────────────────
+  // Fewer than 15% of all scenes are proactive across the whole story — the
+  // protagonist almost never drives events. Distinct from PROTAGONIST_REACTIVE_
+  // DOMINANCE (Act 2 specifically), AGENCY_FRONTLOADED (distribution skew), and
+  // the zone-specific voids: this is a whole-story agency-density floor. A
+  // protagonist who initiates this rarely is a passenger for the entire film.
+  // Requires 10+ records and at least one proactive scene (a total void is
+  // covered by the opening/zone checks).
+  if (n >= 10) {
+    const proactiveCount314 = records.filter(isProactive258).length;
+    if (proactiveCount314 >= 1 && proactiveCount314 / n < 0.15) {
+      issues.push({
+        location: 'Whole-story agency density',
+        rule: 'PROACTIVE_GLOBAL_SCARCITY',
+        severity: 'minor',
+        description: `Only ${proactiveCount314} of ${n} scenes (${Math.round(proactiveCount314 / n * 100)}%) are proactive — the protagonist raises a clock or plants a clue in fewer than one scene in six. Across the whole story the protagonist almost never drives events; they spend the film reacting to a plot that happens around them rather than because of them.`,
+        suggestedFix: 'Raise the agency floor: give the protagonist initiative in each act — a goal they pursue, a deadline they set, a lead they chase. A story is the record of a character trying to get something; if they rarely try, there is no story, only events.',
+      });
+    }
+  }
+
+  // ── Wave 314: STAKES_RAISED_EXTERNALLY ───────────────────────────────────
+  // Two or more scenes carry the purpose "raise_stakes" but none of them is a
+  // proactive scene — the stakes only ever rise from outside, never from the
+  // protagonist's own choices. Distinct from conflict's STAKES_LABEL_UNBACKED
+  // (raise_stakes scenes with no conflict markers at all) and STAKES_NEVER_
+  // PERSONAL (clock never paired with emotion): this flags escalation that the
+  // protagonist never authors. Requires 8+ records.
+  if (n >= 8) {
+    const stakesScenes314 = records.filter((r: any) => r.purpose === 'raise_stakes');
+    if (stakesScenes314.length >= 2 && !stakesScenes314.some(isProactive258)) {
+      issues.push({
+        location: 'Stakes-raising scenes',
+        rule: 'STAKES_RAISED_EXTERNALLY',
+        severity: 'minor',
+        description: `${stakesScenes314.length} scenes raise the stakes but none is proactive — the protagonist never authors an escalation. Stakes that only ever rise from outside (events, antagonists, circumstance) make the protagonist the object of the story's pressure rather than a source of it; their choices never raise the temperature.`,
+        suggestedFix: 'Let the protagonist raise the stakes at least once: a gambit that forces the antagonist\'s hand, a deadline they impose, a confession that escalates the conflict. When the protagonist authors an escalation, the rising stakes become a consequence of who they are, not just weather they endure.',
       });
     }
   }

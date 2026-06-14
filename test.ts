@@ -17897,6 +17897,85 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 314 — intentionPass: proactive suspense decoupled, proactive global scarcity, stakes raised externally', async () => {
+    const makeRec314 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runI314 = async (records: any[]) => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      return intentionPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PROACTIVE_SUSPENSE_DECOUPLED fires when proactive scenes average suspenseDelta ≤ 0', async () => {
+      const recs314sd = Array.from({ length: 10 }, (_, i) =>
+        makeRec314(i, {
+          clockRaised: [2, 4, 6].includes(i),
+          suspenseDelta: [2, 4, 6].includes(i) ? -0.5 : 0.5,
+        })
+      );
+      const res = await runI314(recs314sd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PROACTIVE_SUSPENSE_DECOUPLED'), 'PROACTIVE_SUSPENSE_DECOUPLED should fire');
+    });
+
+    it('PROACTIVE_SUSPENSE_DECOUPLED does not fire when proactive scenes raise suspense', async () => {
+      const recs314nsd = Array.from({ length: 10 }, (_, i) =>
+        makeRec314(i, {
+          clockRaised: [2, 4, 6].includes(i),
+          suspenseDelta: [2, 4, 6].includes(i) ? 2 : 0.5,
+        })
+      );
+      const res = await runI314(recs314nsd);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PROACTIVE_SUSPENSE_DECOUPLED'), 'PROACTIVE_SUSPENSE_DECOUPLED should not fire');
+    });
+
+    it('PROACTIVE_GLOBAL_SCARCITY fires when under 15% of scenes are proactive', async () => {
+      // 12 scenes, exactly 1 proactive (8%)
+      const recs314gs = Array.from({ length: 12 }, (_, i) =>
+        makeRec314(i, { clockRaised: i === 5 })
+      );
+      const res = await runI314(recs314gs);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PROACTIVE_GLOBAL_SCARCITY'), 'PROACTIVE_GLOBAL_SCARCITY should fire');
+    });
+
+    it('PROACTIVE_GLOBAL_SCARCITY does not fire when agency is well distributed', async () => {
+      // 12 scenes, 4 proactive (33%)
+      const recs314ngs = Array.from({ length: 12 }, (_, i) =>
+        makeRec314(i, { clockRaised: [1, 4, 7, 10].includes(i) })
+      );
+      const res = await runI314(recs314ngs);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PROACTIVE_GLOBAL_SCARCITY'), 'PROACTIVE_GLOBAL_SCARCITY should not fire');
+    });
+
+    it('STAKES_RAISED_EXTERNALLY fires when raise_stakes scenes are never proactive', async () => {
+      const recs314se = Array.from({ length: 10 }, (_, i) =>
+        makeRec314(i, {
+          purpose: [3, 6].includes(i) ? 'raise_stakes' : 'development',
+          // proactive activity elsewhere, but NOT on the raise_stakes scenes
+          clockRaised: i === 8,
+        })
+      );
+      const res = await runI314(recs314se);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STAKES_RAISED_EXTERNALLY'), 'STAKES_RAISED_EXTERNALLY should fire');
+    });
+
+    it('STAKES_RAISED_EXTERNALLY does not fire when a stakes scene is proactive', async () => {
+      const recs314nse = Array.from({ length: 10 }, (_, i) =>
+        makeRec314(i, {
+          purpose: [3, 6].includes(i) ? 'raise_stakes' : 'development',
+          clockRaised: i === 3,
+        })
+      );
+      const res = await runI314(recs314nse);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STAKES_RAISED_EXTERNALLY'), 'STAKES_RAISED_EXTERNALLY should not fire');
+    });
+  });
+
   describe('Wave 313 — conflictPass: curiosity decoupled, magnitude peak early, relentless run', async () => {
     const makeRec313 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
