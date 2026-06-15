@@ -19550,6 +19550,88 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 335 — causalityPass: payoff curiosity decoupled, dramatic turn curiosity void, clue seed suspense void', async () => {
+    const makeRec335 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'negative', suspenseDelta: 0.3, curiosityDelta: 0.5,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runC335 = async (records: any[]) => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PAYOFF_CURIOSITY_DECOUPLED fires when payoff scenes avg curiosityDelta ≤ 0', async () => {
+      const recs335pd = [
+        ...Array.from({ length: 5 }, (_, i) => makeRec335(i)),
+        makeRec335(5, { payoffSetupIds: ['A'], curiosityDelta: -0.5 }),
+        makeRec335(6, { payoffSetupIds: ['B'], curiosityDelta: 0 }),
+        makeRec335(7, { payoffSetupIds: ['C'], curiosityDelta: -0.2 }),
+      ];
+      const res = await runC335(recs335pd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CURIOSITY_DECOUPLED'), 'PAYOFF_CURIOSITY_DECOUPLED should fire');
+    });
+
+    it('PAYOFF_CURIOSITY_DECOUPLED does not fire when payoff scenes avg curiosityDelta > 0', async () => {
+      const recs335pdnw = [
+        ...Array.from({ length: 5 }, (_, i) => makeRec335(i)),
+        makeRec335(5, { payoffSetupIds: ['A'], curiosityDelta: 1.0 }),
+        makeRec335(6, { payoffSetupIds: ['B'], curiosityDelta: 0.8 }),
+        makeRec335(7, { payoffSetupIds: ['C'], curiosityDelta: 0.5 }),
+      ];
+      const res = await runC335(recs335pdnw);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CURIOSITY_DECOUPLED'), 'PAYOFF_CURIOSITY_DECOUPLED should not fire');
+    });
+
+    it('DRAMATIC_TURN_CURIOSITY_VOID fires when dramatic turn scenes avg curiosityDelta ≤ 0', async () => {
+      const recs335dt = [
+        ...Array.from({ length: 7 }, (_, i) => makeRec335(i)),
+        makeRec335(7, { dramaticTurn: 'reversal', curiosityDelta: -0.3 }),
+        makeRec335(8, { dramaticTurn: 'recognition', curiosityDelta: 0 }),
+        makeRec335(9, { dramaticTurn: 'reversal', curiosityDelta: -0.1 }),
+      ];
+      const res = await runC335(recs335dt);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_CURIOSITY_VOID'), 'DRAMATIC_TURN_CURIOSITY_VOID should fire');
+    });
+
+    it('DRAMATIC_TURN_CURIOSITY_VOID does not fire when dramatic turn scenes generate curiosity', async () => {
+      const recs335dtnw = [
+        ...Array.from({ length: 7 }, (_, i) => makeRec335(i)),
+        makeRec335(7, { dramaticTurn: 'reversal', curiosityDelta: 1.2 }),
+        makeRec335(8, { dramaticTurn: 'recognition', curiosityDelta: 0.9 }),
+        makeRec335(9, { dramaticTurn: 'reversal', curiosityDelta: 0.7 }),
+      ];
+      const res = await runC335(recs335dtnw);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_CURIOSITY_VOID'), 'DRAMATIC_TURN_CURIOSITY_VOID should not fire');
+    });
+
+    it('CLUE_SEED_SUSPENSE_VOID fires when clue-seeding scenes avg suspenseDelta ≤ 0', async () => {
+      const recs335cs = [
+        ...Array.from({ length: 5 }, (_, i) => makeRec335(i)),
+        makeRec335(5, { seededClueIds: ['clue-A'], suspenseDelta: -0.4 }),
+        makeRec335(6, { seededClueIds: ['clue-B'], suspenseDelta: 0 }),
+        makeRec335(7, { seededClueIds: ['clue-C'], suspenseDelta: -0.2 }),
+      ];
+      const res = await runC335(recs335cs);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLUE_SEED_SUSPENSE_VOID'), 'CLUE_SEED_SUSPENSE_VOID should fire');
+    });
+
+    it('CLUE_SEED_SUSPENSE_VOID does not fire when clue-seeding scenes carry foreboding', async () => {
+      const recs335csnw = [
+        ...Array.from({ length: 5 }, (_, i) => makeRec335(i)),
+        makeRec335(5, { seededClueIds: ['clue-A'], suspenseDelta: 0.8 }),
+        makeRec335(6, { seededClueIds: ['clue-B'], suspenseDelta: 0.6 }),
+        makeRec335(7, { seededClueIds: ['clue-C'], suspenseDelta: 0.4 }),
+      ];
+      const res = await runC335(recs335csnw);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLUE_SEED_SUSPENSE_VOID'), 'CLUE_SEED_SUSPENSE_VOID should not fire');
+    });
+  });
+
   describe('Wave 324 — causalityPass: suspense unreleased run, clock raised no delta, emotional neutral run', async () => {
     const makeRec324 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

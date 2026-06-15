@@ -26,6 +26,10 @@
 // Wave 324 additions: suspense unreleased run (6+ consecutive scenes all raise tension
 // with no release valley), clock raised no delta (≥2 clock raises with clockDelta 0 —
 // cosmetic deadlines), emotional neutral run (6+ consecutive emotionally neutral scenes).
+// Wave 335 additions: payoff curiosity decoupled (payoff scenes avg curiosityDelta ≤ 0 —
+// resolutions that generate no new questions), dramatic turn curiosity void (reversal/twist
+// scenes avg curiosityDelta ≤ 0 — turns that don't ignite audience wonder), clue seed
+// suspense void (clue-planting scenes avg suspenseDelta ≤ 0 — cosmetic foreshadowing).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1358,6 +1362,82 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         }
       } else {
         erun324 = 0;
+      }
+    }
+  }
+
+  // ── Wave 335: PAYOFF_CURIOSITY_DECOUPLED, DRAMATIC_TURN_CURIOSITY_VOID, CLUE_SEED_SUSPENSE_VOID ──
+
+  // PAYOFF_CURIOSITY_DECOUPLED (minor, n≥8, ≥3 payoff scenes): Scenes that pay off a
+  // planted thread (payoffSetupIds non-empty) have an average curiosityDelta of zero or
+  // less — resolutions close one question without opening another. Good payoffs are
+  // bittersweet: they resolve the setup but spawn new uncertainties that keep the
+  // audience hooked. If every payoff lands flat or even suppresses curiosity, the story
+  // feels like a ledger being cleared rather than a living system. Distinct from
+  // PAYOFF_BACK_LOADED (timing of payoffs), PAYOFF_WITHOUT_SETUP (missing prior seed),
+  // CURIOSITY_OPEN_LOOP (unresolved mystery loops), and CURIOSITY_FRONT_LOADED (timing).
+  if (records.length >= 8) {
+    const payoffScenes335 = (records as any[]).filter(r => Array.isArray(r.payoffSetupIds) && r.payoffSetupIds.length > 0);
+    if (payoffScenes335.length >= 3) {
+      const avgCuriosity335p = payoffScenes335.reduce((s: number, r: any) => s + (r.curiosityDelta ?? 0), 0) / payoffScenes335.length;
+      if (avgCuriosity335p <= 0) {
+        issues.push({
+          location: `${payoffScenes335.length} payoff scene(s) — avg curiosityDelta ${avgCuriosity335p.toFixed(2)}`,
+          rule: 'PAYOFF_CURIOSITY_DECOUPLED',
+          severity: 'minor',
+          description: `${payoffScenes335.length} payoff scenes (scenes that resolve planted threads) have an average curiosityDelta of ${avgCuriosity335p.toFixed(2)} — resolutions consistently close questions without opening new ones. Effective payoffs are generative: answering the setup question should reveal a new layer of uncertainty that propels the audience forward. When every resolution leaves curiosity flat or negative, the story's momentum stalls each time a thread closes.`,
+          suggestedFix: "Design payoffs to be revelatory rather than merely conclusive: the answer to one question should expose a deeper question, a new complication, or an unexpected implication. Each resolved thread can become the root of a new one — let the payoff scene's curiosityDelta reflect that the audience's hunger has been redirected, not satisfied.",
+        });
+      }
+    }
+  }
+
+  // DRAMATIC_TURN_CURIOSITY_VOID (minor, n≥10, ≥3 dramatic turn scenes): Scenes with a
+  // genuine dramaticTurn (reversal, recognition, or twist — not 'nothing') have an
+  // average curiosityDelta of zero or less — pivots and reversals that don't ignite
+  // audience wonder. A twist should make the audience ask "what does this mean now?" and
+  // "what happens next?"; if the story changes direction but the audience's curiosity
+  // doesn't rise, the turn has mechanical form but no narrative electricity. Distinct from
+  // DRAMATIC_TURN_AFTERMATH_VOID (checks emptiness of the 2 scenes after a reversal),
+  // DRAMATIC_TURN_CLUSTER (too many turns in a tight window), and CAUSAL_MIDPOINT_VOID
+  // (causal absence at the midpoint specifically).
+  if (records.length >= 10) {
+    const turnScenes335 = (records as any[]).filter(r => r.dramaticTurn && r.dramaticTurn !== 'nothing');
+    if (turnScenes335.length >= 3) {
+      const avgCuriosity335t = turnScenes335.reduce((s: number, r: any) => s + (r.curiosityDelta ?? 0), 0) / turnScenes335.length;
+      if (avgCuriosity335t <= 0) {
+        issues.push({
+          location: `${turnScenes335.length} dramatic turn scene(s) — avg curiosityDelta ${avgCuriosity335t.toFixed(2)}`,
+          rule: 'DRAMATIC_TURN_CURIOSITY_VOID',
+          severity: 'minor',
+          description: `${turnScenes335.length} scenes contain a genuine dramatic turn (reversal, recognition, or twist) but have an average curiosityDelta of ${avgCuriosity335t.toFixed(2)} — the story's pivots fail to ignite audience curiosity. A twist should leave the audience hungry: "what does this mean now?", "what will they do?", "where does this go?" If reversals consistently fail to raise curiosity, the turns are mechanical shape-changes with no narrative electricity — the audience can see the gears, but they feel nothing.`,
+          suggestedFix: 'Make each dramatic turn productive: the reversal should open questions it cannot immediately answer. A recognition scene exposes a new unknown; a twist reframes everything in a way that generates fresh uncertainty. Let the curiosityDelta on turn scenes reflect that the audience has been sent leaning forward, not just informed that the situation has changed.',
+        });
+      }
+    }
+  }
+
+  // CLUE_SEED_SUSPENSE_VOID (minor, n≥8, ≥3 clue-seeding scenes): Scenes that plant
+  // story clues (seededClueIds non-empty) have an average suspenseDelta of zero or less —
+  // foreshadowing that carries no foreboding. When a clue is seeded, the audience should
+  // sense that something is being set in motion — a quiet dread, a ticking implication.
+  // If clue-planting scenes are suspense-neutral or negative, the planted clues feel
+  // cosmetic: the writer is leaving breadcrumbs, but the audience has no reason to feel
+  // the weight of them. Distinct from CLUE_SEED_CLUSTER (all seeds concentrated in one
+  // scene), CHEKHOV_GUN_UNFIRED (seeds that are never paid off), and
+  // REVELATION_WITHOUT_SETUP (revelations that lack prior seeds).
+  if (records.length >= 8) {
+    const seedScenes335 = (records as any[]).filter(r => Array.isArray(r.seededClueIds) && r.seededClueIds.length > 0);
+    if (seedScenes335.length >= 3) {
+      const avgSuspense335s = seedScenes335.reduce((s: number, r: any) => s + (r.suspenseDelta ?? 0), 0) / seedScenes335.length;
+      if (avgSuspense335s <= 0) {
+        issues.push({
+          location: `${seedScenes335.length} clue-seeding scene(s) — avg suspenseDelta ${avgSuspense335s.toFixed(2)}`,
+          rule: 'CLUE_SEED_SUSPENSE_VOID',
+          severity: 'minor',
+          description: `${seedScenes335.length} scenes plant story clues but have an average suspenseDelta of ${avgSuspense335s.toFixed(2)} — foreshadowing without foreboding. A seeded clue should carry weight: the audience should sense that something is being set in motion, even if they cannot name it yet. When clue-planting scenes are suspense-flat or suspense-negative, the foreshadowing is cosmetic — breadcrumbs with no dread attached, so the eventual payoff lands without the accumulated pressure that should make it resonate.`,
+          suggestedFix: 'Let each clue carry its own shadow: the scene that plants the seed should also tighten something — a glance held too long, an object that feels wrong, a line that could mean two things. Suspense need not be overt; a mild positive suspenseDelta on each seed scene signals that the audience has felt the implications, even subliminally, before the payoff arrives.',
+        });
       }
     }
   }
