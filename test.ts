@@ -19612,6 +19612,98 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 334 — beliefPass: told belief suspense decoupled, told belief emotional flatline, revelation relationship decoupled', async () => {
+    const makeRec334 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 1,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runB334 = async (records: any[]) => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('TOLD_BELIEF_SUSPENSE_DECOUPLED fires when assertion scenes have avg suspenseDelta ≤ 0', async () => {
+      const recs334sd = Array.from({ length: 8 }, (_, i) =>
+        makeRec334(i, {
+          dialogueHighlights: [1, 3, 5].includes(i) ? ['ALICE: the truth will come out'] : [],
+          suspenseDelta: 0,
+          curiosityDelta: 2,
+        })
+      );
+      const res = await runB334(recs334sd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TOLD_BELIEF_SUSPENSE_DECOUPLED'), 'TOLD_BELIEF_SUSPENSE_DECOUPLED should fire');
+    });
+
+    it('TOLD_BELIEF_SUSPENSE_DECOUPLED does not fire when assertion scenes raise suspense', async () => {
+      const recs334nsd = Array.from({ length: 8 }, (_, i) =>
+        makeRec334(i, {
+          dialogueHighlights: [1, 3, 5].includes(i) ? ['ALICE: the truth will come out'] : [],
+          suspenseDelta: [1, 3, 5].includes(i) ? 1.5 : 0,
+          curiosityDelta: 2,
+        })
+      );
+      const res = await runB334(recs334nsd);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TOLD_BELIEF_SUSPENSE_DECOUPLED'), 'TOLD_BELIEF_SUSPENSE_DECOUPLED should not fire');
+    });
+
+    it('TOLD_BELIEF_EMOTIONAL_FLATLINE fires when all assertion scenes are emotionally neutral', async () => {
+      const recs334ef = Array.from({ length: 8 }, (_, i) =>
+        makeRec334(i, {
+          dialogueHighlights: [1, 3, 5].includes(i) ? ['ALICE: the truth will come out'] : [],
+          emotionalShift: 'neutral',
+          suspenseDelta: 1.5,
+          curiosityDelta: 2,
+        })
+      );
+      const res = await runB334(recs334ef);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TOLD_BELIEF_EMOTIONAL_FLATLINE'), 'TOLD_BELIEF_EMOTIONAL_FLATLINE should fire');
+    });
+
+    it('TOLD_BELIEF_EMOTIONAL_FLATLINE does not fire when an assertion scene carries emotional charge', async () => {
+      const recs334nef = Array.from({ length: 8 }, (_, i) =>
+        makeRec334(i, {
+          dialogueHighlights: [1, 3, 5].includes(i) ? ['ALICE: the truth will come out'] : [],
+          emotionalShift: i === 3 ? 'positive' : 'neutral',
+          suspenseDelta: 1.5,
+          curiosityDelta: 2,
+        })
+      );
+      const res = await runB334(recs334nef);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TOLD_BELIEF_EMOTIONAL_FLATLINE'), 'TOLD_BELIEF_EMOTIONAL_FLATLINE should not fire');
+    });
+
+    it('REVELATION_RELATIONSHIP_DECOUPLED fires when no revelation scene moves a bond', async () => {
+      const recs334rr = Array.from({ length: 8 }, (_, i) =>
+        makeRec334(i, {
+          revelation: [2, 5].includes(i) ? `disclosure ${i}` : null,
+          suspenseDelta: 1.5,
+          curiosityDelta: 2,
+          relationshipShifts: [],
+        })
+      );
+      const res = await runB334(recs334rr);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_RELATIONSHIP_DECOUPLED'), 'REVELATION_RELATIONSHIP_DECOUPLED should fire');
+    });
+
+    it('REVELATION_RELATIONSHIP_DECOUPLED does not fire when a revelation scene moves a bond', async () => {
+      const recs334nrr = Array.from({ length: 8 }, (_, i) =>
+        makeRec334(i, {
+          revelation: [2, 5].includes(i) ? `disclosure ${i}` : null,
+          suspenseDelta: 1.5,
+          curiosityDelta: 2,
+          relationshipShifts: i === 2 ? [{ pairKey: 'A|B', dimension: 'trust', amount: -1.5 }] : [],
+        })
+      );
+      const res = await runB334(recs334nrr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_RELATIONSHIP_DECOUPLED'), 'REVELATION_RELATIONSHIP_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 323 — beliefPass: revelation curiosity decoupled, told belief curiosity flat, told belief relationship decoupled', async () => {
     const makeRec323 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

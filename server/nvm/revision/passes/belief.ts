@@ -25,6 +25,10 @@
 // Wave 323 additions: revelation curiosity decoupled (revelation scenes avg curiosityDelta
 // ≤ 0 — discoveries never reopen the field), told belief curiosity flat (assertion scenes
 // avg curiosityDelta ≤ 0), told belief relationship decoupled (no assertion scene moves a bond).
+// Wave 334 additions: told belief suspense decoupled (assertion scenes avg suspenseDelta ≤ 0 —
+// claims arrive without tension), told belief emotional flatline (all assertion scenes
+// neutral — claims carry no emotional charge), revelation relationship decoupled (no revelation
+// scene moves a bond — discoveries never alter the relational world).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1139,6 +1143,82 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `None of the ${toldScenes323r.length} scenes containing a told belief also carries a relationship shift — assertions never move a bond. Beliefs are relational acts: to assert, to lie, to confess is to act on another person. When the belief layer never touches the relationship layer, claims float free of the character dynamics they should be straining, deepening, or betraying.`,
           suggestedFix: 'Let assertions land on relationships: a confident claim should impress, alienate, or provoke whoever hears it; a lie should quietly damage the bond with the person deceived. Tie at least some belief beats to a measurable shift in trust or power so the epistemic layer drives the relational one.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 334: TOLD_BELIEF_SUSPENSE_DECOUPLED, TOLD_BELIEF_EMOTIONAL_FLATLINE, REVELATION_RELATIONSHIP_DECOUPLED ──
+
+  // TOLD_BELIEF_SUSPENSE_DECOUPLED (minor, n≥8, ≥3 assertion scenes): Scenes
+  // where a character asserts a belief average suspenseDelta ≤ 0. Claims that
+  // arrive without generating tension register as flat exposition — the audience
+  // files the assertion rather than feeling the stakes of whether it is true.
+  // A contestable belief should make the audience tense: if wrong, someone will
+  // pay for it. Distinct from TOLD_BELIEF_CURIOSITY_FLAT (curiosityDelta, Wave 323)
+  // and REVELATION_SUSPENSE_DECOUPLED (revelation scenes, not assertion scenes).
+  if (records.length >= 8) {
+    const toldScenes334 = (records as any[]).filter(r =>
+      ((r.dialogueHighlights ?? []) as string[]).some(h => h.includes(':')),
+    );
+    if (toldScenes334.length >= 3) {
+      const avgSusp334 = toldScenes334.reduce((s: number, r: any) => s + (r.suspenseDelta ?? 0), 0) / toldScenes334.length;
+      if (avgSusp334 <= 0) {
+        issues.push({
+          location: 'Told-belief scenes — tension register',
+          rule: 'TOLD_BELIEF_SUSPENSE_DECOUPLED',
+          severity: 'minor',
+          description: `${toldScenes334.length} scenes where a character asserts a belief average a suspenseDelta of ${avgSusp334.toFixed(2)} — claims arrive without generating tension. A contestable belief should make the audience feel the stakes of whether it is true; when assertions are accompanied by zero tension, they land as fact rather than as propositions the story will test. The audience files the claim rather than leaning forward to see if it holds.`,
+          suggestedFix: 'Frame assertions so the stakes of being wrong are visible: let the claim be made under pressure, over a disagreement, or in a context where the cost of error is immediately apparent. An assertion made in a tense scene is a gamble; one made in a flat scene is exposition.',
+        });
+      }
+    }
+  }
+
+  // TOLD_BELIEF_EMOTIONAL_FLATLINE (minor, n≥8, ≥3 assertion scenes): All
+  // scenes where a character asserts a belief are emotionally neutral. Claims
+  // carry no emotional charge — the belief layer operates as information
+  // delivery rather than as an emotional register. Characters state things
+  // they feel strongly about with no feeling; the audience registers the
+  // content but not the conviction behind it. Distinct from TOLD_BELIEF_CURIOSITY_FLAT
+  // (curiosity channel, Wave 323), REVELATION_DRAMA_VACUUM (revelation scenes,
+  // checks BOTH emotion and suspense), TOLD_BELIEF_SUSPENSE_DECOUPLED (suspense
+  // channel, not emotional shift).
+  if (records.length >= 8) {
+    const toldScenes334e = (records as any[]).filter(r =>
+      ((r.dialogueHighlights ?? []) as string[]).some(h => h.includes(':')),
+    );
+    if (toldScenes334e.length >= 3 && toldScenes334e.every(r => r.emotionalShift === 'neutral')) {
+      issues.push({
+        location: 'Told-belief scenes — emotional register',
+        rule: 'TOLD_BELIEF_EMOTIONAL_FLATLINE',
+        severity: 'minor',
+        description: `All ${toldScenes334e.length} scenes where a character asserts a belief are emotionally neutral — claims carry no emotional charge. Characters state things they believe (or pretend to believe) with the affect of delivering a weather report. The audience registers the content but not the conviction; told beliefs that land in flat emotional scenes feel like database entries rather than live commitments.`,
+        suggestedFix: 'Give assertions emotional weight: a character stating what they believe should do so from a position of feeling. Conviction, fear of being wrong, pride in being right, or dread of the consequence if the claim is false — the emotional register around an assertion signals how much it matters to the character, and therefore how much it matters to the audience.',
+      });
+    }
+  }
+
+  // REVELATION_RELATIONSHIP_DECOUPLED (minor, n≥8, ≥2 revelation scenes): No
+  // scene containing a revelation also contains a relationship shift. When
+  // discoveries never alter how characters relate to each other, the story's
+  // information events operate independently of its relational world — truth
+  // is revealed but bonds are unaffected. In most stories, revelations reframe
+  // relationships: the truth about who someone is changes how we trust them.
+  // Distinct from TOLD_BELIEF_RELATIONSHIP_DECOUPLED (Wave 323: assertion scenes,
+  // not revelation scenes) and REVELATION_DRAMA_VACUUM (emotional + suspense,
+  // not relationship shifts).
+  if (records.length >= 8) {
+    const revScenes334 = (records as any[]).filter(r => r.revelation !== null && r.revelation !== undefined && r.revelation !== '');
+    if (revScenes334.length >= 2) {
+      const anyRevRelShift334 = revScenes334.some(r => ((r.relationshipShifts ?? []) as any[]).length > 0);
+      if (!anyRevRelShift334) {
+        issues.push({
+          location: 'Revelation scenes — relational impact',
+          rule: 'REVELATION_RELATIONSHIP_DECOUPLED',
+          severity: 'minor',
+          description: `None of the ${revScenes334.length} revelation scene(s) also carries a relationship shift — discoveries never alter how characters relate to one another. In most stories, revelations reframe relationships: the truth about who someone is, or what they did, changes trust, loyalty, or affection. When all revelations are relational non-events, the story's information layer operates independently of its human bonds.`,
+          suggestedFix: 'Let at least one revelation land on a relationship: the truth uncovered should shift the trust between the character who learned it and someone else. A secret revealed should either rupture a bond (if the truth was a betrayal) or strengthen one (if the truth was a shared burden) — discoveries that leave all relationships unchanged fail their dramatic function.',
         });
       }
     }
