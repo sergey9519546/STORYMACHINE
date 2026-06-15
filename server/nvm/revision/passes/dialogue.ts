@@ -23,6 +23,9 @@
 // Wave 325 additions: expletive opener overuse (>25% of lines begin with "There's"/"It's"/
 // "Here's" dummy subjects), absolute overuse (>30% of lines contain "always"/"everyone"/
 // "completely" universals), within-line word echo (≥3 lines triple a word: "No no no").
+// Wave 336 additions: question flood (>35% of all lines are questions — interrogation
+// without assertion), negative opener flood (>30% of lines open with "No"/"Can't"/"Never"
+// — uniform combative tone), mid-sentence caps flood (≥4 lines shout a word via ALL-CAPS).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1449,6 +1452,73 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${echoLineCount325} dialogue lines repeat a single word three or more times within the line ("No no no", "Run run run"). Within-line word tripling is a stock shorthand for panic or insistence; recurring across the script it becomes a tic that signals heightened emotion through typography rather than through what is actually said or done.`,
         suggestedFix: 'Reserve the word-tripling for one genuine peak of panic and convey urgency elsewhere through content and action — a clipped command, an unfinished sentence, a physical beat. Repetition lands when it is rare; when every charged line triples a word, the device stops reading as emotion and starts reading as formatting.',
+      });
+    }
+  }
+
+  // ── Wave 336: DIALOGUE_QUESTION_FLOOD, DIALOGUE_NEGATIVE_OPENER_FLOOD, DIALOGUE_MIDSENTENCE_CAPS_FLOOD ──
+
+  // DIALOGUE_QUESTION_FLOOD (minor, ≥10 lines, >35%): More than 35% of all
+  // dialogue lines end with a question mark — the script runs on interrogation.
+  // Without declarative lines to anchor exchange, dialogue reads like an interview
+  // rather than a conversation: characters only seek, never assert, never decide.
+  // Distinct from DIALOGUE_QUESTION_CLUSTER (3+ consecutive questions in a row)
+  // and TAG_QUESTION_OVERUSE (the specific appended "…isn't it?" form).
+  if (dialogue.length >= 10) {
+    const questionCount336 = dialogue.filter(d => d.line.trimEnd().endsWith('?')).length;
+    if (questionCount336 / dialogue.length > 0.35) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_QUESTION_FLOOD',
+        severity: 'minor',
+        description: `${questionCount336} of ${dialogue.length} dialogue lines (${Math.round(questionCount336 / dialogue.length * 100)}%) end with a question mark — more than a third of all dialogue is interrogative. Without declarative lines to anchor the exchange, the conversation reads as an interview rather than a scene: characters perpetually seek without asserting, committing to a position, or driving an action forward.`,
+        suggestedFix: "Balance the question load: characters who never declare, insist, or state are passive in their own story. Recasting some questions as statements or demands shifts the power dynamic and creates the assertion–challenge tension that makes dialogue feel alive. Reserve dense question runs for scenes of genuine uncertainty or interrogation.",
+      });
+    }
+  }
+
+  // DIALOGUE_NEGATIVE_OPENER_FLOOD (minor, ≥10 lines, >30%): More than 30% of
+  // dialogue lines open with a negative word or contraction — "No", "Not",
+  // "Never", "Don't", "Can't", "Won't", etc. When a third of all dialogue begins
+  // with refusal or denial, the tone is uniformly combative and the audience loses
+  // contrast: there is no baseline of agreement or openness to make the negations
+  // land. Distinct from NEGATION_SATURATION in voice.ts (checks "no/not/never/
+  // nothing" anywhere in the line) and CONTRACTION_STARVATION (missing contractions).
+  if (dialogue.length >= 10) {
+    const negOpenerRe336 = /^(no\b|not\b|never\b|none\b|nothing\b|nobody\b|nowhere\b|don't|can't|won't|isn't|doesn't|didn't|couldn't|wouldn't|shouldn't|haven't|hasn't|hadn't|aren't|wasn't|weren't)/i;
+    const negOpenerCount336 = dialogue.filter(d => negOpenerRe336.test(d.line.trimStart())).length;
+    if (negOpenerCount336 / dialogue.length > 0.3) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_NEGATIVE_OPENER_FLOOD',
+        severity: 'minor',
+        description: `${negOpenerCount336} of ${dialogue.length} dialogue lines (${Math.round(negOpenerCount336 / dialogue.length * 100)}%) open with a negative word or contraction ("No", "Not", "Never", "Don't", "Can't", etc.). When a third of all dialogue begins with refusal or denial, the tone is uniformly combative — without a baseline of agreement or openness, the negations lose their force and the scene reads as characters simply blocking each other rather than genuinely conflicting.`,
+        suggestedFix: "Vary the entry points: characters who always open with refusal never reveal what they do want, what they fear, or what they believe. Let some lines begin with assertion, admission, or question — the negotiation between yes and no is what creates dramatic texture. Reserve negative openers for moments where the denial itself carries the most weight.",
+      });
+    }
+  }
+
+  // DIALOGUE_MIDSENTENCE_CAPS_FLOOD (minor, ≥8 lines, ≥4 lines): Four or more
+  // dialogue lines contain a word of three or more consecutive uppercase letters
+  // that appears after the first word of the line — the writer shouts emphasis
+  // typographically ("I TOLD you", "You simply CANNOT", "We NEED to leave"). Used
+  // sparingly, ALL-CAPS marks a single vocal peak; recurring across four or more
+  // lines it signals that the writer is instructing the actor where to raise their
+  // voice rather than writing lines whose urgency is already in the words and rhythm.
+  // Distinct from EXCLAMATION_OVERUSE (which counts "!" marks) and
+  // ONE_WORD_LINE_DOMINANCE (single-word lines).
+  if (dialogue.length >= 8) {
+    const capsCount336 = dialogue.filter(d => {
+      const words336 = d.line.split(/\s+/);
+      return words336.slice(1).some((w: string) => /^[A-Z]{3,}$/.test(w.replace(/[^A-Za-z]/g, '')));
+    }).length;
+    if (capsCount336 >= 4) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_MIDSENTENCE_CAPS_FLOOD',
+        severity: 'minor',
+        description: `${capsCount336} dialogue lines contain a mid-sentence ALL-CAPS word ("I TOLD you", "You simply CANNOT", "We NEED to leave"). ALL-CAPS mid-sentence is an actor direction embedded in the line — it tells the performer where to shout rather than writing words whose pressure is already felt in the rhythm and word choice. Recurring across four or more lines, it becomes a typographic tic that signals emotion rather than conveying it.`,
+        suggestedFix: "Reserve ALL-CAPS emphasis for one genuine vocal peak in the script and convey urgency elsewhere through sentence structure, word choice, and rhythm. A shorter, better-chosen sentence often hits harder than a shouted word. If the line needs the caps to feel urgent, the line itself needs rewriting.",
       });
     }
   }

@@ -19427,6 +19427,129 @@ The lights go out.`;
     });
   });
 
+  describe('Wave 336 — dialoguePass: question flood, negative opener flood, mid-sentence caps flood', async () => {
+    const runD336 = async (fountain: string) => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DIALOGUE_QUESTION_FLOOD fires when >35% of lines are questions', async () => {
+      const fountain336q = `INT. ROOM - DAY
+
+ALICE
+What do you want from me?
+Are you even listening right now?
+We should leave now today.
+The door is open wide.
+
+BOB
+Did you hear what I said there?
+Why are you doing this to me?
+I am not leaving here at all.
+Maybe later then okay fine.
+The walls feel close tonight.
+What were you thinking of then?`;
+      const res = await runD336(fountain336q);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_QUESTION_FLOOD'), 'DIALOGUE_QUESTION_FLOOD should fire');
+    });
+
+    it('DIALOGUE_QUESTION_FLOOD does not fire when questions are a minority', async () => {
+      const fountain336qnw = `INT. ROOM - DAY
+
+ALICE
+What do you want from me?
+We should leave now today.
+The door is open wide here.
+I am staying right here now.
+
+BOB
+The problem is very clear now.
+We can still try again then.
+Maybe later then okay fine.
+The road is long and hard here.
+I believe you are right here.
+Time to go and leave now please.`;
+      const res = await runD336(fountain336qnw);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_QUESTION_FLOOD'), 'DIALOGUE_QUESTION_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_NEGATIVE_OPENER_FLOOD fires when >30% of lines open with a negative', async () => {
+      const fountain336n = `INT. ROOM - DAY
+
+ALICE
+No, I will not do that now.
+We should leave now today here.
+Can't you see what is happening?
+The door is wide open there.
+
+BOB
+Never again will I do this here.
+I am just standing here now still.
+Don't push me any further please.
+The walls are closing in fast.
+We can still try once more now.
+Won't you just listen to me please.`;
+      const res = await runD336(fountain336n);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_NEGATIVE_OPENER_FLOOD'), 'DIALOGUE_NEGATIVE_OPENER_FLOOD should fire');
+    });
+
+    it('DIALOGUE_NEGATIVE_OPENER_FLOOD does not fire when negatives are rare', async () => {
+      const fountain336nnw = `INT. ROOM - DAY
+
+ALICE
+No, I will not do that now.
+We should leave now today here.
+The door is wide open there now.
+I believe you are right here now.
+
+BOB
+The problem is very clear now here.
+I am just standing here now still.
+The walls are closing in fast now.
+We can still try once more now please.
+You need to trust me right now here.
+Maybe later then okay fine please.`;
+      const res = await runD336(fountain336nnw);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_NEGATIVE_OPENER_FLOOD'), 'DIALOGUE_NEGATIVE_OPENER_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_MIDSENTENCE_CAPS_FLOOD fires when ≥4 lines shout a word mid-sentence', async () => {
+      const fountain336c = `INT. ROOM - DAY
+
+ALICE
+I TOLD you this was wrong here.
+We should leave now today please.
+You simply CANNOT do that to me.
+The door is open very wide now.
+
+BOB
+We NEED to leave right now please.
+I am not leaving here at all now.
+Stop doing this to me PLEASE now.
+The walls feel very close tonight.`;
+      const res = await runD336(fountain336c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_MIDSENTENCE_CAPS_FLOOD'), 'DIALOGUE_MIDSENTENCE_CAPS_FLOOD should fire');
+    });
+
+    it('DIALOGUE_MIDSENTENCE_CAPS_FLOOD does not fire when caps emphasis is rare', async () => {
+      const fountain336cnw = `INT. ROOM - DAY
+
+ALICE
+I TOLD you this was wrong here.
+We should leave now today please.
+The door is open very wide now.
+I believe you are right here now.
+
+BOB
+The problem is very clear now here.
+I am not leaving here at all now.
+We can still try once more now here.
+You CANNOT do this to me right now.`;
+      const res = await runD336(fountain336cnw);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_MIDSENTENCE_CAPS_FLOOD'), 'DIALOGUE_MIDSENTENCE_CAPS_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 325 — dialoguePass: expletive opener overuse, absolute overuse, within-line word echo', async () => {
     const runD325 = async (fountain: string) => {
       const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
