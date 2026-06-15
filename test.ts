@@ -20281,6 +20281,97 @@ He stares at the floor.`;
     });
   });
 
+  describe('Wave 329 — relationshipArcPass: revelation silent, pair early-peak majority, suspense decoupled', async () => {
+    const makeRec329 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const shift329 = (pairKey: string, amount: number) => ({ pairKey, dimension: 'trust', amount });
+    const runRA329 = async (records: any[]) => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('RELATIONSHIP_REVELATION_SILENT fires when no revelation scene contains a bond shift', async () => {
+      const recs329rs = Array.from({ length: 8 }, (_, i) =>
+        makeRec329(i, {
+          revelation: [3, 6].includes(i) ? 'A secret is revealed' : null,
+          relationshipShifts: [1, 4].includes(i) ? [shift329('A|B', 0.5)] : [],
+        })
+      );
+      const res = await runRA329(recs329rs);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_REVELATION_SILENT'), 'RELATIONSHIP_REVELATION_SILENT should fire');
+    });
+
+    it('RELATIONSHIP_REVELATION_SILENT does not fire when a revelation scene has a bond shift', async () => {
+      const recs329nrs = Array.from({ length: 8 }, (_, i) =>
+        makeRec329(i, {
+          revelation: [3, 6].includes(i) ? 'A secret is revealed' : null,
+          relationshipShifts: [3, 5].includes(i) ? [shift329('A|B', 0.5)] : [],
+        })
+      );
+      const res = await runRA329(recs329nrs);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_REVELATION_SILENT'), 'RELATIONSHIP_REVELATION_SILENT should not fire');
+    });
+
+    it('PAIR_EARLY_PEAK_MAJORITY fires when >60% of pairs peak in the first 30% of scenes', async () => {
+      // 10 scenes: 3 pairs each have their biggest shift in scene 1 (first 30%), 1 pair peaks at scene 8
+      const recs329ep = Array.from({ length: 10 }, (_, i) =>
+        makeRec329(i, {
+          relationshipShifts: i === 1
+            ? [shift329('A|B', 5), shift329('C|D', 4), shift329('E|F', 3)]
+            : i === 3 ? [shift329('A|B', 1), shift329('C|D', 1), shift329('E|F', 1)]
+            : i === 8 ? [shift329('G|H', 6)]
+            : [],
+        })
+      );
+      const res = await runRA329(recs329ep);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAIR_EARLY_PEAK_MAJORITY'), 'PAIR_EARLY_PEAK_MAJORITY should fire');
+    });
+
+    it('PAIR_EARLY_PEAK_MAJORITY does not fire when most pairs peak after the first 30%', async () => {
+      // 10 scenes: all 4 pairs have their biggest shift late (scene 7+)
+      const recs329nep = Array.from({ length: 10 }, (_, i) =>
+        makeRec329(i, {
+          relationshipShifts: i === 1
+            ? [shift329('A|B', 1), shift329('C|D', 1), shift329('E|F', 1), shift329('G|H', 1)]
+            : i === 7
+            ? [shift329('A|B', 5), shift329('C|D', 4), shift329('E|F', 3), shift329('G|H', 6)]
+            : [],
+        })
+      );
+      const res = await runRA329(recs329nep);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAIR_EARLY_PEAK_MAJORITY'), 'PAIR_EARLY_PEAK_MAJORITY should not fire');
+    });
+
+    it('RELATIONSHIP_SUSPENSE_DECOUPLED fires when shift scenes have avg suspenseDelta ≤ 0', async () => {
+      const recs329sd = Array.from({ length: 8 }, (_, i) =>
+        makeRec329(i, {
+          relationshipShifts: [2, 4, 6].includes(i) ? [shift329('A|B', 0.5)] : [],
+          suspenseDelta: 0,
+        })
+      );
+      const res = await runRA329(recs329sd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SUSPENSE_DECOUPLED'), 'RELATIONSHIP_SUSPENSE_DECOUPLED should fire');
+    });
+
+    it('RELATIONSHIP_SUSPENSE_DECOUPLED does not fire when shift scenes raise suspense', async () => {
+      const recs329nsd = Array.from({ length: 8 }, (_, i) =>
+        makeRec329(i, {
+          relationshipShifts: [2, 4, 6].includes(i) ? [shift329('A|B', 0.5)] : [],
+          suspenseDelta: [2, 4, 6].includes(i) ? 1.5 : 0,
+        })
+      );
+      const res = await runRA329(recs329nsd);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SUSPENSE_DECOUPLED'), 'RELATIONSHIP_SUSPENSE_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 318 — relationshipArcPass: curiosity decoupled, positive-only pair majority, Act 2b desert', async () => {
     const makeRec318 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

@@ -29,6 +29,9 @@
 // ≤ 0), positive-only pair majority (>60% of pairs have exclusively positive shifts —
 // all-warmth world), relationship Act 2b desert (no shifts in 50%-75% zone).
 // only ever moves in one direction story-wide).
+// Wave 329 additions: relationship revelation silent (no revelation scene contains a
+// bond shift), pair early-peak majority (>60% of pairs peak in the first 30%),
+// relationship suspense decoupled (shift scenes avg suspenseDelta ≤ 0).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1128,6 +1131,87 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         description: `No relationship shifts occur in Act 2b (Scenes ${act2bStart318}–${act2bEnd318 - 1}) — the complication zone's second half is relationally silent. The run-up to the climax generates no bond movement. Character relationships should be under their maximum pressure in the lead-up to the Act 3 turn; silence here means the climax arrives without relational stakes.`,
         suggestedFix: 'Plant at least one relationship shift in Act 2b: a trust test under pressure, an alliance strained by competing goals, or a revelation that reframes a bond. The approach to climax should be the most relationally charged zone, not the quietest.',
       });
+    }
+  }
+
+  // ── Wave 329: RELATIONSHIP_REVELATION_SILENT, PAIR_EARLY_PEAK_MAJORITY, RELATIONSHIP_SUSPENSE_DECOUPLED ──
+
+  // RELATIONSHIP_REVELATION_SILENT (minor, n≥8, ≥2 revelation scenes): No
+  // scene that contains a revelation also contains a relationship shift. When
+  // the story's key disclosures never alter how characters relate to one
+  // another, revelations have no interpersonal consequence — they inform the
+  // audience but don't restructure any bond. Distinct from WARMTH_UNFELT
+  // (emotional quality of positive shifts) and RELATIONSHIP_CLIMAX_TIMING
+  // (climax timing, not revelation-specific).
+  if (records.length >= 8) {
+    const revelationScenes329 = (records as any[]).filter(r =>
+      r.revelation !== null && r.revelation !== undefined && r.revelation !== '',
+    );
+    if (revelationScenes329.length >= 2) {
+      const revelationWithShift329 = revelationScenes329.some(
+        r => ((r.relationshipShifts ?? []) as any[]).length > 0,
+      );
+      if (!revelationWithShift329) {
+        issues.push({
+          location: 'Revelation scenes — relational consequence',
+          rule: 'RELATIONSHIP_REVELATION_SILENT',
+          severity: 'minor',
+          description: `${revelationScenes329.length} revelation scene(s) occur with no accompanying relationship shift in any of them. When the story's key disclosures never alter how characters relate to one another, revelations have no interpersonal consequence — they inform the audience but don't restructure any bond. A revelation that doesn't change a relationship misses its dramatic potential.`,
+          suggestedFix: 'Tie at least one major revelation to a bond rupture or breakthrough: a secret uncovered should change how two characters trust each other; a truth revealed should force a reassessment of loyalty, affection, or power. Let revelations restructure relationships.',
+        });
+      }
+    }
+  }
+
+  // PAIR_EARLY_PEAK_MAJORITY (minor, n≥10, pairs≥3): More than 60% of active
+  // pairs reach their maximum single-shift magnitude in the first 30% of
+  // scenes. When most bonds peak in intensity before the complication zone,
+  // there is no relational escalation — the story peaked early and can only
+  // plateau or diminish. Distinct from RELATIONSHIP_OPENING_BURST (fires when
+  // 100% of ALL shifts are in the first 25%; this fires when most pairs' peak
+  // magnitude is in the first 30%, regardless of where other shifts fall).
+  if (records.length >= 10 && pairStats.size >= 3) {
+    const earlyEnd329 = Math.floor(records.length * 0.3);
+    let earlyPeakCount329 = 0;
+    const activePairs329 = [...pairStats.values()].filter(s => s.shifts.length > 0);
+    for (const stats of activePairs329) {
+      const maxMag329 = Math.max(...stats.shifts.map(s => Math.abs(s.amount)));
+      const peakShift329 = stats.shifts.find(s => Math.abs(s.amount) === maxMag329);
+      if (peakShift329 && peakShift329.sceneIdx < earlyEnd329) earlyPeakCount329++;
+    }
+    if (activePairs329.length >= 3 && earlyPeakCount329 / activePairs329.length > 0.6) {
+      issues.push({
+        location: `Opening 30% (scenes 0–${earlyEnd329 - 1}) — peak shift concentration`,
+        rule: 'PAIR_EARLY_PEAK_MAJORITY',
+        severity: 'minor',
+        description: `${earlyPeakCount329} of ${activePairs329.length} pairs (${Math.round(earlyPeakCount329 / activePairs329.length * 100)}%) reach their maximum relational intensity in the first 30% of scenes (scenes 0–${earlyEnd329 - 1}). When most bonds peak before the complication zone, there is no relational escalation — the story has nowhere to go after Act 1 in terms of bond intensity.`,
+        suggestedFix: "Reserve each pair's most intense shift for its structural role: Act 2 peaks should surpass Act 1, and the climax should surpass both. Front-loaded intensity leaves no room for escalation and makes the later story feel like a cool-down rather than a build-up.",
+      });
+    }
+  }
+
+  // RELATIONSHIP_SUSPENSE_DECOUPLED (minor, n≥8, ≥3 shift scenes): Scenes
+  // containing relationship shifts average suspenseDelta ≤ 0. When bond
+  // changes generate no tension, they feel like plot updates — the audience
+  // registers the shift intellectually but feels no urgency about where the
+  // bond is heading. Distinct from RELATIONSHIP_CURIOSITY_DECOUPLED
+  // (suspenseDelta not curiosityDelta) and WARMTH_UNFELT (emotional tone not
+  // tension level).
+  if (records.length >= 8) {
+    const shiftScenes329 = (records as any[]).filter(r =>
+      ((r.relationshipShifts ?? []) as any[]).length > 0,
+    );
+    if (shiftScenes329.length >= 3) {
+      const avgSuspense329 = shiftScenes329.reduce((acc: number, r: any) => acc + (r.suspenseDelta ?? 0), 0) / shiftScenes329.length;
+      if (avgSuspense329 <= 0) {
+        issues.push({
+          location: 'Relational shift scenes — tension register',
+          rule: 'RELATIONSHIP_SUSPENSE_DECOUPLED',
+          severity: 'minor',
+          description: `${shiftScenes329.length} scenes with relationship shifts average a suspenseDelta of ${avgSuspense329.toFixed(2)} — bond changes arrive without generating tension. When relationships shift but the audience feels no urgency or dread about where they are heading, the shifts are processed as plot updates rather than charged dramatic events.`,
+          suggestedFix: "Let relationship shifts raise stakes: a trust rupture should make the audience fear what comes next; a sudden warmth should feel precarious rather than safe. Bond changes should tighten the audience's grip on the story, not relax it.",
+        });
+      }
     }
   }
 
