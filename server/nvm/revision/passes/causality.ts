@@ -23,6 +23,9 @@
 // with no suspense/relational/revelation/clock driver), clock relief unexplained (a
 // clockDelta<0 release with no revelation or payoff to cause it), dramatic turn
 // cluster (3+ dramatic turns within a three-scene window).
+// Wave 324 additions: suspense unreleased run (6+ consecutive scenes all raise tension
+// with no release valley), clock raised no delta (≥2 clock raises with clockDelta 0 —
+// cosmetic deadlines), emotional neutral run (6+ consecutive emotionally neutral scenes).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1274,6 +1277,87 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Space the turns out. Let each reversal land and ripple — give the characters (and the audience) a scene to absorb and react before the next pivot. Bank some of the clustered turns for later acts where the story needs a fresh jolt.',
         });
         break;
+      }
+    }
+  }
+
+  // ── Wave 324: SUSPENSE_UNRELEASED_RUN, CLOCK_RAISED_NO_DELTA, EMOTIONAL_NEUTRAL_RUN ──
+
+  // SUSPENSE_UNRELEASED_RUN (minor, n≥8): Six or more consecutive scenes each
+  // carry a positive suspenseDelta — tension only ever builds and is never
+  // discharged across a long stretch. A story needs release valleys: sustained
+  // un-relieved rising tension exhausts the audience and leaves no room to
+  // escalate further when the climax arrives. Distinct from ESCALATION_PLATEAU
+  // (peak-height comparison), SUSPENSE_SAWTOOTH (strict sign alternation), and
+  // SUSPENSE_PLATEAU_FLATLINE (a flat, near-zero run).
+  if (records.length >= 8) {
+    let srun324 = 0;
+    let sstart324 = 0;
+    for (let i324 = 0; i324 < records.length; i324++) {
+      if (((records as any[])[i324].suspenseDelta ?? 0) > 0) {
+        if (srun324 === 0) sstart324 = i324;
+        srun324++;
+        if (srun324 >= 6) {
+          issues.push({
+            location: `Scenes ${(records as any[])[sstart324].sceneIdx}–${(records as any[])[i324].sceneIdx} — unreleased tension`,
+            rule: 'SUSPENSE_UNRELEASED_RUN',
+            severity: 'minor',
+            description: `${srun324} consecutive scenes (${(records as any[])[sstart324].sceneIdx}–${(records as any[])[i324].sceneIdx}) each raise suspense with no release in between — tension only ever builds across the whole stretch. Sustained un-relieved rising tension exhausts the audience: without valleys, there is no contrast to make the peaks feel high, and the climax has no headroom left to escalate into.`,
+            suggestedFix: 'Carve a release valley into the run: a scene where the immediate threat eases, a small win, a quiet beat that lets the audience exhale. Tension reads as high only against relief; a relief beat now lets the climax spike higher later.',
+          });
+          break;
+        }
+      } else {
+        srun324 = 0;
+      }
+    }
+  }
+
+  // CLOCK_RAISED_NO_DELTA (minor, n≥6, ≥2 scenes): Two or more scenes set
+  // clockRaised === true but carry clockDelta === 0 — a deadline is announced
+  // without any measurable change in time pressure. The clock is raised
+  // cosmetically: the story says "time is running out" but the pressure gauge
+  // never moves. Distinct from CLOCK_DELTA_WITHOUT_RAISE (the inverse — pressure
+  // effects with no clock established) and CLOCK_GHOST (a raise that later fades).
+  if (records.length >= 6) {
+    const noDeltaClocks324 = (records as any[]).filter(r => r.clockRaised === true && (r.clockDelta ?? 0) === 0);
+    if (noDeltaClocks324.length >= 2) {
+      issues.push({
+        location: `${noDeltaClocks324.length} clock-raise scene(s) with no delta`,
+        rule: 'CLOCK_RAISED_NO_DELTA',
+        severity: 'minor',
+        description: `${noDeltaClocks324.length} scenes raise a clock (clockRaised) but carry clockDelta 0 — a deadline is announced with no measurable change in time pressure. The clock is raised cosmetically: the script says "time is running out" while the pressure gauge never moves, so the announced urgency has no mechanical force behind it.`,
+        suggestedFix: 'Give every clock raise a real delta: when a deadline is introduced or tightened, the time pressure should measurably increase. If a scene only references an existing clock without changing it, do not flag it as a raise — reserve clockRaised for moments that genuinely move the deadline.',
+      });
+    }
+  }
+
+  // EMOTIONAL_NEUTRAL_RUN (minor, n≥10): Six or more consecutive scenes are all
+  // emotionally neutral — the emotional curve flatlines for a long stretch. The
+  // audience reads emotion as their stake in the story; a long neutral run is
+  // dead air where they have nothing to feel. Distinct from EMOTIONAL_MONOTONY
+  // (three consecutive IDENTICAL non-neutral shifts) and EMOTION_WITHOUT_DRIVER_
+  // RUN (non-neutral shifts lacking a cause): this flags sustained absence of
+  // any emotional movement at all.
+  if (records.length >= 10) {
+    let erun324 = 0;
+    let estart324 = 0;
+    for (let i324e = 0; i324e < records.length; i324e++) {
+      if ((records as any[])[i324e].emotionalShift === 'neutral') {
+        if (erun324 === 0) estart324 = i324e;
+        erun324++;
+        if (erun324 >= 6) {
+          issues.push({
+            location: `Scenes ${(records as any[])[estart324].sceneIdx}–${(records as any[])[i324e].sceneIdx} — emotional flatline`,
+            rule: 'EMOTIONAL_NEUTRAL_RUN',
+            severity: 'minor',
+            description: `${erun324} consecutive scenes (${(records as any[])[estart324].sceneIdx}–${(records as any[])[i324e].sceneIdx}) are all emotionally neutral — the emotional curve flatlines for a long stretch. The audience reads emotional movement as their stake in the story; a sustained neutral run is dead air where they are given nothing to feel, and disengagement sets in regardless of how active the plot is.`,
+            suggestedFix: 'Inject emotional movement into the flat stretch: a small loss, an unexpected kindness, a flare of fear or hope. Plot events should leave emotional residue on the characters; if a run of scenes moves the plot but stirs no feeling, the audience is watching machinery, not people.',
+          });
+          break;
+        }
+      } else {
+        erun324 = 0;
       }
     }
   }

@@ -19148,6 +19148,68 @@ He looks away.`;
     });
   });
 
+  describe('Wave 324 — causalityPass: suspense unreleased run, clock raised no delta, emotional neutral run', async () => {
+    const makeRec324 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'positive', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runC324 = async (records: any[]) => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('SUSPENSE_UNRELEASED_RUN fires when 6+ consecutive scenes all raise tension', async () => {
+      const recs324sr = Array.from({ length: 8 }, (_, i) => makeRec324(i, { suspenseDelta: 1 }));
+      const res = await runC324(recs324sr);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SUSPENSE_UNRELEASED_RUN'), 'SUSPENSE_UNRELEASED_RUN should fire');
+    });
+
+    it('SUSPENSE_UNRELEASED_RUN does not fire when release valleys break the run', async () => {
+      const recs324nsr = Array.from({ length: 8 }, (_, i) =>
+        makeRec324(i, { suspenseDelta: [0, 5].includes(i) ? 0 : 1 })
+      );
+      const res = await runC324(recs324nsr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SUSPENSE_UNRELEASED_RUN'), 'SUSPENSE_UNRELEASED_RUN should not fire');
+    });
+
+    it('CLOCK_RAISED_NO_DELTA fires when 2+ clock raises carry no delta', async () => {
+      const recs324cd = Array.from({ length: 8 }, (_, i) =>
+        makeRec324(i, { clockRaised: [2, 4].includes(i), clockDelta: 0 })
+      );
+      const res = await runC324(recs324cd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_RAISED_NO_DELTA'), 'CLOCK_RAISED_NO_DELTA should fire');
+    });
+
+    it('CLOCK_RAISED_NO_DELTA does not fire when clock raises carry a delta', async () => {
+      const recs324ncd = Array.from({ length: 8 }, (_, i) =>
+        makeRec324(i, { clockRaised: [2, 4].includes(i), clockDelta: [2, 4].includes(i) ? 1 : 0 })
+      );
+      const res = await runC324(recs324ncd);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_RAISED_NO_DELTA'), 'CLOCK_RAISED_NO_DELTA should not fire');
+    });
+
+    it('EMOTIONAL_NEUTRAL_RUN fires when 6+ consecutive scenes are emotionally neutral', async () => {
+      const recs324en = Array.from({ length: 10 }, (_, i) =>
+        makeRec324(i, { emotionalShift: i < 6 ? 'neutral' : 'positive' })
+      );
+      const res = await runC324(recs324en);
+      assert.ok(res.issues.some((i: any) => i.rule === 'EMOTIONAL_NEUTRAL_RUN'), 'EMOTIONAL_NEUTRAL_RUN should fire');
+    });
+
+    it('EMOTIONAL_NEUTRAL_RUN does not fire when the neutral run stays under six', async () => {
+      const recs324nen = Array.from({ length: 10 }, (_, i) =>
+        makeRec324(i, { emotionalShift: i < 5 ? 'neutral' : 'positive' })
+      );
+      const res = await runC324(recs324nen);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'EMOTIONAL_NEUTRAL_RUN'), 'EMOTIONAL_NEUTRAL_RUN should not fire');
+    });
+  });
+
   describe('Wave 323 — beliefPass: revelation curiosity decoupled, told belief curiosity flat, told belief relationship decoupled', async () => {
     const makeRec323 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
