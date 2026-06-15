@@ -22,6 +22,10 @@
 // Wave 314 additions: proactive suspense decoupled (proactive scenes' own avg
 // suspenseDelta ≤ 0), proactive global scarcity (<15% of all scenes proactive),
 // stakes raised externally (raise_stakes scenes none of which are proactive).
+// Wave 339 additions: proactive emotion decoupled (≥3 proactive scenes all emotionally
+// neutral — initiative without feeling), proactive revelation absent (≥3 proactive
+// scenes none followed by a revelation in the next 2 scenes — agency without discovery),
+// proactive relationship void (≥3 proactive scenes none with any relationship shift).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1228,6 +1232,87 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${stakesScenes314.length} scenes raise the stakes but none is proactive — the protagonist never authors an escalation. Stakes that only ever rise from outside (events, antagonists, circumstance) make the protagonist the object of the story's pressure rather than a source of it; their choices never raise the temperature.`,
         suggestedFix: 'Let the protagonist raise the stakes at least once: a gambit that forces the antagonist\'s hand, a deadline they impose, a confession that escalates the conflict. When the protagonist authors an escalation, the rising stakes become a consequence of who they are, not just weather they endure.',
+      });
+    }
+  }
+
+  // ── Wave 339: PROACTIVE_EMOTION_DECOUPLED, PROACTIVE_REVELATION_ABSENT, PROACTIVE_RELATIONSHIP_VOID ──
+
+  // PROACTIVE_EMOTION_DECOUPLED (minor, n≥8, ≥3 proactive scenes): Three or more
+  // proactive scenes (clockRaised or seededClueIds non-empty) are all emotionally
+  // neutral — the protagonist takes initiative without feeling anything while doing
+  // it. When the acts of agency are consistently flat, the protagonist reads as an
+  // efficient operator rather than a person: they raise clocks and plant seeds without
+  // any visible emotional stake in doing so. The audience needs to see that the
+  // protagonist cares about their own plans. Distinct from PROACTIVE_SUSPENSE_
+  // DECOUPLED (suspenseDelta on proactive scenes) and CURIOSITY_WITHOUT_AGENCY
+  // (curiosity spikes unlinked to initiative — different direction).
+  if (n >= 8) {
+    const proactiveScenes339e = (records as any[]).filter(isProactive258);
+    if (proactiveScenes339e.length >= 3 && proactiveScenes339e.every(r => r.emotionalShift === 'neutral')) {
+      issues.push({
+        location: 'Proactive scenes',
+        rule: 'PROACTIVE_EMOTION_DECOUPLED',
+        severity: 'minor',
+        description: `All ${proactiveScenes339e.length} proactive scenes are emotionally neutral — the protagonist takes initiative without feeling anything while doing it. When acts of agency are consistently flat, the protagonist reads as an efficient operator: they raise clocks and plant seeds without visible emotional investment, so the audience has no feeling to follow into the outcome. The protagonist's plans need to matter to the protagonist.`,
+        suggestedFix: "Let initiative carry feeling: when the protagonist plants a clue or sets a deadline, show what it costs them emotionally — hope at the gambit, dread at what it might expose, grim resolve at the risk. A proactive act with no emotion is a chess move; one with feeling is a story beat.",
+      });
+    }
+  }
+
+  // PROACTIVE_REVELATION_ABSENT (minor, n≥8, ≥3 proactive scenes): Three or more
+  // proactive scenes exist and not one of them is followed by a revelation in that
+  // same scene or in either of the two subsequent scenes — the protagonist's
+  // initiative never leads to discovery. When agency produces motion but no
+  // revelation, the protagonist is busy but ineffective: they raise clocks and plant
+  // clues, but these actions never uncover anything the audience did not already know.
+  // Distinct from REVELATION_WITHOUT_PROACTIVE (Wave 258 — looks backward from
+  // revelations to find proactive setup; this looks forward from proactive acts to
+  // find revelations) and TURNS_UNDRIVEN (dramatic turns not following agency).
+  if (n >= 8) {
+    const proactiveScenes339r = (records as any[]).filter(isProactive258);
+    if (proactiveScenes339r.length >= 3) {
+      const hasRevNearby339 = proactiveScenes339r.some((_r: any) => {
+        const idx339 = (records as any[]).indexOf(_r);
+        for (let k339 = idx339; k339 <= Math.min(idx339 + 2, n - 1); k339++) {
+          const rec339 = (records as any[])[k339];
+          if (rec339.revelation !== null && rec339.revelation !== undefined) return true;
+        }
+        return false;
+      });
+      if (!hasRevNearby339) {
+        issues.push({
+          location: 'Proactive scenes',
+          rule: 'PROACTIVE_REVELATION_ABSENT',
+          severity: 'minor',
+          description: `${proactiveScenes339r.length} proactive scenes exist but none is followed by a revelation within two scenes — the protagonist's initiative never leads to discovery. When the protagonist raises clocks and plants clues but nothing is ever uncovered as a result, their agency produces motion without revelation: they are busy without being effective, and the audience watches effort that never pays off in new understanding.`,
+          suggestedFix: "Let initiative produce insight: at least one proactive act should lead to a revelation within the next two scenes — the planted clue turns up a secret, the deadline forces a confession, the pursued lead reveals the antagonist's hand. Agency that never uncovers anything is action without consequence.",
+        });
+      }
+    }
+  }
+
+  // PROACTIVE_RELATIONSHIP_VOID (minor, n≥8, ≥3 proactive scenes): Three or more
+  // proactive scenes exist and not one of them carries any relationship shift — the
+  // protagonist's acts of agency have no interpersonal consequence. When initiative
+  // never affects bonds, the story runs on two parallel tracks that never intersect:
+  // what the protagonist does, and how relationships change. The audience can feel this
+  // disconnect — the protagonist is solving a puzzle that exists apart from their
+  // relationships rather than one they are entangled in. Distinct from CONFLICT_CLOCK_
+  // DECOUPLED (conflict.ts: clock scenes without relational conflict) and from all
+  // proactive checks which focus on suspense, emotion, or curiosity.
+  if (n >= 8) {
+    const proactiveScenes339rv = (records as any[]).filter(isProactive258);
+    if (
+      proactiveScenes339rv.length >= 3 &&
+      !proactiveScenes339rv.some(r => (r.relationshipShifts?.length ?? 0) > 0)
+    ) {
+      issues.push({
+        location: 'Proactive scenes',
+        rule: 'PROACTIVE_RELATIONSHIP_VOID',
+        severity: 'minor',
+        description: `${proactiveScenes339rv.length} proactive scenes exist but none carries a relationship shift — the protagonist's acts of agency have no interpersonal consequence. When initiative never affects bonds, the story runs on two parallel tracks: the protagonist solves a puzzle apart from their relationships, and the audience can feel that disconnect. The protagonist's plans should be entangled with the people they are responsible to or in conflict with.`,
+        suggestedFix: "Root at least one proactive act in a relationship: the protagonist plants a clue that implicates someone they care about, raises a clock that forces a partner to choose, or makes a move that fractures a bond in order to win. Initiative that moves people, not just plot, gives the protagonist something to lose.",
       });
     }
   }

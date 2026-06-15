@@ -17897,6 +17897,96 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 339 — intentionPass: proactive emotion decoupled, proactive revelation absent, proactive relationship void', async () => {
+    const makeRec339 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'negative', suspenseDelta: 0.5, curiosityDelta: 0.5,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runI339 = async (records: any[]) => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      return intentionPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PROACTIVE_EMOTION_DECOUPLED fires when all proactive scenes are emotionally neutral', async () => {
+      const recs339ed = [
+        ...Array.from({ length: 5 }, (_, i) => makeRec339(i)),
+        makeRec339(5, { clockRaised: true, emotionalShift: 'neutral' }),
+        makeRec339(6, { clockRaised: true, emotionalShift: 'neutral' }),
+        makeRec339(7, { clockRaised: true, emotionalShift: 'neutral' }),
+      ];
+      const res = await runI339(recs339ed);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PROACTIVE_EMOTION_DECOUPLED'), 'PROACTIVE_EMOTION_DECOUPLED should fire');
+    });
+
+    it('PROACTIVE_EMOTION_DECOUPLED does not fire when a proactive scene carries emotion', async () => {
+      const recs339ednw = [
+        ...Array.from({ length: 5 }, (_, i) => makeRec339(i)),
+        makeRec339(5, { clockRaised: true, emotionalShift: 'negative' }),
+        makeRec339(6, { clockRaised: true, emotionalShift: 'neutral' }),
+        makeRec339(7, { clockRaised: true, emotionalShift: 'neutral' }),
+      ];
+      const res = await runI339(recs339ednw);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PROACTIVE_EMOTION_DECOUPLED'), 'PROACTIVE_EMOTION_DECOUPLED should not fire');
+    });
+
+    it('PROACTIVE_REVELATION_ABSENT fires when no proactive scene is followed by a revelation', async () => {
+      const recs339ra = [
+        makeRec339(0, { clockRaised: true }),
+        makeRec339(1, { revelation: null }),
+        makeRec339(2, { clockRaised: true }),
+        makeRec339(3, { revelation: null }),
+        makeRec339(4, { clockRaised: true }),
+        makeRec339(5, { revelation: null }),
+        makeRec339(6),
+        makeRec339(7),
+      ];
+      const res = await runI339(recs339ra);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PROACTIVE_REVELATION_ABSENT'), 'PROACTIVE_REVELATION_ABSENT should fire');
+    });
+
+    it('PROACTIVE_REVELATION_ABSENT does not fire when a proactive act leads to a revelation', async () => {
+      const recs339raNw = [
+        makeRec339(0, { clockRaised: true }),
+        makeRec339(1, { revelation: 'She was the informant all along' }),
+        makeRec339(2, { clockRaised: true }),
+        makeRec339(3, { revelation: null }),
+        makeRec339(4, { clockRaised: true }),
+        makeRec339(5, { revelation: null }),
+        makeRec339(6),
+        makeRec339(7),
+      ];
+      const res = await runI339(recs339raNw);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PROACTIVE_REVELATION_ABSENT'), 'PROACTIVE_REVELATION_ABSENT should not fire');
+    });
+
+    it('PROACTIVE_RELATIONSHIP_VOID fires when no proactive scene has a relationship shift', async () => {
+      const recs339rv = [
+        ...Array.from({ length: 5 }, (_, i) => makeRec339(i)),
+        makeRec339(5, { clockRaised: true, relationshipShifts: [] }),
+        makeRec339(6, { clockRaised: true, relationshipShifts: [] }),
+        makeRec339(7, { clockRaised: true, relationshipShifts: [] }),
+      ];
+      const res = await runI339(recs339rv);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PROACTIVE_RELATIONSHIP_VOID'), 'PROACTIVE_RELATIONSHIP_VOID should fire');
+    });
+
+    it('PROACTIVE_RELATIONSHIP_VOID does not fire when a proactive scene moves a bond', async () => {
+      const recs339rvnw = [
+        ...Array.from({ length: 5 }, (_, i) => makeRec339(i)),
+        makeRec339(5, { clockRaised: true, relationshipShifts: [{ pairs: ['A', 'B'], amount: 0.5, dimension: 'trust' }] }),
+        makeRec339(6, { clockRaised: true, relationshipShifts: [] }),
+        makeRec339(7, { clockRaised: true, relationshipShifts: [] }),
+      ];
+      const res = await runI339(recs339rvnw);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PROACTIVE_RELATIONSHIP_VOID'), 'PROACTIVE_RELATIONSHIP_VOID should not fire');
+    });
+  });
+
   describe('Wave 314 — intentionPass: proactive suspense decoupled, proactive global scarcity, stakes raised externally', async () => {
     const makeRec314 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
