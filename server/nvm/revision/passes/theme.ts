@@ -25,6 +25,10 @@
 // keywords — theme name-dropped but never explored in depth), quiet scenes only (every
 // resonant scene is emotionally neutral and low-suspense), resonance burst (a single
 // scene holds >50% of all theme keyword occurrences).
+// Wave 321 additions: peak before midpoint (the densest theme scene falls in the first
+// half — theme should crescendo toward the climax), raise-stakes silent (every stake-
+// raising scene is thematically empty), suspense-release silent (every clock-release
+// scene is thematically empty — exhale beats waste their reflection potential).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1125,6 +1129,86 @@ export async function themePass(input: PassInput): Promise<PassResult> {
           description: `A single scene holds ${maxHits307} of ${totalHits307} total theme keyword occurrences (${Math.round(maxHits307 / totalHits307 * 100)}%) for "${themeRaw}" — the theme is concentrated in one burst rather than woven through the story. A theme delivered in a single concentrated dose reads as a thesis statement the rest of the script forgot to dramatize.`,
           suggestedFix: `Redistribute the theme's language across the story: take the keyword density piled into one scene and spread it so the theme recurs as a thread the audience can track from opening to finale. A theme woven through many scenes accumulates; a theme dumped in one evaporates.`,
         });
+      }
+    }
+
+    // ── Wave 321: peak-before-midpoint, raise-stakes silent, suspense-release silent ──
+
+    // THEME_PEAK_BEFORE_MIDPOINT (minor, n≥8, totalHits≥4, peak≥2): The scene
+    // with the most theme keyword hits — the thematic peak — falls in the first
+    // half of the story. Theme should crescendo toward the climax; a thematic
+    // peak in the setup means the densest statement of the story's idea arrives
+    // before the audience is invested, then the theme thins out. Distinct from
+    // THEME_FRONT_LOADED (first-third vs rest density gradient), THEME_ACCELERATING_
+    // DENSITY_ABSENT (final-third vs first-third), and THEME_RESONANCE_BURST
+    // (single-scene share of total) — this is an argmax-position metric.
+    if (records.length >= 8) {
+      let peakPos321 = -1;
+      let peakHits321 = 0;
+      for (let i = 0; i < records.length; i++) {
+        const h321 = sceneHitCounts.get(records[i].sceneIdx) ?? 0;
+        if (h321 > peakHits321) { peakHits321 = h321; peakPos321 = i; }
+      }
+      const totalHits321 = [...sceneHitCounts.values()].reduce((s, v) => s + v, 0);
+      const midPos321 = Math.floor(records.length / 2);
+      if (peakHits321 >= 2 && totalHits321 >= 4 && peakPos321 >= 0 && peakPos321 < midPos321) {
+        issues.push({
+          location: `Scene ${records[peakPos321].sceneIdx} (thematic peak)`,
+          rule: 'THEME_PEAK_BEFORE_MIDPOINT',
+          severity: 'minor',
+          description: `The thematic peak — the scene with the most "${themeRaw}" language (${peakHits321} hits) — falls in the first half of the story (Scene ${records[peakPos321].sceneIdx} of ${records.length}). Theme should build toward its densest statement near the climax, where the audience is most invested; a peak in the setup states the idea before anyone cares, then lets it thin out toward the ending.`,
+          suggestedFix: `Shift the theme's strongest expression later: let the setup introduce the question lightly and reserve the most concentrated thematic beat for a scene at or near the climax, where the story's events give the idea its full weight. The theme should land hardest where the stakes are highest.`,
+        });
+      }
+    }
+
+    // THEME_RAISE_STAKES_SILENT (minor, n≥8, ≥2 raise-stakes scenes): Every scene
+    // whose purpose is to raise the stakes carries no thematic language. The
+    // moments that escalate the story's danger are disconnected from what the
+    // story is about — the audience feels the pressure rise but never sees it
+    // implicate the theme. Distinct from the other channel-silent checks
+    // (revelation, clock-raised, payoff, clue, curiosity, dramatic-turn, shifts,
+    // high-suspense): population here is scenes with purpose === 'raise_stakes'.
+    if (records.length >= 8) {
+      const stakesScenes321 = records.filter((r: any) => r.purpose === 'raise_stakes');
+      if (stakesScenes321.length >= 2) {
+        const allSilent321 = stakesScenes321.every(
+          r => !sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        );
+        if (allSilent321) {
+          issues.push({
+            location: `${stakesScenes321.length} raise-stakes scene(s)`,
+            rule: 'THEME_RAISE_STAKES_SILENT',
+            severity: 'minor',
+            description: `All ${stakesScenes321.length} stake-raising scenes carry no language related to "${themeRaw}" — the moments that escalate the story's danger are thematically empty. When rising stakes never implicate the theme, the audience feels the pressure mount mechanically but cannot connect it to the story's central question. Escalation without thematic stake is plot machinery.`,
+            suggestedFix: `Tie each escalation to the theme: when the stakes rise, let what is threatened be the value the theme is about. If the theme is "trust," the rising danger should put trust itself at risk — so the audience feels the cost in thematic terms, not just plot terms.`,
+          });
+        }
+      }
+    }
+
+    // THEME_SUSPENSE_RELEASE_SILENT (minor, n≥8, ≥2 release scenes): Every scene
+    // that releases clock pressure (clockDelta < 0) carries no thematic language.
+    // Release beats are the story's exhales — natural reflection points where a
+    // character (and audience) can process what just happened. When all release
+    // moments are thematically silent, the story never uses its quiet beats to
+    // deepen meaning. Distinct from THEME_CLOCK_SCENE_SILENT (population =
+    // clockRaised scenes, i.e. tension BUILD): this audits tension RELEASE.
+    if (records.length >= 8) {
+      const releaseScenes321 = records.filter((r: any) => (r.clockDelta ?? 0) < 0);
+      if (releaseScenes321.length >= 2) {
+        const allSilent321r = releaseScenes321.every(
+          r => !sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        );
+        if (allSilent321r) {
+          issues.push({
+            location: `${releaseScenes321.length} tension-release scene(s)`,
+            rule: 'THEME_SUSPENSE_RELEASE_SILENT',
+            severity: 'minor',
+            description: `All ${releaseScenes321.length} tension-release scenes (clockDelta < 0) carry no language related to "${themeRaw}" — the story's exhale moments are thematically empty. Release beats are where a character and the audience process what just happened; squandering them on plot-only downtime wastes the story's natural reflection points, where theme lands most gently and most deeply.`,
+            suggestedFix: `Use release beats to deepen the theme: after the pressure drops, give a character a moment to reckon with what the recent events mean in terms of "${themeRaw}" — a quiet line, a telling action, an image that reframes the cost. The exhale is when meaning settles.`,
+          });
+        }
       }
     }
   }

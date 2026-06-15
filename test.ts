@@ -19148,6 +19148,103 @@ He looks away.`;
     });
   });
 
+  describe('Wave 321 — themePass: peak before midpoint, raise-stakes silent, suspense-release silent', async () => {
+    const makeRec321 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const THEME321 = 'trust betrayal courage';
+    const runT321 = async (records: any[]) => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: THEME321 },
+      });
+    };
+
+    it('THEME_PEAK_BEFORE_MIDPOINT fires when the densest theme scene is in the first half', async () => {
+      const recs321pk = Array.from({ length: 8 }, (_, i) =>
+        makeRec321(i, {
+          dialogueHighlights:
+            i === 1 ? ['trust trust betrayal here']
+            : [5, 6].includes(i) ? ['a moment of courage']
+            : [],
+        })
+      );
+      const res = await runT321(recs321pk);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_PEAK_BEFORE_MIDPOINT'), 'THEME_PEAK_BEFORE_MIDPOINT should fire');
+    });
+
+    it('THEME_PEAK_BEFORE_MIDPOINT does not fire when the peak is in the second half', async () => {
+      const recs321npk = Array.from({ length: 8 }, (_, i) =>
+        makeRec321(i, {
+          dialogueHighlights:
+            i === 6 ? ['trust trust betrayal here']
+            : [0, 1].includes(i) ? ['a moment of courage']
+            : [],
+        })
+      );
+      const res = await runT321(recs321npk);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_PEAK_BEFORE_MIDPOINT'), 'THEME_PEAK_BEFORE_MIDPOINT should not fire');
+    });
+
+    it('THEME_RAISE_STAKES_SILENT fires when all stake-raising scenes are thematically empty', async () => {
+      const recs321rs = Array.from({ length: 8 }, (_, i) =>
+        makeRec321(i, {
+          dialogueHighlights: [0, 1].includes(i) ? ['the trust holds'] : [],
+          purpose: [3, 5].includes(i) ? 'raise_stakes' : 'development',
+        })
+      );
+      const res = await runT321(recs321rs);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_RAISE_STAKES_SILENT'), 'THEME_RAISE_STAKES_SILENT should fire');
+    });
+
+    it('THEME_RAISE_STAKES_SILENT does not fire when a stake-raising scene carries theme', async () => {
+      const recs321nrs = Array.from({ length: 8 }, (_, i) =>
+        makeRec321(i, {
+          dialogueHighlights:
+            [0, 1].includes(i) ? ['the trust holds']
+            : i === 3 ? ['their courage is tested']
+            : [],
+          purpose: [3, 5].includes(i) ? 'raise_stakes' : 'development',
+        })
+      );
+      const res = await runT321(recs321nrs);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_RAISE_STAKES_SILENT'), 'THEME_RAISE_STAKES_SILENT should not fire');
+    });
+
+    it('THEME_SUSPENSE_RELEASE_SILENT fires when all tension-release scenes are thematically empty', async () => {
+      const recs321sr = Array.from({ length: 8 }, (_, i) =>
+        makeRec321(i, {
+          dialogueHighlights: [0, 1].includes(i) ? ['the trust holds'] : [],
+          clockDelta: [4, 6].includes(i) ? -1 : 0,
+        })
+      );
+      const res = await runT321(recs321sr);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_SUSPENSE_RELEASE_SILENT'), 'THEME_SUSPENSE_RELEASE_SILENT should fire');
+    });
+
+    it('THEME_SUSPENSE_RELEASE_SILENT does not fire when a release scene carries theme', async () => {
+      const recs321nsr = Array.from({ length: 8 }, (_, i) =>
+        makeRec321(i, {
+          dialogueHighlights:
+            [0, 1].includes(i) ? ['the trust holds']
+            : i === 4 ? ['a quiet act of courage']
+            : [],
+          clockDelta: [4, 6].includes(i) ? -1 : 0,
+        })
+      );
+      const res = await runT321(recs321nsr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_SUSPENSE_RELEASE_SILENT'), 'THEME_SUSPENSE_RELEASE_SILENT should not fire');
+    });
+  });
+
   describe('Wave 320 — structurePass: climax revelation absent, Act 2 curiosity valley, emotional opening neutral', async () => {
     const makeRec320 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
