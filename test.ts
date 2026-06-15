@@ -20094,6 +20094,169 @@ Time to go now.`;
     });
   });
 
+  describe('Wave 330 — rhythmPass: we-see flood, light description overload, set dressing dominance', async () => {
+    const runR330 = async (fountain: string) => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('WE_SEE_FLOOD fires when >25% of action lines begin with "We see/hear/find/watch/notice"', async () => {
+      const f330ws = `INT. ARCHIVE ROOM - DAY
+
+We see a row of filing cabinets against the wall.
+
+A woman enters through the side door.
+
+We hear footsteps echo on the stone floor.
+
+She pauses and scans the room.
+
+We notice a drawer left slightly open.
+
+Her hand moves toward it carefully.
+
+We find a photograph inside the drawer.
+
+She turns it over slowly.
+
+The ink on the back is faded.
+
+She sets the photograph down.`;
+      const res = await runR330(f330ws);
+      assert.ok(res.issues.some((i: any) => i.rule === 'WE_SEE_FLOOD'), 'WE_SEE_FLOOD should fire');
+    });
+
+    it('WE_SEE_FLOOD does not fire when action lines avoid "We see" constructions', async () => {
+      const f330nws = `INT. ARCHIVE ROOM - DAY
+
+A row of filing cabinets lines the wall.
+
+A woman enters through the side door.
+
+Footsteps echo on the stone floor.
+
+She pauses and scans the room.
+
+A drawer sits slightly open.
+
+Her hand moves toward it carefully.
+
+A photograph rests inside the drawer.
+
+She turns it over slowly.
+
+The ink on the back is faded.
+
+She sets the photograph down.`;
+      const res = await runR330(f330nws);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'WE_SEE_FLOOD'), 'WE_SEE_FLOOD should not fire');
+    });
+
+    it('LIGHT_DESCRIPTION_OVERLOAD fires when >30% of action lines contain lighting vocabulary', async () => {
+      const f330ld = `INT. ABANDONED THEATRE - NIGHT
+
+Shadows pool in the corners of the empty stage.
+
+A single spotlight cuts through the darkness above.
+
+Marcus steps into the beam of light.
+
+The glow catches the side of his face.
+
+He looks out at the rows of empty seats.
+
+A flicker from the overhead lamp startles him.
+
+He steadies himself on the nearest chair.
+
+The darkness seems to press in from all sides.
+
+A shaft of moonlight falls through the broken skylight.
+
+He reaches for the wall switch.`;
+      const res = await runR330(f330ld);
+      assert.ok(res.issues.some((i: any) => i.rule === 'LIGHT_DESCRIPTION_OVERLOAD'), 'LIGHT_DESCRIPTION_OVERLOAD should fire');
+    });
+
+    it('LIGHT_DESCRIPTION_OVERLOAD does not fire when lighting references are sparse', async () => {
+      const f330nld = `INT. ABANDONED THEATRE - NIGHT
+
+The stage is empty, the curtain pulled to one side.
+
+Marcus enters from the wings, coat still on.
+
+He crosses to the front of the stage.
+
+The seats stretch back into the distance.
+
+He crouches and opens his bag on the floor.
+
+Tools inside — pliers, wire, a small torch.
+
+He works quickly, hands sure.
+
+A pigeon startles in the rafters.
+
+He freezes, listens.
+
+Nothing. He goes back to work.`;
+      const res = await runR330(f330nld);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'LIGHT_DESCRIPTION_OVERLOAD'), 'LIGHT_DESCRIPTION_OVERLOAD should not fire');
+    });
+
+    it('SET_DRESSING_DOMINANCE fires when >35% of action lines mention static furniture or architecture', async () => {
+      const f330sd = `INT. APARTMENT - MORNING
+
+The desk is covered in papers and empty mugs.
+
+Elena sits at the table near the window.
+
+A bookcase runs floor to ceiling on the far wall.
+
+Her laptop rests on the counter to her left.
+
+She picks up her coffee.
+
+The door to the bedroom is still closed.
+
+An overflowing shelf of files sits behind her.
+
+She turns to face the wardrobe mirror.
+
+Boots by the door, coat on the hook.
+
+Her phone buzzes on the table.`;
+      const res = await runR330(f330sd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SET_DRESSING_DOMINANCE'), 'SET_DRESSING_DOMINANCE should fire');
+    });
+
+    it('SET_DRESSING_DOMINANCE does not fire when action lines focus on character behavior', async () => {
+      const f330nsd = `INT. APARTMENT - MORNING
+
+Elena sorts through her mail, discarding most of it unopened.
+
+She makes coffee without watching what her hands do.
+
+A news broadcast plays in the next room.
+
+She leans against the counter, listening.
+
+The presenter is talking about the ferry crash.
+
+Elena goes still.
+
+Her coffee goes cold.
+
+Finally she picks up her phone and dials.
+
+No answer. She dials again.
+
+She closes her eyes and waits.`;
+      const res = await runR330(f330nsd);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SET_DRESSING_DOMINANCE'), 'SET_DRESSING_DOMINANCE should not fire');
+    });
+  });
+
   describe('Wave 319 — rhythmPass: suddenly overuse, pronoun opener dominance, physical interiority leak', async () => {
     const runR319 = async (fountain: string) => {
       const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');

@@ -23,6 +23,10 @@
 // announcement adverbs), pronoun opener dominance (>45% of action lines begin
 // with a personal pronoun — combined-category test), physical interiority leak
 // (>25% of action lines describe internal body sensations).
+// Wave 330 additions: we-see flood (>25% of action lines begin with "We see/
+// hear/find/watch/notice" — narrator intrudes into cinematic present tense),
+// light description overload (>30% contain lighting vocabulary — DP's domain),
+// set dressing dominance (>35% reference static furniture/architecture).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -961,6 +965,73 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${interiorCount319} of ${actionLines.length} action lines (${Math.round(interiorCount319 / actionLines.length * 100)}%) describe internal body sensations (stomach tightens, heart races, breath catches, etc.) — private physical states that a camera cannot film. These are interoceptive descriptions: the audience sees a face, not a racing heart. The screenplay is reporting what the character feels inside rather than writing what would be visible on screen.`,
         suggestedFix: "Translate internal sensation into visible behaviour: instead of \"His stomach drops\", write \"He leans against the doorframe. Doesn't speak.\" Let the actor play the interiority through their body and face — the screenplay's job is to give them something to react to, not to narrate the reaction itself.",
+      });
+    }
+  }
+
+  // ── Wave 330: WE_SEE_FLOOD, LIGHT_DESCRIPTION_OVERLOAD, SET_DRESSING_DOMINANCE ──
+
+  // WE_SEE_FLOOD (minor, ≥10 action lines): More than 25% of action lines begin
+  // with "We see", "We hear", "We find", "We watch", "We notice", or "We observe".
+  // This construction breaks cinematic present tense — the screenplay's narrator
+  // steps into frame and directs the audience's gaze. "We see John enter" is a
+  // production note; "John enters" is a scene. Distinct from CAMERA_DIRECTION_OVERREACH
+  // (explicit lens notation like "CLOSE ON"), PASSIVE_VOICE_OVERUSE ("is seen" —
+  // grammatical passive), and PRONOUN_OPENER_DOMINANCE (combined pronoun category,
+  // not specifically the filmmaking "We see" convention).
+  if (actionLines.length >= 10) {
+    const weSeeRe330 = /^We\s+(see|hear|find|watch|notice|observe)\b/i;
+    const weSeeCount330 = actionLines.filter(l => weSeeRe330.test(l.text.trim())).length;
+    if (weSeeCount330 / actionLines.length > 0.25) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'WE_SEE_FLOOD',
+        severity: 'minor',
+        description: `${weSeeCount330} of ${actionLines.length} action lines (${Math.round(weSeeCount330 / actionLines.length * 100)}%) begin with "We see/hear/find/watch/notice" — the screenplay's narrator steps into frame and tells the audience what to observe. Screenplay convention demands the cinematic present tense: describe what IS, not what "we" see. The script is the camera; it doesn't need to announce itself.`,
+        suggestedFix: 'Remove the "We see/hear" framing and state the action directly: "We see the door open" → "The door opens." Trust the cinematographer to frame it — focus the prose on the event, not the instruction to observe it.',
+      });
+    }
+  }
+
+  // LIGHT_DESCRIPTION_OVERLOAD (minor, ≥10 action lines): More than 30% of
+  // action lines contain lighting vocabulary (light, shadow, dark, glow, beam,
+  // illuminate, ray, sunlight, moonlight, silhouette, flicker, shaft, etc.).
+  // A screenplay heavy on lighting description is doing the DP's job — lighting
+  // is a production decision, not a screenplay element. Distinct from COLOR_ABSENCE
+  // (fires when color is absent), VISUAL_TEXTURE_ABSENT (fires when visual
+  // texture is absent), SENSORY_IMBALANCE (fires when sound is absent).
+  if (actionLines.length >= 10) {
+    const lightRe330 = /\b(lights?|lighting|shadows?|darkness|dimly?|brightly?|glow(?:ing)?|beams?|illuminate[sd]?|rays?|sunlight|moonlight|lamplight|candlelight|flicker(?:ing)?|silhouettes?|silhouetted|backlit|spotlit|spotlight|dappled|shafts?)\b/i;
+    const lightCount330 = actionLines.filter(l => lightRe330.test(l.text)).length;
+    if (lightCount330 / actionLines.length > 0.30) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'LIGHT_DESCRIPTION_OVERLOAD',
+        severity: 'minor',
+        description: `${lightCount330} of ${actionLines.length} action lines (${Math.round(lightCount330 / actionLines.length * 100)}%) contain lighting description (light, shadow, glow, illuminate, beam, etc.) — the screenplay is designing the cinematography rather than dramatizing character action. Lighting is a production decision made by the DP and director; when light fills the prose, the human drama is crowded out.`,
+        suggestedFix: 'Reserve lighting description for functional story beats — a power cut that changes the scene, a match struck that reveals something. Otherwise trust the DP to light the scene and focus the prose on what characters do, want, and reveal.',
+      });
+    }
+  }
+
+  // SET_DRESSING_DOMINANCE (minor, ≥10 action lines): More than 35% of action
+  // lines mention static furniture or architectural elements (desk, chair, table,
+  // door, window, wall, floor, shelf, stairs, counter, etc.). When the prose
+  // catalogues the set rather than dramatizing the people in it, the screenplay
+  // is furnishing a stage rather than staging a drama. Distinct from
+  // VISUAL_TEXTURE_ABSENT (fires when visual detail is absent — opposite problem),
+  // SPATIAL_ANCHOR_ABSENT (fires when characters lack positional grounding), and
+  // OVER_DESCRIPTION (fires for 4+ physical adjectives describing a character).
+  if (actionLines.length >= 10) {
+    const setRe330 = /\b(desks?|chairs?|tables?|couches?|sofas?|beds?|floors?|ceilings?|windows?|doors?|doorways?|carpets?|shelves|shelf|bookcase|bookshelf|staircases?|stairs|hallways?|corridors?|counters?|cupboards?|cabinets?|wardrobes?|fireplace|mantle|mantlepiece|bathtubs?|sinks?|refrigerators?|fridges?|ovens?|stovetops?)\b/i;
+    const setCount330 = actionLines.filter(l => setRe330.test(l.text)).length;
+    if (setCount330 / actionLines.length > 0.35) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'SET_DRESSING_DOMINANCE',
+        severity: 'minor',
+        description: `${setCount330} of ${actionLines.length} action lines (${Math.round(setCount330 / actionLines.length * 100)}%) reference static furniture or architectural elements (desk, chair, door, window, floor, etc.) — the prose is cataloguing the set rather than dramatizing the people in it. A screenplay's action lines should track what characters do; when furniture fills the page, the human drama is crowded out.`,
+        suggestedFix: "Anchor furniture and props to character behavior: instead of noting that a desk sits in the corner, show a character lean against it, avoid it, or slam a fist on its surface. Props earn their place by participating in action, not by being listed.",
       });
     }
   }
