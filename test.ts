@@ -18064,6 +18064,86 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 337 — characterArcPass: suspense/curiosity decoupled, revelation emotion absent, revelation curiosity decoupled', async () => {
+    const makeRec337 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'negative', suspenseDelta: 0.5, curiosityDelta: 0.5,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runA337 = async (records: any[]) => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ARC_SUSPENSE_CURIOSITY_DECOUPLED fires when high-suspense scenes all have curiosityDelta ≤ 0', async () => {
+      const recs337sc = [
+        ...Array.from({ length: 5 }, (_, i) => makeRec337(i)),
+        makeRec337(5, { suspenseDelta: 1.5, curiosityDelta: -0.2 }),
+        makeRec337(6, { suspenseDelta: 2.0, curiosityDelta: 0 }),
+        makeRec337(7, { suspenseDelta: 1.8, curiosityDelta: -0.1 }),
+      ];
+      const res = await runA337(recs337sc);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_SUSPENSE_CURIOSITY_DECOUPLED'), 'ARC_SUSPENSE_CURIOSITY_DECOUPLED should fire');
+    });
+
+    it('ARC_SUSPENSE_CURIOSITY_DECOUPLED does not fire when high-suspense scenes generate curiosity', async () => {
+      const recs337scnw = [
+        ...Array.from({ length: 5 }, (_, i) => makeRec337(i)),
+        makeRec337(5, { suspenseDelta: 1.5, curiosityDelta: 1.2 }),
+        makeRec337(6, { suspenseDelta: 2.0, curiosityDelta: 0.8 }),
+        makeRec337(7, { suspenseDelta: 1.8, curiosityDelta: 0.5 }),
+      ];
+      const res = await runA337(recs337scnw);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_SUSPENSE_CURIOSITY_DECOUPLED'), 'ARC_SUSPENSE_CURIOSITY_DECOUPLED should not fire');
+    });
+
+    it('ARC_REVELATION_EMOTION_ABSENT fires when all revelation scenes are emotionally neutral', async () => {
+      const recs337re = [
+        ...Array.from({ length: 6 }, (_, i) => makeRec337(i)),
+        makeRec337(6, { revelation: 'The killer was her father', emotionalShift: 'neutral' }),
+        makeRec337(7, { revelation: 'The money is gone', emotionalShift: 'neutral' }),
+      ];
+      const res = await runA337(recs337re);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_REVELATION_EMOTION_ABSENT'), 'ARC_REVELATION_EMOTION_ABSENT should fire');
+    });
+
+    it('ARC_REVELATION_EMOTION_ABSENT does not fire when a revelation scene carries emotion', async () => {
+      const recs337renw = [
+        ...Array.from({ length: 6 }, (_, i) => makeRec337(i)),
+        makeRec337(6, { revelation: 'The killer was her father', emotionalShift: 'negative' }),
+        makeRec337(7, { revelation: 'The money is gone', emotionalShift: 'neutral' }),
+      ];
+      const res = await runA337(recs337renw);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_REVELATION_EMOTION_ABSENT'), 'ARC_REVELATION_EMOTION_ABSENT should not fire');
+    });
+
+    it('ARC_REVELATION_CURIOSITY_DECOUPLED fires when revelation scenes avg curiosityDelta ≤ 0', async () => {
+      const recs337rc = [
+        ...Array.from({ length: 5 }, (_, i) => makeRec337(i)),
+        makeRec337(5, { revelation: 'The map was forged', curiosityDelta: -0.3 }),
+        makeRec337(6, { revelation: 'He was never there', curiosityDelta: 0 }),
+        makeRec337(7, { revelation: 'She knew all along', curiosityDelta: -0.1 }),
+      ];
+      const res = await runA337(recs337rc);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_REVELATION_CURIOSITY_DECOUPLED'), 'ARC_REVELATION_CURIOSITY_DECOUPLED should fire');
+    });
+
+    it('ARC_REVELATION_CURIOSITY_DECOUPLED does not fire when revelations spark new questions', async () => {
+      const recs337rcnw = [
+        ...Array.from({ length: 5 }, (_, i) => makeRec337(i)),
+        makeRec337(5, { revelation: 'The map was forged', curiosityDelta: 1.0 }),
+        makeRec337(6, { revelation: 'He was never there', curiosityDelta: 0.8 }),
+        makeRec337(7, { revelation: 'She knew all along', curiosityDelta: 0.6 }),
+      ];
+      const res = await runA337(recs337rcnw);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_REVELATION_CURIOSITY_DECOUPLED'), 'ARC_REVELATION_CURIOSITY_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 312 — characterArcPass: first half flat, turn emotion absent, curiosity/emotion decoupled', async () => {
     const makeRec312 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

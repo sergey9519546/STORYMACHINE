@@ -24,6 +24,10 @@
 // second half carries emotion — late-starting arc), turn emotion absent (≥2 dramatic-turn
 // scenes all emotionally neutral), curiosity/emotion decoupled (≥3 high-curiosity scenes
 // all emotionally neutral — intrigue without investment).
+// Wave 337 additions: suspense/curiosity decoupled (≥3 high-suspense scenes all curiosity-
+// flat — tension without wonder), revelation emotion absent (≥2 revelation scenes all
+// emotionally neutral — reveals that never move the protagonist), revelation curiosity
+// decoupled (≥3 revelation scenes avg curiosityDelta ≤ 0 — answers that close no new doors).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1131,6 +1135,80 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         description: `All ${highCuriosity312.length} high-curiosity scenes (curiosityDelta > 1) are emotionally neutral — the story's most intriguing moments never move the protagonist. Curiosity engages the audience's head and emotion their heart; when the mysteries land only as puzzles and never as feelings, the audience stays interested but never becomes invested.`,
         suggestedFix: 'Fuse intrigue with feeling: the scene that raises the biggest question should also stir the protagonist — dread at what the answer might be, hope that it changes everything, grief at what it implies. A mystery the character cares about is one the audience cares about.',
       });
+    }
+  }
+
+  // ── Wave 337: ARC_SUSPENSE_CURIOSITY_DECOUPLED, ARC_REVELATION_EMOTION_ABSENT, ARC_REVELATION_CURIOSITY_DECOUPLED ──
+
+  // ARC_SUSPENSE_CURIOSITY_DECOUPLED (minor, n≥8, ≥3 high-suspense scenes):
+  // Three or more scenes with suspenseDelta > 1 (genuine tension peaks) all have
+  // curiosityDelta ≤ 0 — the story's most dangerous moments never raise a new
+  // question in the audience's mind. Tension and wonder are twin engines of
+  // engagement; when tension spikes consistently without igniting curiosity,
+  // the story feels like a thriller without mystery — all danger, no intrigue,
+  // no "but what does this mean?" hanging in the air after each spike.
+  // Distinct from ARC_SUSPENSE_EMOTION_DECOUPLED (crosses suspense with emotion,
+  // not curiosity) and ARC_CURIOSITY_EMOTION_DECOUPLED (crosses curiosity with
+  // emotion, not suspense).
+  if (records.length >= 8) {
+    const highSuspense337 = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 1);
+    if (highSuspense337.length >= 3 && highSuspense337.every(r => (r.curiosityDelta ?? 0) <= 0)) {
+      issues.push({
+        location: 'High-suspense scenes',
+        rule: 'ARC_SUSPENSE_CURIOSITY_DECOUPLED',
+        severity: 'minor',
+        description: `All ${highSuspense337.length} high-suspense scenes (suspenseDelta > 1) carry a curiosityDelta of zero or less — the story's tension peaks never ignite audience wonder. Danger should raise questions: "Will they survive?", "Who is behind this?", "What will they do now?" When the most alarming moments consistently fail to spawn new questions, the story delivers adrenaline without intrigue — the audience is scared, but they are not curious.`,
+        suggestedFix: 'Let danger generate questions: when the stakes spike, layer in a new unknown — an unexpected face, a missing piece, a revelation that recasts everything just as the threat lands. The best suspense scenes are those where the audience is simultaneously frightened and newly desperate to know something.',
+      });
+    }
+  }
+
+  // ARC_REVELATION_EMOTION_ABSENT (minor, n≥8, ≥2 revelation scenes): Two or more
+  // scenes carry a genuine revelation (revelation field set) and every one of them
+  // is emotionally neutral — the protagonist receives information without feeling
+  // it. A revelation is a character event, not just a plot event; the moment a
+  // character learns something that changes the shape of their world, they should
+  // be visibly changed by it. If the story's "aha moments" are emotionally flat,
+  // the revelations function as data transfers rather than turning points.
+  // Distinct from ARC_REVELATION_LATE_CLUSTER (timing), ARC_TURN_EMOTION_ABSENT
+  // (dramaticTurn field not revelation), and belief.ts's REVELATION_DRAMA_VACUUM
+  // (which additionally requires low suspense — this fires on emotion alone).
+  if (records.length >= 8) {
+    const revScenes337 = (records as any[]).filter(r => r.revelation !== null && r.revelation !== undefined);
+    if (revScenes337.length >= 2 && revScenes337.every(r => r.emotionalShift === 'neutral')) {
+      issues.push({
+        location: 'Revelation scenes',
+        rule: 'ARC_REVELATION_EMOTION_ABSENT',
+        severity: 'minor',
+        description: `All ${revScenes337.length} revelation scenes are emotionally neutral — the protagonist receives information without being visibly changed by it. A revelation is a character event: the moment a character learns something that reshapes their world, their emotional response is the story's signal to the audience that this matters. When the story's aha moments are all flat, revelations function as data transfers rather than turning points.`,
+        suggestedFix: "Give the protagonist a reaction that is felt, not just processed: the revelation might bring relief, dread, grief, rage, or a terrible clarity. The size of a reveal is measured by how much it moves the person who receives it — an aha moment nobody feels is a plot mechanic, not a story beat.",
+      });
+    }
+  }
+
+  // ARC_REVELATION_CURIOSITY_DECOUPLED (minor, n≥8, ≥3 revelation scenes): Three
+  // or more revelation scenes have an average curiosityDelta of zero or less — the
+  // story's answers close questions without opening new ones. Effective revelations
+  // are generative: they resolve one layer of mystery while exposing a deeper one.
+  // When revelations consistently fail to raise curiosity, the story's aha moments
+  // feel like a ledger being cleared rather than a live system that keeps spinning.
+  // Distinct from ARC_REVELATION_EMOTION_ABSENT (emotion on revelation scenes),
+  // REVELATION_WITHOUT_CURIOSITY in causality.ts (revelation with no preceding
+  // high-curiosity setup — checks setup order, not the revelation's own delta),
+  // and ARC_REVELATION_LATE_CLUSTER (timing of revelations).
+  if (records.length >= 8) {
+    const revScenes337b = (records as any[]).filter(r => r.revelation !== null && r.revelation !== undefined);
+    if (revScenes337b.length >= 3) {
+      const avgCuriosity337r = revScenes337b.reduce((s: number, r: any) => s + (r.curiosityDelta ?? 0), 0) / revScenes337b.length;
+      if (avgCuriosity337r <= 0) {
+        issues.push({
+          location: `${revScenes337b.length} revelation scene(s) — avg curiosityDelta ${avgCuriosity337r.toFixed(2)}`,
+          rule: 'ARC_REVELATION_CURIOSITY_DECOUPLED',
+          severity: 'minor',
+          description: `${revScenes337b.length} revelation scenes have an average curiosityDelta of ${avgCuriosity337r.toFixed(2)} — the story's answers consistently close questions without opening new ones. A revelation should be generative: resolving one mystery while exposing a deeper layer, so the audience leans forward even as one thread closes. When revelations drain rather than feed curiosity, the story feels like a ledger being cleared — complete, perhaps, but not alive.`,
+          suggestedFix: "Design revelations as doors, not walls: each answer should expose a new unknown, reframe what the audience thought they knew, or raise the stakes of a question still open. Let the curiosityDelta on revelation scenes reflect that the audience has been sent hunting, not satisfied.",
+        });
+      }
     }
   }
 
