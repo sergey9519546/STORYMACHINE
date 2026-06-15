@@ -22,6 +22,9 @@
 // Wave 309 additions: told belief drought (≥5 consecutive scenes with no assertion or
 // revelation — belief layer silent), assertion void (≥4 revelations but ≤1 told belief),
 // revelation late first (first revelation past midpoint despite early assertions).
+// Wave 323 additions: revelation curiosity decoupled (revelation scenes avg curiosityDelta
+// ≤ 0 — discoveries never reopen the field), told belief curiosity flat (assertion scenes
+// avg curiosityDelta ≤ 0), told belief relationship decoupled (no assertion scene moves a bond).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1065,6 +1068,79 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         description: `The first revelation does not arrive until Scene ${firstRevIdx309} — past the midpoint — even though the first half already carries ${firstHalfTold309} told beliefs. The epistemic layer is active early (characters assert) but the story confirms or overturns nothing until the back half, so the audience holds those claims for a long time with no payoff to reward their attention.`,
         suggestedFix: 'Deliver a revelation in the first half that pays off one of the early assertions — a partial truth, a small unmasking, a confirmation that reframes what came before. An early first revelation teaches the audience that the claims they are tracking will pay off, which keeps them invested.',
       });
+    }
+  }
+
+  // ── Wave 323: REVELATION_CURIOSITY_DECOUPLED, TOLD_BELIEF_CURIOSITY_FLAT, TOLD_BELIEF_RELATIONSHIP_DECOUPLED ──
+
+  // REVELATION_CURIOSITY_DECOUPLED (minor, n≥8, ≥3 revelations): Revelation
+  // scenes have an average curiosityDelta ≤ 0. A revelation should answer one
+  // question while opening another — it should leave the audience MORE curious,
+  // not less. When discoveries land without raising fresh curiosity, the
+  // epistemic engine closes loops without ever reopening them, and the story
+  // deflates toward its ending. Distinct from REVELATION_SUSPENSE_DECOUPLED
+  // (suspenseDelta channel) and REVELATION_DRAMA_VACUUM (emotionalShift).
+  if (records.length >= 8) {
+    const revScenes323 = (records as any[]).filter(r => r.revelation !== null);
+    if (revScenes323.length >= 3) {
+      const avgRevCur323 = revScenes323.reduce((s, r) => s + (r.curiosityDelta ?? 0), 0) / revScenes323.length;
+      if (avgRevCur323 <= 0) {
+        issues.push({
+          location: 'Revelation scenes — curiosity register',
+          rule: 'REVELATION_CURIOSITY_DECOUPLED',
+          severity: 'minor',
+          description: `${revScenes323.length} revelation scenes average a curiosityDelta of ${avgRevCur323.toFixed(2)} — discoveries arrive without raising fresh curiosity. A revelation should answer one question while opening another; when every discovery only closes loops, the story's mystery engine winds down toward the ending instead of accelerating. The audience gets answers but loses the hunger that made them want the answers.`,
+          suggestedFix: 'Let each revelation reopen the field: the truth that answers one question should complicate or raise another. A discovery that lands with "but then why...?" keeps the audience leaning forward; a discovery that merely confirms closes a door without opening one.',
+        });
+      }
+    }
+  }
+
+  // TOLD_BELIEF_CURIOSITY_FLAT (minor, n≥8, ≥3 told-belief scenes): Scenes where
+  // a character asserts a belief have an average curiosityDelta ≤ 0. An
+  // assertion — especially a confident or contestable one — should make the
+  // audience wonder whether it is true. When told beliefs never spike curiosity,
+  // the claims register as flat exposition rather than as questions the story
+  // will test. Distinct from TOLD_BELIEF_DOMINATION (tell/show ratio) and
+  // EXPOSITION_DUMP (consecutive told-only run): this audits the curiosity
+  // channel on assertion scenes.
+  if (records.length >= 8) {
+    const toldScenes323 = (records as any[]).filter(r => ((r.dialogueHighlights ?? []) as string[]).some(h => h.includes(':')));
+    if (toldScenes323.length >= 3) {
+      const avgToldCur323 = toldScenes323.reduce((s, r) => s + (r.curiosityDelta ?? 0), 0) / toldScenes323.length;
+      if (avgToldCur323 <= 0) {
+        issues.push({
+          location: 'Told-belief scenes — curiosity register',
+          rule: 'TOLD_BELIEF_CURIOSITY_FLAT',
+          severity: 'minor',
+          description: `${toldScenes323.length} scenes where a character asserts a belief average a curiosityDelta of ${avgToldCur323.toFixed(2)} — assertions arrive without making the audience wonder whether they are true. A claim that provokes no curiosity is flat exposition; the audience files it as fact rather than holding it as a question the story might overturn. Assertions earn their place by being doubtable.`,
+          suggestedFix: 'Frame assertions so the audience can question them: give the claim a tell that hints it might be wrong (an evasive delivery, a contradicting detail in the frame, another character\'s skeptical reaction). A belief stated against a flicker of doubt becomes a question the audience wants answered.',
+        });
+      }
+    }
+  }
+
+  // TOLD_BELIEF_RELATIONSHIP_DECOUPLED (minor, n≥8, ≥3 told-belief scenes): No
+  // scene that contains a told belief also carries a relationship shift. Beliefs
+  // — and especially deceptions — are relational acts: to assert, to lie, to
+  // confess is to act on someone. When assertion scenes never move a
+  // relationship, the belief layer floats free of the character bonds it should
+  // be straining or strengthening. Distinct from BELIEF_ISOLATION (a belief
+  // never expressed) and SOLE_ASSERTER (one character dominates assertions):
+  // this audits whether assertions ever land relationally.
+  if (records.length >= 8) {
+    const toldScenes323r = (records as any[]).filter(r => ((r.dialogueHighlights ?? []) as string[]).some(h => h.includes(':')));
+    if (toldScenes323r.length >= 3) {
+      const anyRelShift323 = toldScenes323r.some(r => ((r.relationshipShifts ?? []) as any[]).length > 0);
+      if (!anyRelShift323) {
+        issues.push({
+          location: 'Told-belief scenes — relational impact',
+          rule: 'TOLD_BELIEF_RELATIONSHIP_DECOUPLED',
+          severity: 'minor',
+          description: `None of the ${toldScenes323r.length} scenes containing a told belief also carries a relationship shift — assertions never move a bond. Beliefs are relational acts: to assert, to lie, to confess is to act on another person. When the belief layer never touches the relationship layer, claims float free of the character dynamics they should be straining, deepening, or betraying.`,
+          suggestedFix: 'Let assertions land on relationships: a confident claim should impress, alienate, or provoke whoever hears it; a lie should quietly damage the bond with the person deceived. Tie at least some belief beats to a measurable shift in trust or power so the epistemic layer drives the relational one.',
+        });
+      }
     }
   }
 

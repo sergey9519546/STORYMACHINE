@@ -19148,6 +19148,90 @@ He looks away.`;
     });
   });
 
+  describe('Wave 323 — beliefPass: revelation curiosity decoupled, told belief curiosity flat, told belief relationship decoupled', async () => {
+    const makeRec323 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runB323 = async (records: any[]) => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('REVELATION_CURIOSITY_DECOUPLED fires when revelation scenes have avg curiosityDelta ≤ 0', async () => {
+      const recs323rc = Array.from({ length: 8 }, (_, i) =>
+        makeRec323(i, {
+          revelation: [2, 4, 6].includes(i) ? `disclosure ${i}` : null,
+          curiosityDelta: 0,
+        })
+      );
+      const res = await runB323(recs323rc);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_CURIOSITY_DECOUPLED'), 'REVELATION_CURIOSITY_DECOUPLED should fire');
+    });
+
+    it('REVELATION_CURIOSITY_DECOUPLED does not fire when revelations raise curiosity', async () => {
+      const recs323nrc = Array.from({ length: 8 }, (_, i) =>
+        makeRec323(i, {
+          revelation: [2, 4, 6].includes(i) ? `disclosure ${i}` : null,
+          curiosityDelta: [2, 4, 6].includes(i) ? 2 : 0,
+        })
+      );
+      const res = await runB323(recs323nrc);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_CURIOSITY_DECOUPLED'), 'REVELATION_CURIOSITY_DECOUPLED should not fire');
+    });
+
+    it('TOLD_BELIEF_CURIOSITY_FLAT fires when assertion scenes have avg curiosityDelta ≤ 0', async () => {
+      const recs323tc = Array.from({ length: 8 }, (_, i) =>
+        makeRec323(i, {
+          dialogueHighlights: [1, 3, 5].includes(i) ? [`ALICE: she lied to me`] : [],
+          curiosityDelta: 0,
+        })
+      );
+      const res = await runB323(recs323tc);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TOLD_BELIEF_CURIOSITY_FLAT'), 'TOLD_BELIEF_CURIOSITY_FLAT should fire');
+    });
+
+    it('TOLD_BELIEF_CURIOSITY_FLAT does not fire when assertions raise curiosity', async () => {
+      const recs323ntc = Array.from({ length: 8 }, (_, i) =>
+        makeRec323(i, {
+          dialogueHighlights: [1, 3, 5].includes(i) ? [`ALICE: she lied to me`] : [],
+          curiosityDelta: [1, 3, 5].includes(i) ? 2 : 0,
+        })
+      );
+      const res = await runB323(recs323ntc);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TOLD_BELIEF_CURIOSITY_FLAT'), 'TOLD_BELIEF_CURIOSITY_FLAT should not fire');
+    });
+
+    it('TOLD_BELIEF_RELATIONSHIP_DECOUPLED fires when no assertion scene moves a bond', async () => {
+      const recs323rd = Array.from({ length: 8 }, (_, i) =>
+        makeRec323(i, {
+          dialogueHighlights: [1, 3, 5].includes(i) ? [`ALICE: she lied to me`] : [],
+          curiosityDelta: 2,
+          relationshipShifts: [],
+        })
+      );
+      const res = await runB323(recs323rd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TOLD_BELIEF_RELATIONSHIP_DECOUPLED'), 'TOLD_BELIEF_RELATIONSHIP_DECOUPLED should fire');
+    });
+
+    it('TOLD_BELIEF_RELATIONSHIP_DECOUPLED does not fire when an assertion scene shifts a relationship', async () => {
+      const recs323nrd = Array.from({ length: 8 }, (_, i) =>
+        makeRec323(i, {
+          dialogueHighlights: [1, 3, 5].includes(i) ? [`ALICE: she lied to me`] : [],
+          curiosityDelta: 2,
+          relationshipShifts: i === 3 ? [{ pairKey: 'A|B', dimension: 'trust', amount: -0.5 }] : [],
+        })
+      );
+      const res = await runB323(recs323nrd);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TOLD_BELIEF_RELATIONSHIP_DECOUPLED'), 'TOLD_BELIEF_RELATIONSHIP_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 322 — voicePass: trailing ellipsis flood, repeated opener word, conjunction opener', async () => {
     const runV322 = async (fountain: string) => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
