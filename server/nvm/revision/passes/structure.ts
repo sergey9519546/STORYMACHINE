@@ -22,6 +22,9 @@
 // Wave 320 additions: climax revelation absent (no revelation in Act 3 while 2+
 // exist earlier), Act 2 curiosity valley (Act 2 avg curiosity below both bookend
 // acts), emotional opening neutral (first 3 scenes all emotionally neutral).
+// Wave 331 additions: Act 3 emotional flatline (all finale scenes emotionally
+// neutral), Act 1 warmth absent (no positive scene in opening act),
+// dramatic turn opening absent (no dramatic turn in first 30% of scenes).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1178,6 +1181,75 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The first three scenes are all emotionally neutral — the opening establishes nothing on the emotional channel. The audience meets the story through flat affect and is given no feeling to attach to before the plot begins. An opening that engages the mind (plot, questions) but not the heart risks the audience watching from a distance rather than investing.`,
         suggestedFix: 'Charge at least one of the first three scenes emotionally: a moment of warmth, dread, grief, or longing that gives the audience a feeling to carry into the story. Emotional investment in the opening is what makes the later stakes matter — the audience must care before they can be made anxious.',
+      });
+    }
+  }
+
+  // ── Wave 331: ACT3_EMOTIONAL_FLATLINE, ACT1_WARMTH_ABSENT, DRAMATIC_TURN_OPENING_ABSENT ──
+
+  // ACT3_EMOTIONAL_FLATLINE (minor, n≥10, ≥3 Act 3 scenes): All scenes in Act 3
+  // (final 25%) carry emotionalShift='neutral'. The finale generates no emotional
+  // charge — neither the climax nor the denouement gives the audience a feeling to
+  // land on. Stories that resolve without emotional register leave their audiences
+  // intellectually closed but emotionally untouched. Distinct from
+  // EMOTIONAL_OPENING_NEUTRAL (first 3 scenes, not Act 3), MIDPOINT_EMOTIONAL_FLATLINE
+  // (midpoint only), EMOTIONAL_ARC_UNIFORM (>70% of ALL scenes same shift, any value).
+  if (n >= 10) {
+    const act3Start331 = Math.floor(n * 0.75);
+    const act3Scenes331 = records.slice(act3Start331);
+    if (act3Scenes331.length >= 3 && act3Scenes331.every(r => r.emotionalShift === 'neutral')) {
+      issues.push({
+        location: `Act 3 (Scenes ${act3Start331}–${n - 1}) — emotional flatline`,
+        rule: 'ACT3_EMOTIONAL_FLATLINE',
+        severity: 'minor',
+        description: `All ${act3Scenes331.length} Act 3 scenes (${act3Start331}–${n - 1}) are emotionally neutral — the finale generates no emotional charge. Stories that resolve without emotional register close their audience intellectually but leave them untouched at the feeling level. A climax and denouement that carry no emotional weight miss the cathartic function of the final act.`,
+        suggestedFix: 'Charge the finale emotionally: the climax should reach the highest (or lowest) emotional register in the story, and the denouement should deliver either earned warmth or productive grief. The audience needs a feeling to carry out of the theatre — give the resolution an emotional signature.',
+      });
+    }
+  }
+
+  // ACT1_WARMTH_ABSENT (minor, n≥8, ≥2 Act 1 scenes): No scene in the first 25%
+  // carries emotionalShift='positive'. The opening act never establishes emotional
+  // warmth — the story's world is introduced without a baseline of care, hope, or
+  // connection. Without warmth to contrast against, the darker elements of Acts 2
+  // and 3 have no emotional leverage point. Distinct from EMOTIONAL_OPENING_NEUTRAL
+  // (first 3 scenes all neutral — could include negative scenes; this fires when
+  // no scene is specifically positive), EMOTIONAL_ARC_UNIFORM (all scenes same shift).
+  if (n >= 8) {
+    const act1End331 = Math.floor(n * 0.25);
+    const act1Scenes331 = records.slice(0, act1End331);
+    if (act1Scenes331.length >= 2 && !act1Scenes331.some(r => r.emotionalShift === 'positive')) {
+      issues.push({
+        location: `Act 1 (Scenes 0–${act1End331 - 1}) — no warmth established`,
+        rule: 'ACT1_WARMTH_ABSENT',
+        severity: 'minor',
+        description: `None of the ${act1Scenes331.length} Act 1 scene(s) carry a positive emotional shift — the opening act never establishes warmth, hope, or connection. Without a baseline of care, the later darkness has no emotional leverage; the audience has nothing to lose. A world introduced without warmth is harder to invest in.`,
+        suggestedFix: 'Give at least one Act 1 scene a positive emotional register: a relationship that works, a moment of competence or joy, a world worth fighting for. This baseline is what the protagonist will spend the rest of the story trying to recover or protect — without it, the stakes are abstract.',
+      });
+    }
+  }
+
+  // DRAMATIC_TURN_OPENING_ABSENT (minor, n≥10): No scene in the opening 30%
+  // carries a dramaticTurn. The opening act never pivots direction. A screenplay's
+  // first act should contain at least one turning point that launches the
+  // protagonist out of their ordinary world — without a turn, the opening is
+  // pure setup with no dramatic event to orient the audience's expectations.
+  // Distinct from MIDPOINT_REVERSAL_ABSENT (checks suspenseDelta<-1 OR revelation
+  // in the midpoint zone, not dramaticTurn), ACT1_BOUNDARY_WEAK (Act 1 boundary
+  // scene suspense, not dramaticTurn), INCITING_INCIDENT_TOO_LATE (any dramatic
+  // event past 40%, not specifically dramaticTurn field).
+  if (n >= 10) {
+    const openingEnd331 = Math.floor(n * 0.30);
+    const hasTurn331 = records.slice(0, openingEnd331).some(
+      r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    );
+    if (!hasTurn331) {
+      issues.push({
+        location: `Opening 30% (Scenes 0–${openingEnd331 - 1}) — no dramatic turn`,
+        rule: 'DRAMATIC_TURN_OPENING_ABSENT',
+        severity: 'minor',
+        description: `No scene in the opening 30% (scenes 0–${openingEnd331 - 1}) carries a dramatic turn — the opening act never pivots. A screenplay's first act should contain at least one turning point that disrupts the protagonist's ordinary world and launches the central conflict. Without a turn, the opening is pure setup with no event to signal that the story has actually started.`,
+        suggestedFix: 'Place a dramatic turn in the opening act: the discovery of a problem, the arrival of an antagonist, a decision that changes the protagonist\'s direction. This turn is what separates the story from its backstory — it is the moment the audience knows the clock has started.',
       });
     }
   }

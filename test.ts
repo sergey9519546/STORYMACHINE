@@ -20028,6 +20028,73 @@ Time to go now.`;
     });
   });
 
+  describe('Wave 331 — structurePass: Act 3 emotional flatline, Act 1 warmth absent, dramatic turn opening absent', async () => {
+    const makeRec331 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'negative', suspenseDelta: 1.0, curiosityDelta: 1,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'reversal',
+      ...overrides,
+    });
+    const runST331 = async (records: any[]) => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      return structurePass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ACT3_EMOTIONAL_FLATLINE fires when all Act 3 scenes are emotionally neutral', async () => {
+      // n=10 → act3Start=7; scenes 7,8,9 all neutral
+      const recs331ef = Array.from({ length: 10 }, (_, i) =>
+        makeRec331(i, { emotionalShift: i >= 7 ? 'neutral' : 'negative' })
+      );
+      const res = await runST331(recs331ef);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACT3_EMOTIONAL_FLATLINE'), 'ACT3_EMOTIONAL_FLATLINE should fire');
+    });
+
+    it('ACT3_EMOTIONAL_FLATLINE does not fire when an Act 3 scene carries emotional charge', async () => {
+      const recs331nef = Array.from({ length: 10 }, (_, i) =>
+        makeRec331(i, { emotionalShift: i === 8 ? 'positive' : 'neutral' })
+      );
+      const res = await runST331(recs331nef);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACT3_EMOTIONAL_FLATLINE'), 'ACT3_EMOTIONAL_FLATLINE should not fire');
+    });
+
+    it('ACT1_WARMTH_ABSENT fires when no Act 1 scene has a positive emotional shift', async () => {
+      // n=8 → act1End=2; scenes 0,1 both neutral or negative — no positive
+      const recs331wa = Array.from({ length: 8 }, (_, i) =>
+        makeRec331(i, { emotionalShift: i < 2 ? 'neutral' : 'negative' })
+      );
+      const res = await runST331(recs331wa);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACT1_WARMTH_ABSENT'), 'ACT1_WARMTH_ABSENT should fire');
+    });
+
+    it('ACT1_WARMTH_ABSENT does not fire when an Act 1 scene is emotionally positive', async () => {
+      const recs331nwa = Array.from({ length: 8 }, (_, i) =>
+        makeRec331(i, { emotionalShift: i === 1 ? 'positive' : 'neutral' })
+      );
+      const res = await runST331(recs331nwa);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACT1_WARMTH_ABSENT'), 'ACT1_WARMTH_ABSENT should not fire');
+    });
+
+    it('DRAMATIC_TURN_OPENING_ABSENT fires when no scene in the first 30% has a dramatic turn', async () => {
+      // n=10 → openingEnd=3; scenes 0,1,2 have dramaticTurn='nothing'
+      const recs331dt = Array.from({ length: 10 }, (_, i) =>
+        makeRec331(i, { dramaticTurn: i < 3 ? 'nothing' : 'reversal' })
+      );
+      const res = await runST331(recs331dt);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_OPENING_ABSENT'), 'DRAMATIC_TURN_OPENING_ABSENT should fire');
+    });
+
+    it('DRAMATIC_TURN_OPENING_ABSENT does not fire when the opening contains a dramatic turn', async () => {
+      const recs331ndt = Array.from({ length: 10 }, (_, i) =>
+        makeRec331(i, { dramaticTurn: i === 2 ? 'revelation' : 'nothing' })
+      );
+      const res = await runST331(recs331ndt);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_OPENING_ABSENT'), 'DRAMATIC_TURN_OPENING_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 320 — structurePass: climax revelation absent, Act 2 curiosity valley, emotional opening neutral', async () => {
     const makeRec320 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
