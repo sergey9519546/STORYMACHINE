@@ -17976,6 +17976,101 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 338 — conflictPass: clock decoupled, dramatic turn void, first-half monopoly', async () => {
+    const makeRec338 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'negative', suspenseDelta: 0.5, curiosityDelta: 0.5,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF338 = async (records: any[]) => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      return conflictPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    const neg338 = [{ pairs: ['A', 'B'], amount: -0.5, dimension: 'trust' }];
+
+    it('CONFLICT_CLOCK_DECOUPLED fires when clock scenes carry no relational conflict', async () => {
+      const recs338cd = [
+        ...Array.from({ length: 6 }, (_, i) => makeRec338(i)),
+        makeRec338(6, { clockRaised: true, clockDelta: 1, relationshipShifts: [] }),
+        makeRec338(7, { clockRaised: true, clockDelta: 1, relationshipShifts: [] }),
+      ];
+      const res = await runCF338(recs338cd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_CLOCK_DECOUPLED'), 'CONFLICT_CLOCK_DECOUPLED should fire');
+    });
+
+    it('CONFLICT_CLOCK_DECOUPLED does not fire when a clock scene carries conflict', async () => {
+      const recs338cdnw = [
+        ...Array.from({ length: 6 }, (_, i) => makeRec338(i)),
+        makeRec338(6, { clockRaised: true, clockDelta: 1, relationshipShifts: neg338 }),
+        makeRec338(7, { clockRaised: true, clockDelta: 1, relationshipShifts: [] }),
+      ];
+      const res = await runCF338(recs338cdnw);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_CLOCK_DECOUPLED'), 'CONFLICT_CLOCK_DECOUPLED should not fire');
+    });
+
+    it('CONFLICT_DRAMATIC_TURN_VOID fires when turn scenes carry no relational conflict', async () => {
+      const recs338dt = [
+        ...Array.from({ length: 7 }, (_, i) => makeRec338(i)),
+        makeRec338(7, { dramaticTurn: 'reversal', relationshipShifts: [] }),
+        makeRec338(8, { dramaticTurn: 'recognition', relationshipShifts: [] }),
+        makeRec338(9, { dramaticTurn: 'reversal', relationshipShifts: [] }),
+      ];
+      const res = await runCF338(recs338dt);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_DRAMATIC_TURN_VOID'), 'CONFLICT_DRAMATIC_TURN_VOID should fire');
+    });
+
+    it('CONFLICT_DRAMATIC_TURN_VOID does not fire when a turn scene cracks a bond', async () => {
+      const recs338dtnw = [
+        ...Array.from({ length: 7 }, (_, i) => makeRec338(i)),
+        makeRec338(7, { dramaticTurn: 'reversal', relationshipShifts: neg338 }),
+        makeRec338(8, { dramaticTurn: 'recognition', relationshipShifts: [] }),
+        makeRec338(9, { dramaticTurn: 'reversal', relationshipShifts: [] }),
+      ];
+      const res = await runCF338(recs338dtnw);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_DRAMATIC_TURN_VOID'), 'CONFLICT_DRAMATIC_TURN_VOID should not fire');
+    });
+
+    it('CONFLICT_FIRST_HALF_MONOPOLY fires when >70% of conflict scenes are in the first half', async () => {
+      const recs338fh = [
+        makeRec338(0, { relationshipShifts: neg338 }),
+        makeRec338(1, { relationshipShifts: [] }),
+        makeRec338(2, { relationshipShifts: neg338 }),
+        makeRec338(3, { relationshipShifts: [] }),
+        makeRec338(4, { relationshipShifts: neg338 }),
+        makeRec338(5, { relationshipShifts: [] }),
+        makeRec338(6, { relationshipShifts: [] }),
+        makeRec338(7, { relationshipShifts: neg338 }),
+        makeRec338(8, { relationshipShifts: [] }),
+        makeRec338(9, { relationshipShifts: [] }),
+      ];
+      // 4 conflict scenes: 3 in first half (0,2,4) + 1 in second half (7) = 75%
+      const res = await runCF338(recs338fh);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_FIRST_HALF_MONOPOLY'), 'CONFLICT_FIRST_HALF_MONOPOLY should fire');
+    });
+
+    it('CONFLICT_FIRST_HALF_MONOPOLY does not fire when conflict is evenly distributed', async () => {
+      const recs338fhnw = [
+        makeRec338(0, { relationshipShifts: neg338 }),
+        makeRec338(1, { relationshipShifts: [] }),
+        makeRec338(2, { relationshipShifts: [] }),
+        makeRec338(3, { relationshipShifts: [] }),
+        makeRec338(4, { relationshipShifts: [] }),
+        makeRec338(5, { relationshipShifts: neg338 }),
+        makeRec338(6, { relationshipShifts: neg338 }),
+        makeRec338(7, { relationshipShifts: neg338 }),
+        makeRec338(8, { relationshipShifts: [] }),
+        makeRec338(9, { relationshipShifts: [] }),
+      ];
+      // 4 conflict scenes: 1 in first half (0) + 3 in second half (5,6,7) = 25%
+      const res = await runCF338(recs338fhnw);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_FIRST_HALF_MONOPOLY'), 'CONFLICT_FIRST_HALF_MONOPOLY should not fire');
+    });
+  });
+
   describe('Wave 313 — conflictPass: curiosity decoupled, magnitude peak early, relentless run', async () => {
     const makeRec313 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

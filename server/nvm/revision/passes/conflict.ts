@@ -18,6 +18,10 @@
 // Wave 313 additions: conflict curiosity decoupled (conflict scenes avg curiosityDelta
 // ≤ 0), conflict magnitude peak early (heaviest relational rupture in the first half,
 // distributed), conflict relentless run (≥4 consecutive scenes with a negative shift).
+// Wave 338 additions: conflict clock decoupled (≥2 clock scenes none with relational
+// conflict — deadlines without friction), conflict dramatic turn void (≥3 turn scenes
+// none with negative relationship shift — pivots that don't crack bonds), conflict
+// first-half monopoly (>70% of all conflict scenes in the first half — front-loaded).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1241,6 +1245,83 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         description: `${maxRunC313} consecutive scenes (${s313}–${e313}) each carry a negative relationship shift with no respite between them. Unbroken relational conflict exhausts the audience: with no breather, each new rupture lands softer than the last and the mounting pressure flattens into noise rather than building.`,
         suggestedFix: 'Insert a respite within the run — a scene of détente, a shared moment, a temporary alliance — before resuming the conflict. The contrast lets the next rupture register; relentless souring desensitizes the audience to the very damage the story is trying to make them feel.',
       });
+    }
+  }
+
+  // ── Wave 338: CONFLICT_CLOCK_DECOUPLED, CONFLICT_DRAMATIC_TURN_VOID, CONFLICT_FIRST_HALF_MONOPOLY ──
+
+  // CONFLICT_CLOCK_DECOUPLED (minor, n≥8, ≥2 clock-raised scenes): Two or more scenes
+  // raise a deadline (clockRaised === true) and not one of them carries a negative
+  // relationship shift — deadlines without relational friction. A ticking clock should
+  // pressure the characters, and pressure cracks bonds: characters disagree about how to
+  // respond, blame each other for the predicament, or betray one another under the
+  // urgency. When every clock scene is relationally placid, the deadline is a prop that
+  // creates urgency in the plot while leaving the characters untouched by each other.
+  // Distinct from CONFLICT_SUSPENSE_DECOUPLED (suspenseDelta on conflict scenes) and
+  // THREAT_AMNESIA (clock forgotten in second half — timing, not relational impact).
+  if (records.length >= 8) {
+    const clockScenes338 = (records as any[]).filter(r => r.clockRaised === true);
+    const isClockConflict338 = (r: any) => ((r.relationshipShifts as any[] ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3);
+    if (clockScenes338.length >= 2 && !clockScenes338.some(isClockConflict338)) {
+      issues.push({
+        location: `${clockScenes338.length} clock-raised scene(s) — none carry relational conflict`,
+        rule: 'CONFLICT_CLOCK_DECOUPLED',
+        severity: 'minor',
+        description: `${clockScenes338.length} scenes raise a clock (clockRaised) but none carry a negative relationship shift — deadlines without relational friction. A ticking clock should pressure the people in the story: under time pressure, characters disagree about how to respond, blame each other, make desperate deals, or betray one another. When every clock scene is relationally placid, the deadline is a prop that drives plot urgency while leaving the characters untouched by each other.`,
+        suggestedFix: "Let the deadline crack something: a clock scene is an opportunity to reveal what a character will sacrifice under pressure. At least one clock scene should carry a negative relationship shift — the moment urgency forces a choice that damages a bond, making the ticking clock cost something interpersonal as well as practical.",
+      });
+    }
+  }
+
+  // CONFLICT_DRAMATIC_TURN_VOID (minor, n≥10, ≥3 dramatic turn scenes): Three or more
+  // scenes contain a genuine dramatic turn (reversal, recognition, or twist — not
+  // 'nothing') and not one of them carries a negative relationship shift — pivots
+  // that leave every bond intact. A dramatic turn should rearrange the forces in the
+  // story, which means rearranging relationships: a reversal that exposes a betrayal,
+  // a recognition that shatters a partnership, a twist that creates a new enemy. When
+  // the story's turning points are relationally inert, they move the plot without
+  // moving the people. Distinct from ARC_TURN_EMOTION_ABSENT (emotion not relationship
+  // shifts) and CONFLICT_CURIOSITY_DECOUPLED (curiosity on conflict scenes, not turns).
+  if (records.length >= 10) {
+    const turnScenes338 = (records as any[]).filter(r => r.dramaticTurn && r.dramaticTurn !== 'nothing');
+    const isTurnConflict338 = (r: any) => ((r.relationshipShifts as any[] ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3);
+    if (turnScenes338.length >= 3 && !turnScenes338.some(isTurnConflict338)) {
+      issues.push({
+        location: 'Dramatic-turn scenes',
+        rule: 'CONFLICT_DRAMATIC_TURN_VOID',
+        severity: 'minor',
+        description: `${turnScenes338.length} dramatic turn scenes (reversals, recognitions, twists) none of which carry a negative relationship shift — pivots that leave every bond intact. A dramatic turn should rearrange the forces in the story, which means rearranging relationships: a reversal that exposes a betrayal, a recognition that shatters a partnership, a twist that creates a new enemy. When the story's turning points are relationally inert, they move the plot while leaving the people in it unchanged.`,
+        suggestedFix: "Give at least one dramatic turn a relational cost: the moment the story changes direction should also be a moment when a relationship changes direction. A turn that costs someone a bond — or reveals that a bond was never what it seemed — lands twice: once in the plot, once in the heart.",
+      });
+    }
+  }
+
+  // CONFLICT_FIRST_HALF_MONOPOLY (minor, n≥10, ≥4 conflict scenes): More than 70%
+  // of all conflict scenes (scenes with at least one negative relationship shift of
+  // magnitude ≥ 0.3) fall in the first half of the story. All the relational damage
+  // is done early, leaving the second half with nothing to escalate against. The
+  // climax inherits relationships that have already been battered down rather than
+  // bonds still cracking under growing pressure. Distinct from CONFLICT_MAGNITUDE_
+  // PEAK_EARLY (the heaviest single rupture in first half — this checks proportion
+  // of all conflict scenes), ESCALATION_PLATEAU (peak then stalls — different
+  // mechanism), and ANTAGONIST_VANISH (dramatic reversals timing, not relational scenes).
+  if (records.length >= 10) {
+    const allConflict338 = (records as any[]).filter(r =>
+      ((r.relationshipShifts as any[] ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3)
+    );
+    if (allConflict338.length >= 4) {
+      const half338 = Math.floor(records.length * 0.5);
+      const firstHalfConflict338 = allConflict338.filter(r => (records as any[]).indexOf(r) < half338);
+      const ratio338 = firstHalfConflict338.length / allConflict338.length;
+      if (ratio338 > 0.7) {
+        issues.push({
+          location: `${firstHalfConflict338.length} of ${allConflict338.length} conflict scenes in first half (${Math.round(ratio338 * 100)}%)`,
+          rule: 'CONFLICT_FIRST_HALF_MONOPOLY',
+          severity: 'minor',
+          description: `${firstHalfConflict338.length} of ${allConflict338.length} conflict scenes (${Math.round(ratio338 * 100)}%) fall in the first half of the story — all the relational damage is done early and the second half has nothing to escalate against. When the majority of conflict front-loads, the climax arrives after relationships have already been battered down rather than at the moment when bonds are at maximum strain.`,
+          suggestedFix: "Redistribute conflict across the arc: hold back some of the most damaging ruptures for the second half so the climax arrives at the worst point in the relationships rather than on the far side of them. The audience should feel that bonds are at their most strained precisely when the story reaches its peak.",
+        });
+      }
     }
   }
 
