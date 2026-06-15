@@ -19696,6 +19696,235 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 333 — voicePass: name opener flood, retrospective opener, word stutter', async () => {
+    const runV333 = async (fountain: string) => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      return voicePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DIALOGUE_NAME_OPENER_FLOOD fires when >30% of dialogue lines begin with direct name address', async () => {
+      const f333nof = `INT. OFFICE - DAY
+
+ALICE
+John, I need to talk to you right now.
+
+BOB
+That's not what I meant at all.
+
+ALICE
+Mary, please just listen for a moment.
+
+BOB
+I don't know what you want from me.
+
+ALICE
+Sarah, where have you been all week?
+
+BOB
+I tried calling but nobody answered.
+
+ALICE
+I'm not sure what to do about this situation.
+
+BOB
+Kate, you need to be honest with everyone.
+
+ALICE
+She never came back to the meeting room.
+
+BOB
+This whole thing is getting out of control.`;
+      const res = await runV333(f333nof);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_NAME_OPENER_FLOOD'), 'DIALOGUE_NAME_OPENER_FLOOD should fire');
+    });
+
+    it('DIALOGUE_NAME_OPENER_FLOOD does not fire when name-address openers are sparse', async () => {
+      const f333nnof = `INT. OFFICE - DAY
+
+ALICE
+I need to talk to you right now.
+
+BOB
+That's not what I meant at all.
+
+ALICE
+Please just listen for a moment.
+
+BOB
+I don't know what you want from me.
+
+ALICE
+Where have you been all week long?
+
+BOB
+I tried calling but nobody answered.
+
+ALICE
+I'm not sure what to do about this.
+
+BOB
+You need to be honest with everyone.
+
+ALICE
+John, she never came back after that.
+
+BOB
+This whole thing is getting out of control.`;
+      const res = await runV333(f333nnof);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_NAME_OPENER_FLOOD'), 'DIALOGUE_NAME_OPENER_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_RETROSPECTIVE_OPENER fires when ≥4 dialogue lines open with retrospective phrases', async () => {
+      const f333ro = `INT. KITCHEN - EVENING
+
+ALICE
+I remember when you still cared about anything.
+
+BOB
+Nothing happened the way you said.
+
+ALICE
+Back when we were happy this would never occur.
+
+BOB
+That was years ago and things have changed now.
+
+ALICE
+I used to think you were different from the others.
+
+BOB
+Stop bringing up the past every single time.
+
+ALICE
+Years ago you promised me this would not happen.
+
+BOB
+What do you want me to say at this point?
+
+ALICE
+Do you remember what you told me that morning?
+
+BOB
+I was wrong. Is that what you need to hear?
+
+ALICE
+I want you to understand what you did back then.
+
+BOB
+Then let me explain without interruption this time.`;
+      const res = await runV333(f333ro);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_RETROSPECTIVE_OPENER'), 'DIALOGUE_RETROSPECTIVE_OPENER should fire');
+    });
+
+    it('DIALOGUE_RETROSPECTIVE_OPENER does not fire when dialogue stays in the present', async () => {
+      const f333nro = `INT. KITCHEN - EVENING
+
+ALICE
+You don't care about anything anymore.
+
+BOB
+That's not fair and you know it perfectly.
+
+ALICE
+I'm tired of having this same argument again.
+
+BOB
+Then stop starting it every single time.
+
+ALICE
+I need you to listen to me right now.
+
+BOB
+I am listening. What do you want from me?
+
+ALICE
+Something has to change between us today.
+
+BOB
+I agree. But what exactly are you proposing?
+
+ALICE
+We need to have an honest conversation tonight.
+
+BOB
+Fine. Let's start from the beginning then.`;
+      const res = await runV333(f333nro);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_RETROSPECTIVE_OPENER'), 'DIALOGUE_RETROSPECTIVE_OPENER should not fire');
+    });
+
+    it('DIALOGUE_WORD_STUTTER fires when ≥3 dialogue lines contain immediate word repetition', async () => {
+      const f333ws = `INT. HOSPITAL - NIGHT
+
+ALICE
+No no, this can't be happening to us now.
+
+BOB
+I understand what you're saying completely.
+
+ALICE
+Please please just tell me what is going on.
+
+BOB
+The doctor said he needs more time to decide.
+
+ALICE
+Stop stop, you are not listening at all now.
+
+BOB
+Sit down and let me get you some water.
+
+ALICE
+But they told us everything would be fine here.
+
+BOB
+They did. I don't know what changed exactly.
+
+ALICE
+We have to do something about this immediately.
+
+BOB
+We will. I promise we'll figure this out.`;
+      const res = await runV333(f333ws);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_WORD_STUTTER'), 'DIALOGUE_WORD_STUTTER should fire');
+    });
+
+    it('DIALOGUE_WORD_STUTTER does not fire when dialogue has no immediate word repetition', async () => {
+      const f333nws = `INT. HOSPITAL - NIGHT
+
+ALICE
+This can't be happening to us right now.
+
+BOB
+I understand what you're feeling completely.
+
+ALICE
+Please just tell me what is really going on.
+
+BOB
+The doctor said he needs more time today.
+
+ALICE
+I can't breathe properly thinking about this.
+
+BOB
+Sit down and let me get you some water now.
+
+ALICE
+They told us everything would be fine here.
+
+BOB
+They did. I don't know what went wrong exactly.
+
+ALICE
+We have to do something about this immediately.
+
+BOB
+We will. I promise we'll figure this out together.`;
+      const res = await runV333(f333nws);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_WORD_STUTTER'), 'DIALOGUE_WORD_STUTTER should not fire');
+    });
+  });
+
   describe('Wave 322 — voicePass: trailing ellipsis flood, repeated opener word, conjunction opener', async () => {
     const runV322 = async (fountain: string) => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');

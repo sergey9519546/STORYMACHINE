@@ -26,6 +26,9 @@
 // Wave 322 additions: trailing ellipsis flood (>25% of dialogue lines trail off with "..."),
 // repeated opener word (a single word begins >40% of dialogue lines), conjunction opener
 // (>30% of dialogue lines begin with And/But/So/Because — speech reads as one run-on).
+// Wave 333 additions: name opener flood (>30% of dialogue lines begin with direct
+// character address like "John, I..."), retrospective narrator opener (≥4 lines opening
+// with "I remember"/"Back when" etc.), word stutter (≥3 lines with immediate word repeat).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1391,6 +1394,100 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `${conjCount322} of ${dlg322.length} dialogue lines (${Math.round(conjCount322 / dlg322.length * 100)}%) begin with a coordinating conjunction ("And", "But", "So", "Because"). Conjunction openers chain each line to the last; in excess they make every utterance a continuation rather than a distinct statement, and the dialogue reads as one unbroken run-on instead of weighed, separable beats.`,
           suggestedFix: 'Let most lines stand on their own. A conjunction opener can carry momentum at a key moment, but when most lines begin with one, the speech never lands a clean declarative beat. Start more lines with their actual subject so each statement carries its own weight.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 333: DIALOGUE_NAME_OPENER_FLOOD, DIALOGUE_RETROSPECTIVE_OPENER, DIALOGUE_WORD_STUTTER ──
+  {
+    const dlg333: string[] = [];
+    let inDlg333 = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg333 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg333 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg333 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg333) dlg333.push(t);
+      else inDlg333 = false;
+    }
+
+    // DIALOGUE_NAME_OPENER_FLOOD (minor, ≥10 dialogue lines): More than 30% of
+    // dialogue lines begin with direct address — a capitalized word followed by a
+    // comma that is not a common conjunction, adverb, or article (e.g., "John, I",
+    // "Mary, please", "Frank, you need to"). TV-habit overuse of direct address in
+    // dialogue reads as expository; when most lines open by naming the person being
+    // addressed, the script is manufacturing artificial intimacy. Distinct from
+    // DIALOGUE_REPEATED_OPENER_WORD (one specific word >40%) and DIALOGUE_HEDGING_OPENER
+    // (hedging phrases, not proper-name address).
+    if (dlg333.length >= 10) {
+      const NON_NAME_WORDS333 = new Set([
+        'i','he','she','we','they','it','you','and','but','or','so','yet','nor',
+        'the','a','an','in','on','at','to','for','with','by','from','of','about',
+        'well','actually','honestly','basically','never','always','sometimes','maybe',
+        'look','listen','wait','yes','no','please','sure','right','okay','fine','now',
+        'what','where','when','who','why','how','which','if','that','this','these',
+        'yesterday','today','tomorrow','then','before','after','anyway','still','just',
+        'here','there','until','while','once','then','meanwhile','sorry','thanks',
+      ]);
+      const nameRe333 = /^([A-Z][a-z]{0,14}),\s/;
+      const nameCount333 = dlg333.filter(l => {
+        const m = nameRe333.exec(l.trim());
+        return m !== null && !NON_NAME_WORDS333.has(m[1].toLowerCase());
+      }).length;
+      if (nameCount333 / dlg333.length > 0.30) {
+        issues.push({
+          location: 'Dialogue direct-address openers',
+          rule: 'DIALOGUE_NAME_OPENER_FLOOD',
+          severity: 'minor',
+          description: `${nameCount333} of ${dlg333.length} dialogue lines (${Math.round(nameCount333 / dlg333.length * 100)}%) begin with direct character address ("John, I...", "Mary, you..."). Overuse of name-first address makes dialogue feel artificially intimate and expository — real conversational speech rarely prefaces statements with the listener's name. When most lines open this way, the dialogue loses natural rhythm and reads as theatrical narration.`,
+          suggestedFix: 'Remove the direct address from most lines and let the character speak directly to their point. Reserve name-first address for moments of genuine urgency, confrontation, or intimacy — where naming someone is a deliberate dramatic act, not a speech habit.',
+        });
+      }
+    }
+
+    // DIALOGUE_RETROSPECTIVE_OPENER (minor, ≥10 dialogue lines, ≥4 matches):
+    // At least 4 dialogue lines open with explicit retrospective indicators
+    // ("I remember", "Back when", "Do you remember", "I used to", "Years ago",
+    // "Before you", "That was when", "In those days"). When many dialogue lines
+    // open in retrospective mode, characters are narrating the past rather than
+    // confronting each other in the present. Backstory delivered in retrospective
+    // openers pauses dramatic time. Distinct from DIALOGUE_HEDGING_OPENER (hedging
+    // phrases not temporal retrospection) and DIALOGUE_CONJUNCTION_OPENER (additive
+    // chain openers not retrospective openers).
+    if (dlg333.length >= 10) {
+      const retroRe333 = /^(I remember|Do you remember|Back when|Years ago|Before you|Before I|When I was|That was when|I used to|You used to|We used to|In those days|Back then|Once I|Once you|Once we|Last time I)/i;
+      const retroCount333 = dlg333.filter(l => retroRe333.test(l.trim())).length;
+      if (retroCount333 >= 4 && retroCount333 / dlg333.length > 0.25) {
+        issues.push({
+          location: 'Dialogue retrospective openers',
+          rule: 'DIALOGUE_RETROSPECTIVE_OPENER',
+          severity: 'minor',
+          description: `${retroCount333} of ${dlg333.length} dialogue lines (${Math.round(retroCount333 / dlg333.length * 100)}%) open with retrospective narration ("I remember", "Back when", "Years ago", "I used to"). When characters consistently open in the past tense, they are narrating backstory rather than confronting each other in the present — dramatic time is paused while characters deliver exposition in the guise of conversation.`,
+          suggestedFix: 'Move backstory from retrospective dialogue to present-tense consequence: instead of "I remember when you left me," let the action show what that departure cost. When characters must reference the past, root it in a present emotion — "You left. I never recovered." rather than "I remember when you left."',
+        });
+      }
+    }
+
+    // DIALOGUE_WORD_STUTTER (minor, ≥10 dialogue lines, ≥3 matches): At least 3
+    // dialogue lines contain an immediate word repetition — the same word appearing
+    // twice in succession ("no no", "please please", "I I can't", "why why"). A
+    // single stutter marks genuine emotional overwhelm; a pattern of stutters across
+    // multiple lines becomes a verbal tic that the audience discounts. Distinct from
+    // NEAR_WORD_REPEAT in rhythm.ts (which checks for the same word in a 5-line
+    // window of action prose; this checks for same-word adjacency within a single
+    // dialogue line across multiple lines).
+    if (dlg333.length >= 10) {
+      const stutterRe333 = /\b(\w{2,})\s+\1\b/i;
+      const stutterCount333 = dlg333.filter(l => stutterRe333.test(l)).length;
+      if (stutterCount333 >= 3) {
+        issues.push({
+          location: 'Dialogue word repetition',
+          rule: 'DIALOGUE_WORD_STUTTER',
+          severity: 'minor',
+          description: `${stutterCount333} dialogue lines contain immediate word repetition ("no no", "please please", "I I") — a stutter pattern that appears across multiple exchanges. A single stutter marks genuine emotional overwhelm; when the device recurs across ${stutterCount333} lines, it becomes a verbal tic the audience stops registering. The emergency of the stutter is normalised by repetition.`,
+          suggestedFix: 'Reserve the stutter for one moment of genuine breakdown. If a character repeats a word once in the script ("no no"), it lands hard; if they do it repeatedly, it becomes their voice pattern and loses impact. Find other ways to signal overwhelm: silence, a subject change, a line that contradicts the previous one.',
         });
       }
     }
