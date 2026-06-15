@@ -23,6 +23,9 @@
 // below 60% of overall avg length), curiosity midzone gap (midzone avg ≤ 0 while
 // opening was positive), clock scene pacing mismatch (clock-raising scenes avg
 // above 1.5× overall length — urgency undercut by slow page pace).
+// Wave 327 additions: dramatic-turn scene underweight (turn scenes avg below 60% of
+// overall length), payoff scene underweight (payoff scenes avg below 60%), emotional
+// peak scene underweight (non-neutral scenes avg below 60% — feeling given least room).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1157,6 +1160,90 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `Clock-raising scenes (clockRaised) average ${clockAvg316.toFixed(1)} weighted lines — ${Math.round(clockAvg316 / avgLength * 100)}% of the overall scene average (${avgLength.toFixed(1)}). The moments that announce "time is running out" are the script's slowest-reading sequences: the form contradicts the urgency. A ticking clock should feel fast.`,
           suggestedFix: 'Compress clock scenes: strip all exposition, cut to the beat that introduces the deadline, and let the consequences unspool in subsequent scenes. Urgency is communicated by brevity — the faster the scene reads, the faster time appears to be moving.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 327: DRAMATIC_TURN_SCENE_UNDERWEIGHT, PAYOFF_SCENE_UNDERWEIGHT, EMOTIONAL_PEAK_SCENE_UNDERWEIGHT ──
+
+  // DRAMATIC_TURN_SCENE_UNDERWEIGHT (minor, n≥8, ≥2 turn scenes): Scenes that
+  // contain a dramatic turn (dramaticTurn !== 'nothing') average below 60% of
+  // the overall scene length. A turn is a pivot — the audience needs room to
+  // register the reversal and its consequence. Rushing pivots through the
+  // script's thinnest scenes blunts the very moments meant to change the story's
+  // direction. Distinct from REVELATION_SCENE_UNDERWEIGHT (revelation channel)
+  // and CLOCK_SCENE_PACING_MISMATCH (clock channel, opposite direction).
+  if (records.length >= 8) {
+    const turnLengths327: number[] = [];
+    for (let i327 = 0; i327 < records.length; i327++) {
+      if (((records as any[])[i327].dramaticTurn ?? 'nothing') !== 'nothing') {
+        turnLengths327.push(sceneLengths.get(i327) ?? 0);
+      }
+    }
+    if (turnLengths327.length >= 2) {
+      const turnAvg327 = turnLengths327.reduce((s, v) => s + v, 0) / turnLengths327.length;
+      if (turnAvg327 < avgLength * 0.6) {
+        issues.push({
+          location: `${turnLengths327.length} dramatic-turn scene(s)`,
+          rule: 'DRAMATIC_TURN_SCENE_UNDERWEIGHT',
+          severity: 'minor',
+          description: `The ${turnLengths327.length} dramatic-turn scene(s) average ${turnAvg327.toFixed(1)} weighted lines — ${Math.round(turnAvg327 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). Turns are pivots that change the story's direction; rushing them through the script's thinnest scenes denies the audience time to register the reversal and feel its consequence.`,
+          suggestedFix: 'Give each turn room: stage the reversal, then hold for the reaction and the first consequence in the same scene. A pivot needs at least average length so the audience experiences the change rather than merely being informed of it.',
+        });
+      }
+    }
+  }
+
+  // PAYOFF_SCENE_UNDERWEIGHT (minor, n≥8, ≥2 payoff scenes): Scenes that resolve
+  // a setup (payoffSetupIds.length > 0) average below 60% of the overall scene
+  // length. A payoff is a promise redeemed — compressing it into the thinnest
+  // page space cheats the audience of the satisfaction the setup earned.
+  // Distinct from REVELATION_SCENE_UNDERWEIGHT (revelation channel) and the
+  // payoff-pass timing checks (this audits page weight, not scheduling).
+  if (records.length >= 8) {
+    const payoffLengths327: number[] = [];
+    for (let i327p = 0; i327p < records.length; i327p++) {
+      if (((((records as any[])[i327p].payoffSetupIds ?? []) as any[]).length) > 0) {
+        payoffLengths327.push(sceneLengths.get(i327p) ?? 0);
+      }
+    }
+    if (payoffLengths327.length >= 2) {
+      const payoffAvg327 = payoffLengths327.reduce((s, v) => s + v, 0) / payoffLengths327.length;
+      if (payoffAvg327 < avgLength * 0.6) {
+        issues.push({
+          location: `${payoffLengths327.length} payoff scene(s)`,
+          rule: 'PAYOFF_SCENE_UNDERWEIGHT',
+          severity: 'minor',
+          description: `The ${payoffLengths327.length} payoff scene(s) average ${payoffAvg327.toFixed(1)} weighted lines — ${Math.round(payoffAvg327 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). A payoff is a promise the setup made coming due; compressing it into the thinnest page space cheats the audience of the satisfaction they have been waiting for. The harvest deserves at least as much room as the planting.`,
+          suggestedFix: 'Expand payoff scenes: let the resolution land, then play the reaction and the changed situation it creates. A payoff rushed in two lines reads as a checkbox; given room, it reads as the moment the story was building toward.',
+        });
+      }
+    }
+  }
+
+  // EMOTIONAL_PEAK_SCENE_UNDERWEIGHT (minor, n≥8, ≥3 non-neutral scenes): Scenes
+  // carrying a non-neutral emotional shift average below 60% of the overall
+  // scene length. The story's emotional high points are its shortest scenes —
+  // feeling is given the least room to develop. Distinct from the suspense and
+  // revelation underweight checks (different channels): this audits page weight
+  // against the emotional channel specifically.
+  if (records.length >= 8) {
+    const emoLengths327: number[] = [];
+    for (let i327e = 0; i327e < records.length; i327e++) {
+      if ((records as any[])[i327e].emotionalShift !== 'neutral') {
+        emoLengths327.push(sceneLengths.get(i327e) ?? 0);
+      }
+    }
+    if (emoLengths327.length >= 3) {
+      const emoAvg327 = emoLengths327.reduce((s, v) => s + v, 0) / emoLengths327.length;
+      if (emoAvg327 < avgLength * 0.6) {
+        issues.push({
+          location: `${emoLengths327.length} emotionally charged scene(s)`,
+          rule: 'EMOTIONAL_PEAK_SCENE_UNDERWEIGHT',
+          severity: 'minor',
+          description: `The ${emoLengths327.length} emotionally charged scene(s) average ${emoAvg327.toFixed(1)} weighted lines — ${Math.round(emoAvg327 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The story's emotional high points are its shortest scenes: feeling is given the least room to develop. Emotion needs duration — a beat of silence, a held reaction, a consequence — to move from the page into the audience.`,
+          suggestedFix: 'Give emotional peaks room to breathe: slow down at the moments of greatest feeling, let reactions land and aftermath register. The audience cannot be moved at the same speed the plot is advanced; the charged scenes are exactly where the script should linger.',
         });
       }
     }

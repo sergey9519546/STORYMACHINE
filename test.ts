@@ -19148,6 +19148,80 @@ He looks away.`;
     });
   });
 
+  describe('Wave 327 — pacingPass: dramatic-turn scene underweight, payoff scene underweight, emotional peak scene underweight', async () => {
+    const makeRec327 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain327 = (lineCounts: number[]) =>
+      lineCounts.map((n, i) =>
+        `INT. SC${i} - DAY\n\n${Array.from({ length: n }, (_, j) => `Action line ${j + 1} for scene ${i}.`).join('\n\n')}`
+      ).join('\n\n');
+    const runP327 = async (records: any[], fountain: string) => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      return pacingPass({ fountain, original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DRAMATIC_TURN_SCENE_UNDERWEIGHT fires when turn scenes run far below average length', async () => {
+      const lc327t = [10, 10, 2, 10, 10, 2, 10, 10];
+      const recs327t = Array.from({ length: 8 }, (_, i) =>
+        makeRec327(i, { dramaticTurn: [2, 5].includes(i) ? 'reversal' : 'nothing' })
+      );
+      const res = await runP327(recs327t, makeFountain327(lc327t));
+      assert.ok(res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_SCENE_UNDERWEIGHT'), 'DRAMATIC_TURN_SCENE_UNDERWEIGHT should fire');
+    });
+
+    it('DRAMATIC_TURN_SCENE_UNDERWEIGHT does not fire when turn scenes are average length', async () => {
+      const lc327nt = [10, 10, 10, 10, 10, 10, 10, 10];
+      const recs327nt = Array.from({ length: 8 }, (_, i) =>
+        makeRec327(i, { dramaticTurn: [2, 5].includes(i) ? 'reversal' : 'nothing' })
+      );
+      const res = await runP327(recs327nt, makeFountain327(lc327nt));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_SCENE_UNDERWEIGHT'), 'DRAMATIC_TURN_SCENE_UNDERWEIGHT should not fire');
+    });
+
+    it('PAYOFF_SCENE_UNDERWEIGHT fires when payoff scenes run far below average length', async () => {
+      const lc327p = [10, 10, 2, 10, 10, 2, 10, 10];
+      const recs327p = Array.from({ length: 8 }, (_, i) =>
+        makeRec327(i, { payoffSetupIds: [2, 5].includes(i) ? [`clue${i}`] : [] })
+      );
+      const res = await runP327(recs327p, makeFountain327(lc327p));
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_SCENE_UNDERWEIGHT'), 'PAYOFF_SCENE_UNDERWEIGHT should fire');
+    });
+
+    it('PAYOFF_SCENE_UNDERWEIGHT does not fire when payoff scenes are average length', async () => {
+      const lc327np = [10, 10, 10, 10, 10, 10, 10, 10];
+      const recs327np = Array.from({ length: 8 }, (_, i) =>
+        makeRec327(i, { payoffSetupIds: [2, 5].includes(i) ? [`clue${i}`] : [] })
+      );
+      const res = await runP327(recs327np, makeFountain327(lc327np));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_SCENE_UNDERWEIGHT'), 'PAYOFF_SCENE_UNDERWEIGHT should not fire');
+    });
+
+    it('EMOTIONAL_PEAK_SCENE_UNDERWEIGHT fires when charged scenes run far below average length', async () => {
+      const lc327e = [10, 10, 2, 10, 2, 10, 2, 10];
+      const recs327e = Array.from({ length: 8 }, (_, i) =>
+        makeRec327(i, { emotionalShift: [2, 4, 6].includes(i) ? 'positive' : 'neutral' })
+      );
+      const res = await runP327(recs327e, makeFountain327(lc327e));
+      assert.ok(res.issues.some((i: any) => i.rule === 'EMOTIONAL_PEAK_SCENE_UNDERWEIGHT'), 'EMOTIONAL_PEAK_SCENE_UNDERWEIGHT should fire');
+    });
+
+    it('EMOTIONAL_PEAK_SCENE_UNDERWEIGHT does not fire when charged scenes are average length', async () => {
+      const lc327ne = [10, 10, 10, 10, 10, 10, 10, 10];
+      const recs327ne = Array.from({ length: 8 }, (_, i) =>
+        makeRec327(i, { emotionalShift: [2, 4, 6].includes(i) ? 'positive' : 'neutral' })
+      );
+      const res = await runP327(recs327ne, makeFountain327(lc327ne));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'EMOTIONAL_PEAK_SCENE_UNDERWEIGHT'), 'EMOTIONAL_PEAK_SCENE_UNDERWEIGHT should not fire');
+    });
+  });
+
   describe('Wave 326 — originalityPass: montage crutch, title card crutch, time card crutch', async () => {
     const runO326 = async (fountain: string) => {
       const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
