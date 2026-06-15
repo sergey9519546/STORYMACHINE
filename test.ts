@@ -19148,6 +19148,92 @@ He looks away.`;
     });
   });
 
+  describe('Wave 328 — payoffPass: payoff relationship decoupled, clue seed curiosity flat, clue seed emotion flat', async () => {
+    const makeRec328 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runPay328 = async (records: any[]) => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      return payoffPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PAYOFF_RELATIONSHIP_DECOUPLED fires when no payoff scene moves a bond', async () => {
+      const recs328rd = Array.from({ length: 8 }, (_, i) =>
+        makeRec328(i, {
+          seededClueIds: i < 3 ? [`clue${i}`] : [],
+          payoffSetupIds: [3, 5, 7].includes(i) ? [`clue${[3, 5, 7].indexOf(i)}`] : [],
+          relationshipShifts: [],
+        })
+      );
+      const res = await runPay328(recs328rd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_RELATIONSHIP_DECOUPLED'), 'PAYOFF_RELATIONSHIP_DECOUPLED should fire');
+    });
+
+    it('PAYOFF_RELATIONSHIP_DECOUPLED does not fire when a payoff scene shifts a relationship', async () => {
+      const recs328nrd = Array.from({ length: 8 }, (_, i) =>
+        makeRec328(i, {
+          seededClueIds: i < 3 ? [`clue${i}`] : [],
+          payoffSetupIds: [3, 5, 7].includes(i) ? [`clue${[3, 5, 7].indexOf(i)}`] : [],
+          relationshipShifts: i === 5 ? [{ pairKey: 'A|B', dimension: 'trust', amount: -0.5 }] : [],
+        })
+      );
+      const res = await runPay328(recs328nrd);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_RELATIONSHIP_DECOUPLED'), 'PAYOFF_RELATIONSHIP_DECOUPLED should not fire');
+    });
+
+    it('CLUE_SEED_CURIOSITY_FLAT fires when clue-seeding scenes raise no curiosity', async () => {
+      const recs328cf = Array.from({ length: 8 }, (_, i) =>
+        makeRec328(i, {
+          seededClueIds: [1, 3, 5].includes(i) ? [`clue${i}`] : [],
+          curiosityDelta: 0,
+        })
+      );
+      const res = await runPay328(recs328cf);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLUE_SEED_CURIOSITY_FLAT'), 'CLUE_SEED_CURIOSITY_FLAT should fire');
+    });
+
+    it('CLUE_SEED_CURIOSITY_FLAT does not fire when clue-seeding scenes raise curiosity', async () => {
+      const recs328ncf = Array.from({ length: 8 }, (_, i) =>
+        makeRec328(i, {
+          seededClueIds: [1, 3, 5].includes(i) ? [`clue${i}`] : [],
+          curiosityDelta: [1, 3, 5].includes(i) ? 2 : 0,
+        })
+      );
+      const res = await runPay328(recs328ncf);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLUE_SEED_CURIOSITY_FLAT'), 'CLUE_SEED_CURIOSITY_FLAT should not fire');
+    });
+
+    it('CLUE_SEED_EMOTION_FLAT fires when every clue-seeding scene is emotionally neutral', async () => {
+      const recs328ef = Array.from({ length: 8 }, (_, i) =>
+        makeRec328(i, {
+          seededClueIds: [1, 3, 5].includes(i) ? [`clue${i}`] : [],
+          curiosityDelta: 2,
+          emotionalShift: 'neutral',
+        })
+      );
+      const res = await runPay328(recs328ef);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLUE_SEED_EMOTION_FLAT'), 'CLUE_SEED_EMOTION_FLAT should fire');
+    });
+
+    it('CLUE_SEED_EMOTION_FLAT does not fire when a clue-seeding scene is emotionally charged', async () => {
+      const recs328nef = Array.from({ length: 8 }, (_, i) =>
+        makeRec328(i, {
+          seededClueIds: [1, 3, 5].includes(i) ? [`clue${i}`] : [],
+          curiosityDelta: 2,
+          emotionalShift: i === 3 ? 'positive' : 'neutral',
+        })
+      );
+      const res = await runPay328(recs328nef);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLUE_SEED_EMOTION_FLAT'), 'CLUE_SEED_EMOTION_FLAT should not fire');
+    });
+  });
+
   describe('Wave 327 — pacingPass: dramatic-turn scene underweight, payoff scene underweight, emotional peak scene underweight', async () => {
     const makeRec327 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

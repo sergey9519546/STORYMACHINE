@@ -21,6 +21,9 @@
 // Wave 317 additions: payoff emotion decoupled (all payoff scenes emotionally neutral),
 // unresolved clue ratio high (≥40% of seeded clues still open in final scene), payoff
 // curiosity mismatch (payoff scenes avg curiosityDelta ≤ 0 despite 3+ payoffs).
+// Wave 328 additions: payoff relationship decoupled (no payoff scene moves a bond),
+// clue seed curiosity flat (clue-seeding scenes avg curiosityDelta ≤ 0), clue seed
+// emotion flat (every clue planted in an emotionally neutral scene).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1052,6 +1055,71 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Let each payoff open something: the answer to one question should raise another, or the resolution should make the audience wonder "what does this mean for X?" Every payoff is an opportunity to deepen the mystery even as it resolves the immediate thread.',
         });
       }
+    }
+  }
+
+  // ── Wave 328: PAYOFF_RELATIONSHIP_DECOUPLED, CLUE_SEED_CURIOSITY_FLAT, CLUE_SEED_EMOTION_FLAT ──
+
+  // PAYOFF_RELATIONSHIP_DECOUPLED (minor, n≥8, ≥3 payoff scenes): No scene
+  // containing a payoff also carries a relationship shift. Payoffs resolve plot
+  // threads but never move a bond — the setup/payoff machine runs in a lane
+  // separate from the characters. The most resonant payoffs change a
+  // relationship as they close a loop. Completes the payoff-channel trilogy with
+  // PAYOFF_EMOTION_DECOUPLED (emotion) and PAYOFF_CURIOSITY_MISMATCH (curiosity).
+  if (records.length >= 8) {
+    const payoffScenes328 = (records as any[]).filter(r => ((r.payoffSetupIds ?? []) as string[]).length > 0);
+    if (payoffScenes328.length >= 3) {
+      const anyRelShift328 = payoffScenes328.some(r => ((r.relationshipShifts ?? []) as any[]).length > 0);
+      if (!anyRelShift328) {
+        issues.push({
+          location: 'Payoff scenes — relational impact',
+          rule: 'PAYOFF_RELATIONSHIP_DECOUPLED',
+          severity: 'minor',
+          description: `None of the ${payoffScenes328.length} payoff scenes also carries a relationship shift — resolutions close plot threads but never move a bond. The setup/payoff machine runs in a lane separate from the characters; the audience gets the answer to the plot question without feeling its effect on anyone. The most resonant payoffs change a relationship in the act of closing a loop.`,
+          suggestedFix: 'Tie payoffs to relationships: let the resolution of a thread also shift trust, power, or intimacy between characters. The clue that exposes the traitor should also break the friendship; the secret that comes out should also heal or sever a bond. Plot resolution and relational change should arrive together.',
+        });
+      }
+    }
+  }
+
+  // CLUE_SEED_CURIOSITY_FLAT (minor, n≥8, ≥3 seed scenes): Scenes that plant a
+  // clue (seededClueIds.length > 0) have an average curiosityDelta ≤ 0. A clue
+  // planted in a scene that raises no curiosity does not register as a question
+  // — the audience needs to feel "what is that for?" at the moment of planting,
+  // or the seed passes unnoticed and its later payoff lands without setup.
+  // Distinct from the payoff-side curiosity check: this audits the seed side.
+  if (records.length >= 8) {
+    const seedScenes328 = (records as any[]).filter(r => ((r.seededClueIds ?? []) as string[]).length > 0);
+    if (seedScenes328.length >= 3) {
+      const avgSeedCur328 = seedScenes328.reduce((acc: number, r: any) => acc + (r.curiosityDelta ?? 0), 0) / seedScenes328.length;
+      if (avgSeedCur328 <= 0) {
+        issues.push({
+          location: 'Clue-seeding scenes — curiosity register',
+          rule: 'CLUE_SEED_CURIOSITY_FLAT',
+          severity: 'minor',
+          description: `${seedScenes328.length} clue-seeding scenes average a curiosityDelta of ${avgSeedCur328.toFixed(2)} — clues are planted in scenes that raise no curiosity. A seed only works if the audience registers it as a question ("what is that for?"); planted in a flat scene, the clue passes unnoticed, and its later payoff lands without the setup that should have charged it.`,
+          suggestedFix: 'Plant clues so they prick curiosity: give the planted detail a beat of attention — a character notices it, a camera-worthy oddity, a line that half-explains and half-mystifies. The seed the audience wonders about is the seed they will remember when it pays off.',
+        });
+      }
+    }
+  }
+
+  // CLUE_SEED_EMOTION_FLAT (minor, n≥8, ≥3 seed scenes): Every scene that plants
+  // a clue is emotionally neutral. Clues attached to a charged moment lodge in
+  // memory; clues dropped in affectless scenes are forgotten before they can pay
+  // off. Distinct from SETUP_WITHOUT_CONSEQUENCE (repeated clues lacking any
+  // downstream effect) and CLUE_SEED_CURIOSITY_FLAT (curiosity channel): this
+  // audits the emotional charge of the planting scenes.
+  if (records.length >= 8) {
+    const seedScenes328e = (records as any[]).filter(r => ((r.seededClueIds ?? []) as string[]).length > 0);
+    if (seedScenes328e.length >= 3 && seedScenes328e.every(r => r.emotionalShift === 'neutral')) {
+      issues.push({
+        location: 'Clue-seeding scenes — emotional register',
+        rule: 'CLUE_SEED_EMOTION_FLAT',
+        severity: 'minor',
+        description: `All ${seedScenes328e.length} clue-seeding scenes are emotionally neutral — every clue is planted in an affectless scene. Memory is emotional: a clue attached to a charged moment lodges and resurfaces when it pays off, while a clue dropped in a flat scene is forgotten before it can matter. Neutral planting wastes the setup half of the setup/payoff contract.`,
+        suggestedFix: 'Plant at least some clues inside emotionally charged scenes, where the audience is already leaning in: the keepsake mentioned during a goodbye, the detail glimpsed in a moment of fear. The feeling makes the fact stick, so the payoff later has something to land against.',
+      });
     }
   }
 
