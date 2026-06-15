@@ -19148,6 +19148,125 @@ He looks away.`;
     });
   });
 
+  describe('Wave 326 — originalityPass: montage crutch, title card crutch, time card crutch', async () => {
+    const runO326 = async (fountain: string) => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      return originalityPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('MONTAGE_CRUTCH fires when two or more montages appear', async () => {
+      const fountain326m = `INT. GYM - DAY
+
+MONTAGE:
+
+Rocky climbs the stairs.
+
+INT. KITCHEN - DAY
+
+A montage of breakfasts over the weeks.
+
+BEGIN MONTAGE
+
+Training reps in the dark.`;
+      const res = await runO326(fountain326m);
+      assert.ok(res.issues.some((i: any) => i.rule === 'MONTAGE_CRUTCH'), 'MONTAGE_CRUTCH should fire');
+    });
+
+    it('MONTAGE_CRUTCH does not fire for a single montage', async () => {
+      const fountain326nm = `INT. GYM - DAY
+
+MONTAGE:
+
+Rocky climbs the stairs.
+
+INT. KITCHEN - DAY
+
+He pours a glass of juice.`;
+      const res = await runO326(fountain326nm);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'MONTAGE_CRUTCH'), 'MONTAGE_CRUTCH should not fire');
+    });
+
+    it('TITLE_CARD_CRUTCH fires when three or more on-screen text cards appear', async () => {
+      const fountain326t = `INT. OFFICE - DAY
+
+SUPER: WASHINGTON, D.C.
+
+The senator reads a file.
+
+INT. HALL - NIGHT
+
+CHYRON: SIX MONTHS AGO
+
+A guard locks the door.
+
+EXT. STREET - DAY
+
+TITLE: THE RECKONING
+
+A car pulls away.`;
+      const res = await runO326(fountain326t);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TITLE_CARD_CRUTCH'), 'TITLE_CARD_CRUTCH should fire');
+    });
+
+    it('TITLE_CARD_CRUTCH does not fire when on-screen text is sparse', async () => {
+      const fountain326nt = `INT. OFFICE - DAY
+
+SUPER: WASHINGTON, D.C.
+
+The senator reads a file.
+
+INT. HALL - NIGHT
+
+A guard locks the door.
+
+EXT. STREET - DAY
+
+A car pulls away.`;
+      const res = await runO326(fountain326nt);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TITLE_CARD_CRUTCH'), 'TITLE_CARD_CRUTCH should not fire');
+    });
+
+    it('TIME_CARD_CRUTCH fires when three or more time-jump captions appear', async () => {
+      const fountain326c = `INT. ROOM - DAY
+
+A phone rings.
+
+THREE WEEKS LATER
+
+The room is empty now.
+
+MEANWHILE
+
+A car speeds down the highway.
+
+LATER THAT NIGHT
+
+The lights go out.`;
+      const res = await runO326(fountain326c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TIME_CARD_CRUTCH'), 'TIME_CARD_CRUTCH should fire');
+    });
+
+    it('TIME_CARD_CRUTCH does not fire when time-jump captions are rare', async () => {
+      const fountain326nc = `INT. ROOM - DAY
+
+A phone rings.
+
+THREE WEEKS LATER
+
+The room is empty now.
+
+INT. HIGHWAY - DAY
+
+A car speeds down the road.
+
+INT. HOUSE - NIGHT
+
+The lights go out.`;
+      const res = await runO326(fountain326nc);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TIME_CARD_CRUTCH'), 'TIME_CARD_CRUTCH should not fire');
+    });
+  });
+
   describe('Wave 325 — dialoguePass: expletive opener overuse, absolute overuse, within-line word echo', async () => {
     const runD325 = async (fountain: string) => {
       const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');

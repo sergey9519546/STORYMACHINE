@@ -22,6 +22,9 @@
 // gestures like nods/shrugs/sighs/grins), slug generic location (>60% of sluglines
 // use placeholder names like ROOM/OFFICE/STREET), flashback crutch (≥4 explicit
 // flashback transition markers).
+// Wave 326 additions: montage crutch (≥2 montage markers — dramatized struggle skipped),
+// title card crutch (≥3 SUPER:/TITLE:/CHYRON: on-screen text cards), time card crutch
+// (≥3 standalone time-jump captions like "THREE WEEKS LATER"/"MEANWHILE").
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1426,6 +1429,68 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${fbCount315} explicit flashback transitions (FLASHBACK:, END FLASHBACK, BACK TO:, etc.) signal a script structured around fragmented memory. Flashbacks in bulk replace forward-moving causality with accumulated explanation — the audience experiences events after the fact rather than in the present tense. Sustained use trains the audience that the current scene is provisional.`,
         suggestedFix: 'Flatten the temporal structure: dramatize as much as possible in present-tense sequence, where actions have immediate consequences. When the past matters, let characters carry it in behaviour rather than revisiting it directly — the scar is more powerful than the wound.',
+      });
+    }
+  }
+
+  // ── Wave 326: MONTAGE_CRUTCH ─────────────────────────────────────────────
+  // Two or more montage markers ("MONTAGE:", "BEGIN MONTAGE", "montage of …").
+  // A montage compresses effort, training, or the passage of time into a
+  // sequence of glimpses — useful once, but leaned on repeatedly it skips
+  // exactly the dramatized struggle that earns a story's turns. Distinct from
+  // FLASHBACK_CRUTCH (temporal flashback markers) and TIME_CARD_CRUTCH (caption
+  // jumps): this fires on montage devices specifically.
+  {
+    const montageRe326 = /^(MONTAGE\b|BEGIN MONTAGE\b|END MONTAGE\b|MONTAGE:|A MONTAGE\b)|\bmontage of\b/i;
+    const montageCount326 = lines.filter(l => montageRe326.test(l.trim())).length;
+    if (montageCount326 >= 2) {
+      issues.push({
+        location: `${montageCount326} montage markers`,
+        rule: 'MONTAGE_CRUTCH',
+        severity: 'minor',
+        description: `${montageCount326} montage sequences appear in the script. A montage compresses effort, training, or elapsed time into a string of glimpses — it works once as a deliberate device, but leaned on repeatedly it skips the dramatized struggle that earns a story's turns. Each montage is a stretch the audience watches summarized rather than experienced.`,
+        suggestedFix: 'Keep at most one montage and dramatize the rest: pick the single most important beat inside each montage and play it as a full scene with stakes and consequence. The work a character does is more compelling shown in one hard scene than glimpsed across a dozen quick cuts.',
+      });
+    }
+  }
+
+  // ── Wave 326: TITLE_CARD_CRUTCH ──────────────────────────────────────────
+  // Three or more on-screen text cards ("SUPER:", "TITLE:", "CHYRON:",
+  // "SUBTITLE:", "TEXT ON SCREEN"). Printed text that delivers information the
+  // story should dramatize is a crutch — it tells the audience facts (dates,
+  // places, stakes) the scenes ought to convey. Distinct from FLASHBACK_CRUTCH
+  // and MONTAGE_CRUTCH: this fires on superimposed-text devices.
+  {
+    const titleCardRe326 = /^(SUPER:|SUPERIMPOSE:|TITLE:|TITLE CARD:|CHYRON:|SUBTITLE:|CAPTION:|TEXT ON SCREEN|ON SCREEN TEXT|INTERTITLE:)/i;
+    const titleCardCount326 = lines.filter(l => titleCardRe326.test(l.trim())).length;
+    if (titleCardCount326 >= 3) {
+      issues.push({
+        location: `${titleCardCount326} on-screen text cards`,
+        rule: 'TITLE_CARD_CRUTCH',
+        severity: 'minor',
+        description: `${titleCardCount326} on-screen text cards (SUPER:, TITLE:, CHYRON:, etc.) appear in the script. Printed text delivering dates, places, or stakes is a crutch: it hands the audience facts the scenes themselves should convey. A story that repeatedly superimposes its information has stopped trusting its own images to carry meaning.`,
+        suggestedFix: 'Convert most text cards into dramatized information: establish a location through a recognizable detail in the frame, a time jump through changed circumstances, a stakes update through a character\'s reaction. Reserve on-screen text for the rare fact no scene can naturally show.',
+      });
+    }
+  }
+
+  // ── Wave 326: TIME_CARD_CRUTCH ───────────────────────────────────────────
+  // Three or more standalone temporal-jump captions ("THREE WEEKS LATER",
+  // "MEANWHILE", "TWO YEARS EARLIER", "DAYS LATER", "ELSEWHERE", "LATER THAT
+  // NIGHT"). Frequent jump captions manage time and space by announcement
+  // rather than by storytelling — the script narrates its own structure
+  // instead of letting transitions read from the scenes. Distinct from
+  // TITLE_CARD_CRUTCH (superimposed exposition text) and MONTAGE_CRUTCH.
+  {
+    const timeCardRe326 = /^((MOMENTS|HOURS|DAYS|WEEKS|MONTHS|YEARS|SECONDS|MINUTES) LATER|(THREE|TWO|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|A FEW|SEVERAL|MANY) (DAYS|WEEKS|MONTHS|YEARS|HOURS|MINUTES) (LATER|EARLIER|AGO)|MEANWHILE|ELSEWHERE|LATER THAT (NIGHT|DAY|EVENING|MORNING|AFTERNOON)|EARLIER THAT (NIGHT|DAY|EVENING|MORNING)|THE NEXT (DAY|MORNING|NIGHT|WEEK|YEAR)|SOME TIME LATER|YEARS EARLIER|YEARS LATER)\.?$/i;
+    const timeCardCount326 = lines.filter(l => timeCardRe326.test(l.trim())).length;
+    if (timeCardCount326 >= 3) {
+      issues.push({
+        location: `${timeCardCount326} time-jump captions`,
+        rule: 'TIME_CARD_CRUTCH',
+        severity: 'minor',
+        description: `${timeCardCount326} standalone time-jump captions ("THREE WEEKS LATER", "MEANWHILE", "LATER THAT NIGHT") appear in the script. Frequent jump captions manage time and space by announcement rather than by storytelling — the script narrates its own structure instead of letting the transitions read from the scenes themselves. Each caption is a seam the audience is told about rather than carried across.`,
+        suggestedFix: 'Let most transitions read from the scenes: a change of season in the frame, a healed wound, a different set of clothes, a line of dialogue that anchors the new moment. Reserve explicit time captions for jumps so large or specific that no visual cue could convey them.',
       });
     }
   }
