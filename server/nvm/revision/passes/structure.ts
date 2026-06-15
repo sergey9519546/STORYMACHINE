@@ -19,6 +19,9 @@
 // Wave 306 additions: midpoint emotional flatline (the central scene is emotionally
 // neutral with no suspense), final image weak (last scene has no emotional/suspense/
 // relational charge), act balance extreme (one act holds >55% of all scenes).
+// Wave 320 additions: climax revelation absent (no revelation in Act 3 while 2+
+// exist earlier), Act 2 curiosity valley (Act 2 avg curiosity below both bookend
+// acts), emotional opening neutral (first 3 scenes all emotionally neutral).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1101,6 +1104,80 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         suggestedFix: biggest306.name === 'Act 2'
           ? 'Redistribute scenes toward Act 1 and Act 3 so the setup has room to establish stakes and the resolution has room to land. Act 2 should be the largest act but not by starving the others.'
           : `Move scenes out of ${biggest306.name} into Act 2. The complication zone (Act 2) should be the story's largest act; a bloated ${biggest306.name} signals the setup or resolution is doing work that belongs in the middle.`,
+      });
+    }
+  }
+
+  // ── Wave 320: CLIMAX_REVELATION_ABSENT ───────────────────────────────────
+  // The story carries 2+ revelations but none of them lands in Act 3 (final
+  // 25%). The climax act resolves without a single disclosure — the audience
+  // arrives at the ending already knowing everything, so the climax delivers
+  // confirmation rather than discovery. Distinct from REVELATION_DROUGHT
+  // (long gap between any revelations) and ACT2_REVELATION_ABSENT (Act 2
+  // specifically): this fires when revelations exist but are all spent before
+  // the climax. Requires 8+ records.
+  if (n >= 8) {
+    const act3Start320 = Math.floor(n * 0.75);
+    const totalRevs320 = records.filter(r => r.revelation).length;
+    const act3Revs320 = records.filter(r => r.revelation && r.sceneIdx >= act3Start320).length;
+    if (totalRevs320 >= 2 && act3Revs320 === 0) {
+      issues.push({
+        location: `Act 3 (Scenes ${act3Start320}–${n - 1}) — no revelation`,
+        rule: 'CLIMAX_REVELATION_ABSENT',
+        severity: 'minor',
+        description: `The story carries ${totalRevs320} revelations but none lands in Act 3 (Scenes ${act3Start320}+). Every disclosure is spent before the climax, so the audience arrives at the ending already knowing everything. The climax delivers confirmation rather than discovery — the most charged structural position holds no new truth.`,
+        suggestedFix: 'Reserve at least one significant revelation for Act 3: the final piece that recontextualizes the climax, the truth the protagonist has been missing, or the cost they only now understand. A climax without discovery is an outcome the audience has already calculated.',
+      });
+    }
+  }
+
+  // ── Wave 320: ACT2_CURIOSITY_VALLEY ──────────────────────────────────────
+  // Act 2 (25%–75%) has an average curiosityDelta below BOTH Act 1 (0–25%)
+  // and Act 3 (75%–100%). The complication zone — the longest stretch of the
+  // story — is the least curious, sagging between a curious setup and a
+  // curious finale. Distinct from ACT1_CURIOSITY_ABSENT (no spike in Act 1)
+  // and ACT3_CURIOSITY_SPIKE_ABSENT (no spike in the final quarter): this
+  // audits Act 2 relative to its neighbours. Requires 12+ records with ≥3
+  // scenes in each act.
+  if (n >= 12) {
+    const a1End320 = Math.floor(n * 0.25);
+    const a2End320 = Math.floor(n * 0.75);
+    const a1Recs320 = records.slice(0, a1End320);
+    const a2Recs320 = records.slice(a1End320, a2End320);
+    const a3Recs320 = records.slice(a2End320);
+    if (a1Recs320.length >= 3 && a2Recs320.length >= 3 && a3Recs320.length >= 3) {
+      const avgCur320 = (rs: typeof records) => rs.reduce((s, r) => s + (r.curiosityDelta ?? 0), 0) / rs.length;
+      const a1Cur320 = avgCur320(a1Recs320);
+      const a2Cur320 = avgCur320(a2Recs320);
+      const a3Cur320 = avgCur320(a3Recs320);
+      if (a2Cur320 < a1Cur320 && a2Cur320 < a3Cur320) {
+        issues.push({
+          location: `Act 2 (Scenes ${a1End320}–${a2End320 - 1}) — curiosity valley`,
+          rule: 'ACT2_CURIOSITY_VALLEY',
+          severity: 'minor',
+          description: `Act 2's average curiosityDelta (${a2Cur320.toFixed(2)}) is below both Act 1 (${a1Cur320.toFixed(2)}) and Act 3 (${a3Cur320.toFixed(2)}) — the complication zone is the least curious stretch of the story. The longest act sags between a curious setup and a curious finale, exactly where the audience spends most of their time. Curiosity that dips in the middle invites disengagement before the climax can re-grab them.`,
+          suggestedFix: 'Plant fresh questions through Act 2: each complication should open a new line of inquiry, and the midpoint should raise a question that reframes everything before it. The middle act is where curiosity must be actively renewed, not coasted through on the opening hook.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 320: EMOTIONAL_OPENING_NEUTRAL ──────────────────────────────────
+  // The first three scenes are all emotionally neutral. The opening establishes
+  // nothing on the emotional channel — the audience meets the story through a
+  // flat affect and is given no feeling to attach to before the plot machinery
+  // starts. Distinct from OPENING_SUSPENSE_FLATLINE (first 3 scenes suspense ≤ 0)
+  // and COLD_OPEN_INERT (scene 0 lacks all hooks): this audits the emotional
+  // register specifically across the opening run. Requires 6+ records.
+  if (n >= 6) {
+    const opening320 = records.slice(0, 3);
+    if (opening320.every(r => r.emotionalShift === 'neutral')) {
+      issues.push({
+        location: 'Opening (Scenes 0–2) — emotional flatline',
+        rule: 'EMOTIONAL_OPENING_NEUTRAL',
+        severity: 'minor',
+        description: `The first three scenes are all emotionally neutral — the opening establishes nothing on the emotional channel. The audience meets the story through flat affect and is given no feeling to attach to before the plot begins. An opening that engages the mind (plot, questions) but not the heart risks the audience watching from a distance rather than investing.`,
+        suggestedFix: 'Charge at least one of the first three scenes emotionally: a moment of warmth, dread, grief, or longing that gives the audience a feeling to carry into the story. Emotional investment in the opening is what makes the later stakes matter — the audience must care before they can be made anxious.',
       });
     }
   }

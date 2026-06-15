@@ -19148,6 +19148,72 @@ He looks away.`;
     });
   });
 
+  describe('Wave 320 — structurePass: climax revelation absent, Act 2 curiosity valley, emotional opening neutral', async () => {
+    const makeRec320 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'negative', suspenseDelta: 1.0, curiosityDelta: 1,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runST320 = async (records: any[]) => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      return structurePass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CLIMAX_REVELATION_ABSENT fires when 2+ revelations exist but none in Act 3', async () => {
+      // n=8 → act3Start=6; put revelations at scenes 2 and 4 (both before Act 3)
+      const recs320cr = Array.from({ length: 8 }, (_, i) =>
+        makeRec320(i, { revelation: [2, 4].includes(i) ? `Disclosure ${i}` : null })
+      );
+      const res = await runST320(recs320cr);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLIMAX_REVELATION_ABSENT'), 'CLIMAX_REVELATION_ABSENT should fire');
+    });
+
+    it('CLIMAX_REVELATION_ABSENT does not fire when a revelation lands in Act 3', async () => {
+      const recs320ncr = Array.from({ length: 8 }, (_, i) =>
+        makeRec320(i, { revelation: [2, 4, 7].includes(i) ? `Disclosure ${i}` : null })
+      );
+      const res = await runST320(recs320ncr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLIMAX_REVELATION_ABSENT'), 'CLIMAX_REVELATION_ABSENT should not fire');
+    });
+
+    it('ACT2_CURIOSITY_VALLEY fires when Act 2 curiosity is below both bookend acts', async () => {
+      // n=12 → Act1 0-2, Act2 3-8, Act3 9-11
+      const recs320cv = Array.from({ length: 12 }, (_, i) =>
+        makeRec320(i, { curiosityDelta: (i >= 3 && i < 9) ? 0 : 2 })
+      );
+      const res = await runST320(recs320cv);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACT2_CURIOSITY_VALLEY'), 'ACT2_CURIOSITY_VALLEY should fire');
+    });
+
+    it('ACT2_CURIOSITY_VALLEY does not fire when Act 2 sustains curiosity', async () => {
+      const recs320ncv = Array.from({ length: 12 }, (_, i) =>
+        makeRec320(i, { curiosityDelta: (i >= 3 && i < 9) ? 2 : 1 })
+      );
+      const res = await runST320(recs320ncv);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACT2_CURIOSITY_VALLEY'), 'ACT2_CURIOSITY_VALLEY should not fire');
+    });
+
+    it('EMOTIONAL_OPENING_NEUTRAL fires when the first three scenes are all neutral', async () => {
+      const recs320eo = Array.from({ length: 8 }, (_, i) =>
+        makeRec320(i, { emotionalShift: i < 3 ? 'neutral' : 'positive' })
+      );
+      const res = await runST320(recs320eo);
+      assert.ok(res.issues.some((i: any) => i.rule === 'EMOTIONAL_OPENING_NEUTRAL'), 'EMOTIONAL_OPENING_NEUTRAL should fire');
+    });
+
+    it('EMOTIONAL_OPENING_NEUTRAL does not fire when an early scene carries emotional charge', async () => {
+      const recs320neo = Array.from({ length: 8 }, (_, i) =>
+        makeRec320(i, { emotionalShift: i === 1 ? 'positive' : 'neutral' })
+      );
+      const res = await runST320(recs320neo);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'EMOTIONAL_OPENING_NEUTRAL'), 'EMOTIONAL_OPENING_NEUTRAL should not fire');
+    });
+  });
+
   describe('Wave 319 — rhythmPass: suddenly overuse, pronoun opener dominance, physical interiority leak', async () => {
     const runR319 = async (fountain: string) => {
       const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
