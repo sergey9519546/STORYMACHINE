@@ -19148,6 +19148,129 @@ He looks away.`;
     });
   });
 
+  describe('Wave 325 — dialoguePass: expletive opener overuse, absolute overuse, within-line word echo', async () => {
+    const runD325 = async (fountain: string) => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DIALOGUE_EXPLETIVE_OPENER_OVERUSE fires when >25% of lines begin with a dummy subject', async () => {
+      const fountain325e = `INT. ROOM - DAY
+
+ALICE
+There's something wrong here.
+It's not what you think.
+We should leave now.
+The door is open.
+
+BOB
+Here's the problem now.
+I am not leaving.
+There was a noise outside.
+The walls feel close.
+We can still try.
+Maybe later then.`;
+      const res = await runD325(fountain325e);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_EXPLETIVE_OPENER_OVERUSE'), 'DIALOGUE_EXPLETIVE_OPENER_OVERUSE should fire');
+    });
+
+    it('DIALOGUE_EXPLETIVE_OPENER_OVERUSE does not fire when openers use real subjects', async () => {
+      const fountain325ne = `INT. ROOM - DAY
+
+ALICE
+There's something wrong here.
+We should leave now.
+The door is open.
+I am not leaving.
+
+BOB
+The problem is clear now.
+We can still try.
+Maybe later then.
+The road is long.
+Morning comes early here.
+Time to go now.`;
+      const res = await runD325(fountain325ne);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_EXPLETIVE_OPENER_OVERUSE'), 'DIALOGUE_EXPLETIVE_OPENER_OVERUSE should not fire');
+    });
+
+    it('DIALOGUE_ABSOLUTE_OVERUSE fires when >30% of lines contain a universal term', async () => {
+      const fountain325a = `INT. ROOM - DAY
+
+ALICE
+You always do this.
+Everyone knows the truth.
+We should leave now.
+The door is open.
+
+BOB
+I completely understand now.
+I am not leaving.
+Everything is falling apart.
+The walls feel close.
+We can still try.
+Maybe later then.`;
+      const res = await runD325(fountain325a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_ABSOLUTE_OVERUSE'), 'DIALOGUE_ABSOLUTE_OVERUSE should fire');
+    });
+
+    it('DIALOGUE_ABSOLUTE_OVERUSE does not fire when absolutes are rare', async () => {
+      const fountain325na = `INT. ROOM - DAY
+
+ALICE
+You always do this.
+We should leave now.
+The door is open.
+I am not leaving.
+
+BOB
+The problem is clear now.
+We can still try.
+Maybe later then.
+The road is long.
+Morning comes early here.
+Time to go now.`;
+      const res = await runD325(fountain325na);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_ABSOLUTE_OVERUSE'), 'DIALOGUE_ABSOLUTE_OVERUSE should not fire');
+    });
+
+    it('DIALOGUE_WITHIN_LINE_WORD_ECHO fires when 3+ lines triple a word', async () => {
+      const fountain325w = `INT. ROOM - DAY
+
+ALICE
+No no no please stop.
+Run run run right now.
+
+BOB
+Stop stop stop it please.
+I am staying here now.
+We should leave soon.
+The door is open wide.
+The walls feel close.
+Maybe later then okay.`;
+      const res = await runD325(fountain325w);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_WITHIN_LINE_WORD_ECHO'), 'DIALOGUE_WITHIN_LINE_WORD_ECHO should fire');
+    });
+
+    it('DIALOGUE_WITHIN_LINE_WORD_ECHO does not fire without within-line tripling', async () => {
+      const fountain325nw = `INT. ROOM - DAY
+
+ALICE
+No please stop right now.
+Run quickly to the door.
+
+BOB
+Stop it for a second.
+I am staying here now.
+We should leave soon.
+The door is open wide.
+The walls feel close.
+Maybe later then okay.`;
+      const res = await runD325(fountain325nw);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_WITHIN_LINE_WORD_ECHO'), 'DIALOGUE_WITHIN_LINE_WORD_ECHO should not fire');
+    });
+  });
+
   describe('Wave 324 — causalityPass: suspense unreleased run, clock raised no delta, emotional neutral run', async () => {
     const makeRec324 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

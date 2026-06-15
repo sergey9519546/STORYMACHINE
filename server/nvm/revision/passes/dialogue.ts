@@ -20,6 +20,9 @@
 // Wave 311 additions: hedge saturation (>30% of lines contain a softener anywhere —
 // "just"/"maybe"/"sort of"/"I think"), filler sound overuse (≥3 lines with a vocalized
 // hesitation — "um"/"uh"/"er"), one-word-line dominance (>35% of lines are a single word).
+// Wave 325 additions: expletive opener overuse (>25% of lines begin with "There's"/"It's"/
+// "Here's" dummy subjects), absolute overuse (>30% of lines contain "always"/"everyone"/
+// "completely" universals), within-line word echo (≥3 lines triple a word: "No no no").
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1376,6 +1379,76 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${oneWordCount311} of ${dialogue.length} dialogue lines (${Math.round(oneWordCount311 / dialogue.length * 100)}%) are a single word. A run of one-word lines reads as a reflex volley rather than a conversation — no character develops a thought, builds an argument, or reveals themselves through how they say something.`,
         suggestedFix: 'Let characters complete thoughts. Reserve one-word lines for genuine punch — a flat "No." after a plea — and surround them with lines that carry intent and subtext. A monosyllable lands hardest when it interrupts speech, not when it is the only register the scene has.',
+      });
+    }
+  }
+
+  // ── Wave 325: DIALOGUE_EXPLETIVE_OPENER_OVERUSE, DIALOGUE_ABSOLUTE_OVERUSE, DIALOGUE_WITHIN_LINE_WORD_ECHO ──
+
+  // DIALOGUE_EXPLETIVE_OPENER_OVERUSE (minor, ≥10 lines, >25%): More than 25%
+  // of dialogue lines begin with an expletive/dummy-subject construction
+  // ("There's…", "It's…", "Here's…", "There was…"). Expletive openers delay the
+  // real subject and drain a line of agency — "There's a problem" instead of
+  // "We have a problem" or "The bridge is out." Distinct from FILLER_OPENER_
+  // OVERUSE (interjections "Well,"/"Look,"), DIALOGUE_OPENER_MONOTONY (a single
+  // repeated word), and voice's conjunction opener: this targets dummy subjects.
+  if (dialogue.length >= 10) {
+    const expletiveRe325 = /^(there'?s|there is|there are|there was|there were|it'?s|it is|it was|here'?s|here is)\b/i;
+    const expletiveCount325 = dialogue.filter(d => expletiveRe325.test(d.line.trim())).length;
+    if (expletiveCount325 / dialogue.length > 0.25) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_EXPLETIVE_OPENER_OVERUSE',
+        severity: 'minor',
+        description: `${expletiveCount325} of ${dialogue.length} dialogue lines (${Math.round(expletiveCount325 / dialogue.length * 100)}%) begin with an expletive construction ("There's…", "It's…", "Here's…"). Dummy-subject openers delay the real subject and drain a line of agency — "There's a problem" holds the speaker at arm's length from the trouble, where "The deal is dead" or "We're trapped" puts them in it.`,
+        suggestedFix: 'Recast expletive openers around a real subject and an active verb: "There is someone at the door" → "Someone\'s at the door" or, sharper, "He found us." The dummy subject is almost always cuttable, and cutting it makes the line land faster and harder.',
+      });
+    }
+  }
+
+  // DIALOGUE_ABSOLUTE_OVERUSE (minor, ≥10 lines, >30%): More than 30% of
+  // dialogue lines contain a universal/absolute term ("always", "everyone",
+  // "everything", "completely", "totally", "absolutely", "forever",
+  // "constantly", "entirely"). Dialogue saturated with absolutes reads as
+  // hyperbole — every character speaks in totalizing extremes, so nothing is
+  // measured and no claim carries weight. Distinct from voice's NEGATION_
+  // SATURATION (a disjoint set: no/not/never/nothing) and DIALOGUE_HEDGE_
+  // SATURATION (the opposite register — softeners). Requires 10+ lines.
+  if (dialogue.length >= 10) {
+    const absoluteRe325 = /\b(always|everyone|everybody|everything|everywhere|completely|totally|absolutely|forever|constantly|entirely|every single (time|day|one)|all the time)\b/i;
+    const absoluteCount325 = dialogue.filter(d => absoluteRe325.test(d.line)).length;
+    if (absoluteCount325 / dialogue.length > 0.3) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_ABSOLUTE_OVERUSE',
+        severity: 'minor',
+        description: `${absoluteCount325} of ${dialogue.length} dialogue lines (${Math.round(absoluteCount325 / dialogue.length * 100)}%) contain an absolute term ("always", "everyone", "everything", "completely"). Dialogue saturated with universals reads as hyperbole — when every character speaks in totalizing extremes, nothing is measured and no claim carries weight, because the next line is just as absolute as the last.`,
+        suggestedFix: 'Replace blanket absolutes with specifics: "You always do this" → "You did it again at dinner, in front of my mother." The concrete instance hits harder than the universal claim, and it gives the other character something precise to deny or defend.',
+      });
+    }
+  }
+
+  // DIALOGUE_WITHIN_LINE_WORD_ECHO (minor, ≥8 lines, ≥3 echo lines): Three or
+  // more dialogue lines repeat the same word three or more times within a single
+  // line ("No no no", "Run run run", "I want I want I want"). Within-line word
+  // tripling is a stock shorthand for panic or insistence; used repeatedly it
+  // becomes a tic that signals heightened emotion by typography rather than
+  // craft. Distinct from DIALOGUE_REPEATED_LINE (whole lines repeated across the
+  // script) and DIALOGUE_ONE_WORD_DOMINANCE (single-word lines). Requires 8+ lines.
+  if (dialogue.length >= 8) {
+    const echoLineCount325 = dialogue.filter(d => {
+      const words325 = (d.line.toLowerCase().match(/[a-z']+/g) ?? []).filter(w => w.length >= 2);
+      const freq325 = new Map<string, number>();
+      for (const w of words325) freq325.set(w, (freq325.get(w) ?? 0) + 1);
+      return [...freq325.values()].some(v => v >= 3);
+    }).length;
+    if (echoLineCount325 >= 3) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_WITHIN_LINE_WORD_ECHO',
+        severity: 'minor',
+        description: `${echoLineCount325} dialogue lines repeat a single word three or more times within the line ("No no no", "Run run run"). Within-line word tripling is a stock shorthand for panic or insistence; recurring across the script it becomes a tic that signals heightened emotion through typography rather than through what is actually said or done.`,
+        suggestedFix: 'Reserve the word-tripling for one genuine peak of panic and convey urgency elsewhere through content and action — a clipped command, an unfinished sentence, a physical beat. Repetition lands when it is rare; when every charged line triples a word, the device stops reading as emotion and starts reading as formatting.',
       });
     }
   }
