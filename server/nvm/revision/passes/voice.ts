@@ -23,6 +23,9 @@
 // word-count band — every speech the same size), em-dash dialogue flood (>30% of dialogue
 // lines contain an interruption dash), ALL-CAPS shout in dialogue (≥3 dialogue lines with
 // a shouted ALL-CAPS word).
+// Wave 322 additions: trailing ellipsis flood (>25% of dialogue lines trail off with "..."),
+// repeated opener word (a single word begins >40% of dialogue lines), conjunction opener
+// (>30% of dialogue lines begin with And/But/So/Because — speech reads as one run-on).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1306,6 +1309,88 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `${shoutLines308.length} dialogue lines contain a shouted ALL-CAPS word. Caps-shouting is a blunt substitute for intensity that the words and context should carry on their own; recurring caps in speech reads as the script yelling at the reader rather than trusting the scene to land its own force.`,
           suggestedFix: 'Strip the caps and build intensity through the line itself — sharper word choice, a harder beat, an action line that shows the volume ("Her voice cracks the room"). If emphasis is essential, italics on a single word do the job once; caps used repeatedly just flatten into noise.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 322: trailing ellipsis flood, repeated opener word, conjunction opener ──
+  {
+    const dlg322: string[] = [];
+    let inDlg322 = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg322 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg322 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg322 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg322) dlg322.push(t);
+      else inDlg322 = false;
+    }
+
+    // DIALOGUE_TRAILING_ELLIPSIS_FLOOD (minor, ≥10 dialogue lines): More than 25%
+    // of dialogue lines trail off with an ellipsis ("I don't know...", "Maybe
+    // we should..."). One trailing ellipsis lands a moment of hesitation or a
+    // thought left hanging; a flood of them makes every character perpetually
+    // unable to finish a sentence, draining dialogue of declarative force.
+    // Distinct from DIALOGUE_DASH_INTERRUPTION_FLOOD (em-dash cut-offs — an
+    // external interruption) and the rhythm/originality ellipsis checks (action
+    // lines): this audits dialogue lines that trail off into silence.
+    if (dlg322.length >= 10) {
+      const ellipsisCount322 = dlg322.filter(l => /(\.\.\.|…)\s*$/.test(l.trim())).length;
+      if (ellipsisCount322 / dlg322.length > 0.25) {
+        issues.push({
+          location: 'Dialogue trailing ellipses',
+          rule: 'DIALOGUE_TRAILING_ELLIPSIS_FLOOD',
+          severity: 'minor',
+          description: `${ellipsisCount322} of ${dlg322.length} dialogue lines (${Math.round(ellipsisCount322 / dlg322.length * 100)}%) trail off with an ellipsis. One trailing ellipsis lands a hesitation or a thought left hanging; a flood of them makes every character perpetually unable to finish a sentence. The device stops signaling uncertainty because it never stops appearing, and the dialogue loses all declarative force.`,
+          suggestedFix: 'Let most lines land their full stop. Reserve the trailing ellipsis for the rare moment a character genuinely cannot or will not finish — and convey hesitation elsewhere through content (a non-answer, a deflection, a subject change) so the silence carries weight when it does come.',
+        });
+      }
+    }
+
+    // DIALOGUE_REPEATED_OPENER_WORD (minor, ≥12 dialogue lines): A single word
+    // begins more than 40% of all dialogue lines — every other line opens the
+    // same way. Distinct from DIALOGUE_HEDGING_OPENER (a category of hedging
+    // phrases) and the action-line opener checks: this is the dialogue analogue
+    // of repeated sentence openings, catching a verbal tic ("You... You...
+    // You...") that flattens the rhythm of every exchange regardless of which
+    // word it is.
+    if (dlg322.length >= 12) {
+      const firstWords322 = new Map<string, number>();
+      for (const l of dlg322) {
+        const w = (l.trim().split(/\s+/)[0] ?? '').toLowerCase().replace(/[^a-z']/g, '');
+        if (w) firstWords322.set(w, (firstWords322.get(w) ?? 0) + 1);
+      }
+      const [topWord322, topCount322] = [...firstWords322.entries()].sort((a, b) => b[1] - a[1])[0] ?? ['', 0];
+      if (topCount322 / dlg322.length > 0.4) {
+        issues.push({
+          location: 'Dialogue line openers',
+          rule: 'DIALOGUE_REPEATED_OPENER_WORD',
+          severity: 'minor',
+          description: `${topCount322} of ${dlg322.length} dialogue lines (${Math.round(topCount322 / dlg322.length * 100)}%) begin with "${topWord322}" — nearly every other line opens the same way. A single dominant opener word gives the dialogue a metronomic sameness; the audience starts hearing the pattern instead of the meaning, and no character's verbal entry point stands out from another's.`,
+          suggestedFix: `Vary how lines begin: a question, a name, an objection, a concrete noun. When most lines start with "${topWord322}", characters all share one verbal reflex — break it so each speaker can enter a line from their own angle.`,
+        });
+      }
+    }
+
+    // DIALOGUE_CONJUNCTION_OPENER (minor, ≥10 dialogue lines): More than 30% of
+    // dialogue lines begin with a coordinating conjunction ("And...", "But...",
+    // "So...", "Or...", "Because..."). Conjunction openers chain speech to what
+    // came before; in excess they make every line a continuation, so dialogue
+    // reads as one unbroken run-on rather than distinct, weighed statements.
+    // Distinct from DIALOGUE_HEDGING_OPENER (hedging phrases) and the action-line
+    // conjunction checks in rhythm/originality: this audits dialogue specifically.
+    if (dlg322.length >= 10) {
+      const conjRe322 = /^(and|but|so|or|because|yet|nor)\b/i;
+      const conjCount322 = dlg322.filter(l => conjRe322.test(l.trim())).length;
+      if (conjCount322 / dlg322.length > 0.3) {
+        issues.push({
+          location: 'Dialogue conjunction openers',
+          rule: 'DIALOGUE_CONJUNCTION_OPENER',
+          severity: 'minor',
+          description: `${conjCount322} of ${dlg322.length} dialogue lines (${Math.round(conjCount322 / dlg322.length * 100)}%) begin with a coordinating conjunction ("And", "But", "So", "Because"). Conjunction openers chain each line to the last; in excess they make every utterance a continuation rather than a distinct statement, and the dialogue reads as one unbroken run-on instead of weighed, separable beats.`,
+          suggestedFix: 'Let most lines stand on their own. A conjunction opener can carry momentum at a key moment, but when most lines begin with one, the speech never lands a clean declarative beat. Start more lines with their actual subject so each statement carries its own weight.',
         });
       }
     }

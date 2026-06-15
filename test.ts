@@ -19148,6 +19148,241 @@ He looks away.`;
     });
   });
 
+  describe('Wave 322 — voicePass: trailing ellipsis flood, repeated opener word, conjunction opener', async () => {
+    const runV322 = async (fountain: string) => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      return voicePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DIALOGUE_TRAILING_ELLIPSIS_FLOOD fires when >25% of dialogue lines trail off', async () => {
+      const fountain322e = `INT. ROOM - DAY
+
+ALICE
+I don't know...
+
+BOB
+We should go now.
+
+ALICE
+Maybe later...
+
+BOB
+The door is locked.
+
+ALICE
+If only we...
+
+BOB
+Nothing makes sense here.
+
+ALICE
+I thought that...
+
+BOB
+You always do this.
+
+ALICE
+Let me explain myself.
+
+BOB
+Just tell me already.`;
+      const res = await runV322(fountain322e);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_TRAILING_ELLIPSIS_FLOOD'), 'DIALOGUE_TRAILING_ELLIPSIS_FLOOD should fire');
+    });
+
+    it('DIALOGUE_TRAILING_ELLIPSIS_FLOOD does not fire when few lines trail off', async () => {
+      const fountain322ne = `INT. ROOM - DAY
+
+ALICE
+I don't know...
+
+BOB
+We should go now.
+
+ALICE
+Maybe we can leave.
+
+BOB
+The door is locked.
+
+ALICE
+If only we tried harder.
+
+BOB
+Nothing makes sense here.
+
+ALICE
+I thought that you knew.
+
+BOB
+You always do this.
+
+ALICE
+Let me explain myself.
+
+BOB
+Just tell me already.`;
+      const res = await runV322(fountain322ne);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_TRAILING_ELLIPSIS_FLOOD'), 'DIALOGUE_TRAILING_ELLIPSIS_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_REPEATED_OPENER_WORD fires when a single word begins >40% of dialogue lines', async () => {
+      const fountain322r = `INT. ROOM - DAY
+
+ALICE
+You should leave now.
+
+BOB
+I am staying here.
+
+ALICE
+You never listen anymore.
+
+BOB
+That is not true.
+
+ALICE
+You always say that.
+
+BOB
+We can talk later.
+
+ALICE
+You broke the promise.
+
+BOB
+The promise was unfair.
+
+ALICE
+You owe me answers.
+
+BOB
+Nothing is owed here.
+
+ALICE
+You will regret this.
+
+BOB
+Time will tell then.`;
+      const res = await runV322(fountain322r);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_REPEATED_OPENER_WORD'), 'DIALOGUE_REPEATED_OPENER_WORD should fire');
+    });
+
+    it('DIALOGUE_REPEATED_OPENER_WORD does not fire when openers vary', async () => {
+      const fountain322nr = `INT. ROOM - DAY
+
+ALICE
+We should leave now.
+
+BOB
+I am staying here.
+
+ALICE
+Time is running out.
+
+BOB
+That is not true.
+
+ALICE
+Nobody asked for this.
+
+BOB
+We can talk later.
+
+ALICE
+Promises mean nothing now.
+
+BOB
+The promise was unfair.
+
+ALICE
+Answers are all I want.
+
+BOB
+Nothing is owed here.
+
+ALICE
+Regret comes for everyone.
+
+BOB
+Time will tell then.`;
+      const res = await runV322(fountain322nr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_REPEATED_OPENER_WORD'), 'DIALOGUE_REPEATED_OPENER_WORD should not fire');
+    });
+
+    it('DIALOGUE_CONJUNCTION_OPENER fires when >30% of dialogue lines begin with a conjunction', async () => {
+      const fountain322c = `INT. ROOM - DAY
+
+ALICE
+And then she left.
+
+BOB
+I stayed behind alone.
+
+ALICE
+But you promised me.
+
+BOB
+Things change quickly here.
+
+ALICE
+So what now happens?
+
+BOB
+We figure it out.
+
+ALICE
+Because nothing is certain.
+
+BOB
+Everything feels wrong now.
+
+ALICE
+We should rest now.
+
+BOB
+Sleep sounds good tonight.`;
+      const res = await runV322(fountain322c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_CONJUNCTION_OPENER'), 'DIALOGUE_CONJUNCTION_OPENER should fire');
+    });
+
+    it('DIALOGUE_CONJUNCTION_OPENER does not fire when few lines begin with a conjunction', async () => {
+      const fountain322nc = `INT. ROOM - DAY
+
+ALICE
+And then she left.
+
+BOB
+I stayed behind alone.
+
+ALICE
+But you promised me.
+
+BOB
+Things change quickly here.
+
+ALICE
+We should rest now.
+
+BOB
+Sleep sounds good tonight.
+
+ALICE
+Morning comes early here.
+
+BOB
+The road is long.
+
+ALICE
+Let us move on.
+
+BOB
+Time to go now.`;
+      const res = await runV322(fountain322nc);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_CONJUNCTION_OPENER'), 'DIALOGUE_CONJUNCTION_OPENER should not fire');
+    });
+  });
+
   describe('Wave 321 — themePass: peak before midpoint, raise-stakes silent, suspense-release silent', async () => {
     const makeRec321 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
