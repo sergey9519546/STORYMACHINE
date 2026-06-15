@@ -19931,6 +19931,94 @@ Time to go now.`;
     });
   });
 
+  describe('Wave 332 — themePass: development scene desert, curiosity peak absent, Act 2b density drop', async () => {
+    const makeRec332 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const THEME332 = 'trust betrayal courage';
+    const runT332 = async (records: any[]) => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: THEME332 },
+      });
+    };
+
+    it('THEME_DEVELOPMENT_SCENE_DESERT fires when no development scene carries theme', async () => {
+      // 10 records: 0,1 are exposition with theme; 2-9 are development with no theme
+      const recs332dd = Array.from({ length: 10 }, (_, i) =>
+        makeRec332(i, {
+          purpose: i < 2 ? 'exposition' : 'development',
+          dialogueHighlights: i < 2 ? ['the trust holds'] : [],
+        })
+      );
+      const res = await runT332(recs332dd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_DEVELOPMENT_SCENE_DESERT'), 'THEME_DEVELOPMENT_SCENE_DESERT should fire');
+    });
+
+    it('THEME_DEVELOPMENT_SCENE_DESERT does not fire when a development scene carries theme', async () => {
+      const recs332ndd = Array.from({ length: 10 }, (_, i) =>
+        makeRec332(i, {
+          purpose: i < 2 ? 'exposition' : 'development',
+          dialogueHighlights: [0, 1, 5].includes(i) ? ['the trust holds'] : [],
+        })
+      );
+      const res = await runT332(recs332ndd);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_DEVELOPMENT_SCENE_DESERT'), 'THEME_DEVELOPMENT_SCENE_DESERT should not fire');
+    });
+
+    it('THEME_CURIOSITY_PEAK_ABSENT fires when the highest-curiosity scene lacks theme', async () => {
+      // 8 records: scenes 0,1,2 have theme; scene 3 has peak curiosityDelta=5 but no theme
+      const recs332cp = Array.from({ length: 8 }, (_, i) =>
+        makeRec332(i, {
+          dialogueHighlights: [0, 1, 2].includes(i) ? ['a moment of courage'] : [],
+          curiosityDelta: i === 3 ? 5 : 0,
+        })
+      );
+      const res = await runT332(recs332cp);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CURIOSITY_PEAK_ABSENT'), 'THEME_CURIOSITY_PEAK_ABSENT should fire');
+    });
+
+    it('THEME_CURIOSITY_PEAK_ABSENT does not fire when the peak curiosity scene carries theme', async () => {
+      const recs332ncp = Array.from({ length: 8 }, (_, i) =>
+        makeRec332(i, {
+          dialogueHighlights: [0, 1, 2, 3].includes(i) ? ['a moment of courage'] : [],
+          curiosityDelta: i === 3 ? 5 : 0,
+        })
+      );
+      const res = await runT332(recs332ncp);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CURIOSITY_PEAK_ABSENT'), 'THEME_CURIOSITY_PEAK_ABSENT should not fire');
+    });
+
+    it('THEME_ACT2B_DENSITY_DROP fires when theme density falls sharply from Act 2a to Act 2b', async () => {
+      // n=12 → act2a=scenes 3-5, act2b=scenes 6-8; act2a all resonant, act2b none
+      const recs332ad = Array.from({ length: 12 }, (_, i) =>
+        makeRec332(i, {
+          dialogueHighlights: (i >= 3 && i < 6) ? ['the courage to trust'] : [],
+        })
+      );
+      const res = await runT332(recs332ad);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_ACT2B_DENSITY_DROP'), 'THEME_ACT2B_DENSITY_DROP should fire');
+    });
+
+    it('THEME_ACT2B_DENSITY_DROP does not fire when theme density holds from Act 2a to Act 2b', async () => {
+      const recs332nad = Array.from({ length: 12 }, (_, i) =>
+        makeRec332(i, {
+          dialogueHighlights: (i >= 3 && i < 9) ? ['the courage to trust'] : [],
+        })
+      );
+      const res = await runT332(recs332nad);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_ACT2B_DENSITY_DROP'), 'THEME_ACT2B_DENSITY_DROP should not fire');
+    });
+  });
+
   describe('Wave 321 — themePass: peak before midpoint, raise-stakes silent, suspense-release silent', async () => {
     const makeRec321 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

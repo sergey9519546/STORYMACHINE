@@ -29,6 +29,10 @@
 // half — theme should crescendo toward the climax), raise-stakes silent (every stake-
 // raising scene is thematically empty), suspense-release silent (every clock-release
 // scene is thematically empty — exhale beats waste their reflection potential).
+// Wave 332 additions: development scene desert (none of the purpose='development'
+// scenes carry theme — connective tissue is thematically empty), curiosity peak absent
+// (the highest-curiosity scene lacks theme even when others carry it), Act 2b density
+// drop (theme thins in Act 2b vs Act 2a — story loses thematic pressure pre-climax).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1207,6 +1211,92 @@ export async function themePass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `All ${releaseScenes321.length} tension-release scenes (clockDelta < 0) carry no language related to "${themeRaw}" — the story's exhale moments are thematically empty. Release beats are where a character and the audience process what just happened; squandering them on plot-only downtime wastes the story's natural reflection points, where theme lands most gently and most deeply.`,
             suggestedFix: `Use release beats to deepen the theme: after the pressure drops, give a character a moment to reckon with what the recent events mean in terms of "${themeRaw}" — a quiet line, a telling action, an image that reframes the cost. The exhale is when meaning settles.`,
+          });
+        }
+      }
+    }
+
+    // ── Wave 332: THEME_DEVELOPMENT_SCENE_DESERT, THEME_CURIOSITY_PEAK_ABSENT, THEME_ACT2B_DENSITY_DROP ──
+
+    // THEME_DEVELOPMENT_SCENE_DESERT (minor, n≥10, ≥4 dev scenes): None of the
+    // scenes with purpose='development' carry thematic resonance. The story's
+    // connective tissue — the scenes that link structural events — is completely
+    // thematically empty. When theme only appears at set-pieces (revelations,
+    // turns, escalations) but never in the in-between moments, the audience
+    // experiences the theme as episodic punctuation rather than a continuous
+    // undercurrent. Distinct from THEME_ACT2_DESERT (zone-based %; this is
+    // purpose-based and can fire outside Act 2) and THEME_QUIET_SCENES_ONLY
+    // (fires when theme ONLY appears in quiet scenes — the opposite problem).
+    if (records.length >= 10) {
+      const devScenes332 = records.filter((r: any) => r.purpose === 'development');
+      if (devScenes332.length >= 4) {
+        const anyDevResonant332 = devScenes332.some((r: any) =>
+          sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        );
+        if (!anyDevResonant332) {
+          issues.push({
+            location: `${devScenes332.length} development scene(s)`,
+            rule: 'THEME_DEVELOPMENT_SCENE_DESERT',
+            severity: 'minor',
+            description: `All ${devScenes332.length} scenes marked as 'development' carry no language related to "${themeRaw}" — the story's connective tissue is thematically empty. Theme appears at structural peak moments (revelations, turns, escalations) but vanishes in the scenes between them. The audience experiences the theme as episodic punctuation rather than a continuous undercurrent of meaning.`,
+            suggestedFix: `Weave the theme into the development scenes: a passing reference, an image that echoes the theme's vocabulary, or a character action that embodies the theme without announcing it. The connective tissue of the story is where the theme becomes habitual — where the audience starts to feel it before they consciously register it.`,
+          });
+        }
+      }
+    }
+
+    // THEME_CURIOSITY_PEAK_ABSENT (minor, n≥8, totalHits≥3): The scene with the
+    // highest curiosityDelta carries no thematic resonance — even though other scenes
+    // do carry the theme. The story's single most question-raising moment is
+    // thematically mute. The audience is most curious at that scene but the curiosity
+    // is pure plot mechanics, not thematic inquiry. Distinct from THEME_CURIOSITY_DECOUPLED
+    // (fires when ALL high-curiosity scenes lack theme; this fires when the PEAK
+    // curiosity scene lacks theme even if other curiosity scenes carry it).
+    if (records.length >= 8 && totalHits >= 3) {
+      const maxCuriosity332 = Math.max(...(records as any[]).map(r => r.curiosityDelta ?? 0));
+      if (maxCuriosity332 > 0) {
+        const peakRec332 = (records as any[]).find(r => (r.curiosityDelta ?? 0) === maxCuriosity332);
+        if (peakRec332 && !sceneHasResonance(sceneTexts.get(peakRec332.sceneIdx) ?? '', expandedKeywords)) {
+          issues.push({
+            location: `Scene ${peakRec332.sceneIdx} (peak curiosity: ${maxCuriosity332})`,
+            rule: 'THEME_CURIOSITY_PEAK_ABSENT',
+            severity: 'minor',
+            description: `The scene with the highest curiosityDelta (Scene ${peakRec332.sceneIdx}, delta ${maxCuriosity332}) carries no language related to "${themeRaw}" — the story's single most question-raising moment is thematically mute. While other scenes carry the theme, the moment of maximum curiosity leaves the audience wondering about plot mechanics rather than thematic meaning. The most urgent question posed should be the story's thematic question.`,
+            suggestedFix: `Embed the theme in the peak curiosity scene: let the question it raises be ultimately about "${themeRaw}" rather than purely about what happens next. The audience should leave that scene wondering about the theme, not just about the plot.`,
+          });
+        }
+      }
+    }
+
+    // THEME_ACT2B_DENSITY_DROP (minor, n≥12): Thematic resonance density in Act 2b
+    // (50%–75%) falls below half the density of Act 2a (25%–50%). The theme
+    // thins precisely when the story should be escalating its central question —
+    // the run-up to the climax loses thematic pressure. Distinct from
+    // THEME_DENSITY_INVERSION (first half vs second half overall), THEME_FRONT_LOADED
+    // (first-third vs rest), and THEME_ACT2_DESERT (Act 2 as a whole < 30% resonant):
+    // this specifically checks the 2a-to-2b trajectory within Act 2.
+    if (records.length >= 12) {
+      const act2aStart332 = Math.floor(records.length * 0.25);
+      const act2bStart332 = Math.floor(records.length * 0.5);
+      const act2bEnd332 = Math.floor(records.length * 0.75);
+      const act2aRecs332 = records.slice(act2aStart332, act2bStart332);
+      const act2bRecs332 = records.slice(act2bStart332, act2bEnd332);
+      if (act2aRecs332.length > 0 && act2bRecs332.length > 0) {
+        const act2aResonant332 = act2aRecs332.filter((r: any) =>
+          sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        ).length;
+        const act2bResonant332 = act2bRecs332.filter((r: any) =>
+          sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        ).length;
+        const act2aDensity332 = act2aResonant332 / act2aRecs332.length;
+        const act2bDensity332 = act2bResonant332 / act2bRecs332.length;
+        if (act2aDensity332 > 0.4 && act2bDensity332 < act2aDensity332 * 0.5) {
+          issues.push({
+            location: `Act 2a vs Act 2b — thematic density drop`,
+            rule: 'THEME_ACT2B_DENSITY_DROP',
+            severity: 'minor',
+            description: `Thematic density falls sharply from Act 2a (${Math.round(act2aDensity332 * 100)}% resonant) to Act 2b (${Math.round(act2bDensity332 * 100)}% resonant) — the story loses thematic pressure in the run-up to the climax. The complication zone should escalate the theme toward its most intense statement near the climax; a thinning in Act 2b means the thematic question goes quiet at the exact moment it should be most insistent.`,
+            suggestedFix: `Maintain or increase thematic density into Act 2b: let the escalating stakes also escalate the thematic question. Each new complication in Act 2b should tighten the screw on "${themeRaw}" — the theme should arrive at the climax at maximum pressure, not at minimum.`,
           });
         }
       }
