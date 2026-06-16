@@ -37,6 +37,10 @@
 // sluglines ending in CONTINUOUS/MOMENTS LATER/SAME/LATER — one scene chopped into
 // fragments), back-to-scene crutch (≥2 "BACK TO SCENE"/"RESUME SCENE" return markers —
 // the script keeps stepping out of its own timeline).
+// Wave 382 additions: chapter label crutch (≥3 "CHAPTER ONE"/"PART TWO" segment headings —
+// novelistic structure imposed on film), split-screen crutch (≥2 "SPLIT SCREEN" markers —
+// a gimmick leaned on for parallelism), match-cut overuse (≥3 "MATCH CUT TO" transitions —
+// directorial editing punctuation the writer should not be calling).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1697,6 +1701,70 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${backToCount368} "BACK TO SCENE" / "RESUME SCENE" return markers appear in the script. Each one marks a return from a flashback, dream, or aside back into the present-tense timeline — their proliferation reveals a story that keeps stepping out of its own main line and having to climb back in. Every departure-and-return interrupts the forward drive of the scene the audience is actually invested in.`,
         suggestedFix: 'Reduce the number of departures from the present timeline: fold the information delivered in the inserts into present-tense action and dialogue. A story that has to keep announcing "BACK TO SCENE" is spending too much time away from the scene; the fewer round-trips out of the now, the stronger the through-line.',
+      });
+    }
+  }
+
+  // ── Wave 382: CHAPTER_LABEL_CRUTCH ───────────────────────────────────────
+  // Three or more standalone chapter/part/book segment headings ("CHAPTER ONE",
+  // "PART TWO", "BOOK III"). Segmenting a film into titled chapters is a novelistic
+  // device — a handful of directors wield it as style, but as a default it imposes
+  // literary structure on a medium that flows continuously, and it lets the writer
+  // announce act breaks the drama should make the audience feel. Distinct from TITLE_
+  // CARD_CRUTCH (SUPER:/TITLE:/CHYRON: on-screen text) and TIME_CARD_CRUTCH (time-jump
+  // captions): this targets enumerated segment headings.
+  {
+    const chapterRe382 = /^(chapter|part|book)\s+([0-9]+|[ivxlcdm]+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/i;
+    const chapterCount382 = lines.filter(l => chapterRe382.test(l.trim())).length;
+    if (chapterCount382 >= 3) {
+      issues.push({
+        location: `${chapterCount382} chapter/part segment headings`,
+        rule: 'CHAPTER_LABEL_CRUTCH',
+        severity: 'minor',
+        description: `${chapterCount382} standalone chapter/part headings ("CHAPTER ONE", "PART TWO") segment the script. Titling a film into chapters is a novelistic device — a few directors wield it as deliberate style, but as a default it imposes literary structure on a continuously flowing medium and lets the writer announce act breaks the drama should make the audience feel rather than read.`,
+        suggestedFix: 'Cut the chapter headings and let the act structure emerge from the story\'s turns: a strong inciting incident, midpoint, and climax mark the movements without labels. Reserve titled chapters for the rare case where the segmentation is itself a thematic statement, not a substitute for dramatic shaping.',
+      });
+    }
+  }
+
+  // ── Wave 382: SPLIT_SCREEN_CRUTCH ────────────────────────────────────────
+  // Two or more "SPLIT SCREEN" markers. Split screen is a striking device for
+  // genuine simultaneity (two ends of a phone call, a race converging), but reached
+  // for repeatedly it becomes a gimmick that manufactures parallelism the writing
+  // could achieve through cutting, and it signals scenes that cannot generate their
+  // own momentum. Distinct from INTERCUT_OVERUSE (cross-cutting between full scenes)
+  // and MONTAGE_CRUTCH (compressed time).
+  {
+    const splitScreenRe382 = /\bsplit[\s-]?screen\b/i;
+    const splitCount382 = lines.filter(l => splitScreenRe382.test(l.trim())).length;
+    if (splitCount382 >= 2) {
+      issues.push({
+        location: `${splitCount382} split-screen markers`,
+        rule: 'SPLIT_SCREEN_CRUTCH',
+        severity: 'minor',
+        description: `${splitCount382} "SPLIT SCREEN" markers appear in the script. Split screen is striking for genuine simultaneity — two ends of a call, converging races — but reached for repeatedly it becomes a gimmick that manufactures parallelism ordinary cutting would achieve, and it signals scenes leaning on a visual trick rather than their own momentum. Pervasive split-screen also pre-empts the director's staging choices.`,
+        suggestedFix: 'Reserve split screen for the one or two moments where seeing both frames at once is the dramatic point. Elsewhere, trust intercutting or sequencing to carry the parallel action; if a beat needs split screen to work, the underlying scenes likely need strengthening.',
+      });
+    }
+  }
+
+  // ── Wave 382: MATCH_CUT_OVERUSE ──────────────────────────────────────────
+  // Three or more "MATCH CUT TO" transitions. A match cut is a precise editing
+  // figure — a graphic or thematic rhyme across a cut — and a spec script directs
+  // the reader through prose, not editing calls. Used heavily it both claims the
+  // editor's chair and dilutes the device, since a match cut lands only when it is
+  // rare. Distinct from SMASH_CUT_OVERUSE (a hard, jarring cut for impact) and FADE_
+  // TRANSITION_OVERUSE (soft fades/dissolves).
+  {
+    const matchCutRe382 = /\bmatch cut\b/i;
+    const matchCutCount382 = lines.filter(l => matchCutRe382.test(l.trim())).length;
+    if (matchCutCount382 >= 3) {
+      issues.push({
+        location: `${matchCutCount382} match-cut transitions`,
+        rule: 'MATCH_CUT_OVERUSE',
+        severity: 'minor',
+        description: `${matchCutCount382} "MATCH CUT TO" transitions appear in the script. A match cut is a precise editing figure — a graphic or thematic rhyme bridging a cut — and a spec script directs the reader through prose, not editing calls. Used heavily it both claims the editor's chair and dilutes the device itself, since a match cut lands only when it is rare and surprising.`,
+        suggestedFix: 'Keep at most one match cut, for the moment the visual rhyme genuinely carries meaning, and let the rest of the transitions be ordinary cuts the prose implies. Calling for repeated match cuts on the page reads as a writer art-directing the edit rather than telling the story.',
       });
     }
   }

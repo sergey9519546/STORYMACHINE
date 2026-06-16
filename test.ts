@@ -20681,6 +20681,129 @@ He looks away.`;
     });
   });
 
+  describe('Wave 382 — originalityPass: chapter label crutch, split-screen crutch, match-cut overuse', async () => {
+    const runO382 = async (fountain: string) => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      return originalityPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CHAPTER_LABEL_CRUTCH fires when three or more chapter/part headings appear', async () => {
+      const f382c = `CHAPTER ONE
+
+INT. HOUSE - DAY
+
+She opens the door.
+
+CHAPTER TWO
+
+INT. OFFICE - DAY
+
+He signs the form.
+
+PART THREE
+
+EXT. STREET - NIGHT
+
+They meet at last.`;
+      const res = await runO382(f382c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CHAPTER_LABEL_CRUTCH'), 'CHAPTER_LABEL_CRUTCH should fire');
+    });
+
+    it('CHAPTER_LABEL_CRUTCH does not fire without chapter headings', async () => {
+      const f382cn = `INT. HOUSE - DAY
+
+She opens the door.
+
+INT. OFFICE - DAY
+
+He signs the form.
+
+EXT. STREET - NIGHT
+
+They meet at last.`;
+      const res = await runO382(f382cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CHAPTER_LABEL_CRUTCH'), 'CHAPTER_LABEL_CRUTCH should not fire');
+    });
+
+    it('SPLIT_SCREEN_CRUTCH fires when two or more split-screen markers appear', async () => {
+      const f382s = `INT. APARTMENT - NIGHT
+
+SPLIT SCREEN:
+
+She dials the phone.
+
+INT. CAR - NIGHT
+
+He answers, breathless.
+
+SPLIT SCREEN:
+
+Both check their watches at once.`;
+      const res = await runO382(f382s);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SPLIT_SCREEN_CRUTCH'), 'SPLIT_SCREEN_CRUTCH should fire');
+    });
+
+    it('SPLIT_SCREEN_CRUTCH does not fire with at most one split-screen marker', async () => {
+      const f382sn = `INT. APARTMENT - NIGHT
+
+SPLIT SCREEN:
+
+She dials the phone.
+
+INT. CAR - NIGHT
+
+He answers, breathless.
+
+He pulls over to talk.`;
+      const res = await runO382(f382sn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SPLIT_SCREEN_CRUTCH'), 'SPLIT_SCREEN_CRUTCH should not fire');
+    });
+
+    it('MATCH_CUT_OVERUSE fires when three or more match cuts appear', async () => {
+      const f382m = `INT. KITCHEN - DAY
+
+She cracks an egg.
+
+MATCH CUT TO:
+
+EXT. QUARRY - DAY
+
+A boulder splits open.
+
+MATCH CUT TO:
+
+INT. CLINIC - DAY
+
+A door swings wide.
+
+MATCH CUT TO:
+
+EXT. CANYON - DAY
+
+The gorge yawns below.`;
+      const res = await runO382(f382m);
+      assert.ok(res.issues.some((i: any) => i.rule === 'MATCH_CUT_OVERUSE'), 'MATCH_CUT_OVERUSE should fire');
+    });
+
+    it('MATCH_CUT_OVERUSE does not fire with fewer than three match cuts', async () => {
+      const f382mn = `INT. KITCHEN - DAY
+
+She cracks an egg.
+
+MATCH CUT TO:
+
+EXT. QUARRY - DAY
+
+A boulder splits open.
+
+INT. CLINIC - DAY
+
+A door swings wide.`;
+      const res = await runO382(f382mn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'MATCH_CUT_OVERUSE'), 'MATCH_CUT_OVERUSE should not fire');
+    });
+  });
+
   describe('Wave 368 — originalityPass: off-screen cue overuse, continuous slug overuse, back-to-scene crutch', async () => {
     const runO368 = async (fountain: string) => {
       const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
