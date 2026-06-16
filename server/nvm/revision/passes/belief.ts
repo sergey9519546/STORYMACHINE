@@ -29,6 +29,10 @@
 // claims arrive without tension), told belief emotional flatline (all assertion scenes
 // neutral — claims carry no emotional charge), revelation relationship decoupled (no revelation
 // scene moves a bond — discoveries never alter the relational world).
+// Wave 348 additions: revelation/assertion disconnect (no revelation lands within two scenes of
+// a prior assertion — the dramatic-irony engine never fires), revelation midpoint void (the
+// 40%–60% pivot carries no revelation while revelations exist elsewhere), told belief dramatic
+// turn decoupled (no assertion scene coincides with a story pivot).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1221,6 +1225,87 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Let at least one revelation land on a relationship: the truth uncovered should shift the trust between the character who learned it and someone else. A secret revealed should either rupture a bond (if the truth was a betrayal) or strengthen one (if the truth was a shared burden) — discoveries that leave all relationships unchanged fail their dramatic function.',
         });
       }
+    }
+  }
+
+  // ── Wave 348: REVELATION_ASSERTION_DISCONNECT, REVELATION_MIDPOINT_VOID, TOLD_BELIEF_DRAMATIC_TURN_DECOUPLED ──
+
+  // REVELATION_ASSERTION_DISCONNECT (minor, n≥8, ≥2 revelations, ≥2 assertions): The
+  // story contains both told beliefs (assertions) and witnessed revelations, but not one
+  // revelation lands in the same scene as — or within the two scenes after — a prior
+  // assertion. The dramatic-irony engine is never engaged: a character asserts X, then
+  // the story reveals not-X, and the audience feels the floor drop out. When revelations
+  // never follow assertions, the two systems run on separate tracks — claims are made and
+  // truths are uncovered, but no truth ever overturns a claim. Distinct from BELIEF_
+  // ASYMMETRY (a count imbalance — many revelations, almost no assertions) and BELIEF_
+  // REVERSAL_UNSUPPORTED (a belief flip lacking cause): this audits the sequencing of
+  // assertion → revelation.
+  if (records.length >= 8) {
+    const assertionIdxs348 = new Set<number>(toldBeliefs.map(t => t.sceneIdx));
+    const revelationIdxs348 = witnessedBeliefs.map(w => w.sceneIdx);
+    if (assertionIdxs348.size >= 2 && revelationIdxs348.length >= 2) {
+      const anyRevFollowsAssertion348 = revelationIdxs348.some(ri =>
+        assertionIdxs348.has(ri) || assertionIdxs348.has(ri - 1) || assertionIdxs348.has(ri - 2),
+      );
+      if (!anyRevFollowsAssertion348) {
+        issues.push({
+          location: 'Assertion → revelation sequencing',
+          rule: 'REVELATION_ASSERTION_DISCONNECT',
+          severity: 'minor',
+          description: `The story has ${assertionIdxs348.size} assertion scene(s) and ${revelationIdxs348.length} revelation(s), but no revelation lands in or within two scenes of a prior assertion — the dramatic-irony engine is never engaged. Claims are made and truths are uncovered, but no truth ever directly overturns a claim, so the audience never gets the payoff of watching a character's certainty collapse. Assertions and revelations run on separate tracks.`,
+          suggestedFix: 'Sequence at least one revelation to land right after an assertion it overturns: let a character commit to a belief, then have the story reveal — soon and pointedly — that they were wrong. The gap between what a character is sure of and what is true is where dramatic irony lives; close that gap by putting the revelation in striking distance of the claim.',
+        });
+      }
+    }
+  }
+
+  // REVELATION_MIDPOINT_VOID (minor, n≥8, ≥2 revelations): The midpoint zone (40%–60%)
+  // contains no revelation, even though the story delivers two or more revelations
+  // elsewhere. The structural midpoint is canonically where a major revelation turns the
+  // story — recasting the goal, raising the stakes, or flipping the protagonist's
+  // understanding. When revelations cluster before and after but skip the center, the
+  // story's pivot lands without the discovery that should power it. Distinct from BELIEF_
+  // MIDPOINT_VOID (fires when the midpoint has NO belief activity of any kind — told or
+  // witnessed; this fires specifically when revelations exist but avoid the midpoint, even
+  // if assertions are present there) and from REVELATION_DELAYED / REVELATION_LATE_FIRST
+  // (timing of the first revelation, not the midpoint specifically).
+  if (records.length >= 8 && witnessedBeliefs.length >= 2) {
+    const midStart348 = Math.floor(records.length * 0.4);
+    const midEnd348 = Math.floor(records.length * 0.6);
+    const hasMidRevelation348 = witnessedBeliefs.some(w => w.sceneIdx >= midStart348 && w.sceneIdx < midEnd348);
+    if (!hasMidRevelation348) {
+      issues.push({
+        location: `Midpoint zone (Scenes ${midStart348}–${midEnd348 - 1}) — no revelation`,
+        rule: 'REVELATION_MIDPOINT_VOID',
+        severity: 'minor',
+        description: `The midpoint zone (Scenes ${midStart348}–${midEnd348 - 1}) contains no revelation, though the story delivers ${witnessedBeliefs.length} revelations elsewhere. The structural midpoint is where a major discovery should turn the story — recasting the goal, raising the stakes, or flipping the protagonist's understanding. When revelations cluster around the center but skip it, the pivot lands without the discovery that should power it, and the story's middle sags.`,
+        suggestedFix: 'Place a significant revelation at the midpoint: the truth that reframes what the protagonist is really up against, or the discovery that raises the cost of failure. The midpoint reversal is most powerful when it turns on something newly learned — let the center of the story be where the audience and the protagonist learn the thing that changes everything.',
+      });
+    }
+  }
+
+  // TOLD_BELIEF_DRAMATIC_TURN_DECOUPLED (minor, n≥8, ≥3 assertion scenes): No scene in
+  // which a character asserts a belief also carries a dramatic turn. The moments a
+  // character commits to a claim never coincide with a story pivot, so assertions read as
+  // inert background rather than as stances taken at consequential moments. A belief
+  // declared at a turning point — a vow made as everything changes, a conviction stated
+  // just as it is about to be tested — carries dramatic weight that an offhand assertion
+  // does not. Completes the told-belief channel set with TOLD_BELIEF_SUSPENSE_DECOUPLED,
+  // TOLD_BELIEF_EMOTIONAL_FLATLINE, TOLD_BELIEF_CURIOSITY_FLAT, and TOLD_BELIEF_
+  // RELATIONSHIP_DECOUPLED; distinct from PAYOFF/CONFLICT/THEME dramatic-turn checks
+  // (different scene populations).
+  if (records.length >= 8) {
+    const toldScenes348 = (records as any[]).filter(r =>
+      ((r.dialogueHighlights ?? []) as string[]).some(h => h.includes(':')),
+    );
+    if (toldScenes348.length >= 3 && !toldScenes348.some(r => (r.dramaticTurn ?? 'nothing') !== 'nothing')) {
+      issues.push({
+        location: 'Told-belief scenes — dramatic pivot',
+        rule: 'TOLD_BELIEF_DRAMATIC_TURN_DECOUPLED',
+        severity: 'minor',
+        description: `None of the ${toldScenes348.length} scenes where a character asserts a belief carries a dramatic turn — the moments characters commit to claims never coincide with a story pivot. Assertions land as inert background rather than as stances taken at consequential moments. A belief declared at a turning point carries weight an offhand assertion lacks; here the belief layer and the turning-point layer never meet.`,
+        suggestedFix: 'Tie at least one assertion to a dramatic turn: let a character state their conviction at the moment the story reverses — a vow made as the situation flips, a certainty declared just before it is tested. An assertion made at a pivot becomes a stake the turn can pay off; one made in a flat scene is just dialogue.',
+      });
     }
   }
 

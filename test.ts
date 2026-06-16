@@ -20386,6 +20386,85 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 348 — beliefPass: revelation/assertion disconnect, revelation midpoint void, told belief dramatic turn decoupled', async () => {
+    const makeRec348 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 1,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runB348 = async (records: any[]) => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('REVELATION_ASSERTION_DISCONNECT fires when no revelation follows a prior assertion', async () => {
+      // assertions at scenes 0,1; revelations at scenes 7,8 — none within 2 scenes of an assertion
+      const recs348ad = Array.from({ length: 10 }, (_, i) =>
+        makeRec348(i, {
+          dialogueHighlights: [0, 1].includes(i) ? ['ALICE: the bridge will hold'] : [],
+          revelation: [7, 8].includes(i) ? 'The bridge was rigged to collapse' : null,
+        })
+      );
+      const res = await runB348(recs348ad);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_ASSERTION_DISCONNECT'), 'REVELATION_ASSERTION_DISCONNECT should fire');
+    });
+
+    it('REVELATION_ASSERTION_DISCONNECT does not fire when a revelation follows an assertion', async () => {
+      // assertion at scene 6; revelation at scene 7 (within 2 scenes) — engine engaged
+      const recs348adn = Array.from({ length: 10 }, (_, i) =>
+        makeRec348(i, {
+          dialogueHighlights: [0, 6].includes(i) ? ['ALICE: the bridge will hold'] : [],
+          revelation: [7, 8].includes(i) ? 'The bridge was rigged to collapse' : null,
+        })
+      );
+      const res = await runB348(recs348adn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_ASSERTION_DISCONNECT'), 'REVELATION_ASSERTION_DISCONNECT should not fire');
+    });
+
+    it('REVELATION_MIDPOINT_VOID fires when the midpoint carries no revelation', async () => {
+      // n=10 → midpoint = scenes 4,5; revelations at scenes 1,8 only
+      const recs348mv = Array.from({ length: 10 }, (_, i) =>
+        makeRec348(i, { revelation: [1, 8].includes(i) ? 'A secret surfaces' : null })
+      );
+      const res = await runB348(recs348mv);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_MIDPOINT_VOID'), 'REVELATION_MIDPOINT_VOID should fire');
+    });
+
+    it('REVELATION_MIDPOINT_VOID does not fire when a revelation lands at the midpoint', async () => {
+      const recs348mvn = Array.from({ length: 10 }, (_, i) =>
+        makeRec348(i, { revelation: [4, 8].includes(i) ? 'A secret surfaces' : null })
+      );
+      const res = await runB348(recs348mvn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_MIDPOINT_VOID'), 'REVELATION_MIDPOINT_VOID should not fire');
+    });
+
+    it('TOLD_BELIEF_DRAMATIC_TURN_DECOUPLED fires when no assertion scene carries a dramatic turn', async () => {
+      const recs348dt = Array.from({ length: 10 }, (_, i) =>
+        makeRec348(i, {
+          dialogueHighlights: [1, 3, 5].includes(i) ? ['ALICE: we can still win this'] : [],
+          dramaticTurn: 'nothing',
+        })
+      );
+      const res = await runB348(recs348dt);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TOLD_BELIEF_DRAMATIC_TURN_DECOUPLED'), 'TOLD_BELIEF_DRAMATIC_TURN_DECOUPLED should fire');
+    });
+
+    it('TOLD_BELIEF_DRAMATIC_TURN_DECOUPLED does not fire when an assertion scene carries a turn', async () => {
+      const recs348dtn = Array.from({ length: 10 }, (_, i) =>
+        makeRec348(i, {
+          dialogueHighlights: [1, 3, 5].includes(i) ? ['ALICE: we can still win this'] : [],
+          dramaticTurn: i === 3 ? 'reversal' : 'nothing',
+        })
+      );
+      const res = await runB348(recs348dtn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TOLD_BELIEF_DRAMATIC_TURN_DECOUPLED'), 'TOLD_BELIEF_DRAMATIC_TURN_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 334 — beliefPass: told belief suspense decoupled, told belief emotional flatline, revelation relationship decoupled', async () => {
     const makeRec334 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
