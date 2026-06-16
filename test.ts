@@ -17897,6 +17897,85 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 367 — intentionPass: proactive adversity absent, proactive backloaded, proactive payoff coincidence absent', async () => {
+    const makeRec367 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0.5,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runI367 = async (records: any[]) => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      return intentionPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PROACTIVE_ADVERSITY_ABSENT fires when no negative-emotion scene is proactive', async () => {
+      const recs367aa = Array.from({ length: 8 }, (_, i) =>
+        makeRec367(i, {
+          emotionalShift: [1, 2].includes(i) ? 'negative' : 'neutral',
+          seededClueIds: i === 5 ? ['clue_x'] : [],
+        }),
+      );
+      const res = await runI367(recs367aa);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PROACTIVE_ADVERSITY_ABSENT'), 'PROACTIVE_ADVERSITY_ABSENT should fire');
+    });
+
+    it('PROACTIVE_ADVERSITY_ABSENT does not fire when a negative-emotion scene is proactive', async () => {
+      const recs367aani = Array.from({ length: 8 }, (_, i) =>
+        makeRec367(i, {
+          emotionalShift: [1, 2].includes(i) ? 'negative' : 'neutral',
+          seededClueIds: i === 1 || i === 5 ? ['clue_x'] : [],
+        }),
+      );
+      const res = await runI367(recs367aani);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PROACTIVE_ADVERSITY_ABSENT'), 'PROACTIVE_ADVERSITY_ABSENT should not fire');
+    });
+
+    it('PROACTIVE_BACKLOADED fires when >70% of proactive acts fall in the second half', async () => {
+      // n=10 → mid=5; proactive at 2 (first half) and 6,7,8 (second half) → 3/4 = 75%
+      const recs367bl = Array.from({ length: 10 }, (_, i) =>
+        makeRec367(i, { seededClueIds: [2, 6, 7, 8].includes(i) ? ['c'] : [] }),
+      );
+      const res = await runI367(recs367bl);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PROACTIVE_BACKLOADED'), 'PROACTIVE_BACKLOADED should fire');
+    });
+
+    it('PROACTIVE_BACKLOADED does not fire when proactive acts are balanced across halves', async () => {
+      // proactive at 2,3 (first half) and 7,8 (second half) → 2/4 = 50%
+      const recs367blni = Array.from({ length: 10 }, (_, i) =>
+        makeRec367(i, { seededClueIds: [2, 3, 7, 8].includes(i) ? ['c'] : [] }),
+      );
+      const res = await runI367(recs367blni);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PROACTIVE_BACKLOADED'), 'PROACTIVE_BACKLOADED should not fire');
+    });
+
+    it('PROACTIVE_PAYOFF_COINCIDENCE_ABSENT fires when no scene is both proactive and a payoff', async () => {
+      const recs367pc = Array.from({ length: 8 }, (_, i) =>
+        makeRec367(i, {
+          seededClueIds: [1, 2, 3].includes(i) ? ['c'] : [],
+          payoffSetupIds: [5, 6].includes(i) ? ['p'] : [],
+        }),
+      );
+      const res = await runI367(recs367pc);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PROACTIVE_PAYOFF_COINCIDENCE_ABSENT'), 'PROACTIVE_PAYOFF_COINCIDENCE_ABSENT should fire');
+    });
+
+    it('PROACTIVE_PAYOFF_COINCIDENCE_ABSENT does not fire when a scene is both proactive and a payoff', async () => {
+      // scene 3 is both proactive (seededClueIds) and a payoff (payoffSetupIds)
+      const recs367pcni = Array.from({ length: 8 }, (_, i) =>
+        makeRec367(i, {
+          seededClueIds: [1, 2, 3].includes(i) ? ['c'] : [],
+          payoffSetupIds: [3, 6].includes(i) ? ['p'] : [],
+        }),
+      );
+      const res = await runI367(recs367pcni);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PROACTIVE_PAYOFF_COINCIDENCE_ABSENT'), 'PROACTIVE_PAYOFF_COINCIDENCE_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 353 — intentionPass: proactive curiosity decoupled, proactive suspense peak decoupled, proactive curiosity peak decoupled', async () => {
     const makeRec353 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

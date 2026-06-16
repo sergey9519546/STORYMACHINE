@@ -30,6 +30,12 @@
 // — initiative opens no questions), proactive suspense peak decoupled (the story's highest-
 // suspense scene is not protagonist-driven), proactive curiosity peak decoupled (the story's
 // highest-curiosity scene is not protagonist-driven).
+// Wave 367 additions: proactive adversity absent (the protagonist's negative-emotion scenes
+// are never proactive — they never fight back from a low point), proactive backloaded (>70%
+// of proactive acts fall in the second half — initiative arrives late, distributed differently
+// from the all-or-nothing late-surge and the single-burst overclustering checks), proactive
+// payoff coincidence absent (no scene is both proactive and a payoff — the protagonist's
+// initiative never lands a payoff in the same moment it is exerted).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1392,6 +1398,84 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `The story's highest-curiosity scene (Scene ${peakCur353.sceneIdx}, curiosityDelta ${maxCur353b}) is not a proactive scene — the most intriguing question opens by itself rather than through the protagonist's action, even though they take initiative elsewhere. The biggest hook in the story binds the audience to the protagonist when it is something their digging uncovered, not something that merely surfaced.`,
           suggestedFix: 'Let the protagonist\'s initiative open the story\'s biggest question: route the peak-curiosity beat through a choice they made — the door they opened, the lead they chased, the secret they pried loose. A mystery the protagonist triggers makes their agency the engine of intrigue.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 367: PROACTIVE_ADVERSITY_ABSENT, PROACTIVE_BACKLOADED, PROACTIVE_PAYOFF_COINCIDENCE_ABSENT ──
+
+  // PROACTIVE_ADVERSITY_ABSENT (minor, n≥8, ≥2 negative scenes, proactive exists):
+  // None of the protagonist's negative-emotion scenes (their setbacks and low points)
+  // is proactive — they take initiative only when things are going well, never fighting
+  // back from adversity. A protagonist who acts only from comfort and goes passive the
+  // moment they suffer reads as fragile rather than driven; the most compelling agency
+  // is the kind exerted from the floor. Distinct from PROACTIVE_EMOTION_DECOUPLED (which
+  // audits whether proactive scenes are emotionally neutral — this audits whether the
+  // protagonist's worst moments contain any initiative).
+  if (n >= 8) {
+    const negScenes367 = (records as any[]).filter(r => r.emotionalShift === 'negative');
+    const anyProactive367 = (records as any[]).some(isProactive258);
+    if (negScenes367.length >= 2 && anyProactive367 && !negScenes367.some(isProactive258)) {
+      issues.push({
+        location: `${negScenes367.length} negative-emotion scene(s) — no initiative`,
+        rule: 'PROACTIVE_ADVERSITY_ABSENT',
+        severity: 'minor',
+        description: `None of the protagonist's ${negScenes367.length} negative-emotion scenes is proactive — they take initiative elsewhere but never while suffering a setback. A protagonist who acts only when things go well and goes passive the moment they're hurt reads as fragile rather than driven. The most compelling agency is the kind exerted from the floor: the choice to fight back precisely when everything has gone wrong.`,
+        suggestedFix: "Give the protagonist a proactive beat at a low point: a clue they chase through grief, a deadline they force despite the setback. Initiative born of adversity — acting because things are bad, not because they're good — is what separates a driven protagonist from one the plot merely rewards when convenient.",
+      });
+    }
+  }
+
+  // PROACTIVE_BACKLOADED (minor, n≥10, ≥3 proactive scenes): More than 70% of the
+  // protagonist's proactive acts fall in the second half of the story. Initiative arrives
+  // late — the setup and first complication zone pass with the protagonist mostly passive,
+  // then agency concentrates toward the climax. Distinct from PROACTIVE_LATE_SURGE (the
+  // all-or-nothing case: zero proactive acts in the first half) — this fires even when the
+  // first half has some initiative, as long as it is a small minority — and from PROACTIVE_
+  // OVERCLUSTERING (a single tight burst spanning ≤20% of the story, anywhere).
+  if (n >= 10) {
+    const mid367 = Math.floor(n * 0.5);
+    const proIdxs367: number[] = [];
+    for (let i = 0; i < n; i++) {
+      if (isProactive258(records[i])) proIdxs367.push(i);
+    }
+    if (proIdxs367.length >= 3) {
+      const secondHalf367 = proIdxs367.filter(i => i >= mid367).length;
+      if (secondHalf367 / proIdxs367.length > 0.7) {
+        issues.push({
+          location: `Proactive distribution — ${secondHalf367}/${proIdxs367.length} acts in the back half`,
+          rule: 'PROACTIVE_BACKLOADED',
+          severity: 'minor',
+          description: `${secondHalf367} of the protagonist's ${proIdxs367.length} proactive acts (${Math.round(secondHalf367 / proIdxs367.length * 100)}%) fall in the second half — initiative arrives late. The setup and first complication zone pass with the protagonist mostly passive, and agency only concentrates as the climax approaches. A protagonist who is reactive through the front half asks the audience to invest in someone who isn't yet driving their own story.`,
+          suggestedFix: 'Move some proactive beats into the first half: an early choice, a goal pursued from the outset, a clock the protagonist raises before the midpoint. Agency established early makes the protagonist the engine of the story from the start, rather than someone who wakes up to their own plot halfway through.',
+        });
+      }
+    }
+  }
+
+  // PROACTIVE_PAYOFF_COINCIDENCE_ABSENT (minor, n≥8, ≥3 proactive scenes, ≥2 payoff
+  // scenes): No single scene is both proactive and a payoff — the protagonist's moments
+  // of initiative and the story's moments of payoff never coincide. The protagonist
+  // exerts agency and the story delivers callbacks, but never in the same beat, so the
+  // satisfaction of a payoff is never the direct, immediate product of the protagonist's
+  // action. Distinct from PAYOFF_WITHOUT_EFFORT (which checks a 3-scene lookback before
+  // each payoff for any proactive act): this checks same-scene coincidence specifically,
+  // catching stories where payoffs follow effort but never land in the act itself.
+  if (n >= 8) {
+    const proScenes367 = (records as any[]).filter(isProactive258);
+    const payoffScenes367 = (records as any[]).filter(r => ((r.payoffSetupIds ?? []) as any[]).length > 0);
+    if (proScenes367.length >= 3 && payoffScenes367.length >= 2) {
+      const anyCoincide367 = (records as any[]).some(r =>
+        isProactive258(r) && ((r.payoffSetupIds ?? []) as any[]).length > 0,
+      );
+      if (!anyCoincide367) {
+        issues.push({
+          location: 'Initiative / payoff coincidence',
+          rule: 'PROACTIVE_PAYOFF_COINCIDENCE_ABSENT',
+          severity: 'minor',
+          description: `Across ${proScenes367.length} proactive scenes and ${payoffScenes367.length} payoff scenes, no single scene is both — the protagonist's initiative and the story's payoffs never land in the same beat. The protagonist exerts agency and the story delivers callbacks, but the satisfaction of a payoff is never the immediate product of an action the protagonist is taking in that very moment, so cause and reward stay structurally separated.`,
+          suggestedFix: 'Let at least one payoff fire inside a proactive scene: the moment the protagonist plants the decisive clue or forces the confrontation should also be the moment a long-seeded thread pays off. When agency and payoff coincide, the protagonist visibly earns the resolution in real time rather than triggering it from a distance.',
         });
       }
     }
