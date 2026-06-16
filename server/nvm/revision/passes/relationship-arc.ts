@@ -52,6 +52,14 @@
 // pair midpoint void (a pair shifts before and after the 40%–60% window but not within it — the
 // per-pair midpoint cell), pair emotion flat (a pair with ≥3 shifts all in neutral scenes — the
 // per-pair emotion cell, distinct from the whole-story and polarity-set emotion checks).
+// Wave 399 additions: pair suspense flat (a pair with ≥3 shifts whose every shift scene has
+// suspenseDelta ≤ 0 — bond moves entirely without dramatic tension; per-pair suspense cell,
+// complement of relationship suspense decoupled which aggregates globally), pair curiosity flat
+// (same analytical mode × curiosity channel — the per-pair curiosity cell, complement of
+// relationship curiosity decoupled), relationship revelation emotion decoupled (revelation
+// scenes that also carry a bond shift are all emotionally neutral — disclosures crack bonds
+// without the scene feeling anything; distinct from revelation silent which fires when no
+// revelation+shift overlap exists at all).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1584,6 +1592,106 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         description: `${flatPairs385.length === 1 ? 'One pair' : `${flatPairs385.length} pairs`} (${flatPairs385.join('; ')}) move${flatPairs385.length === 1 ? 's' : ''} 3 or more times, yet every one of those shifts lands in an emotionally neutral scene. The bond changes repeatedly but the protagonist never feels any of its movements, so this relationship's whole arc is logged as a sequence of status changes the audience tracks intellectually without ever being moved by.`,
         suggestedFix: 'Let this bond\'s shifts cost or reward the protagonist emotionally: a warming that brings relief, a cooling that brings unease, a rupture that wounds. A relationship that moves three or more times without a single felt beat is mechanics, not drama — pair its changes with the protagonist\'s reaction so the audience invests in it.',
       });
+    }
+  }
+
+  // ── Wave 399: PAIR_SUSPENSE_FLAT, PAIR_CURIOSITY_FLAT, RELATIONSHIP_REVELATION_EMOTION_DECOUPLED ──
+
+  // PAIR_SUSPENSE_FLAT (minor, n≥8, pair with ≥3 shifts, overall suspense present):
+  // A single pair accumulates 3+ shifts, but every shift scene has suspenseDelta ≤ 0 —
+  // this bond moves entirely without dramatic tension. When the relationship engine and
+  // the suspense engine never share a scene for this pair, the bond's movement feels
+  // consequence-free: the audience tracks status changes but never feels the pressure
+  // behind them. Per-pair × suspense channel. Distinct from RELATIONSHIP_SUSPENSE_
+  // DECOUPLED (global avg across all pairs — this fires when ONE pair's shifts are all
+  // suspense-flat even though other pairs' shifts may carry suspense) and PAIR_EMOTION_
+  // FLAT (emotion channel rather than suspense channel).
+  if (records.length >= 8) {
+    const suspByScene399a = new Map<number, number>();
+    for (const r of records as any[]) suspByScene399a.set(r.sceneIdx, r.suspenseDelta ?? 0);
+    const anyOverallSusp399a = [...suspByScene399a.values()].some(v => v > 0);
+    if (anyOverallSusp399a) {
+      const flatSuspPairs399a: string[] = [];
+      for (const [pairKey399a, stats399a] of pairStats) {
+        if (stats399a.shifts.length >= 3 &&
+            stats399a.shifts.every(s => (suspByScene399a.get(s.sceneIdx) ?? 0) <= 0)) {
+          flatSuspPairs399a.push(pairKey399a);
+        }
+      }
+      if (flatSuspPairs399a.length > 0) {
+        issues.push({
+          location: `Pair(s) ${flatSuspPairs399a.join(', ')} — suspense-flat shifts`,
+          rule: 'PAIR_SUSPENSE_FLAT',
+          severity: 'minor',
+          description: `${flatSuspPairs399a.length === 1 ? 'One pair' : `${flatSuspPairs399a.length} pairs`} (${flatSuspPairs399a.join('; ')}) move${flatSuspPairs399a.length === 1 ? 's' : ''} 3 or more times, yet every one of those shifts lands in a scene with zero dramatic tension. The bond changes but the audience is never under pressure when it does, so this relationship's arc plays out entirely in low-stakes moments — the movements feel like administrative updates rather than dramatic events.`,
+          suggestedFix: 'Let this bond shift when the story\'s tension is already elevated: a relationship that cracks during a chase, warms under threat, or reverses mid-crisis lands with far more force than one whose movements all happen in peaceful scenes. The pressure of the situation should amplify the cost or reward of the bond\'s change.',
+        });
+      }
+    }
+  }
+
+  // PAIR_CURIOSITY_FLAT (minor, n≥8, pair with ≥3 shifts, overall curiosity present):
+  // A single pair accumulates 3+ shifts, but every shift scene has curiosityDelta ≤ 0 —
+  // this bond moves without ever raising a question. When the audience is never made to
+  // wonder about this relationship's outcome — because its changes happen only in scenes
+  // with no curiosity charge — the arc feels closed and predictable rather than something
+  // to track and anticipate. Per-pair × curiosity channel. Distinct from RELATIONSHIP_
+  // CURIOSITY_DECOUPLED (global avg across all pairs), PAIR_SUSPENSE_FLAT (suspense
+  // channel rather than curiosity), and PAIR_EMOTION_FLAT (emotion channel).
+  if (records.length >= 8) {
+    const curioByScene399b = new Map<number, number>();
+    for (const r of records as any[]) curioByScene399b.set(r.sceneIdx, r.curiosityDelta ?? 0);
+    const anyOverallCurio399b = [...curioByScene399b.values()].some(v => v > 0);
+    if (anyOverallCurio399b) {
+      const flatCurioPairs399b: string[] = [];
+      for (const [pairKey399b, stats399b] of pairStats) {
+        if (stats399b.shifts.length >= 3 &&
+            stats399b.shifts.every(s => (curioByScene399b.get(s.sceneIdx) ?? 0) <= 0)) {
+          flatCurioPairs399b.push(pairKey399b);
+        }
+      }
+      if (flatCurioPairs399b.length > 0) {
+        issues.push({
+          location: `Pair(s) ${flatCurioPairs399b.join(', ')} — curiosity-flat shifts`,
+          rule: 'PAIR_CURIOSITY_FLAT',
+          severity: 'minor',
+          description: `${flatCurioPairs399b.length === 1 ? 'One pair' : `${flatCurioPairs399b.length} pairs`} (${flatCurioPairs399b.join('; ')}) move${flatCurioPairs399b.length === 1 ? 's' : ''} 3 or more times, yet every one of those shifts lands in a scene that raises no curiosity. The bond changes but never makes the audience wonder what will happen next between them, so its arc feels closed and fully anticipated — the audience tracks the relationship like a dial they can already read.`,
+          suggestedFix: 'Let this bond shift in scenes that simultaneously raise a question: a warming that creates uncertainty about what the other character really wants, a cooling that makes the audience wonder whether it\'s permanent. A relationship the audience actively wonders about is one they will invest in to the end.',
+        });
+      }
+    }
+  }
+
+  // RELATIONSHIP_REVELATION_EMOTION_DECOUPLED (minor, n≥8, ≥2 revelation scenes,
+  // ≥1 revelation+shift scene, all revelation+shift scenes emotionally neutral):
+  // The story has revelation scenes that do coincide with bond shifts (so it is NOT
+  // revelation-silent), but every such scene is emotionally neutral — disclosures crack
+  // or strengthen bonds without the scene itself feeling anything. A revelation that also
+  // moves a bond should be one of the story's most charged moments: the disclosure lands
+  // and the relationship moves simultaneously. When this compound moment is emotionally
+  // flat, both signals are diluted. Distinct from RELATIONSHIP_REVELATION_SILENT (no
+  // revelation+shift overlap at all — this fires when overlap exists but is flat),
+  // RELATIONSHIP_RUPTURE_EMOTION_FLAT (negative shifts in neutral scenes, no revelation
+  // filter), and WARMTH_UNFELT (positive shifts in neutral scenes, no revelation filter).
+  if (records.length >= 8) {
+    const revelCount399c = (records as any[]).filter(r => r.revelation === true).length;
+    if (revelCount399c >= 2) {
+      const revelShiftScenes399c = (records as any[]).filter(r =>
+        r.revelation === true &&
+        ((r.relationshipShifts ?? []) as any[]).length > 0,
+      );
+      if (revelShiftScenes399c.length >= 1) {
+        const allFlat399c = revelShiftScenes399c.every(r => (r.emotionalShift ?? 'neutral') === 'neutral');
+        if (allFlat399c) {
+          issues.push({
+            location: 'Revelation + bond-shift scenes — emotionally neutral',
+            rule: 'RELATIONSHIP_REVELATION_EMOTION_DECOUPLED',
+            severity: 'minor',
+            description: `The story has ${revelShiftScenes399c.length} scene(s) where a revelation and a relationship shift coincide, but every one of them is emotionally neutral. A revelation that also moves a bond should be one of the story's most charged moments — the disclosure lands, the relationship shifts, and the protagonist feels both. When that compound moment carries no emotional register, two powerful signals cancel each other out rather than amplifying.`,
+            suggestedFix: 'Let revelation+bond-shift scenes carry emotional weight: a disclosure that warms a bond should also bring relief, joy, or cautious hope; one that ruptures should bring shock, grief, or fury. The emotional register is the scene telling the audience how much this moment costs.',
+          });
+        }
+      }
     }
   }
 

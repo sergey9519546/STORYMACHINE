@@ -18713,6 +18713,85 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 399 — relationshipArcPass: pair suspense flat, pair curiosity flat, revelation emotion decoupled', async () => {
+    const makeRec399 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const shift399 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
+    const runR399 = async (records: any[]) => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PAIR_SUSPENSE_FLAT fires when a pair shifts 3+ times all in suspense-free scenes while overall suspense exists', async () => {
+      // A|B shifts at scenes 1,3,5 (all suspenseDelta=0); scene 7 has suspenseDelta=2 → fires
+      const recs399a = Array.from({ length: 8 }, (_, i) => makeRec399(i, {
+        relationshipShifts: [1, 3, 5].includes(i) ? shift399(-0.4) : [],
+        suspenseDelta: i === 7 ? 2 : 0,
+      }));
+      const res = await runR399(recs399a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAIR_SUSPENSE_FLAT'), 'PAIR_SUSPENSE_FLAT should fire');
+    });
+
+    it('PAIR_SUSPENSE_FLAT does not fire when one of the pair\'s shift scenes has positive suspense', async () => {
+      // A|B shifts at scenes 1,3,5; scene 3 has suspenseDelta=1.5 → no fire
+      const recs399anr = Array.from({ length: 8 }, (_, i) => makeRec399(i, {
+        relationshipShifts: [1, 3, 5].includes(i) ? shift399(-0.4) : [],
+        suspenseDelta: i === 3 ? 1.5 : 0,
+      }));
+      const res = await runR399(recs399anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAIR_SUSPENSE_FLAT'), 'PAIR_SUSPENSE_FLAT should not fire');
+    });
+
+    it('PAIR_CURIOSITY_FLAT fires when a pair shifts 3+ times all in curiosity-free scenes while overall curiosity exists', async () => {
+      // A|B shifts at scenes 1,3,5 (all curiosityDelta=0); scene 7 has curiosityDelta=2 → fires
+      const recs399b = Array.from({ length: 8 }, (_, i) => makeRec399(i, {
+        relationshipShifts: [1, 3, 5].includes(i) ? shift399(0.4) : [],
+        curiosityDelta: i === 7 ? 2 : 0,
+      }));
+      const res = await runR399(recs399b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAIR_CURIOSITY_FLAT'), 'PAIR_CURIOSITY_FLAT should fire');
+    });
+
+    it('PAIR_CURIOSITY_FLAT does not fire when one of the pair\'s shift scenes has positive curiosity', async () => {
+      // A|B shifts at scenes 1,3,5; scene 3 has curiosityDelta=1 → no fire
+      const recs399bnr = Array.from({ length: 8 }, (_, i) => makeRec399(i, {
+        relationshipShifts: [1, 3, 5].includes(i) ? shift399(0.4) : [],
+        curiosityDelta: i === 3 ? 1 : 0,
+      }));
+      const res = await runR399(recs399bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAIR_CURIOSITY_FLAT'), 'PAIR_CURIOSITY_FLAT should not fire');
+    });
+
+    it('RELATIONSHIP_REVELATION_EMOTION_DECOUPLED fires when all revelation+shift scenes are emotionally neutral', async () => {
+      // Scenes 3,5 have revelation=true AND A|B shift AND emotionalShift='neutral' → fires
+      const recs399c = Array.from({ length: 8 }, (_, i) => makeRec399(i, {
+        revelation: [3, 5].includes(i) ? true : null,
+        relationshipShifts: [3, 5].includes(i) ? shift399(-0.3) : [],
+        emotionalShift: 'neutral',
+      }));
+      const res = await runR399(recs399c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_REVELATION_EMOTION_DECOUPLED'), 'RELATIONSHIP_REVELATION_EMOTION_DECOUPLED should fire');
+    });
+
+    it('RELATIONSHIP_REVELATION_EMOTION_DECOUPLED does not fire when a revelation+shift scene carries emotion', async () => {
+      // Scene 3 has revelation+shift+emotionalShift='negative' → no fire
+      const recs399cnr = Array.from({ length: 8 }, (_, i) => makeRec399(i, {
+        revelation: [3, 5].includes(i) ? true : null,
+        relationshipShifts: [3, 5].includes(i) ? shift399(-0.3) : [],
+        emotionalShift: i === 3 ? 'negative' : 'neutral',
+      }));
+      const res = await runR399(recs399cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_REVELATION_EMOTION_DECOUPLED'), 'RELATIONSHIP_REVELATION_EMOTION_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 398 — payoffPass: clue seed suspense flat, payoff midpoint void, clue seed revelation decoupled', async () => {
     const makeRec398 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
