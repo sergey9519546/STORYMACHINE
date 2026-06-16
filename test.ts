@@ -19880,6 +19880,82 @@ He looks away.`;
     });
   });
 
+  describe('Wave 370 — payoffPass: payoff curiosity peak decoupled, payoff Act 3 absent, clue seed midpoint void', async () => {
+    const makeRec370 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runPay370 = async (records: any[]) => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      return payoffPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PAYOFF_CURIOSITY_PEAK_DECOUPLED fires when the peak-curiosity scene carries no payoff', async () => {
+      // scene 6 has peak curiosityDelta=2.0 (no payoff); payoffs at scenes 2,4
+      const recs370cp = Array.from({ length: 8 }, (_, i) =>
+        makeRec370(i, {
+          curiosityDelta: i === 6 ? 2.0 : 0,
+          payoffSetupIds: [2, 4].includes(i) ? [`setup${i}`] : [],
+        }),
+      );
+      const res = await runPay370(recs370cp);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CURIOSITY_PEAK_DECOUPLED'), 'PAYOFF_CURIOSITY_PEAK_DECOUPLED should fire');
+    });
+
+    it('PAYOFF_CURIOSITY_PEAK_DECOUPLED does not fire when the peak-curiosity scene carries a payoff', async () => {
+      // scene 6 peak curiosity AND a payoff
+      const recs370cpn = Array.from({ length: 8 }, (_, i) =>
+        makeRec370(i, {
+          curiosityDelta: i === 6 ? 2.0 : 0,
+          payoffSetupIds: [2, 4, 6].includes(i) ? [`setup${i}`] : [],
+        }),
+      );
+      const res = await runPay370(recs370cpn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CURIOSITY_PEAK_DECOUPLED'), 'PAYOFF_CURIOSITY_PEAK_DECOUPLED should not fire');
+    });
+
+    it('PAYOFF_ACT3_ABSENT fires when 3+ payoffs land before Act 3 and none within it', async () => {
+      // n=12 → act3Start=9; payoffs at 2,4,6 (all before 9)
+      const recs370a3 = Array.from({ length: 12 }, (_, i) =>
+        makeRec370(i, { payoffSetupIds: [2, 4, 6].includes(i) ? [`setup${i}`] : [] }),
+      );
+      const res = await runPay370(recs370a3);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_ACT3_ABSENT'), 'PAYOFF_ACT3_ABSENT should fire');
+    });
+
+    it('PAYOFF_ACT3_ABSENT does not fire when a payoff lands in Act 3', async () => {
+      // payoff at scene 10 (Act 3)
+      const recs370a3n = Array.from({ length: 12 }, (_, i) =>
+        makeRec370(i, { payoffSetupIds: [2, 4, 6, 10].includes(i) ? [`setup${i}`] : [] }),
+      );
+      const res = await runPay370(recs370a3n);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_ACT3_ABSENT'), 'PAYOFF_ACT3_ABSENT should not fire');
+    });
+
+    it('CLUE_SEED_MIDPOINT_VOID fires when no clue is seeded in the 40-60% zone but seeds exist on both sides', async () => {
+      // n=10 → mid zone [4,6); seeds at 1 (before), 8 (after); none at 4 or 5
+      const recs370mv = Array.from({ length: 10 }, (_, i) =>
+        makeRec370(i, { seededClueIds: [1, 2, 8].includes(i) ? [`clue${i}`] : [] }),
+      );
+      const res = await runPay370(recs370mv);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLUE_SEED_MIDPOINT_VOID'), 'CLUE_SEED_MIDPOINT_VOID should fire');
+    });
+
+    it('CLUE_SEED_MIDPOINT_VOID does not fire when a clue is seeded in the midpoint zone', async () => {
+      // seed at scene 5 (within [4,6))
+      const recs370mvn = Array.from({ length: 10 }, (_, i) =>
+        makeRec370(i, { seededClueIds: [1, 5, 8].includes(i) ? [`clue${i}`] : [] }),
+      );
+      const res = await runPay370(recs370mvn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLUE_SEED_MIDPOINT_VOID'), 'CLUE_SEED_MIDPOINT_VOID should not fire');
+    });
+  });
+
   describe('Wave 356 — payoffPass: clue seed dramatic turn decoupled, payoff clock decoupled, late clue plant', async () => {
     const makeRec356 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

@@ -33,6 +33,10 @@
 // with a story pivot), payoff clock decoupled (≥3 payoffs and ≥2 clock scenes but no
 // payoff lands under time pressure), late clue plant (a clue seeded in the final 15% —
 // no room left to pay it off).
+// Wave 370 additions: payoff curiosity peak decoupled (the single highest-curiosity scene
+// carries no payoff while payoffs exist elsewhere), payoff Act 3 absent (no payoff lands in
+// the final 25% though ≥3 resolve earlier — the finale settles nothing), clue seed midpoint
+// void (no clue planted in the 40%–60% pivot while seeds exist on both sides).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1285,6 +1289,85 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         description: `${lateSeedScenes356.length} clue-seeding scene(s) fall in the final 15% of the story (Scenes ${lateStart356}–${records.length - 1}) — a clue planted this late has no room to be set up before it would need to pay off. Such a seed either dangles unresolved or pays off almost immediately, robbing it of the delay between planting and harvest that makes a payoff satisfying.`,
         suggestedFix: 'Move late clue plants earlier so they have room to breathe before their payoff, or cut them if they are not paid off at all. The pleasure of a payoff is proportional to how long the seed has been quietly waiting; a clue introduced in the closing stretch cannot earn that.',
       });
+    }
+  }
+
+  // ── Wave 370: PAYOFF_CURIOSITY_PEAK_DECOUPLED, PAYOFF_ACT3_ABSENT, CLUE_SEED_MIDPOINT_VOID ──
+
+  // PAYOFF_CURIOSITY_PEAK_DECOUPLED (minor, n≥8, maxCuriosity>1, ≥2 payoff scenes):
+  // The single highest-curiosityDelta scene carries no payoff, even though the story
+  // resolves planted threads elsewhere. The moment the audience is most urgently
+  // wondering is not where any thread snaps shut — peak intrigue and the satisfaction of
+  // resolution never coincide. A payoff landing at the curiosity peak doubles its force:
+  // the answer arrives exactly when the audience most wants it. Distinct from PAYOFF_
+  // CURIOSITY_MISMATCH (which averages curiosityDelta across payoff scenes — this isolates
+  // the single peak-curiosity scene and checks whether a payoff lands there).
+  if (records.length >= 8) {
+    const payoffScenes370 = (records as any[]).filter(r => ((r.payoffSetupIds ?? []) as string[]).length > 0);
+    const maxCur370 = Math.max(...(records as any[]).map(r => r.curiosityDelta ?? 0));
+    if (payoffScenes370.length >= 2 && maxCur370 > 1) {
+      const peakCur370 = (records as any[]).find(r => (r.curiosityDelta ?? 0) === maxCur370);
+      if (peakCur370 && ((peakCur370.payoffSetupIds ?? []) as string[]).length === 0) {
+        issues.push({
+          location: `Scene ${peakCur370.sceneIdx} — peak curiosity (${maxCur370.toFixed(2)})`,
+          rule: 'PAYOFF_CURIOSITY_PEAK_DECOUPLED',
+          severity: 'minor',
+          description: `The story's highest-curiosityDelta scene (Scene ${peakCur370.sceneIdx}, curiosityDelta ${maxCur370.toFixed(2)}) carries no payoff, even though ${payoffScenes370.length} other scenes resolve planted threads. The moment the audience is most urgently wondering is not where anything snaps shut — peak intrigue and the satisfaction of resolution never meet, so the most charged delivery slot for a payoff is left empty.`,
+          suggestedFix: 'Land a payoff at the peak-curiosity scene: when the audience is most desperate to know, that is the moment to resolve a planted thread — or to pay one off in a way that opens the next question. A payoff that arrives at the crest of curiosity hits with doubled force.',
+        });
+      }
+    }
+  }
+
+  // PAYOFF_ACT3_ABSENT (minor, n≥10, ≥3 payoffs in Acts 1–2): No payoff lands in Act 3
+  // (the final 25% of scenes), even though three or more planted threads resolve earlier.
+  // Every loop the story closes is closed before the finale, so the climax and resolution
+  // arrive with no payoff left to deliver — the ending has nothing to pay off because the
+  // accounting was all settled in advance. Distinct from PAYOFF_BEFORE_CLIMAX (which
+  // requires EVERY clue resolved before the final 20% and gates on act position) and
+  // PAYOFF_FRONT_LOADED (>60% of payoffs in the first half): this fires on the binary
+  // absence of any payoff in the final quarter while payoffs exist earlier.
+  if (records.length >= 10) {
+    const act3Start370 = Math.floor(records.length * 0.75);
+    const earlyPayoffs370 = (records as any[]).filter((r, i) => i < act3Start370 && ((r.payoffSetupIds ?? []) as string[]).length > 0);
+    const act3Payoffs370 = (records as any[]).filter((r, i) => i >= act3Start370 && ((r.payoffSetupIds ?? []) as string[]).length > 0);
+    if (earlyPayoffs370.length >= 3 && act3Payoffs370.length === 0) {
+      issues.push({
+        location: `Act 3 (Scenes ${act3Start370}–${records.length - 1}) — no payoffs`,
+        rule: 'PAYOFF_ACT3_ABSENT',
+        severity: 'minor',
+        description: `${earlyPayoffs370.length} payoffs land in Acts 1–2 but none in Act 3 (Scenes ${act3Start370}–${records.length - 1}) — every loop the story closes is closed before the finale. The climax and resolution arrive with no thread left to pay off, so the ending settles nothing the audience has been waiting for; the satisfaction of resolution is spent before the moment it should peak.`,
+        suggestedFix: 'Reserve at least one significant payoff for Act 3: hold a planted thread closed until the climax or resolution so the ending delivers the click of completion at the story\'s peak. A finale with no payoffs left is a finale the audience has no structural reason to anticipate.',
+      });
+    }
+  }
+
+  // CLUE_SEED_MIDPOINT_VOID (minor, n≥10, ≥3 seed scenes): No clue is planted in the
+  // midpoint zone (40%–60%), even though clues are seeded both before it and after it.
+  // The setup engine goes quiet at the exact structural pivot — the moment a strong
+  // midpoint should be planting the seeds that reframe the second half. Distinct from
+  // SETUP_DESERT_ACT2B (the 50%–75% zone), SETUP_FRONT_GAP (the first 25%), and CLUE_
+  // DROUGHT (a max-gap measure anywhere): this isolates the central 40%–60% window and
+  // requires seeds on both sides, catching a setup gap that straddles the pivot.
+  if (records.length >= 10) {
+    const midStart370 = Math.floor(records.length * 0.4);
+    const midEnd370 = Math.floor(records.length * 0.6);
+    const seedScenes370 = (records as any[])
+      .map((r, i) => ({ r, i }))
+      .filter(({ r }) => ((r.seededClueIds ?? []) as string[]).length > 0);
+    if (seedScenes370.length >= 3) {
+      const inMid370 = seedScenes370.some(({ i }) => i >= midStart370 && i < midEnd370);
+      const beforeMid370 = seedScenes370.some(({ i }) => i < midStart370);
+      const afterMid370 = seedScenes370.some(({ i }) => i >= midEnd370);
+      if (!inMid370 && beforeMid370 && afterMid370) {
+        issues.push({
+          location: `Midpoint zone (Scenes ${midStart370}–${midEnd370 - 1}) — no clue seeded`,
+          rule: 'CLUE_SEED_MIDPOINT_VOID',
+          severity: 'minor',
+          description: `No clue is planted in the midpoint zone (Scenes ${midStart370}–${midEnd370 - 1}), though clues are seeded both before and after it — the setup engine goes silent at the exact structural pivot. The midpoint is where a strong story plants the seeds that reframe the second half; a setup void there means the pivot reorganizes the plot without planting anything the back half can harvest.`,
+          suggestedFix: 'Plant a clue at the midpoint: let the pivot that reframes the story also seed the detail its second half will pay off. The midpoint reversal is most powerful when it both turns the plot and quietly lays the groundwork for what the turn makes possible.',
+        });
+      }
     }
   }
 
