@@ -35,6 +35,11 @@
 // runs below 60% of overall length), seed scene bloat (clue-seeding scenes average above
 // 1.5× overall — foreshadowing telegraphed by page space), stakes scene underweight
 // (raise_stakes scenes average below 60% — escalations rushed).
+// Wave 369 additions: clock scene underweight (clock-raise scenes average below 60% of
+// overall — deadlines rushed; the complement of clock scene pacing mismatch), revelation
+// scene bloat (revelation scenes average above 1.5× overall — disclosures over-explained;
+// complement of revelation scene underweight), payoff scene bloat (payoff scenes average
+// above 1.5× overall — callbacks belabored; complement of payoff scene underweight).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1433,6 +1438,92 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `The ${stakesLengths355.length} stakes-raising scene(s) average ${stakesAvg355.toFixed(1)} weighted lines — ${Math.round(stakesAvg355 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The moments that escalate what is at risk are rushed through the script's thinnest page space, so the audience is told the stakes rose without being given time to feel the new weight. Escalation has to be absorbed to land.`,
           suggestedFix: 'Give stakes-raising scenes room to breathe: let the new danger or cost sink in through reaction and consequence, not just announcement. A raise that the audience experiences — sees what it threatens, feels what it could cost — lands far harder than one the script states and moves past.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 369: CLOCK_SCENE_UNDERWEIGHT, REVELATION_SCENE_BLOAT, PAYOFF_SCENE_BLOAT ──
+
+  // CLOCK_SCENE_UNDERWEIGHT (minor, n≥8, ≥2 clock scenes): Scenes that raise a clock
+  // (clockRaised === true) average below 60% of the overall scene length — deadlines are
+  // raised in the script's thinnest page space, so the audience is told time is running
+  // out without being given room to feel the pressure tighten. Urgency needs a beat to
+  // register the cost of the shrinking window. The complement of CLOCK_SCENE_PACING_
+  // MISMATCH (clock scenes running ABOVE 1.5× — urgency undercut by a slow page): this
+  // fires on the opposite failure, clock scenes rushed too thin to land.
+  if (records.length >= 8) {
+    const clockLengths369: number[] = [];
+    for (let i369 = 0; i369 < records.length; i369++) {
+      if ((records as any[])[i369].clockRaised === true) {
+        clockLengths369.push(sceneLengths.get(i369) ?? 0);
+      }
+    }
+    if (clockLengths369.length >= 2) {
+      const clockAvg369 = clockLengths369.reduce((s, v) => s + v, 0) / clockLengths369.length;
+      if (clockAvg369 > 0 && clockAvg369 < avgLength * 0.6) {
+        issues.push({
+          location: `${clockLengths369.length} clock-raising scene(s)`,
+          rule: 'CLOCK_SCENE_UNDERWEIGHT',
+          severity: 'minor',
+          description: `The ${clockLengths369.length} clock-raising scene(s) average ${clockAvg369.toFixed(1)} weighted lines — ${Math.round(clockAvg369 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The deadlines that should tighten the screws are raised in the script's thinnest page space, so the audience is told time is running out without being given room to feel the window shrink. Urgency has to be absorbed to bite.`,
+          suggestedFix: 'Give clock-raising scenes room to land the pressure: show what the shrinking window threatens and how the characters feel it closing, rather than announcing the deadline and cutting away. A clock the audience feel tightening is dread; a clock merely stated is a number.',
+        });
+      }
+    }
+  }
+
+  // REVELATION_SCENE_BLOAT (minor, n≥8, ≥2 revelation scenes): Scenes carrying a
+  // revelation average above 1.5× the overall scene length — disclosures are lingered on
+  // and over-explained. A revelation lands hardest when it arrives clean and the audience
+  // is left to feel its implications; when the scene sprawls, the truth is spelled out and
+  // re-stated until its impact dissipates into exposition. The complement of REVELATION_
+  // SCENE_UNDERWEIGHT (revelation scenes below 60% — disclosures rushed): this fires on
+  // the opposite failure, revelations belabored.
+  if (records.length >= 8) {
+    const revLengths369: number[] = [];
+    for (let i369r = 0; i369r < records.length; i369r++) {
+      if ((records as any[])[i369r].revelation !== null && (records as any[])[i369r].revelation !== undefined) {
+        revLengths369.push(sceneLengths.get(i369r) ?? 0);
+      }
+    }
+    if (revLengths369.length >= 2) {
+      const revAvg369 = revLengths369.reduce((s, v) => s + v, 0) / revLengths369.length;
+      if (revAvg369 > avgLength * 1.5) {
+        issues.push({
+          location: `${revLengths369.length} revelation scene(s)`,
+          rule: 'REVELATION_SCENE_BLOAT',
+          severity: 'minor',
+          description: `The ${revLengths369.length} revelation scene(s) average ${revAvg369.toFixed(1)} weighted lines — ${Math.round(revAvg369 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The story's disclosures are lingered on and over-explained. A revelation lands hardest when it arrives clean and the audience is left to feel its implications; a scene that sprawls spells the truth out and re-states it until the impact dissolves into exposition.`,
+          suggestedFix: 'Compress revelation scenes to the moment of disclosure and its immediate charge: deliver the truth, hold on the reaction, and cut before the scene starts explaining what the audience already grasps. The power of a reveal is in what it implies, not in how thoroughly it is unpacked.',
+        });
+      }
+    }
+  }
+
+  // PAYOFF_SCENE_BLOAT (minor, n≥8, ≥2 payoff scenes): Scenes that fire a payoff
+  // (payoffSetupIds non-empty) average above 1.5× the overall scene length — callbacks are
+  // belabored. A payoff is most satisfying when it snaps shut: the audience recognizes the
+  // planted thread and feels the click of completion. When the payoff scene sprawls, the
+  // connection is over-drawn and the pleasure of recognition is replaced by the tedium of
+  // being walked through it. The complement of PAYOFF_SCENE_UNDERWEIGHT (payoff scenes
+  // below 60% — resolutions rushed): this fires on the opposite failure.
+  if (records.length >= 8) {
+    const payoffLengths369: number[] = [];
+    for (let i369p = 0; i369p < records.length; i369p++) {
+      if ((((records as any[])[i369p].payoffSetupIds ?? []) as any[]).length > 0) {
+        payoffLengths369.push(sceneLengths.get(i369p) ?? 0);
+      }
+    }
+    if (payoffLengths369.length >= 2) {
+      const payoffAvg369 = payoffLengths369.reduce((s, v) => s + v, 0) / payoffLengths369.length;
+      if (payoffAvg369 > avgLength * 1.5) {
+        issues.push({
+          location: `${payoffLengths369.length} payoff scene(s)`,
+          rule: 'PAYOFF_SCENE_BLOAT',
+          severity: 'minor',
+          description: `The ${payoffLengths369.length} payoff scene(s) average ${payoffAvg369.toFixed(1)} weighted lines — ${Math.round(payoffAvg369 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The story's callbacks are belabored. A payoff is most satisfying when it snaps shut — the audience recognizes the planted thread and feels the click of completion; a scene that sprawls over-draws the connection and trades the pleasure of recognition for the tedium of being walked through it.`,
+          suggestedFix: 'Tighten payoff scenes to the beat of recognition: let the callback land and trust the audience to feel the connection without it being explained. The satisfaction of a payoff is in the click of "of course"; over-explaining the setup-to-payoff link smothers exactly the recognition that makes it land.',
         });
       }
     }

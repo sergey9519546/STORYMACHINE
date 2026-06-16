@@ -20110,6 +20110,68 @@ He looks away.`;
     });
   });
 
+  describe('Wave 369 — pacingPass: clock scene underweight, revelation scene bloat, payoff scene bloat', async () => {
+    const makeRec369 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain369 = (lineCounts: number[]) =>
+      lineCounts.map((n, i) =>
+        `INT. SC${i} - DAY\n\n${Array.from({ length: n }, (_, j) => `Action line ${j + 1} for scene ${i}.`).join('\n\n')}`
+      ).join('\n\n');
+    const runP369 = async (records: any[], fountain: string) => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      return pacingPass({ fountain, original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CLOCK_SCENE_UNDERWEIGHT fires when clock-raise scenes run far below average length', async () => {
+      const lc369c = [10, 10, 2, 10, 10, 2, 10, 10];
+      const recs369c = Array.from({ length: 8 }, (_, i) => makeRec369(i, { clockRaised: [2, 5].includes(i) }));
+      const res = await runP369(recs369c, makeFountain369(lc369c));
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_SCENE_UNDERWEIGHT'), 'CLOCK_SCENE_UNDERWEIGHT should fire');
+    });
+
+    it('CLOCK_SCENE_UNDERWEIGHT does not fire when clock-raise scenes are average length', async () => {
+      const lc369cn = [10, 10, 10, 10, 10, 10, 10, 10];
+      const recs369cn = Array.from({ length: 8 }, (_, i) => makeRec369(i, { clockRaised: [2, 5].includes(i) }));
+      const res = await runP369(recs369cn, makeFountain369(lc369cn));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_SCENE_UNDERWEIGHT'), 'CLOCK_SCENE_UNDERWEIGHT should not fire');
+    });
+
+    it('REVELATION_SCENE_BLOAT fires when revelation scenes run far above average length', async () => {
+      const lc369r = [4, 4, 20, 4, 4, 20, 4, 4];
+      const recs369r = Array.from({ length: 8 }, (_, i) => makeRec369(i, { revelation: [2, 5].includes(i) ? 'the hidden truth' : null }));
+      const res = await runP369(recs369r, makeFountain369(lc369r));
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_SCENE_BLOAT'), 'REVELATION_SCENE_BLOAT should fire');
+    });
+
+    it('REVELATION_SCENE_BLOAT does not fire when revelation scenes are average length', async () => {
+      const lc369rn = [10, 10, 10, 10, 10, 10, 10, 10];
+      const recs369rn = Array.from({ length: 8 }, (_, i) => makeRec369(i, { revelation: [2, 5].includes(i) ? 'the hidden truth' : null }));
+      const res = await runP369(recs369rn, makeFountain369(lc369rn));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_SCENE_BLOAT'), 'REVELATION_SCENE_BLOAT should not fire');
+    });
+
+    it('PAYOFF_SCENE_BLOAT fires when payoff scenes run far above average length', async () => {
+      const lc369p = [4, 4, 20, 4, 4, 20, 4, 4];
+      const recs369p = Array.from({ length: 8 }, (_, i) => makeRec369(i, { payoffSetupIds: [2, 5].includes(i) ? [`setup${i}`] : [] }));
+      const res = await runP369(recs369p, makeFountain369(lc369p));
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_SCENE_BLOAT'), 'PAYOFF_SCENE_BLOAT should fire');
+    });
+
+    it('PAYOFF_SCENE_BLOAT does not fire when payoff scenes are average length', async () => {
+      const lc369pn = [10, 10, 10, 10, 10, 10, 10, 10];
+      const recs369pn = Array.from({ length: 8 }, (_, i) => makeRec369(i, { payoffSetupIds: [2, 5].includes(i) ? [`setup${i}`] : [] }));
+      const res = await runP369(recs369pn, makeFountain369(lc369pn));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_SCENE_BLOAT'), 'PAYOFF_SCENE_BLOAT should not fire');
+    });
+  });
+
   describe('Wave 355 — pacingPass: suspense peak scene underweight, seed scene bloat, stakes scene underweight', async () => {
     const makeRec355 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
