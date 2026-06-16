@@ -32,6 +32,12 @@
 // half carried emotion — arc runs out of fuel), emotional recovery absent (≥2 falls and joy
 // exists but none after the first fall — relentless downslope), relational first-half flat
 // (no bond shift in the front half while the back half moves bonds — late relational start).
+// Wave 365 additions: peak suspense emotion absent (the single highest-suspense scene is
+// emotionally neutral while the protagonist shows emotion elsewhere — the tension peak leaves
+// them unmoved), peak curiosity emotion absent (the single highest-curiosity scene is neutral
+// while emotion exists elsewhere — the intrigue peak doesn't move them), relational shift
+// emotion flat (every relationship-shift scene is emotionally neutral — bonds move but the
+// protagonist registers no feeling about any of them).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1296,6 +1302,78 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Move a relationship early: let a bond warm, fray, or shift in the first half so the audience has a relational stake before the midpoint. The connections the back half puts under pressure land harder when the first half has already made the audience care about them.',
         });
       }
+    }
+  }
+
+  // ── Wave 365: ARC_PEAK_SUSPENSE_EMOTION_ABSENT, ARC_PEAK_CURIOSITY_EMOTION_ABSENT, ARC_RELATIONAL_SHIFT_EMOTION_FLAT ──
+
+  // ARC_PEAK_SUSPENSE_EMOTION_ABSENT (minor, n≥8, maxSuspense>1, emotion exists
+  // elsewhere): The single scene with the highest suspenseDelta carries a neutral
+  // emotional shift, even though the protagonist shows emotion in at least one other
+  // scene. The story's most tense moment leaves the protagonist unmoved — at the
+  // peak of danger, the character feels nothing. Distinct from ARC_SUSPENSE_EMOTION_
+  // DECOUPLED (which requires ALL ≥3 high-suspense scenes to be neutral; this fires
+  // on the single peak even when other high-suspense scenes carry emotion).
+  if (records.length >= 8) {
+    const maxSuspense365 = Math.max(...(records as any[]).map(r => r.suspenseDelta ?? 0));
+    const emotionExists365 = (records as any[]).some(r => r.emotionalShift !== 'neutral');
+    if (maxSuspense365 > 1 && emotionExists365) {
+      const peakSusp365 = (records as any[]).find(r => (r.suspenseDelta ?? 0) === maxSuspense365);
+      if (peakSusp365 && peakSusp365.emotionalShift === 'neutral') {
+        issues.push({
+          location: `Scene ${peakSusp365.sceneIdx} — peak suspense (${maxSuspense365.toFixed(2)})`,
+          rule: 'ARC_PEAK_SUSPENSE_EMOTION_ABSENT',
+          severity: 'minor',
+          description: `The story's highest-suspense scene (Scene ${peakSusp365.sceneIdx}, suspenseDelta ${maxSuspense365.toFixed(2)}) carries a neutral emotional shift, even though the protagonist shows emotion in other scenes. At the single most tense moment of the story, the character feels nothing — the danger spikes but never touches them, so the audience experiences the peak as plot mechanics rather than as a crisis for someone they care about.`,
+          suggestedFix: "Charge the peak-suspense scene emotionally: the moment of maximum danger should be the moment the protagonist feels the most — terror, desperate resolve, the cost of what's at risk. The story's tensest scene is the worst possible place for the character to be a neutral observer.",
+        });
+      }
+    }
+  }
+
+  // ARC_PEAK_CURIOSITY_EMOTION_ABSENT (minor, n≥8, maxCuriosity>1, emotion exists
+  // elsewhere): The single scene with the highest curiosityDelta carries a neutral
+  // emotional shift, even though the protagonist shows emotion in at least one other
+  // scene. The story's most intriguing moment — where the audience most wants to know
+  // what happens — leaves the protagonist emotionally flat. Intrigue that doesn't move
+  // the character reads as a puzzle rather than a stake. Distinct from ARC_CURIOSITY_
+  // EMOTION_DECOUPLED (which requires ALL ≥3 high-curiosity scenes neutral; this fires
+  // on the single peak) and ARC_PEAK_SUSPENSE_EMOTION_ABSENT (suspense channel).
+  if (records.length >= 8) {
+    const maxCuriosity365 = Math.max(...(records as any[]).map(r => r.curiosityDelta ?? 0));
+    const emotionExists365b = (records as any[]).some(r => r.emotionalShift !== 'neutral');
+    if (maxCuriosity365 > 1 && emotionExists365b) {
+      const peakCur365 = (records as any[]).find(r => (r.curiosityDelta ?? 0) === maxCuriosity365);
+      if (peakCur365 && peakCur365.emotionalShift === 'neutral') {
+        issues.push({
+          location: `Scene ${peakCur365.sceneIdx} — peak curiosity (${maxCuriosity365.toFixed(2)})`,
+          rule: 'ARC_PEAK_CURIOSITY_EMOTION_ABSENT',
+          severity: 'minor',
+          description: `The story's highest-curiosity scene (Scene ${peakCur365.sceneIdx}, curiosityDelta ${maxCuriosity365.toFixed(2)}) carries a neutral emotional shift, even though the protagonist shows emotion elsewhere. At the moment the audience is most urgently wondering what happens next, the character feels nothing — the intrigue spikes but never lands as a personal stake, so the peak plays as a puzzle to solve rather than a crisis to dread or hope through.`,
+          suggestedFix: "Tie the peak-curiosity moment to the protagonist's emotional life: the question the audience is most desperate to answer should also be the one the character most fears or most hopes for. Intrigue becomes drama when the unknown threatens or promises something the protagonist feels.",
+        });
+      }
+    }
+  }
+
+  // ARC_RELATIONAL_SHIFT_EMOTION_FLAT (minor, n≥8, ≥3 relationship-shift scenes):
+  // Every scene that carries a relationship shift is emotionally neutral — the
+  // protagonist's bonds move (warm, cool, fracture, repair) but they register no
+  // feeling about any of it. The relational arc proceeds as a ledger of status
+  // changes rather than as lived experience. Distinct from relationship-arc.ts's
+  // RELATIONSHIP_RUPTURE_EMOTION_FLAT (negative shifts only) and WARMTH_UNFELT
+  // (strong positive shifts only): this audits the protagonist's emotional response
+  // to ALL relationship movement regardless of direction, from the character-arc side.
+  if (records.length >= 8) {
+    const shiftScenes365 = (records as any[]).filter(r => ((r.relationshipShifts ?? []) as any[]).length > 0);
+    if (shiftScenes365.length >= 3 && shiftScenes365.every(r => r.emotionalShift === 'neutral')) {
+      issues.push({
+        location: `${shiftScenes365.length} relationship-shift scene(s) — emotional register`,
+        rule: 'ARC_RELATIONAL_SHIFT_EMOTION_FLAT',
+        severity: 'minor',
+        description: `All ${shiftScenes365.length} scenes where a relationship shifts are emotionally neutral — the protagonist's bonds warm, cool, or fracture, but they register no feeling about any of it. The relational arc proceeds as a ledger of status changes rather than as lived experience, so the audience tracks who-relates-to-whom without ever feeling the weight of those connections changing on the person at the center.`,
+        suggestedFix: 'Let relationship changes move the protagonist emotionally: a warming bond should bring relief or hope, a cooling one unease or grief. When every relational shift lands in a neutral scene, the bonds read as plot bookkeeping; pair them with the protagonist\'s felt reaction so the relationships matter to the audience because they matter to the character.',
+      });
     }
   }
 

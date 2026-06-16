@@ -18404,6 +18404,90 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 365 — characterArcPass: peak suspense emotion absent, peak curiosity emotion absent, relational shift emotion flat', async () => {
+    const makeRec365 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runA365 = async (records: any[]) => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    const relShift365 = [{ pairKey: 'A|B', dimension: 'trust', amount: 0.5 }];
+
+    it('ARC_PEAK_SUSPENSE_EMOTION_ABSENT fires when the highest-suspense scene is neutral while emotion exists elsewhere', async () => {
+      // scene 3 has peak suspenseDelta=3 (neutral); scene 1 is emotionally charged
+      const recs365ps = Array.from({ length: 8 }, (_, i) =>
+        makeRec365(i, {
+          suspenseDelta: i === 3 ? 3 : 0,
+          emotionalShift: i === 1 ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runA365(recs365ps);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_PEAK_SUSPENSE_EMOTION_ABSENT'), 'ARC_PEAK_SUSPENSE_EMOTION_ABSENT should fire');
+    });
+
+    it('ARC_PEAK_SUSPENSE_EMOTION_ABSENT does not fire when the peak-suspense scene carries emotion', async () => {
+      const recs365psni = Array.from({ length: 8 }, (_, i) =>
+        makeRec365(i, {
+          suspenseDelta: i === 3 ? 3 : 0,
+          emotionalShift: i === 3 ? 'negative' : i === 1 ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runA365(recs365psni);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_PEAK_SUSPENSE_EMOTION_ABSENT'), 'ARC_PEAK_SUSPENSE_EMOTION_ABSENT should not fire');
+    });
+
+    it('ARC_PEAK_CURIOSITY_EMOTION_ABSENT fires when the highest-curiosity scene is neutral while emotion exists elsewhere', async () => {
+      const recs365pc = Array.from({ length: 8 }, (_, i) =>
+        makeRec365(i, {
+          curiosityDelta: i === 4 ? 3 : 0,
+          emotionalShift: i === 1 ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runA365(recs365pc);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_PEAK_CURIOSITY_EMOTION_ABSENT'), 'ARC_PEAK_CURIOSITY_EMOTION_ABSENT should fire');
+    });
+
+    it('ARC_PEAK_CURIOSITY_EMOTION_ABSENT does not fire when the peak-curiosity scene carries emotion', async () => {
+      const recs365pcni = Array.from({ length: 8 }, (_, i) =>
+        makeRec365(i, {
+          curiosityDelta: i === 4 ? 3 : 0,
+          emotionalShift: i === 4 ? 'positive' : i === 1 ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runA365(recs365pcni);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_PEAK_CURIOSITY_EMOTION_ABSENT'), 'ARC_PEAK_CURIOSITY_EMOTION_ABSENT should not fire');
+    });
+
+    it('ARC_RELATIONAL_SHIFT_EMOTION_FLAT fires when every relationship-shift scene is emotionally neutral', async () => {
+      // scenes 2,4,6 carry relationship shifts, all neutral
+      const recs365rs = Array.from({ length: 8 }, (_, i) =>
+        makeRec365(i, {
+          relationshipShifts: [2, 4, 6].includes(i) ? relShift365 : [],
+        }),
+      );
+      const res = await runA365(recs365rs);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_SHIFT_EMOTION_FLAT'), 'ARC_RELATIONAL_SHIFT_EMOTION_FLAT should fire');
+    });
+
+    it('ARC_RELATIONAL_SHIFT_EMOTION_FLAT does not fire when a relationship-shift scene carries emotion', async () => {
+      const recs365rsni = Array.from({ length: 8 }, (_, i) =>
+        makeRec365(i, {
+          relationshipShifts: [2, 4, 6].includes(i) ? relShift365 : [],
+          emotionalShift: i === 4 ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runA365(recs365rsni);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_SHIFT_EMOTION_FLAT'), 'ARC_RELATIONAL_SHIFT_EMOTION_FLAT should not fire');
+    });
+  });
+
   describe('Wave 351 — characterArcPass: second half emotionally flat, emotional recovery absent, relational first-half flat', async () => {
     const makeRec351 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
