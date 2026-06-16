@@ -4,3 +4,6 @@
 ## 2024-05-19 - [O(N) Rendering Latency Bottleneck in Fountain Highlighting]
 **Learning:** Found an unexpected O(N^2) memory scaling issue caused by `text.split("\n")` being mapped into a massive dictionary (`lineClasses`) and then mapped *again* to create React elements. This double-allocation strategy causes measurable frame stuttering when typing in large scripts since it executes completely synchronously on the main thread during high-frequency render events.
 **Action:** When parsing hierarchical document structures to flat nodes (like text lines), always prefer mapping directly over the parsed AST (e.g. `blocks`) to generate React Elements instead of building intermediate hash maps or re-splitting raw strings.
+## 2025-02-28 - ⚡ Bolt: Performance Improvement in ScriptIDE component
+**Learning:** Found more instances of String.prototype.split() in high-frequency paths in ScriptIDE, particularly `renderHighlightedText`, `handleKeyDown` and `handleNavigate`.
+**Action:** Replaced them with zero-allocation character code loops and string index methods like `indexOf` and `lastIndexOf` to prevent garbage collection spikes during keystroke updates.
