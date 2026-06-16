@@ -32,6 +32,11 @@
 // Wave 329 additions: relationship revelation silent (no revelation scene contains a
 // bond shift), pair early-peak majority (>60% of pairs peak in the first 30%),
 // relationship suspense decoupled (shift scenes avg suspenseDelta ≤ 0).
+// Wave 343 additions: relationship rupture emotion flat (every negative-shift scene is
+// emotionally neutral — the negative counterpart to warmth unfelt), relationship global
+// amplitude frontload (story-wide first-half shift magnitude > 1.5× second-half — ensemble
+// intensity front-loads), relationship shift drought (the longest contiguous no-shift run
+// spans ≥40% of the story — relational silence anywhere, not just a named act zone).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1212,6 +1217,100 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
           suggestedFix: "Let relationship shifts raise stakes: a trust rupture should make the audience fear what comes next; a sudden warmth should feel precarious rather than safe. Bond changes should tighten the audience's grip on the story, not relax it.",
         });
       }
+    }
+  }
+
+  // ── Wave 343: RELATIONSHIP_RUPTURE_EMOTION_FLAT, RELATIONSHIP_GLOBAL_AMPLITUDE_FRONTLOAD, RELATIONSHIP_SHIFT_DROUGHT ──
+
+  // RELATIONSHIP_RUPTURE_EMOTION_FLAT (minor, n≥8, ≥3 rupture scenes): Every scene
+  // that carries a negative relationship shift (amount ≤ -0.3) is emotionally neutral.
+  // Bonds break, but the protagonist registers no feeling — the rupture is logged as a
+  // plot fact rather than experienced as a loss. The negative-shift counterpart to
+  // WARMTH_UNFELT (which audits strong positive shifts in neutral scenes); distinct also
+  // from RELATIONSHIP_SUSPENSE_DECOUPLED and RELATIONSHIP_CURIOSITY_DECOUPLED (those audit
+  // all shift scenes on the suspense/curiosity channels, not negative shifts on emotion).
+  if (records.length >= 8) {
+    const ruptureScenes343 = (records as any[]).filter(r =>
+      ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+    );
+    if (ruptureScenes343.length >= 3 && ruptureScenes343.every(r => r.emotionalShift === 'neutral')) {
+      issues.push({
+        location: 'Relational rupture scenes — emotional register',
+        rule: 'RELATIONSHIP_RUPTURE_EMOTION_FLAT',
+        severity: 'minor',
+        description: `All ${ruptureScenes343.length} scenes that fracture a bond (negative relationship shift) are emotionally neutral — the ruptures are logged as plot facts rather than experienced as losses. When a relationship breaks and the protagonist feels nothing, the audience feels nothing: the cost of the broken bond never lands, so the rupture is information rather than drama.`,
+        suggestedFix: 'Let bond ruptures wound: a betrayal should bring anger or grief, a severed alliance should cost the protagonist visibly. Pair at least the major negative shifts with an emotional beat so the audience feels the relationship breaking, not just learns that it broke.',
+      });
+    }
+  }
+
+  // RELATIONSHIP_GLOBAL_AMPLITUDE_FRONTLOAD (minor, n≥10, ≥2 shifts each half): Across
+  // the whole ensemble, the average magnitude of relationship shifts in the first half
+  // exceeds 1.5× the average magnitude in the second half. The story's biggest relational
+  // swings all land early, and the back half coasts on smaller movements into the climax.
+  // Distinct from RELATIONSHIP_AMPLITUDE_DECAY (per-pair, requires one pair with ≥4 shifts)
+  // — this aggregates every pair, so it fires on ensembles where no single pair has enough
+  // shifts to trip the per-pair check — and from PAIR_EARLY_PEAK_MAJORITY (per-pair peak
+  // location, not story-wide magnitude averages).
+  if (records.length >= 10) {
+    const allShifts343: number[] = [];
+    const firstHalfMags343: number[] = [];
+    const secondHalfMags343: number[] = [];
+    const mid343 = Math.floor(records.length * 0.5);
+    for (const stats of pairStats.values()) {
+      for (const sh of stats.shifts) {
+        allShifts343.push(Math.abs(sh.amount));
+        if (sh.sceneIdx < mid343) firstHalfMags343.push(Math.abs(sh.amount));
+        else secondHalfMags343.push(Math.abs(sh.amount));
+      }
+    }
+    if (firstHalfMags343.length >= 2 && secondHalfMags343.length >= 2) {
+      const firstAvg343 = firstHalfMags343.reduce((s, m) => s + m, 0) / firstHalfMags343.length;
+      const secondAvg343 = secondHalfMags343.reduce((s, m) => s + m, 0) / secondHalfMags343.length;
+      if (secondAvg343 > 0 && firstAvg343 > 1.5 * secondAvg343) {
+        issues.push({
+          location: `Relational intensity — first half avg ${firstAvg343.toFixed(2)} vs second half avg ${secondAvg343.toFixed(2)}`,
+          rule: 'RELATIONSHIP_GLOBAL_AMPLITUDE_FRONTLOAD',
+          severity: 'minor',
+          description: `Across the whole ensemble, relationship shifts in the first half average ${firstAvg343.toFixed(2)} in magnitude versus ${secondAvg343.toFixed(2)} in the second half — the biggest relational swings all land early. The back half coasts on smaller movements into the climax, so the story's relational intensity peaks before its dramatic stakes do and the ending inherits bonds that have already done their loudest moving.`,
+          suggestedFix: "Reserve some of the largest relational swings for the back half: a climactic betrayal, a hard-won reconciliation, a power inversion at the worst possible moment. The ensemble's most consequential bond movements should escalate toward the climax, not be spent in the opening movement.",
+        });
+      }
+    }
+  }
+
+  // RELATIONSHIP_SHIFT_DROUGHT (minor, n≥10, ≥4 total shifts): The longest contiguous
+  // run of scenes carrying no relationship shift spans at least 40% of the story. For a
+  // long stretch — wherever it falls — the relational engine goes completely silent, so
+  // the audience loses track of the bonds while the plot continues. Distinct from
+  // RELATIONSHIP_MIDPOINT_FREEZE (a fixed middle-50% window), RELATIONSHIP_VELOCITY_
+  // COLLAPSE (no shifts in the entire second half), and RELATIONSHIP_THIRD_ACT_
+  // ESCALATION_ABSENT (final-25% zone): this is a sliding max-gap measure that catches a
+  // drought straddling any act boundary, which the fixed-zone checks miss.
+  if (records.length >= 10 && totalShifts >= 4) {
+    let run343 = 0;
+    let runStart343 = 0;
+    let maxRun343 = 0;
+    let maxStart343 = 0;
+    for (let i343 = 0; i343 < records.length; i343++) {
+      if (((records as any[])[i343].relationshipShifts ?? []).length === 0) {
+        if (run343 === 0) runStart343 = i343;
+        run343++;
+        if (run343 > maxRun343) { maxRun343 = run343; maxStart343 = runStart343; }
+      } else {
+        run343 = 0;
+      }
+    }
+    if (maxRun343 >= Math.ceil(records.length * 0.4)) {
+      const s343 = (records as any[])[maxStart343].sceneIdx;
+      const e343 = (records as any[])[maxStart343 + maxRun343 - 1].sceneIdx;
+      issues.push({
+        location: `Scenes ${s343}–${e343} — relational silence`,
+        rule: 'RELATIONSHIP_SHIFT_DROUGHT',
+        severity: 'minor',
+        description: `The longest stretch with no relationship movement runs ${maxRun343} consecutive scenes (${s343}–${e343}), spanning ${Math.round(maxRun343 / records.length * 100)}% of the story. For this whole span the relational engine goes silent — bonds neither warm nor cool while the plot continues — so the audience loses the thread of the characters' connections at exactly the length where it should be deepening.`,
+        suggestedFix: 'Thread relational movement through the drought: even a small beat — a flicker of trust, a quiet friction, a shift in who relies on whom — keeps the bonds alive across the stretch. A long run with no relational change makes the middle of the story feel like plot happening to strangers.',
+      });
     }
   }
 

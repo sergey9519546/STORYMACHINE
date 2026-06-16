@@ -21694,6 +21694,88 @@ He stares at the floor.`;
     });
   });
 
+  describe('Wave 343 — relationshipArcPass: rupture emotion flat, global amplitude frontload, shift drought', async () => {
+    const makeRec343 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const shift343 = (pairKey: string, amount: number) => ({ pairKey, dimension: 'trust', amount });
+    const runRA343 = async (records: any[]) => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('RELATIONSHIP_RUPTURE_EMOTION_FLAT fires when every negative-shift scene is emotionally neutral', async () => {
+      const recs343re = Array.from({ length: 8 }, (_, i) =>
+        makeRec343(i, { relationshipShifts: [1, 3, 5].includes(i) ? [shift343('A|B', -0.5)] : [] })
+      );
+      const res = await runRA343(recs343re);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_RUPTURE_EMOTION_FLAT'), 'RELATIONSHIP_RUPTURE_EMOTION_FLAT should fire');
+    });
+
+    it('RELATIONSHIP_RUPTURE_EMOTION_FLAT does not fire when a rupture scene carries emotion', async () => {
+      const recs343ren = Array.from({ length: 8 }, (_, i) =>
+        makeRec343(i, {
+          relationshipShifts: [1, 3, 5].includes(i) ? [shift343('A|B', -0.5)] : [],
+          emotionalShift: i === 3 ? 'negative' : 'neutral',
+        })
+      );
+      const res = await runRA343(recs343ren);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_RUPTURE_EMOTION_FLAT'), 'RELATIONSHIP_RUPTURE_EMOTION_FLAT should not fire');
+    });
+
+    it('RELATIONSHIP_GLOBAL_AMPLITUDE_FRONTLOAD fires when first-half shifts dwarf second-half shifts', async () => {
+      const recs343af = Array.from({ length: 10 }, (_, i) =>
+        makeRec343(i, {
+          relationshipShifts:
+            i === 1 ? [shift343('A|B', 4)] :
+            i === 2 ? [shift343('A|B', 4)] :
+            i === 6 ? [shift343('C|D', 1)] :
+            i === 7 ? [shift343('C|D', 1)] : [],
+        })
+      );
+      const res = await runRA343(recs343af);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_GLOBAL_AMPLITUDE_FRONTLOAD'), 'RELATIONSHIP_GLOBAL_AMPLITUDE_FRONTLOAD should fire');
+    });
+
+    it('RELATIONSHIP_GLOBAL_AMPLITUDE_FRONTLOAD does not fire when magnitudes are even across halves', async () => {
+      const recs343afn = Array.from({ length: 10 }, (_, i) =>
+        makeRec343(i, {
+          relationshipShifts:
+            i === 1 ? [shift343('A|B', 2)] :
+            i === 2 ? [shift343('A|B', 2)] :
+            i === 6 ? [shift343('C|D', 2)] :
+            i === 7 ? [shift343('C|D', 2)] : [],
+        })
+      );
+      const res = await runRA343(recs343afn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_GLOBAL_AMPLITUDE_FRONTLOAD'), 'RELATIONSHIP_GLOBAL_AMPLITUDE_FRONTLOAD should not fire');
+    });
+
+    it('RELATIONSHIP_SHIFT_DROUGHT fires when the longest no-shift run spans ≥40% of the story', async () => {
+      const recs343dr = Array.from({ length: 10 }, (_, i) =>
+        makeRec343(i, { relationshipShifts: [0, 1, 8, 9].includes(i) ? [shift343('A|B', 0.5)] : [] })
+      );
+      // scenes 2-7 (6 consecutive) carry no shift — 60% of the story
+      const res = await runRA343(recs343dr);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_DROUGHT'), 'RELATIONSHIP_SHIFT_DROUGHT should fire');
+    });
+
+    it('RELATIONSHIP_SHIFT_DROUGHT does not fire when shifts are evenly distributed', async () => {
+      const recs343drn = Array.from({ length: 10 }, (_, i) =>
+        makeRec343(i, { relationshipShifts: [0, 3, 6, 9].includes(i) ? [shift343('A|B', 0.5)] : [] })
+      );
+      // longest no-shift run is 2 scenes
+      const res = await runRA343(recs343drn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_DROUGHT'), 'RELATIONSHIP_SHIFT_DROUGHT should not fire');
+    });
+  });
+
   describe('Wave 329 — relationshipArcPass: revelation silent, pair early-peak majority, suspense decoupled', async () => {
     const makeRec329 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
