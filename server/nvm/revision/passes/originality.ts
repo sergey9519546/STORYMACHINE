@@ -29,6 +29,9 @@
 // dramatized), beat direction overuse (≥4 standalone "(beat)" parentheticals — the
 // single most overused stage direction), smash cut overuse (≥3 dramatic cut transitions
 // like "SMASH CUT TO:"/"HARD CUT TO:" — directorial punctuation leaned on for impact).
+// Wave 354 additions: fade transition overuse (≥4 FADE/DISSOLVE soft transitions),
+// dream sequence crutch (≥2 labeled dream/fantasy sequences), intercut overuse (≥3
+// "INTERCUT" markers — cross-cutting to manufacture momentum scenes lack).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1560,6 +1563,70 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${smashCount340} emphatic cut transitions ("SMASH CUT TO:", "HARD CUT TO:", "MATCH CUT TO:") appear in the script. A plain "CUT TO:" is invisible standard formatting; the emphatic variants are editorial punctuation meant to jolt the reader. Sprinkled throughout, they stop jolting and start reading as the writer shouting for an impact the scenes should generate on their own — the transition is asked to carry a charge the cut-from and cut-to images have not built.`,
         suggestedFix: 'Reserve a SMASH CUT for the one or two transitions whose collision genuinely lands a shock, and let the rest be ordinary cuts. Impact comes from the contrast between what precedes and follows the cut, not from the capitalized label; build the jolt into the juxtaposition of images and the transition will feel hard without being announced.',
+      });
+    }
+  }
+
+  // ── Wave 354: FADE_TRANSITION_OVERUSE ────────────────────────────────────
+  // Four or more soft-transition markers ("FADE IN", "FADE OUT", "FADE TO BLACK",
+  // "DISSOLVE TO", "CROSS DISSOLVE"). A FADE IN to open and a FADE OUT to close are
+  // standard; beyond that, fades and dissolves are the writer punctuating their own
+  // structure — each soft transition tells the reader "time passes / mood shifts" rather
+  // than letting the scenes imply it. A script full of fades reads as a string of vignettes
+  // smeared together. Distinct from SMASH_CUT_OVERUSE (hard cuts), TIME_CARD_CRUTCH
+  // (caption text), and MONTAGE_CRUTCH.
+  {
+    const fadeRe354 = /^(FADE IN|FADE OUT|FADE TO( BLACK| WHITE)?|FADE UP|DISSOLVE TO|CROSS ?DISSOLVE( TO)?)\s*:?\.?$/i;
+    const fadeCount354 = lines.filter(l => fadeRe354.test(l.trim())).length;
+    if (fadeCount354 >= 4) {
+      issues.push({
+        location: `${fadeCount354} fade/dissolve transitions`,
+        rule: 'FADE_TRANSITION_OVERUSE',
+        severity: 'minor',
+        description: `${fadeCount354} soft-transition markers ("FADE IN", "FADE OUT", "DISSOLVE TO") appear in the script. A FADE IN to open and a FADE OUT to close are standard; beyond that, fades and dissolves are the writer punctuating their own structure, each one telling the reader "time passes" or "mood shifts" rather than letting the scenes imply it. A script full of fades reads as a string of vignettes smeared together instead of a continuous drama.`,
+        suggestedFix: 'Keep the opening FADE IN and closing FADE OUT and cut the rest. Let scenes hard-cut into one another and trust the change of location, time-of-day, or circumstance to signal the transition; reserve a dissolve for the rare moment the soft blur itself carries meaning.',
+      });
+    }
+  }
+
+  // ── Wave 354: DREAM_SEQUENCE_CRUTCH ──────────────────────────────────────
+  // Two or more explicit dream/fantasy/nightmare sequence markers. A labeled unreality
+  // sequence is a device for externalizing interior states; used more than once it becomes
+  // a crutch for delivering symbolism or backstory the waking story should dramatize, and
+  // it repeatedly suspends the stakes (nothing in a dream is real). Distinct from JUST_A_
+  // DREAM_REVEAL (events retroactively dismissed as a dream) and FLASHBACK_CRUTCH (past-
+  // event inserts): this fires on explicitly labeled dream/fantasy sequences.
+  {
+    const dreamRe354 = /\b(dream sequence|fantasy sequence|nightmare sequence|begin dream|end dream)\b/i;
+    const dreamCount354 = lines.filter(l => dreamRe354.test(l.trim())).length;
+    if (dreamCount354 >= 2) {
+      issues.push({
+        location: `${dreamCount354} dream/fantasy sequence markers`,
+        rule: 'DREAM_SEQUENCE_CRUTCH',
+        severity: 'minor',
+        description: `${dreamCount354} explicit dream, fantasy, or nightmare sequence markers appear in the script. A labeled unreality sequence externalizes interior states, but leaned on repeatedly it becomes a crutch for delivering symbolism or backstory the waking story should dramatize — and each one suspends the stakes, since nothing inside a dream is real. The audience learns to discount whatever happens once the label appears.`,
+        suggestedFix: 'Keep at most one dream/fantasy sequence and externalize the rest through waking behavior: the fear a nightmare would show can surface as a waking flinch, an avoided room, a compulsive habit. Interior life reads strongest when it leaks into real action with real consequences, not when it is quarantined in a sequence the audience knows does not count.',
+      });
+    }
+  }
+
+  // ── Wave 354: INTERCUT_OVERUSE ───────────────────────────────────────────
+  // Three or more "INTERCUT" markers. Intercutting is a powerful tool for parallel
+  // action (a phone call, a race against a clock), but heavy reliance on it is a tell that
+  // scenes cannot stand on their own — the writer keeps cross-cutting to manufacture
+  // momentum that individual scenes lack, and the audience is shuttled between locations
+  // rather than allowed to settle into any of them. Distinct from MONTAGE_CRUTCH (compressed
+  // time) and SMASH_CUT_OVERUSE (single hard transitions).
+  {
+    const intercutRe354 = /\bintercut\b/i;
+    const intercutCount354 = lines.filter(l => intercutRe354.test(l.trim())).length;
+    if (intercutCount354 >= 3) {
+      issues.push({
+        location: `${intercutCount354} intercut markers`,
+        rule: 'INTERCUT_OVERUSE',
+        severity: 'minor',
+        description: `${intercutCount354} "INTERCUT" markers appear in the script. Intercutting is powerful for genuine parallel action, but heavy reliance on it signals that scenes cannot stand on their own — the writer keeps cross-cutting to manufacture momentum the individual scenes lack, shuttling the audience between locations rather than letting them settle into any one. Pervasive intercutting fragments attention instead of building tension.`,
+        suggestedFix: 'Reserve intercutting for the one or two sequences where the parallel timelines genuinely collide or race each other. Elsewhere, let each scene play to its own end and trust ordinary sequencing; if a scene needs an intercut to stay alive, the scene itself likely needs strengthening.',
       });
     }
   }

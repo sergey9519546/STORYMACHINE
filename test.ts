@@ -19949,6 +19949,139 @@ He looks away.`;
     });
   });
 
+  describe('Wave 354 — originalityPass: fade transition overuse, dream sequence crutch, intercut overuse', async () => {
+    const runO354 = async (fountain: string) => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      return originalityPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('FADE_TRANSITION_OVERUSE fires when four or more fade/dissolve transitions appear', async () => {
+      const f354f = `FADE IN:
+
+INT. ROOM - DAY
+
+She opens the door.
+
+FADE OUT.
+
+INT. HALL - NIGHT
+
+He waits.
+
+DISSOLVE TO:
+
+EXT. STREET - DAY
+
+The crowd moves.
+
+FADE TO BLACK.
+
+INT. CAR - NIGHT
+
+The engine starts.`;
+      const res = await runO354(f354f);
+      assert.ok(res.issues.some((i: any) => i.rule === 'FADE_TRANSITION_OVERUSE'), 'FADE_TRANSITION_OVERUSE should fire');
+    });
+
+    it('FADE_TRANSITION_OVERUSE does not fire with only opening and closing fades', async () => {
+      const f354fn = `FADE IN:
+
+INT. ROOM - DAY
+
+She opens the door.
+
+INT. HALL - NIGHT
+
+He waits.
+
+EXT. STREET - DAY
+
+The crowd moves.
+
+FADE OUT.`;
+      const res = await runO354(f354fn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'FADE_TRANSITION_OVERUSE'), 'FADE_TRANSITION_OVERUSE should not fire');
+    });
+
+    it('DREAM_SEQUENCE_CRUTCH fires when two or more dream sequences appear', async () => {
+      const f354d = `INT. BEDROOM - NIGHT
+
+She closes her eyes.
+
+DREAM SEQUENCE:
+
+She runs through an endless forest.
+
+INT. BEDROOM - DAY
+
+She wakes.
+
+NIGHTMARE SEQUENCE:
+
+The forest burns around her.`;
+      const res = await runO354(f354d);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DREAM_SEQUENCE_CRUTCH'), 'DREAM_SEQUENCE_CRUTCH should fire');
+    });
+
+    it('DREAM_SEQUENCE_CRUTCH does not fire for a single dream sequence', async () => {
+      const f354dn = `INT. BEDROOM - NIGHT
+
+She closes her eyes.
+
+DREAM SEQUENCE:
+
+She runs through an endless forest.
+
+INT. BEDROOM - DAY
+
+She wakes and stares at the ceiling.`;
+      const res = await runO354(f354dn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DREAM_SEQUENCE_CRUTCH'), 'DREAM_SEQUENCE_CRUTCH should not fire');
+    });
+
+    it('INTERCUT_OVERUSE fires when three or more intercut markers appear', async () => {
+      const f354i = `INT. OFFICE - DAY
+
+He dials the phone.
+
+INTERCUT - PHONE CONVERSATION
+
+INT. KITCHEN - DAY
+
+She answers.
+
+INTERCUT WITH:
+
+EXT. ROAD - DAY
+
+The car speeds on.
+
+INTERCUT BETWEEN THE THREE:
+
+They all shout at once.`;
+      const res = await runO354(f354i);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTERCUT_OVERUSE'), 'INTERCUT_OVERUSE should fire');
+    });
+
+    it('INTERCUT_OVERUSE does not fire for a single intercut', async () => {
+      const f354in = `INT. OFFICE - DAY
+
+He dials the phone.
+
+INTERCUT - PHONE CONVERSATION
+
+INT. KITCHEN - DAY
+
+She answers.
+
+EXT. ROAD - DAY
+
+The car speeds on.`;
+      const res = await runO354(f354in);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTERCUT_OVERUSE'), 'INTERCUT_OVERUSE should not fire');
+    });
+  });
+
   describe('Wave 340 — originalityPass: voiceover crutch, beat direction overuse, smash cut overuse', async () => {
     const runO340 = async (fountain: string) => {
       const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
