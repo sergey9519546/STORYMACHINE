@@ -22935,6 +22935,92 @@ Time to go now.`;
     });
   });
 
+  describe('Wave 374 — themePass: Act 1 density drop, clock peak absent, charged scene silent', async () => {
+    const makeRec374 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const THEME374 = 'trust betrayal courage';
+    const runT374 = async (records: any[]) => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: THEME374 },
+      });
+    };
+
+    it('THEME_ACT1_DENSITY_DROP fires when Act 1 resonance is less than half the rest of the story', async () => {
+      // n=12; Act 1 = scenes 0-2 (none resonant); rest 3-11 with 4,5,6 resonant
+      const recs374a1 = Array.from({ length: 12 }, (_, i) =>
+        makeRec374(i, { dialogueHighlights: [4, 5, 6].includes(i) ? ['the courage to trust'] : [] }),
+      );
+      const res = await runT374(recs374a1);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_ACT1_DENSITY_DROP'), 'THEME_ACT1_DENSITY_DROP should fire');
+    });
+
+    it('THEME_ACT1_DENSITY_DROP does not fire when Act 1 carries theme proportionate to the body', async () => {
+      const recs374a1n = Array.from({ length: 12 }, (_, i) =>
+        makeRec374(i, { dialogueHighlights: [1, 4, 5, 6].includes(i) ? ['the courage to trust'] : [] }),
+      );
+      const res = await runT374(recs374a1n);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_ACT1_DENSITY_DROP'), 'THEME_ACT1_DENSITY_DROP should not fire');
+    });
+
+    it('THEME_CLOCK_PEAK_ABSENT fires when the largest-clockDelta scene is thematically silent', async () => {
+      // scene 1 resonant (so block runs); clocks at 2 (delta 1) and 5 (delta 3, peak), neither resonant
+      const recs374ck = Array.from({ length: 8 }, (_, i) =>
+        makeRec374(i, {
+          dialogueHighlights: i === 1 ? ['a moment of courage'] : [],
+          clockRaised: [2, 5].includes(i),
+          clockDelta: i === 2 ? 1 : i === 5 ? 3 : 0,
+        }),
+      );
+      const res = await runT374(recs374ck);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CLOCK_PEAK_ABSENT'), 'THEME_CLOCK_PEAK_ABSENT should fire');
+    });
+
+    it('THEME_CLOCK_PEAK_ABSENT does not fire when the peak deadline carries theme', async () => {
+      const recs374ckn = Array.from({ length: 8 }, (_, i) =>
+        makeRec374(i, {
+          dialogueHighlights: i === 1 ? ['a moment of courage'] : i === 5 ? ['the courage to act'] : [],
+          clockRaised: [2, 5].includes(i),
+          clockDelta: i === 2 ? 1 : i === 5 ? 3 : 0,
+        }),
+      );
+      const res = await runT374(recs374ckn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CLOCK_PEAK_ABSENT'), 'THEME_CLOCK_PEAK_ABSENT should not fire');
+    });
+
+    it('THEME_CHARGED_SCENE_SILENT fires when no non-neutral scene carries theme', async () => {
+      // scene 1 neutral + resonant (block runs); charged scenes 2,4,6 carry no theme
+      const recs374cs = Array.from({ length: 8 }, (_, i) =>
+        makeRec374(i, {
+          dialogueHighlights: i === 1 ? ['a moment of courage'] : [],
+          emotionalShift: i === 2 || i === 6 ? 'negative' : i === 4 ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runT374(recs374cs);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CHARGED_SCENE_SILENT'), 'THEME_CHARGED_SCENE_SILENT should fire');
+    });
+
+    it('THEME_CHARGED_SCENE_SILENT does not fire when a charged scene carries theme', async () => {
+      const recs374csn = Array.from({ length: 8 }, (_, i) =>
+        makeRec374(i, {
+          dialogueHighlights: i === 1 ? ['a moment of courage'] : i === 4 ? ['the courage to stay'] : [],
+          emotionalShift: i === 2 || i === 6 ? 'negative' : i === 4 ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runT374(recs374csn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CHARGED_SCENE_SILENT'), 'THEME_CHARGED_SCENE_SILENT should not fire');
+    });
+  });
+
   describe('Wave 360 — themePass: Act 3 density drop, relationship peak absent, dual peak absent', async () => {
     const makeRec360 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

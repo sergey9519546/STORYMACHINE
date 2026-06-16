@@ -21,6 +21,10 @@
 // largest relationship shift magnitude is thematically silent while others carry theme),
 // dual peak absent (the scene with max combined suspenseDelta + curiosityDelta is
 // thematically mute — peak drama and peak curiosity arrive without the theme).
+// Wave 374 additions: Act 1 density drop (the opening 25% is under-themed vs the body),
+// clock peak absent (the largest-clockDelta deadline is thematically silent — complement
+// of clock scene silent), charged scene silent (no non-neutral emotional scene carries the
+// theme — feeling and meaning never coincide, across both polarities together).
 // Wave 265 additions: clue scenes decoupled (≥2 clue-planting scenes with no theme),
 // curiosity scenes decoupled (≥2 curiosity spikes with no theme), payoff scenes
 // decoupled (≥2 payoff scenes with no theme).
@@ -1496,6 +1500,80 @@ export async function themePass(input: PassInput): Promise<PassResult> {
             suggestedFix: `Bring "${themeRaw}" into the story's peak dramatic moment: when suspense and curiosity crest at the same scene, the thematic stakes should be explicit. The audience's maximum engagement is the most powerful moment to remind them what the story is ultimately about.`,
           });
         }
+      }
+    }
+
+    // ── Wave 374: THEME_ACT1_DENSITY_DROP, THEME_CLOCK_PEAK_ABSENT, THEME_CHARGED_SCENE_SILENT ──
+
+    // THEME_ACT1_DENSITY_DROP (minor, n≥12, ≥2 resonant scenes in the body): Act 1
+    // (the first 25%) has a resonance proportion less than half that of the rest of the
+    // story. The opening under-weights the theme relative to the body, so the audience
+    // spends the setup with little sense of what the story is about and the through-line
+    // is established late. Distinct from THEME_OPENING_SILENT (only the first three
+    // scenes), THEME_LATE_DEBUT (first resonant scene past the midpoint), and THEME_FRONT_
+    // LOADED (the opposite — theme concentrated early): this compares Act 1 density to the
+    // remaining acts.
+    if (records.length >= 12) {
+      const act1End374 = Math.floor(records.length * 0.25);
+      const act1Recs374 = (records as any[]).slice(0, act1End374);
+      const restRecs374 = (records as any[]).slice(act1End374);
+      const act1Resonant374 = act1Recs374.filter((r: any) => sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords)).length;
+      const restResonant374 = restRecs374.filter((r: any) => sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords)).length;
+      if (act1Recs374.length >= 2 && restResonant374 >= 2) {
+        const act1Density374 = act1Resonant374 / act1Recs374.length;
+        const restDensity374 = restResonant374 / restRecs374.length;
+        if (act1Density374 < restDensity374 * 0.5) {
+          issues.push({
+            location: `Act 1 (Scenes 0–${act1End374 - 1}) — thematic density drop`,
+            rule: 'THEME_ACT1_DENSITY_DROP',
+            severity: 'minor',
+            description: `Act 1 is ${Math.round(act1Density374 * 100)}% thematically resonant vs ${Math.round(restDensity374 * 100)}% across the rest of the story — the opening under-weights the theme relative to the body. The audience spends the setup with little sense of what "${themeRaw}" means to the story, so the through-line is established late and the early scenes don't frame the question the rest of the film will explore.`,
+            suggestedFix: `Weave "${themeRaw}" into Act 1 at closer to the density of the later acts: an image, a line, or a choice in the opening that plants the thematic question. The theme the audience meets in the setup is the one they feel pay off in the climax — establish it early enough to matter.`,
+          });
+        }
+      }
+    }
+
+    // THEME_CLOCK_PEAK_ABSENT (minor, n≥8, ≥2 clock scenes): The clock-raising scene
+    // with the largest clockDelta is thematically silent, even though the theme appears
+    // elsewhere. The story's most urgent deadline — the moment time pressure peaks — has
+    // no thematic dimension, so the audience feels the clock without connecting it to what
+    // the story is about. Distinct from THEME_CLOCK_SCENE_SILENT (which fires when ALL
+    // clock scenes are silent — a set check); this isolates the single peak deadline.
+    if (records.length >= 8) {
+      const clockScenes374 = (records as any[]).filter(r => r.clockRaised === true);
+      if (clockScenes374.length >= 2) {
+        const peakClock374 = clockScenes374.reduce((best: any, r: any) =>
+          (r.clockDelta ?? 0) > (best.clockDelta ?? 0) ? r : best, clockScenes374[0]);
+        if (peakClock374 && !sceneHasResonance(sceneTexts.get(peakClock374.sceneIdx) ?? '', expandedKeywords)) {
+          issues.push({
+            location: `Scene ${peakClock374.sceneIdx} — peak deadline (clockDelta ${(peakClock374.clockDelta ?? 0).toFixed(2)})`,
+            rule: 'THEME_CLOCK_PEAK_ABSENT',
+            severity: 'minor',
+            description: `The story's most urgent deadline (Scene ${peakClock374.sceneIdx}, clockDelta ${(peakClock374.clockDelta ?? 0).toFixed(2)}) carries no language related to "${themeRaw}", though the theme appears elsewhere. The moment time pressure peaks has no thematic dimension, so the audience feels the clock tightening without connecting the urgency to what the story is ultimately about — the deadline is mechanical rather than meaningful.`,
+            suggestedFix: `Tie the peak deadline to "${themeRaw}": what thematic value is at stake when this clock runs out? When the most urgent moment of time pressure is also the moment the theme is most threatened, the ticking clock becomes unbearable because what it endangers is meaning, not just outcome.`,
+          });
+        }
+      }
+    }
+
+    // THEME_CHARGED_SCENE_SILENT (minor, n≥8, ≥3 non-neutral scenes): No emotionally
+    // charged scene (emotionalShift ≠ 'neutral') carries the theme, even though the theme
+    // appears elsewhere. The story's feeling and its meaning never coincide — emotion lands
+    // in thematically blank scenes and theme lands in emotionally flat ones. Distinct from
+    // THEME_POSITIVE_SHIFT_SILENT and THEME_NEGATIVE_SHIFT_SILENT (each audits a single
+    // polarity at a ≥2 threshold): this fires across both polarities together, catching
+    // stories where charged scenes exist but neither polarity alone meets its threshold.
+    if (records.length >= 8) {
+      const chargedScenes374 = (records as any[]).filter(r => r.emotionalShift && r.emotionalShift !== 'neutral');
+      if (chargedScenes374.length >= 3 && !chargedScenes374.some((r: any) => sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords))) {
+        issues.push({
+          location: `${chargedScenes374.length} emotionally charged scene(s) — thematically silent`,
+          rule: 'THEME_CHARGED_SCENE_SILENT',
+          severity: 'minor',
+          description: `None of the ${chargedScenes374.length} emotionally charged scenes carries language related to "${themeRaw}", though the theme appears elsewhere — the story's feeling and its meaning never coincide. Emotion lands in thematically blank scenes and the theme surfaces only in emotionally flat ones, so the audience never feels the theme and thinks about it in the same beat.`,
+          suggestedFix: `Fuse emotion and theme: let at least one charged scene also carry "${themeRaw}", so the moment the audience feels something is the moment the thematic question is most alive. Theme that is felt rather than merely stated is the difference between a story that means something and one that says it does.`,
+        });
       }
     }
   }
