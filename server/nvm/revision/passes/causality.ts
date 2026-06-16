@@ -39,6 +39,11 @@
 // planting scenes avg curiosityDelta ≤ 0 — foreshadowing that never sparks wonder), clock
 // raise curiosity void (clock-raise scenes avg curiosityDelta ≤ 0 — deadlines create dread
 // but not the wondering urgency about how the protagonist escapes).
+// Wave 377 additions: dramatic turn no emotion (every dramatic-turn scene is emotionally
+// neutral — pivots that move no one, completing the turn-channel set), clock raise no suspense
+// (clock-raise scenes avg suspenseDelta ≤ 0 — deadlines that generate no tension), suspense
+// spike no curiosity (high-suspense scenes avg curiosityDelta ≤ 0 — danger that raises no
+// questions about what happens next).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1601,6 +1606,76 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `${clockScenes363.length} clock-raise scenes average a curiosityDelta of ${avgClockCuriosity363.toFixed(2)} — deadlines create pressure but never make the audience wonder how the protagonist escapes. Effective urgency combines dread and curiosity: a clock should make the audience feel time running out AND urgently want to know whether there is a way out. When deadlines average negative curiosity, the clock closes off possibility rather than opening the question of survival.`,
           suggestedFix: 'Let each deadline raise a question alongside the pressure: a clock tightened should make the audience wonder "how?" not just fear "what if they fail?" Pair each deadline with an obstacle that is interesting rather than just crushing — the countdown is unbearable when the audience is urgently curious whether the protagonist can thread the needle.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 377: DRAMATIC_TURN_NO_EMOTION, CLOCK_RAISE_NO_SUSPENSE, SUSPENSE_SPIKE_NO_CURIOSITY ──
+
+  // DRAMATIC_TURN_NO_EMOTION (minor, n≥8, ≥3 turn scenes): Every scene carrying a
+  // dramatic turn (dramaticTurn !== 'nothing') is emotionally neutral — the story's pivots
+  // move no one. A reversal or recognition should land as a felt event: shock, grief, hope,
+  // dread. When every turn is affectless, the plot changes direction while the protagonist
+  // registers nothing, so the audience processes the pivot as information rather than
+  // experiencing it. Completes the dramatic-turn channel set with DRAMATIC_TURN_NO_SUSPENSE
+  // and DRAMATIC_TURN_CURIOSITY_VOID; distinct from DRAMATIC_TURN_AFTERMATH_VOID (downstream
+  // ripple) and EMOTIONAL_NEUTRAL_RUN (consecutive neutral scenes).
+  if (records.length >= 8) {
+    const turnScenes377 = (records as any[]).filter(r => (r.dramaticTurn ?? 'nothing') !== 'nothing');
+    if (turnScenes377.length >= 3 && turnScenes377.every(r => r.emotionalShift === 'neutral')) {
+      issues.push({
+        location: `${turnScenes377.length} dramatic-turn scene(s) — emotional register`,
+        rule: 'DRAMATIC_TURN_NO_EMOTION',
+        severity: 'minor',
+        description: `All ${turnScenes377.length} dramatic-turn scenes (reversals, recognitions, twists) are emotionally neutral — the story's pivots move no one. A turn is where the situation flips, and the flip should land as a felt event: shock, grief, hope, dread. When every pivot is affectless, the plot changes direction while the protagonist registers nothing, so the audience processes each turn as information rather than experiencing it as drama.`,
+        suggestedFix: 'Let each dramatic turn land emotionally: the reversal that wounds, the recognition that devastates or elates. A pivot the protagonist feels is a pivot the audience feels; one that leaves them neutral is a plot mechanic the story reports rather than a turn it dramatizes.',
+      });
+    }
+  }
+
+  // CLOCK_RAISE_NO_SUSPENSE (minor, n≥8, ≥2 clock scenes): Scenes that raise a clock
+  // (clockRaised === true) average a suspenseDelta of zero or less — deadlines generate no
+  // tension. A ticking clock exists to tighten the screw; when raising it produces no
+  // measurable suspense, the deadline is a label rather than a pressure. Completes the
+  // clock-raise channel set with CLOCK_RAISED_NO_EMOTION and CLOCK_RAISE_CURIOSITY_VOID;
+  // distinct from CLOCK_RAISED_NO_DELTA (no change in time pressure) and SUSPENSE checks
+  // not keyed to the clockRaised field.
+  if (records.length >= 8) {
+    const clockScenes377 = (records as any[]).filter(r => r.clockRaised === true);
+    if (clockScenes377.length >= 2) {
+      const avgSusp377 = clockScenes377.reduce((s: number, r: any) => s + (r.suspenseDelta ?? 0), 0) / clockScenes377.length;
+      if (avgSusp377 <= 0) {
+        issues.push({
+          location: `${clockScenes377.length} clock-raise scene(s) — suspense register`,
+          rule: 'CLOCK_RAISE_NO_SUSPENSE',
+          severity: 'minor',
+          description: `The ${clockScenes377.length} clock-raise scenes average a suspenseDelta of ${avgSusp377.toFixed(2)} — deadlines generate no tension. A ticking clock exists to tighten the screw; when raising it produces no measurable suspense, the deadline is a label the story announces rather than a pressure the audience feels. The countdown is stated but never bites.`,
+          suggestedFix: 'Make each deadline raise the tension: the moment the clock tightens should narrow the protagonist\'s options and sharpen the danger of failing. A clock that does not raise suspense is a number on a wall; one that does is the engine driving the audience to the edge of their seat.',
+        });
+      }
+    }
+  }
+
+  // SUSPENSE_SPIKE_NO_CURIOSITY (minor, n≥8, ≥2 spikes): Scenes that spike suspense
+  // (suspenseDelta > 1.5) average a curiosityDelta of zero or less — the story's most
+  // dangerous moments raise no questions about what happens next. Suspense and curiosity
+  // are distinct engines: tension makes the audience fear an outcome, curiosity makes them
+  // need to know it. A spike that closes off questions is a dead-end thrill — gripping in
+  // the moment but generating no forward pull. Distinct from SUSPENSE_SPIKE_NO_CAUSE
+  // (upstream escalation gap), SUSPENSE_SPIKE_NO_FALLOUT (downstream consequence), and
+  // DRAMATIC_TURN_CURIOSITY_VOID (turn scenes, not suspense spikes).
+  if (records.length >= 8) {
+    const spikes377 = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 1.5);
+    if (spikes377.length >= 2) {
+      const avgCur377 = spikes377.reduce((s: number, r: any) => s + (r.curiosityDelta ?? 0), 0) / spikes377.length;
+      if (avgCur377 <= 0) {
+        issues.push({
+          location: `${spikes377.length} suspense-spike scene(s) — curiosity register`,
+          rule: 'SUSPENSE_SPIKE_NO_CURIOSITY',
+          severity: 'minor',
+          description: `The ${spikes377.length} suspense-spike scenes (suspenseDelta > 1.5) average a curiosityDelta of ${avgCur377.toFixed(2)} — the story's most dangerous moments raise no questions about what happens next. Tension and curiosity are distinct engines: suspense makes the audience fear an outcome, curiosity makes them need to know it. A spike that closes off questions is a dead-end thrill — gripping in the moment but generating no forward pull into the next scene.`,
+          suggestedFix: 'Let high-tension scenes also open questions: a danger that exposes a new unknown, a crisis that raises the stakes of a mystery. When a suspense spike both frightens and intrigues, it pulls the audience forward; when it only frightens, the tension dissipates the moment the scene ends.',
         });
       }
     }

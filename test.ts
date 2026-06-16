@@ -21488,6 +21488,88 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 377 — causalityPass: dramatic turn no emotion, clock raise no suspense, suspense spike no curiosity', async () => {
+    const makeRec377 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runC377 = async (records: any[]) => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DRAMATIC_TURN_NO_EMOTION fires when every dramatic-turn scene is emotionally neutral', async () => {
+      const recs377te = Array.from({ length: 8 }, (_, i) =>
+        makeRec377(i, {
+          dramaticTurn: [1, 3, 5].includes(i) ? 'reversal' : 'nothing',
+          emotionalShift: 'neutral',
+        }),
+      );
+      const res = await runC377(recs377te);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_NO_EMOTION'), 'DRAMATIC_TURN_NO_EMOTION should fire');
+    });
+
+    it('DRAMATIC_TURN_NO_EMOTION does not fire when a dramatic-turn scene carries emotion', async () => {
+      const recs377teni = Array.from({ length: 8 }, (_, i) =>
+        makeRec377(i, {
+          dramaticTurn: [1, 3, 5].includes(i) ? 'reversal' : 'nothing',
+          emotionalShift: i === 3 ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runC377(recs377teni);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_NO_EMOTION'), 'DRAMATIC_TURN_NO_EMOTION should not fire');
+    });
+
+    it('CLOCK_RAISE_NO_SUSPENSE fires when clock-raise scenes average suspenseDelta ≤ 0', async () => {
+      const recs377cs = Array.from({ length: 8 }, (_, i) =>
+        makeRec377(i, {
+          clockRaised: [2, 4].includes(i),
+          suspenseDelta: i === 2 ? -0.5 : i === 4 ? 0 : 0,
+        }),
+      );
+      const res = await runC377(recs377cs);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_RAISE_NO_SUSPENSE'), 'CLOCK_RAISE_NO_SUSPENSE should fire');
+    });
+
+    it('CLOCK_RAISE_NO_SUSPENSE does not fire when clock-raise scenes carry positive suspense', async () => {
+      const recs377csni = Array.from({ length: 8 }, (_, i) =>
+        makeRec377(i, {
+          clockRaised: [2, 4].includes(i),
+          suspenseDelta: i === 2 ? 1.2 : i === 4 ? 0.8 : 0,
+        }),
+      );
+      const res = await runC377(recs377csni);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_RAISE_NO_SUSPENSE'), 'CLOCK_RAISE_NO_SUSPENSE should not fire');
+    });
+
+    it('SUSPENSE_SPIKE_NO_CURIOSITY fires when high-suspense scenes average curiosityDelta ≤ 0', async () => {
+      const recs377sc = Array.from({ length: 8 }, (_, i) =>
+        makeRec377(i, {
+          suspenseDelta: [2, 5].includes(i) ? 2 : 0,
+          curiosityDelta: i === 2 ? -0.3 : i === 5 ? 0 : 0,
+        }),
+      );
+      const res = await runC377(recs377sc);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SUSPENSE_SPIKE_NO_CURIOSITY'), 'SUSPENSE_SPIKE_NO_CURIOSITY should fire');
+    });
+
+    it('SUSPENSE_SPIKE_NO_CURIOSITY does not fire when high-suspense scenes carry positive curiosity', async () => {
+      const recs377scni = Array.from({ length: 8 }, (_, i) =>
+        makeRec377(i, {
+          suspenseDelta: [2, 5].includes(i) ? 2 : 0,
+          curiosityDelta: i === 2 ? 0.8 : i === 5 ? 0.6 : 0,
+        }),
+      );
+      const res = await runC377(recs377scni);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SUSPENSE_SPIKE_NO_CURIOSITY'), 'SUSPENSE_SPIKE_NO_CURIOSITY should not fire');
+    });
+  });
+
   describe('Wave 363 — causalityPass: payoff no emotion, seed scene curiosity void, clock raise curiosity void', async () => {
     const makeRec363 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
