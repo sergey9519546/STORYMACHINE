@@ -17897,6 +17897,82 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 381 — intentionPass: proactive Act 2b void, proactive front-loaded, proactive revelation coincidence absent', async () => {
+    const makeRec381 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0.5,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runI381 = async (records: any[]) => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      return intentionPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PROACTIVE_ACT2B_VOID fires when no proactive act lands in the 50-75% zone', async () => {
+      // n=12 → Act 2b scenes 6,7,8; proactive at 1,3 and 10 (outside Act 2b)
+      const recs381a = Array.from({ length: 12 }, (_, i) =>
+        makeRec381(i, { seededClueIds: [1, 3, 10].includes(i) ? ['c'] : [] }),
+      );
+      const res = await runI381(recs381a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PROACTIVE_ACT2B_VOID'), 'PROACTIVE_ACT2B_VOID should fire');
+    });
+
+    it('PROACTIVE_ACT2B_VOID does not fire when a proactive act lands in Act 2b', async () => {
+      // proactive at scene 7 (within Act 2b)
+      const recs381an = Array.from({ length: 12 }, (_, i) =>
+        makeRec381(i, { seededClueIds: [1, 3, 7].includes(i) ? ['c'] : [] }),
+      );
+      const res = await runI381(recs381an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PROACTIVE_ACT2B_VOID'), 'PROACTIVE_ACT2B_VOID should not fire');
+    });
+
+    it('PROACTIVE_FRONTLOADED fires when >70% of proactive acts fall in the first half', async () => {
+      // n=10 → mid=5; proactive at 0,1,2 (first half) and 8 (second half) → 3/4 = 75%
+      const recs381f = Array.from({ length: 10 }, (_, i) =>
+        makeRec381(i, { seededClueIds: [0, 1, 2, 8].includes(i) ? ['c'] : [] }),
+      );
+      const res = await runI381(recs381f);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PROACTIVE_FRONTLOADED'), 'PROACTIVE_FRONTLOADED should fire');
+    });
+
+    it('PROACTIVE_FRONTLOADED does not fire when proactive acts are balanced across halves', async () => {
+      // proactive at 1,2 (first half) and 7,8 (second half) → 2/4 = 50%
+      const recs381fn = Array.from({ length: 10 }, (_, i) =>
+        makeRec381(i, { seededClueIds: [1, 2, 7, 8].includes(i) ? ['c'] : [] }),
+      );
+      const res = await runI381(recs381fn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PROACTIVE_FRONTLOADED'), 'PROACTIVE_FRONTLOADED should not fire');
+    });
+
+    it('PROACTIVE_REVELATION_COINCIDENCE_ABSENT fires when no proactive scene is also a revelation', async () => {
+      // proactive at 1,2,3 (seeded clues); revelations at 5,6 — no overlap
+      const recs381r = Array.from({ length: 8 }, (_, i) =>
+        makeRec381(i, {
+          seededClueIds: [1, 2, 3].includes(i) ? ['c'] : [],
+          revelation: [5, 6].includes(i) ? 'the hidden truth' : null,
+        }),
+      );
+      const res = await runI381(recs381r);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PROACTIVE_REVELATION_COINCIDENCE_ABSENT'), 'PROACTIVE_REVELATION_COINCIDENCE_ABSENT should fire');
+    });
+
+    it('PROACTIVE_REVELATION_COINCIDENCE_ABSENT does not fire when a proactive scene is also a revelation', async () => {
+      // scene 3 is both proactive (seeded clue) and a revelation
+      const recs381rn = Array.from({ length: 8 }, (_, i) =>
+        makeRec381(i, {
+          seededClueIds: [1, 2, 3].includes(i) ? ['c'] : [],
+          revelation: [3, 6].includes(i) ? 'the hidden truth' : null,
+        }),
+      );
+      const res = await runI381(recs381rn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PROACTIVE_REVELATION_COINCIDENCE_ABSENT'), 'PROACTIVE_REVELATION_COINCIDENCE_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 367 — intentionPass: proactive adversity absent, proactive backloaded, proactive payoff coincidence absent', async () => {
     const makeRec367 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

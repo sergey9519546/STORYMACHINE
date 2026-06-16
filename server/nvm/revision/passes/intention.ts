@@ -36,6 +36,11 @@
 // from the all-or-nothing late-surge and the single-burst overclustering checks), proactive
 // payoff coincidence absent (no scene is both proactive and a payoff — the protagonist's
 // initiative never lands a payoff in the same moment it is exerted).
+// Wave 381 additions: proactive Act 2b void (no initiative in the 50%–75% run-up to the
+// climax while the protagonist acts elsewhere — fills the Act-zone set), proactive front-
+// loaded (>70% of proactive acts in the first half — the distribution mirror of proactive
+// backloaded), proactive revelation coincidence absent (no proactive scene is itself a
+// revelation — initiative never directly turns up a truth in the same beat).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1478,6 +1483,82 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Let at least one payoff fire inside a proactive scene: the moment the protagonist plants the decisive clue or forces the confrontation should also be the moment a long-seeded thread pays off. When agency and payoff coincide, the protagonist visibly earns the resolution in real time rather than triggering it from a distance.',
         });
       }
+    }
+  }
+
+  // ── Wave 381: PROACTIVE_ACT2B_VOID, PROACTIVE_FRONTLOADED, PROACTIVE_REVELATION_COINCIDENCE_ABSENT ──
+
+  // PROACTIVE_ACT2B_VOID (minor, n≥10, ≥3 total proactive): Act 2b (the 50%–75% zone, the
+  // run-up to the climax) contains no proactive act, while the protagonist initiates
+  // elsewhere. The approach to the peak is where the protagonist should be pushing hardest —
+  // springing the trap, forcing the confrontation — yet here they go passive precisely as
+  // the stakes crest. Fills the Act-zone set alongside PROACTIVE_OPENING_ABSENT (Act 1),
+  // PROACTIVE_ACT2A_VOID (25%–50%), PROACTIVE_MIDPOINT_VOID (40%–60%), and PROACTIVE_ACT3_
+  // VOID (final 25%).
+  if (n >= 10) {
+    const a2bStart381 = Math.floor(n * 0.5);
+    const a2bEnd381 = Math.floor(n * 0.75);
+    const totalPro381 = records.filter(isProactive258).length;
+    if (totalPro381 >= 3) {
+      const a2bRecs381 = records.slice(a2bStart381, a2bEnd381);
+      if (a2bRecs381.length >= 2 && a2bRecs381.filter(isProactive258).length === 0) {
+        issues.push({
+          location: `Act 2b (Scenes ${a2bStart381}–${a2bEnd381 - 1})`,
+          rule: 'PROACTIVE_ACT2B_VOID',
+          severity: 'minor',
+          description: `Act 2b (Scenes ${a2bStart381}–${a2bEnd381 - 1}) contains no proactive act — no clock raised, no clue planted — while the protagonist initiates elsewhere. The run-up to the climax is where they should be pushing hardest, springing the trap or forcing the confrontation; going passive here means the protagonist is carried toward the peak rather than driving toward it.`,
+          suggestedFix: 'Give the protagonist a decisive proactive beat in Act 2b: the gambit that sets up the climax, the deadline they impose, the lead they chase into the final confrontation. The approach to the peak should be the protagonist at their most driven, not their most passive.',
+        });
+      }
+    }
+  }
+
+  // PROACTIVE_FRONTLOADED (minor, n≥10, ≥3 proactive scenes): More than 70% of the
+  // protagonist's proactive acts fall in the first half. Initiative is spent early and
+  // dwindles toward the climax, so the protagonist drives the setup but is carried through
+  // the back half where agency matters most. The distribution mirror of PROACTIVE_BACKLOADED
+  // (>70% in the second half); distinct from COMMITMENT_RAMP_INVERSION (which compares
+  // opening-third density to final-third density — a different statistic) and from PROACTIVE_
+  // OVERCLUSTERING (a single tight burst, anywhere).
+  if (n >= 10) {
+    const mid381 = Math.floor(n * 0.5);
+    const proIdxs381: number[] = [];
+    for (let i = 0; i < n; i++) {
+      if (isProactive258(records[i])) proIdxs381.push(i);
+    }
+    if (proIdxs381.length >= 3) {
+      const firstHalf381 = proIdxs381.filter(i => i < mid381).length;
+      if (firstHalf381 / proIdxs381.length > 0.7) {
+        issues.push({
+          location: `Proactive distribution — ${firstHalf381}/${proIdxs381.length} acts in the front half`,
+          rule: 'PROACTIVE_FRONTLOADED',
+          severity: 'minor',
+          description: `${firstHalf381} of the protagonist's ${proIdxs381.length} proactive acts (${Math.round(firstHalf381 / proIdxs381.length * 100)}%) fall in the first half — initiative is spent early and dwindles toward the climax. The protagonist drives the setup but is carried through the back half, where agency matters most; a front-loaded drive leaves the ending happening to them rather than because of them.`,
+          suggestedFix: 'Reserve proactive beats for the back half: the protagonist\'s drive should intensify toward the climax, not fade. Move some initiative later — the decisive move, the forced confrontation — so the character is pushing hardest exactly when the stakes peak.',
+        });
+      }
+    }
+  }
+
+  // PROACTIVE_REVELATION_COINCIDENCE_ABSENT (minor, n≥8, ≥3 proactive scenes, ≥2 revelation
+  // scenes): No single scene is both proactive and a revelation — the protagonist's
+  // initiative never directly turns up a truth in the same beat it is exerted. Discoveries
+  // and agency exist but never coincide, so the protagonist never visibly digs up a truth in
+  // the moment of digging. Mirror of PROACTIVE_PAYOFF_COINCIDENCE_ABSENT (initiative ×
+  // payoff); distinct from REVELATION_WITHOUT_PROACTIVE (which checks a 2-scene lookback
+  // before each revelation — this checks same-scene coincidence specifically).
+  if (n >= 8) {
+    const proScenes381 = records.filter(isProactive258);
+    const revScenes381 = records.filter((r: any) => r.revelation !== null && r.revelation !== undefined);
+    if (proScenes381.length >= 3 && revScenes381.length >= 2 &&
+        !records.some((r: any) => isProactive258(r) && r.revelation !== null && r.revelation !== undefined)) {
+      issues.push({
+        location: 'Initiative / revelation coincidence',
+        rule: 'PROACTIVE_REVELATION_COINCIDENCE_ABSENT',
+        severity: 'minor',
+        description: `Across ${proScenes381.length} proactive scenes and ${revScenes381.length} revelation scenes, no single scene is both — the protagonist's initiative never directly turns up a truth in the same beat it is exerted. Discoveries and agency exist but never coincide, so the audience never watches the protagonist dig up a truth in the act of digging; revelations arrive adjacent to their effort rather than as its immediate product.`,
+        suggestedFix: 'Let at least one revelation fire inside a proactive scene: the moment the protagonist forces a confrontation or chases a lead should also be the moment the truth surfaces. When agency and discovery coincide, the protagonist visibly earns the revelation rather than receiving it after the fact.',
+      });
     }
   }
 

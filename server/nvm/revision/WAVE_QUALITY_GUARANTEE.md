@@ -3,8 +3,8 @@
 **Scope:** the narrative-quality-check "wave" workflow that incrementally extends the
 revision passes in `server/nvm/revision/passes/` (and their tests in `test.ts`).
 
-**Status at last update:** through **Wave 378** — 14 passes, **776** distinct rules,
-**2569** tests, suite green (`node --experimental-strip-types test.ts` ⇒ 0 failures).
+**Status at last update:** through **Wave 380** — 14 passes, **782** distinct rule names,
+**2581** tests, suite green (`node --experimental-strip-types test.ts` ⇒ 0 failures).
 
 ---
 
