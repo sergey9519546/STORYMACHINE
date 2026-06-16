@@ -13,6 +13,9 @@
 // Wave 162 additions: theme midpoint silent (structural pivot has no theme voice),
 // theme accelerating density absent (theme fades instead of amplifying toward climax),
 // theme dialectic in Act 3 absent (Act 2 challenges the theme but Act 3 only affirms).
+// Wave 346 additions: theme suspense peak absent (the highest-suspense scene is themically
+// mute), theme late debut (the first resonant scene falls at or past the midpoint), theme
+// closing quarter silent (the final 25% carries no theme while it appears earlier).
 // Wave 265 additions: clue scenes decoupled (≥2 clue-planting scenes with no theme),
 // curiosity scenes decoupled (≥2 curiosity spikes with no theme), payoff scenes
 // decoupled (≥2 payoff scenes with no theme).
@@ -1297,6 +1300,90 @@ export async function themePass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `Thematic density falls sharply from Act 2a (${Math.round(act2aDensity332 * 100)}% resonant) to Act 2b (${Math.round(act2bDensity332 * 100)}% resonant) — the story loses thematic pressure in the run-up to the climax. The complication zone should escalate the theme toward its most intense statement near the climax; a thinning in Act 2b means the thematic question goes quiet at the exact moment it should be most insistent.`,
             suggestedFix: `Maintain or increase thematic density into Act 2b: let the escalating stakes also escalate the thematic question. Each new complication in Act 2b should tighten the screw on "${themeRaw}" — the theme should arrive at the climax at maximum pressure, not at minimum.`,
+          });
+        }
+      }
+    }
+
+    // ── Wave 346: THEME_SUSPENSE_PEAK_ABSENT, THEME_LATE_DEBUT, THEME_CLOSING_QUARTER_SILENT ──
+
+    // THEME_SUSPENSE_PEAK_ABSENT (minor, n≥8, totalHits≥3): The scene with the
+    // highest suspenseDelta carries no thematic resonance, even though other scenes do.
+    // The story's single most tense moment is thematically mute — the audience is at
+    // peak tension, but the danger is pure plot mechanics rather than a collision with
+    // the theme. The most charged confrontation should be where the thematic question
+    // is most at stake. The suspense analogue of THEME_CURIOSITY_PEAK_ABSENT (Wave 332);
+    // distinct from THEME_SUSPENSE_CLUSTER_SILENT (a run of high-suspense scenes) and
+    // THEME_SUSPENSE_RELEASE_SILENT (tension-release scenes).
+    if (records.length >= 8 && totalHits >= 3) {
+      const maxSuspense346 = Math.max(...(records as any[]).map(r => r.suspenseDelta ?? 0));
+      if (maxSuspense346 > 0) {
+        const peakRec346 = (records as any[]).find(r => (r.suspenseDelta ?? 0) === maxSuspense346);
+        if (peakRec346 && !sceneHasResonance(sceneTexts.get(peakRec346.sceneIdx) ?? '', expandedKeywords)) {
+          issues.push({
+            location: `Scene ${peakRec346.sceneIdx} (peak suspense: ${maxSuspense346})`,
+            rule: 'THEME_SUSPENSE_PEAK_ABSENT',
+            severity: 'minor',
+            description: `The scene with the highest suspenseDelta (Scene ${peakRec346.sceneIdx}, delta ${maxSuspense346}) carries no language related to "${themeRaw}" — the story's single most tense moment is thematically mute. While other scenes carry the theme, the peak of tension lands as pure plot danger rather than a collision with the thematic question. The most charged confrontation is exactly where the theme should be most at stake.`,
+            suggestedFix: `Bind the theme to the peak-tension scene: let what is in jeopardy there be ultimately about "${themeRaw}", not just about who survives or wins. When the audience is most gripped, the stakes they feel should be thematic as well as physical.`,
+          });
+        }
+      }
+    }
+
+    // THEME_LATE_DEBUT (minor, n≥8, totalHits≥2): The first scene that carries any
+    // thematic resonance falls at or after the midpoint — the entire first half of the
+    // story is thematically silent. A theme introduced only in the back half has no time
+    // to establish itself as the story's through-line; the audience reaches the midpoint
+    // with no sense of what the story is about, then is asked to invest in a meaning that
+    // arrives late. Distinct from THEME_OPENING_SILENT (only the first three scenes) and
+    // THEME_FRONT_LOADED / THEME_FIRST_ACT_RESOLUTION (the opposite — theme spent early).
+    if (records.length >= 8 && totalHits >= 2) {
+      const mid346 = Math.floor(records.length * 0.5);
+      let firstResonantPos346 = -1;
+      for (let i346 = 0; i346 < records.length; i346++) {
+        if (sceneHasResonance(sceneTexts.get((records as any[])[i346].sceneIdx) ?? '', expandedKeywords)) {
+          firstResonantPos346 = i346;
+          break;
+        }
+      }
+      if (firstResonantPos346 >= mid346) {
+        issues.push({
+          location: `First thematic resonance at Scene ${(records as any[])[firstResonantPos346].sceneIdx} (past the midpoint)`,
+          rule: 'THEME_LATE_DEBUT',
+          severity: 'minor',
+          description: `The first scene carrying any language related to "${themeRaw}" is Scene ${(records as any[])[firstResonantPos346].sceneIdx}, at or past the story's midpoint — the entire first half is thematically silent. A theme introduced only in the back half has no time to establish itself as the through-line; the audience reaches the midpoint with no sense of what the story is about, then is asked to invest in a meaning that arrives late.`,
+          suggestedFix: `Plant the theme early: let "${themeRaw}" surface — even quietly — in the opening act, through an image, a line, or a choice that frames the question the story will explore. The theme the audience meets in Act 1 is the one they feel resolve in Act 3.`,
+        });
+      }
+    }
+
+    // THEME_CLOSING_QUARTER_SILENT (minor, n≥12, ≥3 final-quarter scenes): The final
+    // 25% of the story contains no thematically resonant scene, while the theme appears
+    // earlier. The thematic frame is left open — the story raises its central question
+    // but lets it go quiet exactly where it should resolve. A theme that vanishes from
+    // the finale denies the audience the sense that the ending answers (or pointedly
+    // refuses to answer) what the story was about. Distinct from THEME_FINAL_SCENE_SILENT
+    // (the single last scene), THEME_RESOLUTION_SILENT (purpose='resolution' scenes), and
+    // THEME_CLIMAX_SCENE_SILENT (the climax scene): this checks the whole closing zone.
+    if (records.length >= 12) {
+      const finalStart346 = Math.floor(records.length * 0.75);
+      const finalRecs346 = (records as any[]).slice(finalStart346);
+      const earlierRecs346 = (records as any[]).slice(0, finalStart346);
+      if (finalRecs346.length >= 3) {
+        const earlierResonant346 = earlierRecs346.some((r: any) =>
+          sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        );
+        const finalResonant346 = finalRecs346.some((r: any) =>
+          sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        );
+        if (earlierResonant346 && !finalResonant346) {
+          issues.push({
+            location: `Closing quarter (Scenes ${finalStart346}–${records.length - 1}) — thematically silent`,
+            rule: 'THEME_CLOSING_QUARTER_SILENT',
+            severity: 'minor',
+            description: `The final quarter of the story (Scenes ${finalStart346}–${records.length - 1}) carries no language related to "${themeRaw}", though the theme appears earlier — the thematic frame is left open. The story raises its central question but lets it go quiet exactly where it should resolve, so the ending answers the plot without answering (or pointedly refusing to answer) what the story was about.`,
+            suggestedFix: `Return to the theme in the closing quarter: the climax and denouement should be where "${themeRaw}" reaches its sharpest statement — the moment the story's argument lands. Let the resolution of the plot also resolve the thematic question, so the ending feels like it meant something.`,
           });
         }
       }

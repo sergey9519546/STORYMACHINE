@@ -21026,6 +21026,84 @@ Time to go now.`;
     });
   });
 
+  describe('Wave 346 — themePass: suspense peak absent, late debut, closing quarter silent', async () => {
+    const makeRec346 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const THEME346 = 'trust betrayal courage';
+    const runT346 = async (records: any[]) => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: THEME346 },
+      });
+    };
+
+    it('THEME_SUSPENSE_PEAK_ABSENT fires when the highest-suspense scene lacks theme', async () => {
+      // scenes 0,1,2 carry theme; scene 3 has peak suspenseDelta=5 but no theme
+      const recs346sp = Array.from({ length: 8 }, (_, i) =>
+        makeRec346(i, {
+          dialogueHighlights: [0, 1, 2].includes(i) ? ['a moment of courage'] : [],
+          suspenseDelta: i === 3 ? 5 : 0.5,
+        })
+      );
+      const res = await runT346(recs346sp);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_SUSPENSE_PEAK_ABSENT'), 'THEME_SUSPENSE_PEAK_ABSENT should fire');
+    });
+
+    it('THEME_SUSPENSE_PEAK_ABSENT does not fire when the peak-suspense scene carries theme', async () => {
+      const recs346spn = Array.from({ length: 8 }, (_, i) =>
+        makeRec346(i, {
+          dialogueHighlights: [0, 1, 2, 3].includes(i) ? ['a moment of courage'] : [],
+          suspenseDelta: i === 3 ? 5 : 0.5,
+        })
+      );
+      const res = await runT346(recs346spn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_SUSPENSE_PEAK_ABSENT'), 'THEME_SUSPENSE_PEAK_ABSENT should not fire');
+    });
+
+    it('THEME_LATE_DEBUT fires when the first resonant scene falls past the midpoint', async () => {
+      // n=10 → midpoint=5; theme only in scenes 6,7,8
+      const recs346ld = Array.from({ length: 10 }, (_, i) =>
+        makeRec346(i, { dialogueHighlights: [6, 7, 8].includes(i) ? ['the courage to trust'] : [] })
+      );
+      const res = await runT346(recs346ld);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_LATE_DEBUT'), 'THEME_LATE_DEBUT should fire');
+    });
+
+    it('THEME_LATE_DEBUT does not fire when the theme appears in the first half', async () => {
+      const recs346ldn = Array.from({ length: 10 }, (_, i) =>
+        makeRec346(i, { dialogueHighlights: [1, 6, 7].includes(i) ? ['the courage to trust'] : [] })
+      );
+      const res = await runT346(recs346ldn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_LATE_DEBUT'), 'THEME_LATE_DEBUT should not fire');
+    });
+
+    it('THEME_CLOSING_QUARTER_SILENT fires when the final 25% carries no theme', async () => {
+      // n=12 → finalStart=9; theme in scenes 0,1,2 only, none in 9,10,11
+      const recs346cq = Array.from({ length: 12 }, (_, i) =>
+        makeRec346(i, { dialogueHighlights: [0, 1, 2].includes(i) ? ['a moment of courage'] : [] })
+      );
+      const res = await runT346(recs346cq);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CLOSING_QUARTER_SILENT'), 'THEME_CLOSING_QUARTER_SILENT should fire');
+    });
+
+    it('THEME_CLOSING_QUARTER_SILENT does not fire when the closing quarter carries theme', async () => {
+      const recs346cqn = Array.from({ length: 12 }, (_, i) =>
+        makeRec346(i, { dialogueHighlights: [0, 1, 2, 10].includes(i) ? ['a moment of courage'] : [] })
+      );
+      const res = await runT346(recs346cqn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CLOSING_QUARTER_SILENT'), 'THEME_CLOSING_QUARTER_SILENT should not fire');
+    });
+  });
+
   describe('Wave 332 — themePass: development scene desert, curiosity peak absent, Act 2b density drop', async () => {
     const makeRec332 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
