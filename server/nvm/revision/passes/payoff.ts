@@ -24,6 +24,11 @@
 // Wave 328 additions: payoff relationship decoupled (no payoff scene moves a bond),
 // clue seed curiosity flat (clue-seeding scenes avg curiosityDelta ≤ 0), clue seed
 // emotion flat (every clue planted in an emotionally neutral scene).
+// Wave 342 additions: clue seed relationship decoupled (no clue-seeding scene moves a
+// bond), payoff dramatic turn decoupled (no payoff scene carries a dramatic turn —
+// resolutions never pivot the story), setup/payoff dead run (6+ consecutive scenes with
+// no seed and no payoff in a story that otherwise uses the machine — connective tissue
+// vanishes for a stretch).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1120,6 +1125,97 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         description: `All ${seedScenes328e.length} clue-seeding scenes are emotionally neutral — every clue is planted in an affectless scene. Memory is emotional: a clue attached to a charged moment lodges and resurfaces when it pays off, while a clue dropped in a flat scene is forgotten before it can matter. Neutral planting wastes the setup half of the setup/payoff contract.`,
         suggestedFix: 'Plant at least some clues inside emotionally charged scenes, where the audience is already leaning in: the keepsake mentioned during a goodbye, the detail glimpsed in a moment of fear. The feeling makes the fact stick, so the payoff later has something to land against.',
       });
+    }
+  }
+
+  // ── Wave 342: CLUE_SEED_RELATIONSHIP_DECOUPLED, PAYOFF_DRAMATIC_TURN_DECOUPLED, SETUP_PAYOFF_DEAD_RUN ──
+
+  // CLUE_SEED_RELATIONSHIP_DECOUPLED (minor, n≥8, ≥3 seed scenes): No scene that
+  // plants a clue (seededClueIds.length > 0) also carries a relationship shift. Clues
+  // are planted in a lane wholly separate from the characters' bonds — the setup
+  // machinery never rides on a relational moment. Clues lodge best when planted during
+  // a beat the audience is already invested in: the keepsake handed over as a friendship
+  // forms, the lie told as trust frays. Completes the seed-side trilogy with
+  // CLUE_SEED_CURIOSITY_FLAT (curiosity) and CLUE_SEED_EMOTION_FLAT (emotion); distinct
+  // from PAYOFF_RELATIONSHIP_DECOUPLED, which audits the payoff side.
+  if (records.length >= 8) {
+    const seedScenes342 = (records as any[]).filter(r => ((r.seededClueIds ?? []) as string[]).length > 0);
+    if (seedScenes342.length >= 3) {
+      const anySeedRel342 = seedScenes342.some(r => ((r.relationshipShifts ?? []) as any[]).length > 0);
+      if (!anySeedRel342) {
+        issues.push({
+          location: 'Clue-seeding scenes — relational impact',
+          rule: 'CLUE_SEED_RELATIONSHIP_DECOUPLED',
+          severity: 'minor',
+          description: `None of the ${seedScenes342.length} clue-seeding scenes also carries a relationship shift — clues are planted in a lane wholly separate from the characters' bonds. The setup machinery never rides on a relational moment, so the seeds drop in scenes the audience has no emotional reason to remember. A clue lodges best when planted during a beat the audience is already invested in.`,
+          suggestedFix: 'Plant some clues inside relational moments: the object passed between characters as trust forms, the detail glimpsed during an argument, the secret half-told as a bond strains. When the seed is bound to a relationship the audience cares about, the planting scene earns its place and the later payoff has something to land against.',
+        });
+      }
+    }
+  }
+
+  // PAYOFF_DRAMATIC_TURN_DECOUPLED (minor, n≥8, ≥3 payoff scenes): No payoff scene
+  // (payoffSetupIds non-empty) carries a dramatic turn (dramaticTurn !== 'nothing').
+  // Resolutions close threads but never pivot the story — the setup/payoff machine
+  // runs without ever producing a reversal, recognition, or twist at the moment a loop
+  // closes. The most powerful payoffs ARE turns: the answer that flips the situation,
+  // the revelation that recasts everything. Distinct from PAYOFF_REVELATION_DISCONNECT
+  // (revelation field within a ±1 window) — this audits the dramaticTurn field on the
+  // payoff scene itself — and from the emotion/curiosity/suspense/relationship payoff
+  // channels.
+  if (records.length >= 8) {
+    const payoffScenes342 = (records as any[]).filter(r => ((r.payoffSetupIds ?? []) as string[]).length > 0);
+    if (payoffScenes342.length >= 3) {
+      const anyTurn342 = payoffScenes342.some(r => (r.dramaticTurn ?? 'nothing') !== 'nothing');
+      if (!anyTurn342) {
+        issues.push({
+          location: 'Payoff scenes — dramatic pivot',
+          rule: 'PAYOFF_DRAMATIC_TURN_DECOUPLED',
+          severity: 'minor',
+          description: `None of the ${payoffScenes342.length} payoff scenes carries a dramatic turn — resolutions close threads but never pivot the story. The setup/payoff machine runs without ever producing a reversal, recognition, or twist at the moment a loop closes, so each payoff lands as a tidy completion rather than a hinge. The most powerful payoffs are turns: the answer that flips the situation, the revelation that recasts everything that came before.`,
+          suggestedFix: 'Let at least one major payoff also turn the story: design the resolution of a thread so that the answer reverses the protagonist\'s situation, exposes a deception, or reframes the goal. A payoff that doubles as a pivot pays off the planting and propels the next act in the same beat.',
+        });
+      }
+    }
+  }
+
+  // SETUP_PAYOFF_DEAD_RUN (minor, n≥10): Six or more consecutive scenes carry no
+  // seeded clue and no payoff, in a story that otherwise uses the setup/payoff machine
+  // (≥3 continuity-active scenes overall). For a long stretch the plot's connective
+  // tissue vanishes: nothing is planted and nothing is harvested, so the audience's
+  // sense of an interlocking design goes quiet. Distinct from the zone-specific voids
+  // (ACT2A_PAYOFF_VOID — payoff-only, act-bounded) and THREAD_CONVERGENCE_ABSENT
+  // (isolation of payoffs): this flags a contiguous run with no continuity activity of
+  // either kind.
+  if (records.length >= 10) {
+    const isContinuityActive342 = (r: any): boolean =>
+      ((r.seededClueIds ?? []) as string[]).length > 0 || ((r.payoffSetupIds ?? []) as string[]).length > 0;
+    const totalActive342 = (records as any[]).filter(isContinuityActive342).length;
+    if (totalActive342 >= 3) {
+      let deadRun342 = 0;
+      let deadStart342 = 0;
+      let maxDead342 = 0;
+      let maxStart342 = 0;
+      for (let i342 = 0; i342 < records.length; i342++) {
+        if (!isContinuityActive342((records as any[])[i342])) {
+          if (deadRun342 === 0) deadStart342 = i342;
+          deadRun342++;
+          if (deadRun342 > maxDead342) { maxDead342 = deadRun342; maxStart342 = deadStart342; }
+        } else {
+          deadRun342 = 0;
+        }
+      }
+      if (maxDead342 >= 6) {
+        const s342 = (records as any[])[maxStart342].sceneIdx;
+        const e342 = (records as any[])[maxStart342 + maxDead342 - 1].sceneIdx;
+        issues.push({
+          location: `Scenes ${s342}–${e342} — no setup or payoff`,
+          rule: 'SETUP_PAYOFF_DEAD_RUN',
+          severity: 'minor',
+          description: `${maxDead342} consecutive scenes (${s342}–${e342}) plant no clue and resolve no thread, in a story that otherwise uses the setup/payoff machine. For this whole stretch the plot's connective tissue vanishes — nothing is seeded and nothing harvested — so the audience's sense of an interlocking design goes quiet and the middle of the story drifts free of the structure built around it.`,
+          suggestedFix: 'Thread continuity through the dead run: plant a small clue, pay off an earlier one, or fold a long fuse partway toward its resolution. The setup/payoff weave is what makes a story feel designed rather than episodic; a long stretch with neither leaves the audience watching events instead of a plot.',
+        });
+      }
     }
   }
 

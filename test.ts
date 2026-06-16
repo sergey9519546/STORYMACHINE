@@ -19413,6 +19413,79 @@ He looks away.`;
     });
   });
 
+  describe('Wave 342 — payoffPass: clue seed relationship decoupled, payoff dramatic turn decoupled, setup/payoff dead run', async () => {
+    const makeRec342 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runPay342 = async (records: any[]) => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      return payoffPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    const relShift342 = [{ pairKey: 'A|B', dimension: 'trust', amount: -0.5 }];
+
+    it('CLUE_SEED_RELATIONSHIP_DECOUPLED fires when no clue-seeding scene moves a bond', async () => {
+      const recs342sr = Array.from({ length: 8 }, (_, i) =>
+        makeRec342(i, { seededClueIds: [0, 1, 2].includes(i) ? [`clue${i}`] : [], relationshipShifts: [] })
+      );
+      const res = await runPay342(recs342sr);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLUE_SEED_RELATIONSHIP_DECOUPLED'), 'CLUE_SEED_RELATIONSHIP_DECOUPLED should fire');
+    });
+
+    it('CLUE_SEED_RELATIONSHIP_DECOUPLED does not fire when a clue-seeding scene shifts a relationship', async () => {
+      const recs342srn = Array.from({ length: 8 }, (_, i) =>
+        makeRec342(i, { seededClueIds: [0, 1, 2].includes(i) ? [`clue${i}`] : [], relationshipShifts: i === 1 ? relShift342 : [] })
+      );
+      const res = await runPay342(recs342srn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLUE_SEED_RELATIONSHIP_DECOUPLED'), 'CLUE_SEED_RELATIONSHIP_DECOUPLED should not fire');
+    });
+
+    it('PAYOFF_DRAMATIC_TURN_DECOUPLED fires when no payoff scene carries a dramatic turn', async () => {
+      const recs342pt = Array.from({ length: 8 }, (_, i) =>
+        makeRec342(i, { payoffSetupIds: [3, 5, 7].includes(i) ? [`clue${i}`] : [], dramaticTurn: 'nothing' })
+      );
+      const res = await runPay342(recs342pt);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_DRAMATIC_TURN_DECOUPLED'), 'PAYOFF_DRAMATIC_TURN_DECOUPLED should fire');
+    });
+
+    it('PAYOFF_DRAMATIC_TURN_DECOUPLED does not fire when a payoff scene pivots the story', async () => {
+      const recs342ptn = Array.from({ length: 8 }, (_, i) =>
+        makeRec342(i, { payoffSetupIds: [3, 5, 7].includes(i) ? [`clue${i}`] : [], dramaticTurn: i === 5 ? 'reversal' : 'nothing' })
+      );
+      const res = await runPay342(recs342ptn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_DRAMATIC_TURN_DECOUPLED'), 'PAYOFF_DRAMATIC_TURN_DECOUPLED should not fire');
+    });
+
+    it('SETUP_PAYOFF_DEAD_RUN fires when 6+ consecutive scenes have no setup or payoff', async () => {
+      const recs342dr = Array.from({ length: 12 }, (_, i) =>
+        makeRec342(i, {
+          seededClueIds: [0, 1].includes(i) ? [`clue${i}`] : [],
+          payoffSetupIds: [10, 11].includes(i) ? [`clue${i - 10}`] : [],
+        })
+      );
+      // scenes 2-9 (8 consecutive) carry no seed and no payoff
+      const res = await runPay342(recs342dr);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SETUP_PAYOFF_DEAD_RUN'), 'SETUP_PAYOFF_DEAD_RUN should fire');
+    });
+
+    it('SETUP_PAYOFF_DEAD_RUN does not fire when continuity activity is well distributed', async () => {
+      const recs342drn = Array.from({ length: 12 }, (_, i) =>
+        makeRec342(i, {
+          seededClueIds: [0, 3, 6, 9].includes(i) ? [`clue${i}`] : [],
+          payoffSetupIds: [2, 5, 8, 11].includes(i) ? [`clue${i}`] : [],
+        })
+      );
+      // longest dead run is 2 scenes
+      const res = await runPay342(recs342drn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SETUP_PAYOFF_DEAD_RUN'), 'SETUP_PAYOFF_DEAD_RUN should not fire');
+    });
+  });
+
   describe('Wave 328 — payoffPass: payoff relationship decoupled, clue seed curiosity flat, clue seed emotion flat', async () => {
     const makeRec328 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
