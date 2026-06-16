@@ -24238,6 +24238,96 @@ He stares at the floor.`;
     });
   });
 
+  describe('Wave 371 — relationshipArcPass: suspense peak absent, clock decoupled, pair first-half void', async () => {
+    const makeRec371 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const shift371 = (pairKey: string, amount: number) => ({ pairKey, dimension: 'trust', amount });
+    const runRA371 = async (records: any[]) => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('RELATIONSHIP_SUSPENSE_PEAK_ABSENT fires when the peak-suspense scene has no shift but 2+ other suspense-positive scenes do', async () => {
+      // scene 3 peak suspenseDelta=2.0 (no shift); scenes 1,5 suspense-positive WITH shifts
+      const recs371sp = Array.from({ length: 8 }, (_, i) =>
+        makeRec371(i, {
+          suspenseDelta: i === 3 ? 2.0 : i === 1 || i === 5 ? 0.8 : 0,
+          relationshipShifts: i === 1 || i === 5 ? [shift371('A|B', 0.4)] : [],
+        }),
+      );
+      const res = await runRA371(recs371sp);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SUSPENSE_PEAK_ABSENT'), 'RELATIONSHIP_SUSPENSE_PEAK_ABSENT should fire');
+    });
+
+    it('RELATIONSHIP_SUSPENSE_PEAK_ABSENT does not fire when the peak-suspense scene carries a shift', async () => {
+      const recs371spn = Array.from({ length: 8 }, (_, i) =>
+        makeRec371(i, {
+          suspenseDelta: i === 3 ? 2.0 : i === 1 || i === 5 ? 0.8 : 0,
+          relationshipShifts: [1, 3, 5].includes(i) ? [shift371('A|B', 0.4)] : [],
+        }),
+      );
+      const res = await runRA371(recs371spn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SUSPENSE_PEAK_ABSENT'), 'RELATIONSHIP_SUSPENSE_PEAK_ABSENT should not fire');
+    });
+
+    it('RELATIONSHIP_CLOCK_DECOUPLED fires when no shift lands in a clock-raised scene', async () => {
+      // shifts at 2,4,6; clockRaised at 1,7 — no overlap
+      const recs371cd = Array.from({ length: 8 }, (_, i) =>
+        makeRec371(i, {
+          relationshipShifts: [2, 4, 6].includes(i) ? [shift371('A|B', 0.5)] : [],
+          clockRaised: [1, 7].includes(i),
+        }),
+      );
+      const res = await runRA371(recs371cd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_CLOCK_DECOUPLED'), 'RELATIONSHIP_CLOCK_DECOUPLED should fire');
+    });
+
+    it('RELATIONSHIP_CLOCK_DECOUPLED does not fire when a shift lands in a clock-raised scene', async () => {
+      // scene 4 has both a shift and clockRaised
+      const recs371cdn = Array.from({ length: 8 }, (_, i) =>
+        makeRec371(i, {
+          relationshipShifts: [2, 4, 6].includes(i) ? [shift371('A|B', 0.5)] : [],
+          clockRaised: [1, 4].includes(i),
+        }),
+      );
+      const res = await runRA371(recs371cdn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_CLOCK_DECOUPLED'), 'RELATIONSHIP_CLOCK_DECOUPLED should not fire');
+    });
+
+    it('PAIR_FIRST_HALF_VOID fires when a pair has 3+ second-half shifts and 0 first-half shifts', async () => {
+      // n=10; A|B shifts at 6,7,8 (second half), none in first half; C|D shifts at 2 to avoid trivial cases
+      const recs371fv = Array.from({ length: 10 }, (_, i) =>
+        makeRec371(i, {
+          relationshipShifts: [6, 7, 8].includes(i)
+            ? [shift371('A|B', 0.5)]
+            : i === 2 ? [shift371('C|D', 0.4)] : [],
+        }),
+      );
+      const res = await runRA371(recs371fv);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAIR_FIRST_HALF_VOID'), 'PAIR_FIRST_HALF_VOID should fire');
+    });
+
+    it('PAIR_FIRST_HALF_VOID does not fire when the same pair also shifts in the first half', async () => {
+      // A|B shifts at 2 (first half) AND 6,7,8
+      const recs371fvn = Array.from({ length: 10 }, (_, i) =>
+        makeRec371(i, {
+          relationshipShifts: [2, 6, 7, 8].includes(i)
+            ? [shift371('A|B', 0.5)]
+            : i === 3 ? [shift371('C|D', 0.4)] : [],
+        }),
+      );
+      const res = await runRA371(recs371fvn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAIR_FIRST_HALF_VOID'), 'PAIR_FIRST_HALF_VOID should not fire');
+    });
+  });
+
   describe('Wave 357 — relationshipArcPass: curiosity peak absent, pair second-half void, dramatic turn decoupled', async () => {
     const makeRec357 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

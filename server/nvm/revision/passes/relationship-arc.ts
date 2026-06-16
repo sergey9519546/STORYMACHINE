@@ -42,6 +42,11 @@
 // do), pair second-half void (a pair with ≥3 first-half shifts has zero in the second half
 // — per-pair front-loading), relationship dramatic turn decoupled (no dramatic-turn scene
 // carries any relationship shift — pivots never crack or strengthen bonds).
+// Wave 371 additions: relationship suspense peak absent (the highest-suspense scene carries
+// no relationship shift while other suspense-positive scenes do), relationship clock decoupled
+// (no shift lands in any clock-raised scene though both exist — bonds never move under deadline
+// pressure), pair first-half void (a pair with ≥3 second-half shifts has zero in the first half
+// — per-pair late start, the mirror of pair second-half void).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1405,6 +1410,85 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
           suggestedFix: 'Let at least one story pivot also shift a bond: a reversal that fractures a trusted alliance, an unexpected turn that forces a character to rely on someone they distrusted. When the plot turns and a relationship shifts in the same moment, the dramatic pivot lands with double weight.',
         });
       }
+    }
+  }
+
+  // ── Wave 371: RELATIONSHIP_SUSPENSE_PEAK_ABSENT, RELATIONSHIP_CLOCK_DECOUPLED, PAIR_FIRST_HALF_VOID ──
+
+  // RELATIONSHIP_SUSPENSE_PEAK_ABSENT (minor, n≥8, ≥2 suspense-positive shift scenes):
+  // The scene with the highest suspenseDelta carries no relationship shift, even though
+  // at least 2 other suspense-positive scenes do. The peak-tension moment — when the
+  // audience is most gripped — never touches the relational world. Distinct from
+  // RELATIONSHIP_SUSPENSE_DECOUPLED (which averages suspenseDelta across all shift scenes);
+  // this isolates the single peak-suspense scene and checks whether a bond moves there.
+  if (records.length >= 8) {
+    const suspPositive371 = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 0);
+    const suspShift371 = suspPositive371.filter(r => ((r.relationshipShifts ?? []) as any[]).length > 0);
+    if (suspShift371.length >= 2) {
+      const peak371 = (records as any[]).reduce((best: any, r: any) =>
+        (r.suspenseDelta ?? 0) > (best.suspenseDelta ?? 0) ? r : best,
+        (records as any[])[0],
+      );
+      if (((peak371.relationshipShifts ?? []) as any[]).length === 0) {
+        issues.push({
+          location: `Scene ${peak371.sceneIdx} — peak suspense`,
+          rule: 'RELATIONSHIP_SUSPENSE_PEAK_ABSENT',
+          severity: 'minor',
+          description: `Scene ${peak371.sceneIdx} carries the story's highest suspenseDelta (${(peak371.suspenseDelta ?? 0).toFixed(2)}) but no relationship shift, even though ${suspShift371.length} other suspense-positive scenes move a bond. The moment the audience is most gripped never touches any character relationship — peak tension and relational stakes are completely disconnected, so the tensest beat plays as pure plot danger rather than danger to a bond the audience cares about.`,
+          suggestedFix: 'Let the peak-tension scene also move a bond: a betrayal exposed at the moment of maximum danger, an alliance forged under fire. When the suspense crests and a relationship shifts in the same beat, the tension carries relational weight rather than mere physical jeopardy.',
+        });
+      }
+    }
+  }
+
+  // RELATIONSHIP_CLOCK_DECOUPLED (minor, n≥8, ≥3 shift scenes, ≥2 clock scenes): No
+  // relationship shift lands in a clock-raised scene, even though the story has both
+  // relational movement and deadlines. Bonds never warm, cool, or fracture under time
+  // pressure — the relational world and the urgency engine run on separate tracks. A
+  // relationship shift forced by a ticking clock carries doubled weight: the bond moves
+  // and the audience feels the deadline at once. Distinct from RELATIONSHIP_SUSPENSE_
+  // DECOUPLED (suspenseDelta channel) and the conflict-pass clock checks (negative shifts
+  // / conflict scenes specifically): this audits all shifts against the clockRaised field.
+  if (records.length >= 8) {
+    const shiftScenes371 = (records as any[]).filter(r => ((r.relationshipShifts ?? []) as any[]).length > 0);
+    const clockScenes371 = (records as any[]).filter(r => r.clockRaised === true);
+    if (shiftScenes371.length >= 3 && clockScenes371.length >= 2 && !clockScenes371.some(r => ((r.relationshipShifts ?? []) as any[]).length > 0)) {
+      issues.push({
+        location: 'Relationship shifts × clock scenes — decoupled',
+        rule: 'RELATIONSHIP_CLOCK_DECOUPLED',
+        severity: 'minor',
+        description: `The story moves bonds in ${shiftScenes371.length} scenes and raises clocks in ${clockScenes371.length}, but no relationship shift ever lands in a clock-raised scene — bonds never move under deadline pressure. The relational world and the urgency engine run on separate tracks, so the story forfeits the doubled charge of a bond fracturing or forging precisely as time runs out.`,
+        suggestedFix: 'Stage at least one relationship shift under a live clock: a trust broken in the scramble before the deadline, an alliance forced by the shrinking window. The convergence of "the bond just changed" and "time is almost up" makes both land harder than either would alone.',
+      });
+    }
+  }
+
+  // PAIR_FIRST_HALF_VOID (minor, n≥10, pairs≥2): At least one pair accumulates ≥3
+  // shifts in the second half of the story but registers zero shifts in the first half.
+  // That pair's entire arc is deferred to the back half — the audience spends the first
+  // half with no sense that the bond is in motion, then it suddenly becomes active. The
+  // mirror of PAIR_SECOND_HALF_VOID (≥3 first-half shifts, none in the second); distinct
+  // from LATE_RELATIONSHIP_INTRODUCTION (a pair whose FIRST shift falls after the
+  // midpoint — a single-shift timing check) by requiring a dense back-half cluster with a
+  // wholly silent front half.
+  if (records.length >= 10 && pairStats.size >= 2) {
+    const mid371 = Math.floor(records.length * 0.5);
+    const voidPairs371: string[] = [];
+    for (const [pairKey371, stats371] of pairStats) {
+      const first371 = stats371.shifts.filter(s => s.sceneIdx < mid371);
+      const second371 = stats371.shifts.filter(s => s.sceneIdx >= mid371);
+      if (second371.length >= 3 && first371.length === 0) {
+        voidPairs371.push(pairKey371);
+      }
+    }
+    if (voidPairs371.length > 0) {
+      issues.push({
+        location: `Pair(s) ${voidPairs371.join(', ')} — first-half void`,
+        rule: 'PAIR_FIRST_HALF_VOID',
+        severity: 'minor',
+        description: `${voidPairs371.length === 1 ? 'One pair' : `${voidPairs371.length} pairs`} (${voidPairs371.join('; ')}) accumulate${voidPairs371.length === 1 ? 's' : ''} 3 or more shifts in the second half but register zero shifts in the first half. The bond's entire arc is deferred to the back half, so the audience spends the opening with no sense that the relationship is in motion, then it abruptly becomes active without the early grounding that would make its movement land.`,
+        suggestedFix: 'Seed the bond early: give the pair at least one shift in the first half — a first friction, a flicker of warmth — so the audience is invested in the relationship before the back half starts moving it in earnest. A bond that only activates after the midpoint asks the audience to care about a connection they were never shown forming.',
+      });
     }
   }
 
