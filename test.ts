@@ -18066,6 +18066,83 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 352 — conflictPass: peak suspense absent, peak emotion absent, peak curiosity absent', async () => {
+    const makeRec352 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'negative', suspenseDelta: 1, curiosityDelta: 1,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF352 = async (records: any[]) => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      return conflictPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    const rupture = (amount: number) => [{ pairs: ['A', 'B'], amount, dimension: 'trust' }];
+
+    it('CONFLICT_PEAK_SUSPENSE_ABSENT fires when the heaviest rupture has suspenseDelta ≤ 0', async () => {
+      const recs352s = Array.from({ length: 8 }, (_, i) =>
+        makeRec352(i,
+          i === 5 ? { relationshipShifts: rupture(-0.4) } :
+          i === 6 ? { relationshipShifts: rupture(-0.9), suspenseDelta: 0 } : {})
+      );
+      const res = await runCF352(recs352s);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_PEAK_SUSPENSE_ABSENT'), 'CONFLICT_PEAK_SUSPENSE_ABSENT should fire');
+    });
+
+    it('CONFLICT_PEAK_SUSPENSE_ABSENT does not fire when the heaviest rupture raises suspense', async () => {
+      const recs352sn = Array.from({ length: 8 }, (_, i) =>
+        makeRec352(i,
+          i === 5 ? { relationshipShifts: rupture(-0.4) } :
+          i === 6 ? { relationshipShifts: rupture(-0.9), suspenseDelta: 1.5 } : {})
+      );
+      const res = await runCF352(recs352sn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_PEAK_SUSPENSE_ABSENT'), 'CONFLICT_PEAK_SUSPENSE_ABSENT should not fire');
+    });
+
+    it('CONFLICT_PEAK_EMOTION_ABSENT fires when the heaviest rupture is emotionally neutral', async () => {
+      const recs352e = Array.from({ length: 8 }, (_, i) =>
+        makeRec352(i,
+          i === 5 ? { relationshipShifts: rupture(-0.4) } :
+          i === 6 ? { relationshipShifts: rupture(-0.9), emotionalShift: 'neutral' } : {})
+      );
+      const res = await runCF352(recs352e);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_PEAK_EMOTION_ABSENT'), 'CONFLICT_PEAK_EMOTION_ABSENT should fire');
+    });
+
+    it('CONFLICT_PEAK_EMOTION_ABSENT does not fire when the heaviest rupture carries emotion', async () => {
+      const recs352en = Array.from({ length: 8 }, (_, i) =>
+        makeRec352(i,
+          i === 5 ? { relationshipShifts: rupture(-0.4) } :
+          i === 6 ? { relationshipShifts: rupture(-0.9), emotionalShift: 'negative' } : {})
+      );
+      const res = await runCF352(recs352en);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_PEAK_EMOTION_ABSENT'), 'CONFLICT_PEAK_EMOTION_ABSENT should not fire');
+    });
+
+    it('CONFLICT_PEAK_CURIOSITY_ABSENT fires when the heaviest rupture has curiosityDelta ≤ 0', async () => {
+      const recs352c = Array.from({ length: 8 }, (_, i) =>
+        makeRec352(i,
+          i === 5 ? { relationshipShifts: rupture(-0.4) } :
+          i === 6 ? { relationshipShifts: rupture(-0.9), curiosityDelta: 0 } : {})
+      );
+      const res = await runCF352(recs352c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_PEAK_CURIOSITY_ABSENT'), 'CONFLICT_PEAK_CURIOSITY_ABSENT should fire');
+    });
+
+    it('CONFLICT_PEAK_CURIOSITY_ABSENT does not fire when the heaviest rupture raises curiosity', async () => {
+      const recs352cn = Array.from({ length: 8 }, (_, i) =>
+        makeRec352(i,
+          i === 5 ? { relationshipShifts: rupture(-0.4) } :
+          i === 6 ? { relationshipShifts: rupture(-0.9), curiosityDelta: 1 } : {})
+      );
+      const res = await runCF352(recs352cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_PEAK_CURIOSITY_ABSENT'), 'CONFLICT_PEAK_CURIOSITY_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 338 — conflictPass: clock decoupled, dramatic turn void, first-half monopoly', async () => {
     const makeRec338 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

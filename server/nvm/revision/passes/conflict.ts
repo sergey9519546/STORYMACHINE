@@ -22,6 +22,10 @@
 // conflict — deadlines without friction), conflict dramatic turn void (≥3 turn scenes
 // none with negative relationship shift — pivots that don't crack bonds), conflict
 // first-half monopoly (>70% of all conflict scenes in the first half — front-loaded).
+// Wave 352 additions: conflict peak suspense absent (the heaviest-rupture scene has
+// suspenseDelta ≤ 0), conflict peak emotion absent (the heaviest-rupture scene is
+// emotionally neutral), conflict peak curiosity absent (the heaviest-rupture scene has
+// curiosityDelta ≤ 0) — the single biggest bond-break is dramatically inert.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1321,6 +1325,59 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
           description: `${firstHalfConflict338.length} of ${allConflict338.length} conflict scenes (${Math.round(ratio338 * 100)}%) fall in the first half of the story — all the relational damage is done early and the second half has nothing to escalate against. When the majority of conflict front-loads, the climax arrives after relationships have already been battered down rather than at the moment when bonds are at maximum strain.`,
           suggestedFix: "Redistribute conflict across the arc: hold back some of the most damaging ruptures for the second half so the climax arrives at the worst point in the relationships rather than on the far side of them. The audience should feel that bonds are at their most strained precisely when the story reaches its peak.",
         });
+      }
+    }
+  }
+
+  // ── Wave 352: CONFLICT_PEAK_SUSPENSE_ABSENT, CONFLICT_PEAK_EMOTION_ABSENT, CONFLICT_PEAK_CURIOSITY_ABSENT ──
+  // The single heaviest bond-rupture in the story (the conflict scene with the largest
+  // negative relationship-shift magnitude) should be its most charged moment. These three
+  // checks audit that peak scene on each dramatic channel. Distinct from CONFLICT_SUSPENSE_
+  // DECOUPLED / CONFLICT_EMOTION_DECOUPLED / CONFLICT_CURIOSITY_DECOUPLED, which average
+  // over ALL conflict scenes — these isolate the single most consequential rupture.
+  if (records.length >= 8) {
+    const conflictRecs352 = (records as any[]).filter(r =>
+      ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+    );
+    if (conflictRecs352.length >= 2) {
+      let peakRec352: any = null;
+      let peakMag352 = 0;
+      for (const r of conflictRecs352) {
+        const mag = Math.max(
+          ...((r.relationshipShifts ?? []) as Array<{ amount: number }>)
+            .filter(s => s.amount <= -0.3)
+            .map(s => Math.abs(s.amount)),
+        );
+        if (mag > peakMag352) { peakMag352 = mag; peakRec352 = r; }
+      }
+      if (peakRec352) {
+        if ((peakRec352.suspenseDelta ?? 0) <= 0) {
+          issues.push({
+            location: `Scene ${peakRec352.sceneIdx} — peak rupture (magnitude ${peakMag352.toFixed(2)})`,
+            rule: 'CONFLICT_PEAK_SUSPENSE_ABSENT',
+            severity: 'minor',
+            description: `The story's heaviest bond-rupture (Scene ${peakRec352.sceneIdx}, magnitude ${peakMag352.toFixed(2)}) carries a suspenseDelta of ${(peakRec352.suspenseDelta ?? 0).toFixed(2)} — the biggest break in the story generates no tension. The most consequential rupture should be the most dangerous-feeling moment, leaving the audience uncertain what the fracture will cost; when it lands tension-flat, the story's central conflict peaks without anyone feeling the stakes.`,
+            suggestedFix: 'Stage the heaviest rupture so it threatens something concrete: the break should put a goal, a life, or a future in jeopardy, not just register as a relationship changing state. The single biggest fracture deserves the story\'s highest suspense, not its flattest.',
+          });
+        }
+        if (peakRec352.emotionalShift === 'neutral') {
+          issues.push({
+            location: `Scene ${peakRec352.sceneIdx} — peak rupture (magnitude ${peakMag352.toFixed(2)})`,
+            rule: 'CONFLICT_PEAK_EMOTION_ABSENT',
+            severity: 'minor',
+            description: `The story's heaviest bond-rupture (Scene ${peakRec352.sceneIdx}, magnitude ${peakMag352.toFixed(2)}) is emotionally neutral — the biggest break leaves the protagonist unmoved. The most consequential fracture in the story should be felt most acutely; when it registers no emotional shift, the rupture reads as a plot adjustment rather than a loss, and the audience is told the bond broke without being made to feel it break.`,
+            suggestedFix: 'Let the heaviest rupture wound: the scene where the most important bond breaks should carry the story\'s sharpest emotional charge — grief, betrayal, rage. The magnitude of a break is measured by how much it costs the person at its center.',
+          });
+        }
+        if ((peakRec352.curiosityDelta ?? 0) <= 0) {
+          issues.push({
+            location: `Scene ${peakRec352.sceneIdx} — peak rupture (magnitude ${peakMag352.toFixed(2)})`,
+            rule: 'CONFLICT_PEAK_CURIOSITY_ABSENT',
+            severity: 'minor',
+            description: `The story's heaviest bond-rupture (Scene ${peakRec352.sceneIdx}, magnitude ${peakMag352.toFixed(2)}) carries a curiosityDelta of ${(peakRec352.curiosityDelta ?? 0).toFixed(2)} — the biggest break raises no questions about what happens next. A major rupture should leave the audience hungry to know how the characters will live with the fracture; when the peak conflict closes a door without opening one, the story's central break is an endpoint rather than a turn.`,
+            suggestedFix: 'Make the heaviest rupture generative: the break should open new uncertainties — what each character does now, what the fracture exposes, who they become without the bond. The biggest conflict should propel the story forward, not just register damage.',
+          });
+        }
       }
     }
   }
