@@ -37,6 +37,12 @@
 // carries no payoff while payoffs exist elsewhere), payoff Act 3 absent (no payoff lands in
 // the final 25% though ≥3 resolve earlier — the finale settles nothing), clue seed midpoint
 // void (no clue planted in the 40%–60% pivot while seeds exist on both sides).
+// Wave 384 additions: payoff suspense peak decoupled (the single highest-suspense scene
+// carries no payoff while payoffs exist elsewhere — the suspense mirror of payoff curiosity
+// peak decoupled), clue seed clock decoupled (≥3 seed scenes and ≥2 clock scenes but no clue
+// is planted under time pressure — the seed-side sibling of payoff clock decoupled), clue
+// seed front-loaded (>60% of clues planted in the first half — the mirror of clue seed late
+// majority).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1368,6 +1374,73 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Plant a clue at the midpoint: let the pivot that reframes the story also seed the detail its second half will pay off. The midpoint reversal is most powerful when it both turns the plot and quietly lays the groundwork for what the turn makes possible.',
         });
       }
+    }
+  }
+
+  // ── Wave 384: PAYOFF_SUSPENSE_PEAK_DECOUPLED, CLUE_SEED_CLOCK_DECOUPLED, CLUE_SEED_FRONT_LOADED ──
+
+  // PAYOFF_SUSPENSE_PEAK_DECOUPLED (minor, n≥8, maxSuspense>1, ≥2 payoff scenes): The
+  // single highest-suspenseDelta scene carries no payoff, even though the story resolves
+  // planted threads elsewhere. The peak-tension moment — when the audience is most gripped —
+  // is not where any thread snaps shut, so the most charged delivery slot for a payoff goes
+  // unused. The suspense mirror of PAYOFF_CURIOSITY_PEAK_DECOUPLED; distinct from PAYOFF_
+  // SUSPENSE_MISMATCH (which averages suspenseDelta across payoff scenes — this isolates the
+  // single peak-suspense scene).
+  if (records.length >= 8) {
+    const payoffScenes384 = (records as any[]).filter(r => ((r.payoffSetupIds ?? []) as string[]).length > 0);
+    const maxSusp384 = Math.max(...(records as any[]).map(r => r.suspenseDelta ?? 0));
+    if (payoffScenes384.length >= 2 && maxSusp384 > 1) {
+      const peakSusp384 = (records as any[]).find(r => (r.suspenseDelta ?? 0) === maxSusp384);
+      if (peakSusp384 && ((peakSusp384.payoffSetupIds ?? []) as string[]).length === 0) {
+        issues.push({
+          location: `Scene ${peakSusp384.sceneIdx} — peak suspense (${maxSusp384.toFixed(2)})`,
+          rule: 'PAYOFF_SUSPENSE_PEAK_DECOUPLED',
+          severity: 'minor',
+          description: `The story's highest-suspenseDelta scene (Scene ${peakSusp384.sceneIdx}, suspenseDelta ${maxSusp384.toFixed(2)}) carries no payoff, even though ${payoffScenes384.length} other scenes resolve planted threads. The moment the audience is most gripped is not where anything snaps shut — peak tension and the satisfaction of resolution never meet, so the most charged delivery slot for a payoff is left empty.`,
+          suggestedFix: 'Land a payoff at the peak-tension scene: resolving a long-planted thread at the moment of maximum suspense doubles its force — the audience gets the answer and the danger at once. The scene that grips hardest is the most powerful place to pay something off.',
+        });
+      }
+    }
+  }
+
+  // CLUE_SEED_CLOCK_DECOUPLED (minor, n≥8, ≥3 seed scenes, ≥2 clock scenes): No scene
+  // that plants a clue also raises a clock, even though the story has both. Clues are never
+  // planted under time pressure, so the seed and the urgency engine never coincide — a clue
+  // glimpsed in the scramble of a deadline rides the scene's tension into memory, but here
+  // every seed drops in calm water. The seed-side sibling of PAYOFF_CLOCK_DECOUPLED (which
+  // audits payoffs against clocks); distinct from CLUE_SEED_SUSPENSE_VOID (causality.ts, the
+  // suspenseDelta channel) — this targets the clockRaised field's co-occurrence.
+  if (records.length >= 8) {
+    const seedScenes384 = (records as any[]).filter(r => ((r.seededClueIds ?? []) as string[]).length > 0);
+    const clockScenes384 = (records as any[]).filter(r => r.clockRaised === true);
+    if (seedScenes384.length >= 3 && clockScenes384.length >= 2 && !seedScenes384.some(r => r.clockRaised === true)) {
+      issues.push({
+        location: 'Clue-seeding scenes × clock scenes — decoupled',
+        rule: 'CLUE_SEED_CLOCK_DECOUPLED',
+        severity: 'minor',
+        description: `The story plants clues in ${seedScenes384.length} scenes and raises clocks in ${clockScenes384.length}, but no clue is seeded in a clock scene — foreshadowing never happens under time pressure. The seed engine and the urgency engine never coincide, so the story forfeits the charge of a clue glimpsed in the scramble of a deadline, where the scene's tension would burn it into the audience's memory.`,
+        suggestedFix: 'Plant at least one clue inside a clock-raising scene: a detail noticed in the rush before a deadline rides the urgency into memory and pays off harder later. The intersection of "remember this" and "we are almost out of time" makes a seed both more vivid and more ominous.',
+      });
+    }
+  }
+
+  // CLUE_SEED_FRONT_LOADED (minor, n≥10, clues≥4): More than 60% of planted clues are
+  // seeded in the first half of the story. The setup engine front-loads its work, so the
+  // back half introduces few new threads and the midpoint-onward stretch coasts on early
+  // plants. The mirror of CLUE_SEED_LATE_MAJORITY (>60% in the second half); distinct from
+  // CLUE_DENSITY_FRONT_COLLAPSE (ALL clues in the first 20% — a stricter, narrower window)
+  // and SETUP_FRONT_GAP (no clues in the first 25%).
+  if (records.length >= 10 && clueInfo.size >= 4) {
+    const midpoint384 = Math.floor(records.length * 0.5);
+    const earlyClues384 = [...clueInfo.values()].filter(c => c.plantedAt < midpoint384).length;
+    if (earlyClues384 / clueInfo.size > 0.6) {
+      issues.push({
+        location: 'Setup distribution',
+        rule: 'CLUE_SEED_FRONT_LOADED',
+        severity: 'minor',
+        description: `${earlyClues384} of ${clueInfo.size} planted clues (${Math.round(earlyClues384 / clueInfo.size * 100)}%) are seeded in the first half of the story — the setup engine front-loads its work. The back half introduces few new threads, so the midpoint-onward stretch coasts on early plants and the audience stops actively processing new setups precisely when the story should be deepening.`,
+        suggestedFix: 'Move some clue plants into the second half: a new thread seeded at the midpoint or in Act 2b keeps the audience processing fresh setups and gives the climax something recently planted to pay off. A setup engine that goes quiet after the midpoint leaves the back half with nothing new to anticipate.',
+      });
     }
   }
 

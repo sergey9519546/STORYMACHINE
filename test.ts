@@ -20101,6 +20101,87 @@ He looks away.`;
     });
   });
 
+  describe('Wave 384 — payoffPass: payoff suspense peak decoupled, clue seed clock decoupled, clue seed front-loaded', async () => {
+    const makeRec384 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runPay384 = async (records: any[]) => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      return payoffPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PAYOFF_SUSPENSE_PEAK_DECOUPLED fires when the peak-suspense scene carries no payoff', async () => {
+      // scene 6 has peak suspenseDelta=2.0 (no payoff); payoffs at 2,4
+      const recs384sp = Array.from({ length: 8 }, (_, i) =>
+        makeRec384(i, {
+          suspenseDelta: i === 6 ? 2.0 : 0,
+          payoffSetupIds: [2, 4].includes(i) ? [`setup${i}`] : [],
+        }),
+      );
+      const res = await runPay384(recs384sp);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_SUSPENSE_PEAK_DECOUPLED'), 'PAYOFF_SUSPENSE_PEAK_DECOUPLED should fire');
+    });
+
+    it('PAYOFF_SUSPENSE_PEAK_DECOUPLED does not fire when the peak-suspense scene carries a payoff', async () => {
+      const recs384spn = Array.from({ length: 8 }, (_, i) =>
+        makeRec384(i, {
+          suspenseDelta: i === 6 ? 2.0 : 0,
+          payoffSetupIds: [2, 4, 6].includes(i) ? [`setup${i}`] : [],
+        }),
+      );
+      const res = await runPay384(recs384spn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_SUSPENSE_PEAK_DECOUPLED'), 'PAYOFF_SUSPENSE_PEAK_DECOUPLED should not fire');
+    });
+
+    it('CLUE_SEED_CLOCK_DECOUPLED fires when no clue-seeding scene raises a clock', async () => {
+      // seeds at 1,3,5; clocks at 2,6 — no overlap
+      const recs384cd = Array.from({ length: 8 }, (_, i) =>
+        makeRec384(i, {
+          seededClueIds: [1, 3, 5].includes(i) ? [`clue${i}`] : [],
+          clockRaised: [2, 6].includes(i),
+        }),
+      );
+      const res = await runPay384(recs384cd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLUE_SEED_CLOCK_DECOUPLED'), 'CLUE_SEED_CLOCK_DECOUPLED should fire');
+    });
+
+    it('CLUE_SEED_CLOCK_DECOUPLED does not fire when a clue-seeding scene raises a clock', async () => {
+      // scene 3 is both a seed scene and a clock scene
+      const recs384cdn = Array.from({ length: 8 }, (_, i) =>
+        makeRec384(i, {
+          seededClueIds: [1, 3, 5].includes(i) ? [`clue${i}`] : [],
+          clockRaised: [3, 6].includes(i),
+        }),
+      );
+      const res = await runPay384(recs384cdn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLUE_SEED_CLOCK_DECOUPLED'), 'CLUE_SEED_CLOCK_DECOUPLED should not fire');
+    });
+
+    it('CLUE_SEED_FRONT_LOADED fires when >60% of clues are planted in the first half', async () => {
+      // n=10 → mid=5; clues at 0,1,2 (first half) and 8 (second half) → 3/4 = 75%
+      const recs384fl = Array.from({ length: 10 }, (_, i) =>
+        makeRec384(i, { seededClueIds: [0, 1, 2, 8].includes(i) ? [`clue${i}`] : [] }),
+      );
+      const res = await runPay384(recs384fl);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLUE_SEED_FRONT_LOADED'), 'CLUE_SEED_FRONT_LOADED should fire');
+    });
+
+    it('CLUE_SEED_FRONT_LOADED does not fire when clues are balanced across halves', async () => {
+      // clues at 1,2 (first half) and 6,8 (second half) → 2/4 = 50%
+      const recs384fln = Array.from({ length: 10 }, (_, i) =>
+        makeRec384(i, { seededClueIds: [1, 2, 6, 8].includes(i) ? [`clue${i}`] : [] }),
+      );
+      const res = await runPay384(recs384fln);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLUE_SEED_FRONT_LOADED'), 'CLUE_SEED_FRONT_LOADED should not fire');
+    });
+  });
+
   describe('Wave 370 — payoffPass: payoff curiosity peak decoupled, payoff Act 3 absent, clue seed midpoint void', async () => {
     const makeRec370 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
