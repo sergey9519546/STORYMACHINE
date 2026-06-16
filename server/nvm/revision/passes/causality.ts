@@ -30,6 +30,10 @@
 // resolutions that generate no new questions), dramatic turn curiosity void (reversal/twist
 // scenes avg curiosityDelta ≤ 0 — turns that don't ignite audience wonder), clue seed
 // suspense void (clue-planting scenes avg suspenseDelta ≤ 0 — cosmetic foreshadowing).
+// Wave 349 additions: clock raised no emotion (every clock-raise scene is emotionally
+// neutral — deadlines with no felt pressure), dramatic turn no suspense (turn scenes avg
+// suspenseDelta ≤ 0 — pivots that generate no tension), suspense spike no fallout (high-
+// suspense scenes produce no downstream consequence within two scenes).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1439,6 +1443,87 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Let each clue carry its own shadow: the scene that plants the seed should also tighten something — a glance held too long, an object that feels wrong, a line that could mean two things. Suspense need not be overt; a mild positive suspenseDelta on each seed scene signals that the audience has felt the implications, even subliminally, before the payoff arrives.',
         });
       }
+    }
+  }
+
+  // ── Wave 349: CLOCK_RAISED_NO_EMOTION, DRAMATIC_TURN_NO_SUSPENSE, SUSPENSE_SPIKE_NO_FALLOUT ──
+
+  // CLOCK_RAISED_NO_EMOTION (minor, n≥6, ≥2 clock-raise scenes): Every scene that
+  // raises a clock (clockRaised === true) is emotionally neutral — deadlines are
+  // announced but generate no felt pressure. A ticking clock is an emotional device:
+  // it should produce dread, urgency, or desperate resolve. When every clock-raise lands
+  // in an affectless scene, the deadline is a plot mechanic the characters note rather
+  // than feel, and the audience registers the countdown without anxiety. Distinct from
+  // CLOCK_RAISED_NO_DELTA (no measurable change in time pressure), CLOCK_RAISED_WITHOUT_
+  // PAYOFF (no downstream payoff), and CLOCK_RELIEF_UNEXPLAINED (uncaused release).
+  if (records.length >= 6) {
+    const clockScenes349 = (records as any[]).filter(r => r.clockRaised === true);
+    if (clockScenes349.length >= 2 && clockScenes349.every(r => r.emotionalShift === 'neutral')) {
+      issues.push({
+        location: `${clockScenes349.length} clock-raise scene(s) — emotional register`,
+        rule: 'CLOCK_RAISED_NO_EMOTION',
+        severity: 'minor',
+        description: `All ${clockScenes349.length} scenes that raise a clock are emotionally neutral — deadlines are announced but generate no felt pressure. A ticking clock is an emotional device: it should produce dread, urgency, or desperate resolve in the people racing it. When every clock-raise lands in an affectless scene, the countdown is a plot mechanic the characters note rather than feel, and the audience watches the timer without anxiety.`,
+        suggestedFix: 'Let each deadline land emotionally: the moment the clock tightens, show what it costs the characters to feel it — the spike of fear, the grim acceptance, the panic that forces a bad choice. A clock the characters dread is a clock the audience dreads; a clock nobody feels is just a number.',
+      });
+    }
+  }
+
+  // DRAMATIC_TURN_NO_SUSPENSE (minor, n≥10, ≥3 turn scenes): Scenes carrying a genuine
+  // dramatic turn (dramaticTurn !== 'nothing') have an average suspenseDelta of zero or
+  // less — the story's pivots generate no tension. A reversal or recognition should
+  // tighten the screw: the moment the situation flips is the moment the audience should
+  // feel the most uncertain about what happens next. When turns are consistently
+  // tension-flat, they read as administrative plot changes rather than dangerous pivots.
+  // The suspense analogue of DRAMATIC_TURN_CURIOSITY_VOID (Wave 335, curiosity channel);
+  // distinct from DRAMATIC_TURN_AFTERMATH_VOID (downstream ripple) and DRAMATIC_TURN_
+  // CLUSTER (timing).
+  if (records.length >= 10) {
+    const turnScenes349 = (records as any[]).filter(r => (r.dramaticTurn ?? 'nothing') !== 'nothing');
+    if (turnScenes349.length >= 3) {
+      const avgSusp349 = turnScenes349.reduce((s: number, r: any) => s + (r.suspenseDelta ?? 0), 0) / turnScenes349.length;
+      if (avgSusp349 <= 0) {
+        issues.push({
+          location: `${turnScenes349.length} dramatic-turn scene(s) — avg suspenseDelta ${avgSusp349.toFixed(2)}`,
+          rule: 'DRAMATIC_TURN_NO_SUSPENSE',
+          severity: 'minor',
+          description: `The ${turnScenes349.length} dramatic-turn scenes (reversals, recognitions, twists) have an average suspenseDelta of ${avgSusp349.toFixed(2)} — the story's pivots generate no tension. A turn is where the situation flips, and that flip should be the most uncertain moment in its stretch: the audience should not know what happens next. When turns land tension-flat, they read as administrative plot changes rather than dangerous pivots that threaten the protagonist.`,
+          suggestedFix: 'Make each turn dangerous: the reversal should raise the stakes and the uncertainty at once — a new threat exposed, an advantage lost, a deadline tightened by the twist. A pivot that does not raise suspense is a change the audience is informed of rather than gripped by.',
+        });
+      }
+    }
+  }
+
+  // SUSPENSE_SPIKE_NO_FALLOUT (minor, n≥8, ≥2 spikes): Two or more scenes spike suspense
+  // (suspenseDelta > 1.5) and not one of them is followed, within the next two scenes, by
+  // any consequence — no emotional shift, no relationship shift, no revelation, no dramatic
+  // turn. Tension is raised and then absorbed without effect: the spike is a dead end
+  // rather than the cause of something. Suspense is a promise of consequence; a spike that
+  // changes nothing downstream teaches the audience that the story's alarms are false.
+  // Distinct from SUSPENSE_SPIKE_NO_CAUSE (the upstream gap — a spike with no escalation
+  // before it), DRAMATIC_TURN_AFTERMATH_VOID (triggered by a reversal, not a suspense
+  // spike), and REVELATION_WITHOUT_REACTION (triggered by a revelation).
+  if (records.length >= 8) {
+    const n349 = records.length;
+    const hasFallout349 = (idx: number): boolean => {
+      for (let k349 = idx + 1; k349 <= Math.min(idx + 2, n349 - 1); k349++) {
+        const r = (records as any[])[k349];
+        if ((r.emotionalShift ?? 'neutral') !== 'neutral') return true;
+        if (((r.relationshipShifts ?? []) as any[]).length > 0) return true;
+        if (r.revelation !== null && r.revelation !== undefined) return true;
+        if ((r.dramaticTurn ?? 'nothing') !== 'nothing') return true;
+      }
+      return false;
+    };
+    const spikes349 = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 1.5);
+    if (spikes349.length >= 2 && !spikes349.some(s => hasFallout349((records as any[]).indexOf(s)))) {
+      issues.push({
+        location: `${spikes349.length} suspense spike(s) — no downstream fallout`,
+        rule: 'SUSPENSE_SPIKE_NO_FALLOUT',
+        severity: 'minor',
+        description: `${spikes349.length} scenes spike suspense (suspenseDelta > 1.5) but none is followed within two scenes by any consequence — no emotional shift, no relationship move, no revelation, no dramatic turn. Tension is raised and then absorbed without effect, so each spike is a dead end rather than the cause of something. Suspense is a promise of consequence; spikes that change nothing downstream teach the audience that the story's alarms are false.`,
+        suggestedFix: 'Let each suspense spike detonate: the scenes right after a tension peak should carry its fallout — a relationship fractured by the crisis, a truth forced into the open, an emotional wound, a reversal. If a spike leads to nothing, either pay it off downstream or cut it; tension that never delivers trains the audience to stop feeling it.',
+      });
     }
   }
 

@@ -20242,6 +20242,87 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 349 — causalityPass: clock raised no emotion, dramatic turn no suspense, suspense spike no fallout', async () => {
+    const makeRec349 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.3, curiosityDelta: 0.5,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runC349 = async (records: any[]) => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CLOCK_RAISED_NO_EMOTION fires when every clock-raise scene is emotionally neutral', async () => {
+      const recs349ce = [
+        ...Array.from({ length: 5 }, (_, i) => makeRec349(i)),
+        makeRec349(5, { clockRaised: true, clockDelta: 1, emotionalShift: 'neutral' }),
+        makeRec349(6, { clockRaised: true, clockDelta: 1, emotionalShift: 'neutral' }),
+        makeRec349(7, { clockRaised: true, clockDelta: 1, emotionalShift: 'neutral' }),
+      ];
+      const res = await runC349(recs349ce);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_RAISED_NO_EMOTION'), 'CLOCK_RAISED_NO_EMOTION should fire');
+    });
+
+    it('CLOCK_RAISED_NO_EMOTION does not fire when a clock-raise scene carries emotion', async () => {
+      const recs349cen = [
+        ...Array.from({ length: 5 }, (_, i) => makeRec349(i)),
+        makeRec349(5, { clockRaised: true, clockDelta: 1, emotionalShift: 'negative' }),
+        makeRec349(6, { clockRaised: true, clockDelta: 1, emotionalShift: 'neutral' }),
+        makeRec349(7, { clockRaised: true, clockDelta: 1, emotionalShift: 'neutral' }),
+      ];
+      const res = await runC349(recs349cen);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_RAISED_NO_EMOTION'), 'CLOCK_RAISED_NO_EMOTION should not fire');
+    });
+
+    it('DRAMATIC_TURN_NO_SUSPENSE fires when dramatic-turn scenes avg suspenseDelta ≤ 0', async () => {
+      const recs349ds = [
+        ...Array.from({ length: 7 }, (_, i) => makeRec349(i)),
+        makeRec349(7, { dramaticTurn: 'reversal', suspenseDelta: -0.3 }),
+        makeRec349(8, { dramaticTurn: 'recognition', suspenseDelta: 0 }),
+        makeRec349(9, { dramaticTurn: 'reversal', suspenseDelta: -0.1 }),
+      ];
+      const res = await runC349(recs349ds);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_NO_SUSPENSE'), 'DRAMATIC_TURN_NO_SUSPENSE should fire');
+    });
+
+    it('DRAMATIC_TURN_NO_SUSPENSE does not fire when dramatic-turn scenes raise suspense', async () => {
+      const recs349dsn = [
+        ...Array.from({ length: 7 }, (_, i) => makeRec349(i)),
+        makeRec349(7, { dramaticTurn: 'reversal', suspenseDelta: 1.5 }),
+        makeRec349(8, { dramaticTurn: 'recognition', suspenseDelta: 1.2 }),
+        makeRec349(9, { dramaticTurn: 'reversal', suspenseDelta: 0.8 }),
+      ];
+      const res = await runC349(recs349dsn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_NO_SUSPENSE'), 'DRAMATIC_TURN_NO_SUSPENSE should not fire');
+    });
+
+    it('SUSPENSE_SPIKE_NO_FALLOUT fires when suspense spikes produce no downstream consequence', async () => {
+      // spikes at scenes 0 and 5; all scenes neutral with no shifts/revelations/turns
+      const recs349sf = Array.from({ length: 10 }, (_, i) =>
+        makeRec349(i, { suspenseDelta: [0, 5].includes(i) ? 2 : 0.3 })
+      );
+      const res = await runC349(recs349sf);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SUSPENSE_SPIKE_NO_FALLOUT'), 'SUSPENSE_SPIKE_NO_FALLOUT should fire');
+    });
+
+    it('SUSPENSE_SPIKE_NO_FALLOUT does not fire when a spike is followed by consequence', async () => {
+      // spike at 0 followed by an emotional shift at scene 1 (fallout); spike at 5
+      const recs349sfn = Array.from({ length: 10 }, (_, i) =>
+        makeRec349(i, {
+          suspenseDelta: [0, 5].includes(i) ? 2 : 0.3,
+          emotionalShift: i === 1 ? 'negative' : 'neutral',
+        })
+      );
+      const res = await runC349(recs349sfn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SUSPENSE_SPIKE_NO_FALLOUT'), 'SUSPENSE_SPIKE_NO_FALLOUT should not fire');
+    });
+  });
+
   describe('Wave 335 — causalityPass: payoff curiosity decoupled, dramatic turn curiosity void, clue seed suspense void', async () => {
     const makeRec335 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
