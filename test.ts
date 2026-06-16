@@ -19573,6 +19573,161 @@ He looks away.`;
     });
   });
 
+  describe('Wave 340 — originalityPass: voiceover crutch, beat direction overuse, smash cut overuse', async () => {
+    const runO340 = async (fountain: string) => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      return originalityPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('VOICEOVER_CRUTCH fires when four or more (V.O.) cues appear', async () => {
+      const fountain340v = `INT. ROOM - DAY
+
+ALICE (V.O.)
+I never meant for it to end this way.
+
+EXT. STREET - NIGHT
+
+BOB (V.O.)
+The city kept its secrets close.
+
+INT. CAR - DAY
+
+ALICE (V.O.)
+Looking back, every choice was a mistake.
+
+INT. OFFICE - NIGHT
+
+BOB (V.O.)
+And so the wheels were already turning.`;
+      const res = await runO340(fountain340v);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICEOVER_CRUTCH'), 'VOICEOVER_CRUTCH should fire');
+    });
+
+    it('VOICEOVER_CRUTCH does not fire for a single framing voiceover', async () => {
+      const fountain340vn = `INT. ROOM - DAY
+
+ALICE (V.O.)
+I never meant for it to end this way.
+
+EXT. STREET - NIGHT
+
+BOB
+The city kept its secrets close.
+
+INT. CAR - DAY
+
+ALICE
+Looking back, every choice mattered.`;
+      const res = await runO340(fountain340vn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICEOVER_CRUTCH'), 'VOICEOVER_CRUTCH should not fire');
+    });
+
+    it('BEAT_DIRECTION_OVERUSE fires when four or more standalone (beat) directions appear', async () => {
+      const fountain340b = `INT. ROOM - DAY
+
+ALICE
+So that's it.
+
+(beat)
+
+You're really leaving.
+
+BOB
+I have to.
+
+(beat)
+
+ALICE
+After everything.
+
+(a beat)
+
+BOB
+Don't make this harder.
+
+(long beat)
+
+ALICE
+Then go.`;
+      const res = await runO340(fountain340b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BEAT_DIRECTION_OVERUSE'), 'BEAT_DIRECTION_OVERUSE should fire');
+    });
+
+    it('BEAT_DIRECTION_OVERUSE does not fire when (beat) is used sparingly', async () => {
+      const fountain340bn = `INT. ROOM - DAY
+
+ALICE
+So that's it.
+
+(beat)
+
+You're really leaving.
+
+BOB
+I have to go now, before I change my mind about all of it.
+
+ALICE
+After everything we built together.
+
+BOB
+Don't make this harder than it already is.`;
+      const res = await runO340(fountain340bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BEAT_DIRECTION_OVERUSE'), 'BEAT_DIRECTION_OVERUSE should not fire');
+    });
+
+    it('SMASH_CUT_OVERUSE fires when three or more dramatic cut transitions appear', async () => {
+      const fountain340s = `INT. ROOM - DAY
+
+She opens the door.
+
+SMASH CUT TO:
+
+INT. HALLWAY - NIGHT
+
+He runs.
+
+HARD CUT TO:
+
+EXT. ROOF - NIGHT
+
+The wind howls.
+
+MATCH CUT TO:
+
+INT. CAR - DAY
+
+The engine roars to life.`;
+      const res = await runO340(fountain340s);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SMASH_CUT_OVERUSE'), 'SMASH_CUT_OVERUSE should fire');
+    });
+
+    it('SMASH_CUT_OVERUSE does not fire for plain CUT TO transitions', async () => {
+      const fountain340sn = `INT. ROOM - DAY
+
+She opens the door.
+
+CUT TO:
+
+INT. HALLWAY - NIGHT
+
+He runs.
+
+CUT TO:
+
+EXT. ROOF - NIGHT
+
+The wind howls.
+
+SMASH CUT TO:
+
+INT. CAR - DAY
+
+The engine roars to life.`;
+      const res = await runO340(fountain340sn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SMASH_CUT_OVERUSE'), 'SMASH_CUT_OVERUSE should not fire');
+    });
+  });
+
   describe('Wave 326 — originalityPass: montage crutch, title card crutch, time card crutch', async () => {
     const runO326 = async (fountain: string) => {
       const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');

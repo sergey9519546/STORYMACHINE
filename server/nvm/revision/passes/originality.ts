@@ -25,6 +25,10 @@
 // Wave 326 additions: montage crutch (≥2 montage markers — dramatized struggle skipped),
 // title card crutch (≥3 SUPER:/TITLE:/CHYRON: on-screen text cards), time card crutch
 // (≥3 standalone time-jump captions like "THREE WEEKS LATER"/"MEANWHILE").
+// Wave 340 additions: voiceover crutch (≥4 (V.O.) cues — story narrated rather than
+// dramatized), beat direction overuse (≥4 standalone "(beat)" parentheticals — the
+// single most overused stage direction), smash cut overuse (≥3 dramatic cut transitions
+// like "SMASH CUT TO:"/"HARD CUT TO:" — directorial punctuation leaned on for impact).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1491,6 +1495,71 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${timeCardCount326} standalone time-jump captions ("THREE WEEKS LATER", "MEANWHILE", "LATER THAT NIGHT") appear in the script. Frequent jump captions manage time and space by announcement rather than by storytelling — the script narrates its own structure instead of letting the transitions read from the scenes themselves. Each caption is a seam the audience is told about rather than carried across.`,
         suggestedFix: 'Let most transitions read from the scenes: a change of season in the frame, a healed wound, a different set of clothes, a line of dialogue that anchors the new moment. Reserve explicit time captions for jumps so large or specific that no visual cue could convey them.',
+      });
+    }
+  }
+
+  // ── Wave 340: VOICEOVER_CRUTCH ───────────────────────────────────────────
+  // Four or more (V.O.) voiceover cues. A character speaking in voiceover narrates
+  // what the scene should dramatize — leaned on, it becomes the writer telling the
+  // story aloud instead of staging it. One framing voiceover can work; four or more
+  // signals a script that explains itself rather than trusting its images and action.
+  // Distinct from INTERIOR_MONOLOGUE_LEAK (interior thought described in action lines,
+  // not a spoken-narration cue) and DIRECTORIAL_INTRUSION (camera/shot calls).
+  {
+    const voRe340 = /\(\s*V\.?\s*O\.?\s*\)/i;
+    const voCount340 = lines.filter(l => voRe340.test(l.trim())).length;
+    if (voCount340 >= 4) {
+      issues.push({
+        location: `${voCount340} voiceover cues`,
+        rule: 'VOICEOVER_CRUTCH',
+        severity: 'minor',
+        description: `${voCount340} (V.O.) voiceover cues appear in the script. Voiceover narration delivers in words what the scene should deliver in image and action — used heavily, it becomes the writer telling the story aloud rather than staging it, so the audience is informed of events instead of experiencing them. A single framing voiceover can serve a story; a script that returns to narration repeatedly has stopped trusting its own scenes to carry meaning.`,
+        suggestedFix: 'Dramatize what the voiceover narrates: convert the spoken summary into an action the audience watches, a line of in-scene dialogue, or a visual detail that makes the point without comment. Reserve voiceover for the rare interior truth no scene could externalize, and let the images carry the rest.',
+      });
+    }
+  }
+
+  // ── Wave 340: BEAT_DIRECTION_OVERUSE ─────────────────────────────────────
+  // Four or more standalone "(beat)" parentheticals. "(beat)" is the single most
+  // overused stage direction — a generic pause inserted to manufacture rhythm the
+  // dialogue should create on its own. Even when overall parenthetical density is
+  // within range (so PARENTHETICAL_FLOOD does not fire), a script that reaches for
+  // "(beat)" again and again is papering over flat exchanges with typographic pauses.
+  // Distinct from PARENTHETICAL_FLOOD (a ratio of ALL parentheticals to dialogue
+  // lines): this fires on the specific "(beat)" tic regardless of overall density.
+  {
+    const beatRe340 = /^\(\s*(a\s+|another\s+|long\s+|short\s+|brief\s+|small\s+)?beat\s*\.?\s*\)$/i;
+    const beatCount340 = lines.filter(l => beatRe340.test(l.trim())).length;
+    if (beatCount340 >= 4) {
+      issues.push({
+        location: `${beatCount340} "(beat)" directions`,
+        rule: 'BEAT_DIRECTION_OVERUSE',
+        severity: 'minor',
+        description: `${beatCount340} standalone "(beat)" parentheticals appear in the script. "(beat)" is screenwriting's most overused stage direction — a generic pause dropped in to manufacture rhythm the dialogue should create on its own. Reaching for it repeatedly papers over flat exchanges with typographic silence: the pause is asserted on the page rather than earned by what the characters say and withhold.`,
+        suggestedFix: 'Cut most "(beat)" directions and build the pause into the writing instead: a short reply against a long one, a question left unanswered, a physical action that interrupts the rhythm. When a silence genuinely matters, dramatize what fills it — a look, a turn away — rather than labeling the gap.',
+      });
+    }
+  }
+
+  // ── Wave 340: SMASH_CUT_OVERUSE ──────────────────────────────────────────
+  // Three or more dramatic cut transitions ("SMASH CUT TO:", "HARD CUT TO:",
+  // "QUICK CUT TO:", "MATCH CUT TO:", "JUMP CUT TO:", "SHOCK CUT TO:"). A plain
+  // "CUT TO:" is invisible standard formatting; the emphatic variants are editorial
+  // punctuation meant to jolt. Sprinkled throughout, they stop jolting and start
+  // reading as the writer shouting for impact the scenes should generate themselves.
+  // Distinct from DIRECTORIAL_INTRUSION (camera/shot calls inside action lines) and
+  // from TITLE_CARD_CRUTCH / TIME_CARD_CRUTCH (on-screen text and time captions).
+  {
+    const smashRe340 = /^(SMASH|HARD|QUICK|MATCH|JUMP|SHOCK)\s+CUT\s+(TO|IN|BACK)\s*:?\.?$/i;
+    const smashCount340 = lines.filter(l => smashRe340.test(l.trim())).length;
+    if (smashCount340 >= 3) {
+      issues.push({
+        location: `${smashCount340} dramatic cut transitions`,
+        rule: 'SMASH_CUT_OVERUSE',
+        severity: 'minor',
+        description: `${smashCount340} emphatic cut transitions ("SMASH CUT TO:", "HARD CUT TO:", "MATCH CUT TO:") appear in the script. A plain "CUT TO:" is invisible standard formatting; the emphatic variants are editorial punctuation meant to jolt the reader. Sprinkled throughout, they stop jolting and start reading as the writer shouting for an impact the scenes should generate on their own — the transition is asked to carry a charge the cut-from and cut-to images have not built.`,
+        suggestedFix: 'Reserve a SMASH CUT for the one or two transitions whose collision genuinely lands a shock, and let the rest be ordinary cuts. Impact comes from the contrast between what precedes and follows the cut, not from the capitalized label; build the jolt into the juxtaposition of images and the transition will feel hard without being announced.',
       });
     }
   }
