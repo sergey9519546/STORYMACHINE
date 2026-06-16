@@ -40,6 +40,11 @@
 // scene bloat (revelation scenes average above 1.5× overall — disclosures over-explained;
 // complement of revelation scene underweight), payoff scene bloat (payoff scenes average
 // above 1.5× overall — callbacks belabored; complement of payoff scene underweight).
+// Wave 383 additions: conflict scene bloat (rupture scenes average above 1.5× overall —
+// ruptures wallowed in; complement of conflict scene underweight), dramatic-turn scene bloat
+// (turn scenes average above 1.5× — pivots that sprawl and lose their snap; complement of
+// dramatic-turn scene underweight), emotional-peak scene bloat (non-neutral scenes average
+// above 1.5× — feeling over-indulged; complement of emotional-peak scene underweight).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1524,6 +1529,84 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `The ${payoffLengths369.length} payoff scene(s) average ${payoffAvg369.toFixed(1)} weighted lines — ${Math.round(payoffAvg369 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The story's callbacks are belabored. A payoff is most satisfying when it snaps shut — the audience recognizes the planted thread and feels the click of completion; a scene that sprawls over-draws the connection and trades the pleasure of recognition for the tedium of being walked through it.`,
           suggestedFix: 'Tighten payoff scenes to the beat of recognition: let the callback land and trust the audience to feel the connection without it being explained. The satisfaction of a payoff is in the click of "of course"; over-explaining the setup-to-payoff link smothers exactly the recognition that makes it land.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 383: CONFLICT_SCENE_BLOAT, DRAMATIC_TURN_SCENE_BLOAT, EMOTIONAL_PEAK_SCENE_BLOAT ──
+
+  // CONFLICT_SCENE_BLOAT (minor, n≥8, ≥2 conflict scenes): Scenes carrying a negative
+  // relationship shift (amount ≤ -0.3) average above 1.5× the overall scene length — the
+  // story's ruptures are wallowed in. A bond-break lands hardest when it is sharp; a rupture
+  // scene that sprawls dilutes the blow with over-played recrimination and the audience
+  // disengages from a fight that will not end. The complement of CONFLICT_SCENE_UNDERWEIGHT
+  // (rupture scenes below 60% — ruptures rushed): this fires on the opposite failure.
+  if (records.length >= 8) {
+    const conflictLengths383: number[] = [];
+    for (let i383 = 0; i383 < records.length; i383++) {
+      const shifts383 = ((records as any[])[i383].relationshipShifts ?? []) as Array<{ amount: number }>;
+      if (shifts383.some(s => s.amount <= -0.3)) conflictLengths383.push(sceneLengths.get(i383) ?? 0);
+    }
+    if (conflictLengths383.length >= 2) {
+      const conflictAvg383 = conflictLengths383.reduce((s, v) => s + v, 0) / conflictLengths383.length;
+      if (conflictAvg383 > avgLength * 1.5) {
+        issues.push({
+          location: `${conflictLengths383.length} conflict scene(s)`,
+          rule: 'CONFLICT_SCENE_BLOAT',
+          severity: 'minor',
+          description: `The ${conflictLengths383.length} conflict scene(s) average ${conflictAvg383.toFixed(1)} weighted lines — ${Math.round(conflictAvg383 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The story's ruptures are wallowed in: a bond-break lands hardest when it is sharp, but a rupture that sprawls dilutes the blow with over-played recrimination, and the audience disengages from a fight that will not resolve.`,
+          suggestedFix: 'Tighten conflict scenes to the blows that matter: the decisive accusation, the wound that lands, the line that cannot be taken back. A rupture is most devastating when it is swift and surgical; extended quarreling drains the tension it should concentrate.',
+        });
+      }
+    }
+  }
+
+  // DRAMATIC_TURN_SCENE_BLOAT (minor, n≥8, ≥2 turn scenes): Scenes carrying a dramatic
+  // turn (dramaticTurn !== 'nothing') average above 1.5× the overall scene length — the
+  // story's pivots sprawl. A turn lands hardest as a sharp reversal the audience feels snap;
+  // a pivot scene that runs long buries the turn in surrounding material and softens its
+  // impact. The complement of DRAMATIC_TURN_SCENE_UNDERWEIGHT (turn scenes below 60% —
+  // pivots rushed): this fires on the opposite failure.
+  if (records.length >= 8) {
+    const turnLengths383: number[] = [];
+    for (let i383t = 0; i383t < records.length; i383t++) {
+      if (((records as any[])[i383t].dramaticTurn ?? 'nothing') !== 'nothing') turnLengths383.push(sceneLengths.get(i383t) ?? 0);
+    }
+    if (turnLengths383.length >= 2) {
+      const turnAvg383 = turnLengths383.reduce((s, v) => s + v, 0) / turnLengths383.length;
+      if (turnAvg383 > avgLength * 1.5) {
+        issues.push({
+          location: `${turnLengths383.length} dramatic-turn scene(s)`,
+          rule: 'DRAMATIC_TURN_SCENE_BLOAT',
+          severity: 'minor',
+          description: `The ${turnLengths383.length} dramatic-turn scene(s) average ${turnAvg383.toFixed(1)} weighted lines — ${Math.round(turnAvg383 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The story's pivots sprawl: a turn lands hardest as a sharp reversal the audience feels snap, but a pivot scene that runs long buries the turn in surrounding material and softens the very jolt it should deliver.`,
+          suggestedFix: 'Compress turn scenes to the moment of reversal and its immediate impact: stage the pivot, let it land, and cut before the scene over-processes it. The power of a turn is in its suddenness; padding it with lead-up and aftermath dissipates the surprise.',
+        });
+      }
+    }
+  }
+
+  // EMOTIONAL_PEAK_SCENE_BLOAT (minor, n≥8, ≥2 charged scenes): Scenes carrying a
+  // non-neutral emotional shift average above 1.5× the overall scene length — the story's
+  // feeling is over-indulged. Emotion lands when it is earned and then released; a charged
+  // scene that lingers tips into sentimentality, holding on the feeling past the point the
+  // audience has absorbed it. The complement of EMOTIONAL_PEAK_SCENE_UNDERWEIGHT (charged
+  // scenes below 60% — feeling rushed): this fires on the opposite failure.
+  if (records.length >= 8) {
+    const emoLengths383: number[] = [];
+    for (let i383e = 0; i383e < records.length; i383e++) {
+      if ((records as any[])[i383e].emotionalShift !== 'neutral') emoLengths383.push(sceneLengths.get(i383e) ?? 0);
+    }
+    if (emoLengths383.length >= 2) {
+      const emoAvg383 = emoLengths383.reduce((s, v) => s + v, 0) / emoLengths383.length;
+      if (emoAvg383 > avgLength * 1.5) {
+        issues.push({
+          location: `${emoLengths383.length} emotionally charged scene(s)`,
+          rule: 'EMOTIONAL_PEAK_SCENE_BLOAT',
+          severity: 'minor',
+          description: `The ${emoLengths383.length} emotionally charged scene(s) average ${emoAvg383.toFixed(1)} weighted lines — ${Math.round(emoAvg383 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The story's feeling is over-indulged: emotion lands when it is earned and released, but a charged scene that lingers tips into sentimentality, holding on the feeling well past the point the audience has absorbed it.`,
+          suggestedFix: 'Trust the audience to feel it and move on: deliver the emotional beat, hold for the reaction, and cut before the scene starts wringing the moment. Restraint amplifies feeling; an emotional scene that overstays its welcome invites the audience to step back from it.',
         });
       }
     }

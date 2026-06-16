@@ -20407,6 +20407,81 @@ He looks away.`;
     });
   });
 
+  describe('Wave 383 — pacingPass: conflict scene bloat, dramatic-turn scene bloat, emotional-peak scene bloat', async () => {
+    const makeRec383 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain383 = (lineCounts: number[]) =>
+      lineCounts.map((n, i) =>
+        `INT. SC${i} - DAY\n\n${Array.from({ length: n }, (_, j) => `Action line ${j + 1} for scene ${i}.`).join('\n\n')}`
+      ).join('\n\n');
+    const runP383 = async (records: any[], fountain: string) => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      return pacingPass({ fountain, original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    const negShift383 = [{ pairKey: 'A|B', amount: -0.5, dimension: 'trust' }];
+
+    it('CONFLICT_SCENE_BLOAT fires when conflict scenes run far above average length', async () => {
+      const lc383c = [4, 4, 20, 4, 4, 20, 4, 4];
+      const recs383c = Array.from({ length: 8 }, (_, i) =>
+        makeRec383(i, { relationshipShifts: [2, 5].includes(i) ? negShift383 : [] })
+      );
+      const res = await runP383(recs383c, makeFountain383(lc383c));
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_SCENE_BLOAT'), 'CONFLICT_SCENE_BLOAT should fire');
+    });
+
+    it('CONFLICT_SCENE_BLOAT does not fire when conflict scenes are average length', async () => {
+      const lc383cn = [10, 10, 10, 10, 10, 10, 10, 10];
+      const recs383cn = Array.from({ length: 8 }, (_, i) =>
+        makeRec383(i, { relationshipShifts: [2, 5].includes(i) ? negShift383 : [] })
+      );
+      const res = await runP383(recs383cn, makeFountain383(lc383cn));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_SCENE_BLOAT'), 'CONFLICT_SCENE_BLOAT should not fire');
+    });
+
+    it('DRAMATIC_TURN_SCENE_BLOAT fires when turn scenes run far above average length', async () => {
+      const lc383t = [4, 4, 20, 4, 4, 20, 4, 4];
+      const recs383t = Array.from({ length: 8 }, (_, i) =>
+        makeRec383(i, { dramaticTurn: [2, 5].includes(i) ? 'reversal' : 'nothing' })
+      );
+      const res = await runP383(recs383t, makeFountain383(lc383t));
+      assert.ok(res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_SCENE_BLOAT'), 'DRAMATIC_TURN_SCENE_BLOAT should fire');
+    });
+
+    it('DRAMATIC_TURN_SCENE_BLOAT does not fire when turn scenes are average length', async () => {
+      const lc383tn = [10, 10, 10, 10, 10, 10, 10, 10];
+      const recs383tn = Array.from({ length: 8 }, (_, i) =>
+        makeRec383(i, { dramaticTurn: [2, 5].includes(i) ? 'reversal' : 'nothing' })
+      );
+      const res = await runP383(recs383tn, makeFountain383(lc383tn));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_SCENE_BLOAT'), 'DRAMATIC_TURN_SCENE_BLOAT should not fire');
+    });
+
+    it('EMOTIONAL_PEAK_SCENE_BLOAT fires when charged scenes run far above average length', async () => {
+      const lc383e = [4, 4, 20, 4, 4, 20, 4, 4];
+      const recs383e = Array.from({ length: 8 }, (_, i) =>
+        makeRec383(i, { emotionalShift: [2, 5].includes(i) ? 'negative' : 'neutral' })
+      );
+      const res = await runP383(recs383e, makeFountain383(lc383e));
+      assert.ok(res.issues.some((i: any) => i.rule === 'EMOTIONAL_PEAK_SCENE_BLOAT'), 'EMOTIONAL_PEAK_SCENE_BLOAT should fire');
+    });
+
+    it('EMOTIONAL_PEAK_SCENE_BLOAT does not fire when charged scenes are average length', async () => {
+      const lc383en = [10, 10, 10, 10, 10, 10, 10, 10];
+      const recs383en = Array.from({ length: 8 }, (_, i) =>
+        makeRec383(i, { emotionalShift: [2, 5].includes(i) ? 'negative' : 'neutral' })
+      );
+      const res = await runP383(recs383en, makeFountain383(lc383en));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'EMOTIONAL_PEAK_SCENE_BLOAT'), 'EMOTIONAL_PEAK_SCENE_BLOAT should not fire');
+    });
+  });
+
   describe('Wave 369 — pacingPass: clock scene underweight, revelation scene bloat, payoff scene bloat', async () => {
     const makeRec369 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
