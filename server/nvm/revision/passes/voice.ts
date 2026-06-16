@@ -36,6 +36,10 @@
 // conditional opener — "If", "Unless", "What if" — characters default to hypotheticals),
 // dialogue apology overuse (≥3 lines are apologies — no dramatic agency), dialogue
 // hesitation flood (>25% of lines contain hesitation sounds — "um", "uh", "er", "hmm").
+// Wave 375 additions: dialogue ellipsis-opener flood (>20% of lines begin with "..." —
+// every line trails in from an unspoken thought), dialogue triadic flood (≥3 lines use a
+// "X, Y, and Z" rule-of-three — rhetorical cadence as a tic), dialogue emphatic-punctuation
+// flood (>20% of lines carry doubled marks like "!!"/"?!" — manufactured intensity).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1661,6 +1665,83 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `${hesitationCount361} of ${dlg361.length} dialogue lines (${Math.round(hesitationCount361 / dlg361.length * 100)}%) contain a hesitation sound ("um", "uh", "er", "hmm"). Written hesitation signals a specific character choice — nervousness, uncertainty, evasion. In density it ceases to be characterization and becomes the script's default voice, making every character sound equivocal and the writing itself tentative.`,
           suggestedFix: "Reserve hesitation sounds for specific characterization: one character who stutters under pressure, one scene where uncertainty is the dramatic point. Remove the others and trust the character's position to speak for itself — a line that says what it means, without hedging, almost always lands harder.",
+        });
+      }
+    }
+  }
+
+  // ── Wave 375: DIALOGUE_ELLIPSIS_OPENER_FLOOD, DIALOGUE_TRIADIC_FLOOD, DIALOGUE_EMPHATIC_PUNCTUATION_FLOOD ──
+  {
+    const dlg375: string[] = [];
+    let inDlg375 = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg375 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg375 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg375 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg375) dlg375.push(t);
+    }
+
+    // DIALOGUE_ELLIPSIS_OPENER_FLOOD (minor, ≥10 lines, >20%): More than 20% of
+    // dialogue lines begin with an ellipsis ("...you knew?"). A line that opens mid-
+    // trail signals the speaker is picking up an interrupted or unspoken thought; used
+    // occasionally it suggests hesitation or continuation, but when a fifth of all lines
+    // open this way every character sounds tentative and adrift, as if no one can begin a
+    // thought cleanly. Distinct from DIALOGUE_TRAILING_ELLIPSIS_FLOOD (lines that END with
+    // "..." — trailing off) and DIALOGUE_HESITATION_FLOOD (vocalized "um"/"uh" sounds).
+    if (dlg375.length >= 10) {
+      const ellipsisOpenerRe375 = /^(\.\.\.|…)/;
+      const ellipsisCount375 = dlg375.filter(l => ellipsisOpenerRe375.test(l.trim())).length;
+      if (ellipsisCount375 / dlg375.length > 0.20) {
+        issues.push({
+          location: 'Dialogue throughout',
+          rule: 'DIALOGUE_ELLIPSIS_OPENER_FLOOD',
+          severity: 'minor',
+          description: `${ellipsisCount375} of ${dlg375.length} dialogue lines (${Math.round(ellipsisCount375 / dlg375.length * 100)}%) begin with an ellipsis ("...you knew?"). A line that opens mid-trail signals a speaker picking up an interrupted or unspoken thought; an occasional one reads as hesitation, but when a fifth of all lines open this way every character sounds tentative and adrift, as if no one can begin a thought cleanly.`,
+          suggestedFix: 'Let most lines begin on a clean first word and reserve the opening ellipsis for the rare beat where a character is genuinely picking up a dropped thread. A character who can start a sentence reads as present and decisive; one who always trails in reads as perpetually unsure.',
+        });
+      }
+    }
+
+    // DIALOGUE_TRIADIC_FLOOD (minor, ≥10 lines, ≥3 lines): Three or more dialogue lines
+    // use a "X, Y, and Z" rule-of-three enumeration ("I'm tired, I'm broke, and I'm done."").
+    // The triad is a potent rhetorical figure, but recurring across dialogue it becomes a
+    // verbal tic that makes every character orate in the same balanced cadence — speech
+    // acquires a written, speechy quality rather than the irregularity of how people talk.
+    // Distinct from rhythm.ts TRIADIC_LIST_OVERLOAD (which audits ACTION lines): this
+    // targets the dialogue channel.
+    if (dlg375.length >= 10) {
+      const triadRe375 = /[^,]+,\s+[^,]+,?\s+(and|or)\s+\w+/i;
+      const triadCount375 = dlg375.filter(l => triadRe375.test(l)).length;
+      if (triadCount375 >= 3) {
+        issues.push({
+          location: 'Dialogue throughout',
+          rule: 'DIALOGUE_TRIADIC_FLOOD',
+          severity: 'minor',
+          description: `${triadCount375} dialogue lines use a "X, Y, and Z" rule-of-three enumeration. The triad is a potent rhetorical figure, but recurring across dialogue it becomes a verbal tic — every character orates in the same balanced three-part cadence, and the speech acquires a written, speechy quality rather than the irregularity of how people actually talk under pressure.`,
+          suggestedFix: 'Break up the triads: let characters trail off after one item, pile up four without the tidy "and", or interrupt themselves. Reserve the rule-of-three for the one speech where its rhetorical polish is the point — a toast, a manipulation, a closing argument.',
+        });
+      }
+    }
+
+    // DIALOGUE_EMPHATIC_PUNCTUATION_FLOOD (minor, ≥10 lines, >20%): More than 20% of
+    // dialogue lines carry a doubled or mixed emphatic punctuation mark ("!!", "?!", "!?",
+    // "?!?"). Stacked marks try to manufacture intensity on the page that the words and
+    // performance should carry; when a fifth of lines shout in punctuation, the dialogue
+    // reads as hysterical and the marks lose all force through repetition. Distinct from
+    // EXCLAMATION_OVERUSE (single "!") and QUESTION_MARK_OVERLOAD (single "?"): this targets
+    // stacked/mixed terminal marks specifically.
+    if (dlg375.length >= 10) {
+      const emphaticRe375 = /[!?][!?]+/;
+      const emphaticCount375 = dlg375.filter(l => emphaticRe375.test(l)).length;
+      if (emphaticCount375 / dlg375.length > 0.20) {
+        issues.push({
+          location: 'Dialogue throughout',
+          rule: 'DIALOGUE_EMPHATIC_PUNCTUATION_FLOOD',
+          severity: 'minor',
+          description: `${emphaticCount375} of ${dlg375.length} dialogue lines (${Math.round(emphaticCount375 / dlg375.length * 100)}%) carry a doubled or mixed emphatic mark ("!!", "?!", "!?"). Stacked punctuation tries to manufacture on the page the intensity that the words and the performance should carry; when this many lines shout in punctuation, the dialogue reads as hysterical and the marks lose all force through repetition.`,
+          suggestedFix: 'Strip the stacked marks back to single terminal punctuation and let the word choice and context supply the heat. If a line only feels intense with "?!", the line itself is doing too little — sharpen what is said so the emphasis is in the meaning, not the typography.',
         });
       }
     }

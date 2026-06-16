@@ -22141,6 +22141,229 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 375 — voicePass: ellipsis-opener flood, triadic flood, emphatic-punctuation flood', async () => {
+    const runV375 = async (fountain: string) => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      return voicePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DIALOGUE_ELLIPSIS_OPENER_FLOOD fires when >20% of dialogue lines begin with an ellipsis', async () => {
+      const f375e = `INT. ROOM - DAY
+
+ANNA
+...you knew the whole time.
+
+MARK
+I did.
+
+ANNA
+...and you said nothing.
+
+MARK
+What was I supposed to say?
+
+ANNA
+...I trusted you.
+
+MARK
+I know.
+
+ANNA
+So where does that leave us now.
+
+MARK
+I'm not sure anymore.
+
+ANNA
+Neither am I.
+
+MARK
+We should decide soon.`;
+      const res = await runV375(f375e);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_ELLIPSIS_OPENER_FLOOD'), 'DIALOGUE_ELLIPSIS_OPENER_FLOOD should fire');
+    });
+
+    it('DIALOGUE_ELLIPSIS_OPENER_FLOOD does not fire when lines begin cleanly', async () => {
+      const f375en = `INT. ROOM - DAY
+
+ANNA
+You knew the whole time.
+
+MARK
+I did.
+
+ANNA
+And you said nothing.
+
+MARK
+What was I supposed to say?
+
+ANNA
+I trusted you.
+
+MARK
+I know.
+
+ANNA
+So where does that leave us now.
+
+MARK
+I'm not sure anymore.
+
+ANNA
+Neither am I.
+
+MARK
+We should decide soon.`;
+      const res = await runV375(f375en);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_ELLIPSIS_OPENER_FLOOD'), 'DIALOGUE_ELLIPSIS_OPENER_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_TRIADIC_FLOOD fires when 3+ dialogue lines use a rule-of-three enumeration', async () => {
+      const f375t = `INT. BAR - NIGHT
+
+SAM
+I'm tired, I'm broke, and I'm done with this.
+
+RAY
+You always say that.
+
+SAM
+She lied, she stole, and she left without a word.
+
+RAY
+So what now?
+
+SAM
+We find her, we corner her, and we get the truth.
+
+RAY
+That simple, huh.
+
+SAM
+Nothing about this is simple.
+
+RAY
+Then let's go.
+
+SAM
+We can't wait any longer.
+
+RAY
+I'm with you.`;
+      const res = await runV375(f375t);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_TRIADIC_FLOOD'), 'DIALOGUE_TRIADIC_FLOOD should fire');
+    });
+
+    it('DIALOGUE_TRIADIC_FLOOD does not fire when dialogue avoids triadic lists', async () => {
+      const f375tn = `INT. BAR - NIGHT
+
+SAM
+I'm done with this.
+
+RAY
+You always say that.
+
+SAM
+She lied to me.
+
+RAY
+So what now?
+
+SAM
+We find her and get the truth.
+
+RAY
+That simple, huh.
+
+SAM
+Nothing about this is simple.
+
+RAY
+Then let's go.
+
+SAM
+We can't wait any longer.
+
+RAY
+I'm with you.`;
+      const res = await runV375(f375tn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_TRIADIC_FLOOD'), 'DIALOGUE_TRIADIC_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_EMPHATIC_PUNCTUATION_FLOOD fires when >20% of dialogue lines use stacked marks', async () => {
+      const f375p = `INT. KITCHEN - DAY
+
+LIA
+You did what?!
+
+JON
+Calm down.
+
+LIA
+Don't tell me to calm down!!
+
+JON
+It's not a big deal.
+
+LIA
+Not a big deal?!
+
+JON
+I can explain.
+
+LIA
+Then explain it.
+
+JON
+I forgot, okay.
+
+LIA
+You forgot.
+
+JON
+I'm sorry.`;
+      const res = await runV375(f375p);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_EMPHATIC_PUNCTUATION_FLOOD'), 'DIALOGUE_EMPHATIC_PUNCTUATION_FLOOD should fire');
+    });
+
+    it('DIALOGUE_EMPHATIC_PUNCTUATION_FLOOD does not fire when dialogue uses single terminal marks', async () => {
+      const f375pn = `INT. KITCHEN - DAY
+
+LIA
+You did what?
+
+JON
+Calm down.
+
+LIA
+Don't tell me to calm down.
+
+JON
+It's not a big deal.
+
+LIA
+Not a big deal?
+
+JON
+I can explain.
+
+LIA
+Then explain it.
+
+JON
+I forgot, okay.
+
+LIA
+You forgot.
+
+JON
+I'm sorry.`;
+      const res = await runV375(f375pn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_EMPHATIC_PUNCTUATION_FLOOD'), 'DIALOGUE_EMPHATIC_PUNCTUATION_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 361 — voicePass: conditional flood, apology overuse, hesitation flood', async () => {
     const runV361 = async (fountain: string) => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
