@@ -24020,6 +24020,85 @@ Time to go now.`;
     });
   });
 
+  describe('Wave 388 — themePass: midpoint density drop, opening image silent, proactive decoupled', async () => {
+    const makeRec388 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const THEME388 = 'trust betrayal courage';
+    const runT388 = async (records: any[]) => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: THEME388 },
+      });
+    };
+    const themed = ['the courage to trust'];
+
+    it('THEME_MIDPOINT_DENSITY_DROP fires when the 40-60% zone is less than half as resonant as overall', async () => {
+      // n=12; mid zone scenes 4,5,6 (none resonant); resonance at 0,1,2,8,9,10
+      const recs388md = Array.from({ length: 12 }, (_, i) =>
+        makeRec388(i, { dialogueHighlights: [0, 1, 2, 8, 9, 10].includes(i) ? themed : [] }),
+      );
+      const res = await runT388(recs388md);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_MIDPOINT_DENSITY_DROP'), 'THEME_MIDPOINT_DENSITY_DROP should fire');
+    });
+
+    it('THEME_MIDPOINT_DENSITY_DROP does not fire when the midpoint carries proportionate theme', async () => {
+      const recs388mdn = Array.from({ length: 12 }, (_, i) =>
+        makeRec388(i, { dialogueHighlights: [0, 1, 2, 5, 8, 9, 10].includes(i) ? themed : [] }),
+      );
+      const res = await runT388(recs388mdn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_MIDPOINT_DENSITY_DROP'), 'THEME_MIDPOINT_DENSITY_DROP should not fire');
+    });
+
+    it('THEME_OPENING_IMAGE_SILENT fires when the first scene carries no theme but it appears later', async () => {
+      const recs388oi = Array.from({ length: 8 }, (_, i) =>
+        makeRec388(i, { dialogueHighlights: [3, 5].includes(i) ? themed : [] }),
+      );
+      const res = await runT388(recs388oi);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_OPENING_IMAGE_SILENT'), 'THEME_OPENING_IMAGE_SILENT should fire');
+    });
+
+    it('THEME_OPENING_IMAGE_SILENT does not fire when the first scene carries theme', async () => {
+      const recs388oin = Array.from({ length: 8 }, (_, i) =>
+        makeRec388(i, { dialogueHighlights: [0, 3, 5].includes(i) ? themed : [] }),
+      );
+      const res = await runT388(recs388oin);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_OPENING_IMAGE_SILENT'), 'THEME_OPENING_IMAGE_SILENT should not fire');
+    });
+
+    it('THEME_PROACTIVE_DECOUPLED fires when every clock/clue-planting scene is thematically silent', async () => {
+      // proactive at 1,3,5 (seeded clues, no theme); theme present at scene 6
+      const recs388pd = Array.from({ length: 8 }, (_, i) =>
+        makeRec388(i, {
+          seededClueIds: [1, 3, 5].includes(i) ? ['c'] : [],
+          dialogueHighlights: i === 6 ? themed : [],
+        }),
+      );
+      const res = await runT388(recs388pd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_PROACTIVE_DECOUPLED'), 'THEME_PROACTIVE_DECOUPLED should fire');
+    });
+
+    it('THEME_PROACTIVE_DECOUPLED does not fire when a proactive scene carries theme', async () => {
+      // scene 3 is proactive AND themed
+      const recs388pdn = Array.from({ length: 8 }, (_, i) =>
+        makeRec388(i, {
+          seededClueIds: [1, 3, 5].includes(i) ? ['c'] : [],
+          dialogueHighlights: [3, 6].includes(i) ? themed : [],
+        }),
+      );
+      const res = await runT388(recs388pdn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_PROACTIVE_DECOUPLED'), 'THEME_PROACTIVE_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 374 — themePass: Act 1 density drop, clock peak absent, charged scene silent', async () => {
     const makeRec374 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

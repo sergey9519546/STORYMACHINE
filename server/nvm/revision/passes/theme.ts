@@ -25,6 +25,11 @@
 // clock peak absent (the largest-clockDelta deadline is thematically silent — complement
 // of clock scene silent), charged scene silent (no non-neutral emotional scene carries the
 // theme — feeling and meaning never coincide, across both polarities together).
+// Wave 388 additions: midpoint density drop (the 40%–60% zone is <50% as resonant as the
+// story overall — theme thins at the pivot), opening image silent (the first scene carries
+// no theme though it appears later — the bookend mirror of final scene silent), proactive
+// decoupled (every clock/clue-planting scene is thematically silent — agency and meaning
+// never coincide).
 // Wave 265 additions: clue scenes decoupled (≥2 clue-planting scenes with no theme),
 // curiosity scenes decoupled (≥2 curiosity spikes with no theme), payoff scenes
 // decoupled (≥2 payoff scenes with no theme).
@@ -1573,6 +1578,76 @@ export async function themePass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `None of the ${chargedScenes374.length} emotionally charged scenes carries language related to "${themeRaw}", though the theme appears elsewhere — the story's feeling and its meaning never coincide. Emotion lands in thematically blank scenes and the theme surfaces only in emotionally flat ones, so the audience never feels the theme and thinks about it in the same beat.`,
           suggestedFix: `Fuse emotion and theme: let at least one charged scene also carry "${themeRaw}", so the moment the audience feels something is the moment the thematic question is most alive. Theme that is felt rather than merely stated is the difference between a story that means something and one that says it does.`,
+        });
+      }
+    }
+
+    // ── Wave 388: THEME_MIDPOINT_DENSITY_DROP, THEME_OPENING_IMAGE_SILENT, THEME_PROACTIVE_DECOUPLED ──
+
+    // THEME_MIDPOINT_DENSITY_DROP (minor, n≥12, ≥2 midpoint scenes): The midpoint zone
+    // (40%–60%) is less than half as thematically dense as the story overall — theme thins
+    // sharply at the structural pivot, the moment a strong midpoint should be restating the
+    // central question with new force. Distinct from THEME_MIDPOINT_SILENT (a binary ±1-scene
+    // window with NO theme at all) — this fires even when the midpoint carries some theme but
+    // far less than the body — and from THEME_ACT2B_DENSITY_DROP (2a-vs-2b trajectory).
+    if (records.length >= 12) {
+      const midS388 = Math.floor(records.length * 0.4);
+      const midE388 = Math.floor(records.length * 0.6);
+      const midRecs388 = (records as any[]).slice(midS388, midE388);
+      const overallResonant388 = (records as any[]).filter((r: any) => sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords)).length;
+      if (midRecs388.length >= 2 && overallResonant388 >= 2) {
+        const midResonant388 = midRecs388.filter((r: any) => sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords)).length;
+        const midDensity388 = midResonant388 / midRecs388.length;
+        const overallDensity388 = overallResonant388 / records.length;
+        if (midDensity388 < overallDensity388 * 0.5) {
+          issues.push({
+            location: `Midpoint (Scenes ${midS388}–${midE388 - 1}) — thematic density drop`,
+            rule: 'THEME_MIDPOINT_DENSITY_DROP',
+            severity: 'minor',
+            description: `The midpoint zone (Scenes ${midS388}–${midE388 - 1}) is ${Math.round(midDensity388 * 100)}% thematically resonant versus ${Math.round(overallDensity388 * 100)}% across the story — theme thins sharply at the structural pivot. The midpoint is where a strong story restates "${themeRaw}" with new force as the central question is reframed; a density drop there means the pivot turns the plot without deepening the meaning.`,
+            suggestedFix: `Bring the theme back at the midpoint: the reframing turn should make "${themeRaw}" newly urgent — a revelation that recasts the thematic question, a choice that tests it under new terms. The center of the story is exactly where the theme should intensify, not recede.`,
+          });
+        }
+      }
+    }
+
+    // THEME_OPENING_IMAGE_SILENT (minor, n≥6, expandedKeywords≥2): The very first scene
+    // carries no thematic language, though the theme appears later. The opening image is a
+    // privileged thematic slot — it frames how the audience reads everything that follows —
+    // and squandering it means the story's first impression is disconnected from its meaning.
+    // The bookend mirror of THEME_FINAL_SCENE_SILENT (the last scene); distinct from THEME_
+    // OPENING_SILENT (the first three scenes ALL silent — this fires even when scenes 2–3
+    // carry theme but the opening image itself does not).
+    if (records.length >= 6 && expandedKeywords.length >= 2) {
+      const firstRec388 = (records as any[])[0];
+      const laterResonant388 = (records as any[]).slice(1).some((r: any) => sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords));
+      if (firstRec388 && laterResonant388 && !sceneHasResonance(sceneTexts.get(firstRec388.sceneIdx) ?? '', expandedKeywords)) {
+        issues.push({
+          location: `Scene ${firstRec388.sceneIdx} — opening image`,
+          rule: 'THEME_OPENING_IMAGE_SILENT',
+          severity: 'minor',
+          description: `The story's opening image (Scene ${firstRec388.sceneIdx}) carries no language related to "${themeRaw}", though the theme surfaces later. The first scene is a privileged thematic slot — it frames how the audience reads everything that follows — and an opening disconnected from the theme means the story's first impression sets up a different question than the one it ultimately answers.`,
+          suggestedFix: `Plant "${themeRaw}" in the opening image: a detail, a choice, or a visual that quietly poses the thematic question from the very first beat. The image the audience meets first is the lens they watch the rest of the film through — make it carry the meaning.`,
+        });
+      }
+    }
+
+    // THEME_PROACTIVE_DECOUPLED (minor, n≥8, ≥3 proactive scenes): Every scene in which
+    // the protagonist takes initiative (raises a clock or plants a clue) carries no theme.
+    // The protagonist's agency and the story's meaning never coincide — the character drives
+    // the plot in thematically blank scenes, so what they do is never about what the story is
+    // about. Distinct from THEME_CLUE_DECOUPLED (clue-planting scenes only) and THEME_CLOCK_
+    // SCENE_SILENT (clock scenes only): this fires across the combined proactive set, catching
+    // stories where neither subgroup alone meets its threshold but agency-as-a-whole is silent.
+    if (records.length >= 8) {
+      const proactiveScenes388 = (records as any[]).filter((r: any) => r.clockRaised === true || ((r.seededClueIds ?? []) as any[]).length > 0);
+      if (proactiveScenes388.length >= 3 && !proactiveScenes388.some((r: any) => sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords))) {
+        issues.push({
+          location: `${proactiveScenes388.length} proactive scene(s) — thematically silent`,
+          rule: 'THEME_PROACTIVE_DECOUPLED',
+          severity: 'minor',
+          description: `None of the ${proactiveScenes388.length} scenes where the protagonist takes initiative — raising a clock or planting a clue — carries language related to "${themeRaw}". The protagonist's agency and the story's meaning never coincide: the character drives the plot in thematically blank scenes, so what they actively do is never about what the story is ultimately exploring.`,
+          suggestedFix: `Tie the protagonist's initiative to "${themeRaw}": the choices they make to drive the plot should be the choices that test the theme. When agency and meaning coincide, the audience reads the protagonist's actions as an argument about the theme, not just moves that advance the plot.`,
         });
       }
     }
