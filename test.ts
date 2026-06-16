@@ -19799,6 +19799,68 @@ He looks away.`;
     });
   });
 
+  describe('Wave 355 — pacingPass: suspense peak scene underweight, seed scene bloat, stakes scene underweight', async () => {
+    const makeRec355 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain355 = (lineCounts: number[]) =>
+      lineCounts.map((n, i) =>
+        `INT. SC${i} - DAY\n\n${Array.from({ length: n }, (_, j) => `Action line ${j + 1} for scene ${i}.`).join('\n\n')}`
+      ).join('\n\n');
+    const runP355 = async (records: any[], fountain: string) => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      return pacingPass({ fountain, original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('SUSPENSE_PEAK_SCENE_UNDERWEIGHT fires when the peak-suspense scene is far below average length', async () => {
+      const lc355s = [10, 10, 2, 10, 10, 10, 10, 10];
+      const recs355s = Array.from({ length: 8 }, (_, i) => makeRec355(i, { suspenseDelta: i === 2 ? 5 : 0.5 }));
+      const res = await runP355(recs355s, makeFountain355(lc355s));
+      assert.ok(res.issues.some((i: any) => i.rule === 'SUSPENSE_PEAK_SCENE_UNDERWEIGHT'), 'SUSPENSE_PEAK_SCENE_UNDERWEIGHT should fire');
+    });
+
+    it('SUSPENSE_PEAK_SCENE_UNDERWEIGHT does not fire when the peak-suspense scene is average length', async () => {
+      const lc355sn = [10, 10, 10, 10, 10, 10, 10, 10];
+      const recs355sn = Array.from({ length: 8 }, (_, i) => makeRec355(i, { suspenseDelta: i === 2 ? 5 : 0.5 }));
+      const res = await runP355(recs355sn, makeFountain355(lc355sn));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SUSPENSE_PEAK_SCENE_UNDERWEIGHT'), 'SUSPENSE_PEAK_SCENE_UNDERWEIGHT should not fire');
+    });
+
+    it('SEED_SCENE_BLOAT fires when clue-seeding scenes run far above average length', async () => {
+      const lc355b = [4, 4, 20, 4, 4, 20, 4, 4];
+      const recs355b = Array.from({ length: 8 }, (_, i) => makeRec355(i, { seededClueIds: [2, 5].includes(i) ? [`clue${i}`] : [] }));
+      const res = await runP355(recs355b, makeFountain355(lc355b));
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_SCENE_BLOAT'), 'SEED_SCENE_BLOAT should fire');
+    });
+
+    it('SEED_SCENE_BLOAT does not fire when clue-seeding scenes are average length', async () => {
+      const lc355bn = [10, 10, 10, 10, 10, 10, 10, 10];
+      const recs355bn = Array.from({ length: 8 }, (_, i) => makeRec355(i, { seededClueIds: [2, 5].includes(i) ? [`clue${i}`] : [] }));
+      const res = await runP355(recs355bn, makeFountain355(lc355bn));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_SCENE_BLOAT'), 'SEED_SCENE_BLOAT should not fire');
+    });
+
+    it('STAKES_SCENE_UNDERWEIGHT fires when raise_stakes scenes run far below average length', async () => {
+      const lc355k = [10, 10, 2, 10, 10, 2, 10, 10];
+      const recs355k = Array.from({ length: 8 }, (_, i) => makeRec355(i, { purpose: [2, 5].includes(i) ? 'raise_stakes' : 'development' }));
+      const res = await runP355(recs355k, makeFountain355(lc355k));
+      assert.ok(res.issues.some((i: any) => i.rule === 'STAKES_SCENE_UNDERWEIGHT'), 'STAKES_SCENE_UNDERWEIGHT should fire');
+    });
+
+    it('STAKES_SCENE_UNDERWEIGHT does not fire when raise_stakes scenes are average length', async () => {
+      const lc355kn = [10, 10, 10, 10, 10, 10, 10, 10];
+      const recs355kn = Array.from({ length: 8 }, (_, i) => makeRec355(i, { purpose: [2, 5].includes(i) ? 'raise_stakes' : 'development' }));
+      const res = await runP355(recs355kn, makeFountain355(lc355kn));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STAKES_SCENE_UNDERWEIGHT'), 'STAKES_SCENE_UNDERWEIGHT should not fire');
+    });
+  });
+
   describe('Wave 341 — pacingPass: conflict scene underweight, curiosity peak scene underweight, quiet scene bloat', async () => {
     const makeRec341 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

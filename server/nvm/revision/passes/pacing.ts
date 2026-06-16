@@ -31,6 +31,10 @@
 // curiosityDelta scenes avg below 60% — intrigue given least room), quiet scene bloat
 // (scenes carrying no dramatic marker average above 1.5× overall — script lingers on its
 // most inert beats).
+// Wave 355 additions: suspense peak scene underweight (the single highest-suspense scene
+// runs below 60% of overall length), seed scene bloat (clue-seeding scenes average above
+// 1.5× overall — foreshadowing telegraphed by page space), stakes scene underweight
+// (raise_stakes scenes average below 60% — escalations rushed).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1346,6 +1350,89 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `The ${quietLengths341.length} quiet scene(s) — scenes carrying no dramatic marker (no emotional shift, turn, revelation, clock, relationship move, clue, or payoff) — average ${quietAvg341.toFixed(1)} weighted lines, ${Math.round(quietAvg341 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The script's most inert beats are its longest: it lingers exactly where the least is happening, spending page space on scenes that advance neither plot nor character nor feeling.`,
           suggestedFix: 'Compress or cut the quiet scenes: a scene that carries no dramatic charge should be the leanest on the page, not the longest. Find the one beat each inert scene exists to deliver, play it fast, and reinvest the recovered space in the scenes that actually move the story.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 355: SUSPENSE_PEAK_SCENE_UNDERWEIGHT, SEED_SCENE_BLOAT, STAKES_SCENE_UNDERWEIGHT ──
+
+  // SUSPENSE_PEAK_SCENE_UNDERWEIGHT (minor, n≥8, maxSuspense>1): The single highest-
+  // suspense scene runs below 60% of the overall scene length — the story's tensest
+  // moment is one of its shortest. A suspense peak needs room to land: the held breath,
+  // the reaction, the consequence. Rushing the most charged scene through the thinnest
+  // page space blunts the very moment the whole arc has been building toward. Distinct
+  // from SUSPENSE_LENGTH_DECOUPLING (a systemic, multi-scene misallocation) and CLIMAX_
+  // SCENE_UNDERWEIGHT (the climax/Act-3 scene): this isolates the single peak-suspense
+  // scene wherever it falls.
+  if (records.length >= 8) {
+    const maxSusp355 = Math.max(...(records as any[]).map(r => r.suspenseDelta ?? 0));
+    if (maxSusp355 > 1) {
+      const peakIdx355 = (records as any[]).findIndex(r => (r.suspenseDelta ?? 0) === maxSusp355);
+      const peakLen355 = sceneLengths.get(peakIdx355) ?? 0;
+      if (peakLen355 > 0 && peakLen355 < avgLength * 0.6) {
+        issues.push({
+          location: `Scene ${peakIdx355} (peak suspense: ${maxSusp355})`,
+          rule: 'SUSPENSE_PEAK_SCENE_UNDERWEIGHT',
+          severity: 'minor',
+          description: `The story's highest-suspense scene (Scene ${peakIdx355}, suspenseDelta ${maxSusp355}) runs ${peakLen355} weighted lines — ${Math.round(peakLen355 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The tensest moment in the story is one of its shortest scenes. A suspense peak needs room to land — the held breath, the reaction, the consequence — and rushing it through the thinnest page space blunts the beat the whole arc has been building toward.`,
+          suggestedFix: 'Expand the peak-suspense scene: stage the danger, hold on the uncertainty, and let the immediate fallout register before cutting away. The scene of maximum tension should be among the script\'s most fully realized, not a beat the page hurries past.',
+        });
+      }
+    }
+  }
+
+  // SEED_SCENE_BLOAT (minor, n≥8, ≥2 seed scenes): Scenes that plant story clues
+  // (seededClueIds non-empty) average above 1.5× the overall scene length. Foreshadowing
+  // is most effective when it is glimpsed — a detail the audience half-registers and only
+  // recognizes in hindsight. When clue-planting scenes sprawl, the seed is lingered on so
+  // long that it telegraphs its own importance, and the later payoff loses the pleasure of
+  // surprise. Distinct from CLOCK_SCENE_PACING_MISMATCH (clock-raise scenes) and QUIET_
+  // SCENE_BLOAT (scenes with no dramatic marker): this targets the clue-seeding channel.
+  if (records.length >= 8) {
+    const seedLengths355: number[] = [];
+    for (let i355 = 0; i355 < records.length; i355++) {
+      if ((((records as any[])[i355].seededClueIds ?? []) as any[]).length > 0) {
+        seedLengths355.push(sceneLengths.get(i355) ?? 0);
+      }
+    }
+    if (seedLengths355.length >= 2) {
+      const seedAvg355 = seedLengths355.reduce((s, v) => s + v, 0) / seedLengths355.length;
+      if (seedAvg355 > avgLength * 1.5) {
+        issues.push({
+          location: `${seedLengths355.length} clue-seeding scene(s)`,
+          rule: 'SEED_SCENE_BLOAT',
+          severity: 'minor',
+          description: `The ${seedLengths355.length} clue-seeding scene(s) average ${seedAvg355.toFixed(1)} weighted lines — ${Math.round(seedAvg355 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). Foreshadowing works best glimpsed: a detail the audience half-registers and recognizes only in hindsight. When clue-planting scenes sprawl, the seed is lingered on so long that it telegraphs its own importance, and the eventual payoff loses the pleasure of surprise.`,
+          suggestedFix: 'Compress clue-seeding scenes: plant the detail quickly, woven into action that has its own purpose, so it passes almost unnoticed. A clue earns its payoff by being remembered, not by being underlined — the less page space it occupies, the more satisfying its later return.',
+        });
+      }
+    }
+  }
+
+  // STAKES_SCENE_UNDERWEIGHT (minor, n≥8, ≥2 raise_stakes scenes): Scenes whose purpose
+  // is to raise the stakes (purpose === 'raise_stakes') average below 60% of the overall
+  // scene length. The moments that escalate what is at risk are rushed through the
+  // script's thinnest page space, so the audience is told the stakes rose without being
+  // given time to feel the new weight. Escalation needs room to register the cost.
+  // Distinct from the emotional/suspense/conflict underweight checks (different channels)
+  // and from STAKES_RAISED_EXTERNALLY in intention.ts (which audits agency, not length).
+  if (records.length >= 8) {
+    const stakesLengths355: number[] = [];
+    for (let i355s = 0; i355s < records.length; i355s++) {
+      if ((records as any[])[i355s].purpose === 'raise_stakes') {
+        stakesLengths355.push(sceneLengths.get(i355s) ?? 0);
+      }
+    }
+    if (stakesLengths355.length >= 2) {
+      const stakesAvg355 = stakesLengths355.reduce((s, v) => s + v, 0) / stakesLengths355.length;
+      if (stakesAvg355 < avgLength * 0.6) {
+        issues.push({
+          location: `${stakesLengths355.length} stakes-raising scene(s)`,
+          rule: 'STAKES_SCENE_UNDERWEIGHT',
+          severity: 'minor',
+          description: `The ${stakesLengths355.length} stakes-raising scene(s) average ${stakesAvg355.toFixed(1)} weighted lines — ${Math.round(stakesAvg355 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The moments that escalate what is at risk are rushed through the script's thinnest page space, so the audience is told the stakes rose without being given time to feel the new weight. Escalation has to be absorbed to land.`,
+          suggestedFix: 'Give stakes-raising scenes room to breathe: let the new danger or cost sink in through reaction and consequence, not just announcement. A raise that the audience experiences — sees what it threatens, feels what it could cost — lands far harder than one the script states and moves past.',
         });
       }
     }
