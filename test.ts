@@ -18713,6 +18713,82 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 398 — payoffPass: clue seed suspense flat, payoff midpoint void, clue seed revelation decoupled', async () => {
+    const makeRec398 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runPay398 = async (records: any[]) => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      return payoffPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CLUE_SEED_SUSPENSE_FLAT fires when all seed scenes have zero suspense and overall suspense is present', async () => {
+      // Seeds at 2,4,6 with suspenseDelta=0; scene 7 has suspenseDelta=2 (overall > 0) → fires
+      const recs398a = Array.from({ length: 8 }, (_, i) => makeRec398(i, {
+        seededClueIds: [2, 4, 6].includes(i) ? ['c1'] : [],
+        suspenseDelta: i === 7 ? 2 : 0,
+      }));
+      const res = await runPay398(recs398a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLUE_SEED_SUSPENSE_FLAT'), 'CLUE_SEED_SUSPENSE_FLAT should fire');
+    });
+
+    it('CLUE_SEED_SUSPENSE_FLAT does not fire when one seed scene has positive suspense', async () => {
+      // Seeds at 2,4,6; scene 4 has suspenseDelta=1.5 (not all flat) → no fire
+      const recs398anr = Array.from({ length: 8 }, (_, i) => makeRec398(i, {
+        seededClueIds: [2, 4, 6].includes(i) ? ['c1'] : [],
+        suspenseDelta: i === 4 ? 1.5 : 0,
+      }));
+      const res = await runPay398(recs398anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLUE_SEED_SUSPENSE_FLAT'), 'CLUE_SEED_SUSPENSE_FLAT should not fire');
+    });
+
+    it('PAYOFF_MIDPOINT_VOID fires when payoffs exist before and after the 40%–60% zone but not within it', async () => {
+      // n=10, midzone=scenes 4-5; payoffs at 1,2 (early) and 7,8 (late), none at 4-5 → fires
+      const recs398b = Array.from({ length: 10 }, (_, i) => makeRec398(i, {
+        payoffSetupIds: [1, 2, 7, 8].includes(i) ? ['s1'] : [],
+        seededClueIds: i === 0 ? ['s1'] : [],
+      }));
+      const res = await runPay398(recs398b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_MIDPOINT_VOID'), 'PAYOFF_MIDPOINT_VOID should fire');
+    });
+
+    it('PAYOFF_MIDPOINT_VOID does not fire when a payoff lands in the midpoint zone', async () => {
+      // n=10, midzone=scenes 4-5; payoffs at 1 (early), 4 (in midzone), 7 (late) → no fire
+      const recs398bnr = Array.from({ length: 10 }, (_, i) => makeRec398(i, {
+        payoffSetupIds: [1, 4, 7].includes(i) ? ['s1'] : [],
+        seededClueIds: i === 0 ? ['s1'] : [],
+      }));
+      const res = await runPay398(recs398bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_MIDPOINT_VOID'), 'PAYOFF_MIDPOINT_VOID should not fire');
+    });
+
+    it('CLUE_SEED_REVELATION_DECOUPLED fires when no seed scene coincides with a revelation', async () => {
+      // Seeds at 1,3 (revelation=null); revelations at 5,7 (no seeds) → fires
+      const recs398c = Array.from({ length: 8 }, (_, i) => makeRec398(i, {
+        seededClueIds: [1, 3].includes(i) ? ['c1'] : [],
+        revelation: [5, 7].includes(i) ? true : null,
+      }));
+      const res = await runPay398(recs398c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLUE_SEED_REVELATION_DECOUPLED'), 'CLUE_SEED_REVELATION_DECOUPLED should fire');
+    });
+
+    it('CLUE_SEED_REVELATION_DECOUPLED does not fire when a seed scene also carries a revelation', async () => {
+      // Seeds at 1,3; scene 3 also has revelation=true → no fire
+      const recs398cnr = Array.from({ length: 8 }, (_, i) => makeRec398(i, {
+        seededClueIds: [1, 3].includes(i) ? ['c1'] : [],
+        revelation: [3, 6].includes(i) ? true : null,
+      }));
+      const res = await runPay398(recs398cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLUE_SEED_REVELATION_DECOUPLED'), 'CLUE_SEED_REVELATION_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 397 — pacingPass: seed scene underweight, stakes scene bloat, curiosity peak scene bloat', async () => {
     const makeRec397 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

@@ -43,6 +43,12 @@
 // is planted under time pressure — the seed-side sibling of payoff clock decoupled), clue
 // seed front-loaded (>60% of clues planted in the first half — the mirror of clue seed late
 // majority).
+// Wave 398 additions: clue seed suspense flat (all seed scenes have suspenseDelta ≤ 0 —
+// evidence planted in tension-free moments; the suspense-channel complement of clue seed
+// curiosity flat and clue seed emotion flat), payoff midpoint void (no payoff in the 40%–60%
+// pivot zone while payoffs exist before and after — the pivot is structurally inert), clue
+// seed revelation decoupled (no seed scene coincides with a revelation — planting evidence
+// and making disclosures never overlap, missing the compound effect of both in one moment).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1441,6 +1447,91 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         description: `${earlyClues384} of ${clueInfo.size} planted clues (${Math.round(earlyClues384 / clueInfo.size * 100)}%) are seeded in the first half of the story — the setup engine front-loads its work. The back half introduces few new threads, so the midpoint-onward stretch coasts on early plants and the audience stops actively processing new setups precisely when the story should be deepening.`,
         suggestedFix: 'Move some clue plants into the second half: a new thread seeded at the midpoint or in Act 2b keeps the audience processing fresh setups and gives the climax something recently planted to pay off. A setup engine that goes quiet after the midpoint leaves the back half with nothing new to anticipate.',
       });
+    }
+  }
+
+  // ── Wave 398: CLUE_SEED_SUSPENSE_FLAT, PAYOFF_MIDPOINT_VOID, CLUE_SEED_REVELATION_DECOUPLED ──
+
+  // CLUE_SEED_SUSPENSE_FLAT (minor, n≥8, ≥3 seed scenes, overall suspense present):
+  // All clue-seeding scenes have suspenseDelta ≤ 0 — the story plants its evidence only
+  // in moments that generate no dramatic tension. A seed dropped into a low-stakes moment
+  // risks reading as mundane set dressing; planted under pressure, the same detail reads
+  // as charged and memorable. Average mode × suspense channel × seed subset. Distinct from
+  // CLUE_SEED_CURIOSITY_FLAT (curiosityDelta channel), CLUE_SEED_EMOTION_FLAT (emotional-
+  // shift channel), and CLUE_SEED_RELATIONSHIP_DECOUPLED (relationship channel): this
+  // audits the suspense signal for the seed-scene subset.
+  if (records.length >= 8) {
+    const seedRecs398a = (records as any[]).filter(r => ((r.seededClueIds ?? []) as any[]).length > 0);
+    if (seedRecs398a.length >= 3) {
+      const anyOverallSuspense398a = (records as any[]).some(r => (r.suspenseDelta ?? 0) > 0);
+      if (anyOverallSuspense398a) {
+        const allSeedsSuspFlat398a = seedRecs398a.every(r => (r.suspenseDelta ?? 0) <= 0);
+        if (allSeedsSuspFlat398a) {
+          issues.push({
+            location: 'Clue-seeding scenes — suspense decoupled',
+            rule: 'CLUE_SEED_SUSPENSE_FLAT',
+            severity: 'minor',
+            description: `All ${seedRecs398a.length} clue-seeding scenes have suspenseDelta ≤ 0 — the story plants its evidence in moments that generate no dramatic tension. A seed dropped into a low-stakes moment risks reading as mundane set dressing; planted under pressure, the same detail reads as charged and memorable. The suspense engine and the foreshadowing engine never share a scene.`,
+            suggestedFix: 'Plant at least one key clue inside a tense scene: a discovery made under threat, a clue glimpsed while something else is going wrong, or a detail revealed by a character under pressure. Suspense makes a planted seed feel dangerous and therefore worth remembering.',
+          });
+        }
+      }
+    }
+  }
+
+  // PAYOFF_MIDPOINT_VOID (minor, n≥8, ≥3 total payoffs, payoffs on both sides of zone):
+  // No payoff lands in the 40%–60% pivot zone while payoffs exist both before and after it.
+  // The structural midpoint is where momentum pivots; closing a loop here acknowledges the
+  // turn and signals escalation for the back half. A payoff-free midzone leaves the pivot
+  // narratively neutral — the story turns structurally but settles nothing. Zone presence/
+  // absence mode × payoff channel × midpoint position. Distinct from PAYOFF_ACT2A_VOID
+  // (25%–50% zone — broader and offset), MIDSTORY_PAYOFF_VOID (entire 25%–75% mid-half),
+  // and CLUE_SEED_MIDPOINT_VOID (same zone × seed channel rather than payoff channel).
+  if (records.length >= 8) {
+    const payoffScenes398b = (records as any[]).filter(r => ((r.payoffSetupIds ?? []) as any[]).length > 0);
+    if (payoffScenes398b.length >= 3) {
+      const mid40398b = Math.floor(records.length * 0.4);
+      const mid60398b = Math.ceil(records.length * 0.6);
+      const midPayoffs398b = (records as any[]).slice(mid40398b, mid60398b)
+        .filter(r => ((r.payoffSetupIds ?? []) as any[]).length > 0).length;
+      const earlyPayoffs398b = (records as any[]).slice(0, mid40398b)
+        .filter(r => ((r.payoffSetupIds ?? []) as any[]).length > 0).length;
+      const latePayoffs398b = (records as any[]).slice(mid60398b)
+        .filter(r => ((r.payoffSetupIds ?? []) as any[]).length > 0).length;
+      if (midPayoffs398b === 0 && earlyPayoffs398b > 0 && latePayoffs398b > 0) {
+        issues.push({
+          location: `Payoff distribution — midpoint zone void (scenes ${mid40398b}–${mid60398b - 1})`,
+          rule: 'PAYOFF_MIDPOINT_VOID',
+          severity: 'minor',
+          description: `No payoff lands in the 40%–60% pivot zone (scenes ${mid40398b}–${mid60398b - 1}), though payoffs exist in the first half (${earlyPayoffs398b}) and the second half (${latePayoffs398b}). The structural midpoint is where momentum pivots; closing a loop here acknowledges the turn and signals escalation ahead. A payoff-free midzone leaves the pivot narratively neutral — the story turns structurally but settles nothing in the moment.`,
+          suggestedFix: 'Schedule one payoff inside the midpoint zone: a clue resolved at the pivot point gives the audience a sense of completion that resets expectations for the escalating back half. It also distinguishes Act 2a from Act 2b — one half builds, the midpoint closes, the other half escalates.',
+        });
+      }
+    }
+  }
+
+  // CLUE_SEED_REVELATION_DECOUPLED (minor, n≥8, ≥2 seed scenes, ≥2 revelation scenes):
+  // No clue-seeding scene coincides with a revelation — the story plants evidence and
+  // makes disclosures in entirely separate moments. A scene where a clue is planted
+  // alongside a revelation charges both: the disclosure makes the seed feel significant,
+  // and the seed recontextualizes what was just revealed. Co-occurrence mode ×
+  // seededClueIds × revelation channels. Distinct from CLUE_SEED_DRAMATIC_TURN_DECOUPLED
+  // (dramaticTurn signal), CLUE_SEED_CLOCK_DECOUPLED (clock signal), and PAYOFF_
+  // REVELATION_DISCONNECT (payoff side of revelation — this audits the seed side).
+  if (records.length >= 8) {
+    const seedRecs398c = (records as any[]).filter(r => ((r.seededClueIds ?? []) as any[]).length > 0);
+    const revelRecs398c = (records as any[]).filter(r => r.revelation === true);
+    if (seedRecs398c.length >= 2 && revelRecs398c.length >= 2) {
+      const anySeedWithRevel398c = seedRecs398c.some(r => r.revelation === true);
+      if (!anySeedWithRevel398c) {
+        issues.push({
+          location: 'Clue-seeding scenes — revelation decoupled',
+          rule: 'CLUE_SEED_REVELATION_DECOUPLED',
+          severity: 'minor',
+          description: `The story has ${seedRecs398c.length} clue-seeding scene(s) and ${revelRecs398c.length} revelation scene(s), but none coincide — evidence is planted and disclosures are made in entirely separate moments. A clue planted alongside a revelation charges both: the disclosure makes the seed feel significant, and the seed recontextualizes what was just revealed. Keeping the two channels in separate scenes misses the compound effect of a scene that does both.`,
+          suggestedFix: 'In at least one revelation scene, plant a clue within or immediately after the disclosure: as one secret is revealed, let it expose or imply another. A revelation that generates a new mystery — rather than simply closing one — keeps the audience actively processing rather than passively receiving.',
+        });
+      }
     }
   }
 
