@@ -26,6 +26,11 @@
 // suspenseDelta ≤ 0), conflict peak emotion absent (the heaviest-rupture scene is
 // emotionally neutral), conflict peak curiosity absent (the heaviest-rupture scene has
 // curiosityDelta ≤ 0) — the single biggest bond-break is dramatically inert.
+// Wave 366 additions: conflict peak dramatic turn absent (the heaviest-rupture scene
+// carries no dramatic turn — the biggest break is not a story pivot), conflict peak clock
+// absent (the heaviest-rupture scene raises no clock while the story uses clocks elsewhere
+// — the biggest break adds no time pressure), conflict late first rupture (the first
+// conflict scene falls at or after the midpoint — the entire first half is frictionless).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1376,6 +1381,77 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `The story's heaviest bond-rupture (Scene ${peakRec352.sceneIdx}, magnitude ${peakMag352.toFixed(2)}) carries a curiosityDelta of ${(peakRec352.curiosityDelta ?? 0).toFixed(2)} — the biggest break raises no questions about what happens next. A major rupture should leave the audience hungry to know how the characters will live with the fracture; when the peak conflict closes a door without opening one, the story's central break is an endpoint rather than a turn.`,
             suggestedFix: 'Make the heaviest rupture generative: the break should open new uncertainties — what each character does now, what the fracture exposes, who they become without the bond. The biggest conflict should propel the story forward, not just register damage.',
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 366: CONFLICT_PEAK_DRAMATIC_TURN_ABSENT, CONFLICT_PEAK_CLOCK_ABSENT, CONFLICT_LATE_FIRST_RUPTURE ──
+  // The first two extend the Wave 352 peak-rupture audit to the dramatic-turn and clock
+  // channels; the third audits the timing of the story's first rupture.
+  if (records.length >= 8) {
+    const conflictRecs366 = (records as any[]).filter(r =>
+      ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+    );
+    if (conflictRecs366.length >= 2) {
+      let peakRec366: any = null;
+      let peakMag366 = 0;
+      for (const r of conflictRecs366) {
+        const mag = Math.max(
+          ...((r.relationshipShifts ?? []) as Array<{ amount: number }>)
+            .filter(s => s.amount <= -0.3)
+            .map(s => Math.abs(s.amount)),
+        );
+        if (mag > peakMag366) { peakMag366 = mag; peakRec366 = r; }
+      }
+      if (peakRec366) {
+        // CONFLICT_PEAK_DRAMATIC_TURN_ABSENT: the heaviest rupture is not a story pivot.
+        // Distinct from CONFLICT_DRAMATIC_TURN_VOID (audits whether turn scenes carry a
+        // negative shift; this audits whether the peak conflict carries a turn) and from
+        // the Wave 352 peak checks (suspense/emotion/curiosity channels).
+        if ((peakRec366.dramaticTurn ?? 'nothing') === 'nothing') {
+          issues.push({
+            location: `Scene ${peakRec366.sceneIdx} — peak rupture (magnitude ${peakMag366.toFixed(2)})`,
+            rule: 'CONFLICT_PEAK_DRAMATIC_TURN_ABSENT',
+            severity: 'minor',
+            description: `The story's heaviest bond-rupture (Scene ${peakRec366.sceneIdx}, magnitude ${peakMag366.toFixed(2)}) carries no dramatic turn — the biggest break is not a story pivot. The single most consequential fracture should reverse, escalate, or recast the situation; when it leaves the plot's trajectory unchanged, the rupture is an event the story passes through rather than a turn the story turns on.`,
+            suggestedFix: 'Make the heaviest rupture pivot the story: the break should change what the protagonist is pursuing, expose a new obstacle, or invert an alliance. The biggest fracture in the relational world deserves to be a hinge the plot swings on, not a beat it merely records.',
+          });
+        }
+        // CONFLICT_PEAK_CLOCK_ABSENT: the heaviest rupture adds no time pressure even
+        // though the story uses clocks. Distinct from CONFLICT_CLOCK_DECOUPLED (audits
+        // whether clock scenes carry conflict; this audits whether the peak conflict
+        // raises a clock) and CONFLICT_WITHOUT_DEADLINE.
+        const clockScenes366 = (records as any[]).filter(r => r.clockRaised === true);
+        if (clockScenes366.length >= 2 && peakRec366.clockRaised !== true) {
+          issues.push({
+            location: `Scene ${peakRec366.sceneIdx} — peak rupture (magnitude ${peakMag366.toFixed(2)})`,
+            rule: 'CONFLICT_PEAK_CLOCK_ABSENT',
+            severity: 'minor',
+            description: `The story's heaviest bond-rupture (Scene ${peakRec366.sceneIdx}, magnitude ${peakMag366.toFixed(2)}) raises no clock, even though the story uses ${clockScenes366.length} clock-raising scenes elsewhere. The biggest break adds no time pressure — it fractures a bond without tightening the deadline the characters are racing. When the peak conflict and the urgency engine never coincide, the rupture lands in a moment with all the time in the world.`,
+            suggestedFix: 'Couple the heaviest rupture to a deadline: let the break that hurts most also shorten the time available — a betrayal that costs a crucial ally just as the clock runs down, a severed bond that forecloses an escape. The biggest fracture is most devastating when there is no time left to repair it.',
+          });
+        }
+      }
+
+      // CONFLICT_LATE_FIRST_RUPTURE (n≥10): the first conflict scene occurs at or after
+      // the midpoint — the entire first half is frictionless. Distinct from CONFLICT_
+      // OPENING_VOID / CONFLICT_ACT1_ABSENT (the first 25% only) and ELEVENTH_HOUR_
+      // CONFLICT (a NEW pair in the final 10%): this fires when no rupture of any kind
+      // lands before the 50% mark despite the story containing conflict.
+      if (records.length >= 10) {
+        const mid366 = Math.floor(records.length * 0.5);
+        const firstRuptureIdx366 = conflictRecs366
+          .map(r => (records as any[]).indexOf(r))
+          .reduce((min, i) => Math.min(min, i), Infinity);
+        if (firstRuptureIdx366 >= mid366) {
+          issues.push({
+            location: `First rupture at Scene ${(records as any[])[firstRuptureIdx366].sceneIdx} (at or past the midpoint)`,
+            rule: 'CONFLICT_LATE_FIRST_RUPTURE',
+            severity: 'minor',
+            description: `The story's first relational rupture lands at Scene ${(records as any[])[firstRuptureIdx366].sceneIdx}, at or past the midpoint — the entire first half is frictionless. With ${conflictRecs366.length} conflict scenes in the story, all of them fall in the back half, so the setup and first complication zone establish the world and the relationships without ever straining a bond. The audience reaches the midpoint with no felt conflict to invest in.`,
+            suggestedFix: 'Introduce a rupture in the first half: even a small friction — a broken promise, an eroded trust, a clash of goals — gives the audience a relational stake before the story starts breaking things in earnest. A first half with no conflict trains the audience to expect calm exactly when the story should be teaching them to worry.',
           });
         }
       }

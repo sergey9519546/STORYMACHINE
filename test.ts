@@ -18144,6 +18144,83 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 366 — conflictPass: peak dramatic turn absent, peak clock absent, late first rupture', async () => {
+    const makeRec366 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF366 = async (records: any[]) => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      return conflictPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    const rupture366 = (amount: number) => [{ pairKey: 'A|B', amount, dimension: 'trust' }];
+
+    it('CONFLICT_PEAK_DRAMATIC_TURN_ABSENT fires when the heaviest rupture carries no dramatic turn', async () => {
+      const recs366dt = Array.from({ length: 8 }, (_, i) =>
+        makeRec366(i,
+          i === 5 ? { relationshipShifts: rupture366(-0.4) } :
+          i === 6 ? { relationshipShifts: rupture366(-0.9), dramaticTurn: 'nothing' } : {})
+      );
+      const res = await runCF366(recs366dt);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_PEAK_DRAMATIC_TURN_ABSENT'), 'CONFLICT_PEAK_DRAMATIC_TURN_ABSENT should fire');
+    });
+
+    it('CONFLICT_PEAK_DRAMATIC_TURN_ABSENT does not fire when the heaviest rupture is a dramatic turn', async () => {
+      const recs366dtni = Array.from({ length: 8 }, (_, i) =>
+        makeRec366(i,
+          i === 5 ? { relationshipShifts: rupture366(-0.4) } :
+          i === 6 ? { relationshipShifts: rupture366(-0.9), dramaticTurn: 'reversal' } : {})
+      );
+      const res = await runCF366(recs366dtni);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_PEAK_DRAMATIC_TURN_ABSENT'), 'CONFLICT_PEAK_DRAMATIC_TURN_ABSENT should not fire');
+    });
+
+    it('CONFLICT_PEAK_CLOCK_ABSENT fires when the heaviest rupture raises no clock while clocks exist elsewhere', async () => {
+      const recs366ck = Array.from({ length: 8 }, (_, i) =>
+        makeRec366(i,
+          i === 1 || i === 2 ? { clockRaised: true } :
+          i === 5 ? { relationshipShifts: rupture366(-0.4) } :
+          i === 6 ? { relationshipShifts: rupture366(-0.9), clockRaised: false } : {})
+      );
+      const res = await runCF366(recs366ck);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_PEAK_CLOCK_ABSENT'), 'CONFLICT_PEAK_CLOCK_ABSENT should fire');
+    });
+
+    it('CONFLICT_PEAK_CLOCK_ABSENT does not fire when the heaviest rupture raises a clock', async () => {
+      const recs366ckni = Array.from({ length: 8 }, (_, i) =>
+        makeRec366(i,
+          i === 1 || i === 2 ? { clockRaised: true } :
+          i === 5 ? { relationshipShifts: rupture366(-0.4) } :
+          i === 6 ? { relationshipShifts: rupture366(-0.9), clockRaised: true } : {})
+      );
+      const res = await runCF366(recs366ckni);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_PEAK_CLOCK_ABSENT'), 'CONFLICT_PEAK_CLOCK_ABSENT should not fire');
+    });
+
+    it('CONFLICT_LATE_FIRST_RUPTURE fires when the first rupture lands at or past the midpoint', async () => {
+      // n=10 → mid=5; ruptures only at scenes 6 and 8
+      const recs366lf = Array.from({ length: 10 }, (_, i) =>
+        makeRec366(i, [6, 8].includes(i) ? { relationshipShifts: rupture366(-0.5) } : {})
+      );
+      const res = await runCF366(recs366lf);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_LATE_FIRST_RUPTURE'), 'CONFLICT_LATE_FIRST_RUPTURE should fire');
+    });
+
+    it('CONFLICT_LATE_FIRST_RUPTURE does not fire when a rupture lands in the first half', async () => {
+      // rupture at scene 2 (first half) and scene 8
+      const recs366lfni = Array.from({ length: 10 }, (_, i) =>
+        makeRec366(i, [2, 8].includes(i) ? { relationshipShifts: rupture366(-0.5) } : {})
+      );
+      const res = await runCF366(recs366lfni);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_LATE_FIRST_RUPTURE'), 'CONFLICT_LATE_FIRST_RUPTURE should not fire');
+    });
+  });
+
   describe('Wave 352 — conflictPass: peak suspense absent, peak emotion absent, peak curiosity absent', async () => {
     const makeRec352 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
