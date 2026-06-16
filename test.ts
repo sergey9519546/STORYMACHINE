@@ -21211,6 +21211,73 @@ Time to go now.`;
     });
   });
 
+  describe('Wave 345 — structurePass: Act 2b suspense void, Act 2a emotional flatline, midpoint curiosity void', async () => {
+    const makeRec345 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'negative', suspenseDelta: 0.5, curiosityDelta: 1,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runST345 = async (records: any[]) => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      return structurePass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ACT2B_SUSPENSE_VOID fires when Act 2b (scenes 5–6) has no suspense spike', async () => {
+      // n=10 → act2b = slice(5,7) = scenes 5,6; flat there, spikes elsewhere
+      const recs345sv = Array.from({ length: 10 }, (_, i) =>
+        makeRec345(i, { suspenseDelta: [5, 6].includes(i) ? 0.5 : 2 })
+      );
+      const res = await runST345(recs345sv);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACT2B_SUSPENSE_VOID'), 'ACT2B_SUSPENSE_VOID should fire');
+    });
+
+    it('ACT2B_SUSPENSE_VOID does not fire when Act 2b carries a suspense spike', async () => {
+      const recs345svn = Array.from({ length: 10 }, (_, i) =>
+        makeRec345(i, { suspenseDelta: i === 5 ? 2 : 0.5 })
+      );
+      const res = await runST345(recs345svn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACT2B_SUSPENSE_VOID'), 'ACT2B_SUSPENSE_VOID should not fire');
+    });
+
+    it('ACT2A_EMOTIONAL_FLATLINE fires when all Act 2a (scenes 2–4) scenes are neutral', async () => {
+      // n=10 → act2a = slice(2,5) = scenes 2,3,4
+      const recs345ef = Array.from({ length: 10 }, (_, i) =>
+        makeRec345(i, { emotionalShift: [2, 3, 4].includes(i) ? 'neutral' : 'negative' })
+      );
+      const res = await runST345(recs345ef);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACT2A_EMOTIONAL_FLATLINE'), 'ACT2A_EMOTIONAL_FLATLINE should fire');
+    });
+
+    it('ACT2A_EMOTIONAL_FLATLINE does not fire when an Act 2a scene carries emotion', async () => {
+      const recs345efn = Array.from({ length: 10 }, (_, i) =>
+        makeRec345(i, { emotionalShift: [2, 4].includes(i) ? 'neutral' : 'negative' })
+      );
+      const res = await runST345(recs345efn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACT2A_EMOTIONAL_FLATLINE'), 'ACT2A_EMOTIONAL_FLATLINE should not fire');
+    });
+
+    it('MIDPOINT_CURIOSITY_VOID fires when the midpoint (scenes 4–5) averages curiosityDelta ≤ 0', async () => {
+      // n=10 → midpoint = slice(4,6) = scenes 4,5; flat there, curious elsewhere
+      const recs345cv = Array.from({ length: 10 }, (_, i) =>
+        makeRec345(i, { curiosityDelta: [4, 5].includes(i) ? 0 : 2 })
+      );
+      const res = await runST345(recs345cv);
+      assert.ok(res.issues.some((i: any) => i.rule === 'MIDPOINT_CURIOSITY_VOID'), 'MIDPOINT_CURIOSITY_VOID should fire');
+    });
+
+    it('MIDPOINT_CURIOSITY_VOID does not fire when the midpoint raises curiosity', async () => {
+      const recs345cvn = Array.from({ length: 10 }, (_, i) =>
+        makeRec345(i, { curiosityDelta: 2 })
+      );
+      const res = await runST345(recs345cvn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'MIDPOINT_CURIOSITY_VOID'), 'MIDPOINT_CURIOSITY_VOID should not fire');
+    });
+  });
+
   describe('Wave 331 — structurePass: Act 3 emotional flatline, Act 1 warmth absent, dramatic turn opening absent', async () => {
     const makeRec331 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

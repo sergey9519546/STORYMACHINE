@@ -25,6 +25,10 @@
 // Wave 331 additions: Act 3 emotional flatline (all finale scenes emotionally
 // neutral), Act 1 warmth absent (no positive scene in opening act),
 // dramatic turn opening absent (no dramatic turn in first 30% of scenes).
+// Wave 345 additions: Act 2b suspense void (no suspense spike in the 50%–75% run-up to
+// the climax), Act 2a emotional flatline (the 25%–50% conflict zone is all neutral),
+// midpoint curiosity void (the 40%–60% pivot averages curiosityDelta ≤ 0 while the
+// story is otherwise curious).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1251,6 +1255,82 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         description: `No scene in the opening 30% (scenes 0–${openingEnd331 - 1}) carries a dramatic turn — the opening act never pivots. A screenplay's first act should contain at least one turning point that disrupts the protagonist's ordinary world and launches the central conflict. Without a turn, the opening is pure setup with no event to signal that the story has actually started.`,
         suggestedFix: 'Place a dramatic turn in the opening act: the discovery of a problem, the arrival of an antagonist, a decision that changes the protagonist\'s direction. This turn is what separates the story from its backstory — it is the moment the audience knows the clock has started.',
       });
+    }
+  }
+
+  // ── Wave 345: ACT2B_SUSPENSE_VOID, ACT2A_EMOTIONAL_FLATLINE, MIDPOINT_CURIOSITY_VOID ──
+
+  // ACT2B_SUSPENSE_VOID (minor, n≥10): No scene in Act 2b (50%–75%) reaches a
+  // suspenseDelta above 1. The run-up to the climax is entirely flat. Act 2b is the
+  // pressure cooker — the protagonist's lowest point and the approach to the final
+  // confrontation should be the tensest stretch before the climax itself. A void of
+  // meaningful tension here means the story coasts into its peak instead of building
+  // toward it. Distinct from ACT2A_SUSPENSE_VOID (the 25%–50% zone), SECOND_ACT_
+  // INVERSION (Act 2b avg falls relative to Act 2a — a comparison, not an absolute
+  // absence), and DARK_NIGHT_ABSENT (emotional low point, not a suspense spike).
+  if (n >= 10) {
+    const act2bStart345 = Math.floor(n * 0.5);
+    const act2bEnd345 = Math.floor(n * 0.75);
+    const act2bRecs345 = records.slice(act2bStart345, act2bEnd345);
+    if (act2bRecs345.length >= 2 && !act2bRecs345.some(r => r.suspenseDelta > 1)) {
+      issues.push({
+        location: `Act 2b (Scenes ${act2bStart345}–${act2bEnd345 - 1})`,
+        rule: 'ACT2B_SUSPENSE_VOID',
+        severity: 'minor',
+        description: `No scene in Act 2b (Scenes ${act2bStart345}–${act2bEnd345 - 1}) reaches a suspenseDelta above 1 — the run-up to the climax is entirely flat. Act 2b should be the pressure cooker, the tensest stretch before the final confrontation; a void of meaningful tension here means the story coasts into its peak instead of building toward it, and the climax inherits no momentum.`,
+        suggestedFix: 'Escalate through Act 2b: tighten a deadline, spring a setback, or close off an escape route so the suspense climbs above baseline on the approach to the climax. The audience should feel the walls closing in during the stretch just before the peak.',
+      });
+    }
+  }
+
+  // ACT2A_EMOTIONAL_FLATLINE (minor, n≥10, ≥3 Act 2a scenes): Every scene in Act 2a
+  // (25%–50%) carries emotionalShift='neutral'. The first half of the conflict zone
+  // generates no emotional movement — the protagonist meets the rising complications
+  // without feeling anything about them. Act 2a is where the audience's investment
+  // should deepen as the cost of the conflict starts to register; a flatline here means
+  // the story advances the plot while the emotional arc stalls. Distinct from ACT3_
+  // EMOTIONAL_FLATLINE (finale zone), MIDPOINT_EMOTIONAL_FLATLINE (the central scene),
+  // and EMOTIONAL_ARC_UNIFORM (>70% of ALL scenes share one shift, any value).
+  if (n >= 10) {
+    const act2aStart345 = Math.floor(n * 0.25);
+    const act2bStart345b = Math.floor(n * 0.5);
+    const act2aRecs345 = records.slice(act2aStart345, act2bStart345b);
+    if (act2aRecs345.length >= 3 && act2aRecs345.every(r => r.emotionalShift === 'neutral')) {
+      issues.push({
+        location: `Act 2a (Scenes ${act2aStart345}–${act2bStart345b - 1}) — emotional flatline`,
+        rule: 'ACT2A_EMOTIONAL_FLATLINE',
+        severity: 'minor',
+        description: `All ${act2aRecs345.length} Act 2a scenes (${act2aStart345}–${act2bStart345b - 1}) are emotionally neutral — the first half of the conflict zone generates no emotional movement. Act 2a is where the audience's investment should deepen as the cost of the conflict starts to register; a flatline here means the plot advances while the emotional arc stalls, and the protagonist meets rising complications without feeling anything about them.`,
+        suggestedFix: 'Charge Act 2a emotionally: let the early complications land on the protagonist as a flare of fear, a flicker of hope, a wound to a relationship. The conflict should not just happen to the protagonist — it should move them, so the audience deepens its stake as the story climbs toward the midpoint.',
+      });
+    }
+  }
+
+  // MIDPOINT_CURIOSITY_VOID (minor, n≥10, ≥2 midpoint scenes): The midpoint zone
+  // (40%–60%) has an average curiosityDelta of zero or less, in a story that otherwise
+  // generates curiosity (some scene exceeds curiosityDelta 1). The midpoint is where a
+  // strong structure reframes the central question — a revelation that recasts the goal,
+  // a twist that opens a deeper mystery — and curiosity should spike there. A curiosity
+  // void at the exact center means the story passes its pivot without renewing the
+  // audience's need to know. Distinct from ACT2_CURIOSITY_VALLEY (the whole 25%–75% act
+  // averaged below both bookends) and STRUCTURE_CURIOSITY_VOID (no curiosity spike
+  // anywhere in the story): this targets the narrow midpoint window specifically.
+  if (n >= 10) {
+    const midStart345 = Math.floor(n * 0.4);
+    const midEnd345 = Math.floor(n * 0.6);
+    const midRecs345 = records.slice(midStart345, midEnd345);
+    const storyCurious345 = records.some(r => (r.curiosityDelta ?? 0) > 1);
+    if (midRecs345.length >= 2 && storyCurious345) {
+      const midAvg345 = midRecs345.reduce((s, r) => s + (r.curiosityDelta ?? 0), 0) / midRecs345.length;
+      if (midAvg345 <= 0) {
+        issues.push({
+          location: `Midpoint (Scenes ${midStart345}–${midEnd345 - 1}) — curiosity void`,
+          rule: 'MIDPOINT_CURIOSITY_VOID',
+          severity: 'minor',
+          description: `The midpoint zone (Scenes ${midStart345}–${midEnd345 - 1}) averages a curiosityDelta of ${midAvg345.toFixed(2)} while the story generates curiosity spikes elsewhere — the pivot of the story passes without renewing the audience's need to know. A strong midpoint reframes the central question: a revelation that recasts the goal, a twist that opens a deeper mystery. A curiosity void at the exact center means the engine of intrigue stalls precisely where it should re-ignite.`,
+          suggestedFix: 'Reframe the central question at the midpoint: introduce a revelation, a reversal, or a new piece of information that changes what the audience thought the story was about. The middle of the story is the most dangerous place to let curiosity flatten — it is where a slack structure loses the room.',
+        });
+      }
     }
   }
 
