@@ -21799,6 +21799,87 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 376 — beliefPass: revelation suspense peak absent, told belief clock decoupled, assertion midpoint void', async () => {
+    const makeRec376 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runB376 = async (records: any[]) => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('REVELATION_SUSPENSE_PEAK_ABSENT fires when the peak-suspense scene has no revelation while 2+ suspense-positive scenes do', async () => {
+      // scenes 1,4 have suspense + revelation; scene 6 has peak suspense (2.0), no revelation
+      const recs376sp = Array.from({ length: 8 }, (_, i) =>
+        makeRec376(i, {
+          suspenseDelta: i === 6 ? 2.0 : i === 1 || i === 4 ? 0.8 : 0,
+          revelation: [1, 4].includes(i) ? 'the hidden truth' : null,
+        }),
+      );
+      const res = await runB376(recs376sp);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_SUSPENSE_PEAK_ABSENT'), 'REVELATION_SUSPENSE_PEAK_ABSENT should fire');
+    });
+
+    it('REVELATION_SUSPENSE_PEAK_ABSENT does not fire when the peak-suspense scene carries a revelation', async () => {
+      const recs376spn = Array.from({ length: 8 }, (_, i) =>
+        makeRec376(i, {
+          suspenseDelta: i === 6 ? 2.0 : i === 1 || i === 4 ? 0.8 : 0,
+          revelation: [1, 4, 6].includes(i) ? 'the hidden truth' : null,
+        }),
+      );
+      const res = await runB376(recs376spn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_SUSPENSE_PEAK_ABSENT'), 'REVELATION_SUSPENSE_PEAK_ABSENT should not fire');
+    });
+
+    it('TOLD_BELIEF_CLOCK_DECOUPLED fires when no assertion scene raises a clock', async () => {
+      // assertions at 1,3,5; clocks at 2,6 — no overlap
+      const recs376cd = Array.from({ length: 8 }, (_, i) =>
+        makeRec376(i, {
+          dialogueHighlights: [1, 3, 5].includes(i) ? ['ALICE: the plan will work'] : [],
+          clockRaised: [2, 6].includes(i),
+        }),
+      );
+      const res = await runB376(recs376cd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TOLD_BELIEF_CLOCK_DECOUPLED'), 'TOLD_BELIEF_CLOCK_DECOUPLED should fire');
+    });
+
+    it('TOLD_BELIEF_CLOCK_DECOUPLED does not fire when an assertion scene raises a clock', async () => {
+      // scene 3 is both an assertion and a clock scene
+      const recs376cdn = Array.from({ length: 8 }, (_, i) =>
+        makeRec376(i, {
+          dialogueHighlights: [1, 3, 5].includes(i) ? ['ALICE: the plan will work'] : [],
+          clockRaised: [3, 6].includes(i),
+        }),
+      );
+      const res = await runB376(recs376cdn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TOLD_BELIEF_CLOCK_DECOUPLED'), 'TOLD_BELIEF_CLOCK_DECOUPLED should not fire');
+    });
+
+    it('ASSERTION_MIDPOINT_VOID fires when the 40-60% zone has no assertion but assertions exist on both sides', async () => {
+      // n=10 → mid zone [4,6); assertions at 1 (before) and 8 (after), none at 4 or 5
+      const recs376mv = Array.from({ length: 10 }, (_, i) =>
+        makeRec376(i, { dialogueHighlights: [1, 8].includes(i) ? ['ALICE: she is lying'] : [] }),
+      );
+      const res = await runB376(recs376mv);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ASSERTION_MIDPOINT_VOID'), 'ASSERTION_MIDPOINT_VOID should fire');
+    });
+
+    it('ASSERTION_MIDPOINT_VOID does not fire when an assertion lands in the midpoint zone', async () => {
+      // assertion at scene 5 (within [4,6))
+      const recs376mvn = Array.from({ length: 10 }, (_, i) =>
+        makeRec376(i, { dialogueHighlights: [1, 5, 8].includes(i) ? ['ALICE: she is lying'] : [] }),
+      );
+      const res = await runB376(recs376mvn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ASSERTION_MIDPOINT_VOID'), 'ASSERTION_MIDPOINT_VOID should not fire');
+    });
+  });
+
   describe('Wave 362 — beliefPass: revelation clock decoupled, told belief Act 3 absent, revelation curiosity peak absent', async () => {
     const makeRec362 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

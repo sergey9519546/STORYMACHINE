@@ -38,6 +38,11 @@
 // told belief Act 3 absent (assertions exist in Acts 1-2 but none in Act 3 — the finale
 // contains no positions or claims), revelation curiosity peak absent (the scene with the
 // highest curiosityDelta has no revelation while 2+ other curious scenes carry revelations).
+// Wave 376 additions: revelation suspense peak absent (the highest-suspense scene has no
+// revelation while 2+ other suspense-positive scenes carry revelations — peak tension without
+// disclosure), told belief clock decoupled (≥3 assertion scenes and ≥2 clock scenes but no
+// assertion lands under time pressure), assertion midpoint void (the 40%–60% pivot carries no
+// assertion while assertions exist on both sides — claims skip the structural center).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1395,6 +1400,79 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Place a revelation at the peak-curiosity scene: when the audience is most urgently leaning forward wondering what is true, that is the moment to give them a discovery. The scene that raises the most questions should also deliver an answer — or a revelation that opens deeper ones. Curiosity at its peak is the best possible slot for a truth to land.',
         });
       }
+    }
+  }
+
+  // ── Wave 376: REVELATION_SUSPENSE_PEAK_ABSENT, TOLD_BELIEF_CLOCK_DECOUPLED, ASSERTION_MIDPOINT_VOID ──
+
+  // REVELATION_SUSPENSE_PEAK_ABSENT (minor, n≥8, ≥2 suspense-positive revelation scenes):
+  // The scene with the highest suspenseDelta carries no revelation, even though at least 2
+  // other suspense-positive scenes do. The peak-tension moment — when the audience is most
+  // gripped — delivers no truth, so the most charged delivery slot for a disclosure goes
+  // unused. Mirror of REVELATION_CURIOSITY_PEAK_ABSENT (the curiosity channel); distinct
+  // from REVELATION_SUSPENSE_DECOUPLED (which averages suspenseDelta across revelation
+  // scenes — this isolates the single peak-suspense scene).
+  if (records.length >= 8) {
+    const revSet376 = new Set(witnessedBeliefs.map(w => w.sceneIdx));
+    const tenseRevScenes376 = (records as any[]).filter(r => revSet376.has(r.sceneIdx) && (r.suspenseDelta ?? 0) > 0);
+    if (tenseRevScenes376.length >= 2) {
+      const peakSusp376 = (records as any[]).reduce((best: any, r: any) =>
+        (r.suspenseDelta ?? 0) > (best.suspenseDelta ?? 0) ? r : best, (records as any[])[0]);
+      if (peakSusp376 && !revSet376.has(peakSusp376.sceneIdx)) {
+        issues.push({
+          location: `Scene ${peakSusp376.sceneIdx} — peak suspense, no revelation`,
+          rule: 'REVELATION_SUSPENSE_PEAK_ABSENT',
+          severity: 'minor',
+          description: `Scene ${peakSusp376.sceneIdx} carries the story's highest suspenseDelta (${(peakSusp376.suspenseDelta ?? 0).toFixed(2)}) but no revelation, even though ${tenseRevScenes376.length} other suspense-positive scenes deliver discoveries. The moment the audience is most gripped delivers no truth — the most charged slot for a disclosure passes empty, so peak tension and the satisfaction of revelation never coincide.`,
+          suggestedFix: 'Land a revelation at the peak-tension scene: when the audience is most on edge, the arrival of a truth — especially one that reframes the danger — hits with doubled force. The scene of maximum suspense is the most powerful place to disclose something, not to withhold.',
+        });
+      }
+    }
+  }
+
+  // TOLD_BELIEF_CLOCK_DECOUPLED (minor, n≥8, ≥3 assertion scenes, ≥2 clock scenes): No
+  // scene where a character asserts a belief also raises a clock, even though the story has
+  // both assertions and deadlines. Convictions are never declared under time pressure — the
+  // belief layer and the urgency engine never coincide, so claims always land in calm water
+  // rather than at the moment when stating a position costs something. Mirror of REVELATION_
+  // CLOCK_DECOUPLED (the revelation channel); distinct from TOLD_BELIEF_SUSPENSE_DECOUPLED
+  // (suspenseDelta average on assertion scenes, not clockRaised co-occurrence).
+  if (records.length >= 8) {
+    const assertionIdxs376 = new Set<number>(toldBeliefs.map(t => t.sceneIdx));
+    const clockScenes376 = (records as any[]).filter(r => r.clockRaised === true);
+    if (assertionIdxs376.size >= 3 && clockScenes376.length >= 2 && !clockScenes376.some(r => assertionIdxs376.has(r.sceneIdx))) {
+      issues.push({
+        location: 'Assertion scenes × clock scenes — decoupled',
+        rule: 'TOLD_BELIEF_CLOCK_DECOUPLED',
+        severity: 'minor',
+        description: `The story has ${assertionIdxs376.size} assertion scenes and ${clockScenes376.length} clock-raised scenes, but no assertion lands in a clock scene — convictions are never declared under time pressure. The belief layer and the urgency engine run on separate tracks, so claims always land in calm water rather than at the moment when committing to a position costs something.`,
+        suggestedFix: 'Stage at least one assertion under a live clock: a character stating what they believe at the moment the deadline bites, when there is no time to hedge. A conviction declared against a ticking clock is a conviction tested — it carries the weight of a choice made under pressure rather than a position stated at leisure.',
+      });
+    }
+  }
+
+  // ASSERTION_MIDPOINT_VOID (minor, n≥8, ≥2 assertion scenes both sides): The midpoint
+  // zone (40%–60%) contains no assertion, even though characters assert beliefs both before
+  // and after it. The belief layer goes quiet at the structural pivot — the moment a
+  // character should be committing to (or recommitting to) a position as the story turns.
+  // Distinct from BELIEF_MIDPOINT_VOID (no belief activity of ANY kind — told or witnessed —
+  // in the midpoint; this fires specifically when assertions skip the center even if
+  // revelations are present) and REVELATION_MIDPOINT_VOID (the revelation channel).
+  if (records.length >= 8) {
+    const midStart376 = Math.floor(records.length * 0.4);
+    const midEnd376 = Math.floor(records.length * 0.6);
+    const assertionScenes376 = toldBeliefs.map(t => t.sceneIdx);
+    const inMid376 = assertionScenes376.some(i => i >= midStart376 && i < midEnd376);
+    const beforeMid376 = assertionScenes376.some(i => i < midStart376);
+    const afterMid376 = assertionScenes376.some(i => i >= midEnd376);
+    if (!inMid376 && beforeMid376 && afterMid376) {
+      issues.push({
+        location: `Midpoint zone (Scenes ${midStart376}–${midEnd376 - 1}) — no assertion`,
+        rule: 'ASSERTION_MIDPOINT_VOID',
+        severity: 'minor',
+        description: `The midpoint zone (Scenes ${midStart376}–${midEnd376 - 1}) contains no assertion, though characters declare beliefs both before and after it — the belief layer goes silent at the structural pivot. The midpoint is where a character should be committing to or recommitting to a position as the story turns; an assertion void there means the pivot reorganizes the plot without anyone staking a claim on what it means.`,
+        suggestedFix: 'Place an assertion at the midpoint: let a character declare what they now believe as the story turns — a vow renewed under new information, a conviction hardened or abandoned at the pivot. The center of the story is where beliefs should be most actively contested, not where they fall silent.',
+      });
     }
   }
 
