@@ -41,6 +41,12 @@
 // loaded (>70% of proactive acts in the first half — the distribution mirror of proactive
 // backloaded), proactive revelation coincidence absent (no proactive scene is itself a
 // revelation — initiative never directly turns up a truth in the same beat).
+// Wave 395 additions: proactive relationship peak absent (the single largest relational
+// shift is not in a proactive scene even though smaller shifts coincide with initiative —
+// single-peak isolation × relationship magnitude), proactive emotional recoil absent (no
+// proactive act is followed by a negative emotional shift in the next 2 scenes —
+// aftermath/sequence × emotional cost), seed backloaded (all seeded clues fall in the
+// second half — distribution mirror of INTENTION_SEED_GRAVEYARD).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1559,6 +1565,108 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         description: `Across ${proScenes381.length} proactive scenes and ${revScenes381.length} revelation scenes, no single scene is both — the protagonist's initiative never directly turns up a truth in the same beat it is exerted. Discoveries and agency exist but never coincide, so the audience never watches the protagonist dig up a truth in the act of digging; revelations arrive adjacent to their effort rather than as its immediate product.`,
         suggestedFix: 'Let at least one revelation fire inside a proactive scene: the moment the protagonist forces a confrontation or chases a lead should also be the moment the truth surfaces. When agency and discovery coincide, the protagonist visibly earns the revelation rather than receiving it after the fact.',
       });
+    }
+  }
+
+  // ── Wave 395: PROACTIVE_RELATIONSHIP_PEAK_ABSENT, PROACTIVE_EMOTIONAL_RECOIL_ABSENT, SEED_BACKLOADED ──
+
+  // PROACTIVE_RELATIONSHIP_PEAK_ABSENT (minor, n≥8, ≥2 proactive-with-shift scenes,
+  // peak magnitude >0.4): The scene with the largest relational shift magnitude in the
+  // story is not a proactive scene, even though the protagonist does take agency in scenes
+  // that carry relationship shifts elsewhere. The most consequential bond change — the
+  // story's biggest relational moment — happens outside their initiative: they are a
+  // bystander at the most important relational event.
+  // Distinct from PROACTIVE_RELATIONSHIP_VOID (Wave 339: NO proactive scene has ANY shift;
+  // this fires even when some proactive scenes DO have shifts, as long as the single peak-
+  // magnitude shift is not among them), PROACTIVE_PAYOFF_COINCIDENCE_ABSENT (payoffSetupIds
+  // signal, not relationship magnitude), and PROACTIVE_SUSPENSE_PEAK_DECOUPLED (suspenseDelta
+  // peak, not relational-shift magnitude).
+  if (n >= 8) {
+    const proWithRelShift395a = (records as any[]).filter(r =>
+      isProactive258(r) && (r.relationshipShifts?.length ?? 0) > 0,
+    );
+    if (proWithRelShift395a.length >= 2) {
+      let peakRelRec395a: any = null;
+      let peakRelMag395a = 0;
+      for (const r of records as any[]) {
+        for (const s of (r.relationshipShifts ?? []) as Array<{ amount: number }>) {
+          if (Math.abs(s.amount) > peakRelMag395a) {
+            peakRelMag395a = Math.abs(s.amount);
+            peakRelRec395a = r;
+          }
+        }
+      }
+      if (peakRelRec395a && peakRelMag395a > 0.4 && !isProactive258(peakRelRec395a)) {
+        issues.push({
+          location: `Scene ${peakRelRec395a.sceneIdx} — peak relational shift (magnitude ${peakRelMag395a.toFixed(2)})`,
+          rule: 'PROACTIVE_RELATIONSHIP_PEAK_ABSENT',
+          severity: 'minor',
+          description: `The story's largest relational shift (magnitude ${peakRelMag395a.toFixed(2)} at Scene ${peakRelRec395a.sceneIdx}) is not proactive — the most consequential bond change happens outside the protagonist's initiative. Though the protagonist takes agency in scenes that carry smaller relational shifts elsewhere, the single most important relational moment in the story occurs without their drive behind it: they are a bystander at the event that most reshapes the human relationships in the story.`,
+          suggestedFix: 'Route the story\'s biggest relational moment through the protagonist\'s agency: let the largest bond change — the deepest rupture or the most significant repair — happen because of a choice they made. The protagonist should be the agent of the story\'s most important relational consequence, not simply present when it happens.',
+        });
+      }
+    }
+  }
+
+  // PROACTIVE_EMOTIONAL_RECOIL_ABSENT (minor, n≥8, ≥3 proactive scenes): No proactive
+  // act is followed in the next 2 scenes by a negative emotional shift — the protagonist
+  // takes initiative but initiative never costs them emotionally in the scenes that follow.
+  // Agency that produces no adverse emotional aftermath reads as risk-free by design: the
+  // protagonist acts and the world absorbs it without pushing back. Drama is what happens
+  // when a character's choices cost them something; initiative with no emotional recoil
+  // exists outside consequence.
+  // Distinct from GOAL_INVERSION_ABSENT (Wave 171: checks within the proactive scene
+  // itself for a negative emotion/shift — this audits the 2-scene aftermath window),
+  // AGENCY_WITHOUT_CONSEQUENCE (Wave 216: fires when ≥75% of proactive acts produce NO
+  // downstream signal at all — positive or negative; this fires when there is downstream
+  // activity but never a specifically negative emotional cost).
+  if (n >= 8) {
+    const proactiveIdxs395b: number[] = [];
+    for (let i = 0; i < n; i++) {
+      if (isProactive258(records[i])) proactiveIdxs395b.push(i);
+    }
+    if (proactiveIdxs395b.length >= 3) {
+      const noCostAftermath395b = proactiveIdxs395b.every(idx => {
+        const window395b = (records as any[]).slice(idx + 1, idx + 3);
+        return window395b.every(a => a.emotionalShift !== 'negative');
+      });
+      if (noCostAftermath395b) {
+        issues.push({
+          location: 'Proactive scenes — emotional recoil absent',
+          rule: 'PROACTIVE_EMOTIONAL_RECOIL_ABSENT',
+          severity: 'minor',
+          description: `None of the protagonist's ${proactiveIdxs395b.length} proactive acts is followed by a negative emotional shift in the next two scenes — initiative never costs the protagonist emotionally. Agency that produces no adverse aftermath reads as risk-free by design: they act and the world absorbs it without emotional consequence. A character who acts without ever paying an emotional price exists outside the logic of cost that makes stakes feel real.`,
+          suggestedFix: 'Let initiative carry a cost: at least once, the protagonist\'s proactive act should leave an emotional bruise in the scenes that follow — grief at what the gambit required, fear at what it exposed, or anguish at what it cost someone else. A character who acts without emotional recoil is executing a plan; a character who acts and pays a price is living a story.',
+        });
+      }
+    }
+  }
+
+  // SEED_BACKLOADED (minor, n≥8, ≥3 seeded-clue scenes all in second half): All clue-
+  // seeding scenes fall in the second half of the story — no seeds are planted in the
+  // first half. The audience carries no planted threads through the opening and complication
+  // zones; all foreshadowing concentrates near the climax, leaving seeds too little time to
+  // mature into resonant payoffs. An audience that was never taught to watch for a detail
+  // cannot feel the satisfaction of seeing it return.
+  // Distinct from INTENTION_SEED_GRAVEYARD (Wave 286: seeds IN the first half with no
+  // payoffs in the second — the opposite failure direction), SEEDING_CURIOSITY_FLAT (Wave
+  // 300: all seed scenes have low curiosityDelta — a quality check on seeds wherever they
+  // are, not a timing check), and PAYOFF_WITHOUT_EFFORT (Wave 272: payoff scenes not
+  // preceded by proactive effort — the payoff signal, not the seeding signal).
+  if (n >= 8) {
+    const half395c = Math.floor(n * 0.5);
+    const seedRecs395c = (records as any[]).filter(r => ((r.seededClueIds ?? []) as string[]).length > 0);
+    if (seedRecs395c.length >= 3) {
+      const firstHalfSeeds395c = seedRecs395c.filter(r => (records as any[]).indexOf(r) < half395c).length;
+      if (firstHalfSeeds395c === 0) {
+        issues.push({
+          location: `Clue seeds — all ${seedRecs395c.length} in the back half (Scenes ${half395c}+)`,
+          rule: 'SEED_BACKLOADED',
+          severity: 'minor',
+          description: `All ${seedRecs395c.length} clue-seeding scenes fall in the second half (none in the first ${half395c} scenes) — the story plants no threads for the audience to carry through the opening and complication zones. Foreshadowing that arrives near the climax has no time to mature: an audience never taught to notice a detail cannot feel the satisfaction of seeing it return. Back-loaded seeds read as afterthoughts rather than architecture.`,
+          suggestedFix: 'Plant at least one seed in the first half: a detail the audience notices and carries without yet understanding, a question opened in the setup that the second half finally answers. Early seeds are promises; the audience invests in the story by holding them. A first half with no seeds is a first half without promises to the audience.',
+        });
+      }
     }
   }
 

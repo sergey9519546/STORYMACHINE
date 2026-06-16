@@ -18713,6 +18713,93 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 395 — intentionPass: proactive relationship peak absent, proactive emotional recoil absent, seed backloaded', async () => {
+    const makeRec395 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN395 = async (records: any[]) => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      return intentionPass({ fountain: '', original: '', records, structure: { escalating: false, reversalCount: 0, actPosition: 'act2', reversalDensity: 0, avgSuspensePerScene: 0, openClues: 0, approachingClimax: false } as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PROACTIVE_RELATIONSHIP_PEAK_ABSENT fires when the largest shift is not in a proactive scene', async () => {
+      // scenes 1,3 proactive with small shifts; scene 6 has the peak shift but is NOT proactive
+      const recs395rp = Array.from({ length: 8 }, (_, i) =>
+        makeRec395(i, {
+          clockRaised: [1, 3].includes(i),
+          relationshipShifts: [1, 3].includes(i)
+            ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.3 }]
+            : i === 6
+              ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.8 }]
+              : [],
+        }),
+      );
+      const res = await runIN395(recs395rp);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PROACTIVE_RELATIONSHIP_PEAK_ABSENT'), 'PROACTIVE_RELATIONSHIP_PEAK_ABSENT should fire');
+    });
+
+    it('PROACTIVE_RELATIONSHIP_PEAK_ABSENT does not fire when the peak shift is in a proactive scene', async () => {
+      // scene 6 is now also proactive (clockRaised) — peak shift coincides with initiative
+      const recs395rpn = Array.from({ length: 8 }, (_, i) =>
+        makeRec395(i, {
+          clockRaised: [1, 3, 6].includes(i),
+          relationshipShifts: [1, 3].includes(i)
+            ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.3 }]
+            : i === 6
+              ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.8 }]
+              : [],
+        }),
+      );
+      const res = await runIN395(recs395rpn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PROACTIVE_RELATIONSHIP_PEAK_ABSENT'), 'PROACTIVE_RELATIONSHIP_PEAK_ABSENT should not fire');
+    });
+
+    it('PROACTIVE_EMOTIONAL_RECOIL_ABSENT fires when no proactive act is followed by negative emotion in the next 2 scenes', async () => {
+      // proactive at 1,3,5; all subsequent scenes neutral — no emotional recoil
+      const recs395er = Array.from({ length: 8 }, (_, i) =>
+        makeRec395(i, { clockRaised: [1, 3, 5].includes(i) }),
+      );
+      const res = await runIN395(recs395er);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PROACTIVE_EMOTIONAL_RECOIL_ABSENT'), 'PROACTIVE_EMOTIONAL_RECOIL_ABSENT should fire');
+    });
+
+    it('PROACTIVE_EMOTIONAL_RECOIL_ABSENT does not fire when a proactive act is followed by negative emotion', async () => {
+      // proactive at 1,3,5; scene 2 (after scene 1) is negative → recoil exists
+      const recs395ern = Array.from({ length: 8 }, (_, i) =>
+        makeRec395(i, {
+          clockRaised: [1, 3, 5].includes(i),
+          emotionalShift: i === 2 ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runIN395(recs395ern);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PROACTIVE_EMOTIONAL_RECOIL_ABSENT'), 'PROACTIVE_EMOTIONAL_RECOIL_ABSENT should not fire');
+    });
+
+    it('SEED_BACKLOADED fires when all clue seeds fall in the second half', async () => {
+      // n=8, half=4; 3 seeds at scenes 4,5,6 — none in scenes 0-3
+      const recs395sb = Array.from({ length: 8 }, (_, i) =>
+        makeRec395(i, { seededClueIds: [4, 5, 6].includes(i) ? ['clue1'] : [] }),
+      );
+      const res = await runIN395(recs395sb);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_BACKLOADED'), 'SEED_BACKLOADED should fire');
+    });
+
+    it('SEED_BACKLOADED does not fire when at least one seed is in the first half', async () => {
+      // seed at scene 1 (first half), plus scenes 4,5 (second half) — not all backloaded
+      const recs395sbn = Array.from({ length: 8 }, (_, i) =>
+        makeRec395(i, { seededClueIds: [1, 4, 5].includes(i) ? ['clue1'] : [] }),
+      );
+      const res = await runIN395(recs395sbn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_BACKLOADED'), 'SEED_BACKLOADED should not fire');
+    });
+  });
+
   describe('Wave 394 — conflictPass: clue decoupled, payoff decoupled, rupture aftermath void', async () => {
     const makeRec394 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
