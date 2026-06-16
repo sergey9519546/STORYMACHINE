@@ -18560,6 +18560,74 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 379 — characterArcPass: emotion concentration, emotional front-loaded, negative emotion run', async () => {
+    const makeRec379 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runA379 = async (records: any[]) => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ARC_EMOTION_CONCENTRATION fires when all emotional beats burst in a ≤20% span', async () => {
+      // n=10 → span budget floor(10*0.2)=2; charged at 2,3,4 (span 2), rest neutral
+      const recs379ec = Array.from({ length: 10 }, (_, i) =>
+        makeRec379(i, { emotionalShift: [2, 3, 4].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runA379(recs379ec);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_EMOTION_CONCENTRATION'), 'ARC_EMOTION_CONCENTRATION should fire');
+    });
+
+    it('ARC_EMOTION_CONCENTRATION does not fire when emotional beats are spread across the story', async () => {
+      const recs379ecn = Array.from({ length: 10 }, (_, i) =>
+        makeRec379(i, { emotionalShift: [1, 5, 9].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runA379(recs379ecn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_EMOTION_CONCENTRATION'), 'ARC_EMOTION_CONCENTRATION should not fire');
+    });
+
+    it('ARC_EMOTIONAL_FRONT_LOADED fires when >70% of emotional beats fall in the first half', async () => {
+      // n=10 → mid=5; charged at 0,1,2,3 (first half) and 8 (second half) → 4/5 = 80%
+      const recs379fl = Array.from({ length: 10 }, (_, i) =>
+        makeRec379(i, { emotionalShift: [0, 1, 2, 3, 8].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runA379(recs379fl);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_EMOTIONAL_FRONT_LOADED'), 'ARC_EMOTIONAL_FRONT_LOADED should fire');
+    });
+
+    it('ARC_EMOTIONAL_FRONT_LOADED does not fire when emotional beats are balanced across halves', async () => {
+      // charged at 1,3 (first half) and 6,8 (second half) → 2/4 = 50%
+      const recs379fln = Array.from({ length: 10 }, (_, i) =>
+        makeRec379(i, { emotionalShift: [1, 3, 6, 8].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runA379(recs379fln);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_EMOTIONAL_FRONT_LOADED'), 'ARC_EMOTIONAL_FRONT_LOADED should not fire');
+    });
+
+    it('ARC_NEGATIVE_EMOTION_RUN fires when 4+ consecutive scenes are negative', async () => {
+      const recs379nr = Array.from({ length: 8 }, (_, i) =>
+        makeRec379(i, { emotionalShift: [2, 3, 4, 5].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runA379(recs379nr);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_NEGATIVE_EMOTION_RUN'), 'ARC_NEGATIVE_EMOTION_RUN should fire');
+    });
+
+    it('ARC_NEGATIVE_EMOTION_RUN does not fire when negative scenes are broken up', async () => {
+      // runs of 2 negatives each, broken by neutral
+      const recs379nrn = Array.from({ length: 8 }, (_, i) =>
+        makeRec379(i, { emotionalShift: [2, 3, 5, 6].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runA379(recs379nrn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_NEGATIVE_EMOTION_RUN'), 'ARC_NEGATIVE_EMOTION_RUN should not fire');
+    });
+  });
+
   describe('Wave 365 — characterArcPass: peak suspense emotion absent, peak curiosity emotion absent, relational shift emotion flat', async () => {
     const makeRec365 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

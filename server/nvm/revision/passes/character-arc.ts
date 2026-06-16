@@ -38,6 +38,11 @@
 // while emotion exists elsewhere — the intrigue peak doesn't move them), relational shift
 // emotion flat (every relationship-shift scene is emotionally neutral — bonds move but the
 // protagonist registers no feeling about any of them).
+// Wave 379 additions: emotion concentration (all the protagonist's emotional beats burst in a
+// span ≤20% of the story while the rest is flat — the emotion analogue of relational shift
+// concentration), emotional front-loaded (>70% of emotional beats fall in the first half —
+// feeling dwindles toward the climax instead of intensifying), negative emotion run (≥4
+// consecutive negative-emotion scenes with no relief — an unbroken stretch of despair).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1373,6 +1378,97 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `All ${shiftScenes365.length} scenes where a relationship shifts are emotionally neutral — the protagonist's bonds warm, cool, or fracture, but they register no feeling about any of it. The relational arc proceeds as a ledger of status changes rather than as lived experience, so the audience tracks who-relates-to-whom without ever feeling the weight of those connections changing on the person at the center.`,
         suggestedFix: 'Let relationship changes move the protagonist emotionally: a warming bond should bring relief or hope, a cooling one unease or grief. When every relational shift lands in a neutral scene, the bonds read as plot bookkeeping; pair them with the protagonist\'s felt reaction so the relationships matter to the audience because they matter to the character.',
+      });
+    }
+  }
+
+  // ── Wave 379: ARC_EMOTION_CONCENTRATION, ARC_EMOTIONAL_FRONT_LOADED, ARC_NEGATIVE_EMOTION_RUN ──
+
+  // ARC_EMOTION_CONCENTRATION (minor, n≥10, ≥3 charged scenes): All of the protagonist's
+  // non-neutral emotional beats fall within a span of ≤20% of the story, while at least
+  // half of all scenes are emotionally neutral. The character's emotional life bursts in one
+  // chapter and goes flat everywhere else — feeling is a localized event rather than a
+  // through-line. The emotional analogue of ARC_SHIFT_CONCENTRATION (which audits relational
+  // movement bunched in one burst); distinct from ARC_EMOTIONAL_FLATLINE (≥80% neutral
+  // overall, no span requirement) and ARC_EMOTIONAL_FRONT_LOADED (a first-half majority, not
+  // a tight span anywhere).
+  if (records.length >= 10) {
+    const chargedIdxs379: number[] = [];
+    for (let i379 = 0; i379 < records.length; i379++) {
+      if ((records as any[])[i379].emotionalShift !== 'neutral') chargedIdxs379.push(i379);
+    }
+    const neutralCount379 = records.length - chargedIdxs379.length;
+    if (chargedIdxs379.length >= 3) {
+      const span379 = chargedIdxs379[chargedIdxs379.length - 1] - chargedIdxs379[0];
+      if (span379 <= Math.floor(records.length * 0.2) && neutralCount379 / records.length >= 0.5) {
+        issues.push({
+          location: `Emotional beats clustered in Scenes ${(records as any[])[chargedIdxs379[0]].sceneIdx}–${(records as any[])[chargedIdxs379[chargedIdxs379.length - 1]].sceneIdx}`,
+          rule: 'ARC_EMOTION_CONCENTRATION',
+          severity: 'minor',
+          description: `All ${chargedIdxs379.length} of the protagonist's emotional beats fall within a ${span379}-scene span (≤20% of the story), while ${neutralCount379} of ${records.length} scenes are emotionally neutral. The character's emotional life bursts in a single chapter and stays flat before and after it — feeling is a localized event rather than a through-line, so the audience's investment spikes once and then has nothing to ride.`,
+          suggestedFix: 'Distribute the protagonist\'s emotional beats across the whole arc: thread reactions, hopes, and wounds through the setup, the middle, and the climax so feeling builds continuously. An arc whose emotion is concentrated in one stretch leaves the rest of the story affectively inert.',
+        });
+      }
+    }
+  }
+
+  // ARC_EMOTIONAL_FRONT_LOADED (minor, n≥10, ≥4 charged scenes): More than 70% of the
+  // protagonist's non-neutral emotional beats fall in the first half of the story. The
+  // character's emotional intensity peaks early and dwindles toward the climax, so the back
+  // half — where the stakes should be highest — coasts on the least feeling. Distinct from
+  // ARC_SECOND_HALF_EMOTIONALLY_FLAT (the binary case: the entire back half is neutral — this
+  // fires even when the back half carries some emotion, as long as it is a small minority) and
+  // from ARC_EMOTION_CONCENTRATION (a tight span anywhere, not a first-half majority).
+  if (records.length >= 10) {
+    const chargedIdxs379b: number[] = [];
+    for (let i379b = 0; i379b < records.length; i379b++) {
+      if ((records as any[])[i379b].emotionalShift !== 'neutral') chargedIdxs379b.push(i379b);
+    }
+    if (chargedIdxs379b.length >= 4) {
+      const mid379 = Math.floor(records.length * 0.5);
+      const firstHalf379 = chargedIdxs379b.filter(i => i < mid379).length;
+      if (firstHalf379 / chargedIdxs379b.length > 0.7) {
+        issues.push({
+          location: `Emotional distribution — ${firstHalf379}/${chargedIdxs379b.length} beats in the first half`,
+          rule: 'ARC_EMOTIONAL_FRONT_LOADED',
+          severity: 'minor',
+          description: `${firstHalf379} of the protagonist's ${chargedIdxs379b.length} emotional beats (${Math.round(firstHalf379 / chargedIdxs379b.length * 100)}%) fall in the first half — emotional intensity peaks early and dwindles toward the climax. The back half, where the stakes should be highest and the cost of the conflict most acute, coasts on the least feeling, so the ending inherits an emotionally spent protagonist.`,
+          suggestedFix: 'Reserve the protagonist\'s most charged emotional beats for the back half: the deepest loss, the hardest-won hope, the most acute fear should escalate toward the climax. Emotion, like tension, should build across the arc — not be spent in the opening movement.',
+        });
+      }
+    }
+  }
+
+  // ARC_NEGATIVE_EMOTION_RUN (minor, n≥8, run≥4): Four or more consecutive scenes carry
+  // emotionalShift='negative' with no positive or neutral beat to break the descent. An
+  // unbroken stretch of despair exhausts the audience and erases the contrast that makes any
+  // single low point land — relentless gloom reads as monotone, not tragedy. Distinct from
+  // ARC_EMOTIONAL_RECOVERY_ABSENT (a whole-story check: no positive at or after the first
+  // fall), conflict.ts NEGATIVE_SPIRAL_UNBROKEN (consecutive negative relationship SHIFTS,
+  // not emotionalShift), and causality.ts EMOTIONAL_NEUTRAL_RUN (consecutive NEUTRAL scenes).
+  if (records.length >= 8) {
+    let negRun379 = 0;
+    let maxNegRun379 = 0;
+    let maxNegStart379 = 0;
+    let curStart379 = 0;
+    for (let i379n = 0; i379n < records.length; i379n++) {
+      if ((records as any[])[i379n].emotionalShift === 'negative') {
+        if (negRun379 === 0) curStart379 = i379n;
+        negRun379++;
+        if (negRun379 > maxNegRun379) { maxNegRun379 = negRun379; maxNegStart379 = curStart379; }
+      } else {
+        negRun379 = 0;
+      }
+    }
+    if (maxNegRun379 >= 4) {
+      const s379 = (records as any[])[maxNegStart379].sceneIdx;
+      const e379 = (records as any[])[maxNegStart379 + maxNegRun379 - 1].sceneIdx;
+      issues.push({
+        location: `Scenes ${s379}–${e379} — unbroken negative run (${maxNegRun379} scenes)`,
+        rule: 'ARC_NEGATIVE_EMOTION_RUN',
+        severity: 'minor',
+        description: `${maxNegRun379} consecutive scenes (${s379}–${e379}) carry a negative emotional shift with no positive or neutral beat to break the descent. An unbroken stretch of despair exhausts the audience and erases the contrast that makes any single low point land — relentless gloom reads as monotone rather than tragedy, and the audience numbs to suffering that never lets up.`,
+        suggestedFix: 'Break the descent with at least one beat of relief, hope, or even grim humor inside the run — a small win later snatched away, a moment of connection before the next blow. The rhythm of fall-and-respite is what keeps a downward arc dramatic; an unbroken slide flattens into noise.',
       });
     }
   }
