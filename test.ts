@@ -21344,6 +21344,153 @@ Time to go now.`;
     });
   });
 
+  describe('Wave 344 — rhythmPass: polysyndeton overload, semicolon in action, weather description overload', async () => {
+    const runR344 = async (fountain: string) => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('POLYSYNDETON_OVERLOAD fires when 3+ action lines pile up 3+ "and" coordinators', async () => {
+      const f344p = `INT. WAREHOUSE - NIGHT
+
+He grabs the bag and runs and slams the door and bolts.
+
+She turns the corner and stumbles and recovers and keeps going.
+
+The alarm blares and the lights flash and the gates drop and seal.
+
+A guard shouts after them.
+
+The truck idles at the dock.
+
+She climbs in.
+
+He follows close behind.
+
+The engine catches.`;
+      const res = await runR344(f344p);
+      assert.ok(res.issues.some((i: any) => i.rule === 'POLYSYNDETON_OVERLOAD'), 'POLYSYNDETON_OVERLOAD should fire');
+    });
+
+    it('POLYSYNDETON_OVERLOAD does not fire when action lines use measured coordination', async () => {
+      const f344pn = `INT. WAREHOUSE - NIGHT
+
+He grabs the bag and runs.
+
+She turns the corner. She stumbles, then recovers.
+
+The alarm blares. The lights flash.
+
+A guard shouts after them.
+
+The truck idles at the dock.
+
+She climbs in.
+
+He follows close behind.
+
+The engine catches.`;
+      const res = await runR344(f344pn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'POLYSYNDETON_OVERLOAD'), 'POLYSYNDETON_OVERLOAD should not fire');
+    });
+
+    it('SEMICOLON_IN_ACTION fires when 3+ action lines use a semicolon', async () => {
+      const f344s = `INT. STUDY - DAY
+
+She opens the ledger; the figures do not add up.
+
+He paces the room; his jaw tightens with each turn.
+
+The clock ticks; nothing else moves.
+
+A drawer hangs open.
+
+Papers cover the desk.
+
+She lifts a single page.
+
+The ink is smudged.
+
+He stops at the window.`;
+      const res = await runR344(f344s);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEMICOLON_IN_ACTION'), 'SEMICOLON_IN_ACTION should fire');
+    });
+
+    it('SEMICOLON_IN_ACTION does not fire when action lines use periods', async () => {
+      const f344sn = `INT. STUDY - DAY
+
+She opens the ledger. The figures do not add up.
+
+He paces the room. His jaw tightens with each turn.
+
+The clock ticks. Nothing else moves.
+
+A drawer hangs open.
+
+Papers cover the desk.
+
+She lifts a single page.
+
+The ink is smudged.
+
+He stops at the window.`;
+      const res = await runR344(f344sn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEMICOLON_IN_ACTION'), 'SEMICOLON_IN_ACTION should not fire');
+    });
+
+    it('WEATHER_DESCRIPTION_OVERLOAD fires when >30% of action lines describe weather', async () => {
+      const f344w = `EXT. RIDGE - DAY
+
+Rain lashes the ridge in grey sheets.
+
+The wind tears at her coat.
+
+Fog rolls down from the peaks.
+
+She climbs the narrow path.
+
+Thunder rumbles across the valley.
+
+He reaches the summit.
+
+Snow begins to fall in heavy flakes.
+
+The storm closes in around them.
+
+They huddle behind a rock.
+
+She tightens her grip on the rope.`;
+      const res = await runR344(f344w);
+      assert.ok(res.issues.some((i: any) => i.rule === 'WEATHER_DESCRIPTION_OVERLOAD'), 'WEATHER_DESCRIPTION_OVERLOAD should fire');
+    });
+
+    it('WEATHER_DESCRIPTION_OVERLOAD does not fire when weather is incidental', async () => {
+      const f344wn = `EXT. RIDGE - DAY
+
+Rain lashes the ridge in grey sheets.
+
+She climbs the narrow path.
+
+He reaches the summit.
+
+They huddle behind a rock.
+
+She checks the map.
+
+He points to the trail below.
+
+She nods and shoulders the pack.
+
+They start down the slope.
+
+A bird wheels overhead.
+
+She tightens her grip on the rope.`;
+      const res = await runR344(f344wn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'WEATHER_DESCRIPTION_OVERLOAD'), 'WEATHER_DESCRIPTION_OVERLOAD should not fire');
+    });
+  });
+
   describe('Wave 330 — rhythmPass: we-see flood, light description overload, set dressing dominance', async () => {
     const runR330 = async (fountain: string) => {
       const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');

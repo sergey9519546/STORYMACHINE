@@ -27,6 +27,10 @@
 // hear/find/watch/notice" — narrator intrudes into cinematic present tense),
 // light description overload (>30% contain lighting vocabulary — DP's domain),
 // set dressing dominance (>35% reference static furniture/architecture).
+// Wave 344 additions: polysyndeton overload (≥3 action lines each pile up 3+ "and"
+// coordinators — breathless compound action), semicolon in action (≥3 action lines use a
+// semicolon — literary punctuation foreign to screen action), weather description overload
+// (>30% of action lines contain weather vocabulary — the DP's domain crowding the drama).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1032,6 +1036,72 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${setCount330} of ${actionLines.length} action lines (${Math.round(setCount330 / actionLines.length * 100)}%) reference static furniture or architectural elements (desk, chair, door, window, floor, etc.) — the prose is cataloguing the set rather than dramatizing the people in it. A screenplay's action lines should track what characters do; when furniture fills the page, the human drama is crowded out.`,
         suggestedFix: "Anchor furniture and props to character behavior: instead of noting that a desk sits in the corner, show a character lean against it, avoid it, or slam a fist on its surface. Props earn their place by participating in action, not by being listed.",
+      });
+    }
+  }
+
+  // ── Wave 344: POLYSYNDETON_OVERLOAD, SEMICOLON_IN_ACTION, WEATHER_DESCRIPTION_OVERLOAD ──
+
+  // POLYSYNDETON_OVERLOAD (minor, ≥8 action lines, ≥3 lines): Three or more action
+  // lines each string together three or more "and" coordinators ("He grabs the bag
+  // and runs and slams the door and bolts"). Piling clauses with repeated "and" makes
+  // every beat the same weight and the prose breathless — the reader can't tell which
+  // action matters because they all arrive in one undifferentiated rush. Distinct from
+  // THEN_CHAIN (lines beginning with "Then"), CONJUNCTION_OPENER_EXCESS (lines beginning
+  // with a conjunction), and RUN_ON_ACTION (raw sentence length): this targets intra-line
+  // coordinating-conjunction pileup specifically.
+  if (actionLines.length >= 8) {
+    const polysyndetonCount344 = actionLines.filter(l => (l.text.match(/\band\b/gi) ?? []).length >= 3).length;
+    if (polysyndetonCount344 >= 3) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'POLYSYNDETON_OVERLOAD',
+        severity: 'minor',
+        description: `${polysyndetonCount344} action lines string together three or more "and" coordinators ("He grabs the bag and runs and slams the door and bolts"). Piling clauses with repeated "and" gives every beat the same weight and makes the prose breathless — the reader cannot tell which action matters because they all arrive in one undifferentiated rush, and the rhythm flattens into a list.`,
+        suggestedFix: 'Break the chains into separate sentences and vary their length: let the decisive action stand alone in a short sentence while subordinate beats fold into longer ones. Punctuation is pacing — a period where an "and" sat tells the reader this beat lands, then the next.',
+      });
+    }
+  }
+
+  // SEMICOLON_IN_ACTION (minor, ≥8 action lines, ≥3 lines): Three or more action
+  // lines use a semicolon. The semicolon is a literary punctuation mark — it joins
+  // two independent clauses into a considered, written relationship that the camera
+  // has no equivalent for. Screen action wants the clean kinetic beat of a period or
+  // the speed of a fragment, not the balanced subordination of prose. Distinct from
+  // DASH_CHAIN (trailing em-dash), ELLIPSIS_CHAIN (trailing "..."), and ACTION_
+  // PARENTHESIS_ASIDE (parenthetical interjections).
+  if (actionLines.length >= 8) {
+    const semicolonCount344 = actionLines.filter(l => l.text.includes(';')).length;
+    if (semicolonCount344 >= 3) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'SEMICOLON_IN_ACTION',
+        severity: 'minor',
+        description: `${semicolonCount344} action lines use a semicolon. The semicolon is a literary mark — it binds two independent clauses into a considered, written relationship the camera cannot photograph. Screen action wants the clean kinetic snap of a period or the speed of a fragment; the semicolon's balanced subordination belongs to the page, not the frame, and signals prose written to be read rather than shot.`,
+        suggestedFix: "Replace semicolons with periods or restructure the beat: two independent clauses joined by a semicolon are almost always two sentences wanting to be free. Splitting them sharpens the rhythm and lets each action land on its own.",
+      });
+    }
+  }
+
+  // WEATHER_DESCRIPTION_OVERLOAD (minor, ≥10 action lines): More than 30% of action
+  // lines contain weather vocabulary (rain, wind, snow, storm, fog, mist, clouds, sun,
+  // thunder, lightning, breeze, drizzle, etc.). Like lighting and set dressing, ambient
+  // weather is largely the domain of the director and production — when it saturates the
+  // prose, atmosphere crowds out the human drama and the page describes conditions
+  // instead of characters. Distinct from LIGHT_DESCRIPTION_OVERLOAD and SET_DRESSING_
+  // DOMINANCE (different vocabularies) and from originality's WEATHER_OPENER_CRUTCH
+  // (which flags scenes that OPEN on weather — a per-scene structural check, not an
+  // action-line density measure).
+  if (actionLines.length >= 10) {
+    const weatherRe344 = /\b(rain(?:ing|s|y|fall|drops?)?|wind(?:y|s|swept)?|snow(?:ing|s|y|flakes?|fall)?|storm(?:y|s|ing)?|fog(?:gy|s)?|mist(?:y|s)?|clouds?|cloudy|thunder(?:ing|s)?|lightning|breeze|drizzl(?:e|ing)|sleet|hail(?:ing|stones?)?|downpour|blizzard|gale|overcast|sunshine|sunlit|drought|humid(?:ity)?|monsoon)\b/i;
+    const weatherCount344 = actionLines.filter(l => weatherRe344.test(l.text)).length;
+    if (weatherCount344 / actionLines.length > 0.30) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'WEATHER_DESCRIPTION_OVERLOAD',
+        severity: 'minor',
+        description: `${weatherCount344} of ${actionLines.length} action lines (${Math.round(weatherCount344 / actionLines.length * 100)}%) contain weather description (rain, wind, snow, storm, fog, etc.) — atmosphere is crowding out the human drama. Like lighting, ambient weather is largely a production and directorial decision; when it saturates the prose, the page describes conditions instead of characters and the audience's attention drifts from the people to the climate.`,
+        suggestedFix: 'Reserve weather for moments where it materially affects the scene — a storm that strands the characters, cold that frays tempers, rain that hides a sound. Otherwise trust the location and production to supply the weather, and spend the prose on what the characters do within it.',
       });
     }
   }
