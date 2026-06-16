@@ -18713,6 +18713,212 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 396 — originalityPass: revelation purpose monotone, dialogue short-line dominance, dialogue question drought', async () => {
+    const makeRec396 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: false,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const minFountain396 = `INT. SC0 - DAY\nSomething happens.\n\nINT. SC1 - DAY\nSomething else.\n`;
+    const runO396 = async (fountain: string, records: any[] = []) => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      return originalityPass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('REVELATION_PURPOSE_MONOTONE fires when all revelation scenes share the same purpose', async () => {
+      const recs396a = [
+        makeRec396(0, { revelation: true, purpose: 'exposition' }),
+        makeRec396(1),
+        makeRec396(2),
+        makeRec396(3, { revelation: true, purpose: 'exposition' }),
+        makeRec396(4),
+        makeRec396(5),
+        makeRec396(6, { revelation: true, purpose: 'exposition' }),
+        makeRec396(7),
+      ];
+      const res = await runO396(minFountain396, recs396a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_PURPOSE_MONOTONE'), 'REVELATION_PURPOSE_MONOTONE should fire');
+    });
+
+    it('REVELATION_PURPOSE_MONOTONE does not fire when revelation scenes have varied purposes', async () => {
+      const recs396anr = [
+        makeRec396(0, { revelation: true, purpose: 'exposition' }),
+        makeRec396(1),
+        makeRec396(2),
+        makeRec396(3, { revelation: true, purpose: 'conflict' }),
+        makeRec396(4),
+        makeRec396(5),
+        makeRec396(6, { revelation: true, purpose: 'development' }),
+        makeRec396(7),
+      ];
+      const res = await runO396(minFountain396, recs396anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_PURPOSE_MONOTONE'), 'REVELATION_PURPOSE_MONOTONE should not fire');
+    });
+
+    it('DIALOGUE_SHORT_LINE_DOMINANCE fires when ≥75% of dialogue lines are ≤4 words', async () => {
+      const f396b = `INT. ROOM - DAY
+
+ALICE
+Yes.
+No.
+Wait.
+Come on.
+I know.
+Stop it.
+Let's go.
+Fine.
+Sure.
+Okay.
+Never mind.
+All right.
+Do it.
+Let's move.
+Help me.
+`;
+      const res = await runO396(f396b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_SHORT_LINE_DOMINANCE'), 'DIALOGUE_SHORT_LINE_DOMINANCE should fire');
+    });
+
+    it('DIALOGUE_SHORT_LINE_DOMINANCE does not fire when dialogue has sufficient length variation', async () => {
+      const f396bnr = `INT. ROOM - DAY
+
+ALICE
+Yes.
+No.
+Wait.
+Come on.
+I know.
+Stop it.
+Let's go.
+Fine.
+I really think we should take a completely different approach to this whole situation.
+I'm telling you, the situation is far more complex than you might possibly realize.
+We need to think carefully about all the implications before making any rash decisions.
+Let me explain exactly what happened and why it matters so much to us right now.
+You have to understand that everything changed the moment they arrived at the station.
+It was never supposed to go this far, and now we are all stuck with the consequences.
+The only way through this is if we work together and completely trust the process here.
+Actually, I have been meaning to talk to you about something important for many weeks.
+`;
+      const res = await runO396(f396bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_SHORT_LINE_DOMINANCE'), 'DIALOGUE_SHORT_LINE_DOMINANCE should not fire');
+    });
+
+    it('DIALOGUE_QUESTION_DROUGHT fires when fewer than 5% of dialogue lines are interrogative', async () => {
+      const f396c = `INT. ROOM - DAY
+
+ALICE
+I want to leave.
+
+BOB
+That's not happening.
+
+ALICE
+You don't understand.
+
+BOB
+I understand perfectly.
+
+ALICE
+This isn't right.
+
+BOB
+We had no choice.
+
+ALICE
+Something has to change.
+
+BOB
+It already has.
+
+ALICE
+I'm tired of waiting.
+
+BOB
+Everyone is tired.
+
+ALICE
+We need to act.
+
+BOB
+We will. Soon.
+
+ALICE
+I don't believe you.
+
+BOB
+That's your problem.
+
+ALICE
+You never listen.
+
+BOB
+I always listen.
+`;
+      const res = await runO396(f396c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_QUESTION_DROUGHT'), 'DIALOGUE_QUESTION_DROUGHT should fire');
+    });
+
+    it('DIALOGUE_QUESTION_DROUGHT does not fire when enough dialogue lines are interrogative', async () => {
+      const f396cnr = `INT. ROOM - DAY
+
+ALICE
+I want to leave.
+
+BOB
+Did you hear what I said?
+
+ALICE
+You don't understand.
+
+BOB
+Why are you doing this to me?
+
+ALICE
+This isn't right.
+
+BOB
+We had no choice.
+
+ALICE
+What are you even talking about?
+
+BOB
+It already has.
+
+ALICE
+I'm tired of waiting.
+
+BOB
+Everyone is tired.
+
+ALICE
+We need to act.
+
+BOB
+We will. Soon.
+
+ALICE
+I don't believe you.
+
+BOB
+That's your problem.
+
+ALICE
+You never listen.
+
+BOB
+I always listen.
+`;
+      const res = await runO396(f396cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_QUESTION_DROUGHT'), 'DIALOGUE_QUESTION_DROUGHT should not fire');
+    });
+  });
+
   describe('Wave 395 — intentionPass: proactive relationship peak absent, proactive emotional recoil absent, seed backloaded', async () => {
     const makeRec395 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

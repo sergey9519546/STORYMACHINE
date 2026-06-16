@@ -41,6 +41,11 @@
 // novelistic structure imposed on film), split-screen crutch (≥2 "SPLIT SCREEN" markers —
 // a gimmick leaned on for parallelism), match-cut overuse (≥3 "MATCH CUT TO" transitions —
 // directorial editing punctuation the writer should not be calling).
+// Wave 396 additions: revelation purpose monotone (≥3 revelation scenes all sharing the same
+// dramatic purpose — formulaic deployment of disclosure), dialogue short-line dominance
+// (≥75% of dialogue lines are ≤4 words — uniformly telegraphic register with no length
+// variation), dialogue question drought (<5% of dialogue lines are interrogative — characters
+// never ask each other anything, flattening dramatic pressure).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1765,6 +1770,101 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${matchCutCount382} "MATCH CUT TO" transitions appear in the script. A match cut is a precise editing figure — a graphic or thematic rhyme bridging a cut — and a spec script directs the reader through prose, not editing calls. Used heavily it both claims the editor's chair and dilutes the device itself, since a match cut lands only when it is rare and surprising.`,
         suggestedFix: 'Keep at most one match cut, for the moment the visual rhyme genuinely carries meaning, and let the rest of the transitions be ordinary cuts the prose implies. Calling for repeated match cuts on the page reads as a writer art-directing the edit rather than telling the story.',
+      });
+    }
+  }
+
+  // ── Wave 396: REVELATION_PURPOSE_MONOTONE, DIALOGUE_SHORT_LINE_DOMINANCE, DIALOGUE_QUESTION_DROUGHT ──
+
+  // REVELATION_PURPOSE_MONOTONE (minor, n≥8, ≥3 revelation scenes all same purpose):
+  // All revelation scenes serve an identical structural function — the story deploys
+  // disclosure formulaically, as if reveals belong only in one type of moment.
+  // Co-occurrence mode × revelation channel × purpose channel. Distinct from
+  // UNIFORM_SCENE_PURPOSES (all scenes unfiltered, no revelation filter applied),
+  // PURPOSE_BOOKEND_REPEAT (bookend comparison Act 1 vs Act 3 dominant purpose),
+  // and SCENE_PURPOSE_MONOTONE_ACT3 (Act 3 zone × action-scene functional label).
+  if (records.length >= 8) {
+    const revelRecs396a = (records as any[]).filter(r => r.revelation === true);
+    if (revelRecs396a.length >= 3) {
+      const firstPurp396a = revelRecs396a[0].purpose as string;
+      const allSamePurp396a = revelRecs396a.every(r => r.purpose === firstPurp396a);
+      if (allSamePurp396a) {
+        issues.push({
+          location: 'Revelation scenes — purpose monotone',
+          rule: 'REVELATION_PURPOSE_MONOTONE',
+          severity: 'minor',
+          description: `All ${revelRecs396a.length} revelation scenes share the same dramatic purpose ("${firstPurp396a}"). When every disclosure serves the same structural function, reveals feel formulaic — each one lands in the same type of moment, carrying the same dramatic weight, with no register shift between them. Variety in how revelations are deployed is what makes each feel inevitable in retrospect yet surprising in the moment.`,
+          suggestedFix: 'Let revelations land in scenes with different dramatic purposes — some during conflict, some in quieter development moments, some at turning points. A disclosure during a casual exchange hits differently than one mid-confrontation; varying the structural context multiplies the impact of each reveal.',
+        });
+      }
+    }
+  }
+
+  // DIALOGUE_SHORT_LINE_DOMINANCE (minor, ≥15 dialogue lines, ≥75% are ≤4 words):
+  // Nearly all spoken lines are ultra-short — the dialogue register is uniformly
+  // telegraphic with no variation between clipped reaction and developed speech.
+  // Distribution mode × dialogue length channel. Distinct from DIALOGUE_I_DOMINANCE
+  // (first-word opener pattern, not line length), DIALOGUE_EXCLAMATION_FLOOD
+  // (punctuation density, not length distribution), and DIALOGUE_DOMINANCE
+  // (action-vs-dialogue ratio, not within-dialogue length variety).
+  {
+    let totalDlg396b = 0;
+    let shortCount396b = 0;
+    let inDlg396b = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg396b = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg396b = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg396b = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg396b) {
+        totalDlg396b++;
+        if (t.split(/\s+/).filter(Boolean).length <= 4) shortCount396b++;
+      }
+    }
+    if (totalDlg396b >= 15 && shortCount396b / totalDlg396b >= 0.75) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_SHORT_LINE_DOMINANCE',
+        severity: 'minor',
+        description: `${shortCount396b} of ${totalDlg396b} dialogue lines (${Math.round(shortCount396b / totalDlg396b * 100)}%) are four words or fewer — the dialogue is uniformly telegraphic. When nearly every line is a clipped fragment, the script loses the textural contrast that distinguishes characters and the rhythmic variation between short reactions and developed speech. Sustained brevity reads as staccato monotone.`,
+        suggestedFix: 'Vary dialogue length: let characters finish a thought, build an argument, or tell a brief story. Short lines carry weight when they follow longer ones — a one-word reply lands harder after a paragraph of explanation. Uniform brevity flattens what should be a dynamic rhythm of exchange.',
+      });
+    }
+  }
+
+  // DIALOGUE_QUESTION_DROUGHT (minor, ≥15 dialogue lines, <5% end with "?"):
+  // Characters almost never ask each other anything — all dialogue is assertion
+  // or declaration. Interrogative lines are a fundamental dramatic tool: they create
+  // pressure, expose what a character needs to know, and force the other person to
+  // respond rather than merely react. Distribution mode × dialogue register channel.
+  // Distinct from DIALOGUE_EXCLAMATION_FLOOD (exclamation excess — opposite register
+  // and surplus direction), DIALOGUE_I_DOMINANCE (first-word opener pattern, not
+  // sentence-form type), and ADVERB_OVERSATURATION (word-class density, not
+  // sentence-form distribution).
+  {
+    let totalDlg396c = 0;
+    let qCount396c = 0;
+    let inDlg396c = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg396c = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg396c = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg396c = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg396c) {
+        totalDlg396c++;
+        if (t.endsWith('?')) qCount396c++;
+      }
+    }
+    const qShare396c = totalDlg396c > 0 ? qCount396c / totalDlg396c : 0;
+    if (totalDlg396c >= 15 && qShare396c < 0.05) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_QUESTION_DROUGHT',
+        severity: 'minor',
+        description: `Only ${qCount396c} of ${totalDlg396c} dialogue lines (${Math.round(qShare396c * 100)}%) are interrogative. Characters almost never ask each other anything — all spoken lines are declarations, assertions, or commands. Questions create dramatic pressure, reveal what a character needs to know and fears to hear, and force other characters to respond rather than react. A script where no one ever asks anything collapses into a series of parallel monologues.`,
+        suggestedFix: 'Introduce interrogative dialogue at key pressure points: a question reveals vulnerability and shifts power between speakers. "Do you trust me?" or "What did you see?" carries more dramatic weight than three lines of statement. Characters should want information from each other — let that need show in the language.',
       });
     }
   }
