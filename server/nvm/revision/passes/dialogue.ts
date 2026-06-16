@@ -26,6 +26,9 @@
 // Wave 336 additions: question flood (>35% of all lines are questions — interrogation
 // without assertion), negative opener flood (>30% of lines open with "No"/"Can't"/"Never"
 // — uniform combative tone), mid-sentence caps flood (≥4 lines shout a word via ALL-CAPS).
+// Wave 350 additions: you-opener flood (>30% of lines begin with "You" — uniform
+// confrontational pitch), thanks overuse (≥3 gratitude lines — politeness filler), self-
+// reference / illeism (a character names themselves in >20% of their lines).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1520,6 +1523,81 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         description: `${capsCount336} dialogue lines contain a mid-sentence ALL-CAPS word ("I TOLD you", "You simply CANNOT", "We NEED to leave"). ALL-CAPS mid-sentence is an actor direction embedded in the line — it tells the performer where to shout rather than writing words whose pressure is already felt in the rhythm and word choice. Recurring across four or more lines, it becomes a typographic tic that signals emotion rather than conveying it.`,
         suggestedFix: "Reserve ALL-CAPS emphasis for one genuine vocal peak in the script and convey urgency elsewhere through sentence structure, word choice, and rhythm. A shorter, better-chosen sentence often hits harder than a shouted word. If the line needs the caps to feel urgent, the line itself needs rewriting.",
       });
+    }
+  }
+
+  // ── Wave 350: DIALOGUE_YOU_OPENER_FLOOD, DIALOGUE_THANKS_OVERUSE, DIALOGUE_SELF_REFERENCE ──
+
+  // DIALOGUE_YOU_OPENER_FLOOD (minor, ≥10 lines, >30%): More than 30% of dialogue
+  // lines begin with "You". When most lines open by pointing at the listener, every
+  // exchange reads as accusation or instruction — the dialogue acquires a uniform
+  // confrontational pitch and the speakers never turn the lens on themselves. A scene
+  // built entirely of "You did", "You always", "You need to" has no give, only push.
+  // Distinct from PRONOUN_I_OVERLOAD (first-person "I" openers), DIALOGUE_NEGATIVE_
+  // OPENER_FLOOD (negations), and DIALOGUE_ABSOLUTE_OVERUSE ("always"/"never" anywhere
+  // in the line).
+  if (dialogue.length >= 10) {
+    const youOpenerCount350 = dialogue.filter(d => /^you\b/i.test(d.line.trim())).length;
+    if (youOpenerCount350 / dialogue.length > 0.30) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_YOU_OPENER_FLOOD',
+        severity: 'minor',
+        description: `${youOpenerCount350} of ${dialogue.length} dialogue lines (${Math.round(youOpenerCount350 / dialogue.length * 100)}%) begin with "You". When most lines open by pointing at the listener, every exchange reads as accusation or instruction — the dialogue acquires a uniform confrontational pitch and the speakers never turn the lens on themselves. A scene built of "You did", "You always", "You need to" has no give, only push, and the relentless second-person address flattens the texture.`,
+        suggestedFix: 'Vary the grammatical subject: let some lines begin with "I", with a shared "we", or with the thing itself rather than the person blamed for it. A character who can only speak in accusations reveals nothing of their own stake — rebalancing toward first person and concrete subjects restores the give-and-take.',
+      });
+    }
+  }
+
+  // DIALOGUE_THANKS_OVERUSE (minor, ≥8 lines, ≥3 thanks lines): Three or more dialogue
+  // lines are expressions of gratitude ("Thank you", "Thanks", "I appreciate it", "Much
+  // obliged"). Like greetings and apologies, rote thanks is social lubricant that real
+  // scenes cut past — repeated gratitude is politeness filler that softens the dialogue
+  // and rarely carries dramatic charge. Distinct from GREETING_RITUAL_OVERUSE (hellos
+  // and farewells), APOLOGY_LOOP ("sorry"), and SYCOPHANTIC_AGREEMENT (capitulation):
+  // this targets the specific gratitude register.
+  if (dialogue.length >= 8) {
+    const thanksRe350 = /^(thank you|thanks|thank god|thanks a lot|many thanks|much obliged|i appreciate (it|that|you)|i'?m (so |really )?grateful|cheers)\b/i;
+    const thanksCount350 = dialogue.filter(d => thanksRe350.test(d.line.trim())).length;
+    if (thanksCount350 >= 3) {
+      issues.push({
+        location: `${thanksCount350} gratitude line(s)`,
+        rule: 'DIALOGUE_THANKS_OVERUSE',
+        severity: 'minor',
+        description: `${thanksCount350} dialogue lines are expressions of gratitude ("Thank you", "Thanks", "I appreciate it"). Like greetings and apologies, rote thanks is social lubricant real scenes cut past — repeated gratitude is politeness filler that softens the exchange and rarely carries dramatic charge. A script that keeps staging the thank-yous spends lines on courtesy rather than conflict or intent.`,
+        suggestedFix: 'Cut most expressions of gratitude or convert them into something with subtext — a thanks that is really a dismissal, a "much obliged" that drips with resentment. Reserve genuine gratitude for the one moment it costs the character something to say it; as a reflex it is dead air.',
+      });
+    }
+  }
+
+  // DIALOGUE_SELF_REFERENCE (minor, ≥8 lines, ≥3 lines, >20%): Three or more dialogue
+  // lines (and more than 20% of all lines) contain the speaker's own name — a character
+  // referring to themselves in the third person (illeism). Used once it can characterize
+  // grandiosity or detachment; recurring across many lines it reads as an authorial tic
+  // rather than a deliberate voice choice, and it breaks the naturalism of speech.
+  // Distinct from VOCATIVE_NAME_OVERUSE (a speaker naming OTHER characters) — this audits
+  // a speaker naming themselves. Requires 2+ named speakers so the names are meaningful.
+  if (dialogue.length >= 8) {
+    const speakerNames350 = new Set(
+      dialogue.map(d => d.speaker.toLowerCase()).filter(n => n.length >= 3),
+    );
+    if (speakerNames350.size >= 2) {
+      let selfRefLines350 = 0;
+      for (const d of dialogue) {
+        const self = d.speaker.toLowerCase();
+        if (self.length < 3) continue;
+        const re = new RegExp(`\\b${self.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+        if (re.test(d.line.toLowerCase())) selfRefLines350++;
+      }
+      if (selfRefLines350 >= 3 && selfRefLines350 / dialogue.length > 0.20) {
+        issues.push({
+          location: 'Dialogue throughout',
+          rule: 'DIALOGUE_SELF_REFERENCE',
+          severity: 'minor',
+          description: `${selfRefLines350} of ${dialogue.length} dialogue lines (${Math.round(selfRefLines350 / dialogue.length * 100)}%) have a character refer to themselves by name (illeism). Used once, third-person self-reference can characterize grandiosity or detachment; recurring across many lines it reads as an authorial tic rather than a deliberate voice choice, and it breaks the naturalism of how people actually speak about themselves.`,
+          suggestedFix: 'Replace most third-person self-references with "I" and "me". If a character\'s illeism is a deliberate trait (ego, dissociation, performance), keep it sparing and pointed so it reads as character rather than habit; otherwise let them speak in the first person like everyone else.',
+        });
+      }
     }
   }
 

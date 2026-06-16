@@ -19996,6 +19996,125 @@ The lights go out.`;
     });
   });
 
+  describe('Wave 350 — dialoguePass: you-opener flood, thanks overuse, self-reference illeism', async () => {
+    const runD350 = async (fountain: string) => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DIALOGUE_YOU_OPENER_FLOOD fires when >30% of lines begin with "You"', async () => {
+      const f350y = `INT. ROOM - DAY
+
+ALICE
+You never listen to me at all.
+You always do this to us.
+You promised it would be different.
+The rain is falling outside now.
+We should head home before dark.
+
+BOB
+You cannot keep blaming me here.
+You said we would be fine today.
+I packed the bags this morning.
+The car is waiting in the lot.
+Let us just go home now please.`;
+      const res = await runD350(f350y);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_YOU_OPENER_FLOOD'), 'DIALOGUE_YOU_OPENER_FLOOD should fire');
+    });
+
+    it('DIALOGUE_YOU_OPENER_FLOOD does not fire when "You" openers are rare', async () => {
+      const f350yn = `INT. ROOM - DAY
+
+ALICE
+You never listen to me at all.
+We should head home before dark.
+The rain is falling outside now.
+I packed the bags this morning.
+The car is waiting in the lot.
+
+BOB
+We can still make it in time.
+I believe the road is clear now.
+The plan is set for tonight.
+Let us just go home now please.
+Morning will come soon enough.`;
+      const res = await runD350(f350yn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_YOU_OPENER_FLOOD'), 'DIALOGUE_YOU_OPENER_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_THANKS_OVERUSE fires when 3+ lines are expressions of gratitude', async () => {
+      const f350t = `INT. ROOM - DAY
+
+ALICE
+Thank you for coming today.
+The meeting starts at noon now.
+Thanks for all of your help here.
+
+BOB
+I appreciate it more than you know.
+We should review the documents soon.
+The numbers look correct to me.
+Let us proceed with the vote now.
+We adjourn until tomorrow morning.`;
+      const res = await runD350(f350t);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_THANKS_OVERUSE'), 'DIALOGUE_THANKS_OVERUSE should fire');
+    });
+
+    it('DIALOGUE_THANKS_OVERUSE does not fire when gratitude is rare', async () => {
+      const f350tn = `INT. ROOM - DAY
+
+ALICE
+Thank you for coming today.
+The meeting starts at noon now.
+We should review the documents soon.
+
+BOB
+The numbers look correct to me.
+Let us proceed with the vote now.
+We adjourn until tomorrow morning.
+The budget needs another review.
+Nothing else matters right now.`;
+      const res = await runD350(f350tn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_THANKS_OVERUSE'), 'DIALOGUE_THANKS_OVERUSE should not fire');
+    });
+
+    it('DIALOGUE_SELF_REFERENCE fires when a character names themselves in >20% of lines', async () => {
+      const f350s = `INT. ROOM - DAY
+
+JOHN
+John does not make mistakes like that.
+John always keeps his promises here.
+John will handle this himself now.
+The weather looks clear today.
+
+MARY
+We should leave before the storm.
+I packed everything we will need.
+The road ahead is long and dark.
+Let us go now before it rains.`;
+      const res = await runD350(f350s);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_SELF_REFERENCE'), 'DIALOGUE_SELF_REFERENCE should fire');
+    });
+
+    it('DIALOGUE_SELF_REFERENCE does not fire when characters speak in the first person', async () => {
+      const f350sn = `INT. ROOM - DAY
+
+JOHN
+I do not make mistakes like that.
+I always keep my promises here.
+I will handle this myself now.
+The weather looks clear today.
+
+MARY
+We should leave before the storm.
+I packed everything we will need.
+The road ahead is long and dark.
+Let us go now before it rains.`;
+      const res = await runD350(f350sn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_SELF_REFERENCE'), 'DIALOGUE_SELF_REFERENCE should not fire');
+    });
+  });
+
   describe('Wave 336 — dialoguePass: question flood, negative opener flood, mid-sentence caps flood', async () => {
     const runD336 = async (fountain: string) => {
       const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
