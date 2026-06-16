@@ -17897,6 +17897,84 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 353 — intentionPass: proactive curiosity decoupled, proactive suspense peak decoupled, proactive curiosity peak decoupled', async () => {
+    const makeRec353 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'negative', suspenseDelta: 0.5, curiosityDelta: 0.5,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runI353 = async (records: any[]) => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      return intentionPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PROACTIVE_CURIOSITY_DECOUPLED fires when proactive scenes avg curiosityDelta ≤ 0', async () => {
+      const recs353cd = [
+        ...Array.from({ length: 5 }, (_, i) => makeRec353(i)),
+        makeRec353(5, { clockRaised: true, curiosityDelta: 0 }),
+        makeRec353(6, { clockRaised: true, curiosityDelta: -0.3 }),
+        makeRec353(7, { clockRaised: true, curiosityDelta: 0 }),
+      ];
+      const res = await runI353(recs353cd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PROACTIVE_CURIOSITY_DECOUPLED'), 'PROACTIVE_CURIOSITY_DECOUPLED should fire');
+    });
+
+    it('PROACTIVE_CURIOSITY_DECOUPLED does not fire when proactive scenes raise curiosity', async () => {
+      const recs353cdn = [
+        ...Array.from({ length: 5 }, (_, i) => makeRec353(i)),
+        makeRec353(5, { clockRaised: true, curiosityDelta: 1 }),
+        makeRec353(6, { clockRaised: true, curiosityDelta: 0.8 }),
+        makeRec353(7, { clockRaised: true, curiosityDelta: 0.5 }),
+      ];
+      const res = await runI353(recs353cdn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PROACTIVE_CURIOSITY_DECOUPLED'), 'PROACTIVE_CURIOSITY_DECOUPLED should not fire');
+    });
+
+    it('PROACTIVE_SUSPENSE_PEAK_DECOUPLED fires when the peak-suspense scene is not proactive', async () => {
+      const recs353sp = Array.from({ length: 8 }, (_, i) =>
+        makeRec353(i,
+          i === 3 ? { suspenseDelta: 3 } :
+          i === 6 ? { clockRaised: true } : {})
+      );
+      const res = await runI353(recs353sp);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PROACTIVE_SUSPENSE_PEAK_DECOUPLED'), 'PROACTIVE_SUSPENSE_PEAK_DECOUPLED should fire');
+    });
+
+    it('PROACTIVE_SUSPENSE_PEAK_DECOUPLED does not fire when the peak-suspense scene is proactive', async () => {
+      const recs353spn = Array.from({ length: 8 }, (_, i) =>
+        makeRec353(i,
+          i === 3 ? { suspenseDelta: 3, clockRaised: true } :
+          i === 6 ? { clockRaised: true } : {})
+      );
+      const res = await runI353(recs353spn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PROACTIVE_SUSPENSE_PEAK_DECOUPLED'), 'PROACTIVE_SUSPENSE_PEAK_DECOUPLED should not fire');
+    });
+
+    it('PROACTIVE_CURIOSITY_PEAK_DECOUPLED fires when the peak-curiosity scene is not proactive', async () => {
+      const recs353cp = Array.from({ length: 8 }, (_, i) =>
+        makeRec353(i,
+          i === 3 ? { curiosityDelta: 3 } :
+          i === 6 ? { clockRaised: true } : {})
+      );
+      const res = await runI353(recs353cp);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PROACTIVE_CURIOSITY_PEAK_DECOUPLED'), 'PROACTIVE_CURIOSITY_PEAK_DECOUPLED should fire');
+    });
+
+    it('PROACTIVE_CURIOSITY_PEAK_DECOUPLED does not fire when the peak-curiosity scene is proactive', async () => {
+      const recs353cpn = Array.from({ length: 8 }, (_, i) =>
+        makeRec353(i,
+          i === 3 ? { curiosityDelta: 3, clockRaised: true } :
+          i === 6 ? { clockRaised: true } : {})
+      );
+      const res = await runI353(recs353cpn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PROACTIVE_CURIOSITY_PEAK_DECOUPLED'), 'PROACTIVE_CURIOSITY_PEAK_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 339 — intentionPass: proactive emotion decoupled, proactive revelation absent, proactive relationship void', async () => {
     const makeRec339 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

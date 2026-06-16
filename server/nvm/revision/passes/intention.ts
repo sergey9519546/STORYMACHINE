@@ -26,6 +26,10 @@
 // neutral — initiative without feeling), proactive revelation absent (≥3 proactive
 // scenes none followed by a revelation in the next 2 scenes — agency without discovery),
 // proactive relationship void (≥3 proactive scenes none with any relationship shift).
+// Wave 353 additions: proactive curiosity decoupled (proactive scenes avg curiosityDelta ≤ 0
+// — initiative opens no questions), proactive suspense peak decoupled (the story's highest-
+// suspense scene is not protagonist-driven), proactive curiosity peak decoupled (the story's
+// highest-curiosity scene is not protagonist-driven).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1314,6 +1318,82 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         description: `${proactiveScenes339rv.length} proactive scenes exist but none carries a relationship shift — the protagonist's acts of agency have no interpersonal consequence. When initiative never affects bonds, the story runs on two parallel tracks: the protagonist solves a puzzle apart from their relationships, and the audience can feel that disconnect. The protagonist's plans should be entangled with the people they are responsible to or in conflict with.`,
         suggestedFix: "Root at least one proactive act in a relationship: the protagonist plants a clue that implicates someone they care about, raises a clock that forces a partner to choose, or makes a move that fractures a bond in order to win. Initiative that moves people, not just plot, gives the protagonist something to lose.",
       });
+    }
+  }
+
+  // ── Wave 353: PROACTIVE_CURIOSITY_DECOUPLED, PROACTIVE_SUSPENSE_PEAK_DECOUPLED, PROACTIVE_CURIOSITY_PEAK_DECOUPLED ──
+
+  // PROACTIVE_CURIOSITY_DECOUPLED (minor, n≥8, ≥2 proactive scenes): The protagonist's
+  // proactive scenes (clockRaised or seededClueIds) have an average curiosityDelta of zero
+  // or less — initiative never opens a question. When the protagonist acts but their action
+  // raises no new uncertainty, agency reads as task-completion: the audience watches them
+  // execute rather than investigate, and the forward pull of "what will this turn up?" is
+  // missing. Completes the proactive-scene channel set with PROACTIVE_SUSPENSE_DECOUPLED
+  // and PROACTIVE_EMOTION_DECOUPLED; distinct from CURIOSITY_WITHOUT_AGENCY (which checks
+  // whether curiosity spikes are driven by initiative — the opposite direction).
+  if (n >= 8) {
+    const proCur353 = (records as any[]).filter(isProactive258);
+    if (proCur353.length >= 2) {
+      const avgCur353 = proCur353.reduce((s: number, r: any) => s + (r.curiosityDelta ?? 0), 0) / proCur353.length;
+      if (avgCur353 <= 0) {
+        issues.push({
+          location: `${proCur353.length} proactive scene(s) — curiosity register`,
+          rule: 'PROACTIVE_CURIOSITY_DECOUPLED',
+          severity: 'minor',
+          description: `The protagonist's ${proCur353.length} proactive scenes have an average curiosityDelta of ${avgCur353.toFixed(2)} — initiative never opens a question. When the protagonist acts but the action raises no new uncertainty, agency reads as task-completion: the audience watches them execute rather than investigate, and the forward pull of "what will this turn up?" never attaches to what the protagonist does.`,
+          suggestedFix: 'Let initiative generate questions: when the protagonist plants a clue or makes a move, have it expose something unexpected — a complication, a half-answer, a new unknown. Agency that deepens the mystery binds the audience to the protagonist; agency that only ticks boxes leaves them watching a checklist.',
+        });
+      }
+    }
+  }
+
+  // PROACTIVE_SUSPENSE_PEAK_DECOUPLED (minor, n≥8, maxSuspense>1, ≥1 proactive): The
+  // single highest-suspense scene in the story is not a proactive scene — the most
+  // dangerous moment happens TO the protagonist rather than because of them, even though
+  // they take initiative elsewhere. The story's tensest beat should ideally be one the
+  // protagonist precipitated: the gambit that backfires, the confrontation they forced.
+  // Distinct from INTENTION_REACTIVE_CLIMAX (the final-15% climax zone) and PROACTIVE_
+  // SUSPENSE_DECOUPLED (the average suspense of proactive scenes): this isolates the
+  // single peak-suspense scene wherever it falls.
+  if (n >= 8) {
+    const maxSusp353 = Math.max(...(records as any[]).map(r => r.suspenseDelta ?? 0));
+    const anyPro353 = (records as any[]).some(isProactive258);
+    if (maxSusp353 > 1 && anyPro353) {
+      const peakSusp353 = (records as any[]).find(r => (r.suspenseDelta ?? 0) === maxSusp353);
+      if (peakSusp353 && !isProactive258(peakSusp353)) {
+        issues.push({
+          location: `Scene ${peakSusp353.sceneIdx} (peak suspense: ${maxSusp353}) — not protagonist-driven`,
+          rule: 'PROACTIVE_SUSPENSE_PEAK_DECOUPLED',
+          severity: 'minor',
+          description: `The story's highest-suspense scene (Scene ${peakSusp353.sceneIdx}, suspenseDelta ${maxSusp353}) is not a proactive scene — the most dangerous moment happens to the protagonist rather than because of them, even though they take initiative elsewhere. The tensest beat in the story lands hardest when the protagonist precipitated it: a gambit that backfires, a confrontation they forced.`,
+          suggestedFix: 'Tie the peak-suspense moment to the protagonist\'s initiative: let the scene of maximum danger be the consequence of a choice they made — the trap they sprang, the line they crossed. Suspense the protagonist causes implicates them; suspense that merely befalls them makes them a victim of the plot.',
+        });
+      }
+    }
+  }
+
+  // PROACTIVE_CURIOSITY_PEAK_DECOUPLED (minor, n≥8, maxCuriosity>1, ≥1 proactive): The
+  // single highest-curiosity scene in the story is not a proactive scene — the most
+  // intriguing question opens by itself rather than through the protagonist's action, even
+  // though they take initiative elsewhere. The story's biggest hook should ideally be
+  // something the protagonist's digging uncovered. Distinct from CURIOSITY_WITHOUT_AGENCY
+  // (whether ANY curiosity spike >1 is driven by initiative — a set check) and PROACTIVE_
+  // CURIOSITY_DECOUPLED (the average curiosity of proactive scenes): this isolates the
+  // single peak-curiosity scene.
+  if (n >= 8) {
+    const maxCur353b = Math.max(...(records as any[]).map(r => r.curiosityDelta ?? 0));
+    const anyPro353b = (records as any[]).some(isProactive258);
+    if (maxCur353b > 1 && anyPro353b) {
+      const peakCur353 = (records as any[]).find(r => (r.curiosityDelta ?? 0) === maxCur353b);
+      if (peakCur353 && !isProactive258(peakCur353)) {
+        issues.push({
+          location: `Scene ${peakCur353.sceneIdx} (peak curiosity: ${maxCur353b}) — not protagonist-driven`,
+          rule: 'PROACTIVE_CURIOSITY_PEAK_DECOUPLED',
+          severity: 'minor',
+          description: `The story's highest-curiosity scene (Scene ${peakCur353.sceneIdx}, curiosityDelta ${maxCur353b}) is not a proactive scene — the most intriguing question opens by itself rather than through the protagonist's action, even though they take initiative elsewhere. The biggest hook in the story binds the audience to the protagonist when it is something their digging uncovered, not something that merely surfaced.`,
+          suggestedFix: 'Let the protagonist\'s initiative open the story\'s biggest question: route the peak-curiosity beat through a choice they made — the door they opened, the lead they chased, the secret they pried loose. A mystery the protagonist triggers makes their agency the engine of intrigue.',
+        });
+      }
     }
   }
 
