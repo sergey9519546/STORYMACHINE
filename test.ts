@@ -21334,6 +21334,217 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 361 — voicePass: conditional flood, apology overuse, hesitation flood', async () => {
+    const runV361 = async (fountain: string) => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      return voicePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DIALOGUE_CONDITIONAL_FLOOD fires when >30% of dialogue lines begin with a conditional', async () => {
+      const f361c = `INT. LIVING ROOM - DAY
+
+ANNA
+If you leave now, there's no coming back.
+
+MARK
+Unless you change your mind before morning.
+
+ANNA
+What if I told you the truth right now?
+
+MARK
+If that's how you feel.
+
+ANNA
+I've been thinking about it.
+
+MARK
+Suppose we tried something different.
+
+ANNA
+What if things were just simpler?
+
+MARK
+If only that were possible.
+
+ANNA
+I know. I really do.
+
+MARK
+We'll figure it out.`;
+      const res = await runV361(f361c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_CONDITIONAL_FLOOD'), 'DIALOGUE_CONDITIONAL_FLOOD should fire');
+    });
+
+    it('DIALOGUE_CONDITIONAL_FLOOD does not fire when dialogue is mostly declarative', async () => {
+      const f361cn = `INT. LIVING ROOM - DAY
+
+ANNA
+You need to make a decision today.
+
+MARK
+I already made it last night.
+
+ANNA
+Then why are you still here?
+
+MARK
+Because I have something to say.
+
+ANNA
+Say it.
+
+MARK
+I'm staying.
+
+ANNA
+Good.
+
+MARK
+Good.
+
+ANNA
+Now we can move forward.
+
+MARK
+That's all I wanted.`;
+      const res = await runV361(f361cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_CONDITIONAL_FLOOD'), 'DIALOGUE_CONDITIONAL_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_APOLOGY_OVERUSE fires when 3+ dialogue lines are apologies', async () => {
+      const f361a = `INT. OFFICE - DAY
+
+CLAIRE
+I'm sorry about what happened yesterday.
+
+TOM
+It's fine.
+
+CLAIRE
+I apologize for raising my voice.
+
+TOM
+You don't need to do this.
+
+CLAIRE
+Forgive me. I really didn't mean any of it.
+
+TOM
+Claire, stop.
+
+CLAIRE
+I just want you to know I'm aware.
+
+TOM
+I know you are.`;
+      const res = await runV361(f361a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_APOLOGY_OVERUSE'), 'DIALOGUE_APOLOGY_OVERUSE should fire');
+    });
+
+    it('DIALOGUE_APOLOGY_OVERUSE does not fire when dialogue has fewer than 3 apologies', async () => {
+      const f361an = `INT. OFFICE - DAY
+
+CLAIRE
+I'm sorry about yesterday.
+
+TOM
+Forget it.
+
+CLAIRE
+No, it mattered.
+
+TOM
+Then let's talk about it properly.
+
+CLAIRE
+I made a mistake.
+
+TOM
+We both did.
+
+CLAIRE
+So where does that leave us?
+
+TOM
+I don't know yet.`;
+      const res = await runV361(f361an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_APOLOGY_OVERUSE'), 'DIALOGUE_APOLOGY_OVERUSE should not fire');
+    });
+
+    it('DIALOGUE_HESITATION_FLOOD fires when >25% of dialogue lines contain hesitation sounds', async () => {
+      const f361h = `INT. KITCHEN - DAY
+
+BEN
+Um, I wasn't sure you'd be home.
+
+SARA
+Well, I am.
+
+BEN
+Uh, can we talk?
+
+SARA
+About what?
+
+BEN
+Er, about what happened.
+
+SARA
+Just say it.
+
+BEN
+Hmm, I don't know where to start.
+
+SARA
+The beginning.
+
+BEN
+Right. Um, it started a long time ago.
+
+SARA
+I'm listening.`;
+      const res = await runV361(f361h);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_HESITATION_FLOOD'), 'DIALOGUE_HESITATION_FLOOD should fire');
+    });
+
+    it('DIALOGUE_HESITATION_FLOOD does not fire when dialogue speaks without hesitation', async () => {
+      const f361hn = `INT. KITCHEN - DAY
+
+BEN
+I wasn't sure you'd be home.
+
+SARA
+Well, I am.
+
+BEN
+Can we talk?
+
+SARA
+About what?
+
+BEN
+About what happened.
+
+SARA
+Just say it.
+
+BEN
+It started a long time ago.
+
+SARA
+I know.
+
+BEN
+You know?
+
+SARA
+I've known for months.`;
+      const res = await runV361(f361hn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_HESITATION_FLOOD'), 'DIALOGUE_HESITATION_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 347 — voicePass: discourse-marker opener, vocative address flood, greeting filler flood', async () => {
     const runV347 = async (fountain: string) => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');

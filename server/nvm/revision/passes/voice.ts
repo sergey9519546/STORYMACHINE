@@ -32,6 +32,10 @@
 // Wave 347 additions: discourse-marker opener (>25% of lines begin with "Okay,"/"Alright,"/
 // "Anyway,"), vocative address flood (>25% of lines carry a comma-set-off vocative like
 // "honey"/"buddy"/"sir"), greeting filler flood (≥3 lines are hellos/goodbyes/pleasantries).
+// Wave 361 additions: dialogue conditional flood (>30% of dialogue lines begin with a
+// conditional opener — "If", "Unless", "What if" — characters default to hypotheticals),
+// dialogue apology overuse (≥3 lines are apologies — no dramatic agency), dialogue
+// hesitation flood (>25% of lines contain hesitation sounds — "um", "uh", "er", "hmm").
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1574,6 +1578,89 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `${greetingCount347} dialogue lines are greetings or farewells ("Hello", "Goodbye", "Good morning", "See you"). Social pleasantries are almost always cuttable — a scene should begin as late as possible and end as early as possible, skipping the hellos and goodbyes that real life requires but drama does not. Repeatedly staging the small talk wastes the script's openings and closings on words that carry no story.`,
           suggestedFix: 'Cut the greetings and farewells and enter each scene mid-moment, already in motion. If a hello or goodbye must stay, make it do double duty — a greeting that lands as a threat, a farewell that reveals a secret — so the pleasantry carries dramatic freight rather than just marking arrival and departure.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 361: DIALOGUE_CONDITIONAL_FLOOD, DIALOGUE_APOLOGY_OVERUSE, DIALOGUE_HESITATION_FLOOD ──
+  {
+    const dlg361: string[] = [];
+    let inDlg361 = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg361 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg361 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg361 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg361) dlg361.push(t);
+    }
+
+    // DIALOGUE_CONDITIONAL_FLOOD (minor, ≥10 lines, >30%): More than 30% of
+    // dialogue lines begin with a conditional opener ("If ", "Unless ", "Whether ",
+    // "Suppose ", "What if ", "Assuming "). Characters who default to hypothetical
+    // speech rather than declarative action lack dramatic agency — they negotiate
+    // possibility instead of confronting reality. Conditional-heavy dialogue is also
+    // hard to play: actors can't commit to a line that hasn't committed to its premise.
+    // Distinct from DIALOGUE_HEDGING_OPENER (hedging qualifiers like "I think",
+    // "maybe" — not conditional clause openers) and DIALOGUE_INTERROGATIVE_SATURATION
+    // (questions, not conditionals).
+    if (dlg361.length >= 10) {
+      const conditionalRe361 = /^(if\s+|unless\s+|whether\s+|suppose\s+|what\s+if\s+|assuming\s+|provided\s+that\s+|in\s+case\s+)/i;
+      const conditionalCount361 = dlg361.filter(l => conditionalRe361.test(l.trim())).length;
+      if (conditionalCount361 / dlg361.length > 0.30) {
+        issues.push({
+          location: 'Dialogue throughout',
+          rule: 'DIALOGUE_CONDITIONAL_FLOOD',
+          severity: 'minor',
+          description: `${conditionalCount361} of ${dlg361.length} dialogue lines (${Math.round(conditionalCount361 / dlg361.length * 100)}%) begin with a conditional opener ("If", "Unless", "What if", "Suppose"). Characters who default to hypothetical speech lack dramatic agency — they negotiate possibility instead of confronting reality. Conditional-heavy dialogue is also hard to play: an actor can't fully commit to a line that hasn't committed to its own premise.`,
+          suggestedFix: 'Convert conditional speech into declarative speech: "If you leave, I\'ll be alone" → "Don\'t leave me." Characters should confront rather than speculate. Conditionals can be tools for evasion, threat, or bargaining — use them purposefully rather than as a default register.',
+        });
+      }
+    }
+
+    // DIALOGUE_APOLOGY_OVERUSE (minor, ≥8 lines, ≥3 apology lines): Three or
+    // more dialogue lines are apologies ("I'm sorry", "I apologize", "forgive me",
+    // "excuse me", "I didn't mean to", "my mistake", "pardon"). Characters who
+    // constantly apologize have no dramatic agency — they respond to tension by
+    // retreating rather than by asserting, choosing, or confronting. A single
+    // apology can carry enormous dramatic weight; three or more signals that the
+    // writer is using apology as a default reaction to conflict. Distinct from
+    // DIALOGUE_HEDGING_OPENER (qualifying phrases, not full apologies) and
+    // DIALOGUE_GREETING_FILLER_FLOOD (greetings/farewells, not apologies).
+    if (dlg361.length >= 8) {
+      const apologyRe361 = /\b(i'?m\s+sorry\b|i\s+apologize\b|forgive\s+me\b|excuse\s+me\b|pardon\s+(me\b)?|my\s+mistake\b|my\s+apolog(y|ies)\b|i\s+didn'?t\s+mean\s+to\b|i\s+shouldn'?t\s+have\b)/i;
+      const apologyCount361 = dlg361.filter(l => apologyRe361.test(l)).length;
+      if (apologyCount361 >= 3) {
+        issues.push({
+          location: 'Dialogue apologies',
+          rule: 'DIALOGUE_APOLOGY_OVERUSE',
+          severity: 'minor',
+          description: `${apologyCount361} dialogue lines are apologies ("I'm sorry", "I apologize", "forgive me", "excuse me"). Characters who constantly apologize have no dramatic agency — they respond to tension by retreating rather than asserting, choosing, or confronting. A single apology can be a devastating dramatic beat; ${apologyCount361} apologies signals a story where characters default to contrition instead of conflict.`,
+          suggestedFix: "Reserve apology for its maximum impact: one well-placed 'I'm sorry' that costs a character something. Replace the others with more active responses to conflict — a counter-attack, a deflection, a revelation, or a choice. Apology forecloses drama; active response generates it.",
+        });
+      }
+    }
+
+    // DIALOGUE_HESITATION_FLOOD (minor, ≥10 lines, >25%): More than 25% of
+    // dialogue lines contain a hesitation sound or filler word ("um", "uh", "er",
+    // "hmm", "ahh"). Written hesitation is a device for characterizing uncertainty
+    // or nervousness, but in density it makes every character sound uncertain and
+    // the script feel unconfident. Unlike real speech, written dialogue carries only
+    // the hesitations the writer deliberately included; when a quarter of all lines
+    // stutter, the script hasn't chosen nervousness as a character choice — it has
+    // adopted it as a default voice. Distinct from DIALOGUE_DISCOURSE_MARKER_OPENER
+    // ("Okay,", "Alright,") and DIALOGUE_HEDGING_OPENER (hedging qualifiers).
+    if (dlg361.length >= 10) {
+      const hesitationRe361 = /\b(um+|uh+|er+|hmm+|ahh?)\b/i;
+      const hesitationCount361 = dlg361.filter(l => hesitationRe361.test(l)).length;
+      if (hesitationCount361 / dlg361.length > 0.25) {
+        issues.push({
+          location: 'Dialogue throughout',
+          rule: 'DIALOGUE_HESITATION_FLOOD',
+          severity: 'minor',
+          description: `${hesitationCount361} of ${dlg361.length} dialogue lines (${Math.round(hesitationCount361 / dlg361.length * 100)}%) contain a hesitation sound ("um", "uh", "er", "hmm"). Written hesitation signals a specific character choice — nervousness, uncertainty, evasion. In density it ceases to be characterization and becomes the script's default voice, making every character sound equivocal and the writing itself tentative.`,
+          suggestedFix: "Reserve hesitation sounds for specific characterization: one character who stutters under pressure, one scene where uncertainty is the dramatic point. Remove the others and trust the character's position to speak for itself — a line that says what it means, without hedging, almost always lands harder.",
         });
       }
     }
