@@ -32,6 +32,11 @@
 // Wave 354 additions: fade transition overuse (≥4 FADE/DISSOLVE soft transitions),
 // dream sequence crutch (≥2 labeled dream/fantasy sequences), intercut overuse (≥3
 // "INTERCUT" markers — cross-cutting to manufacture momentum scenes lack).
+// Wave 368 additions: off-screen cue overuse (≥4 (O.S.)/(O.C.) cues — voices from
+// off-frame leaned on instead of staging the speaker), continuous slug overuse (≥3
+// sluglines ending in CONTINUOUS/MOMENTS LATER/SAME/LATER — one scene chopped into
+// fragments), back-to-scene crutch (≥2 "BACK TO SCENE"/"RESUME SCENE" return markers —
+// the script keeps stepping out of its own timeline).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1627,6 +1632,71 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${intercutCount354} "INTERCUT" markers appear in the script. Intercutting is powerful for genuine parallel action, but heavy reliance on it signals that scenes cannot stand on their own — the writer keeps cross-cutting to manufacture momentum the individual scenes lack, shuttling the audience between locations rather than letting them settle into any one. Pervasive intercutting fragments attention instead of building tension.`,
         suggestedFix: 'Reserve intercutting for the one or two sequences where the parallel timelines genuinely collide or race each other. Elsewhere, let each scene play to its own end and trust ordinary sequencing; if a scene needs an intercut to stay alive, the scene itself likely needs strengthening.',
+      });
+    }
+  }
+
+  // ── Wave 368: OFF_SCREEN_CUE_OVERUSE ─────────────────────────────────────
+  // Four or more (O.S.) or (O.C.) off-screen / off-camera dialogue cues. A voice
+  // from off-frame is a legitimate tool — a call from the next room, an unseen
+  // speaker — but leaned on repeatedly it signals the writer keeps placing speakers
+  // outside the frame rather than staging them in it, so the scene's geography goes
+  // soft and characters become disembodied voices. Distinct from VOICEOVER_CRUTCH
+  // ((V.O.) narration laid over the image — this is in-scene off-frame speech).
+  {
+    const offScreenRe368 = /\((O\.?S\.?|O\.?C\.?)\)/i;
+    const offScreenCount368 = lines.filter(l => offScreenRe368.test(l.trim())).length;
+    if (offScreenCount368 >= 4) {
+      issues.push({
+        location: `${offScreenCount368} off-screen (O.S./O.C.) cues`,
+        rule: 'OFF_SCREEN_CUE_OVERUSE',
+        severity: 'minor',
+        description: `${offScreenCount368} dialogue cues are marked off-screen or off-camera ((O.S.)/(O.C.)). A voice from off-frame is a fine occasional tool, but leaned on this heavily it signals the writer keeps placing speakers outside the frame rather than staging them within it — the scene's geography softens and characters dissolve into disembodied voices the audience can't locate.`,
+        suggestedFix: 'Bring most speakers into the frame: stage the confrontation in one room where both characters are visible, so the scene plays as embodied action rather than a voice answering from elsewhere. Reserve (O.S.) for the moments where the speaker\'s unseen position is itself dramatic — the threat in the dark, the voice behind the door.',
+      });
+    }
+  }
+
+  // ── Wave 368: CONTINUOUS_SLUG_OVERUSE ────────────────────────────────────
+  // Three or more sluglines whose time-of-day field is a continuity tag
+  // ("CONTINUOUS", "MOMENTS LATER", "SAME", "LATER", "CONT'D"). These tags mark a
+  // scene that is really a continuation of the previous one — used heavily, they
+  // reveal a sequence that has been chopped into fragments by location changes
+  // rather than genuinely distinct scenes, so the scene count inflates without the
+  // story actually moving. Distinct from SCENE_SLUG_TIME_MONOTONE (DAY/NIGHT
+  // monotony) and LOCATION_REPETITION (repeated location names).
+  {
+    const continuousSlugRe368 = /^(INT\.|EXT\.|INT\/EXT\.|I\/E\.).*[-—]\s*(CONTINUOUS|MOMENTS LATER|SAME(?: TIME)?|LATER|CONT'?D)\s*$/i;
+    const continuousCount368 = lines.filter(l => continuousSlugRe368.test(l.trim())).length;
+    if (continuousCount368 >= 3) {
+      issues.push({
+        location: `${continuousCount368} continuity-tagged sluglines`,
+        rule: 'CONTINUOUS_SLUG_OVERUSE',
+        severity: 'minor',
+        description: `${continuousCount368} sluglines use a continuity tag ("CONTINUOUS", "MOMENTS LATER", "SAME", "LATER") as their time field. Each tag marks a scene that is really a continuation of the one before it; used this often, they reveal a single sequence chopped into fragments by location changes rather than a series of genuinely distinct scenes. The scene count inflates while the story stays in place.`,
+        suggestedFix: 'Consolidate continuity-tagged fragments into their parent scenes, or give each a real time jump and dramatic purpose. If three scenes are all "CONTINUOUS", they are one scene playing across rooms — write them as one continuous beat, and reserve a new slugline for a genuine shift in time, place, or intent.',
+      });
+    }
+  }
+
+  // ── Wave 368: BACK_TO_SCENE_CRUTCH ───────────────────────────────────────
+  // Two or more "BACK TO SCENE" / "RESUME SCENE" / "BACK TO PRESENT" return
+  // markers. These mark the return from a flashback, dream, or intercut — and their
+  // proliferation reveals a script that keeps stepping out of its own present-tense
+  // timeline and having to climb back in. Each departure-and-return interrupts the
+  // forward drive of the main scene. Distinct from FLASHBACK_CRUTCH (the transition
+  // INTO the past) and INTERCUT_OVERUSE (the cross-cut markers): this counts the
+  // return-to-the-main-line markers specifically.
+  {
+    const backToRe368 = /^(BACK TO SCENE|BACK TO PRESENT|BACK TO REALITY|RESUME SCENE|RESUME ON|RETURN TO SCENE|PRESENT DAY)\s*:?\.?$/i;
+    const backToCount368 = lines.filter(l => backToRe368.test(l.trim())).length;
+    if (backToCount368 >= 2) {
+      issues.push({
+        location: `${backToCount368} back-to-scene return markers`,
+        rule: 'BACK_TO_SCENE_CRUTCH',
+        severity: 'minor',
+        description: `${backToCount368} "BACK TO SCENE" / "RESUME SCENE" return markers appear in the script. Each one marks a return from a flashback, dream, or aside back into the present-tense timeline — their proliferation reveals a story that keeps stepping out of its own main line and having to climb back in. Every departure-and-return interrupts the forward drive of the scene the audience is actually invested in.`,
+        suggestedFix: 'Reduce the number of departures from the present timeline: fold the information delivered in the inserts into present-tense action and dialogue. A story that has to keep announcing "BACK TO SCENE" is spending too much time away from the scene; the fewer round-trips out of the now, the stronger the through-line.',
       });
     }
   }

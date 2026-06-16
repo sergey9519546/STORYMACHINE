@@ -20322,6 +20322,147 @@ He looks away.`;
     });
   });
 
+  describe('Wave 368 — originalityPass: off-screen cue overuse, continuous slug overuse, back-to-scene crutch', async () => {
+    const runO368 = async (fountain: string) => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      return originalityPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('OFF_SCREEN_CUE_OVERUSE fires when four or more (O.S.)/(O.C.) cues appear', async () => {
+      const f368os = `INT. HOUSE - DAY
+
+ANNA (O.S.)
+Where did you put the keys?
+
+MARK
+On the table.
+
+SARAH (O.S.)
+I can't find them anywhere.
+
+TOM (O.C.)
+Check the drawer.
+
+ANNA (O.S.)
+Found them.`;
+      const res = await runO368(f368os);
+      assert.ok(res.issues.some((i: any) => i.rule === 'OFF_SCREEN_CUE_OVERUSE'), 'OFF_SCREEN_CUE_OVERUSE should fire');
+    });
+
+    it('OFF_SCREEN_CUE_OVERUSE does not fire when speakers are in the frame', async () => {
+      const f368osn = `INT. HOUSE - DAY
+
+ANNA
+Where did you put the keys?
+
+MARK
+On the table.
+
+SARAH (O.S.)
+I can't find them anywhere.
+
+TOM
+Check the drawer.
+
+ANNA
+Found them.`;
+      const res = await runO368(f368osn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'OFF_SCREEN_CUE_OVERUSE'), 'OFF_SCREEN_CUE_OVERUSE should not fire');
+    });
+
+    it('CONTINUOUS_SLUG_OVERUSE fires when three or more sluglines use continuity tags', async () => {
+      const f368cs = `INT. KITCHEN - CONTINUOUS
+
+She pours the coffee.
+
+INT. HALLWAY - MOMENTS LATER
+
+He walks past.
+
+INT. STUDY - SAME
+
+The phone rings.
+
+EXT. GARDEN - LATER
+
+The dog barks.`;
+      const res = await runO368(f368cs);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONTINUOUS_SLUG_OVERUSE'), 'CONTINUOUS_SLUG_OVERUSE should fire');
+    });
+
+    it('CONTINUOUS_SLUG_OVERUSE does not fire when sluglines use real time-of-day', async () => {
+      const f368csn = `INT. KITCHEN - DAY
+
+She pours the coffee.
+
+INT. HALLWAY - NIGHT
+
+He walks past.
+
+INT. STUDY - DAY
+
+The phone rings.
+
+EXT. GARDEN - DUSK
+
+The dog barks.`;
+      const res = await runO368(f368csn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONTINUOUS_SLUG_OVERUSE'), 'CONTINUOUS_SLUG_OVERUSE should not fire');
+    });
+
+    it('BACK_TO_SCENE_CRUTCH fires when two or more return markers appear', async () => {
+      const f368bt = `INT. OFFICE - DAY
+
+He stares at the photograph.
+
+FLASHBACK:
+
+EXT. BEACH - DAY
+
+A child runs along the shore.
+
+BACK TO SCENE:
+
+INT. OFFICE - DAY
+
+He sets the photo down.
+
+FLASHBACK:
+
+EXT. BEACH - DAY
+
+The child laughs.
+
+BACK TO SCENE:
+
+INT. OFFICE - DAY
+
+He closes the drawer.`;
+      const res = await runO368(f368bt);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BACK_TO_SCENE_CRUTCH'), 'BACK_TO_SCENE_CRUTCH should fire');
+    });
+
+    it('BACK_TO_SCENE_CRUTCH does not fire with at most one return marker', async () => {
+      const f368btn = `INT. OFFICE - DAY
+
+He stares at the photograph.
+
+FLASHBACK:
+
+EXT. BEACH - DAY
+
+A child runs along the shore.
+
+BACK TO SCENE:
+
+INT. OFFICE - DAY
+
+He sets the photo down.`;
+      const res = await runO368(f368btn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BACK_TO_SCENE_CRUTCH'), 'BACK_TO_SCENE_CRUTCH should not fire');
+    });
+  });
+
   describe('Wave 354 — originalityPass: fade transition overuse, dream sequence crutch, intercut overuse', async () => {
     const runO354 = async (fountain: string) => {
       const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
