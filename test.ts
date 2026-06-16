@@ -18713,6 +18713,72 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 393 — characterArcPass: emotional back-loaded, positive emotion run, late low-point absent', async () => {
+    const makeRec393 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runA393 = async (records: any[]) => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ARC_EMOTIONAL_BACK_LOADED fires when >70% of emotional beats fall in the second half', async () => {
+      // n=10 → mid=5; charged at 1 (first) and 6,7,8 (second) → 3/4 = 75%
+      const recs393bl = Array.from({ length: 10 }, (_, i) =>
+        makeRec393(i, { emotionalShift: [1, 6, 7, 8].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runA393(recs393bl);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_EMOTIONAL_BACK_LOADED'), 'ARC_EMOTIONAL_BACK_LOADED should fire');
+    });
+
+    it('ARC_EMOTIONAL_BACK_LOADED does not fire when emotional beats are balanced', async () => {
+      const recs393bln = Array.from({ length: 10 }, (_, i) =>
+        makeRec393(i, { emotionalShift: [1, 3, 7, 8].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runA393(recs393bln);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_EMOTIONAL_BACK_LOADED'), 'ARC_EMOTIONAL_BACK_LOADED should not fire');
+    });
+
+    it('ARC_POSITIVE_EMOTION_RUN fires when 4+ consecutive scenes are positive', async () => {
+      const recs393pr = Array.from({ length: 8 }, (_, i) =>
+        makeRec393(i, { emotionalShift: [2, 3, 4, 5].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runA393(recs393pr);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_POSITIVE_EMOTION_RUN'), 'ARC_POSITIVE_EMOTION_RUN should fire');
+    });
+
+    it('ARC_POSITIVE_EMOTION_RUN does not fire when positive scenes are broken up', async () => {
+      const recs393prn = Array.from({ length: 8 }, (_, i) =>
+        makeRec393(i, { emotionalShift: [2, 3, 5, 6].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runA393(recs393prn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_POSITIVE_EMOTION_RUN'), 'ARC_POSITIVE_EMOTION_RUN should not fire');
+    });
+
+    it('ARC_LATE_LOW_POINT_ABSENT fires when all negative beats fall in the first half', async () => {
+      // n=10 → mid=5; negatives at 1,3 (both first half)
+      const recs393lp = Array.from({ length: 10 }, (_, i) =>
+        makeRec393(i, { emotionalShift: [1, 3].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runA393(recs393lp);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_LATE_LOW_POINT_ABSENT'), 'ARC_LATE_LOW_POINT_ABSENT should fire');
+    });
+
+    it('ARC_LATE_LOW_POINT_ABSENT does not fire when a negative beat lands in the second half', async () => {
+      const recs393lpn = Array.from({ length: 10 }, (_, i) =>
+        makeRec393(i, { emotionalShift: [1, 7].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runA393(recs393lpn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_LATE_LOW_POINT_ABSENT'), 'ARC_LATE_LOW_POINT_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 379 — characterArcPass: emotion concentration, emotional front-loaded, negative emotion run', async () => {
     const makeRec379 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

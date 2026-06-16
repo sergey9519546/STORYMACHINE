@@ -43,6 +43,11 @@
 // concentration), emotional front-loaded (>70% of emotional beats fall in the first half —
 // feeling dwindles toward the climax instead of intensifying), negative emotion run (≥4
 // consecutive negative-emotion scenes with no relief — an unbroken stretch of despair).
+// Wave 393 additions: emotional back-loaded (>70% of emotional beats fall in the second half —
+// an emotionally inert opening, the distribution mirror of front-loaded), positive emotion run
+// (≥4 consecutive positive-emotion scenes with no setback — an unbroken upswing, the run mirror
+// of negative emotion run), late low-point absent (≥2 negative beats, all in the first half —
+// the protagonist's darkest moments are early and the back half has no nadir before the climax).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1469,6 +1474,93 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${maxNegRun379} consecutive scenes (${s379}–${e379}) carry a negative emotional shift with no positive or neutral beat to break the descent. An unbroken stretch of despair exhausts the audience and erases the contrast that makes any single low point land — relentless gloom reads as monotone rather than tragedy, and the audience numbs to suffering that never lets up.`,
         suggestedFix: 'Break the descent with at least one beat of relief, hope, or even grim humor inside the run — a small win later snatched away, a moment of connection before the next blow. The rhythm of fall-and-respite is what keeps a downward arc dramatic; an unbroken slide flattens into noise.',
+      });
+    }
+  }
+
+  // ── Wave 393: ARC_EMOTIONAL_BACK_LOADED, ARC_POSITIVE_EMOTION_RUN, ARC_LATE_LOW_POINT_ABSENT ──
+
+  // ARC_EMOTIONAL_BACK_LOADED (minor, n≥10, ≥4 charged scenes): More than 70% of the
+  // protagonist's non-neutral emotional beats fall in the second half. The opening is
+  // emotionally inert and feeling concentrates only as the climax nears, so the audience
+  // spends the first half with little reason to be invested before the back half suddenly
+  // demands they care. The distribution mirror of ARC_EMOTIONAL_FRONT_LOADED; distinct from
+  // ARC_FIRST_HALF_EMOTIONALLY_FLAT (the binary case — the entire first half is neutral — this
+  // fires even when the first half carries some emotion, as long as it is a small minority).
+  if (records.length >= 10) {
+    const chargedIdxs393: number[] = [];
+    for (let i393 = 0; i393 < records.length; i393++) {
+      if ((records as any[])[i393].emotionalShift !== 'neutral') chargedIdxs393.push(i393);
+    }
+    if (chargedIdxs393.length >= 4) {
+      const mid393 = Math.floor(records.length * 0.5);
+      const secondHalf393 = chargedIdxs393.filter(i => i >= mid393).length;
+      if (secondHalf393 / chargedIdxs393.length > 0.7) {
+        issues.push({
+          location: `Emotional distribution — ${secondHalf393}/${chargedIdxs393.length} beats in the second half`,
+          rule: 'ARC_EMOTIONAL_BACK_LOADED',
+          severity: 'minor',
+          description: `${secondHalf393} of the protagonist's ${chargedIdxs393.length} emotional beats (${Math.round(secondHalf393 / chargedIdxs393.length * 100)}%) fall in the second half — the opening is emotionally inert and feeling concentrates only as the climax nears. The audience spends the first half with little reason to be invested, then the back half abruptly demands they care about a character whose inner life was withheld.`,
+          suggestedFix: 'Seed emotional beats in the first half: an early hope, fear, or wound bonds the audience to the protagonist before the stakes peak. Emotion should build across the arc from the outset, not arrive all at once in the back half.',
+        });
+      }
+    }
+  }
+
+  // ARC_POSITIVE_EMOTION_RUN (minor, n≥8, run≥4): Four or more consecutive scenes carry
+  // emotionalShift='positive' with no negative or neutral beat to interrupt the upswing. An
+  // unbroken run of good feeling drains tension — without a setback to threaten the gains, the
+  // ascent reads as frictionless and the audience stops worrying. The run mirror of ARC_
+  // NEGATIVE_EMOTION_RUN; distinct from ARC_UNCONTESTED_ASCENT (a cumulative triumph-vs-
+  // adversity index across the whole story) and ARC_POSITIVE_ONLY (no negative beat anywhere).
+  if (records.length >= 8) {
+    let posRun393 = 0;
+    let maxPosRun393 = 0;
+    let maxPosStart393 = 0;
+    let curStart393 = 0;
+    for (let i393p = 0; i393p < records.length; i393p++) {
+      if ((records as any[])[i393p].emotionalShift === 'positive') {
+        if (posRun393 === 0) curStart393 = i393p;
+        posRun393++;
+        if (posRun393 > maxPosRun393) { maxPosRun393 = posRun393; maxPosStart393 = curStart393; }
+      } else {
+        posRun393 = 0;
+      }
+    }
+    if (maxPosRun393 >= 4) {
+      const s393 = (records as any[])[maxPosStart393].sceneIdx;
+      const e393 = (records as any[])[maxPosStart393 + maxPosRun393 - 1].sceneIdx;
+      issues.push({
+        location: `Scenes ${s393}–${e393} — unbroken positive run (${maxPosRun393} scenes)`,
+        rule: 'ARC_POSITIVE_EMOTION_RUN',
+        severity: 'minor',
+        description: `${maxPosRun393} consecutive scenes (${s393}–${e393}) carry a positive emotional shift with no negative or neutral beat to interrupt the upswing. An unbroken run of good feeling drains tension — without a setback to threaten the gains, the ascent reads as frictionless and the audience stops worrying, so the run plays as wish-fulfillment rather than earned progress.`,
+        suggestedFix: 'Interrupt the upswing with a complication or cost: a win that creates a new problem, a gain shadowed by what it threatens. The rhythm of progress-and-setback is what keeps a rising arc dramatic; an unbroken climb of good feeling lulls the audience instead of gripping them.',
+      });
+    }
+  }
+
+  // ARC_LATE_LOW_POINT_ABSENT (minor, n≥10, ≥2 negative beats): The protagonist suffers two
+  // or more negative emotional beats, but every one falls in the first half — the back half
+  // contains no emotional nadir before the climax. The "all is lost" low point that should
+  // precede the final push is missing from the place it belongs, so the protagonist coasts
+  // into the climax without being broken down first. Distinct from ARC_EMOTIONAL_RECOVERY_
+  // ABSENT (no positive after the first fall — about recovery), ARC_SECOND_HALF_EMOTIONALLY_
+  // FLAT (the entire back half neutral — this allows positive beats late, only negatives are
+  // absent), and structure's DARK_NIGHT_ABSENT (no deep low anywhere).
+  if (records.length >= 10) {
+    const negIdxs393: number[] = [];
+    for (let i393n = 0; i393n < records.length; i393n++) {
+      if ((records as any[])[i393n].emotionalShift === 'negative') negIdxs393.push(i393n);
+    }
+    const mid393b = Math.floor(records.length * 0.5);
+    if (negIdxs393.length >= 2 && negIdxs393.every(i => i < mid393b)) {
+      issues.push({
+        location: `Negative beats all in the first half (latest at Scene ${(records as any[])[negIdxs393[negIdxs393.length - 1]].sceneIdx})`,
+        rule: 'ARC_LATE_LOW_POINT_ABSENT',
+        severity: 'minor',
+        description: `The protagonist suffers ${negIdxs393.length} negative emotional beats, but every one falls in the first half — the back half contains no emotional nadir before the climax. The "all is lost" low point that should precede the final push is missing from where it belongs, so the protagonist coasts into the climax without being broken down first, and the victory loses the contrast that would make it land.`,
+        suggestedFix: 'Place a genuine low point in the back half, just before the climax: the moment the protagonist loses what matters most, doubts everything, hits bottom. The deepest defeat should come late so the final rally has something to rise from — an arc whose lows are all early peaks too smoothly.',
       });
     }
   }
