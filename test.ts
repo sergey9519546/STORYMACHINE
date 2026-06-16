@@ -21917,6 +21917,109 @@ Time to go now.`;
     });
   });
 
+  describe('Wave 360 — themePass: Act 3 density drop, relationship peak absent, dual peak absent', async () => {
+    const makeRec360 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const THEME360 = 'trust betrayal courage';
+    const runT360 = async (records: any[]) => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: THEME360 },
+      });
+    };
+
+    it('THEME_ACT3_DENSITY_DROP fires when Act 3 resonance is less than half of Act 2 resonance', async () => {
+      // 12 scenes; Act 2 = 3-8 (all 6 resonant), Act 3 = 9-11 (only scene 9 resonant)
+      // Act 2 density = 6/6 = 100%; Act 3 density = 1/3 = 33%. 33% < 50%.
+      const recs360a3 = Array.from({ length: 12 }, (_, i) =>
+        makeRec360(i, {
+          dialogueHighlights: (i >= 3 && i <= 8) || i === 9 ? ['the courage to trust'] : [],
+        }),
+      );
+      const res = await runT360(recs360a3);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_ACT3_DENSITY_DROP'), 'THEME_ACT3_DENSITY_DROP should fire');
+    });
+
+    it('THEME_ACT3_DENSITY_DROP does not fire when Act 3 density matches Act 2', async () => {
+      // 12 scenes; Act 2 = 3-8 (3 resonant out of 6 = 50%), Act 3 = 9-11 (3/3 = 100%)
+      // Act 3 density ≥ 50% of Act 2 density: does not fire
+      const recs360a3ni = Array.from({ length: 12 }, (_, i) =>
+        makeRec360(i, {
+          dialogueHighlights: [3, 5, 7, 9, 10, 11].includes(i) ? ['the courage to trust'] : [],
+        }),
+      );
+      const res = await runT360(recs360a3ni);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_ACT3_DENSITY_DROP'), 'THEME_ACT3_DENSITY_DROP should not fire');
+    });
+
+    it('THEME_RELATIONSHIP_PEAK_ABSENT fires when the largest-shift scene lacks theme while 2+ others carry it', async () => {
+      // scenes 2 (shift 0.5 + theme) and 4 (shift 0.4 + theme); scene 6 (shift 1.0, no theme)
+      const recs360rp = Array.from({ length: 8 }, (_, i) =>
+        makeRec360(i, {
+          dialogueHighlights: [2, 4].includes(i) ? ['courage to trust'] : [],
+          relationshipShifts: i === 2
+            ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.5 }]
+            : i === 4 ? [{ pairKey: 'C|D', dimension: 'trust', amount: 0.4 }]
+            : i === 6 ? [{ pairKey: 'A|B', dimension: 'trust', amount: 1.0 }]
+            : [],
+        }),
+      );
+      const res = await runT360(recs360rp);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_RELATIONSHIP_PEAK_ABSENT'), 'THEME_RELATIONSHIP_PEAK_ABSENT should fire');
+    });
+
+    it('THEME_RELATIONSHIP_PEAK_ABSENT does not fire when the largest-shift scene carries theme', async () => {
+      // scene 6 now also carries theme
+      const recs360rpni = Array.from({ length: 8 }, (_, i) =>
+        makeRec360(i, {
+          dialogueHighlights: [2, 4, 6].includes(i) ? ['courage to trust'] : [],
+          relationshipShifts: i === 2
+            ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.5 }]
+            : i === 4 ? [{ pairKey: 'C|D', dimension: 'trust', amount: 0.4 }]
+            : i === 6 ? [{ pairKey: 'A|B', dimension: 'trust', amount: 1.0 }]
+            : [],
+        }),
+      );
+      const res = await runT360(recs360rpni);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_RELATIONSHIP_PEAK_ABSENT'), 'THEME_RELATIONSHIP_PEAK_ABSENT should not fire');
+    });
+
+    it('THEME_DUAL_PEAK_ABSENT fires when the scene with max suspenseDelta+curiosityDelta lacks theme', async () => {
+      // scenes 0,1,2 carry theme; scene 5 has suspenseDelta=2 + curiosityDelta=2 = peak but no theme
+      const recs360dp = Array.from({ length: 8 }, (_, i) =>
+        makeRec360(i, {
+          dialogueHighlights: [0, 1, 2].includes(i) ? ['the courage to trust'] : [],
+          suspenseDelta: i === 5 ? 2 : 0,
+          curiosityDelta: i === 5 ? 2 : 0,
+        }),
+      );
+      const res = await runT360(recs360dp);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_DUAL_PEAK_ABSENT'), 'THEME_DUAL_PEAK_ABSENT should fire');
+    });
+
+    it('THEME_DUAL_PEAK_ABSENT does not fire when the dual-peak scene carries theme', async () => {
+      // scene 5 now also carries theme
+      const recs360dpni = Array.from({ length: 8 }, (_, i) =>
+        makeRec360(i, {
+          dialogueHighlights: [0, 1, 2, 5].includes(i) ? ['the courage to trust'] : [],
+          suspenseDelta: i === 5 ? 2 : 0,
+          curiosityDelta: i === 5 ? 2 : 0,
+        }),
+      );
+      const res = await runT360(recs360dpni);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_DUAL_PEAK_ABSENT'), 'THEME_DUAL_PEAK_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 346 — themePass: suspense peak absent, late debut, closing quarter silent', async () => {
     const makeRec346 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

@@ -16,6 +16,11 @@
 // Wave 346 additions: theme suspense peak absent (the highest-suspense scene is themically
 // mute), theme late debut (the first resonant scene falls at or past the midpoint), theme
 // closing quarter silent (the final 25% carries no theme while it appears earlier).
+// Wave 360 additions: Act 3 density drop (Act 3 resonance proportion < 50% of Act 2's —
+// theme thins at the approach to resolution), relationship peak absent (the scene with the
+// largest relationship shift magnitude is thematically silent while others carry theme),
+// dual peak absent (the scene with max combined suspenseDelta + curiosityDelta is
+// thematically mute — peak drama and peak curiosity arrive without the theme).
 // Wave 265 additions: clue scenes decoupled (≥2 clue-planting scenes with no theme),
 // curiosity scenes decoupled (≥2 curiosity spikes with no theme), payoff scenes
 // decoupled (≥2 payoff scenes with no theme).
@@ -1384,6 +1389,111 @@ export async function themePass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `The final quarter of the story (Scenes ${finalStart346}–${records.length - 1}) carries no language related to "${themeRaw}", though the theme appears earlier — the thematic frame is left open. The story raises its central question but lets it go quiet exactly where it should resolve, so the ending answers the plot without answering (or pointedly refusing to answer) what the story was about.`,
             suggestedFix: `Return to the theme in the closing quarter: the climax and denouement should be where "${themeRaw}" reaches its sharpest statement — the moment the story's argument lands. Let the resolution of the plot also resolve the thematic question, so the ending feels like it meant something.`,
+          });
+        }
+      }
+    }
+
+    // ── Wave 360: THEME_ACT3_DENSITY_DROP, THEME_RELATIONSHIP_PEAK_ABSENT, THEME_DUAL_PEAK_ABSENT ──
+
+    // THEME_ACT3_DENSITY_DROP (minor, n≥12, ≥2 resonant Act 2 scenes): The
+    // proportion of resonant scenes in Act 3 (final 25%) is less than 50% of
+    // the proportion in Act 2 (25%–75%). The theme thins sharply at the approach
+    // to resolution — exactly when it should be at its most insistent. Distinct
+    // from THEME_CLOSING_QUARTER_SILENT (total absence in final 25%; this fires
+    // even when some theme is present but much less dense than Act 2), THEME_
+    // ACCELERATING_DENSITY_ABSENT (keyword count, first-third vs last-third),
+    // THEME_DENSITY_INVERSION (first half vs second half), and THEME_ACT2B_
+    // DENSITY_DROP (Act 2a vs Act 2b within Act 2).
+    if (records.length >= 12) {
+      const act2Start360 = Math.floor(records.length * 0.25);
+      const act3Start360 = Math.floor(records.length * 0.75);
+      const act2Recs360 = (records as any[]).slice(act2Start360, act3Start360);
+      const act3Recs360 = (records as any[]).slice(act3Start360);
+      const act2Resonant360 = act2Recs360.filter((r: any) =>
+        sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+      ).length;
+      const act3Resonant360 = act3Recs360.filter((r: any) =>
+        sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+      ).length;
+      if (act2Resonant360 >= 2 && act3Recs360.length >= 2) {
+        const act2Density360 = act2Resonant360 / act2Recs360.length;
+        const act3Density360 = act3Resonant360 / act3Recs360.length;
+        if (act3Density360 < act2Density360 * 0.5) {
+          issues.push({
+            location: `Act 3 (Scenes ${act3Start360}–${records.length - 1}) — thematic density drop`,
+            rule: 'THEME_ACT3_DENSITY_DROP',
+            severity: 'minor',
+            description: `Act 3 is ${Math.round(act3Density360 * 100)}% thematically resonant vs Act 2's ${Math.round(act2Density360 * 100)}% — the theme thins sharply at the approach to resolution. The story should be escalating its thematic argument toward the climax, not retreating from it; a density drop into Act 3 means the ending inherits a plot without a meaning.`,
+            suggestedFix: `Bring the theme back at full force in Act 3: the climax should be where "${themeRaw}" is most urgently at stake, not where it quietly recedes. Redistribute resonant beats into the finale so the ending answers the story's central question at the moment of highest dramatic pressure.`,
+          });
+        }
+      }
+    }
+
+    // THEME_RELATIONSHIP_PEAK_ABSENT (minor, n≥8, ≥2 resonant relationship-
+    // shift scenes): The scene carrying the largest absolute relationship shift
+    // (max |amount| across all shifts in all scenes) is thematically silent,
+    // even though at least 2 other relationship-shift scenes carry theme. The
+    // biggest relational swing in the story happens without thematic resonance
+    // — the moment a bond moves most dramatically is thematically mute. Distinct
+    // from THEME_RELATIONSHIP_SHIFT_DECOUPLED (all shift scenes are silent; this
+    // fires when others carry theme but the PEAK is silent) and THEME_SUSPENSE_
+    // PEAK_ABSENT / THEME_CURIOSITY_PEAK_ABSENT (different channels).
+    if (records.length >= 8) {
+      const shiftRecs360 = (records as any[]).filter(r =>
+        ((r.relationshipShifts ?? []) as any[]).length > 0,
+      );
+      const resonantShiftRecs360 = shiftRecs360.filter((r: any) =>
+        sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+      );
+      if (resonantShiftRecs360.length >= 2) {
+        let peakAmount360 = 0;
+        let peakRec360: any = null;
+        for (const r of shiftRecs360) {
+          for (const sh of (r.relationshipShifts ?? []) as Array<{ amount: number }>) {
+            if (Math.abs(sh.amount) > peakAmount360) {
+              peakAmount360 = Math.abs(sh.amount);
+              peakRec360 = r;
+            }
+          }
+        }
+        if (peakRec360 && !sceneHasResonance(sceneTexts.get(peakRec360.sceneIdx) ?? '', expandedKeywords)) {
+          issues.push({
+            location: `Scene ${peakRec360.sceneIdx} — largest relationship shift (|${peakAmount360.toFixed(2)}|)`,
+            rule: 'THEME_RELATIONSHIP_PEAK_ABSENT',
+            severity: 'minor',
+            description: `The scene with the story's largest relationship shift (Scene ${peakRec360.sceneIdx}, magnitude ${peakAmount360.toFixed(2)}) carries no language related to "${themeRaw}", even though ${resonantShiftRecs360.length} other relationship-shift scenes do. The biggest relational swing in the story — the moment a bond moves most dramatically — happens without thematic resonance, so the audience registers the event but misses its meaning.`,
+            suggestedFix: `Let the peak relational moment carry the theme: when a bond breaks or deepens most severely, the language should echo what the story is about. If the theme is "${themeRaw}", the biggest shift should make explicit what value is at stake in that bond at that moment.`,
+          });
+        }
+      }
+    }
+
+    // THEME_DUAL_PEAK_ABSENT (minor, n≥8, ≥3 resonant scenes): The scene with
+    // the highest combined (suspenseDelta + curiosityDelta) carries no theme —
+    // the most dramatically and intellectually charged moment of the story is
+    // thematically silent. This is the moment where both tension and curiosity
+    // peak simultaneously; if the theme is absent there, the audience's most
+    // heightened state is thematically blank. Distinct from THEME_SUSPENSE_PEAK_
+    // ABSENT (max suspenseDelta alone) and THEME_CURIOSITY_PEAK_ABSENT (max
+    // curiosityDelta alone): this targets the joint peak, which may be a different
+    // scene than either individual peak.
+    if (records.length >= 8 && resonantScenes.length >= 3) {
+      const maxDual360 = Math.max(...(records as any[]).map(r =>
+        (r.suspenseDelta ?? 0) + (r.curiosityDelta ?? 0),
+      ));
+      if (maxDual360 > 0) {
+        const peakDualRec360 = (records as any[]).find(r =>
+          (r.suspenseDelta ?? 0) + (r.curiosityDelta ?? 0) === maxDual360,
+        );
+        if (peakDualRec360 && !sceneHasResonance(sceneTexts.get(peakDualRec360.sceneIdx) ?? '', expandedKeywords)) {
+          issues.push({
+            location: `Scene ${peakDualRec360.sceneIdx} — combined suspense + curiosity peak (${maxDual360.toFixed(2)})`,
+            rule: 'THEME_DUAL_PEAK_ABSENT',
+            severity: 'minor',
+            description: `Scene ${peakDualRec360.sceneIdx} has the story's highest combined suspense and curiosity charge (suspenseDelta + curiosityDelta = ${maxDual360.toFixed(2)}) but carries no language related to "${themeRaw}". The moment where tension and intrigue peak simultaneously — when the audience is most gripped and most curious — is thematically blank. The most engaged the audience will be all story, and the theme is nowhere in the scene.`,
+            suggestedFix: `Bring "${themeRaw}" into the story's peak dramatic moment: when suspense and curiosity crest at the same scene, the thematic stakes should be explicit. The audience's maximum engagement is the most powerful moment to remind them what the story is ultimately about.`,
           });
         }
       }
