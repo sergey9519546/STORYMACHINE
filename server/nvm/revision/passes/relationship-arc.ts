@@ -37,6 +37,11 @@
 // amplitude frontload (story-wide first-half shift magnitude > 1.5× second-half — ensemble
 // intensity front-loads), relationship shift drought (the longest contiguous no-shift run
 // spans ≥40% of the story — relational silence anywhere, not just a named act zone).
+// Wave 357 additions: relationship curiosity peak absent (the scene with the highest
+// curiosityDelta carries no relationship shift, even though other curiosity-positive scenes
+// do), pair second-half void (a pair with ≥3 first-half shifts has zero in the second half
+// — per-pair front-loading), relationship dramatic turn decoupled (no dramatic-turn scene
+// carries any relationship shift — pivots never crack or strengthen bonds).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1311,6 +1316,95 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         description: `The longest stretch with no relationship movement runs ${maxRun343} consecutive scenes (${s343}–${e343}), spanning ${Math.round(maxRun343 / records.length * 100)}% of the story. For this whole span the relational engine goes silent — bonds neither warm nor cool while the plot continues — so the audience loses the thread of the characters' connections at exactly the length where it should be deepening.`,
         suggestedFix: 'Thread relational movement through the drought: even a small beat — a flicker of trust, a quiet friction, a shift in who relies on whom — keeps the bonds alive across the stretch. A long run with no relational change makes the middle of the story feel like plot happening to strangers.',
       });
+    }
+  }
+
+  // ── Wave 357: RELATIONSHIP_CURIOSITY_PEAK_ABSENT, PAIR_SECOND_HALF_VOID, RELATIONSHIP_DRAMATIC_TURN_DECOUPLED ──
+
+  // RELATIONSHIP_CURIOSITY_PEAK_ABSENT (minor, n≥8, ≥2 curiosity-positive shift
+  // scenes): The scene with the highest curiosityDelta carries no relationship
+  // shift, even though at least 2 other curiosity-positive scenes do. The peak
+  // curiosity moment — the instant the audience most urgently wants to know what
+  // happens next — never touches the relational world. Distinct from
+  // RELATIONSHIP_CURIOSITY_DECOUPLED (which checks that all shift scenes average
+  // low curiosity); this checks specifically whether the curiosity peak itself is
+  // relationally blank.
+  if (records.length >= 8) {
+    const curiosityPositive357 = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0);
+    const curiosityShift357 = curiosityPositive357.filter(r =>
+      ((r.relationshipShifts ?? []) as any[]).length > 0,
+    );
+    if (curiosityShift357.length >= 2) {
+      const peak357 = (records as any[]).reduce((best: any, r: any) =>
+        (r.curiosityDelta ?? 0) > (best.curiosityDelta ?? 0) ? r : best,
+        (records as any[])[0],
+      );
+      if (((peak357.relationshipShifts ?? []) as any[]).length === 0) {
+        issues.push({
+          location: `Scene ${peak357.sceneIdx} — peak curiosity`,
+          rule: 'RELATIONSHIP_CURIOSITY_PEAK_ABSENT',
+          severity: 'minor',
+          description: `Scene ${peak357.sceneIdx} carries the story's highest curiosityDelta (${(peak357.curiosityDelta ?? 0).toFixed(2)}) but no relationship shift, even though ${curiosityShift357.length} other curiosity-positive scenes move a bond. The moment the audience is most urgently wondering what happens next never touches any character relationship — peak curiosity and relational stakes are completely disconnected.`,
+          suggestedFix: 'Let the peak curiosity moment also crack or shift a bond: a revelation that makes the audience wonder AND restructures a relationship, a question that lands in the same scene as a trust rupture or unexpected warmth. Curiosity peaks are the best place to deepen relational stakes.',
+        });
+      }
+    }
+  }
+
+  // PAIR_SECOND_HALF_VOID (minor, n≥10, pairs≥2): At least one pair accumulates
+  // ≥3 shifts in the first half of the story but registers zero shifts in the
+  // second half. That pair exhausts its entire arc before the climax and then
+  // goes relationally silent for the back half. Distinct from RELATIONSHIP_
+  // VELOCITY_COLLAPSE (whole-ensemble: first half has shifts, second half has
+  // none at all) and PAIR_EARLY_PEAK_MAJORITY (>50% of pairs have their single
+  // largest shift in the first half — peak location, not binary presence).
+  if (records.length >= 10 && pairStats.size >= 2) {
+    const mid357 = Math.floor(records.length * 0.5);
+    const voidPairs357: string[] = [];
+    for (const [pairKey357, stats357] of pairStats) {
+      const first357 = stats357.shifts.filter(s => s.sceneIdx < mid357);
+      const second357 = stats357.shifts.filter(s => s.sceneIdx >= mid357);
+      if (first357.length >= 3 && second357.length === 0) {
+        voidPairs357.push(pairKey357);
+      }
+    }
+    if (voidPairs357.length > 0) {
+      issues.push({
+        location: `Pair(s) ${voidPairs357.join(', ')} — second-half void`,
+        rule: 'PAIR_SECOND_HALF_VOID',
+        severity: 'minor',
+        description: `${voidPairs357.length === 1 ? 'One pair' : `${voidPairs357.length} pairs`} (${voidPairs357.join('; ')}) accumulate${voidPairs357.length === 1 ? 's' : ''} 3 or more shifts in the first half but register zero shifts in the second half. The bond's entire arc is spent before the climax; the audience enters the back half with a relationship that has already done all its moving, robbing the climax of relational stakes for that pair.`,
+        suggestedFix: 'Reserve at least one significant shift for the second half: a rupture under climactic pressure, a reconciliation earned through Act 3, or a reversal that reframes everything before it. A relationship that goes silent in the back half feels resolved — or abandoned — before the story ends.',
+      });
+    }
+  }
+
+  // RELATIONSHIP_DRAMATIC_TURN_DECOUPLED (minor, n≥8, ≥3 dramatic-turn scenes,
+  // ≥3 shift scenes): No scene that carries a dramatic turn (dramaticTurn ≠
+  // 'nothing') also carries a relationship shift. Story pivots never crack or
+  // strengthen any bond. Distinct from CONFLICT_DRAMATIC_TURN_VOID (in
+  // conflict.ts, checks conflict-scene coverage; this is in relationship-arc
+  // and checks relational shifts) and RELATIONSHIP_REVELATION_SILENT (revelation
+  // field, not dramaticTurn field).
+  if (records.length >= 8) {
+    const turnScenes357 = (records as any[]).filter(r =>
+      r.dramaticTurn != null && r.dramaticTurn !== 'nothing',
+    );
+    const shiftScenes357b = (records as any[]).filter(r =>
+      ((r.relationshipShifts ?? []) as any[]).length > 0,
+    );
+    if (turnScenes357.length >= 3 && shiftScenes357b.length >= 3) {
+      const turnIdx357 = new Set(turnScenes357.map((r: any) => r.sceneIdx));
+      const overlap357 = shiftScenes357b.some((r: any) => turnIdx357.has(r.sceneIdx));
+      if (!overlap357) {
+        issues.push({
+          location: 'Dramatic turns — relational register',
+          rule: 'RELATIONSHIP_DRAMATIC_TURN_DECOUPLED',
+          severity: 'minor',
+          description: `${turnScenes357.length} dramatic-turn scenes carry zero relationship shifts, even though ${shiftScenes357b.length} other scenes move bonds. Every story pivot happens in relational silence — the moments when the plot reverses or accelerates never crack or strengthen any character bond. Dramatic turns disconnected from the relational world feel plotted rather than felt.`,
+          suggestedFix: 'Let at least one story pivot also shift a bond: a reversal that fractures a trusted alliance, an unexpected turn that forces a character to rely on someone they distrusted. When the plot turns and a relationship shifts in the same moment, the dramatic pivot lands with double weight.',
+        });
+      }
     }
   }
 

@@ -22877,6 +22877,99 @@ He stares at the floor.`;
     });
   });
 
+  describe('Wave 357 — relationshipArcPass: curiosity peak absent, pair second-half void, dramatic turn decoupled', async () => {
+    const makeRec357 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const shift357 = (pairKey: string, amount: number) => ({ pairKey, dimension: 'trust', amount });
+    const runRA357 = async (records: any[]) => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('RELATIONSHIP_CURIOSITY_PEAK_ABSENT fires when peak-curiosity scene has no relationship shift but 2+ other curiosity-positive scenes do', async () => {
+      // 8 scenes; scene 3 has highest curiosityDelta (2.0) but no shift;
+      // scenes 1 and 5 have curiosityDelta > 0 AND carry shifts — 2 qualifying
+      const recs357cpa = Array.from({ length: 8 }, (_, i) =>
+        makeRec357(i, {
+          curiosityDelta: i === 3 ? 2.0 : i === 1 || i === 5 ? 0.8 : 0,
+          relationshipShifts: i === 1 || i === 5 ? [shift357('A|B', 0.4)] : [],
+        }),
+      );
+      const res = await runRA357(recs357cpa);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_CURIOSITY_PEAK_ABSENT'), 'RELATIONSHIP_CURIOSITY_PEAK_ABSENT should fire');
+    });
+
+    it('RELATIONSHIP_CURIOSITY_PEAK_ABSENT does not fire when peak-curiosity scene carries a relationship shift', async () => {
+      // scene 3 is still the peak (2.0) but now also has a shift
+      const recs357cpani = Array.from({ length: 8 }, (_, i) =>
+        makeRec357(i, {
+          curiosityDelta: i === 3 ? 2.0 : i === 1 || i === 5 ? 0.8 : 0,
+          relationshipShifts: [1, 3, 5].includes(i) ? [shift357('A|B', 0.4)] : [],
+        }),
+      );
+      const res = await runRA357(recs357cpani);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_CURIOSITY_PEAK_ABSENT'), 'RELATIONSHIP_CURIOSITY_PEAK_ABSENT should not fire');
+    });
+
+    it('PAIR_SECOND_HALF_VOID fires when one pair has 3+ first-half shifts and 0 second-half shifts', async () => {
+      // 10 scenes; A|B shifts at 0,1,2 (all in first half [0-4]) with nothing in [5-9]
+      // A second pair C|D shifts at 6 to avoid RELATIONSHIP_VELOCITY_COLLAPSE
+      const recs357psv = Array.from({ length: 10 }, (_, i) =>
+        makeRec357(i, {
+          relationshipShifts: [0, 1, 2].includes(i)
+            ? [shift357('A|B', 0.5)]
+            : i === 6 ? [shift357('C|D', 0.4)] : [],
+        }),
+      );
+      const res = await runRA357(recs357psv);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAIR_SECOND_HALF_VOID'), 'PAIR_SECOND_HALF_VOID should fire');
+    });
+
+    it('PAIR_SECOND_HALF_VOID does not fire when the same pair also shifts in the second half', async () => {
+      // A|B shifts at 0,1,2 AND also at 7 — second half present
+      const recs357psvni = Array.from({ length: 10 }, (_, i) =>
+        makeRec357(i, {
+          relationshipShifts: [0, 1, 2, 7].includes(i)
+            ? [shift357('A|B', 0.5)]
+            : i === 6 ? [shift357('C|D', 0.4)] : [],
+        }),
+      );
+      const res = await runRA357(recs357psvni);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAIR_SECOND_HALF_VOID'), 'PAIR_SECOND_HALF_VOID should not fire');
+    });
+
+    it('RELATIONSHIP_DRAMATIC_TURN_DECOUPLED fires when 3+ dramatic-turn scenes and 3+ shift scenes share no overlap', async () => {
+      // 8 scenes; turns at 0,1,2 (no shifts); shifts at 4,5,6 (no turns)
+      const recs357dtd = Array.from({ length: 8 }, (_, i) =>
+        makeRec357(i, {
+          dramaticTurn: [0, 1, 2].includes(i) ? 'reversal' : 'nothing',
+          relationshipShifts: [4, 5, 6].includes(i) ? [shift357('A|B', 0.5)] : [],
+        }),
+      );
+      const res = await runRA357(recs357dtd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_DRAMATIC_TURN_DECOUPLED'), 'RELATIONSHIP_DRAMATIC_TURN_DECOUPLED should fire');
+    });
+
+    it('RELATIONSHIP_DRAMATIC_TURN_DECOUPLED does not fire when at least one dramatic-turn scene also shifts a bond', async () => {
+      // scene 2 has both a turn and a shift
+      const recs357dtdni = Array.from({ length: 8 }, (_, i) =>
+        makeRec357(i, {
+          dramaticTurn: [0, 1, 2].includes(i) ? 'reversal' : 'nothing',
+          relationshipShifts: [2, 4, 5, 6].includes(i) ? [shift357('A|B', 0.5)] : [],
+        }),
+      );
+      const res = await runRA357(recs357dtdni);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_DRAMATIC_TURN_DECOUPLED'), 'RELATIONSHIP_DRAMATIC_TURN_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 343 — relationshipArcPass: rupture emotion flat, global amplitude frontload, shift drought', async () => {
     const makeRec343 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
