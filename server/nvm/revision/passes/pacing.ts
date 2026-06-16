@@ -26,6 +26,11 @@
 // Wave 327 additions: dramatic-turn scene underweight (turn scenes avg below 60% of
 // overall length), payoff scene underweight (payoff scenes avg below 60%), emotional
 // peak scene underweight (non-neutral scenes avg below 60% — feeling given least room).
+// Wave 341 additions: conflict scene underweight (negative-relationship-shift scenes avg
+// below 60% of overall length — ruptures rushed), curiosity peak scene underweight (high-
+// curiosityDelta scenes avg below 60% — intrigue given least room), quiet scene bloat
+// (scenes carrying no dramatic marker average above 1.5× overall — script lingers on its
+// most inert beats).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1244,6 +1249,103 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `The ${emoLengths327.length} emotionally charged scene(s) average ${emoAvg327.toFixed(1)} weighted lines — ${Math.round(emoAvg327 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The story's emotional high points are its shortest scenes: feeling is given the least room to develop. Emotion needs duration — a beat of silence, a held reaction, a consequence — to move from the page into the audience.`,
           suggestedFix: 'Give emotional peaks room to breathe: slow down at the moments of greatest feeling, let reactions land and aftermath register. The audience cannot be moved at the same speed the plot is advanced; the charged scenes are exactly where the script should linger.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 341: CONFLICT_SCENE_UNDERWEIGHT, CURIOSITY_PEAK_SCENE_UNDERWEIGHT, QUIET_SCENE_BLOAT ──
+
+  // CONFLICT_SCENE_UNDERWEIGHT (minor, n≥8, ≥2 conflict scenes): Scenes carrying a
+  // negative relationship shift (amount ≤ -0.3) average below 60% of the overall scene
+  // length. The story's ruptures — the moments bonds crack — are its shortest scenes,
+  // so the audience is told a relationship broke rather than made to watch it break.
+  // Conflict needs room: the accusation, the defense, the wound landing. Distinct from
+  // EMOTIONAL_PEAK_SCENE_UNDERWEIGHT (emotionalShift channel), DRAMATIC_TURN_SCENE_
+  // UNDERWEIGHT (dramaticTurn channel), and SUSPENSE_LENGTH_DECOUPLING (suspense
+  // channel): this audits page weight against the relationship-conflict channel.
+  if (records.length >= 8) {
+    const conflictLengths341: number[] = [];
+    for (let i341c = 0; i341c < records.length; i341c++) {
+      const shifts341 = ((records as any[])[i341c].relationshipShifts ?? []) as Array<{ amount: number }>;
+      if (shifts341.some(s => s.amount <= -0.3)) {
+        conflictLengths341.push(sceneLengths.get(i341c) ?? 0);
+      }
+    }
+    if (conflictLengths341.length >= 2) {
+      const conflictAvg341 = conflictLengths341.reduce((s, v) => s + v, 0) / conflictLengths341.length;
+      if (conflictAvg341 < avgLength * 0.6) {
+        issues.push({
+          location: `${conflictLengths341.length} conflict scene(s)`,
+          rule: 'CONFLICT_SCENE_UNDERWEIGHT',
+          severity: 'minor',
+          description: `The ${conflictLengths341.length} conflict scene(s) — scenes where a bond cracks — average ${conflictAvg341.toFixed(1)} weighted lines, ${Math.round(conflictAvg341 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The story's ruptures are its shortest scenes, so the audience is told a relationship broke rather than made to watch it break. Conflict needs room: the accusation, the defense, the wound landing and registering.`,
+          suggestedFix: 'Give conflict scenes room to play out: stage the disagreement, let each side land a blow, and hold for the damage to settle before cutting away. A relationship rupture compressed into two lines reads as a plot note; given space, it becomes a scene the audience feels.',
+        });
+      }
+    }
+  }
+
+  // CURIOSITY_PEAK_SCENE_UNDERWEIGHT (minor, n≥8, ≥2 high-curiosity scenes): Scenes
+  // with a high curiosityDelta (> 1) average below 60% of the overall scene length.
+  // The story's most intriguing moments — where the biggest questions open — are its
+  // shortest scenes, so the mystery is raised and abandoned in the same breath rather
+  // than given space to take hold in the audience's mind. Distinct from CURIOSITY_
+  // MIDZONE_GAP (zone-based curiosity average, not length) and all other underweight
+  // checks (different channels): this audits page weight against the curiosity channel.
+  if (records.length >= 8) {
+    const curiosityLengths341: number[] = [];
+    for (let i341q = 0; i341q < records.length; i341q++) {
+      if (((records as any[])[i341q].curiosityDelta ?? 0) > 1) {
+        curiosityLengths341.push(sceneLengths.get(i341q) ?? 0);
+      }
+    }
+    if (curiosityLengths341.length >= 2) {
+      const curiosityAvg341 = curiosityLengths341.reduce((s, v) => s + v, 0) / curiosityLengths341.length;
+      if (curiosityAvg341 < avgLength * 0.6) {
+        issues.push({
+          location: `${curiosityLengths341.length} high-curiosity scene(s)`,
+          rule: 'CURIOSITY_PEAK_SCENE_UNDERWEIGHT',
+          severity: 'minor',
+          description: `The ${curiosityLengths341.length} high-curiosity scene(s) average ${curiosityAvg341.toFixed(1)} weighted lines, ${Math.round(curiosityAvg341 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The story's most intriguing moments — where its biggest questions open — are its shortest scenes, so each mystery is raised and abandoned in the same breath rather than given room to take hold and pull the audience forward.`,
+          suggestedFix: 'Let the intriguing scenes breathe: when a scene opens a major question, hold on it long enough for the audience to register the gap and start wondering. A mystery flashed past in two lines never has time to hook; the scenes that raise the stakes of knowing deserve at least average length.',
+        });
+      }
+    }
+  }
+
+  // QUIET_SCENE_BLOAT (minor, n≥8, ≥2 quiet scenes): Scenes carrying no dramatic
+  // marker at all — neutral emotion, no dramatic turn, no revelation, no clock raise,
+  // no relationship shift, no clue seeded, no payoff — average above 1.5× the overall
+  // scene length. The script's most inert beats are its longest: it lingers exactly
+  // where the least is happening. Distinct from OVERLONG_LOW_TENSION (a per-scene 2.5×
+  // threshold gated on low suspense), LONG_SCENE_FLOOD (proportion of long scenes
+  // regardless of content), and CLOCK_SCENE_PACING_MISMATCH (clock-channel bloat):
+  // this aggregates length specifically across scenes that advance nothing.
+  if (records.length >= 8) {
+    const isQuiet341 = (r: any): boolean =>
+      (r.emotionalShift ?? 'neutral') === 'neutral' &&
+      (r.dramaticTurn ?? 'nothing') === 'nothing' &&
+      (r.revelation === null || r.revelation === undefined) &&
+      r.clockRaised !== true &&
+      ((r.relationshipShifts ?? []) as any[]).length === 0 &&
+      ((r.seededClueIds ?? []) as any[]).length === 0 &&
+      ((r.payoffSetupIds ?? []) as any[]).length === 0;
+    const quietLengths341: number[] = [];
+    for (let i341z = 0; i341z < records.length; i341z++) {
+      if (isQuiet341((records as any[])[i341z])) {
+        quietLengths341.push(sceneLengths.get(i341z) ?? 0);
+      }
+    }
+    if (quietLengths341.length >= 2) {
+      const quietAvg341 = quietLengths341.reduce((s, v) => s + v, 0) / quietLengths341.length;
+      if (quietAvg341 > avgLength * 1.5) {
+        issues.push({
+          location: `${quietLengths341.length} quiet scene(s)`,
+          rule: 'QUIET_SCENE_BLOAT',
+          severity: 'minor',
+          description: `The ${quietLengths341.length} quiet scene(s) — scenes carrying no dramatic marker (no emotional shift, turn, revelation, clock, relationship move, clue, or payoff) — average ${quietAvg341.toFixed(1)} weighted lines, ${Math.round(quietAvg341 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The script's most inert beats are its longest: it lingers exactly where the least is happening, spending page space on scenes that advance neither plot nor character nor feeling.`,
+          suggestedFix: 'Compress or cut the quiet scenes: a scene that carries no dramatic charge should be the leanest on the page, not the longest. Find the one beat each inert scene exists to deliver, play it fast, and reinvest the recovered space in the scenes that actually move the story.',
         });
       }
     }

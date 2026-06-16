@@ -19499,6 +19499,82 @@ He looks away.`;
     });
   });
 
+  describe('Wave 341 — pacingPass: conflict scene underweight, curiosity peak scene underweight, quiet scene bloat', async () => {
+    const makeRec341 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain341 = (lineCounts: number[]) =>
+      lineCounts.map((n, i) =>
+        `INT. SC${i} - DAY\n\n${Array.from({ length: n }, (_, j) => `Action line ${j + 1} for scene ${i}.`).join('\n\n')}`
+      ).join('\n\n');
+    const runP341 = async (records: any[], fountain: string) => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      return pacingPass({ fountain, original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    const negShift341 = [{ pairs: ['A', 'B'], amount: -0.5, dimension: 'trust' }];
+
+    it('CONFLICT_SCENE_UNDERWEIGHT fires when conflict scenes run far below average length', async () => {
+      const lc341c = [10, 10, 2, 10, 10, 2, 10, 10];
+      const recs341c = Array.from({ length: 8 }, (_, i) =>
+        makeRec341(i, { relationshipShifts: [2, 5].includes(i) ? negShift341 : [] })
+      );
+      const res = await runP341(recs341c, makeFountain341(lc341c));
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_SCENE_UNDERWEIGHT'), 'CONFLICT_SCENE_UNDERWEIGHT should fire');
+    });
+
+    it('CONFLICT_SCENE_UNDERWEIGHT does not fire when conflict scenes are average length', async () => {
+      const lc341cn = [10, 10, 10, 10, 10, 10, 10, 10];
+      const recs341cn = Array.from({ length: 8 }, (_, i) =>
+        makeRec341(i, { relationshipShifts: [2, 5].includes(i) ? negShift341 : [] })
+      );
+      const res = await runP341(recs341cn, makeFountain341(lc341cn));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_SCENE_UNDERWEIGHT'), 'CONFLICT_SCENE_UNDERWEIGHT should not fire');
+    });
+
+    it('CURIOSITY_PEAK_SCENE_UNDERWEIGHT fires when high-curiosity scenes run far below average length', async () => {
+      const lc341q = [10, 10, 2, 10, 10, 2, 10, 10];
+      const recs341q = Array.from({ length: 8 }, (_, i) =>
+        makeRec341(i, { curiosityDelta: [2, 5].includes(i) ? 2 : 0 })
+      );
+      const res = await runP341(recs341q, makeFountain341(lc341q));
+      assert.ok(res.issues.some((i: any) => i.rule === 'CURIOSITY_PEAK_SCENE_UNDERWEIGHT'), 'CURIOSITY_PEAK_SCENE_UNDERWEIGHT should fire');
+    });
+
+    it('CURIOSITY_PEAK_SCENE_UNDERWEIGHT does not fire when high-curiosity scenes are average length', async () => {
+      const lc341qn = [10, 10, 10, 10, 10, 10, 10, 10];
+      const recs341qn = Array.from({ length: 8 }, (_, i) =>
+        makeRec341(i, { curiosityDelta: [2, 5].includes(i) ? 2 : 0 })
+      );
+      const res = await runP341(recs341qn, makeFountain341(lc341qn));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CURIOSITY_PEAK_SCENE_UNDERWEIGHT'), 'CURIOSITY_PEAK_SCENE_UNDERWEIGHT should not fire');
+    });
+
+    it('QUIET_SCENE_BLOAT fires when inert scenes run far above average length', async () => {
+      const lc341z = [20, 20, 20, 4, 4, 4, 4, 4];
+      // scenes 0,1,2 are quiet (default) and long; scenes 3-7 are charged and short
+      const recs341z = Array.from({ length: 8 }, (_, i) =>
+        makeRec341(i, [3, 4, 5, 6, 7].includes(i) ? { emotionalShift: 'positive', dramaticTurn: 'reversal' } : {})
+      );
+      const res = await runP341(recs341z, makeFountain341(lc341z));
+      assert.ok(res.issues.some((i: any) => i.rule === 'QUIET_SCENE_BLOAT'), 'QUIET_SCENE_BLOAT should fire');
+    });
+
+    it('QUIET_SCENE_BLOAT does not fire when inert scenes are average length', async () => {
+      const lc341zn = [10, 10, 10, 10, 10, 10, 10, 10];
+      const recs341zn = Array.from({ length: 8 }, (_, i) =>
+        makeRec341(i, [3, 4, 5, 6, 7].includes(i) ? { emotionalShift: 'positive', dramaticTurn: 'reversal' } : {})
+      );
+      const res = await runP341(recs341zn, makeFountain341(lc341zn));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'QUIET_SCENE_BLOAT'), 'QUIET_SCENE_BLOAT should not fire');
+    });
+  });
+
   describe('Wave 327 — pacingPass: dramatic-turn scene underweight, payoff scene underweight, emotional peak scene underweight', async () => {
     const makeRec327 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
