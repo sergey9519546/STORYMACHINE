@@ -3,8 +3,39 @@
 **Scope:** the narrative-quality-check "wave" workflow that incrementally extends the
 revision passes in `server/nvm/revision/passes/` (and their tests in `test.ts`).
 
-**Status at last update:** through **Wave 380** — 14 passes, **782** distinct rule names,
-**2581** tests, suite green (`node --experimental-strip-types test.ts` ⇒ 0 failures).
+**Status at last update:** through **Wave 384** — 14 passes, **788** distinct rule names,
+**2605** tests, suite green (`node --experimental-strip-types test.ts` ⇒ 0 failures).
+
+---
+
+## ⚠️ CRITICAL NOTE — read before authoring any wave
+
+**Every wave MUST be done to the fullest capabilities of its feature and be as strong as it
+can possibly be within the data the engine exposes. This is not optional and not a target to
+approximate — it is the entry condition for committing a wave.**
+
+Concretely, before a wave is committed, the author confirms — out loud, in the wave's own
+rule comments — that:
+
+1. **No stronger sibling was skipped.** For each new check, the most powerful form the
+   available signals permit was chosen (e.g. if a single-peak check is sharper than an
+   average check for this failure mode, the peak form is used; if both add value, both are
+   added across the rotation). A weaker formulation is never shipped in place of a stronger
+   one that the data supports.
+2. **No adjacent empty cell was left on the table within reach.** When a one-sided check
+   exists (underweight without bloat, front without back, Act 2a without Act 2b, set-average
+   without single-peak), the wave is expected to close the matching cell rather than add an
+   unrelated weaker check. Coverage advances; it never stalls or repeats.
+3. **The guard is as tight as it can be without becoming brittle.** Thresholds and minimum
+   populations are set so the check fires on every genuine instance of the failure and on no
+   degenerate/noise input — the strongest precision the signal allows.
+4. **The finding is maximally actionable.** The `description` interprets the harm with the
+   measured numbers, and the `suggestedFix` is the most concrete, craft-grounded remedy the
+   case admits — never generic filler.
+
+If any of these cannot be honestly affirmed for a wave, the wave is not done. "Good enough"
+is a failing grade here; the only passing grade is *the strongest version this feature can
+support.*
 
 ---
 
