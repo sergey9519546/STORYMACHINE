@@ -20562,6 +20562,125 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 347 — voicePass: discourse-marker opener, vocative address flood, greeting filler flood', async () => {
+    const runV347 = async (fountain: string) => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      return voicePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DIALOGUE_DISCOURSE_MARKER_OPENER fires when >25% of lines open with a discourse marker', async () => {
+      const f347dm = `INT. ROOM - DAY
+
+ALICE
+Okay, we should leave now.
+Alright, I will get the car.
+Right, you take the bags.
+Anyway, it does not matter much.
+Anyhow, we are out of time here.
+We need to move quickly now.
+The road will be busy tonight.
+I packed everything we own.
+The keys are on the table there.
+Lock the door behind you please.
+Check the windows before we go.
+Do not forget the documents.`;
+      const res = await runV347(f347dm);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_DISCOURSE_MARKER_OPENER'), 'DIALOGUE_DISCOURSE_MARKER_OPENER should fire');
+    });
+
+    it('DIALOGUE_DISCOURSE_MARKER_OPENER does not fire when markers are rare', async () => {
+      const f347dmn = `INT. ROOM - DAY
+
+ALICE
+Okay, we should leave now.
+Alright, I will get the car.
+We need to move quickly now.
+The road will be busy tonight.
+I packed everything we own.
+The keys are on the table there.
+Lock the door behind you please.
+Check the windows before we go.
+Do not forget the documents.
+The train departs at midnight.
+We can sleep on the journey.
+Nothing else matters tonight.`;
+      const res = await runV347(f347dmn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_DISCOURSE_MARKER_OPENER'), 'DIALOGUE_DISCOURSE_MARKER_OPENER should not fire');
+    });
+
+    it('DIALOGUE_VOCATIVE_ADDRESS_FLOOD fires when >25% of lines carry a vocative address', async () => {
+      const f347va = `INT. ROOM - DAY
+
+ALICE
+I know you are tired, honey.
+Come over here, sweetheart.
+You did great today, buddy.
+We can fix this together, sir.
+We should go now, man.
+The car is parked outside.
+I packed all of our things.
+The road is going to be long.
+We can rest when we arrive.
+Everything will be fine soon.
+Trust me on this one thing.
+We leave in five minutes.`;
+      const res = await runV347(f347va);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_VOCATIVE_ADDRESS_FLOOD'), 'DIALOGUE_VOCATIVE_ADDRESS_FLOOD should fire');
+    });
+
+    it('DIALOGUE_VOCATIVE_ADDRESS_FLOOD does not fire when vocatives are rare', async () => {
+      const f347van = `INT. ROOM - DAY
+
+ALICE
+I know you are tired, honey.
+Come over here, sweetheart.
+The car is parked outside.
+I packed all of our things.
+The road is going to be long.
+We can rest when we arrive.
+Everything will be fine soon.
+Trust me on this one thing.
+We leave in five minutes.
+The plan is already set now.
+Nothing can stop us tonight.
+We have waited long enough.`;
+      const res = await runV347(f347van);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_VOCATIVE_ADDRESS_FLOOD'), 'DIALOGUE_VOCATIVE_ADDRESS_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_GREETING_FILLER_FLOOD fires when 3+ lines are greetings or farewells', async () => {
+      const f347gf = `INT. ROOM - DAY
+
+ALICE
+Hello, it is good to see you.
+Good morning to everyone here.
+Goodbye, I will miss this place.
+We should talk about the plan.
+The meeting starts at noon today.
+I reviewed all of the documents.
+The numbers look correct to me.
+Let us proceed with the vote.`;
+      const res = await runV347(f347gf);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_GREETING_FILLER_FLOOD'), 'DIALOGUE_GREETING_FILLER_FLOOD should fire');
+    });
+
+    it('DIALOGUE_GREETING_FILLER_FLOOD does not fire when greetings are rare', async () => {
+      const f347gfn = `INT. ROOM - DAY
+
+ALICE
+Hello, it is good to see you.
+We should talk about the plan.
+The meeting starts at noon today.
+I reviewed all of the documents.
+The numbers look correct to me.
+Let us proceed with the vote.
+The budget needs another review.
+We adjourn until tomorrow morning.`;
+      const res = await runV347(f347gfn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_GREETING_FILLER_FLOOD'), 'DIALOGUE_GREETING_FILLER_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 333 — voicePass: name opener flood, retrospective opener, word stutter', async () => {
     const runV333 = async (fountain: string) => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');

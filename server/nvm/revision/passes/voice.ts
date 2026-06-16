@@ -29,6 +29,9 @@
 // Wave 333 additions: name opener flood (>30% of dialogue lines begin with direct
 // character address like "John, I..."), retrospective narrator opener (≥4 lines opening
 // with "I remember"/"Back when" etc.), word stutter (≥3 lines with immediate word repeat).
+// Wave 347 additions: discourse-marker opener (>25% of lines begin with "Okay,"/"Alright,"/
+// "Anyway,"), vocative address flood (>25% of lines carry a comma-set-off vocative like
+// "honey"/"buddy"/"sir"), greeting filler flood (≥3 lines are hellos/goodbyes/pleasantries).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1488,6 +1491,89 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `${stutterCount333} dialogue lines contain immediate word repetition ("no no", "please please", "I I") — a stutter pattern that appears across multiple exchanges. A single stutter marks genuine emotional overwhelm; when the device recurs across ${stutterCount333} lines, it becomes a verbal tic the audience stops registering. The emergency of the stutter is normalised by repetition.`,
           suggestedFix: 'Reserve the stutter for one moment of genuine breakdown. If a character repeats a word once in the script ("no no"), it lands hard; if they do it repeatedly, it becomes their voice pattern and loses impact. Find other ways to signal overwhelm: silence, a subject change, a line that contradicts the previous one.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 347: DIALOGUE_DISCOURSE_MARKER_OPENER, DIALOGUE_VOCATIVE_ADDRESS_FLOOD, DIALOGUE_GREETING_FILLER_FLOOD ──
+  {
+    const dlg347: string[] = [];
+    let inDlg347 = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg347 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg347 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg347 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg347) dlg347.push(t);
+      else inDlg347 = false;
+    }
+
+    // DIALOGUE_DISCOURSE_MARKER_OPENER (minor, ≥10 dialogue lines, >25%): More than
+    // 25% of dialogue lines begin with a discourse/attention marker ("Okay,",
+    // "Alright,", "Right,", "Anyway,", "Anyhow,"). These are conversational throat-
+    // clearings that delay the actual line; sprinkled occasionally they sound natural,
+    // but when a quarter of all lines open this way the dialogue acquires a verbal tic
+    // and never lands a clean opening beat. Distinct from DIALOGUE_HEDGING_OPENER
+    // (epistemic softeners — "Well,", "Look,", "I mean,") and DIALOGUE_CONJUNCTION_
+    // OPENER (coordinators — "And", "But", "So"): these are managerial discourse markers.
+    if (dlg347.length >= 10) {
+      const markerRe347 = /^(okay[,\s]|ok[,\s]|alright[,\s]|all right[,\s]|anyway[,\s]|anyhow[,\s]|right[,\s])/i;
+      const markerCount347 = dlg347.filter(l => markerRe347.test(l.trim())).length;
+      if (markerCount347 / dlg347.length > 0.25) {
+        issues.push({
+          location: 'Dialogue discourse-marker openers',
+          rule: 'DIALOGUE_DISCOURSE_MARKER_OPENER',
+          severity: 'minor',
+          description: `${markerCount347} of ${dlg347.length} dialogue lines (${Math.round(markerCount347 / dlg347.length * 100)}%) begin with a discourse marker ("Okay,", "Alright,", "Right,", "Anyway,"). These conversational throat-clearings delay the actual line; an occasional one sounds natural, but when a quarter of all dialogue opens this way the speech acquires a verbal tic and never lands a clean opening beat — every line warms up before it says anything.`,
+          suggestedFix: 'Cut most discourse-marker openers and let each line begin on its point. Reserve "Okay," or "Anyway," for the rare moment a character genuinely shifts gears or regroups; as a default opener it adds nothing but throat-clearing.',
+        });
+      }
+    }
+
+    // DIALOGUE_VOCATIVE_ADDRESS_FLOOD (minor, ≥10 dialogue lines, >25%): More than
+    // 25% of dialogue lines contain a comma-set-off vocative address term ("honey",
+    // "buddy", "sir", "man", "kid"). A vocative now and then grounds a relationship,
+    // but pervasive use is a writer's crutch for signalling familiarity or attitude
+    // the dialogue should convey on its own — and it bloats lines with words actors
+    // rarely need. Distinct from DIALOGUE_NAME_OPENER_FLOOD (proper names at the very
+    // start of a line): this catches common-noun address terms anywhere in the line.
+    if (dlg347.length >= 10) {
+      const vocativeRe347 = /,\s*(honey|babe|baby|sweetheart|sweetie|darling|dear|sir|ma'?am|madam|buddy|pal|dude|bro|man|kid|son|boss|chief|champ|mister|miss)\b[.!?,\s]/i;
+      const vocativeEndRe347 = /,\s*(honey|babe|baby|sweetheart|sweetie|darling|dear|sir|ma'?am|madam|buddy|pal|dude|bro|man|kid|son|boss|chief|champ|mister|miss)\s*[.!?]?$/i;
+      const vocativeCount347 = dlg347.filter(l => {
+        const t = l.trim();
+        return vocativeRe347.test(t) || vocativeEndRe347.test(t);
+      }).length;
+      if (vocativeCount347 / dlg347.length > 0.25) {
+        issues.push({
+          location: 'Dialogue vocative address',
+          rule: 'DIALOGUE_VOCATIVE_ADDRESS_FLOOD',
+          severity: 'minor',
+          description: `${vocativeCount347} of ${dlg347.length} dialogue lines (${Math.round(vocativeCount347 / dlg347.length * 100)}%) contain a comma-set-off vocative address term ("honey", "buddy", "sir", "man"). An occasional vocative grounds a relationship, but pervasive use is a crutch for signalling familiarity or attitude the dialogue should carry on its own, and it pads lines with words actors rarely need.`,
+          suggestedFix: 'Strip most vocatives and let the relationship register through what is said and how. Reserve a "honey" or a "sir" for the moment the term itself carries weight — a sudden tenderness, a pointed formality — rather than sprinkling it as conversational texture.',
+        });
+      }
+    }
+
+    // DIALOGUE_GREETING_FILLER_FLOOD (minor, ≥8 dialogue lines, ≥3 matches): Three or
+    // more dialogue lines are greetings or farewells ("Hello", "Hi", "Goodbye", "Good
+    // morning", "See you", "Take care"). Social pleasantries are almost always cuttable:
+    // scenes should start as late as possible and end as early as possible, skipping the
+    // hellos and goodbyes that real life requires but drama does not. A script that keeps
+    // staging the small talk wastes its openings and closings. Distinct from DIALOGUE_
+    // DISCOURSE_MARKER_OPENER (mid-conversation throat-clearing) and the opener checks.
+    if (dlg347.length >= 8) {
+      const greetingRe347 = /^(hello\b|hi\b|good morning\b|good evening\b|good afternoon\b|good night\b|goodbye\b|good-bye\b|bye\b|farewell\b|see you\b|see ya\b|take care\b|so long\b|how do you do\b|nice to meet you\b)/i;
+      const greetingCount347 = dlg347.filter(l => greetingRe347.test(l.trim())).length;
+      if (greetingCount347 >= 3) {
+        issues.push({
+          location: 'Dialogue greetings and farewells',
+          rule: 'DIALOGUE_GREETING_FILLER_FLOOD',
+          severity: 'minor',
+          description: `${greetingCount347} dialogue lines are greetings or farewells ("Hello", "Goodbye", "Good morning", "See you"). Social pleasantries are almost always cuttable — a scene should begin as late as possible and end as early as possible, skipping the hellos and goodbyes that real life requires but drama does not. Repeatedly staging the small talk wastes the script's openings and closings on words that carry no story.`,
+          suggestedFix: 'Cut the greetings and farewells and enter each scene mid-moment, already in motion. If a hello or goodbye must stay, make it do double duty — a greeting that lands as a threat, a farewell that reveals a secret — so the pleasantry carries dramatic freight rather than just marking arrival and departure.',
         });
       }
     }
