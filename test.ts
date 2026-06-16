@@ -24822,6 +24822,153 @@ Time to go now.`;
     });
   });
 
+  describe('Wave 386 — rhythmPass: comma-splice overuse, article-opener dominance, connective-opener overuse', async () => {
+    const runR386 = async (fountain: string) => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('COMMA_SPLICE_OVERUSE fires when 3+ action lines splice two pronoun-subject clauses', async () => {
+      const f386c = `INT. HALL - NIGHT
+
+He turns, she follows close behind.
+
+She stops, he keeps walking.
+
+They wait, it never comes.
+
+A clock ticks on the wall.
+
+The floor creaks underfoot.
+
+She grips the railing hard.
+
+He checks the door again.
+
+The light flickers once.`;
+      const res = await runR386(f386c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'COMMA_SPLICE_OVERUSE'), 'COMMA_SPLICE_OVERUSE should fire');
+    });
+
+    it('COMMA_SPLICE_OVERUSE does not fire when clauses are properly separated', async () => {
+      const f386cn = `INT. HALL - NIGHT
+
+He turns. She follows close behind.
+
+She stops. He keeps walking.
+
+They wait. It never comes.
+
+A clock ticks on the wall.
+
+The floor creaks underfoot.
+
+She grips the railing hard.
+
+He checks the door again.
+
+The light flickers once.`;
+      const res = await runR386(f386cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'COMMA_SPLICE_OVERUSE'), 'COMMA_SPLICE_OVERUSE should not fire');
+    });
+
+    it('ARTICLE_OPENER_DOMINANCE fires when >40% of action lines begin with an article', async () => {
+      const f386a = `INT. ROOM - DAY
+
+The door swings open.
+
+A man steps inside.
+
+The floor is wet.
+
+An alarm rings somewhere.
+
+The window is broken.
+
+She freezes in place.
+
+He reaches for the light.
+
+Footsteps echo below.
+
+Something moves outside.
+
+Silence falls again.`;
+      const res = await runR386(f386a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARTICLE_OPENER_DOMINANCE'), 'ARTICLE_OPENER_DOMINANCE should fire');
+    });
+
+    it('ARTICLE_OPENER_DOMINANCE does not fire when openings are varied', async () => {
+      const f386an = `INT. ROOM - DAY
+
+She opens the door.
+
+A man steps inside.
+
+Water pools on the floor.
+
+Somewhere an alarm rings.
+
+Glass litters the sill.
+
+She freezes in place.
+
+He reaches for the light.
+
+Footsteps echo below.
+
+Something moves outside.
+
+Silence falls again.`;
+      const res = await runR386(f386an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARTICLE_OPENER_DOMINANCE'), 'ARTICLE_OPENER_DOMINANCE should not fire');
+    });
+
+    it('CONNECTIVE_OPENER_OVERUSE fires when 3+ action lines begin with a formal connective', async () => {
+      const f386o = `INT. OFFICE - DAY
+
+However, she stays at her desk.
+
+Therefore, he leaves without a word.
+
+Nonetheless, the meeting continues.
+
+A phone rings in the corner.
+
+She signs the document.
+
+He gathers his coat.
+
+The clock reads five.
+
+They part in silence.`;
+      const res = await runR386(f386o);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONNECTIVE_OPENER_OVERUSE'), 'CONNECTIVE_OPENER_OVERUSE should fire');
+    });
+
+    it('CONNECTIVE_OPENER_OVERUSE does not fire without formal connective openers', async () => {
+      const f386on = `INT. OFFICE - DAY
+
+She stays at her desk.
+
+He leaves without a word.
+
+The meeting continues.
+
+A phone rings in the corner.
+
+She signs the document.
+
+He gathers his coat.
+
+The clock reads five.
+
+They part in silence.`;
+      const res = await runR386(f386on);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONNECTIVE_OPENER_OVERUSE'), 'CONNECTIVE_OPENER_OVERUSE should not fire');
+    });
+  });
+
   describe('Wave 372 — rhythmPass: triadic list overload, mid-line em-dash overuse, temporal opener overuse', async () => {
     const runR372 = async (fountain: string) => {
       const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');

@@ -41,6 +41,11 @@
 // lines interrupt themselves with a mid-sentence em-dash — parenthetical breathlessness),
 // temporal opener overuse (>25% of action lines begin with a time adverb like Now/Soon/
 // Finally/Meanwhile — the prose narrating chronology instead of showing it).
+// Wave 386 additions: comma-splice overuse (≥3 action lines join two pronoun-subject clauses
+// with a comma — a prose error that blurs cinematic beats), article-opener dominance (>40% of
+// action lines begin with The/A/An — monotone sentence openings), connective-opener overuse
+// (≥3 action lines begin with a formal logical connective like However/Therefore/Instead —
+// essayistic register foreign to screen action).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1244,6 +1249,71 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${temporalCount372} of ${actionLines.length} action lines (${Math.round(temporalCount372 / actionLines.length * 100)}%) begin with a temporal adverb ("Now", "Soon", "Later", "Finally", "Meanwhile"). Opening beats by narrating chronology tells the reader when things happen rather than showing the action and letting the sequence imply itself. Heavy use makes the prose read as a timeline being recited instead of a present-tense scene unfolding.`,
         suggestedFix: 'Cut most temporal openers and trust the order of the lines to convey sequence: action written in sequence already reads as "and then this happens." Reserve an explicit time marker for a genuine jump or a beat where the timing is the dramatic point.',
+      });
+    }
+  }
+
+  // ── Wave 386: COMMA_SPLICE_OVERUSE, ARTICLE_OPENER_DOMINANCE, CONNECTIVE_OPENER_OVERUSE ──
+
+  // COMMA_SPLICE_OVERUSE (minor, ≥8 action lines, ≥3 lines): Three or more action lines
+  // join two independent pronoun-subject clauses with a comma ("He turns, she follows.").
+  // A comma splice fuses two beats into one breath where a period would let each land; in
+  // screen action it blurs the discrete kinetic units the camera captures, so two actions
+  // read as a single smeared gesture. Distinct from SEMICOLON_IN_ACTION (semicolons),
+  // RUN_ON_ACTION (raw length), and POLYSYNDETON_OVERLOAD ("and" pileup): this targets the
+  // comma-spliced clause join specifically.
+  if (actionLines.length >= 8) {
+    const commaSpliceRe386 = /,\s+(he|she|they|it|we|you)\s+\w/i;
+    const spliceCount386 = actionLines.filter(l => commaSpliceRe386.test(l.text)).length;
+    if (spliceCount386 >= 3) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'COMMA_SPLICE_OVERUSE',
+        severity: 'minor',
+        description: `${spliceCount386} action lines join two independent clauses with a comma ("He turns, she follows."). A comma splice fuses two beats into one breath where a period would let each land. In screen action this blurs the discrete kinetic units the camera captures — two separate actions read as a single smeared gesture, and the prose loses the clean beat-by-beat rhythm screenwriting depends on.`,
+        suggestedFix: 'Split comma-spliced clauses into separate sentences: "He turns, she follows." → "He turns. She follows." Each action then lands as its own beat with its own emphasis. Reserve the comma join only where the two actions are genuinely one continuous motion.',
+      });
+    }
+  }
+
+  // ARTICLE_OPENER_DOMINANCE (minor, ≥10 action lines, >40%): More than 40% of action
+  // lines begin with an article ("The", "A", "An"). Opening line after line with an article
+  // produces a flat, list-like cadence — "The door opens. A man enters. The light flickers."
+  // — where every beat starts from the same grammatical foot and the prose acquires a
+  // monotonous, inventory-taking rhythm. Distinct from OPENING_WORD_REPETITION (a single
+  // specific word opening >40% of lines): this aggregates the article category, catching
+  // the flatness even when "The" and "A" alternate.
+  if (actionLines.length >= 10) {
+    const articleOpenerRe386 = /^(the|a|an)\s/i;
+    const articleCount386 = actionLines.filter(l => articleOpenerRe386.test(l.text.trim())).length;
+    if (articleCount386 / actionLines.length > 0.40) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'ARTICLE_OPENER_DOMINANCE',
+        severity: 'minor',
+        description: `${articleCount386} of ${actionLines.length} action lines (${Math.round(articleCount386 / actionLines.length * 100)}%) begin with an article ("The", "A", "An"). Opening line after line with an article produces a flat, inventory-taking cadence — "The door opens. A man enters. The light flickers." — where every beat starts from the same grammatical foot and the prose settles into a monotonous rhythm that drains momentum.`,
+        suggestedFix: 'Vary the sentence openings: start some lines with the subject\'s action, a prepositional phrase, or the character\'s name. Recasting "The door opens" as "Hinges shriek as the door swings wide" or leading with motion breaks the article-driven monotony and restores rhythmic variety.',
+      });
+    }
+  }
+
+  // CONNECTIVE_OPENER_OVERUSE (minor, ≥8 action lines, ≥3 lines): Three or more action
+  // lines begin with a formal logical connective ("However", "Therefore", "Thus", "Instead",
+  // "Nonetheless", "Moreover", "Consequently"). These essayistic linkers argue a logical
+  // relationship between beats — they belong to expository prose, not the present-tense
+  // observation of screen action, where the sequence of images implies the logic. Distinct
+  // from CONJUNCTION_OPENER_EXCESS (And/But/So) and TEMPORAL_OPENER_OVERUSE (Now/Soon/Later):
+  // this targets formal argumentative connectives.
+  if (actionLines.length >= 8) {
+    const connectiveRe386 = /^(however|therefore|thus|instead|nonetheless|nevertheless|moreover|furthermore|consequently|hence|accordingly|conversely)[\s,]/i;
+    const connectiveCount386 = actionLines.filter(l => connectiveRe386.test(l.text.trim())).length;
+    if (connectiveCount386 >= 3) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'CONNECTIVE_OPENER_OVERUSE',
+        severity: 'minor',
+        description: `${connectiveCount386} action lines begin with a formal logical connective ("However", "Therefore", "Instead", "Nonetheless"). These essayistic linkers argue a logical relationship between beats — they belong to expository prose, not the present-tense observation of screen action, where the bare sequence of images should imply the logic. Connective-led action reads as an essay describing a film rather than the film itself.`,
+        suggestedFix: 'Cut the logical connectives and let the order of the action carry the relationship: "However, she stays." → "She stays." The contrast or consequence is already visible in what follows what. Screen action shows the logic through sequence; stating it in prose connectives is telling, not showing.',
       });
     }
   }
