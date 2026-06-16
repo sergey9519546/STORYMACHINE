@@ -18223,6 +18223,83 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 380 — conflictPass: Act 2a void, second-half monopoly, revelation decoupled', async () => {
+    const makeRec380 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF380 = async (records: any[]) => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      return conflictPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    const rupture380 = (amount: number) => [{ pairKey: 'A|B', amount, dimension: 'trust' }];
+
+    it('CONFLICT_ACT2A_VOID fires when no rupture lands in the 25-50% zone while conflict exists elsewhere', async () => {
+      // n=12 → Act 2a scenes 3,4,5; ruptures only at 1 and 9 (outside Act 2a)
+      const recs380a = Array.from({ length: 12 }, (_, i) =>
+        makeRec380(i, { relationshipShifts: [1, 9].includes(i) ? rupture380(-0.5) : [] }),
+      );
+      const res = await runCF380(recs380a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_ACT2A_VOID'), 'CONFLICT_ACT2A_VOID should fire');
+    });
+
+    it('CONFLICT_ACT2A_VOID does not fire when a rupture lands in Act 2a', async () => {
+      // rupture at scene 4 (within Act 2a)
+      const recs380an = Array.from({ length: 12 }, (_, i) =>
+        makeRec380(i, { relationshipShifts: [1, 4, 9].includes(i) ? rupture380(-0.5) : [] }),
+      );
+      const res = await runCF380(recs380an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_ACT2A_VOID'), 'CONFLICT_ACT2A_VOID should not fire');
+    });
+
+    it('CONFLICT_SECOND_HALF_MONOPOLY fires when >70% of ruptures fall in the second half', async () => {
+      // n=10 → mid=5; ruptures at 2 (first half) and 6,7,8 (second half) → 3/4 = 75%
+      const recs380m = Array.from({ length: 10 }, (_, i) =>
+        makeRec380(i, { relationshipShifts: [2, 6, 7, 8].includes(i) ? rupture380(-0.5) : [] }),
+      );
+      const res = await runCF380(recs380m);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_SECOND_HALF_MONOPOLY'), 'CONFLICT_SECOND_HALF_MONOPOLY should fire');
+    });
+
+    it('CONFLICT_SECOND_HALF_MONOPOLY does not fire when ruptures are balanced across halves', async () => {
+      // ruptures at 1,3 (first half) and 6,8 (second half) → 2/4 = 50%
+      const recs380mn = Array.from({ length: 10 }, (_, i) =>
+        makeRec380(i, { relationshipShifts: [1, 3, 6, 8].includes(i) ? rupture380(-0.5) : [] }),
+      );
+      const res = await runCF380(recs380mn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_SECOND_HALF_MONOPOLY'), 'CONFLICT_SECOND_HALF_MONOPOLY should not fire');
+    });
+
+    it('CONFLICT_REVELATION_DECOUPLED fires when ruptures and revelations never share a scene', async () => {
+      // ruptures at 2,4; revelations at 5,7 — no overlap
+      const recs380r = Array.from({ length: 10 }, (_, i) =>
+        makeRec380(i, {
+          relationshipShifts: [2, 4].includes(i) ? rupture380(-0.5) : [],
+          revelation: [5, 7].includes(i) ? 'the hidden truth' : null,
+        }),
+      );
+      const res = await runCF380(recs380r);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_REVELATION_DECOUPLED'), 'CONFLICT_REVELATION_DECOUPLED should fire');
+    });
+
+    it('CONFLICT_REVELATION_DECOUPLED does not fire when a rupture scene also carries a revelation', async () => {
+      // scene 4 has both a rupture and a revelation
+      const recs380rn = Array.from({ length: 10 }, (_, i) =>
+        makeRec380(i, {
+          relationshipShifts: [2, 4].includes(i) ? rupture380(-0.5) : [],
+          revelation: [4, 7].includes(i) ? 'the hidden truth' : null,
+        }),
+      );
+      const res = await runCF380(recs380rn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_REVELATION_DECOUPLED'), 'CONFLICT_REVELATION_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 366 — conflictPass: peak dramatic turn absent, peak clock absent, late first rupture', async () => {
     const makeRec366 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

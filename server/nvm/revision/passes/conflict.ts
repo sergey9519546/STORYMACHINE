@@ -31,6 +31,11 @@
 // absent (the heaviest-rupture scene raises no clock while the story uses clocks elsewhere
 // — the biggest break adds no time pressure), conflict late first rupture (the first
 // conflict scene falls at or after the midpoint — the entire first half is frictionless).
+// Wave 380 additions: conflict Act 2a void (no rupture in the 25%–50% zone while the story
+// has conflict — fills the Act-zone set alongside Act1/2b/3/midpoint), conflict second-half
+// monopoly (>70% of ruptures fall in the second half — the distribution mirror of conflict
+// first-half monopoly), conflict revelation decoupled (≥2 ruptures and ≥2 revelations but
+// none share a scene — the rupture and disclosure engines never meet, sibling of clock-decoupled).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1454,6 +1459,77 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
             suggestedFix: 'Introduce a rupture in the first half: even a small friction — a broken promise, an eroded trust, a clash of goals — gives the audience a relational stake before the story starts breaking things in earnest. A first half with no conflict trains the audience to expect calm exactly when the story should be teaching them to worry.',
           });
         }
+      }
+    }
+  }
+
+  // ── Wave 380: CONFLICT_ACT2A_VOID, CONFLICT_SECOND_HALF_MONOPOLY, CONFLICT_REVELATION_DECOUPLED ──
+  {
+    const isConflictScene380 = (r: any): boolean =>
+      ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3);
+    const conflictRecs380 = (records as any[]).filter(isConflictScene380);
+
+    // CONFLICT_ACT2A_VOID (minor, n≥10, ≥2 conflict scenes): No rupture lands in Act 2a
+    // (25%–50%), even though the story contains conflict elsewhere. The first half of the
+    // complication zone — where the protagonist should already be under rising pressure
+    // after the inciting incident — is frictionless. Fills the Act-zone set alongside
+    // CONFLICT_ACT1_ABSENT (Act 1), CONFLICT_ACT2B_VOID (50%–75%), CONFLICT_MIDPOINT_ABSENT
+    // (40%–60%), and CONFLICT_ACT3_ABSENT (final 25%).
+    if (records.length >= 10 && conflictRecs380.length >= 2) {
+      const a2aStart380 = Math.floor(records.length * 0.25);
+      const a2aEnd380 = Math.floor(records.length * 0.5);
+      const a2aRecs380 = (records as any[]).slice(a2aStart380, a2aEnd380);
+      if (a2aRecs380.length >= 2 && !a2aRecs380.some(isConflictScene380)) {
+        issues.push({
+          location: `Act 2a (Scenes ${a2aStart380}–${a2aEnd380 - 1}) — no rupture`,
+          rule: 'CONFLICT_ACT2A_VOID',
+          severity: 'minor',
+          description: `No relational rupture occurs in Act 2a (Scenes ${a2aStart380}–${a2aEnd380 - 1}), though the story contains conflict elsewhere. The first half of the complication zone — where the protagonist should already be under rising pressure after the inciting incident — is frictionless, so the story coasts from setup toward the midpoint without the early escalation that earns the audience's worry.`,
+          suggestedFix: 'Plant a rupture in Act 2a: an early alliance strained, a trust tested, a first cost paid. The stretch right after the inciting incident should be where the conflict starts biting — a frictionless Act 2a lets the tension go slack precisely where it should begin to climb.',
+        });
+      }
+    }
+
+    // CONFLICT_SECOND_HALF_MONOPOLY (minor, n≥8, ≥3 conflict scenes): More than 70% of
+    // the story's ruptures fall in the second half. Conflict arrives late and concentrates
+    // toward the climax, so the front half plays without relational friction and the back
+    // half carries all the strain at once. The distribution mirror of CONFLICT_FIRST_HALF_
+    // MONOPOLY (>70% in the first half); distinct from CONFLICT_LATE_FIRST_RUPTURE (the
+    // binary case — the FIRST rupture falls past the midpoint) and CONFLICT_ACT1_ABSENT /
+    // CONFLICT_OPENING_VOID (zone checks): this fires even when the first half has some
+    // conflict, as long as it is a small minority.
+    if (records.length >= 8 && conflictRecs380.length >= 3) {
+      const mid380 = Math.floor(records.length * 0.5);
+      const secondHalf380 = conflictRecs380.filter(r => (records as any[]).indexOf(r) >= mid380).length;
+      if (secondHalf380 / conflictRecs380.length > 0.7) {
+        issues.push({
+          location: `Conflict distribution — ${secondHalf380}/${conflictRecs380.length} ruptures in the back half`,
+          rule: 'CONFLICT_SECOND_HALF_MONOPOLY',
+          severity: 'minor',
+          description: `${secondHalf380} of the story's ${conflictRecs380.length} ruptures (${Math.round(secondHalf380 / conflictRecs380.length * 100)}%) fall in the second half — conflict arrives late and concentrates toward the climax. The front half plays with little relational friction and the back half carries all the strain at once, so the audience is asked to invest in bonds the first half never showed under pressure.`,
+          suggestedFix: 'Move some ruptures earlier: seed friction in the first half so the relationships the back half breaks have already been shown to be fragile. Conflict distributed across the arc builds continuously; conflict dumped into the second half makes the opening feel inert and the ending feel rushed.',
+        });
+      }
+    }
+
+    // CONFLICT_REVELATION_DECOUPLED (minor, n≥8, ≥2 ruptures, ≥2 revelations): The story's
+    // ruptures and its revelations never share a scene — bonds break in scenes that disclose
+    // nothing, and truths surface in scenes that fracture no bond. The two engines run on
+    // separate tracks, so a rupture never IS a revelation (a betrayal exposed) and a
+    // revelation never costs a relationship. Sibling of CONFLICT_CLOCK_DECOUPLED (rupture ×
+    // clock); distinct from belief.ts REVELATION_RELATIONSHIP_DECOUPLED (no revelation has
+    // ANY relationship shift — this targets negative ruptures specifically and fires even
+    // when revelations coincide with positive shifts).
+    if (records.length >= 8) {
+      const revScenes380 = (records as any[]).filter(r => r.revelation !== null && r.revelation !== undefined);
+      if (conflictRecs380.length >= 2 && revScenes380.length >= 2 && !conflictRecs380.some(r => r.revelation !== null && r.revelation !== undefined)) {
+        issues.push({
+          location: 'Ruptures × revelations — decoupled',
+          rule: 'CONFLICT_REVELATION_DECOUPLED',
+          severity: 'minor',
+          description: `The story has ${conflictRecs380.length} ruptures and ${revScenes380.length} revelations, but none share a scene — bonds break in scenes that disclose nothing, and truths surface in scenes that fracture no bond. The rupture engine and the disclosure engine run separately, so a betrayal never lands as a revelation and a revelation never costs a relationship, forfeiting the doubled charge of a truth that breaks a bond in the same beat.`,
+          suggestedFix: 'Fuse at least one rupture with a revelation: the moment a hidden truth surfaces should also be the moment a bond fractures — the lie exposed that ends the friendship, the secret revealed that severs the alliance. When disclosure and rupture coincide, each makes the other land harder.',
+        });
       }
     }
   }
