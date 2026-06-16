@@ -22380,6 +22380,161 @@ Time to go now.`;
     });
   });
 
+  describe('Wave 358 — rhythmPass: colon in action, sound description overload, intensifier flood', async () => {
+    const runR358 = async (fountain: string) => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('COLON_IN_ACTION fires when 3+ action lines use a colon as a reveal device', async () => {
+      const f358c = `INT. STUDY - NIGHT
+
+She opens the box: a letter inside.
+
+He turns: MARCUS stands in the doorway.
+
+The safe hangs open: empty.
+
+A chair rests by the fireplace.
+
+Papers cover the desk.
+
+She lifts a single page.
+
+He crosses to the window.
+
+The clock reads midnight.`;
+      const res = await runR358(f358c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'COLON_IN_ACTION'), 'COLON_IN_ACTION should fire');
+    });
+
+    it('COLON_IN_ACTION does not fire when action lines use periods instead of colons', async () => {
+      const f358cn = `INT. STUDY - NIGHT
+
+She opens the box. A letter is inside.
+
+He turns. Marcus stands in the doorway.
+
+The safe hangs open. It is empty.
+
+A chair rests by the fireplace.
+
+Papers cover the desk.
+
+She lifts a single page.
+
+He crosses to the window.
+
+The clock reads midnight.`;
+      const res = await runR358(f358cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'COLON_IN_ACTION'), 'COLON_IN_ACTION should not fire');
+    });
+
+    it('SOUND_DESCRIPTION_OVERLOAD fires when >30% of action lines contain sound vocabulary', async () => {
+      const f358s = `EXT. ALLEY - NIGHT
+
+A bang echoes off the walls.
+
+The crash of glass follows close behind.
+
+A roar builds in the distance.
+
+Footsteps clatter across the wet stone.
+
+She presses against the wall.
+
+He checks his watch.
+
+They wait in silence.
+
+A door opens slowly down the block.
+
+Light spills onto the pavement.
+
+She exhales.`;
+      const res = await runR358(f358s);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SOUND_DESCRIPTION_OVERLOAD'), 'SOUND_DESCRIPTION_OVERLOAD should fire');
+    });
+
+    it('SOUND_DESCRIPTION_OVERLOAD does not fire when action lines avoid sound vocabulary', async () => {
+      const f358sn = `EXT. ALLEY - NIGHT
+
+She rounds the corner at speed.
+
+He is already waiting near the wall.
+
+A door swings open at the far end.
+
+She presses against the brick.
+
+He checks his watch.
+
+They wait.
+
+A figure appears in the doorway.
+
+Light falls across the pavement.
+
+She exhales slowly.
+
+He nods once.`;
+      const res = await runR358(f358sn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SOUND_DESCRIPTION_OVERLOAD'), 'SOUND_DESCRIPTION_OVERLOAD should not fire');
+    });
+
+    it('INTENSIFIER_FLOOD fires when >30% of action lines contain filler intensifiers', async () => {
+      const f358i = `INT. KITCHEN - DAY
+
+She is very scared of what she might find.
+
+He moves extremely carefully through the wreckage.
+
+The room is utterly silent now.
+
+She steps quite deliberately toward the door.
+
+A chair has been knocked over.
+
+Papers cover the floor.
+
+He kneels beside the table.
+
+She checks the back room quickly.
+
+The windows are shut.
+
+Dust covers everything.`;
+      const res = await runR358(f358i);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENSIFIER_FLOOD'), 'INTENSIFIER_FLOOD should fire');
+    });
+
+    it('INTENSIFIER_FLOOD does not fire when action lines use precise words without filler', async () => {
+      const f358in = `INT. KITCHEN - DAY
+
+She freezes at the threshold.
+
+He picks through the wreckage with care.
+
+The room is silent.
+
+She moves to the door.
+
+A chair lies on its side.
+
+Papers fan across the floor.
+
+He kneels beside the table.
+
+She opens the back door.
+
+The windows are shut.
+
+Dust coats every surface.`;
+      const res = await runR358(f358in);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENSIFIER_FLOOD'), 'INTENSIFIER_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 344 — rhythmPass: polysyndeton overload, semicolon in action, weather description overload', async () => {
     const runR344 = async (fountain: string) => {
       const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');

@@ -31,6 +31,11 @@
 // coordinators — breathless compound action), semicolon in action (≥3 action lines use a
 // semicolon — literary punctuation foreign to screen action), weather description overload
 // (>30% of action lines contain weather vocabulary — the DP's domain crowding the drama).
+// Wave 358 additions: colon in action (≥3 action lines use a colon as a literary reveal
+// device — typographic stage-direction crowding cinematic prose), sound description overload
+// (>30% of action lines contain sound vocabulary — the sound editor's domain crowding the
+// frame), intensifier flood (>30% of action lines carry filler intensifiers: very, really,
+// quite, extremely, utterly, etc. — padding that signals distrust of the underlying word).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1102,6 +1107,72 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${weatherCount344} of ${actionLines.length} action lines (${Math.round(weatherCount344 / actionLines.length * 100)}%) contain weather description (rain, wind, snow, storm, fog, etc.) — atmosphere is crowding out the human drama. Like lighting, ambient weather is largely a production and directorial decision; when it saturates the prose, the page describes conditions instead of characters and the audience's attention drifts from the people to the climate.`,
         suggestedFix: 'Reserve weather for moments where it materially affects the scene — a storm that strands the characters, cold that frays tempers, rain that hides a sound. Otherwise trust the location and production to supply the weather, and spend the prose on what the characters do within it.',
+      });
+    }
+  }
+
+  // ── Wave 358: COLON_IN_ACTION, SOUND_DESCRIPTION_OVERLOAD, INTENSIFIER_FLOOD ──
+
+  // COLON_IN_ACTION (minor, ≥8 action lines, ≥3 lines): Three or more action
+  // lines use a colon as a dramatic-reveal device ("She opens her hand: a ring.",
+  // "He turns: SARAH stands in the doorway."). The colon is a literary typography
+  // trick — it engineers suspense on the page with punctuation. The camera achieves
+  // the same reveal with a cut or a camera move; encoding it as a colon means the
+  // writer is stage-managing the reader's eye rather than trusting the image to land.
+  // Distinct from SEMICOLON_IN_ACTION (`;` not `:`), DASH_CHAIN (trailing em-dash),
+  // ELLIPSIS_CHAIN (trailing `...`), and ACTION_PARENTHESIS_ASIDE.
+  if (actionLines.length >= 8) {
+    const colonCount358 = actionLines.filter(l => l.text.includes(':')).length;
+    if (colonCount358 >= 3) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'COLON_IN_ACTION',
+        severity: 'minor',
+        description: `${colonCount358} action lines use a colon as a dramatic-reveal device ("He turns: she's already gone."). The colon engineers a beat of suspense on the page with punctuation alone. The camera achieves the same reveal with a cut or a hold; encoding the reveal as a colon means the writer is typographically directing the reader's experience rather than trusting the image to land on its own.`,
+        suggestedFix: "Convert the colon beat into a visual one: split the line at the colon into two separate sentences. \"He turns. She's already gone.\" — the white space between them does the colon's dramatic work while keeping the prose cinematic.",
+      });
+    }
+  }
+
+  // SOUND_DESCRIPTION_OVERLOAD (minor, ≥10 action lines, >30%): More than 30%
+  // of action lines describe specific sounds (bang, crash, roar, hum, buzz,
+  // clatter, screech, etc.). Audio is the sound designer's and composer's domain;
+  // when prose saturates with sonic detail, the writer encroaches on post-production
+  // territory and the text describes what the mix will supply rather than what the
+  // camera shows. Analogous to LIGHT_DESCRIPTION_OVERLOAD (DP's domain) and
+  // WEATHER_DESCRIPTION_OVERLOAD (production design); this fires on the sound
+  // vocabulary specifically.
+  if (actionLines.length >= 10) {
+    const soundRe358 = /\b(bang(?:s|ing)?|crash(?:es|ing)?|roar(?:s|ing)?|hum(?:s|ming)?|buzz(?:es|ing)?|clatter(?:s|ing)?|screech(?:es|ing)?|thud(?:s|ding)?|rattle(?:s|d|ing)?|squeal(?:s|ing)?|wail(?:s|ing)?|sirens?|echoes?|echo(?:ing)?|reverberat(?:es|ing|ed)|blast(?:s|ing)?|shriek(?:s|ing)?|rumble(?:s|d|ing)?|creak(?:s|ing)?|groan(?:s|ing)?)\b/i;
+    const soundCount358 = actionLines.filter(l => soundRe358.test(l.text)).length;
+    if (soundCount358 / actionLines.length > 0.30) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'SOUND_DESCRIPTION_OVERLOAD',
+        severity: 'minor',
+        description: `${soundCount358} of ${actionLines.length} action lines (${Math.round(soundCount358 / actionLines.length * 100)}%) describe specific sounds (bangs, crashes, roars, wails, etc.) — the prose is saturated with sonic detail that belongs to the sound designer. When audio description crowds the page, the writer is composing the mix rather than describing the visual action, and the camera's storytelling is subordinated to a production department's territory.`,
+        suggestedFix: 'Keep sound references for moments where the audio is the dramatic point — a gunshot the audience has dreaded, a silence that breaks something open. Otherwise trust the sound department to supply ambient audio and spend the prose on the visual action that drives the scene forward.',
+      });
+    }
+  }
+
+  // INTENSIFIER_FLOOD (minor, ≥10 action lines, >30%): More than 30% of action
+  // lines contain filler intensifiers (very, really, quite, rather, extremely,
+  // utterly, absolutely, totally, completely, deeply, terribly, incredibly,
+  // awfully, etc.). These are qualifiers that pad imprecise words rather than
+  // replacing them. Distinct from ADVERB_CLUSTERING (which fires per-line when
+  // 3+ `-ly` adverbs appear; this audits story-wide density of a specific set of
+  // non-`-ly` and `-ly` filler intensifiers, not per-line stacking of any adverb).
+  if (actionLines.length >= 10) {
+    const intensifierRe358 = /\b(very|really|quite|rather|extremely|utterly|absolutely|totally|completely|deeply|terribly|incredibly|awfully|dreadfully|enormously|immensely|exceedingly|remarkably)\b/i;
+    const intensifierCount358 = actionLines.filter(l => intensifierRe358.test(l.text)).length;
+    if (intensifierCount358 / actionLines.length > 0.30) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'INTENSIFIER_FLOOD',
+        severity: 'minor',
+        description: `${intensifierCount358} of ${actionLines.length} action lines (${Math.round(intensifierCount358 / actionLines.length * 100)}%) carry filler intensifiers (very, really, quite, extremely, utterly, completely, etc.) — qualifiers that signal the writer doesn't trust the underlying word. "Very cold" is weaker than "freezing"; "really scared" is weaker than "terrified." Intensifiers pad imprecise choices rather than replacing them with precise ones.`,
+        suggestedFix: 'Delete every intensifier and upgrade the underlying word: "very cold" → "freezing", "really angry" → "furious", "quite beautiful" → "stunning". If removing the intensifier makes the image weaker, the problem is the noun or verb, not the missing qualifier — fix the word, not the padding.',
       });
     }
   }
