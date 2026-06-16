@@ -19640,6 +19640,77 @@ He looks away.`;
     });
   });
 
+  describe('Wave 356 — payoffPass: clue seed dramatic turn decoupled, payoff clock decoupled, late clue plant', async () => {
+    const makeRec356 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0.5,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runPay356 = async (records: any[]) => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      return payoffPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CLUE_SEED_DRAMATIC_TURN_DECOUPLED fires when no clue-seeding scene carries a dramatic turn', async () => {
+      const recs356sd = Array.from({ length: 10 }, (_, i) =>
+        makeRec356(i, { seededClueIds: [1, 3, 5].includes(i) ? [`clue${i}`] : [], dramaticTurn: 'nothing' })
+      );
+      const res = await runPay356(recs356sd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLUE_SEED_DRAMATIC_TURN_DECOUPLED'), 'CLUE_SEED_DRAMATIC_TURN_DECOUPLED should fire');
+    });
+
+    it('CLUE_SEED_DRAMATIC_TURN_DECOUPLED does not fire when a clue-seeding scene pivots', async () => {
+      const recs356sdn = Array.from({ length: 10 }, (_, i) =>
+        makeRec356(i, { seededClueIds: [1, 3, 5].includes(i) ? [`clue${i}`] : [], dramaticTurn: i === 3 ? 'reversal' : 'nothing' })
+      );
+      const res = await runPay356(recs356sdn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLUE_SEED_DRAMATIC_TURN_DECOUPLED'), 'CLUE_SEED_DRAMATIC_TURN_DECOUPLED should not fire');
+    });
+
+    it('PAYOFF_CLOCK_DECOUPLED fires when no payoff lands under a clock', async () => {
+      const recs356pc = Array.from({ length: 10 }, (_, i) =>
+        makeRec356(i, {
+          clockRaised: [1, 2].includes(i),
+          payoffSetupIds: [4, 6, 8].includes(i) ? [`clue${i}`] : [],
+        })
+      );
+      const res = await runPay356(recs356pc);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CLOCK_DECOUPLED'), 'PAYOFF_CLOCK_DECOUPLED should fire');
+    });
+
+    it('PAYOFF_CLOCK_DECOUPLED does not fire when a payoff lands under a clock', async () => {
+      const recs356pcn = Array.from({ length: 10 }, (_, i) =>
+        makeRec356(i, {
+          clockRaised: [1, 2, 6].includes(i),
+          payoffSetupIds: [4, 6, 8].includes(i) ? [`clue${i}`] : [],
+        })
+      );
+      const res = await runPay356(recs356pcn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CLOCK_DECOUPLED'), 'PAYOFF_CLOCK_DECOUPLED should not fire');
+    });
+
+    it('LATE_CLUE_PLANT fires when a clue is seeded in the final 15%', async () => {
+      // n=10 → lateStart = floor(8.5) = 8; seed at scene 9
+      const recs356lc = Array.from({ length: 10 }, (_, i) =>
+        makeRec356(i, { seededClueIds: [1, 9].includes(i) ? [`clue${i}`] : [] })
+      );
+      const res = await runPay356(recs356lc);
+      assert.ok(res.issues.some((i: any) => i.rule === 'LATE_CLUE_PLANT'), 'LATE_CLUE_PLANT should fire');
+    });
+
+    it('LATE_CLUE_PLANT does not fire when all clues are seeded early', async () => {
+      const recs356lcn = Array.from({ length: 10 }, (_, i) =>
+        makeRec356(i, { seededClueIds: [1, 2, 3].includes(i) ? [`clue${i}`] : [] })
+      );
+      const res = await runPay356(recs356lcn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'LATE_CLUE_PLANT'), 'LATE_CLUE_PLANT should not fire');
+    });
+  });
+
   describe('Wave 342 — payoffPass: clue seed relationship decoupled, payoff dramatic turn decoupled, setup/payoff dead run', async () => {
     const makeRec342 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

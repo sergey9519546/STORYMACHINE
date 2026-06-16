@@ -29,6 +29,10 @@
 // resolutions never pivot the story), setup/payoff dead run (6+ consecutive scenes with
 // no seed and no payoff in a story that otherwise uses the machine — connective tissue
 // vanishes for a stretch).
+// Wave 356 additions: clue seed dramatic turn decoupled (no clue-seeding scene coincides
+// with a story pivot), payoff clock decoupled (≥3 payoffs and ≥2 clock scenes but no
+// payoff lands under time pressure), late clue plant (a clue seeded in the final 15% —
+// no room left to pay it off).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1216,6 +1220,71 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Thread continuity through the dead run: plant a small clue, pay off an earlier one, or fold a long fuse partway toward its resolution. The setup/payoff weave is what makes a story feel designed rather than episodic; a long stretch with neither leaves the audience watching events instead of a plot.',
         });
       }
+    }
+  }
+
+  // ── Wave 356: CLUE_SEED_DRAMATIC_TURN_DECOUPLED, PAYOFF_CLOCK_DECOUPLED, LATE_CLUE_PLANT ──
+
+  // CLUE_SEED_DRAMATIC_TURN_DECOUPLED (minor, n≥8, ≥3 seed scenes): No scene that plants
+  // a clue (seededClueIds non-empty) also carries a dramatic turn. Clues are always
+  // planted in still water, never in the churn of a pivot — so the seeds drop in moments
+  // the audience has the least reason to attend to. A clue glimpsed during a reversal or
+  // recognition rides the scene's charge into memory. Completes the seed-side channel set
+  // with CLUE_SEED_CURIOSITY_FLAT, CLUE_SEED_EMOTION_FLAT, and CLUE_SEED_RELATIONSHIP_
+  // DECOUPLED; distinct from PAYOFF_DRAMATIC_TURN_DECOUPLED (the payoff side).
+  if (records.length >= 8) {
+    const seedScenes356 = (records as any[]).filter(r => ((r.seededClueIds ?? []) as string[]).length > 0);
+    if (seedScenes356.length >= 3 && !seedScenes356.some(r => (r.dramaticTurn ?? 'nothing') !== 'nothing')) {
+      issues.push({
+        location: 'Clue-seeding scenes — dramatic pivot',
+        rule: 'CLUE_SEED_DRAMATIC_TURN_DECOUPLED',
+        severity: 'minor',
+        description: `None of the ${seedScenes356.length} clue-seeding scenes also carries a dramatic turn — clues are always planted in still water, never in the churn of a pivot. The seeds drop in moments the audience has the least reason to attend to, so they pass unregistered and their later payoffs land without the setup having truly taken hold. A clue glimpsed during a reversal rides the scene's charge into memory.`,
+        suggestedFix: 'Plant at least some clues inside turning-point scenes: a detail noticed in the chaos of a reversal, an object that changes meaning the moment a recognition lands. The audience\'s attention is highest at a pivot — a seed dropped there is a seed they will remember when it pays off.',
+      });
+    }
+  }
+
+  // PAYOFF_CLOCK_DECOUPLED (minor, n≥8, ≥3 payoff scenes, ≥2 clock scenes): The story
+  // raises clocks (clockRaised) and resolves planted threads (payoffSetupIds), but no
+  // payoff ever lands in a clock scene — resolutions never arrive under time pressure.
+  // A payoff that resolves against a ticking clock carries doubled tension: the audience
+  // feels both the satisfaction of the answer and the danger of the deadline. When the
+  // two systems never coincide, payoffs land in calm water and forfeit that charge.
+  // Distinct from CLOCK_WITHOUT_CONFRONTATION / CONFLICT_CLOCK_DECOUPLED (conflict pass)
+  // and PAYOFF_SUSPENSE_MISMATCH (suspenseDelta on payoff scenes, not clock co-occurrence).
+  if (records.length >= 8) {
+    const payoffScenes356 = (records as any[]).filter(r => ((r.payoffSetupIds ?? []) as string[]).length > 0);
+    const clockScenes356 = (records as any[]).filter(r => r.clockRaised === true);
+    if (payoffScenes356.length >= 3 && clockScenes356.length >= 2 && !payoffScenes356.some(r => r.clockRaised === true)) {
+      issues.push({
+        location: 'Payoff scenes — time pressure',
+        rule: 'PAYOFF_CLOCK_DECOUPLED',
+        severity: 'minor',
+        description: `The story raises ${clockScenes356.length} clocks and lands ${payoffScenes356.length} payoffs, but no payoff arrives in a clock scene — resolutions never land under time pressure. A payoff that resolves against a ticking clock carries doubled tension: the satisfaction of the answer and the danger of the deadline at once. When the deadline machine and the payoff machine never meet, the resolutions land in calm water and forfeit that charge.`,
+        suggestedFix: 'Stage at least one major payoff under a live clock: let the thread resolve at the moment the deadline bites, so the answer and the urgency hit together. The convergence of "we finally know" and "we are almost out of time" is one of the most powerful beats available — use it at least once.',
+      });
+    }
+  }
+
+  // LATE_CLUE_PLANT (minor, n≥10, ≥1 late seed): A clue is seeded in the final 15% of
+  // the story, leaving no room to set it up properly before it would need to pay off. A
+  // seed planted this late either dangles unresolved or pays off almost immediately,
+  // robbing it of the delay that makes a payoff satisfying. Distinct from CLUE_SEED_LATE_
+  // MAJORITY (>60% of clues in the whole second half — a proportion) and ORPHAN_CLUE /
+  // DANGLING_PAYOFF (resolution-state checks): this flags the specific timing error of
+  // planting in the closing stretch.
+  if (records.length >= 10) {
+    const lateStart356 = Math.floor(records.length * 0.85);
+    const lateSeedScenes356 = (records as any[]).filter((r, i) => i >= lateStart356 && ((r.seededClueIds ?? []) as string[]).length > 0);
+    if (lateSeedScenes356.length >= 1) {
+      issues.push({
+        location: `Final 15% (Scenes ${lateStart356}–${records.length - 1}) — late clue plant`,
+        rule: 'LATE_CLUE_PLANT',
+        severity: 'minor',
+        description: `${lateSeedScenes356.length} clue-seeding scene(s) fall in the final 15% of the story (Scenes ${lateStart356}–${records.length - 1}) — a clue planted this late has no room to be set up before it would need to pay off. Such a seed either dangles unresolved or pays off almost immediately, robbing it of the delay between planting and harvest that makes a payoff satisfying.`,
+        suggestedFix: 'Move late clue plants earlier so they have room to breathe before their payoff, or cut them if they are not paid off at all. The pleasure of a payoff is proportional to how long the seed has been quietly waiting; a clue introduced in the closing stretch cannot earn that.',
+      });
     }
   }
 
