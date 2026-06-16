@@ -18713,6 +18713,86 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 397 — pacingPass: seed scene underweight, stakes scene bloat, curiosity peak scene bloat', async () => {
+    const makeRec397 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain397 = (lineCounts: number[]) =>
+      lineCounts.map((n, i) =>
+        `INT. SC${i} - DAY\n\n${Array.from({ length: n }, (_, j) => `Action line ${j + 1} for scene ${i}.`).join('\n\n')}`
+      ).join('\n\n');
+    const runP397 = async (records: any[], fountain: string) => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      return pacingPass({ fountain, original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('SEED_SCENE_UNDERWEIGHT fires when clue-seeding scenes average below 60% of overall length', async () => {
+      // Scenes 3,6 seed clues (length 2), rest are length 10 → avg seeding 2, overall avg ~(10*6+2*2)/8 = 64/8 = 8; 2 < 8*0.6=4.8 → fires
+      const lc397a = [10, 10, 10, 2, 10, 10, 2, 10];
+      const recs397a = Array.from({ length: 8 }, (_, i) =>
+        makeRec397(i, { seededClueIds: [3, 6].includes(i) ? ['clue1'] : [] })
+      );
+      const res = await runP397(recs397a, makeFountain397(lc397a));
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_SCENE_UNDERWEIGHT'), 'SEED_SCENE_UNDERWEIGHT should fire');
+    });
+
+    it('SEED_SCENE_UNDERWEIGHT does not fire when clue-seeding scenes are adequately long', async () => {
+      // Scenes 3,6 seed clues (length 8), rest are length 10 → avg seeding 8, overall avg ~9.5; 8 > 9.5*0.6=5.7 → no fire
+      const lc397anr = [10, 10, 10, 8, 10, 10, 8, 10];
+      const recs397anr = Array.from({ length: 8 }, (_, i) =>
+        makeRec397(i, { seededClueIds: [3, 6].includes(i) ? ['clue1'] : [] })
+      );
+      const res = await runP397(recs397anr, makeFountain397(lc397anr));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_SCENE_UNDERWEIGHT'), 'SEED_SCENE_UNDERWEIGHT should not fire');
+    });
+
+    it('STAKES_SCENE_BLOAT fires when raise_stakes scenes average above 1.5× overall length', async () => {
+      // Scenes 2,5 are raise_stakes (length 20), rest length 5 → avg stakes 20, overall ~(5*6+20*2)/8=70/8=8.75; 20 > 8.75*1.5=13.1 → fires
+      const lc397b = [5, 5, 20, 5, 5, 20, 5, 5];
+      const recs397b = Array.from({ length: 8 }, (_, i) =>
+        makeRec397(i, { purpose: [2, 5].includes(i) ? 'raise_stakes' : 'development' })
+      );
+      const res = await runP397(recs397b, makeFountain397(lc397b));
+      assert.ok(res.issues.some((i: any) => i.rule === 'STAKES_SCENE_BLOAT'), 'STAKES_SCENE_BLOAT should fire');
+    });
+
+    it('STAKES_SCENE_BLOAT does not fire when raise_stakes scenes are proportional', async () => {
+      // Scenes 2,5 are raise_stakes (length 9), rest length 7 → avg stakes 9, overall ~(7*6+9*2)/8=60/8=7.5; 9 < 7.5*1.5=11.25 → no fire
+      const lc397bnr = [7, 7, 9, 7, 7, 9, 7, 7];
+      const recs397bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec397(i, { purpose: [2, 5].includes(i) ? 'raise_stakes' : 'development' })
+      );
+      const res = await runP397(recs397bnr, makeFountain397(lc397bnr));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STAKES_SCENE_BLOAT'), 'STAKES_SCENE_BLOAT should not fire');
+    });
+
+    it('CURIOSITY_PEAK_SCENE_BLOAT fires when high-curiosity scenes average above 1.5× overall length', async () => {
+      // Scenes 1,4 have curiosityDelta=2 (length 20), rest length 5 → avg curiosity 20, overall ~(5*6+20*2)/8=8.75; 20 > 8.75*1.5=13.1 → fires
+      const lc397c = [5, 20, 5, 5, 20, 5, 5, 5];
+      const recs397c = Array.from({ length: 8 }, (_, i) =>
+        makeRec397(i, { curiosityDelta: [1, 4].includes(i) ? 2 : 0 })
+      );
+      const res = await runP397(recs397c, makeFountain397(lc397c));
+      assert.ok(res.issues.some((i: any) => i.rule === 'CURIOSITY_PEAK_SCENE_BLOAT'), 'CURIOSITY_PEAK_SCENE_BLOAT should fire');
+    });
+
+    it('CURIOSITY_PEAK_SCENE_BLOAT does not fire when high-curiosity scenes are proportional', async () => {
+      // Scenes 1,4 have curiosityDelta=2 (length 9), rest length 7 → avg curiosity 9, overall 7.5; 9 < 7.5*1.5=11.25 → no fire
+      const lc397cnr = [7, 9, 7, 7, 9, 7, 7, 7];
+      const recs397cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec397(i, { curiosityDelta: [1, 4].includes(i) ? 2 : 0 })
+      );
+      const res = await runP397(recs397cnr, makeFountain397(lc397cnr));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CURIOSITY_PEAK_SCENE_BLOAT'), 'CURIOSITY_PEAK_SCENE_BLOAT should not fire');
+    });
+  });
+
   describe('Wave 396 — originalityPass: revelation purpose monotone, dialogue short-line dominance, dialogue question drought', async () => {
     const makeRec396 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

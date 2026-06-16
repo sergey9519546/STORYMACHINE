@@ -45,6 +45,12 @@
 // (turn scenes average above 1.5× — pivots that sprawl and lose their snap; complement of
 // dramatic-turn scene underweight), emotional-peak scene bloat (non-neutral scenes average
 // above 1.5× — feeling over-indulged; complement of emotional-peak scene underweight).
+// Wave 397 additions: seed scene underweight (clue-seeding scenes average below 60% of overall
+// — seeds dropped too quickly to register; complement of seed scene bloat), stakes scene bloat
+// (raise_stakes scenes average above 1.5× — escalation sprawls and loses urgency; complement
+// of stakes scene underweight), curiosity peak scene bloat (high-curiosityDelta scenes average
+// above 1.5× — the most intriguing moments over-explained; complement of curiosity peak
+// scene underweight).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1607,6 +1613,95 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `The ${emoLengths383.length} emotionally charged scene(s) average ${emoAvg383.toFixed(1)} weighted lines — ${Math.round(emoAvg383 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The story's feeling is over-indulged: emotion lands when it is earned and released, but a charged scene that lingers tips into sentimentality, holding on the feeling well past the point the audience has absorbed it.`,
           suggestedFix: 'Trust the audience to feel it and move on: deliver the emotional beat, hold for the reaction, and cut before the scene starts wringing the moment. Restraint amplifies feeling; an emotional scene that overstays its welcome invites the audience to step back from it.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 397: SEED_SCENE_UNDERWEIGHT, STAKES_SCENE_BLOAT, CURIOSITY_PEAK_SCENE_BLOAT ──
+
+  // SEED_SCENE_UNDERWEIGHT (minor, n≥8, ≥2 seed scenes): Clue-seeding scenes
+  // (seededClueIds non-empty) average below 60% of overall length — seeds are dropped in
+  // passing, too rushed to register as story material. Foreshadowing that is glimpsed too
+  // briefly cannot prime the audience for the payoff; the later reveal will feel
+  // arbitrary rather than earned. The complement of SEED_SCENE_BLOAT (seeding scenes above
+  // 1.5× — telegraphed by page space): this fires on the opposite failure, seeds too thin.
+  // Distinct from REVELATION_SCENE_UNDERWEIGHT (revelation flag, not clue-seeding),
+  // PAYOFF_SCENE_UNDERWEIGHT (payoff signal), and CLOCK_SCENE_UNDERWEIGHT (clock channel).
+  if (records.length >= 8) {
+    const seedUWLengths397: number[] = [];
+    for (let i397a = 0; i397a < records.length; i397a++) {
+      if ((((records as any[])[i397a].seededClueIds ?? []) as any[]).length > 0) {
+        seedUWLengths397.push(sceneLengths.get(i397a) ?? 0);
+      }
+    }
+    if (seedUWLengths397.length >= 2) {
+      const seedUWAvg397 = seedUWLengths397.reduce((s, v) => s + v, 0) / seedUWLengths397.length;
+      if (seedUWAvg397 > 0 && seedUWAvg397 < avgLength * 0.6) {
+        issues.push({
+          location: `${seedUWLengths397.length} clue-seeding scene(s)`,
+          rule: 'SEED_SCENE_UNDERWEIGHT',
+          severity: 'minor',
+          description: `The ${seedUWLengths397.length} clue-seeding scene(s) average ${seedUWAvg397.toFixed(1)} weighted lines — ${Math.round(seedUWAvg397 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). Seeds dropped too quickly cannot prime the audience for the payoff: a detail glimpsed in half a line registers as set dressing, not foreshadowing, and the eventual reveal feels arbitrary rather than earned. Planting a clue still requires enough space for it to land.`,
+          suggestedFix: 'Give clue-seeding scenes enough room for the detail to land distinctly: have a character interact with it, have the environment hold it a beat, or let it generate a reaction. A seed glimpsed in a single line is easily forgotten; one that earns a moment of pause is the kind that pays off.',
+        });
+      }
+    }
+  }
+
+  // STAKES_SCENE_BLOAT (minor, n≥8, ≥2 raise_stakes scenes): Scenes whose purpose is
+  // to raise the stakes (purpose === 'raise_stakes') average above 1.5× the overall
+  // scene length — escalation sprawls and loses its urgency. A raise-the-stakes scene
+  // derives its power from forward momentum: it announces new danger and drives the
+  // characters toward a response. Sprawling stakes scenes become explanation rather
+  // than escalation. The complement of STAKES_SCENE_UNDERWEIGHT (below 60% — too rushed):
+  // this fires on the opposite failure. Distinct from CONFLICT_SCENE_BLOAT (relationship-
+  // shift channel) and DRAMATIC_TURN_SCENE_BLOAT (dramaticTurn signal).
+  if (records.length >= 8) {
+    const stakesBloatLengths397: number[] = [];
+    for (let i397b = 0; i397b < records.length; i397b++) {
+      if ((records as any[])[i397b].purpose === 'raise_stakes') {
+        stakesBloatLengths397.push(sceneLengths.get(i397b) ?? 0);
+      }
+    }
+    if (stakesBloatLengths397.length >= 2) {
+      const stakesBloatAvg397 = stakesBloatLengths397.reduce((s, v) => s + v, 0) / stakesBloatLengths397.length;
+      if (stakesBloatAvg397 > avgLength * 1.5) {
+        issues.push({
+          location: `${stakesBloatLengths397.length} stakes-raising scene(s)`,
+          rule: 'STAKES_SCENE_BLOAT',
+          severity: 'minor',
+          description: `The ${stakesBloatLengths397.length} stakes-raising scene(s) average ${stakesBloatAvg397.toFixed(1)} weighted lines — ${Math.round(stakesBloatAvg397 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). Escalation sprawls and loses its urgency: a raise-the-stakes scene draws its power from forward momentum, announcing new danger and driving toward response. When it sprawls, it becomes explanation rather than escalation, and the urgency it was meant to inject dissipates in the length.`,
+          suggestedFix: 'Compress stakes-raising scenes: deliver the new cost or danger clearly, show the immediate character response, and move on. The audience\'s sense of urgency lives in pace — a tight scene that raises the stakes and cuts away leaves them no room to relax.',
+        });
+      }
+    }
+  }
+
+  // CURIOSITY_PEAK_SCENE_BLOAT (minor, n≥8, ≥2 high-curiosity scenes): Scenes with a
+  // high curiosityDelta (> 1) average above 1.5× the overall scene length — the story's
+  // most intriguing moments are over-explained. A scene that opens a big question should
+  // raise it and withhold the answer; sprawling past the question into exposition collapses
+  // the mystery it just created. The complement of CURIOSITY_PEAK_SCENE_UNDERWEIGHT
+  // (high-curiosity scenes below 60% — mysteries raised too briefly): this fires on the
+  // opposite failure. Distinct from QUIET_SCENE_BLOAT (inert scenes), EMOTIONAL_PEAK_
+  // SCENE_BLOAT (emotional channel), and REVELATION_SCENE_BLOAT (revelation field).
+  if (records.length >= 8) {
+    const curioBloatLengths397: number[] = [];
+    for (let i397c = 0; i397c < records.length; i397c++) {
+      if (((records as any[])[i397c].curiosityDelta ?? 0) > 1) {
+        curioBloatLengths397.push(sceneLengths.get(i397c) ?? 0);
+      }
+    }
+    if (curioBloatLengths397.length >= 2) {
+      const curioBloatAvg397 = curioBloatLengths397.reduce((s, v) => s + v, 0) / curioBloatLengths397.length;
+      if (curioBloatAvg397 > avgLength * 1.5) {
+        issues.push({
+          location: `${curioBloatLengths397.length} high-curiosity scene(s)`,
+          rule: 'CURIOSITY_PEAK_SCENE_BLOAT',
+          severity: 'minor',
+          description: `The ${curioBloatLengths397.length} high-curiosity scene(s) average ${curioBloatAvg397.toFixed(1)} weighted lines — ${Math.round(curioBloatAvg397 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The story's most intriguing moments are over-explained: a scene that opens a large question derives its pull from the gap it creates, not from explaining what the gap is. Sprawling past the opening into exposition collapses the mystery it just raised, converting intrigue into information.`,
+          suggestedFix: 'Trim high-curiosity scenes to the point of the question: raise it, let it sit for one reaction, and cut away with the audience still leaning forward. Restraint is the engine of curiosity — the longer a scene lingers after opening a question, the more it answers by implication, deflating the hook it was meant to set.',
         });
       }
     }
