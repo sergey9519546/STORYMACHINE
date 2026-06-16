@@ -29,6 +29,10 @@
 // Wave 350 additions: you-opener flood (>30% of lines begin with "You" — uniform
 // confrontational pitch), thanks overuse (≥3 gratitude lines — politeness filler), self-
 // reference / illeism (a character names themselves in >20% of their lines).
+// Wave 364 additions: first-person saturation (>40% of lines begin with "I"/"My" —
+// self-centred dialogue never engages with the other person), passive construct flood
+// (>25% of lines use passive voice — evasive agentless speech), present-perfect flood
+// (>25% of lines use present perfect — characters explain the past instead of the now).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1598,6 +1602,72 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Replace most third-person self-references with "I" and "me". If a character\'s illeism is a deliberate trait (ego, dissociation, performance), keep it sparing and pointed so it reads as character rather than habit; otherwise let them speak in the first person like everyone else.',
         });
       }
+    }
+  }
+
+  // ── Wave 364: DIALOGUE_FIRST_PERSON_SATURATION, DIALOGUE_PASSIVE_CONSTRUCT_FLOOD, DIALOGUE_PRESENT_PERFECT_FLOOD ──
+
+  // DIALOGUE_FIRST_PERSON_SATURATION (minor, ≥10 lines, >40%): More than 40% of
+  // dialogue lines begin with "I" or "My". When most speech opens in the first person,
+  // characters report their own experiences and feelings rather than engaging with the
+  // other person or the shared reality — dialogue becomes a sequence of parallel
+  // self-reports rather than an exchange. Distinct from YOU_OPENER_FLOOD (second-person
+  // openers) and DIALOGUE_OPENER_MONOTONY (any single word at >30%; this targets the
+  // combined "I"/"My" first-person category at a higher 40% threshold with a specific
+  // self-centeredness diagnosis).
+  if (dialogue.length >= 10) {
+    const firstPersonCount364 = dialogue.filter(d => /^(I\b|My\b)/i.test(d.line.trim())).length;
+    if (firstPersonCount364 / dialogue.length > 0.40) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_FIRST_PERSON_SATURATION',
+        severity: 'minor',
+        description: `${firstPersonCount364} of ${dialogue.length} dialogue lines (${Math.round(firstPersonCount364 / dialogue.length * 100)}%) begin with "I" or "My" — almost every line opens by centering the speaker. When dialogue is this self-focused, characters report their own experiences rather than engaging with each other or the shared reality. The exchange becomes a sequence of parallel self-reports and the conversational texture flattens; listeners are addressed as audiences, not interlocutors.`,
+        suggestedFix: 'Vary the grammatical subject: let characters begin some lines with "You", with the thing they are reacting to, or with no pronoun at all. The first word of a line sets the focus — when it is always "I" or "My", the scene is a duet of monologues rather than a conversation.',
+      });
+    }
+  }
+
+  // DIALOGUE_PASSIVE_CONSTRUCT_FLOOD (minor, ≥10 lines, >25%): More than 25% of
+  // dialogue lines use a passive construction (auxiliary + past participle: "was told",
+  // "has been done", "will be seen"). Passive dialogue is systematically agentless —
+  // characters describe events without naming who caused them, which obscures
+  // accountability and responsibility. In a confrontation, passive speech reads as
+  // evasion; in exposition, it reads as bureaucratic distancing. Distinct from rhythm.ts
+  // PASSIVE_VOICE (action lines, not dialogue) and from all other dialogue checks.
+  if (dialogue.length >= 10) {
+    const passiveRe364 = /\b(was|were|has been|have been|had been|is being|are being|will be)\s+\w+ed\b/i;
+    const passiveCount364 = dialogue.filter(d => passiveRe364.test(d.line)).length;
+    if (passiveCount364 / dialogue.length > 0.25) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_PASSIVE_CONSTRUCT_FLOOD',
+        severity: 'minor',
+        description: `${passiveCount364} of ${dialogue.length} dialogue lines (${Math.round(passiveCount364 / dialogue.length * 100)}%) use a passive construction ("was told", "has been done", "will be seen"). Passive dialogue is systematically agentless — events happen without named causes, which obscures accountability and weakens confrontation. Characters who speak primarily in passive constructions sound like bureaucrats issuing disclaimers rather than people with stakes.`,
+        suggestedFix: 'Activate the passive constructions: "I was told" → "She told me"; "It was decided" → "I decided" or "You decided". Active voice names the agent and the action and makes it possible to assign responsibility — which is what most dramatic scenes are ultimately about.',
+      });
+    }
+  }
+
+  // DIALOGUE_PRESENT_PERFECT_FLOOD (minor, ≥10 lines, >25%): More than 25% of
+  // dialogue lines use the present perfect tense ("I have been", "she has told me",
+  // "we have tried", "they have always"). The present perfect looks backward — it
+  // describes a past action with current relevance. When most dialogue is in the
+  // present perfect, characters are explaining the past rather than confronting the
+  // present moment. The scene's urgency is displaced into backstory. Distinct from
+  // FUTURE_TENSE_FLOOD (forward-looking tense), TALKING_HEADS (length), and all
+  // other tense checks; this specifically targets backward-looking perfect tense.
+  if (dialogue.length >= 10) {
+    const perfectRe364 = /\b(i'?ve|you'?ve|she'?s|he'?s|we'?ve|they'?ve|i have|you have|she has|he has|we have|they have|it has|hasn'?t|haven'?t)\s+\w/i;
+    const perfectCount364 = dialogue.filter(d => perfectRe364.test(d.line)).length;
+    if (perfectCount364 / dialogue.length > 0.25) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_PRESENT_PERFECT_FLOOD',
+        severity: 'minor',
+        description: `${perfectCount364} of ${dialogue.length} dialogue lines (${Math.round(perfectCount364 / dialogue.length * 100)}%) use the present perfect tense ("I've been", "She's told me", "We've tried"). The present perfect looks backward — it describes past actions with present relevance. When most dialogue is in this tense, characters are explaining the history rather than confronting each other now, and the scene's urgency is displaced from the room into backstory.`,
+        suggestedFix: 'Ground dialogue in the present tense: "I\'ve been worried about you" → "I\'m worried about you". The present tense puts the confrontation in the room rather than in the past. Reserve the present perfect for lines where the pastness of the action matters dramatically; as a default register, it drains the scene of immediate stakes.',
+      });
     }
   }
 

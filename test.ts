@@ -20489,6 +20489,121 @@ The lights go out.`;
     });
   });
 
+  describe('Wave 364 — dialoguePass: first-person saturation, passive construct flood, present-perfect flood', async () => {
+    const runD364 = async (fountain: string) => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DIALOGUE_FIRST_PERSON_SATURATION fires when >40% of lines begin with I or My', async () => {
+      const f364fp = `INT. KITCHEN - DAY
+
+ANNA
+I don't know what to say.
+I've been thinking about this for weeks.
+My mind keeps going back to that night.
+I just can't let it go.
+My hands shake every time I try.
+She needs to understand.
+I can't pretend anymore.
+I tried to call but you didn't answer.
+The door was locked when I arrived.
+My plan was different from yours.`;
+      const res = await runD364(f364fp);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_FIRST_PERSON_SATURATION'), 'DIALOGUE_FIRST_PERSON_SATURATION should fire');
+    });
+
+    it('DIALOGUE_FIRST_PERSON_SATURATION does not fire when dialogue varies its openers', async () => {
+      const f364fpn = `INT. KITCHEN - DAY
+
+ANNA
+What are you doing here?
+This has to stop today.
+We need to talk about it.
+Nobody told me you were coming.
+There's no way around this anymore.
+You knew all along, didn't you?
+It happened three years ago.
+She wasn't supposed to find out.
+He made the first move.
+Everything fell apart that night.`;
+      const res = await runD364(f364fpn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_FIRST_PERSON_SATURATION'), 'DIALOGUE_FIRST_PERSON_SATURATION should not fire');
+    });
+
+    it('DIALOGUE_PASSIVE_CONSTRUCT_FLOOD fires when >25% of dialogue lines use passive constructions', async () => {
+      const f364pc = `INT. OFFICE - DAY
+
+TOM
+She was told about the decision yesterday.
+It has been decided by the board already.
+The report was filed without my knowledge.
+I had no idea what happened.
+The contract was signed by someone else.
+I received the news this morning.
+The evidence was collected before we arrived.
+Nobody warned me about this.
+Something has to change.
+We need to move forward.`;
+      const res = await runD364(f364pc);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_PASSIVE_CONSTRUCT_FLOOD'), 'DIALOGUE_PASSIVE_CONSTRUCT_FLOOD should fire');
+    });
+
+    it('DIALOGUE_PASSIVE_CONSTRUCT_FLOOD does not fire when dialogue uses active voice', async () => {
+      const f364pcn = `INT. OFFICE - DAY
+
+TOM
+She told me about the decision yesterday.
+The board made that call already.
+Someone filed the report without telling me.
+I had no idea this happened.
+She signed the contract herself.
+I heard the news this morning.
+We collected the evidence before you arrived.
+No one warned me about this situation.
+Something has to change for the better.
+We need to move forward together.`;
+      const res = await runD364(f364pcn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_PASSIVE_CONSTRUCT_FLOOD'), 'DIALOGUE_PASSIVE_CONSTRUCT_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_PRESENT_PERFECT_FLOOD fires when >25% of lines use present perfect tense', async () => {
+      const f364pp = `INT. LIVING ROOM - DAY
+
+CLAIRE
+I've been waiting for three hours.
+She's told me everything already.
+We've tried this before, you know.
+I haven't slept in two days.
+They've always done it this way.
+He's never listened to anyone.
+The situation has changed now.
+Nothing works the way it should.
+She walked in without warning.
+Give me one good reason.`;
+      const res = await runD364(f364pp);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_PRESENT_PERFECT_FLOOD'), 'DIALOGUE_PRESENT_PERFECT_FLOOD should fire');
+    });
+
+    it('DIALOGUE_PRESENT_PERFECT_FLOOD does not fire when dialogue stays in present or simple past', async () => {
+      const f364ppn = `INT. LIVING ROOM - DAY
+
+CLAIRE
+I'm waiting for an answer right now.
+She told me everything an hour ago.
+We tried this last month.
+I didn't sleep last night.
+They always do it this way.
+He never listens to anyone here.
+The situation changes by the minute.
+Nothing works the way it should.
+She walked in without knocking.
+Give me one good reason, please.`;
+      const res = await runD364(f364ppn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_PRESENT_PERFECT_FLOOD'), 'DIALOGUE_PRESENT_PERFECT_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 350 — dialoguePass: you-opener flood, thanks overuse, self-reference illeism', async () => {
     const runD350 = async (fountain: string) => {
       const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
