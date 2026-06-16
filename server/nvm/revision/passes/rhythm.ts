@@ -36,6 +36,11 @@
 // (>30% of action lines contain sound vocabulary — the sound editor's domain crowding the
 // frame), intensifier flood (>30% of action lines carry filler intensifiers: very, really,
 // quite, extremely, utterly, etc. — padding that signals distrust of the underlying word).
+// Wave 372 additions: triadic list overload (≥3 action lines use a "X, Y, and Z" rule-of-
+// three enumeration — a rhythmic tic when repeated), mid-line em-dash overuse (≥3 action
+// lines interrupt themselves with a mid-sentence em-dash — parenthetical breathlessness),
+// temporal opener overuse (>25% of action lines begin with a time adverb like Now/Soon/
+// Finally/Meanwhile — the prose narrating chronology instead of showing it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1173,6 +1178,72 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${intensifierCount358} of ${actionLines.length} action lines (${Math.round(intensifierCount358 / actionLines.length * 100)}%) carry filler intensifiers (very, really, quite, extremely, utterly, completely, etc.) — qualifiers that signal the writer doesn't trust the underlying word. "Very cold" is weaker than "freezing"; "really scared" is weaker than "terrified." Intensifiers pad imprecise choices rather than replacing them with precise ones.`,
         suggestedFix: 'Delete every intensifier and upgrade the underlying word: "very cold" → "freezing", "really angry" → "furious", "quite beautiful" → "stunning". If removing the intensifier makes the image weaker, the problem is the noun or verb, not the missing qualifier — fix the word, not the padding.',
+      });
+    }
+  }
+
+  // ── Wave 372: TRIADIC_LIST_OVERLOAD, MID_LINE_EM_DASH_OVERUSE, TEMPORAL_OPENER_OVERUSE ──
+
+  // TRIADIC_LIST_OVERLOAD (minor, ≥8 action lines, ≥3 lines): Three or more action
+  // lines use a "X, Y, and Z" rule-of-three enumeration ("He grabs his coat, his keys,
+  // and his nerve."). The triad is a powerful rhetorical figure precisely because it is
+  // rare; leaned on repeatedly across action lines it becomes a rhythmic tic — every beat
+  // resolves into the same three-part cadence, and the prose acquires a sing-song
+  // predictability. Distinct from POLYSYNDETON_OVERLOAD (3+ "and" coordinators, no commas)
+  // and DECLARATIVE_PILE (sentence-structure uniformity): this targets the comma-list triad.
+  if (actionLines.length >= 8) {
+    const triadRe372 = /[^,]+,\s+[^,]+,?\s+(and|or)\s+\w+/i;
+    const triadCount372 = actionLines.filter(l => triadRe372.test(l.text)).length;
+    if (triadCount372 >= 3) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'TRIADIC_LIST_OVERLOAD',
+        severity: 'minor',
+        description: `${triadCount372} action lines use a "X, Y, and Z" rule-of-three enumeration. The triad lands precisely because it is rare; repeated across action lines it becomes a rhythmic tic — every beat resolves into the same three-part cadence and the prose acquires a sing-song predictability that flattens emphasis. When everything comes in threes, nothing stands out.`,
+        suggestedFix: 'Vary the list structure: break some triads into single decisive images, let others run to two items or four, and reserve the rule-of-three for the one beat where its rhetorical weight matters. Rhythmic variety in enumeration keeps the prose from settling into a chant.',
+      });
+    }
+  }
+
+  // MID_LINE_EM_DASH_OVERUSE (minor, ≥8 action lines, ≥3 lines): Three or more action
+  // lines interrupt themselves with a mid-sentence em-dash (or double hyphen) — text—text.
+  // The interrupting dash injects a parenthetical aside or a sharp pivot into the middle of
+  // a beat; used heavily it makes the action prose breathless and self-interrupting, as if
+  // every line has a second thought it cannot suppress. Distinct from DASH_CHAIN (a trailing
+  // em-dash at the END of the line — an interruption/trailing-off) and ACTION_PARENTHESIS_
+  // ASIDE (parenthetical interjections in parentheses): this targets mid-line dash breaks.
+  if (actionLines.length >= 8) {
+    const midDashRe372 = /\w\s*(—|--)\s*\w/;
+    const trailingDashRe372 = /(—|--)\s*$/;
+    const midDashCount372 = actionLines.filter(l => midDashRe372.test(l.text) && !trailingDashRe372.test(l.text)).length;
+    if (midDashCount372 >= 3) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'MID_LINE_EM_DASH_OVERUSE',
+        severity: 'minor',
+        description: `${midDashCount372} action lines interrupt themselves with a mid-sentence em-dash ("She reaches for the door—then stops."). The interrupting dash injects an aside or a sharp pivot into the middle of a beat; used this often it makes the action prose breathless and self-interrupting, as if every line carries a second thought it can't suppress, and the constant mid-line breaks fracture the reading rhythm.`,
+        suggestedFix: 'Convert most mid-line dashes into separate sentences or clean clauses: "She reaches for the door—then stops." → "She reaches for the door. Then stops." Reserve the interrupting dash for the rare beat where the abrupt pivot is the point; as a habit it makes the prose twitchy.',
+      });
+    }
+  }
+
+  // TEMPORAL_OPENER_OVERUSE (minor, ≥10 action lines, >25%): More than 25% of action
+  // lines begin with a temporal adverb ("Now", "Soon", "Later", "Finally", "Eventually",
+  // "Meanwhile", "Afterward", "Already"). Opening beats by narrating chronology tells the
+  // reader when things happen rather than showing the action and letting sequence imply
+  // itself; heavy use makes the prose read as a timeline being recited. Distinct from
+  // THEN_CHAIN ("Then" openers) and SUDDENLY_OVERUSE ("Suddenly"/urgency adverbs): this
+  // targets a distinct set of chronology-narrating openers.
+  if (actionLines.length >= 10) {
+    const temporalOpenerRe372 = /^(now|soon|later|finally|eventually|meanwhile|afterwards?|already|presently|nowadays|moments later|seconds later)\b/i;
+    const temporalCount372 = actionLines.filter(l => temporalOpenerRe372.test(l.text.trim())).length;
+    if (temporalCount372 / actionLines.length > 0.25) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'TEMPORAL_OPENER_OVERUSE',
+        severity: 'minor',
+        description: `${temporalCount372} of ${actionLines.length} action lines (${Math.round(temporalCount372 / actionLines.length * 100)}%) begin with a temporal adverb ("Now", "Soon", "Later", "Finally", "Meanwhile"). Opening beats by narrating chronology tells the reader when things happen rather than showing the action and letting the sequence imply itself. Heavy use makes the prose read as a timeline being recited instead of a present-tense scene unfolding.`,
+        suggestedFix: 'Cut most temporal openers and trust the order of the lines to convey sequence: action written in sequence already reads as "and then this happens." Reserve an explicit time marker for a genuine jump or a beat where the timing is the dramatic point.',
       });
     }
   }

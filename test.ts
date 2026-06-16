@@ -23586,6 +23586,153 @@ Time to go now.`;
     });
   });
 
+  describe('Wave 372 — rhythmPass: triadic list overload, mid-line em-dash overuse, temporal opener overuse', async () => {
+    const runR372 = async (fountain: string) => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('TRIADIC_LIST_OVERLOAD fires when 3+ action lines use a rule-of-three enumeration', async () => {
+      const f372t = `INT. APARTMENT - DAY
+
+He grabs his coat, his keys, and his nerve.
+
+She checks the stove, the lock, and the window.
+
+They pack the maps, the rope, and the flares.
+
+A dog barks outside.
+
+The kettle whistles.
+
+She sits down.
+
+He looks away.
+
+The clock ticks.`;
+      const res = await runR372(f372t);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TRIADIC_LIST_OVERLOAD'), 'TRIADIC_LIST_OVERLOAD should fire');
+    });
+
+    it('TRIADIC_LIST_OVERLOAD does not fire when action lines avoid triadic lists', async () => {
+      const f372tn = `INT. APARTMENT - DAY
+
+He grabs his coat.
+
+She checks the stove.
+
+They pack the maps.
+
+A dog barks outside.
+
+The kettle whistles.
+
+She sits down.
+
+He looks away.
+
+The clock ticks.`;
+      const res = await runR372(f372tn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TRIADIC_LIST_OVERLOAD'), 'TRIADIC_LIST_OVERLOAD should not fire');
+    });
+
+    it('MID_LINE_EM_DASH_OVERUSE fires when 3+ action lines use a mid-sentence em-dash', async () => {
+      const f372d = `INT. HALL - NIGHT
+
+She reaches for the door—then stops.
+
+He turns around—too late.
+
+The light flickers—and dies.
+
+A floorboard creaks.
+
+She holds her breath.
+
+The shadow moves.
+
+He steps back.
+
+The phone rings.`;
+      const res = await runR372(f372d);
+      assert.ok(res.issues.some((i: any) => i.rule === 'MID_LINE_EM_DASH_OVERUSE'), 'MID_LINE_EM_DASH_OVERUSE should fire');
+    });
+
+    it('MID_LINE_EM_DASH_OVERUSE does not fire when action lines avoid mid-line dashes', async () => {
+      const f372dn = `INT. HALL - NIGHT
+
+She reaches for the door. Then stops.
+
+He turns around. Too late.
+
+The light flickers and dies.
+
+A floorboard creaks.
+
+She holds her breath.
+
+The shadow moves.
+
+He steps back.
+
+The phone rings.`;
+      const res = await runR372(f372dn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'MID_LINE_EM_DASH_OVERUSE'), 'MID_LINE_EM_DASH_OVERUSE should not fire');
+    });
+
+    it('TEMPORAL_OPENER_OVERUSE fires when >25% of action lines begin with a temporal adverb', async () => {
+      const f372o = `EXT. FIELD - DAY
+
+Now she runs across the grass.
+
+Soon the others follow her.
+
+Later the rain begins to fall.
+
+Finally they reach the treeline.
+
+A bird scatters from a branch.
+
+The wind picks up.
+
+She wipes her face.
+
+He checks the map.
+
+The path narrows.
+
+They press on.`;
+      const res = await runR372(f372o);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TEMPORAL_OPENER_OVERUSE'), 'TEMPORAL_OPENER_OVERUSE should fire');
+    });
+
+    it('TEMPORAL_OPENER_OVERUSE does not fire when action lines open without temporal adverbs', async () => {
+      const f372on = `EXT. FIELD - DAY
+
+She runs across the grass.
+
+The others follow her.
+
+The rain begins to fall.
+
+They reach the treeline.
+
+A bird scatters from a branch.
+
+The wind picks up.
+
+She wipes her face.
+
+He checks the map.
+
+The path narrows.
+
+They press on.`;
+      const res = await runR372(f372on);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TEMPORAL_OPENER_OVERUSE'), 'TEMPORAL_OPENER_OVERUSE should not fire');
+    });
+  });
+
   describe('Wave 358 — rhythmPass: colon in action, sound description overload, intensifier flood', async () => {
     const runR358 = async (fountain: string) => {
       const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
