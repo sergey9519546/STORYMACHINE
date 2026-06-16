@@ -28,6 +28,10 @@
 // flat — tension without wonder), revelation emotion absent (≥2 revelation scenes all
 // emotionally neutral — reveals that never move the protagonist), revelation curiosity
 // decoupled (≥3 revelation scenes avg curiosityDelta ≤ 0 — answers that close no new doors).
+// Wave 351 additions: second half emotionally flat (entire back half neutral while the front
+// half carried emotion — arc runs out of fuel), emotional recovery absent (≥2 falls and joy
+// exists but none after the first fall — relentless downslope), relational first-half flat
+// (no bond shift in the front half while the back half moves bonds — late relational start).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1207,6 +1211,89 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `${revScenes337b.length} revelation scenes have an average curiosityDelta of ${avgCuriosity337r.toFixed(2)} — the story's answers consistently close questions without opening new ones. A revelation should be generative: resolving one mystery while exposing a deeper layer, so the audience leans forward even as one thread closes. When revelations drain rather than feed curiosity, the story feels like a ledger being cleared — complete, perhaps, but not alive.`,
           suggestedFix: "Design revelations as doors, not walls: each answer should expose a new unknown, reframe what the audience thought they knew, or raise the stakes of a question still open. Let the curiosityDelta on revelation scenes reflect that the audience has been sent hunting, not satisfied.",
+        });
+      }
+    }
+  }
+
+  // ── Wave 351: ARC_SECOND_HALF_EMOTIONALLY_FLAT, ARC_EMOTIONAL_RECOVERY_ABSENT, ARC_RELATIONAL_FIRST_HALF_FLAT ──
+
+  // ARC_SECOND_HALF_EMOTIONALLY_FLAT (minor, n≥10, second half ≥5 scenes): Every scene
+  // in the second half (50%–100%) is emotionally neutral, while the first half carried at
+  // least two non-neutral beats. The protagonist's emotional arc runs out of fuel exactly
+  // when the stakes should be peaking — the back half plays at a single flat pitch through
+  // the complication, climax, and resolution. The mirror of ARC_FIRST_HALF_EMOTIONALLY_
+  // FLAT (a flat front half); distinct from ARC_FINAL_ACT_CHARACTER_STATIC (the final 25%
+  // only) — this flags the entire back half going emotionally silent.
+  if (records.length >= 10) {
+    const halfIdx351 = Math.floor(records.length * 0.5);
+    const firstHalf351 = (records as any[]).slice(0, halfIdx351);
+    const secondHalf351 = (records as any[]).slice(halfIdx351);
+    if (secondHalf351.length >= 5) {
+      const secondHalfFlat351 = secondHalf351.every(r => r.emotionalShift === 'neutral');
+      const firstHalfCharged351 = firstHalf351.filter(r => r.emotionalShift !== 'neutral').length;
+      if (secondHalfFlat351 && firstHalfCharged351 >= 2) {
+        issues.push({
+          location: `Second half (Scenes ${halfIdx351}–${records.length - 1}) — emotionally flat`,
+          rule: 'ARC_SECOND_HALF_EMOTIONALLY_FLAT',
+          severity: 'minor',
+          description: `Every scene in the second half (${halfIdx351}–${records.length - 1}) is emotionally neutral, while the first half carried ${firstHalfCharged351} charged beats — the protagonist's emotional arc runs out of fuel exactly when the stakes should be peaking. The complication zone, climax, and resolution all play at one flat pitch, so the audience's emotional investment built in the first half is never paid off.`,
+          suggestedFix: 'Carry emotion through the back half and intensify it toward the climax: the second half is where the costs come due, so the protagonist should feel them most sharply there. A character who stops reacting at the midpoint reads as a spectator to their own ending.',
+        });
+      }
+    }
+  }
+
+  // ARC_EMOTIONAL_RECOVERY_ABSENT (minor, n≥8, ≥2 negative shifts, positives exist): The
+  // protagonist suffers two or more negative emotional beats, the story shows positive
+  // emotion somewhere — but no positive beat occurs at or after the first negative one.
+  // All the protagonist's joy is front-loaded before the fall, and once the descent
+  // begins they never rise again. A relentless downslope with no flicker of recovery
+  // exhausts the audience and removes the contrast that makes a low point land. Distinct
+  // from ARC_NEGATIVE_ONLY (no positives anywhere — here positives exist, only mis-timed),
+  // ARC_CATHARSIS_ABSENT (no positive+revelation combination), ARC_EMOTIONAL_RESOLUTION_
+  // ABSENT (final-quarter zone), and ARC_GRIEF_SKIPPED (negatives instantly cancelled).
+  if (records.length >= 8) {
+    const negPositions351 = (records as any[])
+      .map((r, i) => ({ r, i }))
+      .filter(x => x.r.emotionalShift === 'negative');
+    const positiveExists351 = (records as any[]).some(r => r.emotionalShift === 'positive');
+    if (negPositions351.length >= 2 && positiveExists351) {
+      const firstNegIdx351 = negPositions351[0].i;
+      const positiveAfterFall351 = (records as any[]).some((r, i) => i >= firstNegIdx351 && r.emotionalShift === 'positive');
+      if (!positiveAfterFall351) {
+        issues.push({
+          location: `Emotional recovery (first fall at Scene ${(records as any[])[firstNegIdx351].sceneIdx})`,
+          rule: 'ARC_EMOTIONAL_RECOVERY_ABSENT',
+          severity: 'minor',
+          description: `The protagonist suffers ${negPositions351.length} negative emotional beats and the story shows positive emotion elsewhere, but no positive beat lands at or after the first fall (Scene ${(records as any[])[firstNegIdx351].sceneIdx}) — all the joy is front-loaded, and once the descent begins the character never rises again. A relentless downslope with no flicker of recovery exhausts the audience and removes the contrast that makes the lowest point land.`,
+          suggestedFix: 'Give the protagonist at least one moment of recovery after the descent begins — a small win, a kindness, a flash of hope — even if it is later snatched away. The rhythm of fall-and-partial-recovery is what keeps a downward arc dramatic rather than merely grim; an unbroken slide numbs.',
+        });
+      }
+    }
+  }
+
+  // ARC_RELATIONAL_FIRST_HALF_FLAT (minor, n≥10, first half ≥5 scenes): No scene in the
+  // first half (0%–50%) carries a relationship shift, while the second half carries two or
+  // more. The protagonist's relational arc does not begin until the back half — the entire
+  // setup and first complication zone establish the world without ever moving a bond, so
+  // the audience reaches the midpoint with no felt relationships to invest in. The first-
+  // half mirror of ARC_MIDPOINT_RELATIONAL_VOID (the 40%–60% zone) and ARC_LATE_RELATIONAL_
+  // VOID (the final quarter); distinct from both by targeting the front half.
+  if (records.length >= 10) {
+    const halfIdx351b = Math.floor(records.length * 0.5);
+    const firstHalf351b = (records as any[]).slice(0, halfIdx351b);
+    const secondHalf351b = (records as any[]).slice(halfIdx351b);
+    if (firstHalf351b.length >= 5) {
+      const firstHalfHasShift351 = firstHalf351b.some(r => ((r.relationshipShifts ?? []) as any[]).length > 0);
+      const secondHalfShiftScenes351 = secondHalf351b.filter(r => ((r.relationshipShifts ?? []) as any[]).length > 0).length;
+      if (!firstHalfHasShift351 && secondHalfShiftScenes351 >= 2) {
+        issues.push({
+          location: `First half (Scenes 0–${halfIdx351b - 1}) — relationally flat`,
+          rule: 'ARC_RELATIONAL_FIRST_HALF_FLAT',
+          severity: 'minor',
+          description: `No scene in the first half (0–${halfIdx351b - 1}) carries a relationship shift, while the second half carries ${secondHalfShiftScenes351} — the protagonist's relational arc does not begin until the back half. The setup and first complication zone establish the world without ever moving a bond, so the audience reaches the midpoint with no felt relationships to invest in before the story starts changing them.`,
+          suggestedFix: 'Move a relationship early: let a bond warm, fray, or shift in the first half so the audience has a relational stake before the midpoint. The connections the back half puts under pressure land harder when the first half has already made the audience care about them.',
         });
       }
     }

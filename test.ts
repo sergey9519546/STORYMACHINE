@@ -18249,6 +18249,78 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 351 — characterArcPass: second half emotionally flat, emotional recovery absent, relational first-half flat', async () => {
+    const makeRec351 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0.5,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runA351 = async (records: any[]) => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    const relShift351 = [{ pairKey: 'A|B', dimension: 'trust', amount: 0.5 }];
+
+    it('ARC_SECOND_HALF_EMOTIONALLY_FLAT fires when the back half is all neutral', async () => {
+      // n=10 → halfIdx=5; first half has 2 charged, second half (5-9) all neutral
+      const recs351sf = Array.from({ length: 10 }, (_, i) =>
+        makeRec351(i, { emotionalShift: [0, 1].includes(i) ? 'negative' : 'neutral' })
+      );
+      const res = await runA351(recs351sf);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_SECOND_HALF_EMOTIONALLY_FLAT'), 'ARC_SECOND_HALF_EMOTIONALLY_FLAT should fire');
+    });
+
+    it('ARC_SECOND_HALF_EMOTIONALLY_FLAT does not fire when the back half carries emotion', async () => {
+      const recs351sfn = Array.from({ length: 10 }, (_, i) =>
+        makeRec351(i, { emotionalShift: [0, 1, 6].includes(i) ? 'negative' : 'neutral' })
+      );
+      const res = await runA351(recs351sfn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_SECOND_HALF_EMOTIONALLY_FLAT'), 'ARC_SECOND_HALF_EMOTIONALLY_FLAT should not fire');
+    });
+
+    it('ARC_EMOTIONAL_RECOVERY_ABSENT fires when no positive beat follows the first fall', async () => {
+      // positives at 0,1 (front-loaded); negatives at 5,7; nothing positive after scene 5
+      const recs351ra = Array.from({ length: 10 }, (_, i) =>
+        makeRec351(i, {
+          emotionalShift: [0, 1].includes(i) ? 'positive' : [5, 7].includes(i) ? 'negative' : 'neutral',
+        })
+      );
+      const res = await runA351(recs351ra);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_EMOTIONAL_RECOVERY_ABSENT'), 'ARC_EMOTIONAL_RECOVERY_ABSENT should fire');
+    });
+
+    it('ARC_EMOTIONAL_RECOVERY_ABSENT does not fire when a positive beat follows the fall', async () => {
+      const recs351ran = Array.from({ length: 10 }, (_, i) =>
+        makeRec351(i, {
+          emotionalShift: i === 0 ? 'positive' : [5, 7].includes(i) ? 'negative' : i === 8 ? 'positive' : 'neutral',
+        })
+      );
+      const res = await runA351(recs351ran);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_EMOTIONAL_RECOVERY_ABSENT'), 'ARC_EMOTIONAL_RECOVERY_ABSENT should not fire');
+    });
+
+    it('ARC_RELATIONAL_FIRST_HALF_FLAT fires when no bond shifts in the front half', async () => {
+      // n=10 → first half 0-4 has no shifts; second half has shifts at 6,8
+      const recs351rf = Array.from({ length: 10 }, (_, i) =>
+        makeRec351(i, { relationshipShifts: [6, 8].includes(i) ? relShift351 : [] })
+      );
+      const res = await runA351(recs351rf);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_FIRST_HALF_FLAT'), 'ARC_RELATIONAL_FIRST_HALF_FLAT should fire');
+    });
+
+    it('ARC_RELATIONAL_FIRST_HALF_FLAT does not fire when a bond shifts in the front half', async () => {
+      const recs351rfn = Array.from({ length: 10 }, (_, i) =>
+        makeRec351(i, { relationshipShifts: [2, 6, 8].includes(i) ? relShift351 : [] })
+      );
+      const res = await runA351(recs351rfn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_FIRST_HALF_FLAT'), 'ARC_RELATIONAL_FIRST_HALF_FLAT should not fire');
+    });
+  });
+
   describe('Wave 337 — characterArcPass: suspense/curiosity decoupled, revelation emotion absent, revelation curiosity decoupled', async () => {
     const makeRec337 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
