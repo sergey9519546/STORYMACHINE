@@ -37,6 +37,10 @@
 // "worst"/"most" — hyperbolic ranking drains emphasis), anaphora run (≥3 consecutive lines
 // open with the same word — unintended chant), verbal-tic flood (>25% of lines carry a
 // disclaimer-intensifier like "literally"/"actually"/"honestly" — verbal-tic padding).
+// Wave 392 additions: emotion naming (≥3 lines state a feeling outright — "I'm angry"/"I'm
+// scared" — show-don't-tell violation in dialogue), amplifier flood (>25% of lines carry an
+// amplifier like very/really/totally — padded intensity), time-marker flood (>25% of lines
+// carry a temporal reference — dialogue scheduling and recapping instead of confronting now).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1751,6 +1755,71 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${verbalTicCount378} of ${dialogue.length} dialogue lines (${Math.round(verbalTicCount378 / dialogue.length * 100)}%) carry a disclaimer-intensifier ("literally", "actually", "honestly", "basically"). These verbal-tic words pad the line and pre-frame the statement rather than letting it stand. Written dialogue carries only the tics the writer deliberately included, so this density makes every character sound like they share one verbal habit, flattening their distinctness.`,
         suggestedFix: 'Cut most disclaimer-intensifiers and let the statements assert themselves: "I honestly don\'t know" → "I don\'t know." Reserve a tic like "literally" or "honestly" for one character as a deliberate trait if it characterizes them; as a default it is filler that dilutes every line.',
+      });
+    }
+  }
+
+  // ── Wave 392: DIALOGUE_EMOTION_NAMING, DIALOGUE_AMPLIFIER_FLOOD, DIALOGUE_TIME_MARKER_FLOOD ──
+
+  // DIALOGUE_EMOTION_NAMING (minor, ≥8 lines, ≥3 lines): Three or more dialogue lines
+  // state a feeling outright ("I'm angry", "I'm so scared", "I feel hurt"). Naming the
+  // emotion is the on-the-nose form of feeling — it tells the audience what to register
+  // instead of letting behavior, subtext, and choice convey it. A character who announces
+  // their emotions leaves the actor nothing to play and the audience nothing to infer.
+  // Distinct from ON_THE_NOSE (broad literalness), EMOTIONAL_SUPPRESSION (the opposite —
+  // feeling withheld entirely), and TRAIT_LABELING (naming a character's traits).
+  if (dialogue.length >= 8) {
+    const emotionNamingRe392 = /\b(i'?m|i am|i feel|i'?m feeling|feeling)\s+(so\s+|really\s+|very\s+)?(angry|sad|scared|afraid|frightened|happy|hurt|upset|furious|terrified|nervous|anxious|lonely|jealous|miserable|devastated|heartbroken|ashamed|guilty|excited|thrilled|depressed|frustrated|worried|enraged|grief|heartbroken|overjoyed|crushed)\b/i;
+    const emotionNamingCount392 = dialogue.filter(d => emotionNamingRe392.test(d.line)).length;
+    if (emotionNamingCount392 >= 3) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_EMOTION_NAMING',
+        severity: 'minor',
+        description: `${emotionNamingCount392} dialogue lines state a feeling outright ("I'm angry", "I'm so scared", "I feel hurt"). Naming the emotion is the on-the-nose form of feeling — it tells the audience what to register instead of letting behavior, subtext, and choice convey it. A character who announces their emotions leaves the actor nothing to play and the audience nothing to infer.`,
+        suggestedFix: 'Replace stated emotions with behavior that reveals them: "I\'m so angry" becomes a clipped silence, a controlled question, a glass set down too hard. Let the audience read the feeling off what the character does and avoids saying — the emotion lands harder when it is shown leaking out than when it is announced.',
+      });
+    }
+  }
+
+  // DIALOGUE_AMPLIFIER_FLOOD (minor, ≥10 lines, >25%): More than 25% of dialogue lines
+  // carry an amplifier ("very", "really", "totally", "absolutely", "completely",
+  // "extremely"). Amplifiers inflate without sharpening — they signal the writer doesn't
+  // trust the underlying word, and in density they make every line strain for emphasis until
+  // none of it registers. Distinct from DIALOGUE_HEDGE_SATURATION (softeners like "just"/
+  // "maybe"/"sort of") and DIALOGUE_VERBAL_TIC_FLOOD (disclaimers like "literally"/"actually"):
+  // this targets degree-amplifying intensifiers.
+  if (dialogue.length >= 10) {
+    const amplifierRe392 = /\b(very|really|totally|absolutely|completely|extremely|incredibly|utterly|terribly|awfully|enormously|hugely)\b/i;
+    const amplifierCount392 = dialogue.filter(d => amplifierRe392.test(d.line)).length;
+    if (amplifierCount392 / dialogue.length > 0.25) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_AMPLIFIER_FLOOD',
+        severity: 'minor',
+        description: `${amplifierCount392} of ${dialogue.length} dialogue lines (${Math.round(amplifierCount392 / dialogue.length * 100)}%) carry an amplifier ("very", "really", "totally", "absolutely"). Amplifiers inflate without sharpening — they signal the writer doesn't trust the underlying word, and in density they make every line strain for emphasis until none of it registers. "I'm very sure" is weaker than "I'm sure."`,
+        suggestedFix: 'Delete amplifiers and let the bare statement carry the weight, or replace the amplifier-plus-weak-word with a single precise one: "really scared" → "terrified", "very big" → "enormous". If removing the amplifier weakens the line, the underlying word is the problem — fix the word, not the intensifier.',
+      });
+    }
+  }
+
+  // DIALOGUE_TIME_MARKER_FLOOD (minor, ≥10 lines, >25%): More than 25% of dialogue lines
+  // carry an explicit temporal reference ("yesterday", "tomorrow", "last night", "an hour
+  // ago", "next week", "years ago"). Dialogue saturated with time markers is busy scheduling
+  // and recapping — locating events on a timeline — rather than confronting the present
+  // moment between the characters. The scene's urgency leaks into logistics. Distinct from
+  // DIALOGUE_RETROSPECTIVE_FLOOD (lines that OPEN with "I remember"/"Back when"): this counts
+  // mid-line temporal references in both directions.
+  if (dialogue.length >= 10) {
+    const timeMarkerRe392 = /\b(yesterday|tomorrow|tonight|last (night|week|month|year|time)|next (week|month|year|time)|an? (hour|day|week|month|year)s? ago|years? ago|this (morning|afternoon|evening)|a (minute|moment|second)s? ago|in a (minute|moment|second|week|month|year))\b/i;
+    const timeMarkerCount392 = dialogue.filter(d => timeMarkerRe392.test(d.line)).length;
+    if (timeMarkerCount392 / dialogue.length > 0.25) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_TIME_MARKER_FLOOD',
+        severity: 'minor',
+        description: `${timeMarkerCount392} of ${dialogue.length} dialogue lines (${Math.round(timeMarkerCount392 / dialogue.length * 100)}%) carry an explicit temporal reference ("yesterday", "an hour ago", "next week"). Dialogue saturated with time markers is busy scheduling and recapping — locating events on a timeline — rather than confronting the present moment between the characters, so the scene's urgency leaks into logistics.`,
+        suggestedFix: 'Cut most time markers and let the scene play in the present: the audience rarely needs the exact when. Reserve a temporal reference for the beat where the timing is the dramatic point — a deadline, a damning alibi — and trust the rest to unfold in the now.',
       });
     }
   }

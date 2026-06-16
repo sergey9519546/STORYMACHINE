@@ -21508,6 +21508,217 @@ The lights go out.`;
     });
   });
 
+  describe('Wave 392 — dialoguePass: emotion naming, amplifier flood, time-marker flood', async () => {
+    const runD392 = async (fountain: string) => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DIALOGUE_EMOTION_NAMING fires when 3+ lines state a feeling outright', async () => {
+      const f392e = `INT. ROOM - DAY
+
+ANNA
+I'm so angry at you right now.
+
+MARK
+Don't be.
+
+ANNA
+I feel hurt by what you did.
+
+MARK
+I never meant that.
+
+ANNA
+I'm scared of what comes next.
+
+MARK
+We'll be fine.
+
+ANNA
+You always say that.
+
+MARK
+Because it's true.`;
+      const res = await runD392(f392e);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_EMOTION_NAMING'), 'DIALOGUE_EMOTION_NAMING should fire');
+    });
+
+    it('DIALOGUE_EMOTION_NAMING does not fire when feelings are shown not stated', async () => {
+      const f392en = `INT. ROOM - DAY
+
+ANNA
+Get out of my sight.
+
+MARK
+Don't be like this.
+
+ANNA
+You broke the one rule.
+
+MARK
+I never meant that.
+
+ANNA
+And now? What happens now.
+
+MARK
+We'll be fine.
+
+ANNA
+You always say that.
+
+MARK
+Because it's true.`;
+      const res = await runD392(f392en);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_EMOTION_NAMING'), 'DIALOGUE_EMOTION_NAMING should not fire');
+    });
+
+    it('DIALOGUE_AMPLIFIER_FLOOD fires when >25% of lines carry an amplifier', async () => {
+      const f392a = `INT. OFFICE - DAY
+
+SAM
+This is very important to me.
+
+RAY
+Okay.
+
+SAM
+I'm really not sure about it.
+
+RAY
+Take your time.
+
+SAM
+It's absolutely the right call.
+
+RAY
+If you say so.
+
+SAM
+I'm completely certain now.
+
+RAY
+Then let's do it.
+
+SAM
+We move at dawn.
+
+RAY
+Understood.`;
+      const res = await runD392(f392a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_AMPLIFIER_FLOOD'), 'DIALOGUE_AMPLIFIER_FLOOD should fire');
+    });
+
+    it('DIALOGUE_AMPLIFIER_FLOOD does not fire when dialogue avoids amplifiers', async () => {
+      const f392an = `INT. OFFICE - DAY
+
+SAM
+This matters to me.
+
+RAY
+Okay.
+
+SAM
+I'm not sure about it.
+
+RAY
+Take your time.
+
+SAM
+It's the right call.
+
+RAY
+If you say so.
+
+SAM
+I'm certain now.
+
+RAY
+Then let's do it.
+
+SAM
+We move at dawn.
+
+RAY
+Understood.`;
+      const res = await runD392(f392an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_AMPLIFIER_FLOOD'), 'DIALOGUE_AMPLIFIER_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_TIME_MARKER_FLOOD fires when >25% of lines carry a temporal reference', async () => {
+      const f392t = `INT. KITCHEN - DAY
+
+LIA
+You said this yesterday too.
+
+JON
+Did I?
+
+LIA
+We talked about it last night.
+
+JON
+I forget.
+
+LIA
+The meeting is tomorrow morning.
+
+JON
+Right.
+
+LIA
+He called an hour ago.
+
+JON
+And?
+
+LIA
+We decide now.
+
+JON
+Agreed.`;
+      const res = await runD392(f392t);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_TIME_MARKER_FLOOD'), 'DIALOGUE_TIME_MARKER_FLOOD should fire');
+    });
+
+    it('DIALOGUE_TIME_MARKER_FLOOD does not fire when dialogue stays in the present', async () => {
+      const f392tn = `INT. KITCHEN - DAY
+
+LIA
+You said this before.
+
+JON
+Did I?
+
+LIA
+We talked about it already.
+
+JON
+I forget.
+
+LIA
+The meeting is set.
+
+JON
+Right.
+
+LIA
+He called.
+
+JON
+And?
+
+LIA
+We decide now.
+
+JON
+Agreed.`;
+      const res = await runD392(f392tn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_TIME_MARKER_FLOOD'), 'DIALOGUE_TIME_MARKER_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 378 — dialoguePass: superlative flood, anaphora run, verbal-tic flood', async () => {
     const runD378 = async (fountain: string) => {
       const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
