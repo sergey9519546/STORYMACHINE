@@ -34,6 +34,11 @@
 // dramatic turn absent (no dramatic turn in the final 25% despite turns earlier — the
 // finale unfolds without reversals), Act 1 relationship void (no relationship shift in
 // Act 1 while ≥3 shifts exist overall — the opening establishes no relational dynamic).
+// Wave 373 additions: midpoint suspense void (the 40%–60% pivot has no suspense spike
+// while the story spikes elsewhere — completes the midpoint channel set with curiosity and
+// emotion), Act 2 purpose single (all Act 2 scenes share one purpose — the gap between
+// Act 1 and Act 3 purpose checks), Act 2b emotional flatline (the 50%–75% run-up to the
+// climax is all neutral — the emotional mirror of Act 2a emotional flatline).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1419,6 +1424,78 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Act 1 carries no relationship shifts despite ${totalShifts359} relational movements later in the story. The opening act introduces the characters but establishes no bond dynamics — the audience meets people without learning how their relationships work or what stakes exist between them. When Act 1 is relationally silent, the audience enters Act 2 without caring about any of the bonds being tested.`,
         suggestedFix: 'Establish at least one relational dynamic in Act 1: a bond that strengthens, a first friction, or a status shift between two characters. The opening act should make the audience understand what the relationships are so they can feel what\'s at stake when those bonds are tested in Act 2.',
+      });
+    }
+  }
+
+  // ── Wave 373: MIDPOINT_SUSPENSE_VOID, ACT2_PURPOSE_SINGLE, ACT2B_EMOTIONAL_FLATLINE ──
+
+  // MIDPOINT_SUSPENSE_VOID (minor, n≥10, ≥2 midpoint scenes): The midpoint zone
+  // (40%–60%) contains no scene with suspenseDelta > 1, in a story that spikes suspense
+  // elsewhere (some scene exceeds suspenseDelta 1). The structural pivot passes without
+  // tension — the moment the story should be tightening its grip is its slackest. Completes
+  // the midpoint-zone channel set alongside MIDPOINT_CURIOSITY_VOID and MIDPOINT_EMOTIONAL_
+  // FLATLINE. Distinct from ACT2A_SUSPENSE_VOID (25%–50%) and ACT2B_SUSPENSE_VOID (50%–75%):
+  // this targets the narrow 40%–60% center window.
+  if (n >= 10) {
+    const midStart373 = Math.floor(n * 0.4);
+    const midEnd373 = Math.floor(n * 0.6);
+    const midRecs373 = records.slice(midStart373, midEnd373);
+    const storyTense373 = records.some(r => (r.suspenseDelta ?? 0) > 1);
+    if (midRecs373.length >= 2 && storyTense373 && !midRecs373.some(r => (r.suspenseDelta ?? 0) > 1)) {
+      issues.push({
+        location: `Midpoint (Scenes ${midStart373}–${midEnd373 - 1}) — suspense void`,
+        rule: 'MIDPOINT_SUSPENSE_VOID',
+        severity: 'minor',
+        description: `The midpoint zone (Scenes ${midStart373}–${midEnd373 - 1}) contains no scene reaching a suspenseDelta above 1, while the story spikes tension elsewhere — the structural pivot passes without pressure. The midpoint is where a strong story raises the stakes and tightens its grip; a tension void at the exact center means the engine of suspense stalls precisely where the second half should be accelerating out of the turn.`,
+        suggestedFix: 'Raise the tension at the midpoint: let the pivot that reframes the story also escalate the danger — a deadline imposed, a threat revealed, an escape route closed. The middle of the story is the most dangerous place to let suspense flatten, because it is where the audience decides whether the back half is worth the wait.',
+      });
+    }
+  }
+
+  // ACT2_PURPOSE_SINGLE (minor, n≥10, ≥4 Act 2 scenes): Every scene in Act 2 (25%–75%)
+  // shares the same purpose label — the long middle act wears one structural costume
+  // throughout. Act 2 is the most varied stretch of a well-built story: testing, escalation,
+  // reversal, the midpoint turn, the approach to the low point. A single purpose across all
+  // of it signals a middle that repeats one beat. Distinct from ACT1_PURPOSE_SINGLE (Act 1),
+  // ACT3_PURPOSE_MONOTONE (Act 3), and PURPOSE_MONOCULTURE (whole-story dominant purpose):
+  // this targets the central act.
+  if (n >= 10) {
+    const act2Start373 = Math.floor(n * 0.25);
+    const act2End373 = Math.floor(n * 0.75);
+    const act2Recs373 = records.slice(act2Start373, act2End373);
+    if (act2Recs373.length >= 4) {
+      const act2Purposes373 = new Set(act2Recs373.map((r: any) => r.purpose));
+      if (act2Purposes373.size === 1) {
+        const [singlePurpose373] = act2Purposes373;
+        issues.push({
+          location: `Act 2 (Scenes ${act2Start373}–${act2End373 - 1})`,
+          rule: 'ACT2_PURPOSE_SINGLE',
+          severity: 'minor',
+          description: `Act 2 (${act2Recs373.length} scenes) is entirely composed of "${singlePurpose373}" scenes — the long middle act wears one structural label throughout. Act 2 is the most functionally varied stretch of a well-built story: testing, escalation, the midpoint reversal, the approach to the low point. A single purpose across all of it means the middle repeats one beat instead of building through distinct phases.`,
+          suggestedFix: `Differentiate Act 2 structurally: not every middle scene should be "${singlePurpose373}". Move through rising complications, a genuine midpoint turn, setbacks, and the approach to the darkest moment — each serving a different function — so the long act escalates rather than treads water.`,
+        });
+      }
+    }
+  }
+
+  // ACT2B_EMOTIONAL_FLATLINE (minor, n≥10, ≥3 Act 2b scenes): Every scene in Act 2b
+  // (50%–75%) carries emotionalShift='neutral'. The run-up to the climax generates no
+  // emotional movement — the protagonist approaches the story's peak without feeling the
+  // mounting cost. Act 2b is where the stakes should be landing hardest emotionally as the
+  // low point nears. The emotional mirror of ACT2A_EMOTIONAL_FLATLINE (25%–50%); distinct
+  // from ACT3_EMOTIONAL_FLATLINE (finale) and MIDPOINT_EMOTIONAL_FLATLINE (the central scene).
+  if (n >= 10) {
+    const act2bStart373 = Math.floor(n * 0.5);
+    const act2bEnd373 = Math.floor(n * 0.75);
+    const act2bRecs373 = records.slice(act2bStart373, act2bEnd373);
+    if (act2bRecs373.length >= 3 && act2bRecs373.every(r => r.emotionalShift === 'neutral')) {
+      issues.push({
+        location: `Act 2b (Scenes ${act2bStart373}–${act2bEnd373 - 1}) — emotional flatline`,
+        rule: 'ACT2B_EMOTIONAL_FLATLINE',
+        severity: 'minor',
+        description: `All ${act2bRecs373.length} Act 2b scenes (${act2bStart373}–${act2bEnd373 - 1}) are emotionally neutral — the run-up to the climax generates no emotional movement. Act 2b is where the cost of the conflict should be landing hardest as the protagonist approaches their lowest point; a flatline here means the story climbs toward its peak with the emotional arc stalled, so the climax inherits no accumulated feeling.`,
+        suggestedFix: 'Charge Act 2b emotionally: the approach to the climax should be the protagonist\'s most harrowing stretch — mounting dread, deepening loss, the strain of everything closing in. Let the run-up to the peak move the protagonist so the audience arrives at the climax already invested in what it will cost them.',
       });
     }
   }

@@ -23301,6 +23301,71 @@ Time to go now.`;
     });
   });
 
+  describe('Wave 373 — structurePass: midpoint suspense void, Act 2 purpose single, Act 2b emotional flatline', async () => {
+    const makeRec373 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runST373 = async (records: any[]) => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      return structurePass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('MIDPOINT_SUSPENSE_VOID fires when the 40-60% zone has no suspense spike while the story spikes elsewhere', async () => {
+      // n=12 → midpoint zone scenes 4,5,6; spike only at scene 1
+      const recs373ms = Array.from({ length: 12 }, (_, i) =>
+        makeRec373(i, { suspenseDelta: i === 1 ? 2 : 0 }),
+      );
+      const res = await runST373(recs373ms);
+      assert.ok(res.issues.some((i: any) => i.rule === 'MIDPOINT_SUSPENSE_VOID'), 'MIDPOINT_SUSPENSE_VOID should fire');
+    });
+
+    it('MIDPOINT_SUSPENSE_VOID does not fire when the midpoint zone contains a suspense spike', async () => {
+      const recs373msn = Array.from({ length: 12 }, (_, i) =>
+        makeRec373(i, { suspenseDelta: i === 1 || i === 5 ? 2 : 0 }),
+      );
+      const res = await runST373(recs373msn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'MIDPOINT_SUSPENSE_VOID'), 'MIDPOINT_SUSPENSE_VOID should not fire');
+    });
+
+    it('ACT2_PURPOSE_SINGLE fires when all Act 2 scenes share one purpose', async () => {
+      // n=12 → Act 2 = scenes 3-8, all 'development'
+      const recs373ps = Array.from({ length: 12 }, (_, i) => makeRec373(i));
+      const res = await runST373(recs373ps);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACT2_PURPOSE_SINGLE'), 'ACT2_PURPOSE_SINGLE should fire');
+    });
+
+    it('ACT2_PURPOSE_SINGLE does not fire when Act 2 has varied purposes', async () => {
+      const recs373psn = Array.from({ length: 12 }, (_, i) =>
+        makeRec373(i, { purpose: i === 4 ? 'climax' : 'development' }),
+      );
+      const res = await runST373(recs373psn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACT2_PURPOSE_SINGLE'), 'ACT2_PURPOSE_SINGLE should not fire');
+    });
+
+    it('ACT2B_EMOTIONAL_FLATLINE fires when the 50-75% zone is all neutral', async () => {
+      // n=12 → Act 2b = scenes 6,7,8, all neutral; charge elsewhere
+      const recs373ef = Array.from({ length: 12 }, (_, i) =>
+        makeRec373(i, { emotionalShift: i === 1 ? 'positive' : 'neutral' }),
+      );
+      const res = await runST373(recs373ef);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACT2B_EMOTIONAL_FLATLINE'), 'ACT2B_EMOTIONAL_FLATLINE should fire');
+    });
+
+    it('ACT2B_EMOTIONAL_FLATLINE does not fire when an Act 2b scene carries emotion', async () => {
+      const recs373efn = Array.from({ length: 12 }, (_, i) =>
+        makeRec373(i, { emotionalShift: i === 7 ? 'positive' : 'neutral' }),
+      );
+      const res = await runST373(recs373efn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACT2B_EMOTIONAL_FLATLINE'), 'ACT2B_EMOTIONAL_FLATLINE should not fire');
+    });
+  });
+
   describe('Wave 359 — structurePass: opening curiosity flatline, Act 3 dramatic turn absent, Act 1 relationship void', async () => {
     const makeRec359 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
