@@ -43,6 +43,11 @@
 // disclosure), told belief clock decoupled (≥3 assertion scenes and ≥2 clock scenes but no
 // assertion lands under time pressure), assertion midpoint void (the 40%–60% pivot carries no
 // assertion while assertions exist on both sides — claims skip the structural center).
+// Wave 390 additions: revelation dramatic turn decoupled (≥2 revelations and ≥3 turns but none
+// share a scene — disclosure and pivot engines never meet), told belief suspense peak absent
+// (the peak-suspense scene carries no assertion while 2+ suspense-positive assertion scenes
+// exist — the told-belief sibling of the revelation suspense-peak check), told belief curiosity
+// peak absent (the peak-curiosity scene carries no assertion while 2+ curiosity-positive ones do).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1473,6 +1478,80 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         description: `The midpoint zone (Scenes ${midStart376}–${midEnd376 - 1}) contains no assertion, though characters declare beliefs both before and after it — the belief layer goes silent at the structural pivot. The midpoint is where a character should be committing to or recommitting to a position as the story turns; an assertion void there means the pivot reorganizes the plot without anyone staking a claim on what it means.`,
         suggestedFix: 'Place an assertion at the midpoint: let a character declare what they now believe as the story turns — a vow renewed under new information, a conviction hardened or abandoned at the pivot. The center of the story is where beliefs should be most actively contested, not where they fall silent.',
       });
+    }
+  }
+
+  // ── Wave 390: REVELATION_DRAMATIC_TURN_DECOUPLED, TOLD_BELIEF_SUSPENSE_PEAK_ABSENT, TOLD_BELIEF_CURIOSITY_PEAK_ABSENT ──
+
+  // REVELATION_DRAMATIC_TURN_DECOUPLED (minor, n≥8, ≥2 revelations, ≥3 turn scenes): No
+  // revelation lands in a scene that also carries a dramatic turn, even though the story has
+  // both. The disclosure engine and the pivot engine run on separate tracks — a truth never
+  // turns the plot, and a turn never hinges on a truth coming out. When revelation and
+  // reversal never coincide, the story's discoveries feel inert (they change nothing) and its
+  // pivots feel arbitrary (they rest on no new knowledge). Distinct from REVELATION_ASSERTION_
+  // DISCONNECT (revelation vs prior assertion sequencing) and TOLD_BELIEF_DRAMATIC_TURN_
+  // DECOUPLED (assertions × turns): this audits revelations against turns.
+  if (records.length >= 8) {
+    const revSet390 = new Set(witnessedBeliefs.map(w => w.sceneIdx));
+    const turnScenes390 = (records as any[]).filter(r => (r.dramaticTurn ?? 'nothing') !== 'nothing');
+    if (revSet390.size >= 2 && turnScenes390.length >= 3 && !turnScenes390.some(r => revSet390.has(r.sceneIdx))) {
+      issues.push({
+        location: 'Revelations × dramatic turns — decoupled',
+        rule: 'REVELATION_DRAMATIC_TURN_DECOUPLED',
+        severity: 'minor',
+        description: `The story has ${revSet390.size} revelations and ${turnScenes390.length} dramatic turns, but none share a scene — the disclosure engine and the pivot engine run on separate tracks. A truth never turns the plot, and a turn never hinges on a truth coming out, so the discoveries feel inert (they change nothing) and the reversals feel arbitrary (they rest on no new knowledge).`,
+        suggestedFix: 'Fuse at least one revelation with a dramatic turn: the moment a hidden truth surfaces should also be the moment the story pivots on it — the disclosure that forces the protagonist to change course. When discovery and reversal coincide, the revelation has consequence and the turn has cause.',
+      });
+    }
+  }
+
+  // TOLD_BELIEF_SUSPENSE_PEAK_ABSENT (minor, n≥8, ≥2 suspense-positive assertion scenes):
+  // The single highest-suspenseDelta scene carries no assertion, even though ≥2 other
+  // suspense-positive scenes do. The peak-tension moment passes without anyone committing to
+  // a position — a conviction declared under maximum pressure (a vow made as everything hangs
+  // in the balance) is among the most charged beats available, and the story leaves that slot
+  // empty. The told-belief sibling of REVELATION_SUSPENSE_PEAK_ABSENT; distinct from TOLD_
+  // BELIEF_SUSPENSE_DECOUPLED (which averages suspenseDelta across assertion scenes).
+  if (records.length >= 8) {
+    const assertionSet390 = new Set<number>(toldBeliefs.map(t => t.sceneIdx));
+    const tenseAssertion390 = (records as any[]).filter(r => assertionSet390.has(r.sceneIdx) && (r.suspenseDelta ?? 0) > 0);
+    if (tenseAssertion390.length >= 2) {
+      const peakSusp390 = (records as any[]).reduce((best: any, r: any) =>
+        (r.suspenseDelta ?? 0) > (best.suspenseDelta ?? 0) ? r : best, (records as any[])[0]);
+      if (peakSusp390 && !assertionSet390.has(peakSusp390.sceneIdx)) {
+        issues.push({
+          location: `Scene ${peakSusp390.sceneIdx} — peak suspense, no assertion`,
+          rule: 'TOLD_BELIEF_SUSPENSE_PEAK_ABSENT',
+          severity: 'minor',
+          description: `Scene ${peakSusp390.sceneIdx} carries the story's highest suspenseDelta (${(peakSusp390.suspenseDelta ?? 0).toFixed(2)}) but no assertion, even though ${tenseAssertion390.length} other suspense-positive scenes contain one. The peak-tension moment passes without anyone committing to a position — a conviction declared under maximum pressure is among the most charged beats available, and the story leaves that slot empty.`,
+          suggestedFix: 'Place an assertion at the peak-tension scene: a vow, a refusal, a declaration of what the character believes made at the instant everything hangs in the balance. A conviction stated under fire is tested by the very pressure of the moment, which is what gives it weight.',
+        });
+      }
+    }
+  }
+
+  // TOLD_BELIEF_CURIOSITY_PEAK_ABSENT (minor, n≥8, ≥2 curiosity-positive assertion scenes):
+  // The single highest-curiosityDelta scene carries no assertion, even though ≥2 other
+  // curiosity-positive scenes do. The moment the audience is most intrigued passes without a
+  // character staking a claim — an assertion at the peak of curiosity (a confident claim the
+  // audience suspects may be wrong) is a potent dramatic-irony engine the story leaves unused.
+  // The told-belief sibling of REVELATION_CURIOSITY_PEAK_ABSENT; distinct from TOLD_BELIEF_
+  // CURIOSITY_FLAT (which averages curiosityDelta across assertion scenes).
+  if (records.length >= 8) {
+    const assertionSet390b = new Set<number>(toldBeliefs.map(t => t.sceneIdx));
+    const curiousAssertion390 = (records as any[]).filter(r => assertionSet390b.has(r.sceneIdx) && (r.curiosityDelta ?? 0) > 0);
+    if (curiousAssertion390.length >= 2) {
+      const peakCur390 = (records as any[]).reduce((best: any, r: any) =>
+        (r.curiosityDelta ?? 0) > (best.curiosityDelta ?? 0) ? r : best, (records as any[])[0]);
+      if (peakCur390 && !assertionSet390b.has(peakCur390.sceneIdx)) {
+        issues.push({
+          location: `Scene ${peakCur390.sceneIdx} — peak curiosity, no assertion`,
+          rule: 'TOLD_BELIEF_CURIOSITY_PEAK_ABSENT',
+          severity: 'minor',
+          description: `Scene ${peakCur390.sceneIdx} carries the story's highest curiosityDelta (${(peakCur390.curiosityDelta ?? 0).toFixed(2)}) but no assertion, even though ${curiousAssertion390.length} other curiosity-positive scenes contain one. The moment the audience is most intrigued passes without a character staking a claim — a confident assertion at the peak of curiosity, one the audience suspects may be wrong, is a potent dramatic-irony engine the story leaves unused.`,
+          suggestedFix: 'Place an assertion at the peak-curiosity scene: let a character commit to a belief precisely when the audience is most uncertain what is true. The gap between the character\'s certainty and the audience\'s doubt is where dramatic irony lives — the most intriguing moment is the best place to open it.',
+        });
+      }
     }
   }
 

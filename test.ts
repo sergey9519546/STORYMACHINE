@@ -22580,6 +22580,91 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 390 — beliefPass: revelation dramatic turn decoupled, told belief suspense peak absent, told belief curiosity peak absent', async () => {
+    const makeRec390 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runB390 = async (records: any[]) => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('REVELATION_DRAMATIC_TURN_DECOUPLED fires when revelations and turns never share a scene', async () => {
+      // revelations at 2,4; turns at 1,3,5 — no overlap
+      const recs390rt = Array.from({ length: 8 }, (_, i) =>
+        makeRec390(i, {
+          revelation: [2, 4].includes(i) ? 'the hidden truth' : null,
+          dramaticTurn: [1, 3, 5].includes(i) ? 'reversal' : 'nothing',
+        }),
+      );
+      const res = await runB390(recs390rt);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_DRAMATIC_TURN_DECOUPLED'), 'REVELATION_DRAMATIC_TURN_DECOUPLED should fire');
+    });
+
+    it('REVELATION_DRAMATIC_TURN_DECOUPLED does not fire when a revelation coincides with a turn', async () => {
+      // scene 3 is both a revelation and a turn
+      const recs390rtn = Array.from({ length: 8 }, (_, i) =>
+        makeRec390(i, {
+          revelation: [2, 3].includes(i) ? 'the hidden truth' : null,
+          dramaticTurn: [1, 3, 5].includes(i) ? 'reversal' : 'nothing',
+        }),
+      );
+      const res = await runB390(recs390rtn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_DRAMATIC_TURN_DECOUPLED'), 'REVELATION_DRAMATIC_TURN_DECOUPLED should not fire');
+    });
+
+    it('TOLD_BELIEF_SUSPENSE_PEAK_ABSENT fires when the peak-suspense scene has no assertion', async () => {
+      // assertions at 1,4 with suspense>0; scene 6 has peak suspense (2.0), no assertion
+      const recs390sp = Array.from({ length: 8 }, (_, i) =>
+        makeRec390(i, {
+          dialogueHighlights: [1, 4].includes(i) ? ['ALICE: the plan will hold'] : [],
+          suspenseDelta: i === 6 ? 2.0 : [1, 4].includes(i) ? 0.8 : 0,
+        }),
+      );
+      const res = await runB390(recs390sp);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TOLD_BELIEF_SUSPENSE_PEAK_ABSENT'), 'TOLD_BELIEF_SUSPENSE_PEAK_ABSENT should fire');
+    });
+
+    it('TOLD_BELIEF_SUSPENSE_PEAK_ABSENT does not fire when the peak-suspense scene carries an assertion', async () => {
+      const recs390spn = Array.from({ length: 8 }, (_, i) =>
+        makeRec390(i, {
+          dialogueHighlights: [1, 4, 6].includes(i) ? ['ALICE: the plan will hold'] : [],
+          suspenseDelta: i === 6 ? 2.0 : [1, 4].includes(i) ? 0.8 : 0,
+        }),
+      );
+      const res = await runB390(recs390spn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TOLD_BELIEF_SUSPENSE_PEAK_ABSENT'), 'TOLD_BELIEF_SUSPENSE_PEAK_ABSENT should not fire');
+    });
+
+    it('TOLD_BELIEF_CURIOSITY_PEAK_ABSENT fires when the peak-curiosity scene has no assertion', async () => {
+      const recs390cp = Array.from({ length: 8 }, (_, i) =>
+        makeRec390(i, {
+          dialogueHighlights: [1, 4].includes(i) ? ['ALICE: she is innocent'] : [],
+          curiosityDelta: i === 6 ? 2.0 : [1, 4].includes(i) ? 0.8 : 0,
+        }),
+      );
+      const res = await runB390(recs390cp);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TOLD_BELIEF_CURIOSITY_PEAK_ABSENT'), 'TOLD_BELIEF_CURIOSITY_PEAK_ABSENT should fire');
+    });
+
+    it('TOLD_BELIEF_CURIOSITY_PEAK_ABSENT does not fire when the peak-curiosity scene carries an assertion', async () => {
+      const recs390cpn = Array.from({ length: 8 }, (_, i) =>
+        makeRec390(i, {
+          dialogueHighlights: [1, 4, 6].includes(i) ? ['ALICE: she is innocent'] : [],
+          curiosityDelta: i === 6 ? 2.0 : [1, 4].includes(i) ? 0.8 : 0,
+        }),
+      );
+      const res = await runB390(recs390cpn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TOLD_BELIEF_CURIOSITY_PEAK_ABSENT'), 'TOLD_BELIEF_CURIOSITY_PEAK_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 376 — beliefPass: revelation suspense peak absent, told belief clock decoupled, assertion midpoint void', async () => {
     const makeRec376 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
