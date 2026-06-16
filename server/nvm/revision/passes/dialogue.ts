@@ -33,6 +33,10 @@
 // self-centred dialogue never engages with the other person), passive construct flood
 // (>25% of lines use passive voice — evasive agentless speech), present-perfect flood
 // (>25% of lines use present perfect — characters explain the past instead of the now).
+// Wave 378 additions: superlative flood (>25% of lines carry a superlative like "best"/
+// "worst"/"most" — hyperbolic ranking drains emphasis), anaphora run (≥3 consecutive lines
+// open with the same word — unintended chant), verbal-tic flood (>25% of lines carry a
+// disclaimer-intensifier like "literally"/"actually"/"honestly" — verbal-tic padding).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1667,6 +1671,86 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${perfectCount364} of ${dialogue.length} dialogue lines (${Math.round(perfectCount364 / dialogue.length * 100)}%) use the present perfect tense ("I've been", "She's told me", "We've tried"). The present perfect looks backward — it describes past actions with present relevance. When most dialogue is in this tense, characters are explaining the history rather than confronting each other now, and the scene's urgency is displaced from the room into backstory.`,
         suggestedFix: 'Ground dialogue in the present tense: "I\'ve been worried about you" → "I\'m worried about you". The present tense puts the confrontation in the room rather than in the past. Reserve the present perfect for lines where the pastness of the action matters dramatically; as a default register, it drains the scene of immediate stakes.',
+      });
+    }
+  }
+
+  // ── Wave 378: DIALOGUE_SUPERLATIVE_FLOOD, DIALOGUE_ANAPHORA_RUN, DIALOGUE_VERBAL_TIC_FLOOD ──
+
+  // DIALOGUE_SUPERLATIVE_FLOOD (minor, ≥10 lines, >25%): More than 25% of dialogue
+  // lines carry a superlative ("best", "worst", "most", "greatest", "biggest"). Constant
+  // superlatives push every statement to an extreme, so nothing can be merely good or bad —
+  // it is always the most or the worst. The hyperbole flattens the emotional range and
+  // drains the words of force through repetition. Distinct from DIALOGUE_ABSOLUTE_OVERUSE
+  // ("always"/"never"/"everyone"/"completely" universals): this targets ranking superlatives.
+  if (dialogue.length >= 10) {
+    const superlativeRe378 = /\b(most|least|best|worst|greatest|biggest|smallest|hardest|easiest|strongest|weakest|fastest|slowest|richest|poorest|happiest|saddest|closest|furthest|farthest|finest)\b/i;
+    const superlativeCount378 = dialogue.filter(d => superlativeRe378.test(d.line)).length;
+    if (superlativeCount378 / dialogue.length > 0.25) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_SUPERLATIVE_FLOOD',
+        severity: 'minor',
+        description: `${superlativeCount378} of ${dialogue.length} dialogue lines (${Math.round(superlativeCount378 / dialogue.length * 100)}%) carry a superlative ("best", "worst", "most", "greatest"). Constant superlatives push every statement to an extreme, so nothing can be merely good or bad — it is always the most or the worst. The hyperbole flattens the emotional range and the superlatives lose all force through repetition.`,
+        suggestedFix: 'Reserve superlatives for the rare moment a character genuinely means the extreme, and let most statements sit at normal intensity. A character who calls everything "the worst" has nowhere to go when something truly is — calibrated language gives the peaks somewhere to stand out.',
+      });
+    }
+  }
+
+  // DIALOGUE_ANAPHORA_RUN (minor, ≥6 lines, ≥3 consecutive): Three or more consecutive
+  // dialogue lines begin with the same word. Deliberate anaphora is a rhetorical device,
+  // but when it surfaces unplanned across a run of lines it reads as a chant — the dialogue
+  // locks into a repetitive opening cadence that signals the writer reached for the same
+  // sentence frame each time. Distinct from DIALOGUE_OPENER_MONOTONY (a single word opening
+  // >X% of ALL lines, scattered) and voice.ts DIALOGUE_REPEATED_OPENER_WORD: this targets a
+  // consecutive run specifically.
+  if (dialogue.length >= 6) {
+    const firstWord378 = (s: string): string => {
+      const m = s.trim().toLowerCase().match(/^([a-z']+)/);
+      return m ? m[1] : '';
+    };
+    let runStart378 = 0;
+    let maxRun378 = 1;
+    let maxRunWord378 = '';
+    for (let i378 = 1; i378 < dialogue.length; i378++) {
+      const prev378 = firstWord378(dialogue[i378 - 1].line);
+      const cur378 = firstWord378(dialogue[i378].line);
+      if (cur378 && cur378 === prev378) {
+        const runLen378 = i378 - runStart378 + 1;
+        if (runLen378 > maxRun378) { maxRun378 = runLen378; maxRunWord378 = cur378; }
+      } else {
+        runStart378 = i378;
+      }
+    }
+    if (maxRun378 >= 3 && maxRunWord378) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_ANAPHORA_RUN',
+        severity: 'minor',
+        description: `A run of ${maxRun378} consecutive dialogue lines all begin with the same word ("${maxRunWord378}..."). Deliberate anaphora is a rhetorical device, but surfacing unplanned across a run of lines it reads as a chant — the dialogue locks into a repetitive opening cadence that signals the writer reached for the same sentence frame each time rather than varying how each speaker enters their line.`,
+        suggestedFix: `Vary the openings across the run: only one or two lines should start with "${maxRunWord378}" unless the repetition is a deliberate rhetorical build. Recasting the other lines to begin differently breaks the chant and restores the irregular rhythm of real speech.`,
+      });
+    }
+  }
+
+  // DIALOGUE_VERBAL_TIC_FLOOD (minor, ≥10 lines, >25%): More than 25% of dialogue
+  // lines carry a disclaimer-intensifier ("literally", "actually", "honestly", "basically",
+  // "seriously", "frankly", "obviously"). These are verbal-tic words that pad a line and
+  // pre-frame the statement rather than letting it stand — and unlike real speech, written
+  // dialogue carries only the tics the writer deliberately included, so density makes every
+  // character sound like they share one verbal habit. Distinct from DIALOGUE_HEDGE_SATURATION
+  // (softeners like "just"/"maybe"/"sort of") and voice.ts DIALOGUE_DISCOURSE_MARKER_OPENER
+  // (sentence-initial "Okay,"/"Alright,"): this targets mid-line disclaimer-intensifiers.
+  if (dialogue.length >= 10) {
+    const verbalTicRe378 = /\b(literally|actually|basically|honestly|seriously|frankly|obviously|clearly|technically|essentially|apparently|presumably|definitely)\b/i;
+    const verbalTicCount378 = dialogue.filter(d => verbalTicRe378.test(d.line)).length;
+    if (verbalTicCount378 / dialogue.length > 0.25) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_VERBAL_TIC_FLOOD',
+        severity: 'minor',
+        description: `${verbalTicCount378} of ${dialogue.length} dialogue lines (${Math.round(verbalTicCount378 / dialogue.length * 100)}%) carry a disclaimer-intensifier ("literally", "actually", "honestly", "basically"). These verbal-tic words pad the line and pre-frame the statement rather than letting it stand. Written dialogue carries only the tics the writer deliberately included, so this density makes every character sound like they share one verbal habit, flattening their distinctness.`,
+        suggestedFix: 'Cut most disclaimer-intensifiers and let the statements assert themselves: "I honestly don\'t know" → "I don\'t know." Reserve a tic like "literally" or "honestly" for one character as a deliberate trait if it characterizes them; as a default it is filler that dilutes every line.',
       });
     }
   }

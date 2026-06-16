@@ -21008,6 +21008,205 @@ The lights go out.`;
     });
   });
 
+  describe('Wave 378 — dialoguePass: superlative flood, anaphora run, verbal-tic flood', async () => {
+    const runD378 = async (fountain: string) => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DIALOGUE_SUPERLATIVE_FLOOD fires when >25% of dialogue lines carry a superlative', async () => {
+      const f378s = `INT. OFFICE - DAY
+
+SAM
+This is the best deal we have ever seen.
+
+RAY
+It might be.
+
+SAM
+She is the worst manager in the building.
+
+RAY
+That seems harsh.
+
+SAM
+This is the biggest mistake of my life.
+
+RAY
+Calm down.
+
+SAM
+You are the smartest person I know.
+
+RAY
+I doubt that.
+
+SAM
+We should leave now.
+
+RAY
+Fine by me.`;
+      const res = await runD378(f378s);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_SUPERLATIVE_FLOOD'), 'DIALOGUE_SUPERLATIVE_FLOOD should fire');
+    });
+
+    it('DIALOGUE_SUPERLATIVE_FLOOD does not fire when dialogue avoids superlatives', async () => {
+      const f378sn = `INT. OFFICE - DAY
+
+SAM
+This is a fair deal for us.
+
+RAY
+It might be.
+
+SAM
+She is a difficult manager to work with.
+
+RAY
+That seems harsh.
+
+SAM
+This was a mistake on my part.
+
+RAY
+Calm down.
+
+SAM
+You are a sharp person, you know.
+
+RAY
+I doubt that.
+
+SAM
+We should leave now.
+
+RAY
+Fine by me.`;
+      const res = await runD378(f378sn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_SUPERLATIVE_FLOOD'), 'DIALOGUE_SUPERLATIVE_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_ANAPHORA_RUN fires when 3+ consecutive dialogue lines open with the same word', async () => {
+      const f378a = `INT. ROOM - DAY
+
+SAM
+I want to understand this.
+
+RAY
+I think you already do.
+
+SAM
+I knew you would say that.
+
+RAY
+So what now?
+
+SAM
+We decide together.
+
+RAY
+Together it is.`;
+      const res = await runD378(f378a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_ANAPHORA_RUN'), 'DIALOGUE_ANAPHORA_RUN should fire');
+    });
+
+    it('DIALOGUE_ANAPHORA_RUN does not fire when consecutive lines vary their openers', async () => {
+      const f378an = `INT. ROOM - DAY
+
+SAM
+I want to understand this.
+
+RAY
+You already do.
+
+SAM
+Maybe that is true.
+
+RAY
+So what now?
+
+SAM
+We decide together.
+
+RAY
+Together it is.`;
+      const res = await runD378(f378an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_ANAPHORA_RUN'), 'DIALOGUE_ANAPHORA_RUN should not fire');
+    });
+
+    it('DIALOGUE_VERBAL_TIC_FLOOD fires when >25% of dialogue lines carry a disclaimer-intensifier', async () => {
+      const f378v = `INT. BAR - NIGHT
+
+LIA
+I literally cannot believe this.
+
+JON
+Relax.
+
+LIA
+Honestly, you never listen.
+
+JON
+That is not fair.
+
+LIA
+Basically, we are done here.
+
+JON
+Don't say that.
+
+LIA
+Actually, I mean it this time.
+
+JON
+Let's talk tomorrow.
+
+LIA
+There is nothing left to say.
+
+JON
+Maybe there is.`;
+      const res = await runD378(f378v);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_VERBAL_TIC_FLOOD'), 'DIALOGUE_VERBAL_TIC_FLOOD should fire');
+    });
+
+    it('DIALOGUE_VERBAL_TIC_FLOOD does not fire when dialogue avoids verbal-tic words', async () => {
+      const f378vn = `INT. BAR - NIGHT
+
+LIA
+I cannot believe this.
+
+JON
+Relax.
+
+LIA
+You never listen to me.
+
+JON
+That is not fair.
+
+LIA
+We are done here.
+
+JON
+Don't say that.
+
+LIA
+I mean it this time.
+
+JON
+Let's talk tomorrow.
+
+LIA
+There is nothing left to say.
+
+JON
+Maybe there is.`;
+      const res = await runD378(f378vn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_VERBAL_TIC_FLOOD'), 'DIALOGUE_VERBAL_TIC_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 364 — dialoguePass: first-person saturation, passive construct flood, present-perfect flood', async () => {
     const runD364 = async (fountain: string) => {
       const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
