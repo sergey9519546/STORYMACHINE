@@ -44,6 +44,11 @@
 // (clock-raise scenes avg suspenseDelta ≤ 0 — deadlines that generate no tension), suspense
 // spike no curiosity (high-suspense scenes avg curiosityDelta ≤ 0 — danger that raises no
 // questions about what happens next).
+// Wave 391 additions: suspense spike no emotion (every high-suspense scene is emotionally
+// neutral — completes the suspense-spike correlation set), clock raise no fallout (a clock
+// raise produces no consequence within two scenes — the clock/clue siblings of suspense
+// spike no fallout), curiosity spike no fallout (a curiosity spike produces no consequence
+// within two scenes — intrigue raised then dropped).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1678,6 +1683,90 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Let high-tension scenes also open questions: a danger that exposes a new unknown, a crisis that raises the stakes of a mystery. When a suspense spike both frightens and intrigues, it pulls the audience forward; when it only frightens, the tension dissipates the moment the scene ends.',
         });
       }
+    }
+  }
+
+  // ── Wave 391: SUSPENSE_SPIKE_NO_EMOTION, CLOCK_RAISE_NO_FALLOUT, CURIOSITY_SPIKE_NO_FALLOUT ──
+
+  // SUSPENSE_SPIKE_NO_EMOTION (minor, n≥8, ≥2 spikes): Every scene that spikes suspense
+  // (suspenseDelta > 1.5) is emotionally neutral — the story's most tense moments never move
+  // the protagonist. Tension the character does not feel is spectacle: the audience watches
+  // danger without watching anyone be changed by it. Completes the suspense-spike correlation
+  // set with SUSPENSE_SPIKE_NO_CAUSE (upstream), SUSPENSE_SPIKE_NO_FALLOUT (downstream), and
+  // SUSPENSE_SPIKE_NO_CURIOSITY (curiosity channel); distinct from DRAMATIC_TURN_NO_EMOTION
+  // (turn scenes) and EMOTIONAL_NEUTRAL_RUN (consecutive neutral scenes).
+  if (records.length >= 8) {
+    const spikes391 = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 1.5);
+    if (spikes391.length >= 2 && spikes391.every(r => (r.emotionalShift ?? 'neutral') === 'neutral')) {
+      issues.push({
+        location: `${spikes391.length} suspense-spike scene(s) — emotional register`,
+        rule: 'SUSPENSE_SPIKE_NO_EMOTION',
+        severity: 'minor',
+        description: `All ${spikes391.length} suspense-spike scenes (suspenseDelta > 1.5) are emotionally neutral — the story's most tense moments never move the protagonist. Tension the character does not feel is spectacle: the audience watches danger without watching anyone be changed by it, so the spikes grip the eye but never the heart.`,
+        suggestedFix: 'Let high-tension scenes mark the protagonist emotionally: fear that curdles into a negative shift, survival that releases into relief. The most suspenseful scene in the story should also be one of its most felt — if the danger changes nothing about how anyone feels, the audience experiences it as a stunt.',
+      });
+    }
+  }
+
+  // CLOCK_RAISE_NO_FALLOUT (minor, n≥8, ≥2 clock raises): Two or more scenes raise a clock
+  // and not one is followed, within the next two scenes, by any consequence — no emotional
+  // shift, no relationship shift, no revelation, no dramatic turn. The deadline is announced
+  // and then absorbed without effect, so the clock is a number that changes nothing
+  // downstream. Distinct from CLOCK_RAISED_WITHOUT_PAYOFF (no PAYOFF anywhere in the story —
+  // this checks the immediate two-scene window for any consequence) and CLOCK_RAISED_NO_DELTA
+  // (no measurable time-pressure change). The clock sibling of SUSPENSE_SPIKE_NO_FALLOUT.
+  if (records.length >= 8) {
+    const n391c = records.length;
+    const hasFallout391c = (idx: number): boolean => {
+      for (let k = idx + 1; k <= Math.min(idx + 2, n391c - 1); k++) {
+        const r = (records as any[])[k];
+        if ((r.emotionalShift ?? 'neutral') !== 'neutral') return true;
+        if (((r.relationshipShifts ?? []) as any[]).length > 0) return true;
+        if (r.revelation !== null && r.revelation !== undefined) return true;
+        if ((r.dramaticTurn ?? 'nothing') !== 'nothing') return true;
+      }
+      return false;
+    };
+    const clockScenes391 = (records as any[]).filter(r => r.clockRaised === true);
+    if (clockScenes391.length >= 2 && !clockScenes391.some(s => hasFallout391c((records as any[]).indexOf(s)))) {
+      issues.push({
+        location: `${clockScenes391.length} clock-raise scene(s) — no downstream fallout`,
+        rule: 'CLOCK_RAISE_NO_FALLOUT',
+        severity: 'minor',
+        description: `${clockScenes391.length} scenes raise a clock but none is followed within two scenes by any consequence — no emotional shift, no relationship move, no revelation, no dramatic turn. The deadline is announced and then absorbed without effect, so each clock is a number that changes nothing downstream and the audience learns the countdowns are empty threats.`,
+        suggestedFix: 'Let each deadline detonate: the scenes right after a clock raise should carry its pressure — a panicked choice, a fractured alliance, a forced disclosure. If raising the clock leads to nothing in the next beats, either pay off the urgency or cut the clock; a deadline that changes nothing trains the audience to ignore the next one.',
+      });
+    }
+  }
+
+  // CURIOSITY_SPIKE_NO_FALLOUT (minor, n≥8, ≥2 spikes): Two or more scenes spike curiosity
+  // (curiosityDelta > 1.5) and not one is followed, within the next two scenes, by any
+  // consequence — no emotional shift, no relationship shift, no revelation, no dramatic turn.
+  // A question is opened and then nothing develops from it, so the intrigue dissipates
+  // unaddressed. Distinct from CURIOSITY_OPEN_LOOP (a question never resolved anywhere in the
+  // story — this checks the immediate two-scene aftermath for any development) and from the
+  // suspense/clock fallout checks (different trigger channel).
+  if (records.length >= 8) {
+    const n391q = records.length;
+    const hasFallout391q = (idx: number): boolean => {
+      for (let k = idx + 1; k <= Math.min(idx + 2, n391q - 1); k++) {
+        const r = (records as any[])[k];
+        if ((r.emotionalShift ?? 'neutral') !== 'neutral') return true;
+        if (((r.relationshipShifts ?? []) as any[]).length > 0) return true;
+        if (r.revelation !== null && r.revelation !== undefined) return true;
+        if ((r.dramaticTurn ?? 'nothing') !== 'nothing') return true;
+      }
+      return false;
+    };
+    const curSpikes391 = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 1.5);
+    if (curSpikes391.length >= 2 && !curSpikes391.some(s => hasFallout391q((records as any[]).indexOf(s)))) {
+      issues.push({
+        location: `${curSpikes391.length} curiosity-spike scene(s) — no downstream fallout`,
+        rule: 'CURIOSITY_SPIKE_NO_FALLOUT',
+        severity: 'minor',
+        description: `${curSpikes391.length} scenes spike curiosity (curiosityDelta > 1.5) but none is followed within two scenes by any consequence — no emotional shift, no relationship move, no revelation, no dramatic turn. A question is opened and then nothing develops from it, so the intrigue dissipates unaddressed and the audience's leaning-forward goes unrewarded.`,
+        suggestedFix: 'Let each curiosity spike lead somewhere soon: the scenes after a question opens should begin to complicate, partially answer, or raise the stakes of it. A mystery that spikes and then stalls teaches the audience that the story\'s questions don\'t pay off — develop the intrigue while it is hot.',
+      });
     }
   }
 

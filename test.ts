@@ -22187,6 +22187,68 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 391 — causalityPass: suspense spike no emotion, clock raise no fallout, curiosity spike no fallout', async () => {
+    const makeRec391 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runC391 = async (records: any[]) => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('SUSPENSE_SPIKE_NO_EMOTION fires when every high-suspense scene is emotionally neutral', async () => {
+      const recs391se = Array.from({ length: 8 }, (_, i) =>
+        makeRec391(i, { suspenseDelta: [2, 5].includes(i) ? 2 : 0, emotionalShift: 'neutral' }),
+      );
+      const res = await runC391(recs391se);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SUSPENSE_SPIKE_NO_EMOTION'), 'SUSPENSE_SPIKE_NO_EMOTION should fire');
+    });
+
+    it('SUSPENSE_SPIKE_NO_EMOTION does not fire when a spike scene carries emotion', async () => {
+      const recs391sen = Array.from({ length: 8 }, (_, i) =>
+        makeRec391(i, { suspenseDelta: [2, 5].includes(i) ? 2 : 0, emotionalShift: i === 2 ? 'negative' : 'neutral' }),
+      );
+      const res = await runC391(recs391sen);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SUSPENSE_SPIKE_NO_EMOTION'), 'SUSPENSE_SPIKE_NO_EMOTION should not fire');
+    });
+
+    it('CLOCK_RAISE_NO_FALLOUT fires when clock raises produce no consequence within two scenes', async () => {
+      // clocks at 2,5; all other scenes neutral/no consequence
+      const recs391cf = Array.from({ length: 9 }, (_, i) => makeRec391(i, { clockRaised: [2, 5].includes(i) }));
+      const res = await runC391(recs391cf);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_RAISE_NO_FALLOUT'), 'CLOCK_RAISE_NO_FALLOUT should fire');
+    });
+
+    it('CLOCK_RAISE_NO_FALLOUT does not fire when a clock raise is followed by a consequence', async () => {
+      // clock at 2, scene 3 carries an emotional shift (fallout)
+      const recs391cfn = Array.from({ length: 9 }, (_, i) =>
+        makeRec391(i, { clockRaised: [2, 5].includes(i), emotionalShift: i === 3 ? 'negative' : 'neutral' }),
+      );
+      const res = await runC391(recs391cfn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_RAISE_NO_FALLOUT'), 'CLOCK_RAISE_NO_FALLOUT should not fire');
+    });
+
+    it('CURIOSITY_SPIKE_NO_FALLOUT fires when curiosity spikes produce no consequence within two scenes', async () => {
+      const recs391qf = Array.from({ length: 9 }, (_, i) => makeRec391(i, { curiosityDelta: [2, 5].includes(i) ? 2 : 0 }));
+      const res = await runC391(recs391qf);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CURIOSITY_SPIKE_NO_FALLOUT'), 'CURIOSITY_SPIKE_NO_FALLOUT should fire');
+    });
+
+    it('CURIOSITY_SPIKE_NO_FALLOUT does not fire when a curiosity spike is followed by a revelation', async () => {
+      const recs391qfn = Array.from({ length: 9 }, (_, i) =>
+        makeRec391(i, { curiosityDelta: [2, 5].includes(i) ? 2 : 0, revelation: i === 3 ? 'a truth' : null }),
+      );
+      const res = await runC391(recs391qfn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CURIOSITY_SPIKE_NO_FALLOUT'), 'CURIOSITY_SPIKE_NO_FALLOUT should not fire');
+    });
+  });
+
   describe('Wave 377 — causalityPass: dramatic turn no emotion, clock raise no suspense, suspense spike no curiosity', async () => {
     const makeRec377 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
