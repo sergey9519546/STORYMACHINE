@@ -40,6 +40,11 @@
 // every line trails in from an unspoken thought), dialogue triadic flood (≥3 lines use a
 // "X, Y, and Z" rule-of-three — rhetorical cadence as a tic), dialogue emphatic-punctuation
 // flood (>20% of lines carry doubled marks like "!!"/"?!" — manufactured intensity).
+// Wave 389 additions: action expletive opener (>25% of action lines begin with a dummy-
+// subject "There is"/"It was" construction — agency drained from the action), dialogue
+// interrogative-opener flood (>30% of dialogue lines begin with a wh-question word — every
+// exchange reads as interrogation), dialogue comparative flood (>25% of dialogue lines carry
+// a "more/-er than" or "as...as" comparison — speech locked in relative ranking).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1742,6 +1747,85 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `${emphaticCount375} of ${dlg375.length} dialogue lines (${Math.round(emphaticCount375 / dlg375.length * 100)}%) carry a doubled or mixed emphatic mark ("!!", "?!", "!?"). Stacked punctuation tries to manufacture on the page the intensity that the words and the performance should carry; when this many lines shout in punctuation, the dialogue reads as hysterical and the marks lose all force through repetition.`,
           suggestedFix: 'Strip the stacked marks back to single terminal punctuation and let the word choice and context supply the heat. If a line only feels intense with "?!", the line itself is doing too little — sharpen what is said so the emphasis is in the meaning, not the typography.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 389: ACTION_EXPLETIVE_OPENER, DIALOGUE_INTERROGATIVE_OPENER_FLOOD, DIALOGUE_COMPARATIVE_FLOOD ──
+
+  // ACTION_EXPLETIVE_OPENER (minor, ≥10 action lines, >25%): More than 25% of action
+  // lines begin with an expletive dummy-subject construction ("There is", "There are",
+  // "It is", "It was"). These constructions bury the real subject behind a placeholder and
+  // a copula, draining the kinetic, agent-first energy screen action depends on — "There is
+  // a man at the door" instead of "A man waits at the door." Distinct from ABSTRACT_SUBJECT_
+  // OPENING (an abstract NOUN subject), STATIVE_VERB_OVERLOAD (state verbs anywhere), and
+  // PASSIVE_ACTION_VOICE (agentless passives): this targets the expletive-opener pattern.
+  if (actionOnlyLines.length >= 10) {
+    const expletiveRe389 = /^(there\s+(is|are|was|were)\b|there's\b|there're\b|it\s+(is|was)\b|it's\b)/i;
+    const expletiveCount389 = actionOnlyLines.filter(l => expletiveRe389.test(l.trim())).length;
+    if (expletiveCount389 / actionOnlyLines.length > 0.25) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'ACTION_EXPLETIVE_OPENER',
+        severity: 'minor',
+        description: `${expletiveCount389} of ${actionOnlyLines.length} action lines (${Math.round(expletiveCount389 / actionOnlyLines.length * 100)}%) begin with an expletive dummy-subject construction ("There is", "It was"). These bury the real subject behind a placeholder and a copula, draining the kinetic, agent-first energy screen action depends on — "There is a man at the door" sits flat where "A man waits at the door" moves.`,
+        suggestedFix: 'Recast expletive openers around the real subject and an active verb: "There is a shadow on the wall" → "A shadow stretches across the wall." Leading with the agent and what it does restores the forward, visual drive that "There is / It was" constructions sap.',
+      });
+    }
+  }
+
+  // ── Wave 389: dialogue-side checks ──
+  {
+    const dlg389: string[] = [];
+    let inDlg389 = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg389 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg389 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg389 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg389) dlg389.push(t);
+    }
+
+    // DIALOGUE_INTERROGATIVE_OPENER_FLOOD (minor, ≥10 lines, >30%): More than 30% of
+    // dialogue lines begin with a wh-question word ("What", "Why", "How", "Where", "When",
+    // "Who", "Which"). When most lines open by interrogating, every exchange reads as a
+    // cross-examination and the characters pump each other for information rather than
+    // asserting, deflecting, or revealing. Distinct from DIALOGUE_INTERROGATIVE_SATURATION
+    // (lines that END with "?" — this is opener-based and catches the interrogating cadence
+    // even in lines not punctuated as questions) and QUESTION_MARK_OVERLOAD.
+    if (dlg389.length >= 10) {
+      const whOpenerRe389 = /^(what|why|how|where|when|who|whose|whom|which)\b/i;
+      const whCount389 = dlg389.filter(l => whOpenerRe389.test(l.trim())).length;
+      if (whCount389 / dlg389.length > 0.30) {
+        issues.push({
+          location: 'Dialogue throughout',
+          rule: 'DIALOGUE_INTERROGATIVE_OPENER_FLOOD',
+          severity: 'minor',
+          description: `${whCount389} of ${dlg389.length} dialogue lines (${Math.round(whCount389 / dlg389.length * 100)}%) begin with a wh-question word ("What", "Why", "How", "Where"). When most lines open by interrogating, every exchange reads as a cross-examination — characters pump each other for information rather than asserting, deflecting, or revealing, and the scene acquires the rhythm of a deposition.`,
+          suggestedFix: 'Convert many questions into statements, accusations, or evasions and let the other character supply what the question was fishing for: "Why did you do it?" can become "You did it on purpose." A scene of relentless questions has no one taking a position — give the characters claims to defend, not just queries to fire.',
+        });
+      }
+    }
+
+    // DIALOGUE_COMPARATIVE_FLOOD (minor, ≥10 lines, >25%): More than 25% of dialogue
+    // lines carry a comparative construction ("more X than", "better than", "as X as").
+    // Constant comparison locks characters into relative ranking — nothing is simply itself,
+    // it is always more or less than something else — which makes the dialogue feel
+    // argumentative and evaluative rather than felt. Distinct from DIALOGUE_SUPERLATIVE_FLOOD
+    // (best/worst/most absolutes): comparatives rank two things against each other rather
+    // than pushing one to an extreme.
+    if (dlg389.length >= 10) {
+      const comparativeRe389 = /\b(more|less|better|worse|bigger|smaller|stronger|weaker|harder|easier|faster|slower|older|younger|richer|poorer|closer|further|farther|greater|higher|lower|smarter|safer)\s+than\b|\bas\s+\w+\s+as\b/i;
+      const comparativeCount389 = dlg389.filter(l => comparativeRe389.test(l)).length;
+      if (comparativeCount389 / dlg389.length > 0.25) {
+        issues.push({
+          location: 'Dialogue throughout',
+          rule: 'DIALOGUE_COMPARATIVE_FLOOD',
+          severity: 'minor',
+          description: `${comparativeCount389} of ${dlg389.length} dialogue lines (${Math.round(comparativeCount389 / dlg389.length * 100)}%) carry a comparative construction ("more X than", "better than", "as X as"). Constant comparison locks characters into relative ranking — nothing is simply itself, it is always measured against something else — which makes the dialogue feel evaluative and argumentative rather than emotionally direct.`,
+          suggestedFix: 'Let characters speak in direct, absolute terms where the feeling is the point: "I trust you more than I trusted him" can become "I trust you." Reserve comparison for the beat where weighing two things against each other is the dramatic move; as a default register it keeps the dialogue at arm\'s length.',
         });
       }
     }

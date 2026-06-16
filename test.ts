@@ -23003,6 +23003,209 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 389 — voicePass: action expletive opener, dialogue interrogative-opener flood, dialogue comparative flood', async () => {
+    const runV389 = async (fountain: string) => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      return voicePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ACTION_EXPLETIVE_OPENER fires when >25% of action lines begin with There is / It was', async () => {
+      const f389e = `INT. ROOM - DAY
+
+There is a man at the window.
+
+It was cold in the hall.
+
+There are papers on the floor.
+
+It is too quiet here.
+
+She crosses to the desk.
+
+He opens the drawer.
+
+The lamp flickers once.
+
+Footsteps sound below.
+
+A door slams shut.
+
+Dust drifts in the light.`;
+      const res = await runV389(f389e);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_EXPLETIVE_OPENER'), 'ACTION_EXPLETIVE_OPENER should fire');
+    });
+
+    it('ACTION_EXPLETIVE_OPENER does not fire when action leads with real subjects', async () => {
+      const f389en = `INT. ROOM - DAY
+
+A man waits at the window.
+
+Cold air fills the hall.
+
+Papers litter the floor.
+
+Silence presses in.
+
+She crosses to the desk.
+
+He opens the drawer.
+
+The lamp flickers once.
+
+Footsteps sound below.
+
+A door slams shut.
+
+Dust drifts in the light.`;
+      const res = await runV389(f389en);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_EXPLETIVE_OPENER'), 'ACTION_EXPLETIVE_OPENER should not fire');
+    });
+
+    it('DIALOGUE_INTERROGATIVE_OPENER_FLOOD fires when >30% of dialogue lines begin with a wh-word', async () => {
+      const f389q = `INT. OFFICE - DAY
+
+ANNA
+What did you tell them?
+
+MARK
+Nothing important.
+
+ANNA
+Why were you there at all?
+
+MARK
+I had a meeting.
+
+ANNA
+How long have you known?
+
+MARK
+A while now.
+
+ANNA
+Where does that leave us?
+
+MARK
+I don't know yet.
+
+ANNA
+I need an answer.
+
+MARK
+Give me time.`;
+      const res = await runV389(f389q);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_INTERROGATIVE_OPENER_FLOOD'), 'DIALOGUE_INTERROGATIVE_OPENER_FLOOD should fire');
+    });
+
+    it('DIALOGUE_INTERROGATIVE_OPENER_FLOOD does not fire when dialogue mostly asserts', async () => {
+      const f389qn = `INT. OFFICE - DAY
+
+ANNA
+You told them everything.
+
+MARK
+Nothing important.
+
+ANNA
+You were there all night.
+
+MARK
+I had a meeting.
+
+ANNA
+You've known for months.
+
+MARK
+A while now.
+
+ANNA
+This changes everything.
+
+MARK
+I don't know yet.
+
+ANNA
+I need an answer.
+
+MARK
+Give me time.`;
+      const res = await runV389(f389qn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_INTERROGATIVE_OPENER_FLOOD'), 'DIALOGUE_INTERROGATIVE_OPENER_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_COMPARATIVE_FLOOD fires when >25% of dialogue lines carry a comparative', async () => {
+      const f389c = `INT. BAR - NIGHT
+
+SAM
+You're stronger than he ever was.
+
+RAY
+Maybe.
+
+SAM
+This deal is better than the last one.
+
+RAY
+We'll see.
+
+SAM
+She's as sharp as anyone here.
+
+RAY
+True enough.
+
+SAM
+It costs more than we agreed.
+
+RAY
+That's a problem.
+
+SAM
+Let's settle it now.
+
+RAY
+Fine by me.`;
+      const res = await runV389(f389c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_COMPARATIVE_FLOOD'), 'DIALOGUE_COMPARATIVE_FLOOD should fire');
+    });
+
+    it('DIALOGUE_COMPARATIVE_FLOOD does not fire when dialogue avoids comparatives', async () => {
+      const f389cn = `INT. BAR - NIGHT
+
+SAM
+You're strong. He never was.
+
+RAY
+Maybe.
+
+SAM
+This deal works for us.
+
+RAY
+We'll see.
+
+SAM
+She's sharp. Everyone knows it.
+
+RAY
+True enough.
+
+SAM
+It costs too much.
+
+RAY
+That's a problem.
+
+SAM
+Let's settle it now.
+
+RAY
+Fine by me.`;
+      const res = await runV389(f389cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_COMPARATIVE_FLOOD'), 'DIALOGUE_COMPARATIVE_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 375 — voicePass: ellipsis-opener flood, triadic flood, emphatic-punctuation flood', async () => {
     const runV375 = async (fountain: string) => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
