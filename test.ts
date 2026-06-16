@@ -22180,6 +22180,91 @@ Time to go now.`;
     });
   });
 
+  describe('Wave 359 — structurePass: opening curiosity flatline, Act 3 dramatic turn absent, Act 1 relationship void', async () => {
+    const makeRec359 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runST359 = async (records: any[]) => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      return structurePass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('OPENING_CURIOSITY_FLATLINE fires when Act 1 averages curiosityDelta ≤ 0 while story has 2+ curious scenes later', async () => {
+      // 12 scenes; Act 1 = scenes 0-2 (first 25% of 12 = 3 scenes)
+      // Act 1 curiosityDelta: -0.3, -0.2, 0 → avg = -0.167 ≤ 0
+      // Scenes 6 and 9 have curiosityDelta 1.5 > 0.8 → 2 spikes elsewhere
+      const recs359ocf = Array.from({ length: 12 }, (_, i) =>
+        makeRec359(i, {
+          curiosityDelta: i === 0 ? -0.3 : i === 1 ? -0.2 : i === 2 ? 0 : i === 6 || i === 9 ? 1.5 : 0,
+        }),
+      );
+      const res = await runST359(recs359ocf);
+      assert.ok(res.issues.some((i: any) => i.rule === 'OPENING_CURIOSITY_FLATLINE'), 'OPENING_CURIOSITY_FLATLINE should fire');
+    });
+
+    it('OPENING_CURIOSITY_FLATLINE does not fire when Act 1 has positive average curiosityDelta', async () => {
+      // scenes 0,1,2 have curiosityDelta 0.4 → avg positive
+      const recs359ocfni = Array.from({ length: 12 }, (_, i) =>
+        makeRec359(i, {
+          curiosityDelta: i < 3 ? 0.4 : i === 6 || i === 9 ? 1.5 : 0,
+        }),
+      );
+      const res = await runST359(recs359ocfni);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'OPENING_CURIOSITY_FLATLINE'), 'OPENING_CURIOSITY_FLATLINE should not fire');
+    });
+
+    it('ACT3_DRAMATIC_TURN_ABSENT fires when Act 3 has no turns but Acts 1-2 have 3+', async () => {
+      // 12 scenes; Act 3 = scenes 9-11 (final 25% of 12 = 3 scenes)
+      // Turns at scenes 1, 3, 6 (in Acts 1-2); none in 9-11
+      const recs359ata = Array.from({ length: 12 }, (_, i) =>
+        makeRec359(i, {
+          dramaticTurn: [1, 3, 6].includes(i) ? 'reversal' : 'nothing',
+        }),
+      );
+      const res = await runST359(recs359ata);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACT3_DRAMATIC_TURN_ABSENT'), 'ACT3_DRAMATIC_TURN_ABSENT should fire');
+    });
+
+    it('ACT3_DRAMATIC_TURN_ABSENT does not fire when Act 3 contains a dramatic turn', async () => {
+      // turn at scene 10 (Act 3)
+      const recs359atani = Array.from({ length: 12 }, (_, i) =>
+        makeRec359(i, {
+          dramaticTurn: [1, 3, 6, 10].includes(i) ? 'reversal' : 'nothing',
+        }),
+      );
+      const res = await runST359(recs359atani);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACT3_DRAMATIC_TURN_ABSENT'), 'ACT3_DRAMATIC_TURN_ABSENT should not fire');
+    });
+
+    it('ACT1_RELATIONSHIP_VOID fires when Act 1 has no shifts while story has 3+', async () => {
+      // 12 scenes; Act 1 = 0-2 (no shifts); shifts at 4, 6, 8
+      const recs359arv = Array.from({ length: 12 }, (_, i) =>
+        makeRec359(i, {
+          relationshipShifts: [4, 6, 8].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.5 }] : [],
+        }),
+      );
+      const res = await runST359(recs359arv);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACT1_RELATIONSHIP_VOID'), 'ACT1_RELATIONSHIP_VOID should fire');
+    });
+
+    it('ACT1_RELATIONSHIP_VOID does not fire when Act 1 contains a relationship shift', async () => {
+      // shift at scene 1 (Act 1) in addition to later shifts
+      const recs359arvni = Array.from({ length: 12 }, (_, i) =>
+        makeRec359(i, {
+          relationshipShifts: [1, 4, 6, 8].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.5 }] : [],
+        }),
+      );
+      const res = await runST359(recs359arvni);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACT1_RELATIONSHIP_VOID'), 'ACT1_RELATIONSHIP_VOID should not fire');
+    });
+  });
+
   describe('Wave 345 — structurePass: Act 2b suspense void, Act 2a emotional flatline, midpoint curiosity void', async () => {
     const makeRec345 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

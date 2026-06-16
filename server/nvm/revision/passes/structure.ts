@@ -29,6 +29,11 @@
 // the climax), Act 2a emotional flatline (the 25%–50% conflict zone is all neutral),
 // midpoint curiosity void (the 40%–60% pivot averages curiosityDelta ≤ 0 while the
 // story is otherwise curious).
+// Wave 359 additions: opening curiosity flatline (Act 1 averages curiosityDelta ≤ 0
+// while the story is otherwise curious — the hook fails to generate questions), Act 3
+// dramatic turn absent (no dramatic turn in the final 25% despite turns earlier — the
+// finale unfolds without reversals), Act 1 relationship void (no relationship shift in
+// Act 1 while ≥3 shifts exist overall — the opening establishes no relational dynamic).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1331,6 +1336,90 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Reframe the central question at the midpoint: introduce a revelation, a reversal, or a new piece of information that changes what the audience thought the story was about. The middle of the story is the most dangerous place to let curiosity flatten — it is where a slack structure loses the room.',
         });
       }
+    }
+  }
+
+  // ── Wave 359: OPENING_CURIOSITY_FLATLINE, ACT3_DRAMATIC_TURN_ABSENT, ACT1_RELATIONSHIP_VOID ──
+
+  // OPENING_CURIOSITY_FLATLINE (minor, n≥10, ≥2 Act 1 scenes): Act 1 (first 25%)
+  // averages curiosityDelta ≤ 0, while the story has at least 2 scenes elsewhere with
+  // curiosityDelta > 0.8. The opening act not only fails to spike curiosity — it
+  // actively depresses it: the sum of audience questions raised is zero or negative.
+  // The premise is presented without mystery, and the hook of Act 1 is surrendered.
+  // Distinct from ACT1_CURIOSITY_ABSENT (no single spike > 0.5 in Act 1 — a peak check;
+  // this is an average check that fires even when one scene has a small positive
+  // curiosity but others drag the average below zero) and OPENING_SUSPENSE_FLATLINE
+  // (suspenseDelta, not curiosityDelta).
+  if (n >= 10) {
+    const act1End359 = Math.floor(n * 0.25);
+    const act1Recs359 = records.slice(0, act1End359);
+    const storyCurious359 = records.filter((r: any) => (r.curiosityDelta ?? 0) > 0.8).length;
+    if (act1Recs359.length >= 2 && storyCurious359 >= 2) {
+      const act1CurAvg359 = act1Recs359.reduce((s: number, r: any) => s + (r.curiosityDelta ?? 0), 0) / act1Recs359.length;
+      if (act1CurAvg359 <= 0) {
+        issues.push({
+          location: `Act 1 (Scenes 0–${act1End359 - 1}) — curiosity flatline`,
+          rule: 'OPENING_CURIOSITY_FLATLINE',
+          severity: 'minor',
+          description: `Act 1 averages a curiosityDelta of ${act1CurAvg359.toFixed(2)} — the opening not only fails to generate audience questions, it closes them. With ${storyCurious359} curiosity spikes later in the story, the first act is the one stretch where the audience is left with nothing to wonder about. A hook that suppresses curiosity surrenders the narrative contract before it's been established.`,
+          suggestedFix: 'Seed Act 1 with open questions: an anomaly the story withholds the answer to, an unexplained behavior, a hint of stakes the audience can sense but not yet see. The first act should make the audience lean forward wanting more — an Act 1 that averages negative curiosity means the audience has been given less to wonder about than they started with.',
+        });
+      }
+    }
+  }
+
+  // ACT3_DRAMATIC_TURN_ABSENT (minor, n≥10): No scene in the final 25% of the story
+  // carries a dramatic turn (dramaticTurn ≠ 'nothing'), even though ≥3 dramatic turns
+  // exist in the first 75%. The finale proceeds to resolution without any reversals or
+  // escalations — the plot simply coasts to its end. Act 3 should be the most
+  // dynamically structured zone: reversals, complications, climactic pivots. A finale
+  // with no turns plays as inevitable rather than earned. Distinct from DRAMATIC_TURN_
+  // OPENING_ABSENT (checks the first 30%), and from climax checks (ACT2B_SUSPENSE_VOID,
+  // CLIMAX_PURPOSE_ABSENT) which use different fields.
+  if (n >= 10) {
+    const act3Start359 = Math.floor(n * 0.75);
+    const act3Recs359 = records.slice(act3Start359);
+    const act1to2Turns359 = records.slice(0, act3Start359).filter((r: any) =>
+      r.dramaticTurn != null && r.dramaticTurn !== 'nothing',
+    ).length;
+    const act3HasTurn359 = act3Recs359.some((r: any) =>
+      r.dramaticTurn != null && r.dramaticTurn !== 'nothing',
+    );
+    if (act1to2Turns359 >= 3 && !act3HasTurn359) {
+      issues.push({
+        location: `Act 3 (Scenes ${act3Start359}–${n - 1}) — no dramatic turns`,
+        rule: 'ACT3_DRAMATIC_TURN_ABSENT',
+        severity: 'minor',
+        description: `No scene in Act 3 (Scenes ${act3Start359}–${n - 1}) carries a dramatic turn, even though ${act1to2Turns359} turns punctuate Acts 1 and 2. The finale proceeds to resolution without reversals or escalations — the climax plays as a straight line rather than a dynamic sequence of pivots. Act 3 should be the most structurally charged zone; an absence of turns there makes the resolution feel inevitable rather than earned.`,
+        suggestedFix: 'Build at least one reversal into Act 3: a setback before the climax, an unexpected complication that forces the protagonist to adapt, or a twist that reframes the resolution. The finale should contain the story\'s final structural surprise — the turn that makes the ending land with weight rather than arriving on schedule.',
+      });
+    }
+  }
+
+  // ACT1_RELATIONSHIP_VOID (minor, n≥10): No relationship shift of any kind occurs
+  // in Act 1 (first 25%) while the story overall carries ≥3 relationship shifts. The
+  // opening act introduces the characters but establishes no relational dynamic —
+  // the audience meets people without learning how their bonds work or what's at stake
+  // between them. Distinct from NO_RELATIONSHIP_MOVEMENT (zero shifts total — this
+  // fires when Act 1 alone is void), LATE_RELATIONSHIP_INTRODUCTION (a specific pair
+  // first shifts after midpoint), and RELATIONSHIP_OPENING_BURST (opposite: all shifts
+  // in the first 25%, nothing later).
+  if (n >= 10) {
+    const act1End359b = Math.floor(n * 0.25);
+    const totalShifts359 = records.reduce((s: number, r: any) =>
+      s + ((r.relationshipShifts ?? []) as any[]).length, 0,
+    );
+    const act1Shifts359 = records.slice(0, act1End359b).reduce((s: number, r: any) =>
+      s + ((r.relationshipShifts ?? []) as any[]).length, 0,
+    );
+    if (totalShifts359 >= 3 && act1Shifts359 === 0) {
+      issues.push({
+        location: `Act 1 (Scenes 0–${act1End359b - 1}) — no relationship shifts`,
+        rule: 'ACT1_RELATIONSHIP_VOID',
+        severity: 'minor',
+        description: `Act 1 carries no relationship shifts despite ${totalShifts359} relational movements later in the story. The opening act introduces the characters but establishes no bond dynamics — the audience meets people without learning how their relationships work or what stakes exist between them. When Act 1 is relationally silent, the audience enters Act 2 without caring about any of the bonds being tested.`,
+        suggestedFix: 'Establish at least one relational dynamic in Act 1: a bond that strengthens, a first friction, or a status shift between two characters. The opening act should make the audience understand what the relationships are so they can feel what\'s at stake when those bonds are tested in Act 2.',
+      });
     }
   }
 
