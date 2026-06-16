@@ -25621,6 +25621,88 @@ He stares at the floor.`;
     });
   });
 
+  describe('Wave 385 — relationshipArcPass: peak emotion flat, pair midpoint void, pair emotion flat', async () => {
+    const makeRec385 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const shift385 = (pairKey: string, amount: number) => ({ pairKey, dimension: 'trust', amount });
+    const runRA385 = async (records: any[]) => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('RELATIONSHIP_PEAK_EMOTION_FLAT fires when the largest-magnitude shift scene is neutral while 2+ other shift scenes carry emotion', async () => {
+      // scene 6 has the biggest shift (0.9) but is neutral; scenes 2,4 have smaller shifts + emotion
+      const recs385pe = Array.from({ length: 8 }, (_, i) =>
+        makeRec385(i, {
+          relationshipShifts: i === 6 ? [shift385('A|B', 0.9)] : [2, 4].includes(i) ? [shift385('C|D', 0.4)] : [],
+          emotionalShift: [2, 4].includes(i) ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runRA385(recs385pe);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_PEAK_EMOTION_FLAT'), 'RELATIONSHIP_PEAK_EMOTION_FLAT should fire');
+    });
+
+    it('RELATIONSHIP_PEAK_EMOTION_FLAT does not fire when the largest-magnitude shift scene carries emotion', async () => {
+      const recs385pen = Array.from({ length: 8 }, (_, i) =>
+        makeRec385(i, {
+          relationshipShifts: i === 6 ? [shift385('A|B', 0.9)] : [2, 4].includes(i) ? [shift385('C|D', 0.4)] : [],
+          emotionalShift: [2, 4, 6].includes(i) ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runRA385(recs385pen);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_PEAK_EMOTION_FLAT'), 'RELATIONSHIP_PEAK_EMOTION_FLAT should not fire');
+    });
+
+    it('PAIR_MIDPOINT_VOID fires when a pair shifts before and after the 40-60% window but not within it', async () => {
+      // n=10 → mid zone [4,6); A|B shifts at 1 (before) and 8 (after), none at 4 or 5
+      const recs385mv = Array.from({ length: 10 }, (_, i) =>
+        makeRec385(i, { relationshipShifts: [1, 8].includes(i) ? [shift385('A|B', 0.5)] : [] }),
+      );
+      const res = await runRA385(recs385mv);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAIR_MIDPOINT_VOID'), 'PAIR_MIDPOINT_VOID should fire');
+    });
+
+    it('PAIR_MIDPOINT_VOID does not fire when the pair shifts within the midpoint zone', async () => {
+      // A|B shifts at 1, 5 (within [4,6)), and 8
+      const recs385mvn = Array.from({ length: 10 }, (_, i) =>
+        makeRec385(i, { relationshipShifts: [1, 5, 8].includes(i) ? [shift385('A|B', 0.5)] : [] }),
+      );
+      const res = await runRA385(recs385mvn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAIR_MIDPOINT_VOID'), 'PAIR_MIDPOINT_VOID should not fire');
+    });
+
+    it('PAIR_EMOTION_FLAT fires when a pair has 3+ shifts all in emotionally neutral scenes', async () => {
+      // A|B shifts at 2,4,6 all neutral; another pair C|D shifts at 1 with emotion (so not whole-story flat)
+      const recs385ef = Array.from({ length: 8 }, (_, i) =>
+        makeRec385(i, {
+          relationshipShifts: [2, 4, 6].includes(i) ? [shift385('A|B', 0.5)] : i === 1 ? [shift385('C|D', 0.4)] : [],
+          emotionalShift: i === 1 ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runRA385(recs385ef);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAIR_EMOTION_FLAT'), 'PAIR_EMOTION_FLAT should fire');
+    });
+
+    it('PAIR_EMOTION_FLAT does not fire when one of the pair\'s shift scenes carries emotion', async () => {
+      // A|B shifts at 2,4,6 but scene 4 carries emotion
+      const recs385efn = Array.from({ length: 8 }, (_, i) =>
+        makeRec385(i, {
+          relationshipShifts: [2, 4, 6].includes(i) ? [shift385('A|B', 0.5)] : [],
+          emotionalShift: i === 4 ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runRA385(recs385efn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAIR_EMOTION_FLAT'), 'PAIR_EMOTION_FLAT should not fire');
+    });
+  });
+
   describe('Wave 371 — relationshipArcPass: suspense peak absent, clock decoupled, pair first-half void', async () => {
     const makeRec371 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

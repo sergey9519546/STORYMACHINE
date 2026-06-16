@@ -47,6 +47,11 @@
 // (no shift lands in any clock-raised scene though both exist — bonds never move under deadline
 // pressure), pair first-half void (a pair with ≥3 second-half shifts has zero in the first half
 // — per-pair late start, the mirror of pair second-half void).
+// Wave 385 additions: relationship peak emotion flat (the single largest-magnitude shift lands
+// in a neutral scene while other shift scenes carry emotion — the single-peak emotion cell),
+// pair midpoint void (a pair shifts before and after the 40%–60% window but not within it — the
+// per-pair midpoint cell), pair emotion flat (a pair with ≥3 shifts all in neutral scenes — the
+// per-pair emotion cell, distinct from the whole-story and polarity-set emotion checks).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1488,6 +1493,96 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `${voidPairs371.length === 1 ? 'One pair' : `${voidPairs371.length} pairs`} (${voidPairs371.join('; ')}) accumulate${voidPairs371.length === 1 ? 's' : ''} 3 or more shifts in the second half but register zero shifts in the first half. The bond's entire arc is deferred to the back half, so the audience spends the opening with no sense that the relationship is in motion, then it abruptly becomes active without the early grounding that would make its movement land.`,
         suggestedFix: 'Seed the bond early: give the pair at least one shift in the first half — a first friction, a flicker of warmth — so the audience is invested in the relationship before the back half starts moving it in earnest. A bond that only activates after the midpoint asks the audience to care about a connection they were never shown forming.',
+      });
+    }
+  }
+
+  // ── Wave 385: RELATIONSHIP_PEAK_EMOTION_FLAT, PAIR_MIDPOINT_VOID, PAIR_EMOTION_FLAT ──
+
+  // RELATIONSHIP_PEAK_EMOTION_FLAT (minor, n≥8, ≥2 emotionally charged shift scenes): The
+  // single largest-magnitude relationship shift in the story lands in an emotionally neutral
+  // scene, even though at least 2 other shift scenes carry emotion. The biggest bond change —
+  // the moment a relationship moves most — is registered as a status update, not felt as a
+  // turning point. The single-peak emotion cell: distinct from RELATIONSHIP_RUPTURE_EMOTION_
+  // FLAT (all NEGATIVE-shift scenes neutral — a polarity set check), WARMTH_UNFELT (strong
+  // POSITIVE shifts in neutral scenes), and character-arc's ARC_RELATIONAL_SHIFT_EMOTION_FLAT
+  // (ALL shift scenes neutral): this fires even when most shift scenes carry emotion but the
+  // single biggest one does not.
+  if (records.length >= 8) {
+    const emotionByScene385 = new Map<number, string>();
+    for (const r of records as any[]) emotionByScene385.set(r.sceneIdx, r.emotionalShift ?? 'neutral');
+    let peakMag385 = 0;
+    let peakScene385 = -1;
+    const shiftScenes385: any[] = [];
+    for (const r of records as any[]) {
+      const shifts = (r.relationshipShifts ?? []) as Array<{ amount: number }>;
+      if (shifts.length > 0) shiftScenes385.push(r);
+      for (const sh of shifts) {
+        if (Math.abs(sh.amount) > peakMag385) { peakMag385 = Math.abs(sh.amount); peakScene385 = r.sceneIdx; }
+      }
+    }
+    const chargedShift385 = shiftScenes385.filter(r => (r.emotionalShift ?? 'neutral') !== 'neutral' && r.sceneIdx !== peakScene385);
+    if (peakScene385 >= 0 && chargedShift385.length >= 2 && (emotionByScene385.get(peakScene385) ?? 'neutral') === 'neutral') {
+      issues.push({
+        location: `Scene ${peakScene385} — largest relationship shift (|${peakMag385.toFixed(2)}|)`,
+        rule: 'RELATIONSHIP_PEAK_EMOTION_FLAT',
+        severity: 'minor',
+        description: `The story's largest relationship shift (Scene ${peakScene385}, magnitude ${peakMag385.toFixed(2)}) lands in an emotionally neutral scene, even though ${chargedShift385.length} other shift scenes carry emotion. The biggest bond change — the moment a relationship moves most — is registered as a status update rather than felt as a turning point, so the audience notes the shift without experiencing its weight on the people it changes.`,
+        suggestedFix: 'Charge the peak shift emotionally: when the most consequential bond change in the story occurs, the protagonist should feel it most acutely — grief at the rupture, relief or fear at the reconciliation. The biggest relational swing deserves the sharpest emotional beat, not the flattest.',
+      });
+    }
+  }
+
+  // PAIR_MIDPOINT_VOID (minor, n≥10, pairs≥1): A pair shifts both before the midpoint zone
+  // (40%–60%) and after it, but registers no shift within it — that bond goes silent at the
+  // exact structural pivot while staying active on either side. The per-pair midpoint cell:
+  // distinct from RELATIONSHIP_MIDPOINT_FREEZE (ensemble-wide, the middle 50% i.e. 25%–75%,
+  // ANY pair) and from the per-pair PAIR_FIRST_HALF_VOID / PAIR_SECOND_HALF_VOID checks: this
+  // isolates the narrow center window for an individual pair that is otherwise active.
+  if (records.length >= 10 && pairStats.size >= 1) {
+    const midStart385 = Math.floor(records.length * 0.4);
+    const midEnd385 = Math.floor(records.length * 0.6);
+    const voidPairs385: string[] = [];
+    for (const [pairKey385, stats385] of pairStats) {
+      const before385 = stats385.shifts.some(s => s.sceneIdx < midStart385);
+      const after385 = stats385.shifts.some(s => s.sceneIdx >= midEnd385);
+      const inMid385 = stats385.shifts.some(s => s.sceneIdx >= midStart385 && s.sceneIdx < midEnd385);
+      if (before385 && after385 && !inMid385) voidPairs385.push(pairKey385);
+    }
+    if (voidPairs385.length > 0) {
+      issues.push({
+        location: `Pair(s) ${voidPairs385.join(', ')} — midpoint void (Scenes ${midStart385}–${midEnd385 - 1})`,
+        rule: 'PAIR_MIDPOINT_VOID',
+        severity: 'minor',
+        description: `${voidPairs385.length === 1 ? 'One pair' : `${voidPairs385.length} pairs`} (${voidPairs385.join('; ')}) shift${voidPairs385.length === 1 ? 's' : ''} both before and after the midpoint zone (Scenes ${midStart385}–${midEnd385 - 1}) but register${voidPairs385.length === 1 ? 's' : ''} no movement within it. The bond goes silent at the exact structural pivot while staying active on either side, so the midpoint reorganizes the plot without registering on a relationship the story otherwise keeps moving.`,
+        suggestedFix: 'Move the pair at the midpoint: let the central pivot also turn this bond — a trust tested by the midpoint revelation, an alliance reshaped by the reversal. A relationship active on both sides of the center but frozen at it implies the story\'s biggest turn left this bond untouched, which rarely rings true.',
+      });
+    }
+  }
+
+  // PAIR_EMOTION_FLAT (minor, n≥8, pair with ≥3 shifts): A single pair accumulates 3 or
+  // more shifts, every one of which lands in an emotionally neutral scene — this specific
+  // bond moves repeatedly but the protagonist never feels any of its movements. The per-pair
+  // emotion cell: distinct from character-arc's ARC_RELATIONAL_SHIFT_EMOTION_FLAT (ALL shift
+  // scenes across the whole story are neutral — this fires when one bond's shifts are all
+  // neutral even though OTHER bonds' shifts carry emotion) and from RELATIONSHIP_PEAK_EMOTION_
+  // FLAT (the single largest shift, regardless of pair).
+  if (records.length >= 8) {
+    const emotionByScene385b = new Map<number, string>();
+    for (const r of records as any[]) emotionByScene385b.set(r.sceneIdx, r.emotionalShift ?? 'neutral');
+    const flatPairs385: string[] = [];
+    for (const [pairKey385b, stats385b] of pairStats) {
+      if (stats385b.shifts.length >= 3 && stats385b.shifts.every(s => (emotionByScene385b.get(s.sceneIdx) ?? 'neutral') === 'neutral')) {
+        flatPairs385.push(pairKey385b);
+      }
+    }
+    if (flatPairs385.length > 0) {
+      issues.push({
+        location: `Pair(s) ${flatPairs385.join(', ')} — emotionally flat shifts`,
+        rule: 'PAIR_EMOTION_FLAT',
+        severity: 'minor',
+        description: `${flatPairs385.length === 1 ? 'One pair' : `${flatPairs385.length} pairs`} (${flatPairs385.join('; ')}) move${flatPairs385.length === 1 ? 's' : ''} 3 or more times, yet every one of those shifts lands in an emotionally neutral scene. The bond changes repeatedly but the protagonist never feels any of its movements, so this relationship's whole arc is logged as a sequence of status changes the audience tracks intellectually without ever being moved by.`,
+        suggestedFix: 'Let this bond\'s shifts cost or reward the protagonist emotionally: a warming that brings relief, a cooling that brings unease, a rupture that wounds. A relationship that moves three or more times without a single felt beat is mechanics, not drama — pair its changes with the protagonist\'s reaction so the audience invests in it.',
       });
     }
   }
