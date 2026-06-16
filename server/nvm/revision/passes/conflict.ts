@@ -36,6 +36,12 @@
 // monopoly (>70% of ruptures fall in the second half — the distribution mirror of conflict
 // first-half monopoly), conflict revelation decoupled (≥2 ruptures and ≥2 revelations but
 // none share a scene — the rupture and disclosure engines never meet, sibling of clock-decoupled).
+// Wave 394 additions: conflict clue decoupled (rupture scenes never seed a clue — conflict
+// terminates threads without opening them, co-occurrence × seededClueIds), conflict payoff
+// decoupled (payoff scenes never coincide with a rupture — foreshadowing resolves without
+// relational cost, co-occurrence × payoffSetupIds), conflict rupture aftermath void (a major
+// rupture ≤ -0.5 is followed by 2 scenes with no per-pair shift and neutral emotion —
+// sequence/aftermath × relationship-shift channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1530,6 +1536,103 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
           description: `The story has ${conflictRecs380.length} ruptures and ${revScenes380.length} revelations, but none share a scene — bonds break in scenes that disclose nothing, and truths surface in scenes that fracture no bond. The rupture engine and the disclosure engine run separately, so a betrayal never lands as a revelation and a revelation never costs a relationship, forfeiting the doubled charge of a truth that breaks a bond in the same beat.`,
           suggestedFix: 'Fuse at least one rupture with a revelation: the moment a hidden truth surfaces should also be the moment a bond fractures — the lie exposed that ends the friendship, the secret revealed that severs the alliance. When disclosure and rupture coincide, each makes the other land harder.',
         });
+      }
+    }
+  }
+
+  // ── Wave 394: CONFLICT_CLUE_DECOUPLED, CONFLICT_PAYOFF_DECOUPLED, CONFLICT_RUPTURE_AFTERMATH_VOID ──
+
+  // CONFLICT_CLUE_DECOUPLED (minor, n≥8, ≥3 conflict scenes, ≥2 clue-seeding scenes):
+  // Every scene that seeds a clue (seededClueIds non-empty) is relationally inert — none
+  // of the story's rupture scenes plant anything for the audience to carry forward.
+  // Confrontations are closed events: they wound without opening a new thread, leaving the
+  // audience with damage but no forward pull from the highest-stakes scenes.
+  // Distinct from CONFLICT_REVELATION_DECOUPLED (revelation signal — disclosure of existing
+  // secrets, not planting new seeds; seededClueIds vs. the revelation property), from
+  // CONFLICT_CURIOSITY_DECOUPLED (average curiosityDelta ≤ 0 on conflict scenes — a
+  // quantitative channel measure, not a co-occurrence check on the seeding signal), and
+  // from CONFLICT_DRAMATIC_TURN_VOID (turn scenes × rupture — different signal pair).
+  if (records.length >= 8) {
+    const clueScenes394a = (records as any[]).filter(r => ((r.seededClueIds ?? []) as string[]).length > 0);
+    const conflictRecs394a = (records as any[]).filter(r =>
+      ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+    );
+    if (clueScenes394a.length >= 2 && conflictRecs394a.length >= 3) {
+      const anyConflictSeeds394a = conflictRecs394a.some(r => ((r.seededClueIds ?? []) as string[]).length > 0);
+      if (!anyConflictSeeds394a) {
+        issues.push({
+          location: 'Conflict scenes — clue-seeding decoupled',
+          rule: 'CONFLICT_CLUE_DECOUPLED',
+          severity: 'minor',
+          description: `The story seeds ${clueScenes394a.length} clue(s), but none of the ${conflictRecs394a.length} conflict scenes (negative relationship shifts) plant anything — confrontations are closed events that wound without opening new threads. The highest-stakes scenes carry no forward narrative momentum: they terminate rather than seed, leaving the audience with damage but nothing to carry into the next scene.`,
+          suggestedFix: 'Let at least one rupture plant a clue the audience will carry forward: the fight that exposes half a secret, the betrayal that names one conspirator but not the other, the severed bond that seeds an unanswered question. A conflict that seeds a clue turns damage into momentum — the wound becomes a thread.',
+        });
+      }
+    }
+  }
+
+  // CONFLICT_PAYOFF_DECOUPLED (minor, n≥8, ≥2 conflict scenes, ≥2 payoff scenes):
+  // Every payoff scene (payoffSetupIds non-empty) is relationally inert — the scenes
+  // where planted setups are delivered contain no relational rupture. The story resolves
+  // its foreshadowing in scenes where no bond breaks, missing the doubled impact of a
+  // planted seed that blooms at the moment of maximum relational strain.
+  // Distinct from CONFLICT_CLUE_DECOUPLED (seededClueIds — seeding, not delivering),
+  // CONFLICT_REVELATION_DECOUPLED (revelation property vs. payoffSetupIds; revelation is a
+  // specific scene annotation, payoff delivery is a separate seeding-pair signal), and the
+  // Wave 352 peak-rupture audit (single-peak isolation, not co-occurrence mode).
+  if (records.length >= 8) {
+    const payoffScenes394b = (records as any[]).filter(r => ((r.payoffSetupIds ?? []) as string[]).length > 0);
+    const conflictRecs394b = (records as any[]).filter(r =>
+      ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+    );
+    if (payoffScenes394b.length >= 2 && conflictRecs394b.length >= 2) {
+      const payoffInConflict394b = payoffScenes394b.some(r =>
+        ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+      );
+      if (!payoffInConflict394b) {
+        issues.push({
+          location: 'Payoff scenes × conflict — decoupled',
+          rule: 'CONFLICT_PAYOFF_DECOUPLED',
+          severity: 'minor',
+          description: `${payoffScenes394b.length} payoff scenes deliver planted setups, but none coincide with a relational rupture — the story resolves its foreshadowing in scenes where no bond breaks. Payoffs that cost nobody a relationship miss the doubled impact available when a planted seed blooms at the moment of maximum relational strain: the payoff lands, and so does the fracture.`,
+          suggestedFix: 'Fuse at least one payoff with a rupture: the scene where a planted secret is finally disclosed or a foreshadowed threat is finally realized should also be the scene where a relationship reaches its breaking point. When payoff and rupture coincide, each makes the other land harder — the audience simultaneously gets what it was promised and loses what it feared losing.',
+        });
+      }
+    }
+  }
+
+  // CONFLICT_RUPTURE_AFTERMATH_VOID (minor, n≥8, ≥1 major rupture): A major relational
+  // rupture (single negative shift ≤ -0.5) is followed by 2 scenes where the same pair
+  // registers no shift at all and both scenes are emotionally neutral — the wound lands
+  // and the relationship goes silent. The rupture is inflicted and immediately absorbed as
+  // though it registered in the ledger but in nobody's body.
+  // Distinct from REVERSAL_WITHOUT_CONSEQUENCE (Wave 183: suspense reversal target, not
+  // relational rupture; aftermath check is broad — any of emotion/clock/shift/suspense,
+  // not per-pair silence), CONFLICT_RECOVERY_TOO_FAST (Wave 243: looks for fast positive
+  // suspense recovery within 2 scenes — the opposite failure; this checks for NO follow-up
+  // at all in the relationship channel), and RECONCILIATION_ABSENT (Wave 257: story-level
+  // no-repair across the whole arc; this targets the immediate 2-scene aftermath per pair).
+  if (records.length >= 8) {
+    for (let i394c = 0; i394c < records.length - 2; i394c++) {
+      const r394c = (records as any[])[i394c];
+      const shifts394c = ((r394c.relationshipShifts ?? []) as Array<{ pairKey: string; amount: number }>);
+      const majorRupture394c = shifts394c.find(s => s.amount <= -0.5);
+      if (!majorRupture394c) continue;
+      const afterScenes394c = (records as any[]).slice(i394c + 1, i394c + 3);
+      const isVoid394c = afterScenes394c.length === 2 && afterScenes394c.every(a => {
+        const pairShift = ((a.relationshipShifts ?? []) as Array<{ pairKey: string; amount: number }>)
+          .find(s => s.pairKey === majorRupture394c.pairKey);
+        return !pairShift && a.emotionalShift === 'neutral';
+      });
+      if (isVoid394c) {
+        issues.push({
+          location: `Scene ${r394c.sceneIdx} — rupture (${majorRupture394c.pairKey}, shift: ${majorRupture394c.amount.toFixed(2)})`,
+          rule: 'CONFLICT_RUPTURE_AFTERMATH_VOID',
+          severity: 'minor',
+          description: `The major rupture between "${majorRupture394c.pairKey}" at Scene ${r394c.sceneIdx} (shift: ${majorRupture394c.amount.toFixed(2)}) is followed by 2 scenes where that pair has no further shifts and both scenes are emotionally neutral — the wound lands in a relational vacuum. The story inflicts the damage and the relationship goes silent: no echo, no recoil, no acknowledgement. When a rupture leaves the pair and the emotional register both unchanged for two consecutive scenes, the audience concludes the damage didn't really land.`,
+          suggestedFix: 'Let the rupture echo in the next two scenes: a cold exchange between the pair, an emotional reaction that names what was lost, or a shift in that bond — even a tentative one — that confirms the wound registered. The scene after a major break is where the audience learns whether to believe the damage was real.',
+        });
+        break;
       }
     }
   }

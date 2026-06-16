@@ -18713,6 +18713,94 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 394 — conflictPass: clue decoupled, payoff decoupled, rupture aftermath void', async () => {
+    const makeRec394 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF394 = async (records: any[]) => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      return conflictPass({ fountain: '', original: '', records, structure: { escalating: true, avgSuspensePerScene: 0, openClues: 0, reversalDensity: 1, approachingClimax: false } as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CONFLICT_CLUE_DECOUPLED fires when conflict scenes never seed a clue', async () => {
+      // scenes 1,3,5 carry conflict; scenes 6,7 seed clues but have no conflict — decoupled
+      const recs394cd = Array.from({ length: 8 }, (_, i) =>
+        makeRec394(i, {
+          relationshipShifts: [1, 3, 5].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: -0.5 }] : [],
+          seededClueIds: [6, 7].includes(i) ? ['clue1'] : [],
+        }),
+      );
+      const res = await runCF394(recs394cd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_CLUE_DECOUPLED'), 'CONFLICT_CLUE_DECOUPLED should fire');
+    });
+
+    it('CONFLICT_CLUE_DECOUPLED does not fire when a conflict scene also seeds a clue', async () => {
+      // scene 3 has both conflict and a seeded clue
+      const recs394cdn = Array.from({ length: 8 }, (_, i) =>
+        makeRec394(i, {
+          relationshipShifts: [1, 3, 5].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: -0.5 }] : [],
+          seededClueIds: [3, 6].includes(i) ? ['clue1'] : [],
+        }),
+      );
+      const res = await runCF394(recs394cdn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_CLUE_DECOUPLED'), 'CONFLICT_CLUE_DECOUPLED should not fire');
+    });
+
+    it('CONFLICT_PAYOFF_DECOUPLED fires when payoff scenes never coincide with a rupture', async () => {
+      // scenes 1,4 carry conflict; scenes 5,6 deliver payoffs — no overlap
+      const recs394pd = Array.from({ length: 8 }, (_, i) =>
+        makeRec394(i, {
+          relationshipShifts: [1, 4].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: -0.5 }] : [],
+          payoffSetupIds: [5, 6].includes(i) ? ['setup1'] : [],
+        }),
+      );
+      const res = await runCF394(recs394pd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_PAYOFF_DECOUPLED'), 'CONFLICT_PAYOFF_DECOUPLED should fire');
+    });
+
+    it('CONFLICT_PAYOFF_DECOUPLED does not fire when a payoff scene coincides with a rupture', async () => {
+      // scene 5 has both a payoff and a conflict rupture
+      const recs394pdn = Array.from({ length: 8 }, (_, i) =>
+        makeRec394(i, {
+          relationshipShifts: [1, 5].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: -0.5 }] : [],
+          payoffSetupIds: [5, 6].includes(i) ? ['setup1'] : [],
+        }),
+      );
+      const res = await runCF394(recs394pdn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_PAYOFF_DECOUPLED'), 'CONFLICT_PAYOFF_DECOUPLED should not fire');
+    });
+
+    it('CONFLICT_RUPTURE_AFTERMATH_VOID fires when a major rupture has 2 silent aftermath scenes for the same pair', async () => {
+      // scene 2 ruptures A|B (−0.6); scenes 3 & 4 have no A|B shift and are emotionally neutral
+      const recs394rav = Array.from({ length: 8 }, (_, i) =>
+        makeRec394(i, {
+          relationshipShifts: i === 2 ? [{ pairKey: 'A|B', dimension: 'trust', amount: -0.6 }] : [],
+        }),
+      );
+      const res = await runCF394(recs394rav);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_RUPTURE_AFTERMATH_VOID'), 'CONFLICT_RUPTURE_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_RUPTURE_AFTERMATH_VOID does not fire when aftermath contains a follow-up shift for the pair', async () => {
+      // scene 2 ruptures A|B; scene 3 carries a follow-up A|B shift — not a void aftermath
+      const recs394ravn = Array.from({ length: 8 }, (_, i) =>
+        makeRec394(i, {
+          relationshipShifts: [2, 3].includes(i)
+            ? [{ pairKey: 'A|B', dimension: 'trust', amount: i === 2 ? -0.6 : -0.2 }]
+            : [],
+        }),
+      );
+      const res = await runCF394(recs394ravn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_RUPTURE_AFTERMATH_VOID'), 'CONFLICT_RUPTURE_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 393 — characterArcPass: emotional back-loaded, positive emotion run, late low-point absent', async () => {
     const makeRec393 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
