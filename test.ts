@@ -21079,6 +21079,93 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 362 — beliefPass: revelation clock decoupled, told belief Act 3 absent, revelation curiosity peak absent', async () => {
+    const makeRec362 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runB362 = async (records: any[]) => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('REVELATION_CLOCK_DECOUPLED fires when no revelation lands in a clock-raised scene', async () => {
+      // revelations at 2,5; clockRaised at 3,6 — no overlap
+      const recs362rcd = Array.from({ length: 8 }, (_, i) =>
+        makeRec362(i, {
+          revelation: [2, 5].includes(i) ? 'the truth about the contract' : null,
+          clockRaised: [3, 6].includes(i),
+        }),
+      );
+      const res = await runB362(recs362rcd);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_CLOCK_DECOUPLED'), 'REVELATION_CLOCK_DECOUPLED should fire');
+    });
+
+    it('REVELATION_CLOCK_DECOUPLED does not fire when a revelation lands in a clock-raised scene', async () => {
+      // scene 3 has both revelation AND clockRaised
+      const recs362rcdni = Array.from({ length: 8 }, (_, i) =>
+        makeRec362(i, {
+          revelation: [2, 3].includes(i) ? 'the truth about the contract' : null,
+          clockRaised: [3, 6].includes(i),
+        }),
+      );
+      const res = await runB362(recs362rcdni);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_CLOCK_DECOUPLED'), 'REVELATION_CLOCK_DECOUPLED should not fire');
+    });
+
+    it('TOLD_BELIEF_ACT3_ABSENT fires when assertions exist in Acts 1-2 but not in Act 3', async () => {
+      // 12 scenes; Act 3 = 9-11; assertions at 1,3,5 only
+      const recs362tba = Array.from({ length: 12 }, (_, i) =>
+        makeRec362(i, {
+          dialogueHighlights: [1, 3, 5].includes(i) ? ['ALICE: the plan will work'] : [],
+        }),
+      );
+      const res = await runB362(recs362tba);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TOLD_BELIEF_ACT3_ABSENT'), 'TOLD_BELIEF_ACT3_ABSENT should fire');
+    });
+
+    it('TOLD_BELIEF_ACT3_ABSENT does not fire when Act 3 contains an assertion', async () => {
+      // assertion at scene 10 (Act 3)
+      const recs362tbani = Array.from({ length: 12 }, (_, i) =>
+        makeRec362(i, {
+          dialogueHighlights: [1, 3, 5, 10].includes(i) ? ['ALICE: the plan will work'] : [],
+        }),
+      );
+      const res = await runB362(recs362tbani);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TOLD_BELIEF_ACT3_ABSENT'), 'TOLD_BELIEF_ACT3_ABSENT should not fire');
+    });
+
+    it('REVELATION_CURIOSITY_PEAK_ABSENT fires when peak-curiosity scene has no revelation while 2+ others do', async () => {
+      // scenes 1 (curiosityDelta=0.8, revelation) and 4 (curiosityDelta=0.6, revelation)
+      // scene 6 has peak curiosityDelta=2.0 but no revelation
+      const recs362rcpa = Array.from({ length: 8 }, (_, i) =>
+        makeRec362(i, {
+          curiosityDelta: i === 6 ? 2.0 : i === 1 ? 0.8 : i === 4 ? 0.6 : 0,
+          revelation: [1, 4].includes(i) ? 'the hidden truth' : null,
+        }),
+      );
+      const res = await runB362(recs362rcpa);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_CURIOSITY_PEAK_ABSENT'), 'REVELATION_CURIOSITY_PEAK_ABSENT should fire');
+    });
+
+    it('REVELATION_CURIOSITY_PEAK_ABSENT does not fire when peak-curiosity scene carries a revelation', async () => {
+      // scene 6 now also has a revelation
+      const recs362rcpani = Array.from({ length: 8 }, (_, i) =>
+        makeRec362(i, {
+          curiosityDelta: i === 6 ? 2.0 : i === 1 ? 0.8 : i === 4 ? 0.6 : 0,
+          revelation: [1, 4, 6].includes(i) ? 'the hidden truth' : null,
+        }),
+      );
+      const res = await runB362(recs362rcpani);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_CURIOSITY_PEAK_ABSENT'), 'REVELATION_CURIOSITY_PEAK_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 348 — beliefPass: revelation/assertion disconnect, revelation midpoint void, told belief dramatic turn decoupled', async () => {
     const makeRec348 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

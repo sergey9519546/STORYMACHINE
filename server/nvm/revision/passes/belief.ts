@@ -33,6 +33,11 @@
 // a prior assertion — the dramatic-irony engine never fires), revelation midpoint void (the
 // 40%–60% pivot carries no revelation while revelations exist elsewhere), told belief dramatic
 // turn decoupled (no assertion scene coincides with a story pivot).
+// Wave 362 additions: revelation clock decoupled (no revelation lands in a clock-raised scene
+// even though both revelations and clock scenes exist — urgency and discovery never meet),
+// told belief Act 3 absent (assertions exist in Acts 1-2 but none in Act 3 — the finale
+// contains no positions or claims), revelation curiosity peak absent (the scene with the
+// highest curiosityDelta has no revelation while 2+ other curious scenes carry revelations).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1306,6 +1311,90 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         description: `None of the ${toldScenes348.length} scenes where a character asserts a belief carries a dramatic turn — the moments characters commit to claims never coincide with a story pivot. Assertions land as inert background rather than as stances taken at consequential moments. A belief declared at a turning point carries weight an offhand assertion lacks; here the belief layer and the turning-point layer never meet.`,
         suggestedFix: 'Tie at least one assertion to a dramatic turn: let a character state their conviction at the moment the story reverses — a vow made as the situation flips, a certainty declared just before it is tested. An assertion made at a pivot becomes a stake the turn can pay off; one made in a flat scene is just dialogue.',
       });
+    }
+  }
+
+  // ── Wave 362: REVELATION_CLOCK_DECOUPLED, TOLD_BELIEF_ACT3_ABSENT, REVELATION_CURIOSITY_PEAK_ABSENT ──
+
+  // REVELATION_CLOCK_DECOUPLED (minor, n≥8, ≥2 revelations, ≥2 clock scenes): No
+  // scene that carries a revelation also has clockRaised=true, even though the story
+  // has both. The urgency engine and the truth-revealing engine never meet — discoveries
+  // never arrive under deadline pressure, and deadlines never force a disclosure. When
+  // time pressure and revelation are permanently decoupled, neither carries the full
+  // weight it could: the revelation lands without urgency, and the clock ticks without
+  // informational content. Distinct from REVELATION_SUSPENSE_DECOUPLED (avg suspenseDelta
+  // of revelation scenes; this checks the clockRaised field specifically) and TOLD_
+  // BELIEF_SUSPENSE_DECOUPLED (assertions, not revelations).
+  if (records.length >= 8) {
+    const revSet362 = new Set(witnessedBeliefs.map(w => w.sceneIdx));
+    const clockScenes362 = (records as any[]).filter(r => r.clockRaised === true);
+    if (revSet362.size >= 2 && clockScenes362.length >= 2) {
+      const anyRevClock362 = clockScenes362.some(r => revSet362.has(r.sceneIdx));
+      if (!anyRevClock362) {
+        issues.push({
+          location: 'Revelation × clock scenes — decoupled',
+          rule: 'REVELATION_CLOCK_DECOUPLED',
+          severity: 'minor',
+          description: `${revSet362.size} revelation scene(s) and ${clockScenes362.length} clock-raised scenes share no overlap — the urgency engine and the discovery engine never meet. Discoveries that arrive without deadline pressure feel academic; deadlines that pass without disclosure feel mechanical. The most powerful revelations in drama land when time is running out and the truth can no longer be withheld.`,
+          suggestedFix: 'Let at least one revelation arrive under deadline pressure: a truth disclosed because time has run out, a discovery that makes the clock suddenly more threatening. The intersection of "what does the character now know?" and "how much time do they have left?" is one of the most potent structural combinations in storytelling.',
+        });
+      }
+    }
+  }
+
+  // TOLD_BELIEF_ACT3_ABSENT (minor, n≥10, ≥3 assertion scenes in Acts 1-2): No
+  // assertion scene falls in Act 3 (the final 25% of scenes), even though characters
+  // asserted beliefs throughout Acts 1 and 2. The finale contains no moments where
+  // anyone commits to a position — beliefs are stated and tested during the rising
+  // action, but the climax and resolution are delivered without anyone declaring what
+  // they believe. An Act 3 without assertions means the ending resolves plot without
+  // resolving the story's belief conflicts. Distinct from TOLD_BELIEF_FINAL_SCENE (last
+  // scene only), TOLD_BELIEF_ACT3_SURGE (too many in Act 3 — opposite direction), and
+  // BELIEF_FRONT_LOADED (assertions only in first half — this is specifically Act 3).
+  if (records.length >= 10) {
+    const act3Start362 = Math.floor(records.length * 0.75);
+    const act3SceneIdxs362 = new Set((records as any[]).slice(act3Start362).map((r: any) => r.sceneIdx));
+    const act12Assertions362 = toldBeliefs.filter(t => !act3SceneIdxs362.has(t.sceneIdx));
+    const act3Assertions362 = toldBeliefs.filter(t => act3SceneIdxs362.has(t.sceneIdx));
+    if (act12Assertions362.length >= 3 && act3Assertions362.length === 0) {
+      issues.push({
+        location: `Act 3 (from Scene ${(records as any[])[act3Start362].sceneIdx}) — no assertions`,
+        rule: 'TOLD_BELIEF_ACT3_ABSENT',
+        severity: 'minor',
+        description: `${act12Assertions362.length} assertion(s) land in Acts 1–2 but none in Act 3 — the finale contains no moments where any character commits to a position or declares what they believe. The story tests and challenges beliefs through Acts 1 and 2, then resolves without anyone stating what they now hold to be true. An Act 3 without assertions means the ending resolves the plot but leaves the story's belief conflicts unresolved.`,
+        suggestedFix: "Place at least one assertion in Act 3: a character stating what they have learned, what they still believe despite everything, or what they now reject. The climax is where beliefs are confirmed or destroyed — let a character speak the outcome of what the story's belief layer has been arguing.",
+      });
+    }
+  }
+
+  // REVELATION_CURIOSITY_PEAK_ABSENT (minor, n≥8, ≥2 curious revelation scenes): The
+  // scene with the highest curiosityDelta has no revelation, even though at least 2 other
+  // curiosity-positive scenes (curiosityDelta > 0) do carry revelations. The peak curiosity
+  // moment — when the audience is most urgently wondering — is not where any truth is
+  // disclosed. The story's most inquisitive scene passes without answering, or even
+  // deepening, the audience's need to know with a discovery. Distinct from REVELATION_
+  // CURIOSITY_DECOUPLED (revelation scenes avg curiosityDelta ≤ 0 — the opposite direction:
+  // revelation scenes lack curiosity; this checks whether the peak curiosity scene lacks
+  // a revelation).
+  if (records.length >= 8) {
+    const revSet362b = new Set(witnessedBeliefs.map(w => w.sceneIdx));
+    const curiousRevScenes362 = (records as any[]).filter(r =>
+      revSet362b.has(r.sceneIdx) && (r.curiosityDelta ?? 0) > 0,
+    );
+    if (curiousRevScenes362.length >= 2) {
+      const peakCur362 = (records as any[]).reduce((best: any, r: any) =>
+        (r.curiosityDelta ?? 0) > (best.curiosityDelta ?? 0) ? r : best,
+        (records as any[])[0],
+      );
+      if (!revSet362b.has(peakCur362.sceneIdx)) {
+        issues.push({
+          location: `Scene ${peakCur362.sceneIdx} — peak curiosity, no revelation`,
+          rule: 'REVELATION_CURIOSITY_PEAK_ABSENT',
+          severity: 'minor',
+          description: `Scene ${peakCur362.sceneIdx} carries the story's highest curiosityDelta (${(peakCur362.curiosityDelta ?? 0).toFixed(2)}) but no revelation, even though ${curiousRevScenes362.length} other curious scenes do deliver discoveries. The moment the audience is most urgently wondering what is true is precisely where no truth arrives — the peak of audience inquisitiveness passes without disclosure, and the most potent delivery slot for a revelation is left empty.`,
+          suggestedFix: 'Place a revelation at the peak-curiosity scene: when the audience is most urgently leaning forward wondering what is true, that is the moment to give them a discovery. The scene that raises the most questions should also deliver an answer — or a revelation that opens deeper ones. Curiosity at its peak is the best possible slot for a truth to land.',
+        });
+      }
     }
   }
 
