@@ -34,6 +34,11 @@
 // neutral — deadlines with no felt pressure), dramatic turn no suspense (turn scenes avg
 // suspenseDelta ≤ 0 — pivots that generate no tension), suspense spike no fallout (high-
 // suspense scenes produce no downstream consequence within two scenes).
+// Wave 363 additions: payoff no emotion (every payoff scene is emotionally neutral —
+// threads resolve without anyone feeling the resolution), seed scene curiosity void (clue-
+// planting scenes avg curiosityDelta ≤ 0 — foreshadowing that never sparks wonder), clock
+// raise curiosity void (clock-raise scenes avg curiosityDelta ≤ 0 — deadlines create dread
+// but not the wondering urgency about how the protagonist escapes).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1524,6 +1529,80 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         description: `${spikes349.length} scenes spike suspense (suspenseDelta > 1.5) but none is followed within two scenes by any consequence — no emotional shift, no relationship move, no revelation, no dramatic turn. Tension is raised and then absorbed without effect, so each spike is a dead end rather than the cause of something. Suspense is a promise of consequence; spikes that change nothing downstream teach the audience that the story's alarms are false.`,
         suggestedFix: 'Let each suspense spike detonate: the scenes right after a tension peak should carry its fallout — a relationship fractured by the crisis, a truth forced into the open, an emotional wound, a reversal. If a spike leads to nothing, either pay it off downstream or cut it; tension that never delivers trains the audience to stop feeling it.',
       });
+    }
+  }
+
+  // ── Wave 363: PAYOFF_NO_EMOTION, SEED_SCENE_CURIOSITY_VOID, CLOCK_RAISE_CURIOSITY_VOID ──
+
+  // PAYOFF_NO_EMOTION (minor, n≥8, ≥2 payoff scenes): Every scene carrying a
+  // payoff (payoffSetupIds non-empty) is emotionally neutral — planted threads
+  // resolve without anyone feeling the resolution. A payoff is the completion of a
+  // story promise; when every completion lands in an affectless scene, the resolution
+  // is informational rather than dramatic: the audience learns the thread is closed
+  // without feeling what the closure cost or gave. Distinct from PAYOFF_CURIOSITY_
+  // DECOUPLED (curiosityDelta channel) and PAYOFF_BACK_LOADED (timing, not emotional
+  // content).
+  if (records.length >= 8) {
+    const payoffScenes363 = (records as any[]).filter(r =>
+      ((r.payoffSetupIds ?? []) as any[]).length > 0,
+    );
+    if (payoffScenes363.length >= 2 && payoffScenes363.every(r => r.emotionalShift === 'neutral')) {
+      issues.push({
+        location: `${payoffScenes363.length} payoff scene(s) — emotional register`,
+        rule: 'PAYOFF_NO_EMOTION',
+        severity: 'minor',
+        description: `All ${payoffScenes363.length} scenes where a planted thread resolves are emotionally neutral — the closures are informational rather than dramatic. A payoff completes a promise to the audience; when every completion lands in an affectless scene, the audience learns the thread is closed without feeling what that closure cost or gave them. Resolution without emotion is accounting, not catharsis.`,
+        suggestedFix: 'Let each payoff land emotionally: when a thread resolves, the character should feel the weight of its closing — relief, grief, triumph, regret. A payoff scene that generates no emotional charge suggests either the setup was too distant to still matter or the resolution was handled too quickly to feel. Make the completion cost or reward someone.',
+      });
+    }
+  }
+
+  // SEED_SCENE_CURIOSITY_VOID (minor, n≥8, ≥3 seed scenes): Scenes that plant
+  // clues (seededClueIds non-empty) average a curiosityDelta of zero or less. The
+  // story's foreshadowing engine is firing but never opening questions in the
+  // audience. When clues are planted in curiosity-flat scenes, the seeds are
+  // invisible to the audience — they receive information they might need later
+  // without wondering what it means. Distinct from CLUE_SEED_SUSPENSE_VOID (the
+  // suspense channel) and PAYOFF_CURIOSITY_DECOUPLED (payoff scenes, not seed scenes).
+  if (records.length >= 8) {
+    const seedScenes363 = (records as any[]).filter(r =>
+      ((r.seededClueIds ?? []) as any[]).length > 0,
+    );
+    if (seedScenes363.length >= 3) {
+      const avgSeedCuriosity363 = seedScenes363.reduce((s: number, r: any) => s + (r.curiosityDelta ?? 0), 0) / seedScenes363.length;
+      if (avgSeedCuriosity363 <= 0) {
+        issues.push({
+          location: `${seedScenes363.length} seed scene(s) — curiosity register`,
+          rule: 'SEED_SCENE_CURIOSITY_VOID',
+          severity: 'minor',
+          description: `${seedScenes363.length} scenes that plant clues (seededClueIds) average a curiosityDelta of ${avgSeedCuriosity363.toFixed(2)} — the foreshadowing engine is running but never opening questions. When clues are planted in curiosity-flat scenes, the seeds are invisible: the audience receives information without wondering what it means, so the clue sits inert until the payoff rather than building anticipation across the intervening scenes.`,
+          suggestedFix: 'Make each clue plant raise a question: the detail seeded should feel strange, incomplete, or significant enough that the audience wants to know what it means. A clue that sparks curiosity when planted makes its payoff satisfying; a clue planted in a curiosity-flat scene arrives as data and pays off as more data.',
+        });
+      }
+    }
+  }
+
+  // CLOCK_RAISE_CURIOSITY_VOID (minor, n≥8, ≥2 clock scenes): Scenes that raise
+  // the clock (clockRaised === true) average a curiosityDelta of zero or less.
+  // Deadlines generate dread but not the wondering urgency of "how can they possibly
+  // escape?" — the clock creates pressure but closes off questions rather than opening
+  // them. The most effective urgency combines fear and wonder: the audience should
+  // feel time running out AND be urgently curious whether the protagonist can solve
+  // the problem in time. Distinct from CLOCK_RAISED_NO_EMOTION (emotionalShift
+  // channel) and CLOCK_RAISED_NO_DELTA (cosmetic deadlines with no pressure increase).
+  if (records.length >= 8) {
+    const clockScenes363 = (records as any[]).filter(r => r.clockRaised === true);
+    if (clockScenes363.length >= 2) {
+      const avgClockCuriosity363 = clockScenes363.reduce((s: number, r: any) => s + (r.curiosityDelta ?? 0), 0) / clockScenes363.length;
+      if (avgClockCuriosity363 <= 0) {
+        issues.push({
+          location: `${clockScenes363.length} clock-raise scene(s) — curiosity register`,
+          rule: 'CLOCK_RAISE_CURIOSITY_VOID',
+          severity: 'minor',
+          description: `${clockScenes363.length} clock-raise scenes average a curiosityDelta of ${avgClockCuriosity363.toFixed(2)} — deadlines create pressure but never make the audience wonder how the protagonist escapes. Effective urgency combines dread and curiosity: a clock should make the audience feel time running out AND urgently want to know whether there is a way out. When deadlines average negative curiosity, the clock closes off possibility rather than opening the question of survival.`,
+          suggestedFix: 'Let each deadline raise a question alongside the pressure: a clock tightened should make the audience wonder "how?" not just fear "what if they fail?" Pair each deadline with an obstacle that is interesting rather than just crushing — the countdown is unbearable when the audience is urgently curious whether the protagonist can thread the needle.',
+        });
+      }
     }
   }
 
