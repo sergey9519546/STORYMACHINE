@@ -39,6 +39,11 @@
 // emotion), Act 2 purpose single (all Act 2 scenes share one purpose — the gap between
 // Act 1 and Act 3 purpose checks), Act 2b emotional flatline (the 50%–75% run-up to the
 // climax is all neutral — the emotional mirror of Act 2a emotional flatline).
+// Wave 387 additions: Act 1 emotional flatline (the whole first 25% is neutral while emotion
+// exists elsewhere — completes the emotional-flatline zone set with Act 2a/2b/3 and midpoint),
+// Act 2a curiosity void (the 25%–50% zone averages curiosityDelta ≤ 0 while the story is
+// otherwise curious — completes the curiosity-zone set), Act 2 dramatic turn absent (the long
+// middle act 25%–75% carries no pivot while ≥2 turns land outside it — the sagging middle).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1496,6 +1501,81 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `All ${act2bRecs373.length} Act 2b scenes (${act2bStart373}–${act2bEnd373 - 1}) are emotionally neutral — the run-up to the climax generates no emotional movement. Act 2b is where the cost of the conflict should be landing hardest as the protagonist approaches their lowest point; a flatline here means the story climbs toward its peak with the emotional arc stalled, so the climax inherits no accumulated feeling.`,
         suggestedFix: 'Charge Act 2b emotionally: the approach to the climax should be the protagonist\'s most harrowing stretch — mounting dread, deepening loss, the strain of everything closing in. Let the run-up to the peak move the protagonist so the audience arrives at the climax already invested in what it will cost them.',
+      });
+    }
+  }
+
+  // ── Wave 387: ACT1_EMOTIONAL_FLATLINE, ACT2A_CURIOSITY_VOID, ACT2_DRAMATIC_TURN_ABSENT ──
+
+  // ACT1_EMOTIONAL_FLATLINE (minor, n≥8, ≥3 Act 1 scenes): Every scene in Act 1 (the
+  // first 25%) is emotionally neutral, while the story carries emotion elsewhere. The
+  // opening establishes the world without giving the audience anything to feel, so they
+  // are oriented but not invested before the conflict begins. Completes the emotional-
+  // flatline zone set with ACT2A/ACT2B/ACT3_EMOTIONAL_FLATLINE and MIDPOINT_EMOTIONAL_
+  // FLATLINE; distinct from EMOTIONAL_OPENING_NEUTRAL (only the first three scenes) and
+  // ACT1_WARMTH_ABSENT (no POSITIVE beat — this fires even when negatives are also absent).
+  if (n >= 8) {
+    const a1End387 = Math.floor(n * 0.25);
+    const a1Recs387 = records.slice(0, a1End387);
+    const emotionElsewhere387 = records.slice(a1End387).some(r => r.emotionalShift !== 'neutral');
+    if (a1Recs387.length >= 3 && a1Recs387.every(r => r.emotionalShift === 'neutral') && emotionElsewhere387) {
+      issues.push({
+        location: `Act 1 (Scenes 0–${a1End387 - 1}) — emotional flatline`,
+        rule: 'ACT1_EMOTIONAL_FLATLINE',
+        severity: 'minor',
+        description: `All ${a1Recs387.length} Act 1 scenes are emotionally neutral, while the story carries emotion later. The opening establishes the world without giving the audience anything to feel, so they are oriented but not invested before the conflict begins — an Act 1 with no emotional charge asks the audience to wait for a reason to care.`,
+        suggestedFix: 'Charge Act 1 emotionally: let the protagonist\'s ordinary world carry a flicker of longing, fear, or joy so the audience bonds with them before the inciting incident. An emotional beat early is what makes the audience willing to follow the character into the story\'s trouble.',
+      });
+    }
+  }
+
+  // ACT2A_CURIOSITY_VOID (minor, n≥10, ≥2 Act 2a scenes): Act 2a (the 25%–50% zone)
+  // averages curiosityDelta ≤ 0 in a story that otherwise spikes curiosity (some scene
+  // exceeds curiosityDelta 1). The first half of the complication zone — where the early
+  // investigation should be opening questions — generates no intrigue, so the run toward
+  // the midpoint loses the audience's need to know. Completes the curiosity-zone set;
+  // distinct from ACT2_CURIOSITY_VALLEY (whole Act 2 averaged below both bookend acts — a
+  // comparison) and MIDPOINT_CURIOSITY_VOID (the narrow 40%–60% window).
+  if (n >= 10) {
+    const a2aStart387 = Math.floor(n * 0.25);
+    const a2aEnd387 = Math.floor(n * 0.5);
+    const a2aRecs387 = records.slice(a2aStart387, a2aEnd387);
+    const storyCurious387 = records.some(r => (r.curiosityDelta ?? 0) > 1);
+    if (a2aRecs387.length >= 2 && storyCurious387) {
+      const a2aAvg387 = a2aRecs387.reduce((s, r) => s + (r.curiosityDelta ?? 0), 0) / a2aRecs387.length;
+      if (a2aAvg387 <= 0) {
+        issues.push({
+          location: `Act 2a (Scenes ${a2aStart387}–${a2aEnd387 - 1}) — curiosity void`,
+          rule: 'ACT2A_CURIOSITY_VOID',
+          severity: 'minor',
+          description: `Act 2a (Scenes ${a2aStart387}–${a2aEnd387 - 1}) averages a curiosityDelta of ${a2aAvg387.toFixed(2)} while the story spikes curiosity elsewhere — the first half of the complication zone generates no intrigue. The early investigation, where new questions should be opening as the protagonist tests the world, instead coasts, so the run toward the midpoint loses the audience's need to know.`,
+          suggestedFix: 'Open questions in Act 2a: let the protagonist\'s first moves uncover something unexpected — a complication, a partial answer that raises a deeper question, a hint the situation is not what it seemed. Early-Act-2 curiosity is what pulls the audience across the long middle toward the midpoint turn.',
+        });
+      }
+    }
+  }
+
+  // ACT2_DRAMATIC_TURN_ABSENT (minor, n≥12, ≥4 Act 2 scenes): The long middle act
+  // (25%–75%) contains no dramatic turn, even though ≥2 turns land outside it. The
+  // complication zone — the stretch most prone to sagging — proceeds without a single
+  // reversal or recognition, so the middle plays as a flat extension of the setup rather
+  // than a sequence of escalating pivots. Distinct from MIDPOINT_REVERSAL_ABSENT (the
+  // midpoint scene specifically), ACT3_DRAMATIC_TURN_ABSENT (the finale), DRAMATIC_TURN_
+  // OPENING_ABSENT (first 30%), and NO_REVERSALS (the whole story has none).
+  if (n >= 12) {
+    const a2Start387 = Math.floor(n * 0.25);
+    const a2End387 = Math.floor(n * 0.75);
+    const a2Recs387 = records.slice(a2Start387, a2End387);
+    const turnsOutside387 = [...records.slice(0, a2Start387), ...records.slice(a2End387)]
+      .filter((r: any) => r.dramaticTurn != null && r.dramaticTurn !== 'nothing').length;
+    const a2HasTurn387 = a2Recs387.some((r: any) => r.dramaticTurn != null && r.dramaticTurn !== 'nothing');
+    if (a2Recs387.length >= 4 && turnsOutside387 >= 2 && !a2HasTurn387) {
+      issues.push({
+        location: `Act 2 (Scenes ${a2Start387}–${a2End387 - 1}) — no dramatic turns`,
+        rule: 'ACT2_DRAMATIC_TURN_ABSENT',
+        severity: 'minor',
+        description: `The long middle act (Scenes ${a2Start387}–${a2End387 - 1}) contains no dramatic turn, even though ${turnsOutside387} turns land in Acts 1 and 3. The complication zone — the stretch most prone to sagging — proceeds without a single reversal or recognition, so the middle plays as a flat extension of the setup rather than a sequence of escalating pivots that keeps the audience off balance.`,
+        suggestedFix: 'Build reversals into Act 2: a midpoint twist, a setback that forces a new plan, an alliance that flips. The middle act is where a story most often loses momentum; punctuating it with genuine turns is what keeps the long stretch between setup and climax dynamic.',
       });
     }
   }

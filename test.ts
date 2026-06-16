@@ -24472,6 +24472,73 @@ Time to go now.`;
     });
   });
 
+  describe('Wave 387 — structurePass: Act 1 emotional flatline, Act 2a curiosity void, Act 2 dramatic turn absent', async () => {
+    const makeRec387 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runST387 = async (records: any[]) => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      return structurePass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ACT1_EMOTIONAL_FLATLINE fires when the whole first 25% is neutral while emotion exists elsewhere', async () => {
+      // n=12 → Act 1 = scenes 0-2 (all neutral); scene 6 charged
+      const recs387ef = Array.from({ length: 12 }, (_, i) =>
+        makeRec387(i, { emotionalShift: i === 6 ? 'positive' : 'neutral' }),
+      );
+      const res = await runST387(recs387ef);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACT1_EMOTIONAL_FLATLINE'), 'ACT1_EMOTIONAL_FLATLINE should fire');
+    });
+
+    it('ACT1_EMOTIONAL_FLATLINE does not fire when an Act 1 scene carries emotion', async () => {
+      const recs387efn = Array.from({ length: 12 }, (_, i) =>
+        makeRec387(i, { emotionalShift: i === 1 ? 'negative' : 'neutral' }),
+      );
+      const res = await runST387(recs387efn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACT1_EMOTIONAL_FLATLINE'), 'ACT1_EMOTIONAL_FLATLINE should not fire');
+    });
+
+    it('ACT2A_CURIOSITY_VOID fires when the 25-50% zone averages curiosityDelta ≤ 0 while story is curious', async () => {
+      // n=12 → Act 2a = scenes 3-5 (curiosityDelta 0); spike at scene 8
+      const recs387cv = Array.from({ length: 12 }, (_, i) =>
+        makeRec387(i, { curiosityDelta: i === 8 ? 2 : 0 }),
+      );
+      const res = await runST387(recs387cv);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACT2A_CURIOSITY_VOID'), 'ACT2A_CURIOSITY_VOID should fire');
+    });
+
+    it('ACT2A_CURIOSITY_VOID does not fire when Act 2a has positive average curiosity', async () => {
+      const recs387cvn = Array.from({ length: 12 }, (_, i) =>
+        makeRec387(i, { curiosityDelta: (i >= 3 && i <= 5) ? 1 : i === 8 ? 2 : 0 }),
+      );
+      const res = await runST387(recs387cvn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACT2A_CURIOSITY_VOID'), 'ACT2A_CURIOSITY_VOID should not fire');
+    });
+
+    it('ACT2_DRAMATIC_TURN_ABSENT fires when Act 2 has no turn but 2+ turns land outside it', async () => {
+      // n=12 → Act 2 = scenes 3-8; turns at 1 and 10 only
+      const recs387dt = Array.from({ length: 12 }, (_, i) =>
+        makeRec387(i, { dramaticTurn: [1, 10].includes(i) ? 'reversal' : 'nothing' }),
+      );
+      const res = await runST387(recs387dt);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACT2_DRAMATIC_TURN_ABSENT'), 'ACT2_DRAMATIC_TURN_ABSENT should fire');
+    });
+
+    it('ACT2_DRAMATIC_TURN_ABSENT does not fire when Act 2 contains a dramatic turn', async () => {
+      const recs387dtn = Array.from({ length: 12 }, (_, i) =>
+        makeRec387(i, { dramaticTurn: [1, 5, 10].includes(i) ? 'reversal' : 'nothing' }),
+      );
+      const res = await runST387(recs387dtn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACT2_DRAMATIC_TURN_ABSENT'), 'ACT2_DRAMATIC_TURN_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 373 — structurePass: midpoint suspense void, Act 2 purpose single, Act 2b emotional flatline', async () => {
     const makeRec373 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
