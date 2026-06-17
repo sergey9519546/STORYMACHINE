@@ -19668,6 +19668,131 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 424 — originalityPass: insert shot crutch, ellipsis action overuse, action adverb flood', async () => {
+    const runO424 = async (fountain: string) => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      return originalityPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('INSERT_SHOT_CRUTCH fires when 3+ INSERT labels appear', async () => {
+      const f424i = `INT. ROOM - DAY
+
+Anna enters and looks at the table.
+
+INSERT: THE LETTER ON THE TABLE
+
+She reaches for it.
+
+INSERT: THE HANDWRITING UP CLOSE
+
+Words written in red ink.
+
+INSERT: A PHOTOGRAPH INSIDE THE ENVELOPE
+
+Her own face, years younger.
+
+She folds it and puts it in her coat.
+`;
+      const res = await runO424(f424i);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INSERT_SHOT_CRUTCH'), 'INSERT_SHOT_CRUTCH should fire');
+    });
+
+    it('INSERT_SHOT_CRUTCH does not fire with only 2 INSERT labels', async () => {
+      const f424iNF = `INT. ROOM - DAY
+
+Anna enters and looks at the table.
+
+INSERT: THE LETTER ON THE TABLE
+
+She reaches for it.
+
+INSERT: THE HANDWRITING UP CLOSE
+
+Words written in red ink.
+
+She folds it and puts it in her coat.
+`;
+      const res = await runO424(f424iNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INSERT_SHOT_CRUTCH'), 'INSERT_SHOT_CRUTCH should not fire');
+    });
+
+    it('ELLIPSIS_ACTION_OVERUSE fires when >20% of action lines trail off with "..."', async () => {
+      // 3 of 10 action lines have "..." = 30% > 20%
+      const f424e = `INT. ROOM - DAY
+
+She walks toward the window...
+The light fades...
+He turns... but says nothing.
+She reaches out.
+The phone rings.
+He answers.
+She starts to leave.
+The door opens.
+Rain falls outside.
+The clock reads midnight.
+`;
+      const res = await runO424(f424e);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ELLIPSIS_ACTION_OVERUSE'), 'ELLIPSIS_ACTION_OVERUSE should fire');
+    });
+
+    it('ELLIPSIS_ACTION_OVERUSE does not fire when ellipsis is rare in action', async () => {
+      // 1 of 10 action lines has "..." = 10% < 20%
+      const f424eNF = `INT. ROOM - DAY
+
+She walks toward the window.
+The light fades.
+He turns toward her.
+She reaches out...
+The phone rings on the table.
+He answers it quickly.
+She starts to leave.
+The door opens from outside.
+Rain falls against the glass.
+The clock reads midnight.
+`;
+      const res = await runO424(f424eNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ELLIPSIS_ACTION_OVERUSE'), 'ELLIPSIS_ACTION_OVERUSE should not fire');
+    });
+
+    it('ACTION_ADVERB_FLOOD fires when >25% of action lines carry a manner adverb', async () => {
+      // 4 of 10 action lines have adverbs = 40% > 25%
+      const f424a = `INT. ROOM - DAY
+
+She slowly closes the door behind her.
+He carefully sets the glass down.
+She quietly opens the drawer.
+He walks to the window.
+She picks up the letter.
+He reads it to the end.
+She crosses her arms.
+He turns away.
+The phone rings.
+She answers it quickly.
+`;
+      const res = await runO424(f424a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_ADVERB_FLOOD'), 'ACTION_ADVERB_FLOOD should fire');
+    });
+
+    it('ACTION_ADVERB_FLOOD does not fire when adverbs are rare in action', async () => {
+      // 1 of 10 action lines has an adverb = 10% < 25%
+      const f424aNF = `INT. ROOM - DAY
+
+She closes the door behind her.
+He sets the glass down.
+She opens the drawer.
+He walks to the window.
+She picks up the letter.
+He reads it to the end.
+She crosses her arms.
+He turns away.
+The phone rings.
+She quickly answers it.
+`;
+      const res = await runO424(f424aNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_ADVERB_FLOOD'), 'ACTION_ADVERB_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 410 — originalityPass: slow-motion crutch, freeze-frame crutch, sound-cue crutch', async () => {
     const runO410 = async (fountain: string) => {
       const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');

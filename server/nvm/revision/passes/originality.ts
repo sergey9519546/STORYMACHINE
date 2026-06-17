@@ -53,6 +53,14 @@
 // the prose imply it). Each is a distinct device crutch not covered by SMASH_CUT_OVERUSE
 // (hard/jump/match cuts), DIRECTORIAL_INTRUSION (camera/lens calls, "WE HEAR"), or the card
 // crutches (on-screen text/time captions).
+// Wave 424 additions: insert shot crutch (≥3 "INSERT:" label lines — directorial close-up
+// call left in the action prose rather than folded into the narrative; distinct from
+// DIRECTORIAL_INTRUSION which targets camera/lens calls inside action blocks), ellipsis
+// action overuse (>20% of action lines contain "..." — stage directions that trail off
+// instead of completing the image; underweight/bloat mode), action adverb flood (>25% of
+// action lines carry a manner adverb like "slowly"/"quietly"/"suddenly" — substituting
+// description for specific concrete action; distinct from body language clichés and reaction
+// shot overuse which target specific gesture patterns).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1939,6 +1947,109 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${soundCueCount410} lines hard-code a sound effect with an explicit label ("SFX:", "SOUND:"). Spelling out the sound design in labelled cues is the sound editor's job; on the page it reads as a spreadsheet of effects rather than prose that makes the reader hear the world. A script that lists its sounds tells the reader what to hear instead of writing the action so the sound is felt — the cue substitutes for the craft of evocation.`,
         suggestedFix: 'Fold essential sounds into the action prose so the reader hears them through the writing: instead of "SFX: GLASS SHATTERS", write "The glass shatters against the wall." Reserve a labelled cue only for a sound that is genuinely off-screen and plot-critical and cannot be implied by what is on the page.',
+      });
+    }
+  }
+
+  // ── Wave 424: INSERT_SHOT_CRUTCH, ELLIPSIS_ACTION_OVERUSE, ACTION_ADVERB_FLOOD ──
+
+  // INSERT_SHOT_CRUTCH (minor, ≥3 "INSERT:" lines): Three or more lines hard-code an
+  // insert shot with an explicit "INSERT:" or "INSERT -" label. Insert shots are a
+  // director's decision — the choice to isolate an object in a close-up belongs to
+  // the edit, not the script. When a writer labels three or more inserts, they are
+  // building the shot list rather than writing the scene: the detail that warrants an
+  // insert should be integrated into the action prose through a character's attention
+  // rather than called by a slug-like directive. Distinct from DIRECTORIAL_INTRUSION
+  // (Wave 259: camera/lens calls like "CLOSE ON"/"TIGHT ON"/"WE SEE" inside action prose —
+  // this targets the "INSERT:" heading format specifically, which is a slug-level directive
+  // rather than an action-line instruction) and from TITLE_CARD_CRUTCH / TIME_CARD_CRUTCH
+  // (on-screen text / time captions — content cards, not image-composition directives).
+  {
+    const insertRe424a = /^INSERT[\s:\-]/i;
+    const insertCount424a = lines.filter(l => insertRe424a.test(l.trim())).length;
+    if (insertCount424a >= 3) {
+      issues.push({
+        location: `${insertCount424a} INSERT shot label(s)`,
+        rule: 'INSERT_SHOT_CRUTCH',
+        severity: 'minor',
+        description: `${insertCount424a} lines hard-code an INSERT shot with an explicit label ("INSERT:", "INSERT -"). Calling inserts by name is a directorial choice that belongs to the edit; on the page it lifts the reader out of the prose world and into a production checklist. The insert-worthy detail should appear as a natural beat in the action prose — seen through a character's attention or through the scene's natural visual logic — rather than as a labeled shot directive.`,
+        suggestedFix: 'Fold the inserted image into the action prose: instead of "INSERT: THE CLOCK — 3:47 AM", write "She glances at the clock. 3:47 AM." The detail lands harder when the audience receives it through a character\'s attention rather than through a director\'s annotated frame. Remove the INSERT labels and let the prose\'s own focus imply the close-up.',
+      });
+    }
+  }
+
+  // ELLIPSIS_ACTION_OVERUSE (minor, ≥10 action lines, >20%): More than 20% of action lines
+  // contain an ellipsis ("..."). In stage directions, an ellipsis signals either prose that
+  // avoids completing its own thought — the description trails off rather than landing on a
+  // specific image — or an artsy stylistic affectation. Both are problems: the first indicates
+  // incomplete writing, the second a self-conscious manner that makes every third action line
+  // feel like it knows it is being read rather than serving the scene. When more than a fifth
+  // of all action lines use "...", the screenplay's prose voice has a tic that reads as
+  // unfinished regardless of authorial intent. Distinct from dialogue ELLIPSIS_OVERUSE
+  // (Wave 255: the "..." register in dialogue — the trailing-off speech pattern; this targets
+  // "..." specifically in the action/description layer), REACTION_SHOT_OVERUSE (terse lines,
+  // not incomplete-thought lines), and FILTERING_VERB_OVERUSE (perceptual framing, not
+  // trailing-off incompleteness). Underweight/bloat mode.
+  {
+    let actionTotal424b = 0;
+    let ellipsisCount424b = 0;
+    let inDlg424b = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg424b = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg424b = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg424b = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (inDlg424b) continue;
+      actionTotal424b++;
+      if (/\.{3}/.test(t)) ellipsisCount424b++;
+    }
+    if (actionTotal424b >= 10 && ellipsisCount424b / actionTotal424b > 0.20) {
+      issues.push({
+        location: `${ellipsisCount424b} of ${actionTotal424b} action lines contain "..."`,
+        rule: 'ELLIPSIS_ACTION_OVERUSE',
+        severity: 'minor',
+        description: `${ellipsisCount424b} of ${actionTotal424b} action lines (${Math.round(ellipsisCount424b / actionTotal424b * 100)}%) trail off with an ellipsis. In stage directions, "..." signals either prose that avoids completing its own image — the description trails off rather than landing on a specific visual — or a self-conscious stylistic affectation. When more than a fifth of all action lines use the device, the screenplay's prose has a tic that reads as unfinished: the writer keeps declining to say the thing, and the reader keeps stopping where the image should land.`,
+        suggestedFix: 'Complete each action line — say what is on screen, fully and specifically, rather than trailing it into suggestion. Ellipsis in action belongs in rare beats where incompleteness IS the effect: the thing can\'t quite be named, the image is deliberately withheld. For everything else, write the image. The reader experiences what is described, not what is gestured at.',
+      });
+    }
+  }
+
+  // ACTION_ADVERB_FLOOD (minor, ≥10 action lines, >25%): More than 25% of action lines
+  // carry a common manner adverb — "slowly", "carefully", "quietly", "quickly", "gently",
+  // "suddenly", "softly", "nervously", "anxiously", "angrily", "urgently", "deliberately",
+  // "cautiously", "silently", "frantically". Adverbs in action lines substitute for specific
+  // physical description: "she closes the door quietly" tells the reader the manner without
+  // showing a concrete image that implies it. When more than a quarter of all action lines
+  // lean on adverb qualification, the prose is consistently describing HOW actions feel
+  // rather than WHAT actions look like — trading the visual specificity film needs for
+  // abstract instruction that neither the reader nor the director can picture. Distinct from
+  // BODY_LANGUAGE_CLICHÉ_OVERUSE (Wave 315: specific stock gesture nouns — nods/shrugs/sighs;
+  // this targets the adverb + any-verb construction, not named gestures), REACTION_SHOT_
+  // OVERUSE (terse single-beat lines, not qualified lines), and FILTERING_VERB_OVERUSE
+  // (perception verbs like "sees"/"notices" — the source of the filtering, not the manner).
+  {
+    const adverbRe424c = /\b(slowly|carefully|quietly|quickly|gently|suddenly|softly|nervously|anxiously|angrily|urgently|deliberately|cautiously|silently|frantically|hastily|weakly|firmly|coldly|calmly|tensely)\b/i;
+    let actionTotal424c = 0;
+    let adverbCount424c = 0;
+    let inDlg424c = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg424c = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg424c = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg424c = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (inDlg424c) continue;
+      actionTotal424c++;
+      if (adverbRe424c.test(t)) adverbCount424c++;
+    }
+    if (actionTotal424c >= 10 && adverbCount424c / actionTotal424c > 0.25) {
+      issues.push({
+        location: `${adverbCount424c} of ${actionTotal424c} action lines carry a manner adverb`,
+        rule: 'ACTION_ADVERB_FLOOD',
+        severity: 'minor',
+        description: `${adverbCount424c} of ${actionTotal424c} action lines (${Math.round(adverbCount424c / actionTotal424c * 100)}%) carry a manner adverb ("slowly", "carefully", "quietly", "suddenly", "gently"). Adverbs in action lines substitute for specific physical description: they tell the manner rather than showing the concrete image that would imply it. When more than a quarter of all action uses adverb qualification, the prose consistently describes HOW actions feel rather than WHAT they look like — trading visual specificity for abstract instruction.`,
+        suggestedFix: 'Replace manner adverbs with the specific action that implies the manner: "She closes the door quietly" → "She eases the door shut, her fingertips pressing the latch back until it clicks." The concrete image makes the reader feel the quality; the adverb only names it. Reserve a manner adverb for the rare line where the manner genuinely cannot be inferred from the physical action being described.',
       });
     }
   }
