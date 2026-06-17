@@ -67,6 +67,13 @@
 // decoupled), pair revelation flat (a pair with ≥3 shifts, none coinciding with a revelation
 // though revelations exist — the per-pair revelation cell, complement of relationship revelation
 // silent). These complete the per-pair channel set alongside pair suspense/curiosity/emotion flat.
+// Wave 427 additions: relationship shift aftermath void (sequence/aftermath — every shift scene
+// that has room after it is followed by two relationally silent scenes; bonds move in isolation
+// without sparking any chain reaction), pair amplitude growth (run-based — a pair with ≥4 shifts
+// whose late-half average magnitude exceeds 1.5× the early-half average; the complement of
+// relationship amplitude decay), pair repair unmotivated (backward-cause — a pair with ≥3 shifts
+// has positive shifts preceded by neither a prior pair conflict within 3 scenes nor any dramatic
+// catalyst in that scene or the prior; warmings arrive without cause).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1789,6 +1796,135 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
           description: `${flatRevPairs413c.length === 1 ? 'One pair' : `${flatRevPairs413c.length} pairs`} (${flatRevPairs413c.join('; ')}) move${flatRevPairs413c.length === 1 ? 's' : ''} 3 or more times, yet not one of those shifts coincides with a revelation, even though the story discloses truths elsewhere. This bond never changes on the back of something coming to light — the relationship and the story's truths evolve on separate tracks, so the audience never experiences the charged moment where a disclosure and a bond shift land together.`,
           suggestedFix: 'Tie at least one of this pair\'s shifts to a revelation: a secret that surfaces and reshapes how the two regard each other, a truth that breaks or cements their bond in the moment it lands. When a disclosure drives a relationship change, the revelation has interpersonal consequence and the shift has a cause the audience can feel.',
         });
+      }
+    }
+  }
+
+  // ── Wave 427: RELATIONSHIP_SHIFT_AFTERMATH_VOID, PAIR_AMPLITUDE_GROWTH, PAIR_REPAIR_UNMOTIVATED ──
+
+  // RELATIONSHIP_SHIFT_AFTERMATH_VOID (sequence/aftermath, n≥10, ≥2 qualifying shift scenes):
+  // Every scene that carries a relationship shift AND has at least two scenes following it is
+  // succeeded by two scenes that contain no relationship shift in any pair. Bonds move in complete
+  // isolation — each change fires without sparking any relational chain reaction in the scenes
+  // immediately after it. A shift that matters to the story should send ripples: the changed
+  // dynamic surfaces in new behaviour, further relational movement, or at least the tension of
+  // people navigating the altered ground in subsequent scenes. When every shift is followed by
+  // relational dead air, the story treats each bond change as a self-contained event with no
+  // ongoing consequence.
+  // Distinctness: RELATIONSHIP_SHIFT_DROUGHT fires when the LONGEST no-shift run spans ≥40% of
+  // the story; this fires when the two-scene AFTERMATH of EVERY individual shift is silent —
+  // a drought can exist without every shift being dead-ended, and this can fire even when the
+  // global drought is short. PAIR_OSCILLATION counts sign reversals. STATIC_RELATIONSHIP fires
+  // when a pair never shifts at all. This is the only aftermath/sequence check in this pass.
+  if (records.length >= 10) {
+    const shiftScenes427a = (records as any[]).filter(
+      r => ((r.relationshipShifts ?? []) as any[]).length > 0 && r.sceneIdx + 2 < records.length,
+    );
+    if (shiftScenes427a.length >= 2) {
+      const allDeadEnded427a = shiftScenes427a.every(r => {
+        const next1 = (records as any[])[r.sceneIdx + 1];
+        const next2 = (records as any[])[r.sceneIdx + 2];
+        const silent = (s: any) => s && ((s.relationshipShifts ?? []) as any[]).length === 0;
+        return silent(next1) && silent(next2);
+      });
+      if (allDeadEnded427a) {
+        issues.push({
+          location: `${shiftScenes427a.length} shift scene(s) — aftermath relational silence`,
+          rule: 'RELATIONSHIP_SHIFT_AFTERMATH_VOID',
+          severity: 'minor',
+          description: `Every relationship-shift scene that has room after it (${shiftScenes427a.length} in total) is followed by two scenes with no relational movement in any pair. Each bond change fires in isolation — no chain reaction, no altered behaviour, no further shifts sparked by the change — so the story treats each relationship event as self-contained rather than as a cause that reverberates through subsequent scenes.`,
+          suggestedFix: 'Let relationship shifts ripple: in the scene or two after a bond moves, show the characters navigating the changed dynamic — a follow-up confrontation, a shift in how a third party reads the pair, or at least a further micro-move on the same axis. A bond change that has no aftermath registers as a plot note; one that sends ripples registers as a turning point.',
+        });
+      }
+    }
+  }
+
+  // PAIR_AMPLITUDE_GROWTH (run-based, n≥8, pair with ≥4 shifts): A single pair's shifts grow
+  // in absolute magnitude over the story — the late-half average magnitude exceeds 1.5× the
+  // early-half average. Each successive wave of relational movement is larger than the last,
+  // creating an unchecked escalation where every confrontation or reconciliation must outdo the
+  // previous one. While RELATIONSHIP_AMPLITUDE_DECAY catches a bond that dissipates (early swings
+  // large, late swings tiny), this catches the opposite: a bond in sustained, unrelenting
+  // escalation with no stabilisation or plateau. Pure escalation without levelling reads as
+  // melodrama — the audience loses the ability to gauge severity when every move is "the biggest
+  // yet."
+  // Distinctness: RELATIONSHIP_AMPLITUDE_DECAY (early avg > 2× late avg — bond winds down). This
+  // fires on the reversed ratio: late avg > 1.5× early avg. PAIR_OSCILLATION counts sign changes,
+  // not magnitude trend. WEAK_SHIFT_DOMINANCE fires when shifts are consistently tiny across the
+  // whole story — this fires when they are consistently GROWING. These are orthogonal measures.
+  if (records.length >= 8) {
+    for (const [pairKey427b, stats427b] of pairStats) {
+      if (stats427b.shifts.length >= 4) {
+        const mags427b = stats427b.shifts.map(s => Math.abs(s.amount));
+        const half427b = Math.floor(mags427b.length / 2);
+        const earlyAvg427b = mags427b.slice(0, half427b).reduce((s, m) => s + m, 0) / half427b;
+        const lateAvg427b = mags427b.slice(mags427b.length - half427b).reduce((s, m) => s + m, 0) / half427b;
+        if (earlyAvg427b > 0 && lateAvg427b > earlyAvg427b * 1.5) {
+          const [charA427b, charB427b] = pairKey427b.split('|');
+          issues.push({
+            location: `${charA427b} ↔ ${charB427b}`,
+            rule: 'PAIR_AMPLITUDE_GROWTH',
+            severity: 'minor',
+            description: `The bond between ${charA427b} and ${charB427b} escalates in magnitude across the story: early shifts average ${earlyAvg427b.toFixed(2)} but late shifts average ${lateAvg427b.toFixed(2)} — each successive wave is larger than the last. Unchecked relational escalation reads as melodrama: every confrontation or repair must top the previous one, the audience loses their sense of scale, and the bond's eventual peak feels hyperinflated rather than earned.`,
+            suggestedFix: `Give this pair's arc a plateau or a step back after the early escalation: let a mid-story shift settle rather than immediately amplifying, so the late-story peak feels like a true maximum rather than the latest in a series of ever-larger moves. Amplitude should earn its heights by contrast, not by unbroken escalation.`,
+          });
+          break; // one report per pass
+        }
+      }
+    }
+  }
+
+  // PAIR_REPAIR_UNMOTIVATED (backward-cause, n≥10, pair with ≥3 shifts including ≥1 positive):
+  // A pair that shifts three or more times has one or more positive shifts (warmings/repairs), but
+  // looking backward from each such warming: there is no prior conflict for that pair within the
+  // three preceding scenes AND neither the warming scene nor the scene immediately before it carries
+  // a revelation, dramatic turn, clock raise, or suspense spike (> 1). The bond warms without
+  // either a preceding rupture to resolve or a narrative event to motivate it — the audience has
+  // been given no dramatic reason to believe the relationship should be moving toward warmth at
+  // that moment.
+  // Distinctness: RELATIONSHIP_UNEARNED_REVERSAL fires when a sign-CHANGE (positive→negative or
+  // vice versa) has no prior setup in the prior scene specifically. This fires for any positive
+  // shift — not requiring a sign change — and looks back three scenes for a prior pair conflict,
+  // broadening the backward window and covering pairs that warm from neutral. MONOTONE_RELATIONSHIP
+  // and POSITIVE_ONLY_PAIR_MAJORITY cover always-same-sign patterns; this targets individual
+  // warmings inside mixed arcs that lack backward causation.
+  if (records.length >= 10) {
+    const hasCatalyst427c = (r: any) =>
+      r && (
+        r.revelation === true ||
+        (r.dramaticTurn ?? 'nothing') !== 'nothing' ||
+        r.clockRaised === true ||
+        (r.suspenseDelta ?? 0) > 1
+      );
+
+    for (const [pairKey427c, stats427c] of pairStats) {
+      if (stats427c.shifts.length < 3) continue;
+      const positiveShifts427c = stats427c.shifts.filter(s => s.amount >= 0.3);
+      if (positiveShifts427c.length === 0) continue;
+
+      const anyMotivated427c = positiveShifts427c.some(shift => {
+        const si = shift.sceneIdx;
+        // (a) prior negative shift for this pair within 3 scenes
+        const priorConflict = stats427c.shifts.some(
+          s => s.amount <= -0.3 && s.sceneIdx >= si - 3 && s.sceneIdx < si,
+        );
+        if (priorConflict) return true;
+        // (b) dramatic catalyst in the warming scene or the prior scene
+        const scene = (records as any[])[si];
+        const prior = si > 0 ? (records as any[])[si - 1] : null;
+        return hasCatalyst427c(scene) || hasCatalyst427c(prior);
+      });
+
+      if (!anyMotivated427c) {
+        const [charA427c, charB427c] = pairKey427c.split('|');
+        issues.push({
+          location: `${charA427c} ↔ ${charB427c} — unmotivated warming`,
+          rule: 'PAIR_REPAIR_UNMOTIVATED',
+          severity: 'minor',
+          description: `The bond between ${charA427c} and ${charB427c} warms (positive shift ≥ 0.3) in at least one scene, but looking backward, none of those warmings are preceded by a recent pair conflict (within 3 scenes) or a dramatic catalyst in the scene or prior scene. The relationship moves toward warmth without the story providing a reason: no rupture is being resolved, no revelation motivates the change, and no deadline or pivot occurs nearby. Unmotivated warmings feel like mood shifts rather than story events.`,
+          suggestedFix: `Give each warming a backward cause: either let it follow a recent rupture for this pair (so it reads as resolution), or place a revelation, dramatic turn, or clock in the scene that triggers the shift. A bond that warms for no dramatic reason is a relationship that rewrites itself rather than earning its changes through story logic.`,
+        });
+        break; // one report per pass
       }
     }
   }

@@ -19226,6 +19226,82 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 427 — relationshipArcPass: relationship shift aftermath void, pair amplitude growth, pair repair unmotivated', async () => {
+    const makeRec427 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const shift427 = (amount: number, pair = 'A|B') => [{ pairKey: pair, dimension: 'trust', amount }];
+    const runR427 = async (records: any[]) => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('RELATIONSHIP_SHIFT_AFTERMATH_VOID fires when every shift scene is followed by 2 silent scenes', async () => {
+      // n=10; shifts at 2 and 5; scenes 3,4,6,7 default (no shifts) → both aftermath silent → fires
+      const recs427a = Array.from({ length: 10 }, (_, i) =>
+        makeRec427(i, { relationshipShifts: [2, 5].includes(i) ? shift427(-0.4) : [] })
+      );
+      const res = await runR427(recs427a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_AFTERMATH_VOID'), 'RELATIONSHIP_SHIFT_AFTERMATH_VOID should fire');
+    });
+
+    it('RELATIONSHIP_SHIFT_AFTERMATH_VOID does NOT fire when a shift sparks relational activity in its aftermath', async () => {
+      // n=10; shifts at 2 and 3 → scene 2 aftermath includes scene 3 which has a shift → not silent → no fire
+      const recs427aNF = Array.from({ length: 10 }, (_, i) =>
+        makeRec427(i, { relationshipShifts: [2, 3].includes(i) ? shift427(-0.4) : [] })
+      );
+      const res = await runR427(recs427aNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_AFTERMATH_VOID'), 'RELATIONSHIP_SHIFT_AFTERMATH_VOID should not fire');
+    });
+
+    it('PAIR_AMPLITUDE_GROWTH fires when a pair\'s late-half magnitude exceeds 1.5× the early-half', async () => {
+      // 4 shifts: magnitudes 0.1, 0.2 (early half avg=0.15), 0.4, 0.5 (late half avg=0.45)
+      // 0.45 > 0.15*1.5=0.225 → fires
+      const recs427b = Array.from({ length: 10 }, (_, i) => {
+        const shiftMap: Record<number, number> = { 1: -0.1, 3: -0.2, 6: -0.4, 8: -0.5 };
+        return makeRec427(i, { relationshipShifts: shiftMap[i] !== undefined ? shift427(shiftMap[i]) : [] });
+      });
+      const res = await runR427(recs427b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAIR_AMPLITUDE_GROWTH'), 'PAIR_AMPLITUDE_GROWTH should fire');
+    });
+
+    it('PAIR_AMPLITUDE_GROWTH does NOT fire when a pair\'s magnitude stays uniform', async () => {
+      // 4 shifts all magnitude 0.3 → early avg=0.3, late avg=0.3; 0.3 > 0.3*1.5=0.45 → false → no fire
+      const recs427bNF = Array.from({ length: 10 }, (_, i) =>
+        makeRec427(i, { relationshipShifts: [1, 3, 6, 8].includes(i) ? shift427(-0.3) : [] })
+      );
+      const res = await runR427(recs427bNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAIR_AMPLITUDE_GROWTH'), 'PAIR_AMPLITUDE_GROWTH should not fire');
+    });
+
+    it('PAIR_REPAIR_UNMOTIVATED fires when a pair\'s positive shifts have no backward cause', async () => {
+      // n=10; pair A|B: positive shifts at 4 and 7; no prior negative for this pair; no catalyst in those scenes
+      const recs427c = Array.from({ length: 10 }, (_, i) =>
+        makeRec427(i, { relationshipShifts: [4, 7].includes(i) ? shift427(0.4) : [] })
+      );
+      // Add a third shift (negative) AFTER all positives to meet ≥3 shifts requirement
+      recs427c[9] = makeRec427(9, { relationshipShifts: shift427(-0.4) });
+      const res = await runR427(recs427c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAIR_REPAIR_UNMOTIVATED'), 'PAIR_REPAIR_UNMOTIVATED should fire');
+    });
+
+    it('PAIR_REPAIR_UNMOTIVATED does NOT fire when a positive shift follows a prior pair conflict', async () => {
+      // n=10; pair A|B: negative at scene 2, positive at scene 5 (within 3 scenes) → motivated → no fire
+      const recs427cNF = Array.from({ length: 10 }, (_, i) => {
+        const shiftMap: Record<number, number> = { 2: -0.4, 5: 0.4, 8: -0.4 };
+        return makeRec427(i, { relationshipShifts: shiftMap[i] !== undefined ? shift427(shiftMap[i]) : [] });
+      });
+      const res = await runR427(recs427cNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAIR_REPAIR_UNMOTIVATED'), 'PAIR_REPAIR_UNMOTIVATED should not fire');
+    });
+  });
+
   describe('Wave 413 — relationshipArcPass: pair clock flat, pair dramatic-turn flat, pair revelation flat', async () => {
     const makeRec413 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
