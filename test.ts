@@ -18713,6 +18713,111 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 400 — rhythmPass: long-line flood, line-ending repetition, progressive-verb overuse', async () => {
+    const runR400 = async (fountain: string) => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    const makeScene400 = (lines: string[]) =>
+      `INT. ROOM - DAY\n\n${lines.join('\n\n')}`;
+
+    it('LONG_LINE_FLOOD fires when more than 60% of action lines are 12+ words', async () => {
+      // 10 action lines, 8 are ≥12 words (80%) → fires
+      const longLine400 = 'She walks across the room and picks up the glass sitting on the table.';
+      const shortLine400 = 'She stops.';
+      const f400a = makeScene400([
+        longLine400, longLine400, longLine400, longLine400, longLine400,
+        longLine400, longLine400, longLine400, shortLine400, shortLine400,
+      ]);
+      const res = await runR400(f400a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'LONG_LINE_FLOOD'), 'LONG_LINE_FLOOD should fire');
+    });
+
+    it('LONG_LINE_FLOOD does not fire when fewer than 60% of action lines are 12+ words', async () => {
+      // 10 lines, 4 long (40%) → no fire
+      const longLine400nr = 'She walks across the room and picks up the glass sitting on the table.';
+      const shortLine400nr = 'She stops and looks.';
+      const f400anr = makeScene400([
+        longLine400nr, longLine400nr, longLine400nr, longLine400nr,
+        shortLine400nr, shortLine400nr, shortLine400nr, shortLine400nr, shortLine400nr, shortLine400nr,
+      ]);
+      const res = await runR400(f400anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'LONG_LINE_FLOOD'), 'LONG_LINE_FLOOD should not fire');
+    });
+
+    it('LINE_ENDING_REPETITION fires when 4+ action lines end with the same non-trivial word', async () => {
+      // 10 action lines, 4 end with "door" → fires
+      const f400b = makeScene400([
+        'She walks through the door.',
+        'He stands in the hallway.',
+        'She glances back at the door.',
+        'Something flickers beneath the door.',
+        'Nobody locks the door.',
+        'Rain falls outside.',
+        'The dog barks.',
+        'She shivers.',
+        'He waits.',
+        'Dawn breaks.',
+      ]);
+      const res = await runR400(f400b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'LINE_ENDING_REPETITION'), 'LINE_ENDING_REPETITION should fire');
+    });
+
+    it('LINE_ENDING_REPETITION does not fire when line endings are varied', async () => {
+      // 10 action lines all ending with different words → no fire
+      const f400bnr = makeScene400([
+        'She walks through the door.',
+        'He stands in the hallway.',
+        'She glances at the ceiling.',
+        'Something flickers overhead.',
+        'Nobody speaks.',
+        'Rain falls outside.',
+        'The dog barks suddenly.',
+        'She shivers from cold.',
+        'He waits impatiently.',
+        'Dawn breaks early.',
+      ]);
+      const res = await runR400(f400bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'LINE_ENDING_REPETITION'), 'LINE_ENDING_REPETITION should not fire');
+    });
+
+    it('PROGRESSIVE_VERB_OVERUSE fires when more than 25% of action lines use is/are + -ing', async () => {
+      // 10 action lines, 4 use "is/are + -ing" (40%) → fires
+      const f400c = makeScene400([
+        'She is running toward the exit.',
+        'He is watching from the corner.',
+        'They are fighting in the alley.',
+        'She is looking for her keys.',
+        'The guard stands at the gate.',
+        'He checks his watch.',
+        'She opens the car door.',
+        'He steps back.',
+        'They exchange a glance.',
+        'Rain begins.',
+      ]);
+      const res = await runR400(f400c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PROGRESSIVE_VERB_OVERUSE'), 'PROGRESSIVE_VERB_OVERUSE should fire');
+    });
+
+    it('PROGRESSIVE_VERB_OVERUSE does not fire when progressive verbs are rare', async () => {
+      // 10 action lines, 1 uses "is + -ing" (10%) → no fire
+      const f400cnr = makeScene400([
+        'She runs toward the exit.',
+        'He watches from the corner.',
+        'They fight in the alley.',
+        'She looks for her keys.',
+        'The guard stands at the gate.',
+        'He is checking his watch.',
+        'She opens the car door.',
+        'He steps back.',
+        'They exchange a glance.',
+        'Rain begins.',
+      ]);
+      const res = await runR400(f400cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PROGRESSIVE_VERB_OVERUSE'), 'PROGRESSIVE_VERB_OVERUSE should not fire');
+    });
+  });
+
   describe('Wave 399 — relationshipArcPass: pair suspense flat, pair curiosity flat, revelation emotion decoupled', async () => {
     const makeRec399 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

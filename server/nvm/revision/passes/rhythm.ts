@@ -46,6 +46,12 @@
 // action lines begin with The/A/An — monotone sentence openings), connective-opener overuse
 // (≥3 action lines begin with a formal logical connective like However/Therefore/Instead —
 // essayistic register foreign to screen action).
+// Wave 400 additions: long-line flood (>60% of action lines are ≥12 words — uniformly dense
+// prose with no breathing room; upper-end complement of short-line poverty), line-ending
+// repetition (≥4 action lines close on the same non-trivial word — unintentional anaphora at
+// the sentence level, the ending-word counterpart of opening-word repetition), progressive-verb
+// overuse (>25% of action lines use is/are + -ing present-progressive construction — "she is
+// running" instead of "she runs" — a subtle temporal mismatch in cinematic present tense).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1314,6 +1320,90 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${connectiveCount386} action lines begin with a formal logical connective ("However", "Therefore", "Instead", "Nonetheless"). These essayistic linkers argue a logical relationship between beats — they belong to expository prose, not the present-tense observation of screen action, where the bare sequence of images should imply the logic. Connective-led action reads as an essay describing a film rather than the film itself.`,
         suggestedFix: 'Cut the logical connectives and let the order of the action carry the relationship: "However, she stays." → "She stays." The contrast or consequence is already visible in what follows what. Screen action shows the logic through sequence; stating it in prose connectives is telling, not showing.',
+      });
+    }
+  }
+
+  // ── Wave 400: LONG_LINE_FLOOD, LINE_ENDING_REPETITION, PROGRESSIVE_VERB_OVERUSE ──
+
+  // LONG_LINE_FLOOD (minor, ≥10 action lines, >60% are ≥12 words): The action prose is
+  // uniformly dense — more than 60% of all action lines carry ≥12 words, leaving no
+  // white-space breathing room on the page. Dense prose is exhausting to read and signals
+  // a writer who treats action like a novel excerpt rather than a screenplay — every moment
+  // fully described, nothing implied by what's shown. The upper-end complement of SHORT_
+  // LINE_POVERTY (all lines ≤5 words) and ACTION_LINE_WORD_FLOOR (≤5 words floor): this
+  // fires on the opposite failure. Distinct from RUN_ON_ACTION (≥5 consecutive lines >20
+  // words — a streak check at a higher threshold) and MONOTONOUS_RHYTHM (uniformity in
+  // length variance, not upper-end distribution).
+  if (actionLines.length >= 10) {
+    const longCount400a = actionLines.filter(l => countWords(l.text) >= 12).length;
+    if (longCount400a / actionLines.length > 0.6) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'LONG_LINE_FLOOD',
+        severity: 'minor',
+        description: `${longCount400a} of ${actionLines.length} action lines (${Math.round(longCount400a / actionLines.length * 100)}%) are 12 words or longer — the prose is uniformly dense with no visual breathing room. A screenplay page reads fastest when long description is broken by short, punchy beats. When most lines are long, the page becomes a wall of text that slows the reader and buries the moments that should land fast.`,
+        suggestedFix: 'Break up the density: after a long descriptive line, let a short one land — "She stares." or "Nothing." or "A beat." give the eye a rest and make the longer lines feel deliberate rather than exhausting. Vary line length as a rhythmic tool, not just a consequence of how much there is to describe.',
+      });
+    }
+  }
+
+  // LINE_ENDING_REPETITION (minor, ≥10 action lines, ≥4 lines end with the same word):
+  // Four or more action lines close on the same non-trivial final word — an unintentional
+  // sentence-level anaphora that creates a rhythmic echo the audience hears before the
+  // writer intended. Ending-word repetition is the counterpart of opening-word repetition
+  // but at the close of each sentence, where the rhythmic stamp is equally (or more)
+  // noticeable. Distinct from OPENING_WORD_REPETITION (opener-word global count), NEAR_
+  // WORD_REPEAT (any word in a 6-line window, not sentence-final position), and THEN_CHAIN
+  // (specific temporal connective, not any word in sentence-final position).
+  if (actionLines.length >= 10) {
+    const ENDING_STOP400b = new Set([
+      'the','a','an','in','on','at','to','of','and','or','but','it','is','are','was','were',
+      'be','been','that','this','there','his','her','its','their','my','your','our','he',
+      'she','they','we','you','him','me','them','us',
+    ]);
+    const endingCounts400b = new Map<string, number>();
+    for (const l of actionLines) {
+      const words400b = l.text.replace(/[^a-z\s]/gi, '').trim().split(/\s+/).filter(Boolean);
+      const last400b = words400b[words400b.length - 1]?.toLowerCase() ?? '';
+      if (last400b.length >= 3 && !ENDING_STOP400b.has(last400b)) {
+        endingCounts400b.set(last400b, (endingCounts400b.get(last400b) ?? 0) + 1);
+      }
+    }
+    if (endingCounts400b.size > 0) {
+      const [topEnd400b, topEndCount400b] = [...endingCounts400b.entries()].sort((a, b) => b[1] - a[1])[0];
+      if (topEndCount400b >= 4) {
+        issues.push({
+          location: 'Action lines throughout',
+          rule: 'LINE_ENDING_REPETITION',
+          severity: 'minor',
+          description: `${topEndCount400b} action lines end with the same word ("${topEnd400b}") — an unintentional rhythmic echo at the sentence close. Ending-word repetition creates a stamp the reader hears accumulating before the writer intended it, flattening what should be varied prose into a metronomic pattern. Unlike an opening-word tic (which drives forward), a repeated ending word lands and then echoes, compounding the monotone.`,
+          suggestedFix: `Vary how action lines end: restructure sentences so different words close them, or change which detail is the sentence's final emphasis. The last word of a line carries disproportionate weight — repeating "${topEnd400b}" trains the audience to stop caring what the line was building toward.`,
+        });
+      }
+    }
+  }
+
+  // PROGRESSIVE_VERB_OVERUSE (minor, ≥10 action lines, >25% use is/are + -ing):
+  // More than a quarter of all action lines use a present-progressive construction ("she
+  // is running", "he is watching", "they are fighting") instead of the screenplay standard
+  // of simple present ("she runs", "he watches"). Progressive constructions introduce a
+  // temporal layer — the action is ongoing at the time of description — that the simple
+  // cinematic present does not have. This thickens the tense register, makes action feel
+  // less immediate, and is a common marker of prose-fiction habits carried into screenplay
+  // format. Distinct from PASSIVE_VOICE_OVERUSE (was/were + past participle — true passive,
+  // different construction and different register problem) and WEAK_VERB_CHAIN (started
+  // to / began to — modal auxiliary chains, not be-progressive).
+  if (actionLines.length >= 10) {
+    const progressRe400c = /\b(?:is|are)\s+\w+ing\b/i;
+    const progressCount400c = actionLines.filter(l => progressRe400c.test(l.text)).length;
+    if (progressCount400c / actionLines.length > 0.25) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'PROGRESSIVE_VERB_OVERUSE',
+        severity: 'minor',
+        description: `${progressCount400c} of ${actionLines.length} action lines (${Math.round(progressCount400c / actionLines.length * 100)}%) use a present-progressive construction ("is/are + -ing") instead of the screenplay standard of simple present. "She is running" vs. "She runs" — the progressive adds a temporal layer that softens immediacy: the action is happening, ongoing, observed from a distance rather than witnessed in real time. A page of progressive verbs reads like a novelist describing a film rather than a screenplay enacting one.`,
+        suggestedFix: 'Replace "is/are + -ing" with the simple present verb: "She is running" → "She runs", "They are fighting" → "They fight". The simple present is the language of the cinematic now — it drops the reader into the action rather than positioning them as an observer of something ongoing.',
       });
     }
   }
