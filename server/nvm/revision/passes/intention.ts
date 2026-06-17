@@ -54,6 +54,14 @@
 // threads, the distribution mirror of SEED_BACKLOADED), proactive suspense aftermath absent
 // (no proactive act is followed by a suspense spike in the next 2 scenes — initiative never
 // raises tension downstream, aftermath/sequence × suspense channel).
+// Wave 423 additions: seed midpoint void (no clue-seeding scene falls in the 40%–60% zone
+// while seeds exist elsewhere — the structural pivot receives no new threads; zone presence/
+// absence × seed × midpoint), proactive aftermath curiosity absent (no proactive act is
+// followed by a curiosity rise in the next 2 scenes — initiative opens no forward questions;
+// sequence/aftermath × curiosity, completing the aftermath family alongside suspense and
+// revelation), seed drama decoupled (no clue-seeding scene coincides with a dramatic turn —
+// threads planted in quiet exposition rather than at story pivots; co-occurrence/decoupling ×
+// seed × dramatic turn).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1762,6 +1770,109 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `None of the protagonist's ${proactiveIdxs409.length} proactive acts is followed by a suspense spike (suspenseDelta > 1) in the next two scenes — initiative never raises the temperature downstream. Agency that generates no following tension reads as inconsequential: the protagonist acts and the story's danger level is unmoved, so what they do and how dangerous the story feels run on separate tracks. The audience never learns to brace when the protagonist makes a move.`,
           suggestedFix: 'Let at least one proactive act raise the stakes in its wake: the gambit that provokes a retaliation, the clue planted that draws the antagonist\'s attention, the deadline set that tightens the screws over the next scenes. When initiative reliably escalates danger, the audience leans forward every time the protagonist acts — because they have learned that the protagonist\'s moves have teeth.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 423: SEED_MIDPOINT_VOID, PROACTIVE_AFTERMATH_CURIOSITY_ABSENT, SEED_DRAMA_DECOUPLED ──
+
+  // SEED_MIDPOINT_VOID (minor, n≥10, ≥3 seed scenes, at least one outside midpoint): No clue-
+  // planting scene falls in the 40%–60% midpoint zone while seeds exist in other parts of the
+  // story. The midpoint is where the protagonist crosses from reactive to proactive and where
+  // the audience is most receptive to a thread that will pay off in the back half — a seed
+  // planted at the story's pivot has the longest runway to accumulate anticipation before its
+  // resolution. When the midpoint zone receives no new threads, the pivot lands with nothing
+  // newly promised: the audience heads into Act 2b carrying only the threads from the first half,
+  // with nothing the pivot specifically generated for them to wonder about. Zone presence/absence
+  // × seed channel × midpoint zone. Distinct from PROACTIVE_MIDPOINT_VOID (Wave 258: the general
+  // proactive-act family at the midpoint — clock raises and seeds combined), SEED_FRONTLOADED
+  // (Wave 409: ALL seeds in the first half — a distribution check), and SEED_BACKLOADED (Wave 395:
+  // all seeds in the second half — the distribution mirror). This audits specifically the midpoint
+  // zone while those audit hemispheres.
+  if (n >= 10) {
+    const midS423a = Math.floor(n * 0.40);
+    const midE423a = Math.floor(n * 0.60);
+    const seedRecs423a = (records as any[]).filter(r => ((r.seededClueIds ?? []) as string[]).length > 0);
+    if (seedRecs423a.length >= 3) {
+      const hasMidSeed423a = seedRecs423a.some(r => {
+        const idx = (records as any[]).indexOf(r);
+        return idx >= midS423a && idx < midE423a;
+      });
+      const hasOutsideMid423a = seedRecs423a.some(r => {
+        const idx = (records as any[]).indexOf(r);
+        return !(idx >= midS423a && idx < midE423a);
+      });
+      if (!hasMidSeed423a && hasOutsideMid423a) {
+        issues.push({
+          location: `Midpoint zone (Scenes ${midS423a}–${midE423a - 1}) — no clue seeded`,
+          rule: 'SEED_MIDPOINT_VOID',
+          severity: 'minor',
+          description: `No clue is seeded in the midpoint zone (Scenes ${midS423a}–${midE423a - 1}), though ${seedRecs423a.length} seeds land elsewhere. The midpoint is the story's pivot and its most generative moment for planting threads that will pay off in the second half — a seed planted here has the longest runway between promise and delivery. Without any new thread introduced at the pivot, the audience heads into Act 2b carrying only first-half questions, and the structural turn generates no wonder of its own.`,
+          suggestedFix: 'Plant at least one clue in the midpoint zone: a fragment of information that makes the audience wonder about something they have not wondered about before, timed specifically to the story\'s pivot point. A midpoint seed integrates foreshadowing into the structure — the thread introduced as everything changes will feel connected to the change, and its eventual payoff will feel like a consequence of the turn rather than of an arbitrary earlier beat.',
+        });
+      }
+    }
+  }
+
+  // PROACTIVE_AFTERMATH_CURIOSITY_ABSENT (minor, n≥8, ≥3 proactive scenes): No proactive act is
+  // followed by a curiosity rise (curiosityDelta > 0) in the next two scenes — the protagonist
+  // takes initiative but their action never opens a new question in the scenes that immediately
+  // follow. Agency that generates no downstream curiosity reads as narratively inert: the
+  // protagonist acts and the story's question-engine is unmoved by it. Ideally, initiative should
+  // both drive events AND generate new unknowns — the plan the protagonist sets in motion should
+  // leave the audience wondering what comes of it. Sequence/aftermath mode × curiosity.
+  // Distinct from PROACTIVE_CURIOSITY_DECOUPLED (Wave 353: the proactive scenes' OWN
+  // curiosityDelta ≤ 0 — this audits the same-scene curiosity, not what follows), PROACTIVE_
+  // SUSPENSE_AFTERMATH_ABSENT (Wave 409: suspense channel of the 2-scene aftermath window),
+  // and PROACTIVE_REVELATION_ABSENT (Wave 339: revelation in the aftermath — different channel).
+  // This completes the curiosity dimension of the proactive-aftermath family.
+  if (n >= 8) {
+    const proactiveIdxs423b: number[] = [];
+    for (let i = 0; i < n; i++) {
+      if (isProactive258((records as any[])[i])) proactiveIdxs423b.push(i);
+    }
+    if (proactiveIdxs423b.length >= 3) {
+      const anyDownstreamCuriosity423b = proactiveIdxs423b.some(idx => {
+        const window = (records as any[]).slice(idx + 1, idx + 3);
+        return window.some(a => (a.curiosityDelta ?? 0) > 0);
+      });
+      if (!anyDownstreamCuriosity423b) {
+        issues.push({
+          location: 'Proactive scenes — curiosity aftermath absent',
+          rule: 'PROACTIVE_AFTERMATH_CURIOSITY_ABSENT',
+          severity: 'minor',
+          description: `None of the protagonist's ${proactiveIdxs423b.length} proactive acts is followed by a curiosity rise (curiosityDelta > 0) in the next two scenes — initiative never opens a new question downstream. The protagonist acts and the story's question-engine is unmoved by it: every act of agency closes without generating forward wonder. When initiative is systematically uncurious in its aftermath, the audience learns not to speculate about what happens next when the protagonist makes a move — the answers will be flat.`,
+          suggestedFix: 'Let at least one proactive act spawn a new question in the scene or two that follow: the protagonist takes an action whose consequences are immediately unclear, a plan set in motion raises a new "but what if...?", or initiative in one area opens a hole in another. The aftermath of agency should generate as much intrigue as the act itself — initiative that raises no questions produces a story with no sense of forward momentum from the protagonist.',
+        });
+      }
+    }
+  }
+
+  // SEED_DRAMA_DECOUPLED (minor, n≥8, ≥2 seed scenes, ≥2 turn scenes): No clue-planting scene
+  // coincides with a dramatic turn (dramaticTurn !== 'nothing') — threads are always planted in
+  // quiet, non-pivotal beats while dramatic pivots never simultaneously open new questions. When
+  // a clue is planted at a story turn, the audience simultaneously receives new information AND
+  // feels the story shift direction — a doubly charged beat that is far more memorable than either
+  // a seed or a turn in isolation. When the two engines never coincide, seeds are always background
+  // texture (exposition, quiet foreshadowing) rather than the forward-driving events of pivotal
+  // moments. Co-occurrence/decoupling mode × seed × dramatic turn. Distinct from SEEDING_CURIOSITY_
+  // FLAT (Wave 300: seeds don't raise curiosity — a quality check on seed scenes, not co-occurrence),
+  // CONFLICT_CLUE_DECOUPLED (Wave 394: no rupture seeds a clue — the relationship-conflict channel),
+  // and PROACTIVE_REVELATION_COINCIDENCE_ABSENT (Wave 381: no proactive scene is itself a revelation
+  // — agency × disclosure, not seeding × pivot).
+  if (n >= 8) {
+    const seedRecs423c = (records as any[]).filter(r => ((r.seededClueIds ?? []) as string[]).length > 0);
+    const turnRecs423c = (records as any[]).filter(r => (r.dramaticTurn ?? 'nothing') !== 'nothing');
+    if (seedRecs423c.length >= 2 && turnRecs423c.length >= 2) {
+      const anyCoincide423c = seedRecs423c.some(r => (r.dramaticTurn ?? 'nothing') !== 'nothing');
+      if (!anyCoincide423c) {
+        issues.push({
+          location: `${seedRecs423c.length} seed scene(s) and ${turnRecs423c.length} turn scene(s) — never coincide`,
+          rule: 'SEED_DRAMA_DECOUPLED',
+          severity: 'minor',
+          description: `None of the story's ${seedRecs423c.length} clue-seeding scenes coincides with a dramatic turn — threads are always planted in quiet, non-pivotal beats while the story's ${turnRecs423c.length} pivots never simultaneously open a new question. A seed planted at a dramatic turn is doubly charged: the audience receives new information and feels the story shift direction in the same beat. When the seeding engine and the pivot engine never meet, clues feel like background texture rather than integrated into the story's turning machinery.`,
+          suggestedFix: 'Let at least one dramatic turn also plant a clue: a reversal that surfaces a fragment of truth, a twist that leaves a new thread dangling, a pivot whose aftermath contains a piece of information the audience wasn\'t expecting. A seed at a turning point integrates foreshadowing into the story\'s structure rather than treating it as separate groundwork done in exposition.',
         });
       }
     }

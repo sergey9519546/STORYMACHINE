@@ -19957,6 +19957,84 @@ I always listen.
     });
   });
 
+  describe('Wave 423 — intentionPass: seed midpoint void, proactive aftermath curiosity absent, seed drama decoupled', async () => {
+    const makeRec423 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN423 = async (records: any[]) => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      return intentionPass({ fountain: '', original: '', records, structure: { escalating: false, reversalCount: 0, actPosition: 'act2', reversalDensity: 0, avgSuspensePerScene: 0, openClues: 0, approachingClimax: false } as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('SEED_MIDPOINT_VOID fires when no seed falls in the 40%–60% midpoint zone', async () => {
+      // n=10, midpoint=[4,5]; seeds at 1, 2, 8 (outside zone), none in [4,5] → fires
+      const recs423a = Array.from({ length: 10 }, (_, i) => makeRec423(i));
+      recs423a[1] = makeRec423(1, { seededClueIds: ['c1'] });
+      recs423a[2] = makeRec423(2, { seededClueIds: ['c2'] });
+      recs423a[8] = makeRec423(8, { seededClueIds: ['c3'] });
+      const res = await runIN423(recs423a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_MIDPOINT_VOID'), 'SEED_MIDPOINT_VOID should fire');
+    });
+
+    it('SEED_MIDPOINT_VOID does not fire when a seed lands in the midpoint zone', async () => {
+      // n=10, midpoint=[4,5]; seed at 4 (inside zone) → no fire
+      const recs423anr = Array.from({ length: 10 }, (_, i) => makeRec423(i));
+      recs423anr[1] = makeRec423(1, { seededClueIds: ['c1'] });
+      recs423anr[4] = makeRec423(4, { seededClueIds: ['c2'] });
+      recs423anr[8] = makeRec423(8, { seededClueIds: ['c3'] });
+      const res = await runIN423(recs423anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_MIDPOINT_VOID'), 'SEED_MIDPOINT_VOID should not fire');
+    });
+
+    it('PROACTIVE_AFTERMATH_CURIOSITY_ABSENT fires when no proactive act is followed by curiosity rise', async () => {
+      // n=8; proactive at 1,3,5; all subsequent scenes have curiosityDelta=0 → fires
+      const recs423b = Array.from({ length: 8 }, (_, i) => makeRec423(i));
+      recs423b[1] = makeRec423(1, { seededClueIds: ['c1'] });
+      recs423b[3] = makeRec423(3, { seededClueIds: ['c2'] });
+      recs423b[5] = makeRec423(5, { seededClueIds: ['c3'] });
+      const res = await runIN423(recs423b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PROACTIVE_AFTERMATH_CURIOSITY_ABSENT'), 'PROACTIVE_AFTERMATH_CURIOSITY_ABSENT should fire');
+    });
+
+    it('PROACTIVE_AFTERMATH_CURIOSITY_ABSENT does not fire when curiosity rises after a proactive act', async () => {
+      // n=8; proactive at 1,3,5; scene 2 has curiosityDelta=1 → no fire
+      const recs423bnr = Array.from({ length: 8 }, (_, i) => makeRec423(i));
+      recs423bnr[1] = makeRec423(1, { seededClueIds: ['c1'] });
+      recs423bnr[2] = makeRec423(2, { curiosityDelta: 1 });
+      recs423bnr[3] = makeRec423(3, { seededClueIds: ['c2'] });
+      recs423bnr[5] = makeRec423(5, { seededClueIds: ['c3'] });
+      const res = await runIN423(recs423bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PROACTIVE_AFTERMATH_CURIOSITY_ABSENT'), 'PROACTIVE_AFTERMATH_CURIOSITY_ABSENT should not fire');
+    });
+
+    it('SEED_DRAMA_DECOUPLED fires when no seed scene coincides with a dramatic turn', async () => {
+      // n=8; seeds at 1,3 (no turns); turns at 5,7 (no seeds) → fires
+      const recs423c = Array.from({ length: 8 }, (_, i) => makeRec423(i));
+      recs423c[1] = makeRec423(1, { seededClueIds: ['c1'] });
+      recs423c[3] = makeRec423(3, { seededClueIds: ['c2'] });
+      recs423c[5] = makeRec423(5, { dramaticTurn: 'reversal' });
+      recs423c[7] = makeRec423(7, { dramaticTurn: 'twist' });
+      const res = await runIN423(recs423c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_DRAMA_DECOUPLED'), 'SEED_DRAMA_DECOUPLED should fire');
+    });
+
+    it('SEED_DRAMA_DECOUPLED does not fire when a seed scene coincides with a dramatic turn', async () => {
+      // n=8; seed at 1 (also a turn), seeds at 3; turns at 5 → no fire
+      const recs423cnr = Array.from({ length: 8 }, (_, i) => makeRec423(i));
+      recs423cnr[1] = makeRec423(1, { seededClueIds: ['c1'], dramaticTurn: 'reversal' });
+      recs423cnr[3] = makeRec423(3, { seededClueIds: ['c2'] });
+      recs423cnr[5] = makeRec423(5, { dramaticTurn: 'twist' });
+      const res = await runIN423(recs423cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_DRAMA_DECOUPLED'), 'SEED_DRAMA_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 409 — intentionPass: proactive payoff peak decoupled, seed frontloaded, proactive suspense aftermath absent', async () => {
     const makeRec409 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
