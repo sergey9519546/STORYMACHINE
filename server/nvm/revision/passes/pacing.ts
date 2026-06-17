@@ -57,6 +57,15 @@
 // "long goodbye" that overstays the climax; complement of RESOLUTION_TOO_BRIEF), opening scene
 // underweight (the first scene runs below 50% overall — too brief to establish world, tone, or
 // character before the story moves; complement of OPENING_SCENE_BLOAT).
+// Wave 425 additions: scene expansion run (5+ consecutive scenes each strictly longer than the
+// prior — a sustained lengthening that mirrors SCENE_COMPRESSION_SPIRAL's shrinking run; the
+// story balloons across the stretch when it should be compressing toward the climax),
+// suspense midpoint trough (the structural midpoint scene's suspenseDelta falls below BOTH the
+// first-half and second-half average while both averages are positive — the story's gear-change
+// moment is a valley between two zones of energy rather than a pivot), curiosity frontload
+// (>65% of all positive-curiosityDelta scenes sit in the first half — the mystery engine runs
+// hot in setup but stalls through complication and climax, starving the back half of the
+// forward-pull it needs most).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1783,6 +1792,115 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         description: `The opening scene (Scene 0) runs ${openLen411} weighted lines — ${Math.round(openLen411 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The story opens on a fragment. The first scene does foundational work — establishing tone, the world's rules, and a character to attach to — and when it is among the shortest in the script the audience is thrown into motion before they have anywhere to stand, asked to care before they have been given a reason to.`,
         suggestedFix: 'Give the opening room to establish: let the first scene render the world and the protagonist with enough texture that the audience knows whose story this is and what its register will be before the engine turns over. A lean opener can work, but if it is one of the shortest scenes in the script it is likely skipping the orientation the rest of the story depends on.',
       });
+    }
+  }
+
+  // ── Wave 425: SCENE_EXPANSION_RUN, SUSPENSE_MIDPOINT_TROUGH, CURIOSITY_FRONTLOAD ──
+
+  // SCENE_EXPANSION_RUN (run-based, n≥8): Five consecutive scenes where each runs strictly
+  // longer than the previous — a sustained page-space expansion that mirrors SCENE_COMPRESSION_
+  // SPIRAL's shrinking run in the opposite direction. While a compression spiral depletes space
+  // before the climax, an expansion run balloons it: the story gathers mass across the stretch
+  // when it should be cutting weight. An unchecked lengthening run signals unedited accumulation
+  // rather than deliberate escalation — each successive scene adds more rather than distilling to
+  // the essential.
+  // Distinctness: SCENE_COMPRESSION_SPIRAL (n≥8) catches 5 scenes each SHORTER than the prior;
+  // PACE_DECELERATION_TREND uses a global least-squares slope across all scenes — it fires on a
+  // whole-story tilt, not a local run; SCENE_VELOCITY_DROP compares first-half vs second-half
+  // averages. This is the only check for a local 5-consecutive strictly-growing run.
+  if (records.length >= 8) {
+    const orderedLens425a = Array.from({ length: records.length }, (_, i) => sceneLengths.get(i) ?? 0);
+    let expandStart425 = -1;
+    for (let i425 = 0; i425 + 4 < orderedLens425a.length; i425++) {
+      if (
+        orderedLens425a[i425] > 0 &&
+        orderedLens425a[i425 + 1] > orderedLens425a[i425] &&
+        orderedLens425a[i425 + 2] > orderedLens425a[i425 + 1] &&
+        orderedLens425a[i425 + 3] > orderedLens425a[i425 + 2] &&
+        orderedLens425a[i425 + 4] > orderedLens425a[i425 + 3]
+      ) {
+        expandStart425 = i425;
+        break;
+      }
+    }
+    if (expandStart425 >= 0) {
+      issues.push({
+        location: `Scenes ${expandStart425}–${expandStart425 + 4}`,
+        rule: 'SCENE_EXPANSION_RUN',
+        severity: 'minor',
+        description: `Scenes ${expandStart425}–${expandStart425 + 4} are each strictly longer than the last — a five-scene expansion run that inflates page space rather than compressing toward the climax. A sustained lengthening across consecutive scenes signals unedited accumulation: the story is gaining mass across the stretch rather than distilling to essential beats.`,
+        suggestedFix: 'Break the expansion: trim at least one mid-run scene to a leaner beat, or hard-cut a set-piece scene into a briefer punch. The story should tighten as it advances, not balloon — a consecutive expansion run is a sign that no scene in the sequence was asked whether it could do less.',
+      });
+    }
+  }
+
+  // SUSPENSE_MIDPOINT_TROUGH (single-peak isolation, n≥10): The structural midpoint scene
+  // (at floor(n×0.5)) has a suspenseDelta strictly below BOTH the first-half average AND the
+  // second-half average, while both halves carry positive average suspense. The midpoint is the
+  // story's gear-change moment — the pivot where the energy of Act 2a converts into the forward
+  // drive of Act 2b. When the midpoint suspense is a valley between two active zones, the pivot
+  // sags rather than snaps: the audience feels the story dip at the moment it should change
+  // direction, which reads as a structural dead zone at the centre.
+  // Distinctness: MIDPOINT_COLLAPSE fires when midScene length < 50% avg AND suspenseDelta < 2
+  // (a page-length gate plus a weak absolute threshold — this can fire even when surrounding
+  // scenes are also low-energy). SUSPENSE_MIDPOINT_TROUGH fires purely on relative suspense
+  // distribution: the midpoint must be a valley between two positive-energy halves, regardless
+  // of scene length. RHYTHM_INVERSION compares first-third max vs last-third average; this
+  // compares the single midpoint to both flanking zone averages. These are orthogonal measures.
+  if (records.length >= 10) {
+    const midIdx425 = Math.floor(records.length * 0.5);
+    const firstHalf425 = (records as any[]).slice(0, midIdx425);
+    const secondHalf425 = (records as any[]).slice(midIdx425 + 1);
+    if (firstHalf425.length >= 3 && secondHalf425.length >= 2) {
+      const firstHalfAvg425 = firstHalf425.reduce((s: number, r: any) => s + (r.suspenseDelta ?? 0), 0) / firstHalf425.length;
+      const secondHalfAvg425 = secondHalf425.reduce((s: number, r: any) => s + (r.suspenseDelta ?? 0), 0) / secondHalf425.length;
+      const midSusp425 = (records as any[])[midIdx425].suspenseDelta ?? 0;
+      if (
+        firstHalfAvg425 > 0 && secondHalfAvg425 > 0 &&
+        midSusp425 < firstHalfAvg425 && midSusp425 < secondHalfAvg425
+      ) {
+        issues.push({
+          location: `Scene ${midIdx425} (structural midpoint)`,
+          rule: 'SUSPENSE_MIDPOINT_TROUGH',
+          severity: 'minor',
+          description: `The structural midpoint (Scene ${midIdx425}, suspenseDelta ${midSusp425.toFixed(1)}) is lower than both the first-half average (${firstHalfAvg425.toFixed(1)}) and second-half average (${secondHalfAvg425.toFixed(1)}), while both halves carry positive energy. The pivot scene is a suspense valley between two active zones: the story dips at the exact moment it should shift gear, creating a structural dead zone at the centre.`,
+          suggestedFix: 'Raise the midpoint suspense: add a reversal, a new threat, or an acceleration that makes the pivot feel like a gear-change. The midpoint doesn\'t need to be the story\'s peak, but it must carry enough energy to make the transition from Act 2a to Act 2b feel propulsive rather than slack.',
+        });
+      }
+    }
+  }
+
+  // CURIOSITY_FRONTLOAD (distribution/timing, n≥10, ≥4 positive-curiosity scenes): More than
+  // 65% of all scenes with a positive curiosityDelta (> 0) sit in the story's first half. The
+  // mystery engine runs hot during setup but stalls through complication and climax — the back
+  // half of the story is starved of the question-opening that pulls the audience forward. Curiosity
+  // should intensify toward resolution: each successive act should deepen the questions until the
+  // climax finally answers them. A front-loaded distribution suggests the writer seeded all
+  // intrigue in setup then let the questions decay without renewal, so the audience arrives at the
+  // answers without urgency.
+  // Distinctness: PACING_CURIOSITY_OPENING_FLATLINE fires when the opening LACKS curiosity
+  // (avg ≤ 0). This fires when curiosity IS present in the opening but is over-concentrated
+  // there, starving the back half. PACING_CURIOSITY_FINAL_DROP checks whether the final quarter
+  // drops below zero vs overall average. PACING_CURIOSITY_MIDZONE_GAP checks the midzone average
+  // vs the opening zone average. This checks the global PROPORTION of curiosity events — how
+  // many are in the first half — which none of those checks address.
+  if (records.length >= 10) {
+    const halfIdx425c = Math.floor(records.length / 2);
+    const posCurioScenes425 = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0);
+    if (posCurioScenes425.length >= 4) {
+      const inFirstHalf425 = (records as any[]).filter(
+        (r, i) => i < halfIdx425c && (r.curiosityDelta ?? 0) > 0,
+      ).length;
+      const ratio425 = inFirstHalf425 / posCurioScenes425.length;
+      if (ratio425 > 0.65) {
+        issues.push({
+          location: 'Curiosity distribution (story halves)',
+          rule: 'CURIOSITY_FRONTLOAD',
+          severity: 'minor',
+          description: `${inFirstHalf425} of ${posCurioScenes425.length} positive-curiosity scenes (${Math.round(ratio425 * 100)}%) sit in the first half of the story. The mystery engine runs hot in setup but stalls through complication and climax. Curiosity should intensify toward resolution — questions opening and deepening across Act 2 as the audience approaches answers — but this script front-loads its intrigue and lets the back half run dry.`,
+          suggestedFix: 'Open new questions in Act 2 and Act 3: every revelation should answer one thing and raise another, every complication should deepen the central mystery rather than resolve it. Redistribute curiosity events toward the second half so the audience arrives at the climax still urgently needing to know.',
+        });
+      }
     }
   }
 

@@ -19520,6 +19520,84 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 425 — pacingPass: scene expansion run, suspense midpoint trough, curiosity frontload', async () => {
+    const makeRec425 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain425 = (lineCounts: number[]) =>
+      lineCounts.map((n, i) =>
+        `INT. SC${i} - DAY\n\n${Array.from({ length: n }, (_, j) => `Action line ${j + 1} for scene ${i}.`).join('\n\n')}`
+      ).join('\n\n');
+    const runP425 = async (records: any[], fountain: string) => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      return pacingPass({ fountain, original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('SCENE_EXPANSION_RUN fires when 5 consecutive scenes each run strictly longer than the prior', async () => {
+      // Scenes 2-6: lengths 5,6,7,8,9 → each strictly > prior → fires
+      // avg = (5+3+5+6+7+8+9+5)/8 = 48/8 = 6
+      const lc425a = [5, 3, 5, 6, 7, 8, 9, 5];
+      const recs425a = Array.from({ length: 8 }, (_, i) => makeRec425(i));
+      const res = await runP425(recs425a, makeFountain425(lc425a));
+      assert.ok(res.issues.some((i: any) => i.rule === 'SCENE_EXPANSION_RUN'), 'SCENE_EXPANSION_RUN should fire');
+    });
+
+    it('SCENE_EXPANSION_RUN does NOT fire when no 5-consecutive expansion run exists', async () => {
+      // Lengths alternate up/down — no run of 5 consecutive growing scenes
+      const lc425anr = [5, 6, 7, 5, 6, 7, 5, 6];
+      const recs425anr = Array.from({ length: 8 }, (_, i) => makeRec425(i));
+      const res = await runP425(recs425anr, makeFountain425(lc425anr));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SCENE_EXPANSION_RUN'), 'SCENE_EXPANSION_RUN should not fire');
+    });
+
+    it('SUSPENSE_MIDPOINT_TROUGH fires when midpoint suspense is below both halves while both halves are positive', async () => {
+      // n=10, midIdx=5, suspenseDelta: scenes 0-4 all 2, scene 5 = 0, scenes 6-9 all 2
+      // firstHalfAvg=2 > 0, secondHalfAvg=2 > 0, midSusp=0 < 2 → fires
+      const recs425b = Array.from({ length: 10 }, (_, i) =>
+        makeRec425(i, { suspenseDelta: i === 5 ? 0 : 2 })
+      );
+      const lc425b = Array.from({ length: 10 }, () => 5);
+      const res = await runP425(recs425b, makeFountain425(lc425b));
+      assert.ok(res.issues.some((i: any) => i.rule === 'SUSPENSE_MIDPOINT_TROUGH'), 'SUSPENSE_MIDPOINT_TROUGH should fire');
+    });
+
+    it('SUSPENSE_MIDPOINT_TROUGH does NOT fire when midpoint suspense matches surrounding energy', async () => {
+      // n=10, all scenes suspenseDelta=2 — midpoint is not below either half
+      const recs425bnr = Array.from({ length: 10 }, (_, i) => makeRec425(i, { suspenseDelta: 2 }));
+      const lc425bnr = Array.from({ length: 10 }, () => 5);
+      const res = await runP425(recs425bnr, makeFountain425(lc425bnr));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SUSPENSE_MIDPOINT_TROUGH'), 'SUSPENSE_MIDPOINT_TROUGH should not fire');
+    });
+
+    it('CURIOSITY_FRONTLOAD fires when more than 65% of positive-curiosity scenes are in the first half', async () => {
+      // n=10, half=5; scenes 0,1,2,3,4 have curiosityDelta=1 (5 in first half),
+      // scene 7 has curiosityDelta=1 (1 in second half) → total=6, ratio=5/6≈0.833 > 0.65 → fires
+      const recs425c = Array.from({ length: 10 }, (_, i) =>
+        makeRec425(i, { curiosityDelta: [0, 1, 2, 3, 4, 7].includes(i) ? 1 : 0 })
+      );
+      const lc425c = Array.from({ length: 10 }, () => 5);
+      const res = await runP425(recs425c, makeFountain425(lc425c));
+      assert.ok(res.issues.some((i: any) => i.rule === 'CURIOSITY_FRONTLOAD'), 'CURIOSITY_FRONTLOAD should fire');
+    });
+
+    it('CURIOSITY_FRONTLOAD does NOT fire when positive-curiosity scenes are distributed across both halves', async () => {
+      // n=10, half=5; scenes 0,1,2 in first half (curiosityDelta=1), scenes 5,6,7 in second half (curiosityDelta=1)
+      // total=6, in first half=3, ratio=3/6=0.5 < 0.65 → no fire
+      const recs425cnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec425(i, { curiosityDelta: [0, 1, 2, 5, 6, 7].includes(i) ? 1 : 0 })
+      );
+      const lc425cnr = Array.from({ length: 10 }, () => 5);
+      const res = await runP425(recs425cnr, makeFountain425(lc425cnr));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CURIOSITY_FRONTLOAD'), 'CURIOSITY_FRONTLOAD should not fire');
+    });
+  });
+
   describe('Wave 411 — pacingPass: suspense peak scene bloat, resolution bloat, opening scene underweight', async () => {
     const makeRec411 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
