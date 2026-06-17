@@ -55,6 +55,12 @@
 // spike with no upstream driver — the curiosity sibling of SUSPENSE_SPIKE_NO_CAUSE), dramatic
 // turn without cause (≥2 dramatic turns and none has a cause in itself or the prior scene —
 // the story's pivots are systematically unmotivated).
+// Wave 419 additions: revelation relationship void (every revelation scene has no relationship
+// shift — truths surface without changing any bond; average/aggregate mode × revelation ×
+// relationship channel), payoff suspense void (every payoff scene has suspenseDelta ≤ 0 —
+// resolutions never raise or redirect tension; average/aggregate mode × payoff × suspense),
+// clock raise relationship void (every clock-raise scene has no relationship shift — deadlines
+// established in a social vacuum; co-occurrence/decoupling mode × clock × relationship).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1887,6 +1893,84 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Cause each turn: a reversal should be the inevitable-in-hindsight result of forces already in motion — a truth that surfaces, a deadline that bites, an alliance that fractures. Plant the pressure in the turn\'s scene or the one before it, so that when the story pivots, the audience feels it was pushed, not yanked.',
         });
       }
+    }
+  }
+
+  // ── Wave 419: REVELATION_RELATIONSHIP_VOID, PAYOFF_SUSPENSE_VOID, CLOCK_RAISE_RELATIONSHIP_VOID ──
+
+  // REVELATION_RELATIONSHIP_VOID (minor, n≥8, ≥2 revelation scenes): Every scene in which a
+  // truth is revealed (r.revelation !== null) carries no relationship shift — discoveries
+  // surface without any bond fracturing, deepening, or changing between characters. Revelations
+  // that move nobody relationally are causally incomplete: the most powerful moments in a story
+  // are precisely those that reconfigure the interpersonal geometry. Information that lands
+  // without interpersonal consequence teaches the audience that what characters know doesn't
+  // affect how they stand with each other — the belief and relationship layers are permanently
+  // decoupled. Average/aggregate mode × revelation × relationship channel. Distinct from
+  // REVELATION_WITHOUT_CURIOSITY (curiosity channel of revelations, covered separately),
+  // DECEPTION_WITHOUT_CONSEQUENCE (specifically about discovered lies; this fires across all
+  // revelation types when the relational channel is always absent), and DRAMATIC_TURN_NO_EMOTION
+  // (emotion at turn scenes — this audits the relational dimension of revelation scenes).
+  if (records.length >= 8) {
+    const revelationRecs419a = (records as any[]).filter(r => r.revelation !== null);
+    if (revelationRecs419a.length >= 2 &&
+        revelationRecs419a.every(r => ((r.relationshipShifts ?? []) as any[]).length === 0)) {
+      issues.push({
+        location: `${revelationRecs419a.length} revelation scene(s) — no relationship shift in any`,
+        rule: 'REVELATION_RELATIONSHIP_VOID',
+        severity: 'minor',
+        description: `All ${revelationRecs419a.length} revelation scenes produce no relationship shift — every truth that surfaces leaves every bond unchanged. Revelations that move nobody relationally are causally incomplete: if knowing something doesn't change how characters stand with each other, the discovery is effectively inert. The audience expects uncovered truth to fracture, deepen, or force a reckoning between characters — when it never does, the belief layer and the relationship layer appear permanently disconnected.`,
+        suggestedFix: 'Let at least one revelation shift a relationship: the moment a character learns a truth, something should change between them and whoever else is connected to that truth — an alliance cracks, a bond deepens, a distance opens. Revelation that lands without interpersonal consequence feels like exposition rather than drama.',
+      });
+    }
+  }
+
+  // PAYOFF_SUSPENSE_VOID (minor, n≥8, ≥2 payoff scenes): Every scene that resolves a planted
+  // setup (payoffSetupIds.length > 0) carries suspenseDelta ≤ 0 — payoffs are pure exhales with
+  // no lingering or redirected tension. In well-constructed stories, resolutions often generate
+  // new stakes even as they close old ones: a thread resolved reveals a larger problem, a mystery
+  // answered opens a deeper question, a danger survived creates a new adversary. When no payoff
+  // scene ever produces any suspense rise, each resolution is a full stop rather than a comma —
+  // the story's engine loses momentum with each callback rather than redirecting it.
+  // Average/aggregate mode × payoff × suspense channel. Distinct from PAYOFF_NO_EMOTION (emotion
+  // channel, Wave 363), PAYOFF_CURIOSITY_DECOUPLED (curiosity channel, Wave 335), and PAYOFF_BACK_
+  // LOADED (timing/distribution, Wave 268). The suspense channel of payoffs is the only member of
+  // this correlation family not yet audited.
+  if (records.length >= 8) {
+    const payoffRecs419b = (records as any[]).filter(r => ((r.payoffSetupIds ?? []) as any[]).length > 0);
+    if (payoffRecs419b.length >= 2 &&
+        payoffRecs419b.every(r => (r.suspenseDelta ?? 0) <= 0)) {
+      issues.push({
+        location: `${payoffRecs419b.length} payoff scene(s) — no suspense rise in any`,
+        rule: 'PAYOFF_SUSPENSE_VOID',
+        severity: 'minor',
+        description: `All ${payoffRecs419b.length} payoff scenes carry suspenseDelta ≤ 0 — every resolved setup is a pure exhale that generates no new tension. Resolutions that close loops without opening any new pressure remove momentum rather than redirecting it: each payoff is a full stop, and the story's engine loses speed with every callback. Payoffs that also raise stakes — resolving one thread while revealing a new problem, danger, or question — sustain and redirect narrative energy rather than spending it down.`,
+        suggestedFix: 'Let at least one payoff scene generate positive suspense: the resolution of a planted thread often reveals a harder problem, a new adversary, or a raised cost for what just succeeded. A payoff that also raises tension proves the story\'s momentum is self-sustaining — closing one loop can open another.',
+      });
+    }
+  }
+
+  // CLOCK_RAISE_RELATIONSHIP_VOID (minor, n≥8, ≥2 clock-raise scenes): Every scene in which a
+  // new deadline is established (clockRaised === true) carries no relationship shift — ticking-
+  // clock pressure never creates any interpersonal consequence. Deadlines under pressure should
+  // force characters to act against each other, depend on each other, or betray each other:
+  // the clock's social effect is a primary driver of relationship movement. When every deadline
+  // is raised in a social vacuum, the story's time pressure exists only mechanically — it creates
+  // urgency without generating the interpersonal friction that makes urgency personal.
+  // Co-occurrence/decoupling mode × clock channel × relationship. Distinct from CLOCK_RAISED_NO_
+  // EMOTION (emotion channel, Wave 349), CLOCK_RAISE_NO_SUSPENSE (suspense channel, Wave 377),
+  // and CLOCK_RAISE_CURIOSITY_VOID (curiosity channel, Wave 363). The relationship dimension of
+  // clock-raise scenes has not been separately audited, completing the clock-raise correlation set.
+  if (records.length >= 8) {
+    const clockRaiseRecs419c = (records as any[]).filter(r => r.clockRaised === true);
+    if (clockRaiseRecs419c.length >= 2 &&
+        clockRaiseRecs419c.every(r => ((r.relationshipShifts ?? []) as any[]).length === 0)) {
+      issues.push({
+        location: `${clockRaiseRecs419c.length} clock-raise scene(s) — no relationship shift in any`,
+        rule: 'CLOCK_RAISE_RELATIONSHIP_VOID',
+        severity: 'minor',
+        description: `All ${clockRaiseRecs419c.length} scenes that establish deadlines carry no relationship shift — every ticking clock is raised in a social vacuum. Deadlines under pressure are among the most powerful drivers of interpersonal consequence: when time runs out, characters are forced to ask for help, betray allies, abandon obligations, or sacrifice relationships. A story where every deadline appears without any bond moving reads as mechanical urgency — the stakes feel temporal but not personal.`,
+        suggestedFix: 'Let at least one clock-raise scene move a relationship: the moment a deadline is established, it should force a choice that strains or strengthens a bond — someone is depended on, betrayed, or asked to sacrifice. Time pressure that has no interpersonal cost is urgency without stakes.',
+      });
     }
   }
 

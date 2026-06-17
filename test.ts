@@ -24217,6 +24217,85 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 419 — causalityPass: revelation relationship void, payoff suspense void, clock raise relationship void', async () => {
+    const makeRec419 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runC419 = async (records: any[]) => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('REVELATION_RELATIONSHIP_VOID fires when every revelation scene has no relationship shift', async () => {
+      // n=8, revelations at 2 and 5, no relationship shifts in either → fires
+      const recs419a = Array.from({ length: 8 }, (_, i) =>
+        makeRec419(i, { revelation: [2, 5].includes(i) ? `Truth at scene ${i}` : null }),
+      );
+      const res = await runC419(recs419a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_RELATIONSHIP_VOID'), 'REVELATION_RELATIONSHIP_VOID should fire');
+    });
+
+    it('REVELATION_RELATIONSHIP_VOID does not fire when a revelation scene has a relationship shift', async () => {
+      // n=8, revelations at 2 and 5, scene 5 has a relationship shift → no fire
+      const recs419anr = Array.from({ length: 8 }, (_, i) =>
+        makeRec419(i, {
+          revelation: [2, 5].includes(i) ? `Truth at scene ${i}` : null,
+          relationshipShifts: i === 5 ? [{ charA: 'A', charB: 'B', amount: 1 }] : [],
+        }),
+      );
+      const res = await runC419(recs419anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_RELATIONSHIP_VOID'), 'REVELATION_RELATIONSHIP_VOID should not fire');
+    });
+
+    it('PAYOFF_SUSPENSE_VOID fires when every payoff scene has suspenseDelta ≤ 0', async () => {
+      // n=8, payoffs at 3 and 6, both suspenseDelta=0 → fires
+      const recs419b = Array.from({ length: 8 }, (_, i) =>
+        makeRec419(i, { payoffSetupIds: [3, 6].includes(i) ? ['setup-1'] : [] }),
+      );
+      const res = await runC419(recs419b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_SUSPENSE_VOID'), 'PAYOFF_SUSPENSE_VOID should fire');
+    });
+
+    it('PAYOFF_SUSPENSE_VOID does not fire when a payoff scene raises suspense', async () => {
+      // n=8, payoffs at 3 and 6, scene 6 has suspenseDelta=2 → no fire
+      const recs419bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec419(i, {
+          payoffSetupIds: [3, 6].includes(i) ? ['setup-1'] : [],
+          suspenseDelta: i === 6 ? 2 : 0,
+        }),
+      );
+      const res = await runC419(recs419bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_SUSPENSE_VOID'), 'PAYOFF_SUSPENSE_VOID should not fire');
+    });
+
+    it('CLOCK_RAISE_RELATIONSHIP_VOID fires when every clock-raise scene has no relationship shift', async () => {
+      // n=8, clocks raised at 1 and 4, neither has a relationship shift → fires
+      const recs419c = Array.from({ length: 8 }, (_, i) =>
+        makeRec419(i, { clockRaised: [1, 4].includes(i) }),
+      );
+      const res = await runC419(recs419c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_RAISE_RELATIONSHIP_VOID'), 'CLOCK_RAISE_RELATIONSHIP_VOID should fire');
+    });
+
+    it('CLOCK_RAISE_RELATIONSHIP_VOID does not fire when a clock-raise scene has a relationship shift', async () => {
+      // n=8, clocks raised at 1 and 4, scene 4 has a relationship shift → no fire
+      const recs419cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec419(i, {
+          clockRaised: [1, 4].includes(i),
+          relationshipShifts: i === 4 ? [{ charA: 'A', charB: 'B', amount: -1 }] : [],
+        }),
+      );
+      const res = await runC419(recs419cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_RAISE_RELATIONSHIP_VOID'), 'CLOCK_RAISE_RELATIONSHIP_VOID should not fire');
+    });
+  });
+
   describe('Wave 405 — causalityPass: positive reaction without cause, curiosity spike without cause, dramatic turn without cause', async () => {
     const makeRec405 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
