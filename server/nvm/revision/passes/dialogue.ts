@@ -47,6 +47,12 @@
 // "he said"/"she told me"/"they say" — the scene recaps conversations instead of enacting
 // them), oath-intensifier flood (>20% of lines lean on a mild oath — "damn"/"hell"/"oh god"
 // — emphasis outsourced to swearing rather than to the words themselves).
+// Wave 420 additions: interrupt flood (>25% of lines end with "--" — truncated speech
+// becomes a verbal tic rather than a dramatic device; distribution/bloat mode), excuse flood
+// (>25% of lines carry a rationalization — "because"/"I had to"/"that's why" — characters
+// justify past actions rather than engaging the present; valence mode), affirmation flood
+// (>25% of lines are pure bare assent — "yes"/"okay"/"absolutely" — dialogue with no
+// friction or resistance; underweight mode).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1895,6 +1901,85 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${oathCount406} of ${dialogue.length} dialogue lines (${Math.round(oathCount406 / dialogue.length * 100)}%) lean on a mild oath for emphasis ("damn", "hell", "oh god", "jesus"). When emphasis is routinely outsourced to swearing, the oaths stop landing — profanity used as punctuation flattens into wallpaper, so the one moment that should detonate has no charge left because every line already swore.`,
         suggestedFix: 'Strip the reflexive oaths and let the underlying words carry the weight, saving an expletive for the single beat where the character\'s composure genuinely cracks. Emphasis works by contrast: when most lines are clean, the one curse that breaks through registers as a real loss of control rather than as the character\'s ordinary speech rhythm.',
+      });
+    }
+  }
+
+  // ── Wave 420: DIALOGUE_INTERRUPT_FLOOD, DIALOGUE_EXCUSE_FLOOD, DIALOGUE_AFFIRMATION_FLOOD ──
+
+  // DIALOGUE_INTERRUPT_FLOOD (minor, ≥10 lines, >25%): More than 25% of dialogue lines end
+  // with "--" (mid-sentence interruption). Interruptions are a powerful device when used
+  // sparingly — they dramatize power dynamics (who gets to finish a sentence), overlapping
+  // urgency, and characters who are not listening. But when more than a quarter of all lines
+  // are truncated, "--" becomes a verbal tic rather than a device: nobody finishes a thought,
+  // not because the drama demands constant interruption but because the writer has adopted
+  // "--" as a default line ending. The interrupt loses its charge when it is the norm.
+  // Distribution/bloat mode × interruption marker. Distinct from ELLIPSIS_OVERUSE (Wave 255:
+  // trailing "..." — the trailing-off/hesitation register), DIALOGUE_FILLER_SOUND_OVERUSE
+  // (Wave 311: um/uh vocalized hesitation), and DIALOGUE_ONE_WORD_DOMINANCE (short-line
+  // dominance regardless of why the line is short): "--" specifically signals a cut from
+  // outside rather than a fade-out or hesitation from within.
+  if (dialogue.length >= 10) {
+    const interruptCount420a = dialogue.filter(d => /--\s*$/.test(d.line)).length;
+    if (interruptCount420a / dialogue.length > 0.25) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_INTERRUPT_FLOOD',
+        severity: 'minor',
+        description: `${interruptCount420a} of ${dialogue.length} dialogue lines (${Math.round(interruptCount420a / dialogue.length * 100)}%) end with "--" (mid-sentence interruption). When more than a quarter of all lines are truncated, the interruption stops being a dramatic device and becomes a verbal tic — nobody finishes a thought, not because the scene demands constant interruption but because "--" has become the script's default line ending. Power dynamics, urgency, and overlap are only legible through interruption when interruption is the exception.`,
+        suggestedFix: 'Reserve "--" for the beats where interruption matters dramatically: the line the antagonist won\'t let the hero finish, the confession cut off by an alarm, the argument that escalates because nobody is listening. Strip the reflexive mid-sentence cuts and let characters complete their thoughts in most lines — the one interruption that breaks through will land harder against lines that were allowed to land.',
+      });
+    }
+  }
+
+  // DIALOGUE_EXCUSE_FLOOD (minor, ≥10 lines, >25%): More than 25% of dialogue lines carry
+  // an explicit rationalization or excuse pattern — "because", "that's why", "the reason is",
+  // "I had to", "had no choice", "couldn't help it", "I didn't mean to". Characters who spend
+  // more than a quarter of their lines justifying past decisions are living inside retrospective
+  // self-defense rather than engaging the present scene: the dialogue is directed inward at
+  // explaining what already happened rather than outward at confronting what is happening now.
+  // When justification becomes the dominant register, subtext collapses — the script explains
+  // motivation instead of dramatizing it. Valence mode × justification/rationalization register.
+  // Distinct from DIALOGUE_CONDITIONAL_OVERLOAD (Wave 283: if/unless/might/could — hypothetical
+  // future reasoning), DIALOGUE_HEDGE_SATURATION (Wave 311: "just"/"maybe" — uncertainty
+  // softeners), and DIALOGUE_REPORTED_SPEECH_FLOOD (Wave 406: relaying what others said).
+  if (dialogue.length >= 10) {
+    const excuseRe420b = /\b(because|that'?s why|that is why|the reason (is|was|being)|i had (to|no choice)|had no choice|what was i supposed to|couldn'?t help (it|myself)|i didn'?t (mean|intend|want))\b/i;
+    const excuseCount420b = dialogue.filter(d => excuseRe420b.test(d.line)).length;
+    if (excuseCount420b / dialogue.length > 0.25) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_EXCUSE_FLOOD',
+        severity: 'minor',
+        description: `${excuseCount420b} of ${dialogue.length} dialogue lines (${Math.round(excuseCount420b / dialogue.length * 100)}%) carry a rationalization or excuse pattern ("because", "I had to", "that's why", "had no choice"). When over a quarter of all dialogue is self-justification, characters are living in retrospective defense rather than engaging the present scene. Subtext collapses: instead of implying motivation through action, the script explains it in words, draining tension and agency from every exchange.`,
+        suggestedFix: 'Let characters act rather than explain. Strip the "because" clauses and "I had no choice" disclaimers and stage the consequence instead — if a character made a desperate choice, show what they do next rather than justifying what they already did. Reserve explicit rationalization for the single beat where a character\'s self-justification is itself the dramatic subject: the lie they tell themselves that the scene is designed to expose.',
+      });
+    }
+  }
+
+  // DIALOGUE_AFFIRMATION_FLOOD (minor, ≥10 lines, >25%): More than 25% of dialogue lines are
+  // pure bare assent — "yes", "okay", "sure", "right", "exactly", "absolutely", "of course",
+  // "fine", "indeed", "alright", "yeah", "correct", "agreed", "certainly", "definitely",
+  // "understood", "noted", "got it". When a quarter of all lines are nothing but agreement,
+  // the dialogue has no friction: nobody pushes back, nobody redirects, nobody asserts a
+  // position that creates resistance. Pure assent lines are often padding — the writer's way
+  // of giving a character a turn without giving them a position. Dialogue without resistance
+  // is scenery, not drama. Underweight/bloat mode × affirmation register. Distinct from
+  // DIALOGUE_AGREEMENT_CHAIN (Wave 269: 3+ consecutive capitulations — consecutive structural
+  // run; AFFIRMATION_FLOOD fires on overall proportion regardless of placement), DIALOGUE_ONE_
+  // WORD_DOMINANCE (Wave 311: any single-word line — broad short-line pattern, not
+  // semantically restricted to assent), and DIALOGUE_THANKS_OVERUSE (Wave 350: gratitude
+  // specifically — a semantically narrower subset of affirmation).
+  if (dialogue.length >= 10) {
+    const affirmRe420c = /^(yes|yeah|yep|yup|okay|ok|sure|right|exactly|absolutely|of course|fine|indeed|alright|all right|correct|agreed|certainly|definitely|understood|roger|affirmative|fair enough|noted|copy that|got it)[.!]?$/i;
+    const affirmCount420c = dialogue.filter(d => affirmRe420c.test(d.line.trim())).length;
+    if (affirmCount420c / dialogue.length > 0.25) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_AFFIRMATION_FLOOD',
+        severity: 'minor',
+        description: `${affirmCount420c} of ${dialogue.length} dialogue lines (${Math.round(affirmCount420c / dialogue.length * 100)}%) are pure bare assent ("yes", "okay", "sure", "exactly", "absolutely", "of course"). When over a quarter of all lines are nothing but agreement, the dialogue has no friction — nobody pushes back, asserts a position, or redirects the exchange. Pure assent lines are padding: giving a character a turn without a position. Dialogue without resistance is scenery, not drama.`,
+        suggestedFix: 'Replace reflex affirmations with a qualification, a redirect, or a counter-assertion: "Yes, but—", "Sure, if you ignore the part where—", "Okay, then what about—". Reserve pure assent for the dramatic beat where a character\'s capitulation means something — the moment they stop fighting is only powerful when they had been fighting. If a beat only needs acknowledgment, cut the line and use action instead.',
       });
     }
   }

@@ -23202,6 +23202,137 @@ The lights go out.`;
     });
   });
 
+  describe('Wave 420 — dialoguePass: interrupt flood, excuse flood, affirmation flood', async () => {
+    const runD420 = async (fountain: string) => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    const buildD420 = (lines: string[]): string => {
+      const body = lines.map((l, i) => `${i % 2 === 0 ? 'ANNA' : 'MARK'}\n${l}`).join('\n\n');
+      return `INT. ROOM - DAY\n\n${body}\n`;
+    };
+
+    it('DIALOGUE_INTERRUPT_FLOOD fires when >25% of lines end with "--"', async () => {
+      // 5 of 12 lines end with "--" (41.7%) → fires
+      const f420i = buildD420([
+        'We have to leave before--',
+        'But the contract says--',
+        'Not if she finds out about--',
+        'You knew all along that I--',
+        'Listen if you would just--',
+        'The kettle is still on the stove.',
+        'Your brother called from the airport.',
+        'The board meeting starts at three.',
+        'Bring the keys and the folder.',
+        'Her flight lands around midnight.',
+        'The lease is inside the drawer.',
+        'I locked the front door already.',
+      ]);
+      const res = await runD420(f420i);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_INTERRUPT_FLOOD'), 'DIALOGUE_INTERRUPT_FLOOD should fire');
+    });
+
+    it('DIALOGUE_INTERRUPT_FLOOD does not fire when lines are complete sentences', async () => {
+      // 0 of 12 lines end with "--" → no fire
+      const f420iNF = buildD420([
+        'We have to leave before sunrise.',
+        'But the contract says nothing now.',
+        'Not if she finds out the truth.',
+        'You knew all along what happened.',
+        'The kettle is still on the stove.',
+        'Your brother called from the airport.',
+        'The board meeting starts at three.',
+        'Bring the keys and the folder.',
+        'Her flight lands around midnight.',
+        'The lease is inside the drawer.',
+        'I locked the front door already.',
+        'She signed the contract this morning.',
+      ]);
+      const res = await runD420(f420iNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_INTERRUPT_FLOOD'), 'DIALOGUE_INTERRUPT_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_EXCUSE_FLOOD fires when >25% of lines carry rationalization patterns', async () => {
+      // 5 of 12 lines have excuse patterns (41.7%) → fires
+      const f420e = buildD420([
+        'I left because the situation was impossible.',
+        "She did it because she had to protect us.",
+        'I had to make a choice before midnight.',
+        "That's why I never told you the truth.",
+        'The reason is nobody else would do it.',
+        'The kettle is still on the stove.',
+        'Your brother called from the airport.',
+        'The board meeting starts at three.',
+        'Bring the keys and the folder.',
+        'Her flight lands around midnight.',
+        'The lease is inside the drawer.',
+        'I locked the front door already.',
+      ]);
+      const res = await runD420(f420e);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_EXCUSE_FLOOD'), 'DIALOGUE_EXCUSE_FLOOD should fire');
+    });
+
+    it('DIALOGUE_EXCUSE_FLOOD does not fire when dialogue confronts the present', async () => {
+      // 0 excuse patterns in 12 lines → no fire
+      const f420eNF = buildD420([
+        'You never listen to me at all.',
+        'I will not do this again today.',
+        'Put the gun down right now.',
+        'We are leaving before midnight.',
+        'The kettle is still on the stove.',
+        'Your brother is at the airport.',
+        'The board meeting starts at three.',
+        'Bring the keys and the folder.',
+        'The truck is parked by the dock.',
+        'Her flight lands around midnight.',
+        'The lease is inside the drawer.',
+        'I trust you with my life now.',
+      ]);
+      const res = await runD420(f420eNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_EXCUSE_FLOOD'), 'DIALOGUE_EXCUSE_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_AFFIRMATION_FLOOD fires when >25% of lines are pure bare assent', async () => {
+      // 5 of 12 lines are pure affirmations (41.7%) → fires
+      const f420af = buildD420([
+        'Okay.',
+        'Yes.',
+        'Absolutely.',
+        'Of course.',
+        'Right.',
+        'The kettle is still on the stove.',
+        'Your brother called from the airport.',
+        'The board meeting starts at three.',
+        'Bring the keys and the folder.',
+        'Her flight lands around midnight.',
+        'The lease is inside the drawer.',
+        'I locked the front door already.',
+      ]);
+      const res = await runD420(f420af);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_AFFIRMATION_FLOOD'), 'DIALOGUE_AFFIRMATION_FLOOD should fire');
+    });
+
+    it('DIALOGUE_AFFIRMATION_FLOOD does not fire when dialogue has no affirmation flood', async () => {
+      // 0 pure affirmation lines in 12 → no fire
+      const f420afNF = buildD420([
+        'We have to leave before sunrise.',
+        'The car is parked in the street.',
+        'I will not do this again today.',
+        'Turn the kettle off please.',
+        'We have to decide what comes next.',
+        'The board meeting starts at three.',
+        'Your brother called from London.',
+        'The keys are inside the drawer.',
+        'Her flight lands at midnight.',
+        'Bring the folder to the meeting.',
+        'I locked the front door already.',
+        'She signed the contract this morning.',
+      ]);
+      const res = await runD420(f420afNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_AFFIRMATION_FLOOD'), 'DIALOGUE_AFFIRMATION_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 406 — dialoguePass: vague-noun flood, reported-speech flood, oath-intensifier flood', async () => {
     const runD406 = async (fountain: string) => {
       const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
