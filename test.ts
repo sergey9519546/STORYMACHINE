@@ -19211,6 +19211,89 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 410 — originalityPass: slow-motion crutch, freeze-frame crutch, sound-cue crutch', async () => {
+    const runO410 = async (fountain: string) => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      return originalityPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('SLOW_MOTION_CRUTCH fires when slow motion is called 2+ times', async () => {
+      const f410s = `INT. ARENA - DAY
+
+The car flips in SLOW MOTION.
+
+EXT. STREET - NIGHT
+
+She turns, SLO-MO, toward the blast.
+`;
+      const res = await runO410(f410s);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SLOW_MOTION_CRUTCH'), 'SLOW_MOTION_CRUTCH should fire');
+    });
+
+    it('SLOW_MOTION_CRUTCH does NOT fire with a single slow-motion call', async () => {
+      const f410sNF = `INT. ARENA - DAY
+
+The car flips in SLOW MOTION.
+
+EXT. STREET - NIGHT
+
+She turns toward the blast.
+`;
+      const res = await runO410(f410sNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SLOW_MOTION_CRUTCH'), 'SLOW_MOTION_CRUTCH should not fire');
+    });
+
+    it('FREEZE_FRAME_CRUTCH fires when freeze frame is called 2+ times', async () => {
+      const f410f = `INT. HALL - DAY
+
+FREEZE FRAME on his face.
+
+EXT. PARK - DAY
+
+FREEZE ON the crowd.
+`;
+      const res = await runO410(f410f);
+      assert.ok(res.issues.some((i: any) => i.rule === 'FREEZE_FRAME_CRUTCH'), 'FREEZE_FRAME_CRUTCH should fire');
+    });
+
+    it('FREEZE_FRAME_CRUTCH does NOT fire with a single freeze-frame call', async () => {
+      const f410fNF = `INT. HALL - DAY
+
+FREEZE FRAME on his face.
+
+EXT. PARK - DAY
+
+The crowd scatters.
+`;
+      const res = await runO410(f410fNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'FREEZE_FRAME_CRUTCH'), 'FREEZE_FRAME_CRUTCH should not fire');
+    });
+
+    it('SOUND_CUE_CRUTCH fires when 3+ hard-coded sound cues appear', async () => {
+      const f410c = `INT. ROOM - DAY
+
+SFX: GLASS SHATTERS
+
+SFX: DOOR SLAMS
+
+SFX: PHONE RINGS
+`;
+      const res = await runO410(f410c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SOUND_CUE_CRUTCH'), 'SOUND_CUE_CRUTCH should fire');
+    });
+
+    it('SOUND_CUE_CRUTCH does NOT fire with only two sound cues', async () => {
+      const f410cNF = `INT. ROOM - DAY
+
+SFX: GLASS SHATTERS
+
+SFX: DOOR SLAMS
+`;
+      const res = await runO410(f410cNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SOUND_CUE_CRUTCH'), 'SOUND_CUE_CRUTCH should not fire');
+    });
+  });
+
   describe('Wave 396 — originalityPass: revelation purpose monotone, dialogue short-line dominance, dialogue question drought', async () => {
     const makeRec396 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

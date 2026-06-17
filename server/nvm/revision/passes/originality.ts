@@ -46,6 +46,13 @@
 // (≥75% of dialogue lines are ≤4 words — uniformly telegraphic register with no length
 // variation), dialogue question drought (<5% of dialogue lines are interrogative — characters
 // never ask each other anything, flattening dramatic pressure).
+// Wave 410 additions: slow-motion crutch (≥2 "SLOW MOTION"/"SLO-MO" markers — gravity
+// outsourced to a speed effect the staging should earn), freeze-frame crutch (≥2 "FREEZE
+// FRAME"/"FREEZE ON" markers — a held image leaned on for emphasis), sound-cue crutch (≥3
+// hard-coded "SFX:"/"SOUND:" labels — the writer scoring the sound design instead of letting
+// the prose imply it). Each is a distinct device crutch not covered by SMASH_CUT_OVERUSE
+// (hard/jump/match cuts), DIRECTORIAL_INTRUSION (camera/lens calls, "WE HEAR"), or the card
+// crutches (on-screen text/time captions).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1865,6 +1872,73 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Only ${qCount396c} of ${totalDlg396c} dialogue lines (${Math.round(qShare396c * 100)}%) are interrogative. Characters almost never ask each other anything — all spoken lines are declarations, assertions, or commands. Questions create dramatic pressure, reveal what a character needs to know and fears to hear, and force other characters to respond rather than react. A script where no one ever asks anything collapses into a series of parallel monologues.`,
         suggestedFix: 'Introduce interrogative dialogue at key pressure points: a question reveals vulnerability and shifts power between speakers. "Do you trust me?" or "What did you see?" carries more dramatic weight than three lines of statement. Characters should want information from each other — let that need show in the language.',
+      });
+    }
+  }
+
+  // ── Wave 410: SLOW_MOTION_CRUTCH, FREEZE_FRAME_CRUTCH, SOUND_CUE_CRUTCH ──
+
+  // SLOW_MOTION_CRUTCH (minor, ≥2 markers): Two or more lines call for slow motion
+  // ("SLOW MOTION", "SLO-MO", "IN SLOW MOTION"). Slow motion is a director's tool for
+  // stretching a single charged beat; when a script reaches for it repeatedly, it is
+  // outsourcing gravity to a speed effect that the staging, stakes, and imagery should
+  // earn on their own. Every slowed moment announces "this matters" rather than building
+  // the moment so the audience feels it matters. Distinct from SMASH_CUT_OVERUSE (hard/jump
+  // cut transitions), DIRECTORIAL_INTRUSION (camera/lens calls), and FADE_TRANSITION_OVERUSE
+  // (soft transitions): this targets the slow-motion speed effect specifically.
+  {
+    const slowMoRe410 = /\b(SLOW\s+MOTION|SLO-?\s?MO|SLOMO)\b/i;
+    const slowMoCount410 = lines.filter(l => slowMoRe410.test(l.trim())).length;
+    if (slowMoCount410 >= 2) {
+      issues.push({
+        location: `${slowMoCount410} slow-motion call(s)`,
+        rule: 'SLOW_MOTION_CRUTCH',
+        severity: 'minor',
+        description: `${slowMoCount410} lines call for slow motion ("SLOW MOTION", "SLO-MO"). Slow motion is a director's tool for stretching a single charged beat; reached for repeatedly, it outsources gravity to a speed effect the staging and stakes should earn. Each slowed moment announces "this matters" instead of building the beat so the audience feels it matters — and when many moments are slowed, none of them reads as special.`,
+        suggestedFix: 'Reserve slow motion for at most one beat whose weight is already fully earned by the scene around it, and let the rest play at speed. If a moment needs slow motion to register, the fix is usually in the setup — raise the stakes, isolate the image, or hold on the consequence — not in dictating the frame rate.',
+      });
+    }
+  }
+
+  // FREEZE_FRAME_CRUTCH (minor, ≥2 markers): Two or more lines call for a freeze frame
+  // ("FREEZE FRAME", "FREEZE ON", "FREEZE-FRAME"). A freeze frame stops time to underline
+  // an image; leaned on more than once, it becomes a tic that punctuates the script with
+  // manufactured significance rather than letting the moment land in motion. The held image
+  // is asked to carry an emphasis the writing has not built. Distinct from SLOW_MOTION_CRUTCH
+  // (a speed effect, not a stop), TITLE_CARD_CRUTCH (on-screen text), and DIRECTORIAL_INTRUSION
+  // (camera framing): this targets the freeze-frame device specifically.
+  {
+    const freezeRe410 = /\bFREEZE[\s\-]?(FRAME|ON)\b|\bFREEZE-FRAME\b|\bFREEZEFRAME\b/i;
+    const freezeCount410 = lines.filter(l => freezeRe410.test(l.trim())).length;
+    if (freezeCount410 >= 2) {
+      issues.push({
+        location: `${freezeCount410} freeze-frame call(s)`,
+        rule: 'FREEZE_FRAME_CRUTCH',
+        severity: 'minor',
+        description: `${freezeCount410} lines call for a freeze frame ("FREEZE FRAME", "FREEZE ON"). A freeze frame stops time to underline an image; used more than once it becomes a tic that punctuates the script with manufactured significance instead of letting the moment land in motion. The held image is asked to carry an emphasis the surrounding writing has not built, and repetition drains it of the very surprise that makes a freeze land.`,
+        suggestedFix: 'Keep at most one freeze frame, for a single image whose meaning the story has fully loaded, and stage the other emphatic beats in motion. Emphasis in film comes from what the audience has been led to feel about an image, not from literally stopping on it — build the charge into the scene and the moment will hold without being frozen.',
+      });
+    }
+  }
+
+  // SOUND_CUE_CRUTCH (minor, ≥3 markers): Three or more lines hard-code a sound effect with
+  // an explicit label ("SFX:", "SOUND:", "SOUND CUE:", "SOUND FX:"). Spelling out the sound
+  // design in labelled cues is the sound editor's job, not the writer's; on the page it reads
+  // as a spreadsheet of effects rather than prose that makes the reader hear the world. A
+  // script that lists its sounds is telling the reader what to hear instead of writing the
+  // action so the sound is implied. Distinct from DIRECTORIAL_INTRUSION ("WE HEAR" and
+  // camera/lens calls inside action) and from VOICEOVER_CRUTCH / OFF_SCREEN_CUE_OVERUSE
+  // (spoken-voice cues): this targets the labelled sound-effect cue specifically.
+  {
+    const soundCueRe410 = /^\(?\s*(SFX|SOUND|SOUND\s+CUE|SOUND\s+FX|SOUND\s+EFFECT|SOUND\s+EFFECTS)\s*:/i;
+    const soundCueCount410 = lines.filter(l => soundCueRe410.test(l.trim())).length;
+    if (soundCueCount410 >= 3) {
+      issues.push({
+        location: `${soundCueCount410} hard-coded sound cue(s)`,
+        rule: 'SOUND_CUE_CRUTCH',
+        severity: 'minor',
+        description: `${soundCueCount410} lines hard-code a sound effect with an explicit label ("SFX:", "SOUND:"). Spelling out the sound design in labelled cues is the sound editor's job; on the page it reads as a spreadsheet of effects rather than prose that makes the reader hear the world. A script that lists its sounds tells the reader what to hear instead of writing the action so the sound is felt — the cue substitutes for the craft of evocation.`,
+        suggestedFix: 'Fold essential sounds into the action prose so the reader hears them through the writing: instead of "SFX: GLASS SHATTERS", write "The glass shatters against the wall." Reserve a labelled cue only for a sound that is genuinely off-screen and plot-critical and cannot be implied by what is on the page.',
       });
     }
   }
