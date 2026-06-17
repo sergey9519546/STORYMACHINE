@@ -20109,6 +20109,85 @@ I always listen.
     });
   });
 
+  describe('Wave 422 — conflictPass: rupture cause void, aftermath curiosity void, pair shift imbalance', async () => {
+    const rup422 = (amount: number, pairKey = 'A|B') => [{ pairKey, dimension: 'trust', amount }];
+    const makeRec422 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runConf422 = async (records: any[]) => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      return conflictPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CONFLICT_RUPTURE_CAUSE_VOID fires when no conflict scene has an upstream cause', async () => {
+      // n=8, ruptures at 3 and 6, no causes anywhere → fires
+      const recs422a = Array.from({ length: 8 }, (_, i) => makeRec422(i));
+      recs422a[3] = makeRec422(3, { relationshipShifts: rup422(-0.5) });
+      recs422a[6] = makeRec422(6, { relationshipShifts: rup422(-0.4) });
+      const res = await runConf422(recs422a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_RUPTURE_CAUSE_VOID'), 'CONFLICT_RUPTURE_CAUSE_VOID should fire');
+    });
+
+    it('CONFLICT_RUPTURE_CAUSE_VOID does not fire when a rupture has a cause', async () => {
+      // n=8, ruptures at 3 and 6, scene 3 has a revelation (self-cause) → no fire
+      const recs422anr = Array.from({ length: 8 }, (_, i) => makeRec422(i));
+      recs422anr[3] = makeRec422(3, { relationshipShifts: rup422(-0.5), revelation: 'The secret comes out.' });
+      recs422anr[6] = makeRec422(6, { relationshipShifts: rup422(-0.4) });
+      const res = await runConf422(recs422anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_RUPTURE_CAUSE_VOID'), 'CONFLICT_RUPTURE_CAUSE_VOID should not fire');
+    });
+
+    it('CONFLICT_AFTERMATH_CURIOSITY_VOID fires when every rupture aftermath has no curiosity rise', async () => {
+      // n=8, ruptures at 2 and 5; scenes 3,4 and 6,7 have curiosityDelta=0 → fires
+      const recs422b = Array.from({ length: 8 }, (_, i) => makeRec422(i));
+      recs422b[2] = makeRec422(2, { relationshipShifts: rup422(-0.5) });
+      recs422b[5] = makeRec422(5, { relationshipShifts: rup422(-0.4) });
+      const res = await runConf422(recs422b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_AFTERMATH_CURIOSITY_VOID'), 'CONFLICT_AFTERMATH_CURIOSITY_VOID should fire');
+    });
+
+    it('CONFLICT_AFTERMATH_CURIOSITY_VOID does not fire when curiosity rises after a rupture', async () => {
+      // n=8, ruptures at 2 and 5; scene 3 has curiosityDelta=1 → no fire
+      const recs422bnr = Array.from({ length: 8 }, (_, i) => makeRec422(i));
+      recs422bnr[2] = makeRec422(2, { relationshipShifts: rup422(-0.5) });
+      recs422bnr[3] = makeRec422(3, { curiosityDelta: 1 });
+      recs422bnr[5] = makeRec422(5, { relationshipShifts: rup422(-0.4) });
+      const res = await runConf422(recs422bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_AFTERMATH_CURIOSITY_VOID'), 'CONFLICT_AFTERMATH_CURIOSITY_VOID should not fire');
+    });
+
+    it('CONFLICT_PAIR_SHIFT_IMBALANCE fires when one pair dominates total conflict magnitude', async () => {
+      // n=8, pair A|B: -0.8,-0.7,-0.6 = mag 2.1; pair C|D: -0.2; pair E|F: -0.2; total=2.5; A|B=84% → fires
+      const recs422c = Array.from({ length: 8 }, (_, i) => makeRec422(i));
+      recs422c[1] = makeRec422(1, { relationshipShifts: rup422(-0.8, 'A|B') });
+      recs422c[3] = makeRec422(3, { relationshipShifts: rup422(-0.7, 'A|B') });
+      recs422c[4] = makeRec422(4, { relationshipShifts: rup422(-0.2, 'C|D') });
+      recs422c[5] = makeRec422(5, { relationshipShifts: rup422(-0.6, 'A|B') });
+      recs422c[7] = makeRec422(7, { relationshipShifts: rup422(-0.2, 'E|F') });
+      const res = await runConf422(recs422c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_PAIR_SHIFT_IMBALANCE'), 'CONFLICT_PAIR_SHIFT_IMBALANCE should fire');
+    });
+
+    it('CONFLICT_PAIR_SHIFT_IMBALANCE does not fire when conflict is distributed across pairs', async () => {
+      // n=8, three pairs each with similar magnitude: A|B=-1.0, C|D=-1.0, E|F=-1.0; each=33% → no fire
+      const recs422cnr = Array.from({ length: 8 }, (_, i) => makeRec422(i));
+      recs422cnr[1] = makeRec422(1, { relationshipShifts: rup422(-0.5, 'A|B') });
+      recs422cnr[2] = makeRec422(2, { relationshipShifts: rup422(-0.5, 'C|D') });
+      recs422cnr[3] = makeRec422(3, { relationshipShifts: rup422(-0.5, 'E|F') });
+      recs422cnr[5] = makeRec422(5, { relationshipShifts: rup422(-0.5, 'A|B') });
+      recs422cnr[6] = makeRec422(6, { relationshipShifts: rup422(-0.5, 'C|D') });
+      recs422cnr[7] = makeRec422(7, { relationshipShifts: rup422(-0.5, 'E|F') });
+      const res = await runConf422(recs422cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_PAIR_SHIFT_IMBALANCE'), 'CONFLICT_PAIR_SHIFT_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 408 — conflictPass: peak revelation absent, peak payoff absent, peak seed absent', async () => {
     const rup408 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
     const makeRec408 = (idx: number, overrides: any = {}): any => ({

@@ -50,6 +50,13 @@
 // × seededClueIds). These extend the Wave 352/366 peak-rupture audit to the three remaining
 // channels and are distinct from the Wave 380/394 co-occurrence "decoupled" checks, which audit
 // whether ANY rupture coincides (aggregate) rather than whether the single biggest one does.
+// Wave 422 additions: conflict rupture cause void (no conflict scene has a cause in itself or
+// the prior scene — every rupture is an authorial decree without visible provocation; backward-
+// cause mode × rupture channel), conflict aftermath curiosity void (every rupture is followed
+// by 2 scenes where curiosityDelta ≤ 0 — breaking bonds opens no new questions; sequence/
+// aftermath × curiosity), conflict pair shift imbalance (one relationship pair accounts for
+// >65% of total negative shift magnitude while ≥3 pairs exist — the story over-invests in
+// one dyad; average/aggregate × pair distribution).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1707,6 +1714,121 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
             suggestedFix: 'Let the heaviest rupture plant a thread: the break that hurts most should also open a new unknown — the betrayal that hints at a wider conspiracy, the severed alliance that raises the question of who the protagonist can now trust. A rupture that seeds a clue turns an ending into a beginning, converting relational loss into forward pull.',
           });
         }
+      }
+    }
+  }
+
+  // ── Wave 422: CONFLICT_RUPTURE_CAUSE_VOID, CONFLICT_AFTERMATH_CURIOSITY_VOID, CONFLICT_PAIR_SHIFT_IMBALANCE ──
+
+  // CONFLICT_RUPTURE_CAUSE_VOID (minor, n≥8, ≥2 conflict scenes): No conflict scene (negative
+  // relationship shift ≤ -0.3) has an upstream cause in itself or the scene immediately before
+  // it — no revelation, no dramatic turn, no clock raise, no seeded clue, and no prior positive
+  // shift (which would create expectation and thus potential provocation). Every rupture in the
+  // story arrives as an authorial decree: a bond breaks without any visible pressure that would
+  // cause it to break. Audiences accept relational ruptures only when they can feel the force
+  // that caused the break; ruptures without provocation read as arbitrary writer interventions
+  // rather than as consequences of accumulating conflict. Backward-cause mode × rupture channel.
+  // Distinct from DRAMATIC_TURN_WITHOUT_CAUSE (causality pass: turn scenes — not rupture scenes),
+  // DEUS_EX_MACHINA (causality: late plot-closing revelation, not relationship rupture), and
+  // CONFLICT_RUPTURE_AFTERMATH_VOID (Wave 394: the downstream aftermath of ruptures — this audits
+  // the upstream provocation that precedes them).
+  if (records.length >= 8) {
+    const ruptureRecs422a = (records as any[]).filter(r =>
+      ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+    );
+    if (ruptureRecs422a.length >= 2) {
+      const isDriver422a = (r: any): boolean =>
+        r.revelation !== null ||
+        (r.dramaticTurn ?? 'nothing') !== 'nothing' ||
+        r.clockRaised === true ||
+        ((r.seededClueIds ?? []) as any[]).length > 0 ||
+        ((r.relationshipShifts ?? []) as any[]).some((s: any) => (s.amount ?? 0) > 0);
+      const anyHasCause422a = ruptureRecs422a.some((r: any) => {
+        const idx = (records as any[]).indexOf(r);
+        return isDriver422a(r) || (idx > 0 && isDriver422a((records as any[])[idx - 1]));
+      });
+      if (!anyHasCause422a) {
+        issues.push({
+          location: `${ruptureRecs422a.length} conflict scene(s) — no upstream cause`,
+          rule: 'CONFLICT_RUPTURE_CAUSE_VOID',
+          severity: 'minor',
+          description: `All ${ruptureRecs422a.length} of the story's conflict scenes (bond-ruptures ≤ -0.3) arrive without any upstream cause — no revelation, no dramatic turn, no deadline raised, no clue planted, no prior positive shift in themselves or the scene before. Every rupture is an authorial decree: bonds break without visible provocation. Audiences accept relational ruptures when they can feel the force that caused the break; without it, each fracture reads as an arbitrary writer intervention rather than as the consequence of accumulating pressure.`,
+          suggestedFix: 'Give each rupture a cause in its own scene or the one before: a secret surfacing, a turn that changes the dynamic, a deadline that forces a choice, a planted threat that detonates. Relational fractures land as inevitable rather than arbitrary when the audience can trace the pressure that produced them — cause first, then break.',
+        });
+      }
+    }
+  }
+
+  // CONFLICT_AFTERMATH_CURIOSITY_VOID (minor, n≥8, ≥2 conflict scenes): Every scene with a
+  // major relationship rupture (≤ -0.3) is followed by two scenes where curiosityDelta ≤ 0 —
+  // breaking bonds never opens new questions. When a relationship fractures, the audience should
+  // immediately wonder: will it be repaired? Who caused this? What happens next between them?
+  // A rupture that closes the curiosity channel in both of its subsequent scenes teaches the
+  // audience that relational damage is a dead end rather than a story generator. Sequence/aftermath
+  // mode × curiosity. Distinct from CONFLICT_RUPTURE_AFTERMATH_VOID (Wave 394: checks neutral
+  // emotion and no relationship shift in the aftermath — the curiosity channel is NOT checked
+  // there), CONFLICT_CURIOSITY_DECOUPLED (Wave 313: avg curiosityDelta of conflict scenes
+  // themselves ≤ 0 — the scene of rupture, not the aftermath), and CURIOSITY_SPIKE_NO_FALLOUT
+  // (causality pass: forward-looking — what FOLLOWS a curiosity spike; this is backward-looking
+  // — what follows a rupture).
+  if (records.length >= 8) {
+    const ruptureRecs422b = (records as any[]).filter(r =>
+      ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+    );
+    if (ruptureRecs422b.length >= 2) {
+      const allFlatAftermath422b = ruptureRecs422b.every((r: any) => {
+        const idx = (records as any[]).indexOf(r);
+        for (let off = 1; off <= 2; off++) {
+          if (idx + off >= records.length) continue;
+          if (((records as any[])[idx + off].curiosityDelta ?? 0) > 0) return false;
+        }
+        return true;
+      });
+      if (allFlatAftermath422b) {
+        issues.push({
+          location: 'All rupture aftermath scenes — curiosity flat',
+          rule: 'CONFLICT_AFTERMATH_CURIOSITY_VOID',
+          severity: 'minor',
+          description: `Every bond-rupture in the story (${ruptureRecs422b.length} conflict scene(s)) is followed by two scenes with no curiosity rise — breaking bonds never opens new questions. When a relationship fractures, the audience should immediately wonder what happens next between those characters: will the bond be repaired, who is to blame, what secret now becomes speakable? Ruptures that generate no forward curiosity teach the audience that relational damage is a dead end rather than a generator of new story energy.`,
+          suggestedFix: 'Let each rupture raise at least one question in the scene that follows: the character who was betrayed wonders whether to tell anyone; an alliance breaks and it is suddenly unclear who can be trusted; a wound opens and the audience is left wondering whether it will heal. Relational damage should create questions, not silence.',
+        });
+      }
+    }
+  }
+
+  // CONFLICT_PAIR_SHIFT_IMBALANCE (minor, n≥8, ≥3 pairs with negative shifts): One relationship
+  // pair accounts for more than 65% of the story's total negative-shift magnitude while at least
+  // two other pairs also carry negative shifts. When the overwhelming majority of relational
+  // damage concentrates in a single dyad, the story's conflict is structurally myopic: one
+  // relationship bears the entire dramatic burden while other bonds are present but barely
+  // stressed. The audience invests in the primary pair but has little relational concern for
+  // anyone else. Average/aggregate × pair distribution. Distinct from CONFLICT_PAIR_DENSITY_GAP
+  // (Wave 271: one pair's scene count is 3× any other — a scene-count ratio, not magnitude
+  // proportion), RELATIONAL_SYMMETRY_ABSENT (one-sided reciprocity within a pair), and SINGLE_
+  // REGISTER (all shifts in one emotional dimension regardless of pair).
+  if (records.length >= 8) {
+    const negShifts422c: Array<{ pairKey: string; mag: number }> = [];
+    for (const r of records as any[]) {
+      for (const s of (r.relationshipShifts ?? []) as any[]) {
+        if ((s.amount ?? 0) < 0) negShifts422c.push({ pairKey: String(s.pairKey ?? 'unknown'), mag: Math.abs(s.amount) });
+      }
+    }
+    const pairKeys422c = new Set(negShifts422c.map(s => s.pairKey));
+    if (pairKeys422c.size >= 3) {
+      const totalMag422c = negShifts422c.reduce((sum, s) => sum + s.mag, 0);
+      const magByPair422c = new Map<string, number>();
+      for (const s of negShifts422c) magByPair422c.set(s.pairKey, (magByPair422c.get(s.pairKey) ?? 0) + s.mag);
+      let maxPairMag422c = 0;
+      let maxPairKey422c = '';
+      for (const [k, v] of magByPair422c) { if (v > maxPairMag422c) { maxPairMag422c = v; maxPairKey422c = k; } }
+      if (maxPairMag422c / totalMag422c > 0.65) {
+        issues.push({
+          location: `Pair "${maxPairKey422c}" — ${Math.round(maxPairMag422c / totalMag422c * 100)}% of total conflict magnitude`,
+          rule: 'CONFLICT_PAIR_SHIFT_IMBALANCE',
+          severity: 'minor',
+          description: `One relationship pair ("${maxPairKey422c}") accounts for ${Math.round(maxPairMag422c / totalMag422c * 100)}% of the story's total negative-shift magnitude, while ${pairKeys422c.size - 1} other pair(s) also carry conflict. When one dyad bears the overwhelming majority of relational damage, the story's conflict is structurally myopic: the audience invests in that pair but has little relational concern for anyone else, and the supporting bonds feel decorative rather than dramatically stressed.`,
+          suggestedFix: `Distribute relational damage more evenly across the story's pairs: let the bonds outside "${maxPairKey422c}" carry some of the dramatic weight — a secondary trust broken, an alliance strained, a peripheral friendship that pays a cost for the story's central conflict. When multiple relationships are under pressure simultaneously, the audience's relational investment widens and the stakes feel structural rather than personal.`,
+        });
       }
     }
   }
