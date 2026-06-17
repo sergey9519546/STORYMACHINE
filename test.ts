@@ -24306,6 +24306,195 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 403 — voicePass: dialogue passive flood, dialogue imperative flood, action motion verb monotone', async () => {
+    const runV403 = async (fountain: string) => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      return voicePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DIALOGUE_PASSIVE_FLOOD fires when >25% of dialogue lines use passive constructions', async () => {
+      const lines403a = [
+        'He was told to leave immediately.',
+        'She was fired by the committee.',
+        'The plan was rejected before we arrived.',
+        'He was found guilty of everything.',
+        'It has been done before, many times.',
+        'She was never consulted on the matter.',
+        'The orders were given without question.',
+        'He was betrayed by his own people.',
+        'The truth was hidden for years.',
+        'She has been waiting for this moment.',
+        'He was warned not to come here.',
+        'The contract was signed without her.',
+        'Nothing was ever explained to us.',
+        'She was chosen for her silence.',
+        'He was replaced before dawn.',
+        'The records were destroyed on purpose.',
+        'She was left behind by everyone.',
+        'He was promoted despite it all.',
+        'The vote was rigged from the start.',
+        'She was abandoned in the end.',
+      ];
+      const chr403a = 'DETECTIVE';
+      const dlgBlock403a = lines403a.map(l => `${chr403a}\n${l}`).join('\n\n');
+      const fountain403a = `INT. PRECINCT - DAY\n\n${dlgBlock403a}\n`;
+      const res = await runV403(fountain403a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_PASSIVE_FLOOD'), 'DIALOGUE_PASSIVE_FLOOD should fire');
+    });
+
+    it('DIALOGUE_PASSIVE_FLOOD does NOT fire when dialogue uses active voice', async () => {
+      const lines403aNF = [
+        'She told him to leave.',
+        'The committee fired her.',
+        'He decided to reject the plan.',
+        'The jury found him guilty.',
+        'We did this once before.',
+        'Nobody consulted her on anything.',
+        'Someone gave those orders.',
+        'His own people betrayed him.',
+        'They hid the truth for years.',
+        'She has been sitting here all morning.',
+        'He warned us not to come.',
+        'She signed the contract alone.',
+        'Nobody explained anything to us.',
+        'They chose her for her silence.',
+        'He replaced her before dawn.',
+        'Someone destroyed those records.',
+        'Everyone left her behind.',
+        'They promoted him despite it.',
+        'Someone rigged the vote.',
+        'He abandoned her in the end.',
+      ];
+      const chr403aNF = 'WITNESS';
+      const dlgNF403a = lines403aNF.map(l => `${chr403aNF}\n${l}`).join('\n\n');
+      const fountain403aNF = `INT. ROOM - DAY\n\n${dlgNF403a}\n`;
+      const res = await runV403(fountain403aNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_PASSIVE_FLOOD'), 'DIALOGUE_PASSIVE_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_IMPERATIVE_FLOOD fires when >30% of dialogue lines are commands', async () => {
+      const lines403b = [
+        'Go now, before they find us.',
+        'Tell me what happened last night.',
+        'Stop pretending you don\'t know.',
+        'Get out of this house.',
+        'Listen to what I\'m saying.',
+        'Give me the key.',
+        'Look at me when I speak to you.',
+        'Run before they come back.',
+        'Stay where you are.',
+        'Find the folder and bring it here.',
+        'Call him right now.',
+        'Move away from the window.',
+        'Put the gun down slowly.',
+        'Keep your voice low.',
+        'Hold on, I hear something.',
+        'I don\'t know what to tell you.',
+        'She left before I could explain.',
+        'We never had a chance.',
+        'Maybe things will change.',
+        'He didn\'t mean what he said.',
+      ];
+      const chr403b = 'HANDLER';
+      const dlgBlock403b = lines403b.map(l => `${chr403b}\n${l}`).join('\n\n');
+      const fountain403b = `INT. SAFEHOUSE - NIGHT\n\n${dlgBlock403b}\n`;
+      const res = await runV403(fountain403b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_IMPERATIVE_FLOOD'), 'DIALOGUE_IMPERATIVE_FLOOD should fire');
+    });
+
+    it('DIALOGUE_IMPERATIVE_FLOOD does NOT fire when dialogue avoids command dominance', async () => {
+      const lines403bNF = [
+        'I don\'t know what to do anymore.',
+        'She looked at me like I was a stranger.',
+        'Maybe this is how it ends.',
+        'I was thinking about what you said.',
+        'The light here is wrong somehow.',
+        'I can\'t sleep at all these days.',
+        'Something feels different tonight.',
+        'We should have left when we had the chance.',
+        'I keep thinking about that moment.',
+        'She never said a word to me.',
+        'I don\'t believe any of this.',
+        'It was different before all of this.',
+        'I wonder what he actually meant.',
+        'None of this makes sense to me.',
+        'I felt it before I saw it.',
+        'You were right about everything.',
+        'I never wanted any of this.',
+        'She was kind before she changed.',
+        'I thought I understood the rules.',
+        'Something broke that day and stayed broken.',
+      ];
+      const chr403bNF = 'ALEX';
+      const dlgNF403b = lines403bNF.map(l => `${chr403bNF}\n${l}`).join('\n\n');
+      const fountain403bNF = `INT. APARTMENT - NIGHT\n\n${dlgNF403b}\n`;
+      const res = await runV403(fountain403bNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_IMPERATIVE_FLOOD'), 'DIALOGUE_IMPERATIVE_FLOOD should not fire');
+    });
+
+    it('ACTION_MOTION_VERB_MONOTONE fires when >50% of action lines use generic displacement verbs', async () => {
+      const fountain403c = `INT. CORRIDOR - NIGHT
+
+The figure walks toward the exit.
+
+Marcus moves through the shadows.
+
+She enters the room without a sound.
+
+He crosses to the window and pauses.
+
+The guard turns at the far end.
+
+She heads toward the stairwell.
+
+The man approaches the door slowly.
+
+He exits the corridor in silence.
+
+She reaches the landing above.
+
+He comes to a stop by the pillar.
+
+Marcus goes back the way he came.
+
+She walks in a wide arc around it.
+`;
+      const res = await runV403(fountain403c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_MOTION_VERB_MONOTONE'), 'ACTION_MOTION_VERB_MONOTONE should fire');
+    });
+
+    it('ACTION_MOTION_VERB_MONOTONE does NOT fire when action lines use varied specific verbs', async () => {
+      const fountain403cNF = `INT. WAREHOUSE - NIGHT
+
+Marcus seizes the ledger and shoves it inside his coat.
+
+She jams the door with her shoulder, teeth clenched.
+
+The lamp flickers, throwing shadows across the ceiling.
+
+He tears the pages out one by one, jaw tight.
+
+The dog lunges at the chain link and snarls.
+
+She presses herself flat against the beam.
+
+Marcus wrenches the panel free and drops it.
+
+The water drips from a rusted pipe above.
+
+She stares at the name circled in red ink.
+
+He crushes the phone and lets it fall.
+
+The silence settles over the space like dust.
+
+The bulb swings, then dies.
+`;
+      const res = await runV403(fountain403cNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_MOTION_VERB_MONOTONE'), 'ACTION_MOTION_VERB_MONOTONE should not fire');
+    });
+  });
+
   describe('Wave 389 — voicePass: action expletive opener, dialogue interrogative-opener flood, dialogue comparative flood', async () => {
     const runV389 = async (fountain: string) => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');

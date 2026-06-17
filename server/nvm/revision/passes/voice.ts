@@ -45,6 +45,11 @@
 // interrogative-opener flood (>30% of dialogue lines begin with a wh-question word — every
 // exchange reads as interrogation), dialogue comparative flood (>25% of dialogue lines carry
 // a "more/-er than" or "as...as" comparison — speech locked in relative ranking).
+// Wave 403 additions: dialogue passive flood (>25% of dialogue lines use passive constructions
+// — agent erased from speech, evasive bureaucratic register), dialogue imperative flood (>30%
+// of dialogue lines are commands — characters default to directing behavior rather than
+// expressing feeling), action motion verb monotone (>50% of action lines use generic
+// displacement verbs — script describes choreography rather than dramatic action).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1828,6 +1833,114 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Let characters speak in direct, absolute terms where the feeling is the point: "I trust you more than I trusted him" can become "I trust you." Reserve comparison for the beat where weighing two things against each other is the dramatic move; as a default register it keeps the dialogue at arm\'s length.',
         });
       }
+    }
+  }
+
+  // ── Wave 403: DIALOGUE_PASSIVE_FLOOD, DIALOGUE_IMPERATIVE_FLOOD, ACTION_MOTION_VERB_MONOTONE ──
+
+  // DIALOGUE_PASSIVE_FLOOD (minor, ≥15 dialogue lines, >25%): More than 25% of dialogue
+  // lines contain a passive-voice construction ("was told", "were found", "has been done",
+  // "got fired"). Passive voice in dialogue removes the agent — characters describe what
+  // happened without naming who performed the action, creating an evasive, bureaucratic, or
+  // distanced register. A character who says "He was fired" instead of "They fired him" is
+  // either hiding who did it or deflecting accountability. Distinct from PASSIVE_ACTION_VOICE
+  // (action lines only) and ACTION_EXPLETIVE_OPENER (dummy-subject openers in action):
+  // this fires on the passive register of speech itself, not of narration.
+  {
+    const dlg403a: string[] = [];
+    let inDlg403a = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg403a = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg403a = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg403a = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg403a) dlg403a.push(t);
+    }
+    if (dlg403a.length >= 15) {
+      const passiveRe403a = /\b(was|were)\s+\w+ed\b|\bhas\s+been\b|\bhave\s+been\b|\bhad\s+been\b|\bgot\s+\w+ed\b|\bget\s+\w+ed\b/i;
+      const passiveCount403a = dlg403a.filter(l => passiveRe403a.test(l)).length;
+      if (passiveCount403a / dlg403a.length > 0.25) {
+        issues.push({
+          location: 'Dialogue throughout',
+          rule: 'DIALOGUE_PASSIVE_FLOOD',
+          severity: 'minor',
+          description: `${passiveCount403a} of ${dlg403a.length} dialogue lines (${Math.round(passiveCount403a / dlg403a.length * 100)}%) use passive constructions ("was told", "were found", "has been done"). Passive voice in dialogue removes the agent — characters describe what happened without naming who did it, producing an evasive or bureaucratic register. "He was fired" conceals who fired him; "It was decided" hides who decided. A script dense with passive dialogue has characters who systematically avoid assigning responsibility.`,
+          suggestedFix: 'Convert passive dialogue into active speech that names the agent: "He was told to leave" → "She told him to leave." When a character deliberately omits the agent — to protect someone, to deflect blame — make that evasion itself a dramatic choice, not the default register. Active speech has characters owning, attributing, and confronting action directly.',
+        });
+      }
+    }
+  }
+
+  // DIALOGUE_IMPERATIVE_FLOOD (minor, ≥15 dialogue lines, >30%): More than 30% of dialogue
+  // lines are imperative commands beginning with a base-form verb directing another character's
+  // behavior ("Go.", "Tell me.", "Stop.", "Get out."). Characters who default to commands
+  // have no emotional interior that surfaces in dialogue — they only manage others. When
+  // imperatives dominate, the script reads as a sequence of orders rather than a collision of
+  // needs and desires; characters are behavioral managers, not people. Distinct from
+  // DIALOGUE_INTERROGATIVE_SATURATION (question-mark lines), DIALOGUE_CONDITIONAL_FLOOD
+  // (if/unless openers), DIALOGUE_CONJUNCTION_OPENER (And/But/So starters), and
+  // EXCLAMATION_OVERUSE (punctuation): this targets grammatical mood — the imperative verb form.
+  {
+    const dlg403b: string[] = [];
+    let inDlg403b = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg403b = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg403b = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg403b = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg403b) dlg403b.push(t);
+    }
+    if (dlg403b.length >= 15) {
+      const IMPERATIVE_VERBS403b = new Set([
+        'go', 'get', 'come', 'stop', 'tell', 'show', 'give', 'take', 'make', 'let',
+        'stay', 'look', 'listen', 'wait', 'run', 'leave', 'help', 'move', 'find', 'keep',
+        'hold', 'put', 'sit', 'stand', 'turn', 'watch', 'follow', 'call', 'say', 'speak',
+        'walk', 'open', 'close', 'bring', 'forget', 'remember', 'think', 'check', 'read',
+        'drink', 'eat', 'sleep', 'wake', 'send', 'write', 'be', 'die', 'live', 'pull',
+        'push', 'pick', 'drop', 'grab', 'touch', 'hit', 'kill', 'save', 'ask', 'answer',
+        'play', 'use', 'try', 'choose', 'pass', 'drive', 'hide', 'pray', 'trust', 'believe',
+        'promise', 'swear', 'calm', 'breathe', 'do', 'start', 'finish', 'end', 'fly', 'jump',
+        'climb', 'fight',
+      ]);
+      const imperativeCount403b = dlg403b.filter(l => {
+        const first = l.trim().split(/[\s,!.?]+/)[0]?.toLowerCase();
+        return first !== undefined && IMPERATIVE_VERBS403b.has(first);
+      }).length;
+      if (imperativeCount403b / dlg403b.length > 0.30) {
+        issues.push({
+          location: 'Dialogue throughout',
+          rule: 'DIALOGUE_IMPERATIVE_FLOOD',
+          severity: 'minor',
+          description: `${imperativeCount403b} of ${dlg403b.length} dialogue lines (${Math.round(imperativeCount403b / dlg403b.length * 100)}%) begin with an imperative command ("Go", "Tell me", "Stop", "Get out"). When commands dominate dialogue, characters default to directing each other's behavior rather than expressing, feeling, or connecting — they manage one another instead of engaging. A script dense with imperative dialogue has characters who are behavioral managers, not people in emotional relation.`,
+          suggestedFix: 'Convert some commands into the need that motivates them: "Go now" can become "I can\'t do this with you here." The command tells the other character what to do; the need tells the audience what it costs. Characters who express the desire behind their demands are more revealing than characters who only issue orders.',
+        });
+      }
+    }
+  }
+
+  // ACTION_MOTION_VERB_MONOTONE (minor, ≥10 action lines, >50%): More than 50% of action
+  // lines use a generic motion or displacement verb as their primary verb ("walks", "moves",
+  // "enters", "exits", "turns", "crosses", "heads", "approaches", "reaches", "comes", "goes",
+  // "runs", "steps", "leaves", "arrives", "stands", "sits", "rises", "falls"). When motion
+  // verbs dominate the action, the script describes choreography — who moved where — rather
+  // than what characters are doing in any dramatically meaningful sense. The physical world
+  // is reduced to traffic management. Distinct from MONOCHROME_VERBS (a single specific verb
+  // repeated, threshold 25%) and ACTION_ADVERB_FLOOD (adverbs modifying weak verbs): this
+  // fires when the whole category of generic displacement verbs dominates, revealing
+  // verb-level under-description of attitude, intention, and behavior.
+  if (actionOnlyLines.length >= 10) {
+    const motionVerbRe403c = /\b(walks?|walked|moves?|moved|enters?|entered|exits?|exited|turns?|turned|crosses?|crossed|heads?|headed|approaches?|approached|arrives?|arrived|comes|came|goes|went|runs?|ran|steps?|stepped|leaves|left|reaches?|reached|stands?|stood|sits?|sat|rises?|rose|falls?|fell|climbs?|climbed)\b/i;
+    const motionCount403c = actionOnlyLines.filter(l => motionVerbRe403c.test(l)).length;
+    if (motionCount403c / actionOnlyLines.length > 0.50) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'ACTION_MOTION_VERB_MONOTONE',
+        severity: 'minor',
+        description: `${motionCount403c} of ${actionOnlyLines.length} action lines (${Math.round(motionCount403c / actionOnlyLines.length * 100)}%) use a generic motion or displacement verb ("walks", "enters", "moves", "crosses", "turns", "heads"). When displacement verbs dominate the action, the script describes choreography — who moved where — rather than what characters are doing in any dramatically meaningful sense. Action prose reduced to traffic management under-describes the physical world and the psychological stakes behind movement.`,
+        suggestedFix: 'Replace generic motion verbs with specific verbs that carry attitude and intent: "walks toward" → "advances", "strides", "creeps"; "enters" → "bursts in", "slips in", "crashes through." Movement is always motivated — the verb should carry that motivation. When a character walks, how and why they walk is the character.',
+      });
     }
   }
 
