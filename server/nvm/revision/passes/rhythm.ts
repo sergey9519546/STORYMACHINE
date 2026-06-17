@@ -52,6 +52,13 @@
 // the sentence level, the ending-word counterpart of opening-word repetition), progressive-verb
 // overuse (>25% of action lines use is/are + -ing present-progressive construction — "she is
 // running" instead of "she runs" — a subtle temporal mismatch in cinematic present tense).
+// Wave 414 additions: vague-quantifier overload (>25% of action lines lean on imprecise
+// quantities — "some", "several", "a few", "many" — vagueness draining specificity from the
+// staging; distinct from NUMBER_WORD_FLOOD, which flags the opposite over-precision of spelled
+// numerals), atmosphere-abstraction overload (>25% of action lines name an abstract mood noun —
+// "tension", "silence", "an air of menace" — telling the feeling instead of showing the image
+// that produces it), color-description overload (>30% of action lines carry a color word — an
+// over-saturated palette crowding the DP's domain; the upper-end complement of COLOR_ABSENCE).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1404,6 +1411,75 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${progressCount400c} of ${actionLines.length} action lines (${Math.round(progressCount400c / actionLines.length * 100)}%) use a present-progressive construction ("is/are + -ing") instead of the screenplay standard of simple present. "She is running" vs. "She runs" — the progressive adds a temporal layer that softens immediacy: the action is happening, ongoing, observed from a distance rather than witnessed in real time. A page of progressive verbs reads like a novelist describing a film rather than a screenplay enacting one.`,
         suggestedFix: 'Replace "is/are + -ing" with the simple present verb: "She is running" → "She runs", "They are fighting" → "They fight". The simple present is the language of the cinematic now — it drops the reader into the action rather than positioning them as an observer of something ongoing.',
+      });
+    }
+  }
+
+  // ── Wave 414: VAGUE_QUANTIFIER_OVERLOAD, ATMOSPHERE_ABSTRACTION_OVERLOAD, COLOR_DESCRIPTION_OVERLOAD ──
+
+  // VAGUE_QUANTIFIER_OVERLOAD (minor, ≥8 action lines, >25%): More than 25% of action lines
+  // lean on a vague quantifier ("some", "several", "a few", "many", "various", "numerous", "a
+  // couple of", "a number of"). Vague quantities drain specificity from the staging — "some
+  // people gather", "a few cars pass" — leaving the director and the audience with no concrete
+  // image to hold. Screen action is most vivid when it commits to a number the eye can see.
+  // Distinct from NUMBER_WORD_FLOOD (the opposite failure — over-precise spelled numerals like
+  // "three"/"seven" diluting concision) and INTENSIFIER_FLOOD (degree adverbs, not quantities):
+  // this targets imprecise quantification specifically.
+  if (actionLines.length >= 8) {
+    const vagueQuantRe414 = /\b(some|several|a few|many|various|numerous|a couple(?:\s+of)?|a number of|a bunch of|lots of|plenty of|countless|myriad)\b/i;
+    const vagueQuantCount414 = actionLines.filter(l => vagueQuantRe414.test(l.text)).length;
+    if (vagueQuantCount414 / actionLines.length > 0.25) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'VAGUE_QUANTIFIER_OVERLOAD',
+        severity: 'minor',
+        description: `${vagueQuantCount414} of ${actionLines.length} action lines (${Math.round(vagueQuantCount414 / actionLines.length * 100)}%) lean on a vague quantifier ("some", "several", "a few", "many"). Imprecise quantities drain specificity from the staging — "some people gather", "a few cars pass" — leaving nothing concrete for the eye to hold. Screen action is most vivid when it commits to a number the audience can see, and a page of vague quantities reads as a writer gesturing at a scene rather than rendering it.`,
+        suggestedFix: 'Commit to specific, visible quantities: "some people" → "three people"; "a few cars" → "two cars, then a third." A precise number gives the scene a concrete image and a rhythm; vagueness asks the reader to imagine the staging the writer declined to choose. Reserve "some" for the rare beat where the imprecision is itself the point.',
+      });
+    }
+  }
+
+  // ATMOSPHERE_ABSTRACTION_OVERLOAD (minor, ≥8 action lines, >25%): More than 25% of action
+  // lines name an abstract mood or atmosphere noun ("tension", "silence", "an air of menace",
+  // "a sense of dread", "energy", "presence", "atmosphere") instead of rendering the concrete
+  // image that would produce that feeling. Naming the atmosphere is the action-line equivalent
+  // of on-the-nose dialogue — it tells the audience what to feel rather than showing the detail
+  // that makes them feel it. "Tension fills the room" is a label; "Nobody picks up their fork"
+  // is the tension. Distinct from LIGHT/WEATHER/SOUND_DESCRIPTION_OVERLOAD (concrete sensory
+  // vocabulary, the DP's/sound editor's domain) and SET_DRESSING_DOMINANCE (physical furniture):
+  // this targets abstract mood nouns that have no visual referent at all.
+  if (actionLines.length >= 8) {
+    const atmosphereRe414 = /\b(tension|silence|stillness|atmosphere|mood|energy|presence|aura|vibe|unease|dread|menace|melancholy|serenity|chaos|calm)\b|\b(?:an?\s+)?(?:air|sense|feeling|wave|sensation)\s+of\b/i;
+    const atmosphereCount414 = actionLines.filter(l => atmosphereRe414.test(l.text)).length;
+    if (atmosphereCount414 / actionLines.length > 0.25) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'ATMOSPHERE_ABSTRACTION_OVERLOAD',
+        severity: 'minor',
+        description: `${atmosphereCount414} of ${actionLines.length} action lines (${Math.round(atmosphereCount414 / actionLines.length * 100)}%) name an abstract mood ("tension", "silence", "an air of menace", "a sense of dread") rather than rendering the concrete image that produces it. Naming the atmosphere is the action-line equivalent of on-the-nose dialogue — it tells the audience what to feel instead of showing the detail that makes them feel it. "Tension fills the room" is a label; "Nobody picks up their fork" is the tension itself.`,
+        suggestedFix: 'Replace named atmospheres with the physical detail that creates them: "An air of menace" → "He cleans the knife slowly, watching the door." "A sense of dread" → "The phone rings. Nobody moves." The camera cannot photograph "tension" — it can only photograph the behavior and objects that make the audience feel it.',
+      });
+    }
+  }
+
+  // COLOR_DESCRIPTION_OVERLOAD (minor, ≥10 action lines, >30%): More than 30% of action lines
+  // carry a color word — an over-saturated palette where the prose is constantly specifying
+  // hues. Color is one of the cinematographer's primary tools, and a screenplay that names a
+  // color in nearly every line is doing the DP's job for them while crowding the dramatic
+  // action with palette notes the page does not need. A few deliberate color cues land; a
+  // constant stream reads as a writer art-directing every frame. The upper-end complement of
+  // COLOR_ABSENCE (no color word in 12+ lines — a monochrome world); reuses the same color
+  // vocabulary, audited for over-saturation rather than absence.
+  if (actionLines.length >= 10) {
+    const colorRe414 = /\b(red|blue|green|yellow|orange|purple|violet|pink|brown|black|white|grey|gray|gold|silver|crimson|scarlet|cobalt|amber|ivory|ebony|beige|teal|azure|emerald|olive|tan|maroon|navy|khaki)\b/i;
+    const colorCount414 = actionLines.filter(l => colorRe414.test(l.text)).length;
+    if (colorCount414 / actionLines.length > 0.30) {
+      issues.push({
+        location: 'Action lines throughout',
+        rule: 'COLOR_DESCRIPTION_OVERLOAD',
+        severity: 'minor',
+        description: `${colorCount414} of ${actionLines.length} action lines (${Math.round(colorCount414 / actionLines.length * 100)}%) name a color — an over-saturated palette where nearly every line specifies a hue. Color is one of the cinematographer's primary expressive tools, and a screenplay that colors in every frame does the DP's job while crowding the dramatic action with palette notes the page does not need. A few deliberate color cues land with force; a constant stream reads as a writer art-directing every shot.`,
+        suggestedFix: 'Reserve color for the cues that carry meaning — the red dress in a grey room, the one warm light in a cold frame — and let most action describe what happens, not its exact hue. Color used sparingly directs the eye to what matters; color in every line flattens into wallpaper and buries the beats that should pop.',
       });
     }
   }

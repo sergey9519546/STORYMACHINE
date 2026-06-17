@@ -18871,6 +18871,108 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 414 — rhythmPass: vague-quantifier overload, atmosphere-abstraction overload, color-description overload', async () => {
+    const runR414 = async (fountain: string) => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    const makeScene414 = (lines: string[]) => `INT. ROOM - DAY\n\n${lines.join('\n\n')}`;
+
+    it('VAGUE_QUANTIFIER_OVERLOAD fires when >25% of action lines lean on vague quantities', async () => {
+      const f414a = makeScene414([
+        'Some people gather near the gate.',
+        'A few cars pass on the street.',
+        'Several dogs bark in the yard.',
+        'She opens the door.',
+        'He lights a cigarette.',
+        'The kettle boils over.',
+        'Rain streaks the window.',
+        'A train rumbles past.',
+      ]);
+      const res = await runR414(f414a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VAGUE_QUANTIFIER_OVERLOAD'), 'VAGUE_QUANTIFIER_OVERLOAD should fire');
+    });
+
+    it('VAGUE_QUANTIFIER_OVERLOAD does NOT fire when action lines commit to specifics', async () => {
+      const f414aNF = makeScene414([
+        'Some people gather near the gate.',
+        'Two cars pass on the street.',
+        'Three dogs bark in the yard.',
+        'She opens the door.',
+        'He lights a cigarette.',
+        'The kettle boils over.',
+        'Rain streaks the window.',
+        'A train rumbles past.',
+      ]);
+      const res = await runR414(f414aNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VAGUE_QUANTIFIER_OVERLOAD'), 'VAGUE_QUANTIFIER_OVERLOAD should not fire');
+    });
+
+    it('ATMOSPHERE_ABSTRACTION_OVERLOAD fires when >25% of action lines name an abstract mood', async () => {
+      const f414b = makeScene414([
+        'Tension fills the room.',
+        'An air of menace hangs over them.',
+        'A sense of dread creeps in.',
+        'She opens the window.',
+        'He counts the coins.',
+        'The kettle boils.',
+        'A dog crosses the yard.',
+        'She ties her shoes.',
+      ]);
+      const res = await runR414(f414b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ATMOSPHERE_ABSTRACTION_OVERLOAD'), 'ATMOSPHERE_ABSTRACTION_OVERLOAD should fire');
+    });
+
+    it('ATMOSPHERE_ABSTRACTION_OVERLOAD does NOT fire when action lines render concrete images', async () => {
+      const f414bNF = makeScene414([
+        'Tension fills the room.',
+        'Nobody picks up a fork.',
+        'He cleans the knife slowly.',
+        'She opens the window.',
+        'He counts the coins.',
+        'The kettle boils.',
+        'A dog crosses the yard.',
+        'She ties her shoes.',
+      ]);
+      const res = await runR414(f414bNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ATMOSPHERE_ABSTRACTION_OVERLOAD'), 'ATMOSPHERE_ABSTRACTION_OVERLOAD should not fire');
+    });
+
+    it('COLOR_DESCRIPTION_OVERLOAD fires when >30% of action lines carry a color word', async () => {
+      const f414c = makeScene414([
+        'The red door slams shut.',
+        'A blue car idles outside.',
+        'Green light floods the hall.',
+        'She wears a yellow coat.',
+        'She opens the window.',
+        'He counts the coins.',
+        'The kettle boils.',
+        'A dog crosses the yard.',
+        'She ties her shoes.',
+        'He reads the letter.',
+      ]);
+      const res = await runR414(f414c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'COLOR_DESCRIPTION_OVERLOAD'), 'COLOR_DESCRIPTION_OVERLOAD should fire');
+    });
+
+    it('COLOR_DESCRIPTION_OVERLOAD does NOT fire when color is used sparingly', async () => {
+      const f414cNF = makeScene414([
+        'The red door slams shut.',
+        'A blue car idles outside.',
+        'Light floods the hall.',
+        'She wears a heavy coat.',
+        'She opens the window.',
+        'He counts the coins.',
+        'The kettle boils.',
+        'A dog crosses the yard.',
+        'She ties her shoes.',
+        'He reads the letter.',
+      ]);
+      const res = await runR414(f414cNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'COLOR_DESCRIPTION_OVERLOAD'), 'COLOR_DESCRIPTION_OVERLOAD should not fire');
+    });
+  });
+
   describe('Wave 400 — rhythmPass: long-line flood, line-ending repetition, progressive-verb overuse', async () => {
     const runR400 = async (fountain: string) => {
       const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
