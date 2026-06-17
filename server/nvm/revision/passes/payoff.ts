@@ -56,6 +56,15 @@
 // payoff relationship peak decoupled (the single largest relational shift scene carries no
 // payoff while payoffs exist elsewhere — single-peak isolation × relationship magnitude,
 // distinct from the co-occurrence PAYOFF_RELATIONSHIP_DECOUPLED).
+// Wave 426 additions: payoff aftermath question void (sequence/aftermath — every payoff scene is
+// followed by two scenes that raise no curiosity and plant no new clue, so each resolution
+// deflates the story instead of re-engaging it), payoff consecutive run (run-based — three or
+// more consecutive scenes each fire a payoff, a "resolution avalanche" that dumps closures
+// back-to-back with no rebuild between; distinct from CLUSTERED_PAYOFFS which counts many in ONE
+// scene and THREAD_CONVERGENCE_ABSENT which is the opposite, payoffs in isolation), payoff
+// relationship valence uniform (valence — when payoffs DO move bonds, every relational shift on
+// a payoff scene shares one sign, so the resolution phase ruptures-only or repairs-only;
+// distinct from PAYOFF_RELATIONSHIP_DECOUPLED, which fires when NO payoff moves a bond at all).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1624,6 +1633,125 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `The story's largest relational shift (magnitude ${peakRelMag412c.toFixed(2)} at Scene ${peakRelRec412c.sceneIdx}) carries no payoff, even though ${payoffScenes412c.length} other scenes resolve planted threads. The most consequential relational moment — the biggest rupture or repair in the story — is not also the moment a long-running thread snaps shut, so the human climax and the structural climax land in separate scenes and neither amplifies the other.`,
           suggestedFix: 'Land a payoff at the peak relational shift: arrange for the scene where a bond most decisively breaks or mends to also be the scene where a planted setup pays off. When the relational and structural climaxes coincide, the resolution of the plot thread and the resolution of the relationship reinforce each other — the audience feels both completions in a single beat.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 426: PAYOFF_AFTERMATH_QUESTION_VOID, PAYOFF_CONSECUTIVE_RUN, PAYOFF_RELATIONSHIP_VALENCE_UNIFORM ──
+
+  // PAYOFF_AFTERMATH_QUESTION_VOID (sequence/aftermath, n≥10, ≥2 qualifying payoff scenes): Every
+  // payoff scene that has at least two scenes after it is followed by two scenes that BOTH raise no
+  // curiosity (curiosityDelta ≤ 0) AND plant no new clue (seededClueIds empty). A payoff closes a
+  // loop, and the moment a question is answered the audience's forward pull momentarily slackens —
+  // the story must immediately re-engage, opening a fresh question or planting a new thread in the
+  // wake of the resolution. When every payoff is followed by a curiosity-flat, seed-empty stretch,
+  // the story deflates a little with each closure and never rebuilds the pull it just spent.
+  // Distinctness: this is the only sequence/aftermath check on the payoff channel. PAYOFF_CURIOSITY_
+  // MISMATCH audits curiosity WITHIN payoff scenes (average), not the scenes AFTER. SETUP_PAYOFF_
+  // DEAD_RUN catches a 6+ scene gap with no seed/payoff anywhere (connective tissue), not the
+  // specific two-scene aftermath of each payoff. PAYOFF_FRONT_LOADED is a zone-timing measure.
+  if (records.length >= 10) {
+    const n426a = records.length;
+    const qualifyingPayoffs426: any[] = [];
+    for (let i = 0; i < n426a - 2; i++) {
+      if ((((records as any[])[i].payoffSetupIds ?? []) as string[]).length > 0) {
+        qualifyingPayoffs426.push(records[i]);
+      }
+    }
+    if (qualifyingPayoffs426.length >= 2) {
+      const allDeadEnded426 = qualifyingPayoffs426.every((r: any) => {
+        const i = r.sceneIdx;
+        // sceneIdx is the array index in these records; guard against gaps anyway.
+        const a = (records as any[])[i + 1];
+        const b = (records as any[])[i + 2];
+        if (!a || !b) return false;
+        const aFlat = (a.curiosityDelta ?? 0) <= 0 && ((a.seededClueIds ?? []) as string[]).length === 0;
+        const bFlat = (b.curiosityDelta ?? 0) <= 0 && ((b.seededClueIds ?? []) as string[]).length === 0;
+        return aFlat && bFlat;
+      });
+      if (allDeadEnded426) {
+        issues.push({
+          location: `${qualifyingPayoffs426.length} payoff scene(s) — aftermath`,
+          rule: 'PAYOFF_AFTERMATH_QUESTION_VOID',
+          severity: 'minor',
+          description: `Every payoff scene with room after it (${qualifyingPayoffs426.length} in total) is followed by two scenes that raise no curiosity and plant no new clue. Each resolution closes a loop and then lets the air out: the moment a question is answered the audience's forward pull slackens, and nothing in the next two scenes re-engages it. The story deflates a little with every payoff and never rebuilds the pull it just spent.`,
+          suggestedFix: 'Re-engage immediately after each payoff: in the scene that closes a thread or the one right after, open a new question, plant a fresh clue, or expose a consequence that complicates what was just resolved. A payoff should feel like one wave receding as the next rises — not the tide going out.',
+        });
+      }
+    }
+  }
+
+  // PAYOFF_CONSECUTIVE_RUN (run-based, n≥8): Three or more consecutive scenes each fire at least
+  // one payoff — a "resolution avalanche" where the story spends a back-to-back stretch closing
+  // threads with no scene of rebuild or new tension between them. Payoffs land hardest when they
+  // are spaced so each closure can register and the story can re-pressurize before the next; firing
+  // them in an unbroken run blurs the individual satisfactions together and burns through the
+  // story's stored questions all at once, leaving the remainder of the script with nothing left to
+  // resolve.
+  // Distinctness: CLUSTERED_PAYOFFS counts 3+ setups resolved in a SINGLE scene (intra-scene
+  // density); this counts payoffs firing across 3+ CONSECUTIVE scenes (inter-scene run). THREAD_
+  // CONVERGENCE_ABSENT is the opposite failure (payoffs resolving in isolation, never adjacent).
+  // PAYOFF_FRONT_LOADED is a zone-proportion measure, not a local consecutive run.
+  if (records.length >= 8) {
+    const hasPayoff426 = (r: any) => (((r.payoffSetupIds ?? []) as string[]).length) > 0;
+    let runStart426 = -1;
+    let runLen426 = 0;
+    let bestStart426 = -1;
+    for (let i = 0; i < records.length; i++) {
+      if (hasPayoff426((records as any[])[i])) {
+        if (runLen426 === 0) runStart426 = i;
+        runLen426++;
+        if (runLen426 >= 3 && bestStart426 < 0) bestStart426 = runStart426;
+      } else {
+        runLen426 = 0;
+      }
+    }
+    if (bestStart426 >= 0) {
+      // Recompute the actual length of the run that triggered (for the message).
+      let len426 = 0;
+      for (let i = bestStart426; i < records.length && hasPayoff426((records as any[])[i]); i++) len426++;
+      issues.push({
+        location: `Scenes ${bestStart426}–${bestStart426 + len426 - 1} — consecutive payoffs`,
+        rule: 'PAYOFF_CONSECUTIVE_RUN',
+        severity: 'minor',
+        description: `Scenes ${bestStart426}–${bestStart426 + len426 - 1} each fire a payoff — ${len426} consecutive scenes of resolution with no rebuild between them. A back-to-back run of closures blurs the individual satisfactions together and spends the story's stored questions all at once; payoffs land hardest when they are spaced so each can register and the story can re-pressurize before the next arrives.`,
+        suggestedFix: 'Interleave the payoffs with rebuilds: between two resolutions, give the story a scene that raises a new stake, deepens a complication, or opens a fresh question. Spreading closures across the act lets each one breathe and keeps the engine from emptying its tank in a single stretch.',
+      });
+    }
+  }
+
+  // PAYOFF_RELATIONSHIP_VALENCE_UNIFORM (valence, n≥8, ≥3 relational-moving payoff shifts): Among
+  // the payoff scenes that DO move a bond (a relationshipShift with |amount| ≥ 0.3), every such
+  // shift carries the same sign — the story's resolutions are ruptures-only or repairs-only. When
+  // every thread that closes also breaks a bond (and none mends one), or vice versa, the resolution
+  // phase has a monotone relational color: the audience experiences the payoffs as a uniform wave of
+  // loss or a uniform wave of reconciliation, with no counterpoint. A resonant payoff structure pays
+  // some threads off as repairs and others as ruptures, so the ending's relational texture is mixed.
+  // Distinctness: PAYOFF_RELATIONSHIP_DECOUPLED fires when NO payoff scene moves ANY bond (the
+  // machine is decoupled from relationships entirely); this fires precisely when payoffs DO move
+  // bonds, but all in one direction. PAYOFF_RELATIONSHIP_PEAK_DECOUPLED is a single-peak isolation
+  // check (the biggest shift isn't a payoff), not a valence/direction check across all payoff shifts.
+  if (records.length >= 8) {
+    const payoffRelShifts426: number[] = [];
+    for (const r of records as any[]) {
+      if ((((r.payoffSetupIds ?? []) as string[]).length) > 0) {
+        for (const s of (r.relationshipShifts ?? []) as Array<{ amount: number }>) {
+          if (Math.abs(s.amount) >= 0.3) payoffRelShifts426.push(s.amount);
+        }
+      }
+    }
+    if (payoffRelShifts426.length >= 3) {
+      const allPositive426 = payoffRelShifts426.every(a => a >= 0.3);
+      const allNegative426 = payoffRelShifts426.every(a => a <= -0.3);
+      if (allPositive426 || allNegative426) {
+        const dir426 = allPositive426 ? 'repairs' : 'ruptures';
+        issues.push({
+          location: `${payoffRelShifts426.length} relational shifts on payoff scenes`,
+          rule: 'PAYOFF_RELATIONSHIP_VALENCE_UNIFORM',
+          severity: 'minor',
+          description: `All ${payoffRelShifts426.length} relationship shifts that occur on payoff scenes are ${dir426} (same sign). The story's resolutions move bonds in only one direction — every thread that closes also ${allPositive426 ? 'mends' : 'breaks'} a relationship, and none does the reverse. The resolution phase reads as a monotone wave of ${allPositive426 ? 'reconciliation' : 'loss'} with no counterpoint, flattening the relational texture of the ending.`,
+          suggestedFix: `Vary the relational valence of the payoffs: let at least one thread close in a way that ${allPositive426 ? 'costs a bond — a victory that estranges, a truth that wounds' : 'mends a bond — a reconciliation, a debt forgiven, an alliance sealed'}. An ending whose resolutions cut both ways feels truer than one where every closure pulls the same emotional direction.`,
         });
       }
     }

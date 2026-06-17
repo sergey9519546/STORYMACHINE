@@ -19376,6 +19376,82 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 426 — payoffPass: payoff aftermath question void, payoff consecutive run, payoff relationship valence uniform', async () => {
+    const mkShift426 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
+    const makeRec426 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runPay426 = async (records: any[]) => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      return payoffPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PAYOFF_AFTERMATH_QUESTION_VOID fires when every payoff is followed by two curiosity-flat, seed-empty scenes', async () => {
+      // n=10; payoffs at 2 and 5; scenes 3,4,6,7 default (curiosityDelta 0, no seeds) → all dead-ended
+      const recs426a = Array.from({ length: 10 }, (_, i) => makeRec426(i));
+      recs426a[2] = makeRec426(2, { payoffSetupIds: ['s1'] });
+      recs426a[5] = makeRec426(5, { payoffSetupIds: ['s2'] });
+      const res = await runPay426(recs426a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_AFTERMATH_QUESTION_VOID'), 'PAYOFF_AFTERMATH_QUESTION_VOID should fire');
+    });
+
+    it('PAYOFF_AFTERMATH_QUESTION_VOID does NOT fire when a payoff is re-engaged in its aftermath', async () => {
+      // n=10; payoffs at 2 and 5; scene 3 raises curiosity → payoff at 2 is not dead-ended → no fire
+      const recs426aNF = Array.from({ length: 10 }, (_, i) => makeRec426(i));
+      recs426aNF[2] = makeRec426(2, { payoffSetupIds: ['s1'] });
+      recs426aNF[3] = makeRec426(3, { curiosityDelta: 1.5 });
+      recs426aNF[5] = makeRec426(5, { payoffSetupIds: ['s2'] });
+      const res = await runPay426(recs426aNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_AFTERMATH_QUESTION_VOID'), 'PAYOFF_AFTERMATH_QUESTION_VOID should not fire');
+    });
+
+    it('PAYOFF_CONSECUTIVE_RUN fires when 3+ consecutive scenes each fire a payoff', async () => {
+      // n=8; payoffs at 3,4,5 (consecutive run of 3) → fires
+      const recs426b = Array.from({ length: 8 }, (_, i) => makeRec426(i));
+      recs426b[3] = makeRec426(3, { payoffSetupIds: ['s1'] });
+      recs426b[4] = makeRec426(4, { payoffSetupIds: ['s2'] });
+      recs426b[5] = makeRec426(5, { payoffSetupIds: ['s3'] });
+      const res = await runPay426(recs426b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CONSECUTIVE_RUN'), 'PAYOFF_CONSECUTIVE_RUN should fire');
+    });
+
+    it('PAYOFF_CONSECUTIVE_RUN does NOT fire when payoffs are spaced apart', async () => {
+      // n=8; payoffs at 3,5,7 (no 3 consecutive) → no fire
+      const recs426bNF = Array.from({ length: 8 }, (_, i) => makeRec426(i));
+      recs426bNF[3] = makeRec426(3, { payoffSetupIds: ['s1'] });
+      recs426bNF[5] = makeRec426(5, { payoffSetupIds: ['s2'] });
+      recs426bNF[7] = makeRec426(7, { payoffSetupIds: ['s3'] });
+      const res = await runPay426(recs426bNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CONSECUTIVE_RUN'), 'PAYOFF_CONSECUTIVE_RUN should not fire');
+    });
+
+    it('PAYOFF_RELATIONSHIP_VALENCE_UNIFORM fires when all payoff-scene relational shifts share one sign', async () => {
+      // n=8; payoffs at 2,4,6 each with a -0.5 shift → 3 shifts all negative → fires
+      const recs426c = Array.from({ length: 8 }, (_, i) => makeRec426(i));
+      recs426c[2] = makeRec426(2, { payoffSetupIds: ['s1'], relationshipShifts: mkShift426(-0.5) });
+      recs426c[4] = makeRec426(4, { payoffSetupIds: ['s2'], relationshipShifts: mkShift426(-0.5) });
+      recs426c[6] = makeRec426(6, { payoffSetupIds: ['s3'], relationshipShifts: mkShift426(-0.5) });
+      const res = await runPay426(recs426c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_RELATIONSHIP_VALENCE_UNIFORM'), 'PAYOFF_RELATIONSHIP_VALENCE_UNIFORM should fire');
+    });
+
+    it('PAYOFF_RELATIONSHIP_VALENCE_UNIFORM does NOT fire when payoff-scene relational shifts are mixed', async () => {
+      // n=8; payoffs at 2,4,6; scene 2 has +0.5, scenes 4,6 have -0.5 → mixed signs → no fire
+      const recs426cNF = Array.from({ length: 8 }, (_, i) => makeRec426(i));
+      recs426cNF[2] = makeRec426(2, { payoffSetupIds: ['s1'], relationshipShifts: mkShift426(0.5) });
+      recs426cNF[4] = makeRec426(4, { payoffSetupIds: ['s2'], relationshipShifts: mkShift426(-0.5) });
+      recs426cNF[6] = makeRec426(6, { payoffSetupIds: ['s3'], relationshipShifts: mkShift426(-0.5) });
+      const res = await runPay426(recs426cNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_RELATIONSHIP_VALENCE_UNIFORM'), 'PAYOFF_RELATIONSHIP_VALENCE_UNIFORM should not fire');
+    });
+  });
+
   describe('Wave 412 — payoffPass: clue seed curiosity peak decoupled, clue seed suspense peak decoupled, payoff relationship peak decoupled', async () => {
     const mkShift412 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
     const makeRec412 = (idx: number, overrides: any = {}): any => ({
