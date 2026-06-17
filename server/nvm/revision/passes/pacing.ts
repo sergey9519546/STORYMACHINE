@@ -51,6 +51,12 @@
 // of stakes scene underweight), curiosity peak scene bloat (high-curiosityDelta scenes average
 // above 1.5× — the most intriguing moments over-explained; complement of curiosity peak
 // scene underweight).
+// Wave 411 additions: suspense peak scene bloat (the single highest-suspense scene runs above
+// 1.5× overall — the tensest beat sprawls and loses its grip; complement of SUSPENSE_PEAK_
+// SCENE_UNDERWEIGHT), resolution bloat (the final resolution scene runs above 2× overall — the
+// "long goodbye" that overstays the climax; complement of RESOLUTION_TOO_BRIEF), opening scene
+// underweight (the first scene runs below 50% overall — too brief to establish world, tone, or
+// character before the story moves; complement of OPENING_SCENE_BLOAT).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1704,6 +1710,79 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Trim high-curiosity scenes to the point of the question: raise it, let it sit for one reaction, and cut away with the audience still leaning forward. Restraint is the engine of curiosity — the longer a scene lingers after opening a question, the more it answers by implication, deflating the hook it was meant to set.',
         });
       }
+    }
+  }
+
+  // ── Wave 411: SUSPENSE_PEAK_SCENE_BLOAT, RESOLUTION_BLOAT, OPENING_SCENE_UNDERWEIGHT ──
+
+  // SUSPENSE_PEAK_SCENE_BLOAT (minor, n≥8, maxSuspense>1): The single highest-suspense scene
+  // runs above 1.5× the overall scene length — the story's tensest moment sprawls. Suspense is
+  // sustained by economy: the held breath works because nothing is wasted around it. When the
+  // peak-tension scene balloons past the page space its neighbours occupy, the writing dilutes
+  // the very pressure it should be concentrating — the audience's grip loosens as the scene
+  // overstays. The complement of SUSPENSE_PEAK_SCENE_UNDERWEIGHT (the peak runs too SHORT);
+  // distinct from QUIET_SCENE_BLOAT (no-marker scenes) and SUSPENSE_LENGTH_DECOUPLING (a
+  // systemic, multi-scene misallocation): this isolates the single peak-suspense scene.
+  if (records.length >= 8) {
+    const maxSusp411 = Math.max(...(records as any[]).map(r => r.suspenseDelta ?? 0));
+    if (maxSusp411 > 1) {
+      const peakIdx411 = (records as any[]).findIndex(r => (r.suspenseDelta ?? 0) === maxSusp411);
+      const peakLen411 = sceneLengths.get(peakIdx411) ?? 0;
+      if (peakLen411 > 0 && peakLen411 > avgLength * 1.5) {
+        issues.push({
+          location: `Scene ${peakIdx411} (peak suspense: ${maxSusp411})`,
+          rule: 'SUSPENSE_PEAK_SCENE_BLOAT',
+          severity: 'minor',
+          description: `The story's highest-suspense scene (Scene ${peakIdx411}, suspenseDelta ${maxSusp411}) runs ${peakLen411} weighted lines — ${Math.round(peakLen411 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The tensest moment in the story is one of its longest scenes. Suspense is sustained by economy — the held breath works because nothing around it is wasted — and a peak-tension scene that sprawls past its neighbours dilutes the very pressure it should be concentrating, so the audience's grip loosens as the scene overstays.`,
+          suggestedFix: 'Tighten the peak-suspense scene: cut everything that does not raise or hold the tension, and let the danger play in lean, propulsive beats. The scene of maximum tension should be among the script\'s most economical, not its most expansive — every extra line of digression is a place the held breath can escape.',
+        });
+      }
+    }
+  }
+
+  // RESOLUTION_BLOAT (minor, n≥6): The final resolution scene runs above 2× the overall scene
+  // length — the story overstays its ending. After the climax, decompression should be brief: a
+  // beat of release, an image that lands the meaning, and out. When the closing scene balloons
+  // to more than double the average, the story delivers a "long goodbye" — multiple endings,
+  // belaboured reflection, a denouement that dissipates the energy the climax just generated.
+  // The complement of RESOLUTION_TOO_BRIEF (the ending is rushed); distinct from ENDING_ON_PEAK
+  // (no decompression at all — the opposite failure) and POST_RELEASE_DEAD_AIR (a run of flat
+  // scenes after the tension release, not a single bloated final scene).
+  if (records.length >= 6) {
+    const lastIdx411 = records.length - 1;
+    const lastLen411 = sceneLengths.get(lastIdx411) ?? 0;
+    const lastRec411 = records[lastIdx411];
+    const isResolution411 = lastRec411 &&
+      (lastRec411.purpose === 'resolution' || (lastRec411.suspenseDelta ?? 0) < 0);
+    if (isResolution411 && lastLen411 > 0 && lastLen411 > avgLength * 2) {
+      issues.push({
+        location: `Scene ${lastIdx411} (final/resolution)`,
+        rule: 'RESOLUTION_BLOAT',
+        severity: 'minor',
+        description: `The final scene (Scene ${lastIdx411}) runs ${lastLen411} weighted lines — ${Math.round(lastLen411 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The story overstays its ending: after the climax, decompression should be brief — a beat of release, an image that lands the meaning, and out. A closing scene more than double the average delivers a "long goodbye" of multiple endings and belaboured reflection that dissipates the energy the climax just generated.`,
+        suggestedFix: 'Trim the resolution to its essential release: find the single image or exchange that earns the emotional landing and end on it. If the closing scene is doing several jobs — tying off subplots, reflecting, foreshadowing a sequel — keep only the one the story most needs, and let the rest be implied. The audience leaves most satisfied a beat before they expect to.',
+      });
+    }
+  }
+
+  // OPENING_SCENE_UNDERWEIGHT (minor, n≥6): The first scene runs below 50% of the overall scene
+  // length — the story opens on a fragment. An opening scene does foundational work: it sets the
+  // tone, establishes the world's rules, and gives the audience a character to attach to before
+  // the plot accelerates. When the first scene is among the shortest in the script, the audience
+  // is thrown into motion before they have anywhere to stand — they are asked to care before they
+  // have been given a reason to. The complement of OPENING_SCENE_BLOAT (the opener is overlong);
+  // distinct from RESOLUTION_TOO_BRIEF (the final scene) and CURIOSITY_OPENING_FLATLINE (a
+  // suspense/curiosity-quality check on the opening, not a page-length check).
+  if (records.length >= 6) {
+    const openLen411 = sceneLengths.get(0) ?? 0;
+    if (openLen411 > 0 && openLen411 < avgLength * 0.5) {
+      issues.push({
+        location: `Scene 0 (${records[0]?.slug ?? 'opening'})`,
+        rule: 'OPENING_SCENE_UNDERWEIGHT',
+        severity: 'minor',
+        description: `The opening scene (Scene 0) runs ${openLen411} weighted lines — ${Math.round(openLen411 / avgLength * 100)}% of the overall average (${avgLength.toFixed(1)}). The story opens on a fragment. The first scene does foundational work — establishing tone, the world's rules, and a character to attach to — and when it is among the shortest in the script the audience is thrown into motion before they have anywhere to stand, asked to care before they have been given a reason to.`,
+        suggestedFix: 'Give the opening room to establish: let the first scene render the world and the protagonist with enough texture that the audience knows whose story this is and what its register will be before the engine turns over. A lean opener can work, but if it is one of the shortest scenes in the script it is likely skipping the orientation the rest of the story depends on.',
+      });
     }
   }
 

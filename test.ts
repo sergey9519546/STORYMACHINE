@@ -19131,6 +19131,74 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 411 — pacingPass: suspense peak scene bloat, resolution bloat, opening scene underweight', async () => {
+    const makeRec411 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0.5, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain411 = (lineCounts: number[]) =>
+      lineCounts.map((n, i) =>
+        `INT. SC${i} - DAY\n\n${Array.from({ length: n }, (_, j) => `Action line ${j + 1} for scene ${i}.`).join('\n\n')}`
+      ).join('\n\n');
+    const runP411 = async (records: any[], fountain: string) => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      return pacingPass({ fountain, original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('SUSPENSE_PEAK_SCENE_BLOAT fires when the highest-suspense scene runs above 1.5× overall', async () => {
+      // Scene 4 is the suspense peak (3) and longest (20); avg ~ (5*7+20)/8 = 6.875; 20 > 10.3 → fires
+      const lc411a = [5, 5, 5, 5, 20, 5, 5, 5];
+      const recs411a = Array.from({ length: 8 }, (_, i) => makeRec411(i, { suspenseDelta: i === 4 ? 3 : 0.5 }));
+      const res = await runP411(recs411a, makeFountain411(lc411a));
+      assert.ok(res.issues.some((i: any) => i.rule === 'SUSPENSE_PEAK_SCENE_BLOAT'), 'SUSPENSE_PEAK_SCENE_BLOAT should fire');
+    });
+
+    it('SUSPENSE_PEAK_SCENE_BLOAT does NOT fire when the peak scene is proportional', async () => {
+      // Scene 4 is peak (3) but length 7 like the rest; avg 7; 7 not > 10.5 → no fire
+      const lc411anr = [7, 7, 7, 7, 7, 7, 7, 7];
+      const recs411anr = Array.from({ length: 8 }, (_, i) => makeRec411(i, { suspenseDelta: i === 4 ? 3 : 0.5 }));
+      const res = await runP411(recs411anr, makeFountain411(lc411anr));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SUSPENSE_PEAK_SCENE_BLOAT'), 'SUSPENSE_PEAK_SCENE_BLOAT should not fire');
+    });
+
+    it('RESOLUTION_BLOAT fires when the final resolution scene runs above 2× overall', async () => {
+      // Final scene (idx5) is resolution, length 30; avg ~ (5*5+30)/6 = 9.17; 30 > 18.3 → fires
+      const lc411b = [5, 5, 5, 5, 5, 30];
+      const recs411b = Array.from({ length: 6 }, (_, i) => makeRec411(i, i === 5 ? { purpose: 'resolution', suspenseDelta: -1 } : {}));
+      const res = await runP411(recs411b, makeFountain411(lc411b));
+      assert.ok(res.issues.some((i: any) => i.rule === 'RESOLUTION_BLOAT'), 'RESOLUTION_BLOAT should fire');
+    });
+
+    it('RESOLUTION_BLOAT does NOT fire when the final scene is proportional', async () => {
+      // Final scene (idx5) is resolution, length 9; avg ~ (5*5+9)/6 = 5.67; 9 < 11.3 → no fire
+      const lc411bnr = [5, 5, 5, 5, 5, 9];
+      const recs411bnr = Array.from({ length: 6 }, (_, i) => makeRec411(i, i === 5 ? { purpose: 'resolution', suspenseDelta: -1 } : {}));
+      const res = await runP411(recs411bnr, makeFountain411(lc411bnr));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RESOLUTION_BLOAT'), 'RESOLUTION_BLOAT should not fire');
+    });
+
+    it('OPENING_SCENE_UNDERWEIGHT fires when the first scene runs below 50% overall', async () => {
+      // Scene 0 length 2, rest length 12; avg ~ (2+12*5)/6 = 10.33; 2 < 5.17 → fires
+      const lc411c = [2, 12, 12, 12, 12, 12];
+      const recs411c = Array.from({ length: 6 }, (_, i) => makeRec411(i));
+      const res = await runP411(recs411c, makeFountain411(lc411c));
+      assert.ok(res.issues.some((i: any) => i.rule === 'OPENING_SCENE_UNDERWEIGHT'), 'OPENING_SCENE_UNDERWEIGHT should fire');
+    });
+
+    it('OPENING_SCENE_UNDERWEIGHT does NOT fire when the opening is adequately long', async () => {
+      // Scene 0 length 9, rest length 10; avg ~ (9+10*5)/6 = 9.83; 9 > 4.9 → no fire
+      const lc411cnr = [9, 10, 10, 10, 10, 10];
+      const recs411cnr = Array.from({ length: 6 }, (_, i) => makeRec411(i));
+      const res = await runP411(recs411cnr, makeFountain411(lc411cnr));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'OPENING_SCENE_UNDERWEIGHT'), 'OPENING_SCENE_UNDERWEIGHT should not fire');
+    });
+  });
+
   describe('Wave 397 — pacingPass: seed scene underweight, stakes scene bloat, curiosity peak scene bloat', async () => {
     const makeRec397 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
