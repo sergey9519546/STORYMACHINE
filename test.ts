@@ -19592,6 +19592,76 @@ I always listen.
     });
   });
 
+  describe('Wave 407 — characterArcPass: relational positive-only, relational back-loaded, relational recovery absent', async () => {
+    const mkShift407 = (amount: number) => [{ pairKey: 'ANNA-MARK', dimension: 'trust', amount }];
+    const makeRec407 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runA407 = async (records: any[]) => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ARC_RELATIONAL_POSITIVE_ONLY fires when all relationship shifts are positive', async () => {
+      const recs407p = Array.from({ length: 8 }, (_, i) => makeRec407(i));
+      recs407p[2] = makeRec407(2, { relationshipShifts: mkShift407(0.5) });
+      recs407p[4] = makeRec407(4, { relationshipShifts: mkShift407(0.6) });
+      recs407p[6] = makeRec407(6, { relationshipShifts: mkShift407(0.4) });
+      const res = await runA407(recs407p);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_POSITIVE_ONLY'), 'ARC_RELATIONAL_POSITIVE_ONLY should fire');
+    });
+
+    it('ARC_RELATIONAL_POSITIVE_ONLY does NOT fire when a negative shift exists', async () => {
+      const recs407pNF = Array.from({ length: 8 }, (_, i) => makeRec407(i));
+      recs407pNF[2] = makeRec407(2, { relationshipShifts: mkShift407(0.5) });
+      recs407pNF[4] = makeRec407(4, { relationshipShifts: mkShift407(-0.6) });
+      recs407pNF[6] = makeRec407(6, { relationshipShifts: mkShift407(0.4) });
+      const res = await runA407(recs407pNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_POSITIVE_ONLY'), 'ARC_RELATIONAL_POSITIVE_ONLY should not fire');
+    });
+
+    it('ARC_RELATIONAL_BACK_LOADED fires when >70% of shift scenes fall in the second half', async () => {
+      // n=10 → mid=5; shift scenes at 1 (front) and 5,6,7,8 (back) → 4/5 = 80%, front=1
+      const recs407b = Array.from({ length: 10 }, (_, i) => makeRec407(i));
+      [1, 5, 6, 7, 8].forEach(i => { recs407b[i] = makeRec407(i, { relationshipShifts: mkShift407(0.5) }); });
+      const res = await runA407(recs407b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_BACK_LOADED'), 'ARC_RELATIONAL_BACK_LOADED should fire');
+    });
+
+    it('ARC_RELATIONAL_BACK_LOADED does NOT fire when shifts are balanced across halves', async () => {
+      // n=10 → mid=5; shift scenes at 1,2 (front) and 6,7 (back) → 2/4 = 50%
+      const recs407bNF = Array.from({ length: 10 }, (_, i) => makeRec407(i));
+      [1, 2, 6, 7].forEach(i => { recs407bNF[i] = makeRec407(i, { relationshipShifts: mkShift407(0.5) }); });
+      const res = await runA407(recs407bNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_BACK_LOADED'), 'ARC_RELATIONAL_BACK_LOADED should not fire');
+    });
+
+    it('ARC_RELATIONAL_RECOVERY_ABSENT fires when no positive shift follows the first fracture', async () => {
+      const recs407r = Array.from({ length: 8 }, (_, i) => makeRec407(i));
+      recs407r[1] = makeRec407(1, { relationshipShifts: mkShift407(0.5) });
+      recs407r[3] = makeRec407(3, { relationshipShifts: mkShift407(-0.6) });
+      recs407r[5] = makeRec407(5, { relationshipShifts: mkShift407(-0.4) });
+      const res = await runA407(recs407r);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_RECOVERY_ABSENT'), 'ARC_RELATIONAL_RECOVERY_ABSENT should fire');
+    });
+
+    it('ARC_RELATIONAL_RECOVERY_ABSENT does NOT fire when a repair follows the first fracture', async () => {
+      const recs407rNF = Array.from({ length: 8 }, (_, i) => makeRec407(i));
+      recs407rNF[1] = makeRec407(1, { relationshipShifts: mkShift407(0.5) });
+      recs407rNF[3] = makeRec407(3, { relationshipShifts: mkShift407(-0.6) });
+      recs407rNF[5] = makeRec407(5, { relationshipShifts: mkShift407(-0.4) });
+      recs407rNF[6] = makeRec407(6, { relationshipShifts: mkShift407(0.7) });
+      const res = await runA407(recs407rNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_RECOVERY_ABSENT'), 'ARC_RELATIONAL_RECOVERY_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 393 — characterArcPass: emotional back-loaded, positive emotion run, late low-point absent', async () => {
     const makeRec393 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

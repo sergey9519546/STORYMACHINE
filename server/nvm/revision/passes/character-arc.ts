@@ -48,6 +48,12 @@
 // (≥4 consecutive positive-emotion scenes with no setback — an unbroken upswing, the run mirror
 // of negative emotion run), late low-point absent (≥2 negative beats, all in the first half —
 // the protagonist's darkest moments are early and the back half has no nadir before the climax).
+// Wave 407 additions: relational positive-only (≥3 relationship shifts, none negative — bonds
+// only ever warm, the relational mirror of ARC_POSITIVE_ONLY), relational back-loaded (>70% of
+// relationship shifts fall in the second half while the front half has at least one — a
+// relationally inert opening, the relational mirror of ARC_EMOTIONAL_BACK_LOADED), relational
+// recovery absent (≥2 negative shifts and a positive shift exists, but none after the first
+// fracture — a broken bond never repairs, the relational mirror of ARC_EMOTIONAL_RECOVERY_ABSENT).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1562,6 +1568,92 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         description: `The protagonist suffers ${negIdxs393.length} negative emotional beats, but every one falls in the first half — the back half contains no emotional nadir before the climax. The "all is lost" low point that should precede the final push is missing from where it belongs, so the protagonist coasts into the climax without being broken down first, and the victory loses the contrast that would make it land.`,
         suggestedFix: 'Place a genuine low point in the back half, just before the climax: the moment the protagonist loses what matters most, doubts everything, hits bottom. The deepest defeat should come late so the final rally has something to rise from — an arc whose lows are all early peaks too smoothly.',
       });
+    }
+  }
+
+  // ── Wave 407: ARC_RELATIONAL_POSITIVE_ONLY, ARC_RELATIONAL_BACK_LOADED, ARC_RELATIONAL_RECOVERY_ABSENT ──
+
+  // ARC_RELATIONAL_POSITIVE_ONLY (minor, n≥8, ≥3 positive shifts, 0 negative): The story makes
+  // three or more relationship shifts and not one of them is negative — every bond only ever
+  // warms. Trust builds, alliances form, intimacy deepens, but nothing ever erodes, betrays, or
+  // fractures. A relational world that only improves has no relational stakes: there is no bond
+  // the audience fears losing because no bond is ever threatened. This is the relational-channel
+  // mirror of ARC_POSITIVE_ONLY (which audits the protagonist's EMOTIONAL valence); distinct
+  // from RELATIONAL_SYMMETRY_ABSENT (one-sided reciprocity) and ARC_RELATIONAL_RECOVERY_ABSENT
+  // (which requires negatives to exist) — this fires when negative relational movement is wholly
+  // absent.
+  if (records.length >= 8) {
+    const allShifts407: any[] = (records as any[]).flatMap(r => (r.relationshipShifts as any[] ?? []));
+    const posShifts407 = allShifts407.filter(s => (s.amount ?? 0) > 0);
+    const negShifts407 = allShifts407.filter(s => (s.amount ?? 0) < 0);
+    if (posShifts407.length >= 3 && negShifts407.length === 0) {
+      issues.push({
+        location: `${posShifts407.length} relationship shifts — all positive`,
+        rule: 'ARC_RELATIONAL_POSITIVE_ONLY',
+        severity: 'minor',
+        description: `All ${posShifts407.length} of the story's relationship shifts are positive — every bond only ever warms, and not one erodes, betrays, or fractures. A relational world that only improves has no relational stakes: there is no bond the audience fears losing because no bond is ever threatened, so the warmth reads as frictionless rather than earned.`,
+        suggestedFix: 'Introduce relational cost: a trust broken, an alliance that strains under pressure, an intimacy that curdles. Even a story about people growing closer needs a fracture to repair — the threat of loss is what gives a deepening bond its weight. Let at least one relationship move the wrong way before it is mended.',
+      });
+    }
+  }
+
+  // ARC_RELATIONAL_BACK_LOADED (minor, n≥10, ≥4 shift scenes, front half ≥1): More than 70% of
+  // the scenes that move a relationship fall in the second half, while the front half has at
+  // least one. The opening is relationally inert and bonding/breaking concentrates only as the
+  // climax nears, so the audience spends the first half with little relational investment before
+  // the back half abruptly demands they care who trusts whom. The relational mirror of ARC_
+  // EMOTIONAL_BACK_LOADED; distinct from ARC_RELATIONAL_FIRST_HALF_FLAT (the binary case — zero
+  // shifts in the front half — this fires even when the front half carries one or two, as long
+  // as they are a small minority) and ARC_LATE_RELATIONAL_VOID (the opposite — none late).
+  if (records.length >= 10) {
+    const shiftSceneIdxs407: number[] = [];
+    for (let i407 = 0; i407 < records.length; i407++) {
+      if (((records as any[])[i407].relationshipShifts as any[] ?? []).length > 0) shiftSceneIdxs407.push(i407);
+    }
+    if (shiftSceneIdxs407.length >= 4) {
+      const mid407 = Math.floor(records.length * 0.5);
+      const frontHalf407 = shiftSceneIdxs407.filter(i => i < mid407).length;
+      const backHalf407 = shiftSceneIdxs407.filter(i => i >= mid407).length;
+      if (frontHalf407 >= 1 && backHalf407 / shiftSceneIdxs407.length > 0.7) {
+        issues.push({
+          location: `Relational distribution — ${backHalf407}/${shiftSceneIdxs407.length} shift scenes in the second half`,
+          rule: 'ARC_RELATIONAL_BACK_LOADED',
+          severity: 'minor',
+          description: `${backHalf407} of the story's ${shiftSceneIdxs407.length} relationship-shift scenes (${Math.round(backHalf407 / shiftSceneIdxs407.length * 100)}%) fall in the second half — the opening is relationally inert and bonding or breaking concentrates only as the climax nears. The audience spends the first half with little relational investment, then the back half abruptly demands they care who trusts, betrays, or loves whom.`,
+          suggestedFix: 'Seed relational movement in the first half: an early alliance, a small betrayal, a flicker of attraction or distrust establishes the bonds the back half will test. Relationships should accumulate stakes from the outset, not have all their movement crammed into the run-up to the climax.',
+        });
+      }
+    }
+  }
+
+  // ARC_RELATIONAL_RECOVERY_ABSENT (minor, n≥8, ≥2 negative shifts, ≥1 positive somewhere): The
+  // story makes two or more negative relationship shifts and contains at least one positive shift,
+  // but no positive shift occurs after the first fracture — once a bond breaks, nothing relational
+  // is ever mended again. The relational world enters a one-way decline: the warmth all lives
+  // before the first betrayal, and the back half is unrelieved erosion. The relational mirror of
+  // ARC_EMOTIONAL_RECOVERY_ABSENT (which tracks emotional valence); distinct from ARC_RELATIONAL_
+  // POSITIVE_ONLY (which requires zero negatives) and ARC_NEGATIVE_ONLY (the emotion channel) —
+  // this fires specifically on the absence of relational repair after the first fall.
+  if (records.length >= 8) {
+    const negSceneIdx407: number[] = [];
+    const posSceneIdx407: number[] = [];
+    for (let i407r = 0; i407r < records.length; i407r++) {
+      const shifts = ((records as any[])[i407r].relationshipShifts as any[] ?? []);
+      if (shifts.some(s => (s.amount ?? 0) < 0)) negSceneIdx407.push(i407r);
+      if (shifts.some(s => (s.amount ?? 0) > 0)) posSceneIdx407.push(i407r);
+    }
+    if (negSceneIdx407.length >= 2 && posSceneIdx407.length >= 1) {
+      const firstNeg407 = negSceneIdx407[0];
+      const posAfterFirstNeg407 = posSceneIdx407.some(i => i > firstNeg407);
+      if (!posAfterFirstNeg407) {
+        issues.push({
+          location: `No relational repair after the first fracture (Scene ${(records as any[])[firstNeg407].sceneIdx})`,
+          rule: 'ARC_RELATIONAL_RECOVERY_ABSENT',
+          severity: 'minor',
+          description: `The story breaks a bond ${negSceneIdx407.length} times and has the capacity for relational warmth (a positive shift exists), but no relationship ever moves the right way after the first fracture at Scene ${(records as any[])[firstNeg407].sceneIdx}. Once the first bond breaks, the relational world enters a one-way decline — all the warmth lives before the first betrayal, and the back half is unrelieved erosion with no repair to hope for.`,
+          suggestedFix: 'Place at least one relational repair after the first fracture: a reconciliation, a new trust formed in the wreckage of an old one, an unexpected ally. Even a tragic arc lands harder when a moment of repair gives the audience something to lose again — relentless relational decline numbs where alternating break-and-mend keeps the bonds alive.',
+        });
+      }
     }
   }
 
