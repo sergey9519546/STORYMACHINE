@@ -49,6 +49,13 @@
 // pivot zone while payoffs exist before and after — the pivot is structurally inert), clue
 // seed revelation decoupled (no seed scene coincides with a revelation — planting evidence
 // and making disclosures never overlap, missing the compound effect of both in one moment).
+// Wave 412 additions: clue seed curiosity peak decoupled (the single highest-curiosity scene
+// seeds no clue while seeds exist elsewhere — the seed-side mirror of payoff curiosity peak
+// decoupled), clue seed suspense peak decoupled (the single highest-suspense scene seeds no
+// clue while seeds exist elsewhere — the seed-side mirror of payoff suspense peak decoupled),
+// payoff relationship peak decoupled (the single largest relational shift scene carries no
+// payoff while payoffs exist elsewhere — single-peak isolation × relationship magnitude,
+// distinct from the co-occurrence PAYOFF_RELATIONSHIP_DECOUPLED).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1530,6 +1537,93 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `The story has ${seedRecs398c.length} clue-seeding scene(s) and ${revelRecs398c.length} revelation scene(s), but none coincide — evidence is planted and disclosures are made in entirely separate moments. A clue planted alongside a revelation charges both: the disclosure makes the seed feel significant, and the seed recontextualizes what was just revealed. Keeping the two channels in separate scenes misses the compound effect of a scene that does both.`,
           suggestedFix: 'In at least one revelation scene, plant a clue within or immediately after the disclosure: as one secret is revealed, let it expose or imply another. A revelation that generates a new mystery — rather than simply closing one — keeps the audience actively processing rather than passively receiving.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 412: CLUE_SEED_CURIOSITY_PEAK_DECOUPLED, CLUE_SEED_SUSPENSE_PEAK_DECOUPLED, PAYOFF_RELATIONSHIP_PEAK_DECOUPLED ──
+
+  // CLUE_SEED_CURIOSITY_PEAK_DECOUPLED (minor, n≥8, maxCuriosity>1, ≥2 seed scenes): The single
+  // highest-curiosityDelta scene plants no clue, even though the story seeds clues elsewhere. The
+  // moment the audience is most urgently wondering is not where the story plants anything to
+  // wonder about later — peak intrigue and the act of foreshadowing never coincide. A clue
+  // planted at the curiosity peak rides the audience's heightened attention, so the seed lands
+  // when they are most likely to register and remember it. The seed-side mirror of PAYOFF_
+  // CURIOSITY_PEAK_DECOUPLED; distinct from CLUE_SEED_CURIOSITY_FLAT (which averages curiosityDelta
+  // across seed scenes — this isolates the single peak-curiosity scene and checks for a seed there).
+  if (records.length >= 8) {
+    const seedScenes412a = (records as any[]).filter(r => ((r.seededClueIds ?? []) as string[]).length > 0);
+    const maxCur412a = Math.max(...(records as any[]).map(r => r.curiosityDelta ?? 0));
+    if (seedScenes412a.length >= 2 && maxCur412a > 1) {
+      const peakCur412a = (records as any[]).find(r => (r.curiosityDelta ?? 0) === maxCur412a);
+      if (peakCur412a && ((peakCur412a.seededClueIds ?? []) as string[]).length === 0) {
+        issues.push({
+          location: `Scene ${peakCur412a.sceneIdx} — peak curiosity (${maxCur412a.toFixed(2)})`,
+          rule: 'CLUE_SEED_CURIOSITY_PEAK_DECOUPLED',
+          severity: 'minor',
+          description: `The story's highest-curiosityDelta scene (Scene ${peakCur412a.sceneIdx}, curiosityDelta ${maxCur412a.toFixed(2)}) plants no clue, even though ${seedScenes412a.length} other scenes seed threads. The moment the audience is most urgently wondering is not where the story plants anything for them to wonder about later — peak intrigue and foreshadowing never coincide, so the seed that would benefit most from the audience's heightened attention is never dropped there.`,
+          suggestedFix: 'Plant a clue at the peak-curiosity scene: when the audience is most alert and leaning in, slip in the detail you want them to carry. A seed dropped at the crest of curiosity is the one most likely to lodge — they are already scrutinizing the scene for answers, so the planted thread registers without being underlined.',
+        });
+      }
+    }
+  }
+
+  // CLUE_SEED_SUSPENSE_PEAK_DECOUPLED (minor, n≥8, maxSuspense>1, ≥2 seed scenes): The single
+  // highest-suspenseDelta scene plants no clue, even though the story seeds clues elsewhere. The
+  // tensest moment in the story is not where any thread is planted — peak danger and foreshadowing
+  // never share a scene. A clue planted under maximum tension reads as charged and dangerous, so
+  // the audience remembers it as something that mattered in a moment that mattered. The seed-side
+  // mirror of PAYOFF_SUSPENSE_PEAK_DECOUPLED; distinct from CLUE_SEED_SUSPENSE_FLAT (which audits
+  // whether ALL seed scenes are tension-free on average — this isolates the single peak-suspense
+  // scene and checks whether a seed lands there).
+  if (records.length >= 8) {
+    const seedScenes412b = (records as any[]).filter(r => ((r.seededClueIds ?? []) as string[]).length > 0);
+    const maxSusp412b = Math.max(...(records as any[]).map(r => r.suspenseDelta ?? 0));
+    if (seedScenes412b.length >= 2 && maxSusp412b > 1) {
+      const peakSusp412b = (records as any[]).find(r => (r.suspenseDelta ?? 0) === maxSusp412b);
+      if (peakSusp412b && ((peakSusp412b.seededClueIds ?? []) as string[]).length === 0) {
+        issues.push({
+          location: `Scene ${peakSusp412b.sceneIdx} — peak suspense (${maxSusp412b.toFixed(2)})`,
+          rule: 'CLUE_SEED_SUSPENSE_PEAK_DECOUPLED',
+          severity: 'minor',
+          description: `The story's highest-suspenseDelta scene (Scene ${peakSusp412b.sceneIdx}, suspenseDelta ${maxSusp412b.toFixed(2)}) plants no clue, even though ${seedScenes412b.length} other scenes seed threads. The tensest moment in the story is not where any thread is planted — peak danger and foreshadowing never share a scene, so the seed that would feel most charged is never dropped where the pressure could brand it into the audience's memory.`,
+          suggestedFix: 'Plant a clue at the peak-suspense scene: a detail glimpsed under threat, an object that matters seen in the middle of the danger. Tension makes a seed feel dangerous and therefore worth remembering — the audience encodes what they see in the scenes that frighten them most, so the highest-suspense beat is the most retentive place to foreshadow.',
+        });
+      }
+    }
+  }
+
+  // PAYOFF_RELATIONSHIP_PEAK_DECOUPLED (minor, n≥8, ≥2 payoff scenes, peak relational shift > 0.4):
+  // The scene carrying the story's single largest relational shift (the biggest rupture or repair)
+  // resolves no planted setup, even though the story pays off threads elsewhere. The most
+  // consequential relational moment and the satisfaction of a structural payoff never coincide:
+  // the audience's biggest emotional-relational beat is not also the moment a long-running thread
+  // snaps shut. A payoff that lands at the peak relational shift makes the structural and the
+  // human climax the same beat. Single-peak isolation × relationship magnitude × payoff channel.
+  // Distinct from PAYOFF_RELATIONSHIP_DECOUPLED (co-occurrence: NO payoff scene moves ANY bond —
+  // this fires even when some payoffs move bonds, as long as the single biggest shift is not a
+  // payoff) and from the curiosity/suspense peak-decoupled checks (different signal channels).
+  if (records.length >= 8) {
+    const payoffScenes412c = (records as any[]).filter(r => ((r.payoffSetupIds ?? []) as string[]).length > 0);
+    if (payoffScenes412c.length >= 2) {
+      let peakRelRec412c: any = null;
+      let peakRelMag412c = 0;
+      for (const r of records as any[]) {
+        for (const s of (r.relationshipShifts ?? []) as Array<{ amount: number }>) {
+          if (Math.abs(s.amount) > peakRelMag412c) {
+            peakRelMag412c = Math.abs(s.amount);
+            peakRelRec412c = r;
+          }
+        }
+      }
+      if (peakRelRec412c && peakRelMag412c > 0.4 && ((peakRelRec412c.payoffSetupIds ?? []) as string[]).length === 0) {
+        issues.push({
+          location: `Scene ${peakRelRec412c.sceneIdx} — peak relational shift (magnitude ${peakRelMag412c.toFixed(2)})`,
+          rule: 'PAYOFF_RELATIONSHIP_PEAK_DECOUPLED',
+          severity: 'minor',
+          description: `The story's largest relational shift (magnitude ${peakRelMag412c.toFixed(2)} at Scene ${peakRelRec412c.sceneIdx}) carries no payoff, even though ${payoffScenes412c.length} other scenes resolve planted threads. The most consequential relational moment — the biggest rupture or repair in the story — is not also the moment a long-running thread snaps shut, so the human climax and the structural climax land in separate scenes and neither amplifies the other.`,
+          suggestedFix: 'Land a payoff at the peak relational shift: arrange for the scene where a bond most decisively breaks or mends to also be the scene where a planted setup pays off. When the relational and structural climaxes coincide, the resolution of the plot thread and the resolution of the relationship reinforce each other — the audience feels both completions in a single beat.',
         });
       }
     }

@@ -19055,6 +19055,74 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 412 — payoffPass: clue seed curiosity peak decoupled, clue seed suspense peak decoupled, payoff relationship peak decoupled', async () => {
+    const mkShift412 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
+    const makeRec412 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runPay412 = async (records: any[]) => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      return payoffPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CLUE_SEED_CURIOSITY_PEAK_DECOUPLED fires when the highest-curiosity scene seeds no clue', async () => {
+      const recs412a = Array.from({ length: 8 }, (_, i) => makeRec412(i));
+      recs412a[2] = makeRec412(2, { seededClueIds: ['c1'] });
+      recs412a[4] = makeRec412(4, { seededClueIds: ['c2'], curiosityDelta: 0.5 });
+      recs412a[6] = makeRec412(6, { curiosityDelta: 3 }); // peak, no seed
+      const res = await runPay412(recs412a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLUE_SEED_CURIOSITY_PEAK_DECOUPLED'), 'CLUE_SEED_CURIOSITY_PEAK_DECOUPLED should fire');
+    });
+
+    it('CLUE_SEED_CURIOSITY_PEAK_DECOUPLED does NOT fire when the peak-curiosity scene seeds a clue', async () => {
+      const recs412aNF = Array.from({ length: 8 }, (_, i) => makeRec412(i));
+      recs412aNF[2] = makeRec412(2, { seededClueIds: ['c1'] });
+      recs412aNF[6] = makeRec412(6, { curiosityDelta: 3, seededClueIds: ['c2'] }); // peak seeds a clue
+      const res = await runPay412(recs412aNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLUE_SEED_CURIOSITY_PEAK_DECOUPLED'), 'CLUE_SEED_CURIOSITY_PEAK_DECOUPLED should not fire');
+    });
+
+    it('CLUE_SEED_SUSPENSE_PEAK_DECOUPLED fires when the highest-suspense scene seeds no clue', async () => {
+      const recs412b = Array.from({ length: 8 }, (_, i) => makeRec412(i));
+      recs412b[2] = makeRec412(2, { seededClueIds: ['c1'] });
+      recs412b[4] = makeRec412(4, { seededClueIds: ['c2'] });
+      recs412b[6] = makeRec412(6, { suspenseDelta: 3 }); // peak, no seed
+      const res = await runPay412(recs412b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLUE_SEED_SUSPENSE_PEAK_DECOUPLED'), 'CLUE_SEED_SUSPENSE_PEAK_DECOUPLED should fire');
+    });
+
+    it('CLUE_SEED_SUSPENSE_PEAK_DECOUPLED does NOT fire when the peak-suspense scene seeds a clue', async () => {
+      const recs412bNF = Array.from({ length: 8 }, (_, i) => makeRec412(i));
+      recs412bNF[2] = makeRec412(2, { seededClueIds: ['c1'] });
+      recs412bNF[6] = makeRec412(6, { suspenseDelta: 3, seededClueIds: ['c2'] }); // peak seeds a clue
+      const res = await runPay412(recs412bNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLUE_SEED_SUSPENSE_PEAK_DECOUPLED'), 'CLUE_SEED_SUSPENSE_PEAK_DECOUPLED should not fire');
+    });
+
+    it('PAYOFF_RELATIONSHIP_PEAK_DECOUPLED fires when the largest relational shift carries no payoff', async () => {
+      const recs412c = Array.from({ length: 8 }, (_, i) => makeRec412(i));
+      recs412c[1] = makeRec412(1, { payoffSetupIds: ['p1'], relationshipShifts: mkShift412(0.3) });
+      recs412c[3] = makeRec412(3, { payoffSetupIds: ['p2'] });
+      recs412c[5] = makeRec412(5, { relationshipShifts: mkShift412(-0.9) }); // peak shift, no payoff
+      const res = await runPay412(recs412c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_RELATIONSHIP_PEAK_DECOUPLED'), 'PAYOFF_RELATIONSHIP_PEAK_DECOUPLED should fire');
+    });
+
+    it('PAYOFF_RELATIONSHIP_PEAK_DECOUPLED does NOT fire when the largest shift is a payoff scene', async () => {
+      const recs412cNF = Array.from({ length: 8 }, (_, i) => makeRec412(i));
+      recs412cNF[1] = makeRec412(1, { payoffSetupIds: ['p1'], relationshipShifts: mkShift412(0.3) });
+      recs412cNF[5] = makeRec412(5, { payoffSetupIds: ['p2'], relationshipShifts: mkShift412(-0.9) }); // peak shift is a payoff
+      const res = await runPay412(recs412cNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_RELATIONSHIP_PEAK_DECOUPLED'), 'PAYOFF_RELATIONSHIP_PEAK_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 398 — payoffPass: clue seed suspense flat, payoff midpoint void, clue seed revelation decoupled', async () => {
     const makeRec398 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
