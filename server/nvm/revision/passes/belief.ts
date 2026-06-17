@@ -48,6 +48,11 @@
 // (the peak-suspense scene carries no assertion while 2+ suspense-positive assertion scenes
 // exist — the told-belief sibling of the revelation suspense-peak check), told belief curiosity
 // peak absent (the peak-curiosity scene carries no assertion while 2+ curiosity-positive ones do).
+// Wave 404 additions: revelation payoff decoupled (≥2 revelation and ≥2 payoff scenes but none
+// share a scene — discovery and resolution never converge), told belief seed decoupled (≥2
+// assertion and ≥2 seed scenes but none share a scene — verbal deception and physical evidence
+// never compound), assertion Act 1 only (≥3 total assertions all before the 25% mark —
+// belief layer closes at the point where it should begin complicating).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1552,6 +1557,78 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Place an assertion at the peak-curiosity scene: let a character commit to a belief precisely when the audience is most uncertain what is true. The gap between the character\'s certainty and the audience\'s doubt is where dramatic irony lives — the most intriguing moment is the best place to open it.',
         });
       }
+    }
+  }
+
+  // ── Wave 404: REVELATION_PAYOFF_DECOUPLED, TOLD_BELIEF_SEED_DECOUPLED, ASSERTION_ACT1_ONLY ──
+
+  // REVELATION_PAYOFF_DECOUPLED (minor, n≥8, ≥2 revelation, ≥2 payoff scenes): No revelation
+  // lands in a scene that also has payoffSetupIds — the story's discovery moments and narrative
+  // resolution moments never coincide. A revelation that also pays off a narrative thread is the
+  // most satisfying structural unit: the truth that comes out IS the thing the audience was
+  // waiting for. When they never share a scene, discoveries feel like digressions and payoffs
+  // feel mechanical — the story resolves threads and discloses truths on separate schedules.
+  // Distinct from REVELATION_DRAMATIC_TURN_DECOUPLED (turns, not payoffs), REVELATION_ASSERTION_
+  // DISCONNECT (revelation vs prior assertion timing), and CLUE_SEED_REVELATION_DECOUPLED
+  // (seeds × revelation): this audits revelation against the explicit payoff/setup channel.
+  if (records.length >= 8) {
+    const revSet404 = new Set(witnessedBeliefs.map(w => w.sceneIdx));
+    const payoffRecs404 = (records as any[]).filter(r => ((r.payoffSetupIds ?? []) as any[]).length > 0);
+    if (revSet404.size >= 2 && payoffRecs404.length >= 2 && !payoffRecs404.some(r => revSet404.has(r.sceneIdx))) {
+      issues.push({
+        location: 'Revelations × payoff scenes — decoupled',
+        rule: 'REVELATION_PAYOFF_DECOUPLED',
+        severity: 'minor',
+        description: `The story has ${revSet404.size} revelation scenes and ${payoffRecs404.length} payoff scenes, but none share a scene — discovery and resolution never converge. The most satisfying structural unit is a revelation that also pays off a thread: the truth that comes out IS the thing the audience was waiting for. When they are always separate, disclosures feel like digressions and payoffs feel mechanical — the story resolves threads and discloses truths on separate schedules that never compound each other.`,
+        suggestedFix: 'Fuse at least one revelation with a payoff: arrange for a narrative thread to resolve at the same moment a hidden truth surfaces. The revelation IS the payoff — the answer to the audience\'s long-running question arrives precisely when the structural promise comes due. This convergence produces the deepest form of narrative satisfaction.',
+      });
+    }
+  }
+
+  // TOLD_BELIEF_SEED_DECOUPLED (minor, n≥8, ≥2 assertion scenes, ≥2 seed scenes): No scene
+  // in which a character makes an assertion also has seededClueIds — verbal deception and
+  // physical evidence-planting never coincide. A scene where a character stakes a claim AND
+  // plants physical evidence creates a compound deception: the audience receives both a verbal
+  // misdirection and material evidence, maximizing dramatic irony and the sense that the story
+  // is being architecturally constructed around the lie. When they never share a scene, the
+  // deception layer operates purely verbally while the evidence layer operates purely physically,
+  // and the two never reinforce each other. Distinct from TOLD_BELIEF_CLOCK_DECOUPLED (clocks),
+  // REVELATION_PAYOFF_DECOUPLED (revelations × payoffs), and all other assertion × signal checks.
+  if (records.length >= 8) {
+    const assertionSet404b = new Set<number>(toldBeliefs.map(t => t.sceneIdx));
+    const seedRecs404b = (records as any[]).filter(r => ((r.seededClueIds ?? []) as any[]).length > 0);
+    if (assertionSet404b.size >= 2 && seedRecs404b.length >= 2 && !seedRecs404b.some(r => assertionSet404b.has(r.sceneIdx))) {
+      issues.push({
+        location: 'Assertion scenes × seed scenes — decoupled',
+        rule: 'TOLD_BELIEF_SEED_DECOUPLED',
+        severity: 'minor',
+        description: `The story has ${assertionSet404b.size} scenes where characters make assertions and ${seedRecs404b.length} scenes that plant clues, but none share a scene — verbal deception and physical evidence never coincide. A scene where a character stakes a claim and also plants evidence creates a compound deception: the audience receives both a verbal misdirection and material proof, making the coming revelation land with double force. When the two tracks never meet, they miss the opportunity to reinforce each other.`,
+        suggestedFix: 'Let at least one assertion coincide with a clue-planting beat: have a character declare what they believe (or what they want others to believe) in the same scene where physical evidence is embedded. When the lie and the clue share a scene, the revelation that resolves both is structurally the richest moment available.',
+      });
+    }
+  }
+
+  // ASSERTION_ACT1_ONLY (minor, n≥8, ≥3 told beliefs, all before the 25% mark): All of the
+  // story's assertions are concentrated in the first quarter — the belief layer closes at the
+  // point where it should begin complicating. The conflict and resolution zones contain no new
+  // claims, no re-evaluations, no shifting certainties — characters state their positions in
+  // the opening and never revisit them. More specific than BELIEF_FRONT_LOADED (first 50%):
+  // this fires when the belief layer is entirely confined to Act 1, leaving the bulk of the
+  // story without any explicit intellectual or epistemic stakes. Distinct from TOLD_BELIEF_ACT3_
+  // ABSENT (Act 3 has no assertions) and TOLD_BELIEF_DROUGHT (5 consecutive scenes silent):
+  // this catches the structural pattern where assertions vanish after the setup.
+  if (records.length >= 8 && toldBeliefs.length >= 3) {
+    const act1End404c = Math.floor(records.length * 0.25);
+    const act1Beliefs404c = toldBeliefs.filter(t => t.sceneIdx < act1End404c);
+    const laterBeliefs404c = toldBeliefs.filter(t => t.sceneIdx >= act1End404c);
+    if (act1Beliefs404c.length >= 3 && laterBeliefs404c.length === 0) {
+      issues.push({
+        location: `Assertions concentrated in Scenes 0–${act1End404c - 1} (Act 1 only)`,
+        rule: 'ASSERTION_ACT1_ONLY',
+        severity: 'minor',
+        description: `All ${toldBeliefs.length} of the story's assertions appear before Scene ${act1End404c} (the first 25%) — the belief layer closes at the point where it should begin complicating. The conflict and resolution zones contain no new claims, re-evaluations, or shifting certainties. Characters state their positions in the opening and are never heard from again on what they believe, leaving the bulk of the story without explicit intellectual or epistemic stakes.`,
+        suggestedFix: 'Distribute assertions across the full arc: characters should re-evaluate, double down, or contradict themselves as the conflict escalates. A claim made in Act 1 that a character defends under pressure in Act 2 and abandons (or dies for) in Act 3 gives the belief layer structural weight. The story\'s positions should be tested, not just stated.',
+      });
     }
   }
 

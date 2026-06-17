@@ -23798,6 +23798,101 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 404 — beliefPass: revelation payoff decoupled, told belief seed decoupled, assertion Act 1 only', async () => {
+    const makeRec404 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      seededClueIds: [], payoffSetupIds: [], revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], dramaticTurn: 'nothing',
+      purpose: 'establish', unresolvedClues: [],
+      ...overrides,
+    });
+    const runB404 = async (records: any[], fountain = '') => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('REVELATION_PAYOFF_DECOUPLED fires when revelation and payoff scenes never share a scene', async () => {
+      const recs404a = [
+        makeRec404(0), makeRec404(1), makeRec404(2),
+        makeRec404(3, { revelation: 'The killer was never caught.' }),
+        makeRec404(4),
+        makeRec404(5, { revelation: 'She knew all along.' }),
+        makeRec404(6, { payoffSetupIds: ['setup-A'] }),
+        makeRec404(7, { payoffSetupIds: ['setup-B'] }),
+        makeRec404(8),
+      ];
+      const res = await runB404(recs404a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_PAYOFF_DECOUPLED'), 'REVELATION_PAYOFF_DECOUPLED should fire');
+    });
+
+    it('REVELATION_PAYOFF_DECOUPLED does NOT fire when a revelation shares a scene with a payoff', async () => {
+      const recs404aNF = [
+        makeRec404(0), makeRec404(1), makeRec404(2),
+        makeRec404(3, { revelation: 'He was lying the whole time.', payoffSetupIds: ['setup-X'] }),
+        makeRec404(4),
+        makeRec404(5, { revelation: 'The letter was forged.' }),
+        makeRec404(6, { payoffSetupIds: ['setup-Y'] }),
+        makeRec404(7),
+        makeRec404(8),
+      ];
+      const res = await runB404(recs404aNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_PAYOFF_DECOUPLED'), 'REVELATION_PAYOFF_DECOUPLED should not fire');
+    });
+
+    it('TOLD_BELIEF_SEED_DECOUPLED fires when assertion and seed scenes never share a scene', async () => {
+      const recs404b = [
+        makeRec404(0, { dialogueHighlights: ['CARL: The vault was never opened.'] }),
+        makeRec404(1),
+        makeRec404(2, { dialogueHighlights: ['ANA: He never left the country.'] }),
+        makeRec404(3, { seededClueIds: ['clue-1'] }),
+        makeRec404(4),
+        makeRec404(5, { seededClueIds: ['clue-2'] }),
+        makeRec404(6),
+        makeRec404(7),
+        makeRec404(8),
+      ];
+      const res = await runB404(recs404b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TOLD_BELIEF_SEED_DECOUPLED'), 'TOLD_BELIEF_SEED_DECOUPLED should fire');
+    });
+
+    it('TOLD_BELIEF_SEED_DECOUPLED does NOT fire when an assertion scene also plants a clue', async () => {
+      const recs404bNF = [
+        makeRec404(0, { dialogueHighlights: ['CARL: The vault was never opened.'], seededClueIds: ['clue-1'] }),
+        makeRec404(1),
+        makeRec404(2, { dialogueHighlights: ['ANA: He never left the country.'] }),
+        makeRec404(3, { seededClueIds: ['clue-2'] }),
+        makeRec404(4),
+        makeRec404(5),
+        makeRec404(6),
+        makeRec404(7),
+        makeRec404(8),
+      ];
+      const res = await runB404(recs404bNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TOLD_BELIEF_SEED_DECOUPLED'), 'TOLD_BELIEF_SEED_DECOUPLED should not fire');
+    });
+
+    it('ASSERTION_ACT1_ONLY fires when all assertions are in the first 25% of scenes', async () => {
+      // 12 scenes → act1End = floor(12*0.25) = 3 → scenes 0-2 are Act 1
+      const recs404c = Array.from({ length: 12 }, (_, i) => makeRec404(i));
+      recs404c[0] = makeRec404(0, { dialogueHighlights: ['LEE: The bridge was sabotaged.'] });
+      recs404c[1] = makeRec404(1, { dialogueHighlights: ['MAY: No one survived that night.'] });
+      recs404c[2] = makeRec404(2, { dialogueHighlights: ['LEE: The file was never declassified.'] });
+      const res = await runB404(recs404c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ASSERTION_ACT1_ONLY'), 'ASSERTION_ACT1_ONLY should fire');
+    });
+
+    it('ASSERTION_ACT1_ONLY does NOT fire when assertions span beyond the first 25%', async () => {
+      const recs404cNF = Array.from({ length: 10 }, (_, i) => makeRec404(i));
+      recs404cNF[0] = makeRec404(0, { dialogueHighlights: ['LEE: The bridge was sabotaged.'] });
+      recs404cNF[1] = makeRec404(1, { dialogueHighlights: ['MAY: No one survived that night.'] });
+      recs404cNF[5] = makeRec404(5, { dialogueHighlights: ['LEE: The file was never declassified.'] });
+      const res = await runB404(recs404cNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ASSERTION_ACT1_ONLY'), 'ASSERTION_ACT1_ONLY should not fire');
+    });
+  });
+
   describe('Wave 390 — beliefPass: revelation dramatic turn decoupled, told belief suspense peak absent, told belief curiosity peak absent', async () => {
     const makeRec390 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
