@@ -19504,6 +19504,80 @@ I always listen.
     });
   });
 
+  describe('Wave 408 — conflictPass: peak revelation absent, peak payoff absent, peak seed absent', async () => {
+    const rup408 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
+    const makeRec408 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF408 = async (records: any[]) => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      return conflictPass({ fountain: '', original: '', records, structure: { escalating: true, avgSuspensePerScene: 0, openClues: 0, reversalDensity: 1, approachingClimax: false } as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CONFLICT_PEAK_REVELATION_ABSENT fires when the heaviest rupture discloses nothing', async () => {
+      const recs408r = Array.from({ length: 8 }, (_, i) => makeRec408(i));
+      recs408r[2] = makeRec408(2, { relationshipShifts: rup408(-0.4) });
+      recs408r[5] = makeRec408(5, { relationshipShifts: rup408(-0.85) }); // peak, no revelation
+      recs408r[1] = makeRec408(1, { revelation: 'Truth one.' });
+      recs408r[3] = makeRec408(3, { revelation: 'Truth two.' });
+      const res = await runCF408(recs408r);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_PEAK_REVELATION_ABSENT'), 'CONFLICT_PEAK_REVELATION_ABSENT should fire');
+    });
+
+    it('CONFLICT_PEAK_REVELATION_ABSENT does NOT fire when the heaviest rupture reveals a truth', async () => {
+      const recs408rNF = Array.from({ length: 8 }, (_, i) => makeRec408(i));
+      recs408rNF[2] = makeRec408(2, { relationshipShifts: rup408(-0.4) });
+      recs408rNF[5] = makeRec408(5, { relationshipShifts: rup408(-0.85), revelation: 'The big secret.' }); // peak has revelation
+      recs408rNF[1] = makeRec408(1, { revelation: 'Truth one.' });
+      const res = await runCF408(recs408rNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_PEAK_REVELATION_ABSENT'), 'CONFLICT_PEAK_REVELATION_ABSENT should not fire');
+    });
+
+    it('CONFLICT_PEAK_PAYOFF_ABSENT fires when the heaviest rupture pays off no setup', async () => {
+      const recs408p = Array.from({ length: 8 }, (_, i) => makeRec408(i));
+      recs408p[2] = makeRec408(2, { relationshipShifts: rup408(-0.4) });
+      recs408p[5] = makeRec408(5, { relationshipShifts: rup408(-0.85) }); // peak, no payoff
+      recs408p[1] = makeRec408(1, { payoffSetupIds: ['p1'] });
+      recs408p[3] = makeRec408(3, { payoffSetupIds: ['p2'] });
+      const res = await runCF408(recs408p);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_PEAK_PAYOFF_ABSENT'), 'CONFLICT_PEAK_PAYOFF_ABSENT should fire');
+    });
+
+    it('CONFLICT_PEAK_PAYOFF_ABSENT does NOT fire when the heaviest rupture delivers a payoff', async () => {
+      const recs408pNF = Array.from({ length: 8 }, (_, i) => makeRec408(i));
+      recs408pNF[2] = makeRec408(2, { relationshipShifts: rup408(-0.4) });
+      recs408pNF[5] = makeRec408(5, { relationshipShifts: rup408(-0.85), payoffSetupIds: ['p3'] }); // peak has payoff
+      recs408pNF[1] = makeRec408(1, { payoffSetupIds: ['p1'] });
+      const res = await runCF408(recs408pNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_PEAK_PAYOFF_ABSENT'), 'CONFLICT_PEAK_PAYOFF_ABSENT should not fire');
+    });
+
+    it('CONFLICT_PEAK_SEED_ABSENT fires when the heaviest rupture seeds no clue', async () => {
+      const recs408s = Array.from({ length: 8 }, (_, i) => makeRec408(i));
+      recs408s[2] = makeRec408(2, { relationshipShifts: rup408(-0.4) });
+      recs408s[5] = makeRec408(5, { relationshipShifts: rup408(-0.85) }); // peak, no seed
+      recs408s[1] = makeRec408(1, { seededClueIds: ['c1'] });
+      recs408s[3] = makeRec408(3, { seededClueIds: ['c2'] });
+      const res = await runCF408(recs408s);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_PEAK_SEED_ABSENT'), 'CONFLICT_PEAK_SEED_ABSENT should fire');
+    });
+
+    it('CONFLICT_PEAK_SEED_ABSENT does NOT fire when the heaviest rupture seeds a clue', async () => {
+      const recs408sNF = Array.from({ length: 8 }, (_, i) => makeRec408(i));
+      recs408sNF[2] = makeRec408(2, { relationshipShifts: rup408(-0.4) });
+      recs408sNF[5] = makeRec408(5, { relationshipShifts: rup408(-0.85), seededClueIds: ['c3'] }); // peak seeds a clue
+      recs408sNF[1] = makeRec408(1, { seededClueIds: ['c1'] });
+      const res = await runCF408(recs408sNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_PEAK_SEED_ABSENT'), 'CONFLICT_PEAK_SEED_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 394 — conflictPass: clue decoupled, payoff decoupled, rupture aftermath void', async () => {
     const makeRec394 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

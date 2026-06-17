@@ -42,6 +42,14 @@
 // relational cost, co-occurrence × payoffSetupIds), conflict rupture aftermath void (a major
 // rupture ≤ -0.5 is followed by 2 scenes with no per-pair shift and neutral emotion —
 // sequence/aftermath × relationship-shift channel).
+// Wave 408 additions: conflict peak revelation absent (the single heaviest-rupture scene
+// discloses nothing while the story has revelations elsewhere — single-peak isolation ×
+// revelation), conflict peak payoff absent (the heaviest-rupture scene pays off no setup while
+// payoffs exist elsewhere — single-peak isolation × payoffSetupIds), conflict peak seed absent
+// (the heaviest-rupture scene seeds no clue while seeds exist elsewhere — single-peak isolation
+// × seededClueIds). These extend the Wave 352/366 peak-rupture audit to the three remaining
+// channels and are distinct from the Wave 380/394 co-occurrence "decoupled" checks, which audit
+// whether ANY rupture coincides (aggregate) rather than whether the single biggest one does.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1633,6 +1641,72 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
           suggestedFix: 'Let the rupture echo in the next two scenes: a cold exchange between the pair, an emotional reaction that names what was lost, or a shift in that bond — even a tentative one — that confirms the wound registered. The scene after a major break is where the audience learns whether to believe the damage was real.',
         });
         break;
+      }
+    }
+  }
+
+  // ── Wave 408: CONFLICT_PEAK_REVELATION_ABSENT, CONFLICT_PEAK_PAYOFF_ABSENT, CONFLICT_PEAK_SEED_ABSENT ──
+  // Extend the Wave 352/366 peak-rupture audit to the revelation, payoff, and clue-seed channels.
+  // The "heaviest rupture" is the conflict scene with the largest single negative shift magnitude.
+  if (records.length >= 8) {
+    const conflictRecs408 = (records as any[]).filter(r =>
+      ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+    );
+    if (conflictRecs408.length >= 2) {
+      let peakRec408: any = null;
+      let peakMag408 = 0;
+      for (const r of conflictRecs408) {
+        const mag = Math.max(
+          ...((r.relationshipShifts ?? []) as Array<{ amount: number }>)
+            .filter(s => s.amount <= -0.3)
+            .map(s => Math.abs(s.amount)),
+        );
+        if (mag > peakMag408) { peakMag408 = mag; peakRec408 = r; }
+      }
+      if (peakRec408) {
+        // CONFLICT_PEAK_REVELATION_ABSENT: the heaviest rupture discloses nothing, even though
+        // the story has revelations elsewhere — the biggest break surfaces no truth. Distinct
+        // from CONFLICT_REVELATION_DECOUPLED (co-occurrence: NO rupture shares a scene with a
+        // revelation; this can fire even when some lesser rupture does, as long as the PEAK
+        // one does not) and the Wave 352/366 peak checks (other channels).
+        const revScenes408 = (records as any[]).filter(r => r.revelation !== null && r.revelation !== undefined);
+        if (revScenes408.length >= 2 && (peakRec408.revelation === null || peakRec408.revelation === undefined)) {
+          issues.push({
+            location: `Scene ${peakRec408.sceneIdx} — peak rupture (magnitude ${peakMag408.toFixed(2)})`,
+            rule: 'CONFLICT_PEAK_REVELATION_ABSENT',
+            severity: 'minor',
+            description: `The story's heaviest bond-rupture (Scene ${peakRec408.sceneIdx}, magnitude ${peakMag408.toFixed(2)}) carries no revelation, even though the story discloses ${revScenes408.length} truths in other scenes. The single most consequential fracture surfaces nothing — the biggest break is not the moment a hidden truth comes out. When the peak conflict and the disclosure engine never coincide, the audience watches the deepest wound land without learning anything from it.`,
+            suggestedFix: 'Let the heaviest rupture reveal something: the betrayal that exposes a long-held secret, the fight that forces a confession, the break that finally makes a buried truth speakable. A rupture that also discloses is doubly charged — the relationship breaks and the audience\'s understanding lurches forward in the same beat.',
+          });
+        }
+        // CONFLICT_PEAK_PAYOFF_ABSENT: the heaviest rupture pays off no setup, even though the
+        // story delivers payoffs elsewhere — the biggest break collects on no promise. Distinct
+        // from CONFLICT_PAYOFF_DECOUPLED (co-occurrence: NO payoff scene carries a rupture; this
+        // audits whether the single peak rupture is also a payoff).
+        const payoffScenes408 = (records as any[]).filter(r => ((r.payoffSetupIds ?? []) as any[]).length > 0);
+        if (payoffScenes408.length >= 2 && ((peakRec408.payoffSetupIds ?? []) as any[]).length === 0) {
+          issues.push({
+            location: `Scene ${peakRec408.sceneIdx} — peak rupture (magnitude ${peakMag408.toFixed(2)})`,
+            rule: 'CONFLICT_PEAK_PAYOFF_ABSENT',
+            severity: 'minor',
+            description: `The story's heaviest bond-rupture (Scene ${peakRec408.sceneIdx}, magnitude ${peakMag408.toFixed(2)}) pays off no planted setup, even though ${payoffScenes408.length} other scenes deliver payoffs. The single biggest break collects on no promise the story made — the fracture that costs the most is not the one that resolves a thread the audience was tracking. The peak of relational damage and the peak of structural satisfaction never coincide.`,
+            suggestedFix: 'Make the heaviest rupture pay something off: the break that hurts most should also be the moment a planted seed blooms — the foreshadowed betrayal arriving at last, the threat the audience was warned about finally severing the bond it threatened. A rupture that resolves a setup turns relational pain into structural catharsis.',
+          });
+        }
+        // CONFLICT_PEAK_SEED_ABSENT: the heaviest rupture seeds no clue, even though the story
+        // plants clues elsewhere — the biggest break opens no thread. Distinct from CONFLICT_
+        // CLUE_DECOUPLED (co-occurrence: NO rupture seeds a clue; this audits whether the single
+        // peak rupture seeds one).
+        const seedScenes408 = (records as any[]).filter(r => ((r.seededClueIds ?? []) as any[]).length > 0);
+        if (seedScenes408.length >= 2 && ((peakRec408.seededClueIds ?? []) as any[]).length === 0) {
+          issues.push({
+            location: `Scene ${peakRec408.sceneIdx} — peak rupture (magnitude ${peakMag408.toFixed(2)})`,
+            rule: 'CONFLICT_PEAK_SEED_ABSENT',
+            severity: 'minor',
+            description: `The story's heaviest bond-rupture (Scene ${peakRec408.sceneIdx}, magnitude ${peakMag408.toFixed(2)}) seeds no clue, even though ${seedScenes408.length} other scenes plant threads. The single most consequential fracture opens nothing forward — the biggest break terminates a bond without leaving the audience a new question to carry. When the peak conflict plants no seed, the story's deepest wound generates no momentum.`,
+            suggestedFix: 'Let the heaviest rupture plant a thread: the break that hurts most should also open a new unknown — the betrayal that hints at a wider conspiracy, the severed alliance that raises the question of who the protagonist can now trust. A rupture that seeds a clue turns an ending into a beginning, converting relational loss into forward pull.',
+          });
+        }
       }
     }
   }
