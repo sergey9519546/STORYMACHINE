@@ -23343,6 +23343,67 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 405 — causalityPass: positive reaction without cause, curiosity spike without cause, dramatic turn without cause', async () => {
+    const makeRec405 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runC405 = async (records: any[]) => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('POSITIVE_REACTION_WITHOUT_CAUSE fires when a positive shift has no on-page cause', async () => {
+      const recs405p = Array.from({ length: 6 }, (_, i) => makeRec405(i));
+      recs405p[4] = makeRec405(4, { emotionalShift: 'positive' });
+      const res = await runC405(recs405p);
+      assert.ok(res.issues.some((i: any) => i.rule === 'POSITIVE_REACTION_WITHOUT_CAUSE'), 'POSITIVE_REACTION_WITHOUT_CAUSE should fire');
+    });
+
+    it('POSITIVE_REACTION_WITHOUT_CAUSE does NOT fire when the positive shift has a cause', async () => {
+      const recs405pNF = Array.from({ length: 6 }, (_, i) => makeRec405(i));
+      recs405pNF[4] = makeRec405(4, { emotionalShift: 'positive', payoffSetupIds: ['pay-1'] });
+      const res = await runC405(recs405pNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'POSITIVE_REACTION_WITHOUT_CAUSE'), 'POSITIVE_REACTION_WITHOUT_CAUSE should not fire');
+    });
+
+    it('CURIOSITY_SPIKE_WITHOUT_CAUSE fires when a curiosity spike has no upstream driver', async () => {
+      const recs405c = Array.from({ length: 6 }, (_, i) => makeRec405(i));
+      recs405c[4] = makeRec405(4, { curiosityDelta: 2 });
+      const res = await runC405(recs405c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CURIOSITY_SPIKE_WITHOUT_CAUSE'), 'CURIOSITY_SPIKE_WITHOUT_CAUSE should fire');
+    });
+
+    it('CURIOSITY_SPIKE_WITHOUT_CAUSE does NOT fire when a driver precedes the spike', async () => {
+      const recs405cNF = Array.from({ length: 6 }, (_, i) => makeRec405(i));
+      recs405cNF[3] = makeRec405(3, { seededClueIds: ['clue-1'] });
+      recs405cNF[4] = makeRec405(4, { curiosityDelta: 2 });
+      const res = await runC405(recs405cNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CURIOSITY_SPIKE_WITHOUT_CAUSE'), 'CURIOSITY_SPIKE_WITHOUT_CAUSE should not fire');
+    });
+
+    it('DRAMATIC_TURN_WITHOUT_CAUSE fires when every dramatic turn lacks an upstream cause', async () => {
+      const recs405t = Array.from({ length: 8 }, (_, i) => makeRec405(i));
+      recs405t[3] = makeRec405(3, { dramaticTurn: 'reversal' });
+      recs405t[6] = makeRec405(6, { dramaticTurn: 'reversal' });
+      const res = await runC405(recs405t);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_WITHOUT_CAUSE'), 'DRAMATIC_TURN_WITHOUT_CAUSE should fire');
+    });
+
+    it('DRAMATIC_TURN_WITHOUT_CAUSE does NOT fire when a turn has an upstream cause', async () => {
+      const recs405tNF = Array.from({ length: 8 }, (_, i) => makeRec405(i));
+      recs405tNF[3] = makeRec405(3, { dramaticTurn: 'reversal', revelation: 'The truth comes out.' });
+      recs405tNF[6] = makeRec405(6, { dramaticTurn: 'reversal' });
+      const res = await runC405(recs405tNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_WITHOUT_CAUSE'), 'DRAMATIC_TURN_WITHOUT_CAUSE should not fire');
+    });
+  });
+
   describe('Wave 391 — causalityPass: suspense spike no emotion, clock raise no fallout, curiosity spike no fallout', async () => {
     const makeRec391 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

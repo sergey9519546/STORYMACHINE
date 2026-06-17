@@ -49,6 +49,12 @@
 // raise produces no consequence within two scenes — the clock/clue siblings of suspense
 // spike no fallout), curiosity spike no fallout (a curiosity spike produces no consequence
 // within two scenes — intrigue raised then dropped).
+// Wave 405 additions: positive reaction without cause (a positive emotional shift with no
+// on-page cause in itself or the prior two scenes — the positive sibling of REACTION_WITHOUT_
+// CAUSE, which handles only negative emotion), curiosity spike without cause (a curiosity
+// spike with no upstream driver — the curiosity sibling of SUSPENSE_SPIKE_NO_CAUSE), dramatic
+// turn without cause (≥2 dramatic turns and none has a cause in itself or the prior scene —
+// the story's pivots are systematically unmotivated).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1767,6 +1773,120 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         description: `${curSpikes391.length} scenes spike curiosity (curiosityDelta > 1.5) but none is followed within two scenes by any consequence — no emotional shift, no relationship move, no revelation, no dramatic turn. A question is opened and then nothing develops from it, so the intrigue dissipates unaddressed and the audience's leaning-forward goes unrewarded.`,
         suggestedFix: 'Let each curiosity spike lead somewhere soon: the scenes after a question opens should begin to complicate, partially answer, or raise the stakes of it. A mystery that spikes and then stalls teaches the audience that the story\'s questions don\'t pay off — develop the intrigue while it is hot.',
       });
+    }
+  }
+
+  // ── Wave 405: POSITIVE_REACTION_WITHOUT_CAUSE, CURIOSITY_SPIKE_WITHOUT_CAUSE, DRAMATIC_TURN_WITHOUT_CAUSE ──
+
+  // POSITIVE_REACTION_WITHOUT_CAUSE (minor): A scene carries a positive emotional shift but
+  // neither it nor the two scenes before it contain any on-page cause for relief or joy — no
+  // positive relationship shift, no revelation, no payoff, no suspense release (suspenseDelta
+  // < -1), no clock relief (clockDelta < 0). The character brightens with no visible reason,
+  // so the upswing reads as unearned. This is the positive sibling of REACTION_WITHOUT_CAUSE,
+  // which keys exclusively on negative emotion (`emotionalShift !== 'negative'` → continue);
+  // an uncaused positive turn is just as much a causal gap as an uncaused negative one, and is
+  // arguably more damaging because audiences resist unearned relief most of all. Distinct from
+  // EMOTION_WITHOUT_DRIVER_RUN (a 3+ consecutive non-neutral run, sign-agnostic) — this fires
+  // on a single positive scene whose joy has no traceable origin.
+  for (let i = 2; i < records.length; i++) {
+    const curr = records[i] as any;
+    if (curr.emotionalShift !== 'positive') continue;
+    const selfCause405 =
+      curr.revelation !== null ||
+      (curr.suspenseDelta ?? 0) < -1 ||
+      (curr.clockDelta ?? 0) < 0 ||
+      ((curr.payoffSetupIds ?? []) as any[]).length > 0 ||
+      ((curr.relationshipShifts ?? []) as any[]).some((s: any) => s.amount > 0);
+    if (selfCause405) continue;
+    let priorCause405 = false;
+    for (let j = Math.max(0, i - 2); j < i; j++) {
+      const p = records[j] as any;
+      if (
+        p.emotionalShift === 'positive' ||
+        p.revelation !== null ||
+        (p.suspenseDelta ?? 0) < -1 ||
+        (p.clockDelta ?? 0) < 0 ||
+        ((p.payoffSetupIds ?? []) as any[]).length > 0 ||
+        ((p.relationshipShifts ?? []) as any[]).some((s: any) => s.amount > 0)
+      ) { priorCause405 = true; break; }
+    }
+    if (!priorCause405) {
+      issues.push({
+        location: `Scene ${i} (${curr.slug})`,
+        rule: 'POSITIVE_REACTION_WITHOUT_CAUSE',
+        severity: 'minor',
+        description: `Scene ${i} turns emotionally positive but neither it nor the two preceding scenes contain any cause for relief or joy — no good news, no reconciliation, no thread paying off, no danger receding. The upswing has no on-page cause, so the relief reads as unearned. Audiences forgive a character feeling bad for no reason far more readily than feeling good for no reason; uncaused joy reads as the story handing out a reward it never set up.`,
+        suggestedFix: 'Give the positive turn a visible cause in this scene or just before it: a victory, a reunion, a problem solved, a threat lifted, or a kindness received. Relief lands only when the audience has felt the weight it relieves — earn the upswing by showing what changed for the better.',
+      });
+      break;
+    }
+  }
+
+  // CURIOSITY_SPIKE_WITHOUT_CAUSE (minor, n≥4): A scene spikes curiosity (curiosityDelta > 1.5)
+  // but neither it nor the two preceding scenes contain any driver that would open a question —
+  // no revelation, no newly seeded clue, no dramatic turn, no clock raise. Intrigue materializes
+  // from nowhere: the audience is told to lean forward without anything on the page giving them
+  // a reason to wonder. This is the curiosity-channel sibling of SUSPENSE_SPIKE_NO_CAUSE (which
+  // audits the suspense channel for an upstream escalation gap). Distinct from CURIOSITY_SPIKE_
+  // NO_FALLOUT (the downstream-consequence gap) and REVELATION_WITHOUT_CURIOSITY (revelation
+  // scenes that fail to raise curiosity) — this is the upstream cause gap for a curiosity spike.
+  for (let i = 2; i < records.length; i++) {
+    const curr = records[i] as any;
+    if ((curr.curiosityDelta ?? 0) <= 1.5) continue;
+    const hasDriver405 = (r: any): boolean =>
+      r.revelation !== null ||
+      ((r.seededClueIds ?? []) as any[]).length > 0 ||
+      (r.dramaticTurn ?? 'nothing') !== 'nothing' ||
+      r.clockRaised === true;
+    if (hasDriver405(curr)) continue;
+    let priorDriver405 = false;
+    for (let j = Math.max(0, i - 2); j < i; j++) {
+      if (hasDriver405(records[j] as any)) { priorDriver405 = true; break; }
+    }
+    if (!priorDriver405) {
+      issues.push({
+        location: `Scene ${i} (${curr.slug})`,
+        rule: 'CURIOSITY_SPIKE_WITHOUT_CAUSE',
+        severity: 'minor',
+        description: `Scene ${i} spikes curiosity (curiosityDelta ${(curr.curiosityDelta ?? 0).toFixed(1)}) but neither it nor the two preceding scenes plant anything to wonder about — no revelation, no new clue, no dramatic turn, no clock raised. The intrigue materializes from nowhere: the story signals a question without anything on the page giving the audience a reason to ask it.`,
+        suggestedFix: 'Anchor the curiosity spike to a concrete trigger in this scene or just before it: plant a clue, surface a partial truth, or let a turn raise a new unknown. Wonder is a response to a gap in the audience\'s knowledge — open the gap on the page before asking them to lean into it.',
+      });
+      break;
+    }
+  }
+
+  // DRAMATIC_TURN_WITHOUT_CAUSE (minor, n≥8, ≥2 turns): The story contains two or more dramatic
+  // turns, and not one of them has a cause in its own scene or the immediately preceding scene —
+  // no revelation, no suspense rise (suspenseDelta > 1), no clock raise, no relationship shift,
+  // no newly seeded clue. The plot's pivots are systematically unmotivated: each reversal arrives
+  // as an authorial decree rather than the consequence of pressure the audience has watched build.
+  // This is the dramatic-turn channel of the backward-cause family. Distinct from DEUS_EX_MACHINA
+  // (a late plot-CLOSING revelation that arrives with no setup), SUSPENSE_SPIKE_NO_CAUSE (the
+  // suspense channel), and DRAMATIC_TURN_AFTERMATH_VOID (the downstream-fallout gap for turns).
+  if (records.length >= 8) {
+    const turns405 = (records as any[]).filter(r => (r.dramaticTurn ?? 'nothing') !== 'nothing');
+    if (turns405.length >= 2) {
+      const turnHasCause405 = (rec: any): boolean => {
+        const idx = (records as any[]).indexOf(rec);
+        const causeIn = (r: any): boolean =>
+          r.revelation !== null ||
+          (r.suspenseDelta ?? 0) > 1 ||
+          r.clockRaised === true ||
+          ((r.relationshipShifts ?? []) as any[]).length > 0 ||
+          ((r.seededClueIds ?? []) as any[]).length > 0;
+        if (causeIn(rec)) return true;
+        if (idx > 0 && causeIn((records as any[])[idx - 1])) return true;
+        return false;
+      };
+      if (!turns405.some(t => turnHasCause405(t))) {
+        issues.push({
+          location: `${turns405.length} dramatic-turn scene(s) — no upstream cause`,
+          rule: 'DRAMATIC_TURN_WITHOUT_CAUSE',
+          severity: 'minor',
+          description: `All ${turns405.length} of the story's dramatic turns arrive with no cause in their own scene or the scene just before — no revelation, no rising tension, no deadline, no shifting bond, no planted clue precedes any pivot. The plot's reversals are systematically unmotivated: each turn reads as an authorial decree rather than the consequence of pressure the audience watched accumulate, so the story lurches rather than builds.`,
+          suggestedFix: 'Cause each turn: a reversal should be the inevitable-in-hindsight result of forces already in motion — a truth that surfaces, a deadline that bites, an alliance that fractures. Plant the pressure in the turn\'s scene or the one before it, so that when the story pivots, the audience feels it was pushed, not yanked.',
+        });
+      }
     }
   }
 
