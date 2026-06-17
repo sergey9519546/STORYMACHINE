@@ -18713,6 +18713,108 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 430 — themePass: dramatic turn aftermath silent, peak unmotivated, resonance emotionally lopsided', async () => {
+    const makeRec430 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const THEME430 = 'redemption forgiveness courage';
+    const runT430 = async (records: any[]) => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: THEME430 },
+      });
+    };
+    const themed430 = ['act of redemption'];
+
+    it('THEME_DRAMATIC_TURN_AFTERMATH_SILENT fires when every post-turn scene is thematically silent', async () => {
+      // n=10, turns at 2 and 5; resonant at 0 and 1; post-turn scenes 3 and 6 are silent → fires
+      const recs430a = Array.from({ length: 10 }, (_, i) =>
+        makeRec430(i, {
+          dialogueHighlights: [0, 1].includes(i) ? themed430 : [],
+          dramaticTurn: [2, 5].includes(i) ? 'reversal' : 'nothing',
+        }),
+      );
+      const res = await runT430(recs430a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_DRAMATIC_TURN_AFTERMATH_SILENT'), 'THEME_DRAMATIC_TURN_AFTERMATH_SILENT should fire');
+    });
+
+    it('THEME_DRAMATIC_TURN_AFTERMATH_SILENT does not fire when at least one post-turn scene carries the theme', async () => {
+      // n=10, turns at 2 and 5; resonant at 0, 1, and 3 (scene 3 is aftermath of turn at 2) → no fire
+      const recs430anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec430(i, {
+          dialogueHighlights: [0, 1, 3].includes(i) ? themed430 : [],
+          dramaticTurn: [2, 5].includes(i) ? 'reversal' : 'nothing',
+        }),
+      );
+      const res = await runT430(recs430anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_DRAMATIC_TURN_AFTERMATH_SILENT'), 'THEME_DRAMATIC_TURN_AFTERMATH_SILENT should not fire');
+    });
+
+    it('THEME_PEAK_UNMOTIVATED fires when the thematic peak has no catalyst in the two prior scenes', async () => {
+      // n=10; totalHits=7 (scenes 0,1,2 have 1 hit each; scene 5 has 4 hits → peak)
+      // scenes 3 and 4 (2 prior to peak) are non-catalytic → fires
+      const recs430b = Array.from({ length: 10 }, (_, i) =>
+        makeRec430(i, {
+          dialogueHighlights: [0, 1, 2].includes(i)
+            ? ['forgiveness']
+            : i === 5
+              ? ['redemption', 'redemption', 'redemption', 'redemption']
+              : [],
+        }),
+      );
+      const res = await runT430(recs430b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_PEAK_UNMOTIVATED'), 'THEME_PEAK_UNMOTIVATED should fire');
+    });
+
+    it('THEME_PEAK_UNMOTIVATED does not fire when the scene before the thematic peak contains a catalyst', async () => {
+      // Same as above but scene 4 (one before peak at 5) has a revelation → catalyst found → no fire
+      const recs430bnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec430(i, {
+          dialogueHighlights: [0, 1, 2].includes(i)
+            ? ['forgiveness']
+            : i === 5
+              ? ['redemption', 'redemption', 'redemption', 'redemption']
+              : [],
+          revelation: i === 4 ? 'a hidden truth emerges' : null,
+        }),
+      );
+      const res = await runT430(recs430bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_PEAK_UNMOTIVATED'), 'THEME_PEAK_UNMOTIVATED should not fire');
+    });
+
+    it('THEME_RESONANCE_EMOTIONALLY_LOPSIDED fires when all 4 charged resonant scenes share the same negative polarity', async () => {
+      // n=8; resonant at 0,1,2,3,4; scenes 0,1,2,3 are emotionally negative → chargedResonant=4, all neg → fires
+      const recs430c = Array.from({ length: 8 }, (_, i) =>
+        makeRec430(i, {
+          dialogueHighlights: [0, 1, 2, 3, 4].includes(i) ? themed430 : [],
+          emotionalShift: [0, 1, 2, 3].includes(i) ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runT430(recs430c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_RESONANCE_EMOTIONALLY_LOPSIDED'), 'THEME_RESONANCE_EMOTIONALLY_LOPSIDED should fire');
+    });
+
+    it('THEME_RESONANCE_EMOTIONALLY_LOPSIDED does not fire when charged resonant scenes are evenly split', async () => {
+      // n=8; resonant at 0,1,2,3,4; scenes 0,1 positive + scenes 2,3 negative → 2:2 ratio → no fire
+      const recs430cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec430(i, {
+          dialogueHighlights: [0, 1, 2, 3, 4].includes(i) ? themed430 : [],
+          emotionalShift: [0, 1].includes(i) ? 'positive' : [2, 3].includes(i) ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runT430(recs430cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_RESONANCE_EMOTIONALLY_LOPSIDED'), 'THEME_RESONANCE_EMOTIONALLY_LOPSIDED should not fire');
+    });
+  });
+
   describe('Wave 416 — themePass: resonant singleton run, peak suspense aftermath silent, dual rise decoupled', async () => {
     const makeRec416 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

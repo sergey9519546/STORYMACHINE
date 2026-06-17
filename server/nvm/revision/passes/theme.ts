@@ -63,6 +63,14 @@
 // peak suspenseDelta), dual rise decoupled (every scene where both suspenseDelta and
 // curiosityDelta are simultaneously positive carries no theme — co-occurrence/
 // decoupling mode across the joint tension+curiosity channel).
+// Wave 430 additions: dramatic turn aftermath silent (sequence/aftermath — every scene
+// immediately following a dramatic pivot carries no theme even though other scenes do,
+// wasting the most reflective post-reversal processing beat), peak unmotivated
+// (backward-cause — the story's densest theme scene lacks any structural catalyst in
+// the two preceding scenes, so the thematic peak appears without narrative preparation),
+// resonance emotionally lopsided (valence — the emotionally charged resonant scenes are
+// ≥3:1 skewed toward one polarity, leaving the theme unable to speak in the opposite
+// emotional register).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1866,6 +1874,122 @@ export async function themePass(input: PassInput): Promise<PassResult> {
           description: `All ${dualRiseScenes416c.length} scenes where both suspense and curiosity rise simultaneously carry no language related to "${themeRaw}". The story's doubly charged states — where the audience is both tense and intrigued at once — are always thematically empty. When maximum engagement never coincides with thematic meaning, the audience learns to separate "exciting and mysterious" from "what the story is about."`,
           suggestedFix: `Let at least one of the story's dual-rise moments carry "${themeRaw}": the scenes where tension and intrigue peak together are where the audience is most receptive to the meaning of what they're experiencing. A scene that is dangerous, mysterious, AND thematically resonant is the most memorable kind — the audience remembers what they felt AND what it meant.`,
         });
+      }
+    }
+
+    // ── Wave 430: THEME_DRAMATIC_TURN_AFTERMATH_SILENT, THEME_PEAK_UNMOTIVATED, THEME_RESONANCE_EMOTIONALLY_LOPSIDED ──
+
+    // THEME_DRAMATIC_TURN_AFTERMATH_SILENT (sequence/aftermath, n≥10, ≥2 qualifying
+    // post-turn scenes): Every scene immediately following a dramatic pivot carries no
+    // thematic language, even though theme appears elsewhere. A dramatic turn creates
+    // a processing beat — the scene that follows is where the audience absorbs what the
+    // reversal means. That aftermath is the story's second-most-receptive delivery
+    // window for meaning (behind peak suspense), because the audience is reeling and
+    // primed to ask "what does this change?" When every post-turn aftermath is blank,
+    // the story never uses this reflective state to deepen the theme.
+    // Distinctness: THEME_DRAMATIC_TURN_DECOUPLED (Wave 279) checks whether the
+    // TURN SCENES THEMSELVES carry theme. This checks the scene AFTER each turn — a
+    // different structural position. Distinct from THEME_PEAK_SUSPENSE_AFTERMATH_SILENT
+    // (Wave 416: aftermath of the single highest-suspense scene, not of all turns).
+    if (records.length >= 10 && resonantScenes.length >= 2) {
+      const turnAftermathRecs430a: typeof records = [];
+      for (let i430a = 0; i430a < records.length - 1; i430a++) {
+        if ((records[i430a].dramaticTurn ?? 'nothing') !== 'nothing') {
+          turnAftermathRecs430a.push(records[i430a + 1]);
+        }
+      }
+      if (turnAftermathRecs430a.length >= 2 &&
+          !turnAftermathRecs430a.some(r =>
+            sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+          )) {
+        issues.push({
+          location: `${turnAftermathRecs430a.length} post-dramatic-turn scene(s) — thematically silent`,
+          rule: 'THEME_DRAMATIC_TURN_AFTERMATH_SILENT',
+          severity: 'minor',
+          description: `The scene immediately following every dramatic turn (${turnAftermathRecs430a.length} aftermath scenes) carries no language related to "${themeRaw}", even though the theme appears elsewhere. Post-turn scenes are the story's most receptive delivery windows for meaning — the audience is reeling from a reversal and primed to ask what it means — yet every one is thematically blank. The processing beat after each pivot wastes its thematic potential.`,
+          suggestedFix: `Let at least one scene following a dramatic turn carry "${themeRaw}": after a reversal, a character's first response should speak to the theme — a choice, an observation, or an image that frames what the pivot just cost or revealed in terms of the story's central question. The beat after the turn is where meaning settles.`,
+        });
+      }
+    }
+
+    // THEME_PEAK_UNMOTIVATED (backward-cause, n≥10, peakHits≥3, totalHits≥6):
+    // The scene with the highest theme keyword density — the story's thematic peak —
+    // arrives without any structural catalyst in the two scenes preceding it.
+    // Looking backward from the peak: neither of the two prior scenes contains a
+    // revelation, dramatic turn, clock-raised signal, or high suspense (>1). The
+    // thematic peak appears to surface at random rather than as a consequence of
+    // rising dramatic energy. A well-crafted thematic peak should be triggered by
+    // something that opens the audience emotionally before the meaning lands hardest.
+    // Distinctness: THEME_PEAK_BEFORE_MIDPOINT (Wave 321) audits WHERE the peak
+    // lands (position), not WHY it's there (backward cause). The single-peak
+    // isolation checks (THEME_SUSPENSE_PEAK_ABSENT, THEME_CURIOSITY_PEAK_ABSENT,
+    // etc.) compare the peak scene to others — this is the only check that looks
+    // backward from the peak to audit its narrative justification.
+    if (records.length >= 10 && totalHits >= 6) {
+      let peakPos430b = -1;
+      let peakHits430b = 0;
+      for (let i430b = 0; i430b < records.length; i430b++) {
+        const h430b = sceneHitCounts.get(records[i430b].sceneIdx) ?? 0;
+        if (h430b > peakHits430b) { peakHits430b = h430b; peakPos430b = i430b; }
+      }
+      const isCatalyst430b = (r: typeof records[0]) =>
+        r.revelation !== null ||
+        (r.dramaticTurn ?? 'nothing') !== 'nothing' ||
+        r.clockRaised === true ||
+        (r.suspenseDelta ?? 0) > 1;
+      if (peakPos430b >= 2 && peakHits430b >= 3) {
+        const prior1_430b = records[peakPos430b - 1];
+        const prior2_430b = records[peakPos430b - 2];
+        if (!isCatalyst430b(prior1_430b) && !isCatalyst430b(prior2_430b)) {
+          issues.push({
+            location: `Scene ${records[peakPos430b].sceneIdx} — thematic peak (${peakHits430b} keyword hits)`,
+            rule: 'THEME_PEAK_UNMOTIVATED',
+            severity: 'minor',
+            description: `The story's thematic peak — Scene ${records[peakPos430b].sceneIdx} with ${peakHits430b} theme keyword hits for "${themeRaw}" — arrives without any structural catalyst in the two preceding scenes (no revelation, dramatic turn, clock-raised, or high suspense). The most concentrated thematic statement in the story surfaces without narrative preparation; there is no dramatic cause to explain why the theme peaks here. An unmotivated thematic peak reads as a thesis paragraph accidentally placed in the script rather than earned by what precedes it.`,
+            suggestedFix: `Motivate the thematic peak: let the scene before (or two before) the densest theme moment carry a revelation, a turn, or a spike in suspense that opens the audience emotionally before the meaning lands at full force. The thematic peak must be earned — the audience needs to be primed by rising dramatic energy before the theme can land at its hardest. Move the peak, or add a catalyst that justifies its position.`,
+          });
+        }
+      }
+    }
+
+    // THEME_RESONANCE_EMOTIONALLY_LOPSIDED (valence, n≥8, ≥4 charged resonant
+    // scenes): The emotionally charged resonant scenes — those carrying both a
+    // non-neutral emotional shift and thematic language — are ≥3:1 skewed toward
+    // one polarity. The theme speaks overwhelmingly in one emotional register,
+    // leaving it unable to articulate the opposite face of its tension. A theme
+    // confined to positive moments cannot show what it costs to fail; a theme
+    // confined to negative moments cannot show what it looks like to succeed. Both
+    // extremes collapse the theme's range to a single emotional note, denying the
+    // audience the full dialectical picture.
+    // Distinctness: THEME_NO_DIALECTIC (Wave 148) is a binary check firing when NO
+    // resonant scene at all carries a negative charge — it fires even at 0 negative
+    // scenes, regardless of ratio. This valence check fires at the RATIO of charged
+    // resonant scenes (≥3:1), catching imbalance even when both polarities appear
+    // but one dominates. THEME_POSITIVE_SHIFT_SILENT / THEME_NEGATIVE_SHIFT_SILENT
+    // (Waves 251/279) check whether scenes of a given polarity carry theme at all —
+    // the inverse direction. This checks whether the RESONANT SET ITSELF is emotionally
+    // one-sided, an entirely different population and question.
+    if (records.length >= 8 && resonantScenes.length >= 4) {
+      const chargedResonant430c = resonantScenes.filter((r: any) => r.emotionalShift !== 'neutral');
+      if (chargedResonant430c.length >= 4) {
+        const posCount430c = chargedResonant430c.filter((r: any) => r.emotionalShift === 'positive').length;
+        const negCount430c = chargedResonant430c.length - posCount430c;
+        const minCount430c = Math.min(posCount430c, negCount430c);
+        const maxCount430c = Math.max(posCount430c, negCount430c);
+        const lopsided430c = minCount430c === 0
+          ? maxCount430c >= 4
+          : maxCount430c >= minCount430c * 3;
+        if (lopsided430c) {
+          const dominant430c = posCount430c > negCount430c ? 'positive' : 'negative';
+          const minority430c = posCount430c > negCount430c ? 'negative' : 'positive';
+          issues.push({
+            location: 'Emotionally charged resonant scenes',
+            rule: 'THEME_RESONANCE_EMOTIONALLY_LOPSIDED',
+            severity: 'minor',
+            description: `Of ${chargedResonant430c.length} emotionally charged scenes that carry the theme "${themeRaw}", ${maxCount430c} are ${dominant430c} and only ${minCount430c} are ${minority430c} — the theme speaks overwhelmingly in one emotional register. A theme present only in ${dominant430c} moments can only articulate one pole of its tension and never shows what "${themeRaw}" looks like when experienced in ${minority430c} terms. The audience receives a one-note picture of what the theme means.`,
+            suggestedFix: `Balance the emotional register of the theme: let "${themeRaw}" appear in both ${dominant430c} and ${minority430c} moments — in scenes of both gain and loss. A thematically resonant ${minority430c} scene shows what the theme means in its opposite emotional register; the dialectic of the theme lives in both polarities. Write at least one scene where the theme is felt in a ${minority430c} emotional context.`,
+          });
+        }
       }
     }
   }
