@@ -54,6 +54,12 @@
 // relationally inert opening, the relational mirror of ARC_EMOTIONAL_BACK_LOADED), relational
 // recovery absent (≥2 negative shifts and a positive shift exists, but none after the first
 // fracture — a broken bond never repairs, the relational mirror of ARC_EMOTIONAL_RECOVERY_ABSENT).
+// Wave 421 additions: relational negative-only (≥3 shifts, zero positive — every bond only
+// erodes; valence mode, relational mirror of ARC_RELATIONAL_POSITIVE_ONLY), peak relational
+// emotion absent (the scene with the highest absolute shift magnitude is emotionally neutral while
+// emotion exists elsewhere; single-peak isolation × relational × emotion), relational midpoint
+// void (no shift in the 40%–60% pivot zone while shifts exist elsewhere; zone presence/absence ×
+// relational × midpoint).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1652,6 +1658,102 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `The story breaks a bond ${negSceneIdx407.length} times and has the capacity for relational warmth (a positive shift exists), but no relationship ever moves the right way after the first fracture at Scene ${(records as any[])[firstNeg407].sceneIdx}. Once the first bond breaks, the relational world enters a one-way decline — all the warmth lives before the first betrayal, and the back half is unrelieved erosion with no repair to hope for.`,
           suggestedFix: 'Place at least one relational repair after the first fracture: a reconciliation, a new trust formed in the wreckage of an old one, an unexpected ally. Even a tragic arc lands harder when a moment of repair gives the audience something to lose again — relentless relational decline numbs where alternating break-and-mend keeps the bonds alive.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 421: ARC_RELATIONAL_NEGATIVE_ONLY, ARC_PEAK_RELATIONAL_EMOTION_ABSENT, ARC_RELATIONAL_MIDPOINT_VOID ──
+
+  // ARC_RELATIONAL_NEGATIVE_ONLY (minor, n≥8, ≥3 negative shifts, 0 positive): The story makes
+  // three or more relationship shifts and not one of them is positive — every bond only ever
+  // erodes, betrays, or fractures with nothing ever warming or deepening. A relational world that
+  // only declines has no relational hope: the audience never has a bond that is improving to invest
+  // in, so there is no relational joy the story can later put at risk. Decline without any repair
+  // or warmth reads as nihilistic in tone, and the audience stops expecting the bonds to matter
+  // because they only ever move one direction. Valence mode × relational channel. This is the
+  // relational mirror of ARC_RELATIONAL_POSITIVE_ONLY (Wave 407: all shifts positive, zero negative).
+  // Distinct from ARC_NEGATIVE_ONLY (the emotion channel — the protagonist never has an emotional
+  // upswing — not the relational channel), and ARC_RELATIONAL_RECOVERY_ABSENT (which fires when
+  // both polarities exist but no repair follows the first fracture — requires a positive shift to
+  // exist somewhere).
+  if (records.length >= 8) {
+    const allShifts421: any[] = (records as any[]).flatMap(r => (r.relationshipShifts as any[] ?? []));
+    const negShifts421 = allShifts421.filter(s => (s.amount ?? 0) < 0);
+    const posShifts421 = allShifts421.filter(s => (s.amount ?? 0) > 0);
+    if (negShifts421.length >= 3 && posShifts421.length === 0) {
+      issues.push({
+        location: `${negShifts421.length} relationship shifts — all negative`,
+        rule: 'ARC_RELATIONAL_NEGATIVE_ONLY',
+        severity: 'minor',
+        description: `All ${negShifts421.length} of the story's relationship shifts are negative — every bond only ever erodes, betrays, or fractures, and nothing ever warms or deepens. A relational world that only declines has no relational hope: without a bond that is improving, the audience has nothing relational to lose. Unrelieved relational decline reads as nihilistic, and the audience stops expecting bonds to matter because they only ever move one direction.`,
+        suggestedFix: 'Introduce at least one positive relational movement: a trust formed amid betrayal, a bond that deepens under pressure, an unexpected warmth. Even a tragedy needs a moment of genuine connection for its loss to register — decline is only painful against the backdrop of something worth preserving.',
+      });
+    }
+  }
+
+  // ARC_PEAK_RELATIONAL_EMOTION_ABSENT (minor, n≥8, ≥3 scenes with shifts, emotion exists
+  // elsewhere): The scene carrying the highest absolute relationship-shift magnitude is
+  // emotionally neutral — the story's biggest bond event (the sharpest deepening or worst
+  // fracture) leaves the protagonist unregistered. When the most extreme relational moment
+  // produces no emotion, the audience learns that the bonds don't really matter to anyone in
+  // the story — the protagonist doesn't feel their most dramatic relational event, so why should
+  // the audience? Single-peak isolation mode × relational × emotion. Distinct from ARC_PEAK_
+  // SUSPENSE_EMOTION_ABSENT (suspense channel, Wave 365), ARC_PEAK_CURIOSITY_EMOTION_ABSENT
+  // (curiosity channel, Wave 365), and ARC_RELATIONAL_SHIFT_EMOTION_FLAT (Wave 365: fires when
+  // ALL relational scenes are neutral — this fires on only the peak scene being neutral while
+  // others carry emotion, a more targeted isolation of the most critical beat).
+  if (records.length >= 8) {
+    const shiftScenes421b = (records as any[]).filter(r => ((r.relationshipShifts as any[] ?? [])).length > 0);
+    if (shiftScenes421b.length >= 3) {
+      const peakShiftScene421b = shiftScenes421b.reduce((best: any, r: any) => {
+        const maxAbs = Math.max(...(r.relationshipShifts as any[]).map((s: any) => Math.abs(s.amount ?? 0)));
+        const bestMaxAbs = Math.max(...(best.relationshipShifts as any[]).map((s: any) => Math.abs(s.amount ?? 0)));
+        return maxAbs > bestMaxAbs ? r : best;
+      });
+      const hasEmotionElsewhere421b = (records as any[]).some(
+        r => r.sceneIdx !== peakShiftScene421b.sceneIdx && r.emotionalShift !== 'neutral',
+      );
+      if (peakShiftScene421b.emotionalShift === 'neutral' && hasEmotionElsewhere421b) {
+        issues.push({
+          location: `Scene ${peakShiftScene421b.sceneIdx} (peak relationship shift — emotionally neutral)`,
+          rule: 'ARC_PEAK_RELATIONAL_EMOTION_ABSENT',
+          severity: 'minor',
+          description: `The scene with the story's largest relationship shift (Scene ${peakShiftScene421b.sceneIdx}) is emotionally neutral — the protagonist's most dramatic bond event, the sharpest deepening or worst fracture, registers as no emotional state change. When the peak relational moment produces no emotion while other scenes carry feeling, the audience learns that the bonds don't actually matter to anyone in the story, so the biggest relational event fails to land.`,
+          suggestedFix: `Give the peak relational scene an emotional charge: the scene where a bond moves most sharply should be the scene where the protagonist feels most intensely — joy, grief, betrayal, or relief. The audience mirrors the protagonist's emotional state; if the protagonist registers nothing at their most extreme relational moment, the audience registers nothing either.`,
+        });
+      }
+    }
+  }
+
+  // ARC_RELATIONAL_MIDPOINT_VOID (minor, n≥10, ≥2 shift scenes, shifts outside midpoint):
+  // No relationship shifts occurs in the 40%–60% zone (the story's structural pivot), while
+  // shifts exist both outside this zone. The midpoint is the scene where the protagonist
+  // typically crosses from reactivity to agency, and their relational world should be most
+  // actively changing around that turn: alliances form or fracture, loyalties are tested, the
+  // cost of the protagonist's goal becomes clear through its impact on the people around them.
+  // A relational void at the midpoint means the story's relationships are static exactly when
+  // they should be pivoting. Zone presence/absence × relational × midpoint. Distinct from
+  // ARC_LATE_RELATIONAL_VOID (final quarter — a different zone), ARC_RELATIONAL_FIRST_HALF_FLAT
+  // (the entire front half — binary, broader), and ARC_RELATIONAL_BACK_LOADED (distribution of
+  // all shifts — proportion-based, not zone-based).
+  if (records.length >= 10) {
+    const midS421c = Math.floor(records.length * 0.40);
+    const midE421c = Math.floor(records.length * 0.60);
+    const shiftIdxs421c: number[] = [];
+    for (let i421 = 0; i421 < records.length; i421++) {
+      if (((records as any[])[i421].relationshipShifts as any[] ?? []).length > 0) shiftIdxs421c.push(i421);
+    }
+    if (shiftIdxs421c.length >= 2) {
+      const hasMidShift421c = shiftIdxs421c.some(i => i >= midS421c && i < midE421c);
+      const hasOutsideMid421c = shiftIdxs421c.some(i => !(i >= midS421c && i < midE421c));
+      if (!hasMidShift421c && hasOutsideMid421c) {
+        issues.push({
+          location: `Midpoint zone (Scenes ${midS421c}–${midE421c - 1}) — no relationship shift`,
+          rule: 'ARC_RELATIONAL_MIDPOINT_VOID',
+          severity: 'minor',
+          description: `No relationship shifts occurs in the story's midpoint zone (Scenes ${midS421c}–${midE421c - 1}) though shifts exist elsewhere. The midpoint is where the protagonist typically crosses from reactivity to agency, and it is the zone where their relational world should be most actively in motion — alliances forming or fracturing, loyalties tested, the cost of the protagonist's goal becoming visible through its impact on bonds. A relational void at the pivot means the story's structural fulcrum has no interpersonal weight.`,
+          suggestedFix: `Place at least one relationship shift in the midpoint zone: a trust extended or broken at the halfway point grounds the structural pivot in the protagonist's relational world, making the story's turn feel personal rather than mechanical. The scene where everything changes for the protagonist should also change something between them and at least one other character.`,
         });
       }
     }

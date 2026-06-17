@@ -20271,6 +20271,83 @@ I always listen.
     });
   });
 
+  describe('Wave 421 — characterArcPass: relational negative-only, peak relational emotion absent, relational midpoint void', async () => {
+    const mkShift421 = (amount: number) => [{ pairKey: 'ANNA-MARK', dimension: 'trust', amount }];
+    const makeRec421 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runA421 = async (records: any[]) => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ARC_RELATIONAL_NEGATIVE_ONLY fires when every relationship shift is negative', async () => {
+      // n=8, three negative shifts, zero positive → fires
+      const recs421a = Array.from({ length: 8 }, (_, i) => makeRec421(i));
+      recs421a[1] = makeRec421(1, { relationshipShifts: mkShift421(-0.5) });
+      recs421a[4] = makeRec421(4, { relationshipShifts: mkShift421(-0.6) });
+      recs421a[6] = makeRec421(6, { relationshipShifts: mkShift421(-0.4) });
+      const res = await runA421(recs421a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_NEGATIVE_ONLY'), 'ARC_RELATIONAL_NEGATIVE_ONLY should fire');
+    });
+
+    it('ARC_RELATIONAL_NEGATIVE_ONLY does not fire when a positive shift exists', async () => {
+      // n=8, two negative shifts, one positive → no fire
+      const recs421anr = Array.from({ length: 8 }, (_, i) => makeRec421(i));
+      recs421anr[1] = makeRec421(1, { relationshipShifts: mkShift421(-0.5) });
+      recs421anr[4] = makeRec421(4, { relationshipShifts: mkShift421(-0.6) });
+      recs421anr[6] = makeRec421(6, { relationshipShifts: mkShift421(0.4) });
+      const res = await runA421(recs421anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_NEGATIVE_ONLY'), 'ARC_RELATIONAL_NEGATIVE_ONLY should not fire');
+    });
+
+    it('ARC_PEAK_RELATIONAL_EMOTION_ABSENT fires when the peak-shift scene is emotionally neutral', async () => {
+      // n=8, shifts at 2 (amount=2, neutral), 4 (amount=1, positive), 6 (amount=0.5, negative)
+      // peak is scene 2 (abs=2) which is neutral; emotion exists at 4 and 6 → fires
+      const recs421b = Array.from({ length: 8 }, (_, i) => makeRec421(i));
+      recs421b[2] = makeRec421(2, { relationshipShifts: [{ pairKey: 'A-B', dimension: 'trust', amount: 2 }], emotionalShift: 'neutral' });
+      recs421b[4] = makeRec421(4, { relationshipShifts: [{ pairKey: 'A-B', dimension: 'trust', amount: 1 }], emotionalShift: 'positive' });
+      recs421b[6] = makeRec421(6, { relationshipShifts: [{ pairKey: 'A-B', dimension: 'trust', amount: 0.5 }], emotionalShift: 'negative' });
+      const res = await runA421(recs421b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_PEAK_RELATIONAL_EMOTION_ABSENT'), 'ARC_PEAK_RELATIONAL_EMOTION_ABSENT should fire');
+    });
+
+    it('ARC_PEAK_RELATIONAL_EMOTION_ABSENT does not fire when the peak-shift scene carries emotion', async () => {
+      // same structure but peak shift scene (scene 2) is now emotional (positive) → no fire
+      const recs421bnr = Array.from({ length: 8 }, (_, i) => makeRec421(i));
+      recs421bnr[2] = makeRec421(2, { relationshipShifts: [{ pairKey: 'A-B', dimension: 'trust', amount: 2 }], emotionalShift: 'positive' });
+      recs421bnr[4] = makeRec421(4, { relationshipShifts: [{ pairKey: 'A-B', dimension: 'trust', amount: 1 }], emotionalShift: 'neutral' });
+      recs421bnr[6] = makeRec421(6, { relationshipShifts: [{ pairKey: 'A-B', dimension: 'trust', amount: 0.5 }], emotionalShift: 'neutral' });
+      const res = await runA421(recs421bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_PEAK_RELATIONAL_EMOTION_ABSENT'), 'ARC_PEAK_RELATIONAL_EMOTION_ABSENT should not fire');
+    });
+
+    it('ARC_RELATIONAL_MIDPOINT_VOID fires when no shift occurs in the 40%–60% zone', async () => {
+      // n=10, midpoint=[4,5]; shifts at 1 and 8 (outside zone), none in [4,5] → fires
+      const recs421c = Array.from({ length: 10 }, (_, i) => makeRec421(i));
+      recs421c[1] = makeRec421(1, { relationshipShifts: mkShift421(0.5) });
+      recs421c[8] = makeRec421(8, { relationshipShifts: mkShift421(-0.5) });
+      const res = await runA421(recs421c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_MIDPOINT_VOID'), 'ARC_RELATIONAL_MIDPOINT_VOID should fire');
+    });
+
+    it('ARC_RELATIONAL_MIDPOINT_VOID does not fire when a shift lands in the midpoint zone', async () => {
+      // n=10, midpoint=[4,5]; shift at 4 (inside zone) → no fire
+      const recs421cnr = Array.from({ length: 10 }, (_, i) => makeRec421(i));
+      recs421cnr[1] = makeRec421(1, { relationshipShifts: mkShift421(0.5) });
+      recs421cnr[4] = makeRec421(4, { relationshipShifts: mkShift421(-0.3) });
+      recs421cnr[8] = makeRec421(8, { relationshipShifts: mkShift421(-0.5) });
+      const res = await runA421(recs421cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_MIDPOINT_VOID'), 'ARC_RELATIONAL_MIDPOINT_VOID should not fire');
+    });
+  });
+
   describe('Wave 407 — characterArcPass: relational positive-only, relational back-loaded, relational recovery absent', async () => {
     const mkShift407 = (amount: number) => [{ pairKey: 'ANNA-MARK', dimension: 'trust', amount }];
     const makeRec407 = (idx: number, overrides: any = {}): any => ({
