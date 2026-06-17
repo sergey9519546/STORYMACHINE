@@ -18713,6 +18713,96 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 416 — themePass: resonant singleton run, peak suspense aftermath silent, dual rise decoupled', async () => {
+    const makeRec416 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const THEME416 = 'redemption forgiveness courage';
+    const runT416 = async (records: any[]) => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: THEME416 },
+      });
+    };
+    const themed416 = ['act of redemption'];
+
+    it('THEME_RESONANT_SINGLETON_RUN fires when every resonant scene is isolated by silent scenes', async () => {
+      // n=10, resonant at 0,2,4,6 (all separated by silent scenes 1,3,5,7,8,9 → max run=1) → fires
+      const recs416a = Array.from({ length: 10 }, (_, i) =>
+        makeRec416(i, { dialogueHighlights: [0, 2, 4, 6].includes(i) ? themed416 : [] }),
+      );
+      const res = await runT416(recs416a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_RESONANT_SINGLETON_RUN'), 'THEME_RESONANT_SINGLETON_RUN should fire');
+    });
+
+    it('THEME_RESONANT_SINGLETON_RUN does not fire when at least two consecutive resonant scenes exist', async () => {
+      // n=10, resonant at 0,1,4,6 (scenes 0 and 1 are consecutive → max run=2) → no fire
+      const recs416anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec416(i, { dialogueHighlights: [0, 1, 4, 6].includes(i) ? themed416 : [] }),
+      );
+      const res = await runT416(recs416anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_RESONANT_SINGLETON_RUN'), 'THEME_RESONANT_SINGLETON_RUN should not fire');
+    });
+
+    it('THEME_PEAK_SUSPENSE_AFTERMATH_SILENT fires when the scene after the peak-suspense scene is thematically silent', async () => {
+      // n=8, resonant at 0,1; peak suspense at scene 3 (delta=4); scene 4 is silent → fires
+      const recs416b = Array.from({ length: 8 }, (_, i) =>
+        makeRec416(i, {
+          dialogueHighlights: [0, 1].includes(i) ? themed416 : [],
+          suspenseDelta: i === 3 ? 4 : 0,
+        }),
+      );
+      const res = await runT416(recs416b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_PEAK_SUSPENSE_AFTERMATH_SILENT'), 'THEME_PEAK_SUSPENSE_AFTERMATH_SILENT should fire');
+    });
+
+    it('THEME_PEAK_SUSPENSE_AFTERMATH_SILENT does not fire when the aftermath of the peak-suspense scene carries theme', async () => {
+      // n=8, resonant at 0,1,4; peak suspense at scene 3 (delta=4); scene 4 is resonant → no fire
+      const recs416bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec416(i, {
+          dialogueHighlights: [0, 1, 4].includes(i) ? themed416 : [],
+          suspenseDelta: i === 3 ? 4 : 0,
+        }),
+      );
+      const res = await runT416(recs416bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_PEAK_SUSPENSE_AFTERMATH_SILENT'), 'THEME_PEAK_SUSPENSE_AFTERMATH_SILENT should not fire');
+    });
+
+    it('THEME_DUAL_RISE_DECOUPLED fires when every dual-rise scene is thematically silent', async () => {
+      // n=8, resonant at 0,1; dual-rise at 4 (s=2,c=1) and 5 (s=1,c=2); 4 and 5 are not resonant → fires
+      const recs416c = Array.from({ length: 8 }, (_, i) =>
+        makeRec416(i, {
+          dialogueHighlights: [0, 1].includes(i) ? themed416 : [],
+          suspenseDelta: i === 4 ? 2 : i === 5 ? 1 : 0,
+          curiosityDelta: i === 4 ? 1 : i === 5 ? 2 : 0,
+        }),
+      );
+      const res = await runT416(recs416c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_DUAL_RISE_DECOUPLED'), 'THEME_DUAL_RISE_DECOUPLED should fire');
+    });
+
+    it('THEME_DUAL_RISE_DECOUPLED does not fire when at least one dual-rise scene carries the theme', async () => {
+      // n=8, resonant at 0,1,4; scene 4 has suspenseDelta=2 AND curiosityDelta=1 AND is resonant → no fire
+      const recs416cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec416(i, {
+          dialogueHighlights: [0, 1, 4].includes(i) ? themed416 : [],
+          suspenseDelta: i === 4 ? 2 : i === 5 ? 1 : 0,
+          curiosityDelta: i === 4 ? 1 : i === 5 ? 2 : 0,
+        }),
+      );
+      const res = await runT416(recs416cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_DUAL_RISE_DECOUPLED'), 'THEME_DUAL_RISE_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 402 — themePass: Act 2a density drop, seed peak absent, payoff peak absent', async () => {
     const makeRec402 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

@@ -56,6 +56,13 @@
 // scenes carry theme — connective tissue is thematically empty), curiosity peak absent
 // (the highest-curiosity scene lacks theme even when others carry it), Act 2b density
 // drop (theme thins in Act 2b vs Act 2a — story loses thematic pressure pre-climax).
+// Wave 416 additions: resonant singleton run (the theme never accumulates across
+// consecutive scenes — every resonant scene is isolated, run-based mode × resonance
+// sequence), peak suspense aftermath silent (the scene immediately following the
+// story's highest-suspense moment carries no theme — sequence/aftermath mode ×
+// peak suspenseDelta), dual rise decoupled (every scene where both suspenseDelta and
+// curiosityDelta are simultaneously positive carries no theme — co-occurrence/
+// decoupling mode across the joint tension+curiosity channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1762,6 +1769,103 @@ export async function themePass(input: PassInput): Promise<PassResult> {
             });
           }
         }
+      }
+    }
+
+    // ── Wave 416: THEME_RESONANT_SINGLETON_RUN, THEME_PEAK_SUSPENSE_AFTERMATH_SILENT, THEME_DUAL_RISE_DECOUPLED ──
+
+    // THEME_RESONANT_SINGLETON_RUN (minor, n≥10, ≥4 resonant scenes): The longest
+    // consecutive run of thematically resonant scenes is exactly 1 — the theme never
+    // builds momentum across two adjacent scenes. Every resonant scene is an isolated
+    // island surrounded by theme-silent scenes; the theme fires in disconnected beats
+    // rather than flowing as a continuous through-line. A theme that never accumulates
+    // across consecutive scenes feels like episodic punctuation rather than a woven
+    // undercurrent — the audience registers it as interruption, not architecture.
+    // Run-based mode × resonance sequence. Distinct from THEME_CONSECUTIVE_RESONANT_
+    // SURFEIT (Wave 208: fires when max run ≥5 — the opposite excess), and
+    // THEME_SILENT_STRETCH (Wave 223: measures the longest SILENT run, not resonant).
+    if (records.length >= 10 && resonantScenes.length >= 4) {
+      let maxRun416a = 0;
+      let curRun416a = 0;
+      for (let i = 0; i < records.length; i++) {
+        if (sceneHasResonance(sceneTexts.get(records[i].sceneIdx) ?? '', expandedKeywords)) {
+          if (++curRun416a > maxRun416a) maxRun416a = curRun416a;
+        } else {
+          curRun416a = 0;
+        }
+      }
+      if (maxRun416a <= 1) {
+        issues.push({
+          location: 'Thematic distribution — resonance never consecutive',
+          rule: 'THEME_RESONANT_SINGLETON_RUN',
+          severity: 'minor',
+          description: `The theme "${themeRaw}" appears in ${resonantScenes.length} scenes but never in two consecutive scenes — every resonant moment is isolated by theme-silent scenes. A theme that fires only in disconnected beats never builds momentum; the audience experiences it as episodic punctuation rather than a continuous through-line that deepens as the story escalates.`,
+          suggestedFix: `Let the theme accumulate across at least one pair of consecutive scenes: a scene that lands the theme should be followed by a scene that deepens or challenges it, so meaning builds rather than resets each time. Two adjacent resonant scenes create a thematic rhythm the audience can track and anticipate.`,
+        });
+      }
+    }
+
+    // THEME_PEAK_SUSPENSE_AFTERMATH_SILENT (minor, n≥8, ≥2 resonant scenes): The
+    // scene immediately following the story's highest-suspense scene carries no
+    // thematic language. The aftermath of maximum tension — the natural exhale and
+    // reflection beat that follows the story's most charged moment — is thematically
+    // mute. This is the most receptive moment in the story for meaning to land: the
+    // audience is adrenaline-primed and looking for the point of what they just
+    // experienced. Squandering it on thematically empty content wastes the story's
+    // most powerful delivery window. Sequence/aftermath mode × peak suspenseDelta.
+    // Distinct from THEME_SUSPENSE_PEAK_ABSENT (Wave 346: the peak scene ITSELF is
+    // silent), THEME_SUSPENSE_RELEASE_SILENT (Wave 321: clockDelta<0 release beats),
+    // and THEME_CLIMAX_SCENE_SILENT (Wave 174: peak-suspense scene in Act 3 only).
+    if (records.length >= 8 && resonantScenes.length >= 2) {
+      let peakSuspPos416b = 0;
+      let peakSuspVal416b = records[0].suspenseDelta ?? 0;
+      for (let i = 1; i < records.length; i++) {
+        if ((records[i].suspenseDelta ?? 0) > peakSuspVal416b) {
+          peakSuspVal416b = records[i].suspenseDelta ?? 0;
+          peakSuspPos416b = i;
+        }
+      }
+      if (peakSuspVal416b > 0 && peakSuspPos416b < records.length - 1) {
+        const aftermathRec416b = records[peakSuspPos416b + 1];
+        if (!sceneHasResonance(sceneTexts.get(aftermathRec416b.sceneIdx) ?? '', expandedKeywords)) {
+          issues.push({
+            location: `Scene ${aftermathRec416b.sceneIdx} (aftermath of peak-suspense Scene ${records[peakSuspPos416b].sceneIdx})`,
+            rule: 'THEME_PEAK_SUSPENSE_AFTERMATH_SILENT',
+            severity: 'minor',
+            description: `The scene immediately following the story's highest-suspense moment (Scene ${records[peakSuspPos416b].sceneIdx}, suspenseDelta ${peakSuspVal416b.toFixed(1)}) carries no language related to "${themeRaw}". The aftermath of maximum tension is the story's most receptive delivery window for meaning — the audience is adrenaline-primed and looking for the point of what they just experienced — yet it is thematically blank.`,
+            suggestedFix: `Give the aftermath scene thematic resonance: a character's first words or action after the peak tension should speak to "${themeRaw}" — crystallizing what the danger revealed about the story's central question or complicating the protagonist's relationship to it. The exhale beat is where meaning lands deepest because the audience's guard is down.`,
+          });
+        }
+      }
+    }
+
+    // THEME_DUAL_RISE_DECOUPLED (minor, n≥8, ≥2 resonant scenes, ≥2 dual-rise
+    // scenes): Every scene where BOTH suspenseDelta > 0 AND curiosityDelta > 0
+    // simultaneously carries no thematic language. The moments of doubly energized
+    // audience engagement — where tension and intrigue rise together — are always
+    // thematically mute. When the story's most doubly engaged states never coincide
+    // with theme, the audience never feels that "more at stake, more mysterious"
+    // also means "more meaningful." Co-occurrence/decoupling mode × suspenseDelta
+    // × curiosityDelta. Distinct from THEME_DUAL_PEAK_ABSENT (Wave 360: only the
+    // single scene with the highest sum of both), THEME_SUSPENSE_CLUSTER_SILENT
+    // (Wave 279: high suspense alone, threshold > 1), and THEME_CURIOSITY_DECOUPLED
+    // (Wave 265: high curiosity alone, threshold > 1 — this fires at any positive
+    // value when both channels rise together).
+    if (records.length >= 8 && resonantScenes.length >= 2) {
+      const dualRiseScenes416c = (records as any[]).filter(
+        r => (r.suspenseDelta ?? 0) > 0 && (r.curiosityDelta ?? 0) > 0,
+      );
+      if (dualRiseScenes416c.length >= 2 &&
+          !dualRiseScenes416c.some((r: any) =>
+            sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+          )) {
+        issues.push({
+          location: `${dualRiseScenes416c.length} dual-rise scene(s) — simultaneous tension and curiosity increase, all thematically silent`,
+          rule: 'THEME_DUAL_RISE_DECOUPLED',
+          severity: 'minor',
+          description: `All ${dualRiseScenes416c.length} scenes where both suspense and curiosity rise simultaneously carry no language related to "${themeRaw}". The story's doubly charged states — where the audience is both tense and intrigued at once — are always thematically empty. When maximum engagement never coincides with thematic meaning, the audience learns to separate "exciting and mysterious" from "what the story is about."`,
+          suggestedFix: `Let at least one of the story's dual-rise moments carry "${themeRaw}": the scenes where tension and intrigue peak together are where the audience is most receptive to the meaning of what they're experiencing. A scene that is dangerous, mysterious, AND thematically resonant is the most memorable kind — the audience remembers what they felt AND what it meant.`,
+        });
       }
     }
   }
