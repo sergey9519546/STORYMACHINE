@@ -18713,6 +18713,94 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 402 — themePass: Act 2a density drop, seed peak absent, payoff peak absent', async () => {
+    const makeRec402 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const THEME402 = 'trust betrayal courage';
+    const runT402 = async (records: any[]) => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: THEME402 },
+      });
+    };
+    const themed402 = ['the courage to trust'];
+
+    it('THEME_ACT2A_DENSITY_DROP fires when Act 2a is less than half as resonant as overall', async () => {
+      // n=12, Act 2a = scenes 3-5; resonance at 0,1,2,8,9,10 (none in 3-5) → overall 50%, Act 2a 0% → fires
+      const recs402a = Array.from({ length: 12 }, (_, i) =>
+        makeRec402(i, { dialogueHighlights: [0, 1, 2, 8, 9, 10].includes(i) ? themed402 : [] }),
+      );
+      const res = await runT402(recs402a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_ACT2A_DENSITY_DROP'), 'THEME_ACT2A_DENSITY_DROP should fire');
+    });
+
+    it('THEME_ACT2A_DENSITY_DROP does not fire when Act 2a is proportionately resonant', async () => {
+      // n=12, Act 2a = scenes 3-5; resonance at 0,3,4,8 → Act 2a 67%, overall 33%; 0.67 > 0.33*0.5 → no fire
+      const recs402anr = Array.from({ length: 12 }, (_, i) =>
+        makeRec402(i, { dialogueHighlights: [0, 3, 4, 8].includes(i) ? themed402 : [] }),
+      );
+      const res = await runT402(recs402anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_ACT2A_DENSITY_DROP'), 'THEME_ACT2A_DENSITY_DROP should not fire');
+    });
+
+    it('THEME_SEED_PEAK_ABSENT fires when the peak seed scene is silent while other seed scenes carry theme', async () => {
+      // Seeds: scene 2 plants 1 clue (resonant), scene 5 plants 3 clues (silent = peak is silent) → fires
+      const recs402b = Array.from({ length: 10 }, (_, i) =>
+        makeRec402(i, {
+          seededClueIds: i === 2 ? ['c1'] : i === 5 ? ['c2', 'c3', 'c4'] : [],
+          dialogueHighlights: [0, 1, 2, 7, 8, 9].includes(i) ? themed402 : [], // scene 2 themed, scene 5 not
+        }),
+      );
+      const res = await runT402(recs402b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_SEED_PEAK_ABSENT'), 'THEME_SEED_PEAK_ABSENT should fire');
+    });
+
+    it('THEME_SEED_PEAK_ABSENT does not fire when the peak seed scene carries theme', async () => {
+      // Seeds: scene 2 (1 clue), scene 5 (3 clues = peak) AND scene 5 carries theme → no fire
+      const recs402bnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec402(i, {
+          seededClueIds: i === 2 ? ['c1'] : i === 5 ? ['c2', 'c3', 'c4'] : [],
+          dialogueHighlights: [0, 1, 2, 5, 7].includes(i) ? themed402 : [],
+        }),
+      );
+      const res = await runT402(recs402bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_SEED_PEAK_ABSENT'), 'THEME_SEED_PEAK_ABSENT should not fire');
+    });
+
+    it('THEME_PAYOFF_PEAK_ABSENT fires when the peak payoff scene is silent while other payoff scenes carry theme', async () => {
+      // Payoffs: scene 3 resolves 1 setup (resonant), scene 7 resolves 3 setups (silent = peak) → fires
+      const recs402c = Array.from({ length: 10 }, (_, i) =>
+        makeRec402(i, {
+          payoffSetupIds: i === 3 ? ['s1'] : i === 7 ? ['s2', 's3', 's4'] : [],
+          dialogueHighlights: [0, 1, 3, 8, 9].includes(i) ? themed402 : [], // scene 3 themed, scene 7 not
+        }),
+      );
+      const res = await runT402(recs402c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_PAYOFF_PEAK_ABSENT'), 'THEME_PAYOFF_PEAK_ABSENT should fire');
+    });
+
+    it('THEME_PAYOFF_PEAK_ABSENT does not fire when the peak payoff scene carries theme', async () => {
+      // Payoffs: scene 3 (1 setup), scene 7 (3 setups = peak) AND scene 7 carries theme → no fire
+      const recs402cnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec402(i, {
+          payoffSetupIds: i === 3 ? ['s1'] : i === 7 ? ['s2', 's3', 's4'] : [],
+          dialogueHighlights: [0, 1, 3, 7, 9].includes(i) ? themed402 : [],
+        }),
+      );
+      const res = await runT402(recs402cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_PAYOFF_PEAK_ABSENT'), 'THEME_PAYOFF_PEAK_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 401 — structurePass: Act 2b curiosity void, midpoint dramatic turn void, Act 3 suspense void', async () => {
     const makeRec401 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

@@ -30,6 +30,12 @@
 // no theme though it appears later — the bookend mirror of final scene silent), proactive
 // decoupled (every clock/clue-planting scene is thematically silent — agency and meaning
 // never coincide).
+// Wave 402 additions: Act 2a density drop (the 25%–50% conflict-entry zone is less than
+// half as resonant as overall — completes the zone density set with Act 1/2b/3/midpoint),
+// seed peak absent (the scene that plants the most clues is thematically silent while other
+// seed scenes carry theme — the single-peak mode for the seededClueIds channel), payoff
+// peak absent (the scene that resolves the most setups is thematically silent while other
+// payoff scenes carry theme — the single-peak mode for the payoffSetupIds channel).
 // Wave 265 additions: clue scenes decoupled (≥2 clue-planting scenes with no theme),
 // curiosity scenes decoupled (≥2 curiosity spikes with no theme), payoff scenes
 // decoupled (≥2 payoff scenes with no theme).
@@ -1649,6 +1655,113 @@ export async function themePass(input: PassInput): Promise<PassResult> {
           description: `None of the ${proactiveScenes388.length} scenes where the protagonist takes initiative — raising a clock or planting a clue — carries language related to "${themeRaw}". The protagonist's agency and the story's meaning never coincide: the character drives the plot in thematically blank scenes, so what they actively do is never about what the story is ultimately exploring.`,
           suggestedFix: `Tie the protagonist's initiative to "${themeRaw}": the choices they make to drive the plot should be the choices that test the theme. When agency and meaning coincide, the audience reads the protagonist's actions as an argument about the theme, not just moves that advance the plot.`,
         });
+      }
+    }
+
+    // ── Wave 402: THEME_ACT2A_DENSITY_DROP, THEME_SEED_PEAK_ABSENT, THEME_PAYOFF_PEAK_ABSENT ──
+
+    // THEME_ACT2A_DENSITY_DROP (minor, n≥12, ≥3 Act 2a scenes, overall resonance≥2):
+    // Act 2a (25%–50%) is less than half as thematically dense as the story overall —
+    // theme thins in the entry to the conflict zone. Act 2a is where the protagonist
+    // first engages the central struggle; if the theme is absent here, the conflict
+    // opens as plot mechanics rather than as a dramatization of the story's meaning.
+    // Completes the zone density set alongside THEME_ACT1_DENSITY_DROP,
+    // THEME_MIDPOINT_DENSITY_DROP, THEME_ACT2B_DENSITY_DROP, and THEME_ACT3_DENSITY_DROP.
+    // Distinct from THEME_ACT2_DESERT (Act 2 as a whole < 30% resonant — a binary
+    // all-of-Act-2 check) and THEME_ACT2B_DENSITY_DROP (2a-vs-2b trajectory — this
+    // fires when Act 2a itself is under-themed relative to the whole story).
+    if (records.length >= 12) {
+      const a2aStart402 = Math.floor(records.length * 0.25);
+      const a2aEnd402 = Math.floor(records.length * 0.5);
+      const a2aRecs402 = records.slice(a2aStart402, a2aEnd402);
+      const overallResonant402 = (records as any[]).filter(
+        r => sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+      ).length;
+      if (a2aRecs402.length >= 3 && overallResonant402 >= 2) {
+        const a2aResonant402 = a2aRecs402.filter(
+          r => sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        ).length;
+        const a2aDensity402 = a2aResonant402 / a2aRecs402.length;
+        const overallDensity402 = overallResonant402 / records.length;
+        if (a2aDensity402 < overallDensity402 * 0.5) {
+          issues.push({
+            location: `Act 2a (Scenes ${a2aStart402}–${a2aEnd402 - 1}) — thematic density drop`,
+            rule: 'THEME_ACT2A_DENSITY_DROP',
+            severity: 'minor',
+            description: `Act 2a (Scenes ${a2aStart402}–${a2aEnd402 - 1}) is ${Math.round(a2aDensity402 * 100)}% thematically resonant versus ${Math.round(overallDensity402 * 100)}% across the story — the theme thins precisely as the protagonist enters the central conflict. Act 2a is where the struggle opens and the audience's investment in the theme should deepen; a density drop here means the conflict is engaged as pure plot mechanics with "${themeRaw}" absent from the scenes that should first test it.`,
+            suggestedFix: `Bring the theme into the early conflict: as the protagonist first engages the central struggle, let the scenes echo "${themeRaw}" — through a character's observation, a choice that embodies the theme's tension, or an image that reframes the conflict in thematic terms. The entry into Act 2 is where the audience learns that the story is about something, not just about someone.`,
+          });
+        }
+      }
+    }
+
+    // THEME_SEED_PEAK_ABSENT (minor, n≥8, totalHits≥3, ≥2 seed scenes, ≥1 resonant seed):
+    // The scene that plants the most clues (highest seededClueIds.length) carries no
+    // thematic resonance, even though other seed scenes do carry the theme. This specific
+    // scene — the story's densest foreshadowing moment — is thematically mute. Seeding
+    // clues and raising thematic questions should be the same gesture: the evidence the
+    // protagonist or audience collects should feel meaningful in thematic terms, not just
+    // as plot mechanics. Single-peak mode × seededClueIds × theme. Distinct from
+    // THEME_CLUE_DECOUPLED (ALL seed scenes silent — this fires when the peak is silent
+    // even though other seed scenes carry theme) and THEME_PAYOFF_PEAK_ABSENT (same mode
+    // applied to the payoff side of the seed/payoff channel pair).
+    if (records.length >= 8 && totalHits >= 3) {
+      const seedRecs402b = (records as any[]).filter(
+        r => ((r.seededClueIds ?? []) as any[]).length > 0,
+      );
+      if (seedRecs402b.length >= 2) {
+        const anySeedResonant402b = seedRecs402b.some(
+          r => sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        );
+        if (anySeedResonant402b) {
+          const peakSeedCount402b = Math.max(...seedRecs402b.map(r => ((r.seededClueIds ?? []) as any[]).length));
+          const peakSeedRec402b = seedRecs402b.find(
+            r => ((r.seededClueIds ?? []) as any[]).length === peakSeedCount402b,
+          );
+          if (peakSeedRec402b && !sceneHasResonance(sceneTexts.get(peakSeedRec402b.sceneIdx) ?? '', expandedKeywords)) {
+            issues.push({
+              location: `Scene ${peakSeedRec402b.sceneIdx} (peak clue-planting: ${peakSeedCount402b} seed(s))`,
+              rule: 'THEME_SEED_PEAK_ABSENT',
+              severity: 'minor',
+              description: `The scene that plants the most clues (Scene ${peakSeedRec402b.sceneIdx}, ${peakSeedCount402b} seed(s)) carries no language related to "${themeRaw}", though other seed scenes do carry the theme. The densest foreshadowing moment is thematically mute — the story plants evidence as a plot mechanic without the scene being about "${themeRaw}". The clues the audience will be asked to remember should feel thematically significant when they are planted.`,
+              suggestedFix: `Let the story's richest clue-planting scene also carry "${themeRaw}": the evidence being planted should feel dangerous or revealing in thematic terms, not just mechanically important. When a seed and a thematic note land in the same scene, the payoff that resolves the clue also resolves the thematic question — the most satisfying form of closure.`,
+            });
+          }
+        }
+      }
+    }
+
+    // THEME_PAYOFF_PEAK_ABSENT (minor, n≥8, totalHits≥3, ≥2 payoff scenes, ≥1 resonant):
+    // The scene that resolves the most narrative setups (highest payoffSetupIds.length)
+    // carries no thematic resonance, while other payoff scenes do. The story's densest
+    // resolution moment — where the audience experiences the largest return on its
+    // narrative investment — is thematically mute. A payoff that settles the biggest thread
+    // without any language of the theme collapses a structural catharsis into a mere plot
+    // event. Single-peak mode × payoffSetupIds × theme. Distinct from THEME_PAYOFF_SILENT
+    // (all payoff scenes silent) and THEME_SEED_PEAK_ABSENT (seed side of same channel pair).
+    if (records.length >= 8 && totalHits >= 3) {
+      const payoffRecs402c = (records as any[]).filter(
+        r => ((r.payoffSetupIds ?? []) as any[]).length > 0,
+      );
+      if (payoffRecs402c.length >= 2) {
+        const anyPayoffResonant402c = payoffRecs402c.some(
+          r => sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        );
+        if (anyPayoffResonant402c) {
+          const peakPayoffCount402c = Math.max(...payoffRecs402c.map(r => ((r.payoffSetupIds ?? []) as any[]).length));
+          const peakPayoffRec402c = payoffRecs402c.find(
+            r => ((r.payoffSetupIds ?? []) as any[]).length === peakPayoffCount402c,
+          );
+          if (peakPayoffRec402c && !sceneHasResonance(sceneTexts.get(peakPayoffRec402c.sceneIdx) ?? '', expandedKeywords)) {
+            issues.push({
+              location: `Scene ${peakPayoffRec402c.sceneIdx} (peak payoff: ${peakPayoffCount402c} setup(s) resolved)`,
+              rule: 'THEME_PAYOFF_PEAK_ABSENT',
+              severity: 'minor',
+              description: `The scene that resolves the most setups (Scene ${peakPayoffRec402c.sceneIdx}, ${peakPayoffCount402c} payoff(s)) carries no language related to "${themeRaw}", though other payoff scenes do. The story's densest resolution moment — where the audience receives the largest return on its narrative investment — is thematically mute. The most important convergence of threads lands without any echo of what the story is ultimately about.`,
+              suggestedFix: `Infuse the peak payoff scene with "${themeRaw}": the resolution of the story's most important threads should make the audience feel the theme being answered, not just the plot being closed. A payoff that resolves a setup AND speaks to the theme produces the deepest catharsis — the story closes two loops at once.`,
+            });
+          }
+        }
       }
     }
   }
