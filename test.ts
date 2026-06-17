@@ -18801,6 +18801,64 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 415 — structurePass: Act 1 suspense void, Act 2a dramatic turn void, Act 2b dramatic turn void', async () => {
+    const makeRec415 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runST415 = async (records: any[]) => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      return structurePass({ fountain: '', original: '', records, structure: { completionPercent: 100, actPosition: 'act3' } as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ACT1_SUSPENSE_VOID fires when Act 1 has no suspense spike while the story spikes elsewhere', async () => {
+      // n=12, Act1 = scenes 0-2 (all flat); scene 6 spikes suspense → fires
+      const recs415a = Array.from({ length: 12 }, (_, i) => makeRec415(i, { suspenseDelta: i === 6 ? 2 : 0 }));
+      const res = await runST415(recs415a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACT1_SUSPENSE_VOID'), 'ACT1_SUSPENSE_VOID should fire');
+    });
+
+    it('ACT1_SUSPENSE_VOID does NOT fire when Act 1 carries a suspense spike', async () => {
+      // Scene 1 (Act 1) spikes suspense → no fire
+      const recs415aNF = Array.from({ length: 12 }, (_, i) => makeRec415(i, { suspenseDelta: [1, 6].includes(i) ? 2 : 0 }));
+      const res = await runST415(recs415aNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACT1_SUSPENSE_VOID'), 'ACT1_SUSPENSE_VOID should not fire');
+    });
+
+    it('ACT2A_DRAMATIC_TURN_VOID fires when Act 2a has no turn while turns land elsewhere', async () => {
+      // n=12, Act2a = scenes 3-5 (no turn); turns at scenes 1,8 → fires
+      const recs415b = Array.from({ length: 12 }, (_, i) => makeRec415(i, { dramaticTurn: [1, 8].includes(i) ? 'reversal' : 'nothing' }));
+      const res = await runST415(recs415b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACT2A_DRAMATIC_TURN_VOID'), 'ACT2A_DRAMATIC_TURN_VOID should fire');
+    });
+
+    it('ACT2A_DRAMATIC_TURN_VOID does NOT fire when Act 2a carries a turn', async () => {
+      // Turn inside Act 2a (scene 4); turns also at 1,8 → no fire
+      const recs415bNF = Array.from({ length: 12 }, (_, i) => makeRec415(i, { dramaticTurn: [1, 4, 8].includes(i) ? 'reversal' : 'nothing' }));
+      const res = await runST415(recs415bNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACT2A_DRAMATIC_TURN_VOID'), 'ACT2A_DRAMATIC_TURN_VOID should not fire');
+    });
+
+    it('ACT2B_DRAMATIC_TURN_VOID fires when Act 2b has no turn while turns land elsewhere', async () => {
+      // n=12, Act2b = scenes 6-8 (no turn); turns at scenes 1,10 → fires
+      const recs415c = Array.from({ length: 12 }, (_, i) => makeRec415(i, { dramaticTurn: [1, 10].includes(i) ? 'reversal' : 'nothing' }));
+      const res = await runST415(recs415c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACT2B_DRAMATIC_TURN_VOID'), 'ACT2B_DRAMATIC_TURN_VOID should fire');
+    });
+
+    it('ACT2B_DRAMATIC_TURN_VOID does NOT fire when Act 2b carries a turn', async () => {
+      // Turn inside Act 2b (scene 7); turns also at 1,10 → no fire
+      const recs415cNF = Array.from({ length: 12 }, (_, i) => makeRec415(i, { dramaticTurn: [1, 7, 10].includes(i) ? 'reversal' : 'nothing' }));
+      const res = await runST415(recs415cNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACT2B_DRAMATIC_TURN_VOID'), 'ACT2B_DRAMATIC_TURN_VOID should not fire');
+    });
+  });
+
   describe('Wave 401 — structurePass: Act 2b curiosity void, midpoint dramatic turn void, Act 3 suspense void', async () => {
     const makeRec401 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

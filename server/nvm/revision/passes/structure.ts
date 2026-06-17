@@ -50,6 +50,12 @@
 // elsewhere — the pivot is structurally inert; completes the midpoint channel set), Act 3
 // suspense void (the final 25% generates no suspense spike while the story spikes elsewhere —
 // the climax act builds no tension).
+// Wave 415 additions: Act 1 suspense void (the 0%–25% setup generates no suspense spike while
+// the story spikes elsewhere — completes the suspense zone set with Act 2a/2b/3 and midpoint),
+// Act 2a dramatic turn void (the 25%–50% approach zone carries no reversal while ≥2 turns land
+// elsewhere), Act 2b dramatic turn void (the 50%–75% escalation zone carries no reversal while
+// ≥2 turns land elsewhere) — the last two complete the per-half dramatic-turn zone set alongside
+// the opening/Act 2/Act 3/midpoint turn checks.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1668,6 +1674,83 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `No scene in Act 3 (Scenes ${a3Start401c}–${n - 1}) reaches a suspenseDelta above 1, even though the story builds meaningful tension elsewhere. The finale resolves without the audience being under pressure — the action happens and the resolution arrives, but no scene in the final act generates the sense of threat and uncertainty that makes an ending feel earned rather than merely arrived at.`,
         suggestedFix: 'Build genuine tension in Act 3: a complication that threatens the resolution, a last-moment reversal, or a confrontation that could go either way. The audience should not be confident of the outcome until it arrives — Act 3 tension is what converts a satisfying plot conclusion into a felt experience.',
+      });
+    }
+  }
+
+  // ── Wave 415: ACT1_SUSPENSE_VOID, ACT2A_DRAMATIC_TURN_VOID, ACT2B_DRAMATIC_TURN_VOID ──
+
+  // ACT1_SUSPENSE_VOID (minor, n≥10, ≥2 Act 1 scenes, overall suspense > 1): No scene in Act 1
+  // (0%–25%) reaches a suspenseDelta above 1, even though the story builds meaningful tension
+  // elsewhere. The setup establishes the world with no flicker of threat or uncertainty, so the
+  // audience has nothing pulling them forward through the opening — the first quarter reads as
+  // pure exposition with no pressure. Completes the suspense-void zone set alongside ACT2A_
+  // SUSPENSE_VOID (25%–50%), ACT2B_SUSPENSE_VOID (50%–75%), MIDPOINT_SUSPENSE_VOID (40%–60%),
+  // and ACT3_SUSPENSE_VOID (75%–100%). Distinct from OPENING_SUSPENSE_FLATLINE (the first 3
+  // scenes all ≤ 0 — a stricter, narrower opener check): this audits the whole Act 1 zone for
+  // the absence of any genuine spike.
+  if (n >= 10) {
+    const a1End415 = Math.floor(n * 0.25);
+    const a1Recs415 = records.slice(0, a1End415);
+    const anyOverallSusp415 = records.some((r: any) => (r.suspenseDelta ?? 0) > 1);
+    if (a1Recs415.length >= 2 && anyOverallSusp415 && !a1Recs415.some((r: any) => (r.suspenseDelta ?? 0) > 1)) {
+      issues.push({
+        location: `Act 1 (Scenes 0–${a1End415 - 1}) — suspense void`,
+        rule: 'ACT1_SUSPENSE_VOID',
+        severity: 'minor',
+        description: `No scene in Act 1 (Scenes 0–${a1End415 - 1}) reaches a suspenseDelta above 1, even though the story builds meaningful tension elsewhere. The setup establishes the world with no flicker of threat or uncertainty, so the audience has nothing pulling them forward through the opening — the first quarter reads as pure exposition, and the story asks for patience before it has given a reason to keep watching.`,
+        suggestedFix: 'Introduce a thread of tension in Act 1: a threat glimpsed, a deadline implied, a question of safety raised. The opening does not need a set-piece, but it needs at least one beat where something is at stake — a low hum of suspense in the setup is what makes the audience trust that the story is going somewhere.',
+      });
+    }
+  }
+
+  // ACT2A_DRAMATIC_TURN_VOID (minor, n≥12, ≥3 Act 2a scenes, ≥2 turns outside): The Act 2a
+  // approach zone (25%–50%) contains no dramatic turn, even though ≥2 turns land outside it. The
+  // stretch where the protagonist first engages the central problem proceeds without a single
+  // reversal or recognition — the approach plays as a flat ramp rather than a series of
+  // course-corrections. Completes the per-half dramatic-turn zone set; distinct from ACT2_
+  // DRAMATIC_TURN_ABSENT (the whole 25%–75% middle — this isolates the front half), MIDPOINT_
+  // DRAMATIC_TURN_VOID (the 40%–60% pivot), and ACT2B_DRAMATIC_TURN_VOID (the back half).
+  if (n >= 12) {
+    const a2aStart415 = Math.floor(n * 0.25);
+    const a2aEnd415 = Math.floor(n * 0.5);
+    const a2aRecs415 = records.slice(a2aStart415, a2aEnd415);
+    const turnsOutside415a = [...records.slice(0, a2aStart415), ...records.slice(a2aEnd415)]
+      .filter((r: any) => r.dramaticTurn != null && r.dramaticTurn !== 'nothing').length;
+    const a2aHasTurn415 = a2aRecs415.some((r: any) => r.dramaticTurn != null && r.dramaticTurn !== 'nothing');
+    if (a2aRecs415.length >= 3 && turnsOutside415a >= 2 && !a2aHasTurn415) {
+      issues.push({
+        location: `Act 2a (Scenes ${a2aStart415}–${a2aEnd415 - 1}) — no dramatic turns`,
+        rule: 'ACT2A_DRAMATIC_TURN_VOID',
+        severity: 'minor',
+        description: `The Act 2a approach zone (Scenes ${a2aStart415}–${a2aEnd415 - 1}) contains no dramatic turn, even though ${turnsOutside415a} turns land elsewhere. The stretch where the protagonist first engages the central problem proceeds without a single reversal or recognition, so the approach plays as a flat ramp into the midpoint rather than a series of course-corrections that keep the audience recalibrating.`,
+        suggestedFix: 'Build a reversal into Act 2a: a first attempt that fails and forces a new tack, an ally who turns out to have an agenda, a discovery that complicates the protagonist\'s plan. The approach to the midpoint is more compelling as a sequence of small turns than as an uninterrupted build.',
+      });
+    }
+  }
+
+  // ACT2B_DRAMATIC_TURN_VOID (minor, n≥12, ≥3 Act 2b scenes, ≥2 turns outside): The Act 2b
+  // escalation zone (50%–75%) contains no dramatic turn, even though ≥2 turns land outside it.
+  // The run-up to the climax — where stakes should compound and the situation should keep
+  // shifting under the protagonist — proceeds without a single reversal, so the back half of
+  // the middle act builds in a straight line into the finale. Completes the per-half dramatic-
+  // turn zone set; distinct from ACT2_DRAMATIC_TURN_ABSENT (the whole 25%–75% middle), MIDPOINT_
+  // DRAMATIC_TURN_VOID (40%–60%), ACT3_DRAMATIC_TURN_ABSENT (the finale), and ACT2A_DRAMATIC_
+  // TURN_VOID (the front half).
+  if (n >= 12) {
+    const a2bStart415 = Math.floor(n * 0.5);
+    const a2bEnd415 = Math.floor(n * 0.75);
+    const a2bRecs415 = records.slice(a2bStart415, a2bEnd415);
+    const turnsOutside415b = [...records.slice(0, a2bStart415), ...records.slice(a2bEnd415)]
+      .filter((r: any) => r.dramaticTurn != null && r.dramaticTurn !== 'nothing').length;
+    const a2bHasTurn415 = a2bRecs415.some((r: any) => r.dramaticTurn != null && r.dramaticTurn !== 'nothing');
+    if (a2bRecs415.length >= 3 && turnsOutside415b >= 2 && !a2bHasTurn415) {
+      issues.push({
+        location: `Act 2b (Scenes ${a2bStart415}–${a2bEnd415 - 1}) — no dramatic turns`,
+        rule: 'ACT2B_DRAMATIC_TURN_VOID',
+        severity: 'minor',
+        description: `The Act 2b escalation zone (Scenes ${a2bStart415}–${a2bEnd415 - 1}) contains no dramatic turn, even though ${turnsOutside415b} turns land elsewhere. The run-up to the climax — where stakes should compound and the situation should keep shifting under the protagonist — proceeds without a single reversal, so the back half of the middle act builds in a straight line into the finale instead of tightening through a series of pivots.`,
+        suggestedFix: 'Place a reversal in Act 2b: a betrayal that strips away an advantage, a plan that backfires and raises the cost, a revelation that changes what winning requires. The escalation zone earns the climax by repeatedly raising the stakes through turns, not by simply accelerating toward it.',
       });
     }
   }
