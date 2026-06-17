@@ -19019,6 +19019,69 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 428 — rhythmPass: consecutive opener run, action finale bloat, longest action outlier', async () => {
+    const runR428 = async (fountain: string) => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CONSECUTIVE_OPENER_RUN fires when 5+ consecutive action lines begin with the same word', async () => {
+      // 5 consecutive "She" openers + 3 others = 8 action lines total
+      const f428a = `INT. ROOM - DAY\n\n` +
+        `She crosses to the window.\n\nShe picks up the phone.\n\nShe dials a number.\n\nShe waits.\n\nShe hangs up.\n\n` +
+        `He enters.\n\nRain falls.\n\nThe door opens.`;
+      const res = await runR428(f428a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONSECUTIVE_OPENER_RUN'), 'CONSECUTIVE_OPENER_RUN should fire');
+    });
+
+    it('CONSECUTIVE_OPENER_RUN does NOT fire when openers alternate without a run of 5', async () => {
+      // Alternating She/He — max run = 1
+      const f428aNF = `INT. ROOM - DAY\n\n` +
+        `She crosses.\n\nHe stops.\n\nShe turns.\n\nHe picks it up.\n\nShe smiles.\n\nHe opens the door.\n\nShe speaks.\n\nHe nods.`;
+      const res = await runR428(f428aNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONSECUTIVE_OPENER_RUN'), 'CONSECUTIVE_OPENER_RUN should not fire');
+    });
+
+    it('ACTION_FINALE_BLOAT fires when last 25% of action lines average >1.4× the first 75%', async () => {
+      // 12 short lines ("Line N." = 2 words) then 4 long lines (~13 words) placed in the last 25%
+      const shortLines = Array.from({ length: 12 }, (_, i) => `Line ${i + 1}.`);
+      const longLines = [
+        'The character moves slowly through the elaborate and meticulously described room.',
+        'She examines each object with tremendous care noting every detail of the decor.',
+        'He reaches the far wall where portraits of unknown ancestors stare blankly down.',
+        'They stand together in silence letting the weight of the moment settle completely.',
+      ];
+      const f428b = `INT. ROOM - DAY\n\n${shortLines.join('\n\n')}\n\nINT. OFFICE - DAY\n\n${longLines.join('\n\n')}`;
+      const res = await runR428(f428b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_FINALE_BLOAT'), 'ACTION_FINALE_BLOAT should fire');
+    });
+
+    it('ACTION_FINALE_BLOAT does NOT fire when action line density is uniform throughout', async () => {
+      // 16 lines of uniform length (~6 words each) in one scene
+      const uniformLines = Array.from({ length: 16 }, () => 'She opens the door and steps.');
+      const f428bNF = `INT. ROOM - DAY\n\n${uniformLines.join('\n\n')}`;
+      const res = await runR428(f428bNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_FINALE_BLOAT'), 'ACTION_FINALE_BLOAT should not fire');
+    });
+
+    it('LONGEST_ACTION_OUTLIER fires when the single longest line is ≥25 words and ≥4× average', async () => {
+      // 7 short lines (2 words) + 1 line of 35 words → avg=(7×2+35)/8=6.125; 35≥4×6.125=24.5 and ≥25 → fires
+      const shortOnes = ['Line one.', 'Line two.', 'Line three.', 'Line four.', 'Line five.', 'Line six.', 'Line seven.'];
+      const longOne = 'She steps into the room and crosses to the window where the light falls grey and thin across the floor spreading slowly toward the chairs that nobody sits in anymore.';
+      const f428c = `INT. ROOM - DAY\n\n${[...shortOnes, longOne].join('\n\n')}`;
+      const res = await runR428(f428c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'LONGEST_ACTION_OUTLIER'), 'LONGEST_ACTION_OUTLIER should fire');
+    });
+
+    it('LONGEST_ACTION_OUTLIER does NOT fire when all action lines are proportionally sized', async () => {
+      // 8 lines all ~8 words → max=8, avg≈8; 8 < 25 and 8 < 4×8=32 → no fire
+      const evenLines = Array.from({ length: 8 }, () => 'She opens the door and steps inside.');
+      const f428cNF = `INT. ROOM - DAY\n\n${evenLines.join('\n\n')}`;
+      const res = await runR428(f428cNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'LONGEST_ACTION_OUTLIER'), 'LONGEST_ACTION_OUTLIER should not fire');
+    });
+  });
+
   describe('Wave 414 — rhythmPass: vague-quantifier overload, atmosphere-abstraction overload, color-description overload', async () => {
     const runR414 = async (fountain: string) => {
       const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');

@@ -59,6 +59,14 @@
 // "tension", "silence", "an air of menace" — telling the feeling instead of showing the image
 // that produces it), color-description overload (>30% of action lines carry a color word — an
 // over-saturated palette crowding the DP's domain; the upper-end complement of COLOR_ABSENCE).
+// Wave 428 additions: consecutive opener run (run-based — 5+ consecutive action lines all begin
+// with the same first word, a local metronomic tic; distinct from all the global %-threshold
+// opener checks which audit proportion across the whole script), action finale bloat (zone/
+// distribution — last 25% of action lines averages >1.4× the word count of the first 75%;
+// prose density grows toward the climax instead of tightening as pace should accelerate),
+// longest action outlier (single-peak isolation — the single longest action line is ≥25 words
+// AND ≥4× the average word count; one gargantuan line dominates, distinct from LONG_LINE_FLOOD
+// which audits a global proportion rather than isolating the single outlier).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1480,6 +1488,110 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${colorCount414} of ${actionLines.length} action lines (${Math.round(colorCount414 / actionLines.length * 100)}%) name a color — an over-saturated palette where nearly every line specifies a hue. Color is one of the cinematographer's primary expressive tools, and a screenplay that colors in every frame does the DP's job while crowding the dramatic action with palette notes the page does not need. A few deliberate color cues land with force; a constant stream reads as a writer art-directing every shot.`,
         suggestedFix: 'Reserve color for the cues that carry meaning — the red dress in a grey room, the one warm light in a cold frame — and let most action describe what happens, not its exact hue. Color used sparingly directs the eye to what matters; color in every line flattens into wallpaper and buries the beats that should pop.',
+      });
+    }
+  }
+
+  // ── Wave 428: CONSECUTIVE_OPENER_RUN, ACTION_FINALE_BLOAT, LONGEST_ACTION_OUTLIER ──
+
+  // CONSECUTIVE_OPENER_RUN (run-based, ≥8 action lines): Five or more consecutive action lines
+  // all begin with the same first word (case-insensitive). A local repetition tic where the
+  // writer locks onto one opening word for an entire paragraph — "She does. She does. She does.
+  // She does. She does." — producing a metronomic cadence that reads as inattention rather than
+  // rhythm. Even when the GLOBAL proportion of that opener is within normal range (so none of the
+  // %-threshold checks fire), a local run of five or more identical openers creates a pounding
+  // monotone that flattens the individual beats into a list.
+  // Distinctness: PRONOUN_OPENER_DOMINANCE (>45% globally start with a pronoun), ARTICLE_OPENER_
+  // DOMINANCE (>40% globally start with The/A/An), PREPOSITIONAL_OPENING_DOMINANCE (>35%), and
+  // TEMPORAL_OPENER_OVERUSE (>25%) are all global proportion checks on specific categories; this
+  // is the only run-based check on opener patterns, catching LOCAL clustering regardless of
+  // category and regardless of the global proportion.
+  if (actionLines.length >= 8) {
+    const firstWord428a = (text: string) => (text.trim().split(/\s+/)[0] ?? '').toLowerCase();
+    let runLen428a = 1;
+    let runWord428a = firstWord428a(actionLines[0].text);
+    let runStart428a = 0;
+    let bestRun428a = { word: runWord428a, start: 0, len: 1 };
+    for (let i = 1; i < actionLines.length; i++) {
+      const fw428a = firstWord428a(actionLines[i].text);
+      if (fw428a === runWord428a) {
+        runLen428a++;
+        if (runLen428a > bestRun428a.len) bestRun428a = { word: runWord428a, start: runStart428a, len: runLen428a };
+      } else {
+        runLen428a = 1;
+        runWord428a = fw428a;
+        runStart428a = i;
+      }
+    }
+    if (bestRun428a.len >= 5) {
+      issues.push({
+        location: `Action lines ${bestRun428a.start + 1}–${bestRun428a.start + bestRun428a.len} (opener: "${bestRun428a.word}")`,
+        rule: 'CONSECUTIVE_OPENER_RUN',
+        severity: 'minor',
+        description: `${bestRun428a.len} consecutive action lines in a row all begin with "${bestRun428a.word}" — a local repetition tic that reduces the prose to a metronomic list. Even when the global proportion of that opener is unremarkable, a run of five or more identical first words creates a pounding cadence that flattens individual beats into a monotone sequence.`,
+        suggestedFix: `Break the opener run: vary the sentence construction across these ${bestRun428a.len} lines. Start one with an object ("The door—"), one with a clause ("When she finally—"), one with a verb ("Slams the—"). Varying how sentences open is the single fastest way to restore prose rhythm to a paragraph that has locked into a tic.`,
+      });
+    }
+  }
+
+  // ACTION_FINALE_BLOAT (zone/distribution, ≥10 action lines, ≥3 in last zone): The last 25%
+  // of the fountain's action lines (by position in the script) average more than 1.4× the word
+  // count of the first 75%. The prose grows denser toward the climax instead of tightening —
+  // the opposite of the rhythmic principle that action description should accelerate as stakes
+  // rise and cutting quickens. A script that gets MORE expansive in its action lines as it
+  // approaches the finale reads as though the writer slowed down to describe the ending in
+  // theatrical detail rather than cutting the image to its essential flash.
+  // Distinctness: LONG_LINE_FLOOD (>60% of all action lines globally are ≥12 words) audits a
+  // global proportion regardless of position in the script. ACTION_FINALE_BLOAT audits the
+  // SPATIAL DISTRIBUTION of word density — only the zone contrast between first 75% and last
+  // 25% — which can fire even when LONG_LINE_FLOOD stays quiet (e.g., 40% of lines are long
+  // but concentrated in the finale). No other check compares action line word-count by zone.
+  if (actionLines.length >= 10) {
+    const totalFountainLines428b = fountain.split('\n').length;
+    const zoneThreshold428b = totalFountainLines428b * 0.75;
+    const firstZone428b = actionLines.filter(l => l.lineNum <= zoneThreshold428b);
+    const lastZone428b = actionLines.filter(l => l.lineNum > zoneThreshold428b);
+    if (firstZone428b.length >= 3 && lastZone428b.length >= 3) {
+      const wc428b = (l: { text: string }) => l.text.split(/\s+/).filter(Boolean).length;
+      const firstAvg428b = firstZone428b.reduce((s, l) => s + wc428b(l), 0) / firstZone428b.length;
+      const lastAvg428b = lastZone428b.reduce((s, l) => s + wc428b(l), 0) / lastZone428b.length;
+      if (firstAvg428b > 0 && lastAvg428b > firstAvg428b * 1.4) {
+        issues.push({
+          location: 'Action lines — finale density (last 25% of script)',
+          rule: 'ACTION_FINALE_BLOAT',
+          severity: 'minor',
+          description: `Action lines in the last 25% of the script average ${lastAvg428b.toFixed(1)} words, compared to ${firstAvg428b.toFixed(1)} in the first 75% — the prose grows ${Math.round(lastAvg428b / firstAvg428b * 100 - 100)}% denser toward the climax. Rhythm works against the story here: as stakes rise and cutting should quicken, the action description expands. The finale reads in theatrical slow-motion where it should flash.`,
+          suggestedFix: 'Trim the late-script action lines to their essential image: one verb, one object, one consequence — nothing more. The most urgent moments in the story deserve the leanest prose. Reserve expansive description for the opening and Act 2 texture; let the finale move.',
+        });
+      }
+    }
+  }
+
+  // LONGEST_ACTION_OUTLIER (single-peak isolation, ≥8 action lines): The single longest action
+  // line (by word count) is at least 25 words AND at least 4× the average action line word
+  // count. One gargantuan line dominates the script's prose — likely a dense exposition dump,
+  // an elaborate blocking note, or a stage direction that has sprawled into a paragraph. Unlike
+  // the camera-direction and set-dressing checks (which audit domains), this catches any
+  // over-long line regardless of content: whatever is in it, no single action line should be
+  // 4× the typical one. The outlier is usually a case of a writer putting several beats,
+  // multiple description layers, or explanatory commentary all into one block rather than
+  // cutting it into discrete, screenable images.
+  // Distinctness: LONG_LINE_FLOOD fires when >60% of all lines globally are ≥12 words — a
+  // proportion check that stays quiet if only ONE line is catastrophically over-long. This
+  // fires only when ONE specific line is 4× average AND ≥25 words — a single-peak outlier
+  // check that is complementary and orthogonal to the flood check.
+  if (actionLines.length >= 8) {
+    const wcs428c = actionLines.map(l => l.text.split(/\s+/).filter(Boolean).length);
+    const avgWc428c = wcs428c.reduce((s, w) => s + w, 0) / wcs428c.length;
+    const maxWc428c = Math.max(...wcs428c);
+    if (maxWc428c >= 25 && avgWc428c > 0 && maxWc428c >= avgWc428c * 4) {
+      const peakIdx428c = wcs428c.indexOf(maxWc428c);
+      issues.push({
+        location: `Action line ${actionLines[peakIdx428c].lineNum} (${maxWc428c} words)`,
+        rule: 'LONGEST_ACTION_OUTLIER',
+        severity: 'minor',
+        description: `The longest action line in the script runs ${maxWc428c} words — ${(maxWc428c / avgWc428c).toFixed(1)}× the average of ${avgWc428c.toFixed(1)} words per line. One action line has sprawled into a paragraph while the rest of the script is written in compact beats. This outlier is typically a case of multiple images, blocking notes, and commentary all collapsed into one block rather than cut into discrete screenable moments.`,
+        suggestedFix: 'Break this line into three or four shorter beats, each on its own line with a blank between: identify the distinct images inside it (the object, the action, the consequence) and render each as its own action line. A 25+ word action line is almost never a single screenable moment — it is at least two, and cutting it gives each image the space to land.',
       });
     }
   }
