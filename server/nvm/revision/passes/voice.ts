@@ -50,6 +50,12 @@
 // of dialogue lines are commands — characters default to directing behavior rather than
 // expressing feeling), action motion verb monotone (>50% of action lines use generic
 // displacement verbs — script describes choreography rather than dramatic action).
+// Wave 417 additions: action line length uniformity (action-line word counts cluster so
+// tightly — coefficient of variation < 0.30 — that the prose has a flat, metronomic cadence
+// with no rhythmic texture; distribution/variance mode), dialogue monosyllabic flood (>35% of
+// dialogue lines are ≤2 words — speech never develops past terse fragments; underweight/brevity
+// mode), dialogue negation flood (>40% of dialogue lines carry a negation — characters defined
+// by refusal and denial rather than desire and assertion; valence mode).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1941,6 +1947,111 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         description: `${motionCount403c} of ${actionOnlyLines.length} action lines (${Math.round(motionCount403c / actionOnlyLines.length * 100)}%) use a generic motion or displacement verb ("walks", "enters", "moves", "crosses", "turns", "heads"). When displacement verbs dominate the action, the script describes choreography — who moved where — rather than what characters are doing in any dramatically meaningful sense. Action prose reduced to traffic management under-describes the physical world and the psychological stakes behind movement.`,
         suggestedFix: 'Replace generic motion verbs with specific verbs that carry attitude and intent: "walks toward" → "advances", "strides", "creeps"; "enters" → "bursts in", "slips in", "crashes through." Movement is always motivated — the verb should carry that motivation. When a character walks, how and why they walk is the character.',
       });
+    }
+  }
+
+  // ── Wave 417: ACTION_LINE_LENGTH_UNIFORMITY, DIALOGUE_MONOSYLLABIC_FLOOD, DIALOGUE_NEGATION_FLOOD ──
+
+  // ACTION_LINE_LENGTH_UNIFORMITY (minor, ≥12 action lines, mean ≥6 words, CV < 0.30):
+  // The word counts of the action lines cluster so tightly around their mean — coefficient
+  // of variation (stddev / mean) below 0.30 — that the prose has a flat, metronomic cadence.
+  // Screen action lives on rhythmic contrast: a long descriptive build resolved by a curt
+  // two-word punch ("She runs. Glass everywhere. The room empties. Silence."). When every
+  // action line is the same length, the prose loses its visual music and reads like a list of
+  // equally weighted facts; the eye and ear find no emphasis. The mean ≥6 guard restricts this
+  // to substantive prose (a script of pure fragments is a different defect). This is a pure
+  // distribution/variance measure over the whole action corpus. Distinct from
+  // FRAGMENT_RHYTHM_ABSENCE (Wave 224 — fires on the *absence* of short ≤4-word fragments,
+  // i.e. an absolute floor) and DIALOGUE_LENGTH_UNIFORMITY (Wave 308 — dialogue, tight band):
+  // this fires on low *relative spread* of action-line lengths regardless of their absolute size,
+  // catching prose where every line is, say, a uniform 12 words.
+  if (actionOnlyLines.length >= 12) {
+    const wordCounts417a = actionOnlyLines.map(l => l.split(/\s+/).filter(Boolean).length);
+    const mean417a = wordCounts417a.reduce((s, v) => s + v, 0) / wordCounts417a.length;
+    if (mean417a >= 6) {
+      const variance417a = wordCounts417a.reduce((s, v) => s + (v - mean417a) ** 2, 0) / wordCounts417a.length;
+      const cv417a = Math.sqrt(variance417a) / mean417a;
+      if (cv417a < 0.30) {
+        issues.push({
+          location: 'Action line prose',
+          rule: 'ACTION_LINE_LENGTH_UNIFORMITY',
+          severity: 'minor',
+          description: `Across ${actionOnlyLines.length} action lines, the word counts cluster tightly around a mean of ${mean417a.toFixed(1)} words (coefficient of variation ${cv417a.toFixed(2)}, below the 0.30 rhythm threshold) — every action line is nearly the same length. Screen action lives on rhythmic contrast: a long descriptive build resolved by a curt punch. When all lines are equal length, the prose reads as a flat list of equally weighted facts and the eye finds no emphasis or pace.`,
+          suggestedFix: 'Vary action-line length deliberately. Let a long, detailed line set up a moment and a two- or three-word fragment land the beat: "She crosses the dark hall, one hand trailing the wall, breath held against the silence. Then — a sound." Contrast in length creates the staccato-and-legato rhythm that makes action prose cinematic rather than uniform.',
+        });
+      }
+    }
+  }
+
+  // DIALOGUE_MONOSYLLABIC_FLOOD (minor, ≥12 dialogue lines, >35% are ≤2 words): More than
+  // 35% of dialogue lines are two words or fewer ("Yes." / "No way." / "Why?" / "Stop it.").
+  // Dialogue that never develops past terse fragments gives characters no room to reveal
+  // interiority, rhetoric, or relation — every exchange is a clipped transaction. A scene of
+  // pure monosyllables can be a powerful choice for tension, but as a pervasive default it
+  // signals dialogue that withholds the texture of how a character actually thinks and speaks.
+  // Underweight/brevity mode on the dialogue channel. Distinct from DIALOGUE_LENGTH_UNIFORMITY
+  // (Wave 308 — fires when lines cluster in a tight band at *any* size, including uniformly
+  // long): this fires specifically on a brevity floor — a large share of lines being barely
+  // verbal — and is the brevity counterpart to the action-side length checks.
+  {
+    const dlg417b: string[] = [];
+    let inDlg417b = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg417b = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg417b = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg417b = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg417b) dlg417b.push(t);
+    }
+    if (dlg417b.length >= 12) {
+      const monoCount417b = dlg417b.filter(l => l.split(/\s+/).filter(Boolean).length <= 2).length;
+      if (monoCount417b / dlg417b.length > 0.35) {
+        issues.push({
+          location: 'Dialogue throughout',
+          rule: 'DIALOGUE_MONOSYLLABIC_FLOOD',
+          severity: 'minor',
+          description: `${monoCount417b} of ${dlg417b.length} dialogue lines (${Math.round(monoCount417b / dlg417b.length * 100)}%) are two words or fewer ("Yes." / "No way." / "Why?"). Dialogue that never develops past terse fragments gives characters no room to reveal interiority, rhetoric, or relation — every exchange becomes a clipped transaction. Sustained monosyllabic speech withholds the texture of how a character actually thinks, deflects, persuades, or breaks down.`,
+          suggestedFix: 'Let at least some exchanges breathe past the one-word reflex. A clipped line lands hardest when it interrupts developed speech — reserve "No." for the moment it means something, and elsewhere let characters argue, evade, or confess in full sentences. The contrast between terse and expansive is where dialogue rhythm and character voice emerge.',
+        });
+      }
+    }
+  }
+
+  // DIALOGUE_NEGATION_FLOOD (minor, ≥12 dialogue lines, >40% carry a negation): More than
+  // 40% of dialogue lines contain a negation construction ("not", "no", "never", "nothing",
+  // "nobody", a contracted "-n't", etc.). Characters whose speech is dominated by negation are
+  // defined by what they refuse, deny, or lack rather than by what they want, assert, or
+  // pursue. A script saturated with denial reads as relentlessly defensive — every line pushes
+  // away rather than reaches toward, and the cumulative effect is airless and reactive.
+  // Valence mode on the dialogue channel — the only rule that audits the semantic polarity of
+  // speech rather than its punctuation (EXCLAMATION_OVERUSE / DIALOGUE_INTERROGATIVE_*),
+  // grammatical mood (DIALOGUE_IMPERATIVE_FLOOD), opener token (conjunction / conditional /
+  // wh-question openers), or register (DIALOGUE_PASSIVE_FLOOD). A character can negate in any
+  // mood — a question, a command, a declaration — so this cuts orthogonally across them all.
+  {
+    const dlg417c: string[] = [];
+    let inDlg417c = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg417c = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg417c = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg417c = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg417c) dlg417c.push(t);
+    }
+    if (dlg417c.length >= 12) {
+      const negationRe417c = /\b(no|not|never|nothing|none|nobody|nowhere|neither|nor)\b|n['']t\b/i;
+      const negCount417c = dlg417c.filter(l => negationRe417c.test(l)).length;
+      if (negCount417c / dlg417c.length > 0.40) {
+        issues.push({
+          location: 'Dialogue throughout',
+          rule: 'DIALOGUE_NEGATION_FLOOD',
+          severity: 'minor',
+          description: `${negCount417c} of ${dlg417c.length} dialogue lines (${Math.round(negCount417c / dlg417c.length * 100)}%) are built on negation ("not", "no", "never", "nothing", "can't", "won't"). Characters whose speech is dominated by negation are defined by what they refuse, deny, or lack rather than by what they want or pursue. Relentless denial reads as defensive and reactive — every line pushes away rather than reaches toward, and the scene loses the forward pull of active desire.`,
+          suggestedFix: 'Recast some negations as the positive want underneath them: "I don\'t want to be here" carries less than "I want to be anywhere but here," and "It\'s not your fault" lands harder as "You did everything you could." Negation has power as a sharp exception, not as the default grammar of every line. Let characters assert and pursue, so the refusals stand out when they come.',
+        });
+      }
     }
   }
 

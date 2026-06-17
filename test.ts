@@ -25336,6 +25336,140 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 417 — voicePass: action line length uniformity, dialogue monosyllabic flood, dialogue negation flood', async () => {
+    const runV417 = async (fountain: string) => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      return voicePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ACTION_LINE_LENGTH_UNIFORMITY fires when every action line is the same length (low CV)', async () => {
+      // 12 action lines, each exactly 9 words → CV = 0 < 0.30, mean = 9 ≥ 6 → fires
+      const lines417a = [
+        'A cold wind moves across the empty parking lot.',
+        'The lights flicker once and then settle into place.',
+        'Rain streaks the glass in long diagonal grey lines.',
+        'A clock ticks somewhere behind the far office wall.',
+        'Dust hangs in the slanted light near the door.',
+        'Papers cover the desk in a chaotic loose pile.',
+        'A phone buzzes against the wood and goes quiet.',
+        'Shadows stretch long across the cracked tile kitchen floor.',
+        'Steam rises slowly from a mug on the counter.',
+        'A door swings shut at the far hallway end.',
+        'Snow gathers on the sill outside the bedroom window.',
+        'A faint hum comes from the old refrigerator unit.',
+      ];
+      const fountain417a = `INT. OFFICE - DAY\n\n${lines417a.join('\n\n')}\n`;
+      const res = await runV417(fountain417a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_LINE_LENGTH_UNIFORMITY'), 'ACTION_LINE_LENGTH_UNIFORMITY should fire');
+    });
+
+    it('ACTION_LINE_LENGTH_UNIFORMITY does NOT fire when action line lengths vary widely (high CV)', async () => {
+      // 6 lines of 3 words + 6 lines of 15 words → mean 9, stddev 6, CV 0.67 ≥ 0.30 → no fire
+      const lines417aNF = [
+        'Thunder cracks overhead.',
+        'The old detective limps slowly across the flooded warehouse floor toward the broken steel door.',
+        'Glass shatters somewhere.',
+        'A young woman crouches behind the rusted crates and watches the men move through shadows.',
+        'Footsteps echo close.',
+        'The guard sweeps his flashlight beam across the cavernous space and finds nothing but dust.',
+        'Smoke fills everything.',
+        'She pulls the heavy tarp aside to reveal a stack of unmarked wooden shipping crates.',
+        'A whistle blows.',
+        'A truck engine rumbles to life outside and headlights sweep through the high dirty windows.',
+        'Lights flicker twice.',
+        'He freezes mid-step as a low voice drifts from somewhere deep within the dark interior.',
+      ];
+      const fountain417aNF = `INT. WAREHOUSE - NIGHT\n\n${lines417aNF.join('\n\n')}\n`;
+      const res = await runV417(fountain417aNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_LINE_LENGTH_UNIFORMITY'), 'ACTION_LINE_LENGTH_UNIFORMITY should not fire');
+    });
+
+    it('DIALOGUE_MONOSYLLABIC_FLOOD fires when >35% of dialogue lines are two words or fewer', async () => {
+      // 7 of 12 lines ≤2 words → 58% > 35% → fires
+      const lines417b = [
+        'Yes.', 'No.', 'Why?', 'Stop.', 'Maybe.', 'Go.', 'Now.',
+        'I don\'t think that\'s true.',
+        'We should leave before dark.',
+        'She never came back home.',
+        'Tell me what you saw.',
+        'Nothing about this feels right.',
+      ];
+      const chr417b = 'INTERROGATOR';
+      const dlg417b = lines417b.map(l => `${chr417b}\n${l}`).join('\n\n');
+      const fountain417b = `INT. CELL - DAY\n\n${dlg417b}\n`;
+      const res = await runV417(fountain417b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_MONOSYLLABIC_FLOOD'), 'DIALOGUE_MONOSYLLABIC_FLOOD should fire');
+    });
+
+    it('DIALOGUE_MONOSYLLABIC_FLOOD does NOT fire when dialogue develops into full sentences', async () => {
+      // 2 of 12 lines ≤2 words → 17% ≤ 35% → no fire
+      const lines417bNF = [
+        'Yes.', 'No.',
+        'I keep thinking about what you told me last night.',
+        'She walked out before either of us could explain.',
+        'There has to be a reason he kept it hidden.',
+        'We met at the harbor when the tide was low.',
+        'I want to understand why everything fell apart so fast.',
+        'He smiled like he already knew how it would end.',
+        'The letter said more than she ever said aloud.',
+        'Tell me everything you remember about that summer.',
+        'We should have stayed when we still had the chance.',
+        'I painted the whole fence before the rain came.',
+      ];
+      const chr417bNF = 'NARRATOR';
+      const dlg417bNF = lines417bNF.map(l => `${chr417bNF}\n${l}`).join('\n\n');
+      const fountain417bNF = `INT. PORCH - DUSK\n\n${dlg417bNF}\n`;
+      const res = await runV417(fountain417bNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_MONOSYLLABIC_FLOOD'), 'DIALOGUE_MONOSYLLABIC_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_NEGATION_FLOOD fires when >40% of dialogue lines carry a negation', async () => {
+      // 8 of 12 lines negated → 67% > 40% → fires
+      const lines417c = [
+        'I can\'t do this anymore.',
+        'There\'s nothing left to say.',
+        'No one ever listens to me.',
+        'I won\'t go back there.',
+        'She never told me the truth.',
+        'It doesn\'t matter now.',
+        'Nobody knows what happened.',
+        'I don\'t believe you.',
+        'Maybe we should try again.',
+        'I saw the whole thing.',
+        'Tell me everything you remember.',
+        'She left at dawn.',
+      ];
+      const chr417c = 'WIDOW';
+      const dlg417c = lines417c.map(l => `${chr417c}\n${l}`).join('\n\n');
+      const fountain417c = `INT. KITCHEN - NIGHT\n\n${dlg417c}\n`;
+      const res = await runV417(fountain417c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_NEGATION_FLOOD'), 'DIALOGUE_NEGATION_FLOOD should fire');
+    });
+
+    it('DIALOGUE_NEGATION_FLOOD does NOT fire when dialogue is mostly assertive', async () => {
+      // 3 of 12 lines negated → 25% ≤ 40% → no fire
+      const lines417cNF = [
+        'I can\'t stay long.',
+        'Nothing surprises me anymore.',
+        'She never wrote back.',
+        'We met by the river yesterday.',
+        'I want to understand this.',
+        'Tell me about your sister.',
+        'The house felt warm inside.',
+        'He smiled when he saw me.',
+        'Let\'s walk to the harbor.',
+        'I remember that summer well.',
+        'She painted the whole fence blue.',
+        'Everyone gathered in the yard.',
+      ];
+      const chr417cNF = 'FRIEND';
+      const dlg417cNF = lines417cNF.map(l => `${chr417cNF}\n${l}`).join('\n\n');
+      const fountain417cNF = `INT. GARDEN - DAY\n\n${dlg417cNF}\n`;
+      const res = await runV417(fountain417cNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_NEGATION_FLOOD'), 'DIALOGUE_NEGATION_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 403 — voicePass: dialogue passive flood, dialogue imperative flood, action motion verb monotone', async () => {
     const runV403 = async (fountain: string) => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
