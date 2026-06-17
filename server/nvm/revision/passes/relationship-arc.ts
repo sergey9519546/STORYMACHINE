@@ -60,6 +60,13 @@
 // scenes that also carry a bond shift are all emotionally neutral — disclosures crack bonds
 // without the scene feeling anything; distinct from revelation silent which fires when no
 // revelation+shift overlap exists at all).
+// Wave 413 additions: pair clock flat (a pair with ≥3 shifts, none of which land in a clock-
+// raised scene though clocks exist — the per-pair clock cell, complement of relationship clock
+// decoupled), pair dramatic-turn flat (a pair with ≥3 shifts, none coinciding with a dramatic
+// turn though turns exist — the per-pair turn cell, complement of relationship dramatic turn
+// decoupled), pair revelation flat (a pair with ≥3 shifts, none coinciding with a revelation
+// though revelations exist — the per-pair revelation cell, complement of relationship revelation
+// silent). These complete the per-pair channel set alongside pair suspense/curiosity/emotion flat.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1691,6 +1698,97 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
             suggestedFix: 'Let revelation+bond-shift scenes carry emotional weight: a disclosure that warms a bond should also bring relief, joy, or cautious hope; one that ruptures should bring shock, grief, or fury. The emotional register is the scene telling the audience how much this moment costs.',
           });
         }
+      }
+    }
+  }
+
+  // PAIR_CLOCK_FLAT (minor, n≥8, pair with ≥3 shifts, ≥1 clock scene): A single pair
+  // accumulates 3+ shifts, but not one of them lands in a clock-raised scene, even though the
+  // story raises clocks elsewhere. This bond never moves under deadline pressure — its changes
+  // all happen in untimed moments, so the urgency engine and this relationship's arc never
+  // intersect. The per-pair complement of RELATIONSHIP_CLOCK_DECOUPLED (which fires when NO
+  // shift of ANY pair lands in a clock scene — this fires when ONE pair's shifts are all
+  // clock-free even though another pair's shift may coincide with a clock). Distinct from
+  // PAIR_SUSPENSE_FLAT (suspenseDelta channel) and PAIR_EMOTION_FLAT (emotion channel).
+  if (records.length >= 8) {
+    const clockScenes413a = new Set<number>((records as any[]).filter(r => r.clockRaised === true).map(r => r.sceneIdx));
+    if (clockScenes413a.size >= 1) {
+      const flatClockPairs413a: string[] = [];
+      for (const [pairKey413a, stats413a] of pairStats) {
+        if (stats413a.shifts.length >= 3 &&
+            stats413a.shifts.every(s => !clockScenes413a.has(s.sceneIdx))) {
+          flatClockPairs413a.push(pairKey413a);
+        }
+      }
+      if (flatClockPairs413a.length > 0) {
+        issues.push({
+          location: `Pair(s) ${flatClockPairs413a.join(', ')} — clock-decoupled shifts`,
+          rule: 'PAIR_CLOCK_FLAT',
+          severity: 'minor',
+          description: `${flatClockPairs413a.length === 1 ? 'One pair' : `${flatClockPairs413a.length} pairs`} (${flatClockPairs413a.join('; ')}) move${flatClockPairs413a.length === 1 ? 's' : ''} 3 or more times, yet not one of those shifts lands in a clock-raised scene, even though the story raises deadlines elsewhere. This bond never changes under time pressure — its movements all happen in untimed moments, so the urgency engine and this relationship's arc never intersect and the bond's changes feel disconnected from the story's ticking stakes.`,
+          suggestedFix: 'Let this bond shift while a clock is running: a relationship that cracks or strengthens as a deadline bears down acquires the pressure of the moment — the audience feels the change matters more because there is no time to undo it. Move at least one of this pair\'s shifts into a scene where the clock is already ticking.',
+        });
+      }
+    }
+  }
+
+  // PAIR_DRAMATIC_TURN_FLAT (minor, n≥8, pair with ≥3 shifts, ≥1 dramatic-turn scene): A single
+  // pair accumulates 3+ shifts, but not one of them coincides with a dramatic turn, even though
+  // the story has turns elsewhere. This bond's movements never pivot the plot — the relationship
+  // changes, but those changes are never the hinge the story turns on. The per-pair complement of
+  // RELATIONSHIP_DRAMATIC_TURN_DECOUPLED (which fires when NO shift of ANY pair coincides with a
+  // turn — this fires when ONE pair's shifts are all turn-free even though another pair's shift
+  // may coincide with a turn). Distinct from PAIR_CLOCK_FLAT (clock channel) and PAIR_SUSPENSE_
+  // FLAT (suspense channel).
+  if (records.length >= 8) {
+    const turnScenes413b = new Set<number>((records as any[]).filter(r => (r.dramaticTurn ?? 'nothing') !== 'nothing').map(r => r.sceneIdx));
+    if (turnScenes413b.size >= 1) {
+      const flatTurnPairs413b: string[] = [];
+      for (const [pairKey413b, stats413b] of pairStats) {
+        if (stats413b.shifts.length >= 3 &&
+            stats413b.shifts.every(s => !turnScenes413b.has(s.sceneIdx))) {
+          flatTurnPairs413b.push(pairKey413b);
+        }
+      }
+      if (flatTurnPairs413b.length > 0) {
+        issues.push({
+          location: `Pair(s) ${flatTurnPairs413b.join(', ')} — dramatic-turn-decoupled shifts`,
+          rule: 'PAIR_DRAMATIC_TURN_FLAT',
+          severity: 'minor',
+          description: `${flatTurnPairs413b.length === 1 ? 'One pair' : `${flatTurnPairs413b.length} pairs`} (${flatTurnPairs413b.join('; ')}) move${flatTurnPairs413b.length === 1 ? 's' : ''} 3 or more times, yet not one of those shifts coincides with a dramatic turn, even though the story pivots elsewhere. This bond's changes never turn the plot — the relationship moves, but its movement is never the hinge the story swings on, so the audience reads these shifts as side-developments rather than as the engine of the narrative.`,
+          suggestedFix: 'Make at least one of this pair\'s shifts a story pivot: the betrayal that redirects the plot, the alliance that opens a new front, the reconciliation that changes what is possible. When a relationship\'s change IS the turn, the bond stops being decoration and becomes the mechanism by which the story advances.',
+        });
+      }
+    }
+  }
+
+  // PAIR_REVELATION_FLAT (minor, n≥8, pair with ≥3 shifts, ≥1 revelation scene): A single pair
+  // accumulates 3+ shifts, but not one of them coincides with a revelation, even though the story
+  // discloses truths elsewhere. This bond never moves on the back of a disclosure — its changes
+  // are never driven by something coming to light, so the relationship and the story's truths
+  // evolve on separate tracks. The per-pair complement of RELATIONSHIP_REVELATION_SILENT (which
+  // fires when NO shift of ANY pair coincides with a revelation — this fires when ONE pair's
+  // shifts are all revelation-free even though another pair's shift may coincide with one).
+  // Distinct from RELATIONSHIP_REVELATION_EMOTION_DECOUPLED (revelation+shift scenes that exist
+  // but are emotionally flat) and the other per-pair channel-flat checks.
+  if (records.length >= 8) {
+    const revScenes413c = new Set<number>((records as any[]).filter(r => r.revelation === true).map(r => r.sceneIdx));
+    if (revScenes413c.size >= 1) {
+      const flatRevPairs413c: string[] = [];
+      for (const [pairKey413c, stats413c] of pairStats) {
+        if (stats413c.shifts.length >= 3 &&
+            stats413c.shifts.every(s => !revScenes413c.has(s.sceneIdx))) {
+          flatRevPairs413c.push(pairKey413c);
+        }
+      }
+      if (flatRevPairs413c.length > 0) {
+        issues.push({
+          location: `Pair(s) ${flatRevPairs413c.join(', ')} — revelation-decoupled shifts`,
+          rule: 'PAIR_REVELATION_FLAT',
+          severity: 'minor',
+          description: `${flatRevPairs413c.length === 1 ? 'One pair' : `${flatRevPairs413c.length} pairs`} (${flatRevPairs413c.join('; ')}) move${flatRevPairs413c.length === 1 ? 's' : ''} 3 or more times, yet not one of those shifts coincides with a revelation, even though the story discloses truths elsewhere. This bond never changes on the back of something coming to light — the relationship and the story's truths evolve on separate tracks, so the audience never experiences the charged moment where a disclosure and a bond shift land together.`,
+          suggestedFix: 'Tie at least one of this pair\'s shifts to a revelation: a secret that surfaces and reshapes how the two regard each other, a truth that breaks or cements their bond in the moment it lands. When a disclosure drives a relationship change, the revelation has interpersonal consequence and the shift has a cause the audience can feel.',
+        });
       }
     }
   }

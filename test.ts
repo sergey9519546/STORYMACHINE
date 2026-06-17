@@ -18976,6 +18976,77 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 413 — relationshipArcPass: pair clock flat, pair dramatic-turn flat, pair revelation flat', async () => {
+    const makeRec413 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const shift413 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
+    const runR413 = async (records: any[]) => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PAIR_CLOCK_FLAT fires when a pair shifts 3+ times all in clock-free scenes while a clock exists', async () => {
+      const recs413a = Array.from({ length: 8 }, (_, i) => makeRec413(i, {
+        relationshipShifts: [1, 3, 5].includes(i) ? shift413(-0.4) : [],
+        clockRaised: i === 7,
+      }));
+      const res = await runR413(recs413a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAIR_CLOCK_FLAT'), 'PAIR_CLOCK_FLAT should fire');
+    });
+
+    it('PAIR_CLOCK_FLAT does NOT fire when one of the pair\'s shift scenes raises a clock', async () => {
+      const recs413aNF = Array.from({ length: 8 }, (_, i) => makeRec413(i, {
+        relationshipShifts: [1, 3, 5].includes(i) ? shift413(-0.4) : [],
+        clockRaised: i === 3,
+      }));
+      const res = await runR413(recs413aNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAIR_CLOCK_FLAT'), 'PAIR_CLOCK_FLAT should not fire');
+    });
+
+    it('PAIR_DRAMATIC_TURN_FLAT fires when a pair shifts 3+ times none coinciding with a turn', async () => {
+      const recs413b = Array.from({ length: 8 }, (_, i) => makeRec413(i, {
+        relationshipShifts: [1, 3, 5].includes(i) ? shift413(-0.4) : [],
+        dramaticTurn: i === 7 ? 'reversal' : 'nothing',
+      }));
+      const res = await runR413(recs413b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAIR_DRAMATIC_TURN_FLAT'), 'PAIR_DRAMATIC_TURN_FLAT should fire');
+    });
+
+    it('PAIR_DRAMATIC_TURN_FLAT does NOT fire when one of the pair\'s shift scenes is a turn', async () => {
+      const recs413bNF = Array.from({ length: 8 }, (_, i) => makeRec413(i, {
+        relationshipShifts: [1, 3, 5].includes(i) ? shift413(-0.4) : [],
+        dramaticTurn: i === 3 ? 'reversal' : 'nothing',
+      }));
+      const res = await runR413(recs413bNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAIR_DRAMATIC_TURN_FLAT'), 'PAIR_DRAMATIC_TURN_FLAT should not fire');
+    });
+
+    it('PAIR_REVELATION_FLAT fires when a pair shifts 3+ times none coinciding with a revelation', async () => {
+      const recs413c = Array.from({ length: 8 }, (_, i) => makeRec413(i, {
+        relationshipShifts: [1, 3, 5].includes(i) ? shift413(-0.4) : [],
+        revelation: i === 7 ? true : null,
+      }));
+      const res = await runR413(recs413c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAIR_REVELATION_FLAT'), 'PAIR_REVELATION_FLAT should fire');
+    });
+
+    it('PAIR_REVELATION_FLAT does NOT fire when one of the pair\'s shift scenes is a revelation', async () => {
+      const recs413cNF = Array.from({ length: 8 }, (_, i) => makeRec413(i, {
+        relationshipShifts: [1, 3, 5].includes(i) ? shift413(-0.4) : [],
+        revelation: i === 3 ? true : null,
+      }));
+      const res = await runR413(recs413cNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAIR_REVELATION_FLAT'), 'PAIR_REVELATION_FLAT should not fire');
+    });
+  });
+
   describe('Wave 399 — relationshipArcPass: pair suspense flat, pair curiosity flat, revelation emotion decoupled', async () => {
     const makeRec399 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
