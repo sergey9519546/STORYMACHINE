@@ -47,6 +47,13 @@
 // proactive act is followed by a negative emotional shift in the next 2 scenes —
 // aftermath/sequence × emotional cost), seed backloaded (all seeded clues fall in the
 // second half — distribution mirror of INTENTION_SEED_GRAVEYARD).
+// Wave 409 additions: proactive payoff peak decoupled (the scene that resolves the most
+// setups is not proactive even though smaller payoffs coincide with initiative — single-peak
+// isolation × payoff magnitude, the payoff sibling of PROACTIVE_RELATIONSHIP_PEAK_ABSENT),
+// seed frontloaded (all seeded clues fall in the first half — the back half plants no new
+// threads, the distribution mirror of SEED_BACKLOADED), proactive suspense aftermath absent
+// (no proactive act is followed by a suspense spike in the next 2 scenes — initiative never
+// raises tension downstream, aftermath/sequence × suspense channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1665,6 +1672,96 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `All ${seedRecs395c.length} clue-seeding scenes fall in the second half (none in the first ${half395c} scenes) — the story plants no threads for the audience to carry through the opening and complication zones. Foreshadowing that arrives near the climax has no time to mature: an audience never taught to notice a detail cannot feel the satisfaction of seeing it return. Back-loaded seeds read as afterthoughts rather than architecture.`,
           suggestedFix: 'Plant at least one seed in the first half: a detail the audience notices and carries without yet understanding, a question opened in the setup that the second half finally answers. Early seeds are promises; the audience invests in the story by holding them. A first half with no seeds is a first half without promises to the audience.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 409: PROACTIVE_PAYOFF_PEAK_DECOUPLED, SEED_FRONTLOADED, PROACTIVE_SUSPENSE_AFTERMATH_ABSENT ──
+
+  // PROACTIVE_PAYOFF_PEAK_DECOUPLED (minor, n≥8, ≥2 proactive payoff scenes): The scene that
+  // resolves the most setups (the highest payoffSetupIds.length in the story) is not a proactive
+  // scene, even though smaller payoffs DO coincide with the protagonist's initiative. The
+  // single biggest narrative payoff — the moment the audience collects the largest return on its
+  // investment — lands without the protagonist's agency behind it: the story's most satisfying
+  // resolution happens to them rather than because of them. The payoff sibling of PROACTIVE_
+  // RELATIONSHIP_PEAK_ABSENT (relationship magnitude). Distinct from PROACTIVE_PAYOFF_COINCIDENCE_
+  // ABSENT (co-occurrence: NO proactive scene is a payoff — this fires even when some proactive
+  // scenes deliver payoffs, as long as the single biggest payoff is not among them) and
+  // PAYOFF_WITHOUT_EFFORT (payoff scenes not preceded by proactive effort — a backward-sequence
+  // check, not a single-peak isolation).
+  if (n >= 8) {
+    const proWithPayoff409 = (records as any[]).filter(r =>
+      isProactive258(r) && ((r.payoffSetupIds ?? []) as string[]).length > 0,
+    );
+    if (proWithPayoff409.length >= 2) {
+      const peakPayoffCount409 = Math.max(...(records as any[]).map(r => ((r.payoffSetupIds ?? []) as string[]).length));
+      const peakPayoffRec409 = (records as any[]).find(r => ((r.payoffSetupIds ?? []) as string[]).length === peakPayoffCount409);
+      if (peakPayoffRec409 && peakPayoffCount409 >= 1 && !isProactive258(peakPayoffRec409)) {
+        issues.push({
+          location: `Scene ${peakPayoffRec409.sceneIdx} — peak payoff (${peakPayoffCount409} setup(s) resolved)`,
+          rule: 'PROACTIVE_PAYOFF_PEAK_DECOUPLED',
+          severity: 'minor',
+          description: `The story's largest payoff (Scene ${peakPayoffRec409.sceneIdx}, ${peakPayoffCount409} setup(s) resolved) is not proactive — the single biggest narrative return lands without the protagonist's agency behind it. Though smaller payoffs coincide with the protagonist's initiative elsewhere, the most satisfying resolution in the story — where the audience collects the largest return on its investment — happens to them rather than because of them, so the climax of the seeding/payoff architecture is not something they earned.`,
+          suggestedFix: 'Route the story\'s biggest payoff through the protagonist\'s initiative: let the moment that resolves the most threads be the consequence of a choice they made — the plan that finally pays off, the lead they chased that delivers everything at once. The largest return on the audience\'s investment should be the protagonist\'s achievement, not a windfall the plot hands them.',
+        });
+      }
+    }
+  }
+
+  // SEED_FRONTLOADED (minor, n≥8, ≥3 seeded-clue scenes all in first half): All clue-seeding
+  // scenes fall in the first half — the back half plants no new threads. The story stops opening
+  // questions after the midpoint, so the audience heads into the complication and climax zones
+  // with nothing new to wonder about: every thread it is tracking was planted early and the late
+  // story only closes loops, never opens them. A back half that seeds nothing has no forward pull
+  // of its own — it lives entirely on promises made before the midpoint. The distribution mirror
+  // of SEED_BACKLOADED (all seeds in the second half). Distinct from INTENTION_SEED_GRAVEYARD
+  // (seeds in the first half with no payoffs in the second — a seed/payoff pairing failure; this
+  // is purely a timing-distribution check on where seeds fall) and SEEDING_CURIOSITY_FLAT
+  // (a quality check on seed scenes' curiosityDelta, not their placement).
+  if (n >= 8) {
+    const half409s = Math.floor(n * 0.5);
+    const seedRecs409 = (records as any[]).filter(r => ((r.seededClueIds ?? []) as string[]).length > 0);
+    if (seedRecs409.length >= 3) {
+      const secondHalfSeeds409 = seedRecs409.filter(r => (records as any[]).indexOf(r) >= half409s).length;
+      if (secondHalfSeeds409 === 0) {
+        issues.push({
+          location: `Clue seeds — all ${seedRecs409.length} in the front half (Scenes 0–${half409s - 1})`,
+          rule: 'SEED_FRONTLOADED',
+          severity: 'minor',
+          description: `All ${seedRecs409.length} clue-seeding scenes fall in the first half (none at or after Scene ${half409s}) — the back half plants no new threads. The story stops opening questions after the midpoint, so the audience enters the complication and climax zones with nothing new to wonder about: every thread it tracks was planted early, and the late story only closes loops rather than opening them. A back half that seeds nothing has no forward pull of its own.`,
+          suggestedFix: 'Plant at least one seed in the second half: a fresh question raised as the climax nears, a new detail that complicates what the audience thought it understood. Late seeds keep the back half generative — the story should still be opening doors even as it begins closing them, so the run-up to the climax carries its own momentum rather than only paying off early promises.',
+        });
+      }
+    }
+  }
+
+  // PROACTIVE_SUSPENSE_AFTERMATH_ABSENT (minor, n≥8, ≥3 proactive scenes): No proactive act is
+  // followed in the next 2 scenes by a suspense spike (suspenseDelta > 1) — the protagonist takes
+  // initiative but their action never raises the temperature in the scenes that follow. Agency
+  // that generates no downstream tension reads as inconsequential: the protagonist acts, and the
+  // story's danger level is unmoved by it, so initiative and suspense run on separate tracks.
+  // Distinct from PROACTIVE_SUSPENSE_DECOUPLED (the proactive scene's OWN average suspenseDelta
+  // ≤ 0 — same-scene, not downstream), PROACTIVE_SUSPENSE_PEAK_DECOUPLED (the global peak-suspense
+  // scene is not proactive — single-peak isolation), and PROACTIVE_REVELATION_ABSENT (the
+  // revelation channel of the same 2-scene aftermath window): this audits the suspense aftermath.
+  if (n >= 8) {
+    const proactiveIdxs409: number[] = [];
+    for (let i = 0; i < n; i++) {
+      if (isProactive258(records[i])) proactiveIdxs409.push(i);
+    }
+    if (proactiveIdxs409.length >= 3) {
+      const anyDownstreamSpike409 = proactiveIdxs409.some(idx => {
+        const window409 = (records as any[]).slice(idx + 1, idx + 3);
+        return window409.some(a => (a.suspenseDelta ?? 0) > 1);
+      });
+      if (!anyDownstreamSpike409) {
+        issues.push({
+          location: 'Proactive scenes — suspense aftermath absent',
+          rule: 'PROACTIVE_SUSPENSE_AFTERMATH_ABSENT',
+          severity: 'minor',
+          description: `None of the protagonist's ${proactiveIdxs409.length} proactive acts is followed by a suspense spike (suspenseDelta > 1) in the next two scenes — initiative never raises the temperature downstream. Agency that generates no following tension reads as inconsequential: the protagonist acts and the story's danger level is unmoved, so what they do and how dangerous the story feels run on separate tracks. The audience never learns to brace when the protagonist makes a move.`,
+          suggestedFix: 'Let at least one proactive act raise the stakes in its wake: the gambit that provokes a retaliation, the clue planted that draws the antagonist\'s attention, the deadline set that tightens the screws over the next scenes. When initiative reliably escalates danger, the audience leans forward every time the protagonist acts — because they have learned that the protagonist\'s moves have teeth.',
         });
       }
     }

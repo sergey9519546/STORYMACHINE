@@ -19417,6 +19417,71 @@ I always listen.
     });
   });
 
+  describe('Wave 409 — intentionPass: proactive payoff peak decoupled, seed frontloaded, proactive suspense aftermath absent', async () => {
+    const makeRec409 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN409 = async (records: any[]) => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      return intentionPass({ fountain: '', original: '', records, structure: { escalating: false, reversalCount: 0, actPosition: 'act2', reversalDensity: 0, avgSuspensePerScene: 0, openClues: 0, approachingClimax: false } as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PROACTIVE_PAYOFF_PEAK_DECOUPLED fires when the biggest payoff is not proactive', async () => {
+      const recs409p = Array.from({ length: 8 }, (_, i) => makeRec409(i));
+      recs409p[1] = makeRec409(1, { seededClueIds: ['s1'], payoffSetupIds: ['p1'] }); // proactive + payoff
+      recs409p[3] = makeRec409(3, { clockRaised: true, payoffSetupIds: ['p2'] });      // proactive + payoff
+      recs409p[6] = makeRec409(6, { payoffSetupIds: ['p3', 'p4', 'p5'] });             // peak, NOT proactive
+      const res = await runIN409(recs409p);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PROACTIVE_PAYOFF_PEAK_DECOUPLED'), 'PROACTIVE_PAYOFF_PEAK_DECOUPLED should fire');
+    });
+
+    it('PROACTIVE_PAYOFF_PEAK_DECOUPLED does NOT fire when the biggest payoff is proactive', async () => {
+      const recs409pNF = Array.from({ length: 8 }, (_, i) => makeRec409(i));
+      recs409pNF[1] = makeRec409(1, { seededClueIds: ['s1'], payoffSetupIds: ['p1'] });
+      recs409pNF[3] = makeRec409(3, { clockRaised: true, payoffSetupIds: ['p2'] });
+      recs409pNF[6] = makeRec409(6, { clockRaised: true, payoffSetupIds: ['p3', 'p4', 'p5'] }); // peak IS proactive
+      const res = await runIN409(recs409pNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PROACTIVE_PAYOFF_PEAK_DECOUPLED'), 'PROACTIVE_PAYOFF_PEAK_DECOUPLED should not fire');
+    });
+
+    it('SEED_FRONTLOADED fires when all seeds fall in the first half', async () => {
+      // n=8 → half=4; seeds at 1,2,3 (all first half)
+      const recs409s = Array.from({ length: 8 }, (_, i) => makeRec409(i));
+      [1, 2, 3].forEach(i => { recs409s[i] = makeRec409(i, { seededClueIds: [`c${i}`] }); });
+      const res = await runIN409(recs409s);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_FRONTLOADED'), 'SEED_FRONTLOADED should fire');
+    });
+
+    it('SEED_FRONTLOADED does NOT fire when a seed falls in the second half', async () => {
+      // n=8 → half=4; seeds at 1,2 (first half) and 5 (second half)
+      const recs409sNF = Array.from({ length: 8 }, (_, i) => makeRec409(i));
+      [1, 2, 5].forEach(i => { recs409sNF[i] = makeRec409(i, { seededClueIds: [`c${i}`] }); });
+      const res = await runIN409(recs409sNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_FRONTLOADED'), 'SEED_FRONTLOADED should not fire');
+    });
+
+    it('PROACTIVE_SUSPENSE_AFTERMATH_ABSENT fires when no proactive act raises suspense downstream', async () => {
+      const recs409a = Array.from({ length: 8 }, (_, i) => makeRec409(i));
+      [1, 3, 5].forEach(i => { recs409a[i] = makeRec409(i, { clockRaised: true }); }); // proactive, no downstream spikes
+      const res = await runIN409(recs409a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PROACTIVE_SUSPENSE_AFTERMATH_ABSENT'), 'PROACTIVE_SUSPENSE_AFTERMATH_ABSENT should fire');
+    });
+
+    it('PROACTIVE_SUSPENSE_AFTERMATH_ABSENT does NOT fire when a proactive act spikes suspense downstream', async () => {
+      const recs409aNF = Array.from({ length: 8 }, (_, i) => makeRec409(i));
+      [1, 3, 5].forEach(i => { recs409aNF[i] = makeRec409(i, { clockRaised: true }); });
+      recs409aNF[2] = makeRec409(2, { suspenseDelta: 2 }); // downstream of scene 1
+      const res = await runIN409(recs409aNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PROACTIVE_SUSPENSE_AFTERMATH_ABSENT'), 'PROACTIVE_SUSPENSE_AFTERMATH_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 395 — intentionPass: proactive relationship peak absent, proactive emotional recoil absent, seed backloaded', async () => {
     const makeRec395 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
