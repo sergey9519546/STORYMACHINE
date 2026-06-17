@@ -24733,6 +24733,91 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 418 — beliefPass: revelation consecutive flood, assertion Act 2a void, assertion aftermath void', async () => {
+    const makeRec418 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      seededClueIds: [], payoffSetupIds: [], revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], dramaticTurn: 'nothing',
+      purpose: 'development', unresolvedClues: [],
+      ...overrides,
+    });
+    const runB418 = async (records: any[], fountain = '') => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('REVELATION_CONSECUTIVE_FLOOD fires when 3+ revelation scenes appear consecutively', async () => {
+      // n=10, revelations at 3,4,5,6 → consecutive run=4 ≥3 → fires
+      const recs418a = Array.from({ length: 10 }, (_, i) =>
+        makeRec418(i, {
+          revelation: [3, 4, 5, 6].includes(i) ? `Truth revealed at scene ${i}` : null,
+          dialogueHighlights: [3, 4, 5, 6].includes(i) ? [`truth at scene ${i}`] : [],
+        }),
+      );
+      const res = await runB418(recs418a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_CONSECUTIVE_FLOOD'), 'REVELATION_CONSECUTIVE_FLOOD should fire');
+    });
+
+    it('REVELATION_CONSECUTIVE_FLOOD does not fire when revelations are separated by non-revelation scenes', async () => {
+      // n=10, revelations at 2,4,6,8 → all isolated (max run=1) → no fire
+      const recs418anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec418(i, {
+          revelation: [2, 4, 6, 8].includes(i) ? `Truth revealed at scene ${i}` : null,
+          dialogueHighlights: [2, 4, 6, 8].includes(i) ? [`truth at scene ${i}`] : [],
+        }),
+      );
+      const res = await runB418(recs418anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_CONSECUTIVE_FLOOD'), 'REVELATION_CONSECUTIVE_FLOOD should not fire');
+    });
+
+    it('ASSERTION_ACT2A_VOID fires when no assertion lands in the 25%–50% zone while others exist', async () => {
+      // n=12, act2a=[3..5]; assertions at 0,1,10 (3 toldBeliefs) → none in [3..5] → fires
+      const recs418b = Array.from({ length: 12 }, (_, i) =>
+        makeRec418(i, {
+          dialogueHighlights: [0, 1, 10].includes(i) ? ['CHAR: He claims the evidence was planted.'] : [],
+        }),
+      );
+      const res = await runB418(recs418b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ASSERTION_ACT2A_VOID'), 'ASSERTION_ACT2A_VOID should fire');
+    });
+
+    it('ASSERTION_ACT2A_VOID does not fire when an assertion lands in the Act 2a zone', async () => {
+      // n=12, act2a=[3..5]; assertion at 4 (inside zone) → no fire
+      const recs418bnr = Array.from({ length: 12 }, (_, i) =>
+        makeRec418(i, {
+          dialogueHighlights: [0, 4, 10].includes(i) ? ['CHAR: He claims the evidence was planted.'] : [],
+        }),
+      );
+      const res = await runB418(recs418bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ASSERTION_ACT2A_VOID'), 'ASSERTION_ACT2A_VOID should not fire');
+    });
+
+    it('ASSERTION_AFTERMATH_VOID fires when every assertion is followed by two flat scenes', async () => {
+      // n=10, assertions at 0,3,6; all subsequent scenes have suspense=0, no rel-shifts, no revelations → fires
+      const recs418c = Array.from({ length: 10 }, (_, i) =>
+        makeRec418(i, {
+          dialogueHighlights: [0, 3, 6].includes(i) ? ['CHAR: She insists she was never there.'] : [],
+        }),
+      );
+      const res = await runB418(recs418c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ASSERTION_AFTERMATH_VOID'), 'ASSERTION_AFTERMATH_VOID should fire');
+    });
+
+    it('ASSERTION_AFTERMATH_VOID does not fire when an assertion is followed by a suspense rise', async () => {
+      // n=10, assertions at 0,3,6; scene 1 has suspenseDelta=2 (aftermath of 0 is not flat) → no fire
+      const recs418cnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec418(i, {
+          dialogueHighlights: [0, 3, 6].includes(i) ? ['CHAR: She insists she was never there.'] : [],
+          suspenseDelta: i === 1 ? 2 : 0,
+        }),
+      );
+      const res = await runB418(recs418cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ASSERTION_AFTERMATH_VOID'), 'ASSERTION_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 404 — beliefPass: revelation payoff decoupled, told belief seed decoupled, assertion Act 1 only', async () => {
     const makeRec404 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

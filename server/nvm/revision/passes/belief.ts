@@ -53,6 +53,14 @@
 // assertion and ≥2 seed scenes but none share a scene — verbal deception and physical evidence
 // never compound), assertion Act 1 only (≥3 total assertions all before the 25% mark —
 // belief layer closes at the point where it should begin complicating).
+// Wave 418 additions: revelation consecutive flood (3+ revelation scenes appear back-to-back
+// without breathing room — discoveries pile up faster than the audience can process them;
+// run-based mode × revelation channel), assertion Act 2a void (no assertion lands in the
+// 25%–50% conflict-entry zone while assertions exist elsewhere — the belief battle sits silent
+// precisely where it should open; zone presence/absence × assertion × Act 2a), assertion
+// aftermath void (every assertion scene is followed by two scenes with no revelation, no
+// relationship shift, and no suspense rise — claims land without cascading consequence;
+// sequence/aftermath mode × assertion channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1628,6 +1636,104 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `All ${toldBeliefs.length} of the story's assertions appear before Scene ${act1End404c} (the first 25%) — the belief layer closes at the point where it should begin complicating. The conflict and resolution zones contain no new claims, re-evaluations, or shifting certainties. Characters state their positions in the opening and are never heard from again on what they believe, leaving the bulk of the story without explicit intellectual or epistemic stakes.`,
         suggestedFix: 'Distribute assertions across the full arc: characters should re-evaluate, double down, or contradict themselves as the conflict escalates. A claim made in Act 1 that a character defends under pressure in Act 2 and abandons (or dies for) in Act 3 gives the belief layer structural weight. The story\'s positions should be tested, not just stated.',
+      });
+    }
+  }
+
+  // ── Wave 418: REVELATION_CONSECUTIVE_FLOOD, ASSERTION_ACT2A_VOID, ASSERTION_AFTERMATH_VOID ──
+
+  // REVELATION_CONSECUTIVE_FLOOD (minor, n≥10, ≥4 revelations): Three or more revelation
+  // scenes occur consecutively with no non-revelation scene between them. When discoveries
+  // pile up back-to-back, none of them registers as a turn — the audience stops reacting and
+  // starts cataloguing facts. Each revelation needs time around it: a scene of consequence,
+  // a relationship shift, or a character using the new knowledge before the next truth arrives.
+  // Run-based mode × revelation channel. Distinct from EXPOSITION_DUMP (consecutive TOLD
+  // beliefs, not revelations), ADJACENT_DECEPTION_PAYOFF (specific assertion→revelation pair
+  // within 1 scene — a targeted pairing, not a run), and TOLD_BELIEF_DROUGHT (runs of silence).
+  if (records.length >= 10 && witnessedBeliefs.length >= 4) {
+    const revIdxSet418a = new Set(witnessedBeliefs.map(w => w.sceneIdx));
+    let maxRun418a = 0;
+    let curRun418a = 0;
+    let maxStart418a = -1;
+    let curStart418a = -1;
+    for (const r of records) {
+      if (revIdxSet418a.has(r.sceneIdx)) {
+        if (curRun418a === 0) curStart418a = r.sceneIdx;
+        if (++curRun418a > maxRun418a) { maxRun418a = curRun418a; maxStart418a = curStart418a; }
+      } else {
+        curRun418a = 0;
+      }
+    }
+    if (maxRun418a >= 3) {
+      issues.push({
+        location: `Revelation run starting at Scene ${maxStart418a} (${maxRun418a} consecutive)`,
+        rule: 'REVELATION_CONSECUTIVE_FLOOD',
+        severity: 'minor',
+        description: `A run of ${maxRun418a} consecutive revelation scenes occurs starting at Scene ${maxStart418a} — discoveries arrive back-to-back with no breathing room. When truths pile up in sequence, none of them lands as a turn because there is no space for the audience to absorb the change in what they believe. The second revelation arrives before the first has been processed; the third before the second.`,
+        suggestedFix: 'Interleave non-revelation scenes between discoveries: after each truth is revealed, give one scene over to reaction, consequence, or dramatic use of the new knowledge before the next revelation arrives. A revelation earns its impact from the silence around it — the scene where everything changes is only perceptible against scenes where nothing changes.',
+      });
+    }
+  }
+
+  // ASSERTION_ACT2A_VOID (minor, n≥12, ≥3 told beliefs, assertions exist outside Act 2a):
+  // No told belief (character assertion) lands in Act 2a (25%–50% of scenes), while assertions
+  // appear elsewhere. Act 2a is where the protagonist first engages the central conflict — the
+  // zone where characters should be most actively staking, defending, and testing positions.
+  // An assertion vacuum in this zone means the belief battle opens in silence, and the audience
+  // enters the complication zone without knowing what the characters believe is at stake.
+  // Zone presence/absence × assertion × Act 2a. Distinct from REVELATION_ACT2A_DESERT
+  // (revelations in the same zone; this is for assertions), ASSERTION_MIDPOINT_VOID (40%–60%
+  // zone; this is 25%–50%), TOLD_BELIEF_ACT3_ABSENT (Act 3 zone), and ASSERTION_ACT1_ONLY
+  // (Wave 404: all assertions confined TO Act 1; this fires when Act 2a specifically is void
+  // while other zones carry assertions).
+  if (records.length >= 12 && toldBeliefs.length >= 3) {
+    const act2aS418b = Math.floor(records.length * 0.25);
+    const act2aE418b = Math.floor(records.length * 0.50);
+    const hasAct2aAssertion418b = toldBeliefs.some(t => t.sceneIdx >= act2aS418b && t.sceneIdx < act2aE418b);
+    const hasOtherAssertion418b = toldBeliefs.some(t => !(t.sceneIdx >= act2aS418b && t.sceneIdx < act2aE418b));
+    if (!hasAct2aAssertion418b && hasOtherAssertion418b) {
+      issues.push({
+        location: `Act 2a (Scenes ${act2aS418b}–${act2aE418b - 1}) — no character assertions`,
+        rule: 'ASSERTION_ACT2A_VOID',
+        severity: 'minor',
+        description: `No told belief (character assertion) occurs in Act 2a (Scenes ${act2aS418b}–${act2aE418b - 1}), though assertions appear elsewhere in the story. Act 2a is where the protagonist first engages the central conflict — the zone where characters should be most actively staking and testing their positions. Without assertions in this zone, the belief battle sits silent exactly where it should be opening, and the audience enters the complication without knowing what characters think is true.`,
+        suggestedFix: 'Add at least one character assertion in Act 2a: a position staked, a claim defended, or a deliberate misdirection delivered as the conflict first escalates. The entry to complication is where the story\'s epistemic stakes should crystallize — what characters believe becomes the fuel the next acts will burn through.',
+      });
+    }
+  }
+
+  // ASSERTION_AFTERMATH_VOID (minor, n≥10, ≥3 told beliefs): Every assertion scene is
+  // followed by two scenes in which nothing happens as a result — no revelation, no
+  // relationship shift, and no suspense rise in either of the two scenes that follow the
+  // assertion. Claims that land without downstream cascade never establish that believing
+  // the wrong thing (or the right thing at the wrong time) has any narrative weight. The
+  // belief layer makes declarations but those declarations leave no footprint in the scenes
+  // that immediately follow. Sequence/aftermath mode × assertion channel. Distinct from
+  // REVELATION_AFTERMATH_GAP (Wave 225: aftermath of REVELATIONS — this is aftermath of
+  // ASSERTIONS), TOLD_BELIEF_SUSPENSE_DECOUPLED (audits the assertion scenes themselves for
+  // low suspense; AFTERMATH audits the subsequent scenes), and DECEPTION_WITHOUT_CONSEQUENCE
+  // (specifically about discovered lies; this fires across all assertion types when every
+  // claim is followed by a flat aftermath regardless of truth value).
+  if (records.length >= 10 && toldBeliefs.length >= 3) {
+    const revIdxSet418c = new Set(witnessedBeliefs.map(w => w.sceneIdx));
+    const allHaveQuietAftermath418c = toldBeliefs.every(t => {
+      for (let offset = 1; offset <= 2; offset++) {
+        const nextIdx = t.sceneIdx + offset;
+        if (nextIdx >= records.length) continue;
+        const nextR = records[nextIdx];
+        if (revIdxSet418c.has(nextR.sceneIdx)) return false;
+        if (((nextR.relationshipShifts ?? []) as any[]).length > 0) return false;
+        if ((nextR.suspenseDelta ?? 0) > 0) return false;
+      }
+      return true;
+    });
+    if (allHaveQuietAftermath418c) {
+      issues.push({
+        location: 'All assertion aftermath scenes',
+        rule: 'ASSERTION_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Each of the ${toldBeliefs.length} assertion scene(s) is followed by two scenes with no revelation, no relationship shift, and no suspense rise — every claim lands without cascading consequence. Assertions that never generate an immediate ripple — no disclosure, no bond moving, no tension rising — fail to establish that beliefs have weight. The story declares positions but those declarations leave no mark in the scenes that immediately follow.`,
+        suggestedFix: 'Let at least one assertion create an immediate downstream ripple: after a character states a belief, the next scene or two should show that claim changing something — another character discovers it is false, a relationship cracks, or tension rises because the assertion is now in play. Beliefs that generate consequence teach the audience to care about what characters believe.',
       });
     }
   }
