@@ -44,6 +44,12 @@
 // Act 2a curiosity void (the 25%–50% zone averages curiosityDelta ≤ 0 while the story is
 // otherwise curious — completes the curiosity-zone set), Act 2 dramatic turn absent (the long
 // middle act 25%–75% carries no pivot while ≥2 turns land outside it — the sagging middle).
+// Wave 401 additions: Act 2b curiosity void (the 50%–75% run-up to the climax generates no
+// curiosity while the story is otherwise curious — completes the per-half curiosity zone set),
+// midpoint dramatic turn void (the 40%–60% pivot carries no reversal while ≥2 turns land
+// elsewhere — the pivot is structurally inert; completes the midpoint channel set), Act 3
+// suspense void (the final 25% generates no suspense spike while the story spikes elsewhere —
+// the climax act builds no tension).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1576,6 +1582,92 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The long middle act (Scenes ${a2Start387}–${a2End387 - 1}) contains no dramatic turn, even though ${turnsOutside387} turns land in Acts 1 and 3. The complication zone — the stretch most prone to sagging — proceeds without a single reversal or recognition, so the middle plays as a flat extension of the setup rather than a sequence of escalating pivots that keeps the audience off balance.`,
         suggestedFix: 'Build reversals into Act 2: a midpoint twist, a setback that forces a new plan, an alliance that flips. The middle act is where a story most often loses momentum; punctuating it with genuine turns is what keeps the long stretch between setup and climax dynamic.',
+      });
+    }
+  }
+
+  // ── Wave 401: ACT2B_CURIOSITY_VOID, MIDPOINT_DRAMATIC_TURN_VOID, ACT3_SUSPENSE_VOID ──
+
+  // ACT2B_CURIOSITY_VOID (minor, n≥10, ≥2 Act 2b scenes, overall curiosity present):
+  // No scene in Act 2b (50%–75%) raises curiosity — the escalation zone generates no new
+  // questions while the story otherwise does. Act 2b is where the story should deepen its
+  // central mystery and build anticipation for the climax; if nothing in this zone raises a
+  // question, the run-up to the finale feels like a succession of events the audience can
+  // already predict. Completes the curiosity-zone set alongside ACT1_CURIOSITY_ABSENT,
+  // ACT2A_CURIOSITY_VOID, and ACT3_CURIOSITY_SPIKE_ABSENT. Distinct from MIDPOINT_
+  // CURIOSITY_VOID (40%–60% pivot zone) and ACT2_CURIOSITY_VALLEY (comparative valley,
+  // not an absolute absence in the back half).
+  if (n >= 10) {
+    const a2bStart401a = Math.floor(n * 0.5);
+    const a2bEnd401a = Math.floor(n * 0.75);
+    const a2bRecs401a = records.slice(a2bStart401a, a2bEnd401a);
+    const anyOverallCurio401a = records.some((r: any) => (r.curiosityDelta ?? 0) > 0);
+    if (a2bRecs401a.length >= 2 && anyOverallCurio401a) {
+      const a2bHasCurio401a = a2bRecs401a.some((r: any) => (r.curiosityDelta ?? 0) > 0);
+      if (!a2bHasCurio401a) {
+        issues.push({
+          location: `Act 2b (Scenes ${a2bStart401a}–${a2bEnd401a - 1}) — curiosity void`,
+          rule: 'ACT2B_CURIOSITY_VOID',
+          severity: 'minor',
+          description: `No scene in Act 2b (Scenes ${a2bStart401a}–${a2bEnd401a - 1}) raises curiosity — the escalation zone generates no new questions while the story does so elsewhere. Act 2b should deepen the central mystery and build anticipation for the climax; a curiosity void here means the run-up to the finale is a sequence of events the audience can predict rather than questions they are eager to have answered.`,
+          suggestedFix: 'Plant a new question in Act 2b: a discovery that recasts the central problem, a character whose motives become suddenly unclear, or a clue that implies more is at stake than the audience realized. The escalation zone should not just raise the tension but renew the mystery.',
+        });
+      }
+    }
+  }
+
+  // MIDPOINT_DRAMATIC_TURN_VOID (minor, n≥10, ≥2 dramatic turns outside midpoint):
+  // No dramatic turn lands in the 40%–60% pivot zone while at least 2 turns exist in the
+  // rest of the story. The structural midpoint is typically the story's sharpest reversal —
+  // where the protagonist's approach must change because the world has shifted. A pivot zone
+  // with no pivot is a structural non-event: the story reaches its geographic center, nothing
+  // changes direction, and the second half must inherit the same momentum as the first rather
+  // than a new trajectory. Completes the midpoint channel set alongside MIDPOINT_SUSPENSE_VOID,
+  // MIDPOINT_CURIOSITY_VOID, and MIDPOINT_EMOTIONAL_FLATLINE. Distinct from ACT2_DRAMATIC_TURN_
+  // ABSENT (the entire 25%–75% zone — a broader absence) and ACT3_DRAMATIC_TURN_ABSENT
+  // (the finale zone).
+  if (n >= 10) {
+    const midStart401b = Math.floor(n * 0.4);
+    const midEnd401b = Math.ceil(n * 0.6);
+    const midRecs401b = records.slice(midStart401b, midEnd401b);
+    const outsideRecs401b = [...records.slice(0, midStart401b), ...records.slice(midEnd401b)];
+    const turnsOutside401b = outsideRecs401b.filter(
+      (r: any) => r.dramaticTurn != null && r.dramaticTurn !== 'nothing',
+    ).length;
+    const midHasTurn401b = midRecs401b.some(
+      (r: any) => r.dramaticTurn != null && r.dramaticTurn !== 'nothing',
+    );
+    if (midRecs401b.length >= 2 && turnsOutside401b >= 2 && !midHasTurn401b) {
+      issues.push({
+        location: `Midpoint zone (Scenes ${midStart401b}–${midEnd401b - 1}) — no dramatic turn`,
+        rule: 'MIDPOINT_DRAMATIC_TURN_VOID',
+        severity: 'minor',
+        description: `No dramatic turn lands in the 40%–60% pivot zone (Scenes ${midStart401b}–${midEnd401b - 1}), though ${turnsOutside401b} turns exist elsewhere. The structural midpoint is typically the story's sharpest reversal — the moment where the protagonist's approach must change because the world has shifted. A pivot zone with no pivot passes the geographic center of the story without changing direction, and the second half inherits the same momentum as the first.`,
+        suggestedFix: 'Place a genuine reversal at the midpoint: a revelation that recasts the protagonist\'s goal, an unexpected alliance or betrayal, or a discovery that forces a new plan. The midpoint turn is what separates Act 2a (approach) from Act 2b (escalation) — without it, the middle is one long undifferentiated stretch.',
+      });
+    }
+  }
+
+  // ACT3_SUSPENSE_VOID (minor, n≥10, ≥2 Act 3 scenes, overall suspense > 0):
+  // No scene in Act 3 (75%–100%) generates meaningful suspense (suspenseDelta > 1) while
+  // the story builds tension elsewhere. The finale should be the story's most tense stretch;
+  // a suspense-void climax means the ending resolves without the audience being under
+  // pressure. The action happens, the resolution arrives — but nothing is at stake in the
+  // physical pace of the final act. Distinct from ACT2B_SUSPENSE_VOID (the 50%–75% run-up),
+  // OPENING_SUSPENSE_FLATLINE (the first 3 scenes), CLIMAX_PLATEAU (a flat peak that is too
+  // uniformly distributed, not an absence), and UNRESOLVED_ENDING (which fires when the final
+  // scene is too tense, the opposite case).
+  if (n >= 10) {
+    const a3Start401c = Math.floor(n * 0.75);
+    const a3Recs401c = records.slice(a3Start401c);
+    const anyOverallSusp401c = records.some((r: any) => (r.suspenseDelta ?? 0) > 1);
+    if (a3Recs401c.length >= 2 && anyOverallSusp401c && !a3Recs401c.some((r: any) => (r.suspenseDelta ?? 0) > 1)) {
+      issues.push({
+        location: `Act 3 (Scenes ${a3Start401c}–${n - 1}) — suspense void`,
+        rule: 'ACT3_SUSPENSE_VOID',
+        severity: 'minor',
+        description: `No scene in Act 3 (Scenes ${a3Start401c}–${n - 1}) reaches a suspenseDelta above 1, even though the story builds meaningful tension elsewhere. The finale resolves without the audience being under pressure — the action happens and the resolution arrives, but no scene in the final act generates the sense of threat and uncertainty that makes an ending feel earned rather than merely arrived at.`,
+        suggestedFix: 'Build genuine tension in Act 3: a complication that threatens the resolution, a last-moment reversal, or a confrontation that could go either way. The audience should not be confident of the outcome until it arrives — Act 3 tension is what converts a satisfying plot conclusion into a felt experience.',
       });
     }
   }

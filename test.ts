@@ -18713,6 +18713,76 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 401 — structurePass: Act 2b curiosity void, midpoint dramatic turn void, Act 3 suspense void', async () => {
+    const makeRec401 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runST401 = async (records: any[]) => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      return structurePass({ fountain: '', original: '', records, structure: { completionPercent: 100, actPosition: 'act3' } as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ACT2B_CURIOSITY_VOID fires when Act 2b has no curiosity while story otherwise curious', async () => {
+      // n=12, Act 2b = scenes 6-8; curiosity only at scenes 1,4 (Act 2a) → fires
+      const recs401a = Array.from({ length: 12 }, (_, i) => makeRec401(i, {
+        curiosityDelta: [1, 4].includes(i) ? 1.5 : 0,
+      }));
+      const res = await runST401(recs401a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACT2B_CURIOSITY_VOID'), 'ACT2B_CURIOSITY_VOID should fire');
+    });
+
+    it('ACT2B_CURIOSITY_VOID does not fire when Act 2b has a curiosity-raising scene', async () => {
+      // n=12, Act 2b = scenes 6-8; curiosity at scene 7 (Act 2b) → no fire
+      const recs401anr = Array.from({ length: 12 }, (_, i) => makeRec401(i, {
+        curiosityDelta: [1, 7].includes(i) ? 1.5 : 0,
+      }));
+      const res = await runST401(recs401anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACT2B_CURIOSITY_VOID'), 'ACT2B_CURIOSITY_VOID should not fire');
+    });
+
+    it('MIDPOINT_DRAMATIC_TURN_VOID fires when no turn in midpoint zone while 2+ turns exist elsewhere', async () => {
+      // n=10, midzone=scenes 4-5; turns at scenes 1,8 (outside midzone) → fires
+      const recs401b = Array.from({ length: 10 }, (_, i) => makeRec401(i, {
+        dramaticTurn: [1, 8].includes(i) ? 'reversal' : 'nothing',
+      }));
+      const res = await runST401(recs401b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'MIDPOINT_DRAMATIC_TURN_VOID'), 'MIDPOINT_DRAMATIC_TURN_VOID should fire');
+    });
+
+    it('MIDPOINT_DRAMATIC_TURN_VOID does not fire when a turn lands in the midpoint zone', async () => {
+      // n=10, midzone=scenes 4-5; turn at scene 5 (in midzone) + scene 1 → no fire
+      const recs401bnr = Array.from({ length: 10 }, (_, i) => makeRec401(i, {
+        dramaticTurn: [1, 5].includes(i) ? 'reversal' : 'nothing',
+      }));
+      const res = await runST401(recs401bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'MIDPOINT_DRAMATIC_TURN_VOID'), 'MIDPOINT_DRAMATIC_TURN_VOID should not fire');
+    });
+
+    it('ACT3_SUSPENSE_VOID fires when Act 3 has no suspense spike while story has suspense elsewhere', async () => {
+      // n=12, Act 3 = scenes 9-11; suspense only at scenes 2,5 (Acts 1/2) → fires
+      const recs401c = Array.from({ length: 12 }, (_, i) => makeRec401(i, {
+        suspenseDelta: [2, 5].includes(i) ? 2 : 0,
+      }));
+      const res = await runST401(recs401c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACT3_SUSPENSE_VOID'), 'ACT3_SUSPENSE_VOID should fire');
+    });
+
+    it('ACT3_SUSPENSE_VOID does not fire when Act 3 has a suspense spike', async () => {
+      // n=12, Act 3 = scenes 9-11; suspense at scene 10 (Act 3) → no fire
+      const recs401cnr = Array.from({ length: 12 }, (_, i) => makeRec401(i, {
+        suspenseDelta: [2, 10].includes(i) ? 2 : 0,
+      }));
+      const res = await runST401(recs401cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACT3_SUSPENSE_VOID'), 'ACT3_SUSPENSE_VOID should not fire');
+    });
+  });
+
   describe('Wave 400 — rhythmPass: long-line flood, line-ending repetition, progressive-verb overuse', async () => {
     const runR400 = async (fountain: string) => {
       const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
