@@ -41,6 +41,12 @@
 // scared" — show-don't-tell violation in dialogue), amplifier flood (>25% of lines carry an
 // amplifier like very/really/totally — padded intensity), time-marker flood (>25% of lines
 // carry a temporal reference — dialogue scheduling and recapping instead of confronting now).
+// Wave 406 additions: vague-noun flood (>30% of lines lean on indefinite placeholders —
+// "thing"/"stuff"/"something"/"someone" — characters gesture vaguely instead of naming
+// concretely), reported-speech flood (>20% of lines recount what someone else said —
+// "he said"/"she told me"/"they say" — the scene recaps conversations instead of enacting
+// them), oath-intensifier flood (>20% of lines lean on a mild oath — "damn"/"hell"/"oh god"
+// — emphasis outsourced to swearing rather than to the words themselves).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1820,6 +1826,75 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${timeMarkerCount392} of ${dialogue.length} dialogue lines (${Math.round(timeMarkerCount392 / dialogue.length * 100)}%) carry an explicit temporal reference ("yesterday", "an hour ago", "next week"). Dialogue saturated with time markers is busy scheduling and recapping — locating events on a timeline — rather than confronting the present moment between the characters, so the scene's urgency leaks into logistics.`,
         suggestedFix: 'Cut most time markers and let the scene play in the present: the audience rarely needs the exact when. Reserve a temporal reference for the beat where the timing is the dramatic point — a deadline, a damning alibi — and trust the rest to unfold in the now.',
+      });
+    }
+  }
+
+  // ── Wave 406: DIALOGUE_VAGUE_NOUN_FLOOD, DIALOGUE_REPORTED_SPEECH_FLOOD, DIALOGUE_OATH_INTENSIFIER_FLOOD ──
+
+  // DIALOGUE_VAGUE_NOUN_FLOOD (minor, ≥10 lines, >30%): More than 30% of dialogue lines lean
+  // on an indefinite placeholder noun or pronoun ("thing", "things", "stuff", "something",
+  // "someone", "somewhere", "somehow", "anything", "whatever"). Characters who speak in vague
+  // pointers — "do the thing", "get the stuff", "something happened", "talk to someone" — never
+  // name the concrete object of the scene, so the dialogue feels evasive or under-written and
+  // the audience cannot picture what anyone is actually discussing. The placeholder set here is
+  // deliberately disjoint from DIALOGUE_ABSOLUTE_OVERUSE (everyone/everything/always — totalizing
+  // universals) and from voice's NEGATION_SATURATION (no/not/never/nothing): this targets the
+  // indefinite-vagueness register, not the absolute or the negative one.
+  if (dialogue.length >= 10) {
+    const vagueNounRe406 = /\b(thing|things|stuff|something|someone|somebody|somewhere|somehow|anything|anybody|whatever|thingy|whatsit)\b/i;
+    const vagueNounCount406 = dialogue.filter(d => vagueNounRe406.test(d.line)).length;
+    if (vagueNounCount406 / dialogue.length > 0.30) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_VAGUE_NOUN_FLOOD',
+        severity: 'minor',
+        description: `${vagueNounCount406} of ${dialogue.length} dialogue lines (${Math.round(vagueNounCount406 / dialogue.length * 100)}%) lean on an indefinite placeholder ("thing", "stuff", "something", "someone"). Characters who speak in vague pointers never name the concrete object of the scene — "do the thing", "get the stuff", "talk to someone" — so the dialogue reads as evasive or under-written and the audience cannot picture what anyone is actually discussing.`,
+        suggestedFix: 'Replace placeholders with the specific noun the scene is really about: "Get the stuff" → "Get the morphine"; "Something happened" → "She found the letters." A concrete noun grounds the scene in a real object with real stakes; reserve deliberate vagueness for the beat where a character is genuinely evading, and make that evasion legible as a choice.',
+      });
+    }
+  }
+
+  // DIALOGUE_REPORTED_SPEECH_FLOOD (minor, ≥10 lines, >20%): More than 20% of dialogue lines
+  // recount what someone else said ("he said", "she told me", "they say", "I told him", "she
+  // goes", "he was like"). When characters spend the scene relaying off-page conversations, the
+  // story recaps dialogue instead of enacting it — the dramatic exchange happened elsewhere, and
+  // we are getting the minutes. Direct confrontation is replaced by hearsay, which drains the
+  // present scene of agency. Distinct from DIALOGUE_TIME_MARKER_FLOOD (temporal references),
+  // DIALOGUE_PASSIVE_CONSTRUCT_FLOOD (agentless "was told"), and DIALOGUE_PRESENT_PERFECT_FLOOD
+  // (have/has done): this targets the speech-attribution / quotation-of-others pattern.
+  if (dialogue.length >= 10) {
+    const reportedSpeechRe406 = /\b(he|she|they|i|we|you)\s+(said|says|told|tells|asked|asks|replied|answered|mentioned|claimed|whispered|shouted|goes)\b|\btold\s+(me|him|her|them|us|you)\b|\b(was|were)\s+like\b|\bthey\s+say\b/i;
+    const reportedSpeechCount406 = dialogue.filter(d => reportedSpeechRe406.test(d.line)).length;
+    if (reportedSpeechCount406 / dialogue.length > 0.20) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_REPORTED_SPEECH_FLOOD',
+        severity: 'minor',
+        description: `${reportedSpeechCount406} of ${dialogue.length} dialogue lines (${Math.round(reportedSpeechCount406 / dialogue.length * 100)}%) recount what someone else said ("he said", "she told me", "they say"). When characters spend the scene relaying off-page conversations, the story recaps dialogue instead of enacting it — the real exchange happened elsewhere and we are getting the minutes. Confrontation is replaced by hearsay, draining the present scene of agency.`,
+        suggestedFix: 'Dramatize the reported exchange instead of summarizing it: if what "she told me" matters, stage that scene; if it does not, cut the recap and let the present characters act on the information directly. Reserve reported speech for the beat where the act of relaying is itself the drama — a lie about what was said, a quote weaponized — not as the default mode of the scene.',
+      });
+    }
+  }
+
+  // DIALOGUE_OATH_INTENSIFIER_FLOOD (minor, ≥10 lines, >20%): More than 20% of dialogue lines
+  // lean on a mild oath as an intensifier ("damn", "dammit", "hell", "the hell", "for god's
+  // sake", "oh god", "jesus", "christ", "bloody"). When emphasis is routinely outsourced to
+  // swearing, the oaths stop landing — profanity used as punctuation flattens into wallpaper,
+  // and the one moment that should detonate has no charge left because every line already swore.
+  // Distinct from DIALOGUE_AMPLIFIER_FLOOD (very/really/totally — degree amplifiers), DIALOGUE_
+  // VERBAL_TIC_FLOOD (literally/actually/honestly — disclaimers), and EXCLAMATION_OVERUSE
+  // (punctuation): this targets the oath/expletive lexical register specifically.
+  if (dialogue.length >= 10) {
+    const oathRe406 = /\b(damn|damn it|dammit|goddamn|goddammit|hell|the hell|for god'?s sake|for christ'?s sake|oh god|oh my god|my god|jesus|christ|good lord|bloody|for fuck'?s sake)\b/i;
+    const oathCount406 = dialogue.filter(d => oathRe406.test(d.line)).length;
+    if (oathCount406 / dialogue.length > 0.20) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_OATH_INTENSIFIER_FLOOD',
+        severity: 'minor',
+        description: `${oathCount406} of ${dialogue.length} dialogue lines (${Math.round(oathCount406 / dialogue.length * 100)}%) lean on a mild oath for emphasis ("damn", "hell", "oh god", "jesus"). When emphasis is routinely outsourced to swearing, the oaths stop landing — profanity used as punctuation flattens into wallpaper, so the one moment that should detonate has no charge left because every line already swore.`,
+        suggestedFix: 'Strip the reflexive oaths and let the underlying words carry the weight, saving an expletive for the single beat where the character\'s composure genuinely cracks. Emphasis works by contrast: when most lines are clean, the one curse that breaks through registers as a real loss of control rather than as the character\'s ordinary speech rhythm.',
       });
     }
   }

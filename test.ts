@@ -22453,6 +22453,131 @@ The lights go out.`;
     });
   });
 
+  describe('Wave 406 — dialoguePass: vague-noun flood, reported-speech flood, oath-intensifier flood', async () => {
+    const runD406 = async (fountain: string) => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    const buildD406 = (lines: string[]): string => {
+      const body = lines.map((l, i) => `${i % 2 === 0 ? 'ANNA' : 'MARK'}\n${l}`).join('\n\n');
+      return `INT. ROOM - DAY\n\n${body}\n`;
+    };
+
+    it('DIALOGUE_VAGUE_NOUN_FLOOD fires when >30% of lines lean on indefinite placeholders', async () => {
+      const f406v = buildD406([
+        'Just do the thing we talked about.',
+        'Get the stuff from the car.',
+        'Something happened last night.',
+        'I need to talk to someone.',
+        'Put it somewhere safe.',
+        'We will figure it out somehow.',
+        'Whatever you decide is fine.',
+        'The car is parked outside.',
+        'I locked the front door.',
+        'Marcus left at noon today.',
+        'The meeting starts at three.',
+        'She signed the contract already.',
+      ]);
+      const res = await runD406(f406v);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_VAGUE_NOUN_FLOOD'), 'DIALOGUE_VAGUE_NOUN_FLOOD should fire');
+    });
+
+    it('DIALOGUE_VAGUE_NOUN_FLOOD does NOT fire when dialogue names concrete objects', async () => {
+      const f406vNF = buildD406([
+        'The car is parked outside the bank.',
+        'I locked the steel front door.',
+        'Marcus left the office at noon.',
+        'The board meeting starts at three.',
+        'She signed the lease this morning.',
+        'Bring the morphine and the bandages.',
+        'The bridge on Route 9 is closed.',
+        'Your brother called from Lisbon.',
+        'The kettle is still on the stove.',
+        'He parked the truck by the dock.',
+        'The letters are inside the drawer.',
+        'Her flight lands at midnight.',
+      ]);
+      const res = await runD406(f406vNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_VAGUE_NOUN_FLOOD'), 'DIALOGUE_VAGUE_NOUN_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_REPORTED_SPEECH_FLOOD fires when >20% of lines recount what others said', async () => {
+      const f406r = buildD406([
+        'He said the deal was already off.',
+        'She told me to wait right here.',
+        'They say the bridge is closed now.',
+        'I told him exactly what happened.',
+        'He was like, forget the whole plan.',
+        'The kettle is still on the stove.',
+        'Your brother called from the airport.',
+        'The board meeting starts at three.',
+        'Bring the keys and the folder.',
+        'The truck is parked by the dock.',
+        'Her flight lands around midnight.',
+        'The lease is inside the drawer.',
+      ]);
+      const res = await runD406(f406r);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_REPORTED_SPEECH_FLOOD'), 'DIALOGUE_REPORTED_SPEECH_FLOOD should fire');
+    });
+
+    it('DIALOGUE_REPORTED_SPEECH_FLOOD does NOT fire when characters confront in the present', async () => {
+      const f406rNF = buildD406([
+        'You never listen to me at all.',
+        'I will not do this again.',
+        'Put the gun down right now.',
+        'We are leaving before midnight.',
+        'The kettle is still on the stove.',
+        'Your brother is at the airport.',
+        'The board meeting starts at three.',
+        'Bring the keys and the folder.',
+        'The truck is parked by the dock.',
+        'Her flight lands around midnight.',
+        'The lease is inside the drawer.',
+        'I trust you with my life.',
+      ]);
+      const res = await runD406(f406rNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_REPORTED_SPEECH_FLOOD'), 'DIALOGUE_REPORTED_SPEECH_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_OATH_INTENSIFIER_FLOOD fires when >20% of lines lean on a mild oath', async () => {
+      const f406o = buildD406([
+        'Damn it, not this again.',
+        'What the hell were you thinking?',
+        'Oh god, this is really bad.',
+        'Jesus, would you slow down.',
+        'The kettle is still on the stove.',
+        'Your brother is at the airport.',
+        'The board meeting starts at three.',
+        'Bring the keys and the folder.',
+        'The truck is parked by the dock.',
+        'Her flight lands around midnight.',
+        'The lease is inside the drawer.',
+        'I locked the front door.',
+      ]);
+      const res = await runD406(f406o);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_OATH_INTENSIFIER_FLOOD'), 'DIALOGUE_OATH_INTENSIFIER_FLOOD should fire');
+    });
+
+    it('DIALOGUE_OATH_INTENSIFIER_FLOOD does NOT fire when dialogue avoids oaths', async () => {
+      const f406oNF = buildD406([
+        'Not this again, please.',
+        'What were you thinking back there?',
+        'This is really bad for us.',
+        'Would you slow down a little.',
+        'The kettle is still on the stove.',
+        'Your brother is at the airport.',
+        'The board meeting starts at three.',
+        'Bring the keys and the folder.',
+        'The truck is parked by the dock.',
+        'Her flight lands around midnight.',
+        'The lease is inside the drawer.',
+        'I locked the front door.',
+      ]);
+      const res = await runD406(f406oNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_OATH_INTENSIFIER_FLOOD'), 'DIALOGUE_OATH_INTENSIFIER_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 392 — dialoguePass: emotion naming, amplifier flood, time-marker flood', async () => {
     const runD392 = async (fountain: string) => {
       const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
