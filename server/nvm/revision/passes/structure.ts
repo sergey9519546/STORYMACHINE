@@ -56,6 +56,14 @@
 // elsewhere), Act 2b dramatic turn void (the 50%–75% escalation zone carries no reversal while
 // ≥2 turns land elsewhere) — the last two complete the per-half dramatic-turn zone set alongside
 // the opening/Act 2/Act 3/midpoint turn checks.
+// Wave 429 additions: inciting aftermath stall (sequence/aftermath — the first early catalyst in
+// the opening 40% is followed by two scenes that neither raise suspense nor curiosity; the story
+// sparks its engine then stalls, squandering the inciting incident's momentum), climax unprepared
+// (backward-cause — the peak-suspense scene in the final 30% and its two preceding scenes carry
+// no revelation or dramatic turn though the story uses these devices elsewhere; the climax erupts
+// without structural run-up), purpose monotone run (run-based — five or more consecutive scenes
+// share one purpose; a local structural plateau distinct from the global PURPOSE_MONOCULTURE and
+// the zone-complete ACT1/ACT2/ACT3_PURPOSE_SINGLE checks).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1751,6 +1759,127 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The Act 2b escalation zone (Scenes ${a2bStart415}–${a2bEnd415 - 1}) contains no dramatic turn, even though ${turnsOutside415b} turns land elsewhere. The run-up to the climax — where stakes should compound and the situation should keep shifting under the protagonist — proceeds without a single reversal, so the back half of the middle act builds in a straight line into the finale instead of tightening through a series of pivots.`,
         suggestedFix: 'Place a reversal in Act 2b: a betrayal that strips away an advantage, a plan that backfires and raises the cost, a revelation that changes what winning requires. The escalation zone earns the climax by repeatedly raising the stakes through turns, not by simply accelerating toward it.',
+      });
+    }
+  }
+
+  // ── Wave 429: INCITING_AFTERMATH_STALL, CLIMAX_UNPREPARED, PURPOSE_MONOTONE_RUN ──
+
+  // INCITING_AFTERMATH_STALL (minor, n≥10): The first dramatic catalyst in the opening 40% of the
+  // story (the earliest scene carrying a revelation, a dramatic turn, or a suspenseDelta > 1.5) is
+  // followed by two scenes that neither raise suspense nor curiosity — both have suspenseDelta ≤ 0
+  // AND curiosityDelta ≤ 0. The story fires its inciting spark and then immediately stalls: the
+  // event that should propel the protagonist into the central problem generates no momentum in its
+  // wake, so the audience feels the engine catch and die. An inciting incident earns its name by
+  // what it sets in motion; a catalyst followed by two inert scenes is a catalyst that catalysed
+  // nothing.
+  // Analytical mode: sequence/aftermath (the beats AFTER the first catalyst), the first such check
+  // in this pass. Distinct from MISSING_INCITING_INCIDENT (no catalyst exists at all — this
+  // requires one to exist, then audits its consequence), OPENING_SUSPENSE_FLATLINE (first 3 scenes
+  // all ≤ 0 regardless of any catalyst), and COLD_OPEN_INERT (the very first scene only).
+  if (n >= 10) {
+    const catalystZoneEnd429 = Math.floor(n * 0.4);
+    const isCatalyst429 = (r: any): boolean =>
+      !!r.revelation ||
+      (r.dramaticTurn != null && r.dramaticTurn !== 'nothing') ||
+      (r.suspenseDelta ?? 0) > 1.5;
+    let firstCatalystIdx429 = -1;
+    for (let i = 0; i < catalystZoneEnd429 && i < n; i++) {
+      if (isCatalyst429(records[i])) { firstCatalystIdx429 = i; break; }
+    }
+    if (firstCatalystIdx429 >= 0 && firstCatalystIdx429 + 2 < n) {
+      const after1_429 = records[firstCatalystIdx429 + 1];
+      const after2_429 = records[firstCatalystIdx429 + 2];
+      const flat429 = (r: any) => (r.suspenseDelta ?? 0) <= 0 && (r.curiosityDelta ?? 0) <= 0;
+      if (flat429(after1_429) && flat429(after2_429)) {
+        issues.push({
+          location: `Scenes ${firstCatalystIdx429 + 1}–${firstCatalystIdx429 + 2} (after first catalyst at Scene ${firstCatalystIdx429})`,
+          rule: 'INCITING_AFTERMATH_STALL',
+          severity: 'minor',
+          description: `The story's first dramatic catalyst (Scene ${firstCatalystIdx429}) is followed by two scenes that raise neither suspense nor curiosity — both flat on both channels. The inciting spark fires and the story immediately stalls: the event that should launch the protagonist into the central problem generates no momentum in its wake, so the audience feels the engine catch and die before the journey begins.`,
+          suggestedFix: 'Let the catalyst propel the next two scenes: a consequence the protagonist must react to, a question the event opens, a new pressure it introduces. An inciting incident is defined by what it sets in motion — the scenes immediately after it should accelerate, not idle.',
+        });
+      }
+    }
+  }
+
+  // CLIMAX_UNPREPARED (minor, n≥10): The peak-suspense scene in the final 30% of the story (the
+  // climax), together with the two scenes immediately before it, carries no revelation and no
+  // dramatic turn — even though the story uses revelations or turns elsewhere (≥2 such scenes
+  // total). The climax erupts without structural run-up: nothing in its approach discloses, pivots,
+  // or recontextualises, so the peak arrives as raw intensity with no preparation. A climax lands
+  // because the scenes feeding it have armed it — a truth surfacing, a reversal landing, the ground
+  // shifting under the protagonist just before the confrontation. When the run-up is dramatically
+  // inert, the climax is a loud event the audience has not been set up to feel.
+  // Analytical mode: backward-cause (looking back from the peak for its preparation). Distinct from
+  // FALSE_CLIMAX (peak located too EARLY — this concerns a correctly-placed peak with no run-up),
+  // PROTAGONIST_PASSIVITY_CLIMAX (the peak scene's own emotion/clock/discovery, not the 2-scene
+  // run-up), and CLIMAX_REVELATION_ABSENT (whole Act-3 zone, revelations only — this is anchored to
+  // the specific peak scene's immediate approach and also counts dramatic turns, so it fires even
+  // when Act 3 holds a revelation that is not in the climax's run-up).
+  if (n >= 10) {
+    const climaxZoneStart429 = Math.floor(n * 0.7);
+    let climaxIdx429 = -1;
+    let climaxSusp429 = -Infinity;
+    for (let i = climaxZoneStart429; i < n; i++) {
+      if ((records[i].suspenseDelta ?? 0) > climaxSusp429) {
+        climaxSusp429 = records[i].suspenseDelta ?? 0;
+        climaxIdx429 = i;
+      }
+    }
+    const deviceScenes429 = records.filter(
+      (r: any) => !!r.revelation || (r.dramaticTurn != null && r.dramaticTurn !== 'nothing'),
+    ).length;
+    if (climaxIdx429 >= 2 && climaxSusp429 > 1 && deviceScenes429 >= 2) {
+      const runUpStart429 = Math.max(0, climaxIdx429 - 2);
+      const runUp429 = records.slice(runUpStart429, climaxIdx429 + 1);
+      const runUpHasDevice429 = runUp429.some(
+        (r: any) => !!r.revelation || (r.dramaticTurn != null && r.dramaticTurn !== 'nothing'),
+      );
+      if (!runUpHasDevice429) {
+        issues.push({
+          location: `Scenes ${runUpStart429}–${climaxIdx429} (climax run-up, peak suspense ${climaxSusp429.toFixed(1)})`,
+          rule: 'CLIMAX_UNPREPARED',
+          severity: 'minor',
+          description: `The climax (Scene ${climaxIdx429}, peak suspense ${climaxSusp429.toFixed(1)}) and the two scenes before it carry no revelation and no dramatic turn, even though the story uses ${deviceScenes429} such device scenes elsewhere. The peak erupts without structural run-up — nothing in its approach discloses, pivots, or recontextualises — so the climax arrives as raw intensity the audience has not been armed to feel.`,
+          suggestedFix: 'Arm the climax in its approach: place a revelation or a dramatic turn in the two scenes feeding it — a truth that surfaces, a reversal that lands, an advantage that vanishes just before the confrontation. The climax should be the detonation of a charge the run-up has been setting, not a sudden spike with no fuse.',
+        });
+      }
+    }
+  }
+
+  // PURPOSE_MONOTONE_RUN (minor, n≥10): Five or more consecutive scenes share the same purpose
+  // label, while the story as a whole uses at least two distinct purposes. A localized stretch of
+  // identical structural intent — five scenes in a row all "development", or all "raise_stakes" —
+  // reads as a plateau where the story stops rotating through structural functions, even when the
+  // global purpose distribution is varied. The audience loses their sense of forward structural
+  // motion across the run: scene after scene serves the same narrative job with no change of gear.
+  // Analytical mode: run-based (a local consecutive run). Distinct from PURPOSE_MONOCULTURE (a
+  // GLOBAL proportion — one purpose across >70% of ALL scenes), and from ACT1/ACT2/ACT3_PURPOSE_
+  // SINGLE (which require an entire ACT ZONE to be one purpose): a 5-scene run can sit inside a
+  // varied zone or straddle a zone boundary, firing where none of those zone-complete or global
+  // checks would. The run < n guard ensures it is a local plateau, not whole-story monoculture.
+  if (n >= 10) {
+    let bestRunStart429 = 0, bestRunLen429 = 1;
+    let curRunStart429 = 0, curRunLen429 = 1;
+    for (let i = 1; i < n; i++) {
+      const same429 = (records[i].purpose ?? 'unknown') === (records[i - 1].purpose ?? 'unknown');
+      if (same429) {
+        curRunLen429++;
+        if (curRunLen429 > bestRunLen429) { bestRunLen429 = curRunLen429; bestRunStart429 = curRunStart429; }
+      } else {
+        curRunStart429 = i;
+        curRunLen429 = 1;
+      }
+    }
+    if (bestRunLen429 >= 5 && bestRunLen429 < n) {
+      const runPurpose429 = records[bestRunStart429].purpose ?? 'unknown';
+      issues.push({
+        location: `Scenes ${bestRunStart429}–${bestRunStart429 + bestRunLen429 - 1} (purpose: "${runPurpose429}")`,
+        rule: 'PURPOSE_MONOTONE_RUN',
+        severity: 'minor',
+        description: `${bestRunLen429} consecutive scenes (Scenes ${bestRunStart429}–${bestRunStart429 + bestRunLen429 - 1}) all carry the purpose "${runPurpose429}" — a localized structural plateau where the story stops rotating through narrative functions. Even though the script uses other purposes elsewhere, this run serves the same structural job scene after scene with no change of gear, so the audience loses the sense of forward structural motion across the stretch.`,
+        suggestedFix: `Break the run by varying scene purpose: between the "${runPurpose429}" scenes, insert a reversal, a character-moment that reframes the stakes, or a setup that plants a later payoff. A run of one structural function reads as the story marking time; rotating purposes keeps each scene advancing the architecture, not just the page count.`,
       });
     }
   }

@@ -18891,6 +18891,83 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 429 — structurePass: inciting aftermath stall, climax unprepared, purpose monotone run', async () => {
+    const makeRec429 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runST429 = async (records: any[]) => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      return structurePass({ fountain: '', original: '', records, structure: { completionPercent: 100, actPosition: 'act3' } as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('INCITING_AFTERMATH_STALL fires when the first early catalyst is followed by two flat scenes', async () => {
+      // n=10; catalyst (revelation) at scene 1; scenes 2,3 flat (default) → fires
+      const recs429a = Array.from({ length: 10 }, (_, i) => makeRec429(i, i === 1 ? { revelation: 'a truth' } : {}));
+      const res = await runST429(recs429a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INCITING_AFTERMATH_STALL'), 'INCITING_AFTERMATH_STALL should fire');
+    });
+
+    it('INCITING_AFTERMATH_STALL does NOT fire when the catalyst sparks curiosity in its aftermath', async () => {
+      // n=10; catalyst at scene 1; scene 2 raises curiosity → aftermath not flat → no fire
+      const recs429aNF = Array.from({ length: 10 }, (_, i) => {
+        if (i === 1) return makeRec429(i, { revelation: 'a truth' });
+        if (i === 2) return makeRec429(i, { curiosityDelta: 2 });
+        return makeRec429(i);
+      });
+      const res = await runST429(recs429aNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INCITING_AFTERMATH_STALL'), 'INCITING_AFTERMATH_STALL should not fire');
+    });
+
+    it('CLIMAX_UNPREPARED fires when the climax run-up carries no revelation or turn while devices exist elsewhere', async () => {
+      // n=10; climax peak (suspense 3) at scene 8; run-up scenes 6,7,8 have no device;
+      // revelation at scene 1 + turn at scene 3 → deviceScenes=2 → fires
+      const recs429b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 8) return makeRec429(i, { suspenseDelta: 3 });
+        if (i === 1) return makeRec429(i, { revelation: 'a truth' });
+        if (i === 3) return makeRec429(i, { dramaticTurn: 'reversal' });
+        return makeRec429(i);
+      });
+      const res = await runST429(recs429b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLIMAX_UNPREPARED'), 'CLIMAX_UNPREPARED should fire');
+    });
+
+    it('CLIMAX_UNPREPARED does NOT fire when a dramatic turn lands in the climax run-up', async () => {
+      // n=10; climax peak at scene 8; turn at scene 7 (in run-up window 6-8); revelation at scene 1 → no fire
+      const recs429bNF = Array.from({ length: 10 }, (_, i) => {
+        if (i === 8) return makeRec429(i, { suspenseDelta: 3 });
+        if (i === 7) return makeRec429(i, { dramaticTurn: 'reversal' });
+        if (i === 1) return makeRec429(i, { revelation: 'a truth' });
+        return makeRec429(i);
+      });
+      const res = await runST429(recs429bNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLIMAX_UNPREPARED'), 'CLIMAX_UNPREPARED should not fire');
+    });
+
+    it('PURPOSE_MONOTONE_RUN fires when 5+ consecutive scenes share one purpose', async () => {
+      // n=10; scenes 2-7 (6 in a row) all 'investigation', rest 'development' → run=6 → fires
+      const recs429c = Array.from({ length: 10 }, (_, i) =>
+        makeRec429(i, { purpose: i >= 2 && i <= 7 ? 'investigation' : 'development' })
+      );
+      const res = await runST429(recs429c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PURPOSE_MONOTONE_RUN'), 'PURPOSE_MONOTONE_RUN should fire');
+    });
+
+    it('PURPOSE_MONOTONE_RUN does NOT fire when purposes alternate without a run of 5', async () => {
+      // n=10; purpose alternates every scene → max run = 1 → no fire
+      const recs429cNF = Array.from({ length: 10 }, (_, i) =>
+        makeRec429(i, { purpose: i % 2 === 0 ? 'development' : 'investigation' })
+      );
+      const res = await runST429(recs429cNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PURPOSE_MONOTONE_RUN'), 'PURPOSE_MONOTONE_RUN should not fire');
+    });
+  });
+
   describe('Wave 415 — structurePass: Act 1 suspense void, Act 2a dramatic turn void, Act 2b dramatic turn void', async () => {
     const makeRec415 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
