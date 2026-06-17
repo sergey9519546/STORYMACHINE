@@ -56,6 +56,14 @@
 // dialogue lines are ≤2 words — speech never develops past terse fragments; underweight/brevity
 // mode), dialogue negation flood (>40% of dialogue lines carry a negation — characters defined
 // by refusal and denial rather than desire and assertion; valence mode).
+// Wave 431 additions: dialogue I-opener run (≥4 consecutive dialogue lines each begin with the
+// first-person "I" — a stretch where conversation collapses into back-to-back self-reference;
+// run-based mode, the first run-based check in this pass), dialogue length outlier (one dialogue
+// line towers over the rest — ≥30 words and ≥4× the mean line length — an unmotivated monologue
+// dump amid otherwise terse speech; single-peak isolation mode), dialogue hedged-question flood
+// (>20% of dialogue lines simultaneously hedge AND end in a question mark — doubly-tentative
+// speech that neither the hedging-opener nor the interrogative-saturation rate check would catch
+// alone; co-occurrence mode on the conjunction of two tics).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2050,6 +2058,116 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `${negCount417c} of ${dlg417c.length} dialogue lines (${Math.round(negCount417c / dlg417c.length * 100)}%) are built on negation ("not", "no", "never", "nothing", "can't", "won't"). Characters whose speech is dominated by negation are defined by what they refuse, deny, or lack rather than by what they want or pursue. Relentless denial reads as defensive and reactive — every line pushes away rather than reaches toward, and the scene loses the forward pull of active desire.`,
           suggestedFix: 'Recast some negations as the positive want underneath them: "I don\'t want to be here" carries less than "I want to be anywhere but here," and "It\'s not your fault" lands harder as "You did everything you could." Negation has power as a sharp exception, not as the default grammar of every line. Let characters assert and pursue, so the refusals stand out when they come.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 431: DIALOGUE_I_OPENER_RUN, DIALOGUE_LENGTH_OUTLIER, DIALOGUE_HEDGED_QUESTION_FLOOD ──
+  // All three share a single ordered collection of dialogue lines (speech lines in
+  // script order, parentheticals and cues excluded), built once here.
+  {
+    const dlg431: string[] = [];
+    let inDlg431 = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg431 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg431 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg431 = true; continue; }
+      if (/^\(/.test(t)) continue; // parenthetical
+      if (inDlg431) dlg431.push(t);
+    }
+
+    // DIALOGUE_I_OPENER_RUN (minor, ≥8 dialogue lines, run ≥4): Four or more
+    // consecutive dialogue lines each begin with the first-person pronoun "I"
+    // ("I want…", "I'm not…", "I'll go…", "I never…"). A sustained run of
+    // self-referential openers is the texture of characters talking AT each other
+    // rather than WITH each other — each line launches from the speaker's own ego
+    // instead of responding to what was just said, so the exchange reads as parallel
+    // monologues. The "I" opener is detected with a lookahead so genuine pronoun
+    // openers ("I'm") match while words that merely start with the letter i ("It",
+    // "Is", "If") do not. Run-based mode — the FIRST run-based check in this pass:
+    // distinct from DIALOGUE_REPEATED_OPENER_WORD (Wave 322 — a single word begins
+    // >40% of ALL lines, a global rate regardless of adjacency) and
+    // DIALOGUE_CONJUNCTION_OPENER (Wave 322 — And/But/So rate). This fires on local
+    // CONSECUTIVENESS of "I", which a whole-corpus rate can entirely miss.
+    if (dlg431.length >= 8) {
+      const iOpenerRe431 = /^i(?=$|[\s,.!?;:'’])/i;
+      let curRun431 = 0;
+      let maxRun431 = 0;
+      let maxRunEnd431 = -1;
+      for (let i = 0; i < dlg431.length; i++) {
+        if (iOpenerRe431.test(dlg431[i])) {
+          curRun431++;
+          if (curRun431 > maxRun431) { maxRun431 = curRun431; maxRunEnd431 = i; }
+        } else {
+          curRun431 = 0;
+        }
+      }
+      if (maxRun431 >= 4) {
+        const runStart431 = maxRunEnd431 - maxRun431 + 1;
+        issues.push({
+          location: 'Dialogue exchange',
+          rule: 'DIALOGUE_I_OPENER_RUN',
+          severity: 'minor',
+          description: `${maxRun431} consecutive dialogue lines each begin with "I" (lines ${runStart431 + 1}–${maxRunEnd431 + 1} of the spoken corpus) — a sustained run of first-person openers. When every line in a stretch launches from the speaker's own ego ("I want…", "I'm not…", "I never…"), characters are talking AT each other rather than responding to one another; the exchange reads as parallel monologues of self-assertion rather than a live conversation.`,
+          suggestedFix: 'Break the run by having a line begin with a response to what was just said — the other character\'s name, a "You…", a reaction to their words, or a question that engages their point. Dialogue is a volley: let some lines open by reaching toward the other person instead of restating the self.',
+        });
+      }
+    }
+
+    // DIALOGUE_LENGTH_OUTLIER (minor, ≥12 dialogue lines, max ≥30 words AND ≥4× mean):
+    // A single dialogue line towers over every other — at least 30 words long and at
+    // least four times the mean line length. One unmotivated monologue dump amid
+    // otherwise terse speech reads as the writer breaking character to deliver
+    // exposition or a thesis: the rhythm of exchange stops dead while one speaker
+    // holds the floor for a paragraph. A long speech can be a deliberate aria, but a
+    // lone extreme outlier against an otherwise clipped corpus signals an undigested
+    // info-dump rather than an earned set-piece. Single-peak ISOLATION mode — the
+    // first such check in this pass. Distinct from DIALOGUE_LENGTH_UNIFORMITY (Wave
+    // 308 — fires when lengths cluster in a TIGHT band, the opposite condition) and
+    // DIALOGUE_MONOSYLLABIC_FLOOD (Wave 417 — a brevity FLOOR measured as a rate):
+    // this isolates the single longest line as an outlier against the distribution.
+    if (dlg431.length >= 12) {
+      const wc431 = dlg431.map(l => l.split(/\s+/).filter(Boolean).length);
+      const mean431 = wc431.reduce((s, v) => s + v, 0) / wc431.length;
+      const max431 = Math.max(...wc431);
+      if (max431 >= 30 && mean431 > 0 && max431 >= mean431 * 4) {
+        issues.push({
+          location: 'Dialogue length distribution',
+          rule: 'DIALOGUE_LENGTH_OUTLIER',
+          severity: 'minor',
+          description: `A single dialogue line runs ${max431} words — ${(max431 / mean431).toFixed(1)}× the ${mean431.toFixed(1)}-word mean of the other ${dlg431.length - 1} lines. One monologue towering over otherwise terse speech stops the rhythm of exchange dead: while one speaker holds the floor for a full paragraph, the scene's volley collapses. A lone extreme outlier against a clipped corpus usually signals an undigested exposition or thesis dump rather than an earned aria.`,
+          suggestedFix: 'Break the giant speech into a real exchange: let the other character interrupt, react, or push back so the information surfaces through conflict rather than a monologue. If the long speech is a deliberate set-piece, earn it — build the rhythm up toward it and give the surrounding scene room to register its weight, rather than dropping a paragraph into a corpus of one-liners.',
+        });
+      }
+    }
+
+    // DIALOGUE_HEDGED_QUESTION_FLOOD (minor, ≥12 dialogue lines, >20% hedge AND
+    // question simultaneously): More than a fifth of dialogue lines are BOTH hedged
+    // ("maybe", "perhaps", "I think", "kind of", "sort of", "probably", "I guess")
+    // AND end in a question mark — the doubly-tentative line ("Maybe we should… go?",
+    // "I think it's the right one?"). Characters who default to the hedged question
+    // can neither assert nor commit to asking; every line is qualified twice over,
+    // draining the scene of conviction and forward pressure. Co-occurrence mode —
+    // it fires on the CONJUNCTION of two tics, each of which has its own single-
+    // feature rule (DIALOGUE_HEDGING_OPENER, Wave 266, opener-position hedges;
+    // DIALOGUE_INTERROGATIVE_SATURATION, Wave 294, lines ending in "?"). Neither of
+    // those rate checks need cross its own threshold for the joint pattern to
+    // dominate a scene, so the conjunction is genuinely orthogonal: a line can hedge
+    // mid-sentence (missed by the opener check) and a question can be confident
+    // (counted, but harmless, by the saturation check) — only their overlap is the
+    // specific weakness this rule isolates.
+    if (dlg431.length >= 12) {
+      const hedgeRe431 = /\b(maybe|perhaps|probably|possibly|i think|i guess|i suppose|kind of|sort of|i mean|or something|i dunno|i don['’]t know)\b/i;
+      const hedgedQ431 = dlg431.filter(l => l.trimEnd().endsWith('?') && hedgeRe431.test(l)).length;
+      if (hedgedQ431 / dlg431.length > 0.20) {
+        issues.push({
+          location: 'Dialogue throughout',
+          rule: 'DIALOGUE_HEDGED_QUESTION_FLOOD',
+          severity: 'minor',
+          description: `${hedgedQ431} of ${dlg431.length} dialogue lines (${Math.round(hedgedQ431 / dlg431.length * 100)}%) are both hedged AND phrased as questions ("Maybe we should… go?", "I think it's the right one?"). The doubly-tentative line qualifies itself twice over — it neither asserts nor commits to asking — so characters who default to it can never apply pressure. The cumulative effect is a scene that perpetually defers: no one states, no one demands, every beat dissolves into a softened query.`,
+          suggestedFix: 'Pick one register per line and commit to it. Turn a hedged question into a clean assertion ("Maybe we should go?" → "We\'re going.") or a direct question ("Is this the right one?"), reserving the tentative-query form for the rare moment a character is genuinely both unsure and probing. Conviction — even wrong conviction — gives a scene the forward pressure that perpetual hedging drains.',
         });
       }
     }

@@ -26462,6 +26462,128 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 431 — voicePass: dialogue I-opener run, dialogue length outlier, dialogue hedged-question flood', async () => {
+    const runV431 = async (fountain: string) => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      return voicePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    // Build a dialogue-only fountain: each line preceded by its own character cue.
+    const dlgFountain431 = (lines: string[], chr = 'ALEX', slug = 'INT. ROOM - DAY') =>
+      `${slug}\n\n${lines.map(l => `${chr}\n${l}`).join('\n\n')}\n`;
+
+    it('DIALOGUE_I_OPENER_RUN fires when four or more consecutive dialogue lines begin with "I"', async () => {
+      // 8 lines; lines 2–5 each begin with "I"/"I'm" → run of 4 ≥ 4 → fires
+      const lines431a = [
+        'We need to talk about this.',
+        'I want to leave right now.',
+        'I can\'t stay in this house.',
+        'I never agreed to any of it.',
+        'I\'m done waiting for an answer.',
+        'You should go before it starts.',
+        'She left without saying goodbye.',
+        'Tell me everything you saw tonight.',
+      ];
+      const res = await runV431(dlgFountain431(lines431a));
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_I_OPENER_RUN'), 'DIALOGUE_I_OPENER_RUN should fire');
+    });
+
+    it('DIALOGUE_I_OPENER_RUN does NOT fire when "I" openers never reach four in a row', async () => {
+      // 8 lines; longest consecutive "I" run is 3 (lines 1–3), broken by line 4 → no fire
+      const lines431aNF = [
+        'I want to leave right now.',
+        'I can\'t stay in this house.',
+        'I never agreed to this plan.',
+        'You should go before it starts.',
+        'I\'m done waiting for an answer.',
+        'We can talk about it later.',
+        'She left without saying goodbye.',
+        'Tell me everything you saw tonight.',
+      ];
+      const res = await runV431(dlgFountain431(lines431aNF));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_I_OPENER_RUN'), 'DIALOGUE_I_OPENER_RUN should not fire');
+    });
+
+    it('DIALOGUE_LENGTH_OUTLIER fires when one dialogue line towers over the rest (≥30 words and ≥4× mean)', async () => {
+      // 11 three-word lines + one 38-word line → mean ≈ 5.9, max 38 ≥ 30 and ≥ 4× mean → fires
+      const lines431b = [
+        'Stop the car.',
+        'Hand it over.',
+        'Get down now.',
+        'Watch the door.',
+        'Hold the line.',
+        'Check the back.',
+        'Find the key.',
+        'Cut the wire.',
+        'Take the stairs.',
+        'Block the exit.',
+        'Call for backup.',
+        'Listen to me very carefully because we only get one shot at this and if anyone moves too early the whole plan collapses and every single one of us ends up either captured or dead before sunrise tomorrow.',
+      ];
+      const res = await runV431(dlgFountain431(lines431b));
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_LENGTH_OUTLIER'), 'DIALOGUE_LENGTH_OUTLIER should fire');
+    });
+
+    it('DIALOGUE_LENGTH_OUTLIER does NOT fire when dialogue lengths are moderate with no extreme outlier', async () => {
+      // 12 lines each ~9–13 words; max well under 30 and under 4× mean → no fire
+      const lines431bNF = [
+        'We should leave before the storm finally reaches the coast.',
+        'She told me the whole story over dinner last night.',
+        'He kept the letters hidden in the attic for years.',
+        'They never found out who left the door wide open.',
+        'I keep wondering what he meant by that strange remark.',
+        'The car broke down twice on the way to town.',
+        'Nobody answered the phone when she called the second time.',
+        'We met at the harbor when the tide was low.',
+        'He smiled like he already knew how it would end.',
+        'The letter said far more than she ever said aloud.',
+        'We should have stayed when we still had the chance.',
+        'I painted the whole back fence before the rain came.',
+      ];
+      const res = await runV431(dlgFountain431(lines431bNF));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_LENGTH_OUTLIER'), 'DIALOGUE_LENGTH_OUTLIER should not fire');
+    });
+
+    it('DIALOGUE_HEDGED_QUESTION_FLOOD fires when >20% of lines both hedge and end in a question', async () => {
+      // 4 of 12 lines hedge AND end in "?" → 33% > 20% → fires
+      const lines431c = [
+        'Maybe we should go now?',
+        'I think it\'s the right one?',
+        'Kind of strange, isn\'t it?',
+        'Perhaps she already knew the truth?',
+        'We leave at dawn.',
+        'Hand me the map.',
+        'The door is locked.',
+        'She never called back.',
+        'Get the car ready.',
+        'He left an hour ago.',
+        'Lock everything down.',
+        'Find the other exit.',
+      ];
+      const res = await runV431(dlgFountain431(lines431c));
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_HEDGED_QUESTION_FLOOD'), 'DIALOGUE_HEDGED_QUESTION_FLOOD should fire');
+    });
+
+    it('DIALOGUE_HEDGED_QUESTION_FLOOD does NOT fire when hedges and questions rarely co-occur', async () => {
+      // Only 2 of 12 lines are hedged questions (a confident question and a hedge-without-? are excluded) → 17% ≤ 20% → no fire
+      const lines431cNF = [
+        'Maybe we should go now?',
+        'I think it\'s the right one?',
+        'Is this the way out?',
+        'Maybe we wait here a while.',
+        'We leave at dawn.',
+        'Hand me the map.',
+        'The door is locked.',
+        'She never called back.',
+        'Get the car ready.',
+        'He left an hour ago.',
+        'Lock everything down.',
+        'Find the other exit.',
+      ];
+      const res = await runV431(dlgFountain431(lines431cNF));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_HEDGED_QUESTION_FLOOD'), 'DIALOGUE_HEDGED_QUESTION_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 417 — voicePass: action line length uniformity, dialogue monosyllabic flood, dialogue negation flood', async () => {
     const runV417 = async (fountain: string) => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
