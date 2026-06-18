@@ -61,6 +61,14 @@
 // aftermath void (every assertion scene is followed by two scenes with no revelation, no
 // relationship shift, and no suspense rise — claims land without cascading consequence;
 // sequence/aftermath mode × assertion channel).
+// Wave 432 additions: revelation emotional monotone (all emotionally charged revelation scenes
+// share the same polarity — every discovery lands as either uniformly bad or uniformly good news,
+// erasing tonal surprise from the disclosure layer; valence mode × revelation channel),
+// revelation unprepared climax (the story's final revelation has no told belief or assertion in
+// the three prior scenes — the climactic disclosure has no planted deception to resolve;
+// backward-cause mode × final revelation), assertion singleton run (no two assertion scenes ever
+// appear consecutively — the belief battle spreads so thin that claims never accumulate or build
+// momentum; run-based mode × assertion channel, the complement of REVELATION_CONSECUTIVE_FLOOD).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1734,6 +1742,114 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Each of the ${toldBeliefs.length} assertion scene(s) is followed by two scenes with no revelation, no relationship shift, and no suspense rise — every claim lands without cascading consequence. Assertions that never generate an immediate ripple — no disclosure, no bond moving, no tension rising — fail to establish that beliefs have weight. The story declares positions but those declarations leave no mark in the scenes that immediately follow.`,
         suggestedFix: 'Let at least one assertion create an immediate downstream ripple: after a character states a belief, the next scene or two should show that claim changing something — another character discovers it is false, a relationship cracks, or tension rises because the assertion is now in play. Beliefs that generate consequence teach the audience to care about what characters believe.',
+      });
+    }
+  }
+
+  // ── Wave 432: REVELATION_EMOTIONAL_MONOTONE, REVELATION_UNPREPARED_CLIMAX, ASSERTION_SINGLETON_RUN ──
+
+  // REVELATION_EMOTIONAL_MONOTONE (valence, n≥8, ≥3 charged revelation scenes):
+  // All emotionally charged revelation scenes — those where the discovery lands
+  // with a non-neutral emotional shift — carry the same polarity: either every one
+  // is positive or every one is negative. When disclosures are uniformly bad news
+  // (always 'negative') or uniformly good news (always 'positive'), the audience
+  // learns to predict the emotional register of a revelation before it arrives,
+  // draining the surprise and dramatic range from the disclosure layer. Discoveries
+  // should alternate: a truth that costs something and a truth that frees something
+  // create a richer epistemic texture than a series of identically-valenced shocks.
+  // Valence mode × revelation channel. Distinct from REVELATION_DRAMA_VACUUM (fires
+  // when ALL revelations are emotionally neutral — this fires when the charged ones
+  // are all one polarity, a genuinely different population) and TOLD_BELIEF_EMOTIONAL_
+  // FLATLINE (assertion channel, not revelation channel).
+  if (records.length >= 8 && witnessedBeliefs.length >= 3) {
+    const chargedRevScenes432a = records.filter(
+      r => r.revelation !== null && r.emotionalShift !== 'neutral',
+    );
+    if (chargedRevScenes432a.length >= 3) {
+      const allPos432a = chargedRevScenes432a.every(r => r.emotionalShift === 'positive');
+      const allNeg432a = chargedRevScenes432a.every(r => r.emotionalShift === 'negative');
+      if (allPos432a || allNeg432a) {
+        const dominant432a = allPos432a ? 'positive' : 'negative';
+        issues.push({
+          location: `${chargedRevScenes432a.length} emotionally charged revelation scene(s)`,
+          rule: 'REVELATION_EMOTIONAL_MONOTONE',
+          severity: 'minor',
+          description: `All ${chargedRevScenes432a.length} emotionally charged revelation scenes carry a '${dominant432a}' emotional shift — every charged discovery lands as ${dominant432a === 'positive' ? 'good news' : 'bad news'}. When disclosures are emotionally uniform, the audience predicts the register before the truth arrives, and the surprise of revelation collapses into formula. A disclosure layer needs both kinds of truth: revelations that cost and revelations that free create tonal texture and unpredictability.`,
+          suggestedFix: `Introduce at least one revelation that lands in the opposite emotional register: if every discovery has been bad news, write one that is a genuine relief — a truth that lightens rather than burdens. Tonal variation in revelations keeps the audience uncertain about what a disclosure will mean, which is the source of suspense in the disclosure layer.`,
+        });
+      }
+    }
+  }
+
+  // REVELATION_UNPREPARED_CLIMAX (backward-cause, n≥10, ≥2 revelations, last
+  // revelation at position ≥3 in records): The story's final revelation scene
+  // has no told belief (character assertion) in any of the three scenes that
+  // precede it. Looking backward from the climactic disclosure, there is no
+  // planted deception, positioned claim, or epistemic stake that the revelation
+  // resolves — the final truth arrives without a lie it is correcting or a
+  // mystery it is answering. The most powerful revelations are those that
+  // discharge a dramatic irony the audience has been carrying: they have known
+  // or suspected a truth; a character is about to discover it. Without a backward
+  // assertion to create that irony, the final revelation reads as information
+  // delivery rather than dramatic culmination. Backward-cause mode × final
+  // revelation. Distinct from REVELATION_ASSERTION_DISCONNECT (checks the whole
+  // story for adjacent revelation/assertion pairs — this focuses specifically on
+  // the FINAL revelation and looks backward 3 scenes) and REVELATION_LATE_FIRST
+  // (position of the FIRST revelation — this is about the LAST).
+  if (records.length >= 10 && witnessedBeliefs.length >= 2) {
+    const lastRevSceneIdx432b = Math.max(...witnessedBeliefs.map(w => w.sceneIdx));
+    const lastRevRecPos432b = records.findIndex(r => r.sceneIdx === lastRevSceneIdx432b);
+    if (lastRevRecPos432b >= 3) {
+      const priorSceneIdxs432b = records
+        .slice(lastRevRecPos432b - 3, lastRevRecPos432b)
+        .map(r => r.sceneIdx);
+      const hasPriorAssertion432b = toldBeliefs.some(t =>
+        priorSceneIdxs432b.includes(t.sceneIdx),
+      );
+      if (!hasPriorAssertion432b) {
+        issues.push({
+          location: `Scene ${lastRevSceneIdx432b} — final revelation`,
+          rule: 'REVELATION_UNPREPARED_CLIMAX',
+          severity: 'minor',
+          description: `The story's final revelation (Scene ${lastRevSceneIdx432b}) is not preceded by any character assertion in the three scenes before it — there is no planted claim, defended position, or deliberate misdirection that the climactic disclosure is resolving. A revelation without a prior assertion has no dramatic irony behind it: the audience has not been given a false belief to correct, a mystery to solve, or a lie to unmask. The final truth arrives as information, not as the culmination of a belief arc.`,
+          suggestedFix: `Plant an assertion in the run-up to the final revelation: give a character a position they defend, a lie they maintain, or a belief they act on in the three scenes before the climactic disclosure. When the audience carries a planted claim into the revelation scene, the truth arriving feels earned — it resolves an epistemic debt rather than just delivering a fact.`,
+        });
+      }
+    }
+  }
+
+  // ASSERTION_SINGLETON_RUN (run-based, n≥10, ≥4 told beliefs): No two assertion
+  // scenes appear consecutively — the longest run of scenes containing a told
+  // belief is exactly one. Every claim is an island surrounded by assertion-free
+  // scenes on both sides; the belief battle never accumulates, never builds to a
+  // debate, and never gives consecutive characters the chance to challenge, echo,
+  // or double-down on what has just been asserted. A story where beliefs are
+  // spread too thin never creates the sense of an epistemic war — it delivers
+  // isolated opinions into a vacuum rather than a contested arena. Run-based mode
+  // × assertion channel — the complement of REVELATION_CONSECUTIVE_FLOOD (Wave
+  // 418: revelation run too dense) and the assertion-channel mirror of the silence
+  // version TOLD_BELIEF_DROUGHT (which fires on too-long runs of NO assertions).
+  // Distinct from TOLD_BELIEF_CLUSTERING (3+ assertions in ONE scene) and
+  // EXPOSITION_DUMP (3+ consecutive told-only scenes — this fires when the max
+  // consecutive assertion run is 1, the opposite condition).
+  if (records.length >= 10 && toldBeliefs.length >= 4) {
+    const assertionIdxSet432c = new Set(toldBeliefs.map(t => t.sceneIdx));
+    let maxRun432c = 0;
+    let curRun432c = 0;
+    for (const r of records) {
+      if (assertionIdxSet432c.has(r.sceneIdx)) {
+        if (++curRun432c > maxRun432c) maxRun432c = curRun432c;
+      } else {
+        curRun432c = 0;
+      }
+    }
+    if (maxRun432c <= 1) {
+      issues.push({
+        location: 'Assertion distribution — every claim isolated',
+        rule: 'ASSERTION_SINGLETON_RUN',
+        severity: 'minor',
+        description: `The story has ${toldBeliefs.length} character assertions but no two appear in consecutive scenes — every claim is surrounded by assertion-free scenes on both sides. When beliefs are spread so thin that they never accumulate or overlap, the epistemic layer cannot build momentum: characters state positions in isolation rather than debate, double down, or react to what was just claimed. A story needs runs of assertion to dramatize a contested belief arena, not just isolated opinions delivered into silence.`,
+        suggestedFix: `Place at least two consecutive assertion scenes: let one character\'s claim in a scene be met by another character\'s counter-assertion in the next scene, or let a position be doubled-down on after it goes uncontested. Back-to-back assertions create the texture of an argument or a belief crisis — they signal that what characters think is actually at stake.`,
       });
     }
   }

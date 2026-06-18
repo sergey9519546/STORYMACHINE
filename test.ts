@@ -25774,6 +25774,93 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 432 — beliefPass: revelation emotional monotone, revelation unprepared climax, assertion singleton run', async () => {
+    const makeRec432 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      seededClueIds: [], payoffSetupIds: [], revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], dramaticTurn: 'nothing',
+      purpose: 'development', unresolvedClues: [],
+      ...overrides,
+    });
+    const runB432 = async (records: any[], fountain = '') => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('REVELATION_EMOTIONAL_MONOTONE fires when all charged revelation scenes share the same negative polarity', async () => {
+      // n=8; revelations at 2,4,6 all with emotionalShift='negative' → allNeg=true → fires
+      const recs432a = Array.from({ length: 8 }, (_, i) =>
+        makeRec432(i, {
+          revelation: [2, 4, 6].includes(i) ? `Truth revealed at scene ${i}` : null,
+          emotionalShift: [2, 4, 6].includes(i) ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runB432(recs432a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_EMOTIONAL_MONOTONE'), 'REVELATION_EMOTIONAL_MONOTONE should fire');
+    });
+
+    it('REVELATION_EMOTIONAL_MONOTONE does not fire when revelations carry mixed emotional polarities', async () => {
+      // n=8; revelations at 2,4,6 — scenes 2,4 negative, scene 6 positive → mixed → no fire
+      const recs432anr = Array.from({ length: 8 }, (_, i) =>
+        makeRec432(i, {
+          revelation: [2, 4, 6].includes(i) ? `Truth revealed at scene ${i}` : null,
+          emotionalShift: [2, 4].includes(i) ? 'negative' : i === 6 ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runB432(recs432anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_EMOTIONAL_MONOTONE'), 'REVELATION_EMOTIONAL_MONOTONE should not fire');
+    });
+
+    it('REVELATION_UNPREPARED_CLIMAX fires when the final revelation has no prior assertion in the 3 preceding scenes', async () => {
+      // n=10; revelations at 2 and 8; scenes 5,6,7 (the 3 prior to scene 8) have no assertions → fires
+      const recs432b = Array.from({ length: 10 }, (_, i) =>
+        makeRec432(i, {
+          revelation: [2, 8].includes(i) ? `Disclosure at scene ${i}` : null,
+          // assertion only at scene 1, far from the final revelation at 8
+          dialogueHighlights: i === 1 ? ['CHAR: She claims he was never there.'] : [],
+        }),
+      );
+      const res = await runB432(recs432b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_UNPREPARED_CLIMAX'), 'REVELATION_UNPREPARED_CLIMAX should fire');
+    });
+
+    it('REVELATION_UNPREPARED_CLIMAX does not fire when an assertion appears within 3 scenes of the final revelation', async () => {
+      // n=10; revelations at 2 and 8; scene 7 has an assertion (1 scene before the final) → no fire
+      const recs432bnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec432(i, {
+          revelation: [2, 8].includes(i) ? `Disclosure at scene ${i}` : null,
+          dialogueHighlights: i === 7 ? ['CHAR: She insists the key was hidden before the storm.'] : [],
+        }),
+      );
+      const res = await runB432(recs432bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_UNPREPARED_CLIMAX'), 'REVELATION_UNPREPARED_CLIMAX should not fire');
+    });
+
+    it('ASSERTION_SINGLETON_RUN fires when no two assertion scenes appear consecutively', async () => {
+      // n=10; 4 assertions at scenes 0,3,6,9 (none consecutive) → maxRun=1 ≤ 1 → fires
+      const recs432c = Array.from({ length: 10 }, (_, i) =>
+        makeRec432(i, {
+          dialogueHighlights: [0, 3, 6, 9].includes(i) ? ['CHAR: She claims it was never there.'] : [],
+        }),
+      );
+      const res = await runB432(recs432c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ASSERTION_SINGLETON_RUN'), 'ASSERTION_SINGLETON_RUN should fire');
+    });
+
+    it('ASSERTION_SINGLETON_RUN does not fire when two consecutive assertion scenes exist', async () => {
+      // n=10; assertions at 0,1,5,8 — scenes 0 and 1 are consecutive → maxRun=2 > 1 → no fire
+      const recs432cnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec432(i, {
+          dialogueHighlights: [0, 1, 5, 8].includes(i) ? ['CHAR: She claims it was never there.'] : [],
+        }),
+      );
+      const res = await runB432(recs432cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ASSERTION_SINGLETON_RUN'), 'ASSERTION_SINGLETON_RUN should not fire');
+    });
+  });
+
   describe('Wave 418 — beliefPass: revelation consecutive flood, assertion Act 2a void, assertion aftermath void', async () => {
     const makeRec418 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
