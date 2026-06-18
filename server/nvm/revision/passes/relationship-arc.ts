@@ -74,6 +74,16 @@
 // relationship amplitude decay), pair repair unmotivated (backward-cause — a pair with ≥3 shifts
 // has positive shifts preceded by neither a prior pair conflict within 3 scenes nor any dramatic
 // catalyst in that scene or the prior; warmings arrive without cause).
+// Wave 441 additions: pair ensemble solo (≥3 pairs each with ≥2 shifts yet no single scene has
+// shifts from 2+ different pairs simultaneously — the relational world moves one bond at a time,
+// missing compound beats where multiple dynamics shift together; co-occurrence/decoupling ×
+// multi-pair coincidence, first check auditing simultaneous multi-pair movement), pair rupture run
+// (3+ consecutive scenes each carry at least one major rupture ≤ -0.3 — back-to-back breaks
+// with no breath between them; run-based × negative-shift channel, distinct from PAIR_AMPLITUDE_
+// GROWTH's magnitude-growth run), relationship climax void (no shift of magnitude ≥ 0.3 in the
+// final 15% of scenes while ≥3 shifts from ≥2 pairs exist in the first 85% — the story's most
+// emotionally charged moment is relationally silent; zone presence/absence × final-zone, fills
+// the zone set alongside midpoint freeze and Act 2b desert).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1925,6 +1935,132 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
           suggestedFix: `Give each warming a backward cause: either let it follow a recent rupture for this pair (so it reads as resolution), or place a revelation, dramatic turn, or clock in the scene that triggers the shift. A bond that warms for no dramatic reason is a relationship that rewrites itself rather than earning its changes through story logic.`,
         });
         break; // one report per pass
+      }
+    }
+  }
+
+  // ── Wave 441: PAIR_ENSEMBLE_SOLO, PAIR_RUPTURE_RUN, RELATIONSHIP_CLIMAX_VOID ──
+
+  // PAIR_ENSEMBLE_SOLO (minor, n≥10, ≥3 active pairs with ≥2 shifts each): No single scene
+  // contains shifts from two or more different pairs — every relational event happens to one bond
+  // at a time, with no scene where multiple dynamics simultaneously shift in response to the same
+  // event. Ensemble drama generates its richest moments from compound beats: a revelation that
+  // simultaneously strains one bond and repairs another, a confrontation that shifts two pairs
+  // at once, a climax that cracks one friendship as it cements another. When every scene is a
+  // solo for a single pair, the relational world's dynamics never interact — each bond lives in
+  // its own bubble, processed by the audience in sequence rather than simultaneously. Co-occurrence/
+  // decoupling mode × multi-pair coincidence. Distinct from DEPTH_GAP (Wave 276: one pair gets 3×
+  // more shifts than the second — a count-imbalance, not a co-occurrence check), SINGLE_PAIR_
+  // RELATIONSHIP (Wave 161: ALL shifts involve only one pair — this fires even when 3+ pairs exist,
+  // as long as they never coincide in the same scene), and RELATIONSHIP_SHIFT_AFTERMATH_VOID (Wave
+  // 427: shift aftermath is relationally silent — a sequential check, not a within-scene check).
+  // This is the first check to audit whether the ensemble's bonds ever move simultaneously.
+  if (records.length >= 10) {
+    const activePairs441a = [...pairStats.entries()]
+      .filter(([, stats]) => stats.shifts.length >= 2)
+      .map(([key]) => key);
+    if (activePairs441a.length >= 3) {
+      const anyCompound441a = (records as any[]).some(r => {
+        const pairsInScene = new Set<string>();
+        for (const s of ((r.relationshipShifts ?? []) as Array<{ pairKey: string; amount: number }>)) {
+          if (Math.abs(s.amount) >= 0.3) pairsInScene.add(s.pairKey);
+        }
+        return pairsInScene.size >= 2;
+      });
+      if (!anyCompound441a) {
+        issues.push({
+          location: `${activePairs441a.length} active pairs — never coincide in same scene`,
+          rule: 'PAIR_ENSEMBLE_SOLO',
+          severity: 'minor',
+          description: `The story has ${activePairs441a.length} active relationship pairs (each with ≥2 shifts), but no single scene shifts two or more of them simultaneously — every relational event is a solo act. Ensemble drama's richest moments come from compound beats: a scene where one bond fractures while another tentatively repairs, a confrontation that simultaneously damages one pair and clarifies another, a climax that cracks one friendship while cementing an alliance. When bonds never move together, the audience processes them in sequence rather than in tension with one another, and the relational world loses the complexity that arises from dynamics interacting.`,
+          suggestedFix: 'Design at least one scene where two different pairs each experience a significant shift: a dinner-table confrontation that simultaneously strains the couple and repairs the friendship, a revelation that damages the protagonist\'s alliance with the mentor while deepening their bond with the rival, a climax that costs one relationship while earning another. A compound relational beat is one of the most efficient pages in drama — it moves two dynamics for the price of one scene.',
+        });
+      }
+    }
+  }
+
+  // PAIR_RUPTURE_RUN (minor, n≥8): Three or more consecutive scenes each carry at least one
+  // major relationship rupture (a negative shift with amount ≤ -0.3) — an unbroken sequence of
+  // back-to-back bond breaks with no relational breath between them. When ruptures stack in
+  // consecutive scenes, the audience is subjected to a relational grinding that loses its
+  // individual impact through accumulation: each break arrives before the previous one has
+  // registered. Ruptures land hardest when they are spaced — when the audience has a non-rupture
+  // scene to absorb the cost of the prior break before the next one arrives. A consecutive run
+  // of ≥3 ruptures also makes recovery feel impossible, since no scene in the run is available
+  // for even the smallest tentative repair. Run-based mode × negative-shift channel. Distinct
+  // from PAIR_AMPLITUDE_GROWTH (Wave 427: increasing magnitudes per pair — a growth-trend run,
+  // not a consecutive-scenes check), RELATIONSHIP_SHIFT_DROUGHT (Wave 343: the longest no-shift
+  // run ≥40% — the complement, not rupture density), and CONFLICT_BREATHING_ROOM_ABSENT (Wave
+  // 436 in the conflict pass: 4+ ruptures with ≤1 gap — a distribution check with a different
+  // threshold and a different pass perspective). This is the first check in this pass for a local
+  // consecutive run of negative-shift scenes.
+  if (records.length >= 8) {
+    let maxRupRun441b = 0;
+    let curRupRun441b = 0;
+    let maxRupStart441b = -1;
+    let curRupStart441b = -1;
+    for (let i = 0; i < records.length; i++) {
+      const hasRup = ((records as any[])[i].relationshipShifts ?? []).some(
+        (s: any) => (s.amount ?? 0) <= -0.3,
+      );
+      if (hasRup) {
+        if (curRupRun441b === 0) curRupStart441b = i;
+        if (++curRupRun441b > maxRupRun441b) {
+          maxRupRun441b = curRupRun441b;
+          maxRupStart441b = curRupStart441b;
+        }
+      } else {
+        curRupRun441b = 0;
+      }
+    }
+    if (maxRupRun441b >= 3) {
+      issues.push({
+        location: `Scenes ${maxRupStart441b}–${maxRupStart441b + maxRupRun441b - 1} — consecutive rupture run`,
+        rule: 'PAIR_RUPTURE_RUN',
+        severity: 'minor',
+        description: `Scenes ${maxRupStart441b}–${maxRupStart441b + maxRupRun441b - 1} each carry at least one major relationship rupture — ${maxRupRun441b} consecutive scenes of back-to-back bond breaks with no non-rupture scene between them. When breaks stack consecutively, each one arrives before the previous has registered: the audience is ground through relational damage rather than being given time to feel any individual break's cost. A run of ruptures without pause also makes recovery feel narratively impossible, since the machine never slows enough for even a tentative repair.`,
+        suggestedFix: `Interrupt the rupture run at Scenes ${maxRupStart441b}–${maxRupStart441b + maxRupRun441b - 1}: insert at least one non-rupture scene between consecutive breaks. It need not be a repair — it can be a neutral scene, a scene with a different relational focus, or a moment of forced civility — but the break between breaks gives each rupture room to hurt before the next one arrives.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_CLIMAX_VOID (minor, n≥10, ≥3 shifts of |amount|≥0.3 from ≥2 pairs in first 85%):
+  // The story's climax zone (final 15% of scenes) contains no relationship shift of magnitude ≥ 0.3
+  // while the first 85% has significant bond movement from at least two pairs. The story's most
+  // emotionally charged structural zone is relationally silent: bonds do not move at the moment
+  // when the audience is most invested in them, and the climax resolves narratively without
+  // registering relational consequence. The climax zone is the moment when the central tensions
+  // come to a head — and for stories with meaningful relational arcs, the climax should be where
+  // bonds either complete their movement or reach their most acute state. Zone presence/absence
+  // mode × final-zone × relationship. Distinct from MIDPOINT_FREEZE (Wave 276: middle 50% silent),
+  // RELATIONSHIP_ACT2B_DESERT (Wave 318: 50%–75% zone silent), PAIR_SECOND_HALF_VOID (Wave 357:
+  // a specific pair has zero second-half shifts — per-pair, not global), and RELATIONSHIP_OPENING_
+  // BURST (Wave 290: ALL shifts in the first 25% — a distribution check, not a zone void). This
+  // fills the final zone of the relational zone set.
+  if (records.length >= 10) {
+    const climaxStart441c = Math.floor(records.length * 0.85);
+    let earlyShiftCount441c = 0;
+    const earlyPairs441c = new Set<string>();
+    for (let i = 0; i < climaxStart441c; i++) {
+      for (const s of ((records as any[])[i].relationshipShifts ?? []) as Array<{ pairKey: string; amount: number }>) {
+        if (Math.abs(s.amount) >= 0.3) {
+          earlyPairs441c.add(s.pairKey);
+          earlyShiftCount441c++;
+        }
+      }
+    }
+    if (earlyShiftCount441c >= 3 && earlyPairs441c.size >= 2) {
+      const hasClimaxShift441c = (records as any[]).slice(climaxStart441c).some(r =>
+        ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => Math.abs(s.amount) >= 0.3),
+      );
+      if (!hasClimaxShift441c) {
+        issues.push({
+          location: `Climax zone (Scenes ${climaxStart441c}–${records.length - 1}) — relationally silent`,
+          rule: 'RELATIONSHIP_CLIMAX_VOID',
+          severity: 'minor',
+          description: `The climax zone (final 15% of scenes: Scenes ${climaxStart441c}–${records.length - 1}) contains no relationship shift of magnitude ≥ 0.3, while ${earlyShiftCount441c} meaningful shifts from ${earlyPairs441c.size} pairs occur in the preceding ${climaxStart441c} scenes. The story's most emotionally charged structural zone is relationally silent: bonds do not move at the moment when the audience is most invested in them. For any story with meaningful relational arcs, the climax should register in the relationship layer — as a bond that finally breaks, finally mends, or reaches its most acute state.`,
+          suggestedFix: `Give at least one pair a meaningful shift in the climax zone (Scenes ${climaxStart441c}–${records.length - 1}): the bond that the story has been tracing should reach its highest or lowest point at the climax rather than going quiet at the moment of maximum intensity. The relationship shift doesn't need to be the climax's primary focus — it can be a consequence, a cost, or a revelation — but the relational engine should not stall at the story's most emotionally loaded moment.`,
+        });
       }
     }
   }

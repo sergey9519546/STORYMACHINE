@@ -19468,6 +19468,96 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 441 — relationshipArcPass: pair ensemble solo, pair rupture run, relationship climax void', async () => {
+    const mkShift441 = (pairKey: string, amount: number) => [{ pairKey, dimension: 'trust', amount }];
+    const makeRec441 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runRA441 = async (records: any[]) => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PAIR_ENSEMBLE_SOLO fires when 3+ active pairs never shift in the same scene', async () => {
+      // n=10; pair A|B shifts at 1 and 3; pair C|D shifts at 5 and 7; pair E|F shifts at 2 and 8
+      // 3 active pairs, but no scene has 2+ pairs shifting simultaneously → fires
+      const recs441a = Array.from({ length: 10 }, (_, i) => makeRec441(i));
+      recs441a[1] = makeRec441(1, { relationshipShifts: mkShift441('A|B', -0.5) });
+      recs441a[2] = makeRec441(2, { relationshipShifts: mkShift441('E|F', 0.4) });
+      recs441a[3] = makeRec441(3, { relationshipShifts: mkShift441('A|B', 0.3) });
+      recs441a[5] = makeRec441(5, { relationshipShifts: mkShift441('C|D', -0.4) });
+      recs441a[7] = makeRec441(7, { relationshipShifts: mkShift441('C|D', 0.3) });
+      recs441a[8] = makeRec441(8, { relationshipShifts: mkShift441('E|F', -0.5) });
+      const res = await runRA441(recs441a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAIR_ENSEMBLE_SOLO'), 'PAIR_ENSEMBLE_SOLO should fire');
+    });
+
+    it('PAIR_ENSEMBLE_SOLO does not fire when two pairs shift in the same scene', async () => {
+      // n=10; scene 3 has both A|B and C|D shifting → compound beat → no fire
+      const recs441anr = Array.from({ length: 10 }, (_, i) => makeRec441(i));
+      recs441anr[1] = makeRec441(1, { relationshipShifts: mkShift441('A|B', -0.5) });
+      recs441anr[3] = makeRec441(3, {
+        relationshipShifts: [
+          { pairKey: 'A|B', dimension: 'trust', amount: 0.3 },
+          { pairKey: 'C|D', dimension: 'trust', amount: -0.4 },
+        ],
+      });
+      recs441anr[5] = makeRec441(5, { relationshipShifts: mkShift441('C|D', 0.3) });
+      recs441anr[7] = makeRec441(7, { relationshipShifts: mkShift441('E|F', -0.5) });
+      recs441anr[8] = makeRec441(8, { relationshipShifts: mkShift441('E|F', 0.3) });
+      const res = await runRA441(recs441anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAIR_ENSEMBLE_SOLO'), 'PAIR_ENSEMBLE_SOLO should not fire');
+    });
+
+    it('PAIR_RUPTURE_RUN fires when 3+ consecutive scenes each have a major rupture', async () => {
+      // n=8; scenes 2,3,4 each have a rupture ≤ -0.3 → maxRupRun=3 → fires
+      const recs441b = Array.from({ length: 8 }, (_, i) => makeRec441(i));
+      recs441b[2] = makeRec441(2, { relationshipShifts: mkShift441('A|B', -0.5) });
+      recs441b[3] = makeRec441(3, { relationshipShifts: mkShift441('C|D', -0.4) });
+      recs441b[4] = makeRec441(4, { relationshipShifts: mkShift441('A|B', -0.3) });
+      const res = await runRA441(recs441b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAIR_RUPTURE_RUN'), 'PAIR_RUPTURE_RUN should fire');
+    });
+
+    it('PAIR_RUPTURE_RUN does not fire when ruptures are separated by non-rupture scenes', async () => {
+      // n=8; ruptures at 2 and 4 (scene 3 has no rupture) → max run=1 → no fire
+      const recs441bnr = Array.from({ length: 8 }, (_, i) => makeRec441(i));
+      recs441bnr[2] = makeRec441(2, { relationshipShifts: mkShift441('A|B', -0.5) });
+      recs441bnr[4] = makeRec441(4, { relationshipShifts: mkShift441('A|B', -0.4) });
+      const res = await runRA441(recs441bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAIR_RUPTURE_RUN'), 'PAIR_RUPTURE_RUN should not fire');
+    });
+
+    it('RELATIONSHIP_CLIMAX_VOID fires when the final 15% has no relationship shifts', async () => {
+      // n=10; climaxStart=Math.floor(10*0.85)=8; shifts at 1(A|B),2(A|B),4(C|D),6(C|D) (4 shifts, 2 pairs before climax)
+      // scenes 8,9 (climax zone) have no shifts → fires
+      const recs441c = Array.from({ length: 10 }, (_, i) => makeRec441(i));
+      recs441c[1] = makeRec441(1, { relationshipShifts: mkShift441('A|B', -0.5) });
+      recs441c[2] = makeRec441(2, { relationshipShifts: mkShift441('A|B', 0.4) });
+      recs441c[4] = makeRec441(4, { relationshipShifts: mkShift441('C|D', -0.3) });
+      recs441c[6] = makeRec441(6, { relationshipShifts: mkShift441('C|D', 0.3) });
+      const res = await runRA441(recs441c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_CLIMAX_VOID'), 'RELATIONSHIP_CLIMAX_VOID should fire');
+    });
+
+    it('RELATIONSHIP_CLIMAX_VOID does not fire when a shift occurs in the final 15%', async () => {
+      // n=10; climaxStart=8; scene 9 has a shift → no fire
+      const recs441cnr = Array.from({ length: 10 }, (_, i) => makeRec441(i));
+      recs441cnr[1] = makeRec441(1, { relationshipShifts: mkShift441('A|B', -0.5) });
+      recs441cnr[2] = makeRec441(2, { relationshipShifts: mkShift441('A|B', 0.4) });
+      recs441cnr[4] = makeRec441(4, { relationshipShifts: mkShift441('C|D', -0.3) });
+      recs441cnr[9] = makeRec441(9, { relationshipShifts: mkShift441('A|B', 0.5) });
+      const res = await runRA441(recs441cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_CLIMAX_VOID'), 'RELATIONSHIP_CLIMAX_VOID should not fire');
+    });
+  });
+
   describe('Wave 427 — relationshipArcPass: relationship shift aftermath void, pair amplitude growth, pair repair unmotivated', async () => {
     const makeRec427 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
