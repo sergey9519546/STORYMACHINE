@@ -64,6 +64,16 @@
 // without structural run-up), purpose monotone run (run-based — five or more consecutive scenes
 // share one purpose; a local structural plateau distinct from the global PURPOSE_MONOCULTURE and
 // the zone-complete ACT1/ACT2/ACT3_PURPOSE_SINGLE checks).
+// Wave 443 additions: revelation-curiosity decoupled (co-occurrence/decoupling — every revelation
+// scene has curiosityDelta ≤ 0; revelations never co-occur with a curiosity spike, so disclosures
+// close questions rather than opening new ones; the first co-occurrence check in this pass, distinct
+// from all zone-based and channel-isolation checks), peak suspense emotional vacuum (single-peak
+// isolation × valence — the single highest-suspense scene in the story has emotionalShift = neutral
+// while emotion is active elsewhere; the tensest moment is emotionally blank, isolating the peak
+// from the story's affective register), positive scene drought (valence × underweight — fewer than
+// 15% of scenes carry positive emotionalShift while ≥3 carry negative; the positive register is
+// chronically underrepresented, distinct from EMOTIONAL_ARC_UNIFORM which audits dominance of any
+// one register above 70% and from ACT_1_WARMTH_ABSENT which is zone-scoped).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1880,6 +1890,105 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${bestRunLen429} consecutive scenes (Scenes ${bestRunStart429}–${bestRunStart429 + bestRunLen429 - 1}) all carry the purpose "${runPurpose429}" — a localized structural plateau where the story stops rotating through narrative functions. Even though the script uses other purposes elsewhere, this run serves the same structural job scene after scene with no change of gear, so the audience loses the sense of forward structural motion across the stretch.`,
         suggestedFix: `Break the run by varying scene purpose: between the "${runPurpose429}" scenes, insert a reversal, a character-moment that reframes the stakes, or a setup that plants a later payoff. A run of one structural function reads as the story marking time; rotating purposes keeps each scene advancing the architecture, not just the page count.`,
+      });
+    }
+  }
+
+  // ── Wave 443: REVELATION_CURIOSITY_DECOUPLED, PEAK_SUSPENSE_EMOTIONAL_VACUUM, POSITIVE_SCENE_DROUGHT ──
+
+  // REVELATION_CURIOSITY_DECOUPLED (co-occurrence/decoupling, n≥10, ≥2 revelation scenes, ≥2 curiosity scenes):
+  // Every scene carrying a revelation has curiosityDelta ≤ 0 — revelations never co-occur with a
+  // curiosity spike. Good structural disclosure ties revelation to mystery: each truth uncovered
+  // should simultaneously open a new question (positive curiosityDelta), cycling the audience between
+  // knowing and wondering. When revelations and curiosity permanently decouple — disclosures flatten
+  // curiosity rather than generating it — the story's information layer and its mystery layer operate
+  // as separate channels that never reinforce each other. Revelations feel like closures; the audience
+  // leaves each disclosure scene with less to wonder about, not more.
+  // Distinctness: ACT_1_CURIOSITY_ABSENT checks a zone for any curiosity spike. REVELATION_DROUGHT
+  // checks for long runs without revelation. This is the first CO-OCCURRENCE check in the pass: it
+  // asks whether revelation and curiosity ever appear IN THE SAME SCENE — a granular coincidence
+  // test orthogonal to all zone-presence and channel-isolation checks.
+  if (n >= 10) {
+    const revScenes443a = (records as any[]).filter(r => !!r.revelation);
+    const curScenes443a = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0);
+    if (revScenes443a.length >= 2 && curScenes443a.length >= 2) {
+      const hasCoOccurrence443a = revScenes443a.some(r => (r.curiosityDelta ?? 0) > 0);
+      if (!hasCoOccurrence443a) {
+        issues.push({
+          location: `${revScenes443a.length} revelation scene(s) — none carries curiosityDelta > 0`,
+          rule: 'REVELATION_CURIOSITY_DECOUPLED',
+          severity: 'minor',
+          description: `The story has ${revScenes443a.length} revelation scene(s) and ${curScenes443a.length} scene(s) with positive curiosityDelta, but they never coincide — no revelation scene raises curiosity. Good structural disclosure cycles the audience between knowing and wondering: each truth uncovered should open a new question. When revelations and curiosity decouple, disclosures feel like closures rather than catalysts; the audience leaves each revelation scene with less to wonder about, not more.`,
+          suggestedFix: 'Pair each revelation with a mystery: the truth revealed should simultaneously expose a new unknown. After disclosing who did it, let the audience wonder why. After revealing the secret, show that solving it creates a bigger problem. Revelations that open questions generate forward pull; revelations that only close them feel like dead ends.',
+        });
+      }
+    }
+  }
+
+  // PEAK_SUSPENSE_EMOTIONAL_VACUUM (single-peak isolation × valence, n≥8, peakSuspense > 2, ≥2 emotional scenes):
+  // The single scene with the highest suspenseDelta in the entire story — the global suspense peak —
+  // has emotionalShift = 'neutral' (or no emotionalShift) while ≥2 other scenes carry a non-neutral
+  // emotional register. The single tensest moment in the script is emotionally blank: maximum tension
+  // without an emotional charge. A story's peak suspense moment should fuse both channels — the tension
+  // of stakes and the feeling of what those stakes mean — so the audience is gripped at both levels
+  // simultaneously. When the peak is emotionally inert, it generates spectacle without resonance: the
+  // audience feels the machinery of danger but not the human cost of it.
+  // Distinctness: All existing structure.ts checks that reference the suspense peak use it to locate
+  // a zone or anchor a backward-cause check (CLIMAX_UNPREPARED, FALSE_CLIMAX). None audit the
+  // emotional valence of the peak scene itself. MIDPOINT_EMOTIONAL_FLATLINE checks the midpoint
+  // zone for emotional neutrality. This is the only check that isolates the SINGLE GLOBAL PEAK by
+  // suspenseDelta and then audits an orthogonal channel (emotional valence) of that specific scene.
+  if (n >= 8) {
+    const emotionalScenes443b = (records as any[]).filter(r =>
+      r.emotionalShift === 'positive' || r.emotionalShift === 'negative',
+    );
+    if (emotionalScenes443b.length >= 2) {
+      let peakIdx443b = -1;
+      let peakSusp443b = -Infinity;
+      for (let i = 0; i < n; i++) {
+        const s = (records as any[])[i].suspenseDelta ?? 0;
+        if (s > peakSusp443b) { peakSusp443b = s; peakIdx443b = i; }
+      }
+      if (peakSusp443b > 2 && peakIdx443b >= 0) {
+        const peakRec443b = (records as any[])[peakIdx443b];
+        const peakEmotion443b = peakRec443b.emotionalShift ?? 'neutral';
+        if (peakEmotion443b !== 'positive' && peakEmotion443b !== 'negative') {
+          issues.push({
+            location: `Scene ${peakIdx443b} (peak suspense ${peakSusp443b.toFixed(1)}, emotionalShift: ${peakEmotion443b})`,
+            rule: 'PEAK_SUSPENSE_EMOTIONAL_VACUUM',
+            severity: 'minor',
+            description: `The single highest-suspense scene in the story (Scene ${peakIdx443b}, suspenseDelta ${peakSusp443b.toFixed(1)}) carries no emotional charge — emotionalShift is "${peakEmotion443b}" — even though ${emotionalScenes443b.length} other scenes use a non-neutral emotional register. The tensest moment in the script is emotionally blank: the audience feels the machinery of danger but not the human cost of it. A story's suspense peak should fuse both channels simultaneously — the weight of stakes and the feeling of what those stakes mean — so tension and emotion amplify each other rather than operating on separate tracks.`,
+            suggestedFix: 'Give the peak suspense scene an emotional charge: what does this moment cost the protagonist personally? What relationship hangs in the balance? What hope or fear is crystallised here? The highest-tension scene is the moment when the audience most needs to feel something — align the emotional register with the dramatic register so the peak lands on both levels at once.',
+          });
+        }
+      }
+    }
+  }
+
+  // POSITIVE_SCENE_DROUGHT (valence × underweight, n≥10, negativeCount≥3, positiveRatio<0.15):
+  // Fewer than 15% of scenes carry emotionalShift = 'positive' while ≥3 scenes carry 'negative'.
+  // The story is heavily negatively valenced — darkness vastly outweighs uplift, with near-zero
+  // emotional counterweight. While dramatic tension requires conflict and darkness, a story with
+  // almost no positive emotional scenes becomes tonally relentless and narratively exhausting: the
+  // audience has nowhere to breathe, no small victories to latch onto, no warmth to make the
+  // darkness meaningful by contrast. Positive emotional moments — not saccharine relief, but genuine
+  // moments of connection, agency, or earned uplift — create the contrast that makes the dark scenes
+  // feel like a cost rather than just a baseline.
+  // Distinctness: ACT_1_WARMTH_ABSENT checks only the first 25% zone. EMOTIONAL_ARC_UNIFORM fires
+  // when one register exceeds 70% of all scenes (dominance threshold). ACT_3_EMOTIONAL_FLATLINE
+  // checks the finale for neutral (not negative). This is the only check auditing the global
+  // RATIO of positive scenes — the positive register can be chronically absent even when
+  // no single zone or proportion threshold trips any existing check.
+  if (n >= 10) {
+    const positiveCount443c = (records as any[]).filter(r => r.emotionalShift === 'positive').length;
+    const negativeCount443c = (records as any[]).filter(r => r.emotionalShift === 'negative').length;
+    if (negativeCount443c >= 3 && positiveCount443c / n < 0.15) {
+      issues.push({
+        location: `Emotional valence — ${positiveCount443c} positive scene(s) vs ${negativeCount443c} negative (${(positiveCount443c / n * 100).toFixed(0)}% positive of ${n} total)`,
+        rule: 'POSITIVE_SCENE_DROUGHT',
+        severity: 'minor',
+        description: `Only ${positiveCount443c} of ${n} scenes (${(positiveCount443c / n * 100).toFixed(0)}%) carry positive emotionalShift, while ${negativeCount443c} carry negative. The story's emotional register is heavily skewed toward darkness with almost no uplifting counterweight. Positive emotional moments — earned connections, small victories, moments of agency — create the contrast that makes darkness feel like a cost rather than a baseline. Without them, the story risks becoming tonally relentless: the audience has nowhere to breathe and nothing to lose that they have first been given.`,
+        suggestedFix: 'Introduce positive emotional scenes as deliberate structural anchors, not as softening: a moment of genuine connection before a separation, a small victory before a reversal, a hopeful choice before a betrayal. These create the emotional debt that makes the dark scenes land. The ratio need not balance — but some positive register is needed for contrast to function.',
       });
     }
   }

@@ -18993,6 +18993,88 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 443 — structurePass: revelation-curiosity decoupled, peak suspense emotional vacuum, positive scene drought', async () => {
+    const makeRec443 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null, dramaticTurn: null,
+      purpose: 'development', relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      ...overrides,
+    });
+    const runS443 = async (recs: any[]) => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      return structurePass({ fountain: '', original: '', records: recs, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('REVELATION_CURIOSITY_DECOUPLED fires when no revelation scene has curiosityDelta > 0', async () => {
+      // 10 scenes: 3 revelations (curiosityDelta=0), 3 curiosity spikes (no revelation), never co-occurring
+      const recs443a = Array.from({ length: 10 }, (_, i) => makeRec443(i));
+      recs443a[1] = makeRec443(1, { revelation: 'The killer is revealed.', curiosityDelta: 0 });
+      recs443a[3] = makeRec443(3, { revelation: 'The motive is disclosed.', curiosityDelta: 0 });
+      recs443a[5] = makeRec443(5, { revelation: 'The secret is out.', curiosityDelta: 0 });
+      recs443a[2] = makeRec443(2, { curiosityDelta: 1.5 });
+      recs443a[6] = makeRec443(6, { curiosityDelta: 2.0 });
+      recs443a[8] = makeRec443(8, { curiosityDelta: 1.0 });
+      const res = await runS443(recs443a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_CURIOSITY_DECOUPLED'), 'REVELATION_CURIOSITY_DECOUPLED should fire');
+    });
+
+    it('REVELATION_CURIOSITY_DECOUPLED does NOT fire when at least one revelation scene has curiosityDelta > 0', async () => {
+      const recs443aNF = Array.from({ length: 10 }, (_, i) => makeRec443(i));
+      recs443aNF[1] = makeRec443(1, { revelation: 'The killer is revealed.', curiosityDelta: 1.5 }); // co-occurs!
+      recs443aNF[3] = makeRec443(3, { revelation: 'The motive is disclosed.', curiosityDelta: 0 });
+      recs443aNF[5] = makeRec443(5, { curiosityDelta: 2.0 });
+      recs443aNF[7] = makeRec443(7, { curiosityDelta: 1.0 });
+      const res = await runS443(recs443aNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_CURIOSITY_DECOUPLED'), 'REVELATION_CURIOSITY_DECOUPLED should not fire');
+    });
+
+    it('PEAK_SUSPENSE_EMOTIONAL_VACUUM fires when the single highest-suspense scene is emotionally neutral', async () => {
+      // 8 scenes: peak suspense at idx 5 (suspenseDelta=3.5, neutral), 2 emotional scenes elsewhere
+      const recs443b = Array.from({ length: 8 }, (_, i) => makeRec443(i));
+      recs443b[2] = makeRec443(2, { emotionalShift: 'positive' });
+      recs443b[4] = makeRec443(4, { emotionalShift: 'negative' });
+      recs443b[5] = makeRec443(5, { suspenseDelta: 3.5, emotionalShift: 'neutral' }); // peak, but neutral
+      recs443b[6] = makeRec443(6, { suspenseDelta: 1.2 });
+      const res = await runS443(recs443b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PEAK_SUSPENSE_EMOTIONAL_VACUUM'), 'PEAK_SUSPENSE_EMOTIONAL_VACUUM should fire');
+    });
+
+    it('PEAK_SUSPENSE_EMOTIONAL_VACUUM does NOT fire when the peak suspense scene carries an emotional charge', async () => {
+      // Peak suspense scene has emotionalShift = 'negative'
+      const recs443bNF = Array.from({ length: 8 }, (_, i) => makeRec443(i));
+      recs443bNF[2] = makeRec443(2, { emotionalShift: 'positive' });
+      recs443bNF[4] = makeRec443(4, { emotionalShift: 'negative' });
+      recs443bNF[5] = makeRec443(5, { suspenseDelta: 3.5, emotionalShift: 'negative' }); // peak with charge
+      const res = await runS443(recs443bNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PEAK_SUSPENSE_EMOTIONAL_VACUUM'), 'PEAK_SUSPENSE_EMOTIONAL_VACUUM should not fire');
+    });
+
+    it('POSITIVE_SCENE_DROUGHT fires when <15% of scenes are positive while ≥3 are negative', async () => {
+      // 12 scenes: 1 positive (8%), 4 negative — below 15% threshold
+      const recs443c = Array.from({ length: 12 }, (_, i) => makeRec443(i));
+      recs443c[0] = makeRec443(0, { emotionalShift: 'positive' }); // only positive scene
+      recs443c[2] = makeRec443(2, { emotionalShift: 'negative' });
+      recs443c[4] = makeRec443(4, { emotionalShift: 'negative' });
+      recs443c[7] = makeRec443(7, { emotionalShift: 'negative' });
+      recs443c[9] = makeRec443(9, { emotionalShift: 'negative' });
+      const res = await runS443(recs443c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'POSITIVE_SCENE_DROUGHT'), 'POSITIVE_SCENE_DROUGHT should fire');
+    });
+
+    it('POSITIVE_SCENE_DROUGHT does NOT fire when positive scenes reach ≥15% of total', async () => {
+      // 10 scenes: 2 positive (20%) — above 15% threshold
+      const recs443cNF = Array.from({ length: 10 }, (_, i) => makeRec443(i));
+      recs443cNF[1] = makeRec443(1, { emotionalShift: 'positive' });
+      recs443cNF[4] = makeRec443(4, { emotionalShift: 'positive' });
+      recs443cNF[6] = makeRec443(6, { emotionalShift: 'negative' });
+      recs443cNF[8] = makeRec443(8, { emotionalShift: 'negative' });
+      recs443cNF[9] = makeRec443(9, { emotionalShift: 'negative' });
+      const res = await runS443(recs443cNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'POSITIVE_SCENE_DROUGHT'), 'POSITIVE_SCENE_DROUGHT should not fire');
+    });
+  });
+
   describe('Wave 429 — structurePass: inciting aftermath stall, climax unprepared, purpose monotone run', async () => {
     const makeRec429 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
