@@ -4,3 +4,9 @@
 ## 2024-05-19 - [O(N) Rendering Latency Bottleneck in Fountain Highlighting]
 **Learning:** Found an unexpected O(N^2) memory scaling issue caused by `text.split("\n")` being mapped into a massive dictionary (`lineClasses`) and then mapped *again* to create React elements. This double-allocation strategy causes measurable frame stuttering when typing in large scripts since it executes completely synchronously on the main thread during high-frequency render events.
 **Action:** When parsing hierarchical document structures to flat nodes (like text lines), always prefer mapping directly over the parsed AST (e.g. `blocks`) to generate React Elements instead of building intermediate hash maps or re-splitting raw strings.
+## 2024-06-18 - [ScriptIDE Performance Optimization]\n**Learning:** High-frequency string splitting (e.g., `text.split('\n')` on every keystroke) causes significant memory allocation and garbage collection spikes, leading to stuttering in text editors. Replacing these with zero-allocation alternatives like `lastIndexOf('\n')`, `indexOf`, and regex loops () dramatically improves React render latency.\n**Action:** For text-heavy components, especially editors, prefer direct string slicing and indexing over `.split()` to prevent O(N) array allocation overhead on every update cycle.
+## 2024-06-18 - [ScriptIDE Performance Optimization]
+**Learning:** High-frequency string splitting (e.g., `text.split('
+')` on every keystroke) causes significant memory allocation and garbage collection spikes, leading to stuttering in text editors. Replacing these with zero-allocation alternatives like `lastIndexOf('
+')`, `indexOf`, and regex loops (`/[^\s]+/g.exec()`) dramatically improves React render latency.
+**Action:** For text-heavy components, especially editors, prefer direct string slicing and indexing over `.split()` to prevent O(N) array allocation overhead on every update cycle.
