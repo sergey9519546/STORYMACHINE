@@ -20140,6 +20140,166 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 438 — originalityPass: passive verb dominance, dialogue monologue drought, action question intrusion', async () => {
+    const runO438 = async (fountain: string) => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      return originalityPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PASSIVE_VERB_DOMINANCE fires when >25% of action lines use passive construction', async () => {
+      // 4 of 10 action lines are passive = 40% > 25%
+      const f438p = `INT. ROOM - DAY
+
+A gun is found on the table.
+The letter is opened by Maria.
+She walks toward the window.
+Three shots can be heard outside.
+The door is closed behind her.
+He reaches for the phone.
+She reads the note carefully.
+The lights go out.
+An envelope is left on the counter.
+He checks the lock.
+`;
+      const res = await runO438(f438p);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PASSIVE_VERB_DOMINANCE'), 'PASSIVE_VERB_DOMINANCE should fire');
+    });
+
+    it('PASSIVE_VERB_DOMINANCE does not fire when passive voice is rare in action', async () => {
+      // 2 of 10 action lines are passive = 20% ≤ 25%
+      const f438pNF = `INT. ROOM - DAY
+
+A gun rests on the table.
+Maria opens the letter.
+She walks toward the window.
+Three shots ring out outside.
+She closes the door behind her.
+He reaches for the phone.
+She reads the note carefully.
+The lights go out.
+A note is left on the counter.
+He checks the lock.
+`;
+      const res = await runO438(f438pNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PASSIVE_VERB_DOMINANCE'), 'PASSIVE_VERB_DOMINANCE should not fire');
+    });
+
+    it('DIALOGUE_MONOLOGUE_DROUGHT fires when <5% of dialogue lines exceed 15 words', async () => {
+      // 12 short dialogue lines, 0 long → 0% < 5% → fires
+      const f438m = `INT. ROOM - DAY
+
+Anna looks at him.
+
+ANNA
+You did it.
+
+MARK
+I didn't.
+
+ANNA
+You lied.
+
+MARK
+No.
+
+ANNA
+Then explain.
+
+MARK
+I can't.
+
+ANNA
+Try.
+
+MARK
+Not now.
+
+ANNA
+Why not?
+
+MARK
+It's complicated.
+
+ANNA
+Just say it.
+
+MARK
+Tomorrow.
+`;
+      const res = await runO438(f438m);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_MONOLOGUE_DROUGHT'), 'DIALOGUE_MONOLOGUE_DROUGHT should fire');
+    });
+
+    it('DIALOGUE_MONOLOGUE_DROUGHT does not fire when extended speeches exist', async () => {
+      // 12 dialogue lines, 1 is >15 words (line with a long speech) → 8.3% ≥ 5% → no fire
+      const f438mNF = `INT. ROOM - DAY
+
+Anna looks at him.
+
+ANNA
+You did it.
+
+MARK
+I didn't.
+
+ANNA
+You lied.
+
+MARK
+Look, I know this looks bad, but I need you to understand what was actually at stake when I made that decision.
+
+ANNA
+Try.
+
+MARK
+Not now.
+
+ANNA
+Why not?
+
+MARK
+It's complicated.
+
+ANNA
+Just say it.
+
+MARK
+Tomorrow.
+`;
+      const res = await runO438(f438mNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_MONOLOGUE_DROUGHT'), 'DIALOGUE_MONOLOGUE_DROUGHT should not fire');
+    });
+
+    it('ACTION_QUESTION_INTRUSION fires when 3+ action lines contain a question mark', async () => {
+      const f438q = `INT. ROOM - DAY
+
+What does she know?
+Anna picks up the envelope.
+Can he trust her with this?
+She sets it back down.
+Where is all this headed?
+He watches from the doorway.
+She doesn't look up.
+`;
+      const res = await runO438(f438q);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_QUESTION_INTRUSION'), 'ACTION_QUESTION_INTRUSION should fire');
+    });
+
+    it('ACTION_QUESTION_INTRUSION does not fire when fewer than 3 action lines ask questions', async () => {
+      const f438qNF = `INT. ROOM - DAY
+
+What does she know?
+Anna picks up the envelope.
+She sets it back down.
+He watches from the doorway.
+She doesn't look up.
+Can he trust her with this?
+`;
+      const res = await runO438(f438qNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_QUESTION_INTRUSION'), 'ACTION_QUESTION_INTRUSION should not fire');
+    });
+  });
+
   describe('Wave 424 — originalityPass: insert shot crutch, ellipsis action overuse, action adverb flood', async () => {
     const runO424 = async (fountain: string) => {
       const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');

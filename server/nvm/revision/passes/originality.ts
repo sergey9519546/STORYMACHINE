@@ -61,6 +61,17 @@
 // action lines carry a manner adverb like "slowly"/"quietly"/"suddenly" — substituting
 // description for specific concrete action; distinct from body language clichés and reaction
 // shot overuse which target specific gesture patterns).
+// Wave 438 additions: passive verb dominance (>25% of action lines use passive construction
+// like "is seen"/"are found"/"can be heard" — passive voice removes agency from the visual
+// description and distances the reader; underweight/bloat × action prose × verb form, distinct
+// from COPULA_ACTION_DOMINANCE which targets linking-verb state predicates, not passive voice),
+// dialogue monologue drought (<5% of dialogue lines are >15 words while ≥12 dialogue lines
+// exist — no extended speeches or full arguments, the register is uniformly telegraphic;
+// underweight/bloat × dialogue × length distribution, distinct from DIALOGUE_SHORT_LINE_
+// DOMINANCE which measures what percent are ≤4 words, not whether any are long), action
+// question intrusion (≥3 action lines contain a question mark — the writer inserts authorial
+// questions into stage directions instead of presenting images; count threshold × action layer
+// × discourse mode, distinct from DIALOGUE_QUESTION_DROUGHT which audits the dialogue layer).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2050,6 +2061,130 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${adverbCount424c} of ${actionTotal424c} action lines (${Math.round(adverbCount424c / actionTotal424c * 100)}%) carry a manner adverb ("slowly", "carefully", "quietly", "suddenly", "gently"). Adverbs in action lines substitute for specific physical description: they tell the manner rather than showing the concrete image that would imply it. When more than a quarter of all action uses adverb qualification, the prose consistently describes HOW actions feel rather than WHAT they look like — trading visual specificity for abstract instruction.`,
         suggestedFix: 'Replace manner adverbs with the specific action that implies the manner: "She closes the door quietly" → "She eases the door shut, her fingertips pressing the latch back until it clicks." The concrete image makes the reader feel the quality; the adverb only names it. Reserve a manner adverb for the rare line where the manner genuinely cannot be inferred from the physical action being described.',
+      });
+    }
+  }
+
+  // ── Wave 438: PASSIVE_VERB_DOMINANCE, DIALOGUE_MONOLOGUE_DROUGHT, ACTION_QUESTION_INTRUSION ──
+
+  // PASSIVE_VERB_DOMINANCE (minor, ≥10 action lines, >25%): More than 25% of action lines
+  // use passive construction ("is seen", "are found", "can be heard", "was revealed",
+  // "has been taken"). Passive voice in action lines removes agency from the visual
+  // description: the world is observed being acted upon rather than shown acting. "A gun
+  // is found on the table" gives less visual authority than "A gun sits on the table" —
+  // the passive construction puts the reader at a remove from the image, processing what was
+  // done to things rather than watching things exist and move. When more than a quarter of
+  // all action lines are passive, the screenplay's prose has a systemic distancing quality
+  // that accumulates across reading. Underweight/bloat mode × action prose × verb form.
+  // Distinct from COPULA_ACTION_DOMINANCE (Wave 259: linking-verb state predicates — "the room
+  // is dark", "he is afraid" — being-verb as main predicate, not passive voice), FILTERING_VERB_
+  // OVERUSE (Wave 259: "she sees"/"he notices" — POV attribution verbs, not passive constructions),
+  // and ACTION_ADVERB_FLOOD (Wave 424: manner adverbs qualifying verbs, not verb form itself).
+  {
+    // Covers regular past participles (-ed, -en) plus common irregular past participles
+    // used in passive constructions in screenplay action lines.
+    const passiveRe438a = /\b(is|are|was|were|can be|could be|will be|has been|have been)\s+(?:[a-z]+(?:ed|en)|found|heard|left|shown|known|built|held|kept|sent|told|made|done|brought|caught|hit|set|put|lost|shut|cut|let|won|worn|drawn|thrown|grown|shot|sold|paid|felt|met|thought|bought|laid|spread|split|spent|bent|swept|wept|crept)\b/i;
+    let actionTotal438a = 0;
+    let passiveCount438a = 0;
+    let inDlg438a = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg438a = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg438a = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg438a = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (inDlg438a) continue;
+      actionTotal438a++;
+      if (passiveRe438a.test(t)) passiveCount438a++;
+    }
+    if (actionTotal438a >= 10 && passiveCount438a / actionTotal438a > 0.25) {
+      issues.push({
+        location: `${passiveCount438a} of ${actionTotal438a} action lines use passive construction`,
+        rule: 'PASSIVE_VERB_DOMINANCE',
+        severity: 'minor',
+        description: `${passiveCount438a} of ${actionTotal438a} action lines (${Math.round(passiveCount438a / actionTotal438a * 100)}%) use passive voice — "is seen", "are found", "can be heard", "was revealed". Passive construction removes agency from the visual surface: the world is observed being acted upon rather than shown acting. The reader processes what was done to things rather than watching things exist and move, which creates a subtle but cumulative distance from the visual world. More than a quarter of action lines in this passive register gives the screenplay's prose a distancing quality that makes the imagery feel reported rather than witnessed.`,
+        suggestedFix: 'Convert passive constructions to active ones by giving the subject visual agency: "A gun is found on the table" → "A gun rests on the table" or "Detective Chen finds a gun on the table." Let objects exist actively or give a character the verb. Reserve passive construction for the rare case where grammatical agency genuinely belongs to the acted-upon thing.',
+      });
+    }
+  }
+
+  // DIALOGUE_MONOLOGUE_DROUGHT (minor, ≥12 dialogue lines, <5% long): Fewer than 5% of
+  // dialogue lines are extended (>15 words) while the screenplay has ≥12 dialogue lines.
+  // Extended dialogue lines — speeches, monologues, extended arguments — are how characters
+  // develop position, reveal interiority, and sustain rhetorical pressure on each other.
+  // When almost no dialogue line crosses 15 words, the screenplay operates entirely in
+  // shorthand: every exchange is either rapid-fire repartee or terse surface reading with
+  // nothing sustained. The register is uniformly telegraphic — characters never hold the
+  // floor long enough to say something complex. A screenplay with no monologues, no
+  // extended speeches, no arguments that develop across multiple sentences, denies characters
+  // the tools to articulate their inner worlds beyond reaction. Underweight/bloat mode ×
+  // dialogue × length distribution. Distinct from DIALOGUE_SHORT_LINE_DOMINANCE (Wave 396:
+  // measures whether ≥75% of lines are ≤4 words — a different threshold at a different end
+  // of the distribution; DIALOGUE_SHORT_LINE_DOMINANCE can fire without DIALOGUE_MONOLOGUE_
+  // DROUGHT when dialogue averages 5-14 words per line with no long speeches), PARENTHETICAL_
+  // FLOOD (Wave 273: acting wrench directions — direction-layer density, not speech length),
+  // and DIALOGUE_QUESTION_DROUGHT (Wave 396: dialogue interrogativeness — a register quality,
+  // not a length distribution). This is the first check auditing the upper tail of dialogue
+  // line length.
+  {
+    let dlgTotal438b = 0;
+    let longDlgCount438b = 0;
+    let inDlg438b = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg438b = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg438b = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg438b = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (!inDlg438b) continue;
+      dlgTotal438b++;
+      if (t.split(/\s+/).filter(Boolean).length > 15) longDlgCount438b++;
+    }
+    if (dlgTotal438b >= 12 && longDlgCount438b / dlgTotal438b < 0.05) {
+      issues.push({
+        location: `${longDlgCount438b} of ${dlgTotal438b} dialogue lines exceed 15 words`,
+        rule: 'DIALOGUE_MONOLOGUE_DROUGHT',
+        severity: 'minor',
+        description: `Only ${longDlgCount438b} of ${dlgTotal438b} dialogue lines (${Math.round(longDlgCount438b / dlgTotal438b * 100)}%) exceed 15 words — the screenplay has almost no extended speeches. Every exchange is rapid-fire shorthand; characters never sustain a position, develop an argument, or reveal interiority over more than a single clipped line. Extended dialogue is how characters occupy rhetorical space: a monologue reveals how someone thinks, a sustained argument shows how relationships process pressure, a speech places the audience inside a character's world view. When no character ever holds the floor across more than 15 words, the dialogue register is uniformly telegraphic — characters react but never truly speak.`,
+        suggestedFix: 'Give at least one character at least one extended speech or sustained argument somewhere in the screenplay. An extended exchange doesn\'t mean a lecture — it means a character develops a thought across three or four sentences, with subclause, contradiction, and arrival. The goal is at least one beat where a character is allowed to be complex in speech rather than punchy in reaction.',
+      });
+    }
+  }
+
+  // ACTION_QUESTION_INTRUSION (minor, ≥3 action lines with "?"): Three or more action lines
+  // (non-dialogue stage directions) contain a question mark — the writer inserts rhetorical
+  // or authorial questions into the visual prose. Action lines exist to present what the camera
+  // records: the images, movements, and objects that make up the scene. A question mark in
+  // action prose is a discourse-mode switch from showing to editorializing: "What does he know?
+  // Can she trust him? Where is this headed?" — these are the writer's commentary about the
+  // scene, not the scene itself. The audience cannot see a question; they can only see its
+  // answer. Three or more such intrusions signal a screenplay that repeatedly breaks the visual
+  // contract to address the reader directly, a habit that distances the prose from the images
+  // it is meant to conjure. Count threshold × action layer × discourse mode. Distinct from
+  // DIALOGUE_QUESTION_DROUGHT (Wave 396: questions in the dialogue layer — a character asking
+  // another character something — a dramatic tool), DIRECTORIAL_INTRUSION (Wave 259: camera/
+  // lens calls and "WE HEAR" — structural labels, not rhetorical questions), and EXCLAMATION_
+  // IN_ACTION (Wave 273: exclamatory punctuation in action — the analogous over-excitement
+  // mode, not questioning). This is the first check to audit the question-mark in action prose.
+  {
+    let questionCount438c = 0;
+    let inDlg438c = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg438c = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg438c = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg438c = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (inDlg438c) continue;
+      if (/\?/.test(t)) questionCount438c++;
+    }
+    if (questionCount438c >= 3) {
+      issues.push({
+        location: `${questionCount438c} action line(s) contain a question mark`,
+        rule: 'ACTION_QUESTION_INTRUSION',
+        severity: 'minor',
+        description: `${questionCount438c} action lines contain a question mark — the writer is inserting authorial questions into the stage directions. Action prose exists to present what the camera records: images, movements, objects. A question mark in an action line is a discourse-mode switch from showing to editorializing — "What does he know? Can she trust him?" — the writer's commentary about the scene rather than the scene itself. The audience cannot see a question; they can only see what follows from its answer being visible on screen. Repeated question-mark intrusions break the screenplay's visual contract, stepping outside the scene to address the reader directly.`,
+        suggestedFix: 'Remove the question marks from action lines and replace with the visual image that answers the question: instead of "What is she thinking?" write what she does — the gesture, the look, the action that externalises the thought. If the question is genuinely unanswerable (the scene is meant to be ambiguous), write the unresolved image directly. The authorial question belongs in a note to yourself or a director\'s treatment, not in the script\'s action prose.',
       });
     }
   }
