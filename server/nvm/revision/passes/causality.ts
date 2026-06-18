@@ -61,6 +61,15 @@
 // resolutions never raise or redirect tension; average/aggregate mode × payoff × suspense),
 // clock raise relationship void (every clock-raise scene has no relationship shift — deadlines
 // established in a social vacuum; co-occurrence/decoupling mode × clock × relationship).
+// Wave 433 additions: suspense peak uncaused (the story's single highest-suspense scene has no
+// causal driver — escalation, clock, revelation, or turn — in the two scenes before it, so the
+// tension apex arrives without a rising gradient; single-peak isolation × backward-cause mode,
+// the first single-peak check in this pass), curiosity decline run (4+ consecutive scenes each
+// with curiosityDelta < 0 — the audience's open questions drain continuously with nothing
+// reopening the field; run-based × valence mode × curiosity channel), payoff peak inert (the
+// single densest payoff scene — the largest convergence of resolved setups — lands neutral in
+// emotion, suspense, curiosity, AND relationship simultaneously; single-peak isolation × payoff
+// channel, distinct from the aggregate per-channel payoff voids).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1971,6 +1980,125 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         description: `All ${clockRaiseRecs419c.length} scenes that establish deadlines carry no relationship shift — every ticking clock is raised in a social vacuum. Deadlines under pressure are among the most powerful drivers of interpersonal consequence: when time runs out, characters are forced to ask for help, betray allies, abandon obligations, or sacrifice relationships. A story where every deadline appears without any bond moving reads as mechanical urgency — the stakes feel temporal but not personal.`,
         suggestedFix: 'Let at least one clock-raise scene move a relationship: the moment a deadline is established, it should force a choice that strains or strengthens a bond — someone is depended on, betrayed, or asked to sacrifice. Time pressure that has no interpersonal cost is urgency without stakes.',
       });
+    }
+  }
+
+  // ── Wave 433: SUSPENSE_PEAK_UNCAUSED, CURIOSITY_DECLINE_RUN, PAYOFF_PEAK_INERT ──
+
+  // SUSPENSE_PEAK_UNCAUSED (minor, n≥8, peak suspenseDelta ≥ 2): The single
+  // highest-suspense scene in the story — the global tension apex — has no causal
+  // driver in either of the two scenes immediately before it. Looking backward
+  // from the peak, neither prior scene shows any of: a positive suspense rise
+  // (a building gradient), a raised clock, a revelation, or a dramatic turn. The
+  // story's most tense moment therefore arrives without a run-up — the audience
+  // hits maximum tension on a flat approach, so the apex reads as an arbitrary jump
+  // rather than the culmination of mounting pressure. Single-peak isolation ×
+  // backward-cause mode — the FIRST single-peak check in this pass. Distinct from
+  // SUSPENSE_SPIKE_NO_CAUSE (a per-scene scanner that fires on ANY local spike > 3
+  // lacking clock/clue setup and ignores revelation/turn as causes): this isolates
+  // the SINGLE global maximum, fires at a lower peak floor (≥ 2), and counts
+  // revelation and dramatic turn as valid preparation — auditing whether the
+  // story's one tension apex was built toward, not whether local spikes are sudden.
+  if (records.length >= 8) {
+    let peakPos433a = -1;
+    let peakVal433a = -Infinity;
+    for (let i = 0; i < records.length; i++) {
+      const sd = records[i].suspenseDelta ?? 0;
+      if (sd > peakVal433a) { peakVal433a = sd; peakPos433a = i; }
+    }
+    if (peakPos433a >= 2 && peakVal433a >= 2) {
+      const isDriver433a = (r: any) =>
+        (r.suspenseDelta ?? 0) > 0 ||
+        r.clockRaised === true ||
+        r.revelation !== null ||
+        ((r.dramaticTurn ?? 'nothing') !== 'nothing');
+      const prior1_433a = records[peakPos433a - 1];
+      const prior2_433a = records[peakPos433a - 2];
+      if (!isDriver433a(prior1_433a) && !isDriver433a(prior2_433a)) {
+        issues.push({
+          location: `Scene ${records[peakPos433a].sceneIdx} (${records[peakPos433a].slug}) — peak suspense ${peakVal433a.toFixed(1)}`,
+          rule: 'SUSPENSE_PEAK_UNCAUSED',
+          severity: 'minor',
+          description: `The story's highest-suspense scene (Scene ${records[peakPos433a].sceneIdx}, suspenseDelta ${peakVal433a.toFixed(1)}) has no causal driver in the two scenes before it — neither prior scene raises suspense, starts a clock, delivers a revelation, or turns the story. The tension apex arrives on a flat approach, so the peak reads as an arbitrary jump rather than the culmination of mounting pressure. An audience reaches maximum tension without having been wound up to it.`,
+          suggestedFix: 'Build a gradient into the tension peak: in the two scenes before the story\'s most suspenseful moment, escalate — raise a clock, plant a threat, deliver a partial revelation, or stack a complication so the suspense rises step by step. The apex should feel earned by its run-up, the top of a climb rather than a cliff that appears from nowhere.',
+        });
+      }
+    }
+  }
+
+  // CURIOSITY_DECLINE_RUN (minor, n≥10, run ≥4): Four or more consecutive scenes
+  // each carry a negative curiosityDelta — the audience's open questions are being
+  // continuously closed or drained across a sustained stretch with nothing
+  // reopening the field. Curiosity is the forward-pull of a story: the accumulation
+  // of "what happens next / why / who." A run where every scene only resolves or
+  // dissipates curiosity (and none reopens it) bleeds the mystery engine dry over a
+  // span — the audience's reasons to keep watching erode scene by scene with no new
+  // hook arriving. Run-based × valence mode × curiosity channel — the FIRST
+  // consecutive-negative-curiosity run check. Distinct from CURIOSITY_FRONT_LOADED
+  // (timing/distribution of positive spikes), CURIOSITY_OPEN_LOOP (questions never
+  // answered), CURIOSITY_SPIKE_NO_FALLOUT (a spike with no consequence), and
+  // EMOTIONAL_NEUTRAL_RUN / SUSPENSE_UNRELEASED_RUN (same run mode, different
+  // channels): this is specifically a run of declining curiosity valence.
+  if (records.length >= 10) {
+    let maxRun433b = 0;
+    let curRun433b = 0;
+    let maxStart433b = -1;
+    let curStart433b = -1;
+    for (let i = 0; i < records.length; i++) {
+      if ((records[i].curiosityDelta ?? 0) < 0) {
+        if (curRun433b === 0) curStart433b = i;
+        if (++curRun433b > maxRun433b) { maxRun433b = curRun433b; maxStart433b = curStart433b; }
+      } else {
+        curRun433b = 0;
+      }
+    }
+    if (maxRun433b >= 4) {
+      const runEnd433b = maxStart433b + maxRun433b - 1;
+      issues.push({
+        location: `Scenes ${records[maxStart433b].sceneIdx}–${records[runEnd433b].sceneIdx} (${maxRun433b} consecutive)`,
+        rule: 'CURIOSITY_DECLINE_RUN',
+        severity: 'minor',
+        description: `A run of ${maxRun433b} consecutive scenes (Scenes ${records[maxStart433b].sceneIdx}–${records[runEnd433b].sceneIdx}) each lower audience curiosity (curiosityDelta < 0) with no scene reopening the field. Curiosity is a story's forward pull — the accumulation of unanswered questions that make an audience lean in. When every scene across a stretch only closes or drains curiosity and none plants a new hook, the mystery engine bleeds out: the audience's reasons to keep watching erode scene by scene.`,
+        suggestedFix: 'Interrupt the decline with a fresh question: somewhere in this run, plant a new mystery, complicate an answer the audience thought was settled, or reveal a detail that reframes what they know. Curiosity should be replenished as it is spent — a story that only ever closes loops without opening new ones runs out of forward momentum.',
+      });
+    }
+  }
+
+  // PAYOFF_PEAK_INERT (minor, n≥8, densest payoff resolves ≥2 setups): The single
+  // scene that resolves the most planted setups — the story's largest convergence
+  // of threads — lands completely inert: neutral emotional shift, no suspense rise
+  // (≤0), no curiosity rise (≤0), AND no relationship shift, all at once. The
+  // biggest structural payoff the story has, the moment where the most loops close
+  // together, produces no felt consequence on any channel. A convergence that
+  // discharges nothing wastes the story's strongest cathartic opportunity — the
+  // audience receives the largest return on its narrative investment as a flat fact.
+  // Single-peak isolation × payoff channel. Distinct from the aggregate per-channel
+  // payoff voids (PAYOFF_NO_EMOTION, PAYOFF_SUSPENSE_VOID, PAYOFF_CURIOSITY_
+  // DECOUPLED — each fires when ONE channel is absent across ALL payoff scenes):
+  // this isolates the SINGLE densest payoff and fires only when it is inert across
+  // EVERY channel simultaneously, catching a hollow centerpiece even when other
+  // payoff scenes are lively and no single aggregate channel is uniformly void.
+  if (records.length >= 8) {
+    const payoffRecs433c = (records as any[]).filter(r => ((r.payoffSetupIds ?? []) as any[]).length > 0);
+    if (payoffRecs433c.length >= 1) {
+      const peakCount433c = Math.max(...payoffRecs433c.map(r => ((r.payoffSetupIds ?? []) as any[]).length));
+      if (peakCount433c >= 2) {
+        const peakPayoff433c = payoffRecs433c.find(r => ((r.payoffSetupIds ?? []) as any[]).length === peakCount433c);
+        const inert433c = peakPayoff433c &&
+          peakPayoff433c.emotionalShift === 'neutral' &&
+          (peakPayoff433c.suspenseDelta ?? 0) <= 0 &&
+          (peakPayoff433c.curiosityDelta ?? 0) <= 0 &&
+          ((peakPayoff433c.relationshipShifts ?? []) as any[]).length === 0;
+        if (inert433c) {
+          issues.push({
+            location: `Scene ${peakPayoff433c.sceneIdx} (${peakPayoff433c.slug}) — peak payoff, ${peakCount433c} setups resolved`,
+            rule: 'PAYOFF_PEAK_INERT',
+            severity: 'minor',
+            description: `The story's densest payoff scene (Scene ${peakPayoff433c.sceneIdx}, resolving ${peakCount433c} planted setups) lands completely inert — neutral emotion, no suspense rise, no curiosity rise, and no relationship shift, all at once. The single moment where the most threads converge produces no felt consequence on any channel. The audience receives the largest return on its narrative investment as a flat fact, and the story's strongest cathartic opportunity discharges nothing.`,
+            suggestedFix: 'Charge the peak payoff on at least one channel: the scene where the most setups resolve should make someone feel something, raise a new question even as it answers old ones, redirect tension toward a fresh problem, or move a relationship. The biggest convergence of threads is the story\'s catharsis engine — let it fire rather than merely report that the loops have closed.',
+          });
+        }
+      }
     }
   }
 

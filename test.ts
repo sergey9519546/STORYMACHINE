@@ -25179,6 +25179,81 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 433 — causalityPass: suspense peak uncaused, curiosity decline run, payoff peak inert', async () => {
+    const makeRec433 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runC433 = async (records: any[]) => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('SUSPENSE_PEAK_UNCAUSED fires when the global suspense peak has no driver in the two prior scenes', async () => {
+      // n=8; peak at scene 5 (suspenseDelta=4); scenes 3,4 flat (no rise, clock, revelation, or turn) → fires
+      const recs433a = Array.from({ length: 8 }, (_, i) =>
+        makeRec433(i, { suspenseDelta: i === 5 ? 4 : 0 }),
+      );
+      const res = await runC433(recs433a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SUSPENSE_PEAK_UNCAUSED'), 'SUSPENSE_PEAK_UNCAUSED should fire');
+    });
+
+    it('SUSPENSE_PEAK_UNCAUSED does not fire when a rising gradient leads into the peak', async () => {
+      // n=8; peak at scene 5 (suspenseDelta=4); scene 4 has suspenseDelta=2 (a driver) → no fire
+      const recs433anr = Array.from({ length: 8 }, (_, i) =>
+        makeRec433(i, { suspenseDelta: i === 5 ? 4 : i === 4 ? 2 : 0 }),
+      );
+      const res = await runC433(recs433anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SUSPENSE_PEAK_UNCAUSED'), 'SUSPENSE_PEAK_UNCAUSED should not fire');
+    });
+
+    it('CURIOSITY_DECLINE_RUN fires when four or more consecutive scenes lower curiosity', async () => {
+      // n=10; scenes 3,4,5,6 each curiosityDelta=-1 → run of 4 ≥4 → fires
+      const recs433b = Array.from({ length: 10 }, (_, i) =>
+        makeRec433(i, { curiosityDelta: [3, 4, 5, 6].includes(i) ? -1 : 0 }),
+      );
+      const res = await runC433(recs433b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CURIOSITY_DECLINE_RUN'), 'CURIOSITY_DECLINE_RUN should fire');
+    });
+
+    it('CURIOSITY_DECLINE_RUN does not fire when the negative-curiosity run is broken before reaching four', async () => {
+      // n=10; scenes 3,4,5 = -1 (run 3), scene 6 = 0 break, scene 7 = -1 → max run 3 <4 → no fire
+      const recs433bnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec433(i, { curiosityDelta: [3, 4, 5, 7].includes(i) ? -1 : 0 }),
+      );
+      const res = await runC433(recs433bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CURIOSITY_DECLINE_RUN'), 'CURIOSITY_DECLINE_RUN should not fire');
+    });
+
+    it('PAYOFF_PEAK_INERT fires when the densest payoff scene is inert across every channel', async () => {
+      // n=8; scene 2 resolves 2 setups (the peak), scene 5 resolves 1; scene 2 is fully inert → fires
+      const recs433c = Array.from({ length: 8 }, (_, i) =>
+        makeRec433(i, {
+          payoffSetupIds: i === 2 ? ['s1', 's2'] : i === 5 ? ['s3'] : [],
+        }),
+      );
+      const res = await runC433(recs433c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_PEAK_INERT'), 'PAYOFF_PEAK_INERT should fire');
+    });
+
+    it('PAYOFF_PEAK_INERT does not fire when the densest payoff scene carries a consequence', async () => {
+      // n=8; peak payoff at scene 2 (2 setups) has suspenseDelta=2 → not inert → no fire
+      const recs433cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec433(i, {
+          payoffSetupIds: i === 2 ? ['s1', 's2'] : i === 5 ? ['s3'] : [],
+          suspenseDelta: i === 2 ? 2 : 0,
+        }),
+      );
+      const res = await runC433(recs433cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_PEAK_INERT'), 'PAYOFF_PEAK_INERT should not fire');
+    });
+  });
+
   describe('Wave 419 — causalityPass: revelation relationship void, payoff suspense void, clock raise relationship void', async () => {
     const makeRec419 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
