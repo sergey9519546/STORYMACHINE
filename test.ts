@@ -20554,6 +20554,87 @@ I always listen.
     });
   });
 
+  describe('Wave 437 — intentionPass: seed run isolated, proactive zone imbalance, seed clockless', async () => {
+    const makeRec437 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN437 = async (records: any[]) => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      return intentionPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('SEED_RUN_ISOLATED fires when 3+ consecutive scenes each plant a clue', async () => {
+      // n=8, ≥4 total seeds; scenes 2,3,4 consecutively seed → maxSeedRun=3 → fires
+      const recs437a = Array.from({ length: 8 }, (_, i) => makeRec437(i));
+      recs437a[0] = makeRec437(0, { seededClueIds: ['c1'] });
+      recs437a[2] = makeRec437(2, { seededClueIds: ['c2'] });
+      recs437a[3] = makeRec437(3, { seededClueIds: ['c3'] });
+      recs437a[4] = makeRec437(4, { seededClueIds: ['c4'] });
+      const res = await runIN437(recs437a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_RUN_ISOLATED'), 'SEED_RUN_ISOLATED should fire');
+    });
+
+    it('SEED_RUN_ISOLATED does not fire when no 3 consecutive scenes seed clues', async () => {
+      // n=8, ≥4 total seeds but max run=2 (scenes 2,3 then break) → no fire
+      const recs437anr = Array.from({ length: 8 }, (_, i) => makeRec437(i));
+      recs437anr[0] = makeRec437(0, { seededClueIds: ['c1'] });
+      recs437anr[2] = makeRec437(2, { seededClueIds: ['c2'] });
+      recs437anr[3] = makeRec437(3, { seededClueIds: ['c3'] });
+      recs437anr[6] = makeRec437(6, { seededClueIds: ['c4'] });
+      const res = await runIN437(recs437anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_RUN_ISOLATED'), 'SEED_RUN_ISOLATED should not fire');
+    });
+
+    it('PROACTIVE_ZONE_IMBALANCE fires when one zone has ≥50% of initiative while another is empty', async () => {
+      // n=10; clockRaised at 0,1,2 (zone 0: 3 proactive) but zone 2 (indices 5-6) has none
+      // zones: [0]=0-2→3, [1]=2-4→0, [2]=5-6→0, [3]=7-9→1; totalProactive=4; zone0=3/4=75% ≥50%; zone1 empty → fires
+      const recs437b = Array.from({ length: 10 }, (_, i) => makeRec437(i));
+      recs437b[0] = makeRec437(0, { clockRaised: true });
+      recs437b[1] = makeRec437(1, { clockRaised: true });
+      recs437b[2] = makeRec437(2, { clockRaised: true });
+      recs437b[8] = makeRec437(8, { clockRaised: true });
+      const res = await runIN437(recs437b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PROACTIVE_ZONE_IMBALANCE'), 'PROACTIVE_ZONE_IMBALANCE should fire');
+    });
+
+    it('PROACTIVE_ZONE_IMBALANCE does not fire when initiative is spread across all zones', async () => {
+      // n=10; one proactive act in each zone: 0→zone0, 3→zone1, 6→zone2, 8→zone3; no zone empty → no fire
+      const recs437bnr = Array.from({ length: 10 }, (_, i) => makeRec437(i));
+      recs437bnr[0] = makeRec437(0, { clockRaised: true });
+      recs437bnr[3] = makeRec437(3, { clockRaised: true });
+      recs437bnr[6] = makeRec437(6, { clockRaised: true });
+      recs437bnr[8] = makeRec437(8, { clockRaised: true });
+      const res = await runIN437(recs437bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PROACTIVE_ZONE_IMBALANCE'), 'PROACTIVE_ZONE_IMBALANCE should not fire');
+    });
+
+    it('SEED_CLOCKLESS fires when all seed scenes lack clock pressure', async () => {
+      // n=8, 3 seed scenes all with clockRaised=false, clockDelta=0 → fires
+      const recs437c = Array.from({ length: 8 }, (_, i) => makeRec437(i));
+      recs437c[1] = makeRec437(1, { seededClueIds: ['c1'], clockRaised: false, clockDelta: 0 });
+      recs437c[4] = makeRec437(4, { seededClueIds: ['c2'], clockRaised: false, clockDelta: 0 });
+      recs437c[6] = makeRec437(6, { seededClueIds: ['c3'], clockRaised: false, clockDelta: 0 });
+      const res = await runIN437(recs437c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_CLOCKLESS'), 'SEED_CLOCKLESS should fire');
+    });
+
+    it('SEED_CLOCKLESS does not fire when at least one seed scene has clock pressure', async () => {
+      // n=8, 3 seed scenes; scene 4 has clockRaised=true → no fire
+      const recs437cnr = Array.from({ length: 8 }, (_, i) => makeRec437(i));
+      recs437cnr[1] = makeRec437(1, { seededClueIds: ['c1'], clockRaised: false, clockDelta: 0 });
+      recs437cnr[4] = makeRec437(4, { seededClueIds: ['c2'], clockRaised: true, clockDelta: 0 });
+      recs437cnr[6] = makeRec437(6, { seededClueIds: ['c3'], clockRaised: false, clockDelta: 0 });
+      const res = await runIN437(recs437cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_CLOCKLESS'), 'SEED_CLOCKLESS should not fire');
+    });
+  });
+
   describe('Wave 423 — intentionPass: seed midpoint void, proactive aftermath curiosity absent, seed drama decoupled', async () => {
     const makeRec423 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

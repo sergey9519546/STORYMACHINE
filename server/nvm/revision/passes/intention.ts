@@ -62,6 +62,13 @@
 // revelation), seed drama decoupled (no clue-seeding scene coincides with a dramatic turn —
 // threads planted in quiet exposition rather than at story pivots; co-occurrence/decoupling ×
 // seed × dramatic turn).
+// Wave 437 additions: seed run isolated (≥3 consecutive scenes each planting a clue — a rapid-fire
+// burst of thread-laying that overwhelms individual threads; run-based × seed channel, first
+// consecutive-run check for seeds), proactive zone imbalance (one structural zone has 0 proactive
+// acts while another has ≥50% of all initiative — bloat and void co-present simultaneously;
+// underweight/bloat × initiative distribution, first four-zone audit of imbalance), seed clockless
+// (all seed scenes have no clock pressure — threads always planted in calm moments, never under
+// urgency; co-occurrence/decoupling × seed × clock, first seed × clock intersection check).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1873,6 +1880,128 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `None of the story's ${seedRecs423c.length} clue-seeding scenes coincides with a dramatic turn — threads are always planted in quiet, non-pivotal beats while the story's ${turnRecs423c.length} pivots never simultaneously open a new question. A seed planted at a dramatic turn is doubly charged: the audience receives new information and feels the story shift direction in the same beat. When the seeding engine and the pivot engine never meet, clues feel like background texture rather than integrated into the story's turning machinery.`,
           suggestedFix: 'Let at least one dramatic turn also plant a clue: a reversal that surfaces a fragment of truth, a twist that leaves a new thread dangling, a pivot whose aftermath contains a piece of information the audience wasn\'t expecting. A seed at a turning point integrates foreshadowing into the story\'s structure rather than treating it as separate groundwork done in exposition.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 437: SEED_RUN_ISOLATED, PROACTIVE_ZONE_IMBALANCE, SEED_CLOCKLESS ──
+
+  // SEED_RUN_ISOLATED (minor, n≥8, ≥4 seed scenes, maxSeedRun≥3): Three or more consecutive
+  // scenes each plant at least one seeded clue — the story delivers a burst of new threads
+  // without pause for any single thread to register. When clues are distributed across isolated
+  // scenes the audience can absorb each thread before the next arrives; when ≥3 consecutive
+  // scenes all seed clues, the audience is overwhelmed with rapid-fire thread-laying, causing
+  // individual questions to blur together and the entire batch to feel like undifferentiated
+  // exposition rather than carefully staged foreshadowing. Run-based mode × seed channel.
+  // Distinct from SEED_FRONTLOADED (Wave 409: ALL seeds in the first half — hemispheric
+  // distribution, not consecutive-run detection), SEED_BACKLOADED (Wave 395: the distribution
+  // mirror), SEED_MIDPOINT_VOID (Wave 423: zone absence, not run bloat), and SEED_DRAMA_DECOUPLED
+  // (Wave 423: co-occurrence with turns — quality, not run). This is the first run-based check
+  // for the seed channel.
+  if (n >= 8) {
+    const seedRecs437a = (records as any[]).filter(r => ((r.seededClueIds ?? []) as string[]).length > 0);
+    if (seedRecs437a.length >= 4) {
+      let maxSeedRun437a = 0;
+      let curSeedRun437a = 0;
+      let maxSeedStart437a = -1;
+      let curSeedStart437a = -1;
+      for (let i = 0; i < n; i++) {
+        const isSeed = ((records as any[])[i].seededClueIds ?? [] as string[]).length > 0;
+        if (isSeed) {
+          if (curSeedRun437a === 0) curSeedStart437a = i;
+          if (++curSeedRun437a > maxSeedRun437a) {
+            maxSeedRun437a = curSeedRun437a;
+            maxSeedStart437a = curSeedStart437a;
+          }
+        } else {
+          curSeedRun437a = 0;
+        }
+      }
+      if (maxSeedRun437a >= 3) {
+        issues.push({
+          location: `Scenes ${maxSeedStart437a}–${maxSeedStart437a + maxSeedRun437a - 1} — consecutive seed burst`,
+          rule: 'SEED_RUN_ISOLATED',
+          severity: 'minor',
+          description: `${maxSeedRun437a} consecutive scenes (${maxSeedStart437a}–${maxSeedStart437a + maxSeedRun437a - 1}) each plant at least one new clue — a rapid-fire burst of thread-laying. When questions arrive in back-to-back-to-back scenes without pause, individual threads compete for attention and each one lands with reduced weight: the audience is filling an inbox rather than holding a single thread in suspense. Seeds planted in isolation, separated by scenes where no new question is introduced, are far more memorable than seeds delivered in bursts.`,
+          suggestedFix: `Break the seed cluster at Scenes ${maxSeedStart437a}–${maxSeedStart437a + maxSeedRun437a - 1}: move one or two of the clue plants to a later scene, creating at least one non-seeding scene between consecutive seeds. The gap between seeds is part of their effect — the audience needs a scene to carry a question before they receive the next one. Spread the thread-laying so each clue gets its own moment of arrival.`,
+        });
+      }
+    }
+  }
+
+  // PROACTIVE_ZONE_IMBALANCE (minor, n≥10, ≥4 proactive scenes): Divides the story into four
+  // equal-length structural zones (Act 1: 0–25%, Act 2a: 25–50%, Act 2b: 50–75%, Act 3: 75–100%).
+  // At least one zone has zero proactive acts while another zone contains ≥50% of all proactive
+  // acts — initiative is simultaneously absent from one zone and bloated in another. The story's
+  // agency engine is concentrated in one quarter while another quarter goes entirely without. This
+  // is not merely a zone void (which PROACTIVE_ACT2A_VOID and PROACTIVE_ACT2B_VOID check for
+  // specific zones) nor a hemispheric imbalance (which PROACTIVE_BACKLOADED and PROACTIVE_FRONTLOADED
+  // check) — it requires the co-presence of a full void AND a proportional bloat in the same story.
+  // Underweight/bloat mode × initiative distribution. Distinct from PROACTIVE_ACT2A_VOID (Wave 272:
+  // Act 2a specifically empty without requiring a bloat), PROACTIVE_ACT2B_VOID (Wave 381: Act 2b
+  // specifically empty), PROACTIVE_BACKLOADED (Wave 367: >70% in second half — two-zone partition),
+  // PROACTIVE_FRONTLOADED (Wave 381: >70% in first half), PROACTIVE_LATE_SURGE (Wave 272: passive
+  // first half with burst second half — a temporal pattern, not a zone-level audit). This is the
+  // first check to audit imbalance across all four structural zones simultaneously.
+  if (n >= 10) {
+    const proactiveZoneCounts437b = [0, 0, 0, 0];
+    for (let i = 0; i < n; i++) {
+      if (isProactive258((records as any[])[i])) {
+        const zoneIdx = Math.min(3, Math.floor((i / n) * 4));
+        proactiveZoneCounts437b[zoneIdx]++;
+      }
+    }
+    const totalProactive437b = proactiveZoneCounts437b.reduce((a, b) => a + b, 0);
+    if (totalProactive437b >= 4) {
+      const maxZoneCount437b = Math.max(...proactiveZoneCounts437b);
+      const hasEmptyZone437b = proactiveZoneCounts437b.some(c => c === 0);
+      if (hasEmptyZone437b && maxZoneCount437b / totalProactive437b >= 0.50) {
+        const emptyZoneNames437b = ['Act 1 (0–25%)', 'Act 2a (25–50%)', 'Act 2b (50–75%)', 'Act 3 (75–100%)'];
+        const bloatZone437b = proactiveZoneCounts437b.indexOf(maxZoneCount437b);
+        const emptyZones437b = proactiveZoneCounts437b
+          .map((c, i) => c === 0 ? emptyZoneNames437b[i] : null)
+          .filter(Boolean)
+          .join(', ');
+        issues.push({
+          location: `${emptyZones437b} empty; ${emptyZoneNames437b[bloatZone437b]} has ${maxZoneCount437b}/${totalProactive437b} proactive acts`,
+          rule: 'PROACTIVE_ZONE_IMBALANCE',
+          severity: 'minor',
+          description: `The story's ${totalProactive437b} proactive acts are unevenly distributed across its four structural zones: ${emptyZoneNames437b[bloatZone437b]} contains ${maxZoneCount437b} of them (${Math.round((maxZoneCount437b / totalProactive437b) * 100)}%) while ${emptyZones437b} contains none. Initiative simultaneously bloats in one zone and vanishes from another: the audience receives concentrated agency in one structural quarter while another quarter passes without the protagonist driving a single event. The structural zones where initiative is absent will feel like the protagonist is adrift, while the bloated zone will feel like the protagonist is compulsively busy.`,
+          suggestedFix: `Redistribute initiative: move at least one proactive act from ${emptyZoneNames437b[bloatZone437b]} into the empty zone(s) — ${emptyZones437b} — so every structural quarter of the story has some evidence of the protagonist driving events. The goal is not perfect uniformity, but that no zone is completely initiative-free while another is carrying more than half the total load.`,
+        });
+      }
+    }
+  }
+
+  // SEED_CLOCKLESS (minor, n≥8, ≥3 seed scenes): Every clue-seeding scene has no clock
+  // pressure (clockRaised = false, clockDelta ≤ 0) — threads are always planted in moments
+  // of calm, never under urgency. When a clue is planted while a clock is running, it carries
+  // double charge: the audience receives a new thread AND feels time pressure on the very
+  // question they are asked to hold. A seed planted under urgency tells the audience that
+  // this particular question matters NOW — it has a deadline. Seeds planted exclusively in
+  // low-urgency, clockless moments signal that the information is supplementary material
+  // delivered during a lull rather than story-critical intelligence introduced at a
+  // consequential moment. Co-occurrence/decoupling × seed × clock. Distinct from SEED_DRAMA_
+  // DECOUPLED (Wave 423: seeds never coincide with dramatic turns — a pivot quality signal,
+  // not an urgency check), SEEDING_CURIOSITY_FLAT (Wave 300: seed scenes have low curiosityDelta
+  // — an information-quality signal, not an urgency-channel check), and CURIOSITY_WITHOUT_AGENCY
+  // (Wave 300: curiosity spikes without protagonist initiative — neither seed-specific nor
+  // clock-specific). This is the first check to audit the co-occurrence of seed scenes with
+  // clock pressure.
+  if (n >= 8) {
+    const seedRecs437c = (records as any[]).filter(r => ((r.seededClueIds ?? []) as string[]).length > 0);
+    if (seedRecs437c.length >= 3) {
+      const allClockless437c = seedRecs437c.every(r =>
+        r.clockRaised !== true && (r.clockDelta ?? 0) <= 0,
+      );
+      if (allClockless437c) {
+        issues.push({
+          location: `All ${seedRecs437c.length} seed scene(s) — no clock pressure`,
+          rule: 'SEED_CLOCKLESS',
+          severity: 'minor',
+          description: `All ${seedRecs437c.length} clue-seeding scenes are planted without any clock pressure (clockRaised = false, clockDelta ≤ 0 in every case) — threads are always introduced in moments of calm. A seed planted while a clock is running signals to the audience that this information is urgent: a question introduced under time pressure carries a built-in deadline, and the audience holds it with more tension than a question introduced in a quiet moment. When every clue arrives during a lull, the seeding engine and the urgency engine are entirely decoupled — threads feel like background texture rather than strategically timed intelligence.`,
+          suggestedFix: 'Let at least one clue be planted in a scene where a clock is running or time pressure is elevated: a seed planted as a deadline looms, during an escalating confrontation, or at a moment when the protagonist is under pressure to act quickly. The urgency does not need to be explicitly about the clue — it simply needs to co-exist with the new question, so the audience receives the thread in a heightened state rather than a relaxed one.',
         });
       }
     }
