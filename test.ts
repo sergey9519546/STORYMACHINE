@@ -20784,6 +20784,87 @@ I always listen.
     });
   });
 
+  describe('Wave 436 — conflictPass: positive spiral, rupture suspense void, breathing room absent', async () => {
+    const rup436 = (amount: number, pairKey = 'A|B') => [{ pairKey, dimension: 'trust', amount }];
+    const makeRec436 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runConf436 = async (records: any[]) => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      return conflictPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CONFLICT_POSITIVE_SPIRAL fires when ≥3 consecutive positive-shift scenes exist alongside ≥2 ruptures', async () => {
+      // n=8, ruptures at 0 and 6; positive shifts at 2, 3, 4 (run of 3) → fires
+      const recs436a = Array.from({ length: 8 }, (_, i) => makeRec436(i));
+      recs436a[0] = makeRec436(0, { relationshipShifts: rup436(-0.5) });
+      recs436a[2] = makeRec436(2, { relationshipShifts: rup436(0.4) });
+      recs436a[3] = makeRec436(3, { relationshipShifts: rup436(0.3) });
+      recs436a[4] = makeRec436(4, { relationshipShifts: rup436(0.2) });
+      recs436a[6] = makeRec436(6, { relationshipShifts: rup436(-0.4) });
+      const res = await runConf436(recs436a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_POSITIVE_SPIRAL'), 'CONFLICT_POSITIVE_SPIRAL should fire');
+    });
+
+    it('CONFLICT_POSITIVE_SPIRAL does not fire when positive run is only 2 scenes long', async () => {
+      // n=8, ruptures at 0 and 6; positive shifts at 2 and 3 only (run of 2) → no fire
+      const recs436anr = Array.from({ length: 8 }, (_, i) => makeRec436(i));
+      recs436anr[0] = makeRec436(0, { relationshipShifts: rup436(-0.5) });
+      recs436anr[2] = makeRec436(2, { relationshipShifts: rup436(0.4) });
+      recs436anr[3] = makeRec436(3, { relationshipShifts: rup436(0.3) });
+      recs436anr[6] = makeRec436(6, { relationshipShifts: rup436(-0.4) });
+      const res = await runConf436(recs436anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_POSITIVE_SPIRAL'), 'CONFLICT_POSITIVE_SPIRAL should not fire');
+    });
+
+    it('CONFLICT_RUPTURE_SUSPENSE_VOID fires when every rupture aftermath has no suspense rise', async () => {
+      // n=8, ruptures at 2 and 5; scenes 3,4 and 6,7 all have suspenseDelta=0 → fires
+      const recs436b = Array.from({ length: 8 }, (_, i) => makeRec436(i));
+      recs436b[2] = makeRec436(2, { relationshipShifts: rup436(-0.5) });
+      recs436b[5] = makeRec436(5, { relationshipShifts: rup436(-0.4) });
+      const res = await runConf436(recs436b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_RUPTURE_SUSPENSE_VOID'), 'CONFLICT_RUPTURE_SUSPENSE_VOID should fire');
+    });
+
+    it('CONFLICT_RUPTURE_SUSPENSE_VOID does not fire when suspense rises after a rupture', async () => {
+      // n=8, ruptures at 2 and 5; scene 3 has suspenseDelta=1 → no fire
+      const recs436bnr = Array.from({ length: 8 }, (_, i) => makeRec436(i));
+      recs436bnr[2] = makeRec436(2, { relationshipShifts: rup436(-0.5) });
+      recs436bnr[3] = makeRec436(3, { suspenseDelta: 1 });
+      recs436bnr[5] = makeRec436(5, { relationshipShifts: rup436(-0.4) });
+      const res = await runConf436(recs436bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_RUPTURE_SUSPENSE_VOID'), 'CONFLICT_RUPTURE_SUSPENSE_VOID should not fire');
+    });
+
+    it('CONFLICT_BREATHING_ROOM_ABSENT fires when 4+ ruptures are always ≤1 scene apart', async () => {
+      // n=10, ruptures at 0, 2, 4, 6 → gaps all =1 → maxGap=1 → fires
+      const recs436c = Array.from({ length: 10 }, (_, i) => makeRec436(i));
+      recs436c[0] = makeRec436(0, { relationshipShifts: rup436(-0.5) });
+      recs436c[2] = makeRec436(2, { relationshipShifts: rup436(-0.4) });
+      recs436c[4] = makeRec436(4, { relationshipShifts: rup436(-0.5) });
+      recs436c[6] = makeRec436(6, { relationshipShifts: rup436(-0.4) });
+      const res = await runConf436(recs436c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_BREATHING_ROOM_ABSENT'), 'CONFLICT_BREATHING_ROOM_ABSENT should fire');
+    });
+
+    it('CONFLICT_BREATHING_ROOM_ABSENT does not fire when ruptures have ≥2 clear scenes between them', async () => {
+      // n=10, ruptures at 0, 2, 5, 8 → gaps: 1, 2, 2 → maxGap=2 > 1 → no fire
+      const recs436cnr = Array.from({ length: 10 }, (_, i) => makeRec436(i));
+      recs436cnr[0] = makeRec436(0, { relationshipShifts: rup436(-0.5) });
+      recs436cnr[2] = makeRec436(2, { relationshipShifts: rup436(-0.4) });
+      recs436cnr[5] = makeRec436(5, { relationshipShifts: rup436(-0.5) });
+      recs436cnr[8] = makeRec436(8, { relationshipShifts: rup436(-0.4) });
+      const res = await runConf436(recs436cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_BREATHING_ROOM_ABSENT'), 'CONFLICT_BREATHING_ROOM_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 422 — conflictPass: rupture cause void, aftermath curiosity void, pair shift imbalance', async () => {
     const rup422 = (amount: number, pairKey = 'A|B') => [{ pairKey, dimension: 'trust', amount }];
     const makeRec422 = (idx: number, overrides: any = {}): any => ({

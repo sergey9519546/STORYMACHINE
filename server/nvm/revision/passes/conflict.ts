@@ -57,6 +57,15 @@
 // aftermath × curiosity), conflict pair shift imbalance (one relationship pair accounts for
 // >65% of total negative shift magnitude while ≥3 pairs exist — the story over-invests in
 // one dyad; average/aggregate × pair distribution).
+// Wave 436 additions: positive spiral (≥3 consecutive scenes each with a positive relationship
+// shift while ≥2 ruptures exist elsewhere — the relational world warms unbroken, removing
+// friction; run-based × positive-shift channel, complement of CONFLICT_RELENTLESS_RUN),
+// rupture suspense void (every major rupture is followed by 2 scenes with suspenseDelta ≤ 0 —
+// bond-breaking never escalates tension; sequence/aftermath × suspense channel, parallel to
+// Wave 422's CONFLICT_AFTERMATH_CURIOSITY_VOID but suspense rather than curiosity), breathing
+// room absent (≥4 ruptures exist and the maximum non-rupture gap between consecutive ruptures
+// is ≤1 scene — every break is followed almost immediately by another; distribution/timing ×
+// rupture spacing, distinct from CONFLICT_RELENTLESS_RUN which requires CONSECUTIVE ruptures).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1828,6 +1837,136 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `One relationship pair ("${maxPairKey422c}") accounts for ${Math.round(maxPairMag422c / totalMag422c * 100)}% of the story's total negative-shift magnitude, while ${pairKeys422c.size - 1} other pair(s) also carry conflict. When one dyad bears the overwhelming majority of relational damage, the story's conflict is structurally myopic: the audience invests in that pair but has little relational concern for anyone else, and the supporting bonds feel decorative rather than dramatically stressed.`,
           suggestedFix: `Distribute relational damage more evenly across the story's pairs: let the bonds outside "${maxPairKey422c}" carry some of the dramatic weight — a secondary trust broken, an alliance strained, a peripheral friendship that pays a cost for the story's central conflict. When multiple relationships are under pressure simultaneously, the audience's relational investment widens and the stakes feel structural rather than personal.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 436: CONFLICT_POSITIVE_SPIRAL, CONFLICT_RUPTURE_SUSPENSE_VOID, CONFLICT_BREATHING_ROOM_ABSENT ──
+
+  // CONFLICT_POSITIVE_SPIRAL (minor, n≥8, ≥2 ruptures, maxPositiveRun≥3): Three or more
+  // consecutive scenes each carry at least one positive relationship shift, while the story
+  // also has ≥2 rupture scenes (negative shift ≤ -0.3). The relational world warms for an
+  // unbroken stretch of ≥3 scenes, removing dramatic friction from the relationship layer
+  // for that span. Conflict lives in contrast: a bond improving matters only against a
+  // background of bonds under stress. When the relational world enters a long uninterrupted
+  // upswing, the audience loses its grip on tension — there is nothing relational to fear
+  // breaking because everything is visibly warming. Run-based mode × positive-shift channel.
+  // The complement of CONFLICT_RELENTLESS_RUN (Wave 313: ≥4 consecutive scenes with a
+  // negative shift — the pressure mirror of this check) and NEGATIVE_SPIRAL_UNBROKEN (Wave
+  // 285: same, negative direction). Distinct from ARC_RELATIONAL_POSITIVE_ONLY (character-arc
+  // pass: ALL shifts globally are positive — this fires on a LOCAL run of warmth, not the
+  // global absence of negativity) and ARC_POSITIVE_EMOTION_RUN (emotional shifts, not
+  // relational shifts): this is the first positive-relational-run check in the conflict pass.
+  if (records.length >= 8) {
+    const ruptureCount436a = (records as any[]).filter(r =>
+      ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => (s.amount ?? 0) <= -0.3),
+    ).length;
+    if (ruptureCount436a >= 2) {
+      let maxPosRun436a = 0;
+      let curPosRun436a = 0;
+      let maxPosStart436a = -1;
+      let curPosStart436a = -1;
+      for (let i = 0; i < records.length; i++) {
+        const hasPos = ((records as any[])[i].relationshipShifts ?? [] as any[]).some(
+          (s: any) => (s.amount ?? 0) > 0,
+        );
+        if (hasPos) {
+          if (curPosRun436a === 0) curPosStart436a = i;
+          if (++curPosRun436a > maxPosRun436a) {
+            maxPosRun436a = curPosRun436a;
+            maxPosStart436a = curPosStart436a;
+          }
+        } else {
+          curPosRun436a = 0;
+        }
+      }
+      if (maxPosRun436a >= 3) {
+        issues.push({
+          location: `Scenes ${maxPosStart436a}–${maxPosStart436a + maxPosRun436a - 1} — positive relationship spiral`,
+          rule: 'CONFLICT_POSITIVE_SPIRAL',
+          severity: 'minor',
+          description: `${maxPosRun436a} consecutive scenes (${maxPosStart436a}–${maxPosStart436a + maxPosRun436a - 1}) each carry a positive relationship shift while the story also has ${ruptureCount436a} rupture scenes. The relational world warms for ${maxPosRun436a} scenes without interruption. Conflict lives in contrast — a bond improving matters only against a background of bonds under stress. An extended upswing without friction teaches the audience that the relational world is safe, draining the tension from every scene in the spiral.`,
+          suggestedFix: 'Interrupt the warmth: introduce a complication, a misunderstanding, or a small fracture within the positive spiral so the upswing feels earned against resistance rather than uncontested. A single scene of relational friction within the spiral makes the warmth around it feel more fragile and therefore more meaningful.',
+        });
+      }
+    }
+  }
+
+  // CONFLICT_RUPTURE_SUSPENSE_VOID (minor, n≥8, ≥2 ruptures): Every scene with a major
+  // relationship rupture (negative shift ≤ -0.3) is followed by two scenes where suspenseDelta
+  // ≤ 0 — bond-breaking never escalates the story's tension. When a bond fractures the
+  // audience expects stakes to rise: who did this, what will the protagonist do, what is now
+  // at risk? When every rupture is followed by flat or declining suspense, the conflict layer
+  // teaches the audience that breaking bonds has no escalatory consequence. Sequence/aftermath
+  // mode × suspense channel. Parallel to CONFLICT_AFTERMATH_CURIOSITY_VOID (Wave 422: the
+  // curiosity channel aftermath of ruptures), distinct from it by channel (suspenseDelta vs
+  // curiosityDelta). Distinct from CONFLICT_SUSPENSE_DECOUPLED (Wave 285: average suspense
+  // of conflict scenes themselves — this checks the AFTERMATH suspense, not the scene of
+  // rupture itself) and CONFLICT_PEAK_SUSPENSE_ABSENT (Wave 352: the peak-rupture scene's
+  // own suspenseDelta — single-peak, not aftermath): this is the first check to audit the
+  // suspense channel in the two scenes following each rupture.
+  if (records.length >= 8) {
+    const ruptureRecs436b = (records as any[]).filter(r =>
+      ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => (s.amount ?? 0) <= -0.3),
+    );
+    if (ruptureRecs436b.length >= 2) {
+      const allFlatSusp436b = ruptureRecs436b.every((r: any) => {
+        const idx = (records as any[]).indexOf(r);
+        for (let off = 1; off <= 2; off++) {
+          if (idx + off >= records.length) continue;
+          if (((records as any[])[idx + off].suspenseDelta ?? 0) > 0) return false;
+        }
+        return true;
+      });
+      if (allFlatSusp436b) {
+        issues.push({
+          location: 'All rupture aftermath scenes — suspense flat',
+          rule: 'CONFLICT_RUPTURE_SUSPENSE_VOID',
+          severity: 'minor',
+          description: `Every bond-rupture in the story (${ruptureRecs436b.length} conflict scene(s)) is followed by two scenes with no suspense rise — breaking bonds never escalates the story's tension. When a relationship fractures, the audience expects stakes to rise: who is responsible, what must the protagonist do next, what is now at risk? When every rupture is followed by flat or declining suspense, the conflict layer teaches the audience that breaking bonds has no escalatory consequence, and conflict loses its forward pull.`,
+          suggestedFix: 'Let each rupture raise suspense in the scene that follows: make the cost of the broken bond immediately visible — a new vulnerability exposed, a protection lost, a counter-move the protagonist must now fear. Relational damage should make the world more dangerous, not quieter; the scene after the break should be the scene where the audience leans forward wondering what it means.',
+        });
+      }
+    }
+  }
+
+  // CONFLICT_BREATHING_ROOM_ABSENT (minor, n≥10, ≥4 ruptures, maxGap≤1): The story has ≥4
+  // rupture scenes and the maximum gap between any two consecutive ruptures is ≤1 non-rupture
+  // scene — every bond-break is followed almost immediately by another. No two ruptures allow
+  // the audience more than one scene of non-conflict before the next fracture. The audience
+  // needs processing room between relational breaks: the scene that absorbs a rupture's
+  // impact, where characters regroup and the audience registers what was lost, before the
+  // next break arrives. When the gap is always ≤1 scene, the story delivers a sequence of
+  // rapid-fire ruptures with no breathing space for any individual break to register as a
+  // distinct emotional event — the audience numbs to conflict because it never stops.
+  // Distribution/timing mode × rupture spacing. Distinct from CONFLICT_RELENTLESS_RUN (Wave
+  // 313: ≥4 CONSECUTIVE rupture scenes with zero gap — this fires when the maximum gap is
+  // ≤1, catching the case where ruptures are separated by exactly one calm scene rather than
+  // being literally consecutive, a different population and a gentler but still problematic
+  // distribution) and NEGATIVE_SPIRAL_UNBROKEN (Wave 285: ≥4 consecutive negative SHIFTS —
+  // the same consecutive-run concept): BREATHING_ROOM_ABSENT fires when the maximum between-
+  // rupture gap is ≤1, which CONFLICT_RELENTLESS_RUN never catches.
+  if (records.length >= 10) {
+    const rupturePositions436c: number[] = [];
+    for (let i = 0; i < records.length; i++) {
+      if (((records as any[])[i].relationshipShifts ?? [] as any[]).some((s: any) => (s.amount ?? 0) <= -0.3)) {
+        rupturePositions436c.push(i);
+      }
+    }
+    if (rupturePositions436c.length >= 4) {
+      let maxGap436c = 0;
+      for (let k = 1; k < rupturePositions436c.length; k++) {
+        const gap = rupturePositions436c[k] - rupturePositions436c[k - 1] - 1;
+        if (gap > maxGap436c) maxGap436c = gap;
+      }
+      if (maxGap436c <= 1) {
+        issues.push({
+          location: `${rupturePositions436c.length} ruptures — max gap ≤ ${maxGap436c} scene`,
+          rule: 'CONFLICT_BREATHING_ROOM_ABSENT',
+          severity: 'minor',
+          description: `The story has ${rupturePositions436c.length} bond-ruptures and the maximum gap between any two consecutive ones is ${maxGap436c} non-conflict scene(s) — every rupture is followed almost immediately by another. The audience never gets more than one scene to absorb a break before the next fracture arrives. Without breathing room, individual ruptures lose their distinctiveness: the audience numbs to conflict because it never pauses, and what should be the sharpest relational breaks blend into an undifferentiated rhythm of damage.`,
+          suggestedFix: 'Spread ruptures further apart: after a significant bond-break, allow at least two or three scenes before the next one. The scene that absorbs a rupture\'s impact — where characters regroup, where the audience registers what was lost — is not inert. It is where the audience internalizes the cost of the break, so the next fracture lands against that accumulated weight rather than in an already-numb environment.',
         });
       }
     }
