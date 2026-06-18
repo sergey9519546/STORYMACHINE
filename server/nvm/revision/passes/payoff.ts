@@ -65,6 +65,16 @@
 // relationship valence uniform (valence — when payoffs DO move bonds, every relational shift on
 // a payoff scene shares one sign, so the resolution phase ruptures-only or repairs-only;
 // distinct from PAYOFF_RELATIONSHIP_DECOUPLED, which fires when NO payoff moves a bond at all).
+// Wave 440 additions: payoff backloaded (>70% of payoffs in the second half while ≥3 exist —
+// the distribution mirror of PAYOFF_FRONT_LOADED; the first half resolves nothing while the
+// second half carries all closures; distribution/timing × underweight/bloat), payoff emotional
+// recoil absent (no payoff scene is followed by a negative emotional shift within 2 scenes —
+// resolutions never produce grief, loss, or emotional cost downstream; sequence/aftermath ×
+// negative-emotion channel, distinct from PAYOFF_AFTERMATH_QUESTION_VOID by channel and from
+// PAYOFF_EMOTION_DECOUPLED which audits the payoff scene itself), payoff suspense recoil absent
+// (no payoff scene is followed by a suspenseDelta > 0 within 2 scenes — resolutions never create
+// new pressure downstream; sequence/aftermath × suspense channel, completing the aftermath-channel
+// family alongside curiosity/seed and emotional recoil).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1752,6 +1762,120 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `All ${payoffRelShifts426.length} relationship shifts that occur on payoff scenes are ${dir426} (same sign). The story's resolutions move bonds in only one direction — every thread that closes also ${allPositive426 ? 'mends' : 'breaks'} a relationship, and none does the reverse. The resolution phase reads as a monotone wave of ${allPositive426 ? 'reconciliation' : 'loss'} with no counterpoint, flattening the relational texture of the ending.`,
           suggestedFix: `Vary the relational valence of the payoffs: let at least one thread close in a way that ${allPositive426 ? 'costs a bond — a victory that estranges, a truth that wounds' : 'mends a bond — a reconciliation, a debt forgiven, an alliance sealed'}. An ending whose resolutions cut both ways feels truer than one where every closure pulls the same emotional direction.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 440: PAYOFF_BACKLOADED, PAYOFF_EMOTIONAL_RECOIL_ABSENT, PAYOFF_SUSPENSE_RECOIL_ABSENT ──
+
+  // PAYOFF_BACKLOADED (minor, ≥3 payoffs, n≥8, >70% in second half): More than 70% of all
+  // payoffs land in the second half of the story while the first half has fewer than 30%.
+  // The distribution mirror of PAYOFF_FRONT_LOADED (which fires when >60% land in the first
+  // half). When almost all resolutions are withheld until the second half, the first half of
+  // the story functions entirely as setup with no earned satisfaction — no thread closes, no
+  // investment is returned, and the audience receives no confirmation that the payoff machine
+  // is working. A story with no payoffs in the first half also denies itself the narrative
+  // technique of the early payoff that reframes the setup: the mid-story twist that pays off
+  // something the audience didn't know was a setup until it resolved. Distribution/timing ×
+  // underweight/bloat mode. Distinct from PAYOFF_FRONT_LOADED (Wave 261: >60% in first half
+  // — the opposite imbalance), PAYOFF_ACT3_ABSENT (Wave 370: zero payoffs in Act 3 final 25%
+  // — a zone void, not a proportion), ACT_2A_PAYOFF_VOID (Wave 275: zero payoffs in Act 2a
+  // 25–50% zone — a zone void), and UNRESOLVED_CLUE_RATIO_HIGH (Wave 317: percentage of clue
+  // IDs still open at the end — a different measure of unresolved threads by identity, not
+  // scene-timing distribution).
+  if (payoffInfo.size >= 3 && records.length >= 8) {
+    const midpoint440a = Math.floor(records.length / 2);
+    const firstHalfPayoffs440a = [...payoffInfo.values()].filter(s => s < midpoint440a).length;
+    const backRatio440a = 1 - firstHalfPayoffs440a / payoffInfo.size;
+    if (backRatio440a > 0.70) {
+      const backHalfCount440a = payoffInfo.size - firstHalfPayoffs440a;
+      issues.push({
+        location: `Payoff distribution (${backHalfCount440a} of ${payoffInfo.size} in second half)`,
+        rule: 'PAYOFF_BACKLOADED',
+        severity: 'minor',
+        description: `${backHalfCount440a} of ${payoffInfo.size} payoffs (${Math.round(backRatio440a * 100)}%) land in the second half of the story — the resolution engine is severely back-loaded. The first half resolves almost nothing: the audience plants questions throughout setup with no payoffs returned until after the midpoint, receiving no confirmation that the payoff machine is working and no early reframings of threads they didn't know were setups. A first half with no payoffs treats every seed as pure promise deferred, and the second half must work through all of it.`,
+        suggestedFix: 'Move at least one payoff into the first half: a minor thread that resolves early to prove the machine is running, to reward the audience\'s attention, and to set up the richer payoffs that follow. An early payoff that reframes what came before it ("that wasn\'t setup, it was this all along") is especially powerful — it rewards re-reading while keeping the first-half investment active.',
+      });
+    }
+  }
+
+  // PAYOFF_EMOTIONAL_RECOIL_ABSENT (minor, n≥8, ≥2 qualifying payoff scenes): No payoff scene
+  // (with at least 2 scenes remaining after it) is followed by a negative emotional shift
+  // (emotionalShift = 'negative') in the next two scenes. When threads close, the closures
+  // should sometimes produce grief, loss, disillusionment, or emotional cost in the scenes that
+  // follow: a truth revealed that wounds, a victory that costs something, a question answered
+  // that opens a worse one. When every payoff's aftermath stays emotionally neutral or positive,
+  // resolutions feel consequence-free — the story ties its threads and moves on without
+  // emotional weight. The absence of negative emotional recoil after payoffs teaches the audience
+  // that closures are clean events rather than moments of genuine reckoning. Sequence/aftermath
+  // mode × negative-emotion channel. Distinct from PAYOFF_EMOTION_DECOUPLED (Wave 317: the
+  // payoff SCENES themselves are all emotionally neutral — this fires even when payoff scenes
+  // have positive emotion, as long as the aftermath lacks negative recoil), PAYOFF_AFTERMATH_
+  // QUESTION_VOID (Wave 426: aftermath lacks curiosity or seeds — curiosity/seed channel, not
+  // emotional channel), and PAYOFF_SUSPENSE_RECOIL_ABSENT (Wave 440, same wave: suspense
+  // channel of the aftermath window). This is the first check to audit the negative-emotion
+  // dimension of the 2-scene aftermath following payoffs.
+  if (records.length >= 8) {
+    const qualPayoffs440b: number[] = [];
+    for (let i = 0; i < records.length - 2; i++) {
+      if ((((records as any[])[i].payoffSetupIds ?? []) as string[]).length > 0) {
+        qualPayoffs440b.push(i);
+      }
+    }
+    if (qualPayoffs440b.length >= 2) {
+      const anyNegRecoil440b = qualPayoffs440b.some(idx => {
+        for (let off = 1; off <= 2; off++) {
+          if (idx + off < records.length && (records as any[])[idx + off].emotionalShift === 'negative') return true;
+        }
+        return false;
+      });
+      if (!anyNegRecoil440b) {
+        issues.push({
+          location: `All ${qualPayoffs440b.length} qualifying payoff scene(s) — no negative emotional aftermath`,
+          rule: 'PAYOFF_EMOTIONAL_RECOIL_ABSENT',
+          severity: 'minor',
+          description: `None of the story's ${qualPayoffs440b.length} payoff scenes (that have at least 2 scenes following them) is followed by a negative emotional shift within the next two scenes. When threads close, some resolutions should produce grief, loss, disillusionment, or emotional cost: a truth that wounds, a victory that costs something, an answer that opens a worse question. When every payoff's aftermath stays emotionally neutral or positive, the resolutions feel consequence-free — the story ties its bows without emotional weight, and the audience learns that closures are clean transactions rather than moments of genuine reckoning.`,
+          suggestedFix: 'Let at least one payoff produce negative emotional fallout in the scene or two that follow: a revelation that changes how the protagonist sees themselves, a victory won at a cost that the audience feels, an answer that makes the problem look worse rather than better. The best payoffs earn their emotional cost — the closure that brings grief lands harder than the one that simply concludes.',
+        });
+      }
+    }
+  }
+
+  // PAYOFF_SUSPENSE_RECOIL_ABSENT (minor, n≥8, ≥2 qualifying payoff scenes): No payoff scene
+  // (with at least 2 scenes remaining after it) is followed by a positive suspenseDelta in the
+  // next two scenes. When threads close, the resolution should often create new pressure:
+  // completing one arc exposes a deeper problem, the answer reveals a new danger, the closed
+  // loop unmasks what was hidden behind it. When every payoff's aftermath is suspense-flat, the
+  // resolutions feel hermetically sealed — they close the old without creating pressure for the
+  // new. The story's threads resolve but generate no forward momentum in the tension channel,
+  // so payoffs feel like endpoints rather than turning points. Sequence/aftermath mode × suspense
+  // channel. Distinct from PAYOFF_SUSPENSE_MISMATCH (Wave 289: the payoff scenes' own average
+  // suspenseDelta ≤ 0 — the suspense IN the payoff scene, not its aftermath), PAYOFF_AFTERMATH_
+  // QUESTION_VOID (Wave 426: curiosity/seed channel aftermath), PAYOFF_EMOTIONAL_RECOIL_ABSENT
+  // (Wave 440, same wave: negative-emotion aftermath channel). This completes the aftermath-
+  // channel family: curiosity/seed (Wave 426), negative emotion (this wave), suspense (this wave).
+  if (records.length >= 8) {
+    const qualPayoffs440c: number[] = [];
+    for (let i = 0; i < records.length - 2; i++) {
+      if ((((records as any[])[i].payoffSetupIds ?? []) as string[]).length > 0) {
+        qualPayoffs440c.push(i);
+      }
+    }
+    if (qualPayoffs440c.length >= 2) {
+      const anySuspRecoil440c = qualPayoffs440c.some(idx => {
+        for (let off = 1; off <= 2; off++) {
+          if (idx + off < records.length && ((records as any[])[idx + off].suspenseDelta ?? 0) > 0) return true;
+        }
+        return false;
+      });
+      if (!anySuspRecoil440c) {
+        issues.push({
+          location: `All ${qualPayoffs440c.length} qualifying payoff scene(s) — no suspense recoil`,
+          rule: 'PAYOFF_SUSPENSE_RECOIL_ABSENT',
+          severity: 'minor',
+          description: `None of the story's ${qualPayoffs440c.length} payoff scenes (that have at least 2 scenes following them) is followed by a positive suspenseDelta within the next two scenes — resolutions never generate new pressure downstream. When threads close, the resolution should often precipitate new tension: the answer reveals a worse problem, the closed loop exposes a deeper danger, the completed arc unmasks something lurking behind it. When every payoff's aftermath is suspense-flat, the resolutions feel like endpoints rather than turning points — they close the old without opening the new pressure that would keep the audience leaning forward.`,
+          suggestedFix: 'Let at least one payoff create new pressure in the scene or two that follow: resolve one thread in a way that immediately exposes a deeper problem, use the answer to a question to reveal that the stakes were higher than the audience knew, or let the closing of one loop open a worse one. The payoff that generates suspense in its aftermath is more powerful than the one that simply concludes — it tells the audience that resolutions are not safe harbours but transitions to the next danger.',
         });
       }
     }

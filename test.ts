@@ -19694,6 +19694,94 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 440 — payoffPass: payoff backloaded, payoff emotional recoil absent, payoff suspense recoil absent', async () => {
+    const makeRec440 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runPO440 = async (records: any[]) => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      return payoffPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PAYOFF_BACKLOADED fires when >70% of payoffs are in the second half', async () => {
+      // n=8, midpoint=4; payoffs at 4,5,6 (3 in second half) + payoff at 0 (1 in first half)
+      // backRatio = 3/4 = 75% > 70% → fires
+      const recs440a = Array.from({ length: 8 }, (_, i) => makeRec440(i));
+      recs440a[0] = makeRec440(0, { seededClueIds: ['c1'] });
+      recs440a[4] = makeRec440(4, { payoffSetupIds: ['c1'] });
+      recs440a[5] = makeRec440(5, { seededClueIds: ['c2'], payoffSetupIds: ['c2'] });
+      recs440a[6] = makeRec440(6, { seededClueIds: ['c3'], payoffSetupIds: ['c3'] });
+      // Need 4th payoff in second half: sceneIdx=7 is >= midpoint=4
+      recs440a[7] = makeRec440(7, { payoffSetupIds: ['c4'] });
+      // Now payoffs at 4,5,6,7 = 4 in second half; 0 in first half... wait, only 4 payoffs?
+      // payoffInfo maps are built from seededClueIds/payoffSetupIds. Let me re-read:
+      // payoffInfo: a Map from setupId to scene index where it was paid off.
+      // payoffInfo.size = number of unique payoff events. Above: c1 at 4, c2 at 5, c3 at 6, c4 at 7
+      // First half (idx < 4): 0 payoffs; second half (idx >= 4): 4 payoffs
+      // backRatio = 4/4 = 100% > 70% → fires ✓
+      // But we need to seed c4 somewhere for payoffInfo to register...
+      // Actually payoffInfo only tracks payoffSetupIds across scenes; c4's plant location doesn't matter
+      const res = await runPO440(recs440a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_BACKLOADED'), 'PAYOFF_BACKLOADED should fire');
+    });
+
+    it('PAYOFF_BACKLOADED does not fire when payoffs are balanced across halves', async () => {
+      // n=8, midpoint=4; payoffs at 1,2 (first half) and 5,6 (second half)
+      // backRatio = 2/4 = 50% ≤ 70% → no fire
+      const recs440anr = Array.from({ length: 8 }, (_, i) => makeRec440(i));
+      recs440anr[1] = makeRec440(1, { payoffSetupIds: ['c1'] });
+      recs440anr[2] = makeRec440(2, { payoffSetupIds: ['c2'] });
+      recs440anr[5] = makeRec440(5, { payoffSetupIds: ['c3'] });
+      recs440anr[6] = makeRec440(6, { payoffSetupIds: ['c4'] });
+      const res = await runPO440(recs440anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_BACKLOADED'), 'PAYOFF_BACKLOADED should not fire');
+    });
+
+    it('PAYOFF_EMOTIONAL_RECOIL_ABSENT fires when no payoff is followed by negative emotional shift', async () => {
+      // n=8; payoffs at 1 and 4 (both have 2+ scenes after); scenes 2,3 and 5,6 all neutral → fires
+      const recs440b = Array.from({ length: 8 }, (_, i) => makeRec440(i));
+      recs440b[1] = makeRec440(1, { payoffSetupIds: ['c1'] });
+      recs440b[4] = makeRec440(4, { payoffSetupIds: ['c2'] });
+      const res = await runPO440(recs440b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_EMOTIONAL_RECOIL_ABSENT'), 'PAYOFF_EMOTIONAL_RECOIL_ABSENT should fire');
+    });
+
+    it('PAYOFF_EMOTIONAL_RECOIL_ABSENT does not fire when a payoff is followed by negative emotion', async () => {
+      // n=8; payoffs at 1 and 4; scene 2 (after payoff at 1) has emotionalShift='negative' → no fire
+      const recs440bnr = Array.from({ length: 8 }, (_, i) => makeRec440(i));
+      recs440bnr[1] = makeRec440(1, { payoffSetupIds: ['c1'] });
+      recs440bnr[2] = makeRec440(2, { emotionalShift: 'negative' });
+      recs440bnr[4] = makeRec440(4, { payoffSetupIds: ['c2'] });
+      const res = await runPO440(recs440bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_EMOTIONAL_RECOIL_ABSENT'), 'PAYOFF_EMOTIONAL_RECOIL_ABSENT should not fire');
+    });
+
+    it('PAYOFF_SUSPENSE_RECOIL_ABSENT fires when no payoff is followed by a suspense rise', async () => {
+      // n=8; payoffs at 1 and 4; scenes 2,3 and 5,6 all have suspenseDelta=0 → fires
+      const recs440c = Array.from({ length: 8 }, (_, i) => makeRec440(i));
+      recs440c[1] = makeRec440(1, { payoffSetupIds: ['c1'] });
+      recs440c[4] = makeRec440(4, { payoffSetupIds: ['c2'] });
+      const res = await runPO440(recs440c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_SUSPENSE_RECOIL_ABSENT'), 'PAYOFF_SUSPENSE_RECOIL_ABSENT should fire');
+    });
+
+    it('PAYOFF_SUSPENSE_RECOIL_ABSENT does not fire when a payoff is followed by a suspense rise', async () => {
+      // n=8; payoffs at 1 and 4; scene 2 has suspenseDelta=1 → no fire
+      const recs440cnr = Array.from({ length: 8 }, (_, i) => makeRec440(i));
+      recs440cnr[1] = makeRec440(1, { payoffSetupIds: ['c1'] });
+      recs440cnr[2] = makeRec440(2, { suspenseDelta: 1 });
+      recs440cnr[4] = makeRec440(4, { payoffSetupIds: ['c2'] });
+      const res = await runPO440(recs440cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_SUSPENSE_RECOIL_ABSENT'), 'PAYOFF_SUSPENSE_RECOIL_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 426 — payoffPass: payoff aftermath question void, payoff consecutive run, payoff relationship valence uniform', async () => {
     const mkShift426 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
     const makeRec426 = (idx: number, overrides: any = {}): any => ({
