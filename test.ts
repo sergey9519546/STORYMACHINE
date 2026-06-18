@@ -24033,6 +24033,114 @@ The lights go out.`;
     });
   });
 
+  describe('Wave 434 — dialoguePass: tension peak silent, climax void, hedge front-loaded', async () => {
+    const makeRec434 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
+      sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false,
+      revelation: null, dramaticTurn: 'nothing', payoffSetupIds: [], relationshipShifts: [],
+      emotionalShift: 'neutral', seededClueIds: [], dialogueHighlights: [], unresolvedClues: [],
+      purpose: '', slug: `s${sceneIdx}`, ...extra,
+    });
+    const runD434 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    const buildScenes434 = (count: number, withDlgFn: (i: number) => boolean): string => {
+      let f = '';
+      const labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${labels[i] ?? i} - DAY\n\n`;
+        if (withDlgFn(i)) {
+          f += `ALICE\nShe found the documents early this morning.\n\nBOB\nWe need to leave before they close the gate.\n\n`;
+        } else {
+          f += `The door crashes open. A figure steps from the dark. Silence fills the room.\n\n`;
+        }
+      }
+      return f;
+    };
+
+    it('DIALOGUE_TENSION_PEAK_SILENT fires when peak-suspense scene has no dialogue', async () => {
+      // 8 scenes; scene index 5 is the peak (suspenseDelta=3) with no dialogue; all others have 2 lines each
+      const recs434a = Array.from({ length: 8 }, (_, i) => makeRec434(i, i === 5 ? { suspenseDelta: 3 } : {}));
+      const f434a = buildScenes434(8, i => i !== 5);
+      const res = await runD434(f434a, recs434a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_TENSION_PEAK_SILENT'), 'DIALOGUE_TENSION_PEAK_SILENT should fire');
+    });
+
+    it('DIALOGUE_TENSION_PEAK_SILENT does not fire when peak-suspense scene has dialogue', async () => {
+      // Same structure but ALL scenes (including scene 5) have dialogue
+      const recs434aNF = Array.from({ length: 8 }, (_, i) => makeRec434(i, i === 5 ? { suspenseDelta: 3 } : {}));
+      const f434aNF = buildScenes434(8, () => true);
+      const res = await runD434(f434aNF, recs434aNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_TENSION_PEAK_SILENT'), 'DIALOGUE_TENSION_PEAK_SILENT should not fire');
+    });
+
+    it('DIALOGUE_CLIMAX_VOID fires when final 20% of scenes has no dialogue', async () => {
+      // 10 scenes; finalStart = floor(10*0.8) = 8; scenes 8-9 have no dialogue
+      const recs434b = Array.from({ length: 10 }, (_, i) => makeRec434(i));
+      const f434b = buildScenes434(10, i => i < 8);
+      const res = await runD434(f434b, recs434b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_CLIMAX_VOID'), 'DIALOGUE_CLIMAX_VOID should fire');
+    });
+
+    it('DIALOGUE_CLIMAX_VOID does not fire when final 20% has dialogue', async () => {
+      // Same 10 scenes but ALL scenes have dialogue
+      const recs434bNF = Array.from({ length: 10 }, (_, i) => makeRec434(i));
+      const f434bNF = buildScenes434(10, () => true);
+      const res = await runD434(f434bNF, recs434bNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_CLIMAX_VOID'), 'DIALOGUE_CLIMAX_VOID should not fire');
+    });
+
+    it('DIALOGUE_HEDGE_FRONT_LOADED fires when hedges cluster in first half only', async () => {
+      // 14 lines: first 7 carry 5 hedges; last 7 carry 0 hedges → fires (5≥5, 0≤1)
+      const lines434c = [
+        'Maybe we should wait a little longer here.',       // hedge
+        'I think the signal will arrive quite soon.',       // hedge
+        'Perhaps if we just move the box to the left.',     // hedge (two: perhaps + just)
+        'I guess we have no other choice right now.',       // hedge
+        'Sort of lost without any real direction forward.', // hedge
+        'She drove without stopping once for gas.',
+        'We need to reach them before the sun goes down.',
+        // second half (indices 7-13):
+        'The door is locked from the inside tonight.',
+        'Turn the generator off at the main switch.',
+        'She is standing right outside the hallway door.',
+        'Call the office and confirm the meeting time.',
+        'Bring everything you need for the long road.',
+        'He left without saying a single word at all.',
+        'The contract was signed and filed before noon.',
+      ];
+      const body434c = lines434c.map((l, i) => `${i % 2 === 0 ? 'ALICE' : 'BOB'}\n${l}`).join('\n\n');
+      const f434c = `INT. ROOM - DAY\n\n${body434c}\n`;
+      const res = await runD434(f434c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_HEDGE_FRONT_LOADED'), 'DIALOGUE_HEDGE_FRONT_LOADED should fire');
+    });
+
+    it('DIALOGUE_HEDGE_FRONT_LOADED does not fire when hedges appear in only 3 first-half lines', async () => {
+      // 14 lines: first 7 carry only 3 hedges → firstHedges=3 < 5, so does not fire
+      const lines434cNF = [
+        'Maybe we should wait a little longer here.',   // hedge
+        'I think the signal will arrive quite soon.',   // hedge
+        'Perhaps if we move the box to the corner.',    // hedge
+        'She drove without stopping once for gas.',
+        'We need to reach them before the sun goes down.',
+        'The door was locked when we arrived here.',
+        'Turn the generator off at the main switch.',
+        // second half (indices 7-13):
+        'She is standing right outside the hallway.',
+        'Call the office and confirm the meeting time.',
+        'Bring everything you need for the long road.',
+        'He left without saying a single word at all.',
+        'The contract was signed before noon today.',
+        'We have no time left to waste on this matter.',
+        'The report is filed and ready for review now.',
+      ];
+      const body434cNF = lines434cNF.map((l, i) => `${i % 2 === 0 ? 'ALICE' : 'BOB'}\n${l}`).join('\n\n');
+      const f434cNF = `INT. ROOM - DAY\n\n${body434cNF}\n`;
+      const res = await runD434(f434cNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_HEDGE_FRONT_LOADED'), 'DIALOGUE_HEDGE_FRONT_LOADED should not fire');
+    });
+  });
+
   describe('Wave 420 — dialoguePass: interrupt flood, excuse flood, affirmation flood', async () => {
     const runD420 = async (fountain: string) => {
       const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');

@@ -53,6 +53,15 @@
 // justify past actions rather than engaging the present; valence mode), affirmation flood
 // (>25% of lines are pure bare assent — "yes"/"okay"/"absolutely" — dialogue with no
 // friction or resistance; underweight mode).
+// Wave 434 additions: tension peak silent (the scene with the story's highest suspenseDelta
+// contains no dialogue — the most gripped moment passes without a spoken word; single-peak
+// isolation × backward-cause mode, first check in this pass to use suspenseDelta for peak
+// isolation), climax void (the final 20% of scenes has no dialogue at all while the earlier
+// story is verbally active — the resolution plays as silent spectacle; zone presence/absence
+// mode × climax zone, first zone-silence check in this pass), hedge front-loaded (hedging
+// language concentrates entirely in the first half of dialogue with ≤1 instance in the
+// second half — uncertainty vocabulary disappears from escalation and climax; distribution/
+// timing mode × hedging lexeme, distinct from HEDGE_SATURATION which is a rate check).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1980,6 +1989,115 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${affirmCount420c} of ${dialogue.length} dialogue lines (${Math.round(affirmCount420c / dialogue.length * 100)}%) are pure bare assent ("yes", "okay", "sure", "exactly", "absolutely", "of course"). When over a quarter of all lines are nothing but agreement, the dialogue has no friction — nobody pushes back, asserts a position, or redirects the exchange. Pure assent lines are padding: giving a character a turn without a position. Dialogue without resistance is scenery, not drama.`,
         suggestedFix: 'Replace reflex affirmations with a qualification, a redirect, or a counter-assertion: "Yes, but—", "Sure, if you ignore the part where—", "Okay, then what about—". Reserve pure assent for the dramatic beat where a character\'s capitulation means something — the moment they stop fighting is only powerful when they had been fighting. If a beat only needs acknowledgment, cut the line and use action instead.',
+      });
+    }
+  }
+
+  // ── Wave 434: DIALOGUE_TENSION_PEAK_SILENT, DIALOGUE_CLIMAX_VOID, DIALOGUE_HEDGE_FRONT_LOADED ──
+
+  // DIALOGUE_TENSION_PEAK_SILENT (minor, n≥8, dlg≥10, peakSuspense≥2, peakPos≥1):
+  // The scene with the story's highest suspenseDelta contains no dialogue. The
+  // moment of peak narrative tension is entirely silent — no character speaks
+  // when the story is at its most gripped. Film dialogue is most powerful under
+  // pressure: a confession at gunpoint, a vow during a chase, a revelation in the
+  // burning house. When the peak-suspense scene passes in complete silence, the
+  // most charged delivery slot for a spoken line goes unused, and what a character
+  // says (or cannot say) under maximum pressure is never dramatized. Single-peak
+  // isolation × backward-cause mode (looking backward from the structural peak to
+  // check whether a character voice was present). Distinct from TALKING_HEADS (runs
+  // of dialogue without physical action — the opposite absence), DIALOGUE_DENSITY_
+  // INVERSION (Act-level density ratio, not a single peak scene), and EMOTIONAL_
+  // SUPPRESSION (what is said — a text-pattern check): this is the first check in
+  // the pass to use suspenseDelta to isolate the structural peak and audit for
+  // the presence of speech at that exact moment.
+  if (records.length >= 8 && dialogue.length >= 10) {
+    let peakPos434a = -1;
+    let peakVal434a = -Infinity;
+    for (let i = 0; i < records.length; i++) {
+      const sd = (records[i] as any).suspenseDelta ?? 0;
+      if (sd > peakVal434a) { peakVal434a = sd; peakPos434a = i; }
+    }
+    if (peakPos434a >= 1 && peakVal434a >= 2) {
+      const peakSceneIdx434a = (records[peakPos434a] as any).sceneIdx;
+      const lineToScene434a = buildLineToSceneMap(fountain);
+      const peakHasDlg434a = dialogue.some(d => (lineToScene434a[d.lineNum - 1] ?? 0) === peakSceneIdx434a);
+      if (!peakHasDlg434a) {
+        issues.push({
+          location: `Scene ${peakSceneIdx434a} — peak suspense, no dialogue`,
+          rule: 'DIALOGUE_TENSION_PEAK_SILENT',
+          severity: 'minor',
+          description: `Scene ${peakSceneIdx434a} carries the story's highest suspenseDelta (${peakVal434a.toFixed(2)}) but contains no dialogue — the most gripped moment of the story passes in complete silence. Film dialogue is most powerful under pressure: a question the character cannot hold back, a declaration they can no longer swallow, a fragment cut off by the crisis. When the peak-suspense scene is entirely unspoken, the most charged delivery slot for a voice goes empty.`,
+          suggestedFix: `Add at least one line of dialogue to the peak-tension scene: a question asked at the worst possible moment, a vow or denial forced by the crisis, or a fragment of speech cut off before it finishes. A character who speaks under maximum pressure concentrates the scene's energy in a way that silence alone cannot — and what they manage to say (or fail to say) becomes the line the audience remembers.`,
+        });
+      }
+    }
+  }
+
+  // DIALOGUE_CLIMAX_VOID (minor, n≥10, dlg≥15, ≥10 early-dialogue lines): The
+  // final 20% of scenes — the climax and denouement zone — contains no dialogue
+  // lines at all, even though the earlier story carries substantial verbal content.
+  // When the ending is rendered entirely in action without a single spoken line,
+  // the resolution plays out as pure spectacle: characters never voice what they
+  // believe, what they have lost, or what the events mean. Film endings gain much
+  // of their resonance from a character speaking directly at the turning point —
+  // a declaration, a question, a silence broken just once at the decisive moment.
+  // A climax that never opens its mouth resolves the plot while leaving the story's
+  // human stakes unspoken. Zone presence/absence mode × climax zone. Distinct from
+  // NO_DIALOGUE (fires when the ENTIRE script has zero dialogue — the most extreme
+  // condition; this fires when dialogue is present elsewhere but entirely absent
+  // from the final 20%), LAST_ACT_EXPOSITION_SPIKE (checks for too much expository
+  // dialogue in Act 3, not absence of dialogue), and DIALOGUE_DENSITY_INVERSION
+  // (compares Act-level density ratios): this is the first zone-silence check in
+  // the pass — the first to require dialogue's complete absence from a specific
+  // structural zone while confirming it is present elsewhere.
+  if (records.length >= 10 && dialogue.length >= 15) {
+    const finalStart434b = Math.floor(records.length * 0.8);
+    const lineToScene434b = buildLineToSceneMap(fountain);
+    const earlyDlgCount434b = dialogue.filter(d => (lineToScene434b[d.lineNum - 1] ?? 0) < finalStart434b).length;
+    const finalDlgCount434b = dialogue.filter(d => (lineToScene434b[d.lineNum - 1] ?? 0) >= finalStart434b).length;
+    if (finalDlgCount434b === 0 && earlyDlgCount434b >= 10) {
+      issues.push({
+        location: `Final 20% (Scenes ${finalStart434b}+) — no dialogue`,
+        rule: 'DIALOGUE_CLIMAX_VOID',
+        severity: 'minor',
+        description: `The final 20% of scenes (from Scene ${finalStart434b}) contains no dialogue, even though the earlier story carries ${earlyDlgCount434b} spoken lines. The climax and denouement play out in complete silence: no character speaks through the resolution. When the ending is entirely unspoken, the story's verbal stakes — what characters believe, what they have lost, what the events mean — are never given voice. The resolution plays as spectacle rather than as drama.`,
+        suggestedFix: `Add at least one dialogue line to the climax zone: a declaration, a question, or a silence broken at the decisive moment. The line does not have to explain what happened — it can be oblique, fragmented, or barely audible — but a character must speak. An ending without a voice resolves the plot while leaving the story's human meaning unspoken; the final spoken line is what the audience carries out of the theatre.`,
+      });
+    }
+  }
+
+  // DIALOGUE_HEDGE_FRONT_LOADED (minor, dlg≥14, first-half hedges≥5, second-half
+  // hedges≤1): Hedging language — "maybe", "perhaps", "I think", "I guess",
+  // "I suppose", "just", "sort of", "kind of", "probably", "possibly" — concentrates
+  // entirely in the first half of dialogue, with at most one hedge line in the
+  // entire second half. The story's uncertainty vocabulary is structurally
+  // backwards: characters speak with maximum diffidence in the setup but with
+  // unbroken certainty through the escalation, climax, and resolution. In practice,
+  // doubt and tentativeness belong in the complication and climax zones — the moments
+  // of maximum pressure — not in the opening where everyone is still finding their
+  // footing. When hedging language disappears from the second half, characters who
+  // were tentative become inexplicably decisive precisely when the stakes are
+  // highest, and the voice of doubt goes silent just where the story most needs it.
+  // Distribution/timing mode × hedging lexeme. Distinct from DIALOGUE_HEDGE_
+  // SATURATION (Wave 311: fires when >30% of ALL lines carry a softener — a global
+  // rate check regardless of temporal position; FRONT_LOADED fires on scripts where
+  // the hedge count may be well below 30% but is entirely clustered in the first
+  // half, catching a different population), DIALOGUE_CONDITIONAL_OVERLOAD (Wave 283:
+  // conditional syntactic structures — if/unless/might/could — not hedging
+  // qualifiers), and DIALOGUE_FIRST_PERSON_SATURATION (register breadth, not
+  // uncertainty register): this is the first distribution/timing check in the pass.
+  if (dialogue.length >= 14) {
+    const hedgeRe434c = /\b(just|maybe|perhaps|probably|possibly|i think|i guess|i suppose|kind of|sort of|i mean|or something)\b/i;
+    const half434c = Math.floor(dialogue.length / 2);
+    const firstHedges434c = dialogue.slice(0, half434c).filter(d => hedgeRe434c.test(d.line)).length;
+    const secondHedges434c = dialogue.slice(half434c).filter(d => hedgeRe434c.test(d.line)).length;
+    if (firstHedges434c >= 5 && secondHedges434c <= 1) {
+      issues.push({
+        location: 'Dialogue — hedge distribution (front-loaded)',
+        rule: 'DIALOGUE_HEDGE_FRONT_LOADED',
+        severity: 'minor',
+        description: `${firstHedges434c} hedge lines ("maybe", "I think", "I guess", "just", "sort of") appear in the first half of dialogue, but only ${secondHedges434c} in the second half — the story's uncertainty vocabulary is entirely front-loaded. Characters speak with maximum diffidence in the setup but with unbroken certainty through the escalation and climax. Doubt and tentativeness belong at the moments of highest pressure; when hedging disappears from the second half, characters become inexplicably decisive precisely when the stakes make wavering most natural and human.`,
+        suggestedFix: `Redistribute hedging language into the escalation and climax: let characters voice doubt and uncertainty as pressure mounts, and ensure the second half carries at least two or three hedge lines at the moments of maximum stakes. Reserve complete certainty for the resolution, when a character has earned it through the confrontation — not as the default register of the entire second half.`,
       });
     }
   }
