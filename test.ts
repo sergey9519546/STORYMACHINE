@@ -21025,6 +21025,88 @@ I always listen.
     });
   });
 
+  describe('Wave 435 — characterArcPass: emotional overload, clock emotion decoupled, peak relational uncaused', async () => {
+    const mkShift435 = (amount: number) => [{ pairKey: 'ANNA-MARK', dimension: 'trust', amount }];
+    const mkShifts435 = (...amounts: number[]) => amounts.map(a => ({ pairKey: 'ANNA-MARK', dimension: 'trust', amount: a }));
+    const makeRec435 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runA435 = async (records: any[]) => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ARC_EMOTIONAL_OVERLOAD fires when ≥80% of scenes are non-neutral with both polarities', async () => {
+      // n=10, 9 non-neutral (5 positive, 4 negative) → 90%, both polarities → fires
+      const recs435a = Array.from({ length: 10 }, (_, i) =>
+        makeRec435(i, { emotionalShift: i < 5 ? 'positive' : i < 9 ? 'negative' : 'neutral' }),
+      );
+      const res = await runA435(recs435a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_EMOTIONAL_OVERLOAD'), 'ARC_EMOTIONAL_OVERLOAD should fire');
+    });
+
+    it('ARC_EMOTIONAL_OVERLOAD does not fire when fewer than 80% of scenes are non-neutral', async () => {
+      // n=10, 6 non-neutral (3 positive, 3 negative) → 60% → does not fire
+      const recs435anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec435(i, { emotionalShift: i < 3 ? 'positive' : i < 6 ? 'negative' : 'neutral' }),
+      );
+      const res = await runA435(recs435anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_EMOTIONAL_OVERLOAD'), 'ARC_EMOTIONAL_OVERLOAD should not fire');
+    });
+
+    it('ARC_CLOCK_EMOTION_DECOUPLED fires when all clock scenes are emotionally neutral', async () => {
+      // n=8, 3 clockRaised scenes all neutral; scenes 1 and 5 carry non-neutral emotion (non-clock) → fires
+      const recs435b = Array.from({ length: 8 }, (_, i) => makeRec435(i));
+      recs435b[1] = makeRec435(1, { emotionalShift: 'positive' });
+      recs435b[3] = makeRec435(3, { clockRaised: true, emotionalShift: 'neutral' });
+      recs435b[5] = makeRec435(5, { emotionalShift: 'negative' });
+      recs435b[6] = makeRec435(6, { clockRaised: true, emotionalShift: 'neutral' });
+      recs435b[7] = makeRec435(7, { clockRaised: true, emotionalShift: 'neutral' });
+      const res = await runA435(recs435b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_CLOCK_EMOTION_DECOUPLED'), 'ARC_CLOCK_EMOTION_DECOUPLED should fire');
+    });
+
+    it('ARC_CLOCK_EMOTION_DECOUPLED does not fire when a clock scene carries emotion', async () => {
+      // n=8, 3 clockRaised scenes but one is non-neutral → all-neutral condition fails → no fire
+      const recs435bnr = Array.from({ length: 8 }, (_, i) => makeRec435(i));
+      recs435bnr[1] = makeRec435(1, { emotionalShift: 'positive' });
+      recs435bnr[3] = makeRec435(3, { clockRaised: true, emotionalShift: 'positive' }); // clock + emotion
+      recs435bnr[5] = makeRec435(5, { emotionalShift: 'negative' });
+      recs435bnr[6] = makeRec435(6, { clockRaised: true, emotionalShift: 'neutral' });
+      recs435bnr[7] = makeRec435(7, { clockRaised: true, emotionalShift: 'neutral' });
+      const res = await runA435(recs435bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_CLOCK_EMOTION_DECOUPLED'), 'ARC_CLOCK_EMOTION_DECOUPLED should not fire');
+    });
+
+    it('ARC_PEAK_RELATIONAL_UNCAUSED fires when the peak-shift-count scene has no causal setup', async () => {
+      // n=10, peak is scene 6 (2 shifts); scenes 4 and 5 are both causal-driver-free → fires
+      const recs435c = Array.from({ length: 10 }, (_, i) => makeRec435(i));
+      recs435c[2] = makeRec435(2, { relationshipShifts: mkShift435(0.3) }); // 1 shift (not peak)
+      recs435c[4] = makeRec435(4); // causal-driver-free (neutral, no revelation, no clock, no turn)
+      recs435c[5] = makeRec435(5); // causal-driver-free
+      recs435c[6] = makeRec435(6, { relationshipShifts: mkShifts435(0.5, -0.4) }); // peak: 2 shifts
+      const res = await runA435(recs435c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_PEAK_RELATIONAL_UNCAUSED'), 'ARC_PEAK_RELATIONAL_UNCAUSED should fire');
+    });
+
+    it('ARC_PEAK_RELATIONAL_UNCAUSED does not fire when the preceding scene carries a driver', async () => {
+      // Same but scene 5 (immediately before peak) has a dramatic turn → driver present → no fire
+      const recs435cnr = Array.from({ length: 10 }, (_, i) => makeRec435(i));
+      recs435cnr[2] = makeRec435(2, { relationshipShifts: mkShift435(0.3) });
+      recs435cnr[4] = makeRec435(4); // causal-driver-free
+      recs435cnr[5] = makeRec435(5, { dramaticTurn: 'reversal' }); // driver present
+      recs435cnr[6] = makeRec435(6, { relationshipShifts: mkShifts435(0.5, -0.4) }); // peak: 2 shifts
+      const res = await runA435(recs435cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_PEAK_RELATIONAL_UNCAUSED'), 'ARC_PEAK_RELATIONAL_UNCAUSED should not fire');
+    });
+  });
+
   describe('Wave 421 — characterArcPass: relational negative-only, peak relational emotion absent, relational midpoint void', async () => {
     const mkShift421 = (amount: number) => [{ pairKey: 'ANNA-MARK', dimension: 'trust', amount }];
     const makeRec421 = (idx: number, overrides: any = {}): any => ({

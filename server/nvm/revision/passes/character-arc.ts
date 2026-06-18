@@ -60,6 +60,16 @@
 // emotion exists elsewhere; single-peak isolation × relational × emotion), relational midpoint
 // void (no shift in the 40%–60% pivot zone while shifts exist elsewhere; zone presence/absence ×
 // relational × midpoint).
+// Wave 435 additions: emotional overload (≥80% of scenes are non-neutral with both polarities
+// present — perpetual emotion with no breathing room, emotion becomes wallpaper without
+// contrast; underweight/bloat mode, the complement of ARC_EMOTIONAL_FLATLINE), clock emotion
+// decoupled (≥3 clockRaised scenes are all emotionally neutral while non-clock scenes carry
+// feeling — deadlines never produce emotional investment; co-occurrence/decoupling × clockRaised
+// × emotionalShift, first clockRaised channel check in this pass), peak relational uncaused
+// (the scene with the most relationship shifts by count has no emotional charge, revelation,
+// clock, or turn in the two preceding scenes — the densest relational moment appears without
+// narrative preparation; backward-cause × single-peak isolation × relational channel, distinct
+// from ARC_PEAK_RELATIONAL_EMOTION_ABSENT which audits the peak scene's own emotional state).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1755,6 +1765,125 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
           description: `No relationship shifts occurs in the story's midpoint zone (Scenes ${midS421c}–${midE421c - 1}) though shifts exist elsewhere. The midpoint is where the protagonist typically crosses from reactivity to agency, and it is the zone where their relational world should be most actively in motion — alliances forming or fracturing, loyalties tested, the cost of the protagonist's goal becoming visible through its impact on bonds. A relational void at the pivot means the story's structural fulcrum has no interpersonal weight.`,
           suggestedFix: `Place at least one relationship shift in the midpoint zone: a trust extended or broken at the halfway point grounds the structural pivot in the protagonist's relational world, making the story's turn feel personal rather than mechanical. The scene where everything changes for the protagonist should also change something between them and at least one other character.`,
         });
+      }
+    }
+  }
+
+  // ── Wave 435: ARC_EMOTIONAL_OVERLOAD, ARC_CLOCK_EMOTION_DECOUPLED, ARC_PEAK_RELATIONAL_UNCAUSED ──
+
+  // ARC_EMOTIONAL_OVERLOAD (minor, n≥10, ≥8 non-neutral, ≥80% non-neutral, both polarities):
+  // ≥80% of scenes carry a non-neutral emotional shift — the story has no emotional breathing
+  // room. Every scene charges the protagonist, so the perpetual emotion becomes wallpaper:
+  // there is no neutral contrast to make the charged scenes register with any specificity.
+  // Without a flat scene to push off from, the audience loses the ability to gauge how much
+  // any given beat costs; the baseline for "feeling something" is lost because nothing is ever
+  // not felt. Underweight/bloat mode × emotional density. The complement of ARC_EMOTIONAL_
+  // FLATLINE (which fires at ≥80% neutral; this fires at ≥80% non-neutral). Distinct from
+  // ARC_POSITIVE_ONLY (all non-neutral scenes are positive — a directional filter regardless
+  // of proportion) and ARC_NEGATIVE_ONLY (same, negative): by requiring BOTH polarities to
+  // be present, this check is guaranteed not to overlap with either one-directional rule —
+  // if both positive and negative exist at ≥80% combined, the story is emotionally dense,
+  // not emotionally uniform. First underweight/bloat check in this pass targeting the
+  // emotional-density dimension (too much emotion rather than too little).
+  if (records.length >= 10) {
+    const nonNeutral435a = (records as any[]).filter(r => r.emotionalShift !== 'neutral');
+    const posCount435a = nonNeutral435a.filter(r => r.emotionalShift === 'positive').length;
+    const negCount435a = nonNeutral435a.filter(r => r.emotionalShift === 'negative').length;
+    const overloadRatio435a = nonNeutral435a.length / records.length;
+    if (nonNeutral435a.length >= 8 && overloadRatio435a >= 0.80 && posCount435a >= 1 && negCount435a >= 1) {
+      issues.push({
+        location: `${nonNeutral435a.length} of ${records.length} scenes — non-neutral emotional shift`,
+        rule: 'ARC_EMOTIONAL_OVERLOAD',
+        severity: 'minor',
+        description: `${nonNeutral435a.length} of ${records.length} scenes (${Math.round(overloadRatio435a * 100)}%) carry a non-neutral emotional shift (${posCount435a} positive, ${negCount435a} negative) — the story has no emotional breathing room. When nearly every scene charges the protagonist, the perpetual emotion becomes wallpaper: there is no flat baseline to push off from, and the audience loses the ability to measure how much any given beat actually costs. Contrast is what gives charged scenes their weight; a story that is always emotional is effectively never emotional.`,
+        suggestedFix: 'Introduce neutral scenes as deliberate counterpoint: quiet moments of observation, logistics, or suspension between the emotionally active beats. A protagonist who is neutral — watchful, gathering, processing — makes the surrounding scenes of feeling register more sharply. Emotion needs contrast to have texture; perpetual intensity flattens everything to the same loudness.',
+      });
+    }
+  }
+
+  // ARC_CLOCK_EMOTION_DECOUPLED (minor, n≥8, ≥3 clock scenes, all neutral, emotion
+  // elsewhere): Every scene with clockRaised=true is emotionally neutral for the
+  // protagonist, even though non-clock scenes do carry feeling. Deadlines should be
+  // among the most emotionally charged moments in a story: the ticking clock is meant
+  // to concentrate feeling, force decision, and produce urgency the audience shares
+  // with the protagonist. When clock scenes produce no emotional state change while other
+  // scenes do, the deadline is a logistical event rather than an emotional one — an
+  // abstract countdown that never registers as feeling. Co-occurrence/decoupling mode ×
+  // clockRaised × emotionalShift. Distinct from ARC_SUSPENSE_EMOTION_DECOUPLED (high-
+  // suspenseDelta scenes emotionally neutral — suspense channel, not deadline channel;
+  // this is the first check in the pass to audit clockRaised specifically) and ARC_TURN_
+  // EMOTION_ABSENT (dramaticTurn channel), ARC_REVELATION_EMOTION_ABSENT (revelation
+  // channel): each of those three targets a different structural signal; this isolates
+  // the urgency-feeling decoupling that makes countdowns feel mechanical rather than human.
+  if (records.length >= 8) {
+    const clockScenes435b = (records as any[]).filter(r => r.clockRaised === true);
+    if (clockScenes435b.length >= 3 && clockScenes435b.every(r => r.emotionalShift === 'neutral')) {
+      const hasEmotionOutsideClock435b = (records as any[]).some(
+        r => !r.clockRaised && r.emotionalShift !== 'neutral',
+      );
+      if (hasEmotionOutsideClock435b) {
+        issues.push({
+          location: `${clockScenes435b.length} clock-raised scenes — all emotionally neutral`,
+          rule: 'ARC_CLOCK_EMOTION_DECOUPLED',
+          severity: 'minor',
+          description: `${clockScenes435b.length} scenes with clockRaised=true are all emotionally neutral for the protagonist, even though non-clock scenes carry feeling. The story's deadlines produce no emotional state change: time pressure arrives and passes without the protagonist registering anything about it. A ticking clock that registers no emotion is a logistical event rather than a dramatic one — the countdown is abstract, and the urgency engine and the emotional engine run on completely separate tracks. The audience feels urgency only when the protagonist does.`,
+          suggestedFix: 'Let at least one deadline scene also carry an emotional charge — fear, anger, relief, or grief shaped by time pressure. The emotion the protagonist feels because the clock is running is what transforms a countdown from a plot mechanism into a dramatic experience. Urgency without feeling is information; urgency with feeling is suspense.',
+        });
+      }
+    }
+  }
+
+  // ARC_PEAK_RELATIONAL_UNCAUSED (backward-cause × single-peak isolation, n≥10,
+  // peakShiftCount≥2, peakPos≥2): The scene with the highest COUNT of relationship
+  // shifts — the densest relational moment in the story — has no causal driver
+  // (emotional charge, revelation, clockRaised, or dramatic turn) in either of the
+  // two preceding scenes. Looking backward from the relational peak, nothing in the
+  // preceding narrative explains why so many bonds changed at once: the relational
+  // climax appears without preparation, unmotivated by the scenes immediately before
+  // it. Relationships change most dramatically when precipitated by something that
+  // forces the shift — a revelation that reframes trust, a deadline that collapses
+  // loyalty, a dramatic turn that reorganizes the protagonist's alliances. Without
+  // that causal pressure in the run-up, the densest relational moment feels arbitrary
+  // rather than inevitable. Backward-cause × single-peak isolation × relational
+  // channel. Distinct from ARC_PEAK_RELATIONAL_EMOTION_ABSENT (Wave 421: uses maximum
+  // absolute magnitude as the peak metric and audits the peak SCENE's own emotional
+  // state; this uses maximum shift COUNT and audits the TWO PRECEDING SCENES for
+  // causal drivers — the peak scene's own state is irrelevant, only its preparation
+  // matters) and ARC_LATE_TURN_UNSUPPORTED (backward-cause for a late dramatic turn
+  // — a different channel; this is for the relational peak) and ARC_UNMOTIVATED_
+  // TRANSFORMATION (backward-cause for the whole-arc transformation event — broader,
+  // not peak-specific): this is the first backward-cause check in the pass targeting
+  // the relational channel as the isolating signal.
+  if (records.length >= 10) {
+    const shiftScenes435c = (records as any[]).filter(r =>
+      ((r.relationshipShifts ?? []) as any[]).length > 0,
+    );
+    if (shiftScenes435c.length >= 2) {
+      const peakRelRec435c = shiftScenes435c.reduce((best: any, r: any) =>
+        ((r.relationshipShifts ?? []) as any[]).length >
+        ((best.relationshipShifts ?? []) as any[]).length ? r : best,
+      );
+      const peakRelCount435c = ((peakRelRec435c.relationshipShifts ?? []) as any[]).length;
+      if (peakRelCount435c >= 2) {
+        const peakRelPos435c = (records as any[]).findIndex(
+          r => r.sceneIdx === peakRelRec435c.sceneIdx,
+        );
+        if (peakRelPos435c >= 2) {
+          const isDriver435c = (r: any) =>
+            r.emotionalShift !== 'neutral' || r.revelation !== null ||
+            r.clockRaised === true || ((r.dramaticTurn ?? 'nothing') !== 'nothing');
+          const prior1_435c = (records as any[])[peakRelPos435c - 1];
+          const prior2_435c = (records as any[])[peakRelPos435c - 2];
+          if (!isDriver435c(prior1_435c) && !isDriver435c(prior2_435c)) {
+            issues.push({
+              location: `Scene ${peakRelRec435c.sceneIdx} — peak relational density (${peakRelCount435c} shifts), no causal setup`,
+              rule: 'ARC_PEAK_RELATIONAL_UNCAUSED',
+              severity: 'minor',
+              description: `Scene ${peakRelRec435c.sceneIdx} contains ${peakRelCount435c} relationship shifts — the densest relational moment in the story — but neither of the two preceding scenes carries a causal driver (emotional charge, revelation, clock raised, or dramatic turn). Relationships change most sharply when precipitated by something that forces the shift: a revelation that reframes trust, a deadline that collapses loyalty, a dramatic turn that reorganizes alliances. Without that preparation, the relational peak appears arbitrary — bonds change densely because the story requires it, not because the narrative made it inevitable.`,
+              suggestedFix: `Plant a causal driver in one or two scenes before the densest relational moment: a revelation that reframes how characters see each other, a dramatic turn that forces a loyalty choice, a clock that concentrates allegiance under pressure. The scene where the most bonds shift at once should feel like the scene everything was pointing toward — prepared by the preceding scenes, not dropped from the sky.`,
+            });
+          }
+        }
       }
     }
   }
