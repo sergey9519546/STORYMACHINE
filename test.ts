@@ -19914,6 +19914,98 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 439 — pacingPass: suspense curiosity decoupled, curiosity flatline run, curiosity aftermath flat', async () => {
+    const makeRec439 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain439 = (n: number) =>
+      Array.from({ length: n }, (_, i) =>
+        `INT. SC${i} - DAY\n\nAction line for scene ${i}.`
+      ).join('\n\n');
+    const runP439 = async (records: any[]) => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      const fountain = makeFountain439(records.length);
+      return pacingPass({ fountain, original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('SUSPENSE_CURIOSITY_DECOUPLED fires when high-suspense and high-curiosity scenes never coincide', async () => {
+      // n=10; scenes 0,1,2 have suspenseDelta=2 (high-suspense); scenes 5,6,7 have curiosityDelta=1 (high-curiosity); no overlap → fires
+      const recs439a = Array.from({ length: 10 }, (_, i) => makeRec439(i));
+      recs439a[0] = makeRec439(0, { suspenseDelta: 2 });
+      recs439a[1] = makeRec439(1, { suspenseDelta: 2 });
+      recs439a[2] = makeRec439(2, { suspenseDelta: 2 });
+      recs439a[5] = makeRec439(5, { curiosityDelta: 1 });
+      recs439a[6] = makeRec439(6, { curiosityDelta: 1 });
+      recs439a[7] = makeRec439(7, { curiosityDelta: 1 });
+      const res = await runP439(recs439a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SUSPENSE_CURIOSITY_DECOUPLED'), 'SUSPENSE_CURIOSITY_DECOUPLED should fire');
+    });
+
+    it('SUSPENSE_CURIOSITY_DECOUPLED does not fire when one scene carries both signals', async () => {
+      // n=10; scene 2 has both suspenseDelta=2 and curiosityDelta=1 → no fire
+      const recs439anr = Array.from({ length: 10 }, (_, i) => makeRec439(i));
+      recs439anr[0] = makeRec439(0, { suspenseDelta: 2 });
+      recs439anr[2] = makeRec439(2, { suspenseDelta: 2, curiosityDelta: 1 });
+      recs439anr[4] = makeRec439(4, { suspenseDelta: 2 });
+      recs439anr[6] = makeRec439(6, { curiosityDelta: 1 });
+      recs439anr[7] = makeRec439(7, { curiosityDelta: 1 });
+      const res = await runP439(recs439anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SUSPENSE_CURIOSITY_DECOUPLED'), 'SUSPENSE_CURIOSITY_DECOUPLED should not fire');
+    });
+
+    it('CURIOSITY_FLATLINE_RUN fires when 5+ consecutive scenes have curiosityDelta ≤ 0', async () => {
+      // n=10; positive-curiosity at 0 and 9 (3 total would be needed... wait we need ≥3);
+      // scenes 0,1,2 have curiosityDelta=1 (3 positive), scenes 3-7 = 5 consecutive flatline → fires
+      const recs439b = Array.from({ length: 10 }, (_, i) => makeRec439(i));
+      recs439b[0] = makeRec439(0, { curiosityDelta: 1 });
+      recs439b[1] = makeRec439(1, { curiosityDelta: 1 });
+      recs439b[2] = makeRec439(2, { curiosityDelta: 1 });
+      // scenes 3-7: curiosityDelta=0 (5 consecutive flatline)
+      recs439b[8] = makeRec439(8, { curiosityDelta: 1 });
+      const res = await runP439(recs439b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CURIOSITY_FLATLINE_RUN'), 'CURIOSITY_FLATLINE_RUN should fire');
+    });
+
+    it('CURIOSITY_FLATLINE_RUN does not fire when flatline run is only 4 scenes', async () => {
+      // n=10; positive-curiosity at 0,1,2 then scenes 3-6 = 4 consecutive flat then 7,8,9 positive → no fire
+      const recs439bnr = Array.from({ length: 10 }, (_, i) => makeRec439(i));
+      recs439bnr[0] = makeRec439(0, { curiosityDelta: 1 });
+      recs439bnr[1] = makeRec439(1, { curiosityDelta: 1 });
+      recs439bnr[2] = makeRec439(2, { curiosityDelta: 1 });
+      // scenes 3-6: flat (4 consecutive)
+      recs439bnr[7] = makeRec439(7, { curiosityDelta: 1 });
+      recs439bnr[8] = makeRec439(8, { curiosityDelta: 1 });
+      recs439bnr[9] = makeRec439(9, { curiosityDelta: 1 });
+      const res = await runP439(recs439bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CURIOSITY_FLATLINE_RUN'), 'CURIOSITY_FLATLINE_RUN should not fire');
+    });
+
+    it('CURIOSITY_AFTERMATH_FLAT fires when no high-suspense scene is followed by a curiosity rise', async () => {
+      // n=8; high-suspense at 1 and 4; scenes 2,3 (after 1) and 5,6 (after 4) have curiosityDelta=0 → fires
+      const recs439c = Array.from({ length: 8 }, (_, i) => makeRec439(i));
+      recs439c[1] = makeRec439(1, { suspenseDelta: 2 });
+      recs439c[4] = makeRec439(4, { suspenseDelta: 2 });
+      const res = await runP439(recs439c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CURIOSITY_AFTERMATH_FLAT'), 'CURIOSITY_AFTERMATH_FLAT should fire');
+    });
+
+    it('CURIOSITY_AFTERMATH_FLAT does not fire when a suspense peak is followed by a curiosity rise', async () => {
+      // n=8; high-suspense at 1 and 4; scene 2 (after scene 1) has curiosityDelta=1 → no fire
+      const recs439cnr = Array.from({ length: 8 }, (_, i) => makeRec439(i));
+      recs439cnr[1] = makeRec439(1, { suspenseDelta: 2 });
+      recs439cnr[2] = makeRec439(2, { curiosityDelta: 1 });
+      recs439cnr[4] = makeRec439(4, { suspenseDelta: 2 });
+      const res = await runP439(recs439cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CURIOSITY_AFTERMATH_FLAT'), 'CURIOSITY_AFTERMATH_FLAT should not fire');
+    });
+  });
+
   describe('Wave 425 — pacingPass: scene expansion run, suspense midpoint trough, curiosity frontload', async () => {
     const makeRec425 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

@@ -66,6 +66,17 @@
 // (>65% of all positive-curiosityDelta scenes sit in the first half — the mystery engine runs
 // hot in setup but stalls through complication and climax, starving the back half of the
 // forward-pull it needs most).
+// Wave 439 additions: suspense curiosity decoupled (high-suspense scenes — suspenseDelta>1 —
+// and high-curiosity scenes — curiosityDelta>0 — never coincide even though both exist in the
+// story; the two forward-pull engines always fire in separate scenes; co-occurrence/decoupling ×
+// dual-channel, distinct from all existing zone/distribution/run checks), curiosity flatline run
+// (5+ consecutive scenes all have curiosityDelta ≤ 0 while positive-curiosity scenes exist
+// elsewhere — the question-engine goes dark for a sustained local stretch; run-based × curiosity
+// channel, distinct from CURIOSITY_FRONTLOAD which checks the first-half proportion), curiosity
+// aftermath flat (no high-suspense scene — suspenseDelta>1 — is followed within 2 scenes by a
+// curiosity rise — curiosityDelta>0 — tension peaks never open new questions downstream;
+// sequence/aftermath × curiosity triggered by suspense peak, distinct from SUSPENSE_CURIOSITY_
+// DECOUPLED by testing the sequential aftermath relationship rather than same-scene coincidence).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1899,6 +1910,119 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `${inFirstHalf425} of ${posCurioScenes425.length} positive-curiosity scenes (${Math.round(ratio425 * 100)}%) sit in the first half of the story. The mystery engine runs hot in setup but stalls through complication and climax. Curiosity should intensify toward resolution — questions opening and deepening across Act 2 as the audience approaches answers — but this script front-loads its intrigue and lets the back half run dry.`,
           suggestedFix: 'Open new questions in Act 2 and Act 3: every revelation should answer one thing and raise another, every complication should deepen the central mystery rather than resolve it. Redistribute curiosity events toward the second half so the audience arrives at the climax still urgently needing to know.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 439: SUSPENSE_CURIOSITY_DECOUPLED, CURIOSITY_FLATLINE_RUN, CURIOSITY_AFTERMATH_FLAT ──
+
+  // SUSPENSE_CURIOSITY_DECOUPLED (minor, n≥10, ≥3 high-suspense scenes, ≥3 high-curiosity scenes):
+  // The story's high-suspense scenes (suspenseDelta > 1) and high-curiosity scenes (curiosityDelta
+  // > 0) never coincide — both forward-pull engines are active in the story, but they always fire
+  // in separate scenes. The most compelling beats combine pressure (the audience fears what may
+  // happen next) with uncertainty (the audience wonders what is actually happening): when the two
+  // engines are systematically in different scenes, neither amplifies the other. A scene that raises
+  // both suspense and curiosity is doubly charged; when suspense and curiosity are always in separate
+  // scenes, the story delivers partial engagement in each rather than full engagement in either.
+  // Co-occurrence/decoupling mode × dual-channel (suspense × curiosity). Distinct from CURIOSITY_
+  // FRONTLOAD (Wave 425: proportion of curiosity events in first half — distribution, not co-occurrence),
+  // SUSPENSE_MIDPOINT_TROUGH (Wave 425: single-scene suspense vs zone averages), NET_TENSION_DEFICIT
+  // (Wave 302: cumulative suspense sum — a global signal, not channel co-occurrence). This is the
+  // first check auditing whether suspense and curiosity peaks ever overlap in the same scene.
+  if (records.length >= 10) {
+    const highSuspRecs439a = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 1);
+    const highCurioRecs439a = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0);
+    if (highSuspRecs439a.length >= 3 && highCurioRecs439a.length >= 3) {
+      const anyOverlap439a = highSuspRecs439a.some(r => (r.curiosityDelta ?? 0) > 0);
+      if (!anyOverlap439a) {
+        issues.push({
+          location: `${highSuspRecs439a.length} high-suspense and ${highCurioRecs439a.length} high-curiosity scenes — never coincide`,
+          rule: 'SUSPENSE_CURIOSITY_DECOUPLED',
+          severity: 'minor',
+          description: `The story has ${highSuspRecs439a.length} high-suspense scenes (suspenseDelta > 1) and ${highCurioRecs439a.length} high-curiosity scenes (curiosityDelta > 0), but the two forward-pull engines never fire in the same scene — every scene is either tense-but-not-curious or curious-but-not-tense. The most compelling beats combine pressure with uncertainty: the audience fears what may happen AND wonders what is actually happening. When suspense and curiosity are systematically decoupled, each scene delivers only partial engagement, and neither signal is amplified by the other.`,
+          suggestedFix: 'Redesign at least one scene to carry both high suspense and high curiosity simultaneously: a confrontation that also surfaces a new question, a race against time that also reveals an ambiguity about a key character, a tense wait that also opens a thread the audience did not know was there. The scene that does double-duty — pressing the audience AND pulling them forward — is typically the story\'s most memorable beat.',
+        });
+      }
+    }
+  }
+
+  // CURIOSITY_FLATLINE_RUN (minor, n≥10, ≥3 positive-curiosity scenes): Five or more consecutive
+  // scenes all have curiosityDelta ≤ 0 while the story has at least three positive-curiosity scenes
+  // elsewhere. The question-engine goes dark for a sustained local stretch — the audience carries
+  // the same set of unresolved questions across 5+ scenes without a new one being raised or an
+  // existing one deepening. While individual scenes may resolve questions (curiosityDelta ≤ 0 is
+  // not always negative — it can be neutral), a run of ≥5 consecutive non-curious scenes creates
+  // a stretch of story where the forward-pull of new unknowns is absent. The audience's questions
+  // are either already answered or simply not renewed during this run, which reads as a curiosity
+  // dead zone: the story becomes about watching events unfold without the pull of not-yet-knowing.
+  // Run-based mode × curiosity channel. Distinct from CURIOSITY_FRONTLOAD (Wave 425: proportion
+  // of curiosity events in the first half — a hemispheric distribution check, not a local run
+  // check), PACING_CURIOSITY_OPENING_FLATLINE (Wave 288: the OPENING zone has avg ≤ 0 — a zone
+  // average), PACING_CURIOSITY_MIDZONE_GAP (Wave 316: midzone average vs opening zone), and
+  // PACING_CURIOSITY_FINAL_DROP (Wave 288: final quarter average ≤ 0 vs overall). This is the
+  // first check to detect a local consecutive run of curiosity-flat scenes.
+  if (records.length >= 10) {
+    const posCurioCount439b = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0).length;
+    if (posCurioCount439b >= 3) {
+      let maxFlatRun439b = 0;
+      let curFlatRun439b = 0;
+      let maxFlatStart439b = -1;
+      let curFlatStart439b = -1;
+      for (let i = 0; i < records.length; i++) {
+        if (((records as any[])[i].curiosityDelta ?? 0) <= 0) {
+          if (curFlatRun439b === 0) curFlatStart439b = i;
+          if (++curFlatRun439b > maxFlatRun439b) {
+            maxFlatRun439b = curFlatRun439b;
+            maxFlatStart439b = curFlatStart439b;
+          }
+        } else {
+          curFlatRun439b = 0;
+        }
+      }
+      if (maxFlatRun439b >= 5) {
+        issues.push({
+          location: `Scenes ${maxFlatStart439b}–${maxFlatStart439b + maxFlatRun439b - 1} — curiosity flatline`,
+          rule: 'CURIOSITY_FLATLINE_RUN',
+          severity: 'minor',
+          description: `Scenes ${maxFlatStart439b}–${maxFlatStart439b + maxFlatRun439b - 1} (${maxFlatRun439b} consecutive scenes) all have curiosityDelta ≤ 0 — the question-engine goes dark for a sustained stretch while ${posCurioCount439b} positive-curiosity scenes appear elsewhere. During these ${maxFlatRun439b} scenes the audience carries the same unresolved questions without any renewal or deepening: no new question is raised, no existing question is made more urgent. A curiosity dead zone of this length teaches the audience that this stretch of story does not generate forward pull — they are watching events unfold rather than being drawn into unknowns.`,
+          suggestedFix: `Seed at least one or two new questions in the flatline run at Scenes ${maxFlatStart439b}–${maxFlatStart439b + maxFlatRun439b - 1}: introduce a new ambiguity, surface a fragment of information that implies there is more the audience doesn't know, or deepen an existing question by showing evidence that the answer is not what it seemed. The question-engine should be active throughout the story, not only in the zones that bookend this run.`,
+        });
+      }
+    }
+  }
+
+  // CURIOSITY_AFTERMATH_FLAT (minor, n≥8, ≥2 high-suspense scenes): No scene with a high
+  // suspenseDelta (> 1) is followed by a curiosity rise (curiosityDelta > 0) in the next two
+  // scenes — tension peaks never open new questions downstream. When suspense rises the audience
+  // is primed for new information: they are alert, vigilant, and expecting revelation or complication.
+  // A scene that raises suspense creates the ideal conditions for seeding a new question in the
+  // aftermath — the audience is maximally receptive. When every tension peak is followed by two
+  // scenes of curiosity-flatness, the story wastes the alertness that suspense generates: each
+  // peak delivers pressure but no new unknowns, so the pressure dissipates without leaving the
+  // audience with anything new to hold. Sequence/aftermath mode × curiosity channel, triggered by
+  // suspense peak. Distinct from SUSPENSE_CURIOSITY_DECOUPLED (Wave 439, same wave: checks same-scene
+  // co-occurrence — whether high-suspense and high-curiosity coincide IN the same beat; this checks
+  // what happens IN THE AFTERMATH of the suspense beat, i.e., the next 2 scenes), PROACTIVE_AFTERMATH_
+  // CURIOSITY_ABSENT (intention.ts Wave 423: the trigger is proactive acts, not suspense peaks —
+  // a different causal input to the same aftermath window), and POST_RELEASE_DEAD_AIR (Wave 302:
+  // the aftermath of the story's tension RELEASE, which is a single-peak anchor; this fires on
+  // ALL high-suspense scenes' aftermath systematically).
+  if (records.length >= 8) {
+    const highSuspRecs439c = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 1);
+    if (highSuspRecs439c.length >= 2) {
+      const anyAftermathCurio439c = highSuspRecs439c.some((r: any) => {
+        const idx = (records as any[]).indexOf(r);
+        const window = (records as any[]).slice(idx + 1, idx + 3);
+        return window.some((a: any) => (a.curiosityDelta ?? 0) > 0);
+      });
+      if (!anyAftermathCurio439c) {
+        issues.push({
+          location: 'All high-suspense scenes — curiosity aftermath absent',
+          rule: 'CURIOSITY_AFTERMATH_FLAT',
+          severity: 'minor',
+          description: `None of the story's ${highSuspRecs439c.length} high-suspense scenes (suspenseDelta > 1) is followed by a curiosity rise (curiosityDelta > 0) in the next two scenes — tension peaks never open new questions downstream. When suspense rises the audience is maximally alert and receptive to new information; the scenes immediately after a tension peak are the ideal moment to plant a new question or deepen an existing one. When every suspense peak is followed by two curiosity-flat scenes, the alertness that tension generates is wasted — pressure dissipates without leaving the audience with anything new to wonder about.`,
+          suggestedFix: 'After at least one high-suspense scene, use the next scene to raise a new question: surface a new ambiguity as the tension clears, let the aftermath of the peak introduce a fragment of information the audience didn\'t have before, or complicate the situation in a way that generates forward uncertainty. The moment after maximum tension is the most fertile ground for a new question — the audience\'s attention is fully engaged and they are primed to wonder what comes next.',
         });
       }
     }
