@@ -19198,6 +19198,118 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 442 — rhythmPass: short-long segregated, long recovery absent, wordcount flatline', async () => {
+    const runR442 = async (fountain: string) => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ACTION_SHORTLONG_SEGREGATED fires when short (≤4w) and long (≥12w) action lines never appear in same 5-line window', async () => {
+      // 3 short (≤4w) + 5 spacers (6–8w) + 3 long (≥12w): gap of 5 spacers prevents any window spanning both
+      const shortOnes442a = ['She runs.', 'He falls.', 'Door slams.'];
+      const spacers442a = [
+        'He walks over to the front door.',
+        'The steady rain starts falling outside now.',
+        'She checks the time on her phone.',
+        'He lights his cigarette by the window.',
+        'She stares at the clock on the wall.',
+      ];
+      const longOnes442a = [
+        'She crosses slowly to the window and peers through the gap in the curtains outside.',
+        'He lifts the phone receiver and holds it to his ear without speaking a word.',
+        'The room fills with the pale light of morning as the clock on the wall ticks.',
+      ];
+      const f442a = `INT. ROOM - DAY\n\n${shortOnes442a.join('\n\n')}\n\n${spacers442a.join('\n\n')}\n\nINT. OFFICE - NIGHT\n\n${longOnes442a.join('\n\n')}`;
+      const res = await runR442(f442a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_SHORTLONG_SEGREGATED'), 'ACTION_SHORTLONG_SEGREGATED should fire');
+    });
+
+    it('ACTION_SHORTLONG_SEGREGATED does NOT fire when short and long lines interleave within 5-line windows', async () => {
+      // Short and long lines alternate — every 5-line window contains both
+      const f442aNF = `INT. ROOM - DAY\n\n` +
+        `She runs.\n\n` +
+        `She crosses slowly to the window and peers through the gap in the curtains outside.\n\n` +
+        `He falls.\n\n` +
+        `He lifts the phone receiver and holds it to his ear without speaking a word.\n\n` +
+        `Door slams.\n\n` +
+        `The room fills with the pale light of morning as the clock on the wall ticks.\n\n` +
+        `Rain falls.\n\n` +
+        `She places the envelope on the table and steps back to consider what she has done.\n\n` +
+        `She stops.\n\n` +
+        `He watches from the doorway as the scene before him shifts into something new entirely.`;
+      const res = await runR442(f442aNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_SHORTLONG_SEGREGATED'), 'ACTION_SHORTLONG_SEGREGATED should not fire');
+    });
+
+    it('ACTION_LONG_RECOVERY_ABSENT fires when no long action line (≥14w) is followed by a short beat (≤7w) within 2 lines', async () => {
+      // 8 lines: 2 qualifying long lines (idx 0, idx 3), each followed only by lines ≥13 words
+      const lines442b = [
+        'She crosses to the window and stands there looking out at the grey afternoon light spread thin.',
+        'He picks up the telephone and dials a number he does not want to dial at all.',
+        'The room settles into silence as the call connects and no one speaks or moves first.',
+        'She opens the envelope slowly and reads the letter inside without changing her expression at all.',
+        'He watches her read and waits for the moment when her face will finally show something.',
+        'The clock on the wall marks the seconds while nothing else in the room moves now.',
+        'She folds the letter and sets it carefully back inside the envelope without saying a word.',
+        'He crosses to the door and stands in the frame looking back at her one last time.',
+      ];
+      const f442b = `INT. ROOM - DAY\n\n${lines442b.join('\n\n')}`;
+      const res = await runR442(f442b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_LONG_RECOVERY_ABSENT'), 'ACTION_LONG_RECOVERY_ABSENT should fire');
+    });
+
+    it('ACTION_LONG_RECOVERY_ABSENT does NOT fire when a long line is followed by a short recovery beat within 2 lines', async () => {
+      // Long lines followed immediately by ≤7-word recovery beats
+      const lines442bNF = [
+        'She crosses to the window and stands there looking out at the grey afternoon light spread thin.',
+        'She stops.',
+        'He picks up the telephone and dials a number he does not want to dial today.',
+        'A long beat.',
+        'The room settles into silence.',
+        'She opens the envelope slowly.',
+        'He watches her read and waits.',
+        'The clock ticks.',
+      ];
+      const f442bNF = `INT. ROOM - DAY\n\n${lines442bNF.join('\n\n')}`;
+      const res = await runR442(f442bNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_LONG_RECOVERY_ABSENT'), 'ACTION_LONG_RECOVERY_ABSENT should not fire');
+    });
+
+    it('ACTION_WORDCOUNT_FLATLINE fires when action line word counts have stdDev < 2.5 (avg > 4)', async () => {
+      // 8 lines all exactly 5 words — variance = 0, stdDev = 0 < 2.5, avg = 5 > 4
+      const lines442c = [
+        'She opens the door slowly.',
+        'He crosses the empty room.',
+        'The phone begins to ring.',
+        'She picks it up quickly.',
+        'He waits by the window.',
+        'Rain streaks the cold glass.',
+        'She hangs up the phone.',
+        'He steps into the light.',
+      ];
+      const f442c = `INT. ROOM - DAY\n\n${lines442c.join('\n\n')}`;
+      const res = await runR442(f442c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_WORDCOUNT_FLATLINE'), 'ACTION_WORDCOUNT_FLATLINE should fire');
+    });
+
+    it('ACTION_WORDCOUNT_FLATLINE does NOT fire when action lines vary widely in word count', async () => {
+      // Alternating 2-word and 17-word lines — high variance, stdDev >> 2.5
+      const lines442cNF = [
+        'She runs.',
+        'He follows her through the corridor and down the stairs and out into the wet morning air.',
+        'Door slams.',
+        'She stops and turns and looks back at the building from across the empty street ahead.',
+        'Gone.',
+        'He emerges through the door and scans the street in both directions before he sees her.',
+        'Rain.',
+        'She holds her ground and waits as he makes his way across the puddled pavement slowly.',
+      ];
+      const f442cNF = `INT. ROOM - DAY\n\n${lines442cNF.join('\n\n')}`;
+      const res = await runR442(f442cNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_WORDCOUNT_FLATLINE'), 'ACTION_WORDCOUNT_FLATLINE should not fire');
+    });
+  });
+
   describe('Wave 428 — rhythmPass: consecutive opener run, action finale bloat, longest action outlier', async () => {
     const runR428 = async (fountain: string) => {
       const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');

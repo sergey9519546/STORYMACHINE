@@ -67,6 +67,16 @@
 // longest action outlier (single-peak isolation — the single longest action line is ≥25 words
 // AND ≥4× the average word count; one gargantuan line dominates, distinct from LONG_LINE_FLOOD
 // which audits a global proportion rather than isolating the single outlier).
+// Wave 442 additions: short-long segregated (co-occurrence/decoupling — short ≤4-word lines and
+// long ≥12-word lines exist but never appear in the same 5-line sliding window; the two length
+// extremes are spatially segregated into separate density zones rather than interleaving for local
+// rhythmic contrast; distinct from all global-proportion and zone-average checks), long recovery
+// absent (sequence/aftermath — no long action line ≥14 words is followed by a short recovery beat
+// ≤7 words within 2 action lines; the first aftermath check in this pass, orthogonal to all
+// proportion and peak-isolation checks), wordcount flatline (average/aggregate × variance — standard
+// deviation of all action-line word counts is <2.5 with avg >4; the only check using statistical
+// variance rather than a proportion or count threshold; fires when all lines are metronomically
+// uniform in length regardless of which threshold they fall under).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1593,6 +1603,108 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         description: `The longest action line in the script runs ${maxWc428c} words — ${(maxWc428c / avgWc428c).toFixed(1)}× the average of ${avgWc428c.toFixed(1)} words per line. One action line has sprawled into a paragraph while the rest of the script is written in compact beats. This outlier is typically a case of multiple images, blocking notes, and commentary all collapsed into one block rather than cut into discrete screenable moments.`,
         suggestedFix: 'Break this line into three or four shorter beats, each on its own line with a blank between: identify the distinct images inside it (the object, the action, the consequence) and render each as its own action line. A 25+ word action line is almost never a single screenable moment — it is at least two, and cutting it gives each image the space to land.',
       });
+    }
+  }
+
+  // ACTION_SHORTLONG_SEGREGATED (co-occurrence/decoupling, ≥10 action lines, ≥2 short ≤4w, ≥2 long ≥12w):
+  // Short action lines (≤4 words) and long action lines (≥12 words) exist in the script but never
+  // appear within the same 5-line consecutive window — the two length extremes are spatially
+  // segregated into separate zones rather than interleaving for rhythmic contrast. Effective screenplay
+  // prose mixes staccato beats and expansive description within each sequence: each dense image is
+  // punctuated by a sharp short beat, and each staccato run is grounded by at least one fuller line.
+  // When short and long lines cluster in entirely separate regions, the script reads in monotonous
+  // density waves — an extended descriptive zone then a staccato zone — with no local rhythmic texture.
+  // Distinctness: LONG_LINE_FLOOD checks a global proportion (>60% lines ≥12 words). ACTION_FINALE_BLOAT
+  // compares zone averages across first 75% vs last 25% of lines. LONGEST_ACTION_OUTLIER isolates one
+  // extreme peak. This is the first check to test LOCAL CO-OCCURRENCE of short and long extremes in a
+  // sliding 5-line window — a granular spatial test distinct from all proportion or zone checks.
+  if (actionLines.length >= 10) {
+    const shortAL442a = actionLines.filter(l => l.text.split(/\s+/).filter(Boolean).length <= 4);
+    const longAL442a = actionLines.filter(l => l.text.split(/\s+/).filter(Boolean).length >= 12);
+    if (shortAL442a.length >= 2 && longAL442a.length >= 2) {
+      let hasCoOccurrence442a = false;
+      for (let w = 0; w <= actionLines.length - 5; w++) {
+        const win442a = actionLines.slice(w, w + 5);
+        const hasShort442a = win442a.some(l => l.text.split(/\s+/).filter(Boolean).length <= 4);
+        const hasLong442a = win442a.some(l => l.text.split(/\s+/).filter(Boolean).length >= 12);
+        if (hasShort442a && hasLong442a) { hasCoOccurrence442a = true; break; }
+      }
+      if (!hasCoOccurrence442a) {
+        issues.push({
+          location: `Action lines — short/long segregation (${shortAL442a.length} short ≤4w, ${longAL442a.length} long ≥12w)`,
+          rule: 'ACTION_SHORTLONG_SEGREGATED',
+          severity: 'minor',
+          description: `The script has ${shortAL442a.length} short action line(s) (≤4 words) and ${longAL442a.length} long line(s) (≥12 words), but they never appear within 5 consecutive action lines of each other — they are spatially segregated into distinct zones. Effective screenplay rhythm interleaves staccato beats with expansive description so each dense image is followed by a short sharp cut. When the extremes cluster in separate regions, the script alternates between a descriptive zone and a staccato zone with no local rhythmic texture inside either.`,
+          suggestedFix: `Break the segregation: after each cluster of long descriptive lines, insert a short sharp action beat (2–3 words: "She stops.", "A beat.", "Gone.") to reset the reader's pace. Follow each staccato run with at least one fuller descriptive line before the next short beat lands.`,
+        });
+      }
+    }
+  }
+
+  // ACTION_LONG_RECOVERY_ABSENT (sequence/aftermath, ≥8 action lines, ≥2 qualifying long lines ≥14w):
+  // For each long action line (≥14 words) that is not among the last two action lines, check whether
+  // either of the next 2 action lines provides a "recovery beat" (≤7 words). Good screenplay rhythm
+  // uses the "density peak → recovery beat" pattern: after an expansive description, a short sharp
+  // line lets the image land before the next dense block arrives. When no long line is ever followed
+  // by a short recovery beat, the prose sustains relentless density peak-to-peak with no rhythmic
+  // exhale — the reader has nowhere to breathe between images.
+  // Distinctness: LONG_LINE_FLOOD is a global proportion check (>60%). ACTION_FINALE_BLOAT compares
+  // zone averages. LONGEST_ACTION_OUTLIER isolates a single peak by word count. This is the FIRST
+  // aftermath/sequence check in this pass — it asks what follows a long line rather than how many
+  // exist or where they cluster. Orthogonal to all existing analytical modes in use here.
+  if (actionLines.length >= 8) {
+    const qualifying442b = actionLines.filter(
+      (l, idx) => l.text.split(/\s+/).filter(Boolean).length >= 14 && idx < actionLines.length - 2,
+    );
+    if (qualifying442b.length >= 2) {
+      const hasRecovery442b = qualifying442b.some(ql => {
+        const qIdx = actionLines.indexOf(ql);
+        return (
+          (qIdx + 1 < actionLines.length &&
+            actionLines[qIdx + 1].text.split(/\s+/).filter(Boolean).length <= 7) ||
+          (qIdx + 2 < actionLines.length &&
+            actionLines[qIdx + 2].text.split(/\s+/).filter(Boolean).length <= 7)
+        );
+      });
+      if (!hasRecovery442b) {
+        issues.push({
+          location: `Action lines — long-line recovery absent (${qualifying442b.length} qualifying lines ≥14w, none followed by ≤7-word beat within 2 lines)`,
+          rule: 'ACTION_LONG_RECOVERY_ABSENT',
+          severity: 'minor',
+          description: `${qualifying442b.length} long action line(s) (≥14 words) appear outside the script's final two action lines, but none is followed by a short recovery beat (≤7 words) within the next 2 action lines. Good prose rhythm uses the "density peak → recovery beat" pattern: after an expansive description, a short sharp line lets the image land before the next dense block arrives. Without recovery beats, long action lines pile up with no rhythmic relief — the prose becomes an unbroken wall of description that tires the reader.`,
+          suggestedFix: `After each cluster of long action lines, insert a short sharp beat — a 2–5 word line that captures the essential consequence ("He freezes.", "A long silence.", "The door is open."). This punctuation tells the reader where one image ends and the next begins.`,
+        });
+      }
+    }
+  }
+
+  // ACTION_WORDCOUNT_FLATLINE (average/aggregate × variance, ≥8 action lines, avg word count >4):
+  // The standard deviation of word counts across all action lines is < 2.5 while the average is >4
+  // (ruling out sparse scripts where every line is a 1-word interjection). Low standard deviation
+  // means every line is nearly the same length — a metronomic uniformity that kills rhythmic interest.
+  // The writer unconsciously produces the same-length line regardless of whether a beat calls for a
+  // short punch or an expansive image. Screenplay rhythm requires diversity: 2-word staccato beats,
+  // 5-word staging notes, 12-word descriptive paragraphs — interleaved to move the reader's eye at
+  // varying speeds.
+  // Distinctness: Every other length check uses a global proportion threshold (>N% of lines cross X),
+  // a count threshold (≥N instances), or a zone-average comparison. Variance is orthogonal: it fires
+  // when line lengths are uniformly mediocre — no line too long, no line too short — a monotone band.
+  // None of the existing checks can detect a script where 100% of lines are exactly 6 words each.
+  if (actionLines.length >= 8) {
+    const wcs442c = actionLines.map(l => l.text.split(/\s+/).filter(Boolean).length);
+    const avg442c = wcs442c.reduce((s, w) => s + w, 0) / wcs442c.length;
+    if (avg442c > 4) {
+      const variance442c = wcs442c.reduce((s, w) => s + (w - avg442c) ** 2, 0) / wcs442c.length;
+      const stdDev442c = Math.sqrt(variance442c);
+      if (stdDev442c < 2.5) {
+        issues.push({
+          location: `Action lines — word-count flatline (stdDev = ${stdDev442c.toFixed(2)}, avg = ${avg442c.toFixed(1)} words)`,
+          rule: 'ACTION_WORDCOUNT_FLATLINE',
+          severity: 'minor',
+          description: `All ${actionLines.length} action lines have nearly identical word counts: standard deviation is ${stdDev442c.toFixed(2)} around an average of ${avg442c.toFixed(1)} words per line. This metronomic uniformity signals that no conscious rhythmic shaping is occurring — the writer produces the same-length line regardless of whether a beat calls for a short punch or an expansive image. Screenplay rhythm requires diversity: 2-word staccato beats, 5-word staging notes, 12-word descriptive paragraphs — interleaved to move the reader's eye at varying speeds.`,
+          suggestedFix: `Deliberately vary action line length to match the dramatic function: short lines (1–4 words) for sharp beats and transitions; medium lines (5–9 words) for staging and reaction; long lines (10–15 words) for setting and atmosphere. Read the script aloud — if every pause feels the same length, the rhythm is wrong.`,
+        });
+      }
     }
   }
 
