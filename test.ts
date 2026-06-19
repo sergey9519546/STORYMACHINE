@@ -19075,6 +19075,96 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 457 — structurePass: revelation suspense decoupled, negative scene drought, dramatic turn causeless', async () => {
+    const makeRec457 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const makeFountain457 = (n: number) =>
+      Array.from({ length: n }, (_, i) =>
+        `INT. SC${i} - DAY\n\nAction line for scene ${i}.`
+      ).join('\n\n');
+    const runST457 = async (records: any[]) => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      const fountain = makeFountain457(records.length);
+      return structurePass({ fountain, original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('REVELATION_SUSPENSE_DECOUPLED fires when all revelation scenes have suspenseDelta ≤ 0', async () => {
+      // 8 scenes: revelations at 2 and 5 (both suspenseDelta=0) → all revelations suspense-flat
+      const recs457a = Array.from({ length: 8 }, (_, i) =>
+        makeRec457(i, {
+          revelation: [2, 5].includes(i) ? true : null,
+          suspenseDelta: 0,
+        }),
+      );
+      const res = await runST457(recs457a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'REVELATION_SUSPENSE_DECOUPLED'), 'REVELATION_SUSPENSE_DECOUPLED should fire');
+    });
+
+    it('REVELATION_SUSPENSE_DECOUPLED does not fire when at least one revelation has suspenseDelta > 0', async () => {
+      // 8 scenes: revelation at 2 (suspenseDelta=0) and 5 (suspenseDelta=2) → one is tensioned → no fire
+      const recs457anr = Array.from({ length: 8 }, (_, i) =>
+        makeRec457(i, {
+          revelation: [2, 5].includes(i) ? true : null,
+          suspenseDelta: i === 5 ? 2 : 0,
+        }),
+      );
+      const res = await runST457(recs457anr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'REVELATION_SUSPENSE_DECOUPLED'), 'REVELATION_SUSPENSE_DECOUPLED should not fire');
+    });
+
+    it('NEGATIVE_SCENE_DROUGHT fires when <15% of scenes are negative while ≥3 are positive', async () => {
+      // 10 scenes: 4 positive, 0 negative → negativeRatio=0% < 15%, positiveCount≥3 → fires
+      const recs457b = Array.from({ length: 10 }, (_, i) =>
+        makeRec457(i, {
+          emotionalShift: [1, 3, 5, 7].includes(i) ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runST457(recs457b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'NEGATIVE_SCENE_DROUGHT'), 'NEGATIVE_SCENE_DROUGHT should fire');
+    });
+
+    it('NEGATIVE_SCENE_DROUGHT does not fire when ≥15% of scenes are negative', async () => {
+      // 10 scenes: 3 positive, 2 negative → negativeRatio=20% ≥ 15% → no fire
+      const recs457bnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec457(i, {
+          emotionalShift: [1, 3, 5].includes(i) ? 'positive' : [7, 9].includes(i) ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runST457(recs457bnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'NEGATIVE_SCENE_DROUGHT'), 'NEGATIVE_SCENE_DROUGHT should not fire');
+    });
+
+    it('DRAMATIC_TURN_CAUSELESS fires when all turns lack upstream revelation/suspense/clock', async () => {
+      // 8 scenes: turns at 4 and 6; prior 3 scenes (1-3 and 3-5) have no revelation/suspense/clock
+      const recs457c = Array.from({ length: 8 }, (_, i) =>
+        makeRec457(i, {
+          dramaticTurn: [4, 6].includes(i) ? 'reversal' : 'nothing',
+        }),
+      );
+      const res = await runST457(recs457c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DRAMATIC_TURN_CAUSELESS'), 'DRAMATIC_TURN_CAUSELESS should fire');
+    });
+
+    it('DRAMATIC_TURN_CAUSELESS does not fire when at least one turn has a revelation in prior 3 scenes', async () => {
+      // 8 scenes: turn at 4; scene 3 has revelation=true → upstream cause → no fire
+      const recs457cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec457(i, {
+          dramaticTurn: [4, 6].includes(i) ? 'reversal' : 'nothing',
+          revelation: i === 3 ? true : null,
+        }),
+      );
+      const res = await runST457(recs457cnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DRAMATIC_TURN_CAUSELESS'), 'DRAMATIC_TURN_CAUSELESS should not fire');
+    });
+  });
+
   describe('Wave 443 — structurePass: revelation-curiosity decoupled, peak suspense emotional vacuum, positive scene drought', async () => {
     const makeRec443 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

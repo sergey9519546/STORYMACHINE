@@ -74,6 +74,14 @@
 // 15% of scenes carry positive emotionalShift while ≥3 carry negative; the positive register is
 // chronically underrepresented, distinct from EMOTIONAL_ARC_UNIFORM which audits dominance of any
 // one register above 70% and from ACT_1_WARMTH_ABSENT which is zone-scoped).
+// Wave 457 additions: revelation suspense decoupled (co-occurrence/decoupling × suspense channel —
+// every revelation scene has suspenseDelta ≤ 0; disclosures never land under tension, the suspense-
+// channel sibling of REVELATION_CURIOSITY_DECOUPLED), negative scene drought (valence × underweight
+// — fewer than 15% of scenes carry negative emotionalShift while ≥3 carry positive; the story is
+// relentlessly upbeat with almost no darkness for contrast, the mirror of POSITIVE_SCENE_DROUGHT),
+// dramatic turn causeless (backward-cause × dramatic turn — every scene whose dramaticTurn ≠ 'nothing'
+// is preceded in the prior 3 scenes by no revelation, high suspense, or clock raise; pivots erupt
+// without structural build-up, the turn-signal sibling of CLIMAX_UNPREPARED).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1990,6 +1998,103 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         description: `Only ${positiveCount443c} of ${n} scenes (${(positiveCount443c / n * 100).toFixed(0)}%) carry positive emotionalShift, while ${negativeCount443c} carry negative. The story's emotional register is heavily skewed toward darkness with almost no uplifting counterweight. Positive emotional moments — earned connections, small victories, moments of agency — create the contrast that makes darkness feel like a cost rather than a baseline. Without them, the story risks becoming tonally relentless: the audience has nowhere to breathe and nothing to lose that they have first been given.`,
         suggestedFix: 'Introduce positive emotional scenes as deliberate structural anchors, not as softening: a moment of genuine connection before a separation, a small victory before a reversal, a hopeful choice before a betrayal. These create the emotional debt that makes the dark scenes land. The ratio need not balance — but some positive register is needed for contrast to function.',
       });
+    }
+  }
+
+  // ── Wave 457: REVELATION_SUSPENSE_DECOUPLED, NEGATIVE_SCENE_DROUGHT, DRAMATIC_TURN_CAUSELESS ──
+
+  // REVELATION_SUSPENSE_DECOUPLED — Co-occurrence/decoupling × suspense channel × revelation
+  // (n≥8, ≥2 revelation scenes, every revelation has suspenseDelta ≤ 0). Every revelation scene
+  // arrives in a moment of zero or falling tension — disclosures never land under pressure. Revelations
+  // are most powerful when the audience is already alert: truth that surfaces during a chase, a
+  // confrontation, or under a deadline registers differently from truth surfacing in calm. When every
+  // disclosure arrives in a tension-free scene, the story systematically separates its informational
+  // machinery from its dramatic pressure — the two engines that most powerfully reinforce each other
+  // are kept apart. Co-occurrence mode × suspense channel × revelation.
+  // Distinct from REVELATION_CURIOSITY_DECOUPLED (Wave 443: curiosity channel — revelations don't
+  // spike questions; this checks suspense channel — revelations don't land under tension), REVELATION_
+  // DROUGHT (Wave 152: revelations absent from long sequences — count/distribution, not co-occurrence),
+  // and all zone-based revelation checks (zone × revelation, not co-occurrence × channel).
+  if (n >= 8) {
+    const revScenes457a = (records as any[]).filter(r => (r.revelation ?? null) === true);
+    if (revScenes457a.length >= 2) {
+      const allRevSuspFlat457a = revScenes457a.every(r => (r.suspenseDelta ?? 0) <= 0);
+      if (allRevSuspFlat457a) {
+        issues.push({
+          location: `All ${revScenes457a.length} revelation scene(s) — suspense decoupled`,
+          rule: 'REVELATION_SUSPENSE_DECOUPLED',
+          severity: 'minor',
+          description: `All ${revScenes457a.length} revelation scenes arrive when suspenseDelta ≤ 0 — disclosures never land under dramatic tension. Revelations are most powerful when the audience is already primed: truth surfacing during confrontation, in the middle of a chase, or under a ticking deadline hits harder than truth arriving in a calm scene because the heightened alertness of a suspense beat amplifies the disclosure's weight. When every revelation is suspense-flat, the story keeps its informational machinery and its dramatic pressure systematically separate — the two most powerful engines for generating audience engagement never reinforce each other within a single beat.`,
+          suggestedFix: `Move at least one revelation into a scene with rising tension (suspenseDelta > 0): let a truth surface during a confrontation, have a character make a disclosure under deadline pressure, or embed an answer inside a scene where stakes are already elevated. A revelation that arrives when the audience is already leaning forward from suspense hits at both the intellectual and visceral level simultaneously.`,
+        });
+      }
+    }
+  }
+
+  // NEGATIVE_SCENE_DROUGHT — Valence × underweight × negative register (n≥10, ≥3 positive scenes,
+  // negativeRatio < 0.15). Fewer than 15% of scenes carry emotionalShift = 'negative' while at least
+  // 3 scenes carry 'positive'. The story is relentlessly upbeat with almost no darkness for contrast.
+  // While positive emotional moments create relief and connection, they require negative moments to
+  // give them meaning: a victory only feels earned after a cost, a reconciliation only feels warm after
+  // a rupture, hope only registers against a background of despair. Without negative emotional scenes,
+  // the story has no shadow — nothing makes the brightness bright. Valence mode × negative underweight.
+  // Distinct from POSITIVE_SCENE_DROUGHT (Wave 443: positive register underrepresented while negatives
+  // dominate — this is the mirror, negative underrepresented while positives dominate), EMOTIONAL_ARC_
+  // UNIFORM (Wave 278: any single register dominates at >70% — this fires at <15% negative with ≥3
+  // positives, a different threshold and direction), ACT_1_WARMTH_ABSENT (Wave 331: zone-scoped, first
+  // 25%; this is a global structural ratio check).
+  if (n >= 10) {
+    const positiveCount457b = (records as any[]).filter(r => (r as any).emotionalShift === 'positive').length;
+    const negativeCount457b = (records as any[]).filter(r => (r as any).emotionalShift === 'negative').length;
+    if (positiveCount457b >= 3 && negativeCount457b / n < 0.15) {
+      issues.push({
+        location: `Emotional valence — ${negativeCount457b} negative scene(s) vs ${positiveCount457b} positive (${(negativeCount457b / n * 100).toFixed(0)}% negative of ${n} total)`,
+        rule: 'NEGATIVE_SCENE_DROUGHT',
+        severity: 'minor',
+        description: `Only ${negativeCount457b} of ${n} scenes (${(negativeCount457b / n * 100).toFixed(0)}%) carry negative emotionalShift, while ${positiveCount457b} scenes carry positive. The story's emotional register is heavily skewed toward the positive with almost no darkness for contrast. Negative emotional moments — cost, grief, loss, disillusionment — give positive moments their meaning: a victory is only felt as a victory against a background of risk, connection only registers against separation, hope only lands against despair. Without negative emotional scenes, the positive scenes have nothing to contrast with and the story risks feeling tonally safe, frictionless, and emotionally unearned.`,
+        suggestedFix: `Introduce negative emotional scenes as deliberate structural anchors: a setback before a triumph, a loss that makes a later recovery feel earned, a moment of grief that gives subsequent warmth its weight. The ratio need not balance — but some darkness is needed for the positive register to carry meaning. Without shadow, there is no light.`,
+      });
+    }
+  }
+
+  // DRAMATIC_TURN_CAUSELESS — Backward-cause × dramatic turn (n≥8, ≥2 turn scenes, all turns
+  // lack upstream cause in prior 3 scenes). Every scene with dramaticTurn ≠ 'nothing' is preceded
+  // in the 3 scenes before it by no revelation, no high suspense (>1), and no clock raise. Pivots
+  // erupt without structural build-up: the story reverses direction without the pressure, information,
+  // or deadline that earns a turn. Dramatic turns should be the visible consequence of rising tension
+  // or new information — when they arrive causeless, they feel arbitrary, like the plot changing
+  // direction for authorial convenience rather than narrative necessity.
+  // Distinct from CLIMAX_UNPREPARED (Wave 429: backward-cause × CLIMAX SCENE SPECIFICALLY — the
+  // peak-suspense scene in the final 30%; this checks ALL dramatic turns across the full script, not
+  // just the climax), REVELATION_CURIOSITY_DECOUPLED (Wave 443: co-occurrence within the same scene),
+  // and all zone-based turn-void checks (zone × turn absent — those check where turns DO NOT exist;
+  // this checks why the turns that DO exist appear without upstream motivation).
+  if (n >= 8) {
+    const turnScenes457c = (records as any[]).filter(r => (r.dramaticTurn ?? 'nothing') !== 'nothing');
+    if (turnScenes457c.length >= 2) {
+      const hasPriorCause457c = (idx: number): boolean => {
+        for (let off = 1; off <= 3; off++) {
+          if (idx - off < 0) continue;
+          const prev = (records as any[])[idx - off];
+          if ((prev?.revelation ?? null) === true) return true;
+          if ((prev?.suspenseDelta ?? 0) > 1) return true;
+          if ((prev?.clockRaised ?? false) === true) return true;
+        }
+        return false;
+      };
+      const allTurnsCauseless457c = turnScenes457c.every((r: any) => {
+        const idx = (records as any[]).indexOf(r);
+        return !hasPriorCause457c(idx);
+      });
+      if (allTurnsCauseless457c) {
+        issues.push({
+          location: `All ${turnScenes457c.length} dramatic turn scene(s) — causeless`,
+          rule: 'DRAMATIC_TURN_CAUSELESS',
+          severity: 'minor',
+          description: `All ${turnScenes457c.length} scenes with dramatic turns (dramaticTurn ≠ 'nothing') are preceded in the prior three scenes by no revelation, no high-suspense moment (suspenseDelta > 1), and no clock raise — the story's pivots erupt without structural build-up. Dramatic turns are the moments when the story changes direction: they work when they feel inevitable-in-retrospect, as if everything leading to that point made this reversal necessary. When every turn arrives without a preceding escalation — no truth surfacing, no pressure building, no deadline closing in — the pivot feels arbitrary and the story changes direction for structural convenience rather than narrative necessity.`,
+          suggestedFix: `Before at least one dramatic turn, build structural runway in the prior two or three scenes: let a revelation surface that makes the reversal feel like its consequence, raise suspense so the turn arrives as release rather than interruption, or introduce a clock that makes the pivot feel necessary. A dramatic turn that follows from something the audience has been shown to be building feels earned; one that arrives from narrative dead air feels like a plot reset.`,
+        });
+      }
     }
   }
 
