@@ -70,6 +70,18 @@
 // clock, or turn in the two preceding scenes — the densest relational moment appears without
 // narrative preparation; backward-cause × single-peak isolation × relational channel, distinct
 // from ARC_PEAK_RELATIONAL_EMOTION_ABSENT which audits the peak scene's own emotional state).
+// Wave 449 additions: relational drought run (≥5 consecutive scenes with no relationship shift
+// despite ≥2 shift scenes existing — the protagonist's interpersonal world freezes in an
+// extended run; run-based × relational × absence, the first run-based check on relational
+// silence, distinct from all three zone-based relational void checks), turn emotional aftermath
+// void (every dramatic turn is followed by 2 emotionally neutral scenes — the protagonist
+// shows no felt reaction to any pivot; sequence/aftermath × turn × emotional aftermath, distinct
+// from ARC_TURN_EMOTION_ABSENT which audits the turn scene itself and from DRAMATIC_TURN_
+// AFTERMATH_VOID in causality.ts which checks all channels simultaneously), curiosity relational
+// decoupled (≥3 curiosity-positive scenes all have no relationship shift while non-curiosity
+// scenes do move bonds — wonder is never accompanied by relational consequence; co-occurrence ×
+// curiosity × relational, the first check in this pass pairing the curiosity trigger with the
+// relational output channel instead of the emotion channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1884,6 +1896,121 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
             });
           }
         }
+      }
+    }
+  }
+
+  // ── Wave 449: ARC_RELATIONAL_DROUGHT_RUN, ARC_TURN_EMOTIONAL_AFTERMATH_VOID, ARC_CURIOSITY_RELATIONAL_DECOUPLED ──
+
+  // ARC_RELATIONAL_DROUGHT_RUN (run-based × relational × absence, n≥10, ≥2 shift scenes,
+  // maxSilentRun≥5): Five or more consecutive scenes pass with no relationship shift, even
+  // though the story contains at least 2 scenes where bonds move. Across the silent stretch,
+  // the protagonist's interpersonal world is frozen: no bond deepens, fractures, or changes
+  // in any direction. A sustained relational silence trains the audience that character
+  // relationships are background scenery — the relational engine idles for too long.
+  // Distinctness: ARC_LATE_RELATIONAL_VOID (Wave 270: final quarter — zone check),
+  // ARC_RELATIONAL_FIRST_HALF_FLAT (Wave 351: first half — zone check), ARC_RELATIONAL_
+  // MIDPOINT_VOID (Wave 421: 40%–60% zone — zone check). All three existing relational-absence
+  // checks are tied to fixed structural zones. This is the first run-based check on relational
+  // silence: it fires on the longest consecutive run of shift-free scenes regardless of zone,
+  // capturing long embedded silences that zone-based checks miss entirely.
+  if (records.length >= 10) {
+    const shiftSet449a = new Set(
+      (records as any[]).filter(r => ((r.relationshipShifts ?? []) as any[]).length > 0)
+        .map(r => (r as any).sceneIdx),
+    );
+    if (shiftSet449a.size >= 2) {
+      let maxSilent449a = 0;
+      let curSilent449a = 0;
+      for (const r of records) {
+        if (shiftSet449a.has((r as any).sceneIdx)) {
+          curSilent449a = 0;
+        } else {
+          if (++curSilent449a > maxSilent449a) maxSilent449a = curSilent449a;
+        }
+      }
+      if (maxSilent449a >= 5) {
+        issues.push({
+          location: `Relational distribution — longest shift-free run: ${maxSilent449a} scenes`,
+          rule: 'ARC_RELATIONAL_DROUGHT_RUN',
+          severity: 'minor',
+          description: `The story has ${shiftSet449a.size} scenes where bonds move but a consecutive stretch of ${maxSilent449a} scenes passes without any relationship shift. Across the silent run, the protagonist's interpersonal world is frozen — no bond deepens, fractures, or changes in any direction. A sustained relational silence trains the audience that character relationships are background rather than a living, changing part of the story: the relational engine idles instead of driving.`,
+          suggestedFix: `Seed a small relational movement within the ${maxSilent449a}-scene silent stretch: a moment of dependence, tension, gratitude, or distance between two characters. It does not need to be a dramatic rupture — even a subtle shift in how characters speak to each other keeps the relational layer alive and makes the audience continue to track the bonds as meaningful stakes.`,
+        });
+      }
+    }
+  }
+
+  // ARC_TURN_EMOTIONAL_AFTERMATH_VOID (sequence/aftermath × dramatic turn × emotional aftermath,
+  // n≥8, ≥2 turns, each followed by ≥1 scene): Every dramatic turn in the script is followed
+  // by two scenes in which the protagonist shows no emotional reaction — the immediate aftermath
+  // of every pivot is emotionally flat. A dramatic turn reorganizes the protagonist's world, and
+  // the emotional response in the scenes after is the dramatization of that reorganization:
+  // the fear, relief, anger, or grief the pivot produces makes it feel real. When every pivot
+  // lands without any felt aftermath, the story changes direction but the protagonist appears
+  // unmoved — every turn is structural without being experiential.
+  // Distinctness: ARC_TURN_EMOTION_ABSENT (Wave 312) fires when the TURN SCENE ITSELF is
+  // emotionally neutral — it audits the turn scene's own register. This audits the 2 scenes
+  // AFTER the turn for emotional response. DRAMATIC_TURN_AFTERMATH_VOID (causality.ts Wave
+  // 296) checks 2 scenes after a turn for ANY fallout (emotion OR relationship OR revelation
+  // OR suspense) — a co-occurrence check. This is specifically the emotional aftermath channel
+  // in the character-arc framing, and the first aftermath check in this pass on the turn channel.
+  if (records.length >= 8) {
+    const turnScenes449b = (records as any[]).filter(r => (r.dramaticTurn ?? 'nothing') !== 'nothing');
+    if (turnScenes449b.length >= 2) {
+      const allTurnsNeutralAftermath449b = turnScenes449b.every(turn => {
+        const turnIdx449b = (records as any[]).findIndex(r => (r as any).sceneIdx === (turn as any).sceneIdx);
+        let checkedAny449b = false;
+        for (let offset = 1; offset <= 2; offset++) {
+          const nextIdx449b = turnIdx449b + offset;
+          if (nextIdx449b >= records.length) continue;
+          checkedAny449b = true;
+          if (((records as any[])[nextIdx449b] as any).emotionalShift !== 'neutral') return false;
+        }
+        return checkedAny449b;
+      });
+      if (allTurnsNeutralAftermath449b) {
+        issues.push({
+          location: `${turnScenes449b.length} dramatic-turn aftermath(s) — no emotional response within 2 scenes`,
+          rule: 'ARC_TURN_EMOTIONAL_AFTERMATH_VOID',
+          severity: 'minor',
+          description: `Every dramatic turn (${turnScenes449b.length} pivots) is followed by two scenes in which the protagonist shows no emotional reaction — every story pivot lands without felt aftermath. A turn reorganizes the protagonist's world, and the emotional response in the scenes immediately after is where that reorganization becomes real for the character: the fear that follows a reversal, the relief after a recognition, the grief when a hope is dashed. When every pivot's aftermath is emotionally flat, the story changes direction but the protagonist is unmoved — the turns feel structural rather than human.`,
+          suggestedFix: `Give the protagonist an emotional reaction in the one or two scenes after at least one dramatic turn: the fear, anger, grief, or relief that the pivot produced. The aftermath is where the turn becomes real for the character — and therefore for the audience. A reversal without felt consequence is a plot event; a reversal followed by a moment of feeling is a turning point.`,
+        });
+      }
+    }
+  }
+
+  // ARC_CURIOSITY_RELATIONAL_DECOUPLED (co-occurrence × curiosity × relational channel, n≥8,
+  // ≥3 curiosity-positive scenes, all relational-silent, with shifts elsewhere): Every scene
+  // in which curiosityDelta > 0 carries no relationship shift, even though non-curiosity scenes
+  // do move bonds. The protagonist's wonder is never simultaneously accompanied by any movement
+  // in their bonds — curiosity is purely intellectual, detached from the social fabric around
+  // the protagonist. When wonder never carries relational consequence, the story's questions
+  // lack the urgency that comes from knowing the answer would change something between two people.
+  // Distinctness: ARC_CURIOSITY_EMOTION_DECOUPLED (Wave 312: curiosity × emotion). ARC_SUSPENSE_
+  // EMOTION_DECOUPLED (Wave 298: suspense × emotion). ARC_REVELATION_EMOTION_ABSENT (Wave 337:
+  // revelation × emotion). All existing co-occurrence checks in this pass pair a structural
+  // trigger with EMOTION. This is the first check to pair the curiosity trigger with the
+  // RELATIONSHIP output channel. REVELATION_RELATIONSHIP_VOID (causality.ts Wave 419) uses a
+  // revelation trigger — different signal channel; this uses curiosity rises.
+  if (records.length >= 8) {
+    const curPositiveScenes449c = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0);
+    if (curPositiveScenes449c.length >= 3) {
+      const allCuriosityRelSilent449c = curPositiveScenes449c.every(
+        r => ((r.relationshipShifts ?? []) as any[]).length === 0,
+      );
+      const hasShiftOutsideCuriosity449c = (records as any[]).some(
+        r => (r.curiosityDelta ?? 0) <= 0 && ((r.relationshipShifts ?? []) as any[]).length > 0,
+      );
+      if (allCuriosityRelSilent449c && hasShiftOutsideCuriosity449c) {
+        issues.push({
+          location: `${curPositiveScenes449c.length} curiosity-positive scenes — no relationship shift in any`,
+          rule: 'ARC_CURIOSITY_RELATIONAL_DECOUPLED',
+          severity: 'minor',
+          description: `Every scene in which curiosity rises (${curPositiveScenes449c.length} scenes with curiosityDelta > 0) carries no relationship shift, even though non-curiosity scenes do move bonds. The protagonist's wonder is never simultaneously accompanied by relational consequence — curiosity is purely intellectual, entirely detached from the social fabric around them. When wonder never touches a bond, the story's questions lack the urgency that comes from knowing the answer would change something between two people: who trusts whom, who owes what, who stands where in relation to another.`,
+          suggestedFix: `Let at least one moment of rising curiosity also move a relationship: a shared discovery that deepens or fractures a bond, a question that changes how two characters see each other, a mystery whose investigation forces a character to depend on or suspect someone else. When wonder has relational stakes — when finding out the truth would change the world between two people — curiosity becomes personal rather than intellectual, and the audience's investment in the answer deepens.`,
+        });
       }
     }
   }

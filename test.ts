@@ -21893,6 +21893,89 @@ I always listen.
     });
   });
 
+  describe('Wave 449 — characterArcPass: relational drought run, turn emotional aftermath void, curiosity relational decoupled', async () => {
+    const makeRec449 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const mkShift449 = (amount: number) => [{ pairKey: 'ALICE-BOB', dimension: 'trust', amount }];
+    const runA449 = async (records: any[]) => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ARC_RELATIONAL_DROUGHT_RUN fires when ≥5 consecutive scenes have no relationship shift', async () => {
+      // n=10; shifts at idx 0 and 9 only; scenes 1–8 are silent → run=8 ≥ 5 → fires
+      const recs449a = Array.from({ length: 10 }, (_, i) =>
+        makeRec449(i, { relationshipShifts: [0, 9].includes(i) ? mkShift449(0.3) : [] }),
+      );
+      const res = await runA449(recs449a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_DROUGHT_RUN'), 'ARC_RELATIONAL_DROUGHT_RUN should fire');
+    });
+
+    it('ARC_RELATIONAL_DROUGHT_RUN does NOT fire when shifts are spread with gaps under 5', async () => {
+      // n=10; shifts at 0,3,6,9 → longest gap = 2 scenes (1,2 or 4,5 or 7,8) < 5 → no fire
+      const recs449anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec449(i, { relationshipShifts: [0, 3, 6, 9].includes(i) ? mkShift449(0.2) : [] }),
+      );
+      const res = await runA449(recs449anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_DROUGHT_RUN'), 'ARC_RELATIONAL_DROUGHT_RUN should not fire');
+    });
+
+    it('ARC_TURN_EMOTIONAL_AFTERMATH_VOID fires when every turn is followed by 2 neutral scenes', async () => {
+      // n=8; turns (negative-shift) at idx 1 and 4; aftermaths (records 2,3 and 5,6) all neutral → fires
+      const recs449b = Array.from({ length: 8 }, (_, i) =>
+        makeRec449(i, {
+          dramaticTurn: i === 1 ? 'reversal' : i === 4 ? 'recognition' : 'nothing',
+          emotionalShift: i === 1 ? 'negative' : i === 4 ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runA449(recs449b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_TURN_EMOTIONAL_AFTERMATH_VOID'), 'ARC_TURN_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_TURN_EMOTIONAL_AFTERMATH_VOID does NOT fire when a turn is followed by an emotional scene', async () => {
+      // n=8; turns at idx 1 and 4; scene 2 has emotionalShift='negative' → aftermath not neutral → no fire
+      const recs449bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec449(i, {
+          dramaticTurn: i === 1 ? 'reversal' : i === 4 ? 'recognition' : 'nothing',
+          emotionalShift: i === 2 ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runA449(recs449bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_TURN_EMOTIONAL_AFTERMATH_VOID'), 'ARC_TURN_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('ARC_CURIOSITY_RELATIONAL_DECOUPLED fires when all curiosity-positive scenes have no relationship shift', async () => {
+      // n=8; curiosity>0 at idx 1,3,5 (no shifts); non-curiosity scene 7 has a shift → fires
+      const recs449c = Array.from({ length: 8 }, (_, i) =>
+        makeRec449(i, {
+          curiosityDelta: [1, 3, 5].includes(i) ? 1.5 : 0,
+          relationshipShifts: i === 7 ? mkShift449(0.4) : [],
+        }),
+      );
+      const res = await runA449(recs449c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_CURIOSITY_RELATIONAL_DECOUPLED'), 'ARC_CURIOSITY_RELATIONAL_DECOUPLED should fire');
+    });
+
+    it('ARC_CURIOSITY_RELATIONAL_DECOUPLED does NOT fire when a curiosity-positive scene carries a relationship shift', async () => {
+      // n=8; curiosity>0 at idx 1,3,5; scene 3 has a relationship shift → allCuriosityRelSilent=false → no fire
+      const recs449cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec449(i, {
+          curiosityDelta: [1, 3, 5].includes(i) ? 1.5 : 0,
+          relationshipShifts: i === 3 ? mkShift449(0.3) : i === 7 ? mkShift449(0.4) : [],
+        }),
+      );
+      const res = await runA449(recs449cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_CURIOSITY_RELATIONAL_DECOUPLED'), 'ARC_CURIOSITY_RELATIONAL_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 435 — characterArcPass: emotional overload, clock emotion decoupled, peak relational uncaused', async () => {
     const mkShift435 = (amount: number) => [{ pairKey: 'ANNA-MARK', dimension: 'trust', amount }];
     const mkShifts435 = (...amounts: number[]) => amounts.map(a => ({ pairKey: 'ANNA-MARK', dimension: 'trust', amount: a }));
