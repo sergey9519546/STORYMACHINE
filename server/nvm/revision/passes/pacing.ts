@@ -77,6 +77,15 @@
 // curiosity rise — curiosityDelta>0 — tension peaks never open new questions downstream;
 // sequence/aftermath × curiosity triggered by suspense peak, distinct from SUSPENSE_CURIOSITY_
 // DECOUPLED by testing the sequential aftermath relationship rather than same-scene coincidence).
+// Wave 453 additions: emotional flatline run (5+ consecutive scenes with neutral emotionalShift
+// while ≥3 emotional scenes exist elsewhere — the feeling register goes dark locally; run-based ×
+// emotional channel, completing the flatline-run family alongside CURIOSITY_FLATLINE_RUN),
+// suspense emotional aftermath flat (no high-suspense scene followed by emotional shift in next 2
+// scenes — danger has no human aftershock; sequence/aftermath × emotional × suspense-peak trigger,
+// completing the suspense-aftermath family alongside CURIOSITY_AFTERMATH_FLAT), suspense emotion
+// decoupled (≥3 high-suspense and ≥3 emotional scenes never coinciding — danger and feeling
+// always in separate scenes; co-occurrence × suspense × emotional channel, completing the
+// co-occurrence family alongside SUSPENSE_CURIOSITY_DECOUPLED).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2023,6 +2032,102 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `None of the story's ${highSuspRecs439c.length} high-suspense scenes (suspenseDelta > 1) is followed by a curiosity rise (curiosityDelta > 0) in the next two scenes — tension peaks never open new questions downstream. When suspense rises the audience is maximally alert and receptive to new information; the scenes immediately after a tension peak are the ideal moment to plant a new question or deepen an existing one. When every suspense peak is followed by two curiosity-flat scenes, the alertness that tension generates is wasted — pressure dissipates without leaving the audience with anything new to wonder about.`,
           suggestedFix: 'After at least one high-suspense scene, use the next scene to raise a new question: surface a new ambiguity as the tension clears, let the aftermath of the peak introduce a fragment of information the audience didn\'t have before, or complicate the situation in a way that generates forward uncertainty. The moment after maximum tension is the most fertile ground for a new question — the audience\'s attention is fully engaged and they are primed to wonder what comes next.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 453: EMOTIONAL_FLATLINE_RUN, SUSPENSE_EMOTIONAL_AFTERMATH_FLAT, SUSPENSE_EMOTION_DECOUPLED ──
+
+  // EMOTIONAL_FLATLINE_RUN — Run-based × emotional channel (n≥10, ≥3 emotional scenes, maxNeutralRun≥5).
+  // A run of 5+ consecutive neutral-emotionalShift scenes while at least 3 emotional scenes exist elsewhere
+  // means the feeling register goes dark for a sustained stretch. Pacing requires that emotion and tension
+  // interleave; a long neutral run signals a structural blindspot — a zone of the script where the
+  // audience's emotional engagement has been allowed to go cold.
+  // Distinct from CURIOSITY_FLATLINE_RUN (Wave 439, same file: tracks curiosityDelta flatness, a different
+  // channel — this tracks emotionalShift, which captures mood-register shifts independent of question-
+  // raising), EMOTIONAL_MONOTONE (originality.ts: single aggregate valence distribution across the whole
+  // script — this targets a localized consecutive-run within the script, not a global proportion), and
+  // SUSPENSE_FLATLINE_RUN (pacing.ts prior: checks suspenseDelta flatness — same run-based mode, different
+  // channel — while this checks emotionalShift neutrality specifically).
+  if (records.length >= 10) {
+    const emotionalSceneCount453a = (records as any[]).filter(r => (r as any).emotionalShift !== 'neutral').length;
+    if (emotionalSceneCount453a >= 3) {
+      let maxNeutralRun453a = 0, curNeutralRun453a = 0;
+      let maxNeutralStart453a = -1, curNeutralStart453a = -1;
+      for (let i = 0; i < records.length; i++) {
+        if ((records as any[])[i].emotionalShift === 'neutral') {
+          if (curNeutralRun453a === 0) curNeutralStart453a = i;
+          if (++curNeutralRun453a > maxNeutralRun453a) {
+            maxNeutralRun453a = curNeutralRun453a;
+            maxNeutralStart453a = curNeutralStart453a;
+          }
+        } else { curNeutralRun453a = 0; }
+      }
+      if (maxNeutralRun453a >= 5) {
+        issues.push({
+          location: `Scenes ${maxNeutralStart453a + 1}–${maxNeutralStart453a + maxNeutralRun453a}: emotional flatline run`,
+          rule: 'EMOTIONAL_FLATLINE_RUN',
+          severity: 'minor',
+          description: `A run of ${maxNeutralRun453a} consecutive emotionally neutral scenes occurs while ${emotionalSceneCount453a} emotional scenes exist elsewhere — the feeling register goes dark for a sustained stretch. Pacing requires that emotional texture and dramatic tension interleave; when a long corridor of neutral scenes interrupts a story that otherwise has emotional range, the audience's engagement is allowed to go cold in a concentrated zone. The contrast with surrounding scenes makes this blindspot structurally visible.`,
+          suggestedFix: `Give at least two or three scenes within the neutral corridor a distinct emotional texture — positive (relief, warmth, joy), negative (dread, guilt, grief), or a mixed valence. The emotional register does not need to be intense; even a small shift (wry recognition, quiet unease) prevents the feeling from going genuinely flat. Consider whether scenes in this zone serve purely functional or expository purposes that could be folded into emotionally active moments elsewhere.`,
+        });
+      }
+    }
+  }
+
+  // SUSPENSE_EMOTIONAL_AFTERMATH_FLAT — Sequence/aftermath × emotional × suspense-peak trigger (n≥8, ≥2
+  // high-suspense scenes, no emotional aftermath). When danger peaks but no emotional scene follows in
+  // the next two scenes, suspense generates physical alertness without human aftershock — the audience
+  // experiences a threat but is never shown how it registers in the characters' inner lives.
+  // Distinct from CURIOSITY_AFTERMATH_FLAT (Wave 439, same wave: tracks curiosityDelta aftermath of
+  // suspense peaks — the intellectual question channel; this tracks emotionalShift in the aftermath, the
+  // feeling-register channel), SUSPENSE_EMOTION_DECOUPLED (Wave 453, below: checks same-scene co-occurrence
+  // of suspense and emotion — whether high-suspense beats also carry emotional texture within the same scene;
+  // this checks the NEXT scenes after the peak, not the peak itself), and PROACTIVE_AFTERMATH_CURIOSITY_
+  // ABSENT (intention.ts Wave 423: different trigger — proactive acts, not suspense peaks).
+  if (records.length >= 8) {
+    const highSuspRecs453b = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 1);
+    if (highSuspRecs453b.length >= 2) {
+      const anyAftermathEmotion453b = highSuspRecs453b.some((r: any) => {
+        const idx = (records as any[]).indexOf(r);
+        const window = (records as any[]).slice(idx + 1, idx + 3);
+        return window.some((a: any) => (a as any).emotionalShift !== 'neutral');
+      });
+      if (!anyAftermathEmotion453b) {
+        issues.push({
+          location: 'All high-suspense scenes — emotional aftermath absent',
+          rule: 'SUSPENSE_EMOTIONAL_AFTERMATH_FLAT',
+          severity: 'minor',
+          description: `None of the story's ${highSuspRecs453b.length} high-suspense scenes (suspenseDelta > 1) is followed by an emotionally charged scene (emotionalShift ≠ 'neutral') within the next two scenes — danger peaks but the human aftershock is missing. Suspense creates physical alertness; the scenes immediately after a peak are the ideal moment to show how the threat registers in a character's inner life: fear, resolve, numbness, grief. When every suspense peak is followed by emotionally neutral scenes, danger becomes an abstract external event disconnected from the characters experiencing it.`,
+          suggestedFix: `After at least one high-suspense scene, give the next scene a distinct emotional texture — the character can react with fear, determination, despair, or dark relief. Even a brief emotionally-charged moment in the scene following a threat peak grounds the audience in the human stakes. The aftermath of maximum danger is when the audience most wants to see what the threat costs the people involved.`,
+        });
+      }
+    }
+  }
+
+  // SUSPENSE_EMOTION_DECOUPLED — Co-occurrence × suspense × emotional channel (n≥10, ≥3 high-suspense,
+  // ≥3 emotional scenes, zero overlap). When suspense and emotional texture always appear in separate scenes,
+  // danger and feeling are systematically structurally isolated — the story's tension and its humanity
+  // occupy different territories of the script and never reinforce each other within a single beat.
+  // Distinct from SUSPENSE_CURIOSITY_DECOUPLED (Wave 439, same file: co-occurrence of suspense × curiosity
+  // channels — intellectual question-raising separated from danger; this checks emotional texture, the
+  // feeling-register channel), SUSPENSE_EMOTIONAL_AFTERMATH_FLAT (Wave 453, above: sequence/aftermath mode
+  // checking the NEXT scenes after a peak; this checks same-scene overlap, i.e., whether the high-suspense
+  // scene itself also carries emotional weight), and EMOTIONAL_FLATLINE_RUN (Wave 453, above: run-based mode,
+  // a consecutive-window test — this is a global decoupling pattern across all qualifying scenes).
+  if (records.length >= 10) {
+    const highSuspRecs453c = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 1);
+    const emotionRecs453c = (records as any[]).filter(r => (r as any).emotionalShift !== 'neutral');
+    if (highSuspRecs453c.length >= 3 && emotionRecs453c.length >= 3) {
+      const anyOverlap453c = highSuspRecs453c.some(r => (r as any).emotionalShift !== 'neutral');
+      if (!anyOverlap453c) {
+        issues.push({
+          location: 'All high-suspense scenes — emotional texture absent (decoupled)',
+          rule: 'SUSPENSE_EMOTION_DECOUPLED',
+          severity: 'minor',
+          description: `All ${highSuspRecs453c.length} high-suspense scenes (suspenseDelta > 1) are emotionally neutral while ${emotionRecs453c.length} emotional scenes exist elsewhere — danger and feeling are systematically in separate scenes and never reinforce each other within a single beat. When suspense and emotional texture always occupy different structural territories, the audience experiences danger as an external event and feeling as an internal event that the story keeps at arm's length from its most intense moments. The most powerful scenes combine threat with felt stakes: a character in danger who also reveals something about who they are or what they want.`,
+          suggestedFix: `Give at least one high-suspense scene an emotional undercurrent — a character's fear, desperation, grief, or dark resolve surfacing within the danger itself. The suspense does not need to be reduced; emotion can layer on top of it. A character who is terrified, angry, or devastated in the middle of a threat sequence is more gripping than one who faces the threat with neutral affect. Even a single scene where danger and feeling converge breaks the structural decoupling.`,
         });
       }
     }

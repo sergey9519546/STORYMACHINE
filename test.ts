@@ -20368,6 +20368,91 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 453 — pacingPass: emotional flatline run, suspense emotional aftermath flat, suspense emotion decoupled', async () => {
+    const makeRec453 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain453 = (n: number) =>
+      Array.from({ length: n }, (_, i) =>
+        `INT. SC${i} - DAY\n\nAction line for scene ${i}.`
+      ).join('\n\n');
+    const runP453 = async (records: any[]) => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      const fountain = makeFountain453(records.length);
+      return pacingPass({ fountain, original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('EMOTIONAL_FLATLINE_RUN fires when ≥5 consecutive neutral scenes exist while ≥3 emotional scenes are present', async () => {
+      // 10 scenes: scenes 0,1,2 are emotional; scenes 3-7 are neutral run (5); scenes 8,9 neutral too
+      // max neutral run = 7 (scenes 3-9), emotional scenes = 3 → should fire
+      const recs453a = Array.from({ length: 10 }, (_, i) =>
+        makeRec453(i, { emotionalShift: i < 3 ? 'positive' : 'neutral' }),
+      );
+      const res = await runP453(recs453a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'EMOTIONAL_FLATLINE_RUN'), 'EMOTIONAL_FLATLINE_RUN should fire');
+    });
+
+    it('EMOTIONAL_FLATLINE_RUN does not fire when neutral run is shorter than 5', async () => {
+      // 10 scenes: 4 neutral in a row, rest emotional — max run = 4, should not fire
+      const recs453anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec453(i, { emotionalShift: i >= 3 && i <= 6 ? 'neutral' : 'negative' }),
+      );
+      const res = await runP453(recs453anr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'EMOTIONAL_FLATLINE_RUN'), 'EMOTIONAL_FLATLINE_RUN should not fire');
+    });
+
+    it('SUSPENSE_EMOTIONAL_AFTERMATH_FLAT fires when no high-suspense scene is followed by emotional aftermath', async () => {
+      // 8 scenes: scenes 1 and 4 have high suspense (suspenseDelta=2), all other scenes neutral-emotion
+      const recs453b = Array.from({ length: 8 }, (_, i) =>
+        makeRec453(i, { suspenseDelta: [1, 4].includes(i) ? 2 : 0, emotionalShift: 'neutral' }),
+      );
+      const res = await runP453(recs453b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'SUSPENSE_EMOTIONAL_AFTERMATH_FLAT'), 'SUSPENSE_EMOTIONAL_AFTERMATH_FLAT should fire');
+    });
+
+    it('SUSPENSE_EMOTIONAL_AFTERMATH_FLAT does not fire when at least one high-suspense scene has emotional aftermath', async () => {
+      // 8 scenes: scene 1 = high suspense; scene 2 = positive emotional → aftermath exists → no fire
+      const recs453bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec453(i, {
+          suspenseDelta: i === 1 ? 2 : 0,
+          emotionalShift: i === 2 ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runP453(recs453bnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'SUSPENSE_EMOTIONAL_AFTERMATH_FLAT'), 'SUSPENSE_EMOTIONAL_AFTERMATH_FLAT should not fire');
+    });
+
+    it('SUSPENSE_EMOTION_DECOUPLED fires when ≥3 high-suspense and ≥3 emotional scenes never coincide', async () => {
+      // 10 scenes: 0,2,4 have high suspense + neutral emotion; 6,7,8 have emotion + no suspense → decoupled
+      const recs453c = Array.from({ length: 10 }, (_, i) =>
+        makeRec453(i, {
+          suspenseDelta: [0, 2, 4].includes(i) ? 2 : 0,
+          emotionalShift: [6, 7, 8].includes(i) ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runP453(recs453c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'SUSPENSE_EMOTION_DECOUPLED'), 'SUSPENSE_EMOTION_DECOUPLED should fire');
+    });
+
+    it('SUSPENSE_EMOTION_DECOUPLED does not fire when at least one high-suspense scene also has emotional texture', async () => {
+      // 10 scenes: scene 0 has high suspense AND positive emotion → overlap exists → no fire
+      const recs453cnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec453(i, {
+          suspenseDelta: [0, 2, 4].includes(i) ? 2 : 0,
+          emotionalShift: [0, 6, 7].includes(i) ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runP453(recs453cnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'SUSPENSE_EMOTION_DECOUPLED'), 'SUSPENSE_EMOTION_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 439 — pacingPass: suspense curiosity decoupled, curiosity flatline run, curiosity aftermath flat', async () => {
     const makeRec439 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
