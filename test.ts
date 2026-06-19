@@ -26907,6 +26907,99 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 446 — beliefPass: revelation drought, assertion reactive void, negative scene revelation void', async () => {
+    const makeRec446 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      seededClueIds: [], payoffSetupIds: [], revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], dramaticTurn: 'nothing',
+      purpose: 'development', unresolvedClues: [],
+      ...overrides,
+    });
+    const runB446 = async (records: any[], fountain = '') => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('REVELATION_DROUGHT fires when revelations leave a run of ≥6 consecutive silent scenes', async () => {
+      // n=10; revelations at 0 and 9; scenes 1–8 silent → run=8 ≥ 6 → fires
+      const recs446a = Array.from({ length: 10 }, (_, i) =>
+        makeRec446(i, {
+          revelation: [0, 9].includes(i) ? `Truth at scene ${i}` : null,
+        }),
+      );
+      const res = await runB446(recs446a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_DROUGHT'), 'REVELATION_DROUGHT should fire');
+    });
+
+    it('REVELATION_DROUGHT does NOT fire when revelations are spread with gaps under 6', async () => {
+      // n=10; revelations at 0,4,8 → longest silent run = 3 < 6 → no fire
+      const recs446anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec446(i, {
+          revelation: [0, 4, 8].includes(i) ? `Truth at scene ${i}` : null,
+        }),
+      );
+      const res = await runB446(recs446anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_DROUGHT'), 'REVELATION_DROUGHT should not fire');
+    });
+
+    it('ASSERTION_REACTIVE_VOID fires when no assertion appears within 2 scenes of any revelation', async () => {
+      // n=10; revelations at 2,6; assertions at 0,9 (outside both revelation aftermath windows)
+      // Aftermath of rev@2: records[3,4] → sceneIdx 3,4 ∉ {0,9} → quiet
+      // Aftermath of rev@6: records[7,8] → sceneIdx 7,8 ∉ {0,9} → quiet → fires
+      const recs446b = Array.from({ length: 10 }, (_, i) =>
+        makeRec446(i, {
+          revelation: [2, 6].includes(i) ? `Revelation at scene ${i}` : null,
+          dialogueHighlights: [0, 9].includes(i) ? ['CHAR: She claims it was never there.'] : [],
+        }),
+      );
+      const res = await runB446(recs446b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ASSERTION_REACTIVE_VOID'), 'ASSERTION_REACTIVE_VOID should fire');
+    });
+
+    it('ASSERTION_REACTIVE_VOID does NOT fire when an assertion follows a revelation within 2 scenes', async () => {
+      // n=10; revelations at 2,6; assertions at 3,7 (1 scene after each revelation)
+      // Aftermath of rev@2: records[3] has assertion → returns false → allQuiet=false → no fire
+      const recs446bnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec446(i, {
+          revelation: [2, 6].includes(i) ? `Revelation at scene ${i}` : null,
+          dialogueHighlights: [3, 7].includes(i) ? ['CHAR: She now believes the key was taken.'] : [],
+        }),
+      );
+      const res = await runB446(recs446bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ASSERTION_REACTIVE_VOID'), 'ASSERTION_REACTIVE_VOID should not fire');
+    });
+
+    it('NEGATIVE_SCENE_REVELATION_VOID fires when no negative-emotional scene coincides with a revelation', async () => {
+      // n=8; negative scenes at 0,2,4 (no revelation); revelations at 1 (neutral) and 5 (neutral)
+      // negScenes=[0,2,4] (3 ≥ 3); revSet={1,5}; hasRevInNeg=false → fires
+      const recs446c = Array.from({ length: 8 }, (_, i) =>
+        makeRec446(i, {
+          emotionalShift: [0, 2, 4].includes(i) ? 'negative' : 'neutral',
+          revelation: [1, 5].includes(i) ? `Truth at scene ${i}` : null,
+          dialogueHighlights: i === 0 ? ['CHAR: She insists nothing happened.'] : [],
+        }),
+      );
+      const res = await runB446(recs446c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'NEGATIVE_SCENE_REVELATION_VOID'), 'NEGATIVE_SCENE_REVELATION_VOID should fire');
+    });
+
+    it('NEGATIVE_SCENE_REVELATION_VOID does NOT fire when at least one negative scene carries a revelation', async () => {
+      // n=8; negative scenes at 0,2,4; revelation at 0 (negative) and 5 (neutral)
+      // negScenes=[0,2,4]; revSet={0,5}; hasRevInNeg = 0 ∈ revSet = true → no fire
+      const recs446cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec446(i, {
+          emotionalShift: [0, 2, 4].includes(i) ? 'negative' : 'neutral',
+          revelation: [0, 5].includes(i) ? `Truth at scene ${i}` : null,
+          dialogueHighlights: i === 1 ? ['CHAR: She insists nothing happened.'] : [],
+        }),
+      );
+      const res = await runB446(recs446cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'NEGATIVE_SCENE_REVELATION_VOID'), 'NEGATIVE_SCENE_REVELATION_VOID should not fire');
+    });
+  });
+
   describe('Wave 432 — beliefPass: revelation emotional monotone, revelation unprepared climax, assertion singleton run', async () => {
     const makeRec432 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

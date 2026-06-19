@@ -69,6 +69,15 @@
 // backward-cause mode × final revelation), assertion singleton run (no two assertion scenes ever
 // appear consecutively — the belief battle spreads so thin that claims never accumulate or build
 // momentum; run-based mode × assertion channel, the complement of REVELATION_CONSECUTIVE_FLOOD).
+// Wave 446 additions: revelation drought (≥6 consecutive scenes with no disclosure despite
+// ≥2 revelations existing — epistemic momentum breaks down in extended silent stretches;
+// run-based × revelation-absence mode, the revelation-channel parallel of TOLD_BELIEF_DROUGHT),
+// assertion reactive void (every revelation is followed by 2 scenes with no character assertion
+// — discoveries never prompt a character to publicly update their worldview; sequence/aftermath ×
+// revelation→assertion direction, the reverse of REVELATION_ASSERTION_DISCONNECT), negative scene
+// revelation void (no negative-emotional scene ever coincides with a revelation — hard moments
+// are quarantined from disclosure; co-occurrence × negative-valence × revelation-absence mode,
+// orthogonal to REVELATION_DRAMA_VACUUM which checks revelation scenes for neutrality).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1851,6 +1860,106 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         description: `The story has ${toldBeliefs.length} character assertions but no two appear in consecutive scenes — every claim is surrounded by assertion-free scenes on both sides. When beliefs are spread so thin that they never accumulate or overlap, the epistemic layer cannot build momentum: characters state positions in isolation rather than debate, double down, or react to what was just claimed. A story needs runs of assertion to dramatize a contested belief arena, not just isolated opinions delivered into silence.`,
         suggestedFix: `Place at least two consecutive assertion scenes: let one character\'s claim in a scene be met by another character\'s counter-assertion in the next scene, or let a position be doubled-down on after it goes uncontested. Back-to-back assertions create the texture of an argument or a belief crisis — they signal that what characters think is actually at stake.`,
       });
+    }
+  }
+
+  // ── Wave 446: REVELATION_DROUGHT, ASSERTION_REACTIVE_VOID, NEGATIVE_SCENE_REVELATION_VOID ──
+
+  // REVELATION_DROUGHT (run-based × revelation absence, n≥10, ≥2 revelations, maxSilentRun≥6):
+  // Despite containing at least 2 revelations, the script has a consecutive stretch of at
+  // least 6 scenes with no disclosure of any kind. A screenplay that pockets its revelations
+  // in tight bursts while leaving long silences between them loses epistemic momentum: the
+  // audience stops wondering what is really true because the story withholds the discovery
+  // layer entirely for too long.
+  // Distinctness: TOLD_BELIEF_DROUGHT (Wave 309) is the assertion-channel parallel (consecutive
+  // no-assertion runs ≥5). REVELATION_ACT_2A_DESERT (Wave 253) and REVELATION_MIDPOINT_VOID
+  // (Wave 348) are zone-based checks at fixed structural positions. REVELATION_DENSITY_DROP
+  // (Wave 295) compares first-half vs. second-half counts globally. This is the first run-based
+  // revelation-ABSENCE check: it fires on the longest consecutive silence regardless of zone.
+  if (records.length >= 10 && witnessedBeliefs.length >= 2) {
+    const revSet446a = new Set(witnessedBeliefs.map(w => w.sceneIdx));
+    let maxSilent446a = 0;
+    let curSilent446a = 0;
+    for (const r of records) {
+      if (revSet446a.has(r.sceneIdx)) {
+        curSilent446a = 0;
+      } else {
+        if (++curSilent446a > maxSilent446a) maxSilent446a = curSilent446a;
+      }
+    }
+    if (maxSilent446a >= 6) {
+      issues.push({
+        location: `Revelation distribution — longest revelation-free run: ${maxSilent446a} scenes`,
+        rule: 'REVELATION_DROUGHT',
+        severity: 'minor',
+        description: `The script contains ${witnessedBeliefs.length} revelation(s) but a stretch of ${maxSilent446a} consecutive scenes has no disclosure at all. Long revelation-free runs drain epistemic momentum: when the audience goes ${maxSilent446a} scenes without learning anything true, the belief layer falls silent and the question of what characters know becomes irrelevant. The most effective scripts keep revelations distributed across the whole story — even small disclosures in between prevent the audience from disengaging from the truth-seeking layer.`,
+        suggestedFix: `Seed a small revelation — not necessarily a major plot twist, but any moment where a character learns something true — somewhere within the ${maxSilent446a}-scene silent stretch. An overheard fragment, a confirmed suspicion, or a background fact admitted in passing is enough to keep the audience tracking the truth; it does not need to resolve a central mystery.`,
+      });
+    }
+  }
+
+  // ASSERTION_REACTIVE_VOID (sequence/aftermath × revelation→assertion, n≥10, ≥2 revelations,
+  // ≥2 assertions): After every revelation in the script, the next two scenes carry no character
+  // assertion. Discoveries never prompt a character to publicly update their worldview, stake a
+  // claim, or restate what they believe in light of new knowledge. When revelation and assertion
+  // operate on independent tracks — when knowing something changes what characters DO but never
+  // what they SAY they believe — the belief layer and the disclosure layer are decoupled at the
+  // causal level.
+  // Distinctness: REVELATION_ASSERTION_DISCONNECT (Wave 348) checks whether a revelation lands
+  // within 2 scenes of a PRIOR assertion (assertion→revelation order: does a claim get discharged
+  // by a truth?). This checks the REVERSE causal direction: revelation→assertion (does a truth
+  // get processed into a claim?). ASSERTION_AFTERMATH_VOID (Wave 418) checks what follows an
+  // ASSERTION in the next 2 scenes. This checks what follows a REVELATION. The first aftermath
+  // check on the revelation→assertion axis; orthogonal to all existing aftermath/disconnect checks.
+  if (records.length >= 10 && witnessedBeliefs.length >= 2 && toldBeliefs.length >= 2) {
+    const assertionSceneIdxSet446b = new Set(toldBeliefs.map(t => t.sceneIdx));
+    const allRevHaveQuietAftermath446b = witnessedBeliefs.every(w => {
+      const revRecPos446b = records.findIndex(r => r.sceneIdx === w.sceneIdx);
+      for (let offset = 1; offset <= 2; offset++) {
+        const nextIdx = revRecPos446b + offset;
+        if (nextIdx >= records.length) continue;
+        if (assertionSceneIdxSet446b.has(records[nextIdx].sceneIdx)) return false;
+      }
+      return true;
+    });
+    if (allRevHaveQuietAftermath446b) {
+      issues.push({
+        location: `All ${witnessedBeliefs.length} revelation aftermath(s) — no assertion within 2 scenes`,
+        rule: 'ASSERTION_REACTIVE_VOID',
+        severity: 'minor',
+        description: `Every revelation (${witnessedBeliefs.length} scenes) is followed by two scenes with no character assertion — discoveries never prompt a character to publicly update their worldview or state a new position. When the script processes a revelation through action and emotion but never through a speech-act belief claim, the disclosure layer and the assertion layer operate in isolation: characters learn things but never say what those things make them believe. An assertion in the aftermath of a revelation dramatises that knowledge matters — that having learned X changes what a character is willing to claim.`,
+        suggestedFix: `After at least one revelation, give a character an assertion in the next scene or two — a claim that reflects, inverts, or responds to what was just disclosed. It can be a character doubling down on a now-false belief, or a character re-positioning based on new knowledge. Either way, the assertion signals that what was discovered has epistemic weight: it changes what characters say they know.`,
+      });
+    }
+  }
+
+  // NEGATIVE_SCENE_REVELATION_VOID (co-occurrence × negative valence × revelation absence,
+  // n≥8, ≥2 revelations, ≥3 negative-emotional scenes): None of the script's emotionally-
+  // negative scenes coincide with any revelation. The script reserves its disclosures for
+  // neutral or positive territory: hard moments are kept revelation-free, and discoveries
+  // happen only in calmer or more positive scenes. The most dramatically powerful revelations
+  // are those that land at moments of hardship — a truth emerging when a character is already
+  // suffering compounds the blow and validates the cost of the difficulty.
+  // Distinctness: REVELATION_DRAMA_VACUUM (Wave 281) fires when all revelation SCENES are
+  // emotionally neutral — it examines the emotional texture of scenes that contain revelations.
+  // REVELATION_EMOTIONAL_MONOTONE (Wave 432) fires when all CHARGED revelation scenes share
+  // one polarity. This fires from the NEGATIVE-SCENE side: checking whether any emotionally
+  // negative scene ever carries a revelation. The first check that audits negative-emotional
+  // scenes for revelation absence rather than revelation scenes for emotional quality.
+  if (records.length >= 8 && witnessedBeliefs.length >= 2) {
+    const negScenes446c = (records as any[]).filter(r => r.emotionalShift === 'negative');
+    if (negScenes446c.length >= 3) {
+      const revSceneIdxSet446c = new Set(witnessedBeliefs.map(w => w.sceneIdx));
+      const hasRevInNeg446c = negScenes446c.some((r: any) => revSceneIdxSet446c.has(r.sceneIdx));
+      if (!hasRevInNeg446c) {
+        issues.push({
+          location: `${negScenes446c.length} negative-emotional scenes — none carry a revelation`,
+          rule: 'NEGATIVE_SCENE_REVELATION_VOID',
+          severity: 'minor',
+          description: `The script has ${negScenes446c.length} emotionally negative scenes but none coincide with a revelation — hard moments are systematically kept revelation-free. The most dramatically potent disclosures land when a character is already under pressure: a truth that emerges during suffering validates the cost of the difficulty and gives the negative scene a deeper purpose than pain alone. When negative-emotional scenes and revelations never share space, the disclosure layer is quarantined from the story's hardest moments, keeping discoveries in safer territory and reducing their weight.`,
+          suggestedFix: `Move at least one revelation into a scene with a negative emotional shift — or write a revelatory moment that lands as bad news rather than a neutral or positive fact. The emotional register of a discovery shapes how it is received: a truth that costs the character something in the moment of its arrival carries more weight than one that arrives into equanimity.`,
+        });
+      }
     }
   }
 
