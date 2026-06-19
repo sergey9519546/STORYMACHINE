@@ -24983,6 +24983,114 @@ The lights go out.`;
     });
   });
 
+  describe('Wave 448 — dialoguePass: curiosity peak silent, question back-loaded, revelation scene void', async () => {
+    const makeRec448 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
+      sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false,
+      revelation: null, dramaticTurn: 'nothing', payoffSetupIds: [], relationshipShifts: [],
+      emotionalShift: 'neutral', seededClueIds: [], dialogueHighlights: [], unresolvedClues: [],
+      purpose: '', slug: `s${sceneIdx}`, ...extra,
+    });
+    const runD448 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    const buildScenes448 = (count: number, withDlgFn: (i: number) => boolean): string => {
+      let f = '';
+      const labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${labels[i] ?? i} - DAY\n\n`;
+        if (withDlgFn(i)) {
+          f += `ALICE\nShe found the documents early this morning.\n\nBOB\nWe need to leave before they close the gate.\n\n`;
+        } else {
+          f += `The door crashes open. A figure steps from the dark.\n\n`;
+        }
+      }
+      return f;
+    };
+
+    it('DIALOGUE_CURIOSITY_PEAK_SILENT fires when peak-curiosity scene has no dialogue', async () => {
+      // 8 scenes; scene 3 has curiosityDelta=2.0 (peak ≥ 1.5, pos=3 ≥ 1) and no dialogue
+      const recs448a = Array.from({ length: 8 }, (_, i) => makeRec448(i, i === 3 ? { curiosityDelta: 2.0 } : {}));
+      const f448a = buildScenes448(8, i => i !== 3);
+      const res = await runD448(f448a, recs448a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_CURIOSITY_PEAK_SILENT'), 'DIALOGUE_CURIOSITY_PEAK_SILENT should fire');
+    });
+
+    it('DIALOGUE_CURIOSITY_PEAK_SILENT does NOT fire when peak-curiosity scene has dialogue', async () => {
+      // Same records but ALL scenes (including scene 3) have dialogue
+      const recs448aNF = Array.from({ length: 8 }, (_, i) => makeRec448(i, i === 3 ? { curiosityDelta: 2.0 } : {}));
+      const f448aNF = buildScenes448(8, () => true);
+      const res = await runD448(f448aNF, recs448aNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_CURIOSITY_PEAK_SILENT'), 'DIALOGUE_CURIOSITY_PEAK_SILENT should not fire');
+    });
+
+    it('DIALOGUE_QUESTION_BACK_LOADED fires when second-half question rate exceeds first-half rate by 2×', async () => {
+      // 12 lines: first half has 1 question (rate≈0.167); second half has 5 questions (rate≈0.833) → 0.833 > 0.167×2 → fires
+      const lines448b = [
+        'She found the documents early this morning.',
+        'We need to leave before they close the gate.',
+        'The car is waiting by the old factory road.',
+        'What exactly did she tell you last night?',      // ? in first half (index 3 of 12 → first of 6)
+        'He made a choice and we have to live with it.',
+        'Turn off the radio before they track us down.',
+        // second half (indices 6-11):
+        'Where are you going with all of this now?',     // ?
+        'Why did you not tell me before today here?',    // ?
+        'When did you first find out about it then?',    // ?
+        'How long have you known about this one plan?',  // ?
+        'Who exactly told you to keep quiet back then?', // ?
+        'The road ends here and we have no way back.',
+      ];
+      const body448b = lines448b.map((l, i) => `${i % 2 === 0 ? 'ALICE' : 'BOB'}\n${l}`).join('\n\n');
+      const f448b = `INT. ROOM - DAY\n\n${body448b}\n`;
+      const res = await runD448(f448b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_QUESTION_BACK_LOADED'), 'DIALOGUE_QUESTION_BACK_LOADED should fire');
+    });
+
+    it('DIALOGUE_QUESTION_BACK_LOADED does NOT fire when questions are evenly distributed', async () => {
+      // 12 lines: 2 questions in first half, 2 in second half → same rate → ratio=1 < 2 → no fire
+      const lines448bNF = [
+        'She found the documents early this morning.',
+        'Where are you going with all of this now?',     // ? in first half
+        'We need to leave before they close the gate.',
+        'The car is waiting by the old factory road.',
+        'What exactly did she tell you last night?',     // ? in first half
+        'Turn off the radio before they track us down.',
+        // second half:
+        'He made a choice and we have to live with it.',
+        'Who exactly told you to keep quiet back then?', // ? in second half
+        'The road ends here and we have no way back.',
+        'She has been waiting for a signal since dawn.',
+        'Why did you not tell me before today here?',    // ? in second half
+        'The bridge was closed before we even arrived.',
+      ];
+      const body448bNF = lines448bNF.map((l, i) => `${i % 2 === 0 ? 'ALICE' : 'BOB'}\n${l}`).join('\n\n');
+      const f448bNF = `INT. ROOM - DAY\n\n${body448bNF}\n`;
+      const res = await runD448(f448bNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_QUESTION_BACK_LOADED'), 'DIALOGUE_QUESTION_BACK_LOADED should not fire');
+    });
+
+    it('DIALOGUE_REVELATION_SCENE_VOID fires when all revelation scenes contain no dialogue', async () => {
+      // 8 scenes; revelations in scenes 2,3 (no dialogue); all other scenes have dialogue
+      const recs448c = Array.from({ length: 8 }, (_, i) =>
+        makeRec448(i, { revelation: [2, 3].includes(i) ? `Truth at scene ${i}` : null }),
+      );
+      const f448c = buildScenes448(8, i => ![2, 3].includes(i));
+      const res = await runD448(f448c, recs448c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_REVELATION_SCENE_VOID'), 'DIALOGUE_REVELATION_SCENE_VOID should fire');
+    });
+
+    it('DIALOGUE_REVELATION_SCENE_VOID does NOT fire when at least one revelation scene has dialogue', async () => {
+      // 8 scenes; revelations in scenes 2,3; scene 2 HAS dialogue, scene 3 does not
+      const recs448cNF = Array.from({ length: 8 }, (_, i) =>
+        makeRec448(i, { revelation: [2, 3].includes(i) ? `Truth at scene ${i}` : null }),
+      );
+      const f448cNF = buildScenes448(8, i => i !== 3); // scene 3 has no dialogue; scene 2 has dialogue
+      const res = await runD448(f448cNF, recs448cNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_REVELATION_SCENE_VOID'), 'DIALOGUE_REVELATION_SCENE_VOID should not fire');
+    });
+  });
+
   describe('Wave 434 — dialoguePass: tension peak silent, climax void, hedge front-loaded', async () => {
     const makeRec434 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
       sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false,

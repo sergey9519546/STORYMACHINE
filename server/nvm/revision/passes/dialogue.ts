@@ -62,6 +62,18 @@
 // language concentrates entirely in the first half of dialogue with ≤1 instance in the
 // second half — uncertainty vocabulary disappears from escalation and climax; distribution/
 // timing mode × hedging lexeme, distinct from HEDGE_SATURATION which is a rate check).
+// Wave 448 additions: curiosity peak silent (the scene with the story's highest curiosityDelta
+// contains no dialogue — the moment of maximum audience wonder passes without any character
+// speaking; single-peak isolation × curiosity channel, the curiosity-channel parallel of
+// DIALOGUE_TENSION_PEAK_SILENT), question back-loaded (questions concentrate in the second
+// half of dialogue at >2× the first-half rate — characters retreat into interrogation
+// precisely when dramatic stakes should force declaration; distribution/timing × question-
+// mark channel, the first distribution check on question density across the story arc, distinct
+// from QUESTION_FLOOD's global rate and DIALOGUE_HEDGE_FRONT_LOADED's hedge channel), revelation
+// scene void (every revelation scene contains no dialogue — every disclosure happens without any
+// character speaking in the moment of discovery; co-occurrence/decoupling × revelation × dialogue
+// presence, distinct from DIALOGUE_TENSION_PEAK_SILENT which is single-peak and from
+// REVELATION_RELATIONSHIP_VOID in causality.ts which checks the relationship channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2099,6 +2111,106 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         description: `${firstHedges434c} hedge lines ("maybe", "I think", "I guess", "just", "sort of") appear in the first half of dialogue, but only ${secondHedges434c} in the second half — the story's uncertainty vocabulary is entirely front-loaded. Characters speak with maximum diffidence in the setup but with unbroken certainty through the escalation and climax. Doubt and tentativeness belong at the moments of highest pressure; when hedging disappears from the second half, characters become inexplicably decisive precisely when the stakes make wavering most natural and human.`,
         suggestedFix: `Redistribute hedging language into the escalation and climax: let characters voice doubt and uncertainty as pressure mounts, and ensure the second half carries at least two or three hedge lines at the moments of maximum stakes. Reserve complete certainty for the resolution, when a character has earned it through the confrontation — not as the default register of the entire second half.`,
       });
+    }
+  }
+
+  // ── Wave 448: DIALOGUE_CURIOSITY_PEAK_SILENT, DIALOGUE_QUESTION_BACK_LOADED, DIALOGUE_REVELATION_SCENE_VOID ──
+
+  // DIALOGUE_CURIOSITY_PEAK_SILENT (single-peak isolation × curiosity × dialogue absence,
+  // n≥8, dlg≥10, peakCuriosity≥1.5, peakPos≥1): The scene with the story's highest
+  // curiosityDelta contains no dialogue — the moment of maximum audience wonder passes
+  // without any character speaking. Curiosity and voice are natural partners: the question
+  // a character cannot hold back, the half-answer demanded, the fragment of truth that opens
+  // more than it closes. When the peak-curiosity scene is entirely silent, the story's most
+  // heightened epistemic moment occurs without anyone speaking to it.
+  // Distinctness: DIALOGUE_TENSION_PEAK_SILENT (Wave 434) isolates peak suspenseDelta and
+  // checks for dialogue absence — this is the curiosity-channel parallel, the same structural
+  // isolation mode applied to a different signal axis. DIALOGUE_CLIMAX_VOID (Wave 434) is a
+  // zone check on the final 20%; CURIOSITY_PEAK_NO_FOLLOWTHROUGH (Wave 447, causality.ts)
+  // checks whether a revelation follows the curiosity peak — a different pass, different output
+  // check. This is the first single-peak check in dialogue.ts on the curiosity axis.
+  if (records.length >= 8 && dialogue.length >= 10) {
+    let peakPos448a = -1;
+    let peakVal448a = -Infinity;
+    for (let i = 0; i < records.length; i++) {
+      const cd = (records[i] as any).curiosityDelta ?? 0;
+      if (cd > peakVal448a) { peakVal448a = cd; peakPos448a = i; }
+    }
+    if (peakPos448a >= 1 && peakVal448a >= 1.5) {
+      const peakSceneIdx448a = (records[peakPos448a] as any).sceneIdx;
+      const lineToScene448a = buildLineToSceneMap(fountain);
+      const peakHasDlg448a = dialogue.some(d => (lineToScene448a[d.lineNum - 1] ?? 0) === peakSceneIdx448a);
+      if (!peakHasDlg448a) {
+        issues.push({
+          location: `Scene ${peakSceneIdx448a} — peak curiosity, no dialogue`,
+          rule: 'DIALOGUE_CURIOSITY_PEAK_SILENT',
+          severity: 'minor',
+          description: `Scene ${peakSceneIdx448a} carries the story's highest curiosityDelta (${peakVal448a.toFixed(2)}) but contains no dialogue — the moment of maximum audience wonder passes without any character speaking. Curiosity and voice are natural partners: the question the character cannot hold back, the half-answer demanded, the fragment of truth that opens more than it closes. When the peak-curiosity scene is entirely unspoken, the story's most heightened epistemic moment — the audience's peak lean-forward — occurs without any human voice speaking to it.`,
+          suggestedFix: `Add at least one line of dialogue to the peak-curiosity scene: a question the character can no longer hold back, a demand for information, or a partial disclosure that invites more wonder rather than closing it. At the moment of maximum audience curiosity, a character voice concentrates the wondering — what they manage to ask or almost-say becomes the question the audience carries forward.`,
+        });
+      }
+    }
+  }
+
+  // DIALOGUE_QUESTION_BACK_LOADED (distribution/timing × question-mark channel, dlg≥12,
+  // firstHalfQs≥1, secondHalfQs≥3, secondHalfRate > 2× firstHalfRate): Questions cluster
+  // in the second half of dialogue — the story's interrogative register more than doubles in
+  // density from setup to escalation. When characters become progressively more questioning
+  // as pressure mounts, they retreat into interrogation precisely where dramatic stakes should
+  // be forcing declaration and commitment. The arc of a well-crafted dialogue moves toward
+  // greater assertiveness as characters are confronted; a script where questioning density
+  // accelerates in the back half inverts this — the climax is more deferring than the setup.
+  // Distinctness: QUESTION_FLOOD (Wave 336) fires when >35% of ALL lines are questions — a
+  // global proportion check blind to temporal position. DIALOGUE_HEDGE_FRONT_LOADED (Wave
+  // 434) is a distribution check on hedge vocabulary (lexeme-based), not question endings.
+  // DIALOGUE_QUESTION_CLUSTER (Wave 269) is a run-based check per speaker (3+ consecutive
+  // questions — local accumulation). This is the FIRST distribution/timing check on the
+  // question-mark channel, auditing the temporal arc of questioning across the story.
+  if (dialogue.length >= 12) {
+    const half448b = Math.floor(dialogue.length / 2);
+    const firstHalfQs448b = dialogue.slice(0, half448b).filter(d => d.line.trimEnd().endsWith('?')).length;
+    const secondHalfQs448b = dialogue.slice(half448b).filter(d => d.line.trimEnd().endsWith('?')).length;
+    const firstHalfRate448b = firstHalfQs448b / half448b;
+    const secondHalfRate448b = secondHalfQs448b / (dialogue.length - half448b);
+    if (firstHalfQs448b >= 1 && secondHalfQs448b >= 3 && secondHalfRate448b > firstHalfRate448b * 2) {
+      issues.push({
+        location: 'Dialogue — question distribution (back-loaded)',
+        rule: 'DIALOGUE_QUESTION_BACK_LOADED',
+        severity: 'minor',
+        description: `${secondHalfQs448b} of the story's question-ending dialogue lines appear in the second half (${Math.round(secondHalfRate448b * 100)}% of second-half lines), versus only ${firstHalfQs448b} in the first half (${Math.round(firstHalfRate448b * 100)}% of first-half lines) — more than twice the question density in the back half. When characters become progressively more interrogative as pressure mounts, they retreat into asking precisely where dramatic stakes should be forcing them to commit, declare, and confront. Back-loaded questioning inverts the arc of conviction: the climax is more deferring than the setup.`,
+        suggestedFix: `Redistribute or replace questions in the back half: as pressure escalates, let characters state what they know, demand what they need, or declare what they will do rather than asking. Save questions for specific moments of genuine uncertainty in the escalation, not as a default register when the story is at its most tense. Well-placed assertions in the climax concentrate dramatic energy in a way that accumulated questioning cannot.`,
+      });
+    }
+  }
+
+  // DIALOGUE_REVELATION_SCENE_VOID (co-occurrence/decoupling × revelation × dialogue presence,
+  // n≥8, dlg≥10, ≥2 revelation scenes): Every scene in which a revelation occurs (r.revelation
+  // non-null) contains no dialogue — truths surface in silent scenes and every disclosure happens
+  // without any character speaking. The disclosure and voice layers are permanently decoupled:
+  // no confession, confrontation, forced admission, or demand-for-truth is ever spoken in the
+  // moment of discovery. When revelations are consistently silent, the story's most significant
+  // epistemic moments are rendered as pure action or visual rather than as dramatic human speech.
+  // Distinctness: DIALOGUE_TENSION_PEAK_SILENT (Wave 434) isolates the SINGLE peak-suspense
+  // scene — one scene, suspense channel. This checks ALL revelation-containing scenes for
+  // the consistent absence of voice — a co-occurrence check on a field-level pattern.
+  // REVELATION_RELATIONSHIP_VOID (causality.ts, Wave 419) checks whether revelation scenes carry
+  // relationship shifts — a different output channel. EMOTIONAL_SUPPRESSION checks what is said
+  // vs. what subtext implies — what is NOT said at all is the opposite condition.
+  if (records.length >= 8 && dialogue.length >= 10) {
+    const revScenes448c = (records as any[]).filter(r => r.revelation !== null && r.revelation !== undefined);
+    if (revScenes448c.length >= 2) {
+      const lineToScene448c = buildLineToSceneMap(fountain);
+      const dlgSceneIdxSet448c = new Set(dialogue.map(d => lineToScene448c[d.lineNum - 1] ?? -1));
+      const allRevSilent448c = revScenes448c.every((r: any) => !dlgSceneIdxSet448c.has(r.sceneIdx));
+      if (allRevSilent448c) {
+        issues.push({
+          location: `${revScenes448c.length} revelation scene(s) — no dialogue in any`,
+          rule: 'DIALOGUE_REVELATION_SCENE_VOID',
+          severity: 'minor',
+          description: `All ${revScenes448c.length} revelation scenes contain no dialogue — every truth the script surfaces does so in complete silence. No character ever speaks in the moment of discovery: no confession, confrontation, forced admission, or demand-for-truth. When disclosures happen in entirely unspoken scenes, the story's most significant epistemic moments are rendered as pure action or visual rather than as dramatic speech, and the disclosure and voice layers of the story are permanently decoupled.`,
+          suggestedFix: `Add at least one line of dialogue to a revelation scene: a character asking the question whose answer is the revelation, a confrontation that forces the disclosure, or a denial in the face of the truth. A revelation with a spoken line — even a fragment — is dramatically richer than one rendered in action alone, because the voice tells us what the discovery means to the character who receives it.`,
+        });
+      }
     }
   }
 
