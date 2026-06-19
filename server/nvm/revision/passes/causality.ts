@@ -70,6 +70,17 @@
 // single densest payoff scene — the largest convergence of resolved setups — lands neutral in
 // emotion, suspense, curiosity, AND relationship simultaneously; single-peak isolation × payoff
 // channel, distinct from the aggregate per-channel payoff voids).
+// Wave 447 additions: suspense decline run (4+ consecutive scenes each with suspenseDelta < 0 —
+// tension bleeds continuously without any reversal; run-based × suspense × negative valence,
+// the sustained-descent complement of SUSPENSE_UNRELEASED_RUN and the suspense-channel parallel
+// of CURIOSITY_DECLINE_RUN), dramatic turn relationship void (every dramatic-turn scene carries
+// no relationship shift — story pivots happen in an interpersonal vacuum; co-occurrence ×
+// dramatic-turn × relationship, completing the turn-scene correlation set alongside DRAMATIC_TURN_
+// NO_SUSPENSE, DRAMATIC_TURN_CURIOSITY_VOID, and DRAMATIC_TURN_NO_EMOTION), curiosity peak no
+// followthrough (the single highest-curiosityDelta scene is not followed within 2 scenes by any
+// revelation — the story's maximum wonder moment leads to no disclosure; single-peak isolation ×
+// curiosity × revelation aftermath, distinct from CURIOSITY_SPIKE_NO_FALLOUT which checks per-
+// spike for any consequence and from SUSPENSE_PEAK_UNCAUSED which is backward-cause on suspense).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2098,6 +2109,111 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
             suggestedFix: 'Charge the peak payoff on at least one channel: the scene where the most setups resolve should make someone feel something, raise a new question even as it answers old ones, redirect tension toward a fresh problem, or move a relationship. The biggest convergence of threads is the story\'s catharsis engine — let it fire rather than merely report that the loops have closed.',
           });
         }
+      }
+    }
+  }
+
+  // ── Wave 447: SUSPENSE_DECLINE_RUN, DRAMATIC_TURN_RELATIONSHIP_VOID, CURIOSITY_PEAK_NO_FOLLOWTHROUGH ──
+
+  // SUSPENSE_DECLINE_RUN (run-based × suspense × negative valence, n≥10, maxRun≥4):
+  // Four or more consecutive scenes each carry a negative suspenseDelta — tension bleeds
+  // continuously across a sustained stretch with nothing reversing the drop. A run of
+  // uninterrupted suspense decline drains the dramatic pressure engine: the audience's
+  // feeling that something is at stake erodes scene by scene without any beat of escalation,
+  // redirection, or new complication arresting the descent.
+  // Distinctness: SUSPENSE_UNRELEASED_RUN (Wave 324) fires on 6+ consecutive POSITIVE suspense
+  // scenes — the complement (sustained ascent with no release). SUSPENSE_PLATEAU_FLATLINE
+  // (Wave 254) fires on 4+ scenes where suspense is flat (near zero). CURIOSITY_DECLINE_RUN
+  // (Wave 433) is structurally identical but on the curiosity channel. This is the first
+  // run-based check on sustained suspense DESCENT — not ascent, not plateau, but a run
+  // of consecutive negative motion on the suspense axis.
+  if (records.length >= 10) {
+    let maxRun447a = 0;
+    let curRun447a = 0;
+    let maxStart447a = -1;
+    let curStart447a = -1;
+    for (let i = 0; i < records.length; i++) {
+      if ((records[i].suspenseDelta ?? 0) < 0) {
+        if (curRun447a === 0) curStart447a = i;
+        if (++curRun447a > maxRun447a) { maxRun447a = curRun447a; maxStart447a = curStart447a; }
+      } else {
+        curRun447a = 0;
+      }
+    }
+    if (maxRun447a >= 4) {
+      const runEnd447a = maxStart447a + maxRun447a - 1;
+      issues.push({
+        location: `Scenes ${records[maxStart447a].sceneIdx}–${records[runEnd447a].sceneIdx} (${maxRun447a} consecutive)`,
+        rule: 'SUSPENSE_DECLINE_RUN',
+        severity: 'minor',
+        description: `A run of ${maxRun447a} consecutive scenes (Scenes ${records[maxStart447a].sceneIdx}–${records[runEnd447a].sceneIdx}) each lower suspense (suspenseDelta < 0) with nothing reversing the drop. Sustained tension drainage deflates the dramatic engine: the audience's sense that something is at stake falls scene by scene without any escalation, redirection, or complication arresting the descent. Continuous decline — without even a momentary reversal — signals to the audience that the stakes have been permanently lowered.`,
+        suggestedFix: `Interrupt the suspense decline with at least one beat of escalation or redirection within the ${maxRun447a}-scene run: raise a clock, introduce a complication, or deliver a partial revelation that resets the threat level. A single non-negative suspense beat breaks the deflation signal and tells the audience the stakes can still rise — that something is still worth fearing.`,
+      });
+    }
+  }
+
+  // DRAMATIC_TURN_RELATIONSHIP_VOID (co-occurrence/decoupling × dramatic turn × relationship,
+  // n≥8, ≥2 turns): Every scene that contains a story pivot (dramaticTurn !== 'nothing') carries
+  // no relationship shift. Story pivots are among the most powerful drivers of interpersonal
+  // consequence: a reversal forces characters to revalue each other, and a recognition changes
+  // how two people stand. When every pivot arrives without any bond moving, the dramatic engine
+  // and the relationship engine operate in isolation — the story changes direction but no one
+  // is relationally touched by the change.
+  // Distinctness: DRAMATIC_TURN_NO_SUSPENSE (Wave 349), DRAMATIC_TURN_CURIOSITY_VOID (Wave 335),
+  // DRAMATIC_TURN_NO_EMOTION (Wave 377) audit the suspense, curiosity, and emotional channels
+  // of turn scenes — this audits the RELATIONSHIP channel, the missing piece of the turn-scene
+  // correlation set. CLOCK_RAISE_RELATIONSHIP_VOID (Wave 419) is the clock-channel parallel;
+  // REVELATION_RELATIONSHIP_VOID (Wave 419) is the revelation-channel parallel. Distinct from
+  // DRAMATIC_TURN_AFTERMATH_VOID (checks the 2 scenes AFTER a turn for any fallout, not the
+  // turn scene itself, and covers all channels not just relationship).
+  if (records.length >= 8) {
+    const turnRecs447b = (records as any[]).filter(r => (r.dramaticTurn ?? 'nothing') !== 'nothing');
+    if (turnRecs447b.length >= 2 &&
+        turnRecs447b.every(r => ((r.relationshipShifts ?? []) as any[]).length === 0)) {
+      issues.push({
+        location: `${turnRecs447b.length} dramatic-turn scene(s) — no relationship shift in any`,
+        rule: 'DRAMATIC_TURN_RELATIONSHIP_VOID',
+        severity: 'minor',
+        description: `All ${turnRecs447b.length} dramatic-turn scenes (reversals, recognitions, and pivots) carry no relationship shift — every story pivot happens in an interpersonal vacuum. Story turns are among the most powerful drivers of relational consequence: a reversal forces characters to revalue or depend on each other, and a recognition can permanently alter the power dynamic between two people. When every pivot arrives without any bond moving, the dramatic engine and the relationship engine operate in isolation — the story changes direction but no character stands differently in relation to another because of it.`,
+        suggestedFix: `Let at least one dramatic turn move a relationship: a reversal that forces a character to depend on or betray another, or a recognition that changes who holds power between two people. The structural pivot of the story should also be a human pivot — when the plot changes direction, so should at least one bond between the people driving it.`,
+      });
+    }
+  }
+
+  // CURIOSITY_PEAK_NO_FOLLOWTHROUGH (single-peak isolation × curiosity × revelation aftermath,
+  // n≥8, peakCuriosity≥1.5, peakPos≤n-3): The scene that generates the audience's single
+  // greatest spike of wonder — the global maximum of curiosityDelta — is not followed within
+  // two scenes by any revelation. The peak intrigue spike leads to silence rather than
+  // disclosure: the moment of maximum audience wonder produces no truth in the immediate wake.
+  // Distinctness: CURIOSITY_SPIKE_NO_FALLOUT (Wave 391) checks whether any curiosity spike
+  // ≥1.5 is followed by ANY consequence (emotion, relationship, revelation, or turn) — a per-
+  // spike check for any consequence. This isolates the SINGLE GLOBAL MAXIMUM and checks only
+  // REVELATION as the expected downstream: even if CURIOSITY_SPIKE_NO_FALLOUT doesn't fire
+  // (because spikes have emotional or relational fallout), this can still fire if the peak
+  // wonder moment is not answered by a disclosure. SUSPENSE_PEAK_UNCAUSED (Wave 433) is the
+  // backward-cause check on the suspense peak — this is the forward-consequence check on the
+  // curiosity peak (different axis, different channel).
+  if (records.length >= 8) {
+    let peakPos447c = -1;
+    let peakCur447c = -Infinity;
+    for (let i = 0; i < records.length; i++) {
+      const cd = (records[i].curiosityDelta ?? 0) as number;
+      if (cd > peakCur447c) { peakCur447c = cd; peakPos447c = i; }
+    }
+    if (peakPos447c >= 0 && peakCur447c >= 1.5 && peakPos447c <= records.length - 3) {
+      const hasRevFollowthrough447c = [peakPos447c + 1, peakPos447c + 2].some(idx => {
+        if (idx >= records.length) return false;
+        const r = (records as any[])[idx];
+        return r.revelation !== null && r.revelation !== undefined;
+      });
+      if (!hasRevFollowthrough447c) {
+        issues.push({
+          location: `Scene ${records[peakPos447c].sceneIdx} (${records[peakPos447c].slug}) — peak curiosity ${peakCur447c.toFixed(1)}`,
+          rule: 'CURIOSITY_PEAK_NO_FOLLOWTHROUGH',
+          severity: 'minor',
+          description: `The story's highest-curiosity scene (Scene ${records[peakPos447c].sceneIdx}, curiosityDelta ${peakCur447c.toFixed(1)}) is not followed within two scenes by any revelation — the audience's single greatest moment of wonder leads to no disclosure. At the moment of maximum "what is really true?", a story should give the audience something true: a revelation that addresses the wonder and redirects it into a new question. When the peak curiosity moment leads nowhere, the story teaches the audience that their most intense engagement will go unrewarded.`,
+          suggestedFix: `Schedule a revelation within two scenes of the story's curiosity peak: at the moment the audience is most hungry for truth, give them a disclosure — not necessarily the central answer, but any truth that addresses the question raised by the peak wonder. The peak of curiosity is a primed moment; let a revelation land while the audience is leaning in.`,
+        });
       }
     }
   }

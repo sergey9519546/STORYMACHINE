@@ -26237,6 +26237,87 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 447 — causalityPass: suspense decline run, dramatic turn relationship void, curiosity peak no followthrough', async () => {
+    const makeRec447 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      seededClueIds: [], payoffSetupIds: [], revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], dramaticTurn: 'nothing',
+      purpose: 'development', unresolvedClues: [],
+      ...overrides,
+    });
+    const runC447 = async (records: any[]) => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('SUSPENSE_DECLINE_RUN fires when 4+ consecutive scenes all lower suspense', async () => {
+      // n=10; suspenseDelta at 3,4,5,6 = -1 → run=4 ≥ 4 → fires
+      const recs447a = Array.from({ length: 10 }, (_, i) =>
+        makeRec447(i, { suspenseDelta: [3, 4, 5, 6].includes(i) ? -1 : 0 }),
+      );
+      const res = await runC447(recs447a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SUSPENSE_DECLINE_RUN'), 'SUSPENSE_DECLINE_RUN should fire');
+    });
+
+    it('SUSPENSE_DECLINE_RUN does NOT fire when the suspense-decline run stays under 4', async () => {
+      // n=10; suspenseDelta at 3,4,5 = -1 (run=3 < 4); scene 6 = 0.5 breaks it
+      const recs447anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec447(i, { suspenseDelta: [3, 4, 5].includes(i) ? -1 : i === 6 ? 0.5 : 0 }),
+      );
+      const res = await runC447(recs447anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SUSPENSE_DECLINE_RUN'), 'SUSPENSE_DECLINE_RUN should not fire');
+    });
+
+    it('DRAMATIC_TURN_RELATIONSHIP_VOID fires when all dramatic-turn scenes carry no relationship shift', async () => {
+      // n=8; turns at idx 2 (reversal) and 5 (recognition); both with relationshipShifts=[] → fires
+      const recs447b = Array.from({ length: 8 }, (_, i) =>
+        makeRec447(i, {
+          dramaticTurn: i === 2 ? 'reversal' : i === 5 ? 'recognition' : 'nothing',
+          suspenseDelta: i === 1 ? 1.5 : i === 4 ? 1.5 : 0,
+        }),
+      );
+      const res = await runC447(recs447b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_RELATIONSHIP_VOID'), 'DRAMATIC_TURN_RELATIONSHIP_VOID should fire');
+    });
+
+    it('DRAMATIC_TURN_RELATIONSHIP_VOID does NOT fire when a dramatic-turn scene carries a relationship shift', async () => {
+      // n=8; turns at idx 2 and 5; scene 2 has a relationship shift → every() fails → no fire
+      const recs447bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec447(i, {
+          dramaticTurn: i === 2 ? 'reversal' : i === 5 ? 'recognition' : 'nothing',
+          relationshipShifts: i === 2 ? [{ charA: 'Alex', charB: 'Sam', direction: 'strained' }] : [],
+          suspenseDelta: i === 1 ? 1.5 : i === 4 ? 1.5 : 0,
+        }),
+      );
+      const res = await runC447(recs447bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_RELATIONSHIP_VOID'), 'DRAMATIC_TURN_RELATIONSHIP_VOID should not fire');
+    });
+
+    it('CURIOSITY_PEAK_NO_FOLLOWTHROUGH fires when the curiosity-peak scene has no revelation in the next 2 scenes', async () => {
+      // n=8; scene 2 has curiosityDelta=3.0 (global peak ≥ 1.5, pos=2 ≤ 8-3=5);
+      // scenes 3,4 have revelation=null → hasRevFollowthrough=false → fires
+      const recs447c = Array.from({ length: 8 }, (_, i) =>
+        makeRec447(i, { curiosityDelta: i === 2 ? 3.0 : 0 }),
+      );
+      const res = await runC447(recs447c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CURIOSITY_PEAK_NO_FOLLOWTHROUGH'), 'CURIOSITY_PEAK_NO_FOLLOWTHROUGH should fire');
+    });
+
+    it('CURIOSITY_PEAK_NO_FOLLOWTHROUGH does NOT fire when a revelation follows the curiosity peak within 2 scenes', async () => {
+      // n=8; scene 2 has curiosityDelta=3.0 (peak); scene 3 has a revelation → hasRevFollowthrough=true → no fire
+      const recs447cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec447(i, {
+          curiosityDelta: i === 2 ? 3.0 : 0,
+          revelation: i === 3 ? 'The key was hidden in the basement all along.' : null,
+        }),
+      );
+      const res = await runC447(recs447cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CURIOSITY_PEAK_NO_FOLLOWTHROUGH'), 'CURIOSITY_PEAK_NO_FOLLOWTHROUGH should not fire');
+    });
+  });
+
   describe('Wave 433 — causalityPass: suspense peak uncaused, curiosity decline run, payoff peak inert', async () => {
     const makeRec433 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
