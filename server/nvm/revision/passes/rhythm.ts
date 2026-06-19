@@ -77,6 +77,17 @@
 // deviation of all action-line word counts is <2.5 with avg >4; the only check using statistical
 // variance rather than a proportion or count threshold; fires when all lines are metronomically
 // uniform in length regardless of which threshold they fall under).
+// Wave 456 additions: consecutive long run (run-based — 5+ consecutive action lines each ≥9 words;
+// a dense-prose avalanche with no breathing room in a localized stretch, distinct from LONG_LINE_FLOOD
+// which audits global proportion and ACTION_LONG_RECOVERY_ABSENT which checks aftermath per-line),
+// opening short absent (zone presence/absence — the first 25% of action lines contain no short line
+// ≤4 words while short lines exist in the rest; the opening rhythmic palette never samples the staccato
+// register, leaving the reader without early contrast; fills the opening-zone cell alongside
+// ACTION_FINALE_BLOAT's finale cell), sentence count peak (single-peak isolation × sentence count —
+// the single action line with the most sentences has ≥5 sentences AND ≥3× the script-average
+// sentence count; one action line packs five-beat clusters while all others are brief, distinct from
+// SINGLE_SENTENCE_FLOOD which fires when ALL lines are one-sentence and from LONGEST_ACTION_OUTLIER
+// which isolates the word-count peak rather than sentence-count peak).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1705,6 +1716,99 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
           suggestedFix: `Deliberately vary action line length to match the dramatic function: short lines (1–4 words) for sharp beats and transitions; medium lines (5–9 words) for staging and reaction; long lines (10–15 words) for setting and atmosphere. Read the script aloud — if every pause feels the same length, the rhythm is wrong.`,
         });
       }
+    }
+  }
+
+  // ── Wave 456: ACTION_CONSECUTIVE_LONG_RUN, ACTION_OPENING_SHORT_ABSENT, ACTION_SENTENCE_COUNT_PEAK ──
+
+  // ACTION_CONSECUTIVE_LONG_RUN — Run-based × long action lines (n≥8, 5+ consecutive lines ≥9w):
+  // Five or more consecutive action lines each containing ≥9 words creates a dense-prose avalanche
+  // with no breathing room in a localized stretch. Dense lines demand more reading effort; when five
+  // or more stack with no short beat between them, the reader is forced through a wall of description
+  // with no rhythmic relief. Good screen prose alternates density — a long image followed by a shorter
+  // beat that lets it settle. Run-based mode × long-line threshold.
+  // Distinct from LONG_LINE_FLOOD (Wave 400: global proportion >60% of all lines ≥12w — this fires
+  // on a local consecutive run at a lower per-line threshold without requiring global dominance),
+  // ACTION_LONG_RECOVERY_ABSENT (Wave 442: sequence/aftermath — no single ≥14w line is followed by a
+  // ≤7w recovery within 2 lines; this checks a global consecutive-run count, not aftermath per-line),
+  // ACTION_FINALE_BLOAT (Wave 428: zone average word count in final 25%; this checks a local run, not
+  // a zone average), and LONGEST_ACTION_OUTLIER (Wave 428: single-peak isolation).
+  if (actionLines.length >= 8) {
+    let maxLongRun456a = 0, curLongRun456a = 0;
+    let maxLongStart456a = -1, curLongStart456a = -1;
+    for (let i = 0; i < actionLines.length; i++) {
+      if (wordCounts[i] >= 9) {
+        if (curLongRun456a === 0) curLongStart456a = actionLines[i].lineNum;
+        if (++curLongRun456a > maxLongRun456a) {
+          maxLongRun456a = curLongRun456a;
+          maxLongStart456a = curLongStart456a;
+        }
+      } else { curLongRun456a = 0; }
+    }
+    if (maxLongRun456a >= 5) {
+      issues.push({
+        location: `Action lines near line ${maxLongStart456a} — consecutive long-line run (${maxLongRun456a} lines ≥9w)`,
+        rule: 'ACTION_CONSECUTIVE_LONG_RUN',
+        severity: 'minor',
+        description: `${maxLongRun456a} consecutive action lines each contain 9 or more words — a dense-prose avalanche with no rhythmic relief between them. Dense action lines demand sustained reading effort; when five or more stack without a short punctuating beat, the reader is forced through a wall of description with nowhere to breathe. Good screenplay prose alternates density: a long image or staging note followed by a shorter beat that lets it settle before the next dense line arrives. The consecutive long-line run also signals that the writer is not consciously shaping rhythm in this passage — lines are being generated at uniform density rather than sculpted for pace.`,
+        suggestedFix: `Insert a short action beat (1–5 words) somewhere within the run of ${maxLongRun456a} long lines near line ${maxLongStart456a}: a reaction, a pause, a single image in sharp focus. The short line does not have to carry much information — "A beat." or "She stops." is enough — but it breaks the density and gives the reader's eye a place to exhale before the next dense line arrives.`,
+      });
+    }
+  }
+
+  // ACTION_OPENING_SHORT_ABSENT — Zone presence/absence × opening zone × short lines (n≥10, first
+  // quarter contains no line ≤4w while short lines exist later). The first 25% of action lines set
+  // the rhythmic palette the reader expects for the script. If the opening zone never samples the
+  // staccato register (no line ≤4 words) while short lines appear later, the script withholds its
+  // sharpest rhythmic tool from the opening pages — the reader forms the impression of a uniformly
+  // dense prose style in the establishing pages and is not primed to expect rhythmic variety.
+  // Distinct from MONOTONOUS_RHYTHM (Wave 137: global word-count uniformity <20% variation across
+  // ALL lines — this fires when the OPENING ZONE SPECIFICALLY lacks short lines even if the global
+  // script has them), ACTION_FINALE_BLOAT (Wave 428: zone-average comparison between finale and
+  // earlier lines; this is a zone presence/absence check, not an average comparison), and
+  // ACTION_WORDCOUNT_FLATLINE (Wave 442: global variance across ALL lines — this targets the opening
+  // zone only). This fills the opening-zone cell alongside the finale cell (ACTION_FINALE_BLOAT).
+  if (actionLines.length >= 10) {
+    const openingEnd456b = Math.max(2, Math.floor(actionLines.length / 4));
+    const openingLines456b = wordCounts.slice(0, openingEnd456b);
+    const laterLines456b = wordCounts.slice(openingEnd456b);
+    const hasShortInOpening456b = openingLines456b.some(w => w <= 4);
+    const hasShortLater456b = laterLines456b.some(w => w <= 4);
+    if (!hasShortInOpening456b && hasShortLater456b) {
+      issues.push({
+        location: `Action lines 1–${openingEnd456b} (opening 25%) — staccato register absent`,
+        rule: 'ACTION_OPENING_SHORT_ABSENT',
+        severity: 'minor',
+        description: `The first ${openingEnd456b} action lines (opening 25% of the script) contain no short line (≤4 words), while short staccato beats appear later in the script. The opening pages set the rhythmic expectations the reader brings to the rest of the script: if every opening action line is medium-to-long, the reader forms the impression of a uniformly dense prose voice and is not primed to expect rhythmic variation. Short beats early in the script — a reaction, a pause, a single-image line — introduce the staccato register immediately and signal to the reader that the prose will vary its tempo.`,
+        suggestedFix: `Add at least one short action line (1–4 words) in the first ${openingEnd456b} action lines of the script: a character reaction, a pause beat, or a single sharp image. The short line does not need to carry dramatic weight — "A silence." or "He freezes." is enough — but its presence early signals rhythmic range and prepares the reader's eye for variety.`,
+      });
+    }
+  }
+
+  // ACTION_SENTENCE_COUNT_PEAK — Single-peak isolation × sentence count (n≥8, peak ≥5 sentences
+  // AND ≥3× script-average sentences-per-action-line). The single action line with the highest
+  // sentence count packs 5+ sentences (multiple beats) while the average action line has far fewer.
+  // Packing five beats into one action line violates the cardinal rule that each screenplay beat
+  // deserves its own visual unit: the reader's eye cannot separate the consequences when five things
+  // happen in a single un-broken visual block. The single-peak nature identifies one pathological
+  // outlier rather than a global proportion problem.
+  // Distinct from SINGLE_SENTENCE_FLOOD (Wave 277: all 12+ action lines have exactly 1 sentence —
+  // the opposite extreme; this fires when ONE line has too MANY sentences), LONGEST_ACTION_OUTLIER
+  // (Wave 428: single peak × word count, not sentence count — the existing peak-isolation check uses
+  // a different metric), and MONOTONOUS_RHYTHM (global proportion, not peak isolation).
+  if (actionLines.length >= 8) {
+    const sentCounts456c = actionLines.map(l => countSentences(l.text));
+    const avgSentCount456c = sentCounts456c.reduce((s, v) => s + v, 0) / sentCounts456c.length;
+    const maxSent456c = Math.max(...sentCounts456c);
+    const maxSentIdx456c = sentCounts456c.indexOf(maxSent456c);
+    if (maxSent456c >= 5 && avgSentCount456c > 0 && maxSent456c >= avgSentCount456c * 3) {
+      issues.push({
+        location: `Action line at line ${actionLines[maxSentIdx456c].lineNum} — sentence-count outlier (${maxSent456c} sentences)`,
+        rule: 'ACTION_SENTENCE_COUNT_PEAK',
+        severity: 'minor',
+        description: `One action line contains ${maxSent456c} sentences while the script average is ${avgSentCount456c.toFixed(1)} sentences per action line — a ${(maxSent456c / avgSentCount456c).toFixed(1)}× outlier. Packing ${maxSent456c} separate beats into a single un-broken action line violates the principle that each screenplay beat deserves its own visual unit: when multiple events are crammed into one block without blank-line separation, the reader's eye cannot cleanly distinguish where one consequence ends and the next begins. The combined weight of five beats in a single line also dilutes each individual moment — nothing lands with the isolation that makes a beat register.`,
+        suggestedFix: `Break the ${maxSent456c}-sentence action line at line ${actionLines[maxSentIdx456c].lineNum} into separate lines, each separated by a blank line: each sentence becomes its own action block. Even a two-word beat ("He stops.") reads with more impact as its own visual unit than as one clause in a five-sentence block. The blank line between beats is how a screenplay tells the reader to pause.`,
+      });
     }
   }
 

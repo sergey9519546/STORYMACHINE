@@ -19362,6 +19362,179 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 456 — rhythmPass: consecutive long run, opening short absent, sentence count peak', async () => {
+    const runR456 = async (fountain: string) => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ACTION_CONSECUTIVE_LONG_RUN fires when 5+ consecutive action lines are each ≥9 words', async () => {
+      // 5 long lines (≥9w each) followed by 3 shorter lines → run of 5 triggers the check
+      const f456a = [
+        'INT. ROOM - DAY',
+        '',
+        'He opens the front door and steps quietly into the hallway.',
+        '',
+        'She stares at the phone resting on the table by the window.',
+        '',
+        'The curtain stirs gently in the breeze coming from the street.',
+        '',
+        'He reaches into his pocket and pulls out a small folded note.',
+        '',
+        'A long moment passes while neither of them says anything at all.',
+        '',
+        'He stops.',
+        '',
+        'She turns.',
+        '',
+        'Silence.',
+      ].join('\n');
+      const res = await runR456(f456a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_CONSECUTIVE_LONG_RUN'), 'ACTION_CONSECUTIVE_LONG_RUN should fire');
+    });
+
+    it('ACTION_CONSECUTIVE_LONG_RUN does not fire when max consecutive long-line run is only 4', async () => {
+      // 4 long lines, then a short one, then 3 more long lines → max run = 4, no fire
+      const f456anr = [
+        'INT. ROOM - DAY',
+        '',
+        'He opens the front door and steps quietly into the hallway.',
+        '',
+        'She stares at the phone resting on the table by the window.',
+        '',
+        'The curtain stirs gently in the breeze coming from the street.',
+        '',
+        'He reaches into his pocket and pulls out a small folded note.',
+        '',
+        'She stops.',
+        '',
+        'He walks back across the room to stand beside the old desk.',
+        '',
+        'She watches him without speaking a single word to break the silence.',
+        '',
+        'The light from the window slowly shifts as the afternoon passes.',
+      ].join('\n');
+      const res = await runR456(f456anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_CONSECUTIVE_LONG_RUN'), 'ACTION_CONSECUTIVE_LONG_RUN should not fire');
+    });
+
+    it('ACTION_OPENING_SHORT_ABSENT fires when no short line (≤4w) is in the first 25% while short lines appear later', async () => {
+      // 12 action lines: first 3 are all ≥9 words; lines 4-12 include short ones (≤4w)
+      const f456b = [
+        'INT. OFFICE - DAY',
+        '',
+        'He walks over to the desk and sits down in the chair slowly.',
+        '',
+        'She stands by the window looking out at the street below her.',
+        '',
+        'The phone rings loudly from across the room near the door.',
+        '',
+        'He picks up.',
+        '',
+        'She turns.',
+        '',
+        'He waits.',
+        '',
+        'She crosses the room and closes the door behind her carefully.',
+        '',
+        'He sets down the receiver and opens the drawer beside the desk.',
+        '',
+        'A beat.',
+        '',
+        'She steps back.',
+        '',
+        'He stares at the window on the far side of the empty room.',
+        '',
+        'She leaves.',
+      ].join('\n');
+      const res = await runR456(f456b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_OPENING_SHORT_ABSENT'), 'ACTION_OPENING_SHORT_ABSENT should fire');
+    });
+
+    it('ACTION_OPENING_SHORT_ABSENT does not fire when a short line appears in the opening 25%', async () => {
+      // 12 action lines: first 3 include "He stops." (2 words ≤4w) → short in opening → no fire
+      const f456bnr = [
+        'INT. OFFICE - DAY',
+        '',
+        'He walks over to the desk and sits down in the chair slowly.',
+        '',
+        'He stops.',
+        '',
+        'She stands by the window looking out at the street below her.',
+        '',
+        'He picks up.',
+        '',
+        'She turns.',
+        '',
+        'He waits.',
+        '',
+        'She crosses the room and closes the door behind her carefully.',
+        '',
+        'He sets down the receiver and opens the drawer beside the desk.',
+        '',
+        'A beat.',
+        '',
+        'She steps back.',
+        '',
+        'He stares at the window on the far side of the empty room.',
+        '',
+        'She leaves.',
+      ].join('\n');
+      const res = await runR456(f456bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_OPENING_SHORT_ABSENT'), 'ACTION_OPENING_SHORT_ABSENT should not fire');
+    });
+
+    it('ACTION_SENTENCE_COUNT_PEAK fires when one action line has ≥5 sentences and ≥3× the avg', async () => {
+      // 8 action lines: 7 with 1 sentence each + 1 with 5 sentences → avg=(5+7)/8=1.5, peak=5, ratio≈3.3 ≥3
+      const f456c = [
+        'INT. HALL - DAY',
+        '',
+        'She looks up.',
+        '',
+        'He steps back.',
+        '',
+        'The door opens.',
+        '',
+        'She waits.',
+        '',
+        'He turns.',
+        '',
+        'She moves away.',
+        '',
+        'He follows.',
+        '',
+        'She drops the key. He picks it up. She looks away. He pockets it. A pause.',
+      ].join('\n');
+      const res = await runR456(f456c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_SENTENCE_COUNT_PEAK'), 'ACTION_SENTENCE_COUNT_PEAK should fire');
+    });
+
+    it('ACTION_SENTENCE_COUNT_PEAK does not fire when max sentence count is only 3 (< 3× avg)', async () => {
+      // 8 action lines: 7 with 1 sentence each + 1 with 3 sentences → avg=(3+7)/8=1.25, ratio=2.4 <3 → no fire
+      const f456cnr = [
+        'INT. HALL - DAY',
+        '',
+        'She looks up.',
+        '',
+        'He steps back.',
+        '',
+        'The door opens.',
+        '',
+        'She waits.',
+        '',
+        'He turns.',
+        '',
+        'She moves away.',
+        '',
+        'He follows.',
+        '',
+        'She drops the key. He picks it up. A pause.',
+      ].join('\n');
+      const res = await runR456(f456cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_SENTENCE_COUNT_PEAK'), 'ACTION_SENTENCE_COUNT_PEAK should not fire');
+    });
+  });
+
   describe('Wave 442 — rhythmPass: short-long segregated, long recovery absent, wordcount flatline', async () => {
     const runR442 = async (fountain: string) => {
       const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
