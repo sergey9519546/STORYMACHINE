@@ -61,6 +61,14 @@
 // action lines carry a manner adverb like "slowly"/"quietly"/"suddenly" — substituting
 // description for specific concrete action; distinct from body language clichés and reaction
 // shot overuse which target specific gesture patterns).
+// Wave 452 additions: dialogue ellipsis flood (>20% of dialogue lines end with "..." —
+// characters trail off instead of completing thoughts; underweight/bloat × dialogue ×
+// trailing-off punctuation, distinct from ELLIPSIS_ACTION_OVERUSE which audits action),
+// slug time monotone (>80% of time-tagged sluglines use the same time-of-day label —
+// story plays out in one lighting condition; underweight/bloat × slugline × time-of-day),
+// dialogue filler opener (≥4 speeches begin with "Well,", "Look,", "Listen,", "Actually,"
+// etc. — verbal hedges that delay the first direct word; count threshold × dialogue ×
+// opening word, first check targeting the opening word of each character speech).
 // Wave 438 additions: passive verb dominance (>25% of action lines use passive construction
 // like "is seen"/"are found"/"can be heard" — passive voice removes agency from the visual
 // description and distances the reader; underweight/bloat × action prose × verb form, distinct
@@ -2185,6 +2193,122 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${questionCount438c} action lines contain a question mark — the writer is inserting authorial questions into the stage directions. Action prose exists to present what the camera records: images, movements, objects. A question mark in an action line is a discourse-mode switch from showing to editorializing — "What does he know? Can she trust him?" — the writer's commentary about the scene rather than the scene itself. The audience cannot see a question; they can only see what follows from its answer being visible on screen. Repeated question-mark intrusions break the screenplay's visual contract, stepping outside the scene to address the reader directly.`,
         suggestedFix: 'Remove the question marks from action lines and replace with the visual image that answers the question: instead of "What is she thinking?" write what she does — the gesture, the look, the action that externalises the thought. If the question is genuinely unanswerable (the scene is meant to be ambiguous), write the unresolved image directly. The authorial question belongs in a note to yourself or a director\'s treatment, not in the script\'s action prose.',
+      });
+    }
+  }
+
+  // ── Wave 452: DIALOGUE_ELLIPSIS_FLOOD, SLUG_TIME_MONOTONE, DIALOGUE_FILLER_OPENER ──
+
+  // DIALOGUE_ELLIPSIS_FLOOD (minor, ≥10 dialogue lines, >20%): More than 20% of dialogue
+  // lines end with an ellipsis ("...") — characters trail off instead of completing thoughts.
+  // Ellipsis dialogue used occasionally communicates hesitation, suppressed knowledge, or
+  // interrupted intent. Used as the default register for more than a fifth of all spoken lines,
+  // it signals a screenplay where nobody ever finishes a sentence — a world of perpetual
+  // half-speech where characters gesture at meaning rather than landing it. The audience stops
+  // reading trailing dialogue as dramatic reticence and starts reading it as the writer avoiding
+  // the decisive word. Underweight/bloat mode × dialogue layer × trailing-off punctuation.
+  // Distinct from ELLIPSIS_ACTION_OVERUSE (Wave 424: the same pattern in the action layer —
+  // this audits the dialogue layer), DIALOGUE_MONOLOGUE_DROUGHT (Wave 438: no extended speeches
+  // — too short, not too incomplete), and ACTION_QUESTION_INTRUSION (Wave 438: action layer):
+  // this is the first check to audit ellipsis use in the dialogue layer specifically.
+  {
+    let dlgTotal452a = 0;
+    let ellipsisCount452a = 0;
+    let inDlg452a = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg452a = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg452a = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg452a = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (!inDlg452a) continue;
+      dlgTotal452a++;
+      if (t.endsWith('...')) ellipsisCount452a++;
+    }
+    if (dlgTotal452a >= 10 && ellipsisCount452a / dlgTotal452a > 0.2) {
+      issues.push({
+        location: `${ellipsisCount452a} of ${dlgTotal452a} dialogue lines end with "..."`,
+        rule: 'DIALOGUE_ELLIPSIS_FLOOD',
+        severity: 'minor',
+        description: `${ellipsisCount452a} of ${dlgTotal452a} dialogue lines (${Math.round(ellipsisCount452a / dlgTotal452a * 100)}%) end with an ellipsis — more than a fifth of all spoken lines trail off without completing their thought. Ellipsis dialogue used occasionally communicates hesitation, suppressed knowledge, or interrupted intent; used as the default register, it signals a screenplay where nobody ever finishes a sentence. The audience stops reading trailing dialogue as dramatic reticence and starts reading it as the writer avoiding the decisive word the character should say.`,
+        suggestedFix: "Let characters finish their sentences. Reserve ellipsis dialogue for the specific moments when hesitation or incompletion is dramatically meaningful: a confession that can't be made, a threat half-spoken. The rest of the time, make characters say what they mean — complete statements land harder than dangling implications. More than one in five trailing-off lines is a register, not a choice; replace the ellipsis with the word the character is too afraid to say, or cut the trailing hesitation entirely.",
+      });
+    }
+  }
+
+  // SLUG_TIME_MONOTONE (minor, ≥6 time-tagged sluglines, >80% same time): More than 80%
+  // of sluglines that specify a time of day all use the same time label — the story plays
+  // out almost entirely in one lighting condition. Whether all DAY or all NIGHT, a story that
+  // never shifts its visual hour forfeits one of screenplay's native expressive tools: morning
+  // has urgency and possibility, afternoon has heat and diminishing returns, night has intimacy
+  // and concealment — these distinctions carry tone for free when the hour changes. A story
+  // that never changes the light is tonally uniform in a way the audience senses without naming.
+  // Underweight/bloat mode × slugline layer × time-of-day distribution. Distinct from SLUG_
+  // INTERIOR_DOMINANCE (Wave 287: INT./EXT. ratio — location type, not time), LOCATION_
+  // REPETITION (Wave 273: same place — not hour), SLUG_GENERIC_LOCATION (Wave 315: placeholder
+  // names): this is the first check to audit time-of-day distribution across sluglines.
+  {
+    const timeCounts452b = new Map<string, number>();
+    let timeTaggedSlugs452b = 0;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) continue;
+      const m = t.toUpperCase().match(/\b(DAY|NIGHT|DAWN|DUSK|MORNING|AFTERNOON|EVENING|SUNSET|SUNRISE|NOON)\b/);
+      if (!m) continue;
+      timeTaggedSlugs452b++;
+      timeCounts452b.set(m[1], (timeCounts452b.get(m[1]) ?? 0) + 1);
+    }
+    if (timeTaggedSlugs452b >= 6) {
+      const dominantEntry452b = [...timeCounts452b.entries()].sort((a, b) => b[1] - a[1])[0];
+      if (dominantEntry452b && dominantEntry452b[1] / timeTaggedSlugs452b > 0.8) {
+        issues.push({
+          location: `${dominantEntry452b[1]} of ${timeTaggedSlugs452b} time-tagged sluglines specify "${dominantEntry452b[0]}"`,
+          rule: 'SLUG_TIME_MONOTONE',
+          severity: 'minor',
+          description: `${dominantEntry452b[1]} of ${timeTaggedSlugs452b} sluglines (${Math.round(dominantEntry452b[1] / timeTaggedSlugs452b * 100)}%) that specify a time of day all use "${dominantEntry452b[0]}" — the story plays out almost entirely in one lighting condition. A screenplay that never changes its hour forfeits the expressive range of light: morning urgency, afternoon heat, nighttime concealment are tonally distinct. A story lived entirely in one hour is visually monotone in a way the audience senses without naming — every scene in the same light creates a world without temporal rhythm or contrast.`,
+          suggestedFix: `Introduce at least one or two scenes in a different time of day. The hour of a scene is part of its character: early morning has a quality that night lacks; twilight implies transition; full noon has a different pressure from midnight. Even if the story's actual timeline is tight, giving scenes a varied time label signals visual awareness that the hour matters. Move at least one "${dominantEntry452b[0]}" scene to a different time to restore the palette.`,
+        });
+      }
+    }
+  }
+
+  // DIALOGUE_FILLER_OPENER (minor, ≥4 speeches begin with filler): Four or more dialogue
+  // speeches begin with a verbal filler opener — "Well,", "Look,", "Listen,", "Actually,",
+  // "Honestly,", "Basically,", "I mean,", "You know," — a hedge or redirect that delays the
+  // character's first direct word. These openers are the spoken equivalent of a throat-clear:
+  // they are how writers get a character speaking when the inciting impulse for the speech is
+  // unclear. A first word that commits immediately to the character's desire, position, or
+  // action is four or five times stronger than a hedge. Four or more such openings signal a
+  // dialogue register that structurally avoids the direct word. Count threshold × dialogue ×
+  // first-word pattern. Distinct from CLICHÉ_DIALOGUE (Wave 137: specific clichéd phrases —
+  // whole-line content, not opening word), DIALOGUE_SHORT_LINE_DOMINANCE (Wave 396: word
+  // count — length distribution), DIALOGUE_QUESTION_DROUGHT (Wave 396: interrogativeness —
+  // register quality, not first word), PARENTHETICAL_FLOOD (Wave 273: acting directions —
+  // direction layer): this is the first check targeting the opening word of each speech.
+  {
+    const fillerRe452c = /^(well[,\s]|look[,\s!]|listen[,\s]|actually[,\s]|honestly[,\s]|basically[,\s]|i mean[,\s]|you know[,\s]|anyway[,\s]|whatever[,\s]|seriously[,\s])/i;
+    let fillerOpenerCount452c = 0;
+    let inDlg452c = false;
+    let isFirstDlgLine452c = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg452c = false; isFirstDlgLine452c = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg452c = false; isFirstDlgLine452c = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg452c = true; isFirstDlgLine452c = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (!inDlg452c) continue;
+      if (isFirstDlgLine452c) {
+        if (fillerRe452c.test(t)) fillerOpenerCount452c++;
+        isFirstDlgLine452c = false;
+      }
+    }
+    if (fillerOpenerCount452c >= 4) {
+      issues.push({
+        location: `${fillerOpenerCount452c} dialogue speech(es) begin with a verbal filler opener`,
+        rule: 'DIALOGUE_FILLER_OPENER',
+        severity: 'minor',
+        description: `${fillerOpenerCount452c} dialogue speeches open with a verbal filler — "Well,", "Look,", "Listen,", "Actually,", "Honestly,", "Basically,", "I mean,", or similar — a hedge that delays the character's first direct word. These openers are the spoken equivalent of a writer clearing their throat before they know what to say: they are how speeches begin when the impulse for the speech is unclear. A first word that commits immediately to the character's desire, position, or action is far stronger. Four or more such openings across the screenplay signals a dialogue register that structurally avoids the direct first word.`,
+        suggestedFix: "Trim the opening filler: \"Well, I don't think that's right\" becomes \"That's wrong.\" \"Look, we need to talk about this\" becomes \"We need to talk.\" Start each speech on the word that carries the character's first real meaning — not the word that marks time before meaning arrives. If a character genuinely can't bring themselves to start directly, that hesitation belongs in a parenthetical note or a stage direction, not in the speech opener itself.",
       });
     }
   }

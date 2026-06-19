@@ -20686,6 +20686,214 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 452 — originalityPass: dialogue ellipsis flood, slug time monotone, dialogue filler opener', async () => {
+    const runO452 = async (fountain: string) => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      return originalityPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DIALOGUE_ELLIPSIS_FLOOD fires when >20% of dialogue lines end with "..."', async () => {
+      // 10 dialogue lines, 3 end with "..." = 30% > 20% → fires
+      const f452a = `INT. ROOM - DAY
+
+ANNA
+I don't know...
+
+MARK
+You have to decide.
+
+ANNA
+Maybe I can't...
+
+MARK
+Stop stalling.
+
+ANNA
+It's complicated...
+
+MARK
+Just answer.
+
+ANNA
+Fine.
+
+MARK
+Good.
+
+ANNA
+Whatever you say.
+
+MARK
+Deal.
+`;
+      const res = await runO452(f452a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_ELLIPSIS_FLOOD'), 'DIALOGUE_ELLIPSIS_FLOOD should fire');
+    });
+
+    it('DIALOGUE_ELLIPSIS_FLOOD does not fire when ellipsis use is rare in dialogue', async () => {
+      // 10 dialogue lines, 1 ends with "..." = 10% ≤ 20% → no fire
+      const f452anr = `INT. ROOM - DAY
+
+ANNA
+I don't know what to say.
+
+MARK
+You have to decide today.
+
+ANNA
+Maybe there is another way...
+
+MARK
+Stop stalling and answer me.
+
+ANNA
+Fine, I'll do it.
+
+MARK
+Good. Let's move on.
+
+ANNA
+Whatever you say, Mark.
+
+MARK
+We have a deal.
+
+ANNA
+I hope you're right.
+
+MARK
+Trust me.
+`;
+      const res = await runO452(f452anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_ELLIPSIS_FLOOD'), 'DIALOGUE_ELLIPSIS_FLOOD should not fire');
+    });
+
+    it('SLUG_TIME_MONOTONE fires when >80% of time-tagged sluglines share the same time', async () => {
+      // 8 sluglines: 7 NIGHT, 1 DAY = 87.5% NIGHT > 80% → fires
+      const f452b = `INT. OFFICE - NIGHT
+
+She works late.
+
+INT. HALLWAY - NIGHT
+
+He watches from the shadows.
+
+INT. STAIRWELL - NIGHT
+
+The door creaks.
+
+EXT. STREET - NIGHT
+
+Rain hits the pavement.
+
+INT. CAR - NIGHT
+
+She grips the wheel.
+
+INT. APARTMENT - NIGHT
+
+He waits.
+
+INT. KITCHEN - NIGHT
+
+The phone rings.
+
+EXT. PARK - DAY
+
+Morning light filters through.
+`;
+      const res = await runO452(f452b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SLUG_TIME_MONOTONE'), 'SLUG_TIME_MONOTONE should fire');
+    });
+
+    it('SLUG_TIME_MONOTONE does not fire when time-of-day is varied', async () => {
+      // 8 sluglines: 5 NIGHT, 3 DAY = 62.5% NIGHT ≤ 80% → no fire
+      const f452bnr = `INT. OFFICE - NIGHT
+
+She works late.
+
+INT. HALLWAY - NIGHT
+
+He watches.
+
+INT. STAIRWELL - DAY
+
+Sunlight streams in.
+
+EXT. STREET - DAY
+
+Rush hour.
+
+INT. CAR - NIGHT
+
+Rain on glass.
+
+INT. APARTMENT - NIGHT
+
+He waits.
+
+INT. KITCHEN - DAY
+
+Morning coffee.
+
+EXT. PARK - NIGHT
+
+The city sleeps.
+`;
+      const res = await runO452(f452bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SLUG_TIME_MONOTONE'), 'SLUG_TIME_MONOTONE should not fire');
+    });
+
+    it('DIALOGUE_FILLER_OPENER fires when 4+ speeches begin with verbal filler openers', async () => {
+      // 4 speeches start with Well/Look/Actually/Honestly → fires
+      const f452c = `INT. ROOM - DAY
+
+ANNA
+Well, I think we should reconsider.
+
+MARK
+Look, there's no time for that.
+
+ANNA
+Actually, you might be wrong about this.
+
+MARK
+Honestly, I've thought about it a lot.
+
+ANNA
+Let's just go.
+`;
+      const res = await runO452(f452c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_FILLER_OPENER'), 'DIALOGUE_FILLER_OPENER should fire');
+    });
+
+    it('DIALOGUE_FILLER_OPENER does not fire when fewer than 4 speeches use filler openers', async () => {
+      // Only 2 filler openers → no fire
+      const f452cnr = `INT. ROOM - DAY
+
+ANNA
+We need to leave now.
+
+MARK
+Well, maybe you're right.
+
+ANNA
+The plan is simple.
+
+MARK
+I disagree with you entirely.
+
+ANNA
+Listen, just trust me on this.
+
+MARK
+Fine. Let's do it your way.
+`;
+      const res = await runO452(f452cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_FILLER_OPENER'), 'DIALOGUE_FILLER_OPENER should not fire');
+    });
+  });
+
   describe('Wave 438 — originalityPass: passive verb dominance, dialogue monologue drought, action question intrusion', async () => {
     const runO438 = async (fountain: string) => {
       const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
