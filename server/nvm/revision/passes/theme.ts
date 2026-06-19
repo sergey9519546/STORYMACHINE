@@ -71,6 +71,15 @@
 // resonance emotionally lopsided (valence — the emotionally charged resonant scenes are
 // ≥3:1 skewed toward one polarity, leaving the theme unable to speak in the opposite
 // emotional register).
+// Wave 444 additions: resonant cluster flood (run-based — 4+ consecutive scenes all carry
+// theme, creating a local echo-chamber drumbeat that dilutes contrast; the opposite extreme
+// from THEME_RESONANT_SINGLETON_RUN and distinct from global-proportion and single-peak checks),
+// long silent stretch (distribution/timing — the single longest gap between any two resonant
+// scenes is ≥5 consecutive inert scenes; fires when one stretch is thematically empty even
+// when global proportion and zone checks pass), revelation aftermath silent (sequence/aftermath —
+// every scene immediately following a revelation carries no theme though theme appears elsewhere;
+// the first aftermath check anchored to the revelation channel, distinct from dramatic-turn
+// aftermath and from the revelation-scenes-themselves check).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1990,6 +1999,116 @@ export async function themePass(input: PassInput): Promise<PassResult> {
             suggestedFix: `Balance the emotional register of the theme: let "${themeRaw}" appear in both ${dominant430c} and ${minority430c} moments — in scenes of both gain and loss. A thematically resonant ${minority430c} scene shows what the theme means in its opposite emotional register; the dialectic of the theme lives in both polarities. Write at least one scene where the theme is felt in a ${minority430c} emotional context.`,
           });
         }
+      }
+    }
+
+    // THEME_RESONANT_CLUSTER_FLOOD (run-based, n≥10, ≥4 resonant scenes, maxConsecutiveRun≥4):
+    // Four or more consecutive scenes all carry thematic language — a local echo-chamber plateau
+    // where theme becomes a relentless drumbeat rather than an accent. Resonance lands hardest when
+    // it punctuates inert scenes; when every scene in a run carries the theme, each occurrence
+    // dilutes the next. A cluster of 4+ consecutive resonant scenes loses the contrast that makes
+    // individual resonant moments feel meaningful.
+    // Distinctness: THEME_RESONANT_SINGLETON_RUN (Wave 416) fires when ALL resonant scenes are
+    // isolated (max consecutive run = 1) — the opposite extreme. THEME_CRAFT fires on high GLOBAL
+    // DENSITY (>40% of all scenes). THEME_RESONANCE_BURST (Wave 307) fires when ONE SCENE holds
+    // >50% of keyword hits — a single-scene check. This fires when a consecutive RUN OF SCENES
+    // is thematically dense, a spatial clustering test distinct from all proportion, isolation,
+    // and single-scene-peak checks.
+    if (records.length >= 10 && resonantScenes.length >= 4) {
+      let maxResRun444a = 0;
+      let maxResRunStart444a = -1;
+      let curResRun444a = 0;
+      let curResRunStart444a = 0;
+      for (let i444a = 0; i444a < records.length; i444a++) {
+        const isRes444a = sceneHasResonance(sceneTexts.get(records[i444a].sceneIdx) ?? '', expandedKeywords);
+        if (isRes444a) {
+          if (curResRun444a === 0) curResRunStart444a = i444a;
+          if (++curResRun444a > maxResRun444a) {
+            maxResRun444a = curResRun444a;
+            maxResRunStart444a = curResRunStart444a;
+          }
+        } else {
+          curResRun444a = 0;
+        }
+      }
+      if (maxResRun444a >= 4 && resonantScenes.length < records.length) {
+        issues.push({
+          location: `Scenes ${maxResRunStart444a}–${maxResRunStart444a + maxResRun444a - 1} — consecutive resonant cluster (${maxResRun444a} scenes)`,
+          rule: 'THEME_RESONANT_CLUSTER_FLOOD',
+          severity: 'minor',
+          description: `${maxResRun444a} consecutive scenes all carry language related to "${themeRaw}" — a local echo-chamber where theme becomes a relentless drumbeat rather than an accent. Thematic resonance lands hardest when it punctuates scenes that don't carry it; when every scene in a run speaks the theme, each occurrence dilutes the next. The contrast that makes individual resonant moments meaningful disappears when ${maxResRun444a} consecutive scenes all announce the same message.`,
+          suggestedFix: `Break the consecutive resonant cluster (Scenes ${maxResRunStart444a}–${maxResRunStart444a + maxResRun444a - 1}) by letting at least one or two scenes advance plot or character without explicitly carrying "${themeRaw}". The silence will make the next resonant scene land harder. Thematic meaning comes from pattern; patterns need variation to register as patterns.`,
+        });
+      }
+    }
+
+    // THEME_LONG_SILENT_STRETCH (distribution/timing, n≥12, ≥2 resonant scenes, maxGap≥5):
+    // The longest consecutive stretch of non-resonant scenes anywhere in the story — including
+    // the stretch before the first resonant scene and after the last — is ≥5 scenes. A gap of
+    // 5+ consecutive inert scenes is long enough for the audience to lose the thematic thread.
+    // Distinct from zone checks which flag entire structural zones: this fires on the SINGLE
+    // WORST GAP regardless of zone boundaries, catching gaps that straddle zones or sit inside
+    // nominally themed zones.
+    // Distinctness: THEME_RESONANCE_GAP fires when >40% of ALL scenes are inert (global proportion).
+    // Zone checks (THEME_ACT2_DESERT, THEME_CLOSING_QUARTER_SILENT, etc.) audit fixed structural
+    // zones. This is a distribution/timing check that identifies the single worst gap — it catches
+    // long thematic silences that zone and proportion checks miss when the silence straddles zones
+    // or sits inside an otherwise-resonant zone.
+    if (records.length >= 12 && resonantScenes.length >= 2) {
+      const resIdx444b: number[] = records
+        .map((r: any, i: number) => ({ i, res: sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords) }))
+        .filter((x: any) => x.res)
+        .map((x: any) => x.i as number);
+      let maxGap444b = 0;
+      if (resIdx444b.length > 0) {
+        maxGap444b = Math.max(maxGap444b, resIdx444b[0]);
+        for (let g = 1; g < resIdx444b.length; g++) {
+          maxGap444b = Math.max(maxGap444b, resIdx444b[g] - resIdx444b[g - 1] - 1);
+        }
+        maxGap444b = Math.max(maxGap444b, records.length - 1 - resIdx444b[resIdx444b.length - 1]);
+      }
+      if (maxGap444b >= 5) {
+        issues.push({
+          location: `Longest thematic silence — ${maxGap444b} consecutive non-resonant scenes`,
+          rule: 'THEME_LONG_SILENT_STRETCH',
+          severity: 'minor',
+          description: `Somewhere in the story, ${maxGap444b} consecutive scenes carry no language related to "${themeRaw}" — long enough for the audience to lose the thematic thread. While individual inert scenes are healthy, a gap of 5 or more creates a portion of the story where the central meaning disappears from view. This gap may sit inside a nominally themed zone or straddle zone boundaries, which is why zone checks may not catch it.`,
+          suggestedFix: `Find the longest gap (${maxGap444b} consecutive scenes without "${themeRaw}") and plant one or two thematic anchors within it — an image, a line of dialogue, or a character choice that briefly reconnects the action to the story's central question without stating it outright. The theme need not be argued; it only needs to be glimpsed.`,
+        });
+      }
+    }
+
+    // THEME_REVELATION_AFTERMATH_SILENT (sequence/aftermath, n≥10, ≥2 qualifying aftermaths):
+    // Every scene immediately following a revelation (r.revelation is non-null and non-empty)
+    // carries no thematic language, even though theme appears elsewhere. A revelation is the story's
+    // disclosure moment — the scene after it is when the audience first processes what the truth means.
+    // That processing beat is the most receptive window for thematic delivery because the audience is
+    // actively recontextualising everything they know. When post-revelation scenes are all thematically
+    // silent, the story's meaning-making never aligns with its information-delivery.
+    // Distinctness: THEME_REVELATION_DECOUPLED (Wave 293) fires when REVELATION SCENES THEMSELVES
+    // carry no theme (a different structural position). THEME_DRAMATIC_TURN_AFTERMATH_SILENT (Wave 430)
+    // checks aftermath of dramatic TURNS (r.dramaticTurn ≠ 'nothing'), a different structural event from
+    // revelations (disclosed information vs reversal of direction). This is the first aftermath check
+    // anchored specifically to the revelation channel.
+    if (records.length >= 10 && resonantScenes.length >= 2) {
+      const revAftermaths444c: typeof records = [];
+      for (let i444c = 0; i444c < records.length - 1; i444c++) {
+        const rev444c = records[i444c].revelation;
+        if (rev444c != null && rev444c !== '') {
+          revAftermaths444c.push(records[i444c + 1]);
+        }
+      }
+      if (revAftermaths444c.length >= 2 &&
+          !revAftermaths444c.some((r: any) =>
+            sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+          )) {
+        issues.push({
+          location: `${revAftermaths444c.length} post-revelation scene(s) — thematically silent`,
+          rule: 'THEME_REVELATION_AFTERMATH_SILENT',
+          severity: 'minor',
+          description: `The scene immediately following every revelation (${revAftermaths444c.length} aftermath scene(s)) carries no language related to "${themeRaw}", even though the theme appears elsewhere. Post-revelation scenes are the most receptive windows for thematic delivery: the audience is actively recontextualising everything they know, primed to understand not just what happened but what it means. When every disclosure is followed by a thematically blank scene, the story's meaning-making never aligns with its information-delivery.`,
+          suggestedFix: `Let at least one scene following a revelation carry "${themeRaw}": after a truth is disclosed, the next scene's reaction — a character's choice, an image, a line of dialogue — should briefly reflect what this revelation means in terms of the story's central question. The processing beat after a disclosure is the most powerful moment to make the audience feel not just the fact but its significance.`,
+        });
       }
     }
   }

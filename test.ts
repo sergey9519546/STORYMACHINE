@@ -18713,6 +18713,88 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 444 — themePass: resonant cluster flood, long silent stretch, revelation aftermath silent', async () => {
+    const makeRec444 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const THEME444 = 'redemption forgiveness courage';
+    const runT444 = async (records: any[]) => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: THEME444 },
+      });
+    };
+    const themed444 = ['act of redemption'];
+
+    it('THEME_RESONANT_CLUSTER_FLOOD fires when 4+ consecutive scenes all carry the theme', async () => {
+      // n=10, resonant at 0,1,2,3,4 (5-scene consecutive run); silent at 5,6,7,8,9
+      const recs444a = Array.from({ length: 10 }, (_, i) =>
+        makeRec444(i, { dialogueHighlights: i < 5 ? themed444 : [] }),
+      );
+      const res = await runT444(recs444a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_RESONANT_CLUSTER_FLOOD'), 'THEME_RESONANT_CLUSTER_FLOOD should fire');
+    });
+
+    it('THEME_RESONANT_CLUSTER_FLOOD does NOT fire when resonant scenes alternate with silent ones', async () => {
+      // n=10, resonant at 0,2,4,6,8 — alternating, max consecutive run = 1 < 4
+      const recs444aNF = Array.from({ length: 10 }, (_, i) =>
+        makeRec444(i, { dialogueHighlights: i % 2 === 0 ? themed444 : [] }),
+      );
+      const res = await runT444(recs444aNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_RESONANT_CLUSTER_FLOOD'), 'THEME_RESONANT_CLUSTER_FLOOD should not fire');
+    });
+
+    it('THEME_LONG_SILENT_STRETCH fires when the longest gap between resonant scenes is ≥5', async () => {
+      // n=12, resonant only at 0 and 11 — gap = 10 consecutive silent scenes between them
+      const recs444b = Array.from({ length: 12 }, (_, i) =>
+        makeRec444(i, { dialogueHighlights: (i === 0 || i === 11) ? themed444 : [] }),
+      );
+      const res = await runT444(recs444b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_LONG_SILENT_STRETCH'), 'THEME_LONG_SILENT_STRETCH should fire');
+    });
+
+    it('THEME_LONG_SILENT_STRETCH does NOT fire when the maximum gap between resonant scenes is ≤4', async () => {
+      // n=12, resonant at 0,3,6,9 (every 3rd scene) — max gap = 2 consecutive silent scenes
+      const recs444bNF = Array.from({ length: 12 }, (_, i) =>
+        makeRec444(i, { dialogueHighlights: i % 3 === 0 ? themed444 : [] }),
+      );
+      const res = await runT444(recs444bNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_LONG_SILENT_STRETCH'), 'THEME_LONG_SILENT_STRETCH should not fire');
+    });
+
+    it('THEME_REVELATION_AFTERMATH_SILENT fires when every post-revelation scene is thematically silent', async () => {
+      // n=10, revelations at 1 and 4; resonant at 0 and 3 (aftertmaths 2 and 5 are silent)
+      const recs444c = Array.from({ length: 10 }, (_, i) =>
+        makeRec444(i, {
+          dialogueHighlights: [0, 3].includes(i) ? themed444 : [],
+          revelation: [1, 4].includes(i) ? 'A truth is disclosed here.' : null,
+        }),
+      );
+      const res = await runT444(recs444c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_REVELATION_AFTERMATH_SILENT'), 'THEME_REVELATION_AFTERMATH_SILENT should fire');
+    });
+
+    it('THEME_REVELATION_AFTERMATH_SILENT does NOT fire when at least one post-revelation scene carries the theme', async () => {
+      // n=10, revelations at 1 and 4; resonant at 0, 2 (aftermath of 1), and 3 → aftermath 2 resonates
+      const recs444cNF = Array.from({ length: 10 }, (_, i) =>
+        makeRec444(i, {
+          dialogueHighlights: [0, 2, 3].includes(i) ? themed444 : [],
+          revelation: [1, 4].includes(i) ? 'A truth is disclosed here.' : null,
+        }),
+      );
+      const res = await runT444(recs444cNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_REVELATION_AFTERMATH_SILENT'), 'THEME_REVELATION_AFTERMATH_SILENT should not fire');
+    });
+  });
+
   describe('Wave 430 — themePass: dramatic turn aftermath silent, peak unmotivated, resonance emotionally lopsided', async () => {
     const makeRec430 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
