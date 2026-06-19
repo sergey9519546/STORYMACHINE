@@ -28175,6 +28175,101 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 460 — beliefPass: assertion causal vacuum, revelation suspense deflation, assertion payoff decoupled', async () => {
+    const makeRec460 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      seededClueIds: [], payoffSetupIds: [], revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], dramaticTurn: 'nothing',
+      purpose: 'development', unresolvedClues: [],
+      ...overrides,
+    });
+    const runB460 = async (records: any[]) => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ASSERTION_CAUSAL_VACUUM fires when every assertion has no narrative trigger in prior 2 scenes', async () => {
+      // n=10; revelation at scene 0 (satisfies witnessedBeliefs≥1); assertions at 5,7,9
+      // Prior 2 scenes before each assertion have no revelation/turn/suspenseDelta>1 → all vacuous
+      const recs460a = Array.from({ length: 10 }, (_, i) =>
+        makeRec460(i, {
+          revelation: i === 0 ? 'The letter was forged.' : null,
+          dialogueHighlights: [5, 7, 9].includes(i) ? [`CHAR: She claims it was not her.`] : [],
+        }),
+      );
+      const res = await runB460(recs460a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ASSERTION_CAUSAL_VACUUM'), 'ASSERTION_CAUSAL_VACUUM should fire');
+    });
+
+    it('ASSERTION_CAUSAL_VACUUM does NOT fire when at least one assertion follows a narrative trigger', async () => {
+      // n=10; revelation at 0; assertions at 5,7,9; scene 4 has dramaticTurn='reversal'
+      // Checking assertion at 5: records[4].dramaticTurn='reversal'≠'nothing' → not vacuous → no fire
+      const recs460anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec460(i, {
+          revelation: i === 0 ? 'The letter was forged.' : null,
+          dramaticTurn: i === 4 ? 'reversal' : 'nothing',
+          dialogueHighlights: [5, 7, 9].includes(i) ? [`CHAR: She claims it was not her.`] : [],
+        }),
+      );
+      const res = await runB460(recs460anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ASSERTION_CAUSAL_VACUUM'), 'ASSERTION_CAUSAL_VACUUM should not fire');
+    });
+
+    it('REVELATION_SUSPENSE_DEFLATION fires when aftermath of revelations averages negative suspenseDelta', async () => {
+      // n=8; revelations at scenes 1,3,5 (pos 1,3,5 < 7); next scenes 2,4,6 have suspenseDelta=-1,-1,-2
+      // avg = (-1 + -1 + -2)/3 = -4/3 < 0 → fires
+      const recs460b = Array.from({ length: 8 }, (_, i) =>
+        makeRec460(i, {
+          revelation: [1, 3, 5].includes(i) ? `Truth ${i}` : null,
+          suspenseDelta: [2, 4, 6].includes(i) ? (i === 6 ? -2 : -1) : 0,
+          dialogueHighlights: i === 0 ? ['CHAR: He insists she is innocent.'] : [],
+        }),
+      );
+      const res = await runB460(recs460b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_SUSPENSE_DEFLATION'), 'REVELATION_SUSPENSE_DEFLATION should fire');
+    });
+
+    it('REVELATION_SUSPENSE_DEFLATION does NOT fire when aftermath average is non-negative', async () => {
+      // n=8; revelations at 1,3,5; scene 2 → -1, scene 4 → -1, scene 6 → +3
+      // avg = (-1 + -1 + 3)/3 = 1/3 ≥ 0 → no fire
+      const recs460bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec460(i, {
+          revelation: [1, 3, 5].includes(i) ? `Truth ${i}` : null,
+          suspenseDelta: i === 2 ? -1 : i === 4 ? -1 : i === 6 ? 3 : 0,
+          dialogueHighlights: i === 0 ? ['CHAR: He insists she is innocent.'] : [],
+        }),
+      );
+      const res = await runB460(recs460bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_SUSPENSE_DEFLATION'), 'REVELATION_SUSPENSE_DEFLATION should not fire');
+    });
+
+    it('ASSERTION_PAYOFF_DECOUPLED fires when assertion scenes and payoff scenes never overlap', async () => {
+      // n=8; assertions at 1,3 (dialogueHighlights); payoffs at 5,7 (payoffSetupIds); no overlap → fires
+      const recs460c = Array.from({ length: 8 }, (_, i) =>
+        makeRec460(i, {
+          dialogueHighlights: [1, 3].includes(i) ? ['CHAR: She claims the map is false.'] : [],
+          payoffSetupIds: [5, 7].includes(i) ? ['setup-001'] : [],
+        }),
+      );
+      const res = await runB460(recs460c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ASSERTION_PAYOFF_DECOUPLED'), 'ASSERTION_PAYOFF_DECOUPLED should fire');
+    });
+
+    it('ASSERTION_PAYOFF_DECOUPLED does NOT fire when an assertion scene coincides with a payoff', async () => {
+      // n=8; assertions at 1,3; payoffs at 3,7 — scene 3 has both assertion AND payoff → no fire
+      const recs460cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec460(i, {
+          dialogueHighlights: [1, 3].includes(i) ? ['CHAR: She claims the map is false.'] : [],
+          payoffSetupIds: [3, 7].includes(i) ? ['setup-001'] : [],
+        }),
+      );
+      const res = await runB460(recs460cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ASSERTION_PAYOFF_DECOUPLED'), 'ASSERTION_PAYOFF_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 446 — beliefPass: revelation drought, assertion reactive void, negative scene revelation void', async () => {
     const makeRec446 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

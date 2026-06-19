@@ -78,6 +78,17 @@
 // revelation void (no negative-emotional scene ever coincides with a revelation — hard moments
 // are quarantined from disclosure; co-occurrence × negative-valence × revelation-absence mode,
 // orthogonal to REVELATION_DRAMA_VACUUM which checks revelation scenes for neutrality).
+// Wave 460 additions: assertion causal vacuum (every assertion scene is unpreceded by any
+// revelation, dramatic turn, or high-suspense event in the 2 prior scenes — claims drop from
+// narrative vacuum with no story pressure motivating them; backward-cause × full assertion
+// population, first check examining assertions as the EFFECT rather than the CAUSE), revelation
+// suspense deflation (the average suspenseDelta of the scene immediately following each qualifying
+// revelation is < 0 — disclosures consistently trigger falling tension rather than escalation;
+// average/aggregate × aftermath × revelation × suspense direction, the first aggregate check on
+// the post-revelation zone), assertion payoff decoupled (no assertion scene shares a scene with
+// any payoffSetupIds — verbal declarations never coincide with narrative resolutions; co-occurrence
+// × assertion × payoff, the payoff-side complement of TOLD_BELIEF_SEED_DECOUPLED which checks
+// the seed side).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1960,6 +1971,109 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
           suggestedFix: `Move at least one revelation into a scene with a negative emotional shift — or write a revelatory moment that lands as bad news rather than a neutral or positive fact. The emotional register of a discovery shapes how it is received: a truth that costs the character something in the moment of its arrival carries more weight than one that arrives into equanimity.`,
         });
       }
+    }
+  }
+
+  // ── Wave 460: ASSERTION_CAUSAL_VACUUM, REVELATION_SUSPENSE_DEFLATION, ASSERTION_PAYOFF_DECOUPLED ──
+
+  // ASSERTION_CAUSAL_VACUUM (backward-cause × full assertion population, n≥10, ≥3 assertions,
+  // ≥1 revelation): Every assertion scene (dialogueHighlights with ':') has no revelation, no
+  // dramatic turn, and no high-suspense event (suspenseDelta > 1) in either of the 2 scenes
+  // immediately preceding it. When no story pressure has just occurred to motivate a character
+  // to stake a claim, assertions read as unmotivated exposition drops rather than live dramatic
+  // stakes born of narrative urgency.
+  // Distinctness: REVELATION_UNPREPARED_CLIMAX (Wave 432) applies backward-cause to the FINAL
+  // revelation looking backward for a prior assertion. This applies backward-cause to EVERY
+  // ASSERTION looking backward for a narrative trigger (revelation/turn/suspense-spike) — the
+  // reverse direction and a different event population. TOLD_BELIEF_DRAMATIC_TURN_DECOUPLED
+  // (Wave 348) is a co-occurrence check (assertion and turn sharing the SAME scene). This checks
+  // two PRIOR scenes, not the assertion scene itself. First backward-cause check with the
+  // assertion as the downstream effect rather than the cause.
+  if (records.length >= 10 && toldBeliefs.length >= 3 && witnessedBeliefs.length >= 1) {
+    const assertionSceneIdxs460a = [...new Set(toldBeliefs.map(t => t.sceneIdx))];
+    const allAssertionsVacuous460a = assertionSceneIdxs460a.every(idx => {
+      const pos460a = records.findIndex(r => r.sceneIdx === idx);
+      if (pos460a < 1) return true;
+      for (let back = 1; back <= 2 && pos460a - back >= 0; back++) {
+        const prior = (records as any[])[pos460a - back];
+        if (prior.revelation !== null && prior.revelation !== undefined && prior.revelation !== '') return false;
+        if ((prior.dramaticTurn ?? 'nothing') !== 'nothing') return false;
+        if ((prior.suspenseDelta ?? 0) > 1) return false;
+      }
+      return true;
+    });
+    if (allAssertionsVacuous460a) {
+      issues.push({
+        location: `${assertionSceneIdxs460a.length} assertion scene(s) — no narrative trigger in prior 2 scenes`,
+        rule: 'ASSERTION_CAUSAL_VACUUM',
+        severity: 'minor',
+        description: `Each of the ${assertionSceneIdxs460a.length} scene(s) where a character makes an assertion is preceded by no revelation, no dramatic turn, and no high-suspense moment in the prior two scenes — assertions drop into the story from a narrative vacuum. When no story event has just occurred to motivate a character to declare their position, told beliefs read as unmotivated exposition rather than as live stakes born of narrative pressure.`,
+        suggestedFix: 'Motivate assertions narratively: have a character state what they believe because something just happened — a discovery they are reacting to, a dramatic turn that forced the question, or a surge of tension where committing to a claim feels urgent. An assertion earned by prior story pressure is a dramatic stake; one that drops from nowhere is exposition.',
+      });
+    }
+  }
+
+  // REVELATION_SUSPENSE_DEFLATION (average/aggregate × aftermath × revelation × suspense direction,
+  // n≥8, ≥3 qualifying revelations not in last record): The average suspenseDelta of the scene
+  // immediately following each qualifying revelation is < 0. Disclosures consistently trigger
+  // falling tension — the story treats revelations as release valves that calm the narrative
+  // rather than as detonators that escalate it.
+  // Distinctness: REVELATION_SUSPENSE_DECOUPLED (Wave 295) averages suspenseDelta OF revelation
+  // scenes themselves (the revelation-as-context population). This averages suspenseDelta OF THE
+  // SCENE AFTER each revelation (aftermath-as-context) — the first aggregate check on the
+  // post-revelation zone. REVELATION_AFTERMATH_ABSENT (Wave 225) requires suspenseDelta ≠ 0 as
+  // "active aftermath" and fires when completely flat (= 0). This fires when aftermath IS
+  // numerically active but uniformly negative — a different population (falling vs. flat) and
+  // a different failure mode (wrong direction vs. no direction).
+  if (records.length >= 8 && witnessedBeliefs.length >= 3) {
+    const qualRev460b = witnessedBeliefs.filter(w => {
+      const pos460b = records.findIndex(r => r.sceneIdx === w.sceneIdx);
+      return pos460b >= 0 && pos460b < records.length - 1;
+    });
+    if (qualRev460b.length >= 3) {
+      let totalAftermath460b = 0;
+      for (const w of qualRev460b) {
+        const pos460b = records.findIndex(r => r.sceneIdx === w.sceneIdx);
+        totalAftermath460b += ((records as any[])[pos460b + 1].suspenseDelta ?? 0);
+      }
+      const avgAftermath460b = totalAftermath460b / qualRev460b.length;
+      if (avgAftermath460b < 0) {
+        issues.push({
+          location: `${qualRev460b.length} revelation aftermath(s) — avg next-scene suspenseDelta ${avgAftermath460b.toFixed(2)}`,
+          rule: 'REVELATION_SUSPENSE_DEFLATION',
+          severity: 'minor',
+          description: `The scene immediately following each of the ${qualRev460b.length} qualifying revelation(s) averages a suspenseDelta of ${avgAftermath460b.toFixed(2)} — disclosures consistently trigger falling tension. When every discovery is followed by a calmer scene, revelations function as resolution beats rather than escalators: they answer questions without creating new pressure. The most effective disclosures raise the stakes for what comes next; revelations whose aftermath is uniformly a tension drop feel like endings rather than turning points.`,
+          suggestedFix: 'Engineer at least one revelation whose aftermath raises tension: stage the scene after the disclosure so that what was learned makes the next action more dangerous, more urgent, or more contested. A revelation that immediately creates a new problem generates forward momentum; one that immediately calms the pressure it arrived with is a conclusion wearing the costume of a midpoint.',
+        });
+      }
+    }
+  }
+
+  // ASSERTION_PAYOFF_DECOUPLED (co-occurrence × assertion × payoff, n≥8, ≥2 assertion scenes,
+  // ≥2 payoff scenes): No scene where a character asserts a belief (dialogueHighlights with ':')
+  // also carries payoffSetupIds — verbal declarations and narrative resolutions never share a
+  // scene. A confession, a truth finally spoken because planted evidence forced it, or a claim
+  // delivered as the payoff of a long-running setup is among the most satisfying structural
+  // moments available; when assertions and payoffs are on separate tracks, the verbal belief
+  // layer misses its most structurally resonant delivery slot.
+  // Distinctness: TOLD_BELIEF_SEED_DECOUPLED (Wave 404) checks assertion × seededClueIds (the
+  // evidence-planting/setup SIDE of the same structural axis). This checks assertion ×
+  // payoffSetupIds (the evidence-resolution/payoff SIDE). REVELATION_PAYOFF_DECOUPLED (Wave 404)
+  // checks revelation × payoff — a different belief-event type. All other told-belief
+  // co-occurrence checks (clock, dramatic turn, relationship, suspense-peak, curiosity-peak,
+  // seed) audit different co-signal populations; payoff is a genuinely empty cell.
+  if (records.length >= 8) {
+    const assertionSceneIdxSet460c = new Set<number>(toldBeliefs.map(t => t.sceneIdx));
+    const payoffRecs460c = (records as any[]).filter(r => ((r.payoffSetupIds ?? []) as any[]).length > 0);
+    if (assertionSceneIdxSet460c.size >= 2 && payoffRecs460c.length >= 2 &&
+        !payoffRecs460c.some(r => assertionSceneIdxSet460c.has(r.sceneIdx))) {
+      issues.push({
+        location: 'Assertion scenes × payoff scenes — decoupled',
+        rule: 'ASSERTION_PAYOFF_DECOUPLED',
+        severity: 'minor',
+        description: `The story has ${assertionSceneIdxSet460c.size} scene(s) where a character asserts a belief and ${payoffRecs460c.length} scenes that pay off planted setups, but none share a scene — verbal declarations and narrative resolutions never converge. A confession extracted by planted evidence, a truth spoken because the setup left no other option, or a claim delivered as the structural payoff of a long-running promise is among the most satisfying moments available. When assertions and payoffs are architecturally separate, the belief layer misses its most resonant delivery slot.`,
+        suggestedFix: 'Stage at least one assertion as a payoff: let a character make their declaration at the moment when planted evidence, a long-running setup, or a structural promise comes due. The confession that arrives because everything points to it — the assertion made because the setup left no other option — fuses the belief layer and the narrative resolution layer into a single, doubly-satisfying beat.',
+      });
     }
   }
 
