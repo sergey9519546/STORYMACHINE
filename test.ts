@@ -20060,6 +20060,87 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 454 — payoffPass: payoff causeless, clue seed causeless, clue seed consecutive run', async () => {
+    const makeRec454 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain454 = (n: number) =>
+      Array.from({ length: n }, (_, i) =>
+        `INT. SC${i} - DAY\n\nAction line for scene ${i}.`
+      ).join('\n\n');
+    const runPay454 = async (records: any[]) => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      const fountain = makeFountain454(records.length);
+      return payoffPass({ fountain, original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PAYOFF_CAUSELESS fires when all payoffs lack an upstream trigger in prior 3 scenes', async () => {
+      // 8 scenes: scenes 4 and 6 have payoffs; no scene in 1-3 or 3-5 has revelation/turn/suspense
+      const recs454a = Array.from({ length: 8 }, (_, i) =>
+        makeRec454(i, { payoffSetupIds: [4, 6].includes(i) ? ['s1'] : [] }),
+      );
+      const res = await runPay454(recs454a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'PAYOFF_CAUSELESS'), 'PAYOFF_CAUSELESS should fire');
+    });
+
+    it('PAYOFF_CAUSELESS does not fire when at least one payoff has an upstream dramatic turn', async () => {
+      // 8 scenes: scene 3 has dramaticTurn='reversal'; scene 4 has payoff → upstream trigger present
+      const recs454anr = Array.from({ length: 8 }, (_, i) =>
+        makeRec454(i, {
+          payoffSetupIds: [4, 6].includes(i) ? ['s1'] : [],
+          dramaticTurn: i === 3 ? 'reversal' : 'nothing',
+        }),
+      );
+      const res = await runPay454(recs454anr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'PAYOFF_CAUSELESS'), 'PAYOFF_CAUSELESS should not fire');
+    });
+
+    it('CLUE_SEED_CAUSELESS fires when all seed scenes lack upstream curiosity/emotion/revelation', async () => {
+      // 8 scenes: scenes 3, 5, 6 plant clues; no preceding scene has curiosityDelta>0, emotionalShift, or revelation
+      const recs454b = Array.from({ length: 8 }, (_, i) =>
+        makeRec454(i, { seededClueIds: [3, 5, 6].includes(i) ? ['c1'] : [] }),
+      );
+      const res = await runPay454(recs454b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'CLUE_SEED_CAUSELESS'), 'CLUE_SEED_CAUSELESS should fire');
+    });
+
+    it('CLUE_SEED_CAUSELESS does not fire when at least one seed is preceded by a curiosity rise', async () => {
+      // 8 scenes: scene 4 has curiosityDelta=1; scene 5 plants a clue → upstream momentum present
+      const recs454bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec454(i, {
+          seededClueIds: [3, 5, 6].includes(i) ? ['c1'] : [],
+          curiosityDelta: i === 4 ? 1 : 0,
+        }),
+      );
+      const res = await runPay454(recs454bnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'CLUE_SEED_CAUSELESS'), 'CLUE_SEED_CAUSELESS should not fire');
+    });
+
+    it('CLUE_SEED_CONSECUTIVE_RUN fires when 3+ consecutive scenes each plant a clue', async () => {
+      // 10 scenes: scenes 2, 3, 4 each plant a clue (run of 3) → should fire
+      const recs454c = Array.from({ length: 10 }, (_, i) =>
+        makeRec454(i, { seededClueIds: [2, 3, 4].includes(i) ? ['c1'] : [] }),
+      );
+      const res = await runPay454(recs454c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'CLUE_SEED_CONSECUTIVE_RUN'), 'CLUE_SEED_CONSECUTIVE_RUN should fire');
+    });
+
+    it('CLUE_SEED_CONSECUTIVE_RUN does not fire when max consecutive seed run is only 2', async () => {
+      // 10 scenes: seeds at 2,3 (run=2), 6,7 (run=2) — max run = 2, should not fire
+      const recs454cnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec454(i, { seededClueIds: [2, 3, 6, 7].includes(i) ? ['c1'] : [] }),
+      );
+      const res = await runPay454(recs454cnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'CLUE_SEED_CONSECUTIVE_RUN'), 'CLUE_SEED_CONSECUTIVE_RUN should not fire');
+    });
+  });
+
   describe('Wave 440 — payoffPass: payoff backloaded, payoff emotional recoil absent, payoff suspense recoil absent', async () => {
     const makeRec440 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

@@ -75,6 +75,14 @@
 // (no payoff scene is followed by a suspenseDelta > 0 within 2 scenes — resolutions never create
 // new pressure downstream; sequence/aftermath × suspense channel, completing the aftermath-channel
 // family alongside curiosity/seed and emotional recoil).
+// Wave 454 additions: payoff causeless (backward-cause × payoff signal — no payoff scene is
+// preceded in the prior 3 scenes by any narrative escalation: no revelation, no dramatic turn,
+// no high-suspense push — resolutions arrive without momentum building toward them), clue seed
+// causeless (backward-cause × clue-seed signal — no seed scene is preceded in the prior 2
+// scenes by curiosity, emotional charge, or a revelation — evidence planted into narrative dead
+// air), clue seed consecutive run (run-based × clue-seed signal — 3+ consecutive scenes each
+// plant a new clue, an "evidence avalanche" that overwhelms the audience with simultaneous
+// information before they can form emotional attachment to individual threads).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1876,6 +1884,127 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `None of the story's ${qualPayoffs440c.length} payoff scenes (that have at least 2 scenes following them) is followed by a positive suspenseDelta within the next two scenes — resolutions never generate new pressure downstream. When threads close, the resolution should often precipitate new tension: the answer reveals a worse problem, the closed loop exposes a deeper danger, the completed arc unmasks something lurking behind it. When every payoff's aftermath is suspense-flat, the resolutions feel like endpoints rather than turning points — they close the old without opening the new pressure that would keep the audience leaning forward.`,
           suggestedFix: 'Let at least one payoff create new pressure in the scene or two that follow: resolve one thread in a way that immediately exposes a deeper problem, use the answer to a question to reveal that the stakes were higher than the audience knew, or let the closing of one loop open a worse one. The payoff that generates suspense in its aftermath is more powerful than the one that simply concludes — it tells the audience that resolutions are not safe harbours but transitions to the next danger.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 454: PAYOFF_CAUSELESS, CLUE_SEED_CAUSELESS, CLUE_SEED_CONSECUTIVE_RUN ──
+
+  // PAYOFF_CAUSELESS — Backward-cause × payoff signal (n≥8, ≥2 payoffs, all payoffs
+  // lack an upstream trigger in the prior 3 scenes). When no payoff is preceded by a
+  // revelation, a dramatic turn, or a high-suspense push in the 3 scenes before it,
+  // resolutions arrive without any narrative momentum building toward them: threads
+  // close because the plot requires it, not because something happened to make the
+  // audience feel the resolution was earned. Backward-cause mode × payoff signal.
+  // Distinct from PAYOFF_REVELATION_DISCONNECT (Wave 289: co-occurrence — payoffs fire
+  // without revelations in the SAME or nearby scene; this is backward-cause checking the
+  // PRIOR 3 scenes for ANY escalating trigger: revelation OR dramatic turn OR suspense peak),
+  // PAYOFF_PRECEDES_SETUP (Wave 261: temporal ordering — payoff before setup causality;
+  // this is about upstream momentum, not ordering), and all aftermath checks (Waves 426/440:
+  // look FORWARD from payoff, not backward at what preceded it).
+  if (records.length >= 8) {
+    const payoffIdxs454a = (records as any[])
+      .map((r, i) => (((r.payoffSetupIds ?? []) as string[]).length > 0 ? i : -1))
+      .filter(i => i >= 0);
+    if (payoffIdxs454a.length >= 2) {
+      const hasUpstreamTrigger454a = (idx: number): boolean => {
+        for (let off = 1; off <= 3; off++) {
+          if (idx - off < 0) continue;
+          const prev = (records as any[])[idx - off];
+          if ((prev.revelation ?? null) === true) return true;
+          if ((prev.dramaticTurn ?? 'nothing') !== 'nothing') return true;
+          if ((prev.suspenseDelta ?? 0) > 1) return true;
+        }
+        return false;
+      };
+      const allCauseless454a = payoffIdxs454a.every(idx => !hasUpstreamTrigger454a(idx));
+      if (allCauseless454a) {
+        issues.push({
+          location: `All ${payoffIdxs454a.length} payoff scene(s) — no upstream narrative trigger`,
+          rule: 'PAYOFF_CAUSELESS',
+          severity: 'minor',
+          description: `None of the story's ${payoffIdxs454a.length} payoff scenes is preceded by a revelation, a dramatic turn, or a high-suspense moment (suspenseDelta > 1) in the prior three scenes — resolutions arrive without any narrative escalation building toward them. Payoffs feel earned when the three preceding scenes have been building pressure, revealing new information, or pivoting the story: the audience senses the resolution is inevitable because something caused it. When every payoff fires into narrative dead air, the thread closures feel mechanically obligatory rather than dramatically necessary — they conclude because the plot requires them to, not because the story has generated the momentum that makes their arrival feel right.`,
+          suggestedFix: `Before at least one payoff scene, build upstream momentum in the prior two or three scenes: surface a revelation that makes the resolution inevitable, include a dramatic turn that recontextualizes the thread, or raise suspense so that the payoff arrives as release rather than random event. The three scenes before a payoff are the runway — give the resolution somewhere to land from.`,
+        });
+      }
+    }
+  }
+
+  // CLUE_SEED_CAUSELESS — Backward-cause × clue-seed signal (n≥8, ≥3 seed scenes, all
+  // seeds lack upstream momentum in prior 2 scenes). When no clue-seeding scene is preceded
+  // by a curiosity rise, an emotional charge, or a revelation in the 2 scenes before it,
+  // evidence is planted into narrative dead air: the audience has no reason to notice or
+  // retain the clue because nothing has heightened their attention immediately before it.
+  // Distinct from PAYOFF_CAUSELESS (Wave 454, above: backward-cause × payoff — different
+  // target signal and different upstream triggers checked), CLUE_SEED_CURIOSITY_FLAT (Wave
+  // 328: the seed scene's own curiosityDelta ≤ 0 — a co-occurrence check on the scene itself;
+  // this is backward-cause checking the PRIOR scenes for evidence-priming momentum),
+  // CLUE_SEED_REVELATION_DECOUPLED (Wave 398: co-occurrence — seed and revelation never
+  // in the same scene; this checks whether upstream revelation preceded the seed by 1-2 scenes).
+  if (records.length >= 8) {
+    const seedIdxs454b = (records as any[])
+      .map((r, i) => (((r.seededClueIds ?? []) as string[]).length > 0 ? i : -1))
+      .filter(i => i >= 0);
+    if (seedIdxs454b.length >= 3) {
+      const hasUpstreamMomentum454b = (idx: number): boolean => {
+        for (let off = 1; off <= 2; off++) {
+          if (idx - off < 0) continue;
+          const prev = (records as any[])[idx - off];
+          if ((prev.curiosityDelta ?? 0) > 0) return true;
+          if ((prev.emotionalShift ?? 'neutral') !== 'neutral') return true;
+          if ((prev.revelation ?? null) === true) return true;
+        }
+        return false;
+      };
+      const allSeedCauseless454b = seedIdxs454b.every(idx => !hasUpstreamMomentum454b(idx));
+      if (allSeedCauseless454b) {
+        issues.push({
+          location: `All ${seedIdxs454b.length} clue-seeding scene(s) — no upstream priming`,
+          rule: 'CLUE_SEED_CAUSELESS',
+          severity: 'minor',
+          description: `None of the story's ${seedIdxs454b.length} clue-seeding scenes is preceded by a curiosity rise, an emotional shift, or a revelation in the prior two scenes — evidence is planted into narrative dead air. Clues land best when the audience is already heightened: a curiosity rise makes them lean in and notice new information, a preceding revelation primes them to receive more, an emotional charge makes them alert. When every clue is planted without any upstream priming, the audience has no reason to register the evidence at the moment of planting — the seed fails to take root because the soil has not been prepared.`,
+          suggestedFix: `Before at least one clue-seeding scene, prime the audience with a curiosity rise, a revelation, or an emotional moment in the scene or two before it. When a clue is planted immediately after the audience has been made alert — a revelation that raises a new question, an emotional peak that has them leaning in — the evidence is more likely to register and be retained. Even a small curiosity push in the preceding scene can function as a priming signal that makes the clue feel significant rather than incidental.`,
+        });
+      }
+    }
+  }
+
+  // CLUE_SEED_CONSECUTIVE_RUN — Run-based × clue-seed signal (n≥10, ≥3 seed scenes,
+  // max consecutive seed run ≥ 3). Three or more consecutive scenes each planting a new
+  // clue creates an "evidence avalanche" — the audience is overwhelmed with simultaneous
+  // information before they can form emotional attachment to any individual thread. The most
+  // memorable clues are those planted in isolation, given room to register before the next
+  // one arrives. Run-based mode × clue-seed signal.
+  // Distinct from PAYOFF_CONSECUTIVE_RUN (Wave 426: run-based × payoff signal — a parallel
+  // check for resolution clustering on the payoff side of the machine; this checks the planting
+  // side), CLUSTERED_PAYOFFS (Wave 154: many payoffs in ONE scene — single-scene bloat, not a
+  // consecutive-scene run), SETUP_PAYOFF_DEAD_RUN (Wave 342: run-based × both signals absent
+  // — a dead stretch with no seeds or payoffs; this fires on the opposite problem, a live stretch
+  // with seeds in every consecutive scene), and LATE_MAJORITY_CLUE_SEEDING (Wave 275:
+  // distribution/timing — >60% of seeds in second half, a global distribution check).
+  if (records.length >= 10) {
+    const isSeedScene454c = (records as any[]).map(r => (((r.seededClueIds ?? []) as string[]).length > 0));
+    const totalSeeds454c = isSeedScene454c.filter(Boolean).length;
+    if (totalSeeds454c >= 3) {
+      let maxSeedRun454c = 0, curSeedRun454c = 0;
+      let maxSeedRunStart454c = -1, curSeedRunStart454c = -1;
+      for (let i = 0; i < records.length; i++) {
+        if (isSeedScene454c[i]) {
+          if (curSeedRun454c === 0) curSeedRunStart454c = i;
+          if (++curSeedRun454c > maxSeedRun454c) {
+            maxSeedRun454c = curSeedRun454c;
+            maxSeedRunStart454c = curSeedRunStart454c;
+          }
+        } else { curSeedRun454c = 0; }
+      }
+      if (maxSeedRun454c >= 3) {
+        issues.push({
+          location: `Scenes ${maxSeedRunStart454c + 1}–${maxSeedRunStart454c + maxSeedRun454c}: consecutive clue-seeding run`,
+          rule: 'CLUE_SEED_CONSECUTIVE_RUN',
+          severity: 'minor',
+          description: `A run of ${maxSeedRun454c} consecutive scenes each plant a new clue — an evidence avalanche that delivers multiple new threads to the audience simultaneously without space to absorb them. The most memorable clues are planted in isolation: given a scene to breathe in, allowed to register before the next mystery arrives. When three or more seeds land back-to-back, the audience's finite attention is divided across all of them simultaneously, reducing each thread's individual impact. A concentrated seed-run also signals structural front-loading — the planting machinery is overactive in one zone while other zones have nothing to wonder about.`,
+          suggestedFix: `Spread the clue-seeding across the run — intersperse at least one non-seed scene between consecutive plants. Use the non-seed scene to give the most recent clue room to breathe: a character reaction, a quiet beat where the implication lands, or simply a scene that does not introduce new evidence. An isolated clue — placed alone, given space — registers more deeply and generates more sustained curiosity than a cluster of three planted in rapid succession.`,
         });
       }
     }
