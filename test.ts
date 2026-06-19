@@ -21260,6 +21260,84 @@ I always listen.
     });
   });
 
+  describe('Wave 451 — intentionPass: proactive relationship aftermath absent, seed emotional decoupled, seed cause void', async () => {
+    const makeRec451 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runInt451 = async (records: any[]) => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      return intentionPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PROACTIVE_RELATIONSHIP_AFTERMATH_ABSENT fires when all proactive acts have no relational aftermath', async () => {
+      // n=10, proactive acts at 1, 4, 7 (clockRaised); aftermath scenes 2,3 / 5,6 / 8,9 have no rel shifts → fires
+      const recs451a = Array.from({ length: 10 }, (_, i) => makeRec451(i));
+      recs451a[1] = makeRec451(1, { clockRaised: true });
+      recs451a[4] = makeRec451(4, { clockRaised: true });
+      recs451a[7] = makeRec451(7, { clockRaised: true });
+      const res = await runInt451(recs451a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PROACTIVE_RELATIONSHIP_AFTERMATH_ABSENT'), 'PROACTIVE_RELATIONSHIP_AFTERMATH_ABSENT should fire');
+    });
+
+    it('PROACTIVE_RELATIONSHIP_AFTERMATH_ABSENT does not fire when a proactive act is followed by a relationship shift', async () => {
+      // n=10, proactive at 1; scene 2 has a relationship shift → no fire
+      const recs451anr = Array.from({ length: 10 }, (_, i) => makeRec451(i));
+      recs451anr[1] = makeRec451(1, { clockRaised: true });
+      recs451anr[2] = makeRec451(2, { relationshipShifts: [{ pairKey: 'A|B', dimension: 'trust', amount: 0.4 }] });
+      recs451anr[4] = makeRec451(4, { clockRaised: true });
+      recs451anr[7] = makeRec451(7, { clockRaised: true });
+      const res = await runInt451(recs451anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PROACTIVE_RELATIONSHIP_AFTERMATH_ABSENT'), 'PROACTIVE_RELATIONSHIP_AFTERMATH_ABSENT should not fire');
+    });
+
+    it('SEED_EMOTIONAL_DECOUPLED fires when all seed scenes are emotionally neutral', async () => {
+      // n=10, 4 seed scenes all neutral → fires
+      const recs451b = Array.from({ length: 10 }, (_, i) => makeRec451(i));
+      recs451b[1] = makeRec451(1, { seededClueIds: ['c1'], emotionalShift: 'neutral' });
+      recs451b[3] = makeRec451(3, { seededClueIds: ['c2'], emotionalShift: 'neutral' });
+      recs451b[6] = makeRec451(6, { seededClueIds: ['c3'], emotionalShift: 'neutral' });
+      recs451b[8] = makeRec451(8, { seededClueIds: ['c4'], emotionalShift: 'neutral' });
+      const res = await runInt451(recs451b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_EMOTIONAL_DECOUPLED'), 'SEED_EMOTIONAL_DECOUPLED should fire');
+    });
+
+    it('SEED_EMOTIONAL_DECOUPLED does not fire when at least one seed scene has an emotional charge', async () => {
+      // n=10, 3 seed scenes: 2 neutral + 1 negative → no fire
+      const recs451bnr = Array.from({ length: 10 }, (_, i) => makeRec451(i));
+      recs451bnr[1] = makeRec451(1, { seededClueIds: ['c1'], emotionalShift: 'neutral' });
+      recs451bnr[3] = makeRec451(3, { seededClueIds: ['c2'], emotionalShift: 'neutral' });
+      recs451bnr[6] = makeRec451(6, { seededClueIds: ['c3'], emotionalShift: 'negative' });
+      const res = await runInt451(recs451bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_EMOTIONAL_DECOUPLED'), 'SEED_EMOTIONAL_DECOUPLED should not fire');
+    });
+
+    it('SEED_CAUSE_VOID fires when all seed scenes have no upstream dramatic trigger', async () => {
+      // n=10, 3 seed scenes at 2, 5, 8; all neutral, no turns, no revelation, no curiosity spike, prior scenes also inert → fires
+      const recs451c = Array.from({ length: 10 }, (_, i) => makeRec451(i));
+      recs451c[2] = makeRec451(2, { seededClueIds: ['c1'] });
+      recs451c[5] = makeRec451(5, { seededClueIds: ['c2'] });
+      recs451c[8] = makeRec451(8, { seededClueIds: ['c3'] });
+      const res = await runInt451(recs451c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_CAUSE_VOID'), 'SEED_CAUSE_VOID should fire');
+    });
+
+    it('SEED_CAUSE_VOID does not fire when a seed scene has a dramatic turn as upstream trigger', async () => {
+      // n=10, 3 seed scenes; scene 5 has dramaticTurn='reversal' (self-trigger) → no fire
+      const recs451cnr = Array.from({ length: 10 }, (_, i) => makeRec451(i));
+      recs451cnr[2] = makeRec451(2, { seededClueIds: ['c1'] });
+      recs451cnr[5] = makeRec451(5, { seededClueIds: ['c2'], dramaticTurn: 'reversal' });
+      recs451cnr[8] = makeRec451(8, { seededClueIds: ['c3'] });
+      const res = await runInt451(recs451cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_CAUSE_VOID'), 'SEED_CAUSE_VOID should not fire');
+    });
+  });
+
   describe('Wave 437 — intentionPass: seed run isolated, proactive zone imbalance, seed clockless', async () => {
     const makeRec437 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

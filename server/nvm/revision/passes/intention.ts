@@ -69,6 +69,14 @@
 // underweight/bloat × initiative distribution, first four-zone audit of imbalance), seed clockless
 // (all seed scenes have no clock pressure — threads always planted in calm moments, never under
 // urgency; co-occurrence/decoupling × seed × clock, first seed × clock intersection check).
+// Wave 451 additions: proactive relationship aftermath absent (≥3 proactive acts all followed by
+// 2 scenes with no relationship shift — initiative never moves any relationship downstream;
+// sequence/aftermath × relationship × proactive, fourth aftermath check completing the family),
+// seed emotional decoupled (≥3 seed scenes all emotionally neutral — threads planted at room
+// temperature with no emotional charge attached; co-occurrence × seed × emotional channel),
+// seed cause void (≥3 seed scenes all lacking any upstream dramatic trigger in themselves or
+// the prior scene — clues arrive in a dramatic vacuum with no primed attention; backward-cause ×
+// seed channel, first backward-cause check for seeds).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2002,6 +2010,112 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `All ${seedRecs437c.length} clue-seeding scenes are planted without any clock pressure (clockRaised = false, clockDelta ≤ 0 in every case) — threads are always introduced in moments of calm. A seed planted while a clock is running signals to the audience that this information is urgent: a question introduced under time pressure carries a built-in deadline, and the audience holds it with more tension than a question introduced in a quiet moment. When every clue arrives during a lull, the seeding engine and the urgency engine are entirely decoupled — threads feel like background texture rather than strategically timed intelligence.`,
           suggestedFix: 'Let at least one clue be planted in a scene where a clock is running or time pressure is elevated: a seed planted as a deadline looms, during an escalating confrontation, or at a moment when the protagonist is under pressure to act quickly. The urgency does not need to be explicitly about the clue — it simply needs to co-exist with the new question, so the audience receives the thread in a heightened state rather than a relaxed one.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 451: PROACTIVE_RELATIONSHIP_AFTERMATH_ABSENT, SEED_EMOTIONAL_DECOUPLED, SEED_CAUSE_VOID ──
+
+  // PROACTIVE_RELATIONSHIP_AFTERMATH_ABSENT (minor, n≥8, ≥3 proactive acts): Every proactive act
+  // (clock raised or clue planted) is followed by 2 scenes where no relationship shift occurs —
+  // the protagonist's initiative never moves any bond in the scenes that follow it. Proactive
+  // agency that generates no relational consequence teaches the audience that the protagonist's
+  // actions exist in a social vacuum: pressing forward achieves plot goals while leaving the cast's
+  // bonds untouched. Sequence/aftermath mode × relationship channel × proactive axis. Completes
+  // the proactive-aftermath family alongside PROACTIVE_EMOTIONAL_RECOIL_ABSENT (Wave 395: emotional
+  // aftermath), PROACTIVE_SUSPENSE_AFTERMATH_ABSENT (Wave 409: suspense aftermath), and PROACTIVE_
+  // AFTERMATH_CURIOSITY_ABSENT (Wave 423: curiosity aftermath) — this adds the relationship channel,
+  // the fourth and final member of the set. Distinct from PROACTIVE_RELATIONSHIP_VOID (Wave 339:
+  // proactive scenes themselves carry no relationship shift — audits the act itself; this audits
+  // the 2 scenes after) and AGENCY_WITHOUT_CONSEQUENCE (Wave 216: broad inertia over suspense/
+  // relationship/revelation combined — not relationship-channel specific).
+  if (n >= 8) {
+    const proactiveRecs451a = (records as any[]).filter(r =>
+      r.clockRaised === true || ((r.seededClueIds ?? []) as string[]).length > 0,
+    );
+    if (proactiveRecs451a.length >= 3) {
+      const allRelSilent451a = proactiveRecs451a.every((r: any) => {
+        const idx = (records as any[]).indexOf(r);
+        for (let off = 1; off <= 2; off++) {
+          if (idx + off >= n) continue;
+          if (((records as any[])[idx + off].relationshipShifts ?? []).length > 0) return false;
+        }
+        return true;
+      });
+      if (allRelSilent451a) {
+        issues.push({
+          location: 'All proactive aftermath scenes — relationships silent',
+          rule: 'PROACTIVE_RELATIONSHIP_AFTERMATH_ABSENT',
+          severity: 'minor',
+          description: `All ${proactiveRecs451a.length} proactive acts (clocks raised or clues planted) are each followed by 2 scenes with no relationship shift — the protagonist's initiative never moves any bond in the scenes that follow it. Proactive agency without relational downstream consequence teaches the audience that the protagonist's actions exist in a social vacuum: pressing forward achieves plot goals while leaving the cast's relationships untouched by each choice. Initiative that changes the world but doesn't move the people in it lands as logistics rather than drama.`,
+          suggestedFix: "Let at least one proactive act ripple into a relationship: the scene or two after a protagonist's decisive move should show a bond reacting — a new trust formed, an alliance strained, a partnership altered by what the protagonist just did. When a character's initiative changes a relationship, the audience feels the full weight of agency: not just that the protagonist did something, but that doing it cost or earned something between people.",
+        });
+      }
+    }
+  }
+
+  // SEED_EMOTIONAL_DECOUPLED (minor, n≥8, ≥3 seed scenes): Every scene that plants a clue
+  // (seededClueIds non-empty) carries a neutral emotional shift — no seed scene is a moment of
+  // heightened feeling. Threads planted in emotionally inert scenes arrive as information delivered
+  // at room temperature: the audience receives the new question without any emotional activation
+  // to make it stick. A seed planted in a scene that also carries a positive or negative emotional
+  // charge imprints the question on the audience with the feeling attached — they hold the thread
+  // harder because of the emotional context. Seeds delivered exclusively in neutral scenes feel like
+  // background exposition. Co-occurrence mode × seed channel × emotional channel. Distinct from
+  // SEEDING_CURIOSITY_FLAT (Wave 300: avg curiosityDelta ≤ 0 in seed scenes — curiosity channel,
+  // not emotion; continuous delta not categorical valence), SEED_DRAMA_DECOUPLED (Wave 423: no
+  // dramatic turn in seed scenes — turn channel), and SEED_CLOCKLESS (Wave 437: no clock in seed
+  // scenes — urgency channel): this is the first check to audit the emotional channel in seed scenes.
+  if (n >= 8) {
+    const seedRecs451b = (records as any[]).filter(r =>
+      ((r.seededClueIds ?? []) as string[]).length > 0,
+    );
+    if (seedRecs451b.length >= 3 && seedRecs451b.every(r => (r as any).emotionalShift === 'neutral')) {
+      issues.push({
+        location: `All ${seedRecs451b.length} seed scene(s) — emotionally neutral`,
+        rule: 'SEED_EMOTIONAL_DECOUPLED',
+        severity: 'minor',
+        description: `All ${seedRecs451b.length} clue-seeding scenes carry a neutral emotional shift — every new thread is planted in a moment of flat feeling. A question introduced while a character is in emotional turmoil or elation is imprinted with that feeling and held harder; a question introduced in a neutral scene arrives as room-temperature information. When every seed is delivered in a calm, emotionally inert moment, the threads feel like background exposition rather than charged foreshadowing — the audience catalogs the question without feeling why it matters.`,
+        suggestedFix: "Plant at least one clue in a scene that also carries an emotional charge: a seed delivered during a moment of grief, triumph, or fear carries the feeling with it, making the thread harder to forget. The emotional activation attaches to the question — the audience holds it not just intellectually but physically. Move one seed into a scene where a character (and the audience) is already feeling something.",
+      });
+    }
+  }
+
+  // SEED_CAUSE_VOID (minor, n≥8, ≥3 seed scenes): Every clue-seeding scene has no dramatic
+  // upstream trigger in itself or the scene immediately before it — no revelation surfacing, no
+  // dramatic turn (≠ 'nothing'), no curiosity spike (curiosityDelta > 0), no emotional activation
+  // (≠ 'neutral'). Every thread is planted in a vacuum: no heightened attention primes the
+  // audience to receive the new question. Seeds planted during dramatic peaks are noticed and
+  // retained; seeds delivered exclusively in calm, undramatic moments are background information
+  // the audience catalogs without registering as significant. Backward-cause mode × seed channel.
+  // Distinct from SEED_DRAMA_DECOUPLED (Wave 423: no dramatic turn IN the seed scene itself —
+  // single-signal in-scene co-occurrence; this looks at the prior scene too, backward-cause mode,
+  // and combines multiple upstream triggers), SEEDING_CURIOSITY_FLAT (Wave 300: curiosity generated
+  // BY seeds downstream; this audits what triggers seeds upstream — opposite direction), SEED_
+  // CLOCKLESS (Wave 437: clock signal, co-occurrence mode; this is backward-cause across revelation/
+  // turn/curiosity/emotion). First backward-cause check for the seed channel.
+  if (n >= 8) {
+    const seedRecs451c = (records as any[]).filter(r =>
+      ((r.seededClueIds ?? []) as string[]).length > 0,
+    );
+    if (seedRecs451c.length >= 3) {
+      const isUpstreamTrigger451c = (r: any): boolean =>
+        r.revelation !== null ||
+        (r.dramaticTurn ?? 'nothing') !== 'nothing' ||
+        (r.curiosityDelta ?? 0) > 0 ||
+        r.emotionalShift !== 'neutral';
+      const allUncaused451c = seedRecs451c.every((r: any) => {
+        const idx = (records as any[]).indexOf(r);
+        return !isUpstreamTrigger451c(r) && (idx === 0 || !isUpstreamTrigger451c((records as any[])[idx - 1]));
+      });
+      if (allUncaused451c) {
+        issues.push({
+          location: `All ${seedRecs451c.length} seed scene(s) — no upstream trigger`,
+          rule: 'SEED_CAUSE_VOID',
+          severity: 'minor',
+          description: `Every clue-seeding scene (seededClueIds non-empty) has no upstream dramatic trigger in itself or the immediately preceding scene — no revelation, no dramatic turn, no curiosity spike, and no emotional activation. Every thread arrives in a dramatic vacuum: there is no heightened alertness to anchor the seed in memory. Seeds planted adjacent to revelations, turns, emotional beats, or curiosity spikes land when the audience is maximally attentive and embed more deeply; seeds planted exclusively in calm, undramatic moments are background information the audience catalogs without registering as significant.`,
+          suggestedFix: "Attach at least one seed to a dramatic event: plant a clue in (or immediately after) a scene with a revelation, a dramatic turn, a moment of high curiosity, or an emotional peak. The surrounding drama primes the audience to notice the new thread — they are already leaning forward and alert when the question arrives. A seed planted in a dramatic vacuum may technically be in the story without ever entering the audience's awareness.",
         });
       }
     }
