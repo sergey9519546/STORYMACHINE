@@ -64,6 +64,16 @@
 // (>20% of dialogue lines simultaneously hedge AND end in a question mark — doubly-tentative
 // speech that neither the hedging-opener nor the interrogative-saturation rate check would catch
 // alone; co-occurrence mode on the conjunction of two tics).
+// Wave 445 additions: dialogue question run (run-based — ≥4 consecutive dialogue lines all end
+// with "?", a sustained interrogation chain where no one answers; the first run-based check on
+// the question-mark channel, distinct from DIALOGUE_INTERROGATIVE_SATURATION's global proportion
+// and from DIALOGUE_I_OPENER_RUN's opener channel), action scene intro heavy (average/aggregate
+// × positional — the first action line per scene averages ≥2× the word count of all subsequent
+// action lines in those scenes; the first positional-average check in this pass, comparing line
+// position within scenes rather than the global corpus), dialogue declarative aftermath question
+// (sequence/aftermath — every declarative dialogue line that is not the last is immediately
+// followed by a question, so every statement triggers an interrogation; distinct from
+// DIALOGUE_QUESTION_RUN which catches local consecutive question clusters).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2168,6 +2178,140 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `${hedgedQ431} of ${dlg431.length} dialogue lines (${Math.round(hedgedQ431 / dlg431.length * 100)}%) are both hedged AND phrased as questions ("Maybe we should… go?", "I think it's the right one?"). The doubly-tentative line qualifies itself twice over — it neither asserts nor commits to asking — so characters who default to it can never apply pressure. The cumulative effect is a scene that perpetually defers: no one states, no one demands, every beat dissolves into a softened query.`,
           suggestedFix: 'Pick one register per line and commit to it. Turn a hedged question into a clean assertion ("Maybe we should go?" → "We\'re going.") or a direct question ("Is this the right one?"), reserving the tentative-query form for the rare moment a character is genuinely both unsure and probing. Conviction — even wrong conviction — gives a scene the forward pressure that perpetual hedging drains.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 445: DIALOGUE_QUESTION_RUN, ACTION_SCENE_INTRO_HEAVY, DIALOGUE_DECLARATIVE_AFTERMATH_QUESTION ──
+  {
+    const dlg445: string[] = [];
+    let inDlg445 = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg445 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg445 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg445 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg445) dlg445.push(t);
+    }
+
+    // DIALOGUE_QUESTION_RUN (run-based, ≥10 dialogue lines, maxRun≥4): Four or more consecutive
+    // dialogue lines each end with "?" — nobody in the exchange answers anything across the run.
+    // Questions beget questions without resolution, assertion, or commitment, draining the scene
+    // of forward direction. A run of 4+ consecutive question-ending lines is a local accumulation
+    // pattern that a global proportion check can entirely miss.
+    // Distinctness: DIALOGUE_INTERROGATIVE_SATURATION (Wave 294) fires when >30% of ALL lines
+    // end with "?" — a global rate. DIALOGUE_HEDGED_QUESTION_FLOOD (Wave 431) is a co-occurrence
+    // mode (hedge + question simultaneously). DIALOGUE_I_OPENER_RUN (Wave 431) is run-based but
+    // on "I" openers, not "?"-closers. This is the FIRST run-based check on the question-mark
+    // channel: a global rate of 29% would miss 4 consecutive questions at the start of a scene.
+    if (dlg445.length >= 10) {
+      let curQ445a = 0, maxQ445a = 0;
+      for (const line of dlg445) {
+        if (line.trimEnd().endsWith('?')) {
+          if (++curQ445a > maxQ445a) maxQ445a = curQ445a;
+        } else {
+          curQ445a = 0;
+        }
+      }
+      if (maxQ445a >= 4) {
+        issues.push({
+          location: 'Dialogue exchange',
+          rule: 'DIALOGUE_QUESTION_RUN',
+          severity: 'minor',
+          description: `${maxQ445a} consecutive dialogue lines each end with a question mark — nobody answers anything across the run. When questions beget questions in an unbroken chain, the scene never moves forward: each line defers dramatic pressure back to the other speaker, creating a conversational loop with no resolution, assertion, or commitment. The exchange reads as mutual interrogation rather than dramatic encounter.`,
+          suggestedFix: `Break the question chain by having at least one line assert, state, or commit rather than ask. The strongest dramatic move after a question is often a statement — not necessarily an answer, but an unexpected declaration that reframes the inquiry. Even "I don't care" or "That's not what matters" advances the scene more than another question.`,
+        });
+      }
+    }
+
+    // ACTION_SCENE_INTRO_HEAVY (average/aggregate × positional, ≥6 qualifying scenes, avgIntro >10w,
+    // avgIntro > avgBody × 2.0): The first action line in each scene (when it precedes any dialogue)
+    // averages ≥2× the word count of all subsequent action lines in those same scenes. Scene
+    // introductions are systematically over-verbose: the establishing description is bloated relative
+    // to the scene's ongoing prose. A well-paced screenplay enters scenes already in motion and trusts
+    // the drama to fill the space. When scene openings are consistently heavier than the rest, the
+    // writer front-loads each scene with an exhaustive establishing shot rather than a lean entry.
+    // Distinctness: No existing check compares word count of the FIRST action line per scene to
+    // the REST of that scene's action lines. All existing length checks audit the GLOBAL action-line
+    // corpus without distinguishing line position within the scene. This is the first positional/
+    // average check in voice.ts: comparing the establishing vs. body action lines.
+    {
+      const siIntros445: number[] = [];
+      const siBodys445: number[] = [];
+      let siInScene445 = false;
+      let siFirstActSeen445 = false;
+      let siDlgBeforeAct445 = false;
+      let siInDlg445 = false;
+      for (const line of allLines) {
+        const t = line.trim();
+        if (!t) { siInDlg445 = false; continue; }
+        if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) {
+          siInScene445 = true;
+          siFirstActSeen445 = false;
+          siDlgBeforeAct445 = false;
+          siInDlg445 = false;
+          continue;
+        }
+        if (!siInScene445) continue;
+        if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) {
+          siInDlg445 = true;
+          if (!siFirstActSeen445) siDlgBeforeAct445 = true;
+          continue;
+        }
+        if (/^\(/.test(t)) continue;
+        if (siInDlg445) continue;
+        // Action line
+        const wc445 = t.split(/\s+/).filter(Boolean).length;
+        if (!siFirstActSeen445 && !siDlgBeforeAct445) {
+          siIntros445.push(wc445);
+          siFirstActSeen445 = true;
+        } else {
+          siBodys445.push(wc445);
+          if (!siFirstActSeen445) siFirstActSeen445 = true;
+        }
+      }
+      const qualCount445 = Math.min(siIntros445.length, siIntros445.length); // = siIntros445.length
+      if (qualCount445 >= 6 && siBodys445.length >= 6) {
+        const avgIntro445 = siIntros445.reduce((s, v) => s + v, 0) / siIntros445.length;
+        const avgBody445 = siBodys445.reduce((s, v) => s + v, 0) / siBodys445.length;
+        if (avgIntro445 > 10 && avgBody445 > 0 && avgIntro445 > avgBody445 * 2.0) {
+          issues.push({
+            location: `Scene-opening action lines (${qualCount445} scenes checked)`,
+            rule: 'ACTION_SCENE_INTRO_HEAVY',
+            severity: 'minor',
+            description: `Across ${qualCount445} scenes, the first action line averages ${avgIntro445.toFixed(1)} words — ${(avgIntro445 / avgBody445).toFixed(1)}× the ${avgBody445.toFixed(1)}-word average of subsequent action lines in those scenes. Scene introductions are systematically heavier than the rest of the prose. A well-paced screenplay enters scenes in motion: the establishing description should be lean, trusting the drama to fill the space. When every scene-opening line is a verbose inventory, the script habitually front-loads with an exhaustive interior shot rather than an efficient point-of-entry.`,
+            suggestedFix: 'Trim the opening action line of each scene to its single most important visual detail. Cut to the establishing fact and let the scene begin — the audience infers the rest of the room from what is dramatic rather than what is listed. Reserve long establishing description for the story\'s opening scene; for subsequent scenes, enter mid-motion.',
+          });
+        }
+      }
+    }
+
+    // DIALOGUE_DECLARATIVE_AFTERMATH_QUESTION (sequence/aftermath, ≥10 dialogue lines, ≥3 qualifying
+    // declarative lines): Every declarative dialogue line (not ending in "?" or "!") that is not the
+    // last dialogue line is immediately followed by a question-ending line. When every statement
+    // automatically triggers an interrogation, dialogue collapses into an interrogation loop: nothing
+    // a character asserts is allowed to land — it is always met with another question rather than a
+    // response that advances the scene or accepts the assertion.
+    // Distinctness: DIALOGUE_QUESTION_RUN (this wave) fires when ≥4 CONSECUTIVE question-ending lines
+    // cluster locally. DIALOGUE_DECLARATIVE_AFTERMATH_QUESTION is orthogonal: it can fire with only
+    // alternating declarative/question pairs (maxRun=1, never triggering QUESTION_RUN), as long as
+    // EVERY declarative is followed by a question. No existing check tracks what follows a statement;
+    // this is the first aftermath check that pivots on the declarative line rather than the question.
+    if (dlg445.length >= 10) {
+      const qualDecl445c: number[] = [];
+      for (let i = 0; i < dlg445.length - 1; i++) {
+        const t = dlg445[i].trimEnd();
+        if (!t.endsWith('?') && !t.endsWith('!')) qualDecl445c.push(i);
+      }
+      if (qualDecl445c.length >= 3 && qualDecl445c.every(qi => dlg445[qi + 1].trimEnd().endsWith('?'))) {
+        issues.push({
+          location: `Dialogue — declarative aftermath (${qualDecl445c.length} statements, each immediately followed by a question)`,
+          rule: 'DIALOGUE_DECLARATIVE_AFTERMATH_QUESTION',
+          severity: 'minor',
+          description: `Every declarative dialogue line (${qualDecl445c.length} lines not ending in "?" or "!") is immediately followed by a question — no statement is ever allowed to land without triggering an interrogation. When every assertion is met with a question rather than a response that engages, accepts, or redirects it, dialogue becomes a loop: the script converts every moment of commitment into another round of inquiry, draining the cumulative forward pressure that declarations build.`,
+          suggestedFix: `Let some declarations be met with responses that engage rather than interrogate: an agreement, a counter-statement, a silence-then-action. Not every assertion needs to provoke a question; some of the most dramatically charged moments occur when a character's statement is simply received — acknowledged, deflected, or ignored — rather than immediately questioned. Reserve the declarative-triggers-question pattern for interrogation scenes where the power dynamic demands it.`,
         });
       }
     }

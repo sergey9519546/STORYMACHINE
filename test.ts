@@ -27682,6 +27682,109 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 445 — voicePass: dialogue question run, action scene intro heavy, dialogue declarative aftermath question', async () => {
+    const runV445 = async (fountain: string) => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      return voicePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    const dlgLine445 = (text: string) => `ALEX\n${text}`;
+    const dlgFountain445 = (lines: string[]) =>
+      `INT. ROOM - DAY\n\n${lines.map(dlgLine445).join('\n\n')}\n`;
+
+    it('DIALOGUE_QUESTION_RUN fires when ≥4 consecutive dialogue lines end with "?"', async () => {
+      // 10 dialogue lines; lines 2–5 each end with "?" → run of 4 ≥ 4 → fires
+      const lines445a = [
+        'We need to leave now.',
+        'Where are you going?',
+        'Why do you ask that?',
+        'What does it matter here?',
+        'Do you even care at all?',
+        'She crosses to the window.',
+        'He picks up the phone.',
+        'Tell me what you saw.',
+        'She closes the door.',
+        'He sits down quietly.',
+      ];
+      const res = await runV445(dlgFountain445(lines445a));
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_QUESTION_RUN'), 'DIALOGUE_QUESTION_RUN should fire');
+    });
+
+    it('DIALOGUE_QUESTION_RUN does NOT fire when question-ending lines never reach four in a row', async () => {
+      // Questions at positions 1,2,3 then non-question, then 5,6 then non-question — max run = 3
+      const lines445aNF = [
+        'We need to leave now.',
+        'Where are you going?',
+        'Why do you ask?',
+        'What does it matter?',
+        'She crosses to the window.',
+        'Do you even care?',
+        'Are you serious about this?',
+        'Tell me what you saw.',
+        'She closes the door.',
+        'He sits down quietly.',
+      ];
+      const res = await runV445(dlgFountain445(lines445aNF));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_QUESTION_RUN'), 'DIALOGUE_QUESTION_RUN should not fire');
+    });
+
+    it('ACTION_SCENE_INTRO_HEAVY fires when first action line per scene averages >2× subsequent action lines', async () => {
+      // 6 scenes: each with a long intro (~14w) and one short body line (~2w)
+      const introLine = 'She steps carefully through the doorway and surveys the room with practiced calm.';
+      const sceneF = (i: number) =>
+        `INT. SCENE${i} - DAY\n\n${introLine}\n\nHe nods.`;
+      const f445b = Array.from({ length: 6 }, (_, i) => sceneF(i)).join('\n\n');
+      const res = await runV445(f445b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_SCENE_INTRO_HEAVY'), 'ACTION_SCENE_INTRO_HEAVY should fire');
+    });
+
+    it('ACTION_SCENE_INTRO_HEAVY does NOT fire when scene intro and body action lines are similar lengths', async () => {
+      // 6 scenes: intro ~5w, body ~5w — ratio ≈ 1 < 2
+      const f445bNF = Array.from({ length: 6 }, (_, i) =>
+        `INT. SCENE${i} - DAY\n\nShe enters the room.\n\nHe follows her inside.`
+      ).join('\n\n');
+      const res = await runV445(f445bNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_SCENE_INTRO_HEAVY'), 'ACTION_SCENE_INTRO_HEAVY should not fire');
+    });
+
+    it('DIALOGUE_DECLARATIVE_AFTERMATH_QUESTION fires when every declarative is immediately followed by a question', async () => {
+      // 10 lines alternating: declarative at 0,2,4,6,8 each followed by question at 1,3,5,7,9
+      // qualDecl=[0,2,4,6,8] (5 >= 3), every dlg[qi+1] ends in '?'
+      // maxRun=1 (no two consecutive questions) so DIALOGUE_QUESTION_RUN does NOT co-fire
+      const lines445c = [
+        'She crosses to the window.',  // 0: declarative → dlg[1] ends '?'
+        'Where are you going?',        // 1: question
+        'I need some air.',            // 2: declarative → dlg[3] ends '?'
+        'Why do you need air?',        // 3: question
+        'He picks up the phone.',      // 4: declarative → dlg[5] ends '?'
+        'Who are you calling?',        // 5: question
+        'She closes the door.',        // 6: declarative → dlg[7] ends '?'
+        'Why did you do that?',        // 7: question
+        'Tell me what happened.',      // 8: declarative → dlg[9] ends '?'
+        'What do you mean exactly?',   // 9: question (last line — not checked as index)
+      ];
+      const res = await runV445(dlgFountain445(lines445c));
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_DECLARATIVE_AFTERMATH_QUESTION'), 'DIALOGUE_DECLARATIVE_AFTERMATH_QUESTION should fire');
+    });
+
+    it('DIALOGUE_DECLARATIVE_AFTERMATH_QUESTION does NOT fire when a declarative is followed by another declarative', async () => {
+      // dlg[0]='She crosses to the window.' (declarative) → dlg[1]='I need some air.' (not '?') → every() fails
+      const lines445cNF = [
+        'She crosses to the window.',  // 0: declarative → dlg[1]='I need some air.' — not '?' → no fire
+        'I need some air.',            // 1: declarative
+        'He picks up the phone.',      // 2: declarative → dlg[3]='Why do you need air?' ✓
+        'Why do you need air?',        // 3: question
+        'She closes the door.',        // 4: declarative → dlg[5]='Who are you calling?' ✓
+        'Who are you calling?',        // 5: question
+        'Tell me what happened.',      // 6: declarative → dlg[7]='Why did you do that?' ✓
+        'Why did you do that?',        // 7: question
+        'He looks at her.',            // 8: declarative → dlg[9]='I understand now.' — not '?' → fails
+        'I understand now.',           // 9: declarative
+      ];
+      const res = await runV445(dlgFountain445(lines445cNF));
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_DECLARATIVE_AFTERMATH_QUESTION'), 'DIALOGUE_DECLARATIVE_AFTERMATH_QUESTION should not fire');
+    });
+  });
+
   describe('Wave 431 — voicePass: dialogue I-opener run, dialogue length outlier, dialogue hedged-question flood', async () => {
     const runV431 = async (fountain: string) => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
