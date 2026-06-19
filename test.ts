@@ -19744,6 +19744,113 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 455 — relationshipArcPass: pair rupture unmotivated, relationship shift curiosity void, relationship warmth run', async () => {
+    const mkShift455 = (pairKey: string, amount: number) => [{ pairKey, dimension: 'trust', amount }];
+    const makeRec455 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const makeFountain455 = (n: number) =>
+      Array.from({ length: n }, (_, i) =>
+        `INT. SC${i} - DAY\n\nAction line for scene ${i}.`
+      ).join('\n\n');
+    const runR455 = async (records: any[]) => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const fountain = makeFountain455(records.length);
+      return relationshipArcPass({ fountain, original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PAIR_RUPTURE_UNMOTIVATED fires when all negative shifts lack upstream warmth/revelation/turn', async () => {
+      // 10 scenes: A|B has 3 shifts (positive at 1, negative at 5 and 8); but no preceding warmth/turn/revelation
+      // before scene 5: no positive shift for A|B in scenes 2-4, no revelation, no dramaticTurn
+      // before scene 8: no positive shift for A|B in scenes 5-7 (only the negative at 5, not ≥0.3), no revelation
+      // positive shift at 1, but it's more than 3 scenes before scene 5 → no motivation
+      const recs455a = Array.from({ length: 10 }, (_, i) =>
+        makeRec455(i, {
+          relationshipShifts: i === 1 ? mkShift455('A|B', 0.4)
+            : i === 5 ? mkShift455('A|B', -0.4)
+            : i === 8 ? mkShift455('A|B', -0.4)
+            : [],
+        }),
+      );
+      const res = await runR455(recs455a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'PAIR_RUPTURE_UNMOTIVATED'), 'PAIR_RUPTURE_UNMOTIVATED should fire');
+    });
+
+    it('PAIR_RUPTURE_UNMOTIVATED does not fire when a negative shift is preceded by a revelation', async () => {
+      // 10 scenes: A|B has 3 shifts (positive at 1, negative at 5 and 8); scene 4 has revelation=true → motivates rupture at 5
+      const recs455anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec455(i, {
+          relationshipShifts: i === 1 ? mkShift455('A|B', 0.4)
+            : i === 5 ? mkShift455('A|B', -0.4)
+            : i === 8 ? mkShift455('A|B', -0.4)
+            : [],
+          revelation: i === 4 ? true : null,
+        }),
+      );
+      const res = await runR455(recs455anr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'PAIR_RUPTURE_UNMOTIVATED'), 'PAIR_RUPTURE_UNMOTIVATED should not fire');
+    });
+
+    it('RELATIONSHIP_SHIFT_CURIOSITY_VOID fires when no shift is followed by curiosity in next 2 scenes', async () => {
+      // 8 scenes: shifts at scenes 2 and 5; no curiosityDelta > 0 in scenes 3,4,6,7
+      const recs455b = Array.from({ length: 8 }, (_, i) =>
+        makeRec455(i, {
+          relationshipShifts: [2, 5].includes(i) ? mkShift455('A|B', 0.4) : [],
+          curiosityDelta: 0,
+        }),
+      );
+      const res = await runR455(recs455b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'RELATIONSHIP_SHIFT_CURIOSITY_VOID'), 'RELATIONSHIP_SHIFT_CURIOSITY_VOID should fire');
+    });
+
+    it('RELATIONSHIP_SHIFT_CURIOSITY_VOID does not fire when a shift is followed by a curiosity rise', async () => {
+      // 8 scenes: shift at 2, curiosityDelta=1 at scene 3 (aftermath) → curiosity void resolved
+      const recs455bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec455(i, {
+          relationshipShifts: [2, 5].includes(i) ? mkShift455('A|B', 0.4) : [],
+          curiosityDelta: i === 3 ? 1 : 0,
+        }),
+      );
+      const res = await runR455(recs455bnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'RELATIONSHIP_SHIFT_CURIOSITY_VOID'), 'RELATIONSHIP_SHIFT_CURIOSITY_VOID should not fire');
+    });
+
+    it('RELATIONSHIP_WARMTH_RUN fires when 3+ consecutive scenes each carry a major positive shift', async () => {
+      // 8 scenes with 2 active pairs; scenes 3,4,5 each have a positive shift ≥0.3 → warmth run of 3
+      const recs455c = Array.from({ length: 8 }, (_, i) =>
+        makeRec455(i, {
+          relationshipShifts: [3, 4, 5].includes(i) ? mkShift455('A|B', 0.4)
+            : i === 0 ? mkShift455('C|D', -0.3)
+            : i === 7 ? mkShift455('C|D', -0.3)
+            : [],
+        }),
+      );
+      const res = await runR455(recs455c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'RELATIONSHIP_WARMTH_RUN'), 'RELATIONSHIP_WARMTH_RUN should fire');
+    });
+
+    it('RELATIONSHIP_WARMTH_RUN does not fire when max consecutive positive-shift run is only 2', async () => {
+      // 8 scenes: warmth at 3,4 (run=2), then 7 (run=1) — max = 2, should not fire
+      const recs455cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec455(i, {
+          relationshipShifts: [3, 4].includes(i) ? mkShift455('A|B', 0.4)
+            : i === 7 ? mkShift455('A|B', 0.4)
+            : i === 0 ? mkShift455('C|D', -0.3)
+            : i === 2 ? mkShift455('C|D', -0.3)
+            : [],
+        }),
+      );
+      const res = await runR455(recs455cnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'RELATIONSHIP_WARMTH_RUN'), 'RELATIONSHIP_WARMTH_RUN should not fire');
+    });
+  });
+
   describe('Wave 441 — relationshipArcPass: pair ensemble solo, pair rupture run, relationship climax void', async () => {
     const mkShift441 = (pairKey: string, amount: number) => [{ pairKey, dimension: 'trust', amount }];
     const makeRec441 = (idx: number, overrides: any = {}): any => ({

@@ -84,6 +84,15 @@
 // final 15% of scenes while ≥3 shifts from ≥2 pairs exist in the first 85% — the story's most
 // emotionally charged moment is relationally silent; zone presence/absence × final-zone, fills
 // the zone set alongside midpoint freeze and Act 2b desert).
+// Wave 455 additions: pair rupture unmotivated (backward-cause × negative shift × per-pair —
+// a pair's negative shifts are all preceded by no prior warmth for that pair, no revelation, and
+// no dramatic turn in the prior 3 scenes; ruptures arrive causeless, the mirror of PAIR_REPAIR_
+// UNMOTIVATED on the negative side), relationship shift curiosity void (sequence/aftermath ×
+// curiosity channel — no relationship-shift scene is followed by curiosityDelta > 0 in the next
+// 2 scenes; bonds move without generating new questions downstream, the curiosity-channel sibling
+// of RELATIONSHIP_SHIFT_AFTERMATH_VOID), relationship warmth run (run-based × positive-shift —
+// 3+ consecutive scenes each carry a major positive shift ≥ 0.3 from any pair; warmings avalanche
+// without breathing room, the positive mirror of PAIR_RUPTURE_RUN).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2060,6 +2069,134 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
           severity: 'minor',
           description: `The climax zone (final 15% of scenes: Scenes ${climaxStart441c}–${records.length - 1}) contains no relationship shift of magnitude ≥ 0.3, while ${earlyShiftCount441c} meaningful shifts from ${earlyPairs441c.size} pairs occur in the preceding ${climaxStart441c} scenes. The story's most emotionally charged structural zone is relationally silent: bonds do not move at the moment when the audience is most invested in them. For any story with meaningful relational arcs, the climax should register in the relationship layer — as a bond that finally breaks, finally mends, or reaches its most acute state.`,
           suggestedFix: `Give at least one pair a meaningful shift in the climax zone (Scenes ${climaxStart441c}–${records.length - 1}): the bond that the story has been tracing should reach its highest or lowest point at the climax rather than going quiet at the moment of maximum intensity. The relationship shift doesn't need to be the climax's primary focus — it can be a consequence, a cost, or a revelation — but the relational engine should not stall at the story's most emotionally loaded moment.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 455: PAIR_RUPTURE_UNMOTIVATED, RELATIONSHIP_SHIFT_CURIOSITY_VOID, RELATIONSHIP_WARMTH_RUN ──
+
+  // PAIR_RUPTURE_UNMOTIVATED — Backward-cause × negative shift × per-pair (n≥10, pair with ≥3
+  // shifts including ≥2 negative). A pair whose negative shifts (amount ≤ -0.3) are ALL preceded
+  // in the prior 3 scenes by neither: (a) a prior positive shift for this pair (warmth to destroy),
+  // (b) a revelation, nor (c) a dramatic turn. Ruptures arrive without any dramatic logic building
+  // toward them — bonds break because the plot requires it, not because any prior warmth is being
+  // damaged or any revelation/turn has recontextualised the relationship.
+  // Distinct from PAIR_REPAIR_UNMOTIVATED (Wave 427: same backward-cause mode × POSITIVE shifts —
+  // warmings arrive causeless; this is the negative-polarity mirror), RELATIONSHIP_UNEARNED_REVERSAL
+  // (Wave 147: a sign CHANGE with no prior setup in the immediately preceding scene — narrower
+  // backward window, requires sign flip, not just any negative shift), and MONOTONE_RELATIONSHIP
+  // (Wave 134: all shifts share the same sign globally, not backward-cause).
+  if (records.length >= 10) {
+    for (const [pairKey455a, stats455a] of pairStats) {
+      if (stats455a.shifts.length < 3) continue;
+      const negShifts455a = stats455a.shifts.filter(s => s.amount <= -0.3);
+      if (negShifts455a.length < 2) continue;
+
+      const anyNegMotivated455a = negShifts455a.some(shift => {
+        const si = shift.sceneIdx;
+        // (a) prior positive shift for THIS pair within 3 scenes
+        const priorWarmth = stats455a.shifts.some(
+          s => s.amount >= 0.3 && s.sceneIdx >= si - 3 && s.sceneIdx < si,
+        );
+        if (priorWarmth) return true;
+        // (b) revelation or dramatic turn in prior 3 scenes
+        for (let off = 1; off <= 3; off++) {
+          const prevIdx = si - off;
+          if (prevIdx < 0) continue;
+          const prev = (records as any[])[prevIdx];
+          if ((prev?.revelation ?? null) === true) return true;
+          if ((prev?.dramaticTurn ?? 'nothing') !== 'nothing') return true;
+        }
+        return false;
+      });
+
+      if (!anyNegMotivated455a) {
+        const [charA455a, charB455a] = pairKey455a.split('|');
+        issues.push({
+          location: `${charA455a} ↔ ${charB455a} — unmotivated rupture(s)`,
+          rule: 'PAIR_RUPTURE_UNMOTIVATED',
+          severity: 'minor',
+          description: `The bond between ${charA455a} and ${charB455a} has ${negShifts455a.length} negative shifts (amount ≤ -0.3), but none is preceded in the prior three scenes by a warming for this pair, a revelation, or a dramatic turn — ruptures arrive without narrative logic building toward them. Ruptures land best when they destroy something: a prior warmth being shattered, a truth coming to light that reframes the bond, or a story pivot that makes the break inevitable. Without one of these backward causes, each break feels arbitrary — the bond damages itself without dramatic justification, which teaches the audience that this relationship's state is not a consequence of anything.`,
+          suggestedFix: `Before at least one negative shift for ${charA455a} and ${charB455a}, build upstream cause: let a prior scene warm the bond (so the rupture destroys something), surface a revelation that recontextualises the relationship (so the break is a consequence of truth), or place a dramatic turn in the prior scene (so the plot's movement cracks the bond). A rupture that follows from something the audience witnessed feels inevitable rather than arbitrary.`,
+        });
+        break; // one report per pass
+      }
+    }
+  }
+
+  // RELATIONSHIP_SHIFT_CURIOSITY_VOID — Sequence/aftermath × curiosity channel × shift (n≥8,
+  // ≥2 qualifying shift scenes with 2+ scenes remaining). No relationship-shift scene is followed
+  // by a curiosityDelta > 0 in the next two scenes — bonds move without generating new questions
+  // downstream. When a relationship changes, the audience naturally wonders: what does this mean
+  // for the story? What happens next between these people? A curiosity rise in the aftermath
+  // converts a relational event into a forward-driving question. When every shift's aftermath is
+  // curiosity-flat, bonds change but the audience is given nothing new to wonder about — the
+  // relational movement has no intellectual forward momentum.
+  // Distinct from RELATIONSHIP_SHIFT_AFTERMATH_VOID (Wave 427: aftermath is relationally silent —
+  // checks whether further SHIFTS follow; this checks whether CURIOSITY rises follow — a different
+  // channel in the aftermath window), RELATIONSHIP_CURIOSITY_DECOUPLED (Wave 318: shift scenes
+  // average curiosityDelta ≤ 0 — same-scene co-occurrence, not aftermath), and PAIR_CURIOSITY_FLAT
+  // (Wave 399: per-pair average, not aftermath sequence).
+  if (records.length >= 8) {
+    const shiftScenes455b = (records as any[]).filter(
+      r => ((r.relationshipShifts ?? []) as any[]).length > 0 && r.sceneIdx + 2 < records.length,
+    );
+    if (shiftScenes455b.length >= 2) {
+      const anyAftermathCurio455b = shiftScenes455b.some(r => {
+        const next1 = (records as any[])[r.sceneIdx + 1];
+        const next2 = (records as any[])[r.sceneIdx + 2];
+        return ((next1?.curiosityDelta ?? 0) > 0) || ((next2?.curiosityDelta ?? 0) > 0);
+      });
+      if (!anyAftermathCurio455b) {
+        issues.push({
+          location: `All ${shiftScenes455b.length} qualifying shift scene(s) — curiosity void in aftermath`,
+          rule: 'RELATIONSHIP_SHIFT_CURIOSITY_VOID',
+          severity: 'minor',
+          description: `None of the story's ${shiftScenes455b.length} relationship-shift scenes (with room after them) is followed by a curiosity rise (curiosityDelta > 0) within the next two scenes — bonds move without generating any new questions downstream. When a relationship changes, the event should trigger the audience's forward-looking attention: what does the shift mean for the story, what do the characters do with the altered dynamic, what new complication does the changed bond introduce? Curiosity in the aftermath of a shift converts the relational event into forward narrative momentum. When every shift's aftermath is curiosity-flat, the audience is told a bond has changed but given nothing new to wonder about, and the relational engine produces movement without drive.`,
+          suggestedFix: `After at least one relationship shift, use the next scene or the one after to open a new question: surface an implication of the changed bond that the audience did not see coming, let the altered dynamic complicate a situation already in motion, or let a character wonder (and the audience share the wondering) what the changed relationship means. The moment after a bond moves is fertile ground for a new question — the audience is already emotionally engaged and primed to wonder what comes next.`,
+        });
+      }
+    }
+  }
+
+  // RELATIONSHIP_WARMTH_RUN — Run-based × positive-shift channel (n≥8, ≥2 active pairs, max
+  // consecutive warmth-scene run ≥ 3). Three or more consecutive scenes each carry at least one
+  // major positive shift (amount ≥ 0.3) from any pair — a warmth avalanche that delivers back-to-
+  // back reconciliations, repairs, or deepening bonds without any cooling or neutral space between
+  // them. Warmings land hardest when they are spaced: each positive move needs room to register
+  // before the next one arrives. A consecutive warmth run also makes the story's relational world
+  // feel frictionless — all the bonds are warming simultaneously without tension, setback, or the
+  // dramatic complications that make repair feel earned. Run-based mode × positive-shift channel.
+  // Distinct from PAIR_RUPTURE_RUN (Wave 441: same run-based mode × negative-shift — the polarity
+  // complement; this is the positive run), MONOTONE_RELATIONSHIP (Wave 134: per-pair uniform sign
+  // across the whole arc, not a consecutive-scene run), WARMTH_UNFELT (Wave 304: positive shifts in
+  // emotionally neutral scenes — a co-occurrence check on the scenes themselves), and POSITIVE_ONLY_
+  // PAIR_MAJORITY (Wave 318: >60% of pairs always warm — distribution, not run-based).
+  if (records.length >= 8) {
+    const activePairs455c = [...pairStats.entries()].filter(([, s]) => s.shifts.length >= 2);
+    if (activePairs455c.length >= 2) {
+      let maxWarmRun455c = 0, curWarmRun455c = 0;
+      let maxWarmStart455c = -1, curWarmStart455c = -1;
+      for (let i = 0; i < records.length; i++) {
+        const isWarm = ((records as any[])[i].relationshipShifts ?? []).some(
+          (s: any) => (s.amount ?? 0) >= 0.3,
+        );
+        if (isWarm) {
+          if (curWarmRun455c === 0) curWarmStart455c = i;
+          if (++curWarmRun455c > maxWarmRun455c) {
+            maxWarmRun455c = curWarmRun455c;
+            maxWarmStart455c = curWarmStart455c;
+          }
+        } else { curWarmRun455c = 0; }
+      }
+      if (maxWarmRun455c >= 3) {
+        issues.push({
+          location: `Scenes ${maxWarmStart455c}–${maxWarmStart455c + maxWarmRun455c - 1} — consecutive warmth run`,
+          rule: 'RELATIONSHIP_WARMTH_RUN',
+          severity: 'minor',
+          description: `Scenes ${maxWarmStart455c}–${maxWarmStart455c + maxWarmRun455c - 1} each carry at least one major positive relationship shift (amount ≥ 0.3) — ${maxWarmRun455c} consecutive scenes of back-to-back bond warmings with no neutral or rupture scene between them. Warmings land best when spaced: a positive move needs room to register before the next one arrives. A consecutive warmth run also signals a frictionless relational world — all bonds are improving simultaneously without any setback, complication, or tension to make the repairs feel earned. When warmth avalanches, each individual moment of connection is diluted by the one that immediately follows it.`,
+          suggestedFix: `Interrupt the warmth run at Scenes ${maxWarmStart455c}–${maxWarmStart455c + maxWarmRun455c - 1}: insert at least one non-warmth scene between consecutive positive moves. It need not be a rupture — it can be a neutral relational scene, a moment of uncertainty, or a beat where a character hesitates before fully committing to the repair. The non-warmth scene between warmings gives each positive moment space to breathe and makes the next warming feel earned rather than automatic.`,
         });
       }
     }
