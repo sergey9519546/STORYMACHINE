@@ -18713,6 +18713,100 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 458 — themePass: relationship decoupled, clock aftermath silent, all resonance causeless', async () => {
+    const makeRec458 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const THEME458 = 'redemption forgiveness courage';
+    const themed458 = ['act of redemption'];
+    const mkShift458 = (pk: string) => [{ pairKey: pk, dimension: 'trust', amount: -0.4 }];
+    const runT458 = async (records: any[]) => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: THEME458 },
+      });
+    };
+
+    it('THEME_RELATIONSHIP_DECOUPLED fires when all relationship-shift scenes are thematically silent', async () => {
+      // 8 scenes: relationship shifts at 1 and 4 (no theme); theme at 6 and 7 (no relationship shifts)
+      const recs458a = Array.from({ length: 8 }, (_, i) =>
+        makeRec458(i, {
+          relationshipShifts: [1, 4].includes(i) ? mkShift458('A|B') : [],
+          dialogueHighlights: [6, 7].includes(i) ? themed458 : [],
+        }),
+      );
+      const res = await runT458(recs458a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'THEME_RELATIONSHIP_DECOUPLED'), 'THEME_RELATIONSHIP_DECOUPLED should fire');
+    });
+
+    it('THEME_RELATIONSHIP_DECOUPLED does not fire when at least one relationship-shift scene carries the theme', async () => {
+      // 8 scenes: scene 4 has both relationship shift AND themed dialogue → overlap → no fire
+      const recs458anr = Array.from({ length: 8 }, (_, i) =>
+        makeRec458(i, {
+          relationshipShifts: [1, 4].includes(i) ? mkShift458('A|B') : [],
+          dialogueHighlights: [4, 7].includes(i) ? themed458 : [],
+        }),
+      );
+      const res = await runT458(recs458anr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'THEME_RELATIONSHIP_DECOUPLED'), 'THEME_RELATIONSHIP_DECOUPLED should not fire');
+    });
+
+    it('THEME_CLOCK_AFTERMATH_SILENT fires when no clock scene is followed by a resonant scene', async () => {
+      // 8 scenes: clock raised at 2 and 5; scene 3 and 6 (their aftermaths) are silent; theme at 0,1
+      const recs458b = Array.from({ length: 8 }, (_, i) =>
+        makeRec458(i, {
+          clockRaised: [2, 5].includes(i) ? true : false,
+          dialogueHighlights: [0, 1].includes(i) ? themed458 : [],
+        }),
+      );
+      const res = await runT458(recs458b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'THEME_CLOCK_AFTERMATH_SILENT'), 'THEME_CLOCK_AFTERMATH_SILENT should fire');
+    });
+
+    it('THEME_CLOCK_AFTERMATH_SILENT does not fire when at least one clock aftermath is resonant', async () => {
+      // 8 scenes: clock at 2; scene 3 has themed dialogue (aftermath is resonant) → no fire
+      const recs458bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec458(i, {
+          clockRaised: [2, 5].includes(i) ? true : false,
+          dialogueHighlights: [0, 3].includes(i) ? themed458 : [],
+        }),
+      );
+      const res = await runT458(recs458bnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'THEME_CLOCK_AFTERMATH_SILENT'), 'THEME_CLOCK_AFTERMATH_SILENT should not fire');
+    });
+
+    it('THEME_ALL_RESONANCE_CAUSELESS fires when all resonant scenes lack upstream revelation/turn/suspense', async () => {
+      // 8 scenes: themed at 3, 5, 7; no revelation/turn/high-suspense in prior 2 scenes of each
+      const recs458c = Array.from({ length: 8 }, (_, i) =>
+        makeRec458(i, {
+          dialogueHighlights: [3, 5, 7].includes(i) ? themed458 : [],
+        }),
+      );
+      const res = await runT458(recs458c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'THEME_ALL_RESONANCE_CAUSELESS'), 'THEME_ALL_RESONANCE_CAUSELESS should fire');
+    });
+
+    it('THEME_ALL_RESONANCE_CAUSELESS does not fire when at least one resonant scene has an upstream dramatic turn', async () => {
+      // 8 scenes: scene 2 has dramaticTurn='reversal'; scene 3 is themed → upstream cause → no fire
+      const recs458cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec458(i, {
+          dialogueHighlights: [3, 5, 7].includes(i) ? themed458 : [],
+          dramaticTurn: i === 2 ? 'reversal' : 'nothing',
+        }),
+      );
+      const res = await runT458(recs458cnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'THEME_ALL_RESONANCE_CAUSELESS'), 'THEME_ALL_RESONANCE_CAUSELESS should not fire');
+    });
+  });
+
   describe('Wave 444 — themePass: resonant cluster flood, long silent stretch, revelation aftermath silent', async () => {
     const makeRec444 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

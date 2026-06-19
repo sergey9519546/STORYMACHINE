@@ -80,6 +80,17 @@
 // every scene immediately following a revelation carries no theme though theme appears elsewhere;
 // the first aftermath check anchored to the revelation channel, distinct from dramatic-turn
 // aftermath and from the revelation-scenes-themselves check).
+// Wave 458 additions: relationship decoupled (co-occurrence/decoupling × relationship shift —
+// all scenes with non-empty relationshipShifts are thematically silent; bonds never move
+// in the same beat where the theme is voiced; the relationship-channel sibling of all
+// existing decoupled checks — clue/curiosity/payoff/turn/emotion/suspense/revelation/clock),
+// clock aftermath silent (sequence/aftermath × clock → theme — no clock-raised scene is
+// followed within 1 scene by theme resonance; every deadline passes without the next scene
+// picking up the thematic meaning; the aftermath sibling of THEME_CLOCK_RAISED_DECOUPLED),
+// all resonance causeless (backward-cause × all resonant scenes — every resonant scene is
+// preceded in the prior 2 scenes by no revelation, dramatic turn, or high suspense; theme
+// surfaces in narrative dead air; broader than THEME_PEAK_UNMOTIVATED which checks only
+// the single densest scene).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2108,6 +2119,109 @@ export async function themePass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `The scene immediately following every revelation (${revAftermaths444c.length} aftermath scene(s)) carries no language related to "${themeRaw}", even though the theme appears elsewhere. Post-revelation scenes are the most receptive windows for thematic delivery: the audience is actively recontextualising everything they know, primed to understand not just what happened but what it means. When every disclosure is followed by a thematically blank scene, the story's meaning-making never aligns with its information-delivery.`,
           suggestedFix: `Let at least one scene following a revelation carry "${themeRaw}": after a truth is disclosed, the next scene's reaction — a character's choice, an image, a line of dialogue — should briefly reflect what this revelation means in terms of the story's central question. The processing beat after a disclosure is the most powerful moment to make the audience feel not just the fact but its significance.`,
+        });
+      }
+    }
+
+    // ── Wave 458: THEME_RELATIONSHIP_DECOUPLED, THEME_CLOCK_AFTERMATH_SILENT, THEME_ALL_RESONANCE_CAUSELESS ──
+
+    // THEME_RELATIONSHIP_DECOUPLED (co-occurrence/decoupling × relationship shift channel, n≥8,
+    // ≥2 relationship-shift scenes): Every scene with non-empty `relationshipShifts` is thematically
+    // silent — bonds never move in the same beat where the theme is voiced. Relationship dynamics
+    // and thematic meaning operate on entirely separate tracks: the story explores its central question
+    // in some scenes and evolves its bonds in others, but the two never coincide. The most powerful
+    // scenes combine dramatic relationship movement with thematic resonance — a bond shift that also
+    // embodies or challenges the story's central question makes both the relationship and the theme
+    // feel necessary to each other. Co-occurrence mode × relationship shift channel.
+    // Distinct from all existing decoupled checks (THEME_CLUE_SCENES_DECOUPLED, THEME_CURIOSITY_
+    // SCENES_DECOUPLED, THEME_PAYOFF_SCENES_DECOUPLED, THEME_DRAMATIC_TURN_DECOUPLED, THEME_NEGATIVE_
+    // EMOTION_DECOUPLED, THEME_SUSPENSE_SCENES_DECOUPLED, THEME_REVELATION_DECOUPLED, THEME_CLOCK_
+    // SCENES_DECOUPLED — all in prior waves; this adds relationship shifts as a new co-occurrence
+    // signal, completing the relational engine's place in the theme co-occurrence family).
+    if (records.length >= 8 && resonantScenes.length >= 2) {
+      const relShiftScenes458a = records.filter(r =>
+        ((r.relationshipShifts ?? []) as any[]).length > 0,
+      );
+      if (relShiftScenes458a.length >= 2 &&
+          !relShiftScenes458a.some(r =>
+            sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+          )) {
+        issues.push({
+          location: `All ${relShiftScenes458a.length} relationship-shift scene(s) — thematically silent`,
+          rule: 'THEME_RELATIONSHIP_DECOUPLED',
+          severity: 'minor',
+          description: `All ${relShiftScenes458a.length} scenes that move a character bond (non-empty relationshipShifts) carry no language related to "${themeRaw}", even though ${resonantScenes.length} scenes carry the theme elsewhere. The story's relational engine and its thematic voice operate on entirely separate tracks: bonds shift in thematically silent scenes, and theme resonates in relationally inert ones. The most powerful scenes in any story combine these two registers — a bond that shifts in a scene that also speaks the central question makes both the relationship and the theme feel inevitable to each other, as if the story could not have been told without that specific convergence.`,
+          suggestedFix: `Give at least one relationship-shift scene a thematic dimension: let the dynamic between the characters embody the story's central question as it shifts — a reconciliation that dramatises "${themeRaw}", a rupture that challenges it, or a shift whose terms are framed by the theme's language. When a bond moves in a scene that also speaks the theme, the audience feels the meaning of the relationship and the meaning of the story simultaneously.`,
+        });
+      }
+    }
+
+    // THEME_CLOCK_AFTERMATH_SILENT (sequence/aftermath × clock → theme, n≥8, ≥2 qualifying
+    // clock-raised scenes with 1+ scene after them): No clock-raised scene is immediately followed
+    // by a scene carrying thematic resonance — every deadline passes without the next scene picking
+    // up the thematic meaning of the pressure. Clock scenes are among the most attention-heightened
+    // moments in a story: the audience is maximally alert when a countdown is running. The scene
+    // immediately following a deadline beat is the most receptive window for thematic delivery —
+    // the character just experienced maximum urgency, and the next scene can use that heightened
+    // state to ask what the deadline meant in terms of the story's central question.
+    // Distinct from THEME_CLOCK_RAISED_DECOUPLED (Wave 293: the clock scenes THEMSELVES carry no
+    // theme — co-occurrence within the same scene; this checks the NEXT scene after the clock fires,
+    // sequence/aftermath mode from a different structural position), and distinct from all other
+    // aftermath checks (dramatic turn aftermath, revelation aftermath — those use a different trigger).
+    if (records.length >= 8 && resonantScenes.length >= 2) {
+      const qualClockIdxs458b: number[] = [];
+      for (let i = 0; i < records.length - 1; i++) {
+        if ((records[i].clockRaised ?? false) === true) qualClockIdxs458b.push(i);
+      }
+      if (qualClockIdxs458b.length >= 2) {
+        const anyAftermathResonant458b = qualClockIdxs458b.some(idx => {
+          const next = records[idx + 1];
+          return next && sceneHasResonance(sceneTexts.get(next.sceneIdx) ?? '', expandedKeywords);
+        });
+        if (!anyAftermathResonant458b) {
+          issues.push({
+            location: `All ${qualClockIdxs458b.length} clock-raised scenes — thematically silent aftermath`,
+            rule: 'THEME_CLOCK_AFTERMATH_SILENT',
+            severity: 'minor',
+            description: `None of the story's ${qualClockIdxs458b.length} clock-raised scenes is immediately followed by a scene with thematic resonance related to "${themeRaw}". Clock scenes maximise audience attention — when a deadline is running, every scene carries heightened alertness. The scene immediately following a deadline beat is the most receptive window for thematic delivery: what did the pressure of that countdown mean in terms of the story's central question? When every clock scene is followed by a thematically silent scene, the deadline machinery generates urgency without meaning — the audience feels the temporal pressure but is never given the thematic frame that would tell them what was at stake beyond the surface event.`,
+            suggestedFix: `After at least one clock-raised scene, let the following scene pick up the theme of "${themeRaw}": a character reflects on what the deadline pressure revealed about themselves, or takes an action that embodies the story's central question under the urgency the deadline established. The scene after a deadline beat is when the meaning of the pressure can be crystallised most powerfully.`,
+          });
+        }
+      }
+    }
+
+    // THEME_ALL_RESONANCE_CAUSELESS (backward-cause × all resonant scenes, n≥8, ≥3 resonant
+    // scenes, every resonant scene lacks upstream cause in prior 2 scenes). Every scene that
+    // carries thematic language is preceded in the two scenes before it by no revelation,
+    // no dramatic turn, and no high suspense (suspenseDelta > 1). The story's thematic moments
+    // consistently surface in narrative dead air — theme appears without any of the structural
+    // triggers that most naturally motivate the audience to receive meaning: the relief after
+    // danger, the processing of a disclosure, the shift of direction from a pivot.
+    // Distinct from THEME_PEAK_UNMOTIVATED (Wave 430: backward-cause × the SINGLE DENSEST theme
+    // scene only; this fires when ALL resonant scenes are systematically causeless — a structural
+    // pattern, not an isolated peak), and from all sequence/aftermath checks (those look FORWARD
+    // from triggers for theme; this looks BACKWARD from resonant scenes for triggers).
+    if (records.length >= 8 && resonantScenes.length >= 3) {
+      const hasCause458c = (idx: number): boolean => {
+        for (let off = 1; off <= 2; off++) {
+          const prevIdx = idx - off;
+          if (prevIdx < 0) continue;
+          const prev = records[prevIdx];
+          if ((prev?.revelation ?? null) !== null && (prev?.revelation ?? '') !== '') return true;
+          if ((prev?.dramaticTurn ?? 'nothing') !== 'nothing') return true;
+          if ((prev?.suspenseDelta ?? 0) > 1) return true;
+        }
+        return false;
+      };
+      const resonantIdxs458c = resonantScenes.map(r => (records as any[]).indexOf(r));
+      const allResCauseless458c = resonantIdxs458c.every(idx => idx >= 0 && !hasCause458c(idx));
+      if (allResCauseless458c) {
+        issues.push({
+          location: `All ${resonantScenes.length} resonant scene(s) — no upstream narrative trigger`,
+          rule: 'THEME_ALL_RESONANCE_CAUSELESS',
+          severity: 'minor',
+          description: `None of the story's ${resonantScenes.length} thematically resonant scenes for "${themeRaw}" is preceded in the prior two scenes by a revelation, a dramatic turn, or a high-suspense moment — theme consistently surfaces in narrative dead air. The most powerful thematic moments arrive when the audience is already primed to receive meaning: a revelation that raises a question the theme then answers, a dramatic turn that has the characters re-examine what they believe, or tension that has been released in the scene that follows. When every resonant scene arrives without any of these upstream triggers, the theme feels structurally optional — it could be moved to any scene and mean the same thing, because it is never the consequence of anything that happened just before.`,
+          suggestedFix: `Before at least one resonant scene, plant a structural trigger in the prior two scenes: a revelation that makes the theme's central question land with specific urgency, a dramatic turn that forces the characters to grapple with what the story is about, or a suspense peak that the following thematic scene then reflects on. Theme that arrives as the consequence of something the audience just experienced feels earned rather than inserted.`,
         });
       }
     }
