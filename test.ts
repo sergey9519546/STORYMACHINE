@@ -29043,6 +29043,247 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 459 — voicePass: dialogue assertion run, dialogue single char domination, dialogue monologue unprompted', async () => {
+    const runV459 = async (fountain: string) => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      return voicePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DIALOGUE_ASSERTION_RUN fires when 5+ consecutive dialogue lines all end declaratively', async () => {
+      // 7 consecutive dialogue lines, none ending in '?' or '!' → max declarative run = 7 ≥ 5
+      const f459a = [
+        'INT. ROOM - DAY',
+        '',
+        'He sits down.',
+        '',
+        'ALICE',
+        'I think we should go tonight.',
+        '',
+        'BOB',
+        'The plan is ready and waiting.',
+        '',
+        'ALICE',
+        'We need to move before dawn.',
+        '',
+        'BOB',
+        'The timing works in our favor.',
+        '',
+        'ALICE',
+        'Everything has been arranged carefully.',
+        '',
+        'BOB',
+        'We have no reason to delay.',
+        '',
+        'ALICE',
+        'This is the only real option.',
+        '',
+        'BOB',
+        'Are you ready then?',
+        '',
+        'ALICE',
+        'Yes.',
+        '',
+        'BOB',
+        'Good.',
+      ].join('\n');
+      const res = await runV459(f459a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_ASSERTION_RUN'), 'DIALOGUE_ASSERTION_RUN should fire');
+    });
+
+    it('DIALOGUE_ASSERTION_RUN does not fire when max declarative run is only 4', async () => {
+      // Run of 4 declaratives, then a question, then more declaratives → max = 4 < 5
+      const f459anr = [
+        'INT. ROOM - DAY',
+        '',
+        'She enters.',
+        '',
+        'ALICE',
+        'I think we should go tonight.',
+        '',
+        'BOB',
+        'The plan is ready and waiting.',
+        '',
+        'ALICE',
+        'We need to move before dawn.',
+        '',
+        'BOB',
+        'The timing works in our favor.',
+        '',
+        'ALICE',
+        'Are you sure about this?',
+        '',
+        'BOB',
+        'Everything has been arranged.',
+        '',
+        'ALICE',
+        'We have no reason to delay.',
+        '',
+        'BOB',
+        'This is our only option.',
+        '',
+        'ALICE',
+        'Then we move at midnight.',
+      ].join('\n');
+      const res = await runV459(f459anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_ASSERTION_RUN'), 'DIALOGUE_ASSERTION_RUN should not fire');
+    });
+
+    it('DIALOGUE_SINGLE_CHAR_DOMINATION fires when one character has >70% of dialogue lines', async () => {
+      // ALICE has 8 lines, BOB 1, CAROL 1, DAN 1 → 8/11 ≈ 73% > 70%, 4 speakers ≥ 3
+      const f459b = [
+        'INT. ROOM - DAY',
+        '',
+        'She speaks.',
+        '',
+        'ALICE',
+        'Line one from Alice.',
+        '',
+        'ALICE',
+        'Line two from Alice.',
+        '',
+        'ALICE',
+        'Line three from Alice.',
+        '',
+        'ALICE',
+        'Line four from Alice.',
+        '',
+        'ALICE',
+        'Line five from Alice.',
+        '',
+        'ALICE',
+        'Line six from Alice.',
+        '',
+        'ALICE',
+        'Line seven from Alice.',
+        '',
+        'ALICE',
+        'Line eight from Alice.',
+        '',
+        'BOB',
+        'Bob speaks once.',
+        '',
+        'CAROL',
+        'Carol speaks once.',
+        '',
+        'DAN',
+        'Dan speaks once.',
+      ].join('\n');
+      const res = await runV459(f459b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_SINGLE_CHAR_DOMINATION'), 'DIALOGUE_SINGLE_CHAR_DOMINATION should fire');
+    });
+
+    it('DIALOGUE_SINGLE_CHAR_DOMINATION does not fire when no character exceeds 70%', async () => {
+      // ALICE 6, BOB 2, CAROL 2 → 6/10 = 60% < 70% → no fire
+      const f459bnr = [
+        'INT. ROOM - DAY',
+        '',
+        'They talk.',
+        '',
+        'ALICE',
+        'Line one.',
+        '',
+        'ALICE',
+        'Line two.',
+        '',
+        'ALICE',
+        'Line three.',
+        '',
+        'ALICE',
+        'Line four.',
+        '',
+        'ALICE',
+        'Line five.',
+        '',
+        'ALICE',
+        'Line six.',
+        '',
+        'BOB',
+        'Bob speaks.',
+        '',
+        'BOB',
+        'Bob again.',
+        '',
+        'CAROL',
+        'Carol speaks.',
+        '',
+        'CAROL',
+        'Carol again.',
+      ].join('\n');
+      const res = await runV459(f459bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_SINGLE_CHAR_DOMINATION'), 'DIALOGUE_SINGLE_CHAR_DOMINATION should not fire');
+    });
+
+    it('DIALOGUE_MONOLOGUE_UNPROMPTED fires when no long speech is preceded by a question', async () => {
+      // 3 long speeches (≥10w), none preceded within 2 lines by a '?' line
+      const f459c = [
+        'INT. ROOM - DAY',
+        '',
+        'He stands.',
+        '',
+        'ALICE',
+        'Yes.',
+        '',
+        'BOB',
+        'I have been waiting for this moment for a very long time.',
+        '',
+        'ALICE',
+        'Understood.',
+        '',
+        'BOB',
+        'The situation demands that we act with great care and deliberation.',
+        '',
+        'ALICE',
+        'Agreed.',
+        '',
+        'BOB',
+        'We will proceed according to the plan we established at the beginning.',
+        '',
+        'ALICE',
+        'Fine.',
+        '',
+        'BOB',
+        'Good.',
+      ].join('\n');
+      const res = await runV459(f459c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_MONOLOGUE_UNPROMPTED'), 'DIALOGUE_MONOLOGUE_UNPROMPTED should fire');
+    });
+
+    it('DIALOGUE_MONOLOGUE_UNPROMPTED does not fire when at least one long speech follows a question', async () => {
+      // Second long speech is immediately preceded by a question from Alice → upstream cause
+      const f459cnr = [
+        'INT. ROOM - DAY',
+        '',
+        'She waits.',
+        '',
+        'ALICE',
+        'Yes.',
+        '',
+        'BOB',
+        'I have been waiting for this moment for a very long time.',
+        '',
+        'ALICE',
+        'What exactly do you mean by that?',
+        '',
+        'BOB',
+        'The situation demands that we act with great care and deliberation.',
+        '',
+        'ALICE',
+        'Agreed.',
+        '',
+        'BOB',
+        'We will proceed according to the plan we established at the beginning.',
+        '',
+        'ALICE',
+        'Fine.',
+        '',
+        'BOB',
+        'Good.',
+      ].join('\n');
+      const res = await runV459(f459cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_MONOLOGUE_UNPROMPTED'), 'DIALOGUE_MONOLOGUE_UNPROMPTED should not fire');
+    });
+  });
+
   describe('Wave 445 — voicePass: dialogue question run, action scene intro heavy, dialogue declarative aftermath question', async () => {
     const runV445 = async (fountain: string) => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');

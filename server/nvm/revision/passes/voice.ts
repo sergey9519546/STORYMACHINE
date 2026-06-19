@@ -74,6 +74,15 @@
 // (sequence/aftermath — every declarative dialogue line that is not the last is immediately
 // followed by a question, so every statement triggers an interrogation; distinct from
 // DIALOGUE_QUESTION_RUN which catches local consecutive question clusters).
+// Wave 459 additions: dialogue assertion run (run-based — 5+ consecutive dialogue lines all end
+// declaratively without "?" or "!"; a sustained assertion avalanche where nobody asks or exclaims;
+// the declarative-polarity mirror of DIALOGUE_QUESTION_RUN, completing the end-punctuation run
+// family), dialogue single char domination (underweight/bloat — one character delivers >70% of all
+// dialogue lines while ≥3 characters speak; the voice engine silences supporting characters
+// systematically; distinct from UNDIFFERENTIATED_CHARACTER_VOICES which audits similarity not
+// quantity), dialogue monologue unprompted (backward-cause — no long speech ≥10 words is preceded
+// within 2 dialogue lines by a question; every extended statement arrives causeless, without the
+// inquiry that would naturally provoke expansion; first backward-cause check in this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2313,6 +2322,136 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
           description: `Every declarative dialogue line (${qualDecl445c.length} lines not ending in "?" or "!") is immediately followed by a question — no statement is ever allowed to land without triggering an interrogation. When every assertion is met with a question rather than a response that engages, accepts, or redirects it, dialogue becomes a loop: the script converts every moment of commitment into another round of inquiry, draining the cumulative forward pressure that declarations build.`,
           suggestedFix: `Let some declarations be met with responses that engage rather than interrogate: an agreement, a counter-statement, a silence-then-action. Not every assertion needs to provoke a question; some of the most dramatically charged moments occur when a character's statement is simply received — acknowledged, deflected, or ignored — rather than immediately questioned. Reserve the declarative-triggers-question pattern for interrogation scenes where the power dynamic demands it.`,
         });
+      }
+    }
+  }
+
+  // ── Wave 459: DIALOGUE_ASSERTION_RUN, DIALOGUE_SINGLE_CHAR_DOMINATION, DIALOGUE_MONOLOGUE_UNPROMPTED ──
+  {
+    const dlg459: string[] = [];
+    let inDlg459 = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg459 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg459 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg459 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg459) dlg459.push(t);
+    }
+
+    // DIALOGUE_ASSERTION_RUN — Run-based × declarative dialogue (≥10 total dialogue lines,
+    // max run of ≥5 consecutive lines each ending without "?" or "!"). A sustained stretch where
+    // nobody questions, exclaims, or challenges anything — the conversation becomes a monotone
+    // assertion avalanche with no interrogation and no intensity. While individual declarative
+    // lines are the backbone of dialogue, five or more in unbroken succession signal that the
+    // exchange has collapsed into a single-register flow: all statement, no probe.
+    // Distinct from DIALOGUE_QUESTION_RUN (Wave 445: run of ≥4 consecutive questions — the
+    // interrogative-polarity mirror; this checks declarative-polarity runs), DIALOGUE_INTERROGATIVE_
+    // SATURATION (Wave 294: global proportion >30% ending in '?' — this measures a local run of
+    // declarations, not global question density), and DIALOGUE_DECLARATIVE_AFTERMATH_QUESTION
+    // (Wave 445: aftermath pattern — every declaration followed by a question; this fires when
+    // declarations run WITHOUT questions following them).
+    if (dlg459.length >= 10) {
+      let maxAssertRun459a = 0, curAssertRun459a = 0;
+      let maxAssertStart459a = -1, curAssertStart459a = -1;
+      for (let i = 0; i < dlg459.length; i++) {
+        const t = dlg459[i].trimEnd();
+        if (!t.endsWith('?') && !t.endsWith('!')) {
+          if (curAssertRun459a === 0) curAssertStart459a = i;
+          if (++curAssertRun459a > maxAssertRun459a) {
+            maxAssertRun459a = curAssertRun459a;
+            maxAssertStart459a = curAssertStart459a;
+          }
+        } else { curAssertRun459a = 0; }
+      }
+      if (maxAssertRun459a >= 5) {
+        issues.push({
+          location: `Dialogue lines ${maxAssertStart459a + 1}–${maxAssertStart459a + maxAssertRun459a} — assertion run (${maxAssertRun459a} consecutive declarative lines)`,
+          rule: 'DIALOGUE_ASSERTION_RUN',
+          severity: 'minor',
+          description: `${maxAssertRun459a} consecutive dialogue lines each end declaratively — no question, no exclamation — creating a sustained assertion avalanche where nobody probes, nobody challenges, and nobody expresses intensity. While declarative dialogue is the backbone of conversation, a run of ${maxAssertRun459a} statements without any interrogation or charged speech signals that the exchange has collapsed into a single emotional register: all assertion, no inquiry. Real conversation — even in conflict — involves the occasional question (however rhetorical) that breaks the monotony of uninterrupted statement and invites the audience to shift their reading from "listening to claims" to "wondering what comes next."`,
+          suggestedFix: `Break the declaration run near dialogue line ${maxAssertStart459a + 1} by inserting at least one line that ends in "?" or "!" within the stretch of ${maxAssertRun459a} statements. Even a rhetorical question ("And you think that matters?") or a charged exclamation changes the register enough to prevent the exchange from feeling like a debate transcript. The variation of end-punctuation creates rhythmic micro-contrast in how the audience reads each line.`,
+        });
+      }
+    }
+
+    // DIALOGUE_SINGLE_CHAR_DOMINATION — Underweight/bloat × dialogue character distribution (≥3
+    // speaking characters, ≥10 total dialogue lines, dominant speaker has >70% of all lines). One
+    // character monopolizes the conversation while the others serve as mere audience — essentially
+    // delivering a solo performance in multi-character scenes. A story that uses 3+ speaking
+    // characters but routes 70%+ of all dialogue through one of them suggests that the other
+    // characters exist primarily as reactive props rather than as independent voices with their
+    // own dramatic weight.
+    // Distinct from UNDIFFERENTIATED_CHARACTER_VOICES (Wave 138: characters sound alike stylistically
+    // — similarity of vocabulary; this checks quantity of lines, not voice distinctiveness), and from
+    // CHARACTER_NAME_MONOTONY_IN_ACTION (Wave 294: one name in >50% of action lines — action staging,
+    // not dialogue quantity).
+    {
+      const charLineCounts459b = new Map<string, number>();
+      let curChar459b: string | null = null;
+      for (const line of allLines) {
+        const t = line.trim();
+        if (!t) { curChar459b = null; continue; }
+        if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { curChar459b = null; continue; }
+        if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) {
+          curChar459b = t.replace(/\s*\(.*\)$/, '').trim();
+          continue;
+        }
+        if (/^\(/.test(t)) continue;
+        if (curChar459b) {
+          charLineCounts459b.set(curChar459b, (charLineCounts459b.get(curChar459b) ?? 0) + 1);
+        }
+      }
+      const totalDlgLines459b = [...charLineCounts459b.values()].reduce((s, v) => s + v, 0);
+      if (charLineCounts459b.size >= 3 && totalDlgLines459b >= 10) {
+        const dominantEntry459b = [...charLineCounts459b.entries()].sort((a, b) => b[1] - a[1])[0];
+        if (dominantEntry459b && dominantEntry459b[1] / totalDlgLines459b > 0.70) {
+          const pct459b = (dominantEntry459b[1] / totalDlgLines459b * 100).toFixed(0);
+          issues.push({
+            location: `${dominantEntry459b[0]} — ${pct459b}% of all dialogue (${dominantEntry459b[1]}/${totalDlgLines459b} lines across ${charLineCounts459b.size} speakers)`,
+            rule: 'DIALOGUE_SINGLE_CHAR_DOMINATION',
+            severity: 'minor',
+            description: `${dominantEntry459b[0]} delivers ${dominantEntry459b[1]} of ${totalDlgLines459b} total dialogue lines (${pct459b}%) — more than 70% of all speech across ${charLineCounts459b.size} speaking characters. The other characters function primarily as reactive props rather than as independent voices. A story with ${charLineCounts459b.size} speaking characters but with 70%+ of dialogue concentrated in one suggests a fundamentally solo performance: the other characters exist to give ${dominantEntry459b[0]} reasons to speak rather than having their own dramatic weight, goals, or verbal personality.`,
+            suggestedFix: `Redistribute dialogue across the ${charLineCounts459b.size} speaking characters: give each supporting character at least one scene where they drive the exchange rather than responding. A character who only reacts never develops an independent voice — and the audience never learns to read them as a distinct personality. Even two or three additional lines per character, placed at key moments, can shift a reactive role into a participant.`,
+          });
+        }
+      }
+    }
+
+    // DIALOGUE_MONOLOGUE_UNPROMPTED — Backward-cause × long speech (≥8 total dialogue lines,
+    // ≥3 long speeches ≥10 words, none preceded within 2 dialogue lines by a question). Every
+    // extended declaration arrives without any prior inquiry to provoke it — the characters expand
+    // spontaneously without being asked. A long speech is dramatically stronger when it is prompted:
+    // a question that forces the answer, a challenge that demands a response, an accusation that
+    // must be refuted. When every long speech arrives causeless (no prior question), the characters
+    // appear to be delivering pre-planned arguments rather than responding to each other in the
+    // moment. Backward-cause mode × long speech length. First backward-cause check in this pass.
+    // Distinct from DIALOGUE_LENGTH_OUTLIER (Wave 431: single-peak × word count — one towering
+    // monologue; this checks ALL long speeches for their upstream cause, not just the peak),
+    // DIALOGUE_QUESTION_RUN (run-based × question channel — a different trigger), and DIALOGUE_
+    // DECLARATIVE_AFTERMATH_QUESTION (Wave 445: sequence/aftermath — what follows declarations;
+    // this is backward-cause checking what PRECEDES long speeches).
+    if (dlg459.length >= 8) {
+      const longSpeeches459c = dlg459
+        .map((t, i) => ({ t, i, wc: t.split(/\s+/).filter(Boolean).length }))
+        .filter(x => x.wc >= 10);
+      if (longSpeeches459c.length >= 3) {
+        const anyPrecededByQuestion459c = longSpeeches459c.some(({ i }) => {
+          for (let off = 1; off <= 2; off++) {
+            const prevIdx = i - off;
+            if (prevIdx >= 0 && dlg459[prevIdx].trimEnd().endsWith('?')) return true;
+          }
+          return false;
+        });
+        if (!anyPrecededByQuestion459c) {
+          issues.push({
+            location: `${longSpeeches459c.length} long speech(es) ≥10 words — no prior question found within 2 lines`,
+            rule: 'DIALOGUE_MONOLOGUE_UNPROMPTED',
+            severity: 'minor',
+            description: `None of the script's ${longSpeeches459c.length} long dialogue speeches (≥10 words) is preceded within the prior 2 dialogue lines by a question — every extended declaration arrives spontaneously, without inquiry to provoke it. Long speeches are dramatically strongest when they are caused: a question that demands an answer, a challenge that forces a response, an accusation that requires refutation. When every extended statement arrives without prior prompting, the characters appear to be delivering pre-planned arguments rather than responding to each other in the moment — the dialogue becomes a series of parallel monologues rather than an exchange. Even a rhetorical question ("So what was I supposed to do?") functions as a cause that makes the following expansion feel earned.`,
+            suggestedFix: `Before at least one long speech, add a question that provokes it: the preceding character's line can be a challenge, an open question, or even a demand for justification. The question-then-long-response pattern is the most natural dialogue unit for exposition, argument, and revelation — the question gives the audience permission to receive a longer speech because it signals that the speaker was asked, not that they chose to lecture. Even a one-word prompt ("Why?") preceding a multi-sentence response changes the register from monologue to dialogue.`,
+          });
+        }
       }
     }
   }
