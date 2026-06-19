@@ -21571,6 +21571,86 @@ I always listen.
     });
   });
 
+  describe('Wave 450 — conflictPass: clock aftermath void, positive emotion rupture, rupture clock aftermath void', async () => {
+    const rup450 = (amount: number, pairKey = 'A|B') => [{ pairKey, dimension: 'trust', amount }];
+    const makeRec450 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runConf450 = async (records: any[]) => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      return conflictPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CONFLICT_CLOCK_AFTERMATH_VOID fires when every clock scene is followed by 2 silent scenes', async () => {
+      // n=10, clocks at 1 and 5; aftermath scenes 2,3 and 6,7 all have no conflict signal → fires
+      const recs450a = Array.from({ length: 10 }, (_, i) => makeRec450(i));
+      recs450a[1] = makeRec450(1, { clockRaised: true });
+      recs450a[5] = makeRec450(5, { clockRaised: true });
+      const res = await runConf450(recs450a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_CLOCK_AFTERMATH_VOID'), 'CONFLICT_CLOCK_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_CLOCK_AFTERMATH_VOID does not fire when a clock scene is followed by a reversal', async () => {
+      // n=10, clocks at 1 and 5; scene 2 has suspenseDelta=-2 (reversal) → no fire
+      const recs450anr = Array.from({ length: 10 }, (_, i) => makeRec450(i));
+      recs450anr[1] = makeRec450(1, { clockRaised: true });
+      recs450anr[2] = makeRec450(2, { suspenseDelta: -2 });
+      recs450anr[5] = makeRec450(5, { clockRaised: true });
+      const res = await runConf450(recs450anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_CLOCK_AFTERMATH_VOID'), 'CONFLICT_CLOCK_AFTERMATH_VOID should not fire');
+    });
+
+    it('CONFLICT_POSITIVE_EMOTION_RUPTURE fires when all conflict scenes have positive emotional shift', async () => {
+      // n=10, 4 rupture scenes all with emotionalShift='positive' → fires
+      const recs450b = Array.from({ length: 10 }, (_, i) => makeRec450(i));
+      recs450b[1] = makeRec450(1, { relationshipShifts: rup450(-0.5), emotionalShift: 'positive' });
+      recs450b[3] = makeRec450(3, { relationshipShifts: rup450(-0.4), emotionalShift: 'positive' });
+      recs450b[6] = makeRec450(6, { relationshipShifts: rup450(-0.6), emotionalShift: 'positive' });
+      recs450b[8] = makeRec450(8, { relationshipShifts: rup450(-0.3), emotionalShift: 'positive' });
+      const res = await runConf450(recs450b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_POSITIVE_EMOTION_RUPTURE'), 'CONFLICT_POSITIVE_EMOTION_RUPTURE should fire');
+    });
+
+    it('CONFLICT_POSITIVE_EMOTION_RUPTURE does not fire when at least one conflict scene is not positive', async () => {
+      // n=10, 3 rupture scenes: 2 positive + 1 neutral → no fire
+      const recs450bnr = Array.from({ length: 10 }, (_, i) => makeRec450(i));
+      recs450bnr[1] = makeRec450(1, { relationshipShifts: rup450(-0.5), emotionalShift: 'positive' });
+      recs450bnr[3] = makeRec450(3, { relationshipShifts: rup450(-0.4), emotionalShift: 'positive' });
+      recs450bnr[6] = makeRec450(6, { relationshipShifts: rup450(-0.6), emotionalShift: 'neutral' });
+      const res = await runConf450(recs450bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_POSITIVE_EMOTION_RUPTURE'), 'CONFLICT_POSITIVE_EMOTION_RUPTURE should not fire');
+    });
+
+    it('CONFLICT_RUPTURE_CLOCK_AFTERMATH_VOID fires when every rupture aftermath has no clock raise', async () => {
+      // n=10, ruptures at 1 and 5; clocks at 0 and 9 (not in aftermath of ruptures) → fires
+      const recs450c = Array.from({ length: 10 }, (_, i) => makeRec450(i));
+      recs450c[0] = makeRec450(0, { clockRaised: true });
+      recs450c[1] = makeRec450(1, { relationshipShifts: rup450(-0.5) });
+      recs450c[5] = makeRec450(5, { relationshipShifts: rup450(-0.4) });
+      recs450c[9] = makeRec450(9, { clockRaised: true });
+      const res = await runConf450(recs450c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_RUPTURE_CLOCK_AFTERMATH_VOID'), 'CONFLICT_RUPTURE_CLOCK_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_RUPTURE_CLOCK_AFTERMATH_VOID does not fire when a rupture is followed by a clock raise', async () => {
+      // n=10, ruptures at 1 and 5; clocks at 0, 2 (aftermath of rupture at 1), and 9 → no fire
+      const recs450cnr = Array.from({ length: 10 }, (_, i) => makeRec450(i));
+      recs450cnr[0] = makeRec450(0, { clockRaised: true });
+      recs450cnr[1] = makeRec450(1, { relationshipShifts: rup450(-0.5) });
+      recs450cnr[2] = makeRec450(2, { clockRaised: true });
+      recs450cnr[5] = makeRec450(5, { relationshipShifts: rup450(-0.4) });
+      recs450cnr[9] = makeRec450(9, { clockRaised: true });
+      const res = await runConf450(recs450cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_RUPTURE_CLOCK_AFTERMATH_VOID'), 'CONFLICT_RUPTURE_CLOCK_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 436 — conflictPass: positive spiral, rupture suspense void, breathing room absent', async () => {
     const rup436 = (amount: number, pairKey = 'A|B') => [{ pairKey, dimension: 'trust', amount }];
     const makeRec436 = (idx: number, overrides: any = {}): any => ({

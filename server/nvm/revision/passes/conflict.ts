@@ -66,6 +66,16 @@
 // room absent (≥4 ruptures exist and the maximum non-rupture gap between consecutive ruptures
 // is ≤1 scene — every break is followed almost immediately by another; distribution/timing ×
 // rupture spacing, distinct from CONFLICT_RELENTLESS_RUN which requires CONSECUTIVE ruptures).
+// Wave 450 additions: clock aftermath void (≥2 clock scenes all followed by 2 scenes with no
+// conflict signal — deadlines raised but never detonated; sequence/aftermath × clock channel,
+// distinct from CONFLICT_CLOCK_DECOUPLED which audits in-scene relational content), positive
+// emotion rupture (≥3 conflict scenes all with positive emotionalShift — characters feel good
+// while bonds break, an emotional/relational inversion; co-occurrence × positive valence ×
+// rupture, complement of CONFLICT_EMOTION_DECOUPLED which audits neutral), rupture clock
+// aftermath void (every rupture followed by 2 scenes with no clock raised while story uses
+// clocks elsewhere — bond-breaking never tightens the deadline; sequence/aftermath × clock ×
+// rupture aftermath, completes the set with CONFLICT_AFTERMATH_CURIOSITY_VOID and
+// CONFLICT_RUPTURE_SUSPENSE_VOID by adding the clock channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1967,6 +1977,113 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `The story has ${rupturePositions436c.length} bond-ruptures and the maximum gap between any two consecutive ones is ${maxGap436c} non-conflict scene(s) — every rupture is followed almost immediately by another. The audience never gets more than one scene to absorb a break before the next fracture arrives. Without breathing room, individual ruptures lose their distinctiveness: the audience numbs to conflict because it never pauses, and what should be the sharpest relational breaks blend into an undifferentiated rhythm of damage.`,
           suggestedFix: 'Spread ruptures further apart: after a significant bond-break, allow at least two or three scenes before the next one. The scene that absorbs a rupture\'s impact — where characters regroup, where the audience registers what was lost — is not inert. It is where the audience internalizes the cost of the break, so the next fracture lands against that accumulated weight rather than in an already-numb environment.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 450: CONFLICT_CLOCK_AFTERMATH_VOID, CONFLICT_POSITIVE_EMOTION_RUPTURE, CONFLICT_RUPTURE_CLOCK_AFTERMATH_VOID ──
+
+  // CONFLICT_CLOCK_AFTERMATH_VOID (minor, n≥8, ≥2 clock scenes): Every clock-raised scene is
+  // followed by 2 scenes with no escalating conflict signal — no reversal (suspenseDelta < -1)
+  // and no negative relationship shift (≤ -0.3) in either aftermath scene. The deadline is
+  // raised but never detonates: after each clock tick the story returns to calm without the
+  // crisis the deadline was supposed to force. When every clock raise is absorbed into silence,
+  // the audience stops believing the ticking clock is real. Sequence/aftermath mode × clock
+  // channel. Distinct from CONFLICT_CLOCK_DECOUPLED (Wave 338: audits whether clock scenes
+  // carry relational conflict IN the same scene — this audits the 2 scenes FOLLOWING each clock
+  // raise), THREAT_AMNESIA (Wave 158: clock not raised in second half — a zone/timing check, not
+  // aftermath), CONFLICT_WITHOUT_DEADLINE (no clock at all — opposite failure): this is the first
+  // check to audit what conflict follows each clock raise.
+  if (records.length >= 8) {
+    const clockRecs450a = (records as any[]).filter(r => r.clockRaised === true);
+    if (clockRecs450a.length >= 2) {
+      const isConflictSignal450a = (r: any): boolean =>
+        (r.suspenseDelta ?? 0) < -1 ||
+        ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3);
+      const allSilentAftermath450a = clockRecs450a.every((r: any) => {
+        const idx = (records as any[]).indexOf(r);
+        for (let off = 1; off <= 2; off++) {
+          if (idx + off >= records.length) continue;
+          if (isConflictSignal450a((records as any[])[idx + off])) return false;
+        }
+        return true;
+      });
+      if (allSilentAftermath450a) {
+        issues.push({
+          location: `${clockRecs450a.length} clock scene(s) — all followed by silent aftermath`,
+          rule: 'CONFLICT_CLOCK_AFTERMATH_VOID',
+          severity: 'minor',
+          description: `All ${clockRecs450a.length} clock-raised scene(s) are each followed by 2 scenes with no escalating conflict — no reversal, no negative relationship shift. The deadline is raised but never detonates: after each clock tick the story returns to calm without the crisis the clock was supposed to force. When every deadline is absorbed into silence, the audience stops believing the ticking clock is real and braces for nothing.`,
+          suggestedFix: 'Let a clock raise trigger conflict in the immediate aftermath: a reversal that follows the deadline announcement, a relationship that fractures under the new urgency, or an antagonist action prompted by the ticking. The scene or two after a clock raise should be where the deadline bites — deadline pressure must translate into dramatic escalation, or the clock is scenery.',
+        });
+      }
+    }
+  }
+
+  // CONFLICT_POSITIVE_EMOTION_RUPTURE (minor, n≥8, ≥3 conflict scenes): Every scene with a
+  // negative relationship shift (≤ -0.3) carries a POSITIVE emotional shift — characters feel
+  // good in every scene where a bond is breaking. The emotional and relational channels are
+  // inverted: each confrontation that fractures a relationship is staged as a moment of elation,
+  // triumph, or relief. The audience is told a bond is breaking while simultaneously seeing that
+  // nobody minds — relational damage registered in the ledger but not in any character's body.
+  // Co-occurrence mode × positive valence × rupture channel. Distinct from CONFLICT_EMOTION_
+  // DECOUPLED (Wave 299: all-neutral emotionalShift in conflict scenes — a different valence
+  // failure; neutral means nobody reacts, positive means everyone reacts in the wrong direction),
+  // CONFLICT_SUSPENSE_DECOUPLED (suspense channel, not emotion), and POSITIVE_SPIRAL_TRAP (Wave
+  // 210: a run of positive emotionalShift globally, not restricted to conflict scenes): this is
+  // the first check to audit the positive-emotion/rupture inversion where every fight is staged
+  // as a win.
+  if (records.length >= 8) {
+    const conflictRecs450b = (records as any[]).filter(r =>
+      ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+    );
+    if (conflictRecs450b.length >= 3 && conflictRecs450b.every(r => (r as any).emotionalShift === 'positive')) {
+      issues.push({
+        location: 'Conflict scenes — emotionally positive inversion',
+        rule: 'CONFLICT_POSITIVE_EMOTION_RUPTURE',
+        severity: 'minor',
+        description: `All ${conflictRecs450b.length} conflict scenes (negative relationship shifts) carry a positive emotional shift — characters feel good in every scene where a bond is breaking. The emotional and relational channels are inverted: each confrontation that fractures a relationship is staged as elation, triumph, or relief. Relational damage appears in the ledger but in nobody's body; the audience is told bonds are breaking while seeing that nobody minds. When conflict is consistently wrapped in positive feeling, the ruptures lose their weight — the story cannot make the audience grieve what the characters seem to enjoy losing.`,
+        suggestedFix: "Let conflict cost something emotionally: at least one scene where a bond fractures should leave the characters — and therefore the audience — feeling the loss, the anger, or the grief. A rupture staged in a positive emotional register reads as a victory or a relief, not as damage. The emotional channel and the relational channel should usually align in conflict scenes, not contradict each other.",
+      });
+    }
+  }
+
+  // CONFLICT_RUPTURE_CLOCK_AFTERMATH_VOID (minor, n≥8, ≥2 ruptures, ≥2 clock scenes): Every
+  // scene with a negative relationship shift (≤ -0.3) is followed by 2 scenes with no clock
+  // raised — bond-breaking never tightens the story's deadline. When a relationship fractures,
+  // the audience expects the world to become more urgent as well as more damaged: the loss of an
+  // ally should shorten the time available, a betrayal exposed should trigger a countdown.
+  // When every rupture is followed by clock silence, breaking bonds has no temporal consequence —
+  // the conflict engine and the urgency engine run on separate tracks. Sequence/aftermath mode ×
+  // clock channel × rupture aftermath. Completes the aftermath-channel set alongside CONFLICT_
+  // AFTERMATH_CURIOSITY_VOID (Wave 422: curiosity channel) and CONFLICT_RUPTURE_SUSPENSE_VOID
+  // (Wave 436: suspense channel) — three aftermath checks, one per non-relational channel.
+  // Distinct from CONFLICT_CLOCK_DECOUPLED (Wave 338: in-scene relational content of clock
+  // raises — not aftermath) and THREAT_AMNESIA (Wave 158: timing of clock in second half,
+  // not rupture-specific): requires ≥2 clock scenes to confirm the story uses urgency but
+  // just not in the wake of its relational fractures.
+  if (records.length >= 8) {
+    const ruptureRecs450c = (records as any[]).filter(r =>
+      ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+    );
+    const clockScenes450c = (records as any[]).filter(r => r.clockRaised === true);
+    if (ruptureRecs450c.length >= 2 && clockScenes450c.length >= 2) {
+      const allDeadClockAftermath450c = ruptureRecs450c.every((r: any) => {
+        const idx = (records as any[]).indexOf(r);
+        for (let off = 1; off <= 2; off++) {
+          if (idx + off >= records.length) continue;
+          if ((records as any[])[idx + off].clockRaised === true) return false;
+        }
+        return true;
+      });
+      if (allDeadClockAftermath450c) {
+        issues.push({
+          location: 'All rupture aftermath scenes — clock silent',
+          rule: 'CONFLICT_RUPTURE_CLOCK_AFTERMATH_VOID',
+          severity: 'minor',
+          description: `Every bond-rupture in the story (${ruptureRecs450c.length} conflict scene(s)) is followed by 2 scenes with no clock raised — breaking bonds never tightens the story's deadline. The loss of an ally, an exposed betrayal, or a severed bond should make the world more urgent as well as more damaged: relational fractures are supposed to close off options and shorten the time the protagonist has to act. The story uses ${clockScenes450c.length} clock-raising scenes but none fall in the wake of a rupture.`,
+          suggestedFix: 'Let at least one rupture trigger a clock raise in the scene that follows: the betrayal that removes a protector and immediately shortens a deadline, the severed bond that forecloses the easiest escape and starts a countdown. Bond-breaking should make things more urgent — the scene after a rupture is where the audience should feel that the damage is also a timer.',
         });
       }
     }
