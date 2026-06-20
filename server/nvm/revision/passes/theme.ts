@@ -91,6 +91,17 @@
 // preceded in the prior 2 scenes by no revelation, dramatic turn, or high suspense; theme
 // surfaces in narrative dead air; broader than THEME_PEAK_UNMOTIVATED which checks only
 // the single densest scene).
+// Wave 472 additions: positive emotion decoupled (co-occurrence/decoupling × positive emotional
+// shift — all scenes with emotionalShift='positive' are thematically silent; the positive polarity
+// complement to THEME_NEGATIVE_EMOTION_DECOUPLED, completing the full valence-channel set in the
+// co-occurrence family), resonant valence uniform (valence × within-resonant-set — >80% of resonant
+// scenes share the same emotional register; theme is tonal-monotone, always voiced in one kind of
+// scene; distinct from RESONANCE_EMOTIONALLY_LOPSIDED which fires on 3:1 charged-scene skew and
+// QUIET_SCENES_ONLY which requires all neutral+low-suspense; this fires even when the uniform
+// register is 'neutral' with high suspense), dialogue peak silent (single-peak isolation × dialogue
+// channel — the scene with the most dialogue highlights carries no theme while ≥2 others do; the
+// script's most verbally active moment is thematically mute; fills the dialogue-channel cell in the
+// single-peak isolation family alongside seed/payoff/curiosity/suspense/relationship/clock peaks).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2223,6 +2234,108 @@ export async function themePass(input: PassInput): Promise<PassResult> {
           description: `None of the story's ${resonantScenes.length} thematically resonant scenes for "${themeRaw}" is preceded in the prior two scenes by a revelation, a dramatic turn, or a high-suspense moment — theme consistently surfaces in narrative dead air. The most powerful thematic moments arrive when the audience is already primed to receive meaning: a revelation that raises a question the theme then answers, a dramatic turn that has the characters re-examine what they believe, or tension that has been released in the scene that follows. When every resonant scene arrives without any of these upstream triggers, the theme feels structurally optional — it could be moved to any scene and mean the same thing, because it is never the consequence of anything that happened just before.`,
           suggestedFix: `Before at least one resonant scene, plant a structural trigger in the prior two scenes: a revelation that makes the theme's central question land with specific urgency, a dramatic turn that forces the characters to grapple with what the story is about, or a suspense peak that the following thematic scene then reflects on. Theme that arrives as the consequence of something the audience just experienced feels earned rather than inserted.`,
         });
+      }
+    }
+
+    // ── Wave 472: THEME_POSITIVE_EMOTION_DECOUPLED, THEME_RESONANT_VALENCE_UNIFORM, THEME_DIALOGUE_PEAK_SILENT ──
+
+    // THEME_POSITIVE_EMOTION_DECOUPLED — Co-occurrence/decoupling × positive emotional shift
+    // (n≥8, ≥2 positive-shift scenes, ≥2 resonant scenes, no positive scene is resonant).
+    // All scenes with emotionalShift='positive' are thematically silent: warmth, triumph, and
+    // relief never coincide with the story's central question. The theme only speaks during
+    // neutral or dark moments, making it exclusively associated with gravity. When the audience
+    // never hears the theme in a positive scene, they cannot experience the story's central
+    // idea as something life-affirming or hopeful — it remains only a question that the script
+    // asks in its darker or flatter register. Completes the emotional-shift channel in the
+    // co-occurrence family alongside THEME_NEGATIVE_EMOTION_DECOUPLED (Wave 279: negative shift
+    // channel).
+    // Distinct from THEME_NEGATIVE_EMOTION_DECOUPLED (Wave 279: negative shift scenes carry no
+    // theme; this is the positive polarity — orthogonal valence × co-occurrence check),
+    // THEME_RESONANCE_EMOTIONALLY_LOPSIDED (Wave 430: fires when CHARGED resonant scenes have
+    // 3:1 polarity skew; this fires when NO positive scene is EVER resonant, a zero-intersection
+    // condition), all zone and sequence/aftermath checks.
+    if (records.length >= 8 && resonantScenes.length >= 2) {
+      const posScenes472a = records.filter(r => r.emotionalShift === 'positive');
+      if (posScenes472a.length >= 2 &&
+          !posScenes472a.some(r =>
+            sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+          )) {
+        issues.push({
+          location: `All ${posScenes472a.length} positive-shift scene(s) — thematically silent`,
+          rule: 'THEME_POSITIVE_EMOTION_DECOUPLED',
+          severity: 'minor',
+          description: `All ${posScenes472a.length} scenes with emotionalShift='positive' carry no language related to "${themeRaw}", while ${resonantScenes.length} scenes carry the theme in neutral or negative moments. The story voices its central question exclusively during gravity and flatness, never during warmth, triumph, or relief. When theme only appears in darker or inert scenes, the audience learns to associate the story's central idea with burden rather than with what is possible — the theme never gets to answer its own question in the emotional register where the answer would feel earned.`,
+          suggestedFix: `Let at least one positive-emotional scene also carry thematic resonance: a triumph that dramatises what "${themeRaw}" looks like when it works, a moment of relief that names what was at stake. A theme that can speak in both joy and grief feels universal; one that only speaks in dark moments feels like a lesson rather than a truth.`,
+        });
+      }
+    }
+
+    // THEME_RESONANT_VALENCE_UNIFORM — Valence × within-resonant-set uniformity (resonantScenes
+    // length ≥ 4, >80% of resonant scenes share the same emotionalShift register). The theme is
+    // tonal-monotone: it is always voiced in one emotional key — always neutral, always positive,
+    // or always negative. A theme voiced exclusively in one register narrows its reach; it can only
+    // speak to the audience when they are in that particular emotional state. A theme that can land
+    // in grief, in triumph, and in neutral reflection is structurally woven into the story at every
+    // level; a theme confined to one register is structurally optional in the other two.
+    // Distinct from THEME_RESONANCE_EMOTIONALLY_LOPSIDED (Wave 430: fires when CHARGED resonant
+    // scenes are 3:1 skewed positive vs negative; requires ≥4 CHARGED resonant scenes and excludes
+    // neutral — my check fires when all resonant are neutral with high suspense, where LOPSIDED's
+    // guard fails), THEME_QUIET_SCENES_ONLY (Wave 307: fires when all resonant are neutral AND
+    // suspenseDelta ≤ 1 — my check fires when all resonant are neutral with some high-suspense
+    // scenes, where QUIET_SCENES_ONLY's guard fails), THEME_RESONANCE_EMOTIONALLY_INERT (Wave 223:
+    // fires when all resonant are neutral AND suspenseDelta ≤ 0 — my check fires when all neutral
+    // but some have suspenseDelta > 0, avoiding INERT's trigger).
+    if (resonantScenes.length >= 4) {
+      const posRes472b = resonantScenes.filter(r => r.emotionalShift === 'positive').length;
+      const negRes472b = resonantScenes.filter(r => r.emotionalShift === 'negative').length;
+      const neuRes472b = resonantScenes.filter(r => r.emotionalShift === 'neutral').length;
+      const maxRes472b = Math.max(posRes472b, negRes472b, neuRes472b);
+      if (maxRes472b / resonantScenes.length > 0.8) {
+        const dominant472b = posRes472b === maxRes472b ? 'positive' : negRes472b === maxRes472b ? 'negative' : 'neutral';
+        issues.push({
+          location: `${resonantScenes.length} resonant scenes — ${dominant472b} emotional register (${maxRes472b}/${resonantScenes.length})`,
+          rule: 'THEME_RESONANT_VALENCE_UNIFORM',
+          severity: 'minor',
+          description: `${maxRes472b} of ${resonantScenes.length} thematically resonant scenes (${Math.round(maxRes472b / resonantScenes.length * 100)}%) share the same emotional register ('${dominant472b}') — the theme is tonal-monotone. A theme voiced exclusively in one emotional key speaks only to the audience when they're in that state; it cannot reach them in the other emotional registers. The full power of a theme comes from its ability to surface in triumph, grief, and calm reflection alike — in different emotional keys, the same idea asks different questions and produces different insights.`,
+          suggestedFix: `Distribute resonant scenes across at least two emotional registers: if the theme currently only speaks in '${dominant472b}' moments, give it at least one scene in the opposite register. A single resonant scene in a different emotional key (${'neutral' === dominant472b ? "'positive' or 'negative'" : "'neutral'"}) dramatically expands the theme's tonal range and prevents it from reading as tonally one-dimensional.`,
+        });
+      }
+    }
+
+    // THEME_DIALOGUE_PEAK_SILENT — Single-peak isolation × dialogue channel (n≥8, ≥2 resonant
+    // scenes, scene with max dialogueHighlights count > 2 is thematically mute). The script's
+    // most verbally active scene — the moment with the most dialogue highlights — carries no
+    // thematic resonance for "${themeRaw}". Dialogue-rich scenes are where the story's verbal
+    // register is highest: characters speak in longer, denser exchanges, and this scene is the
+    // peak of that verbal density. When the verbal peak is thematically silent, the script's
+    // most talkative moment is also its thematically emptiest — the most dialogue the story
+    // produces has nothing to do with its central question. Fills the dialogue-channel cell
+    // alongside THEME_SEED_PEAK_ABSENT (seededClueIds), THEME_PAYOFF_PEAK_ABSENT (payoffs),
+    // THEME_CURIOSITY_PEAK_ABSENT (curiosityDelta), THEME_SUSPENSE_PEAK_ABSENT (suspenseDelta),
+    // THEME_RELATIONSHIP_PEAK_ABSENT (relationshipShifts), THEME_CLOCK_PEAK_ABSENT (clockDelta).
+    // Distinct from all co-occurrence/decoupling checks (those audit entire categories of scenes;
+    // this isolates a single peak by dialogue count — a single-peak mode on a different metric),
+    // THEME_RESONANCE_BURST (Wave 307: one scene has >50% of all keyword hits — a single-peak
+    // check on keyword density; this checks the single peak of DIALOGUE VOLUME, not keyword hits).
+    if (records.length >= 8 && resonantScenes.length >= 2) {
+      const dlgCounts472c = records.map(r => ((r.dialogueHighlights ?? []) as string[]).length);
+      const maxDlg472c = Math.max(...dlgCounts472c);
+      if (maxDlg472c > 2) {
+        const peakDlgIdx472c = dlgCounts472c.indexOf(maxDlg472c);
+        const peakDlgScene472c = records[peakDlgIdx472c];
+        const peakIsResonant472c = sceneHasResonance(
+          sceneTexts.get(peakDlgScene472c.sceneIdx) ?? '',
+          expandedKeywords,
+        );
+        if (!peakIsResonant472c) {
+          issues.push({
+            location: `Scene ${peakDlgScene472c.sceneIdx} (${peakDlgScene472c.slug}) — peak dialogue scene (${maxDlg472c} highlights) is thematically silent`,
+            rule: 'THEME_DIALOGUE_PEAK_SILENT',
+            severity: 'minor',
+            description: `The scene with the most dialogue highlights (${maxDlg472c} at scene ${peakDlgScene472c.sceneIdx}) carries no language related to "${themeRaw}", though ${resonantScenes.length} other scenes carry the theme. The script's most verbally active moment — the scene where characters speak most — is thematically silent. Dialogue is the primary channel through which characters voice ideas, make choices, and reveal meaning; the scene with the most dialogue should be among the most likely to carry thematic weight. When the verbal peak is mute, the theme has been written around the story's main talking point.`,
+            suggestedFix: `Give scene ${peakDlgScene472c.sceneIdx} at least one line of dialogue that touches "${themeRaw}": a character statement, question, or argument that invokes the theme directly or obliquely. The most dialogue-rich scene in the script is the most natural place for thematic language to appear — it's where characters are already speaking most fully, and thematic depth costs only one line.`,
+          });
+        }
       }
     }
   }

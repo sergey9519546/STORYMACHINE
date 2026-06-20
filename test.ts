@@ -18713,6 +18713,101 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 472 — themePass: positive emotion decoupled, resonant valence uniform, dialogue peak silent', async () => {
+    const makeRec472 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const THEME472 = 'redemption forgiveness courage';
+    const themed472 = ['act of redemption'];
+    const runT472 = async (records: any[]) => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: THEME472 },
+      });
+    };
+
+    it('THEME_POSITIVE_EMOTION_DECOUPLED fires when all positive-shift scenes are thematically silent', async () => {
+      // 8 scenes: positive at 2,5 (no theme); theme at 0,7 (neutral) → positive scenes all mute → fire
+      const recs472a = Array.from({ length: 8 }, (_, i) =>
+        makeRec472(i, {
+          emotionalShift: [2, 5].includes(i) ? 'positive' : 'neutral',
+          dialogueHighlights: [0, 7].includes(i) ? themed472 : [],
+        }),
+      );
+      const res = await runT472(recs472a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'THEME_POSITIVE_EMOTION_DECOUPLED'), 'THEME_POSITIVE_EMOTION_DECOUPLED should fire');
+    });
+
+    it('THEME_POSITIVE_EMOTION_DECOUPLED does not fire when a positive scene carries the theme', async () => {
+      // 8 scenes: scene 2 is positive AND themed → overlap → no fire
+      const recs472anr = Array.from({ length: 8 }, (_, i) =>
+        makeRec472(i, {
+          emotionalShift: [2, 5].includes(i) ? 'positive' : 'neutral',
+          dialogueHighlights: [2, 7].includes(i) ? themed472 : [],
+        }),
+      );
+      const res = await runT472(recs472anr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'THEME_POSITIVE_EMOTION_DECOUPLED'), 'THEME_POSITIVE_EMOTION_DECOUPLED should not fire');
+    });
+
+    it('THEME_RESONANT_VALENCE_UNIFORM fires when >80% of resonant scenes share the same emotional register', async () => {
+      // 8 scenes: resonant at 3,4,5,6 — all neutral, scene 4 has suspenseDelta=2 (avoids QUIET/INERT)
+      // 4/4 = 100% neutral > 80% → fire; no positive/negative scenes → LOPSIDED guard fails
+      const recs472b = Array.from({ length: 8 }, (_, i) =>
+        makeRec472(i, {
+          dialogueHighlights: [3, 4, 5, 6].includes(i) ? themed472 : [],
+          suspenseDelta: i === 4 ? 2 : 0,
+        }),
+      );
+      const res = await runT472(recs472b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'THEME_RESONANT_VALENCE_UNIFORM'), 'THEME_RESONANT_VALENCE_UNIFORM should fire');
+    });
+
+    it('THEME_RESONANT_VALENCE_UNIFORM does not fire when resonant scenes span multiple emotional registers', async () => {
+      // 8 scenes: resonant at 3(neutral),4(positive),5(negative),6(neutral) → 2 neutral, 1 pos, 1 neg → 50% max < 80%
+      const recs472bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec472(i, {
+          dialogueHighlights: [3, 4, 5, 6].includes(i) ? themed472 : [],
+          emotionalShift: i === 4 ? 'positive' : i === 5 ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runT472(recs472bnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'THEME_RESONANT_VALENCE_UNIFORM'), 'THEME_RESONANT_VALENCE_UNIFORM should not fire');
+    });
+
+    it('THEME_DIALOGUE_PEAK_SILENT fires when the most dialogue-rich scene (>2 highlights) is thematically mute', async () => {
+      // 8 scenes: scene 3 has 3 dialogue highlights (peak) but no theme; scenes 5,6 are themed
+      const recs472c = Array.from({ length: 8 }, (_, i) =>
+        makeRec472(i, {
+          dialogueHighlights: i === 3 ? ['a plain line', 'another line', 'a third line'] :
+            [5, 6].includes(i) ? themed472 : [],
+        }),
+      );
+      const res = await runT472(recs472c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'THEME_DIALOGUE_PEAK_SILENT'), 'THEME_DIALOGUE_PEAK_SILENT should fire');
+    });
+
+    it('THEME_DIALOGUE_PEAK_SILENT does not fire when the most dialogue-rich scene carries the theme', async () => {
+      // 8 scenes: scene 3 has 3 dialogue highlights including theme text → peak is resonant → no fire
+      const recs472cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec472(i, {
+          dialogueHighlights: i === 3 ? ['a plain line', 'act of redemption', 'a third line'] :
+            [5, 6].includes(i) ? themed472 : [],
+        }),
+      );
+      const res = await runT472(recs472cnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'THEME_DIALOGUE_PEAK_SILENT'), 'THEME_DIALOGUE_PEAK_SILENT should not fire');
+    });
+  });
+
   describe('Wave 458 — themePass: relationship decoupled, clock aftermath silent, all resonance causeless', async () => {
     const makeRec458 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
