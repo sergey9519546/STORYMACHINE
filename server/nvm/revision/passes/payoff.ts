@@ -83,6 +83,14 @@
 // air), clue seed consecutive run (run-based × clue-seed signal — 3+ consecutive scenes each
 // plant a new clue, an "evidence avalanche" that overwhelms the audience with simultaneous
 // information before they can form emotional attachment to individual threads).
+// Wave 468 additions: payoff revelation aftermath absent (sequence/aftermath × revelation ×
+// payoff trigger — no payoff scene is followed by a revelation within 2 scenes; completing the
+// payoff-aftermath channel family with the disclosure channel), seed suspense aftermath absent
+// (sequence/aftermath × suspense × seed trigger — no seed scene is followed by a suspense rise
+// within 2 scenes; first aftermath check for seeds, the seed-side sibling of payoff aftermath
+// suspense recoil), seed emotional aftermath absent (sequence/aftermath × emotional × seed
+// trigger — no seed scene is followed by an emotional shift within 2 scenes; second seed-
+// aftermath check, completes the seed aftermath triad alongside seed suspense aftermath).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2005,6 +2013,111 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `A run of ${maxSeedRun454c} consecutive scenes each plant a new clue — an evidence avalanche that delivers multiple new threads to the audience simultaneously without space to absorb them. The most memorable clues are planted in isolation: given a scene to breathe in, allowed to register before the next mystery arrives. When three or more seeds land back-to-back, the audience's finite attention is divided across all of them simultaneously, reducing each thread's individual impact. A concentrated seed-run also signals structural front-loading — the planting machinery is overactive in one zone while other zones have nothing to wonder about.`,
           suggestedFix: `Spread the clue-seeding across the run — intersperse at least one non-seed scene between consecutive plants. Use the non-seed scene to give the most recent clue room to breathe: a character reaction, a quiet beat where the implication lands, or simply a scene that does not introduce new evidence. An isolated clue — placed alone, given space — registers more deeply and generates more sustained curiosity than a cluster of three planted in rapid succession.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 468: PAYOFF_REVELATION_AFTERMATH_ABSENT, SEED_SUSPENSE_AFTERMATH_ABSENT, SEED_EMOTIONAL_AFTERMATH_ABSENT ──
+
+  // PAYOFF_REVELATION_AFTERMATH_ABSENT (minor, n≥8, ≥2 payoff scenes): No payoff scene is
+  // followed by a revelation in the next two scenes — resolutions never open a new truth
+  // downstream. The ideal payoff is doubly charged: it closes an old thread AND opens a door
+  // to the next discovery. When every resolution is followed by two scenes with no revelation,
+  // the closing of threads is inert — the payoff completes the past but generates nothing for
+  // the future. Sequence/aftermath mode × revelation channel × payoff trigger. Completes the
+  // payoff-aftermath channel family alongside PAYOFF_AFTERMATH_QUESTION_VOID (Wave 426: curiosity
+  // and seed signals in aftermath), PAYOFF_EMOTIONAL_RECOIL_ABSENT (Wave 440: negative emotional
+  // channel in aftermath), and PAYOFF_SUSPENSE_RECOIL_ABSENT (Wave 440: suspense channel in
+  // aftermath): this adds the revelation channel. Distinct from PAYOFF_REVELATION_DISCONNECT
+  // (Wave 289: co-occurrence — payoffs fire without revelations in the same or nearby scene; this
+  // checks the 2 scenes AFTER the payoff, not the payoff scene itself or the scenes before it).
+  if (records.length >= 8) {
+    const payoffIdxs468a = (records as any[])
+      .map((r, i) => (((r.payoffSetupIds ?? []) as string[]).length > 0 ? i : -1))
+      .filter(i => i >= 0);
+    if (payoffIdxs468a.length >= 2) {
+      const anyRevAftermath468a = payoffIdxs468a.some(idx => {
+        const window468a = (records as any[]).slice(idx + 1, idx + 3);
+        return window468a.some((a: any) =>
+          a.revelation !== null && a.revelation !== undefined && a.revelation !== '',
+        );
+      });
+      if (!anyRevAftermath468a) {
+        issues.push({
+          location: `All ${payoffIdxs468a.length} payoff scene(s) — no revelation in the next two scenes`,
+          rule: 'PAYOFF_REVELATION_AFTERMATH_ABSENT',
+          severity: 'minor',
+          description: `None of the story's ${payoffIdxs468a.length} payoff scenes is followed by a revelation in the next two scenes — resolutions never open a new truth downstream. The most resonant payoffs are doubly charged: they close an old thread and simultaneously unlock a new discovery. When every resolution is followed by two scenes with no revelation, the closing of threads is inert — the payoff completes the past without generating anything for the audience to carry forward. A payoff that immediately precedes a disclosure feels like the world rearranging itself after the resolution: answering one question reveals the next.`,
+          suggestedFix: "After at least one payoff, let the next scene or the one after it surface a revelation: a truth the resolution exposes, a consequence that discloses something previously hidden, or a new discovery triggered by the thread closing. A payoff followed by a revelation creates a chain — 'so that's what that meant, and now we see this' — that makes the audience feel the story is a coherent system rather than a list of events.",
+        });
+      }
+    }
+  }
+
+  // SEED_SUSPENSE_AFTERMATH_ABSENT (minor, n≥8, ≥2 seed scenes): No clue-seeding scene is
+  // followed by a suspense rise (suspenseDelta > 0) in the next two scenes — planted threads
+  // never escalate the danger downstream. A clue planted should raise the temperature: the
+  // audience now holds a new unknown, and the scenes after the planting should reflect the
+  // danger that new thread implies. When every seed is followed by two scenes of flat or
+  // falling suspense, evidence is planted without consequence — the thread enters the story
+  // without raising what it should raise. Sequence/aftermath mode × suspense channel × seed
+  // trigger. Distinct from CLUE_SEED_SUSPENSE_FLAT (Wave 398: the seed scene's own
+  // suspenseDelta ≤ 0 — same-scene co-occurrence, not aftermath), PAYOFF_SUSPENSE_RECOIL_
+  // ABSENT (Wave 440: payoff trigger, not seed trigger), and REVELATION_SUSPENSE_AFTERMATH_
+  // FLAT (pacing.ts Wave 467: revelation trigger, not seed trigger). First aftermath check
+  // for the clue-seeding signal, beginning the seed aftermath family.
+  if (records.length >= 8) {
+    const seedIdxs468b = (records as any[])
+      .map((r, i) => (((r.seededClueIds ?? []) as string[]).length > 0 ? i : -1))
+      .filter(i => i >= 0);
+    if (seedIdxs468b.length >= 2) {
+      const anySuspAftermath468b = seedIdxs468b.some(idx => {
+        const window468b = (records as any[]).slice(idx + 1, idx + 3);
+        return window468b.some((a: any) => (a.suspenseDelta ?? 0) > 0);
+      });
+      if (!anySuspAftermath468b) {
+        issues.push({
+          location: `All ${seedIdxs468b.length} seed scene(s) — no suspense rise in the next two scenes`,
+          rule: 'SEED_SUSPENSE_AFTERMATH_ABSENT',
+          severity: 'minor',
+          description: `None of the story's ${seedIdxs468b.length} clue-seeding scenes is followed by a suspense rise (suspenseDelta > 0) in the next two scenes — planted threads never escalate the danger downstream. A new unknown introduced to the audience should make the situation more dangerous: the scenes after the planting should reflect the threat that the new thread implies. When every seed is followed by two scenes of flat or falling suspense, evidence is planted without consequence — the thread enters the story without raising the temperature it should.`,
+          suggestedFix: 'After at least one clue-seeding scene, let the next scene escalate tension: the planted thread has implications that make the situation more dangerous, or a character who receives the clue is put under immediate pressure by it. A seed that raises suspense in the following scene teaches the audience that new information carries risk — they should be nervous when a new clue appears, not relaxed.',
+        });
+      }
+    }
+  }
+
+  // SEED_EMOTIONAL_AFTERMATH_ABSENT (minor, n≥8, ≥2 seed scenes): No clue-seeding scene is
+  // followed by an emotional shift (emotionalShift ≠ 'neutral') in the next two scenes — the
+  // discovery of a new thread produces no felt reaction from any character. A clue that elicits
+  // no emotional response exists as pure information: it enters the story's logical record but
+  // not its characters' inner lives. When the scenes after a plant are emotionally neutral,
+  // planted threads feel like file entries rather than story events — the audience is asked to
+  // hold a question that no character appears to feel the weight of. Sequence/aftermath mode ×
+  // emotional channel × seed trigger. Distinct from CLUE_SEED_EMOTION_FLAT (Wave 328: the seed
+  // scene's own emotionalShift is neutral — the seed scene itself carries no charge; this checks
+  // whether the characters respond emotionally IN THE AFTERMATH of the plant, not whether the
+  // seed scene is itself emotional), SEED_SUSPENSE_AFTERMATH_ABSENT (Wave 468, above: suspense
+  // channel in the seed aftermath window — different channel, same trigger), and PAYOFF_EMOTIONAL_
+  // RECOIL_ABSENT (Wave 440: payoff trigger, not seed trigger): this completes the seed-aftermath
+  // family alongside SEED_SUSPENSE_AFTERMATH_ABSENT.
+  if (records.length >= 8) {
+    const seedIdxs468c = (records as any[])
+      .map((r, i) => (((r.seededClueIds ?? []) as string[]).length > 0 ? i : -1))
+      .filter(i => i >= 0);
+    if (seedIdxs468c.length >= 2) {
+      const anyEmoAftermath468c = seedIdxs468c.some(idx => {
+        const window468c = (records as any[]).slice(idx + 1, idx + 3);
+        return window468c.some((a: any) => (a as any).emotionalShift !== 'neutral');
+      });
+      if (!anyEmoAftermath468c) {
+        issues.push({
+          location: `All ${seedIdxs468c.length} seed scene(s) — no emotional shift in the next two scenes`,
+          rule: 'SEED_EMOTIONAL_AFTERMATH_ABSENT',
+          severity: 'minor',
+          description: `None of the story's ${seedIdxs468c.length} clue-seeding scenes is followed by an emotional shift (emotionalShift ≠ 'neutral') in the next two scenes — planted threads produce no felt reaction from any character. A new unknown should register emotionally: the character who encounters it should show dread, curiosity, relief, or alarm in the scenes that follow. When every seed is followed by two emotionally neutral scenes, the clue exists purely as information — the audience is asked to hold a thread that no character appears to feel the weight of. Threads the characters visibly react to are threads the audience remembers.`,
+          suggestedFix: 'After at least one clue-seeding scene, let a character react emotionally in the next scene or the one after: the evidence they encounter leaves them shaken, hopeful, afraid, or resolute. The emotional response does not need to be dramatic — even quiet unease or grim recognition tells the audience that what was just planted matters. A thread the characters respond to emotionally is far more memorable than one they catalogue without reaction.',
         });
       }
     }

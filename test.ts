@@ -20524,6 +20524,84 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 468 — payoffPass: payoff revelation aftermath absent, seed suspense aftermath absent, seed emotional aftermath absent', async () => {
+    const makeRec468 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain468 = (n: number) =>
+      Array.from({ length: n }, (_, i) =>
+        `INT. SC${i} - DAY\n\nAction line for scene ${i}.`
+      ).join('\n\n');
+    const runPay468 = async (records: any[]) => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      const fountain = makeFountain468(records.length);
+      return payoffPass({ fountain, original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PAYOFF_REVELATION_AFTERMATH_ABSENT fires when no payoff is followed by a revelation within 2 scenes', async () => {
+      // n=10; payoffs at 2 and 6; aftermath scenes 3-4 and 7-8 all have revelation=null → fires
+      const recs468a = Array.from({ length: 10 }, (_, i) => makeRec468(i));
+      recs468a[2] = makeRec468(2, { payoffSetupIds: ['s1'] });
+      recs468a[6] = makeRec468(6, { payoffSetupIds: ['s2'] });
+      const res = await runPay468(recs468a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_AFTERMATH_ABSENT'), 'PAYOFF_REVELATION_AFTERMATH_ABSENT should fire');
+    });
+
+    it('PAYOFF_REVELATION_AFTERMATH_ABSENT does not fire when a payoff is followed by a revelation within 2 scenes', async () => {
+      // n=10; payoff at 2; scene 3 has revelation → no fire
+      const recs468anr = Array.from({ length: 10 }, (_, i) => makeRec468(i));
+      recs468anr[2] = makeRec468(2, { payoffSetupIds: ['s1'] });
+      recs468anr[3] = makeRec468(3, { revelation: 'the true identity' });
+      recs468anr[6] = makeRec468(6, { payoffSetupIds: ['s2'] });
+      const res = await runPay468(recs468anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_AFTERMATH_ABSENT'), 'PAYOFF_REVELATION_AFTERMATH_ABSENT should not fire');
+    });
+
+    it('SEED_SUSPENSE_AFTERMATH_ABSENT fires when no seed scene is followed by a suspense rise within 2 scenes', async () => {
+      // n=10; seeds at 1 and 5; aftermath scenes 2-3 and 6-7 all have suspenseDelta=0 → fires
+      const recs468b = Array.from({ length: 10 }, (_, i) => makeRec468(i));
+      recs468b[1] = makeRec468(1, { seededClueIds: ['c1'] });
+      recs468b[5] = makeRec468(5, { seededClueIds: ['c2'] });
+      const res = await runPay468(recs468b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_SUSPENSE_AFTERMATH_ABSENT'), 'SEED_SUSPENSE_AFTERMATH_ABSENT should fire');
+    });
+
+    it('SEED_SUSPENSE_AFTERMATH_ABSENT does not fire when a seed scene is followed by a suspense rise', async () => {
+      // n=10; seed at 1; scene 2 has suspenseDelta=2 → no fire
+      const recs468bnr = Array.from({ length: 10 }, (_, i) => makeRec468(i));
+      recs468bnr[1] = makeRec468(1, { seededClueIds: ['c1'] });
+      recs468bnr[2] = makeRec468(2, { suspenseDelta: 2 });
+      recs468bnr[5] = makeRec468(5, { seededClueIds: ['c2'] });
+      const res = await runPay468(recs468bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_SUSPENSE_AFTERMATH_ABSENT'), 'SEED_SUSPENSE_AFTERMATH_ABSENT should not fire');
+    });
+
+    it('SEED_EMOTIONAL_AFTERMATH_ABSENT fires when no seed scene is followed by an emotional shift within 2 scenes', async () => {
+      // n=10; seeds at 1 and 5; aftermath scenes 2-3 and 6-7 all neutral → fires
+      const recs468c = Array.from({ length: 10 }, (_, i) => makeRec468(i));
+      recs468c[1] = makeRec468(1, { seededClueIds: ['c1'] });
+      recs468c[5] = makeRec468(5, { seededClueIds: ['c2'] });
+      const res = await runPay468(recs468c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_EMOTIONAL_AFTERMATH_ABSENT'), 'SEED_EMOTIONAL_AFTERMATH_ABSENT should fire');
+    });
+
+    it('SEED_EMOTIONAL_AFTERMATH_ABSENT does not fire when a seed scene is followed by an emotional shift', async () => {
+      // n=10; seed at 1; scene 3 has emotionalShift='negative' → no fire
+      const recs468cnr = Array.from({ length: 10 }, (_, i) => makeRec468(i));
+      recs468cnr[1] = makeRec468(1, { seededClueIds: ['c1'] });
+      recs468cnr[3] = makeRec468(3, { emotionalShift: 'negative' });
+      recs468cnr[5] = makeRec468(5, { seededClueIds: ['c2'] });
+      const res = await runPay468(recs468cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_EMOTIONAL_AFTERMATH_ABSENT'), 'SEED_EMOTIONAL_AFTERMATH_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 454 — payoffPass: payoff causeless, clue seed causeless, clue seed consecutive run', async () => {
     const makeRec454 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
