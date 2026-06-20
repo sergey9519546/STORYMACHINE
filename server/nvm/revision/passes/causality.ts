@@ -81,6 +81,17 @@
 // revelation — the story's maximum wonder moment leads to no disclosure; single-peak isolation ×
 // curiosity × revelation aftermath, distinct from CURIOSITY_SPIKE_NO_FALLOUT which checks per-
 // spike for any consequence and from SUSPENSE_PEAK_UNCAUSED which is backward-cause on suspense).
+// Wave 461 additions: payoff relationship void (every payoff scene carries no relationship shift —
+// thread resolutions never move a bond; co-occurrence/decoupling × payoff × relationship, the
+// relationship-channel completion of the payoff correlation set alongside PAYOFF_NO_EMOTION,
+// PAYOFF_SUSPENSE_VOID, and PAYOFF_CURIOSITY_DECOUPLED), seed scene emotion void (every clue-
+// planting scene is emotionally neutral — foreshadowing is dropped into flat scenes the audience
+// will not remember; co-occurrence/decoupling × seed × emotion, the emotion-channel completion of
+// the seed correlation set alongside CLUE_SEED_SUSPENSE_VOID and SEED_SCENE_CURIOSITY_VOID),
+// relationship stasis run (6+ consecutive scenes with no relationship shift despite ≥2 bond moves
+// existing in the story — the relational engine falls silent for a sustained stretch; run-based ×
+// relationship-absence mode, the relationship-channel parallel of EMOTIONAL_NEUTRAL_RUN and the
+// first run-based check auditing the relationship channel rather than a valence delta).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2213,6 +2224,111 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `The story's highest-curiosity scene (Scene ${records[peakPos447c].sceneIdx}, curiosityDelta ${peakCur447c.toFixed(1)}) is not followed within two scenes by any revelation — the audience's single greatest moment of wonder leads to no disclosure. At the moment of maximum "what is really true?", a story should give the audience something true: a revelation that addresses the wonder and redirects it into a new question. When the peak curiosity moment leads nowhere, the story teaches the audience that their most intense engagement will go unrewarded.`,
           suggestedFix: `Schedule a revelation within two scenes of the story's curiosity peak: at the moment the audience is most hungry for truth, give them a disclosure — not necessarily the central answer, but any truth that addresses the question raised by the peak wonder. The peak of curiosity is a primed moment; let a revelation land while the audience is leaning in.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 461: PAYOFF_RELATIONSHIP_VOID, SEED_SCENE_EMOTION_VOID, RELATIONSHIP_STASIS_RUN ──
+
+  // PAYOFF_RELATIONSHIP_VOID (co-occurrence/decoupling × payoff × relationship, n≥8, ≥2 payoff
+  // scenes): Every scene that pays off a planted setup (payoffSetupIds non-empty) carries no
+  // relationship shift. A payoff is the moment a promise comes due — and the most resonant
+  // resolutions land on the people involved, redrawing a bond as a thread closes: a debt repaid
+  // restores trust, a betrayal revealed ruptures it, a sacrifice fulfilled deepens it. When every
+  // payoff resolves structurally but leaves all relationships untouched, the plumbing of setup-and-
+  // payoff runs disconnected from the human stakes it should be serving.
+  // Distinctness: PAYOFF_NO_EMOTION (Wave 377) audits the emotional channel of payoff scenes,
+  // PAYOFF_SUSPENSE_VOID (Wave 419) the suspense channel, PAYOFF_CURIOSITY_DECOUPLED (Wave 335)
+  // the curiosity channel — this completes the payoff correlation set on the RELATIONSHIP channel,
+  // the one remaining empty cell. REVELATION_RELATIONSHIP_VOID, CLOCK_RAISE_RELATIONSHIP_VOID, and
+  // DRAMATIC_TURN_RELATIONSHIP_VOID (Waves 419/447) are the same relationship-channel check on
+  // different scene populations (revelation, clock, turn) — this is the payoff population.
+  // Distinct from PAYOFF_PEAK_INERT (Wave 433) which isolates the single densest payoff and fires
+  // only when it is inert across ALL channels at once; this fires when the relationship channel is
+  // absent across EVERY payoff scene regardless of their other channels.
+  if (records.length >= 8) {
+    const payoffRecs461a = (records as any[]).filter(r => ((r.payoffSetupIds ?? []) as any[]).length > 0);
+    if (payoffRecs461a.length >= 2 &&
+        payoffRecs461a.every(r => ((r.relationshipShifts ?? []) as any[]).length === 0)) {
+      issues.push({
+        location: `${payoffRecs461a.length} payoff scene(s) — no relationship shift in any`,
+        rule: 'PAYOFF_RELATIONSHIP_VOID',
+        severity: 'minor',
+        description: `All ${payoffRecs461a.length} payoff scenes (where a planted setup resolves) carry no relationship shift — every thread closes without moving a single bond. A payoff is a promise coming due, and the most resonant resolutions land on the people involved: a debt repaid restores trust, a betrayal revealed ruptures it, a sacrifice fulfilled deepens it. When payoffs resolve the plot but leave all relationships untouched, the setup-and-payoff machinery runs disconnected from the human stakes it should serve, and the audience gets structural closure without relational consequence.`,
+        suggestedFix: 'Let at least one payoff move a relationship: arrange for a thread to resolve in a way that redraws a bond — the resolution that repays a debt should restore (or fail to restore) trust, the payoff that exposes a lie should rupture an alliance. When the closing of a structural loop also shifts how two characters stand, the payoff pays off on both the plot and the human level.',
+      });
+    }
+  }
+
+  // SEED_SCENE_EMOTION_VOID (co-occurrence/decoupling × seed × emotion, n≥8, ≥3 seed scenes):
+  // Every scene that plants a clue (seededClueIds non-empty) is emotionally neutral. Foreshadowing
+  // works by encoding a detail in the audience's memory so its later payoff resonates — and emotion
+  // is the primary memory-encoder: a clue dropped during a charged moment lodges, while one dropped
+  // into a flat scene slides past unremembered. When every clue is planted in an emotionally neutral
+  // scene, the seeds are sown in forgettable ground, and the eventual payoffs land without the
+  // "of course — it was there all along" recognition that depends on the audience having retained
+  // the plant.
+  // Distinctness: CLUE_SEED_SUSPENSE_VOID (Wave 350) audits the suspense channel of seed scenes,
+  // SEED_SCENE_CURIOSITY_VOID (Wave 363) the curiosity channel — this completes the seed
+  // correlation set on the EMOTION channel, the remaining empty cell. Distinct from SUSPENSE_SPIKE_
+  // NO_EMOTION / CLOCK_RAISED_NO_EMOTION / DRAMATIC_TURN_NO_EMOTION / PAYOFF_NO_EMOTION (Waves
+  // 391/367/377/377) which are the same emotion-channel check on different scene populations; this
+  // is the seed-scene population. Distinct from CLUE_SEED_CLUSTER (Wave 271, density/timing of
+  // seeds) — this audits the emotional texture of seed scenes, not their distribution.
+  if (records.length >= 8) {
+    const seedScenes461b = (records as any[]).filter(r => ((r.seededClueIds ?? []) as any[]).length > 0);
+    if (seedScenes461b.length >= 3 &&
+        seedScenes461b.every(r => r.emotionalShift === 'neutral')) {
+      issues.push({
+        location: `${seedScenes461b.length} seed scene(s) — all emotionally neutral`,
+        rule: 'SEED_SCENE_EMOTION_VOID',
+        severity: 'minor',
+        description: `All ${seedScenes461b.length} scenes that plant clues (seededClueIds) are emotionally neutral — the foreshadowing engine is sowing its seeds in forgettable ground. Emotion is the primary memory-encoder: a detail dropped during a charged moment lodges in the audience's memory, while one dropped into a flat scene slides past unretained. When every clue is planted without emotional charge, the eventual payoffs cannot trigger the "it was there all along" recognition, because the audience never encoded the plant in the first place.`,
+        suggestedFix: 'Plant at least one clue inside an emotionally charged scene: attach the seeded detail to a moment of conflict, tenderness, fear, or triumph so the audience encodes it alongside the feeling. A clue remembered because it arrived during an emotional peak makes its payoff land as recognition; a clue planted in a neutral scene pays off as new information the audience does not recall being set up.',
+      });
+    }
+  }
+
+  // RELATIONSHIP_STASIS_RUN (run-based × relationship-absence, n≥10, maxRun≥6, ≥2 relationship-
+  // shift scenes overall): Six or more consecutive scenes carry no relationship shift, even though
+  // the story moves bonds at least twice elsewhere. The relational engine — the evolving web of
+  // trust, power, and affection between characters — falls silent across a sustained stretch while
+  // the plot continues. Relationships are a primary axis of audience investment; a long run where
+  // no bond shifts signals that the interpersonal stakes have been parked, and the story coasts on
+  // plot mechanics alone for that span.
+  // Distinctness: EMOTIONAL_NEUTRAL_RUN (Wave 324) is the run-based check on the EMOTION channel
+  // (consecutive neutral emotionalShift); this is the run-based check on the RELATIONSHIP channel
+  // (consecutive scenes with no relationshipShifts) — a different channel and the first run-based
+  // audit of relationship absence. Distinct from CURIOSITY_DECLINE_RUN (Wave 433) and SUSPENSE_
+  // DECLINE_RUN (Wave 447), which track runs of negative VALENCE on a numeric delta; relationship
+  // shifts have no valence axis here, so this tracks presence/absence over a run, not direction.
+  // Distinct from the relationship co-occurrence voids (REVELATION/CLOCK/DRAMATIC_TURN/PAYOFF_
+  // RELATIONSHIP_VOID) which scope to specific event scenes; this audits the whole timeline for a
+  // contiguous relational silence.
+  if (records.length >= 10) {
+    const totalRelScenes461c = (records as any[]).filter(r => ((r.relationshipShifts ?? []) as any[]).length > 0).length;
+    if (totalRelScenes461c >= 2) {
+      let maxRun461c = 0;
+      let curRun461c = 0;
+      let maxStart461c = -1;
+      let curStart461c = -1;
+      for (let i = 0; i < records.length; i++) {
+        if (((records[i] as any).relationshipShifts ?? []).length === 0) {
+          if (curRun461c === 0) curStart461c = i;
+          if (++curRun461c > maxRun461c) { maxRun461c = curRun461c; maxStart461c = curStart461c; }
+        } else {
+          curRun461c = 0;
+        }
+      }
+      if (maxRun461c >= 6) {
+        const runEnd461c = maxStart461c + maxRun461c - 1;
+        issues.push({
+          location: `Scenes ${records[maxStart461c].sceneIdx}–${records[runEnd461c].sceneIdx} (${maxRun461c} consecutive)`,
+          rule: 'RELATIONSHIP_STASIS_RUN',
+          severity: 'minor',
+          description: `A run of ${maxRun461c} consecutive scenes (Scenes ${records[maxStart461c].sceneIdx}–${records[runEnd461c].sceneIdx}) carries no relationship shift, though the story moves a bond ${totalRelScenes461c} times elsewhere. The relational engine — the evolving web of trust, power, and affection between characters — falls silent across this stretch while the plot keeps moving. Relationships are a primary axis of audience investment; a sustained run where no bond shifts tells the audience the interpersonal stakes have been parked, and the story coasts on plot mechanics alone until they resume.`,
+          suggestedFix: `Move at least one relationship within the ${maxRun461c}-scene stasis run: let the events of this stretch cost or strengthen a bond, shift the balance of power between two characters, or test an alliance. The plot advancing without any relational consequence reads as machinery; threading even one bond shift through the run keeps the human stakes alive alongside the events.`,
         });
       }
     }

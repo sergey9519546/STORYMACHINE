@@ -27424,6 +27424,82 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 461 — causalityPass: payoff relationship void, seed scene emotion void, relationship stasis run', async () => {
+    const makeRec461 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      seededClueIds: [], payoffSetupIds: [], revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], dramaticTurn: 'nothing',
+      purpose: 'development', unresolvedClues: [],
+      ...overrides,
+    });
+    const runC461 = async (records: any[]) => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PAYOFF_RELATIONSHIP_VOID fires when every payoff scene carries no relationship shift', async () => {
+      // n=8; payoffs at 3,6, neither has a relationship shift → fires
+      const recs461a = Array.from({ length: 8 }, (_, i) =>
+        makeRec461(i, { payoffSetupIds: [3, 6].includes(i) ? ['setup-1'] : [] }),
+      );
+      const res = await runC461(recs461a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_RELATIONSHIP_VOID'), 'PAYOFF_RELATIONSHIP_VOID should fire');
+    });
+
+    it('PAYOFF_RELATIONSHIP_VOID does NOT fire when a payoff scene also moves a relationship', async () => {
+      // n=8; payoffs at 3,6; scene 3 carries a relationship shift → not all void → no fire
+      const recs461anr = Array.from({ length: 8 }, (_, i) =>
+        makeRec461(i, {
+          payoffSetupIds: [3, 6].includes(i) ? ['setup-1'] : [],
+          relationshipShifts: i === 3 ? [{ pair: 'A-B', delta: 1 }] : [],
+        }),
+      );
+      const res = await runC461(recs461anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_RELATIONSHIP_VOID'), 'PAYOFF_RELATIONSHIP_VOID should not fire');
+    });
+
+    it('SEED_SCENE_EMOTION_VOID fires when every clue-planting scene is emotionally neutral', async () => {
+      // n=8; seeds at 1,3,5, all emotionally neutral → fires
+      const recs461b = Array.from({ length: 8 }, (_, i) =>
+        makeRec461(i, { seededClueIds: [1, 3, 5].includes(i) ? ['clue-1'] : [] }),
+      );
+      const res = await runC461(recs461b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_SCENE_EMOTION_VOID'), 'SEED_SCENE_EMOTION_VOID should fire');
+    });
+
+    it('SEED_SCENE_EMOTION_VOID does NOT fire when a seed scene carries an emotional charge', async () => {
+      // n=8; seeds at 1,3,5; scene 3 is emotionally positive → not all neutral → no fire
+      const recs461bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec461(i, {
+          seededClueIds: [1, 3, 5].includes(i) ? ['clue-1'] : [],
+          emotionalShift: i === 3 ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runC461(recs461bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_SCENE_EMOTION_VOID'), 'SEED_SCENE_EMOTION_VOID should not fire');
+    });
+
+    it('RELATIONSHIP_STASIS_RUN fires when 6+ consecutive scenes carry no relationship shift', async () => {
+      // n=10; relationship shifts at 0 and 9; scenes 1–8 silent → run=8 ≥ 6; total rel scenes=2 → fires
+      const recs461c = Array.from({ length: 10 }, (_, i) =>
+        makeRec461(i, { relationshipShifts: [0, 9].includes(i) ? [{ pair: 'A-B', delta: 1 }] : [] }),
+      );
+      const res = await runC461(recs461c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_STASIS_RUN'), 'RELATIONSHIP_STASIS_RUN should fire');
+    });
+
+    it('RELATIONSHIP_STASIS_RUN does NOT fire when relationship shifts keep the silent run under 6', async () => {
+      // n=10; shifts at 0,4,8 → longest silent run = 3 < 6 → no fire
+      const recs461cnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec461(i, { relationshipShifts: [0, 4, 8].includes(i) ? [{ pair: 'A-B', delta: 1 }] : [] }),
+      );
+      const res = await runC461(recs461cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_STASIS_RUN'), 'RELATIONSHIP_STASIS_RUN should not fire');
+    });
+  });
+
   describe('Wave 447 — causalityPass: suspense decline run, dramatic turn relationship void, curiosity peak no followthrough', async () => {
     const makeRec447 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
