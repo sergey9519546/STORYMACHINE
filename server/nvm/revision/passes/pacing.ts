@@ -86,6 +86,14 @@
 // decoupled (≥3 high-suspense and ≥3 emotional scenes never coinciding — danger and feeling
 // always in separate scenes; co-occurrence × suspense × emotional channel, completing the
 // co-occurrence family alongside SUSPENSE_CURIOSITY_DECOUPLED).
+// Wave 467 additions: revelation suspense aftermath flat (no revelation scene followed by suspense
+// rise in next 2 scenes — disclosures don't escalate danger; sequence/aftermath × suspense ×
+// revelation trigger, first aftermath check with revelation as trigger), clock pressure run (≥4
+// consecutive scenes all under clock pressure — urgency collapses into ambient noise without
+// contrast; run-based × clock channel, first run check for the clock channel), emotional curiosity
+// decoupled (≥3 emotional and ≥3 curiosity-positive scenes never coinciding — feeling and
+// wondering always separate; co-occurrence/decoupling × emotional × curiosity, completing the
+// three-way co-occurrence family).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2128,6 +2136,120 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `All ${highSuspRecs453c.length} high-suspense scenes (suspenseDelta > 1) are emotionally neutral while ${emotionRecs453c.length} emotional scenes exist elsewhere — danger and feeling are systematically in separate scenes and never reinforce each other within a single beat. When suspense and emotional texture always occupy different structural territories, the audience experiences danger as an external event and feeling as an internal event that the story keeps at arm's length from its most intense moments. The most powerful scenes combine threat with felt stakes: a character in danger who also reveals something about who they are or what they want.`,
           suggestedFix: `Give at least one high-suspense scene an emotional undercurrent — a character's fear, desperation, grief, or dark resolve surfacing within the danger itself. The suspense does not need to be reduced; emotion can layer on top of it. A character who is terrified, angry, or devastated in the middle of a threat sequence is more gripping than one who faces the threat with neutral affect. Even a single scene where danger and feeling converge breaks the structural decoupling.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 467: REVELATION_SUSPENSE_AFTERMATH_FLAT, CLOCK_PRESSURE_RUN, EMOTIONAL_CURIOSITY_DECOUPLED ──
+
+  // REVELATION_SUSPENSE_AFTERMATH_FLAT (minor, n≥8, ≥2 revelation scenes): No revelation scene
+  // is followed by a suspense rise (suspenseDelta > 0) in the next two scenes — disclosed truths
+  // never escalate the danger downstream. A revelation should make the situation more urgent or
+  // more dangerous: the audience now knows something that changes the stakes, and the scenes that
+  // follow should reflect that escalation. When every disclosure is followed by two scenes of flat
+  // or falling suspense, revelations land as information delivered rather than story turned.
+  // Sequence/aftermath mode × suspense channel × revelation trigger. Distinct from SUSPENSE_
+  // EMOTIONAL_AFTERMATH_FLAT (Wave 453: emotional aftermath of SUSPENSE peaks — different trigger
+  // and channel), CURIOSITY_AFTERMATH_FLAT (Wave 439: curiosity aftermath of SUSPENSE peaks —
+  // different trigger), and PROACTIVE_REVELATION_ABSENT (intention.ts Wave 339: revelation not
+  // following proactive acts — different file and backward-cause direction). This is the first
+  // aftermath check triggered by revelation scenes, auditing the suspense channel.
+  if (records.length >= 8) {
+    const revRecs467a = (records as any[]).filter(r =>
+      r.revelation !== null && r.revelation !== undefined && r.revelation !== '',
+    );
+    if (revRecs467a.length >= 2) {
+      const anySuspAftermath467a = revRecs467a.some((r: any) => {
+        const idx = (records as any[]).indexOf(r);
+        const window467a = (records as any[]).slice(idx + 1, idx + 3);
+        return window467a.some((a: any) => (a.suspenseDelta ?? 0) > 0);
+      });
+      if (!anySuspAftermath467a) {
+        issues.push({
+          location: 'All revelation scenes — suspense aftermath absent',
+          rule: 'REVELATION_SUSPENSE_AFTERMATH_FLAT',
+          severity: 'minor',
+          description: `None of the story's ${revRecs467a.length} revelation scenes is followed by a suspense rise (suspenseDelta > 0) in the next two scenes — disclosed truths never escalate the danger. A revelation should make the situation more urgent: the audience now knows something that changes the stakes, and what they know should tighten the screw in the scenes that follow. When every disclosure is followed by two scenes of flat or falling suspense, information is delivered without consequence — the truth is told but not felt as escalation.`,
+          suggestedFix: 'After at least one revelation, let the next scene escalate tension: the disclosed truth has implications that make the situation more dangerous, the character now knows something that changes what they must do and how quickly, or the revelation exposes a threat the audience had not yet seen. A disclosure that leaves the story at the same temperature registers as information given, not as story turned.',
+        });
+      }
+    }
+  }
+
+  // CLOCK_PRESSURE_RUN (minor, n≥10, ≥2 non-clock scenes, maxClockRun≥4): Four or more
+  // consecutive scenes each under explicit clock pressure (clockRaised = true or clockDelta > 0).
+  // Continuous deadline pressure across four or more consecutive scenes collapses urgency into
+  // ambient noise: when every scene is under the same ticking clock, the deadline no longer
+  // creates pacing contrast — it becomes the story's standing condition rather than a
+  // rhythmically escalated threat. Effective urgency requires structural contrast; non-clock
+  // scenes make the scenes with pressure land harder. Run-based mode × clock channel. Distinct
+  // from CLOCK_SCENE_PACING_MISMATCH (Wave 316: clock scenes average above 1.5× overall length
+  // — a page-weight issue, not a consecutive-run pattern), CLOCK_SCENE_UNDERWEIGHT (Wave 369:
+  // clock scenes average below 60% — complementary page-weight), and all suspense/curiosity/
+  // emotional flatline runs (different channels): this is the first run-based check for the
+  // clock channel, detecting bloat through sustained consecutive urgency rather than proportion.
+  if (records.length >= 10) {
+    const nonClockCount467b = (records as any[]).filter(r =>
+      r.clockRaised !== true && ((r as any).clockDelta ?? 0) <= 0,
+    ).length;
+    if (nonClockCount467b >= 2) {
+      let maxClockRun467b = 0;
+      let curClockRun467b = 0;
+      let maxClockStart467b = -1;
+      let curClockStart467b = -1;
+      for (let i = 0; i < records.length; i++) {
+        const isClocked467b = (records as any[])[i].clockRaised === true || ((records as any[])[i].clockDelta ?? 0) > 0;
+        if (isClocked467b) {
+          if (curClockRun467b === 0) curClockStart467b = i;
+          if (++curClockRun467b > maxClockRun467b) {
+            maxClockRun467b = curClockRun467b;
+            maxClockStart467b = curClockStart467b;
+          }
+        } else {
+          curClockRun467b = 0;
+        }
+      }
+      if (maxClockRun467b >= 4) {
+        issues.push({
+          location: `Scenes ${maxClockStart467b}–${maxClockStart467b + maxClockRun467b - 1} — unbroken clock-pressure run`,
+          rule: 'CLOCK_PRESSURE_RUN',
+          severity: 'minor',
+          description: `${maxClockRun467b} consecutive scenes (${maxClockStart467b}–${maxClockStart467b + maxClockRun467b - 1}) all carry explicit clock pressure (clockRaised or clockDelta > 0). When four or more scenes in a row are all under the same deadline, urgency collapses into ambient noise: the clock stops feeling like a ticking threat and becomes the story's permanent background condition. Effective deadline pacing relies on contrast — non-clock scenes give the audience a structural moment to breathe, making the return of pressure register as re-escalation rather than continuation of the same standing urgency.`,
+          suggestedFix: `Break the clock run at Scenes ${maxClockStart467b}–${maxClockStart467b + maxClockRun467b - 1}: introduce at least one scene without clock pressure in the middle of the run. Even a brief scene of planning, connection, or reaction without an explicit deadline makes the next clock scene land as renewed threat. Sustained unrelenting urgency is a form of pacing monotony; the pressure must breathe to have impact.`,
+        });
+      }
+    }
+  }
+
+  // EMOTIONAL_CURIOSITY_DECOUPLED (minor, n≥10, ≥3 emotional and ≥3 curiosity-positive scenes,
+  // zero overlap): No scene is both emotionally charged (emotionalShift ≠ 'neutral') AND raises
+  // curiosity (curiosityDelta > 0) — feeling and wondering never occur together in the same beat.
+  // When the emotional register and the question-raising engine are systematically in separate
+  // scenes, the audience can feel or wonder but never simultaneously. The most immersive
+  // storytelling binds feeling to question: a character's devastation is more gripping when the
+  // audience simultaneously does not know what comes next; a mystery is more compelling when a
+  // character's emotional stakes are also on the line in the moment of discovery. Co-occurrence/
+  // decoupling mode × emotional channel × curiosity channel. Distinct from SUSPENSE_CURIOSITY_
+  // DECOUPLED (Wave 439: suspense × curiosity — not emotional), SUSPENSE_EMOTION_DECOUPLED (Wave
+  // 453: suspense × emotional — not curiosity), and EMOTIONAL_FLATLINE_RUN (Wave 453: run-based
+  // mode on emotional channel — consecutive window, not global co-occurrence pattern): this
+  // completes the three-way co-occurrence decoupling family (suspense×curiosity, suspense×
+  // emotion, emotion×curiosity).
+  if (records.length >= 10) {
+    const emotionRecs467c = (records as any[]).filter(r => (r as any).emotionalShift !== 'neutral');
+    const curioRecs467c = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0);
+    if (emotionRecs467c.length >= 3 && curioRecs467c.length >= 3) {
+      const anyOverlap467c = (records as any[]).some(r =>
+        (r as any).emotionalShift !== 'neutral' && (r.curiosityDelta ?? 0) > 0,
+      );
+      if (!anyOverlap467c) {
+        issues.push({
+          location: 'Emotional and curiosity-positive scenes — never coincide',
+          rule: 'EMOTIONAL_CURIOSITY_DECOUPLED',
+          severity: 'minor',
+          description: `All ${emotionRecs467c.length} emotionally charged scenes (emotionalShift ≠ 'neutral') have flat or negative curiosityDelta, and all ${curioRecs467c.length} curiosity-raising scenes (curiosityDelta > 0) are emotionally neutral — feeling and wondering never occur together in the same beat. When emotional activation and question-raising are systematically in separate scenes, the story keeps its two most important audience-engagement systems apart: the audience can feel or wonder, but never simultaneously. The most compelling scenes combine both — a character's grief or triumph is more immersive when the audience simultaneously doesn't know what comes next.`,
+          suggestedFix: "Let at least one emotionally active scene also raise a question: a revelation that strikes with grief, a moment of triumph shadowed by a new unknown, a relationship rupture that opens a mystery. The co-presence of feeling and wondering is one of narrative's most powerful combinations — the audience is simultaneously attached (through emotion) and pulled forward (through curiosity). A scene that achieves both is harder to leave than one that achieves only one.",
         });
       }
     }

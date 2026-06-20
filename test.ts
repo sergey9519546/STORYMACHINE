@@ -20913,6 +20913,91 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 467 — pacingPass: revelation suspense aftermath flat, clock pressure run, emotional curiosity decoupled', async () => {
+    const makeRec467 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain467 = (n: number) =>
+      Array.from({ length: n }, (_, i) =>
+        `INT. SC${i} - DAY\n\nAction line for scene ${i}.`
+      ).join('\n\n');
+    const runP467 = async (records: any[]) => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      const fountain = makeFountain467(records.length);
+      return pacingPass({ fountain, original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('REVELATION_SUSPENSE_AFTERMATH_FLAT fires when no revelation is followed by a suspense rise within 2 scenes', async () => {
+      // n=10; revelations at scenes 2 and 6; aftermath scenes 3-4 and 7-8 all have suspenseDelta ≤ 0 → fires
+      const recs467a = Array.from({ length: 10 }, (_, i) => makeRec467(i));
+      recs467a[2] = makeRec467(2, { revelation: 'the truth' });
+      recs467a[6] = makeRec467(6, { revelation: 'another truth' });
+      const res = await runP467(recs467a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_SUSPENSE_AFTERMATH_FLAT'), 'REVELATION_SUSPENSE_AFTERMATH_FLAT should fire');
+    });
+
+    it('REVELATION_SUSPENSE_AFTERMATH_FLAT does not fire when a revelation is followed by suspense within 2 scenes', async () => {
+      // n=10; revelation at scene 2; scene 3 has suspenseDelta=2 → no fire
+      const recs467anr = Array.from({ length: 10 }, (_, i) => makeRec467(i));
+      recs467anr[2] = makeRec467(2, { revelation: 'the truth' });
+      recs467anr[3] = makeRec467(3, { suspenseDelta: 2 });
+      recs467anr[6] = makeRec467(6, { revelation: 'another truth' });
+      const res = await runP467(recs467anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_SUSPENSE_AFTERMATH_FLAT'), 'REVELATION_SUSPENSE_AFTERMATH_FLAT should not fire');
+    });
+
+    it('CLOCK_PRESSURE_RUN fires when ≥4 consecutive scenes all have clock pressure', async () => {
+      // n=12; scenes 0,1 no clock; scenes 2-6 all clockRaised=true (run=5); scenes 7-11 no clock → fires
+      const recs467b = Array.from({ length: 12 }, (_, i) => makeRec467(i));
+      for (let i = 2; i <= 6; i++) recs467b[i] = makeRec467(i, { clockRaised: true });
+      const res = await runP467(recs467b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_PRESSURE_RUN'), 'CLOCK_PRESSURE_RUN should fire');
+    });
+
+    it('CLOCK_PRESSURE_RUN does not fire when clock scenes are broken up', async () => {
+      // n=12; clock scenes at 2,3 then gap at 4, then clock at 5,6 — max run=2 → no fire
+      const recs467bnr = Array.from({ length: 12 }, (_, i) => makeRec467(i));
+      recs467bnr[2] = makeRec467(2, { clockRaised: true });
+      recs467bnr[3] = makeRec467(3, { clockRaised: true });
+      recs467bnr[5] = makeRec467(5, { clockRaised: true });
+      recs467bnr[6] = makeRec467(6, { clockRaised: true });
+      const res = await runP467(recs467bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_PRESSURE_RUN'), 'CLOCK_PRESSURE_RUN should not fire');
+    });
+
+    it('EMOTIONAL_CURIOSITY_DECOUPLED fires when emotional scenes and curiosity scenes never coincide', async () => {
+      // n=12; scenes 1,3,5 are emotional (positive) but curiosityDelta=0; scenes 7,9,11 have curiosityDelta=1 but neutral → fires
+      const recs467c = Array.from({ length: 12 }, (_, i) => makeRec467(i));
+      recs467c[1] = makeRec467(1, { emotionalShift: 'positive', curiosityDelta: 0 });
+      recs467c[3] = makeRec467(3, { emotionalShift: 'negative', curiosityDelta: 0 });
+      recs467c[5] = makeRec467(5, { emotionalShift: 'positive', curiosityDelta: 0 });
+      recs467c[7] = makeRec467(7, { emotionalShift: 'neutral', curiosityDelta: 1 });
+      recs467c[9] = makeRec467(9, { emotionalShift: 'neutral', curiosityDelta: 2 });
+      recs467c[11] = makeRec467(11, { emotionalShift: 'neutral', curiosityDelta: 1 });
+      const res = await runP467(recs467c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'EMOTIONAL_CURIOSITY_DECOUPLED'), 'EMOTIONAL_CURIOSITY_DECOUPLED should fire');
+    });
+
+    it('EMOTIONAL_CURIOSITY_DECOUPLED does not fire when at least one scene is both emotional and curiosity-positive', async () => {
+      // n=12; scene 5 has both emotionalShift='positive' and curiosityDelta=2 → no fire
+      const recs467cnr = Array.from({ length: 12 }, (_, i) => makeRec467(i));
+      recs467cnr[1] = makeRec467(1, { emotionalShift: 'positive', curiosityDelta: 0 });
+      recs467cnr[3] = makeRec467(3, { emotionalShift: 'negative', curiosityDelta: 0 });
+      recs467cnr[5] = makeRec467(5, { emotionalShift: 'positive', curiosityDelta: 2 });
+      recs467cnr[7] = makeRec467(7, { emotionalShift: 'neutral', curiosityDelta: 1 });
+      recs467cnr[9] = makeRec467(9, { emotionalShift: 'neutral', curiosityDelta: 2 });
+      recs467cnr[11] = makeRec467(11, { emotionalShift: 'neutral', curiosityDelta: 1 });
+      const res = await runP467(recs467cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'EMOTIONAL_CURIOSITY_DECOUPLED'), 'EMOTIONAL_CURIOSITY_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 453 — pacingPass: emotional flatline run, suspense emotional aftermath flat, suspense emotion decoupled', async () => {
     const makeRec453 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
