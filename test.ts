@@ -28598,6 +28598,77 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 475 — causalityPass: emotional zone cluster, seed temporal cluster, payoff zone cluster', async () => {
+    const makeRec475 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      seededClueIds: [], payoffSetupIds: [], revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], dramaticTurn: 'nothing',
+      purpose: 'development', unresolvedClues: [],
+      ...overrides,
+    });
+    const runC475 = async (records: any[]) => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('EMOTIONAL_ZONE_CLUSTER fires when >75% of charged scenes fall in one third', async () => {
+      // n=12; negative scenes at positions 0,1,2,3 (all in first third, floor(12/3)=4 → 0-3)
+      // 4/4=100% > 75% → fires
+      const recs475a = Array.from({ length: 12 }, (_, i) =>
+        makeRec475(i, { emotionalShift: [0, 1, 2, 3].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runC475(recs475a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'EMOTIONAL_ZONE_CLUSTER'), 'EMOTIONAL_ZONE_CLUSTER should fire');
+    });
+
+    it('EMOTIONAL_ZONE_CLUSTER does not fire when charged scenes spread across thirds', async () => {
+      // n=12; charged scenes at 0,4,8,11 → first:1, mid:1, last:2 → max=2/4=50% ≤ 75%
+      const recs475anr = Array.from({ length: 12 }, (_, i) =>
+        makeRec475(i, { emotionalShift: [0, 4, 8, 11].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runC475(recs475anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'EMOTIONAL_ZONE_CLUSTER'), 'EMOTIONAL_ZONE_CLUSTER should not fire');
+    });
+
+    it('SEED_TEMPORAL_CLUSTER fires when >75% of seed scenes fall in one third', async () => {
+      // n=12; seeds at positions 0,1,2,3 (all in first third) → 4/4=100% > 75% → fires
+      const recs475b = Array.from({ length: 12 }, (_, i) =>
+        makeRec475(i, { seededClueIds: [0, 1, 2, 3].includes(i) ? ['clue-x'] : [] }),
+      );
+      const res = await runC475(recs475b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_TEMPORAL_CLUSTER'), 'SEED_TEMPORAL_CLUSTER should fire');
+    });
+
+    it('SEED_TEMPORAL_CLUSTER does not fire when seed scenes spread across thirds', async () => {
+      // n=12; seeds at 0,4,8,11 → first:1, mid:1, last:2 → max=2/4=50% ≤ 75%
+      const recs475bnr = Array.from({ length: 12 }, (_, i) =>
+        makeRec475(i, { seededClueIds: [0, 4, 8, 11].includes(i) ? ['clue-x'] : [] }),
+      );
+      const res = await runC475(recs475bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_TEMPORAL_CLUSTER'), 'SEED_TEMPORAL_CLUSTER should not fire');
+    });
+
+    it('PAYOFF_ZONE_CLUSTER fires when >75% of payoff scenes fall in one third', async () => {
+      // n=12; payoffs at positions 0,1,2,3 (all in first third) → 4/4=100% > 75% → fires
+      const recs475c = Array.from({ length: 12 }, (_, i) =>
+        makeRec475(i, { payoffSetupIds: [0, 1, 2, 3].includes(i) ? ['setup-x'] : [] }),
+      );
+      const res = await runC475(recs475c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_ZONE_CLUSTER'), 'PAYOFF_ZONE_CLUSTER should fire');
+    });
+
+    it('PAYOFF_ZONE_CLUSTER does not fire when payoff scenes spread across thirds', async () => {
+      // n=12; payoffs at 0,4,8,11 → first:1, mid:1, last:2 → max=2/4=50% ≤ 75%
+      const recs475cnr = Array.from({ length: 12 }, (_, i) =>
+        makeRec475(i, { payoffSetupIds: [0, 4, 8, 11].includes(i) ? ['setup-x'] : [] }),
+      );
+      const res = await runC475(recs475cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_ZONE_CLUSTER'), 'PAYOFF_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 461 — causalityPass: payoff relationship void, seed scene emotion void, relationship stasis run', async () => {
     const makeRec461 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

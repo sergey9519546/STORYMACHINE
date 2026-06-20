@@ -92,6 +92,16 @@
 // existing in the story — the relational engine falls silent for a sustained stretch; run-based ×
 // relationship-absence mode, the relationship-channel parallel of EMOTIONAL_NEUTRAL_RUN and the
 // first run-based check auditing the relationship channel rather than a valence delta).
+// Wave 475 additions: emotional zone cluster (distribution/timing — >75% of emotionally charged
+// scenes fall in a single third; the story's affective arc is a spike surrounded by flat territory;
+// first distribution/timing check on the temporal spread of emotional charge across the arc; distinct
+// from EMOTIONAL_NEUTRAL_RUN which is run-based and EMOTIONAL_POSITIVE_DESERT which is zone-absence),
+// seed temporal cluster (distribution/timing — >75% of clue-planting scenes fall in a single third;
+// foreshadowing is architecturally concentrated; distinct from CLUE_SEED_CLUSTER which measures
+// within-scene density and from the seed correlation checks which measure accompanying signals),
+// payoff zone cluster (distribution/timing — >75% of payoff scenes fall in a single third; thread
+// resolutions burst in one zone while the other thirds remain open; distinct from PAYOFF_BACK_LOADED
+// which uses a binary first/second-half partition and from the payoff correlation checks).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2329,6 +2339,114 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `A run of ${maxRun461c} consecutive scenes (Scenes ${records[maxStart461c].sceneIdx}–${records[runEnd461c].sceneIdx}) carries no relationship shift, though the story moves a bond ${totalRelScenes461c} times elsewhere. The relational engine — the evolving web of trust, power, and affection between characters — falls silent across this stretch while the plot keeps moving. Relationships are a primary axis of audience investment; a sustained run where no bond shifts tells the audience the interpersonal stakes have been parked, and the story coasts on plot mechanics alone until they resume.`,
           suggestedFix: `Move at least one relationship within the ${maxRun461c}-scene stasis run: let the events of this stretch cost or strengthen a bond, shift the balance of power between two characters, or test an alliance. The plot advancing without any relational consequence reads as machinery; threading even one bond shift through the run keeps the human stakes alive alongside the events.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 475: EMOTIONAL_ZONE_CLUSTER, SEED_TEMPORAL_CLUSTER, PAYOFF_ZONE_CLUSTER ──
+  const n475 = records.length;
+
+  // EMOTIONAL_ZONE_CLUSTER — Distribution/timing × emotional channel (n≥8, ≥4 non-neutral
+  // scenes, >75% in a single third). When emotionally charged scenes cluster in one structural
+  // zone, the story's affective arc becomes a spike surrounded by flat territory: the opening
+  // fails to build investment, the middle fails to escalate, or the closing arrives without the
+  // audience having anything left to feel.
+  // Distinct from: EMOTIONAL_NEUTRAL_RUN (Wave 324: run-based × consecutive neutral; a single
+  // gap, not zone distribution), EMOTIONAL_POSITIVE_DESERT (Wave 282: zone-absence × positive ×
+  // Act 2; absence of a specific valence in a specific zone, not overall temporal cluster),
+  // EMOTION_WITHOUT_DRIVER_RUN (Wave 310: run-based × non-neutral without causal driver; a
+  // consecutive-gap check, not a zone-distribution check).
+  if (n475 >= 8) {
+    const chargedPositions475a = (records as any[])
+      .map((r, pos) => ({ pos, shift: r.emotionalShift ?? 'neutral' }))
+      .filter(x => x.shift !== 'neutral')
+      .map(x => x.pos);
+    if (chargedPositions475a.length >= 4) {
+      const third475a = Math.floor(n475 / 3);
+      const firstZ475a = chargedPositions475a.filter(p => p < third475a).length;
+      const midZ475a = chargedPositions475a.filter(p => p >= third475a && p < 2 * third475a).length;
+      const lastZ475a = chargedPositions475a.filter(p => p >= 2 * third475a).length;
+      const maxZ475a = Math.max(firstZ475a, midZ475a, lastZ475a);
+      if (maxZ475a / chargedPositions475a.length > 0.75) {
+        const zone475a = firstZ475a === maxZ475a ? 'opening' : midZ475a === maxZ475a ? 'middle' : 'closing';
+        issues.push({
+          location: `${maxZ475a}/${chargedPositions475a.length} emotionally charged scene(s) in the ${zone475a} third`,
+          rule: 'EMOTIONAL_ZONE_CLUSTER',
+          severity: 'minor',
+          description: `${maxZ475a} of ${chargedPositions475a.length} emotionally charged scenes (${(maxZ475a / chargedPositions475a.length * 100).toFixed(0)}%) fall within the ${zone475a} third — the story's affective arc clusters into one structural zone, leaving the remaining two-thirds emotionally flat. When all the feeling detonates in a single zone, the audience experiences a spike surrounded by inert territory: if the cluster is early, they have not yet bonded enough with the stakes for it to land; if it is late, they arrive at the climax having felt nothing building toward it; if it is in the middle, both the opening and closing are affectively silent. Emotional charge works best when distributed by dramatic need: enough opening feeling to establish investment, escalating emotion through the middle to raise stakes, and charged closing beats to pay off the built tension.`,
+          suggestedFix: `Redistribute emotional charge across all three thirds: move at least one or two non-neutral scenes out of the ${zone475a} cluster into the zones currently flat. This doesn't require entirely new scenes — heightening an existing character reaction, sharpening a confrontation, or making a quiet scene land harder can extend the emotional engine beyond its current concentrated zone. Aim for at least one charged scene per structural third.`,
+        });
+      }
+    }
+  }
+
+  // SEED_TEMPORAL_CLUSTER — Distribution/timing × seed/clue channel (n≥8, ≥4 seed scenes,
+  // >75% in a single third). When the story concentrates all its clue-planting in one structural
+  // zone, the foreshadowing engine misfires architecturally: an opening cluster telegraphs before
+  // the audience has invested; a closing cluster plants too late to retroactively foreshadow; a
+  // mid-script cluster leaves the opening and closing without latent mystery.
+  // Distinct from: CLUE_SEED_CLUSTER (Wave 254: 3+ seeds in one scene — within-scene density,
+  // not arc-wide zone distribution), CURIOSITY_FRONT_LOADED (Wave 268: all curiosityDelta spikes
+  // in first half — curiosity-signal channel, not the clue-plant channel), SEED_SCENE_CURIOSITY_
+  // VOID / CLUE_SEED_SUSPENSE_VOID / SEED_SCENE_EMOTION_VOID (Waves 363/350/461: correlation
+  // checks on what signals accompany seed scenes; this checks WHEN they appear in the arc).
+  if (n475 >= 8) {
+    const seedPositions475b = (records as any[])
+      .map((r, pos) => ({ pos, count: ((r.seededClueIds ?? []) as any[]).length }))
+      .filter(x => x.count > 0)
+      .map(x => x.pos);
+    if (seedPositions475b.length >= 4) {
+      const third475b = Math.floor(n475 / 3);
+      const firstZ475b = seedPositions475b.filter(p => p < third475b).length;
+      const midZ475b = seedPositions475b.filter(p => p >= third475b && p < 2 * third475b).length;
+      const lastZ475b = seedPositions475b.filter(p => p >= 2 * third475b).length;
+      const maxZ475b = Math.max(firstZ475b, midZ475b, lastZ475b);
+      if (maxZ475b / seedPositions475b.length > 0.75) {
+        const zone475b = firstZ475b === maxZ475b ? 'opening' : midZ475b === maxZ475b ? 'middle' : 'closing';
+        issues.push({
+          location: `${maxZ475b}/${seedPositions475b.length} clue-planting scene(s) in the ${zone475b} third`,
+          rule: 'SEED_TEMPORAL_CLUSTER',
+          severity: 'minor',
+          description: `${maxZ475b} of ${seedPositions475b.length} clue-planting scenes (${(maxZ475b / seedPositions475b.length * 100).toFixed(0)}%) fall within the ${zone475b} third — the foreshadowing engine concentrates its planting in one structural zone. Effective mystery architecture distributes seeds across the arc: early seeds build the sense that the world is full of information waiting to be understood; mid-script seeds reinforce patterns without telegraphing too clearly; late seeds plant evidence that feels retroactively obvious once the payoff lands. Clustering all planting in the ${zone475b} zone makes the seeding feel systematic and leaves the other zones without the latent information that makes payoffs feel earned rather than announced.`,
+          suggestedFix: `Redistribute clue-planting across all three thirds: move at least one or two seed scenes into the zones currently without foreshadowing. A late-act payoff feels most satisfying when the audience can trace the evidence back through the whole arc, not just through one structural pocket. Even a small planted detail — a character's offhand remark, a staging element that seems decorative — extends the foreshadowing web into the currently bare zones.`,
+        });
+      }
+    }
+  }
+
+  // PAYOFF_ZONE_CLUSTER — Distribution/timing × payoff channel (n≥8, ≥4 payoff scenes,
+  // >75% in a single third). When all thread resolutions concentrate in one structural zone,
+  // dramatic satisfaction is architecturally imbalanced: a dense cluster of payoffs creates a
+  // resolution burst while the other two-thirds remain structurally open. Payoffs work best
+  // when distributed — early payoffs reward investment in planted threads; mid-script payoffs
+  // fuel momentum by closing loops as new ones open; late payoffs deliver climactic satisfaction.
+  // Distinct from: PAYOFF_BACK_LOADED (Wave 268: all payoffs deferred to second half — a
+  // binary partition at 50%; this uses thirds at 33%/67% with a 75% threshold and fires when
+  // any third dominates, including the opening or middle), PAYOFF_PEAK_INERT (Wave 433: single-
+  // peak isolation — the densest payoff scene is emotionally/suspense/curiosity flat; a
+  // within-scene void check, not a zone-distribution check), PAYOFF_CURIOSITY_DECOUPLED /
+  // PAYOFF_SUSPENSE_VOID / PAYOFF_RELATIONSHIP_VOID / PAYOFF_NO_EMOTION (Waves 335/419/461/363:
+  // correlation checks on what signals accompany payoff scenes; this checks WHEN they appear).
+  if (n475 >= 8) {
+    const payoffPositions475c = (records as any[])
+      .map((r, pos) => ({ pos, count: ((r.payoffSetupIds ?? []) as any[]).length }))
+      .filter(x => x.count > 0)
+      .map(x => x.pos);
+    if (payoffPositions475c.length >= 4) {
+      const third475c = Math.floor(n475 / 3);
+      const firstZ475c = payoffPositions475c.filter(p => p < third475c).length;
+      const midZ475c = payoffPositions475c.filter(p => p >= third475c && p < 2 * third475c).length;
+      const lastZ475c = payoffPositions475c.filter(p => p >= 2 * third475c).length;
+      const maxZ475c = Math.max(firstZ475c, midZ475c, lastZ475c);
+      if (maxZ475c / payoffPositions475c.length > 0.75) {
+        const zone475c = firstZ475c === maxZ475c ? 'opening' : midZ475c === maxZ475c ? 'middle' : 'closing';
+        issues.push({
+          location: `${maxZ475c}/${payoffPositions475c.length} payoff scene(s) in the ${zone475c} third`,
+          rule: 'PAYOFF_ZONE_CLUSTER',
+          severity: 'minor',
+          description: `${maxZ475c} of ${payoffPositions475c.length} thread-resolution scenes (${(maxZ475c / payoffPositions475c.length * 100).toFixed(0)}%) fall within the ${zone475c} third — the story concentrates its dramatic satisfactions in one structural zone while the other two-thirds remain narratively open. A cluster of resolutions in the ${zone475c} zone creates a satisfaction burst surrounded by unresolved territory: if it is early, the audience has nothing to track for the rest of the script; if it is in the middle, both opening investment and closing reward are absent; if it is late, the entire script has been building without any delivered promises until the end. The most satisfying narrative architecture delivers resolutions throughout, proving at each stage that the story keeps what it plants.`,
+          suggestedFix: `Redistribute at least one or two payoff scenes into the zones currently empty of resolution: advance a thread's payoff earlier if it creates breathing room before new threads open, or hold one later if it strengthens the climax. The goal is an architecture where the audience feels the story consistently delivering — not banking all its payoffs into one zone and leaving the others structurally inert.`,
         });
       }
     }
