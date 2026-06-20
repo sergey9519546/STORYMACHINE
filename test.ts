@@ -27138,6 +27138,95 @@ The lights go out.`;
     });
   });
 
+  describe('Wave 476 — dialoguePass: clock scene void, positive scene void, dialogue dense aftermath silent', async () => {
+    const makeRec476 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
+      sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false,
+      revelation: null, dramaticTurn: 'nothing', payoffSetupIds: [], relationshipShifts: [],
+      emotionalShift: 'neutral', seededClueIds: [], dialogueHighlights: [], unresolvedClues: [],
+      purpose: '', slug: `s${sceneIdx}`, ...extra,
+    });
+    const runD476 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    // Build n scenes; withDlgFn(i) => true means 2 dialogue lines, false means action only
+    const buildScenes476 = (count: number, withDlgFn: (i: number) => boolean): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\n`;
+        if (withDlgFn(i)) {
+          f += `ALICE\nShe found the documents early this morning.\n\nBOB\nWe should leave before they close the gate.\n\n`;
+        } else {
+          f += `The door crashes open. A figure steps from the dark.\n\n`;
+        }
+      }
+      return f;
+    };
+    // Build a scene with 3 dialogue lines (for dense scenes)
+    const buildDenseScene = (i: number): string =>
+      `INT. SCENE ${i} - DAY\n\nALICE\nShe found all the documents this morning.\n\nBOB\nWe need to leave before they close the gate tonight.\n\nALICE\nThen we move as soon as the sun goes down today.\n\n`;
+    const buildSilentScene = (i: number): string =>
+      `INT. SCENE ${i} - DAY\n\nThe door crashes open. A figure steps from the dark.\n\n`;
+
+    it('DIALOGUE_CLOCK_SCENE_VOID fires when every clockRaised scene has no dialogue', async () => {
+      // n=8; clock scenes at 0,3 (both silent); scenes 1,2,4,5,6,7 each have 2 lines → 12 total ≥ 10
+      const recs476a = Array.from({ length: 8 }, (_, i) =>
+        makeRec476(i, i === 0 || i === 3 ? { clockRaised: true } : {}));
+      const f476a = buildScenes476(8, i => i !== 0 && i !== 3);
+      const res = await runD476(f476a, recs476a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_CLOCK_SCENE_VOID'), 'DIALOGUE_CLOCK_SCENE_VOID should fire');
+    });
+
+    it('DIALOGUE_CLOCK_SCENE_VOID does not fire when a clockRaised scene carries dialogue', async () => {
+      // Same setup but scene 0 (clock) now HAS dialogue → not all clock scenes silent
+      const recs476anr = Array.from({ length: 8 }, (_, i) =>
+        makeRec476(i, i === 0 || i === 3 ? { clockRaised: true } : {}));
+      const f476anr = buildScenes476(8, i => i !== 3);
+      const res = await runD476(f476anr, recs476anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_CLOCK_SCENE_VOID'), 'DIALOGUE_CLOCK_SCENE_VOID should not fire');
+    });
+
+    it('DIALOGUE_POSITIVE_SCENE_VOID fires when every positive-emotion scene has no dialogue', async () => {
+      // n=8; positive scenes at 1,4,6 (all silent); other 5 scenes have 2 lines each → 10 total
+      const recs476b = Array.from({ length: 8 }, (_, i) =>
+        makeRec476(i, [1, 4, 6].includes(i) ? { emotionalShift: 'positive' } : {}));
+      const f476b = buildScenes476(8, i => ![1, 4, 6].includes(i));
+      const res = await runD476(f476b, recs476b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_POSITIVE_SCENE_VOID'), 'DIALOGUE_POSITIVE_SCENE_VOID should fire');
+    });
+
+    it('DIALOGUE_POSITIVE_SCENE_VOID does not fire when a positive scene carries dialogue', async () => {
+      // Positive scenes at 1,4,6; scene 1 now HAS dialogue → not all silent
+      const recs476bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec476(i, [1, 4, 6].includes(i) ? { emotionalShift: 'positive' } : {}));
+      const f476bnr = buildScenes476(8, i => i !== 4 && i !== 6);
+      const res = await runD476(f476bnr, recs476bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_POSITIVE_SCENE_VOID'), 'DIALOGUE_POSITIVE_SCENE_VOID should not fire');
+    });
+
+    it('DIALOGUE_DENSE_AFTERMATH_SILENT fires when every dense scene is followed by a silent scene', async () => {
+      // n=10; dense scenes at 0,2,4 (3 dlg lines each); scenes 1,3,5 silent; scenes 6-9 have 2 lines each
+      // dense scenes 0→next 1 (silent), 2→next 3 (silent), 4→next 5 (silent) → all followed by silence
+      let f476c = buildDenseScene(0) + buildSilentScene(1) + buildDenseScene(2) +
+        buildSilentScene(3) + buildDenseScene(4) + buildSilentScene(5);
+      for (let i = 6; i < 10; i++) f476c += buildScenes476(1, () => true).replace('INT. SCENE 0 - DAY', `INT. SCENE ${i} - DAY`);
+      const recs476c = Array.from({ length: 10 }, (_, i) => makeRec476(i));
+      const res = await runD476(f476c, recs476c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_DENSE_AFTERMATH_SILENT'), 'DIALOGUE_DENSE_AFTERMATH_SILENT should fire');
+    });
+
+    it('DIALOGUE_DENSE_AFTERMATH_SILENT does not fire when a dense scene is followed by an active scene', async () => {
+      // Dense scenes at 0,2,4; but scene 1 (follows 0) now also has 2 dialogue lines → not all silent
+      let f476cnr = buildDenseScene(0);
+      f476cnr += `INT. SCENE 1 - DAY\n\nALICE\nShe found the documents this morning.\n\nBOB\nWe leave now.\n\n`;
+      f476cnr += buildDenseScene(2) + buildSilentScene(3) + buildDenseScene(4) + buildSilentScene(5);
+      for (let i = 6; i < 10; i++) f476cnr += buildScenes476(1, () => true).replace('INT. SCENE 0 - DAY', `INT. SCENE ${i} - DAY`);
+      const recs476cnr = Array.from({ length: 10 }, (_, i) => makeRec476(i));
+      const res = await runD476(f476cnr, recs476cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_DENSE_AFTERMATH_SILENT'), 'DIALOGUE_DENSE_AFTERMATH_SILENT should not fire');
+    });
+  });
+
   describe('Wave 462 — dialoguePass: dramatic turn scene void, negation flood, opening silent', async () => {
     const makeRec462 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
       sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false,

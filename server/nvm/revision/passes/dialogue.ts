@@ -83,6 +83,17 @@
 // contains no dialogue while the rest is verbally active — the story opens as pure silent
 // spectacle; zone presence/absence × opening zone, the opening-zone parallel of DIALOGUE_CLIMAX_
 // VOID which audits the final 20%).
+// Wave 476 additions: clock scene void (co-occurrence/decoupling × clock × dialogue — every
+// clockRaised scene has no dialogue; time pressure is established in pure silence without any
+// character naming or negotiating the deadline; the clock-channel completion of the event-type
+// co-occurrence set alongside revelation and dramatic-turn voids), positive scene void
+// (co-occurrence/decoupling × positive emotional × dialogue — every positively charged scene
+// has no dialogue; victories and joys are rendered without a voice; co-occurrence × emotional
+// valence rather than event-type, the first emotional-register co-occurrence check in this pass),
+// dialogue dense aftermath silent (sequence/aftermath × dialogue density — every scene with ≥3
+// dialogue lines is immediately followed by a scene with zero dialogue; verbal density consistently
+// triggers a cut to silence rather than escalation; the first sequence/aftermath check in this
+// pass, distinct from the zone-silence and single-peak checks).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2311,6 +2322,109 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         description: `The first 20% of scenes (Scenes 0–${openingEnd462c - 1}) contains no dialogue, even though the rest of the story carries ${laterDlgCount462c} spoken lines. The story opens as pure silent spectacle — action, image, and atmosphere with no spoken word until the opening zone has passed. A wordless opening can be a deliberate choice, but when it spans the entire first fifth of a dialogue-driven story, the audience meets the characters without ever hearing them, and the voices that carry the drama are withheld precisely where first impressions of character are formed.`,
         suggestedFix: `Introduce at least one line of dialogue in the opening zone: a first spoken word that establishes a character's voice, register, or relationship before the plot accelerates. The line can be terse or oblique — it does not need to deliver exposition — but hearing a character speak early lets the audience form an impression of who they are, which a silent opening defers until the story is already underway.`,
       });
+    }
+  }
+
+  // ── Wave 476: DIALOGUE_CLOCK_SCENE_VOID, DIALOGUE_POSITIVE_SCENE_VOID, DIALOGUE_DENSE_AFTERMATH_SILENT ──
+
+  // DIALOGUE_CLOCK_SCENE_VOID — Co-occurrence/decoupling × clock × dialogue (n≥8, dlg≥10,
+  // ≥2 clockRaised scenes). Every scene that establishes a deadline (clockRaised === true)
+  // contains no dialogue — time pressure is created in pure silence, without a character ever
+  // naming, negotiating, or responding to the threat out loud. Clock raises are among the most
+  // urgent story events; when every deadline arrives in an unspoken scene, the audience registers
+  // urgency as a visual or structural fact rather than as a human pressure — no character
+  // agonizes, bargains, or threatens because of the clock.
+  // Distinct from: DIALOGUE_REVELATION_SCENE_VOID (Wave 448: revelation channel — different event
+  // type), DIALOGUE_DRAMATIC_TURN_SCENE_VOID (Wave 462: dramatic-turn channel — different event
+  // type), DIALOGUE_TENSION_PEAK_SILENT (Wave 434: single-peak × highest-suspense scene — only
+  // the peak, not all clock-raise scenes), CLOCK_RAISE_RELATIONSHIP_VOID (causality.ts Wave 419:
+  // clock × relationship channel — a different output signal in a different pass).
+  if (records.length >= 8 && dialogue.length >= 10) {
+    const clockScenes476a = (records as any[]).filter(r => r.clockRaised === true);
+    if (clockScenes476a.length >= 2) {
+      const lineToScene476a = buildLineToSceneMap(fountain);
+      const dlgSceneSet476a = new Set(dialogue.map(d => lineToScene476a[d.lineNum - 1] ?? -1));
+      const allClockSilent476a = clockScenes476a.every((r: any) => !dlgSceneSet476a.has(r.sceneIdx));
+      if (allClockSilent476a) {
+        issues.push({
+          location: `${clockScenes476a.length} clock-raise scene(s) — no dialogue in any`,
+          rule: 'DIALOGUE_CLOCK_SCENE_VOID',
+          severity: 'minor',
+          description: `All ${clockScenes476a.length} scenes that raise a story deadline (clockRaised) contain no dialogue — every time pressure in the script is established without a spoken word. Clock raises are among the most urgent narrative events: a deadline is not just a ticking mechanism but a human crisis that provokes negotiation, threat, argument, or desperation. When every deadline scene is silent, the pressure is registered as a visual or structural fact rather than as a dramatic urgency that characters name and respond to in real time.`,
+          suggestedFix: `Add at least one line of dialogue to a clock-raise scene: a character naming the deadline ("We have until dawn"), arguing over what it means ("Then there's no time"), or responding to the pressure it creates. A deadline spoken aloud — even acknowledged in a fragment — becomes a shared human stake rather than a plot-mechanical timestamp that the audience reads but no one inside the story feels aloud.`,
+        });
+      }
+    }
+  }
+
+  // DIALOGUE_POSITIVE_SCENE_VOID — Co-occurrence/decoupling × positive emotional × dialogue
+  // (n≥8, dlg≥10, ≥3 emotionally positive scenes). Every positively charged scene (emotionalShift
+  // === 'positive') contains no dialogue — the story's victories, joys, and emotional wins all
+  // happen in complete silence. The script withholds the voice at every positive peak: no character
+  // celebrates, thanks, expresses relief, or articulates hope aloud when the scene's emotional
+  // charge is positive. This decouples the story's warmth and triumph from human speech.
+  // Distinct from: DIALOGUE_REVELATION_SCENE_VOID / DIALOGUE_DRAMATIC_TURN_SCENE_VOID / DIALOGUE_
+  // CLOCK_SCENE_VOID (co-occurrence × event-type; this is co-occurrence × emotional register, a
+  // different axis), DIALOGUE_TENSION_PEAK_SILENT / DIALOGUE_CURIOSITY_PEAK_SILENT (single-peak
+  // isolation × a numeric delta — only one scene; this checks ALL positive-emotion scenes for
+  // consistent silence), DIALOGUE_NEGATION_FLOOD (valence × line-content lexeme; this is valence
+  // × scene-level presence/absence of voice, not line-level lexical register).
+  if (records.length >= 8 && dialogue.length >= 10) {
+    const posScenes476b = (records as any[]).filter(r => r.emotionalShift === 'positive');
+    if (posScenes476b.length >= 3) {
+      const lineToScene476b = buildLineToSceneMap(fountain);
+      const dlgSceneSet476b = new Set(dialogue.map(d => lineToScene476b[d.lineNum - 1] ?? -1));
+      const allPosSilent476b = posScenes476b.every((r: any) => !dlgSceneSet476b.has(r.sceneIdx));
+      if (allPosSilent476b) {
+        issues.push({
+          location: `${posScenes476b.length} positive-emotion scene(s) — no dialogue in any`,
+          rule: 'DIALOGUE_POSITIVE_SCENE_VOID',
+          severity: 'minor',
+          description: `All ${posScenes476b.length} positively charged scenes (emotionalShift: positive) contain no dialogue — every victory, joy, or emotional win in the script happens in complete silence. No character celebrates, expresses relief, articulates hope, or gives voice to the positive moment. When the story's warmth and triumph are consistently rendered without any spoken word, the positive emotional world of the script is decoupled from the voice layer: joy is shown but never spoken, and the audience never hears a character inhabit it in real time.`,
+          suggestedFix: `Add at least one line of dialogue to a positively charged scene: a character expressing relief, gratitude, triumph, or hope in their own voice. The line need not be grandiose — "We made it" or "I didn't think that was possible" — but a spoken acknowledgment gives the audience a voice to attach to the feeling, rather than leaving the emotion as an entirely external, unspoken event.`,
+        });
+      }
+    }
+  }
+
+  // DIALOGUE_DENSE_AFTERMATH_SILENT — Sequence/aftermath × dialogue density × silence (n≥10,
+  // dlg≥10, ≥3 scenes with ≥3 dialogue lines, every such dense scene immediately followed by
+  // a scene with zero dialogue). A dense verbal exchange consistently triggers a cut to complete
+  // silence in the next scene — the script treats spoken density and its aftermath as
+  // architecturally incompatible. Verbal momentum should carry through: a scene of intense
+  // dialogue often provokes a reaction, an action, or an escalation. When every dense scene is
+  // followed by silence, the verbal layer never accumulates across scene boundaries.
+  // Distinct from: TALKING_HEADS (Wave 150: within-scene dialogue without physical action; a
+  // within-scene density check, not an inter-scene aftermath check), DIALOGUE_CLIMAX_VOID /
+  // DIALOGUE_OPENING_SILENT (Wave 434/462: zone-based silence — structural zones, not dense-scene
+  // aftermath), DIALOGUE_REVELATION_SCENE_VOID / DIALOGUE_DRAMATIC_TURN_SCENE_VOID (co-occurrence
+  // × event-type, not dialogue density aftermath). First sequence/aftermath check in this pass.
+  if (records.length >= 10 && dialogue.length >= 10) {
+    const lineToScene476c = buildLineToSceneMap(fountain);
+    const dlgPerScene476c = new Map<number, number>();
+    for (const d of dialogue) {
+      const si = lineToScene476c[d.lineNum - 1] ?? -1;
+      if (si >= 0) dlgPerScene476c.set(si, (dlgPerScene476c.get(si) ?? 0) + 1);
+    }
+    const denseSceneIdxs476c = [...dlgPerScene476c.entries()]
+      .filter(([, cnt]) => cnt >= 3)
+      .map(([si]) => si);
+    if (denseSceneIdxs476c.length >= 3) {
+      const allDenseFollowedBySilence476c = denseSceneIdxs476c.every(si => {
+        const pos = records.findIndex(r => r.sceneIdx === si);
+        if (pos < 0 || pos >= records.length - 1) return true;
+        const nextSi = (records as any[])[pos + 1].sceneIdx;
+        return (dlgPerScene476c.get(nextSi) ?? 0) === 0;
+      });
+      if (allDenseFollowedBySilence476c) {
+        issues.push({
+          location: `${denseSceneIdxs476c.length} dialogue-dense scene(s) — each immediately followed by a silent scene`,
+          rule: 'DIALOGUE_DENSE_AFTERMATH_SILENT',
+          severity: 'minor',
+          description: `Every one of the ${denseSceneIdxs476c.length} dialogue-dense scenes (≥3 spoken lines) is immediately followed by a scene with no dialogue — verbal density consistently triggers a cut to complete silence. This decouples verbal momentum from its aftermath: a rich exchange of words should provoke a continuation, reaction, or escalation in voice, but instead each dense scene is followed by an entirely unspoken scene. When the pattern is consistent, the verbal layer never compounds across scene boundaries — the script treats spoken density as a terminal event rather than as a force that propagates into what follows.`,
+          suggestedFix: `Give at least one dialogue-dense scene a verbally active sequel: let the scene that follows continue or escalate the exchange — a follow-up confrontation, a reaction spoken aloud, or a scene where characters process what was just said. The aftermath of a dense verbal scene is where its stakes are felt; rendering it consistently in silence drains the verbal momentum precisely when it should compound.`,
+        });
+      }
     }
   }
 
