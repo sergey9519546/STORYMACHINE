@@ -83,6 +83,16 @@
 // quantity), dialogue monologue unprompted (backward-cause — no long speech ≥10 words is preceded
 // within 2 dialogue lines by a question; every extended statement arrives causeless, without the
 // inquiry that would naturally provoke expansion; first backward-cause check in this pass).
+// Wave 473 additions: dialogue question zone cluster (distribution/timing — >75% of question-ending
+// dialogue lines fall within a single third of the dialogue; interrogation is ghettoized into one
+// zone rather than arising organically from dramatic pressure throughout; first distribution/timing
+// check on the temporal position of a dialogue signal), dialogue opening zone long absent
+// (zone presence/absence — zero long speeches ≥10 words in the first 25% of dialogue while ≥3
+// appear in the remaining 75%; the opening register misrepresents character verbosity; first
+// zone-presence/absence check on speech length), dialogue per-character length skew
+// (average/aggregate × per-character — max per-character average speech length ≥3× the min across
+// ≥3 chars with ≥3 lines each; one character has verbal architecture, another is a fragment-prop;
+// first per-character average-aggregate check in this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2450,6 +2460,132 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `None of the script's ${longSpeeches459c.length} long dialogue speeches (≥10 words) is preceded within the prior 2 dialogue lines by a question — every extended declaration arrives spontaneously, without inquiry to provoke it. Long speeches are dramatically strongest when they are caused: a question that demands an answer, a challenge that forces a response, an accusation that requires refutation. When every extended statement arrives without prior prompting, the characters appear to be delivering pre-planned arguments rather than responding to each other in the moment — the dialogue becomes a series of parallel monologues rather than an exchange. Even a rhetorical question ("So what was I supposed to do?") functions as a cause that makes the following expansion feel earned.`,
             suggestedFix: `Before at least one long speech, add a question that provokes it: the preceding character's line can be a challenge, an open question, or even a demand for justification. The question-then-long-response pattern is the most natural dialogue unit for exposition, argument, and revelation — the question gives the audience permission to receive a longer speech because it signals that the speaker was asked, not that they chose to lecture. Even a one-word prompt ("Why?") preceding a multi-sentence response changes the register from monologue to dialogue.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 473: DIALOGUE_QUESTION_ZONE_CLUSTER, DIALOGUE_OPENING_ZONE_LONG_ABSENT, DIALOGUE_PER_CHARACTER_LENGTH_SKEW ──
+  {
+    // DIALOGUE_QUESTION_ZONE_CLUSTER — Distribution/timing × interrogative channel (≥12
+    // dialogue lines, ≥4 question-ending lines, >75% of questions fall within a single
+    // third of the dialogue script). When interrogatives cluster into one positional zone
+    // instead of arising organically from dramatic pressure throughout, the script signals
+    // that interrogation is a phase rather than a naturally distributed mode: other zones
+    // feel like assertion territory where nobody asks anything, while the cluster zone
+    // reads as an interrogation chamber.
+    // Distinct from: DIALOGUE_INTERROGATIVE_SATURATION (Wave 294: global proportion >30% —
+    // measures rate, not when questions appear), DIALOGUE_QUESTION_RUN (Wave 445: ≥4
+    // consecutive questions — local cluster within adjacent lines, not zonal distribution),
+    // DIALOGUE_HEDGED_QUESTION_FLOOD (Wave 431: co-occurrence of hedge+question — a different
+    // signal pair), DIALOGUE_DECLARATIVE_AFTERMATH_QUESTION (Wave 445: sequence/aftermath —
+    // what follows a declaration, not where in the script questions appear).
+    const allDlg473a: string[] = [];
+    let inDlg473a = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg473a = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg473a = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg473a = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg473a) allDlg473a.push(t);
+    }
+    if (allDlg473a.length >= 12) {
+      const questionIdxs473a = allDlg473a
+        .map((t, i) => ({ t, i }))
+        .filter(x => x.t.trimEnd().endsWith('?'))
+        .map(x => x.i);
+      if (questionIdxs473a.length >= 4) {
+        const third473a = Math.floor(allDlg473a.length / 3);
+        const firstZone473a = questionIdxs473a.filter(i => i < third473a).length;
+        const midZone473a = questionIdxs473a.filter(i => i >= third473a && i < 2 * third473a).length;
+        const lastZone473a = questionIdxs473a.filter(i => i >= 2 * third473a).length;
+        const maxZone473a = Math.max(firstZone473a, midZone473a, lastZone473a);
+        if (maxZone473a / questionIdxs473a.length > 0.75) {
+          const zone473aName = firstZone473a === maxZone473a ? 'opening' : midZone473a === maxZone473a ? 'middle' : 'closing';
+          issues.push({
+            location: `Dialogue — ${maxZone473a}/${questionIdxs473a.length} questions in the ${zone473aName} third`,
+            rule: 'DIALOGUE_QUESTION_ZONE_CLUSTER',
+            severity: 'minor',
+            description: `${maxZone473a} of ${questionIdxs473a.length} question-ending dialogue lines (${(maxZone473a / questionIdxs473a.length * 100).toFixed(0)}%) fall within the ${zone473aName} third of the dialogue — interrogatives cluster in one positional zone instead of arising organically throughout. When questions are ghettoized into one segment, the script signals that interrogation is a phase rather than a natural mode that responds to dramatic pressure: the other zones feel like assertion territory where nobody asks anything, while the question-cluster zone reads as an interrogation chamber. Dynamic dialogue distributes inquiry according to dramatic need, not position.`,
+            suggestedFix: `Redistribute questions through the script: move at least one or two questions from the ${zone473aName} cluster to zones where they are currently absent. The goal is organic distribution — questions should arise wherever characters genuinely need to know something, not clump together as if interrogation is its own scene type. Consider where in the other zones a character would realistically be uncertain, challenged, or curious, and plant questions there.`,
+          });
+        }
+      }
+    }
+
+    // DIALOGUE_OPENING_ZONE_LONG_ABSENT — Zone presence/absence × length × opening zone (≥12
+    // dialogue lines, zero long speeches ≥10 words in the first 25% of dialogue, while ≥3 long
+    // speeches ≥10 words appear in the remaining 75%). The opening dialogue zone establishes
+    // the register for how characters use language: if the entire opening contains only terse
+    // fragments while the rest of the script features extended speeches, the register shift is
+    // misleading — the audience reads the opening as establishing that characters are guarded or
+    // economical, then encounters an entirely different verbal mode later without dramatic
+    // justification for the transition.
+    // Distinct from: DIALOGUE_LENGTH_OUTLIER (Wave 431: single-peak isolation — one towering
+    // speech vs. corpus mean; doesn't check zone distribution of length), DIALOGUE_MONOLOGUE_
+    // UNPROMPTED (Wave 459: backward-cause — whether long speeches have a prior question; doesn't
+    // check WHICH zone they occupy), DIALOGUE_MONOSYLLABIC_FLOOD (Wave 417: global proportion ≤2w
+    // across all dialogue — brevity rate, not zone-specific absence of long speeches).
+    const allDlg473b: string[] = [];
+    let inDlg473b = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg473b = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg473b = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg473b = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg473b) allDlg473b.push(t);
+    }
+    if (allDlg473b.length >= 12) {
+      const openEndIdx473b = Math.floor(allDlg473b.length * 0.25);
+      const wordCounts473b = allDlg473b.map(t => t.split(/\s+/).filter(Boolean).length);
+      const openingLong473b = wordCounts473b.slice(0, openEndIdx473b).filter(wc => wc >= 10).length;
+      const restLong473b = wordCounts473b.slice(openEndIdx473b).filter(wc => wc >= 10).length;
+      if (openingLong473b === 0 && restLong473b >= 3) {
+        issues.push({
+          location: `Dialogue — first ${openEndIdx473b} lines have no speeches ≥10 words; ${restLong473b} appear in the remaining ${allDlg473b.length - openEndIdx473b} lines`,
+          rule: 'DIALOGUE_OPENING_ZONE_LONG_ABSENT',
+          severity: 'minor',
+          description: `The first 25% of dialogue lines (${openEndIdx473b} lines) contain no speech of 10 or more words, while ${restLong473b} long speeches (≥10 words) appear in the remaining 75%. The opening dialogue register establishes how characters use language: when the opening is entirely terse fragments and later dialogue shifts to extended speeches, the audience is given a false impression of the characters' verbal register — they appear guarded or economical, then suddenly expansive without a dramatic catalyst that would justify the shift. Either the opening misrepresents the characters, or the later speeches arrive without earned context.`,
+          suggestedFix: `Either move one or two long speeches earlier — to the first 25% of dialogue — to establish that extended speech is part of these characters' register from the start, or add a clear dramatic trigger (a revelation, confrontation, or emotional rupture) that explicitly motivates the transition from terse opening to extended later speeches. The audience should understand WHY the characters suddenly speak at length after a terse opening.`,
+        });
+      }
+    }
+
+    // DIALOGUE_PER_CHARACTER_LENGTH_SKEW — Average/aggregate × per-character statistics (≥3
+    // characters with ≥3 dialogue lines each, max per-character average speech length ≥3× the
+    // min per-character average speech length). One character consistently speaks in extended
+    // passages while another speaks only in fragments — not as a deliberate characterization
+    // choice but as a structural void where the writing gave one character verbal architecture
+    // and left another without it. In a genuine dramatic exchange, characters may be terse or
+    // expansive by design, but a 3× gap in average speech length across all their lines signals
+    // that one character exists primarily as a conversational prompt for another's speeches.
+    // Distinct from: DIALOGUE_LENGTH_OUTLIER (Wave 431: single-peak isolation — one towering
+    // speech vs. corpus mean; aggregate check, not per-character), DIALOGUE_SINGLE_CHAR_
+    // DOMINATION (Wave 459: underweight/bloat × line count — one speaker has >70% of LINES;
+    // this checks average WORD COUNT per speech per character, not line quantity), DIALOGUE_
+    // MONOSYLLABIC_FLOOD (Wave 417: global proportion ≤2w — rate across all dialogue, not a
+    // per-character average-length comparison between the longest and shortest speakers).
+    {
+      const eligChars473c = [...charProfiles.entries()].filter(([, p]) => p.lineCount >= 3);
+      if (eligChars473c.length >= 3) {
+        const charAvgLens473c = eligChars473c.map(([name, p]) => {
+          const avg = p.wordCountsPerLine.reduce((s, v) => s + v, 0) / p.wordCountsPerLine.length;
+          return { name, avg };
+        });
+        const maxAvg473c = Math.max(...charAvgLens473c.map(x => x.avg));
+        const minAvg473c = Math.min(...charAvgLens473c.map(x => x.avg));
+        if (minAvg473c > 0 && maxAvg473c / minAvg473c >= 3.0) {
+          const maxChar473c = charAvgLens473c.find(x => x.avg === maxAvg473c)!;
+          const minChar473c = charAvgLens473c.find(x => x.avg === minAvg473c)!;
+          issues.push({
+            location: `${maxChar473c.name} (avg ${maxAvg473c.toFixed(1)} words/speech) vs. ${minChar473c.name} (avg ${minAvg473c.toFixed(1)} words/speech)`,
+            rule: 'DIALOGUE_PER_CHARACTER_LENGTH_SKEW',
+            severity: 'minor',
+            description: `${maxChar473c.name}'s dialogue averages ${maxAvg473c.toFixed(1)} words per speech — ${(maxAvg473c / minAvg473c).toFixed(1)}× the length of ${minChar473c.name}'s average of ${minAvg473c.toFixed(1)} words. When one character consistently speaks in extended passages while another consistently speaks in fragments, the imbalance suggests that the shorter-speaking character exists primarily as a prompt — an interlocutor whose verbal register was never developed. In a genuine dramatic exchange, characters may be terse or expansive by design, but a 3× gap in average speech length (computed across all their lines, not just one outlier) signals a structural void rather than a characterization choice.`,
+            suggestedFix: `Give ${minChar473c.name} at least two or three more substantial speeches — moments where they develop a thought, articulate a position, or expand an idea — to establish that they are capable of extended expression when the scene demands it. Conversely, if ${maxChar473c.name} is deliberately written as a monologist and ${minChar473c.name} as terse, make that contrast explicitly motivated: a scene where the terse character is forced to expand reveals character through violation of their habitual register and shows that both voices have dramatic capacity.`,
           });
         }
       }

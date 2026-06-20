@@ -30388,6 +30388,278 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 473 — voicePass: dialogue question zone cluster, dialogue opening zone long absent, dialogue per-character length skew', async () => {
+    const runV473 = async (fountain: string) => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      return voicePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DIALOGUE_QUESTION_ZONE_CLUSTER fires when >75% of questions fall in a single zone', async () => {
+      // 12 dialogue lines; first zone (indices 0-3): 4 questions = 100% → fires
+      const f473a = [
+        'INT. ROOM - DAY',
+        '',
+        'He enters the room.',
+        '',
+        'ALICE',
+        'Are you coming today?',
+        '',
+        'BOB',
+        'Did you hear the news?',
+        '',
+        'ALICE',
+        'Have you seen the report?',
+        '',
+        'BOB',
+        'Is everything in order now?',
+        '',
+        'ALICE',
+        'We move tonight on schedule.',
+        '',
+        'BOB',
+        'The plan is fully ready.',
+        '',
+        'ALICE',
+        'Everything has been arranged carefully.',
+        '',
+        'BOB',
+        'We have confirmed all details.',
+        '',
+        'ALICE',
+        'The signal comes at midnight sharp.',
+        '',
+        'BOB',
+        'We depart before the morning light.',
+        '',
+        'ALICE',
+        'Nothing can stop this mission now.',
+        '',
+        'BOB',
+        'All preparations are complete today.',
+      ].join('\n');
+      const res = await runV473(f473a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_QUESTION_ZONE_CLUSTER'), 'DIALOGUE_QUESTION_ZONE_CLUSTER should fire');
+    });
+
+    it('DIALOGUE_QUESTION_ZONE_CLUSTER does not fire when questions are distributed across zones', async () => {
+      // 12 dialogue lines; questions at indices 0, 4, 8 → spread across all three zones
+      const f473anr = [
+        'INT. OFFICE - DAY',
+        '',
+        'She sits.',
+        '',
+        'ALICE',
+        'Are you ready now?',
+        '',
+        'BOB',
+        'Yes I am definitely ready.',
+        '',
+        'ALICE',
+        'Good. We proceed at dawn.',
+        '',
+        'BOB',
+        'The plan is all set.',
+        '',
+        'ALICE',
+        'Did you check the supplies?',
+        '',
+        'BOB',
+        'Everything is ready and packed.',
+        '',
+        'ALICE',
+        'The team is assembled here.',
+        '',
+        'BOB',
+        'We can depart when ready.',
+        '',
+        'ALICE',
+        'Will you lead the way?',
+        '',
+        'BOB',
+        'I know exactly what to do.',
+        '',
+        'ALICE',
+        'Then let us begin the mission.',
+        '',
+        'BOB',
+        'Nothing will go wrong now.',
+      ].join('\n');
+      const res = await runV473(f473anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_QUESTION_ZONE_CLUSTER'), 'DIALOGUE_QUESTION_ZONE_CLUSTER should not fire');
+    });
+
+    it('DIALOGUE_OPENING_ZONE_LONG_ABSENT fires when first 25% is all short and later has ≥3 long speeches', async () => {
+      // 12 dialogue lines; first 3 (25%) are all short; lines 3-11 include 4 long speeches ≥10 words
+      const f473b = [
+        'INT. STUDY - DAY',
+        '',
+        'He thinks.',
+        '',
+        'ALICE',
+        'Yes.',
+        '',
+        'BOB',
+        'No.',
+        '',
+        'ALICE',
+        'Okay.',
+        '',
+        'BOB',
+        'I have been thinking about this situation for a long time now.',
+        '',
+        'ALICE',
+        'The matter is far more complicated than any of us originally anticipated.',
+        '',
+        'BOB',
+        'We need to consider all the different possible options available to us.',
+        '',
+        'ALICE',
+        'There are serious consequences to every action we take in this situation.',
+        '',
+        'BOB',
+        'Good.',
+        '',
+        'ALICE',
+        'Fine.',
+        '',
+        'BOB',
+        'Agreed.',
+        '',
+        'ALICE',
+        'Right.',
+        '',
+        'BOB',
+        'Sure.',
+      ].join('\n');
+      const res = await runV473(f473b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_OPENING_ZONE_LONG_ABSENT'), 'DIALOGUE_OPENING_ZONE_LONG_ABSENT should fire');
+    });
+
+    it('DIALOGUE_OPENING_ZONE_LONG_ABSENT does not fire when the opening zone includes a long speech', async () => {
+      // 12 dialogue lines; line 0 (first zone) is ≥10 words → condition not met
+      const f473bnr = [
+        'INT. STUDY - DAY',
+        '',
+        'She reads.',
+        '',
+        'ALICE',
+        'I have been thinking about this for quite some time now.',
+        '',
+        'BOB',
+        'Yes.',
+        '',
+        'ALICE',
+        'Okay.',
+        '',
+        'BOB',
+        'I have been thinking about this situation for a long time.',
+        '',
+        'ALICE',
+        'The matter is far more complicated than we anticipated today.',
+        '',
+        'BOB',
+        'We need all options on the table before we can proceed.',
+        '',
+        'ALICE',
+        'There are consequences to every action we take in this case.',
+        '',
+        'BOB',
+        'Good.',
+        '',
+        'ALICE',
+        'Fine.',
+        '',
+        'BOB',
+        'Agreed.',
+        '',
+        'ALICE',
+        'Right.',
+        '',
+        'BOB',
+        'Sure.',
+      ].join('\n');
+      const res = await runV473(f473bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_OPENING_ZONE_LONG_ABSENT'), 'DIALOGUE_OPENING_ZONE_LONG_ABSENT should not fire');
+    });
+
+    it('DIALOGUE_PER_CHARACTER_LENGTH_SKEW fires when max/min per-character avg speech length ≥ 3.0', async () => {
+      // ALICE: 3 lines ~15 words each; BOB: 3 lines ~14 words each; CAROL: 3 lines ~1 word each
+      // ratio ≈ 15/1 = 15 ≥ 3 → fires
+      const f473c = [
+        'INT. HALL - DAY',
+        '',
+        'They gather.',
+        '',
+        'ALICE',
+        'I have been thinking carefully about this complicated situation for a very long time.',
+        '',
+        'BOB',
+        'The matter at hand requires careful consideration of all possible outcomes and approaches.',
+        '',
+        'CAROL',
+        'Yes.',
+        '',
+        'ALICE',
+        'We need to evaluate every possible path forward before making any final decisions here.',
+        '',
+        'BOB',
+        'Moving forward requires a complete understanding of the full picture and all consequences.',
+        '',
+        'CAROL',
+        'No.',
+        '',
+        'ALICE',
+        'The situation demands that we take our time and consider every single option available.',
+        '',
+        'BOB',
+        'I agree completely that a thorough analysis is required before we take any action.',
+        '',
+        'CAROL',
+        'Okay.',
+      ].join('\n');
+      const res = await runV473(f473c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_PER_CHARACTER_LENGTH_SKEW'), 'DIALOGUE_PER_CHARACTER_LENGTH_SKEW should fire');
+    });
+
+    it('DIALOGUE_PER_CHARACTER_LENGTH_SKEW does not fire when per-character avg lengths are within 3× of each other', async () => {
+      // ALICE, BOB, CAROL all have similar avg lengths ~5-7 words; ratio < 3
+      const f473cnr = [
+        'INT. HALL - DAY',
+        '',
+        'They sit.',
+        '',
+        'ALICE',
+        'We should go to the market.',
+        '',
+        'BOB',
+        'I agree with that plan today.',
+        '',
+        'CAROL',
+        'Sure, sounds good enough to me.',
+        '',
+        'ALICE',
+        'The timing works well for all.',
+        '',
+        'BOB',
+        'Let us leave at noon then.',
+        '',
+        'CAROL',
+        'Fine, I will be there soon.',
+        '',
+        'ALICE',
+        'Great, see you all at noon.',
+        '',
+        'BOB',
+        'Perfect, we have a solid plan.',
+        '',
+        'CAROL',
+        'Good, I look forward to it.',
+      ].join('\n');
+      const res = await runV473(f473cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_PER_CHARACTER_LENGTH_SKEW'), 'DIALOGUE_PER_CHARACTER_LENGTH_SKEW should not fire');
+    });
+  });
+
   describe('Wave 459 — voicePass: dialogue assertion run, dialogue single char domination, dialogue monologue unprompted', async () => {
     const runV459 = async (fountain: string) => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
