@@ -20101,6 +20101,87 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 469 — relationshipArcPass: shift suspense aftermath void, shift emotional aftermath void, Act 1 void', async () => {
+    const mkShift469 = (pairKey: string, amount: number) => [{ pairKey, dimension: 'trust', amount }];
+    const makeRec469 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const makeFountain469 = (n: number) =>
+      Array.from({ length: n }, (_, i) =>
+        `INT. SC${i} - DAY\n\nAction line for scene ${i}.`
+      ).join('\n\n');
+    const runR469 = async (records: any[]) => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const fountain = makeFountain469(records.length);
+      return relationshipArcPass({ fountain, original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('RELATIONSHIP_SHIFT_SUSPENSE_AFTERMATH_VOID fires when no shift is followed by suspense within 2 scenes', async () => {
+      // n=10; shifts at scenes 2 and 6; aftermath 3-4 and 7-8 all have suspenseDelta=0 → fires
+      const recs469a = Array.from({ length: 10 }, (_, i) => makeRec469(i));
+      recs469a[2] = makeRec469(2, { relationshipShifts: mkShift469('A|B', 0.4) });
+      recs469a[6] = makeRec469(6, { relationshipShifts: mkShift469('A|B', -0.4) });
+      const res = await runR469(recs469a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_SUSPENSE_AFTERMATH_VOID'), 'RELATIONSHIP_SHIFT_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('RELATIONSHIP_SHIFT_SUSPENSE_AFTERMATH_VOID does not fire when a shift is followed by suspense', async () => {
+      // n=10; shift at 2; scene 3 has suspenseDelta=2 → no fire
+      const recs469anr = Array.from({ length: 10 }, (_, i) => makeRec469(i));
+      recs469anr[2] = makeRec469(2, { relationshipShifts: mkShift469('A|B', 0.4) });
+      recs469anr[3] = makeRec469(3, { suspenseDelta: 2 });
+      recs469anr[6] = makeRec469(6, { relationshipShifts: mkShift469('A|B', -0.4) });
+      const res = await runR469(recs469anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_SUSPENSE_AFTERMATH_VOID'), 'RELATIONSHIP_SHIFT_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('RELATIONSHIP_SHIFT_EMOTIONAL_AFTERMATH_VOID fires when no shift is followed by emotional shift within 2 scenes', async () => {
+      // n=10; shifts at 2 and 6; aftermath scenes all neutral → fires
+      const recs469b = Array.from({ length: 10 }, (_, i) => makeRec469(i));
+      recs469b[2] = makeRec469(2, { relationshipShifts: mkShift469('A|B', 0.4) });
+      recs469b[6] = makeRec469(6, { relationshipShifts: mkShift469('A|B', -0.4) });
+      const res = await runR469(recs469b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_EMOTIONAL_AFTERMATH_VOID'), 'RELATIONSHIP_SHIFT_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('RELATIONSHIP_SHIFT_EMOTIONAL_AFTERMATH_VOID does not fire when a shift is followed by an emotional shift', async () => {
+      // n=10; shift at 2; scene 4 has emotionalShift='negative' → no fire
+      const recs469bnr = Array.from({ length: 10 }, (_, i) => makeRec469(i));
+      recs469bnr[2] = makeRec469(2, { relationshipShifts: mkShift469('A|B', 0.4) });
+      recs469bnr[4] = makeRec469(4, { emotionalShift: 'negative' });
+      recs469bnr[6] = makeRec469(6, { relationshipShifts: mkShift469('A|B', -0.4) });
+      const res = await runR469(recs469bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_EMOTIONAL_AFTERMATH_VOID'), 'RELATIONSHIP_SHIFT_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('RELATIONSHIP_ACT1_VOID fires when no shift occurs in the first 25% while ≥3 shifts exist later', async () => {
+      // n=12 (Act 1 = scenes 0-2); shifts at 4, 7, 10 (all in 25%+) → fires
+      const recs469c = Array.from({ length: 12 }, (_, i) => makeRec469(i));
+      recs469c[4] = makeRec469(4, { relationshipShifts: mkShift469('A|B', 0.4) });
+      recs469c[7] = makeRec469(7, { relationshipShifts: mkShift469('A|B', -0.4) });
+      recs469c[10] = makeRec469(10, { relationshipShifts: mkShift469('A|B', 0.5) });
+      const res = await runR469(recs469c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_ACT1_VOID'), 'RELATIONSHIP_ACT1_VOID should fire');
+    });
+
+    it('RELATIONSHIP_ACT1_VOID does not fire when a shift occurs in Act 1', async () => {
+      // n=12; shift at scene 1 (in Act 1) → no fire
+      const recs469cnr = Array.from({ length: 12 }, (_, i) => makeRec469(i));
+      recs469cnr[1] = makeRec469(1, { relationshipShifts: mkShift469('A|B', 0.3) });
+      recs469cnr[4] = makeRec469(4, { relationshipShifts: mkShift469('A|B', 0.4) });
+      recs469cnr[7] = makeRec469(7, { relationshipShifts: mkShift469('A|B', -0.4) });
+      recs469cnr[10] = makeRec469(10, { relationshipShifts: mkShift469('A|B', 0.5) });
+      const res = await runR469(recs469cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_ACT1_VOID'), 'RELATIONSHIP_ACT1_VOID should not fire');
+    });
+  });
+
   describe('Wave 455 — relationshipArcPass: pair rupture unmotivated, relationship shift curiosity void, relationship warmth run', async () => {
     const mkShift455 = (pairKey: string, amount: number) => [{ pairKey, dimension: 'trust', amount }];
     const makeRec455 = (idx: number, overrides: any = {}): any => ({

@@ -93,6 +93,14 @@
 // of RELATIONSHIP_SHIFT_AFTERMATH_VOID), relationship warmth run (run-based × positive-shift —
 // 3+ consecutive scenes each carry a major positive shift ≥ 0.3 from any pair; warmings avalanche
 // without breathing room, the positive mirror of PAIR_RUPTURE_RUN).
+// Wave 469 additions: relationship shift suspense aftermath void (sequence/aftermath × suspense
+// channel — no shift scene followed by suspenseDelta>0 in next 2 scenes; completing the shift-
+// aftermath family's suspense channel alongside RELATIONSHIP_SHIFT_CURIOSITY_VOID), relationship
+// shift emotional aftermath void (sequence/aftermath × emotional channel — no shift scene followed
+// by emotionalShift≠neutral in next 2 scenes; adding the emotional channel to the shift-aftermath
+// family), relationship Act 1 void (zone presence/absence × first-quarter — no shift in the first
+// 25% while ≥3 shifts exist in the rest; fills the zone set alongside midpoint freeze, Act 2b
+// desert, and relationship climax void).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2199,6 +2207,117 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
           suggestedFix: `Interrupt the warmth run at Scenes ${maxWarmStart455c}–${maxWarmStart455c + maxWarmRun455c - 1}: insert at least one non-warmth scene between consecutive positive moves. It need not be a rupture — it can be a neutral relational scene, a moment of uncertainty, or a beat where a character hesitates before fully committing to the repair. The non-warmth scene between warmings gives each positive moment space to breathe and makes the next warming feel earned rather than automatic.`,
         });
       }
+    }
+  }
+
+  // ── Wave 469: RELATIONSHIP_SHIFT_SUSPENSE_AFTERMATH_VOID, RELATIONSHIP_SHIFT_EMOTIONAL_AFTERMATH_VOID, RELATIONSHIP_ACT1_VOID ──
+
+  // RELATIONSHIP_SHIFT_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × suspense channel ×
+  // shift trigger (n≥8, ≥2 qualifying shift scenes). No relationship-shift scene is followed
+  // by a suspense rise (suspenseDelta > 0) in the next two scenes — bonds move without raising
+  // the story's danger level in the aftermath. When a bond changes — rupture or repair — the
+  // altered relationship should shift the stakes: the new dynamic is more dangerous, or the
+  // resolution removes a threat. When every shift's aftermath is suspense-flat, the relational
+  // engine and the danger engine are fully decoupled: bonds change but the temperature of the
+  // story is unmoved by them. Sequence/aftermath mode × suspense channel × shift trigger.
+  // Completing the shift-aftermath family alongside RELATIONSHIP_SHIFT_AFTERMATH_VOID (Wave 427:
+  // further relational shifts in aftermath — same trigger, relational channel) and RELATIONSHIP_
+  // SHIFT_CURIOSITY_VOID (Wave 455: curiosity channel in aftermath): this adds the suspense
+  // channel. Distinct from RELATIONSHIP_SUSPENSE_DECOUPLED (Wave 329: shift scenes average
+  // suspenseDelta ≤ 0 — same-scene co-occurrence, not aftermath), PAIR_SUSPENSE_FLAT (Wave 399:
+  // per-pair average, not aftermath sequence), and SUSPENSE_EMOTIONAL_AFTERMATH_FLAT (pacing.ts
+  // Wave 453: emotional aftermath of suspense peaks — different trigger).
+  if (records.length >= 8) {
+    const shiftScenes469a = (records as any[]).filter(
+      r => ((r.relationshipShifts ?? []) as any[]).length > 0 && (r.sceneIdx + 2) < records.length,
+    );
+    if (shiftScenes469a.length >= 2) {
+      const anyAftermathSusp469a = shiftScenes469a.some((r: any) => {
+        const next1 = (records as any[])[r.sceneIdx + 1];
+        const next2 = (records as any[])[r.sceneIdx + 2];
+        return ((next1?.suspenseDelta ?? 0) > 0) || ((next2?.suspenseDelta ?? 0) > 0);
+      });
+      if (!anyAftermathSusp469a) {
+        issues.push({
+          location: `All ${shiftScenes469a.length} qualifying shift scene(s) — suspense void in aftermath`,
+          rule: 'RELATIONSHIP_SHIFT_SUSPENSE_AFTERMATH_VOID',
+          severity: 'minor',
+          description: `None of the story's ${shiftScenes469a.length} relationship-shift scenes (with room after them) is followed by a suspense rise (suspenseDelta > 0) in the next two scenes — bonds move without escalating the danger level in the aftermath. When a relationship changes, the altered dynamic should shift the stakes: a new rupture makes the situation more dangerous, a repair removes a threat or creates a new one. When every shift's aftermath is suspense-flat, the relational engine and the danger engine run on separate tracks — bonds change but the story's temperature is unmoved by them, so the relationship shifts feel emotionally contained rather than dramatically consequential.`,
+          suggestedFix: 'After at least one relationship shift, let the next scene escalate tension: the broken bond exposes a vulnerability, the repaired alliance raises the antagonist\'s alarm, or the altered dynamic creates a new threat the characters must respond to. When relational changes raise the stakes, the audience understands that the bonds in this story are not decorative — they are load-bearing elements that affect how dangerous the situation is.',
+        });
+      }
+    }
+  }
+
+  // RELATIONSHIP_SHIFT_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × emotional channel ×
+  // shift trigger (n≥8, ≥2 qualifying shift scenes). No relationship-shift scene is followed
+  // by an emotional shift (emotionalShift ≠ 'neutral') in the next two scenes — bonds change
+  // without any character showing the felt cost or relief in the scenes that follow. A bond shift
+  // that produces no emotional reaction in its aftermath is informationally processed but not
+  // emotionally lived: the audience knows the dynamic has changed but never watches any character
+  // absorb what that change means for them. Sequence/aftermath mode × emotional channel × shift
+  // trigger. Adding the emotional channel to the shift-aftermath family alongside RELATIONSHIP_
+  // SHIFT_AFTERMATH_VOID (relational) and RELATIONSHIP_SHIFT_CURIOSITY_VOID (curiosity): this
+  // is the third member. Distinct from WARMTH_UNFELT (Wave 304: positive shifts in emotionally
+  // neutral scenes — same-scene co-occurrence, not aftermath), RELATIONSHIP_RUPTURE_EMOTION_FLAT
+  // (Wave 343: negative shifts in neutral scenes — same-scene, not aftermath), and SUSPENSE_
+  // EMOTIONAL_AFTERMATH_FLAT (pacing.ts Wave 453: emotional aftermath of suspense peaks — different
+  // trigger: suspense peaks, not relational shifts).
+  if (records.length >= 8) {
+    const shiftScenes469b = (records as any[]).filter(
+      r => ((r.relationshipShifts ?? []) as any[]).length > 0 && (r.sceneIdx + 2) < records.length,
+    );
+    if (shiftScenes469b.length >= 2) {
+      const anyAftermathEmo469b = shiftScenes469b.some((r: any) => {
+        const next1 = (records as any[])[r.sceneIdx + 1];
+        const next2 = (records as any[])[r.sceneIdx + 2];
+        return (next1?.emotionalShift !== 'neutral' && next1?.emotionalShift !== undefined) ||
+               (next2?.emotionalShift !== 'neutral' && next2?.emotionalShift !== undefined);
+      });
+      if (!anyAftermathEmo469b) {
+        issues.push({
+          location: `All ${shiftScenes469b.length} qualifying shift scene(s) — emotional void in aftermath`,
+          rule: 'RELATIONSHIP_SHIFT_EMOTIONAL_AFTERMATH_VOID',
+          severity: 'minor',
+          description: `None of the story's ${shiftScenes469b.length} relationship-shift scenes (with room after them) is followed by an emotional shift (emotionalShift ≠ 'neutral') in the next two scenes — bond changes produce no felt reaction in the characters who experience them. A bond shift that generates no emotional aftermath is transactionally processed: the dynamic changed, the record was updated, but no character shows what that change costs or means for them. When every relational move is followed by neutral scenes, the bonds in the story feel like chess pieces repositioned on the board rather than connections felt between people.`,
+          suggestedFix: "After at least one relationship shift, let a character react emotionally in the next scene or two: the rupture leaves someone shaken, relieved, or grimly resolved; the repair produces warmth, discomfort, or grief at what it cost. The emotional aftermath of a bond change is how the audience learns what the relationship meant — and what losing or gaining it feels like to the people in it.",
+        });
+      }
+    }
+  }
+
+  // RELATIONSHIP_ACT1_VOID — Zone presence/absence × first-quarter zone × shift signal (n≥10,
+  // ≥3 shifts outside the first 25%). No relationship shift of any magnitude occurs in the first
+  // 25% of scenes while at least three shifts exist in the remaining 75%. The story opens without
+  // any relational movement: the audience enters the complication zone with no sense of any bond
+  // being established, tested, or defined. A story that defers all relational activity to Act 2
+  // gives the audience nothing to invest in relationally during the setup — no pair to root for,
+  // no rift to watch develop, no dynamic to carry into the conflict. Zone presence/absence mode ×
+  // first-quarter zone. Fills the zone set alongside MIDPOINT_FREEZE (Wave 276: middle 50%),
+  // RELATIONSHIP_ACT2B_DESERT (Wave 318: 50%–75% zone), and RELATIONSHIP_CLIMAX_VOID (Wave 441:
+  // final 15%) — this adds the opening zone. Distinct from RELATIONSHIP_OPENING_BURST (Wave 290:
+  // all shifts concentrated in the first 25% — the opposite problem: all relational movement
+  // front-loaded rather than absent), LATE_RELATIONSHIP_INTRODUCTION (Wave 161: a PAIR first
+  // shifts after the midpoint — per-pair timing; this audits the global zone, not a per-pair
+  // pattern), and PAIR_REPAIR_UNMOTIVATED (Wave 427: backward-cause on warmings, not zone absence).
+  if (records.length >= 10) {
+    const act1End469c = Math.floor(records.length * 0.25);
+    const act1ShiftCount469c = (records as any[])
+      .slice(0, act1End469c)
+      .filter(r => ((r.relationshipShifts ?? []) as any[]).length > 0)
+      .length;
+    const laterShiftCount469c = (records as any[])
+      .slice(act1End469c)
+      .filter(r => ((r.relationshipShifts ?? []) as any[]).length > 0)
+      .length;
+    if (act1ShiftCount469c === 0 && laterShiftCount469c >= 3) {
+      issues.push({
+        location: `Act 1 (Scenes 0–${act1End469c - 1}) — relationally silent`,
+        rule: 'RELATIONSHIP_ACT1_VOID',
+        severity: 'minor',
+        description: `No relationship shift occurs in the first ${act1End469c} scenes (Act 1, the first 25%) while ${laterShiftCount469c} shifts appear in the remaining scenes — the story opens with no relational movement. The audience enters the complication zone without any sense of which bonds are at stake, without a dynamic to root for or a rift to track. Act 1 is where the relationships that will later be tested should be established, defined, or at least gestured at through the first cracks or warmings. A completely relationally silent opening means the audience has nothing invested in the people before the story begins pushing them.`,
+        suggestedFix: `Introduce at least one relational moment in Act 1 (Scenes 0–${act1End469c - 1}): a small warming between two characters that the audience will carry, a first hint of friction that will later become a rupture, or a demonstration of an established bond that later gets tested. The shift does not need to be large — even a minor positive or negative nudge gives the audience a relational anchor before the story's complications begin.`,
+      });
     }
   }
 
