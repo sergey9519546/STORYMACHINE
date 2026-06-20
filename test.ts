@@ -19546,6 +19546,190 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 470 — rhythmPass: middle long absent, impact beat uncaused, density peak early', async () => {
+    const runR470 = async (fountain: string) => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ACTION_MIDDLE_LONG_ABSENT fires when middle 50% has no long line (≥12w) but outer zones have ≥2', async () => {
+      // 12 action lines: first 3 long (≥12w), middle 6 all short, last 3 long (≥12w)
+      // openEnd=3, midEnd=9; outerLong = lines[0-2]+lines[9-11] = 6 long; midLong = 0 → fire
+      const f470a = [
+        'INT. ROOM - DAY',
+        '',
+        'He walks slowly across the polished marble floor toward the tall window at the far end.',
+        '',
+        'She stands in the doorway with her coat still on, holding a worn leather briefcase tightly.',
+        '',
+        'The overhead lights flicker once and then stabilise, casting a cold flat glow across everything.',
+        '',
+        'He turns.',
+        '',
+        'She waits.',
+        '',
+        'He nods.',
+        '',
+        'She steps.',
+        '',
+        'He stops.',
+        '',
+        'She looks.',
+        '',
+        'He walks back to the window and stands there with his hands clasped behind him tightly.',
+        '',
+        'She sets down the briefcase and crosses the room to stand beside him at the glass.',
+        '',
+        'The city below them moves in its usual indifferent rhythm, unaware of what is happening here.',
+      ].join('\n');
+      const res = await runR470(f470a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_MIDDLE_LONG_ABSENT'), 'ACTION_MIDDLE_LONG_ABSENT should fire');
+    });
+
+    it('ACTION_MIDDLE_LONG_ABSENT does not fire when middle 50% contains a long line (≥12w)', async () => {
+      // 12 action lines: first 3 long, one long in middle, last 3 long → midLong ≥ 1 → no fire
+      const f470anr = [
+        'INT. ROOM - DAY',
+        '',
+        'He walks slowly across the polished marble floor toward the tall window at the far end.',
+        '',
+        'She stands in the doorway with her coat still on, holding a worn leather briefcase tightly.',
+        '',
+        'The overhead lights flicker once and then stabilise, casting a cold flat glow across everything.',
+        '',
+        'He turns.',
+        '',
+        'She waits.',
+        '',
+        'He crosses to the far side of the room and opens the cabinet beside the bookcase.',
+        '',
+        'She steps.',
+        '',
+        'He stops.',
+        '',
+        'She looks.',
+        '',
+        'He walks back to the window and stands there with his hands clasped behind him tightly.',
+        '',
+        'She sets down the briefcase and crosses the room to stand beside him at the glass.',
+        '',
+        'The city below them moves in its usual indifferent rhythm, unaware of what is happening here.',
+      ].join('\n');
+      const res = await runR470(f470anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_MIDDLE_LONG_ABSENT'), 'ACTION_MIDDLE_LONG_ABSENT should not fire');
+    });
+
+    it('ACTION_IMPACT_BEAT_UNCAUSED fires when ≥2 short lines (≤4w) lack a ≥9w antecedent within 2 lines', async () => {
+      // 8 action lines, all ≤4 words → qualifyingShort = lines[2..7] = 6, none preceded by ≥9w → fire
+      const f470b = [
+        'INT. HALL - DAY',
+        '',
+        'He stops.',
+        '',
+        'She turns.',
+        '',
+        'A beat.',
+        '',
+        'He waits.',
+        '',
+        'She leaves.',
+        '',
+        'He follows.',
+        '',
+        'Gone.',
+        '',
+        'Silence.',
+      ].join('\n');
+      const res = await runR470(f470b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_IMPACT_BEAT_UNCAUSED'), 'ACTION_IMPACT_BEAT_UNCAUSED should fire');
+    });
+
+    it('ACTION_IMPACT_BEAT_UNCAUSED does not fire when a short line is preceded by a long (≥9w) line within 2', async () => {
+      // 8 action lines: [long(≥9w), long, long, short(≤4w), long, short, short, short]
+      // index 3 (short) has prev1=index2=long(≥9w) → anyBuiltUp=true → no fire
+      const f470bnr = [
+        'INT. HALL - DAY',
+        '',
+        'He walks slowly toward the door at the far end of the hallway.',
+        '',
+        'She stands by the window watching him cross the room without speaking.',
+        '',
+        'He reaches into his coat pocket and takes out a worn folded letter.',
+        '',
+        'He stops.',
+        '',
+        'She crosses to him and takes the letter from his outstretched hand.',
+        '',
+        'She reads.',
+        '',
+        'A beat.',
+        '',
+        'She nods.',
+      ].join('\n');
+      const res = await runR470(f470bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_IMPACT_BEAT_UNCAUSED'), 'ACTION_IMPACT_BEAT_UNCAUSED should not fire');
+    });
+
+    it('ACTION_DENSITY_PEAK_EARLY fires when the longest action line (≥15w) is in the first 25%', async () => {
+      // 10 action lines: first line has 17 words, rest have ≤8 words each
+      // openingEnd = floor(10*0.25) = 2; maxIdx = 0 < 2 AND maxWc=17 ≥ 15 → fire
+      const f470c = [
+        'INT. WAREHOUSE - NIGHT',
+        '',
+        'The old detective reaches into his long coat and pulls out a battered leather notebook stamped with gold initials.',
+        '',
+        'He stops.',
+        '',
+        'She turns.',
+        '',
+        'He nods.',
+        '',
+        'A beat.',
+        '',
+        'She steps back.',
+        '',
+        'He waits.',
+        '',
+        'She leaves.',
+        '',
+        'He follows.',
+        '',
+        'Gone.',
+      ].join('\n');
+      const res = await runR470(f470c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_DENSITY_PEAK_EARLY'), 'ACTION_DENSITY_PEAK_EARLY should fire');
+    });
+
+    it('ACTION_DENSITY_PEAK_EARLY does not fire when the longest action line (≥15w) is after the first 25%', async () => {
+      // 10 action lines: line at index 6 has 17 words; openingEnd=2; maxIdx=6 ≥ 2 → no fire
+      const f470cnr = [
+        'INT. WAREHOUSE - NIGHT',
+        '',
+        'He stops.',
+        '',
+        'She turns.',
+        '',
+        'He nods.',
+        '',
+        'A beat.',
+        '',
+        'She steps back.',
+        '',
+        'He waits.',
+        '',
+        'The old detective reaches into his long coat and pulls out a battered leather notebook stamped with gold initials.',
+        '',
+        'She leaves.',
+        '',
+        'He follows.',
+        '',
+        'Gone.',
+      ].join('\n');
+      const res = await runR470(f470cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_DENSITY_PEAK_EARLY'), 'ACTION_DENSITY_PEAK_EARLY should not fire');
+    });
+  });
+
   describe('Wave 456 — rhythmPass: consecutive long run, opening short absent, sentence count peak', async () => {
     const runR456 = async (fountain: string) => {
       const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');

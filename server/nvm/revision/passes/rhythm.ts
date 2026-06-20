@@ -88,6 +88,16 @@
 // sentence count; one action line packs five-beat clusters while all others are brief, distinct from
 // SINGLE_SENTENCE_FLOOD which fires when ALL lines are one-sentence and from LONGEST_ACTION_OUTLIER
 // which isolates the word-count peak rather than sentence-count peak).
+// Wave 470 additions: middle long absent (zone presence/absence × middle zone — the middle 50% of
+// action lines has zero long lines ≥12 words while ≥2 appear in the outer zones; fills the middle-
+// zone cell alongside opening-zone and finale-zone checks; distinct from all proportion and average
+// checks which have no zone sensitivity), impact beat uncaused (backward-cause — ≥2 short ≤4w
+// lines appear after the first 2 positions but none is preceded by a long ≥9w line within 2 action
+// lines; the first backward-cause check in this pass, reversing the direction of ACTION_LONG_
+// RECOVERY_ABSENT which checks aftermath, not antecedent), density peak early (distribution/timing ×
+// peak position — the single longest action line ≥15w is located in the first 25% of action lines,
+// front-loading the script's most elaborate prose in the setup rather than the climax; distinct from
+// LONGEST_ACTION_OUTLIER which is position-agnostic and fires on word-count ratio, not position).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1808,6 +1818,103 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `One action line contains ${maxSent456c} sentences while the script average is ${avgSentCount456c.toFixed(1)} sentences per action line — a ${(maxSent456c / avgSentCount456c).toFixed(1)}× outlier. Packing ${maxSent456c} separate beats into a single un-broken action line violates the principle that each screenplay beat deserves its own visual unit: when multiple events are crammed into one block without blank-line separation, the reader's eye cannot cleanly distinguish where one consequence ends and the next begins. The combined weight of five beats in a single line also dilutes each individual moment — nothing lands with the isolation that makes a beat register.`,
         suggestedFix: `Break the ${maxSent456c}-sentence action line at line ${actionLines[maxSentIdx456c].lineNum} into separate lines, each separated by a blank line: each sentence becomes its own action block. Even a two-word beat ("He stops.") reads with more impact as its own visual unit than as one clause in a five-sentence block. The blank line between beats is how a screenplay tells the reader to pause.`,
+      });
+    }
+  }
+
+  // ── Wave 470: ACTION_MIDDLE_LONG_ABSENT, ACTION_IMPACT_BEAT_UNCAUSED, ACTION_DENSITY_PEAK_EARLY ──
+
+  // ACTION_MIDDLE_LONG_ABSENT — Zone presence/absence × middle zone (n≥12, 0 long ≥12w in the
+  // middle 50% while ≥2 long lines exist in the outer zones). The middle zone (action lines
+  // 25%–75%) is where Act 2 drama, confrontations, and complex staging live. When every long
+  // descriptive line is front-loaded in the opening zone or back-loaded in the finale zone, the
+  // mid-script drama reads as a telegraphic beat sheet with no expansive staging — the screenplay
+  // thins at its dramatic core. Fills the middle-zone cell in the zone presence/absence matrix
+  // alongside ACTION_OPENING_SHORT_ABSENT (opening zone) and ACTION_FINALE_BLOAT (finale zone).
+  // Distinct from ACTION_FINALE_BLOAT (Wave 428: compares zone AVERAGES, not per-zone long-line
+  // presence), ACTION_OPENING_SHORT_ABSENT (Wave 456: opening zone × short-line presence; this is
+  // middle zone × long-line presence, different zone and different threshold), LONG_LINE_FLOOD
+  // (global proportion, no zone sensitivity whatsoever).
+  if (actionLines.length >= 12) {
+    const openEnd470a = Math.floor(actionLines.length * 0.25);
+    const midEnd470a = Math.floor(actionLines.length * 0.75);
+    const outerLong470a = [
+      ...actionLines.slice(0, openEnd470a),
+      ...actionLines.slice(midEnd470a),
+    ].filter(l => countWords(l.text) >= 12).length;
+    const midLong470a = actionLines.slice(openEnd470a, midEnd470a).filter(
+      l => countWords(l.text) >= 12,
+    ).length;
+    if (midLong470a === 0 && outerLong470a >= 2) {
+      issues.push({
+        location: `Action lines ${openEnd470a + 1}–${midEnd470a} of ${actionLines.length} (middle 50%)`,
+        rule: 'ACTION_MIDDLE_LONG_ABSENT',
+        severity: 'minor',
+        description: `The middle 50% of action lines (positions ${openEnd470a + 1}–${midEnd470a} of ${actionLines.length}) contains no long line (≥12 words), while ${outerLong470a} long lines appear in the opening or finale zones. The mid-script zone — where Act 2 drama, confrontations, and revelations occur — has been rendered entirely in short, compressed beats. Without a single expansive descriptive line in the middle, the drama's core reads as a telegraphic beat sheet rather than fully realised scene staging.`,
+        suggestedFix: 'Add at least one full descriptive action line (≥10 words) in the middle section: where are the characters, how does the space change around them, what does the environment reveal? A long line in the middle zone does not slow the script — it anchors the drama at its most complex point.',
+      });
+    }
+  }
+
+  // ACTION_IMPACT_BEAT_UNCAUSED — Backward-cause × short-line context (n≥8, ≥2 qualifying short
+  // lines ≤4w starting from index 2, none preceded by a long ≥9w line within 2 action lines
+  // before it). A short impact beat derives its punch from the density it crystallises: "She
+  // stops." lands hard after a long staging line that built the moment, but floats when it follows
+  // equally short beats. When ALL of the script's staccato moments arrive context-free — no prior
+  // dense line within 2 action lines — they appear in a vacuum rather than resolving a specific
+  // image or situation. The cause (density buildup) is always absent.
+  // Distinct from ACTION_LONG_RECOVERY_ABSENT (Wave 442: sequence/aftermath — asks what comes
+  // AFTER a long line; this reverses the direction, asking what comes BEFORE a short line — the
+  // first backward-cause check in this pass, analytically opposite in direction of inquiry),
+  // SHORT_LINE_POVERTY (Wave 249: fires when zero short lines exist; this fires when short lines
+  // exist but ALL lack a dense antecedent), STACCATO_FRAGMENTATION (run count, not causal context).
+  if (actionLines.length >= 8) {
+    const qualifyingShortIdxs470b: number[] = [];
+    for (let i = 2; i < actionLines.length; i++) {
+      if (countWords(actionLines[i].text) <= 4) qualifyingShortIdxs470b.push(i);
+    }
+    if (qualifyingShortIdxs470b.length >= 2) {
+      const anyBuiltUp470b = qualifyingShortIdxs470b.some(idx => {
+        const prev1Wc = idx >= 1 ? countWords(actionLines[idx - 1].text) : 0;
+        const prev2Wc = idx >= 2 ? countWords(actionLines[idx - 2].text) : 0;
+        return prev1Wc >= 9 || prev2Wc >= 9;
+      });
+      if (!anyBuiltUp470b) {
+        issues.push({
+          location: 'Action lines throughout — short impact beats lack density buildup',
+          rule: 'ACTION_IMPACT_BEAT_UNCAUSED',
+          severity: 'minor',
+          description: `${qualifyingShortIdxs470b.length} short action line(s) (≤4 words) appear after the script's opening, but none is preceded by a longer line (≥9 words) within the previous 2 action lines. Short impact beats draw their punch from the density they punctuate — "She stops." hits hard after a staging line that built the moment, but floats when it follows equally short beats. All the script's staccato moments arrive context-free: they crystallise nothing because there is no prior density for them to resolve.`,
+          suggestedFix: 'Before each short impact beat, ensure at least one of the preceding 2 action lines is a fuller line (≥9 words) that builds the staging or situation being crystallised. "He lifts the gun, checking the chamber, his hands completely steady." followed by "He fires." is a beat; two consecutive short lines are just a list.',
+        });
+      }
+    }
+  }
+
+  // ACTION_DENSITY_PEAK_EARLY — Distribution/timing × peak position (n≥10, the single longest
+  // action line ≥15w sits in the first 25% of action lines). In a drama building toward a climax,
+  // the most elaborate prose beat should arrive at or after the midpoint — where the staging
+  // complexity and dramatic weight are greatest. When the densest action line is front-loaded in
+  // the setup, the opening pages earn the most elaborate description while the confrontation and
+  // climax are written in lighter, shorter beats. The prose density curve inverts the story's
+  // tension curve.
+  // Distinct from LONGEST_ACTION_OUTLIER (Wave 428: fires when max word count ≥25w AND ≥4×
+  // average — a ratio test, position-agnostic; this fires on POSITION in the first 25%,
+  // regardless of ratio, for any ≥15w peak), ACTION_FINALE_BLOAT (Wave 428: compares zone
+  // AVERAGES between first 75% and last 25%; this tracks a single-line peak's POSITION, not a
+  // zone average), ACTION_OPENING_SHORT_ABSENT (Wave 456: opening zone × short-line absence; this
+  // is opening zone × long-line PEAK presence — complementary and distinct threshold/direction).
+  if (actionLines.length >= 10) {
+    const maxWc470c = Math.max(...wordCounts);
+    const maxIdx470c = wordCounts.indexOf(maxWc470c);
+    const openingEnd470c = Math.floor(actionLines.length * 0.25);
+    if (maxWc470c >= 15 && maxIdx470c < openingEnd470c) {
+      issues.push({
+        location: `Action line ${actionLines[maxIdx470c].lineNum} (${maxWc470c} words — densest in script, in opening 25%)`,
+        rule: 'ACTION_DENSITY_PEAK_EARLY',
+        severity: 'minor',
+        description: `The longest action line (${maxWc470c} words) is action line ${maxIdx470c + 1} of ${actionLines.length} — in the first 25% of action lines. The script's most expansive prose moment is front-loaded in the setup, while the confrontation and climax are written in shorter, lighter beats. The prose density curve inverts the story's tension arc: the opening earns the most elaborate staging while the scenes that cost the characters the most are rendered in compressed, minimal description.`,
+        suggestedFix: 'Trim the dense early line to its essential staging beats, and expand at least one mid-script or late-script action line to carry fuller description. The scene that earns the most words should be the one that costs the characters the most — usually not the opening.',
       });
     }
   }
