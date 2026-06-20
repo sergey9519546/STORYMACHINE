@@ -26062,6 +26062,104 @@ The lights go out.`;
     });
   });
 
+  describe('Wave 462 — dialoguePass: dramatic turn scene void, negation flood, opening silent', async () => {
+    const makeRec462 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
+      sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false,
+      revelation: null, dramaticTurn: 'nothing', payoffSetupIds: [], relationshipShifts: [],
+      emotionalShift: 'neutral', seededClueIds: [], dialogueHighlights: [], unresolvedClues: [],
+      purpose: '', slug: `s${sceneIdx}`, ...extra,
+    });
+    const runD462 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    const buildScenes462 = (count: number, withDlgFn: (i: number) => boolean): string => {
+      let f = '';
+      const labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${labels[i] ?? i} - DAY\n\n`;
+        if (withDlgFn(i)) {
+          f += `ALICE\nShe found the documents early this morning.\n\nBOB\nWe should leave before they close the gate.\n\n`;
+        } else {
+          f += `The door crashes open. A figure steps from the dark.\n\n`;
+        }
+      }
+      return f;
+    };
+
+    it('DIALOGUE_DRAMATIC_TURN_SCENE_VOID fires when every dramatic-turn scene has no dialogue', async () => {
+      // n=8; turn scenes at 2,5 both have no dialogue; other scenes carry 12 dialogue lines
+      const recs462a = Array.from({ length: 8 }, (_, i) => makeRec462(i, [2, 5].includes(i) ? { dramaticTurn: 'reversal' } : {}));
+      const f462a = buildScenes462(8, i => ![2, 5].includes(i));
+      const res = await runD462(f462a, recs462a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_DRAMATIC_TURN_SCENE_VOID'), 'DIALOGUE_DRAMATIC_TURN_SCENE_VOID should fire');
+    });
+
+    it('DIALOGUE_DRAMATIC_TURN_SCENE_VOID does NOT fire when a dramatic-turn scene carries dialogue', async () => {
+      // n=8; turn scenes at 2,5; scene 2 HAS dialogue → not all turns silent → no fire
+      const recs462aNF = Array.from({ length: 8 }, (_, i) => makeRec462(i, [2, 5].includes(i) ? { dramaticTurn: 'reversal' } : {}));
+      const f462aNF = buildScenes462(8, i => i !== 5);
+      const res = await runD462(f462aNF, recs462aNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_DRAMATIC_TURN_SCENE_VOID'), 'DIALOGUE_DRAMATIC_TURN_SCENE_VOID should not fire');
+    });
+
+    it('DIALOGUE_NEGATION_FLOOD fires when more than 30% of lines carry a negation', async () => {
+      // 10 lines, 6 with negation (60% > 30%) → fires
+      const lines462b = [
+        'No, I won\'t go back there.',
+        'Nothing matters anymore to me.',
+        'You can\'t make me do this.',
+        'I never said that to her.',
+        'We don\'t have any time left.',
+        'Nobody is coming to help us.',
+        'She found the documents this morning.',
+        'The car waits by the factory road.',
+        'Turn the radio up and drive fast.',
+        'They will arrive at dawn tomorrow.',
+      ];
+      const body462b = lines462b.map((l, i) => `${i % 2 === 0 ? 'ALICE' : 'BOB'}\n${l}`).join('\n\n');
+      const f462b = `INT. ROOM - DAY\n\n${body462b}\n`;
+      const res = await runD462(f462b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_NEGATION_FLOOD'), 'DIALOGUE_NEGATION_FLOOD should fire');
+    });
+
+    it('DIALOGUE_NEGATION_FLOOD does NOT fire when negation stays at or below 30%', async () => {
+      // 10 lines, 3 with negation (30%, not > 30%) → no fire
+      const lines462bNF = [
+        'No, I won\'t go back there.',
+        'Nothing matters anymore to me.',
+        'You can\'t make me do this.',
+        'She found the documents this morning.',
+        'We should leave before the gate closes.',
+        'The car waits by the factory road.',
+        'Turn the radio up and drive fast.',
+        'He made a choice this evening.',
+        'The road ends just past the hill.',
+        'They will arrive at dawn tomorrow.',
+      ];
+      const body462bNF = lines462bNF.map((l, i) => `${i % 2 === 0 ? 'ALICE' : 'BOB'}\n${l}`).join('\n\n');
+      const f462bNF = `INT. ROOM - DAY\n\n${body462bNF}\n`;
+      const res = await runD462(f462bNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_NEGATION_FLOOD'), 'DIALOGUE_NEGATION_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_OPENING_SILENT fires when the first 20% of scenes has no dialogue', async () => {
+      // n=10; openingEnd=2; scenes 0,1 silent; scenes 2–9 carry 16 dialogue lines (≥15) → fires
+      const recs462c = Array.from({ length: 10 }, (_, i) => makeRec462(i));
+      const f462c = buildScenes462(10, i => i >= 2);
+      const res = await runD462(f462c, recs462c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_OPENING_SILENT'), 'DIALOGUE_OPENING_SILENT should fire');
+    });
+
+    it('DIALOGUE_OPENING_SILENT does NOT fire when the opening zone carries dialogue', async () => {
+      // n=10; all scenes have dialogue → openingDlgCount > 0 → no fire
+      const recs462cNF = Array.from({ length: 10 }, (_, i) => makeRec462(i));
+      const f462cNF = buildScenes462(10, () => true);
+      const res = await runD462(f462cNF, recs462cNF);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_OPENING_SILENT'), 'DIALOGUE_OPENING_SILENT should not fire');
+    });
+  });
+
   describe('Wave 448 — dialoguePass: curiosity peak silent, question back-loaded, revelation scene void', async () => {
     const makeRec448 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
       sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false,

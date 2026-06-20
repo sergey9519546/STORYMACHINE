@@ -74,6 +74,15 @@
 // character speaking in the moment of discovery; co-occurrence/decoupling × revelation × dialogue
 // presence, distinct from DIALOGUE_TENSION_PEAK_SILENT which is single-peak and from
 // REVELATION_RELATIONSHIP_VOID in causality.ts which checks the relationship channel).
+// Wave 462 additions: dramatic-turn scene void (every dramatic-turn scene contains no dialogue —
+// the story's pivots happen in silence; co-occurrence/decoupling × dramatic turn × dialogue
+// presence, the turn-channel parallel of DIALOGUE_REVELATION_SCENE_VOID), negation flood (>30%
+// of lines carry a negation — "no"/"not"/"never"/"can't"/"nothing" — dialogue is dominated by
+// refusal and denial; valence/bloat mode × negation lexeme, the opposite-valence counterpart of
+// DIALOGUE_AFFIRMATION_FLOOD which catches bare assent), opening silent (the first 20% of scenes
+// contains no dialogue while the rest is verbally active — the story opens as pure silent
+// spectacle; zone presence/absence × opening zone, the opening-zone parallel of DIALOGUE_CLIMAX_
+// VOID which audits the final 20%).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2211,6 +2220,97 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
           suggestedFix: `Add at least one line of dialogue to a revelation scene: a character asking the question whose answer is the revelation, a confrontation that forces the disclosure, or a denial in the face of the truth. A revelation with a spoken line — even a fragment — is dramatically richer than one rendered in action alone, because the voice tells us what the discovery means to the character who receives it.`,
         });
       }
+    }
+  }
+
+  // ── Wave 462: DIALOGUE_DRAMATIC_TURN_SCENE_VOID, DIALOGUE_NEGATION_FLOOD, DIALOGUE_OPENING_SILENT ──
+
+  // DIALOGUE_DRAMATIC_TURN_SCENE_VOID (co-occurrence/decoupling × dramatic turn × dialogue
+  // presence, n≥8, dlg≥10, ≥2 turn scenes): Every scene that carries a story pivot
+  // (dramaticTurn !== 'nothing') contains no dialogue — the reversals and recognitions that
+  // redirect the story all happen without a spoken word. A dramatic turn is the moment a
+  // character's situation flips, and the human meaning of that flip usually lives in what they
+  // say (or refuse to say) as it lands: the recognition spoken aloud, the reversal protested, the
+  // accusation that turns the scene. When every pivot is silent, the story's turning points are
+  // rendered as pure action, and the audience is never told — by a voice — what the change means
+  // to the people inside it.
+  // Distinctness: DIALOGUE_REVELATION_SCENE_VOID (Wave 448) is the same co-occurrence check on
+  // the REVELATION channel — this is the DRAMATIC-TURN channel, a different event population.
+  // DIALOGUE_TENSION_PEAK_SILENT (Wave 434) isolates the SINGLE peak-suspense scene; this audits
+  // ALL turn scenes for the consistent absence of voice. DRAMATIC_TURN_RELATIONSHIP_VOID
+  // (causality.ts, Wave 447) checks turn scenes for relationship shifts — a different output
+  // channel in a different pass.
+  if (records.length >= 8 && dialogue.length >= 10) {
+    const turnScenes462a = (records as any[]).filter(r => (r.dramaticTurn ?? 'nothing') !== 'nothing');
+    if (turnScenes462a.length >= 2) {
+      const lineToScene462a = buildLineToSceneMap(fountain);
+      const dlgSceneIdxSet462a = new Set(dialogue.map(d => lineToScene462a[d.lineNum - 1] ?? -1));
+      const allTurnsSilent462a = turnScenes462a.every((r: any) => !dlgSceneIdxSet462a.has(r.sceneIdx));
+      if (allTurnsSilent462a) {
+        issues.push({
+          location: `${turnScenes462a.length} dramatic-turn scene(s) — no dialogue in any`,
+          rule: 'DIALOGUE_DRAMATIC_TURN_SCENE_VOID',
+          severity: 'minor',
+          description: `All ${turnScenes462a.length} dramatic-turn scenes (reversals, recognitions, pivots) contain no dialogue — every turning point in the story happens in complete silence. A dramatic turn is the moment a character's situation flips, and the human meaning of that flip usually lives in what they say as it lands: the recognition spoken aloud, the reversal protested, the accusation that turns the scene. When every pivot is unspoken, the story's turning points are rendered as pure action, and no voice ever tells the audience what the change means to the people inside it.`,
+          suggestedFix: `Add at least one line of dialogue to a dramatic-turn scene: the words a character finds (or fails to find) at the moment everything changes — a recognition, a refusal, an accusation, a name spoken in disbelief. The line need not explain the turn; it should register it in a human voice, so the pivot is felt as a person's experience and not only as a plot mechanic.`,
+        });
+      }
+    }
+  }
+
+  // DIALOGUE_NEGATION_FLOOD (valence/bloat mode × negation lexeme, dlg≥10, >30%): More than 30%
+  // of dialogue lines carry an explicit negation — "no", "not", "never", "can't", "won't",
+  // "don't", "nothing", "nobody", "none". When most lines are framed as denial, refusal, or
+  // absence, the dialogue's prevailing valence is negative-resistant: characters define
+  // themselves by what they reject rather than what they want, and the scene's forward energy
+  // dissipates into a wall of "no". A measure of resistance is dramatically useful, but a
+  // pervasive negation register flattens the emotional range and stalls the exchange — every
+  // line pushes back and none reaches forward.
+  // Distinctness: DIALOGUE_AFFIRMATION_FLOOD (Wave 420) is the opposite-valence counterpart
+  // (>25% bare assent — "yes"/"okay"/"absolutely"); this catches the negation pole. DIALOGUE_
+  // EXCUSE_FLOOD (Wave 420) targets rationalization lexemes ("because"/"I had to"); negation is
+  // a distinct lexical family. Distinct from QUESTION_FLOOD (interrogatives) and all tense/opener
+  // floods: this is the first check auditing the negation register of dialogue.
+  if (dialogue.length >= 10) {
+    const negationRe462b = /\b(no|not|never|can'?t|won'?t|don'?t|doesn'?t|didn'?t|isn'?t|aren'?t|wasn'?t|weren'?t|nothing|nobody|none|nowhere|cannot)\b/i;
+    const negationCount462b = dialogue.filter(d => negationRe462b.test(d.line)).length;
+    if (negationCount462b / dialogue.length > 0.30) {
+      issues.push({
+        location: 'Dialogue throughout',
+        rule: 'DIALOGUE_NEGATION_FLOOD',
+        severity: 'minor',
+        description: `${negationCount462b} of ${dialogue.length} dialogue lines (${Math.round(negationCount462b / dialogue.length * 100)}%) carry an explicit negation ("no", "not", "never", "can't", "nothing"). When most lines are framed as denial, refusal, or absence, the dialogue's prevailing valence is negative-resistant: characters define themselves by what they reject rather than what they want, and the exchange's forward energy dissipates into a wall of "no". Resistance has dramatic value, but a pervasive negation register flattens the emotional range — every line pushes back and none reaches forward.`,
+        suggestedFix: `Convert some negations into positive assertions of desire or intent: "I can't do this" → "I need another way"; "Nothing matters" → "One thing still matters". A character who states what they want, rather than only what they refuse, gives the scene something to move toward. Reserve dense negation for moments of genuine refusal, not as the default grammar of every exchange.`,
+      });
+    }
+  }
+
+  // DIALOGUE_OPENING_SILENT (zone presence/absence × opening zone, n≥10, dlg≥15): The first 20%
+  // of scenes contains no dialogue at all, even though the rest of the story is verbally active.
+  // The story opens as pure silent spectacle: action, image, and atmosphere with no spoken word
+  // until the opening zone has passed. A wordless opening can be a deliberate, powerful choice —
+  // but when it spans the entire first fifth of a dialogue-driven story, the audience meets the
+  // characters without ever hearing them, and the voices that will carry the drama are withheld
+  // precisely where first impressions of character are formed.
+  // Distinctness: DIALOGUE_CLIMAX_VOID (Wave 434) is the same zone-silence check on the FINAL 20%
+  // — this is the opening-zone parallel, completing the bookend pairing. Distinct from DIALOGUE_
+  // TENSION_PEAK_SILENT / DIALOGUE_CURIOSITY_PEAK_SILENT (single-peak isolation, not a zone) and
+  // from DIALOGUE_DENSITY_INVERSION (compares act-level density ratios rather than requiring
+  // complete absence from a zone): this requires dialogue's total absence from the opening while
+  // confirming it is present later.
+  if (records.length >= 10 && dialogue.length >= 15) {
+    const openingEnd462c = Math.floor(records.length * 0.2);
+    const lineToScene462c = buildLineToSceneMap(fountain);
+    const openingDlgCount462c = dialogue.filter(d => (lineToScene462c[d.lineNum - 1] ?? 0) < openingEnd462c).length;
+    const laterDlgCount462c = dialogue.filter(d => (lineToScene462c[d.lineNum - 1] ?? 0) >= openingEnd462c).length;
+    if (openingEnd462c >= 1 && openingDlgCount462c === 0 && laterDlgCount462c >= 10) {
+      issues.push({
+        location: `Opening 20% (Scenes 0–${openingEnd462c - 1}) — no dialogue`,
+        rule: 'DIALOGUE_OPENING_SILENT',
+        severity: 'minor',
+        description: `The first 20% of scenes (Scenes 0–${openingEnd462c - 1}) contains no dialogue, even though the rest of the story carries ${laterDlgCount462c} spoken lines. The story opens as pure silent spectacle — action, image, and atmosphere with no spoken word until the opening zone has passed. A wordless opening can be a deliberate choice, but when it spans the entire first fifth of a dialogue-driven story, the audience meets the characters without ever hearing them, and the voices that carry the drama are withheld precisely where first impressions of character are formed.`,
+        suggestedFix: `Introduce at least one line of dialogue in the opening zone: a first spoken word that establishes a character's voice, register, or relationship before the plot accelerates. The line can be terse or oblique — it does not need to deliver exposition — but hearing a character speak early lets the audience form an impression of who they are, which a silent opening defers until the story is already underway.`,
+      });
     }
   }
 
