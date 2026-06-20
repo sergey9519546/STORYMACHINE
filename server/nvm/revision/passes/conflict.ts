@@ -86,6 +86,17 @@
 // story's deepest fracture arrives unprepared; single-peak isolation × backward-cause mode,
 // distinct from CONFLICT_RUPTURE_CAUSE_VOID which audits ALL ruptures aggregate against the prior
 // single scene, and from the CONFLICT_PEAK_* checks which audit the peak's in-scene channels).
+// Wave 478 additions: rupture temporal cluster (distribution/timing — >75% of rupture scenes fall
+// in a single third; the conflict engine is architecturally ghettoized; first distribution/timing
+// check using thirds on the rupture channel, distinct from CONFLICT_FIRST/SECOND_HALF_MONOPOLY
+// which use a binary 70% threshold), positive emotion aftermath void (sequence/aftermath × rupture
+// × positive emotion — every major rupture is followed by 2 scenes with no positive emotional beat;
+// bond-breaking never precedes relief or recovery; the positive-valence complement of the existing
+// aftermath channels covering curiosity, suspense, clock, revelation, and turn), repair uncaused
+// (backward-cause × positive relational shift — every scene where a bond repairs or warms has no
+// major rupture, revelation, or dramatic turn in its prior 2 scenes; reconciliations are
+// systematically spontaneous; the positive-shift complement of CONFLICT_RUPTURE_CAUSE_VOID which
+// audits all NEGATIVE shifts, and of CONFLICT_PEAK_RUPTURE_UNCAUSED which audits only the peak).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2226,6 +2237,137 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `The story's heaviest rupture (Scene ${peakRec464c.sceneIdx}, negative-shift magnitude ${peakMag464c.toFixed(2)}) has no escalation, revelation, dramatic turn, or clock raise in either of the two scenes before it — the deepest fracture arrives without preparation. The bond that breaks hardest does so with no rising pressure, no precipitating discovery, and no pivot leading into it. A major rupture should be the culmination of accumulating strain; when the biggest one appears out of a calm run-up, it reads as an authorial decree rather than the breaking point of a tension the audience watched build.`,
           suggestedFix: `Build a gradient into the heaviest rupture: in the two scenes before the story's deepest fracture, plant the pressure that makes it inevitable — a rising suspense beat, a revelation that exposes the fault line, a turn that forces the confrontation, or a clock that makes the break unavoidable. The biggest break should land as the snap of a strain the audience felt tightening, not as a sudden severing from nowhere.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 478: CONFLICT_RUPTURE_TEMPORAL_CLUSTER, CONFLICT_POSITIVE_EMOTION_AFTERMATH_VOID, CONFLICT_REPAIR_UNCAUSED ──
+  const n478 = records.length;
+
+  // CONFLICT_RUPTURE_TEMPORAL_CLUSTER — Distribution/timing × rupture channel (n≥8, ≥4 rupture
+  // scenes, >75% in a single third). The story's bond-breaking events cluster in one structural
+  // zone, leaving the other two-thirds without any relational friction. When ruptures concentrate
+  // in one third, the conflict engine has only one gear in that zone and is absent from the others:
+  // the audience experiences a zone of relentless fracture surrounded by relational peace.
+  // Conflict works best when it punctuates all three structural phases — early ruptures establish
+  // the stakes, mid-script ruptures escalate them, and late ruptures force the final reckoning.
+  // Distinct from: CONFLICT_FIRST_HALF_MONOPOLY (Wave 338: >70% in first half — binary partition;
+  // this uses thirds with a 75% threshold and fires when any third dominates, including the
+  // middle or closing), CONFLICT_SECOND_HALF_MONOPOLY (Wave 380: binary second-half — same
+  // limitation), CONFLICT_BREATHING_ROOM_ABSENT (Wave 436: spacing between consecutive ruptures
+  // — a micro-window proximity check, not a zone-distribution check).
+  if (n478 >= 8) {
+    const rupturePositions478a = (records as any[])
+      .map((r, pos) => ({
+        pos,
+        isRupture: ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount < 0),
+      }))
+      .filter(x => x.isRupture)
+      .map(x => x.pos);
+    if (rupturePositions478a.length >= 4) {
+      const third478a = Math.floor(n478 / 3);
+      const firstZ478a = rupturePositions478a.filter(p => p < third478a).length;
+      const midZ478a = rupturePositions478a.filter(p => p >= third478a && p < 2 * third478a).length;
+      const lastZ478a = rupturePositions478a.filter(p => p >= 2 * third478a).length;
+      const maxZ478a = Math.max(firstZ478a, midZ478a, lastZ478a);
+      if (maxZ478a / rupturePositions478a.length > 0.75) {
+        const zone478a = firstZ478a === maxZ478a ? 'opening' : midZ478a === maxZ478a ? 'middle' : 'closing';
+        issues.push({
+          location: `${maxZ478a}/${rupturePositions478a.length} rupture scene(s) in the ${zone478a} third`,
+          rule: 'CONFLICT_RUPTURE_TEMPORAL_CLUSTER',
+          severity: 'minor',
+          description: `${maxZ478a} of ${rupturePositions478a.length} rupture scenes (${(maxZ478a / rupturePositions478a.length * 100).toFixed(0)}%) fall within the ${zone478a} third — the conflict engine is architecturally ghettoized into one structural zone. The other two-thirds of the script pass without any relational friction: the audience experiences either relentless fracture (in the cluster zone) or relational peace (in the empty zones), but not the graduated escalation that makes conflict feel like a pressure building toward a reckoning. Ruptures distributed across all three structural phases accomplish different things: early ruptures establish the cost of the story's stakes, mid-script ruptures escalate and test the bonds that remain, and late ruptures force the final confrontation before resolution.`,
+          suggestedFix: `Redistribute at least one or two ruptures into the zones currently without relational conflict. Even a smaller, earlier fracture — a moment of friction, betrayal, or withdrawal — seeds the zones currently empty of conflict and makes the whole arc feel like a sustained dramatic pressure rather than a burst surrounded by calm.`,
+        });
+      }
+    }
+  }
+
+  // CONFLICT_POSITIVE_EMOTION_AFTERMATH_VOID — Sequence/aftermath × rupture × positive emotion
+  // aftermath (n≥8, ≥3 qualifying major ruptures not in last 2 positions). Every major rupture
+  // (negative shift ≤ -0.3) is followed by 2 scenes in which no positive emotional beat appears.
+  // Bond-breaking never precedes any emotional recovery or relief: the aftermath of every fracture
+  // is uniformly grim or neutral with no positive moment following in the near wake. Dramatic
+  // ruptures are most affecting when they are part of a larger emotional arc — the break is felt,
+  // reacted to, and eventually followed by some counter-movement, however brief or partial.
+  // Distinct from: CONFLICT_AFTERMATH_CURIOSITY_VOID (Wave 422: rupture → no new curiosity),
+  // CONFLICT_RUPTURE_SUSPENSE_VOID (Wave 436: rupture → no suspense rise), CONFLICT_RUPTURE_CLOCK_
+  // AFTERMATH_VOID (Wave 450: rupture → no clock), CONFLICT_RUPTURE_REVELATION_AFTERMATH_VOID /
+  // CONFLICT_RUPTURE_DRAMATIC_TURN_AFTERMATH_VOID (Wave 464: rupture → no revelation/turn) — all
+  // the existing aftermath channels; this is the positive-emotion channel, completing the set by
+  // checking whether ruptures are ever followed by any emotional brightening.
+  if (n478 >= 8) {
+    const majorRuptures478b = (records as any[]).filter(r =>
+      ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+    );
+    const qualRuptures478b = majorRuptures478b.filter(r => {
+      const pos478b = records.findIndex(x => x.sceneIdx === r.sceneIdx);
+      return pos478b >= 0 && pos478b < n478 - 2;
+    });
+    if (qualRuptures478b.length >= 3) {
+      const allAftermathNonPositive478b = qualRuptures478b.every(r => {
+        const pos478b = records.findIndex(x => x.sceneIdx === r.sceneIdx);
+        for (let off = 1; off <= 2; off++) {
+          const nextIdx478b = pos478b + off;
+          if (nextIdx478b >= n478) break;
+          if (((records as any[])[nextIdx478b].emotionalShift ?? 'neutral') === 'positive') return false;
+        }
+        return true;
+      });
+      if (allAftermathNonPositive478b) {
+        issues.push({
+          location: `${qualRuptures478b.length} major rupture aftermath(s) — no positive emotional beat within 2 scenes`,
+          rule: 'CONFLICT_POSITIVE_EMOTION_AFTERMATH_VOID',
+          severity: 'minor',
+          description: `Every major rupture (${qualRuptures478b.length} qualifying bond-breaks) is followed by two scenes in which no positive emotion appears — bond-breaking is never followed by any emotional relief, recovery, or counter-movement. When every fracture's aftermath is uniformly grim or flat, the story's emotional world after a conflict is permanently depressed: there is no "exhale" after any break, no brief positive turn that shows the characters regrouping. Dramatic ruptures are most affecting when they trigger an arc in what follows — the break is felt, processed, and eventually tested against some moment of partial recovery or relief that shows whether anything survived.`,
+          suggestedFix: `After at least one major rupture, introduce a positive emotional moment in the 2-scene aftermath: a character who finds brief relief, a moment of connection after the break, or a small triumph that carries the story forward despite the fracture. The positive moment doesn't neutralize the rupture — it creates the contrast that makes the break more costly by showing what was at stake.`,
+        });
+      }
+    }
+  }
+
+  // CONFLICT_REPAIR_UNCAUSED — Backward-cause × positive relational shift (n≥8, ≥2 scenes with
+  // positive relationship shifts, each at position ≥ 2). Every scene where a bond warms or repairs
+  // has no major rupture, revelation, or dramatic turn in its 2 preceding scenes — reconciliations
+  // and relational repairs are systematically spontaneous. A repaired bond is most dramatically
+  // resonant when it is earned: preceded by a fracture that motivated the reckoning, a truth
+  // revealed that changed the equation, or a pivot that forced the characters together. When every
+  // repair arrives without a visible prior cause, reconciliations feel like authorial gifts rather
+  // than dramatically earned resolutions of conflict.
+  // Distinct from: CONFLICT_RUPTURE_CAUSE_VOID (Wave 422: backward-cause × ALL negative shifts —
+  // audits ruptures as the effect; this audits POSITIVE SHIFTS as the effect), CONFLICT_PEAK_
+  // RUPTURE_UNCAUSED (Wave 464: backward-cause × the single NEGATIVE peak — this checks ALL
+  // positive shifts), ARC_RECONCILIATION_ABSENT (Wave 257: no broken bond ever repairs — that
+  // checks absence of positive shift; here positive shifts exist but are systematically uncaused).
+  if (n478 >= 8) {
+    const posShiftScenes478c = (records as any[]).filter(r =>
+      ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount > 0),
+    );
+    const qualPosShift478c = posShiftScenes478c.filter(r => {
+      const pos478c = records.findIndex(x => x.sceneIdx === r.sceneIdx);
+      return pos478c >= 2;
+    });
+    if (qualPosShift478c.length >= 2) {
+      const allRepairsUncaused478c = qualPosShift478c.every(r => {
+        const pos478c = records.findIndex(x => x.sceneIdx === r.sceneIdx);
+        for (let off = 1; off <= 2; off++) {
+          const priorIdx478c = pos478c - off;
+          if (priorIdx478c < 0) continue;
+          const prior478c = (records as any[])[priorIdx478c];
+          if (((prior478c.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3)) return false;
+          if (prior478c.revelation !== null && prior478c.revelation !== undefined) return false;
+          if ((prior478c.dramaticTurn ?? 'nothing') !== 'nothing') return false;
+        }
+        return true;
+      });
+      if (allRepairsUncaused478c) {
+        issues.push({
+          location: `${qualPosShift478c.length} positive-shift scene(s) — no prior causal driver within 2 scenes`,
+          rule: 'CONFLICT_REPAIR_UNCAUSED',
+          severity: 'minor',
+          description: `Every scene where a bond warms or repairs (${qualPosShift478c.length} positive relationship shifts) has no major rupture, revelation, or dramatic turn in the two preceding scenes — every reconciliation is systematically spontaneous. A repaired bond is most dramatically resonant when it is earned: preceded by a fracture that forced the reckoning, a truth revealed that changed the equation, or a pivot that brought the characters together. When every repair arrives without visible prior cause, reconciliation reads as an authorial gift rather than a hard-won dramatic resolution — the bonds warm for no reason the audience has watched unfold.`,
+          suggestedFix: `Plant a causal driver before at least one positive relational shift: a fracture in the prior scene that the positive shift begins to resolve, a revelation that reframes who the characters are to each other, or a dramatic turn that forces them to cooperate. A repair earned by prior conflict or revelation makes the warming of the bond feel possible and meaningful; one that arrives from a calm run-up reads as sentiment rather than drama.`,
         });
       }
     }

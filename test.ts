@@ -23397,6 +23397,82 @@ I always listen.
     });
   });
 
+  describe('Wave 478 — conflictPass: rupture temporal cluster, positive emotion aftermath void, repair uncaused', async () => {
+    const rup478 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
+    const makeRec478 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runConf478 = async (records: any[]) => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      return conflictPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CONFLICT_RUPTURE_TEMPORAL_CLUSTER fires when >75% of ruptures fall in a single third', async () => {
+      // n=12; ruptures at 0,1,2,3 (all in first third, floor(12/3)=4 → positions 0-3); 4/4=100% > 75%
+      const recs478a = Array.from({ length: 12 }, (_, i) =>
+        makeRec478(i, { relationshipShifts: [0, 1, 2, 3].includes(i) ? rup478(-0.4) : [] }),
+      );
+      const res = await runConf478(recs478a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_RUPTURE_TEMPORAL_CLUSTER'), 'CONFLICT_RUPTURE_TEMPORAL_CLUSTER should fire');
+    });
+
+    it('CONFLICT_RUPTURE_TEMPORAL_CLUSTER does not fire when ruptures spread across thirds', async () => {
+      // n=12; ruptures at 0,4,8,11 → first:1, mid:1, last:2 → max=2/4=50% ≤ 75%
+      const recs478anr = Array.from({ length: 12 }, (_, i) =>
+        makeRec478(i, { relationshipShifts: [0, 4, 8, 11].includes(i) ? rup478(-0.4) : [] }),
+      );
+      const res = await runConf478(recs478anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_RUPTURE_TEMPORAL_CLUSTER'), 'CONFLICT_RUPTURE_TEMPORAL_CLUSTER should not fire');
+    });
+
+    it('CONFLICT_POSITIVE_EMOTION_AFTERMATH_VOID fires when no major rupture aftermath has a positive emotional beat', async () => {
+      // n=8; major ruptures at 1,3,5 (≤-0.3); aftermaths 2-3, 4-5, 6-7 all neutral → fires
+      const recs478b = Array.from({ length: 8 }, (_, i) =>
+        makeRec478(i, { relationshipShifts: [1, 3, 5].includes(i) ? rup478(-0.5) : [] }),
+      );
+      const res = await runConf478(recs478b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_POSITIVE_EMOTION_AFTERMATH_VOID'), 'CONFLICT_POSITIVE_EMOTION_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_POSITIVE_EMOTION_AFTERMATH_VOID does not fire when a rupture aftermath carries a positive beat', async () => {
+      // n=8; major ruptures at 1,3,5; scene 2 (aftermath of rupture@1) is emotionally positive → no fire
+      const recs478bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec478(i, {
+          relationshipShifts: [1, 3, 5].includes(i) ? rup478(-0.5) : [],
+          emotionalShift: i === 2 ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runConf478(recs478bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_POSITIVE_EMOTION_AFTERMATH_VOID'), 'CONFLICT_POSITIVE_EMOTION_AFTERMATH_VOID should not fire');
+    });
+
+    it('CONFLICT_REPAIR_UNCAUSED fires when every positive-shift scene has no causal driver in prior 2 scenes', async () => {
+      // n=8; positive shifts at 3,6 (pos≥2); priors (1,2 for scene 3) and (4,5 for scene 6) have no rupture/revelation/turn
+      const recs478c = Array.from({ length: 8 }, (_, i) =>
+        makeRec478(i, { relationshipShifts: [3, 6].includes(i) ? rup478(0.4) : [] }),
+      );
+      const res = await runConf478(recs478c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_REPAIR_UNCAUSED'), 'CONFLICT_REPAIR_UNCAUSED should fire');
+    });
+
+    it('CONFLICT_REPAIR_UNCAUSED does not fire when a positive shift is preceded by a rupture', async () => {
+      // n=8; positive shifts at 3,6; scene 2 (1 scene before repair@3) has a major rupture → caused → no fire
+      const recs478cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec478(i, {
+          relationshipShifts: i === 3 || i === 6 ? rup478(0.4) : i === 2 ? rup478(-0.5) : [],
+        }),
+      );
+      const res = await runConf478(recs478cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_REPAIR_UNCAUSED'), 'CONFLICT_REPAIR_UNCAUSED should not fire');
+    });
+  });
+
   describe('Wave 464 — conflictPass: rupture revelation aftermath void, rupture dramatic-turn aftermath void, peak rupture uncaused', async () => {
     const rup464 = (amount: number, pairKey = 'A|B') => [{ pairKey, dimension: 'trust', amount }];
     const makeRec464 = (idx: number, overrides: any = {}): any => ({
