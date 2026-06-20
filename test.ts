@@ -22098,6 +22098,88 @@ I always listen.
     });
   });
 
+  describe('Wave 465 — intentionPass: proactive clock aftermath absent, payoff drama decoupled, revelation frontloaded', async () => {
+    const makeRec465 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runInt465 = async (records: any[]) => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      return intentionPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PROACTIVE_CLOCK_AFTERMATH_ABSENT fires when no proactive act is followed by a clock event within 2 scenes', async () => {
+      // n=10, proactive acts at 1,4,7 (clockRaised); aftermath scenes 2-3, 5-6, 8-9 all clockless → fires
+      const recs465a = Array.from({ length: 10 }, (_, i) => makeRec465(i));
+      recs465a[1] = makeRec465(1, { clockRaised: true });
+      recs465a[4] = makeRec465(4, { seededClueIds: ['c1'] });
+      recs465a[7] = makeRec465(7, { clockRaised: true });
+      const res = await runInt465(recs465a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PROACTIVE_CLOCK_AFTERMATH_ABSENT'), 'PROACTIVE_CLOCK_AFTERMATH_ABSENT should fire');
+    });
+
+    it('PROACTIVE_CLOCK_AFTERMATH_ABSENT does not fire when a proactive act is followed by a clockRaised scene', async () => {
+      // n=10, proactive at 1,4,7; scene 5 has clockRaised=true (within 1 of proactive at 4) → no fire
+      const recs465anr = Array.from({ length: 10 }, (_, i) => makeRec465(i));
+      recs465anr[1] = makeRec465(1, { clockRaised: true });
+      recs465anr[4] = makeRec465(4, { seededClueIds: ['c1'] });
+      recs465anr[5] = makeRec465(5, { clockRaised: true });
+      recs465anr[7] = makeRec465(7, { clockRaised: true });
+      const res = await runInt465(recs465anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PROACTIVE_CLOCK_AFTERMATH_ABSENT'), 'PROACTIVE_CLOCK_AFTERMATH_ABSENT should not fire');
+    });
+
+    it('PAYOFF_DRAMA_DECOUPLED fires when payoff scenes and turn scenes never coincide', async () => {
+      // n=10; payoffs at 2,6 (no turns); turns at 4,8 (no payoffs) → fires
+      const recs465b = Array.from({ length: 10 }, (_, i) => makeRec465(i));
+      recs465b[2] = makeRec465(2, { payoffSetupIds: ['s1'] });
+      recs465b[4] = makeRec465(4, { dramaticTurn: 'reversal' });
+      recs465b[6] = makeRec465(6, { payoffSetupIds: ['s2'] });
+      recs465b[8] = makeRec465(8, { dramaticTurn: 'twist' });
+      const res = await runInt465(recs465b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_DRAMA_DECOUPLED'), 'PAYOFF_DRAMA_DECOUPLED should fire');
+    });
+
+    it('PAYOFF_DRAMA_DECOUPLED does not fire when a payoff coincides with a dramatic turn', async () => {
+      // n=10; scene 4 has both payoffSetupIds and a dramaticTurn → no fire
+      const recs465bnr = Array.from({ length: 10 }, (_, i) => makeRec465(i));
+      recs465bnr[2] = makeRec465(2, { payoffSetupIds: ['s1'] });
+      recs465bnr[4] = makeRec465(4, { payoffSetupIds: ['s2'], dramaticTurn: 'reversal' });
+      recs465bnr[7] = makeRec465(7, { dramaticTurn: 'twist' });
+      const res = await runInt465(recs465bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_DRAMA_DECOUPLED'), 'PAYOFF_DRAMA_DECOUPLED should not fire');
+    });
+
+    it('REVELATION_FRONTLOADED fires when more than 70% of revelations fall in the first half', async () => {
+      // n=12 (half=6); 5 revelations: 4 in scenes 0-5 (first half), 1 in scene 9 → 4/5=80% > 70% → fires
+      const recs465c = Array.from({ length: 12 }, (_, i) => makeRec465(i));
+      recs465c[1] = makeRec465(1, { revelation: 'truth A' });
+      recs465c[2] = makeRec465(2, { revelation: 'truth B' });
+      recs465c[3] = makeRec465(3, { revelation: 'truth C' });
+      recs465c[5] = makeRec465(5, { revelation: 'truth D' });
+      recs465c[9] = makeRec465(9, { revelation: 'truth E' });
+      const res = await runInt465(recs465c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_FRONTLOADED'), 'REVELATION_FRONTLOADED should fire');
+    });
+
+    it('REVELATION_FRONTLOADED does not fire when revelations are distributed across both halves', async () => {
+      // n=12 (half=6); 5 revelations: 2 first half (scenes 1,3), 3 second half (scenes 7,9,11) → 2/5=40% ≤ 70% → no fire
+      const recs465cnr = Array.from({ length: 12 }, (_, i) => makeRec465(i));
+      recs465cnr[1] = makeRec465(1, { revelation: 'truth A' });
+      recs465cnr[3] = makeRec465(3, { revelation: 'truth B' });
+      recs465cnr[7] = makeRec465(7, { revelation: 'truth C' });
+      recs465cnr[9] = makeRec465(9, { revelation: 'truth D' });
+      recs465cnr[11] = makeRec465(11, { revelation: 'truth E' });
+      const res = await runInt465(recs465cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_FRONTLOADED'), 'REVELATION_FRONTLOADED should not fire');
+    });
+  });
+
   describe('Wave 451 — intentionPass: proactive relationship aftermath absent, seed emotional decoupled, seed cause void', async () => {
     const makeRec451 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

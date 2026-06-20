@@ -77,6 +77,14 @@
 // seed cause void (≥3 seed scenes all lacking any upstream dramatic trigger in themselves or
 // the prior scene — clues arrive in a dramatic vacuum with no primed attention; backward-cause ×
 // seed channel, first backward-cause check for seeds).
+// Wave 465 additions: proactive clock aftermath absent (≥3 proactive acts none followed by a
+// clock event in the next 2 scenes — initiative never escalates a deadline downstream;
+// sequence/aftermath × clock channel, fifth and final proactive-aftermath family member),
+// payoff drama decoupled (≥2 payoff scenes and ≥2 turn scenes but no payoff coincides with a
+// turn — callbacks land in quiet moments while pivots resolve no planted threads;
+// co-occurrence/decoupling × payoff × dramatic turn), revelation frontloaded (≥4 revelations
+// with >70% in the first half — the story discloses its truths early and the back half runs on
+// established fact; distribution/timing × revelation channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2116,6 +2124,111 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `Every clue-seeding scene (seededClueIds non-empty) has no upstream dramatic trigger in itself or the immediately preceding scene — no revelation, no dramatic turn, no curiosity spike, and no emotional activation. Every thread arrives in a dramatic vacuum: there is no heightened alertness to anchor the seed in memory. Seeds planted adjacent to revelations, turns, emotional beats, or curiosity spikes land when the audience is maximally attentive and embed more deeply; seeds planted exclusively in calm, undramatic moments are background information the audience catalogs without registering as significant.`,
           suggestedFix: "Attach at least one seed to a dramatic event: plant a clue in (or immediately after) a scene with a revelation, a dramatic turn, a moment of high curiosity, or an emotional peak. The surrounding drama primes the audience to notice the new thread — they are already leaning forward and alert when the question arrives. A seed planted in a dramatic vacuum may technically be in the story without ever entering the audience's awareness.",
+        });
+      }
+    }
+  }
+
+  // ── Wave 465: PROACTIVE_CLOCK_AFTERMATH_ABSENT, PAYOFF_DRAMA_DECOUPLED, REVELATION_FRONTLOADED ──
+
+  // PROACTIVE_CLOCK_AFTERMATH_ABSENT (minor, n≥8, ≥3 proactive scenes): No proactive act is
+  // followed in the next 2 scenes by a clock event (clockRaised = true or clockDelta > 0) —
+  // the protagonist takes initiative but their action never escalates a deadline in the scenes
+  // that follow. Initiative that never tightens the urgency engine downstream teaches the
+  // audience that what the protagonist does and how time-pressured the story feels are separate
+  // circuits; the protagonist's moves never trigger the ticking that makes the audience lean
+  // forward. Sequence/aftermath mode × clock channel. Completes the proactive-aftermath family
+  // alongside PROACTIVE_EMOTIONAL_RECOIL_ABSENT (Wave 395: emotional aftermath), PROACTIVE_
+  // SUSPENSE_AFTERMATH_ABSENT (Wave 409: suspense aftermath), PROACTIVE_AFTERMATH_CURIOSITY_
+  // ABSENT (Wave 423: curiosity aftermath), and PROACTIVE_RELATIONSHIP_AFTERMATH_ABSENT (Wave
+  // 451: relationship aftermath) — this adds the clock channel as the fifth and final member.
+  // Distinct from PROACTIVE_SUSPENSE_AFTERMATH_ABSENT (suspense delta signal, not clock events),
+  // STAKES_NEVER_PERSONAL (clock co-occurrence with emotion in the same scene — not aftermath),
+  // and INTENTION_CONVERGENCE_ABSENT (seed + clock same scene — co-occurrence, not aftermath).
+  if (n >= 8) {
+    const proactiveIdxs465a: number[] = [];
+    for (let i = 0; i < n; i++) {
+      if (isProactive258((records as any[])[i])) proactiveIdxs465a.push(i);
+    }
+    if (proactiveIdxs465a.length >= 3) {
+      const anyClockAftermath465a = proactiveIdxs465a.some(idx => {
+        const window465a = (records as any[]).slice(idx + 1, idx + 3);
+        return window465a.some((a: any) => a.clockRaised === true || (a.clockDelta ?? 0) > 0);
+      });
+      if (!anyClockAftermath465a) {
+        issues.push({
+          location: 'Proactive scenes — clock aftermath absent',
+          rule: 'PROACTIVE_CLOCK_AFTERMATH_ABSENT',
+          severity: 'minor',
+          description: `None of the protagonist's ${proactiveIdxs465a.length} proactive acts is followed by a clock event (clockRaised or clockDelta > 0) in the next two scenes — initiative never escalates a deadline downstream. Proactive agency that never raises urgency in the scenes that follow teaches the audience that what the protagonist does and how time-pressured the story feels are separate systems; the protagonist's moves never trigger the ticking that makes the audience lean forward.`,
+          suggestedFix: 'Let at least one proactive act raise a deadline in its wake: the protagonist plants a clue and the antagonist responds by setting a ticking clock, or the clock they raise triggers a countdown escalation in the following scene. When initiative consistently escalates urgency, the audience learns that the protagonist\'s agency moves the story toward its inevitable collision with time.',
+        });
+      }
+    }
+  }
+
+  // PAYOFF_DRAMA_DECOUPLED (minor, n≥8, ≥2 payoff scenes, ≥2 turn scenes): No scene that
+  // resolves a setup (payoffSetupIds non-empty) coincides with a dramatic turn — every story
+  // callback lands in a quiet, non-pivotal moment while the story's turning points deliver no
+  // narrative payoff. A payoff at a dramatic turn is doubly charged: the audience collects on
+  // a planted promise exactly as the story shifts direction, and the accumulated investment
+  // amplifies the pivot's impact. When the two engines are entirely decoupled, callbacks arrive
+  // as low-key closures (the thread closes without ceremony) and turns arrive as surprise events
+  // with no accumulated investment to detonate. Co-occurrence/decoupling mode × payoff × dramatic
+  // turn. Distinct from SEED_DRAMA_DECOUPLED (Wave 423: no seed scene has a dramatic turn — the
+  // seeding side of the same coin; this audits payoff scenes, not seed scenes), PROACTIVE_PAYOFF_
+  // COINCIDENCE_ABSENT (Wave 367: no scene is both proactive and a payoff — the agency × payoff
+  // pairing, different axis), and TURNS_UNDRIVEN (Wave 300: turns not preceded by protagonist
+  // initiative — the agency × turn pairing, not payoff × turn).
+  if (n >= 8) {
+    const payoffRecs465b = (records as any[]).filter(r => ((r.payoffSetupIds ?? []) as string[]).length > 0);
+    const turnRecs465b = (records as any[]).filter(r => (r.dramaticTurn ?? 'nothing') !== 'nothing');
+    if (payoffRecs465b.length >= 2 && turnRecs465b.length >= 2) {
+      const anyCoincide465b = payoffRecs465b.some((r: any) => (r.dramaticTurn ?? 'nothing') !== 'nothing');
+      if (!anyCoincide465b) {
+        issues.push({
+          location: `${payoffRecs465b.length} payoff scene(s) and ${turnRecs465b.length} turn scene(s) — never coincide`,
+          rule: 'PAYOFF_DRAMA_DECOUPLED',
+          severity: 'minor',
+          description: `None of the story's ${payoffRecs465b.length} payoff scenes coincides with a dramatic turn — every callback lands in a quiet, non-pivotal moment while the story's ${turnRecs465b.length} pivots deliver no narrative payoff. A payoff at a dramatic turn is doubly charged: the audience collects on a planted promise exactly as the story reverses or escalates, and the accumulated investment amplifies the pivot's impact. When the two engines are entirely decoupled, payoffs land as quiet closures with no dramatic charge, and turns arrive as pure surprise without the resonance of anything previously promised.`,
+          suggestedFix: "Let at least one payoff fire at a dramatic turn: time a planted thread's resolution to coincide with a reversal, revelation, or pivot. The audience holding a half-forgotten thread will feel the payoff with double intensity when it arrives at a moment of story-level change — the convergence of 'I knew it' and 'everything just changed' is one of narrative's most satisfying beats.",
+        });
+      }
+    }
+  }
+
+  // REVELATION_FRONTLOADED (distribution/timing × revelation channel, n≥10, ≥4 revelations,
+  // >70% in the first half): More than 70% of all revelation scenes fall in the first half of
+  // the story — the narrative front-loads its disclosures. When discoveries concentrate in the
+  // setup and early conflict, the protagonist enters Act 2b and Act 3 with most truths already
+  // known: the back half operates on established fact rather than discovery, and the climax
+  // becomes execution rather than revelation. An audience that already knows what the protagonist
+  // is dealing with loses the forward pull of wondering what is still hidden. Distribution/timing
+  // mode × revelation channel. Completes a parallel distribution family alongside SEED_FRONTLOADED
+  // (Wave 409: all seeds in the first half) and PROACTIVE_FRONTLOADED (Wave 381: all proactive
+  // acts in the first half): this adds the revelation channel. Distinct from INTENTION_DISCOVERY_
+  // ABSENT (Wave 244: no revelation in Act 3 WITH ≥3 proactive acts — requires initiative and
+  // audits only Act 3; this audits the first-half share across the whole story without requiring
+  // proactive acts), REVELATION_WITHOUT_PROACTIVE (Wave 258: revelations not preceded by
+  // initiative — backward-cause, not distribution), and PROACTIVE_REVELATION_COINCIDENCE_ABSENT
+  // (Wave 381: same-scene proactive × revelation co-occurrence — not a timing distribution).
+  if (n >= 10) {
+    const half465c = Math.floor(n * 0.5);
+    const revRecs465c = (records as any[]).filter(r =>
+      r.revelation !== null && r.revelation !== undefined && r.revelation !== '',
+    );
+    if (revRecs465c.length >= 4) {
+      const firstHalfRevs465c = revRecs465c.filter(r => {
+        const idx = (records as any[]).indexOf(r);
+        return idx < half465c;
+      }).length;
+      if (firstHalfRevs465c / revRecs465c.length > 0.70) {
+        issues.push({
+          location: `Revelations — ${firstHalfRevs465c}/${revRecs465c.length} in the front half (Scenes 0–${half465c - 1})`,
+          rule: 'REVELATION_FRONTLOADED',
+          severity: 'minor',
+          description: `${firstHalfRevs465c} of the story's ${revRecs465c.length} revelations (${Math.round(firstHalfRevs465c / revRecs465c.length * 100)}%) fall in the first half — discoveries are front-loaded. When the narrative hands out most of its truths in the setup and early conflict, the protagonist enters Act 2b and Act 3 with the full picture already assembled: the back half runs on established fact rather than discovery, and the climax becomes a matter of execution rather than revelation. An audience that already knows what the protagonist is dealing with loses the forward pull of wondering what is still true.`,
+          suggestedFix: 'Hold back at least one or two major truths for the back half: a revelation that recontextualizes everything should arrive in Act 2b or Act 3, not Act 1, so the protagonist (and audience) is still learning something significant as the stakes peak. A discovery near the climax reframes the entire story and makes the ending feel earned by surprise rather than by the mechanical execution of a known plan.',
         });
       }
     }
