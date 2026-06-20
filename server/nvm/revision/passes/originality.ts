@@ -80,6 +80,15 @@
 // question intrusion (≥3 action lines contain a question mark — the writer inserts authorial
 // questions into stage directions instead of presenting images; count threshold × action layer
 // × discourse mode, distinct from DIALOGUE_QUESTION_DROUGHT which audits the dialogue layer).
+// Wave 466 additions: action pronoun opener flood (>50% of ≥8 action paragraphs open with "He"
+// or "She" — monotone visual grammar where every block begins with the character agent rather
+// than image, object, or environment; distribution/timing × action prose × paragraph opener,
+// first check on block-opening distribution), dialogue question flood (>35% of ≥10 dialogue
+// lines end with "?" — characters never assert, only ask; underweight/bloat × dialogue ×
+// interrogative register, opposite pole of DIALOGUE_QUESTION_DROUGHT), ellipsis run action
+// (≥3 consecutive action lines ending with "..." — a run of trailing-off stage directions;
+// run-based × action prose × ellipsis, distinct from ELLIPSIS_ACTION_OVERUSE which measures
+// proportion not consecutive run length).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2309,6 +2318,132 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${fillerOpenerCount452c} dialogue speeches open with a verbal filler — "Well,", "Look,", "Listen,", "Actually,", "Honestly,", "Basically,", "I mean,", or similar — a hedge that delays the character's first direct word. These openers are the spoken equivalent of a writer clearing their throat before they know what to say: they are how speeches begin when the impulse for the speech is unclear. A first word that commits immediately to the character's desire, position, or action is far stronger. Four or more such openings across the screenplay signals a dialogue register that structurally avoids the direct first word.`,
         suggestedFix: "Trim the opening filler: \"Well, I don't think that's right\" becomes \"That's wrong.\" \"Look, we need to talk about this\" becomes \"We need to talk.\" Start each speech on the word that carries the character's first real meaning — not the word that marks time before meaning arrives. If a character genuinely can't bring themselves to start directly, that hesitation belongs in a parenthetical note or a stage direction, not in the speech opener itself.",
+      });
+    }
+  }
+
+  // ── Wave 466: ACTION_PRONOUN_OPENER_FLOOD, DIALOGUE_QUESTION_FLOOD, ELLIPSIS_RUN_ACTION ──
+
+  // ACTION_PRONOUN_OPENER_FLOOD (minor, ≥8 action paragraphs, >50% open with "He " or "She "):
+  // More than half of all action paragraphs begin with a character pronoun opener — the writer's
+  // default visual grammar is to name the agent before the act, every time. Varied action openers
+  // — an object noticed, a sound heard, a location detail foregrounded — orient the reader to the
+  // world before the character, creating a cinematic perspective and varying the prose rhythm. A
+  // script where every action block opens with "He " or "She " reads like prose fiction with
+  // sluglines added rather than a visually constructed screenplay. Distribution/timing mode ×
+  // action prose layer × paragraph-level opener. Distinct from COPULA_ACTION_DOMINANCE (linking
+  // verbs — predicate form, not opener distribution), FILTERING_VERB_OVERUSE (perception verbs),
+  // PASSIVE_VERB_DOMINANCE (passive construction), and ACTION_ADVERB_FLOOD (adverbs): this is the
+  // first check to audit the distribution of how action paragraphs begin.
+  {
+    let actionBlockCount466a = 0;
+    let pronounOpenerCount466a = 0;
+    let prevWasBlank466a = true;
+    let inDlg466a = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { prevWasBlank466a = true; inDlg466a = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { prevWasBlank466a = false; inDlg466a = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg466a = true; prevWasBlank466a = false; continue; }
+      if (t.startsWith('(')) { prevWasBlank466a = false; continue; }
+      if (inDlg466a) { prevWasBlank466a = false; continue; }
+      // Action line
+      if (prevWasBlank466a) {
+        actionBlockCount466a++;
+        if (/^(He|She)\s/.test(t)) pronounOpenerCount466a++;
+      }
+      prevWasBlank466a = false;
+    }
+    if (actionBlockCount466a >= 8 && pronounOpenerCount466a / actionBlockCount466a > 0.5) {
+      issues.push({
+        location: `${pronounOpenerCount466a} of ${actionBlockCount466a} action block(s) open with "He" or "She"`,
+        rule: 'ACTION_PRONOUN_OPENER_FLOOD',
+        severity: 'minor',
+        description: `${pronounOpenerCount466a} of ${actionBlockCount466a} action paragraphs (${Math.round(pronounOpenerCount466a / actionBlockCount466a * 100)}%) open with "He" or "She" — more than half begin by naming the character's pronoun rather than the image they produce, the object they encounter, or the world around them. A screenplay's visual grammar is shaped by where each block of description starts: varied openers — an object, a location detail, a sound, an effect — give the prose cinematic range. A writer who habitually opens every action with the agent before the act creates prose that reads like a novel with stage directions rather than a script constructed from images.`,
+        suggestedFix: 'Vary action block openers: instead of "He crosses to the window", try "The window frames the city below." Instead of "She opens the drawer", try "The drawer slides open." Lead at least half of action paragraphs with something other than a character pronoun — an object the camera would land on first, a detail of the environment, the result of an action before its cause. This is one of the simplest ways to shift action prose from literary to cinematic.',
+      });
+    }
+  }
+
+  // DIALOGUE_QUESTION_FLOOD (minor, ≥10 dialogue lines, >35% end with "?"): More than a third
+  // of all dialogue lines are questions — characters perpetually interrogate rather than declare,
+  // act, or assert. When more than a third of all spoken lines are questions, the screenplay has
+  // a dialogue register problem at the opposite pole from DIALOGUE_QUESTION_DROUGHT (<5%): instead
+  // of nobody asking anything, everyone is always asking something. A world where every character
+  // is perpetually interrogating produces dialogue that feels like an interview rather than a scene
+  // — characters never commit to a position, never accuse, never declare. Drama requires assertion:
+  // characters must claim things, do things, refuse things. Questions without assertions are a
+  // holding pattern. Underweight/bloat mode × dialogue layer × interrogative register. Distinct
+  // from DIALOGUE_QUESTION_DROUGHT (Wave 396: <5% interrogative — the opposite failure),
+  // DIALOGUE_EXCLAMATION_FLOOD (Wave 287: >25% exclamation — different punctuation signal), and
+  // DIALOGUE_ELLIPSIS_FLOOD (Wave 452: >20% trailing off — different punctuation signal): this
+  // is the first check targeting overuse of the interrogative register in dialogue.
+  {
+    let dlgTotal466b = 0;
+    let questionCount466b = 0;
+    let inDlg466b = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg466b = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg466b = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg466b = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (!inDlg466b) continue;
+      dlgTotal466b++;
+      if (t.endsWith('?')) questionCount466b++;
+    }
+    if (dlgTotal466b >= 10 && questionCount466b / dlgTotal466b > 0.35) {
+      issues.push({
+        location: `${questionCount466b} of ${dlgTotal466b} dialogue lines end with "?"`,
+        rule: 'DIALOGUE_QUESTION_FLOOD',
+        severity: 'minor',
+        description: `${questionCount466b} of ${dlgTotal466b} dialogue lines (${Math.round(questionCount466b / dlgTotal466b * 100)}%) end with a question mark — more than a third of all spoken dialogue is interrogative. When characters are perpetually asking rather than asserting, the dialogue register lacks declarative commitment: nobody claims anything, nobody accuses, nobody refuses. Drama requires assertion — a character who commits to a position, makes an accusation, or flatly states what they want is more dramatically alive than one who only asks. A dialogue layer dominated by questions reads as a world of perpetual holding patterns where the next answer is always deferred to the next question.`,
+        suggestedFix: 'Convert at least half of the unnecessary questions into assertions: instead of "Don\'t you think this is wrong?" try "This is wrong." Instead of "Aren\'t you listening?" try "You\'re not listening." Questions have maximum impact when they are rare and pointed; when more than a third of dialogue asks rather than declares, the asking loses its edge. Reserve questions for genuinely unanswerable moments or for characters weaponizing uncertainty — everywhere else, commit to the declarative.',
+      });
+    }
+  }
+
+  // ELLIPSIS_RUN_ACTION (minor, ≥5 action lines, maxConsecutiveRun≥3): Three or more consecutive
+  // action lines each ending with "..." — a run of stage directions that trail off without
+  // completing the image. One ellipsis in action signals deliberate incompletion: a detail
+  // withheld, a mystery gestured at. Three or more consecutive action lines all trailing off is
+  // a different signal: the writer cannot commit to the image, and the action prose fragments into
+  // a series of incomplete gestures. The audience/reader is left with impressions rather than
+  // scenes — the camera cannot cut to an ellipsis. Run-based mode × action prose layer ×
+  // trailing-off punctuation. Distinct from ELLIPSIS_ACTION_OVERUSE (Wave 424: >20% of all
+  // action lines contain "..." — a proportional threshold check across the whole script; this
+  // checks for consecutive runs of ≥3, which fires even when the total percentage is low if the
+  // ellipses are concentrated in a burst): the consecutive-run check catches bursty incompletion
+  // that the proportion check misses.
+  {
+    let actionTotal466c = 0;
+    let maxEllipsisRun466c = 0;
+    let curEllipsisRun466c = 0;
+    let inDlg466c = false;
+    for (const line of lines) {
+      const t = line.trim();
+      // Blank lines don't break the ellipsis run — they separate paragraphs but the run
+      // continues across inter-paragraph gaps (each action line is one potential run member).
+      if (!t) { inDlg466c = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg466c = false; curEllipsisRun466c = 0; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg466c = true; curEllipsisRun466c = 0; continue; }
+      if (t.startsWith('(')) { curEllipsisRun466c = 0; continue; }
+      if (inDlg466c) { curEllipsisRun466c = 0; continue; }
+      // Action line
+      actionTotal466c++;
+      if (t.endsWith('...')) {
+        if (++curEllipsisRun466c > maxEllipsisRun466c) maxEllipsisRun466c = curEllipsisRun466c;
+      } else {
+        curEllipsisRun466c = 0;
+      }
+    }
+    if (actionTotal466c >= 4 && maxEllipsisRun466c >= 3) {
+      issues.push({
+        location: `${maxEllipsisRun466c} consecutive action line(s) end with "..."`,
+        rule: 'ELLIPSIS_RUN_ACTION',
+        severity: 'minor',
+        description: `A run of ${maxEllipsisRun466c} consecutive action lines each end with "..." — stage directions that trail off without completing the image, in an unbroken sequence. A single ellipsis in action prose can signal a withheld detail or a deliberate mystery; a run of three or more consecutive incomplete lines signals the writer cannot commit to the image, and the action prose fragments into a series of impressions. The screenplay camera cannot cut to a trailing off — it records specific things in specific arrangements. Consecutive incomplete action lines produce a reading experience of mood without substance: the scene gestures but never arrives.`,
+        suggestedFix: 'Complete the trailing action lines: decide what the camera actually shows — the specific object, the precise expression, the exact movement — and write that instead of the ellipsis. If the incompletion is intentional (a deliberately withheld image), use one ellipsis where the mystery is greatest and complete the rest. Three or more consecutive trailing-off action lines in a row indicates that the scene has not yet been written — only its outline, written in gestures.',
       });
     }
   }

@@ -21316,6 +21316,229 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 466 — originalityPass: action pronoun opener flood, dialogue question flood, ellipsis run action', async () => {
+    const runO466 = async (fountain: string) => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      return originalityPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ACTION_PRONOUN_OPENER_FLOOD fires when >50% of action blocks open with "He" or "She"', async () => {
+      // 10 action blocks: 6 open with "He " or "She " = 60% > 50% → fires
+      const f466a = `INT. ROOM - DAY
+
+He enters the room.
+
+INT. HALLWAY - DAY
+
+She looks left.
+
+INT. KITCHEN - DAY
+
+He picks up the phone.
+
+INT. GARAGE - DAY
+
+She checks the lock.
+
+INT. BEDROOM - DAY
+
+He stares at the ceiling.
+
+INT. BATHROOM - DAY
+
+She opens the medicine cabinet.
+
+INT. LIVING ROOM - DAY
+
+The couch sits empty.
+
+INT. OFFICE - DAY
+
+Papers cover every surface.
+
+INT. ATTIC - DAY
+
+Boxes line the walls.
+
+INT. BASEMENT - DAY
+
+The light flickers.
+`;
+      const res = await runO466(f466a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_PRONOUN_OPENER_FLOOD'), 'ACTION_PRONOUN_OPENER_FLOOD should fire');
+    });
+
+    it('ACTION_PRONOUN_OPENER_FLOOD does not fire when action blocks use varied openers', async () => {
+      // 10 action blocks: only 2 open with "He" or "She" = 20% ≤ 50% → no fire
+      const f466anr = `INT. ROOM - DAY
+
+The door swings open.
+
+INT. HALLWAY - DAY
+
+Shadows stretch across the floor.
+
+INT. KITCHEN - DAY
+
+She picks up the knife.
+
+INT. GARAGE - DAY
+
+An old car sits rusting.
+
+INT. BEDROOM - DAY
+
+Moonlight cuts through the blinds.
+
+INT. BATHROOM - DAY
+
+Steam fills the mirror.
+
+INT. LIVING ROOM - DAY
+
+He walks to the window.
+
+INT. OFFICE - DAY
+
+A single lamp burns.
+
+INT. ATTIC - DAY
+
+Dust motes drift in silence.
+
+INT. BASEMENT - DAY
+
+Water drips from a pipe.
+`;
+      const res = await runO466(f466anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_PRONOUN_OPENER_FLOOD'), 'ACTION_PRONOUN_OPENER_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_QUESTION_FLOOD fires when >35% of dialogue lines end with "?"', async () => {
+      // 12 dialogue lines, 5 end with "?" = 41.7% > 35% → fires
+      const f466b = `INT. OFFICE - DAY
+
+ANNA
+What are you doing here?
+
+MARK
+I came to talk.
+
+ANNA
+About what exactly?
+
+MARK
+You know what about.
+
+ANNA
+Do I?
+
+MARK
+Stop playing games.
+
+ANNA
+What games?
+
+MARK
+The ones you always play.
+
+ANNA
+I'm not playing anything.
+
+MARK
+Really?
+
+ANNA
+Yes, really.
+
+MARK
+Fine.
+`;
+      const res = await runO466(f466b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_QUESTION_FLOOD'), 'DIALOGUE_QUESTION_FLOOD should fire');
+    });
+
+    it('DIALOGUE_QUESTION_FLOOD does not fire when question lines are a small minority', async () => {
+      // 12 dialogue lines, 2 end with "?" = 16.7% ≤ 35% → no fire
+      const f466bnr = `INT. OFFICE - DAY
+
+ANNA
+I came here to say goodbye.
+
+MARK
+You don't mean that.
+
+ANNA
+I do. It's over.
+
+MARK
+What happened?
+
+MARK
+I thought we had a plan.
+
+ANNA
+Plans change. I changed.
+
+MARK
+Since when?
+
+ANNA
+Since I stopped waiting.
+
+MARK
+This is not fair.
+
+ANNA
+Life isn't fair, Mark.
+
+MARK
+Don't do this.
+
+ANNA
+I already have.
+`;
+      const res = await runO466(f466bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_QUESTION_FLOOD'), 'DIALOGUE_QUESTION_FLOOD should not fire');
+    });
+
+    it('ELLIPSIS_RUN_ACTION fires when 3 consecutive action lines end with "..."', async () => {
+      // 3 consecutive action lines ending with "..." → fires
+      const f466c = `INT. ROOM - DAY
+
+The light dims...
+
+Something moves in the corner...
+
+A shadow crosses the wall...
+
+She backs toward the door.
+`;
+      const res = await runO466(f466c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ELLIPSIS_RUN_ACTION'), 'ELLIPSIS_RUN_ACTION should fire');
+    });
+
+    it('ELLIPSIS_RUN_ACTION does not fire when ellipsis lines are not consecutive', async () => {
+      // Ellipsis lines broken up by non-ellipsis lines — no run of 3 → no fire
+      const f466cnr = `INT. ROOM - DAY
+
+The light dims...
+
+She steps forward.
+
+Something moves in the corner...
+
+He stands his ground.
+
+A faint sound...
+
+They look at each other.
+`;
+      const res = await runO466(f466cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ELLIPSIS_RUN_ACTION'), 'ELLIPSIS_RUN_ACTION should not fire');
+    });
+  });
+
   describe('Wave 452 — originalityPass: dialogue ellipsis flood, slug time monotone, dialogue filler opener', async () => {
     const runO452 = async (fountain: string) => {
       const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
