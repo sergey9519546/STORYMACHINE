@@ -82,6 +82,16 @@
 // scenes do move bonds — wonder is never accompanied by relational consequence; co-occurrence ×
 // curiosity × relational, the first check in this pass pairing the curiosity trigger with the
 // relational output channel instead of the emotion channel).
+// Wave 463 additions: suspense relational decoupled (≥3 suspense-positive scenes all have no
+// relationship shift while non-suspense scenes do move bonds — danger never carries relational
+// consequence; co-occurrence × suspense × relational, the suspense-channel parallel of ARC_
+// CURIOSITY_RELATIONAL_DECOUPLED), relational front-loaded (>70% of shift scenes fall in the
+// first half while the back half has at least one — bonds all move early then the climax goes
+// relationally inert; distribution/timing × relational, the mirror of ARC_RELATIONAL_BACK_LOADED),
+// revelation relational aftermath void (every revelation is followed by 2 scenes with no
+// relationship shift — discoveries never reshape bonds in their wake; sequence/aftermath ×
+// revelation × relational aftermath, distinct from ARC_REVELATION_EMOTION_ABSENT which audits the
+// revelation scene's own emotion and from ARC_TURN_EMOTIONAL_AFTERMATH_VOID's turn→emotion axis).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2010,6 +2020,116 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `Every scene in which curiosity rises (${curPositiveScenes449c.length} scenes with curiosityDelta > 0) carries no relationship shift, even though non-curiosity scenes do move bonds. The protagonist's wonder is never simultaneously accompanied by relational consequence — curiosity is purely intellectual, entirely detached from the social fabric around them. When wonder never touches a bond, the story's questions lack the urgency that comes from knowing the answer would change something between two people: who trusts whom, who owes what, who stands where in relation to another.`,
           suggestedFix: `Let at least one moment of rising curiosity also move a relationship: a shared discovery that deepens or fractures a bond, a question that changes how two characters see each other, a mystery whose investigation forces a character to depend on or suspect someone else. When wonder has relational stakes — when finding out the truth would change the world between two people — curiosity becomes personal rather than intellectual, and the audience's investment in the answer deepens.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 463: ARC_SUSPENSE_RELATIONAL_DECOUPLED, ARC_RELATIONAL_FRONT_LOADED, ARC_REVELATION_RELATIONAL_AFTERMATH_VOID ──
+
+  // ARC_SUSPENSE_RELATIONAL_DECOUPLED (co-occurrence × suspense × relational channel, n≥8,
+  // ≥3 suspense-positive scenes, all relational-silent, with shifts elsewhere): Every scene in
+  // which suspenseDelta > 0 carries no relationship shift, even though non-suspense scenes do move
+  // bonds. The protagonist's moments of rising danger never coincide with any movement in their
+  // bonds — tension is purely situational, detached from the people the protagonist could lose,
+  // betray, or be saved by. When suspense never carries relational stakes, the threat is to
+  // circumstance rather than to relationship, and the audience fears for the plot rather than for
+  // what the danger could do to a bond that matters.
+  // Distinctness: ARC_SUSPENSE_EMOTION_DECOUPLED (Wave 298) pairs the suspense trigger with the
+  // EMOTION channel; this pairs it with the RELATIONSHIP channel. ARC_CURIOSITY_RELATIONAL_
+  // DECOUPLED (Wave 449) is the same relational-output check on the CURIOSITY trigger — this is
+  // the suspense-trigger sibling, completing the danger-side of the relational-decoupling set.
+  // Distinct from CHARACTER_ARC_RELATIONAL_STASIS (global absence of bonds) — this fires only when
+  // bonds DO move, but never in the scenes where suspense rises.
+  if (records.length >= 8) {
+    const suspPositiveScenes463a = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 0);
+    if (suspPositiveScenes463a.length >= 3) {
+      const allSuspenseRelSilent463a = suspPositiveScenes463a.every(
+        r => ((r.relationshipShifts ?? []) as any[]).length === 0,
+      );
+      const hasShiftOutsideSuspense463a = (records as any[]).some(
+        r => (r.suspenseDelta ?? 0) <= 0 && ((r.relationshipShifts ?? []) as any[]).length > 0,
+      );
+      if (allSuspenseRelSilent463a && hasShiftOutsideSuspense463a) {
+        issues.push({
+          location: `${suspPositiveScenes463a.length} suspense-positive scenes — no relationship shift in any`,
+          rule: 'ARC_SUSPENSE_RELATIONAL_DECOUPLED',
+          severity: 'minor',
+          description: `Every scene in which suspense rises (${suspPositiveScenes463a.length} scenes with suspenseDelta > 0) carries no relationship shift, even though non-suspense scenes do move bonds. The protagonist's moments of rising danger never coincide with any movement in their bonds — tension is purely situational, detached from the people they could lose, betray, or be rescued by. When suspense never touches a relationship, the threat is to circumstance rather than to a bond that matters, and the audience fears for the plot rather than for what the danger could do to the people inside it.`,
+          suggestedFix: `Let at least one moment of rising suspense also move a relationship: a danger that forces two characters to depend on each other, a threat that exposes a betrayal, a crisis that tests whether a bond holds. When tension has relational stakes — when the cost of the danger is what it does to who-trusts-whom — suspense becomes personal, and the audience's fear attaches to people rather than to events.`,
+        });
+      }
+    }
+  }
+
+  // ARC_RELATIONAL_FRONT_LOADED (distribution/timing × relational, n≥10, ≥4 shift scenes, back
+  // half ≥1): More than 70% of the scenes that move a relationship fall in the FIRST half, while
+  // the back half has at least one. Bonds form and break early, then the relational world goes
+  // inert as the story approaches its climax — the audience builds relational investment in the
+  // setup, then watches the back half resolve the plot with no further movement in who trusts,
+  // loves, or betrays whom. A relationally static climax squanders the bonds the opening took care
+  // to establish: the people stop changing toward each other exactly when the stakes peak.
+  // Distinctness: ARC_RELATIONAL_BACK_LOADED (Wave 407) is the exact mirror (>70% in the SECOND
+  // half) — this is the front-loaded pole, a genuinely empty cell. Distinct from ARC_LATE_
+  // RELATIONAL_VOID (the binary case — zero shifts late; this fires even when the back half
+  // carries one or two as long as they are a small minority) and from ARC_RELATIONAL_FIRST_HALF_
+  // FLAT (the opposite — front half empty).
+  if (records.length >= 10) {
+    const shiftSceneIdxs463b: number[] = [];
+    for (let i463b = 0; i463b < records.length; i463b++) {
+      if (((records as any[])[i463b].relationshipShifts as any[] ?? []).length > 0) shiftSceneIdxs463b.push(i463b);
+    }
+    if (shiftSceneIdxs463b.length >= 4) {
+      const mid463b = Math.floor(records.length * 0.5);
+      const frontHalf463b = shiftSceneIdxs463b.filter(i => i < mid463b).length;
+      const backHalf463b = shiftSceneIdxs463b.filter(i => i >= mid463b).length;
+      if (backHalf463b >= 1 && frontHalf463b / shiftSceneIdxs463b.length > 0.7) {
+        issues.push({
+          location: `Relational distribution — ${frontHalf463b}/${shiftSceneIdxs463b.length} shift scenes in the first half`,
+          rule: 'ARC_RELATIONAL_FRONT_LOADED',
+          severity: 'minor',
+          description: `${frontHalf463b} of the story's ${shiftSceneIdxs463b.length} relationship-shift scenes (${Math.round(frontHalf463b / shiftSceneIdxs463b.length * 100)}%) fall in the first half — bonds form and break early, then the relational world goes inert as the story nears its climax. The audience builds relational investment in the setup, then watches the back half resolve the plot with almost no further movement in who trusts, loves, or betrays whom. A relationally static climax squanders the bonds the opening established: the people stop changing toward each other exactly when the stakes peak.`,
+          suggestedFix: `Carry relational movement into the back half: let the climax test or transform a bond rather than only resolving the plot. The relationships established early should pay off late — a trust that finally breaks under maximum pressure, an alliance forged in the crisis, a reconciliation that the ending earns. The peak of the story is where its bonds should move most, not least.`,
+        });
+      }
+    }
+  }
+
+  // ARC_REVELATION_RELATIONAL_AFTERMATH_VOID (sequence/aftermath × revelation × relational
+  // aftermath, n≥8, ≥2 revelations, each followed by ≥1 scene): Every revelation in the script is
+  // followed by two scenes in which no relationship shifts — the immediate wake of every discovery
+  // is relationally flat. A revelation typically reshapes bonds: learning the truth about who
+  // someone is, or what they did, should change how the protagonist stands in relation to them in
+  // the scenes that follow. When every discovery's aftermath leaves all bonds untouched, the
+  // story's truths are informationally significant but relationally inert — the protagonist learns
+  // things that never alter a single relationship.
+  // Distinctness: ARC_REVELATION_EMOTION_ABSENT (Wave 337) audits the revelation SCENE ITSELF for
+  // emotional charge; this audits the 2 scenes AFTER for relational response. ARC_TURN_EMOTIONAL_
+  // AFTERMATH_VOID (Wave 449) is the same aftermath structure on the TURN trigger × EMOTION channel
+  // — this is the REVELATION trigger × RELATIONAL channel, a distinct trigger/output pairing.
+  // REVELATION_RELATIONSHIP_VOID (causality.ts Wave 419) checks the revelation scene's OWN
+  // relationship co-occurrence; this checks the downstream aftermath.
+  if (records.length >= 8) {
+    const revScenes463c = (records as any[]).filter(r => r.revelation !== null && r.revelation !== undefined);
+    if (revScenes463c.length >= 2) {
+      const allRevsRelSilentAftermath463c = revScenes463c.every(rev => {
+        const revIdx463c = (records as any[]).findIndex(r => (r as any).sceneIdx === (rev as any).sceneIdx);
+        let checkedAny463c = false;
+        for (let offset = 1; offset <= 2; offset++) {
+          const nextIdx463c = revIdx463c + offset;
+          if (nextIdx463c >= records.length) continue;
+          checkedAny463c = true;
+          if (((records as any[])[nextIdx463c].relationshipShifts ?? []).length > 0) return false;
+        }
+        return checkedAny463c;
+      });
+      if (allRevsRelSilentAftermath463c) {
+        issues.push({
+          location: `${revScenes463c.length} revelation aftermath(s) — no relationship shift within 2 scenes`,
+          rule: 'ARC_REVELATION_RELATIONAL_AFTERMATH_VOID',
+          severity: 'minor',
+          description: `Every revelation (${revScenes463c.length} discoveries) is followed by two scenes in which no relationship shifts — the immediate wake of every truth is relationally flat. A revelation typically reshapes bonds: learning who someone really is, or what they did, should change how the protagonist stands toward them in the scenes that follow. When every discovery's aftermath leaves all bonds untouched, the story's truths are informationally significant but relationally inert — the protagonist learns things that never alter a single relationship.`,
+          suggestedFix: `Let at least one revelation move a bond in its aftermath: in the scene or two after a discovery, have the truth redraw a relationship — trust withdrawn from someone exposed, an alliance forged with someone vindicated, distance opened or closed by what was learned. A revelation whose aftermath shifts a relationship has consequence beyond information; it changes the human world the protagonist moves through.`,
         });
       }
     }

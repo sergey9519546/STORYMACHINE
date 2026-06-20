@@ -22889,6 +22889,86 @@ I always listen.
     });
   });
 
+  describe('Wave 463 — characterArcPass: suspense relational decoupled, relational front-loaded, revelation relational aftermath void', async () => {
+    const makeRec463 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const mkShift463 = (amount: number) => [{ pairKey: 'ALICE-BOB', dimension: 'trust', amount }];
+    const runA463 = async (records: any[]) => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ARC_SUSPENSE_RELATIONAL_DECOUPLED fires when all suspense-positive scenes have no relationship shift', async () => {
+      // n=8; suspense>0 at 1,3,5 (no shifts); non-suspense scene 7 has a shift → fires
+      const recs463a = Array.from({ length: 8 }, (_, i) =>
+        makeRec463(i, {
+          suspenseDelta: [1, 3, 5].includes(i) ? 1.5 : 0,
+          relationshipShifts: i === 7 ? mkShift463(0.4) : [],
+        }),
+      );
+      const res = await runA463(recs463a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_SUSPENSE_RELATIONAL_DECOUPLED'), 'ARC_SUSPENSE_RELATIONAL_DECOUPLED should fire');
+    });
+
+    it('ARC_SUSPENSE_RELATIONAL_DECOUPLED does NOT fire when a suspense-positive scene carries a relationship shift', async () => {
+      // n=8; suspense>0 at 1,3,5; scene 3 also has a shift → allSuspenseRelSilent=false → no fire
+      const recs463anr = Array.from({ length: 8 }, (_, i) =>
+        makeRec463(i, {
+          suspenseDelta: [1, 3, 5].includes(i) ? 1.5 : 0,
+          relationshipShifts: i === 3 ? mkShift463(0.4) : i === 7 ? mkShift463(0.4) : [],
+        }),
+      );
+      const res = await runA463(recs463anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_SUSPENSE_RELATIONAL_DECOUPLED'), 'ARC_SUSPENSE_RELATIONAL_DECOUPLED should not fire');
+    });
+
+    it('ARC_RELATIONAL_FRONT_LOADED fires when >70% of shift scenes are in the first half', async () => {
+      // n=10; mid=5; shifts at 0,1,2,3 (front=4) and 9 (back=1); front ratio 4/5=80% > 70%, back≥1 → fires
+      const recs463b = Array.from({ length: 10 }, (_, i) =>
+        makeRec463(i, { relationshipShifts: [0, 1, 2, 3, 9].includes(i) ? mkShift463(0.3) : [] }),
+      );
+      const res = await runA463(recs463b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_FRONT_LOADED'), 'ARC_RELATIONAL_FRONT_LOADED should fire');
+    });
+
+    it('ARC_RELATIONAL_FRONT_LOADED does NOT fire when shifts are balanced across halves', async () => {
+      // n=10; mid=5; shifts at 0,1,6,7 → front=2/4=50%, not >70% → no fire
+      const recs463bnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec463(i, { relationshipShifts: [0, 1, 6, 7].includes(i) ? mkShift463(0.3) : [] }),
+      );
+      const res = await runA463(recs463bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_FRONT_LOADED'), 'ARC_RELATIONAL_FRONT_LOADED should not fire');
+    });
+
+    it('ARC_REVELATION_RELATIONAL_AFTERMATH_VOID fires when every revelation has a relationally flat aftermath', async () => {
+      // n=8; revelations at 1,4; aftermaths (records 2,3 and 5,6) carry no relationship shift → fires
+      const recs463c = Array.from({ length: 8 }, (_, i) =>
+        makeRec463(i, { revelation: [1, 4].includes(i) ? `Truth ${i}` : null }),
+      );
+      const res = await runA463(recs463c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_REVELATION_RELATIONAL_AFTERMATH_VOID'), 'ARC_REVELATION_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_REVELATION_RELATIONAL_AFTERMATH_VOID does NOT fire when a revelation aftermath moves a bond', async () => {
+      // n=8; revelations at 1,4; scene 2 (aftermath of rev@1) has a relationship shift → no fire
+      const recs463cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec463(i, {
+          revelation: [1, 4].includes(i) ? `Truth ${i}` : null,
+          relationshipShifts: i === 2 ? mkShift463(0.4) : [],
+        }),
+      );
+      const res = await runA463(recs463cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_REVELATION_RELATIONAL_AFTERMATH_VOID'), 'ARC_REVELATION_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 449 — characterArcPass: relational drought run, turn emotional aftermath void, curiosity relational decoupled', async () => {
     const makeRec449 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
