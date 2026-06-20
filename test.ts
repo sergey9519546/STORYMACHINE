@@ -22487,6 +22487,92 @@ I always listen.
     });
   });
 
+  describe('Wave 464 — conflictPass: rupture revelation aftermath void, rupture dramatic-turn aftermath void, peak rupture uncaused', async () => {
+    const rup464 = (amount: number, pairKey = 'A|B') => [{ pairKey, dimension: 'trust', amount }];
+    const makeRec464 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runConf464 = async (records: any[]) => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      return conflictPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CONFLICT_RUPTURE_REVELATION_AFTERMATH_VOID fires when no rupture is followed by a revelation', async () => {
+      // n=10; ruptures at 1,5; revelations at 0,9 (outside both aftermath windows 2-3 and 6-7) → fires
+      const recs464a = Array.from({ length: 10 }, (_, i) =>
+        makeRec464(i, {
+          relationshipShifts: [1, 5].includes(i) ? rup464(-0.5) : [],
+          revelation: [0, 9].includes(i) ? `Truth ${i}` : null,
+        }),
+      );
+      const res = await runConf464(recs464a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_RUPTURE_REVELATION_AFTERMATH_VOID'), 'CONFLICT_RUPTURE_REVELATION_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_RUPTURE_REVELATION_AFTERMATH_VOID does NOT fire when a revelation follows a rupture', async () => {
+      // n=10; ruptures at 1,5; revelations at 2,9 — scene 2 is in rupture@1 aftermath → no fire
+      const recs464anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec464(i, {
+          relationshipShifts: [1, 5].includes(i) ? rup464(-0.5) : [],
+          revelation: [2, 9].includes(i) ? `Truth ${i}` : null,
+        }),
+      );
+      const res = await runConf464(recs464anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_RUPTURE_REVELATION_AFTERMATH_VOID'), 'CONFLICT_RUPTURE_REVELATION_AFTERMATH_VOID should not fire');
+    });
+
+    it('CONFLICT_RUPTURE_DRAMATIC_TURN_AFTERMATH_VOID fires when no rupture is followed by a dramatic turn', async () => {
+      // n=10; ruptures at 1,5; turns at 0,9 (outside aftermath windows) → fires
+      const recs464b = Array.from({ length: 10 }, (_, i) =>
+        makeRec464(i, {
+          relationshipShifts: [1, 5].includes(i) ? rup464(-0.5) : [],
+          dramaticTurn: [0, 9].includes(i) ? 'reversal' : 'nothing',
+        }),
+      );
+      const res = await runConf464(recs464b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_RUPTURE_DRAMATIC_TURN_AFTERMATH_VOID'), 'CONFLICT_RUPTURE_DRAMATIC_TURN_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_RUPTURE_DRAMATIC_TURN_AFTERMATH_VOID does NOT fire when a turn follows a rupture', async () => {
+      // n=10; ruptures at 1,5; turns at 2,9 — scene 2 is in rupture@1 aftermath → no fire
+      const recs464bnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec464(i, {
+          relationshipShifts: [1, 5].includes(i) ? rup464(-0.5) : [],
+          dramaticTurn: [2, 9].includes(i) ? 'reversal' : 'nothing',
+        }),
+      );
+      const res = await runConf464(recs464bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_RUPTURE_DRAMATIC_TURN_AFTERMATH_VOID'), 'CONFLICT_RUPTURE_DRAMATIC_TURN_AFTERMATH_VOID should not fire');
+    });
+
+    it('CONFLICT_PEAK_RUPTURE_UNCAUSED fires when the heaviest rupture has no driver in the prior 2 scenes', async () => {
+      // n=8; ruptures at 1 (-0.4) and 4 (-0.8 = peak); scenes 2,3 (prior to peak) are clean → fires
+      const recs464c = Array.from({ length: 8 }, (_, i) =>
+        makeRec464(i, { relationshipShifts: i === 1 ? rup464(-0.4) : i === 4 ? rup464(-0.8) : [] }),
+      );
+      const res = await runConf464(recs464c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_PEAK_RUPTURE_UNCAUSED'), 'CONFLICT_PEAK_RUPTURE_UNCAUSED should fire');
+    });
+
+    it('CONFLICT_PEAK_RUPTURE_UNCAUSED does NOT fire when the heaviest rupture is preceded by escalation', async () => {
+      // n=8; ruptures at 1 (-0.4) and 4 (-0.8 = peak); scene 3 has suspenseDelta=1 (escalation) → cause present → no fire
+      const recs464cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec464(i, {
+          relationshipShifts: i === 1 ? rup464(-0.4) : i === 4 ? rup464(-0.8) : [],
+          suspenseDelta: i === 3 ? 1 : 0,
+        }),
+      );
+      const res = await runConf464(recs464cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_PEAK_RUPTURE_UNCAUSED'), 'CONFLICT_PEAK_RUPTURE_UNCAUSED should not fire');
+    });
+  });
+
   describe('Wave 450 — conflictPass: clock aftermath void, positive emotion rupture, rupture clock aftermath void', async () => {
     const rup450 = (amount: number, pairKey = 'A|B') => [{ pairKey, dimension: 'trust', amount }];
     const makeRec450 = (idx: number, overrides: any = {}): any => ({

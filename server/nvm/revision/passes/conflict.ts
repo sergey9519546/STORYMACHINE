@@ -76,6 +76,16 @@
 // clocks elsewhere — bond-breaking never tightens the deadline; sequence/aftermath × clock ×
 // rupture aftermath, completes the set with CONFLICT_AFTERMATH_CURIOSITY_VOID and
 // CONFLICT_RUPTURE_SUSPENSE_VOID by adding the clock channel).
+// Wave 464 additions: rupture revelation aftermath void (every rupture is followed by 2 scenes
+// with no revelation while the story discloses elsewhere — bond-breaking never leads to discovery;
+// sequence/aftermath × revelation channel, completing the aftermath set alongside the curiosity,
+// suspense, and clock channels), rupture dramatic-turn aftermath void (every rupture is followed
+// by 2 scenes with no dramatic turn while turns exist elsewhere — fractures never pivot the story;
+// sequence/aftermath × dramatic-turn channel), peak rupture uncaused (the single heaviest rupture
+// has no escalation, revelation, dramatic turn, or clock raise in the two scenes before it — the
+// story's deepest fracture arrives unprepared; single-peak isolation × backward-cause mode,
+// distinct from CONFLICT_RUPTURE_CAUSE_VOID which audits ALL ruptures aggregate against the prior
+// single scene, and from the CONFLICT_PEAK_* checks which audit the peak's in-scene channels).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2084,6 +2094,138 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `Every bond-rupture in the story (${ruptureRecs450c.length} conflict scene(s)) is followed by 2 scenes with no clock raised — breaking bonds never tightens the story's deadline. The loss of an ally, an exposed betrayal, or a severed bond should make the world more urgent as well as more damaged: relational fractures are supposed to close off options and shorten the time the protagonist has to act. The story uses ${clockScenes450c.length} clock-raising scenes but none fall in the wake of a rupture.`,
           suggestedFix: 'Let at least one rupture trigger a clock raise in the scene that follows: the betrayal that removes a protector and immediately shortens a deadline, the severed bond that forecloses the easiest escape and starts a countdown. Bond-breaking should make things more urgent — the scene after a rupture is where the audience should feel that the damage is also a timer.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 464: CONFLICT_RUPTURE_REVELATION_AFTERMATH_VOID, CONFLICT_RUPTURE_DRAMATIC_TURN_AFTERMATH_VOID, CONFLICT_PEAK_RUPTURE_UNCAUSED ──
+
+  // CONFLICT_RUPTURE_REVELATION_AFTERMATH_VOID (sequence/aftermath × revelation channel, n≥8,
+  // ≥2 ruptures, ≥2 revelations): Every scene with a negative relationship shift (≤ -0.3) is
+  // followed by 2 scenes with no revelation, even though the story discloses truths elsewhere.
+  // Bond-breaking never leads to discovery: a betrayal exposed, an alliance severed, or a trust
+  // broken should crack something open — force a truth into the light in its wake. When every
+  // rupture's aftermath is revelation-silent, the conflict engine and the disclosure engine run
+  // on separate tracks: relationships fracture and truths surface, but a fracture never causes a
+  // truth to surface.
+  // Distinctness: CONFLICT_REVELATION_DECOUPLED (Wave 380) audits whether rupture scenes carry a
+  // revelation IN THE SAME scene — this audits the 2 scenes FOLLOWING each rupture. Completes the
+  // aftermath-channel set alongside CONFLICT_AFTERMATH_CURIOSITY_VOID (Wave 422), CONFLICT_RUPTURE_
+  // SUSPENSE_VOID (Wave 436), and CONFLICT_RUPTURE_CLOCK_AFTERMATH_VOID (Wave 450) by adding the
+  // revelation channel. Requires ≥2 revelations to confirm the story does disclose, just never in
+  // the wake of a rupture.
+  if (records.length >= 8) {
+    const ruptureRecs464a = (records as any[]).filter(r =>
+      ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+    );
+    const revScenes464a = (records as any[]).filter(r => r.revelation !== null && r.revelation !== undefined);
+    if (ruptureRecs464a.length >= 2 && revScenes464a.length >= 2) {
+      const allRevSilentAftermath464a = ruptureRecs464a.every((r: any) => {
+        const idx = (records as any[]).indexOf(r);
+        for (let off = 1; off <= 2; off++) {
+          if (idx + off >= records.length) continue;
+          const next = (records as any[])[idx + off];
+          if (next.revelation !== null && next.revelation !== undefined) return false;
+        }
+        return true;
+      });
+      if (allRevSilentAftermath464a) {
+        issues.push({
+          location: `${ruptureRecs464a.length} rupture aftermath(s) — no revelation within 2 scenes`,
+          rule: 'CONFLICT_RUPTURE_REVELATION_AFTERMATH_VOID',
+          severity: 'minor',
+          description: `Every bond-rupture (${ruptureRecs464a.length} conflict scene(s)) is followed by 2 scenes with no revelation, even though the story discloses ${revScenes464a.length} truths elsewhere. Bond-breaking never leads to discovery: a betrayal exposed, an alliance severed, or a trust broken should crack something open and force a truth into the light in its wake. When every rupture's aftermath is revelation-silent, the conflict engine and the disclosure engine run on separate tracks — relationships fracture and truths surface, but a fracture never causes a truth to surface.`,
+          suggestedFix: `Let at least one rupture detonate a revelation in its aftermath: the betrayal that, once it lands, forces a hidden truth out; the severed bond whose breaking exposes what was being concealed. A fracture that surfaces a discovery makes the conflict productive — the break is not just damage but the pressure that finally cracks something open.`,
+        });
+      }
+    }
+  }
+
+  // CONFLICT_RUPTURE_DRAMATIC_TURN_AFTERMATH_VOID (sequence/aftermath × dramatic-turn channel,
+  // n≥8, ≥2 ruptures, ≥2 turns): Every scene with a negative relationship shift (≤ -0.3) is
+  // followed by 2 scenes with no dramatic turn, even though the story pivots elsewhere. A rupture
+  // is a natural engine of reversal — the loss of an ally, the discovery of a betrayal, or the
+  // collapse of a partnership should be able to turn the story's direction. When every fracture's
+  // aftermath is turn-silent, bond-breaking is dramatically inert: relationships shatter but the
+  // story's trajectory never bends because of it.
+  // Distinctness: CONFLICT_DRAMATIC_TURN_VOID (Wave 367) audits whether rupture scenes carry a
+  // dramatic turn IN THE SAME scene — this audits the 2 scenes FOLLOWING each rupture. Extends the
+  // aftermath-channel set (curiosity/suspense/clock/revelation) with the dramatic-turn channel.
+  // Distinct from CONFLICT_PEAK_DRAMATIC_TURN_ABSENT (Wave 394, single-peak in-scene check).
+  // Requires ≥2 turns to confirm the story does pivot, just never in a rupture's wake.
+  if (records.length >= 8) {
+    const ruptureRecs464b = (records as any[]).filter(r =>
+      ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+    );
+    const turnScenes464b = (records as any[]).filter(r => (r.dramaticTurn ?? 'nothing') !== 'nothing');
+    if (ruptureRecs464b.length >= 2 && turnScenes464b.length >= 2) {
+      const allTurnSilentAftermath464b = ruptureRecs464b.every((r: any) => {
+        const idx = (records as any[]).indexOf(r);
+        for (let off = 1; off <= 2; off++) {
+          if (idx + off >= records.length) continue;
+          if (((records as any[])[idx + off].dramaticTurn ?? 'nothing') !== 'nothing') return false;
+        }
+        return true;
+      });
+      if (allTurnSilentAftermath464b) {
+        issues.push({
+          location: `${ruptureRecs464b.length} rupture aftermath(s) — no dramatic turn within 2 scenes`,
+          rule: 'CONFLICT_RUPTURE_DRAMATIC_TURN_AFTERMATH_VOID',
+          severity: 'minor',
+          description: `Every bond-rupture (${ruptureRecs464b.length} conflict scene(s)) is followed by 2 scenes with no dramatic turn, even though the story pivots ${turnScenes464b.length} times elsewhere. A rupture is a natural engine of reversal — the loss of an ally, a betrayal discovered, or a partnership collapsing should be able to bend the story's direction. When every fracture's aftermath is turn-silent, bond-breaking is dramatically inert: relationships shatter but the trajectory of the story never changes because of it.`,
+          suggestedFix: `Let at least one rupture trigger a dramatic turn in its aftermath: the broken alliance that forces the protagonist onto a new path, the betrayal that flips the goal, the severed bond that recasts what the story is about. A fracture that turns the story makes the relational damage consequential — the break does not just hurt, it redirects.`,
+        });
+      }
+    }
+  }
+
+  // CONFLICT_PEAK_RUPTURE_UNCAUSED (single-peak isolation × backward-cause mode, n≥8, ≥2 ruptures,
+  // peak at record position ≥1): The single heaviest rupture — the scene carrying the largest
+  // negative relationship-shift magnitude — has no escalation (suspenseDelta > 0), revelation,
+  // dramatic turn, or clock raise in either of the two scenes before it. The story's deepest
+  // fracture arrives without preparation: the bond that breaks hardest does so with no rising
+  // pressure, no precipitating discovery, and no pivot leading into it. A major rupture should be
+  // the culmination of accumulating strain; when the biggest one appears from a calm run-up, it
+  // reads as an authorial decree rather than the breaking point of a tension that was visibly
+  // building.
+  // Distinctness: CONFLICT_RUPTURE_CAUSE_VOID (Wave 422) audits ALL ruptures in aggregate against
+  // their own scene or the single prior scene — this ISOLATES the single heaviest rupture and looks
+  // back TWO scenes for a richer set of causal drivers. The CONFLICT_PEAK_* checks (Waves 352/366/
+  // 394/408) audit the peak rupture's IN-SCENE channels (does the peak itself disclose, pivot,
+  // etc.); this audits what PRECEDES the peak. First check in this pass to combine single-peak
+  // isolation with backward-cause, paralleling ARC_PEAK_RELATIONAL_UNCAUSED in character-arc.ts.
+  if (records.length >= 8) {
+    let peakPos464c = -1;
+    let peakMag464c = 0;
+    for (let i = 0; i < records.length; i++) {
+      const negMag = ((records as any[])[i].relationshipShifts ?? [] as Array<{ amount: number }>)
+        .filter((s: { amount: number }) => s.amount < 0)
+        .reduce((m: number, s: { amount: number }) => Math.max(m, Math.abs(s.amount)), 0);
+      if (negMag > peakMag464c) { peakMag464c = negMag; peakPos464c = i; }
+    }
+    const ruptureCount464c = (records as any[]).filter(r =>
+      ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+    ).length;
+    if (peakPos464c >= 1 && peakMag464c >= 0.3 && ruptureCount464c >= 2) {
+      let hasCause464c = false;
+      for (let off = 1; off <= 2; off++) {
+        const priorIdx = peakPos464c - off;
+        if (priorIdx < 0) continue;
+        const prior = (records as any[])[priorIdx];
+        if ((prior.suspenseDelta ?? 0) > 0) hasCause464c = true;
+        if (prior.revelation !== null && prior.revelation !== undefined) hasCause464c = true;
+        if ((prior.dramaticTurn ?? 'nothing') !== 'nothing') hasCause464c = true;
+        if (prior.clockRaised === true) hasCause464c = true;
+      }
+      if (!hasCause464c) {
+        const peakRec464c = (records as any[])[peakPos464c];
+        issues.push({
+          location: `Scene ${peakRec464c.sceneIdx} — heaviest rupture (magnitude ${peakMag464c.toFixed(2)})`,
+          rule: 'CONFLICT_PEAK_RUPTURE_UNCAUSED',
+          severity: 'minor',
+          description: `The story's heaviest rupture (Scene ${peakRec464c.sceneIdx}, negative-shift magnitude ${peakMag464c.toFixed(2)}) has no escalation, revelation, dramatic turn, or clock raise in either of the two scenes before it — the deepest fracture arrives without preparation. The bond that breaks hardest does so with no rising pressure, no precipitating discovery, and no pivot leading into it. A major rupture should be the culmination of accumulating strain; when the biggest one appears out of a calm run-up, it reads as an authorial decree rather than the breaking point of a tension the audience watched build.`,
+          suggestedFix: `Build a gradient into the heaviest rupture: in the two scenes before the story's deepest fracture, plant the pressure that makes it inevitable — a rising suspense beat, a revelation that exposes the fault line, a turn that forces the confrontation, or a clock that makes the break unavoidable. The biggest break should land as the snap of a strain the audience felt tightening, not as a sudden severing from nowhere.`,
         });
       }
     }
