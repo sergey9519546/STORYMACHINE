@@ -92,6 +92,17 @@
 // relationship shift — discoveries never reshape bonds in their wake; sequence/aftermath ×
 // revelation × relational aftermath, distinct from ARC_REVELATION_EMOTION_ABSENT which audits the
 // revelation scene's own emotion and from ARC_TURN_EMOTIONAL_AFTERMATH_VOID's turn→emotion axis).
+// Wave 477 additions: positive relational aftermath void (every positive-emotion scene is followed
+// by 2 scenes with no relationship shift — the protagonist's joys never move a bond in their wake;
+// sequence/aftermath × positive-emotion × relational aftermath, the positive-emotion trigger
+// complement of ARC_REVELATION_RELATIONAL_AFTERMATH_VOID's revelation trigger), turn zone cluster
+// (>75% of dramatic-turn scenes fall in a single third of the script — pivots are ghettoized into
+// one structural zone; distribution/timing × dramatic-turn channel, distinct from DRAMATIC_TURN_
+// CLUSTER in causality.ts which checks micro-window concentration, and from ARC_EMOTIONAL_FRONT/
+// BACK_LOADED which distribute emotion not turns), peak positive uncaused (the script's final
+// positive-emotion scene — the most structurally climactic joy — has no revelation, no dramatic
+// turn, no suspense rise in its 2 preceding scenes; backward-cause × single-peak × positive-
+// emotion, the positive-emotion complement of ARC_PEAK_RELATIONAL_UNCAUSED).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2130,6 +2141,131 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `Every revelation (${revScenes463c.length} discoveries) is followed by two scenes in which no relationship shifts — the immediate wake of every truth is relationally flat. A revelation typically reshapes bonds: learning who someone really is, or what they did, should change how the protagonist stands toward them in the scenes that follow. When every discovery's aftermath leaves all bonds untouched, the story's truths are informationally significant but relationally inert — the protagonist learns things that never alter a single relationship.`,
           suggestedFix: `Let at least one revelation move a bond in its aftermath: in the scene or two after a discovery, have the truth redraw a relationship — trust withdrawn from someone exposed, an alliance forged with someone vindicated, distance opened or closed by what was learned. A revelation whose aftermath shifts a relationship has consequence beyond information; it changes the human world the protagonist moves through.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 477: ARC_POSITIVE_RELATIONAL_AFTERMATH_VOID, ARC_TURN_ZONE_CLUSTER, ARC_PEAK_POSITIVE_UNCAUSED ──
+  const n477 = records.length;
+
+  // ARC_POSITIVE_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × positive-emotion × relational
+  // aftermath (n≥8, ≥2 qualifying positive-emotion scenes not at last position). Every positive
+  // emotional scene (emotionalShift === 'positive') is followed by 2 scenes in which no
+  // relationship shifts. The protagonist's joys and triumphs never move a bond in their wake:
+  // victories are felt emotionally but leave the relational world unchanged. The most affecting
+  // dramatic moments are those where an emotional shift propagates into the interpersonal world —
+  // a triumph that changes a relationship, a positive turn that rebuilds trust or opens a new
+  // alliance — rather than remaining a private, relationally inert event.
+  // Distinct from: ARC_REVELATION_RELATIONAL_AFTERMATH_VOID (Wave 463: revelation trigger →
+  // relational aftermath; this is positive-emotion trigger → relational aftermath, a different
+  // upstream event), ARC_TURN_EMOTIONAL_AFTERMATH_VOID (Wave 449: dramatic turn → emotional
+  // aftermath; different trigger and different output channel), ARC_RELATIONAL_SHIFT_EMOTION_FLAT
+  // (Wave 365: relationship-shift scenes are emotionally neutral; reverse direction — relationship
+  // as trigger, emotion as output; here emotion is trigger and relationship is output).
+  if (n477 >= 8) {
+    const posScenes477a = (records as any[]).filter(r => r.emotionalShift === 'positive');
+    const qualPos477a = posScenes477a.filter(r => {
+      const idx477a = (records as any[]).findIndex(x => x.sceneIdx === r.sceneIdx);
+      return idx477a >= 0 && idx477a < n477 - 1;
+    });
+    if (qualPos477a.length >= 2) {
+      const allPosRelSilent477a = qualPos477a.every(r => {
+        const idx477a = (records as any[]).findIndex(x => x.sceneIdx === r.sceneIdx);
+        let checkedAny477a = false;
+        for (let off = 1; off <= 2; off++) {
+          const nextIdx477a = idx477a + off;
+          if (nextIdx477a >= n477) continue;
+          checkedAny477a = true;
+          if (((records as any[])[nextIdx477a].relationshipShifts ?? []).length > 0) return false;
+        }
+        return checkedAny477a;
+      });
+      if (allPosRelSilent477a) {
+        issues.push({
+          location: `${qualPos477a.length} positive-emotion scene aftermath(s) — no relationship shift within 2 scenes`,
+          rule: 'ARC_POSITIVE_RELATIONAL_AFTERMATH_VOID',
+          severity: 'minor',
+          description: `Every positive-emotion scene (${qualPos477a.length} qualifying) is followed by two scenes in which no relationship shifts — the protagonist's triumphs and joys never move a bond in their aftermath. A positive moment is most dramatically resonant when it propagates into the interpersonal world: a victory that rebuilds trust, a success that opens a new alliance, a relief that closes a rift. When every positive beat is relationally inert in its wake, the story treats joy as a private, internal event that carries no social or relational consequence — the protagonist feels positive, but nothing between the characters changes as a result.`,
+          suggestedFix: `After at least one positive scene, let the emotional uplift move a relationship in the following scene or two: a character who was guarded opens up, a fractured bond starts to repair, or a new alliance forms from the shared positive experience. The aftermath of a positive beat is the natural moment for relational repair and deepening — staging it in relationally silent scenes wastes the emotional momentum just as it peaks.`,
+        });
+      }
+    }
+  }
+
+  // ARC_TURN_ZONE_CLUSTER — Distribution/timing × dramatic-turn channel (n≥8, ≥4 turn scenes,
+  // >75% in a single third). The story's pivots, reversals, and recognitions cluster in one
+  // structural zone rather than distributing across the arc. When all the turns happen in one
+  // third, the rest of the script passes without any directional change: the story coasts in two-
+  // thirds of its arc without redirecting, accelerating, or reversing the protagonist's situation.
+  // Dramatic turns work best when they punctuate the arc at all stages — an early turn sets new
+  // direction, a mid-script turn escalates or reverses it, and a closing turn delivers the final
+  // pivot that determines the resolution.
+  // Distinct from: DRAMATIC_TURN_CLUSTER (causality.ts Wave 310: 3+ turns within a 3-scene micro-
+  // window — within-window density concentration, not arc-level zone distribution), ARC_EMOTIONAL_
+  // FRONT_LOADED / BACK_LOADED (distribution × emotional channel — a different signal), ARC_
+  // RELATIONAL_FRONT_LOADED / BACK_LOADED (distribution × relational — different signal). First
+  // distribution/timing check on the dramatic-turn channel in this pass.
+  if (n477 >= 8) {
+    const turnPositions477b = (records as any[])
+      .map((r, pos) => ({ pos, hasTurn: (r.dramaticTurn ?? 'nothing') !== 'nothing' }))
+      .filter(x => x.hasTurn)
+      .map(x => x.pos);
+    if (turnPositions477b.length >= 4) {
+      const third477b = Math.floor(n477 / 3);
+      const firstZ477b = turnPositions477b.filter(p => p < third477b).length;
+      const midZ477b = turnPositions477b.filter(p => p >= third477b && p < 2 * third477b).length;
+      const lastZ477b = turnPositions477b.filter(p => p >= 2 * third477b).length;
+      const maxZ477b = Math.max(firstZ477b, midZ477b, lastZ477b);
+      if (maxZ477b / turnPositions477b.length > 0.75) {
+        const zone477b = firstZ477b === maxZ477b ? 'opening' : midZ477b === maxZ477b ? 'middle' : 'closing';
+        issues.push({
+          location: `${maxZ477b}/${turnPositions477b.length} dramatic-turn scene(s) in the ${zone477b} third`,
+          rule: 'ARC_TURN_ZONE_CLUSTER',
+          severity: 'minor',
+          description: `${maxZ477b} of ${turnPositions477b.length} dramatic-turn scenes (${(maxZ477b / turnPositions477b.length * 100).toFixed(0)}%) fall within the ${zone477b} third — the story's pivots, reversals, and recognitions are architecturally ghettoized into one zone. The other two-thirds of the script pass without any directional change: the protagonist's situation goes unreverted, unescalated, and unrecognized for most of the arc. Dramatic turns work best when they punctuate the story at all stages: early turns set direction, mid-script turns complicate or reverse it, and late turns force the final reckoning. Clustering all turns in the ${zone477b} zone creates a reversal-dense zone surrounded by structurally static territory.`,
+          suggestedFix: `Redistribute at least one or two dramatic turns into the zones currently without a pivot. The goal is not equal distribution but structural coverage: each act should contain at least one moment where the protagonist's situation meaningfully changes direction. Look for scenes in the currently turn-empty zones where the story could deliver a smaller recognition, escalation, or reversal that prepares the audience for the major turns.`,
+        });
+      }
+    }
+  }
+
+  // ARC_PEAK_POSITIVE_UNCAUSED — Backward-cause × single-peak × positive-emotion (n≥8, ≥1
+  // qualifying positive scene with position ≥ 2). The script's final positive-emotion scene —
+  // the most structurally climactic moment of joy or triumph — has no revelation, no dramatic
+  // turn, and no suspense rise (suspenseDelta > 0) in the 2 scenes immediately preceding it.
+  // The protagonist's peak positive moment arrives without any narrative cause motivating it: no
+  // discovery produced the victory, no reversal set it in motion, and no escalating pressure
+  // preceded the relief. The most emotionally significant positive beat should be the hardest-
+  // won: caused by a specific narrative event that the audience has watched unfold.
+  // Distinct from: ARC_PEAK_RELATIONAL_UNCAUSED (Wave 435: backward-cause × densest-relational
+  // peak — a different peak type and different channel), ARC_EMOTIONAL_RECOVERY_ABSENT (Wave 351:
+  // whether a positive beat exists after falls — timing, not cause), ARC_GRIEF_SKIPPED (Wave 298:
+  // a negative scene immediately followed by positive — a sequence pair, not backward-cause on the
+  // positive scene itself). First backward-cause check targeting the positive-emotion channel peak.
+  if (n477 >= 8) {
+    const posPositions477c = (records as any[])
+      .map((r, pos) => ({ pos, r }))
+      .filter(x => x.r.emotionalShift === 'positive' && x.pos >= 2);
+    if (posPositions477c.length >= 1) {
+      // The "peak" is the last positive scene (most climactically positioned)
+      const peakPos477c = posPositions477c[posPositions477c.length - 1].pos;
+      let hasCause477c = false;
+      for (let off = 1; off <= 2; off++) {
+        const priorIdx477c = peakPos477c - off;
+        if (priorIdx477c < 0) continue;
+        const prior477c = (records as any[])[priorIdx477c];
+        if (prior477c.revelation !== null && prior477c.revelation !== undefined) { hasCause477c = true; break; }
+        if ((prior477c.dramaticTurn ?? 'nothing') !== 'nothing') { hasCause477c = true; break; }
+        if ((prior477c.suspenseDelta ?? 0) > 0) { hasCause477c = true; break; }
+      }
+      if (!hasCause477c) {
+        issues.push({
+          location: `Scene ${(records as any[])[peakPos477c].sceneIdx} — script's final positive-emotion scene, no prior causal driver`,
+          rule: 'ARC_PEAK_POSITIVE_UNCAUSED',
+          severity: 'minor',
+          description: `The script's final positive-emotion scene (Scene ${(records as any[])[peakPos477c].sceneIdx}) — the most structurally climactic moment of joy or triumph — has no revelation, no dramatic turn, and no suspense rise in the two preceding scenes. The protagonist's peak positive moment arrives without any narrative driver: no discovery produced the victory, no reversal set it in motion, and no escalating pressure preceded the relief. The most emotionally significant positive beat should be the hardest-won — caused by a specific story event that the audience has watched build. An uncaused climactic joy feels like a tonal gift rather than a dramatic resolution.`,
+          suggestedFix: `Plant a causal driver in one or both of the two scenes before the climactic positive moment: a revelation whose truth paves the way for the victory, a dramatic turn that opens the door to the positive outcome, or an escalating suspense beat that the positive scene resolves. The goal is that the audience can trace a line from a specific narrative event to the emotional peak — so the joy feels earned by the story, not granted by the author.`,
         });
       }
     }

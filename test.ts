@@ -23885,6 +23885,84 @@ I always listen.
     });
   });
 
+  describe('Wave 477 — characterArcPass: positive relational aftermath void, turn zone cluster, peak positive uncaused', async () => {
+    const makeRec477 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const mkShift477 = (amount: number) => [{ pairKey: 'ALICE-BOB', dimension: 'trust', amount }];
+    const runA477 = async (records: any[]) => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ARC_POSITIVE_RELATIONAL_AFTERMATH_VOID fires when all positive scenes are followed by 2 relational-silent scenes', async () => {
+      // n=8; positive at 1,4 (not last); scenes 2,3 and 5,6 have no relationship shifts → fires
+      // Non-positive scenes 0,7 also have no shifts; scene 0 carries no shift
+      const recs477a = Array.from({ length: 8 }, (_, i) =>
+        makeRec477(i, { emotionalShift: [1, 4].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runA477(recs477a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_POSITIVE_RELATIONAL_AFTERMATH_VOID'), 'ARC_POSITIVE_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_POSITIVE_RELATIONAL_AFTERMATH_VOID does not fire when a positive aftermath carries a shift', async () => {
+      // n=8; positive at 1,4; scene 2 (aftermath of 1) has a relationship shift → not all silent
+      const recs477anr = Array.from({ length: 8 }, (_, i) =>
+        makeRec477(i, {
+          emotionalShift: [1, 4].includes(i) ? 'positive' : 'neutral',
+          relationshipShifts: i === 2 ? mkShift477(0.3) : [],
+        }),
+      );
+      const res = await runA477(recs477anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_POSITIVE_RELATIONAL_AFTERMATH_VOID'), 'ARC_POSITIVE_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('ARC_TURN_ZONE_CLUSTER fires when >75% of turn scenes fall in a single third', async () => {
+      // n=12; turns at 0,1,2,3 (all in first third, floor(12/3)=4 → positions 0-3); 4/4=100% > 75%
+      const recs477b = Array.from({ length: 12 }, (_, i) =>
+        makeRec477(i, { dramaticTurn: [0, 1, 2, 3].includes(i) ? 'reversal' : 'nothing' }),
+      );
+      const res = await runA477(recs477b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_TURN_ZONE_CLUSTER'), 'ARC_TURN_ZONE_CLUSTER should fire');
+    });
+
+    it('ARC_TURN_ZONE_CLUSTER does not fire when turn scenes spread across thirds', async () => {
+      // n=12; turns at 0,4,8,11 → first:1, mid:1, last:2 → max=2/4=50% ≤ 75%
+      const recs477bnr = Array.from({ length: 12 }, (_, i) =>
+        makeRec477(i, { dramaticTurn: [0, 4, 8, 11].includes(i) ? 'reversal' : 'nothing' }),
+      );
+      const res = await runA477(recs477bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_TURN_ZONE_CLUSTER'), 'ARC_TURN_ZONE_CLUSTER should not fire');
+    });
+
+    it('ARC_PEAK_POSITIVE_UNCAUSED fires when the last positive scene has no causal driver in prior 2 scenes', async () => {
+      // n=8; positive at 5 (pos≥2); scenes 3,4 have no revelation/turn/suspenseDelta>0 → uncaused → fires
+      const recs477c = Array.from({ length: 8 }, (_, i) =>
+        makeRec477(i, { emotionalShift: i === 5 ? 'positive' : 'neutral' }),
+      );
+      const res = await runA477(recs477c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_PEAK_POSITIVE_UNCAUSED'), 'ARC_PEAK_POSITIVE_UNCAUSED should fire');
+    });
+
+    it('ARC_PEAK_POSITIVE_UNCAUSED does not fire when a prior scene carries a causal driver', async () => {
+      // n=8; positive at 5; scene 4 (1 scene prior) has dramaticTurn='reversal' → has cause → no fire
+      const recs477cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec477(i, {
+          emotionalShift: i === 5 ? 'positive' : 'neutral',
+          dramaticTurn: i === 4 ? 'reversal' : 'nothing',
+        }),
+      );
+      const res = await runA477(recs477cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_PEAK_POSITIVE_UNCAUSED'), 'ARC_PEAK_POSITIVE_UNCAUSED should not fire');
+    });
+  });
+
   describe('Wave 463 — characterArcPass: suspense relational decoupled, relational front-loaded, revelation relational aftermath void', async () => {
     const makeRec463 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
