@@ -89,6 +89,17 @@
 // any payoffSetupIds — verbal declarations never coincide with narrative resolutions; co-occurrence
 // × assertion × payoff, the payoff-side complement of TOLD_BELIEF_SEED_DECOUPLED which checks
 // the seed side).
+// Wave 474 additions: assertion temporal cluster (distribution/timing — >75% of assertion scene
+// positions fall within a single third of the script; the belief battle is structurally ghettoized
+// into one temporal zone; first distribution/timing check on the temporal spread of assertion scenes
+// across the full arc), revelation emotional aftermath flat (average/aggregate × revelation ×
+// emotional aftermath — all scenes immediately following qualifying revelations are emotionally
+// neutral; disclosures generate no emotional charge in what follows; distinct from REVELATION_DRAMA_
+// VACUUM which checks the revelation scene itself and REVELATION_SUSPENSE_DEFLATION which checks
+// suspenseDelta of the aftermath), assertion curiosity aftermath void (average/aggregate × assertion
+// × curiosity aftermath — average curiosityDelta of scenes immediately following assertion scenes ≤ 0;
+// assertions close the epistemic field rather than reopening it; the curiosity-channel complement of
+// REVELATION_SUSPENSE_DEFLATION and the aftermath-direction complement of TOLD_BELIEF_CURIOSITY_FLAT).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2074,6 +2085,117 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         description: `The story has ${assertionSceneIdxSet460c.size} scene(s) where a character asserts a belief and ${payoffRecs460c.length} scenes that pay off planted setups, but none share a scene — verbal declarations and narrative resolutions never converge. A confession extracted by planted evidence, a truth spoken because the setup left no other option, or a claim delivered as the structural payoff of a long-running promise is among the most satisfying moments available. When assertions and payoffs are architecturally separate, the belief layer misses its most resonant delivery slot.`,
         suggestedFix: 'Stage at least one assertion as a payoff: let a character make their declaration at the moment when planted evidence, a long-running setup, or a structural promise comes due. The confession that arrives because everything points to it — the assertion made because the setup left no other option — fuses the belief layer and the narrative resolution layer into a single, doubly-satisfying beat.',
       });
+    }
+  }
+
+  // ── Wave 474: ASSERTION_TEMPORAL_CLUSTER, REVELATION_EMOTIONAL_AFTERMATH_FLAT, ASSERTION_CURIOSITY_AFTERMATH_VOID ──
+  const n474 = records.length;
+
+  // ASSERTION_TEMPORAL_CLUSTER — Distribution/timing × assertion channel (n≥8, ≥4 unique
+  // assertion scene positions, >75% of those positions fall within a single third of the
+  // script). When told beliefs are structurally ghettoized into one temporal zone, the belief
+  // battle is architecturally lopsided: two-thirds of the story passes without any character
+  // staking a claim, while one zone is saturated with assertion. The told-belief layer is most
+  // effective when characters make claims throughout the arc: early claims create dramatic irony,
+  // mid-script claims escalate existing tensions, and late claims force reckonings.
+  // Distinct from: BELIEF_FRONT_LOADED (Wave 267: all assertions in the first half — a binary
+  // partition at the 50% mark; this uses thirds at 33%/67% with a 75% cluster threshold;
+  // fires when any third dominates, not only the opening), ASSERTION_ACT_2A_VOID (Wave 418:
+  // zone-absence × 25%–50% zone — detects where assertions are MISSING; this detects where
+  // they CLUSTER), TOLD_BELIEF_ACT_3_ABSENT (Wave 362: absence in the final quarter — a
+  // single-zone absence check), ASSERTION_SINGLETON_RUN (Wave 432: run-based × no two assertion
+  // scenes adjacent — a consecutive-proximity check, not a temporal-zone distribution check).
+  if (n474 >= 8 && toldBeliefs.length >= 4) {
+    const assertionSceneIdxs474a = [...new Set(toldBeliefs.map(t => t.sceneIdx))];
+    const assertionPositions474a = assertionSceneIdxs474a
+      .map(idx => records.findIndex(r => r.sceneIdx === idx))
+      .filter(pos => pos >= 0);
+    if (assertionPositions474a.length >= 4) {
+      const third474a = Math.floor(n474 / 3);
+      const firstZone474a = assertionPositions474a.filter(p => p < third474a).length;
+      const midZone474a = assertionPositions474a.filter(p => p >= third474a && p < 2 * third474a).length;
+      const lastZone474a = assertionPositions474a.filter(p => p >= 2 * third474a).length;
+      const maxZone474a = Math.max(firstZone474a, midZone474a, lastZone474a);
+      if (maxZone474a / assertionPositions474a.length > 0.75) {
+        const zoneName474a = firstZone474a === maxZone474a ? 'opening' : midZone474a === maxZone474a ? 'middle' : 'closing';
+        issues.push({
+          location: `${maxZone474a}/${assertionPositions474a.length} assertion scene(s) in the ${zoneName474a} third`,
+          rule: 'ASSERTION_TEMPORAL_CLUSTER',
+          severity: 'minor',
+          description: `${maxZone474a} of ${assertionPositions474a.length} assertion scenes (${(maxZone474a / assertionPositions474a.length * 100).toFixed(0)}%) fall within the ${zoneName474a} third of the script — the belief battle is architecturally ghettoized into one temporal zone. Two-thirds of the story passes without any character staking a verbal claim, while the ${zoneName474a} zone is saturated with assertion. Told beliefs are most effective when they are distributed across the full arc: assertions in the opening zone create dramatic irony (the audience knows what characters claim before they can verify it), assertions in the middle zone escalate existing tensions by forcing characters to double down or recant, and assertions in the closing zone create urgent reckonings. Clustering all assertion into one zone leaves the other zones dramatically inert on the belief channel.`,
+          suggestedFix: `Redistribute assertion scenes across all three thirds of the script: plant at least one character claim in each zone currently empty of assertion. Even a brief line that explicitly stakes a position — a character asserting something is true or false — extends the belief battle across the full arc. If the ${zoneName474a} third naturally generates most of the explicit claims, look for earlier or later moments where a character could be put in the position of declaring what they believe, however briefly.`,
+        });
+      }
+    }
+  }
+
+  // REVELATION_EMOTIONAL_AFTERMATH_FLAT — Average/aggregate × revelation × emotional aftermath
+  // (n≥8, ≥3 qualifying revelations not in the final position). All scenes immediately following
+  // qualifying revelations carry emotionalShift === 'neutral'. Disclosures generate no emotional
+  // charge in the scenes that follow — they function as flat plot updates rather than events that
+  // destabilize characters' emotional states in the next beat. When every discovery is followed by
+  // a neutral scene, revelations have been quarantined from the story's emotional world: they are
+  // processed informationally but never felt in the moment of their aftermath.
+  // Distinct from: REVELATION_DRAMA_VACUUM (Wave 281: emotionalShift of the revelation scene ITSELF
+  // is neutral — checks the revelation-as-context, not the scene after), REVELATION_SUSPENSE_
+  // DEFLATION (Wave 460: checks suspenseDelta of the scene after each revelation — a different
+  // aftermath signal; this checks emotionalShift, not the numeric suspense channel), TOLD_BELIEF_
+  // EMOTIONAL_FLATLINE (Wave 334: emotionalShift of the assertion SCENE itself — different belief
+  // event type and different positional slot).
+  if (n474 >= 8 && witnessedBeliefs.length >= 3) {
+    const qualRev474b = witnessedBeliefs.filter(w => {
+      const pos474b = records.findIndex(r => r.sceneIdx === w.sceneIdx);
+      return pos474b >= 0 && pos474b < n474 - 1;
+    });
+    if (qualRev474b.length >= 3) {
+      const allAftermathFlat474b = qualRev474b.every(w => {
+        const pos474b = records.findIndex(r => r.sceneIdx === w.sceneIdx);
+        return ((records as any[])[pos474b + 1].emotionalShift ?? 'neutral') === 'neutral';
+      });
+      if (allAftermathFlat474b) {
+        issues.push({
+          location: `${qualRev474b.length} revelation aftermath(s) — all emotionally neutral`,
+          rule: 'REVELATION_EMOTIONAL_AFTERMATH_FLAT',
+          severity: 'minor',
+          description: `Each of the ${qualRev474b.length} qualifying revelation(s) is immediately followed by a scene with a neutral emotional shift — disclosures consistently generate no emotional charge in what follows. Revelations function as flat informational updates rather than as events that destabilize characters' emotional states in the next beat. The most effective disclosures propagate emotionally: the scene after a revelation is where characters react, spiral, double down, or pivot — if every reaction scene is emotionally neutral, the discovery has been registered but never felt.`,
+          suggestedFix: 'Stage at least one post-revelation scene with a charged emotional shift: a discovery should make someone angrier, more frightened, more hopeful, or more desperate in the following scene. The emotional aftermath of a revelation is where it is felt rather than merely processed; a neutral reaction scene suggests the disclosure was informational rather than transformative. Even a brief scene that tracks a character\'s emotional state changing in response to what was just revealed extends the disclosure across two beats.',
+        });
+      }
+    }
+  }
+
+  // ASSERTION_CURIOSITY_AFTERMATH_VOID — Average/aggregate × assertion × curiosity aftermath
+  // (n≥8, ≥3 qualifying assertion scenes not in final position). Average curiosityDelta of the
+  // scene immediately following each qualifying assertion ≤ 0. Every time a character stakes a
+  // claim, the following scene fails to reopen any question for the audience — assertions close
+  // the field rather than generating dramatic irony that drives forward curiosity. A well-placed
+  // assertion should heighten what the audience wants to know: is this character right? What will
+  // happen when reality tests this belief? What does holding this position cost them?
+  // Distinct from: TOLD_BELIEF_CURIOSITY_FLAT (Wave 323: curiosityDelta OF the assertion scene
+  // itself ≤ 0 — assertion-as-context, not aftermath), ASSERTION_AFTERMATH_VOID (Wave 418:
+  // aftermath has no revelation, no relationship shift, no suspense rise in next 2 scenes —
+  // a structural compound condition, not specifically curiosity-channel), REVELATION_CURIOSITY_
+  // DECOUPLED (Wave 323: revelation scenes' own curiosityDelta ≤ 0 — a different belief event
+  // type and a different positional slot).
+  if (n474 >= 8 && toldBeliefs.length >= 3) {
+    const assertionSceneIdxsUniq474c = [...new Set(toldBeliefs.map(t => t.sceneIdx))];
+    const qualAssertion474c = assertionSceneIdxsUniq474c
+      .map(idx => records.findIndex(r => r.sceneIdx === idx))
+      .filter(pos => pos >= 0 && pos < n474 - 1);
+    if (qualAssertion474c.length >= 3) {
+      const totalCurDelta474c = qualAssertion474c.reduce((sum, pos) => {
+        return sum + ((records as any[])[pos + 1].curiosityDelta ?? 0);
+      }, 0);
+      const avgCurDelta474c = totalCurDelta474c / qualAssertion474c.length;
+      if (avgCurDelta474c <= 0) {
+        issues.push({
+          location: `${qualAssertion474c.length} assertion aftermath(s) — avg next-scene curiosityDelta ${avgCurDelta474c.toFixed(2)}`,
+          rule: 'ASSERTION_CURIOSITY_AFTERMATH_VOID',
+          severity: 'minor',
+          description: `The scene immediately following each of the ${qualAssertion474c.length} qualifying assertion(s) averages a curiosityDelta of ${avgCurDelta474c.toFixed(2)} — assertions consistently fail to reopen the epistemic field in what follows. When a character stakes a claim, the following scene should heighten what the audience wants to know: is this character right? What happens when reality tests this belief? What does commitment to this position cost? If the scene after every assertion is curiosity-neutral or curiosity-negative, claims function as closures rather than as dramatic irony generators — the belief layer deposits information without fueling anticipation about whether the belief is true or what follows from holding it.`,
+          suggestedFix: 'Engineer at least one assertion whose aftermath reopens the field: have the scene that follows a claim raise a new question about it — through a contradicting event, a character who reacts with suspicion, or a dramatic development that forces the audience to wonder whether the assertion will hold. The most powerful told beliefs are those where the audience knows what a character believes and immediately wonders how that belief will collide with reality.',
+        });
+      }
     }
   }
 

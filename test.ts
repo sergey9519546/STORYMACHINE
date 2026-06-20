@@ -29425,6 +29425,97 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 474 — beliefPass: assertion temporal cluster, revelation emotional aftermath flat, assertion curiosity aftermath void', async () => {
+    const makeRec474 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      seededClueIds: [], payoffSetupIds: [], revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], dramaticTurn: 'nothing',
+      purpose: 'development', unresolvedClues: [],
+      ...overrides,
+    });
+    const runB474 = async (records: any[]) => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ASSERTION_TEMPORAL_CLUSTER fires when >75% of assertion scenes fall in a single third', async () => {
+      // n=12; assertions at positions 0,1,2,3 (all in first third, floor(12/3)=4 → positions 0-3)
+      // 4/4 = 100% > 75% → fires
+      const recs474a = Array.from({ length: 12 }, (_, i) =>
+        makeRec474(i, {
+          dialogueHighlights: [0, 1, 2, 3].includes(i) ? [`CHAR: She claims the mission is doomed.`] : [],
+        }),
+      );
+      const res = await runB474(recs474a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ASSERTION_TEMPORAL_CLUSTER'), 'ASSERTION_TEMPORAL_CLUSTER should fire');
+    });
+
+    it('ASSERTION_TEMPORAL_CLUSTER does not fire when assertion scenes are spread across all thirds', async () => {
+      // n=12; assertions at positions 0,4,8,11 → first zone: 1, mid: 1, last: 2 → max=2/4=50% ≤ 75%
+      const recs474anr = Array.from({ length: 12 }, (_, i) =>
+        makeRec474(i, {
+          dialogueHighlights: [0, 4, 8, 11].includes(i) ? [`CHAR: She claims the mission is doomed.`] : [],
+        }),
+      );
+      const res = await runB474(recs474anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ASSERTION_TEMPORAL_CLUSTER'), 'ASSERTION_TEMPORAL_CLUSTER should not fire');
+    });
+
+    it('REVELATION_EMOTIONAL_AFTERMATH_FLAT fires when all post-revelation scenes are emotionally neutral', async () => {
+      // n=8; revelations at positions 1,3,5 (emotionalShift='positive' so REVELATION_DRAMA_VACUUM won't fire)
+      // Aftermath scenes 2,4,6: emotionalShift='neutral' → all flat → fires
+      const recs474b = Array.from({ length: 8 }, (_, i) =>
+        makeRec474(i, {
+          revelation: [1, 3, 5].includes(i) ? `Truth at scene ${i}` : null,
+          emotionalShift: [1, 3, 5].includes(i) ? 'positive' : 'neutral',
+          dialogueHighlights: i === 0 ? ['CHAR: She insists the map is real.'] : [],
+        }),
+      );
+      const res = await runB474(recs474b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_EMOTIONAL_AFTERMATH_FLAT'), 'REVELATION_EMOTIONAL_AFTERMATH_FLAT should fire');
+    });
+
+    it('REVELATION_EMOTIONAL_AFTERMATH_FLAT does not fire when at least one aftermath is emotionally charged', async () => {
+      // n=8; revelations at 1,3,5; aftermath scenes: 2=neutral, 4=neutral, 6=positive → not all flat
+      const recs474bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec474(i, {
+          revelation: [1, 3, 5].includes(i) ? `Truth at scene ${i}` : null,
+          emotionalShift: [1, 3, 5].includes(i) ? 'positive' : i === 6 ? 'positive' : 'neutral',
+          dialogueHighlights: i === 0 ? ['CHAR: She insists the map is real.'] : [],
+        }),
+      );
+      const res = await runB474(recs474bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_EMOTIONAL_AFTERMATH_FLAT'), 'REVELATION_EMOTIONAL_AFTERMATH_FLAT should not fire');
+    });
+
+    it('ASSERTION_CURIOSITY_AFTERMATH_VOID fires when avg post-assertion curiosityDelta ≤ 0', async () => {
+      // n=8; assertions at positions 1,3,5 (not at 7); aftermaths at 2,4,6 with curiosityDelta=-1,-1,0
+      // avg=(-1-1+0)/3=-0.67 ≤ 0 → fires
+      const recs474c = Array.from({ length: 8 }, (_, i) =>
+        makeRec474(i, {
+          dialogueHighlights: [1, 3, 5].includes(i) ? [`CHAR: She claims he lied about the money.`] : [],
+          curiosityDelta: i === 2 ? -1 : i === 4 ? -1 : 0,
+        }),
+      );
+      const res = await runB474(recs474c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ASSERTION_CURIOSITY_AFTERMATH_VOID'), 'ASSERTION_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('ASSERTION_CURIOSITY_AFTERMATH_VOID does not fire when avg post-assertion curiosityDelta > 0', async () => {
+      // n=8; assertions at 1,3,5; aftermaths at 2,4,6 with curiosityDelta=2,1,1 → avg=4/3 > 0
+      const recs474cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec474(i, {
+          dialogueHighlights: [1, 3, 5].includes(i) ? [`CHAR: She claims he lied about the money.`] : [],
+          curiosityDelta: i === 2 ? 2 : i === 4 ? 1 : i === 6 ? 1 : 0,
+        }),
+      );
+      const res = await runB474(recs474cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ASSERTION_CURIOSITY_AFTERMATH_VOID'), 'ASSERTION_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 460 — beliefPass: assertion causal vacuum, revelation suspense deflation, assertion payoff decoupled', async () => {
     const makeRec460 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
