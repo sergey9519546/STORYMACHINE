@@ -441,8 +441,14 @@ export default function ScriptIDE({
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
     let actionLines = 0;
-    let wordCount = scriptText.trim().split(/\s+/).length;
-    if (scriptText.trim() === "") wordCount = 0;
+    // ⚡ Bolt Performance Optimization: Replace O(N) split allocation with zero-allocation regex loop for word counting
+    let wordCount = 0;
+    if (scriptText.trim() !== "") {
+      const regex = /[^\s]+/g;
+      while (regex.exec(scriptText) !== null) {
+        wordCount++;
+      }
+    }
 
     blocks.forEach((block) => {
       if (block.type === "character") {
@@ -592,9 +598,9 @@ export default function ScriptIDE({
   // ── Key handler ──────────────────────────────────────────────────────────────
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const cursor = e.currentTarget.selectionStart;
-    const textBeforeCursor = scriptText.substring(0, cursor);
-    const lines = textBeforeCursor.split("\n");
-    const currentLine = lines[lines.length - 1];
+    // ⚡ Bolt Performance Optimization: Avoid intermediate array allocation from split() during high-frequency keydown events
+    const lastNewlineIndex = scriptText.lastIndexOf("\n", cursor - 1);
+    const currentLine = scriptText.slice(lastNewlineIndex + 1, cursor);
 
     if (e.key === "i" || e.key === "I") {
       if (currentLine === "") {
@@ -737,10 +743,16 @@ export default function ScriptIDE({
   // ── Navigation ───────────────────────────────────────────────────────────────
   const handleNavigate = (lineIndex: number) => {
     if (!editorRef.current) return;
-    const lines = scriptText.split("\n");
+    // ⚡ Bolt Performance Optimization: Replace text.split() array instantiation with direct string navigation
     let charCount = 0;
-    for (let i = 0; i < lineIndex; i++) {
-      charCount += lines[i].length + 1;
+    let currentLine = 0;
+    let index = 0;
+    while (currentLine < lineIndex && index < scriptText.length) {
+      let nextNewline = scriptText.indexOf("\n", index);
+      if (nextNewline === -1) break;
+      charCount = nextNewline + 1;
+      index = nextNewline + 1;
+      currentLine++;
     }
     editorRef.current.focus();
     editorRef.current.setSelectionRange(charCount, charCount);
