@@ -82,6 +82,17 @@
 // dramatic turn causeless (backward-cause × dramatic turn — every scene whose dramaticTurn ≠ 'nothing'
 // is preceded in the prior 3 scenes by no revelation, high suspense, or clock raise; pivots erupt
 // without structural build-up, the turn-signal sibling of CLIMAX_UNPREPARED).
+// Wave 471 additions: curiosity peak emotional void (single-peak isolation × curiosity channel ×
+// valence — the scene with the highest curiosityDelta is emotionally neutral while ≥2 scenes carry
+// emotional charge elsewhere; fills the curiosity-channel cell in the peak-isolation × valence matrix
+// alongside PEAK_SUSPENSE_EMOTIONAL_VACUUM which uses the suspense channel), positive scene run
+// (run-based × positive emotional valence — 5+ consecutive scenes all emotionalShift='positive';
+// the first run-based check on emotional valence, distinct from EMOTIONAL_ARC_UNIFORM which audits
+// global proportion and NEGATIVE_SCENE_DROUGHT which audits a global ratio), revelation turn
+// decoupled (co-occurrence/decoupling × revelation × dramaticTurn — the story has ≥2 revelations
+// and ≥2 turns but no scene carries both; the truth-surfacing and direction-changing machinery
+// always operate in separate beats; completes the revelation co-occurrence family with curiosity
+// and suspense channels now joined by the dramatic-turn channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2093,6 +2104,101 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `All ${turnScenes457c.length} scenes with dramatic turns (dramaticTurn ≠ 'nothing') are preceded in the prior three scenes by no revelation, no high-suspense moment (suspenseDelta > 1), and no clock raise — the story's pivots erupt without structural build-up. Dramatic turns are the moments when the story changes direction: they work when they feel inevitable-in-retrospect, as if everything leading to that point made this reversal necessary. When every turn arrives without a preceding escalation — no truth surfacing, no pressure building, no deadline closing in — the pivot feels arbitrary and the story changes direction for structural convenience rather than narrative necessity.`,
           suggestedFix: `Before at least one dramatic turn, build structural runway in the prior two or three scenes: let a revelation surface that makes the reversal feel like its consequence, raise suspense so the turn arrives as release rather than interruption, or introduce a clock that makes the pivot feel necessary. A dramatic turn that follows from something the audience has been shown to be building feels earned; one that arrives from narrative dead air feels like a plot reset.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 471: CURIOSITY_PEAK_EMOTIONAL_VOID, POSITIVE_SCENE_RUN, REVELATION_TURN_DECOUPLED ──
+
+  // CURIOSITY_PEAK_EMOTIONAL_VOID — Single-peak isolation × curiosity channel × emotional valence
+  // (n≥8, maxCuriosityDelta > 0, peak scene emotionalShift = 'neutral', ≥2 non-neutral scenes).
+  // The scene that most intensely raises new questions (highest curiosityDelta) arrives emotionally
+  // blank. Curiosity and emotion are the two primary engagement engines: intellectual (what happens
+  // next?) and affective (do I care?). When the peak question-raising moment is emotionally neutral,
+  // the question is generated in a tone vacuum — the audience wonders without urgency, because no
+  // emotional stake makes answering the question feel vital. Questions raised in the middle of grief,
+  // hope, or fear register as more urgent than questions raised in a calm neutral scene.
+  // Distinct from PEAK_SUSPENSE_EMOTIONAL_VACUUM (Wave 443: single-peak isolation × SUSPENSE channel;
+  // this is CURIOSITY channel — orthogonal peak-isolation × valence check on a different axis), all
+  // zone-based curiosity checks (those examine zone averages, not single-peak isolation × valence).
+  if (n >= 8) {
+    const maxCurDelta471a = Math.max(...(records as any[]).map((r: any) => r.curiosityDelta ?? 0));
+    if (maxCurDelta471a > 0) {
+      const peakCurScene471a = (records as any[]).find((r: any) => (r.curiosityDelta ?? 0) === maxCurDelta471a);
+      const nonNeutralCount471a = (records as any[]).filter((r: any) => r.emotionalShift !== 'neutral').length;
+      if (peakCurScene471a !== undefined && peakCurScene471a.emotionalShift === 'neutral' && nonNeutralCount471a >= 2) {
+        issues.push({
+          location: `Scene ${peakCurScene471a.sceneIdx ?? '?'} — peak curiosity scene (curiosityDelta ${maxCurDelta471a}) is emotionally neutral`,
+          rule: 'CURIOSITY_PEAK_EMOTIONAL_VOID',
+          severity: 'minor',
+          description: `The scene with the highest curiosityDelta (${maxCurDelta471a}) has emotionalShift = 'neutral' while ${nonNeutralCount471a} other scene(s) carry emotional charge. The script's strongest intellectual hook — the moment that most intensely raises new questions — arrives in an emotionally inert scene. Curiosity without emotional stake is cold: the audience will wonder, but without a concurrent feeling of risk, loss, or hope they lack urgency about finding out. Questions raised during a moment of grief, fear, or joy are felt as more pressing because the emotional investment makes the answer matter, not merely interest.`,
+          suggestedFix: `Give scene ${peakCurScene471a.sceneIdx ?? '?'} an emotional charge — shift its emotionalShift to 'positive' or 'negative' so the peak question arrives when the audience already has something at stake. Alternatively, move the question-raising moment to an existing emotionally charged scene so the intellectual and affective engines reinforce each other in the same beat.`,
+        });
+      }
+    }
+  }
+
+  // POSITIVE_SCENE_RUN — Run-based × positive emotional valence (n≥8, longest consecutive run
+  // of emotionalShift='positive' scenes ≥ 5). Five or more consecutive positive-emotional scenes
+  // create an uninterrupted tonal plateau: no shadow, no cost, no friction for an extended stretch.
+  // Good news keeps arriving without interruption, which paradoxically numbs the audience to each
+  // individual victory — the register flattens through repetition, and no scene feels meaningfully
+  // positive because all scenes are. Even a comedy needs occasional setbacks to earn its moments of
+  // relief; prolonged positivity without contrast is tonally monotonous.
+  // Distinct from NEGATIVE_SCENE_DROUGHT (Wave 457: global ratio <15% negative while ≥3 positive —
+  // a proportion check; this fires on a LOCAL consecutive run of positives that can fire even when
+  // negatives are globally well-represented if they avoid this specific run), EMOTIONAL_ARC_UNIFORM
+  // (Wave 278: any single register dominates at >70% globally — global proportion, not run-based),
+  // PURPOSE_MONOTONE_RUN (Wave 429: run-based × purpose field; this is run-based × emotional valence,
+  // an orthogonal field).
+  if (n >= 8) {
+    let maxPosRun471b = 0, curPosRun471b = 0;
+    for (const r of (records as any[])) {
+      if (r.emotionalShift === 'positive') {
+        curPosRun471b++;
+        if (curPosRun471b > maxPosRun471b) maxPosRun471b = curPosRun471b;
+      } else {
+        curPosRun471b = 0;
+      }
+    }
+    if (maxPosRun471b >= 5) {
+      issues.push({
+        location: `Consecutive positive scenes — run of ${maxPosRun471b}`,
+        rule: 'POSITIVE_SCENE_RUN',
+        severity: 'minor',
+        description: `${maxPosRun471b} consecutive scenes all carry emotionalShift = 'positive' — an uninterrupted tonal plateau with no shadow, cost, or friction. A run of positive scenes without contrast numbs the audience: when good news keeps arriving without interruption, no individual victory feels like good news anymore because the positive register has become ambient. Dramatic impact requires contrast — the relief only lands if there was something to be relieved from.`,
+        suggestedFix: `Break the run of ${maxPosRun471b} positive scenes with a scene of cost, setback, ambiguity, or loss before it completes. A single negative or neutral scene inside a positive run restores contrast and makes every positive moment around it feel more earned and distinct. Even the most optimistic stories need shadow to give the light its meaning.`,
+      });
+    }
+  }
+
+  // REVELATION_TURN_DECOUPLED — Co-occurrence/decoupling × revelation × dramaticTurn (n≥10,
+  // ≥2 revelation scenes, ≥2 turn scenes, no scene carries both). The story's truth-surfacing
+  // and direction-changing machinery always operate in separate beats: revelations arrive in
+  // non-pivot scenes, and pivots arrive without a coincident disclosure. The most powerful
+  // structural single-scene combination is the revelation-that-reverses — a truth surfaces and
+  // immediately changes everything — and its complete absence means the story never achieves
+  // this double-impact moment. Disclosures close chapters; turns open new ones; when they never
+  // coincide, each scene does only one job where a well-structured script would do both.
+  // Distinct from REVELATION_CURIOSITY_DECOUPLED (Wave 443: revelation × curiosityDelta same-scene
+  // co-occurrence — different field), REVELATION_SUSPENSE_DECOUPLED (Wave 457: revelation ×
+  // suspenseDelta co-occurrence), DRAMATIC_TURN_CAUSELESS (Wave 457: backward-cause — checks
+  // prior-scene buildup for turns; this checks SAME-SCENE co-occurrence, not antecedent causality).
+  if (n >= 10) {
+    const revScenes471c = (records as any[]).filter(r => !!r.revelation);
+    const turnScenes471c = (records as any[]).filter(r => (r.dramaticTurn ?? 'nothing') !== 'nothing');
+    if (revScenes471c.length >= 2 && turnScenes471c.length >= 2) {
+      const anyCoOccur471c = (records as any[]).some(
+        r => !!r.revelation && (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      );
+      if (!anyCoOccur471c) {
+        issues.push({
+          location: `${revScenes471c.length} revelation scene(s) and ${turnScenes471c.length} dramatic-turn scene(s) — never co-occurring`,
+          rule: 'REVELATION_TURN_DECOUPLED',
+          severity: 'minor',
+          description: `The script has ${revScenes471c.length} revelation scene(s) and ${turnScenes471c.length} dramatic-turn scene(s), but no scene carries both — revelations always arrive in non-pivot moments, and pivots always arrive without a coincident disclosure. The most powerful structural single-scene move is the revelation-that-reverses: truth surfaces, and in the same beat the story's direction changes because of what has been learned. This double-impact moment is structurally absent; the script's truth-surfacing and direction-changing machinery are always operating in isolation, and no scene achieves the compressive force that comes from combining both.`,
+          suggestedFix: `Arrange at least one scene that carries both a revelation and a dramatic turn: let the disclosed truth be the thing that pivots the story in a new direction within the same scene. The character learns something — and as a direct consequence in that scene — everything about the story's direction changes. This single-scene combination is the most efficient structural unit in dramatic writing, and the script currently has all the ingredients but keeps them apart.`,
         });
       }
     }

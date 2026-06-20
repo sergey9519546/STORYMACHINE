@@ -19169,6 +19169,88 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 471 — structurePass: curiosity peak emotional void, positive scene run, revelation turn decoupled', async () => {
+    const makeRec471 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const runST471 = async (records: any[]) => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      return structurePass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CURIOSITY_PEAK_EMOTIONAL_VOID fires when peak curiosityDelta scene is emotionally neutral', async () => {
+      // 8 scenes: scene 3 has max curiosityDelta=4 but emotionalShift='neutral'; scenes 1,6 are non-neutral
+      const recs471a = Array.from({ length: 8 }, (_, i) =>
+        makeRec471(i, {
+          curiosityDelta: i === 3 ? 4 : 0,
+          emotionalShift: i === 1 ? 'positive' : i === 6 ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runST471(recs471a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'CURIOSITY_PEAK_EMOTIONAL_VOID'), 'CURIOSITY_PEAK_EMOTIONAL_VOID should fire');
+    });
+
+    it('CURIOSITY_PEAK_EMOTIONAL_VOID does not fire when peak curiosity scene has emotional charge', async () => {
+      // 8 scenes: scene 3 has max curiosityDelta=4 AND emotionalShift='positive' → no fire
+      const recs471anr = Array.from({ length: 8 }, (_, i) =>
+        makeRec471(i, {
+          curiosityDelta: i === 3 ? 4 : 0,
+          emotionalShift: i === 3 ? 'positive' : i === 6 ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runST471(recs471anr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'CURIOSITY_PEAK_EMOTIONAL_VOID'), 'CURIOSITY_PEAK_EMOTIONAL_VOID should not fire');
+    });
+
+    it('POSITIVE_SCENE_RUN fires when 5+ consecutive scenes are emotionally positive', async () => {
+      // 8 scenes: scenes 1-5 all positive (run of 5), scene 0 neutral, scenes 6-7 neutral → fire
+      const recs471b = Array.from({ length: 8 }, (_, i) =>
+        makeRec471(i, { emotionalShift: [1, 2, 3, 4, 5].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runST471(recs471b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'POSITIVE_SCENE_RUN'), 'POSITIVE_SCENE_RUN should fire');
+    });
+
+    it('POSITIVE_SCENE_RUN does not fire when max consecutive positive run is only 4', async () => {
+      // 8 scenes: scenes 0-3 positive (run 4), scene 4 negative, scenes 5-7 positive (run 3)
+      const recs471bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec471(i, { emotionalShift: i === 4 ? 'negative' : 'positive' }),
+      );
+      const res = await runST471(recs471bnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'POSITIVE_SCENE_RUN'), 'POSITIVE_SCENE_RUN should not fire');
+    });
+
+    it('REVELATION_TURN_DECOUPLED fires when no scene carries both revelation and a dramatic turn', async () => {
+      // 10 scenes: revelations at 1,3; turns at 5,7; never in the same scene → fire
+      const recs471c = Array.from({ length: 10 }, (_, i) =>
+        makeRec471(i, {
+          revelation: [1, 3].includes(i) ? true : null,
+          dramaticTurn: [5, 7].includes(i) ? 'reversal' : 'nothing',
+        }),
+      );
+      const res = await runST471(recs471c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'REVELATION_TURN_DECOUPLED'), 'REVELATION_TURN_DECOUPLED should fire');
+    });
+
+    it('REVELATION_TURN_DECOUPLED does not fire when at least one scene carries both revelation and dramatic turn', async () => {
+      // 10 scenes: scene 3 has both revelation and turn → co-occurring → no fire
+      const recs471cnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec471(i, {
+          revelation: [1, 3].includes(i) ? true : null,
+          dramaticTurn: [3, 7].includes(i) ? 'reversal' : 'nothing',
+        }),
+      );
+      const res = await runST471(recs471cnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'REVELATION_TURN_DECOUPLED'), 'REVELATION_TURN_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 457 — structurePass: revelation suspense decoupled, negative scene drought, dramatic turn causeless', async () => {
     const makeRec457 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
