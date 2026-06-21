@@ -94,6 +94,16 @@
 // scenes averaging curiosityDelta ≤ 0 — disclosures collectively fail to open new questions;
 // average/aggregate × revelation × curiosity, new average/aggregate check on the revelation
 // channel).
+// Wave 493 additions: payoff curiosity flat (≥3 payoff scenes averaging curiosityDelta ≤ 0 —
+// callbacks close questions but open none; average/aggregate × payoff × curiosity, the payoff
+// sibling of REVELATION_CURIOSITY_FLAT and distinct from all proactive-curiosity checks which
+// target initiative, not closure scenes), seed Act 1 void (no clue seeded in the first 25%
+// while seeds exist later — the audience enters Act 2 carrying no planted threads; zone
+// presence/absence × seed × opening quarter, distinct from SEED_MIDPOINT_VOID which targets
+// the 40-60% zone and SEED_FRONTLOADED/BACKLOADED which use distribution ratios), payoff run
+// (≥3 consecutive payoff scenes — thread-closures dump in a burst overwhelming individual
+// resolution weight; run-based × payoff channel, completing the run family alongside
+// PROACTIVE_DESERT_RUN, SEED_RUN_ISOLATED, and REVELATION_RUN).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2347,6 +2357,127 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `Across all ${revRecs479c.length} revelation scenes the average curiosityDelta is ${avgRevCuriosity479c.toFixed(2)} — disclosures collectively generate no forward curiosity. A revelation should do double work: close one question and open another. When truths land without raising new mystery, the story transitions to closure mode scene by scene, depleting the audience's forward pull. The ideal revelation shifts "what's happening?" into "but wait — then what about X?" so the disclosure accelerates the audience's need to see the next scene.`,
           suggestedFix: "Reframe revelations to plant new questions even as they answer old ones: 'the killer is revealed — but why did they bury the evidence?' opens a deeper layer. Let each revelation shift the protagonist's goal rather than merely confirm a suspicion; a truth that resets the chase generates curiosity, while a truth that merely confirms a guess does not.",
+        });
+      }
+    }
+  }
+
+  // ── Wave 493: PAYOFF_CURIOSITY_FLAT, SEED_ACT1_VOID, PAYOFF_RUN ──
+
+  // PAYOFF_CURIOSITY_FLAT (average/aggregate × payoff × curiosity, n≥8, ≥3 payoff scenes,
+  // avg curiosityDelta ≤ 0): Across all payoff scenes the average curiosityDelta is ≤ 0 —
+  // callbacks close planted questions but open none. Each payoff should do double duty: resolve
+  // the setup the audience was tracking while also opening a deeper layer of mystery. When every
+  // thread-closure lands in flat or negative curiosity terrain, the story transitions scene by
+  // scene from "what happens next?" to "well, that's settled," depleting forward momentum at
+  // the exact moments that should feel most dynamically satisfying. Distinctness: REVELATION_
+  // CURIOSITY_FLAT (Wave 479) audits revelation scenes — this audits payoff scenes, a different
+  // structural channel. PROACTIVE_CURIOSITY_DECOUPLED (Wave 353) checks proactive scenes, not
+  // payoff scenes. PAYOFF_DRAMA_DECOUPLED (Wave 465) checks co-occurrence with turns, not the
+  // average curiosity generated.
+  {
+    const n493a = records.length;
+    if (n493a >= 8) {
+      const payoffRecs493a = (records as any[]).filter(r =>
+        ((r.payoffSetupIds ?? []) as string[]).length > 0,
+      );
+      if (payoffRecs493a.length >= 3) {
+        const avgPayoffCuriosity493a =
+          payoffRecs493a.reduce((s: number, r: any) => s + (r.curiosityDelta ?? 0), 0) /
+          payoffRecs493a.length;
+        if (avgPayoffCuriosity493a <= 0) {
+          issues.push({
+            location: `Payoff scenes — avg curiosityDelta ${avgPayoffCuriosity493a.toFixed(2)} (≤ 0)`,
+            rule: 'PAYOFF_CURIOSITY_FLAT',
+            severity: 'minor',
+            description: `Across all ${payoffRecs493a.length} payoff scenes the average curiosityDelta is ${avgPayoffCuriosity493a.toFixed(2)} — callbacks close planted questions but open none. Each payoff should do double duty: resolve the thread the audience was tracking while also opening a deeper layer of mystery. When every closure lands without raising curiosity, the story transitions from "what happens next?" to "well, that's settled" with each callback, depleting forward pull at exactly the moments that should feel most dynamically satisfying. The best payoffs reframe the question: answering one mystery shifts the audience's attention to the next unresolved layer, so the act of resolution itself generates momentum rather than consuming it.`,
+            suggestedFix: `Reframe each payoff to open a new question even as it closes the old one: the thread that resolves reveals a deeper truth ("the letter was delivered — but it said something that recontextualises the sender's motives"), the callback that answers "how?" simultaneously raises "but why?" or "and now what?". Let at least one payoff scene carry a curiosityDelta above zero to signal that the story is still accelerating, not winding down.`,
+          });
+        }
+      }
+    }
+  }
+
+  // SEED_ACT1_VOID (zone presence/absence × seed × opening quarter, n≥10, ≥2 seeds total,
+  // none in first 25%): The first quarter of the story plants no clue while seeds exist later —
+  // the audience enters Act 2 carrying no planted threads. Act 1 is the natural home for early
+  // thread-seeding: these are the narrative promises the story makes while the audience is still
+  // learning the world, the plants that will pay off at maximum distance from their origin. When
+  // no seed appears in the opening, the first act is pure exposition without forward hooks;
+  // the audience's curiosity must be sustained entirely by scene-to-scene engagement rather
+  // than by the pull of planted questions whose answers are still out of reach. Distinctness:
+  // SEED_MIDPOINT_VOID (Wave 423) targets the 40%–60% zone; this targets the first 25%.
+  // SEED_FRONTLOADED (Wave 409) fires when >70% of ALL seeds cluster in the first half —
+  // a distribution ratio; this fires when the first quarter is entirely empty regardless of
+  // where the seeds are distributed later. SEED_BACKLOADED (Wave 395) fires when all seeds
+  // are in the second half — a different zone. No existing check is a zone-void for the
+  // opening quarter of the seed channel.
+  {
+    const n493b = records.length;
+    if (n493b >= 10) {
+      const act1End493b = Math.floor(n493b * 0.25);
+      const allSeeds493b = (records as any[]).filter(r =>
+        ((r.seededClueIds ?? []) as string[]).length > 0,
+      );
+      if (allSeeds493b.length >= 2) {
+        const act1Seeds493b = allSeeds493b.filter(r => {
+          const pos = (records as any[]).indexOf(r);
+          return pos < act1End493b;
+        });
+        if (act1Seeds493b.length === 0) {
+          issues.push({
+            location: `Seed layer — Act 1 (scenes 0–${act1End493b - 1}) contains no planted clue`,
+            rule: 'SEED_ACT1_VOID',
+            severity: 'minor',
+            description: `The story's first quarter (scenes 0–${act1End493b - 1}) plants no clue while ${allSeeds493b.length} seed(s) exist later in the script. Act 1 is the natural home for early thread-seeding: plants placed in the opening act pay off at the maximum possible distance from their origin, giving the audience the longest possible time to wonder and anticipate. When the first act is seed-free, it becomes pure exposition and scene-to-scene engagement rather than a set of narrative promises — the audience receives no forward hooks in the window when they are most primed to receive them. The earlier a question is planted, the more meaningful its eventual resolution becomes.`,
+            suggestedFix: `Plant at least one clue in the opening act (scenes 0–${act1End493b - 1}): an unexplained object, an overheard half-sentence, a behavior that doesn't quite fit. The audience should enter Act 2 carrying at least one unresolved question from Act 1, so the later revelation lands with the weight of accumulated anticipation rather than arriving as a new piece of information in the moment it's needed.`,
+          });
+        }
+      }
+    }
+  }
+
+  // PAYOFF_RUN (run-based × payoff channel, n≥8, ≥3 consecutive payoff scenes):
+  // Three or more scenes in an unbroken row each resolve a planted setup — thread-closures
+  // dump in a rapid burst rather than distributing resolutions to give each its weight. Each
+  // payoff needs space to land: a scene of reaction and consequence, the audience absorbing
+  // that a long-held anticipation has been fulfilled, before the next callback fires. When
+  // payoffs stack consecutively, each resolution dilutes the one before; the cumulative effect
+  // is mechanical satisfaction rather than emotional culmination. Payoffs are the structural
+  // rewards the audience has been saving up for — releasing them in a burst spends all that
+  // capital at once without leaving time for the full weight of each to register.
+  // Run-based mode × payoff channel. Distinctness: SEED_RUN_ISOLATED (Wave 437) checks
+  // consecutive seeding scenes (planting); REVELATION_RUN (Wave 479) checks consecutive
+  // revelation scenes (disclosing); this checks consecutive payoff scenes (resolving) —
+  // three distinct structural channels in the same run-based mode. PAYOFF_FINAL_ZONE_VOID
+  // (Wave 479) checks distribution; PAYOFF_DRAMA_DECOUPLED (Wave 465) checks co-occurrence.
+  {
+    const n493c = records.length;
+    if (n493c >= 8) {
+      let maxPayoffRun493c = 0;
+      let curPayoffRun493c = 0;
+      let maxPayoffRunStart493c = 0;
+      let curPayoffRunStart493c = 0;
+      for (let i493c = 0; i493c < n493c; i493c++) {
+        const hasPayoff493c = ((records as any[])[i493c].payoffSetupIds ?? []).length > 0;
+        if (hasPayoff493c) {
+          if (curPayoffRun493c === 0) curPayoffRunStart493c = i493c;
+          curPayoffRun493c++;
+          if (curPayoffRun493c > maxPayoffRun493c) {
+            maxPayoffRun493c = curPayoffRun493c;
+            maxPayoffRunStart493c = curPayoffRunStart493c;
+          }
+        } else {
+          curPayoffRun493c = 0;
+        }
+      }
+      if (maxPayoffRun493c >= 3) {
+        issues.push({
+          location: `Payoff run — Scenes ${maxPayoffRunStart493c}–${maxPayoffRunStart493c + maxPayoffRun493c - 1} (${maxPayoffRun493c} consecutive)`,
+          rule: 'PAYOFF_RUN',
+          severity: 'minor',
+          description: `${maxPayoffRun493c} scenes in a row each resolve a planted setup — the story closes threads in a rapid burst rather than distributing resolutions to give each its full weight. Each payoff needs space to land: a scene of reaction and consequence, the audience absorbing that a long-held anticipation has been fulfilled, before the next callback fires. When payoffs stack consecutively, each resolution dilutes the one before; the cumulative effect is mechanical satisfaction rather than emotional culmination. Payoffs are the structural rewards the audience has been accumulating — spending them all at once leaves no time for the full weight of each to register, and the audience exits the burst having processed the information without feeling the full satisfaction each individual payoff warranted.`,
+          suggestedFix: `Break the payoff cluster with at least one non-payoff scene between consecutive resolutions — a scene of reaction (a character absorbing what just resolved), a consequence beat (the practical impact of the closure), or an escalation (the resolution raising a new problem). Spreading payoffs across the second half rather than clustering them in a burst maintains the sense that the story is continuously delivering on its promises rather than paying its narrative debts all at once.`,
         });
       }
     }

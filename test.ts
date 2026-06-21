@@ -23663,6 +23663,78 @@ I always listen.
     });
   });
 
+  describe('Wave 493 — intentionPass: payoff curiosity flat, seed Act 1 void, payoff run', async () => {
+    const makeRec493 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runI493 = async (records: any[]) => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      return intentionPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // PAYOFF_CURIOSITY_FLAT fire: n=8; payoffs at 2,4,6 with curiosityDelta=0 each → avg=0
+    it('PAYOFF_CURIOSITY_FLAT fires when payoff scenes average curiosityDelta ≤ 0', async () => {
+      const recs493a: any[] = Array.from({ length: 8 }, (_, i) => makeRec493(i, {
+        payoffSetupIds: [2, 4, 6].includes(i) ? ['setup1'] : [],
+        curiosityDelta: [2, 4, 6].includes(i) ? 0 : 0,
+      }));
+      const res = await runI493(recs493a);
+      assert.ok(res.issues.some((x: any) => x.rule === 'PAYOFF_CURIOSITY_FLAT'), 'PAYOFF_CURIOSITY_FLAT should fire');
+    });
+
+    // PAYOFF_CURIOSITY_FLAT no-fire: payoff scene at idx 4 has curiosityDelta=1 → avg > 0
+    it('PAYOFF_CURIOSITY_FLAT does not fire when at least one payoff scene has positive curiosityDelta', async () => {
+      const recs493an: any[] = Array.from({ length: 8 }, (_, i) => makeRec493(i, {
+        payoffSetupIds: [2, 4, 6].includes(i) ? ['setup1'] : [],
+        curiosityDelta: i === 4 ? 1 : 0,
+      }));
+      const res = await runI493(recs493an);
+      assert.ok(!res.issues.some((x: any) => x.rule === 'PAYOFF_CURIOSITY_FLAT'), 'PAYOFF_CURIOSITY_FLAT should not fire');
+    });
+
+    // SEED_ACT1_VOID fire: n=12; act1End=3; seeds at scenes 4,7 (none in 0-2)
+    it('SEED_ACT1_VOID fires when no clue is seeded in the first quarter', async () => {
+      const recs493b: any[] = Array.from({ length: 12 }, (_, i) => makeRec493(i, {
+        seededClueIds: [4, 7].includes(i) ? ['clue1'] : [],
+      }));
+      const res = await runI493(recs493b);
+      assert.ok(res.issues.some((x: any) => x.rule === 'SEED_ACT1_VOID'), 'SEED_ACT1_VOID should fire');
+    });
+
+    // SEED_ACT1_VOID no-fire: seed at scene 1 falls within Act 1 (first 25% of 12=0-2)
+    it('SEED_ACT1_VOID does not fire when a seed exists in the first quarter', async () => {
+      const recs493bn: any[] = Array.from({ length: 12 }, (_, i) => makeRec493(i, {
+        seededClueIds: [1, 7].includes(i) ? ['clue1'] : [],
+      }));
+      const res = await runI493(recs493bn);
+      assert.ok(!res.issues.some((x: any) => x.rule === 'SEED_ACT1_VOID'), 'SEED_ACT1_VOID should not fire');
+    });
+
+    // PAYOFF_RUN fire: n=8; payoffs at scenes 3,4,5 — 3 consecutive
+    it('PAYOFF_RUN fires when 3 or more consecutive payoff scenes exist', async () => {
+      const recs493c: any[] = Array.from({ length: 8 }, (_, i) => makeRec493(i, {
+        payoffSetupIds: [3, 4, 5].includes(i) ? ['setup1'] : [],
+      }));
+      const res = await runI493(recs493c);
+      assert.ok(res.issues.some((x: any) => x.rule === 'PAYOFF_RUN'), 'PAYOFF_RUN should fire');
+    });
+
+    // PAYOFF_RUN no-fire: payoffs at 2,4,6 — each separated by a non-payoff scene (max run=1)
+    it('PAYOFF_RUN does not fire when no run of 3 consecutive payoff scenes exists', async () => {
+      const recs493cn: any[] = Array.from({ length: 8 }, (_, i) => makeRec493(i, {
+        payoffSetupIds: [2, 4, 6].includes(i) ? ['setup1'] : [],
+      }));
+      const res = await runI493(recs493cn);
+      assert.ok(!res.issues.some((x: any) => x.rule === 'PAYOFF_RUN'), 'PAYOFF_RUN should not fire');
+    });
+  });
+
   describe('Wave 479 — intentionPass: revelation run, payoff final zone void, revelation curiosity flat', async () => {
     const makeRec479 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
