@@ -18713,6 +18713,100 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 514 — themePass: seed aftermath silent, high-suspense aftermath silent, curiosity aftermath silent', async () => {
+    const makeRec514 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const THEME514 = 'redemption forgiveness courage';
+    const themed514 = ['act of redemption'];
+    const runT514 = async (records: any[]) => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: THEME514 },
+      });
+    };
+
+    it('THEME_SEED_AFTERMATH_SILENT fires when no seed scene is followed by a resonant scene', async () => {
+      // 9 scenes: seeds at 1 and 4; themed at 0 and 7 (not at positions 2 or 5, the scenes after seeds) → fires
+      const recs514a = Array.from({ length: 9 }, (_, i) =>
+        makeRec514(i, {
+          seededClueIds: [1, 4].includes(i) ? ['clue-A'] : [],
+          dialogueHighlights: [0, 7].includes(i) ? themed514 : [],
+        }),
+      );
+      const res = await runT514(recs514a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_SEED_AFTERMATH_SILENT'), 'THEME_SEED_AFTERMATH_SILENT should fire');
+    });
+
+    it('THEME_SEED_AFTERMATH_SILENT does not fire when a seed scene is followed by a resonant scene', async () => {
+      // 9 scenes: seeds at 1 and 4; scene 2 (immediately after seed 1) is themed → aftermath resonance exists → no fire
+      const recs514anr = Array.from({ length: 9 }, (_, i) =>
+        makeRec514(i, {
+          seededClueIds: [1, 4].includes(i) ? ['clue-A'] : [],
+          dialogueHighlights: [2, 7].includes(i) ? themed514 : [],
+        }),
+      );
+      const res = await runT514(recs514anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_SEED_AFTERMATH_SILENT'), 'THEME_SEED_AFTERMATH_SILENT should not fire');
+    });
+
+    it('THEME_HIGH_SUSPENSE_AFTERMATH_SILENT fires when no high-suspense scene is followed by a resonant scene', async () => {
+      // 9 scenes: high suspense (>1) at 1 and 4; themed at 0 and 7 (not at positions 2 or 5) → fires
+      const recs514b = Array.from({ length: 9 }, (_, i) =>
+        makeRec514(i, {
+          suspenseDelta: [1, 4].includes(i) ? 2 : 0,
+          dialogueHighlights: [0, 7].includes(i) ? themed514 : [],
+        }),
+      );
+      const res = await runT514(recs514b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_HIGH_SUSPENSE_AFTERMATH_SILENT'), 'THEME_HIGH_SUSPENSE_AFTERMATH_SILENT should fire');
+    });
+
+    it('THEME_HIGH_SUSPENSE_AFTERMATH_SILENT does not fire when a high-suspense scene is followed by a resonant scene', async () => {
+      // 9 scenes: high suspense at 1 and 4; scene 2 (immediately after high-suspense 1) is themed → no fire
+      const recs514bnr = Array.from({ length: 9 }, (_, i) =>
+        makeRec514(i, {
+          suspenseDelta: [1, 4].includes(i) ? 2 : 0,
+          dialogueHighlights: [2, 7].includes(i) ? themed514 : [],
+        }),
+      );
+      const res = await runT514(recs514bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_HIGH_SUSPENSE_AFTERMATH_SILENT'), 'THEME_HIGH_SUSPENSE_AFTERMATH_SILENT should not fire');
+    });
+
+    it('THEME_CURIOSITY_AFTERMATH_SILENT fires when no curiosity-spike scene is followed by a resonant scene', async () => {
+      // 9 scenes: curiosity spikes (>0) at 1 and 4; themed at 0 and 7 (not at positions 2 or 5) → fires
+      const recs514c = Array.from({ length: 9 }, (_, i) =>
+        makeRec514(i, {
+          curiosityDelta: [1, 4].includes(i) ? 1 : 0,
+          dialogueHighlights: [0, 7].includes(i) ? themed514 : [],
+        }),
+      );
+      const res = await runT514(recs514c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CURIOSITY_AFTERMATH_SILENT'), 'THEME_CURIOSITY_AFTERMATH_SILENT should fire');
+    });
+
+    it('THEME_CURIOSITY_AFTERMATH_SILENT does not fire when a curiosity scene is followed by a resonant scene', async () => {
+      // 9 scenes: curiosity spikes at 1 and 4; scene 2 (immediately after curiosity 1) is themed → no fire
+      const recs514cnr = Array.from({ length: 9 }, (_, i) =>
+        makeRec514(i, {
+          curiosityDelta: [1, 4].includes(i) ? 1 : 0,
+          dialogueHighlights: [2, 7].includes(i) ? themed514 : [],
+        }),
+      );
+      const res = await runT514(recs514cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CURIOSITY_AFTERMATH_SILENT'), 'THEME_CURIOSITY_AFTERMATH_SILENT should not fire');
+    });
+  });
+
   describe('Wave 500 — themePass: negative emotion aftermath silent, last resonant causeless, payoff aftermath silent', async () => {
     const makeRec500 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

@@ -122,6 +122,17 @@
 // silent (sequence/aftermath × payoff trigger → theme — n≥8, ≥2 qualifying payoff scenes not at
 // last position, none followed by a resonant scene; first aftermath check with the payoff channel,
 // distinct from THEME_REVELATION_AFTERMATH_SILENT which uses the revelation trigger).
+// Wave 514 additions: seed aftermath silent (sequence/aftermath × seed trigger → theme — n≥8, ≥2
+// qualifying seed scenes [seededClueIds non-empty] not at last position, none followed by a resonant
+// scene; the seed-channel aftermath complement to THEME_PAYOFF_AFTERMATH_SILENT; distinct from
+// THEME_CLUE_SCENES_DECOUPLED which fires when the clue scene ITSELF is silent), high-suspense
+// aftermath silent (sequence/aftermath × suspense trigger — n≥8, ≥2 high-suspense scenes with
+// suspenseDelta>1 not at last position, none followed by resonant; broader than THEME_PEAK_SUSPENSE_
+// AFTERMATH_SILENT which targets only the single max-suspense spike; distinct from THEME_HIGH_SUSPENSE_
+// SCENES_DECOUPLED which fires when the scene itself is silent), curiosity aftermath silent
+// (sequence/aftermath × curiosity trigger — n≥8, ≥2 curiosity-spike scenes with curiosityDelta>0
+// not at last position, none followed by resonant; the curiosity-channel aftermath complement to
+// THEME_CURIOSITY_SCENES_DECOUPLED; completes the aftermath × {seed, suspense, curiosity} channel family).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2576,6 +2587,116 @@ export async function themePass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `The script has ${payoffIdxs500c.length} scenes that deliver on planted setups (non-empty payoffSetupIds), but not one is followed immediately by a scene that touches "${themeRaw}". A payoff scene is a moment of structural completion — what was promised has arrived. That completion is a natural gateway for theme: it asks why the resolution mattered, what it cost, and what it means for the characters. When no payoff scene is followed by a resonant next beat, the story treats resolution as purely mechanical: loops close without meaning being extracted from them.`,
             suggestedFix: `After at least one payoff scene, let the next scene voice or embody "${themeRaw}" — even a single moment that connects the resolution to the story's central question. A payoff is not just the end of a planted setup; it is a narrative event with meaning. The scene immediately after it is the most natural moment to ask: what did that resolution mean for the theme?`,
+          });
+        }
+      }
+    }
+
+    // ── Wave 514: THEME_SEED_AFTERMATH_SILENT, THEME_HIGH_SUSPENSE_AFTERMATH_SILENT,
+    //              THEME_CURIOSITY_AFTERMATH_SILENT ──────────────────────────────────────────────
+
+    // THEME_SEED_AFTERMATH_SILENT (sequence/aftermath × seed trigger → theme, n≥8, ≥2 qualifying
+    // seed scenes [seededClueIds non-empty, pos < n-1], none followed by a resonant next scene):
+    // Every scene that plants a clue or setup passes without the next scene touching the theme —
+    // seed moments are buried without the story signaling their meaning. When a scene plants a seed,
+    // the story is making a promise about what will matter; the next beat is a natural moment to
+    // connect that promise to the central question. Sequence/aftermath mode × seed trigger × theme
+    // aftermath. Distinctness: THEME_PAYOFF_AFTERMATH_SILENT (Wave 500) uses the payoffSetupIds
+    // channel (what arrives); this uses the seededClueIds channel (what is planted). THEME_CLUE_
+    // SCENES_DECOUPLED (Wave 265) fires when the clue scene ITSELF is silent — co-occurrence mode;
+    // this fires when the FOLLOWING scene is silent — aftermath mode, a later failure in the seed
+    // lifecycle distinct from what the seed scene itself carries.
+    const n514a = records.length;
+    if (n514a >= 8) {
+      const seedIdxs514a: number[] = [];
+      for (let i514a = 0; i514a < n514a - 1; i514a++) {
+        if (((records[i514a].seededClueIds ?? []) as string[]).length > 0) seedIdxs514a.push(i514a);
+      }
+      if (seedIdxs514a.length >= 2) {
+        const anySeedAftermath514a = seedIdxs514a.some(i514a => {
+          const next514a = records[i514a + 1];
+          return sceneHasResonance(sceneTexts.get(next514a.sceneIdx) ?? '', expandedKeywords);
+        });
+        if (!anySeedAftermath514a) {
+          issues.push({
+            location: `${seedIdxs514a.length} seed scene(s) — none followed by theme resonance`,
+            rule: 'THEME_SEED_AFTERMATH_SILENT',
+            severity: 'minor',
+            description: `The script has ${seedIdxs514a.length} scenes that plant clues or setups (non-empty seededClueIds), but not one is followed immediately by a scene that touches "${themeRaw}". When a scene plants a seed, the story is making a promise about what will matter; the next beat is a natural moment to voice what that promise means — to connect the planted expectation to the central question. When every seed moment passes without the theme entering the next beat, clue-planting becomes purely mechanical: seeds are buried but their meaning is never foreshadowed, leaving the eventual payoff disconnected from the theme.`,
+            suggestedFix: `After at least one seed scene, let the next scene voice or embody "${themeRaw}" — a moment that connects the planted setup to the story's central question. A seed is not just a future narrative promise; it is a thematic signal about what the story values. The scene immediately after planting is the most natural moment to let the audience feel what the seed means.`,
+          });
+        }
+      }
+    }
+
+    // THEME_HIGH_SUSPENSE_AFTERMATH_SILENT (sequence/aftermath × high-suspense trigger → theme,
+    // n≥8, ≥2 scenes with suspenseDelta>1 not at last position, none followed by a resonant scene):
+    // Every moment of peak tension passes without the next scene picking up the theme. A high-suspense
+    // scene is when the story's stakes feel most immediate; the scene that follows is uniquely
+    // positioned to channel that tension into thematic meaning — to answer "what does this danger
+    // signify?" with the story's central idea. When no high-suspense moment is followed by a resonant
+    // beat, the script uses tension as spectacle rather than as a delivery mechanism for meaning.
+    // Sequence/aftermath mode × suspense trigger × theme aftermath. Distinctness: THEME_PEAK_SUSPENSE_
+    // AFTERMATH_SILENT (Wave 416) fires on the scene after the single max-suspenseDelta spike — only
+    // one position. This fires when ANY of ≥2 high-suspense scenes (suspenseDelta>1) fails to be
+    // followed by theme — a broader, distribution-level version of the same failure mode. THEME_HIGH_
+    // SUSPENSE_SCENES_DECOUPLED (Wave 279) fires when the high-suspense scenes THEMSELVES carry no
+    // theme — co-occurrence mode. This fires when FOLLOWING scenes are silent — aftermath mode,
+    // one temporal step later.
+    const n514b = records.length;
+    if (n514b >= 8) {
+      const highSuspIdxs514b: number[] = [];
+      for (let i514b = 0; i514b < n514b - 1; i514b++) {
+        if (records[i514b].suspenseDelta > 1) highSuspIdxs514b.push(i514b);
+      }
+      if (highSuspIdxs514b.length >= 2) {
+        const anyHighSuspAftermath514b = highSuspIdxs514b.some(i514b => {
+          const next514b = records[i514b + 1];
+          return sceneHasResonance(sceneTexts.get(next514b.sceneIdx) ?? '', expandedKeywords);
+        });
+        if (!anyHighSuspAftermath514b) {
+          issues.push({
+            location: `${highSuspIdxs514b.length} high-suspense scene(s) — none followed by theme resonance`,
+            rule: 'THEME_HIGH_SUSPENSE_AFTERMATH_SILENT',
+            severity: 'minor',
+            description: `The script has ${highSuspIdxs514b.length} high-suspense scenes (suspenseDelta > 1), but not one is followed immediately by a scene that touches "${themeRaw}". A high-suspense moment is when the story's stakes feel most immediate and real; the scene that follows it is uniquely positioned to channel that tension into thematic meaning — to answer the implicit question "what does this danger mean?" with the story's central idea. When no peak-tension moment is followed by a resonant beat, the script uses suspense as spectacle: tension is raised and managed but its thematic significance is never extracted.`,
+            suggestedFix: `After at least one high-suspense scene, let the next scene voice or embody "${themeRaw}" — even a brief moment that connects the tension to the story's central question. The scene immediately following a moment of peak danger is the most receptive in the script to thematic weight: the audience's attention is fully engaged and the question "why does this matter?" is already live.`,
+          });
+        }
+      }
+    }
+
+    // THEME_CURIOSITY_AFTERMATH_SILENT (sequence/aftermath × curiosity trigger → theme, n≥8, ≥2
+    // scenes with curiosityDelta>0 not at last position, none followed by a resonant scene): Every
+    // scene that raises a question or mystery passes without the next scene picking up the theme.
+    // When a scene spikes curiosity, the story is declaring "there is something you need to understand";
+    // the next beat is the most natural moment to connect that need-to-know to what the story is
+    // actually about. When no curiosity beat is followed by a resonant scene, the script poses
+    // mysteries as appetite stimulation rather than thematic motivation — questions are raised but
+    // their connection to the central meaning is never signaled. Sequence/aftermath mode × curiosity
+    // trigger × theme aftermath. Distinctness: THEME_CURIOSITY_SCENES_DECOUPLED (Wave 265) fires when
+    // the curiosity scene ITSELF carries no theme — co-occurrence mode. This fires when the FOLLOWING
+    // scene is silent — aftermath mode, one temporal step later. THEME_PAYOFF_AFTERMATH_CURIOSITY_FLAT
+    // in pacing.ts is a completely different axis (curiosity in aftermath of payoff triggers, not
+    // theme in aftermath of curiosity triggers).
+    const n514c = records.length;
+    if (n514c >= 8) {
+      const curIdxs514c: number[] = [];
+      for (let i514c = 0; i514c < n514c - 1; i514c++) {
+        if (records[i514c].curiosityDelta > 0) curIdxs514c.push(i514c);
+      }
+      if (curIdxs514c.length >= 2) {
+        const anyCurAftermath514c = curIdxs514c.some(i514c => {
+          const next514c = records[i514c + 1];
+          return sceneHasResonance(sceneTexts.get(next514c.sceneIdx) ?? '', expandedKeywords);
+        });
+        if (!anyCurAftermath514c) {
+          issues.push({
+            location: `${curIdxs514c.length} curiosity-spike scene(s) — none followed by theme resonance`,
+            rule: 'THEME_CURIOSITY_AFTERMATH_SILENT',
+            severity: 'minor',
+            description: `The script has ${curIdxs514c.length} scenes that spike audience curiosity (curiosityDelta > 0), but not one is followed immediately by a scene that touches "${themeRaw}". When a scene raises a question or mystery, the story is declaring that something needs to be understood. The next beat is the most natural moment to connect that need-to-know to what the story is actually about. When no curiosity beat is followed by a resonant scene, the script poses mysteries as appetite stimulation rather than thematic motivation — questions are raised but their connection to the central meaning is never signaled, leaving intrigue and theme permanently decoupled across time.`,
+            suggestedFix: `After at least one curiosity-raising scene, let the next scene voice or embody "${themeRaw}" — a moment that connects the story's open question to its central theme. The scene immediately following a curiosity spike is the most receptive moment for thematic anchoring: the audience is actively wondering "what does this mean?" and the answer can be thematic as well as plot-level.`,
           });
         }
       }
