@@ -21479,6 +21479,100 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 525 — relationshipArcPass: shift seed aftermath void, shift payoff aftermath void, seed decoupled', async () => {
+    const mkShift525 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
+    const makeRec525 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runRA525 = async (records: any[]) => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    it('RELATIONSHIP_SHIFT_SEED_AFTERMATH_VOID fires when all shifts have no seed in their aftermath', async () => {
+      // 10 scenes: shifts at 0,2,4 (not last 2); seeds at 7,9 — no seed in aftermath windows 1-2, 3-4, 5-6
+      const recs525a = Array.from({ length: 10 }, (_, i) =>
+        makeRec525(i, {
+          relationshipShifts: [0, 2, 4].includes(i) ? mkShift525(0.4) : [],
+          seededClueIds: [7, 9].includes(i) ? ['c1'] : [],
+        }),
+      );
+      const res = await runRA525(recs525a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_SEED_AFTERMATH_VOID'), 'RELATIONSHIP_SHIFT_SEED_AFTERMATH_VOID should fire');
+    });
+
+    it('RELATIONSHIP_SHIFT_SEED_AFTERMATH_VOID does not fire when a shift is followed by a seed', async () => {
+      // 10 scenes: shifts at 0,2,4; seed at 1 (directly after shift 0) — in aftermath
+      const recs525an = Array.from({ length: 10 }, (_, i) =>
+        makeRec525(i, {
+          relationshipShifts: [0, 2, 4].includes(i) ? mkShift525(0.4) : [],
+          seededClueIds: [1, 9].includes(i) ? ['c1'] : [],
+        }),
+      );
+      const res = await runRA525(recs525an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_SEED_AFTERMATH_VOID'), 'RELATIONSHIP_SHIFT_SEED_AFTERMATH_VOID should not fire');
+    });
+
+    it('RELATIONSHIP_SHIFT_PAYOFF_AFTERMATH_VOID fires when all shifts have no payoff in their aftermath', async () => {
+      // 10 scenes: shifts at 0,2,4; payoffs at 7,9 — no payoff in aftermath windows 1-2, 3-4, 5-6
+      const recs525b = Array.from({ length: 10 }, (_, i) =>
+        makeRec525(i, {
+          relationshipShifts: [0, 2, 4].includes(i) ? mkShift525(0.4) : [],
+          payoffSetupIds: [7, 9].includes(i) ? ['s1'] : [],
+        }),
+      );
+      const res = await runRA525(recs525b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_PAYOFF_AFTERMATH_VOID'), 'RELATIONSHIP_SHIFT_PAYOFF_AFTERMATH_VOID should fire');
+    });
+
+    it('RELATIONSHIP_SHIFT_PAYOFF_AFTERMATH_VOID does not fire when a shift is followed by a payoff', async () => {
+      // 10 scenes: shifts at 0,2,4; payoff at 3 (after shift 2) — in aftermath window
+      const recs525bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec525(i, {
+          relationshipShifts: [0, 2, 4].includes(i) ? mkShift525(0.4) : [],
+          payoffSetupIds: [3, 9].includes(i) ? ['s1'] : [],
+        }),
+      );
+      const res = await runRA525(recs525bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_PAYOFF_AFTERMATH_VOID'), 'RELATIONSHIP_SHIFT_PAYOFF_AFTERMATH_VOID should not fire');
+    });
+
+    it('RELATIONSHIP_SEED_DECOUPLED fires when shift scenes and seed scenes never overlap', async () => {
+      // 10 scenes: shifts at 0,1,2; seeds at 5,6,7 — no overlap
+      const recs525c = Array.from({ length: 10 }, (_, i) =>
+        makeRec525(i, {
+          relationshipShifts: [0, 1, 2].includes(i) ? mkShift525(0.4) : [],
+          seededClueIds: [5, 6, 7].includes(i) ? ['c1'] : [],
+        }),
+      );
+      const res = await runRA525(recs525c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SEED_DECOUPLED'), 'RELATIONSHIP_SEED_DECOUPLED should fire');
+    });
+
+    it('RELATIONSHIP_SEED_DECOUPLED does not fire when at least one scene has both shift and seed', async () => {
+      // 10 scenes: shift AND seed at scene 1; shifts at 2,3; seeds at 5,6
+      const recs525cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec525(i, {
+          relationshipShifts: [1, 2, 3].includes(i) ? mkShift525(0.4) : [],
+          seededClueIds: [1, 5, 6].includes(i) ? ['c1'] : [],
+        }),
+      );
+      const res = await runRA525(recs525cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SEED_DECOUPLED'), 'RELATIONSHIP_SEED_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 511 — relationshipArcPass: shift dramatic turn aftermath void, rupture thirds cluster, relationship payoff decoupled', async () => {
     const mkShift511 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
     const makeRec511 = (idx: number, overrides: any = {}): any => ({

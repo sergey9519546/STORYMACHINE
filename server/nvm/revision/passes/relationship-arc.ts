@@ -130,6 +130,20 @@
 // run (run-based × shift dimension — ≥4 consecutive shift scenes all using only one relationship
 // dimension while ≥2 distinct dimensions exist globally; a local single-axis burst distinct from
 // SHIFT_DIMENSION_CONCENTRATION which audits the whole-story proportion).
+// Wave 525 additions: relationship shift seed aftermath void (sequence/aftermath × seed × shift
+// trigger — ≥3 shift scenes not in last 2 positions, ≥2 seed scenes, every shift followed by 2
+// scenes with no seededClueIds; bond-moving never activates foreshadowing in its aftermath; adds
+// seed to the shift-aftermath family, completing the family alongside suspense/emotional/revelation/
+// clock/dramatic-turn; distinct from RELATIONSHIP_SHIFT_AFTERMATH_VOID which checks all channels
+// simultaneously and from co-occurrence checks), relationship shift payoff aftermath void (sequence/
+// aftermath × payoff × shift trigger — ≥3 shift scenes not in last 2 positions, ≥2 payoff scenes,
+// every shift followed by 2 scenes with no payoffSetupIds; bond-moving never triggers thread
+// resolution in its aftermath; adds payoff to the shift-aftermath family; distinct from
+// RELATIONSHIP_PAYOFF_DECOUPLED which is same-scene co-occurrence), relationship seed decoupled
+// (co-occurrence × seed × shift — ≥3 shift scenes, ≥3 seed scenes, zero overlap; bond-moving
+// and foreshadowing planting never coincide; first check in this pass pairing the seed channel
+// with relationship shift in co-occurrence mode; distinct from all existing co-occurrence checks
+// that pair shift with curiosity/suspense/turn/clock/payoff/revelation and from aftermath checks).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2740,6 +2754,129 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
             severity: 'minor',
             description: `The script's ${shiftScenes511c.length} relationship-shift scenes and ${payoffScenes511c.length} payoff scenes never coincide — bonds never move at the moment a setup is resolved. A payoff that also shifts a relationship earns double force: the closure of the thread and the interpersonal cost or reward of the bond change land simultaneously, each amplifying the other. When every payoff lands in a relationally static scene and every shift scene carries no payoff, both channels are weaker than they could be — resolutions feel informationally complete but emotionally unmoored, and bond shifts feel emotionally present but causally thin.`,
             suggestedFix: `Arrange at least one payoff to coincide with a relationship shift — the resolved setup should also crack or repair a bond at the same moment. The payoff need not be about the relationship directly; a thread resolution that the two characters witness together can move their dynamic at the same time as it closes the informational loop. A payoff that also shifts a relationship is the story telling two things at once, and the audience receives both with compounded resonance.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 525 checks ──────────────────────────────────────────────────────
+  {
+    // RELATIONSHIP_SHIFT_SEED_AFTERMATH_VOID — sequence/aftermath × seed × shift trigger.
+    // n≥8, ≥3 qualifying shift scenes (any shift, not in last 2 positions), ≥2 seed scenes.
+    // Every shift scene is followed by 2 scenes with no seededClueIds → fire. Bond-moving
+    // never activates foreshadowing in its aftermath: the moment a relationship moves, the
+    // scenes that follow contain no planted threads. Relational events should generate
+    // narrative consequence across multiple channels; when they only ever shift and never
+    // seed, the relational layer and the foreshadowing layer are causally disconnected.
+    // Distinct from: RELATIONSHIP_SHIFT_AFTERMATH_VOID (Wave 427: no shift in aftermath —
+    // a different channel entirely), RELATIONSHIP_SHIFT_CLOCK_AFTERMATH_VOID / SUSPENSE /
+    // EMOTIONAL / REVELATION / DRAMATIC_TURN (different aftermath channels). Adds seed to
+    // shift-aftermath family. Distinct from RELATIONSHIP_PAYOFF_DECOUPLED (same-scene co-occur).
+    const n525a = records.length;
+    if (n525a >= 8) {
+      const qualShifts525a = (records as any[]).filter((r, pos) =>
+        ((r.relationshipShifts ?? []) as any[]).length > 0 && pos < n525a - 2,
+      );
+      const seedScenes525a = (records as any[]).filter(r =>
+        ((r.seededClueIds ?? []) as string[]).length > 0,
+      );
+      if (qualShifts525a.length >= 3 && seedScenes525a.length >= 2) {
+        const allShiftNoSeedAftermath525a = qualShifts525a.every((r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos + off];
+            if (nxt && ((nxt.seededClueIds ?? []) as string[]).length > 0) return false;
+          }
+          return true;
+        });
+        if (allShiftNoSeedAftermath525a) {
+          issues.push({
+            location: `${qualShifts525a.length} shift scene(s) — no seed in any aftermath window`,
+            rule: 'RELATIONSHIP_SHIFT_SEED_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `Every relationship-shift scene (${qualShifts525a.length} scene(s)) is followed by two scenes in which no clue is planted, despite ${seedScenes525a.length} seed scene(s) existing elsewhere. When a bond moves — warming, fracturing, or oscillating — the scenes that follow are the natural place to plant a thread about what the change means: a hint about the pair's future, a detail that becomes significant in light of the new dynamic, or a foreshadowing of what will happen if the bond continues on its current trajectory. When every shift's aftermath is seed-free, the relational layer and the foreshadowing layer operate on separate tracks — bonds change but those changes generate no forward threads for the audience to carry.`,
+            suggestedFix: `After at least one relationship-shift scene, plant a seed in the following scene: a detail, contradiction, or planted object that the fresh bond movement makes narratively relevant. The seed doesn't need to be about the specific pair; a shift can plant a clue about a third character whose relationship with both parties is now in question, or about a circumstance that the changed dynamic makes newly possible.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // RELATIONSHIP_SHIFT_PAYOFF_AFTERMATH_VOID — sequence/aftermath × payoff × shift trigger.
+    // n≥8, ≥3 qualifying shift scenes (not in last 2 positions), ≥2 payoff scenes.
+    // Every shift scene is followed by 2 scenes with no payoffSetupIds → fire. Bond-moving
+    // never triggers thread resolution in its aftermath: the moment a relationship moves, no
+    // planted promise is delivered in the following two scenes. A bond change and a payoff
+    // coinciding in the aftermath creates maximum resonance — the delivery lands inside a fresh
+    // relational context that makes it more significant.
+    // Distinct from: RELATIONSHIP_PAYOFF_DECOUPLED (Wave 511: same-scene co-occurrence — shift
+    // and payoff never in the SAME scene; this checks the aftermath of the shift scene).
+    // RELATIONSHIP_SHIFT_SEED_AFTERMATH_VOID (above: seed channel not payoff). Adds payoff to
+    // the shift-aftermath family alongside seed/suspense/emotional/revelation/clock/dramatic-turn.
+    const n525b = records.length;
+    if (n525b >= 8) {
+      const qualShifts525b = (records as any[]).filter((r, pos) =>
+        ((r.relationshipShifts ?? []) as any[]).length > 0 && pos < n525b - 2,
+      );
+      const payoffScenes525b = (records as any[]).filter(r =>
+        ((r.payoffSetupIds ?? []) as string[]).length > 0,
+      );
+      if (qualShifts525b.length >= 3 && payoffScenes525b.length >= 2) {
+        const allShiftNoPayoffAftermath525b = qualShifts525b.every((r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos + off];
+            if (nxt && ((nxt.payoffSetupIds ?? []) as string[]).length > 0) return false;
+          }
+          return true;
+        });
+        if (allShiftNoPayoffAftermath525b) {
+          issues.push({
+            location: `${qualShifts525b.length} shift scene(s) — no payoff in any aftermath window`,
+            rule: 'RELATIONSHIP_SHIFT_PAYOFF_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `Every relationship-shift scene (${qualShifts525b.length} scene(s)) is followed by two scenes in which no planted promise is resolved, despite ${payoffScenes525b.length} payoff scene(s) existing elsewhere. A payoff that lands in the aftermath of a relationship shift earns compounded resonance: the delivery arrives inside a fresh interpersonal context where it means something different than it would in a relationally static scene. When every shift's aftermath contains no payoff delivery, the two most structurally valuable beat types operate on completely separate tracks — bonds change and promises are kept, but never together.`,
+            suggestedFix: `After at least one relationship-shift scene, deliver a payoff in the following scene — a planted promise whose resolution makes new sense in light of the bond change that just happened. The payoff need not be about the specific pair; an earlier threat materializing, a contingency paying off, or a foreshadowed consequence arriving in the wake of the relational shift gives the delivery a second layer of meaning tied to the new dynamic.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // RELATIONSHIP_SEED_DECOUPLED — co-occurrence × seed × shift.
+    // n≥8, ≥3 shift scenes, ≥3 seed scenes. No scene has both a relationship shift and a
+    // seededClueId → fire. Bond-moving and foreshadowing never coincide: the most dramatically
+    // charged scenes (those where a relationship moves) are always foreshadowing-free. The
+    // highest-impact planting happens in emotionally charged contexts, and bond movement is
+    // exactly that — but when the two channels are always separate, each operates at a fraction
+    // of its potential force.
+    // Distinct from: RELATIONSHIP_PAYOFF_DECOUPLED (Wave 511: payoff × shift), RELATIONSHIP_
+    // CURIOSITY_DECOUPLED (curiosity × shift), RELATIONSHIP_CLOCK_DECOUPLED (clock × shift),
+    // RELATIONSHIP_DRAMATIC_TURN_DECOUPLED (turn × shift), and all aftermath checks. First
+    // check in this pass pairing seed channel with relationship shift in co-occurrence mode.
+    const n525c = records.length;
+    if (n525c >= 8) {
+      const shiftScenes525c = (records as any[]).filter(r =>
+        ((r.relationshipShifts ?? []) as any[]).length > 0,
+      );
+      const seedScenes525c = (records as any[]).filter(r =>
+        ((r.seededClueIds ?? []) as string[]).length > 0,
+      );
+      if (shiftScenes525c.length >= 3 && seedScenes525c.length >= 3) {
+        const seedIdxSet525c = new Set(seedScenes525c.map((r: any) => (records as any[]).indexOf(r)));
+        const hasOverlap525c = shiftScenes525c.some((r: any) =>
+          seedIdxSet525c.has((records as any[]).indexOf(r)),
+        );
+        if (!hasOverlap525c) {
+          issues.push({
+            location: `${shiftScenes525c.length} shift scene(s) and ${seedScenes525c.length} seed scene(s) — no overlap`,
+            rule: 'RELATIONSHIP_SEED_DECOUPLED',
+            severity: 'minor',
+            description: `The script's ${shiftScenes525c.length} relationship-shift scenes and ${seedScenes525c.length} clue-planting scenes never coincide — bond-moving and foreshadowing are fully decoupled. The highest-impact planting locations are scenes with emotional charge, and a relationship shift is exactly that: the moment a bond moves, the audience is maximally invested in what is happening between these characters and what it might mean. Planting a clue in that context is a double investment — the audience receives both the interpersonal event and the foreshadowing of what it implies. When the two channels are always in separate scenes, each operates at half its potential.`,
+            suggestedFix: `Let at least one relationship-shift scene also contain a seeded clue: a detail planted in the scene where a bond moves, a contingency prepared at the moment of fracture or repair, or a foreshadowing element that becomes significant in light of the changed dynamic. The seed in the shift scene tells the audience to carry something forward from the moment when they are already most emotionally primed.`,
           });
         }
       }
