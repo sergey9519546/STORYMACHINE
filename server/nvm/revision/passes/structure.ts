@@ -112,6 +112,17 @@
 // ≥2 qualifying turn scenes none followed by a suspense spike in next 2 scenes while ≥3 suspense
 // scenes exist; first aftermath check using the dramatic-turn trigger, distinct from REVELATION_
 // AFTERMATH_CLOCK_VOID [revelation trigger] and INCITING_AFTERMATH_STALL [inciting incident trigger]).
+// Wave 541 additions: revelation aftermath suspense void (sequence/aftermath × suspense ×
+// revelation trigger — ≥3 qualifying revelations none followed by a suspense spike in next
+// 2 scenes while ≥2 suspense-spike scenes exist; disclosures never activate tension in their
+// aftermath; suspense-channel sibling of REVELATION_AFTERMATH_CLOCK_VOID and REVELATION_
+// AFTERMATH_EMOTION_VOID), turn aftermath curiosity void (sequence/aftermath × curiosity ×
+// dramatic-turn trigger — ≥3 qualifying turns none followed by curiosityDelta>0 in next 2
+// scenes while ≥2 curiosity scenes exist; pivots never generate new questions; curiosity-
+// channel sibling of TURN_AFTERMATH_SUSPENSE_VOID), emotional neutral run (run-based × neutral
+// emotional valence — 6+ consecutive emotionally neutral scenes while ≥4 emotionally charged
+// scenes exist; the story goes affectively flat for a sustained stretch; neutral-counterpart of
+// POSITIVE_SCENE_RUN and NEGATIVE_SCENE_RUN, completing the three-valence run family).
 // Wave 527 additions: clock run (run-based × clock channel — 5+ consecutive clockRaised scenes;
 // the first run check on the clock channel, completing the channel-run family alongside SUSPENSE_RUN,
 // CURIOSITY_RUN, POSITIVE_SCENE_RUN, NEGATIVE_SCENE_RUN), turn emotion decoupled (co-occurrence/
@@ -2692,6 +2703,124 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `None of the story's ${qualRevScenes527c.length} revelations is followed by an emotionally charged scene (positive or negative emotionalShift) within the next two scenes, even though ${emotionalScenes527c.length} emotional scenes exist elsewhere. A revelation is an information event that should trigger a felt response: the character learns something that changes what they understand and therefore what they feel. When every disclosure is followed by two scenes of emotional neutrality, revelations function as information transfers rather than as dramatic events — they change what the audience knows without changing how the story feels. The gap between learning and feeling is the gap between exposition and drama.`,
           suggestedFix: `Let at least one revelation be followed within two scenes by an emotionally charged beat — a scene where the character responds to what they've learned with visible positive or negative feeling. The response doesn't need to be extreme; even a scene of quiet realization qualifies if the emotionalShift is non-neutral. The revelation and its emotional aftermath together form one complete dramatic unit: disclosure plus response, information plus feeling.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 541: REVELATION_AFTERMATH_SUSPENSE_VOID, TURN_AFTERMATH_CURIOSITY_VOID, EMOTIONAL_NEUTRAL_RUN ──
+
+  // REVELATION_AFTERMATH_SUSPENSE_VOID (sequence/aftermath × suspense × revelation trigger,
+  // n≥8, ≥3 qualifying revelations [pos < n-2], ≥2 suspense-spike scenes): No qualifying
+  // revelation is followed by a suspense spike (suspenseDelta > 0) within the next 2 scenes,
+  // despite suspense-spike scenes existing elsewhere. Disclosures should activate tension in their
+  // aftermath: learning a truth changes the stakes for what follows, and that changed-stakes feeling
+  // should manifest as rising tension in the scenes immediately after the revelation. When every
+  // disclosure is followed by two tension-free scenes, revelations function as informational pauses
+  // rather than as catalysts — the audience learns something without the story's pressure rising to
+  // account for it. Sequence/aftermath mode × suspense channel × revelation trigger. Distinct from
+  // REVELATION_SUSPENSE_DECOUPLED (Wave 457: co-occurrence — revelation and suspense never in the
+  // same scene), REVELATION_AFTERMATH_CLOCK_VOID (Wave 499: clock channel, same trigger), REVELATION_
+  // AFTERMATH_EMOTION_VOID (Wave 527: emotion channel, same trigger).
+  if (n >= 8) {
+    const qualRevs541a = (records as any[]).filter((r, pos) =>
+      r.revelation && r.revelation !== null && r.revelation !== '' && pos < n - 2,
+    );
+    const suspScenes541a = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 0);
+    if (qualRevs541a.length >= 3 && suspScenes541a.length >= 2) {
+      const anyRevFollowedBySusp541a = qualRevs541a.some((r: any) => {
+        const pos541a = (records as any[]).indexOf(r);
+        for (let off = 1; off <= 2; off++) {
+          const nxt = (records as any[])[pos541a + off];
+          if (nxt && (nxt.suspenseDelta ?? 0) > 0) return true;
+        }
+        return false;
+      });
+      if (!anyRevFollowedBySusp541a) {
+        issues.push({
+          location: `All ${qualRevs541a.length} revelation scene(s) — no suspense spike within 2 scenes`,
+          rule: 'REVELATION_AFTERMATH_SUSPENSE_VOID',
+          severity: 'minor',
+          description: `None of the story's ${qualRevs541a.length} revelation scene(s) is followed by a suspense spike (suspenseDelta > 0) within the next two scenes, even though ${suspScenes541a.length} tension-raising scenes exist elsewhere. A revelation is a disclosure that should raise the stakes: learning a truth changes what the characters are now facing, and that changed-stakes awareness should manifest as rising tension in the scenes immediately following. When every disclosure is followed by two tension-free scenes, revelations function as informational pauses — the audience learns something new, but the story's pressure dial does not rise to account for the new information. The revelation and its suspense aftermath together form a catalytic unit: disclosure plus escalation, information plus consequence. Without that aftermath, revelations close prior questions without opening the pressure that makes the answers matter.`,
+          suggestedFix: `After at least one revelation, introduce a scene with positive suspenseDelta in the following one or two scenes — a threat that now feels more real because of what was just disclosed, an obstacle that the newly revealed truth makes more urgent, or a complication that the revelation directly enables. The suspense spike confirms that the audience is not just receiving information but watching the story's stakes change as a result of it.`,
+        });
+      }
+    }
+  }
+
+  // TURN_AFTERMATH_CURIOSITY_VOID (sequence/aftermath × curiosity × dramatic-turn trigger,
+  // n≥8, ≥3 qualifying turns [pos < n-2], ≥2 curiosity-spike scenes): No qualifying dramatic
+  // turn is followed by a curiosity spike (curiosityDelta > 0) within the next 2 scenes, despite
+  // curiosity scenes existing elsewhere. A dramatic turn should generate new questions: when the
+  // story reverses direction, the audience should be asking what this new direction means, where it
+  // leads, and what consequences will follow. When every pivot is followed by two curiosity-flat
+  // scenes, turns reorient the plot without opening any new questions — the story changes direction
+  // without the audience wondering where the new direction goes. Sequence/aftermath mode × curiosity
+  // channel × dramatic-turn trigger. Distinct from TURN_AFTERMATH_SUSPENSE_VOID (Wave 513: suspense
+  // channel, same trigger), REVELATION_TURN_DECOUPLED (Wave 471: co-occurrence, revelation trigger),
+  // CLOCK_TURN_DECOUPLED (Wave 513: co-occurrence, clock trigger).
+  if (n >= 8) {
+    const qualTurns541b = (records as any[]).filter((r, pos) =>
+      (r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '' && pos < n - 2,
+    );
+    const curiosityScenes541b = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0);
+    if (qualTurns541b.length >= 3 && curiosityScenes541b.length >= 2) {
+      const anyTurnFollowedByCuriosity541b = qualTurns541b.some((r: any) => {
+        const pos541b = (records as any[]).indexOf(r);
+        for (let off = 1; off <= 2; off++) {
+          const nxt = (records as any[])[pos541b + off];
+          if (nxt && (nxt.curiosityDelta ?? 0) > 0) return true;
+        }
+        return false;
+      });
+      if (!anyTurnFollowedByCuriosity541b) {
+        issues.push({
+          location: `All ${qualTurns541b.length} turn scene(s) — no curiosity spike within 2 scenes`,
+          rule: 'TURN_AFTERMATH_CURIOSITY_VOID',
+          severity: 'minor',
+          description: `None of the story's ${qualTurns541b.length} dramatic turn(s) is followed by a curiosity spike (curiosityDelta > 0) within the next two scenes, even though ${curiosityScenes541b.length} curiosity-generating scenes exist elsewhere. A dramatic turn should open new questions: when the story reverses direction, the audience should be asking what this new direction means, where it leads, and what consequences the pivot will bring. When every turn is followed by two curiosity-flat scenes, pivots reorient the plot without the audience wondering where the new direction goes — the story changes its trajectory without generating any new forward pull. A turn that does not produce curiosity is a structural pivot without narrative momentum: it redirects the vehicle but does not point it toward anything the audience wants to see.`,
+          suggestedFix: `After at least one dramatic turn, introduce a scene with positive curiosityDelta in the following one or two scenes — a question opened by the new direction, an implication of the reversal that the audience now wants to track, or a character discovery enabled by the turn. The curiosity spike confirms that the pivot changed not just what is happening but what the audience is wondering about as a result.`,
+        });
+      }
+    }
+  }
+
+  // EMOTIONAL_NEUTRAL_RUN (run-based × neutral emotional valence, n≥8, ≥4 emotionally charged
+  // scenes): Six or more consecutive scenes all emotionally neutral (emotionalShift='neutral')
+  // while at least 4 emotionally charged scenes exist elsewhere. The story goes affectively flat
+  // for a sustained stretch — six or more beats without any positive or negative emotional charge —
+  // even though the story has demonstrated the capacity for emotional range. Unlike the zone-based
+  // flatline checks (ACT_EMOTIONAL_FLATLINE, MIDPOINT_EMOTIONAL_FLATLINE) that audit specific
+  // structural positions, this fires for any local contiguous run of neutral scenes regardless of
+  // its position. A 6+-scene neutral run is a drought in the story's felt experience: the audience
+  // tracks events without registering them emotionally, experiencing the plot as information rather
+  // than as something they care about. Run-based mode × neutral-valence channel. Distinct from
+  // ACT_1_EMOTIONAL_FLATLINE / ACT_2A_EMOTIONAL_FLATLINE / etc. (zone-specific, position-based),
+  // EMOTIONAL_ARC_UNIFORM (>70% of all scenes same register — global proportion), POSITIVE_SCENE_RUN
+  // (Wave 471: positive valence), NEGATIVE_SCENE_RUN (Wave 485: negative valence — this completes
+  // the three-valence run family by auditing the neutral register).
+  if (n >= 8) {
+    const emotionalScenes541c = (records as any[]).filter(r =>
+      (r.emotionalShift ?? 'neutral') !== 'neutral',
+    );
+    if (emotionalScenes541c.length >= 4) {
+      let maxNeutralRun541c = 0;
+      let curNeutralRun541c = 0;
+      for (const r of records as any[]) {
+        if ((r.emotionalShift ?? 'neutral') === 'neutral') {
+          curNeutralRun541c++;
+          if (curNeutralRun541c > maxNeutralRun541c) maxNeutralRun541c = curNeutralRun541c;
+        } else {
+          curNeutralRun541c = 0;
+        }
+      }
+      if (maxNeutralRun541c >= 6) {
+        issues.push({
+          location: `${maxNeutralRun541c} consecutive emotionally neutral scene(s)`,
+          rule: 'EMOTIONAL_NEUTRAL_RUN',
+          severity: 'minor',
+          description: `${maxNeutralRun541c} consecutive scenes carry no emotional charge (all emotionalShift='neutral'), even though ${emotionalScenes541c.length} emotionally charged scenes exist elsewhere in the story. In a ${maxNeutralRun541c}-scene neutral run, the audience tracks events without registering them as felt experience — the plot advances as information rather than as something that matters to anyone. Emotional engagement requires recurrence: the audience's investment is maintained by regular emotional signals that remind them the events have stakes. A 6+-scene neutral stretch severs that connection: the audience is watching rather than feeling, and by the end of the run the story's emotional temperature has cooled enough that even the next emotional beat arrives against a lowered baseline of investment.`,
+          suggestedFix: `Introduce at least one emotionally charged scene (positive or negative emotionalShift) within the ${maxNeutralRun541c}-scene neutral run — a moment where what is happening registers as felt experience for the protagonist. The charge need not be large; even a small positive shift (a brief moment of relief or connection) or a small negative shift (a flash of fear or loss) within the run re-engages the audience's emotional tracking and prevents the stretch from becoming an affect-free zone.`,
         });
       }
     }

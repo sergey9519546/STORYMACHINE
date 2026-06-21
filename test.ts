@@ -19651,6 +19651,92 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 541 — structurePass: revelation aftermath suspense void, turn aftermath curiosity void, emotional neutral run', async () => {
+    const makeRec541 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const runST541 = async (records: any[]) => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      return structurePass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('REVELATION_AFTERMATH_SUSPENSE_VOID fires when no revelation is followed by a suspense spike', async () => {
+      // 9 scenes: revelations at 0,2,4 (pos<7); suspense at 7,8 — all outside aftermath windows [1-2],[3-4],[5-6]
+      const recs541a = Array.from({ length: 9 }, (_, i) =>
+        makeRec541(i, {
+          revelation: [0, 2, 4].includes(i) ? 'truth revealed' : null,
+          suspenseDelta: [7, 8].includes(i) ? 1 : 0,
+        }),
+      );
+      const res = await runST541(recs541a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_AFTERMATH_SUSPENSE_VOID'), 'REVELATION_AFTERMATH_SUSPENSE_VOID should fire');
+    });
+
+    it('REVELATION_AFTERMATH_SUSPENSE_VOID does not fire when a revelation is followed by a suspense spike', async () => {
+      // 9 scenes: revelations at 0,2,4; suspense at 5 (within aftermath window of rev at 4)
+      const recs541an = Array.from({ length: 9 }, (_, i) =>
+        makeRec541(i, {
+          revelation: [0, 2, 4].includes(i) ? 'truth revealed' : null,
+          suspenseDelta: [5, 8].includes(i) ? 1 : 0,
+        }),
+      );
+      const res = await runST541(recs541an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_AFTERMATH_SUSPENSE_VOID'), 'REVELATION_AFTERMATH_SUSPENSE_VOID should not fire');
+    });
+
+    it('TURN_AFTERMATH_CURIOSITY_VOID fires when no dramatic turn is followed by a curiosity spike', async () => {
+      // 9 scenes: turns at 0,2,4 (pos<7); curiosity at 7,8 — outside aftermath windows [1-2],[3-4],[5-6]
+      const recs541b = Array.from({ length: 9 }, (_, i) =>
+        makeRec541(i, {
+          dramaticTurn: [0, 2, 4].includes(i) ? 'reversal' : 'nothing',
+          curiosityDelta: [7, 8].includes(i) ? 1 : 0,
+        }),
+      );
+      const res = await runST541(recs541b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TURN_AFTERMATH_CURIOSITY_VOID'), 'TURN_AFTERMATH_CURIOSITY_VOID should fire');
+    });
+
+    it('TURN_AFTERMATH_CURIOSITY_VOID does not fire when a turn is followed by a curiosity spike', async () => {
+      // 9 scenes: turns at 0,2,4; curiosity at 5 (within aftermath window of turn at 4)
+      const recs541bn = Array.from({ length: 9 }, (_, i) =>
+        makeRec541(i, {
+          dramaticTurn: [0, 2, 4].includes(i) ? 'reversal' : 'nothing',
+          curiosityDelta: [5, 8].includes(i) ? 1 : 0,
+        }),
+      );
+      const res = await runST541(recs541bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TURN_AFTERMATH_CURIOSITY_VOID'), 'TURN_AFTERMATH_CURIOSITY_VOID should not fire');
+    });
+
+    it('EMOTIONAL_NEUTRAL_RUN fires when 6+ consecutive scenes are all emotionally neutral', async () => {
+      // 10 scenes: emotional at 0,1,8,9 (4 charged); neutral run at 2-7 (6 consecutive)
+      const recs541c = Array.from({ length: 10 }, (_, i) =>
+        makeRec541(i, {
+          emotionalShift: [0, 1, 8, 9].includes(i) ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runST541(recs541c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'EMOTIONAL_NEUTRAL_RUN'), 'EMOTIONAL_NEUTRAL_RUN should fire');
+    });
+
+    it('EMOTIONAL_NEUTRAL_RUN does not fire when the neutral run is shorter than 6', async () => {
+      // 10 scenes: emotional at 0,1,7,8,9 (5 charged); neutral run at 2-6 (5 consecutive)
+      const recs541cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec541(i, {
+          emotionalShift: [0, 1, 7, 8, 9].includes(i) ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runST541(recs541cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'EMOTIONAL_NEUTRAL_RUN'), 'EMOTIONAL_NEUTRAL_RUN should not fire');
+    });
+  });
+
   describe('Wave 527 — structurePass: clock run, turn emotion decoupled, revelation aftermath emotion void', async () => {
     const makeRec527 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
