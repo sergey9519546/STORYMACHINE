@@ -104,6 +104,18 @@
 // emotionally non-neutral scenes lacks any upstream cause in prior 2 scenes — the emotional
 // climax is unmotivated; backward-cause × emotional peak, second backward-cause check in
 // pacing.ts).
+// Wave 509 additions: suspense flatline run (5+ consecutive scenes with suspenseDelta ≤ 0 while
+// ≥3 positive-suspense scenes exist elsewhere — the tension engine goes dark for a sustained
+// local stretch; run-based × suspense channel, completing the flatline-run family alongside
+// CURIOSITY_FLATLINE_RUN and EMOTIONAL_FLATLINE_RUN), payoff suspense decoupled (≥3 payoff and
+// ≥3 high-suspense scenes never coinciding — callbacks never land inside tension and tension
+// never has semantic resonance; co-occurrence/decoupling × payoff × suspense, first payoff-
+// channel entry in the decoupling family distinct from the curiosity/emotion/suspense entries),
+// payoff aftermath curiosity flat (≥3 payoff scenes none followed by curiosity rise in next 2
+// scenes — resolved setups never open new questions downstream; sequence/aftermath × curiosity
+// × payoff trigger, first payoff-trigger entry in the curiosity-aftermath family, distinct from
+// CURIOSITY_AFTERMATH_FLAT which uses the high-suspense trigger and CLOCK_AFTERMATH_CURIOSITY_FLAT
+// which uses the clock trigger).
 // Wave 495 additions: clock aftermath curiosity flat (≥3 clock-raising scenes none followed
 // by curiosity rise in next 2 scenes — deadlines never open new questions downstream;
 // sequence/aftermath × curiosity × clock trigger, extending the aftermath family to the clock ×
@@ -2532,6 +2544,104 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `The story's highest-curiosity scene (Scene ${peakCurPos495c}, curiosityDelta: ${peakCurVal495c}) has no revelation, dramatic turn, or clock event in itself or in either of the two preceding scenes — the greatest question-raise in the story emerges from a dramatic vacuum. A curiosity peak should be the consequence of an informational or pivotal event: a disclosure that opens a deeper mystery, a turn that reframes everything the audience thought they knew, or a deadline that raises the stakes of an unanswered question. When the highest-curiosity moment has no upstream cause, the question-raise reads as authorial withholding — the audience wonders not because events have opened a gap but because information was simply not provided.`,
           suggestedFix: `Add at least one of a revelation, dramatic turn, or clock event to Scene ${peakCurPos495c} or the two scenes before it. The peak curiosity should feel like a question that the story has actively opened — a disclosure that generates a deeper mystery, a pivot that recontextualises the unknown, a deadline that makes the unanswered question urgent. A question-raise caused by an event lands as earned mystery; one without cause lands as a gap the audience can't locate.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 509: SUSPENSE_FLATLINE_RUN, PAYOFF_SUSPENSE_DECOUPLED, PAYOFF_AFTERMATH_CURIOSITY_FLAT ──
+  const n509 = records.length;
+
+  // SUSPENSE_FLATLINE_RUN (run-based × suspense channel, n≥8, ≥3 positive-suspense scenes elsewhere):
+  // 5+ consecutive scenes all with suspenseDelta ≤ 0 while positive-suspense scenes exist. Completes
+  // the flatline-run family: CURIOSITY_FLATLINE_RUN (Wave 439) covers the curiosity channel,
+  // EMOTIONAL_FLATLINE_RUN (Wave 453) covers the emotional channel — this adds suspense. A sustained
+  // stretch where tension never rises (5+ scenes) drains the audience's sense of stakes: every scene
+  // that passes without pressure signals the danger has been indefinitely suspended, not temporarily
+  // held. Distinct from CLOCK_PRESSURE_RUN (Wave 467: clock consecutive presence, not a flatline) and
+  // NET_TENSION_DEFICIT (Wave 302: aggregate valence, not a run-based stretch).
+  if (n509 >= 8) {
+    const posSuspScenes509a = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 0);
+    if (posSuspScenes509a.length >= 3) {
+      let maxFlatRun509a = 0;
+      let curFlatRun509a = 0;
+      for (const r of records as any[]) {
+        if ((r.suspenseDelta ?? 0) <= 0) {
+          curFlatRun509a++;
+          if (curFlatRun509a > maxFlatRun509a) maxFlatRun509a = curFlatRun509a;
+        } else {
+          curFlatRun509a = 0;
+        }
+      }
+      if (maxFlatRun509a >= 5) {
+        issues.push({
+          location: `${maxFlatRun509a} consecutive scenes — suspense flatline`,
+          rule: 'SUSPENSE_FLATLINE_RUN',
+          severity: 'minor',
+          description: `The script has a run of ${maxFlatRun509a} consecutive scenes without any suspense rise (suspenseDelta ≤ 0) while ${posSuspScenes509a.length} scenes elsewhere carry positive suspense — the tension engine goes dark for a sustained stretch. A flatline of five or more scenes drains the audience's sense that anything is at stake: each scene that passes without raising the pressure signals that the danger has been suspended indefinitely, not temporarily. The effect is not restful — it is disengaging, because the audience can feel the stakes have been parked rather than held in abeyance.`,
+          suggestedFix: `Introduce at least one suspense-rising event within the flatline run — a complication, a threat, a revelation that reactivates what is at risk. The rise doesn't need to be large; a single scene with a positive suspenseDelta breaks the plateau and signals to the audience that the story's danger is still present, still building, even during a quieter stretch.`,
+        });
+      }
+    }
+  }
+
+  // PAYOFF_SUSPENSE_DECOUPLED (co-occurrence/decoupling × payoff × suspense, n≥8, ≥3 payoff scenes
+  // and ≥3 high-suspense scenes): Payoff scenes (payoffSetupIds.length > 0) and high-suspense scenes
+  // (suspenseDelta > 1) never coincide — every callback lands in a low-tension scene and every
+  // high-tension moment passes without a payoff. Callbacks gain their deepest force when they land
+  // inside the tension they were built to resolve; high-tension moments gain semantic weight when a
+  // setup collects inside them. Full separation keeps both channels thinner than they need to be.
+  // Co-occurrence/decoupling mode × payoff × suspense. Distinct from SUSPENSE_CURIOSITY_DECOUPLED
+  // (Wave 439: curiosity channel), SUSPENSE_EMOTION_DECOUPLED (Wave 453: emotional channel),
+  // EMOTIONAL_CURIOSITY_DECOUPLED (Wave 467: emotional × curiosity) — first payoff-channel entry.
+  if (n509 >= 8) {
+    const payoffScenes509b = (records as any[]).filter(r => Array.isArray(r.payoffSetupIds) && r.payoffSetupIds.length > 0);
+    const highSuspScenes509b = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 1);
+    if (payoffScenes509b.length >= 3 && highSuspScenes509b.length >= 3) {
+      const payoffIdxSet509b = new Set(payoffScenes509b.map((r: any) => (records as any[]).indexOf(r)));
+      const highSuspIdxSet509b = new Set(highSuspScenes509b.map((r: any) => (records as any[]).indexOf(r)));
+      const hasOverlap509b = [...payoffIdxSet509b].some(idx => highSuspIdxSet509b.has(idx));
+      if (!hasOverlap509b) {
+        issues.push({
+          location: `${payoffScenes509b.length} payoff scene(s) and ${highSuspScenes509b.length} high-suspense scene(s) — no overlap`,
+          rule: 'PAYOFF_SUSPENSE_DECOUPLED',
+          severity: 'minor',
+          description: `The script's ${payoffScenes509b.length} payoff scenes and ${highSuspScenes509b.length} high-suspense scenes (suspenseDelta > 1) never coincide — every callback lands in a low-tension scene and every high-tension moment passes without a payoff. When the two channels are fully decoupled, each loses its fullest force: a payoff in a calm scene reads like a footnote, and a suspense peak without a callback has no semantic anchor — the audience feels pressure without resonance. Payoffs gain their deepest effect when they land inside the tension they were built to resolve, converting two parallel threads into a unified dramatic beat.`,
+          suggestedFix: `Arrange at least one payoff to fire within a high-suspense scene — a callback that resolves an earlier setup at the moment of greatest pressure. The payoff need not resolve the core tension; a small resolution landing inside a larger threat gives the high-suspense scene both forward momentum and backward meaning.`,
+        });
+      }
+    }
+  }
+
+  // PAYOFF_AFTERMATH_CURIOSITY_FLAT (sequence/aftermath × curiosity × payoff trigger, n≥8, ≥3
+  // qualifying payoff scenes not in last 2 positions): Every payoff scene is followed by 2 scenes
+  // with curiosityDelta ≤ 0 — callbacks never open new questions downstream. A resolved setup should
+  // reorient the audience's wondering: the answer to an old mystery reveals what they now need to
+  // understand next. When every payoff is met by curiosity silence, the resolution machinery operates
+  // strictly as exhaust — closing loops without generating forward pull.
+  // Sequence/aftermath mode × curiosity × payoff trigger. Distinct from CURIOSITY_AFTERMATH_FLAT
+  // (Wave 439: trigger is high-suspense scene), CLOCK_AFTERMATH_CURIOSITY_FLAT (Wave 495: trigger is
+  // clock event) — first payoff-trigger entry in the curiosity-aftermath family.
+  if (n509 >= 8) {
+    const qualPayoffRecs509c = (records as any[]).filter((r, pos) =>
+      Array.isArray(r.payoffSetupIds) && r.payoffSetupIds.length > 0 && pos < n509 - 2,
+    );
+    if (qualPayoffRecs509c.length >= 3) {
+      const allPayoffNoCurAftermath509c = qualPayoffRecs509c.every((r: any) => {
+        const pos509c = (records as any[]).indexOf(r);
+        for (let off = 1; off <= 2; off++) {
+          const nxt = (records as any[])[pos509c + off];
+          if (nxt && (nxt.curiosityDelta ?? 0) > 0) return false;
+        }
+        return true;
+      });
+      if (allPayoffNoCurAftermath509c) {
+        issues.push({
+          location: `${qualPayoffRecs509c.length} payoff scene(s) — curiosity aftermath absent`,
+          rule: 'PAYOFF_AFTERMATH_CURIOSITY_FLAT',
+          severity: 'minor',
+          description: `None of the story's ${qualPayoffRecs509c.length} payoff scenes is followed by a curiosity rise (curiosityDelta > 0) in either of the next two scenes — every callback closes a loop without opening a new question downstream. A resolved setup should do more than satisfy: the answer to an old mystery should reorient the audience's wondering, revealing what they need to understand next. When every payoff is followed by curiosity silence, the resolution machinery operates strictly as exhaust — closing loops without generating forward pull — and the story gradually loses the engine that keeps the audience leaning forward between acts.`,
+          suggestedFix: `Let at least one payoff trigger a question in the scene or two that follows: the answered setup should reveal a new layer of the story's central mystery, or show the protagonist realising that the resolved question has exposed a more pressing one. A callback that generates a new question is a ratchet, converting the earned satisfaction of a closed loop into the forward pressure of a newly opened one.`,
         });
       }
     }

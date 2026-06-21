@@ -22445,6 +22445,85 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 509 — pacingPass: suspense flatline run, payoff suspense decoupled, payoff aftermath curiosity flat', async () => {
+    const makeRec509 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain509 = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\n\nAction line for scene ${i}.`).join('\n\n');
+    const runP509 = async (records: any[]) => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      return pacingPass({ fountain: makeFountain509(records.length), original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // SUSPENSE_FLATLINE_RUN fire: n=8; scenes 0-4 flat (suspenseDelta=0), scenes 5-7 positive
+    // → 5 consecutive flat scenes, 3 positive scenes elsewhere → fires
+    it('SUSPENSE_FLATLINE_RUN fires when 5+ consecutive scenes have no suspense rise', async () => {
+      const recs509a: any[] = Array.from({ length: 8 }, (_, i) => makeRec509(i, {
+        suspenseDelta: i >= 5 ? 2 : 0,
+      }));
+      const res = await runP509(recs509a);
+      assert.ok(res.issues.some((x: any) => x.rule === 'SUSPENSE_FLATLINE_RUN'), 'SUSPENSE_FLATLINE_RUN should fire');
+    });
+
+    // SUSPENSE_FLATLINE_RUN no-fire: n=8; scenes 0,1,2,7 positive, scenes 3-6 flat
+    // → max flat run = 4 < 5 → no fire
+    it('SUSPENSE_FLATLINE_RUN does not fire when the longest flat run is only 4', async () => {
+      const recs509anr: any[] = Array.from({ length: 8 }, (_, i) => makeRec509(i, {
+        suspenseDelta: [0, 1, 2, 7].includes(i) ? 2 : 0,
+      }));
+      const res = await runP509(recs509anr);
+      assert.ok(!res.issues.some((x: any) => x.rule === 'SUSPENSE_FLATLINE_RUN'), 'SUSPENSE_FLATLINE_RUN should not fire');
+    });
+
+    // PAYOFF_SUSPENSE_DECOUPLED fire: n=8; payoffs at 0,1,2 (suspenseDelta=0); high-suspense at 5,6,7 (no payoff)
+    // → no overlap → fires
+    it('PAYOFF_SUSPENSE_DECOUPLED fires when payoff scenes and high-suspense scenes never coincide', async () => {
+      const recs509b: any[] = Array.from({ length: 8 }, (_, i) => makeRec509(i, {
+        payoffSetupIds: [0, 1, 2].includes(i) ? ['A'] : [],
+        suspenseDelta: [5, 6, 7].includes(i) ? 2 : 0,
+      }));
+      const res = await runP509(recs509b);
+      assert.ok(res.issues.some((x: any) => x.rule === 'PAYOFF_SUSPENSE_DECOUPLED'), 'PAYOFF_SUSPENSE_DECOUPLED should fire');
+    });
+
+    // PAYOFF_SUSPENSE_DECOUPLED no-fire: scene 2 is both a payoff AND high-suspense → overlap → no fire
+    it('PAYOFF_SUSPENSE_DECOUPLED does not fire when at least one scene is both a payoff and high-suspense', async () => {
+      const recs509bnr: any[] = Array.from({ length: 8 }, (_, i) => makeRec509(i, {
+        payoffSetupIds: [0, 1, 2].includes(i) ? ['A'] : [],
+        suspenseDelta: [2, 5, 6, 7].includes(i) ? 2 : 0,
+      }));
+      const res = await runP509(recs509bnr);
+      assert.ok(!res.issues.some((x: any) => x.rule === 'PAYOFF_SUSPENSE_DECOUPLED'), 'PAYOFF_SUSPENSE_DECOUPLED should not fire');
+    });
+
+    // PAYOFF_AFTERMATH_CURIOSITY_FLAT fire: n=8; payoffs at 0,1,2; all curiosityDelta=0 → no curiosity aftermath → fires
+    it('PAYOFF_AFTERMATH_CURIOSITY_FLAT fires when payoff scenes are never followed by a curiosity rise', async () => {
+      const recs509c: any[] = Array.from({ length: 8 }, (_, i) => makeRec509(i, {
+        payoffSetupIds: [0, 1, 2].includes(i) ? ['B'] : [],
+        curiosityDelta: 0,
+      }));
+      const res = await runP509(recs509c);
+      assert.ok(res.issues.some((x: any) => x.rule === 'PAYOFF_AFTERMATH_CURIOSITY_FLAT'), 'PAYOFF_AFTERMATH_CURIOSITY_FLAT should fire');
+    });
+
+    // PAYOFF_AFTERMATH_CURIOSITY_FLAT no-fire: scene 3 (aftermath of payoff at 2) has curiosityDelta=1 → no fire
+    it('PAYOFF_AFTERMATH_CURIOSITY_FLAT does not fire when at least one payoff is followed by a curiosity rise', async () => {
+      const recs509cnr: any[] = Array.from({ length: 8 }, (_, i) => makeRec509(i, {
+        payoffSetupIds: [0, 1, 2].includes(i) ? ['B'] : [],
+        curiosityDelta: i === 3 ? 1 : 0,
+      }));
+      const res = await runP509(recs509cnr);
+      assert.ok(!res.issues.some((x: any) => x.rule === 'PAYOFF_AFTERMATH_CURIOSITY_FLAT'), 'PAYOFF_AFTERMATH_CURIOSITY_FLAT should not fire');
+    });
+  });
+
   describe('Wave 495 — pacingPass: clock aftermath curiosity flat, revelation emotional aftermath flat, curiosity peak uncaused', async () => {
     const makeRec495 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
