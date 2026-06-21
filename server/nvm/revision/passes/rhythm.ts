@@ -98,6 +98,14 @@
 // peak position — the single longest action line ≥15w is located in the first 25% of action lines,
 // front-loading the script's most elaborate prose in the setup rather than the climax; distinct from
 // LONGEST_ACTION_OUTLIER which is position-agnostic and fires on word-count ratio, not position).
+// Wave 484 additions: consecutive short run (run-based × short channel — 5+ consecutive action
+// lines each ≤4 words, a sustained staccato burst that loses impact through repetition; run mirror
+// of CONSECUTIVE_LONG_RUN which targets ≥9w runs), finale short absent (zone presence/absence ×
+// finale zone — the last 25% of action lines contains no short ≤4w line while ≥2 exist elsewhere;
+// the finale zone mirror of OPENING_SHORT_ABSENT, completing the zone set), action sentence average
+// high (average/aggregate × sentence count per line — ≥8 action lines averaging >3 sentences each,
+// multi-clause overload that collapses the shot-by-shot grammar of cinematic action; the average/
+// aggregate complement of SINGLE_SENTENCE_FLOOD and SENTENCE_COUNT_PEAK).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -1915,6 +1923,102 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The longest action line (${maxWc470c} words) is action line ${maxIdx470c + 1} of ${actionLines.length} — in the first 25% of action lines. The script's most expansive prose moment is front-loaded in the setup, while the confrontation and climax are written in shorter, lighter beats. The prose density curve inverts the story's tension arc: the opening earns the most elaborate staging while the scenes that cost the characters the most are rendered in compressed, minimal description.`,
         suggestedFix: 'Trim the dense early line to its essential staging beats, and expand at least one mid-script or late-script action line to carry fuller description. The scene that earns the most words should be the one that costs the characters the most — usually not the opening.',
+      });
+    }
+  }
+
+  // ── Wave 484: CONSECUTIVE_SHORT_RUN, ACTION_FINALE_SHORT_ABSENT, ACTION_SENTENCE_AVERAGE_HIGH ──
+
+  // CONSECUTIVE_SHORT_RUN (run-based × short action line channel, ≥8 action lines,
+  // maxConsecutiveRun ≥ 5): Five or more consecutive action lines each contain four words or
+  // fewer — a sustained staccato burst that loses its impact through sheer repetition. A single
+  // short line ("He stops.") has force when it crystallises a long moment; five or more in
+  // succession produces a telegraphic stutter. The staccato register relies on contrast: it hits
+  // hardest when it follows or precedes density. A run of five or more consecutive short lines
+  // suggests the writer has stayed in shorthand long after the image has been delivered, or has
+  // broken a single beat into too many micro-fragments instead of constructing the action as a
+  // complete unit. Run-based mode × short-line channel. Distinct from CONSECUTIVE_LONG_RUN (Wave
+  // 456: ≥9-word lines — same mode, opposite end), ACTION_LINE_WORD_COUNT_FLOOR (Wave 291: ALL
+  // action lines ≤5 words — global presence/absence check, not a run), ACTION_IMPACT_BEAT_
+  // UNCAUSED (Wave 470: backward-cause on short lines — antecedent context, not run length):
+  // this is the run-based mirror of CONSECUTIVE_LONG_RUN on the short-line channel.
+  if (actionLines.length >= 8) {
+    let maxShortRun484a = 0;
+    let curShortRun484a = 0;
+    for (const wc of wordCounts) {
+      if (wc <= 4) {
+        if (++curShortRun484a > maxShortRun484a) maxShortRun484a = curShortRun484a;
+      } else {
+        curShortRun484a = 0;
+      }
+    }
+    if (maxShortRun484a >= 5) {
+      issues.push({
+        location: `${maxShortRun484a} consecutive action line(s) of ≤4 words`,
+        rule: 'CONSECUTIVE_SHORT_RUN',
+        severity: 'minor',
+        description: `A run of ${maxShortRun484a} consecutive action lines each contain four words or fewer — a sustained staccato burst that outlasts its impact. A short line hits hardest when it crystallises the density before it; five or more in succession creates a telegraphic stutter rather than a sequence of punches. The very property that makes short beats effective — their economy against surrounding fullness — is cancelled when they accumulate into a run. After three or four short lines in a row, the reader's attention shifts from what each line captures to the mechanical rhythm of the shorthand.`,
+        suggestedFix: 'Break the staccato run by expanding at least one of the short lines into a fuller staging beat (8–12 words) that gives the action physical and spatial specificity. The short lines before and after it will then read as the sharp beats they were intended to be, rather than as a list. "He runs. She runs. Door. Stairs. Corner." becomes far more effective as: "He bolts for the door. She cuts around the corner after him, hands flat against the wall as she takes the turn." followed by a single short beat: "Gone."',
+      });
+    }
+  }
+
+  // ACTION_FINALE_SHORT_ABSENT (zone presence/absence × finale zone × short-line channel,
+  // ≥10 action lines, ≥2 short ≤4w lines in the first 75%, none in the final 25%): The
+  // script's opening and middle use short impact beats, but the finale zone (last 25% of
+  // action lines) uses none — the climactic staging is written entirely in longer, fuller
+  // lines with no staccato relief. As pace accelerates toward a climax, short impact beats
+  // become structurally important: a one-line beat at the moment of decision, a three-word
+  // line at the turning point, forces the reader to pause and feel the beat's weight. When
+  // the finale zone has zero short lines among its action prose, the climax is written at a
+  // uniform prose density rather than using short beats to create the sensation of time slowing
+  // at critical moments. Zone presence/absence mode × finale zone × short-line channel. Distinct
+  // from ACTION_OPENING_SHORT_ABSENT (Wave 456: opening zone — this is the finale zone mirror),
+  // ACTION_MIDDLE_LONG_ABSENT (Wave 470: middle zone × long lines — different zone and channel),
+  // ACTION_FINALE_BLOAT (Wave 428: finale avg word count vs first-75% avg — average comparison,
+  // not short-line presence/absence).
+  if (actionLines.length >= 10) {
+    const finaleStart484b = Math.floor(actionLines.length * 0.75);
+    const finaleShortCount484b = wordCounts.slice(finaleStart484b).filter(w => w <= 4).length;
+    const outerShortCount484b = wordCounts.slice(0, finaleStart484b).filter(w => w <= 4).length;
+    if (finaleShortCount484b === 0 && outerShortCount484b >= 2) {
+      issues.push({
+        location: `Action lines ${finaleStart484b + 1}–${actionLines.length} (final 25%) — no short ≤4-word line`,
+        rule: 'ACTION_FINALE_SHORT_ABSENT',
+        severity: 'minor',
+        description: `The final 25% of action lines (the climactic staging) contains no short line of 4 words or fewer, while ${outerShortCount484b} such lines appear earlier in the script. The staccato register used to create impact in earlier sections disappears precisely when the story needs it most: at the climax, a one-line beat at the moment of decision, a three-word line at the turning point, forces the reader to pause inside the beat rather than pass through it at prose velocity. When the finale is written entirely in longer, fuller lines, the climactic staging feels uniform rather than punctuated — every beat takes the same amount of time to read, regardless of its dramatic weight.`,
+        suggestedFix: 'Add at least one short action line (≤4 words) in the finale zone: the single word at the decision point, the two-word beat before the final action, the minimal line that holds the moment. "She pulls the trigger." becomes "She fires." if the preceding two lines have built the moment fully. Short beats in the climax are not shortcuts — they are the most intensive form of staging because they ask the reader to stop and feel rather than read.',
+      });
+    }
+  }
+
+  // ACTION_SENTENCE_AVERAGE_HIGH (average/aggregate × sentence count per action line, ≥8 action
+  // lines, avg sentences per line > 3.0): Action lines average more than three sentences each —
+  // the prose layer is structured as multi-clause paragraphs rather than shot-by-shot beats.
+  // A cinematic action line should typically represent one thing the camera records: one physical
+  // action, one visual detail, one spatial element. When the average line packs three or more
+  // sentences, each action beat is no longer a camera instruction but a paragraph of connected
+  // moves. This collapses the implicit shot grammar into prose narrative: the reader cannot feel
+  // where one camera position ends and the next begins, and the director has no clean unit of
+  // staging to work with. Average/aggregate mode × sentence count per action line. Distinct from
+  // SENTENCE_COUNT_PEAK (Wave 456: the single outlier line with the most sentences — single-peak
+  // isolation, not average), SINGLE_SENTENCE_FLOOD (Wave 277: ALL lines have exactly one sentence
+  // — the opposite failure), POLYSYNDETON_OVERLOAD (Wave 344: "and" coordinators — different
+  // multi-clause signal): this is the first average/aggregate check on sentences-per-line density.
+  if (actionLines.length >= 8) {
+    const countSentences484c = (text: string): number => {
+      const matches = text.match(/[.!?]+/g);
+      return matches ? matches.length : 0;
+    };
+    const totalSentences484c = actionLines.reduce((s, l) => s + Math.max(1, countSentences484c(l.text)), 0);
+    const avgSentences484c = totalSentences484c / actionLines.length;
+    if (avgSentences484c > 3.0) {
+      issues.push({
+        location: `Action lines — avg ${avgSentences484c.toFixed(1)} sentences/line across ${actionLines.length} lines`,
+        rule: 'ACTION_SENTENCE_AVERAGE_HIGH',
+        severity: 'minor',
+        description: `Action lines average ${avgSentences484c.toFixed(1)} sentences each across ${actionLines.length} lines — the prose is structured as multi-clause paragraphs rather than shot-by-shot beats. A cinematic action line should typically represent one thing the camera records: one physical action, one visual detail, one spatial movement. When the average line packs three or more sentences, the script's implicit shot grammar collapses into prose narrative: the reader cannot feel where one camera position ends and the next begins, and the director receives paragraphs to block rather than units of staging to assemble.`,
+        suggestedFix: 'Break multi-sentence action lines into separate lines, each representing one distinct visual beat: instead of "She opens the door. The room is dark. A shape moves in the corner." write three separate action lines, each one a beat the camera can hold. The white space between them — the blank lines in the script — is where the cuts live. Three separate short lines read faster and cut cleaner than one long line with three sentences inside it.',
       });
     }
   }

@@ -19723,6 +19723,171 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 484 — rhythmPass: consecutive short run, finale short absent, sentence average high', async () => {
+    const runR484 = async (fountain: string) => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CONSECUTIVE_SHORT_RUN fires when 5 or more consecutive action lines are ≤4 words', async () => {
+      // 9 action lines: first 4 normal-length, then 5 consecutive ≤4-word lines → fires
+      const f484a = [
+        'INT. ROOM - DAY',
+        '',
+        'She walks to the window and peers through the blinds at the empty street below.',
+        '',
+        'He lifts the phone from the desk and checks the screen for the third time this minute.',
+        '',
+        'The clock on the wall reads midnight.',
+        '',
+        'She turns.',
+        '',
+        'He stands.',
+        '',
+        'Door opens.',
+        '',
+        'Light shifts.',
+        '',
+        'Silence.',
+      ].join('\n');
+      const res = await runR484(f484a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONSECUTIVE_SHORT_RUN'), 'CONSECUTIVE_SHORT_RUN should fire');
+    });
+
+    it('CONSECUTIVE_SHORT_RUN does not fire when short lines are interspersed with longer ones', async () => {
+      // 9 action lines alternating long and short — max run = 1 → no fire
+      const f484anr = [
+        'INT. ROOM - DAY',
+        '',
+        'She walks to the window and peers through the blinds at the empty street below.',
+        '',
+        'He turns.',
+        '',
+        'She lifts the phone from the desk and checks the screen for the third time.',
+        '',
+        'Door opens.',
+        '',
+        'A figure steps into the doorway, silhouetted against the bright hallway light.',
+        '',
+        'He stands.',
+        '',
+        'She crosses to the desk and picks up the envelope sitting on the blotter.',
+        '',
+        'Light shifts.',
+      ].join('\n');
+      const res = await runR484(f484anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONSECUTIVE_SHORT_RUN'), 'CONSECUTIVE_SHORT_RUN should not fire');
+    });
+
+    it('ACTION_FINALE_SHORT_ABSENT fires when the final 25% has no short line but earlier sections do', async () => {
+      // 12 action lines: short lines at positions 0,1 (first 25%), none in positions 9-11 (last 25%) → fires
+      const f484b = [
+        'INT. ROOM - DAY',
+        '',
+        'She turns.',
+        '',
+        'He stops.',
+        '',
+        'She crosses slowly to the window and stands looking out at the rain-soaked street below.',
+        '',
+        'He lifts the phone and checks the screen again, waiting for a message that has not arrived.',
+        '',
+        'The clock on the wall ticks steadily, each second marking time toward the moment they both dread.',
+        '',
+        'She turns from the window and walks back toward the center of the room, hands clasped in front.',
+        '',
+        'He sets the phone face-down on the desk and looks up at her for the first time all night.',
+        '',
+        'The lamp between them casts two separate pools of light that do not quite overlap.',
+        '',
+        'She studies his face carefully, reading the lines around his eyes for something she can use.',
+        '',
+        'He opens his mouth to speak, then closes it again, reconsidering each word before it arrives.',
+      ].join('\n');
+      const res = await runR484(f484b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_FINALE_SHORT_ABSENT'), 'ACTION_FINALE_SHORT_ABSENT should fire');
+    });
+
+    it('ACTION_FINALE_SHORT_ABSENT does not fire when the final 25% has a short line', async () => {
+      // 12 action lines: short line at position 10 (in last 25%) → no fire
+      const f484bnr = [
+        'INT. ROOM - DAY',
+        '',
+        'She turns.',
+        '',
+        'He stops.',
+        '',
+        'She crosses slowly to the window and stands looking out at the rain-soaked street below.',
+        '',
+        'He lifts the phone and checks the screen again, waiting for a message that has not arrived.',
+        '',
+        'The clock on the wall ticks steadily, each second marking time toward the moment they both dread.',
+        '',
+        'She turns from the window and walks back toward the center of the room, hands clasped in front.',
+        '',
+        'He sets the phone face-down on the desk and looks up at her for the first time all night.',
+        '',
+        'The lamp between them casts two separate pools of light that do not quite overlap.',
+        '',
+        'She studies his face carefully, reading the lines around his eyes for something she can use.',
+        '',
+        'He fires.',
+      ].join('\n');
+      const res = await runR484(f484bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_FINALE_SHORT_ABSENT'), 'ACTION_FINALE_SHORT_ABSENT should not fire');
+    });
+
+    it('ACTION_SENTENCE_AVERAGE_HIGH fires when action lines average more than 3 sentences each', async () => {
+      // 8 action lines each with 4 sentences → avg = 4 > 3 → fires
+      const f484c = [
+        'INT. ROOM - DAY',
+        '',
+        'She opens the door. The room is dark. A shape moves. Glass breaks.',
+        '',
+        'He crosses to the window. The blinds rattle. Wind enters. Cold air fills the room.',
+        '',
+        'She lifts the phone. The screen glows blue. She reads the message. Her hand shakes.',
+        '',
+        'He reaches for the lamp. His fingers find the switch. Light floods the room. Nothing there.',
+        '',
+        'She moves to the desk. Papers everywhere. She sorts through them. One catches her eye.',
+        '',
+        'He opens the drawer. A gun inside. He stares at it. He closes the drawer.',
+        '',
+        'She steps back. He steps forward. The space between them shrinks. Neither speaks.',
+        '',
+        'He turns away. She watches. The clock ticks. Time passes.',
+      ].join('\n');
+      const res = await runR484(f484c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_SENTENCE_AVERAGE_HIGH'), 'ACTION_SENTENCE_AVERAGE_HIGH should fire');
+    });
+
+    it('ACTION_SENTENCE_AVERAGE_HIGH does not fire when action lines average 3 or fewer sentences', async () => {
+      // 8 action lines each with 1-2 sentences → avg ≤ 2 → no fire
+      const f484cnr = [
+        'INT. ROOM - DAY',
+        '',
+        'She opens the door and steps inside.',
+        '',
+        'The room is dark.',
+        '',
+        'He stands by the window, watching the street.',
+        '',
+        'She crosses to him.',
+        '',
+        'The lamp flickers once and goes out.',
+        '',
+        'He turns.',
+        '',
+        'She reaches for the phone on the desk.',
+        '',
+        'He stops her with a look.',
+      ].join('\n');
+      const res = await runR484(f484cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_SENTENCE_AVERAGE_HIGH'), 'ACTION_SENTENCE_AVERAGE_HIGH should not fire');
+    });
+  });
+
   describe('Wave 470 — rhythmPass: middle long absent, impact beat uncaused, density peak early', async () => {
     const runR470 = async (fountain: string) => {
       const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
