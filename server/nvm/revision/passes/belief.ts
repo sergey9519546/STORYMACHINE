@@ -100,6 +100,17 @@
 // × curiosity aftermath — average curiosityDelta of scenes immediately following assertion scenes ≤ 0;
 // assertions close the epistemic field rather than reopening it; the curiosity-channel complement of
 // REVELATION_SUSPENSE_DEFLATION and the aftermath-direction complement of TOLD_BELIEF_CURIOSITY_FLAT).
+// Wave 488 additions: revelation temporal cluster (distribution/timing × revelation × thirds —
+// n≥9, ≥3 revelations, >75% in one structural third; the revelation-channel complement of
+// ASSERTION_TEMPORAL_CLUSTER; disclosures are ghettoized into one temporal zone), revelation
+// relationship peak absent (single-peak isolation × relationship magnitude × revelation — n≥8,
+// ≥2 revelation scenes, ≥2 relationship-shift scenes, the scene with maximum relationship-shift
+// magnitude has no revelation while another relationship-shift scene does; the relationship-
+// magnitude single-peak check distinct from REVELATION_RELATIONSHIP_DECOUPLED which fires on
+// all relationship-shift scenes), assertion negative decoupled (co-occurrence × negative emotion ×
+// assertion absence — n≥8, ≥2 assertion scenes, ≥2 negative-emotion scenes, no assertion lands
+// in a negative-emotion scene; the negative-valence complement of TOLD_BELIEF_EMOTIONAL_FLATLINE
+// which fires when assertions are emotionally neutral; this fires when they are never in defeat).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2194,6 +2205,118 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `The scene immediately following each of the ${qualAssertion474c.length} qualifying assertion(s) averages a curiosityDelta of ${avgCurDelta474c.toFixed(2)} — assertions consistently fail to reopen the epistemic field in what follows. When a character stakes a claim, the following scene should heighten what the audience wants to know: is this character right? What happens when reality tests this belief? What does commitment to this position cost? If the scene after every assertion is curiosity-neutral or curiosity-negative, claims function as closures rather than as dramatic irony generators — the belief layer deposits information without fueling anticipation about whether the belief is true or what follows from holding it.`,
           suggestedFix: 'Engineer at least one assertion whose aftermath reopens the field: have the scene that follows a claim raise a new question about it — through a contradicting event, a character who reacts with suspicion, or a dramatic development that forces the audience to wonder whether the assertion will hold. The most powerful told beliefs are those where the audience knows what a character believes and immediately wonders how that belief will collide with reality.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 488: REVELATION_TEMPORAL_CLUSTER, REVELATION_RELATIONSHIP_PEAK_ABSENT, ASSERTION_NEGATIVE_DECOUPLED ──
+
+  // REVELATION_TEMPORAL_CLUSTER — distribution/timing × revelation × thirds.
+  // n≥9, ≥3 revelation scenes. Divide records into three equal structural thirds. Count revelation
+  // scenes in each third. If >75% of revelations fall in a single third, the disclosure layer is
+  // ghettoized — the story dumps its secrets in one structural zone and is epistemically quiet in
+  // the others. Audiences process revelations as turning points: if all revelations land in one
+  // phase, the other phases have no information to process, no dramatic irony to maintain.
+  // Distinct from: ASSERTION_TEMPORAL_CLUSTER (Wave 474: same analytical mode but assertion scenes,
+  // not revelations; this fills the revelation channel), REVELATION_DROUGHT (run-based consecutive
+  // absence — that fires on the single longest silence between revelations, not global thirds
+  // distribution), REVELATION_MIDPOINT_VOID / REVELATION_ACT2A_DESERT (zone-absence checks that
+  // fire when a specific structural zone has ZERO revelations; this fires on over-concentration in
+  // one zone even if all three zones have some revelations, at 75%+ in one).
+  const n488a = records.length;
+  if (n488a >= 9) {
+    const revIdxs488a = records
+      .map((r, i) => ({ r, i }))
+      .filter(({ r }) => r.revelation !== null && r.revelation !== '' && r.revelation !== undefined)
+      .map(({ i }) => i);
+    if (revIdxs488a.length >= 3) {
+      const third488a = Math.floor(n488a / 3);
+      const zone1488a = revIdxs488a.filter(i => i < third488a).length;
+      const zone2488a = revIdxs488a.filter(i => i >= third488a && i < 2 * third488a).length;
+      const zone3488a = revIdxs488a.filter(i => i >= 2 * third488a).length;
+      const maxZone488a = Math.max(zone1488a, zone2488a, zone3488a);
+      if (maxZone488a / revIdxs488a.length > 0.75) {
+        const zoneName488a = zone1488a === maxZone488a ? 'first' : zone2488a === maxZone488a ? 'second' : 'third';
+        issues.push({
+          location: `Revelation distribution — ${maxZone488a}/${revIdxs488a.length} revelations in ${zoneName488a} third (zones: ${zone1488a}/${zone2488a}/${zone3488a})`,
+          rule: 'REVELATION_TEMPORAL_CLUSTER',
+          severity: 'minor',
+          description: `${Math.round(maxZone488a / revIdxs488a.length * 100)}% of revelations (${maxZone488a} of ${revIdxs488a.length}) are concentrated in the ${zoneName488a} structural third. Disclosures are temporally ghettoized — the story exhausts its epistemic capital in one zone and is informationally silent in the other two. The two quiet thirds provide no new information, no pivots of understanding, and no dramatic irony. A well-structured belief-and-revelation arc keeps disclosures distributed by dramatic pressure, not positional habit.`,
+          suggestedFix: `Move at least one revelation from the ${zoneName488a} cluster into each of the thirds that currently lack disclosures. Spreading revelations across the story's structure ensures the audience faces fresh information in more than one zone — the script does not front-load or back-load all its secrets into a single phase.`,
+        });
+      }
+    }
+  }
+
+  // REVELATION_RELATIONSHIP_PEAK_ABSENT — single-peak isolation × relationship magnitude × revelation.
+  // n≥8. Among all scenes with relationship shifts, find the one with the highest total |amount|.
+  // If that peak-relationship scene has no revelation, while ≥2 revelation scenes and ≥2 relationship-
+  // shift scenes exist and at least one other relationship-shift scene DOES have a revelation → fire.
+  // The story's single biggest relational rupture is epistemically empty — no information changes
+  // hands at the moment of maximum bond stress.
+  // Distinct from: REVELATION_RELATIONSHIP_DECOUPLED (Wave 334: all relationship-shift scenes are
+  // revelation-silent — fires when the ENTIRE relationship-shift category is disclosure-free; this
+  // fires on the single PEAK relationship scene while other rel-shift scenes may carry revelations,
+  // a single-peak isolation mode), any existing single-peak checks on suspense/curiosity/payoff/seed
+  // peaks (those isolate different channels).
+  if (records.length >= 8) {
+    const relMags488b = records.map(r => {
+      const shifts = (r.relationshipShifts ?? []) as Array<{ pairKey: string; dimension: string; amount: number }>;
+      return shifts.reduce((s, sh) => s + Math.abs(sh.amount ?? 0), 0);
+    });
+    const maxRelMag488b = Math.max(...relMags488b);
+    if (maxRelMag488b > 0) {
+      const peakRelIdx488b = relMags488b.indexOf(maxRelMag488b);
+      const peakHasRev488b = records[peakRelIdx488b].revelation !== null &&
+        records[peakRelIdx488b].revelation !== '' &&
+        records[peakRelIdx488b].revelation !== undefined;
+      const revCount488b = records.filter(r =>
+        r.revelation !== null && r.revelation !== '' && r.revelation !== undefined,
+      ).length;
+      const relShiftCount488b = relMags488b.filter(m => m > 0).length;
+      const otherRelWithRev488b = relMags488b.some((m, i) =>
+        m > 0 && i !== peakRelIdx488b && (
+          records[i].revelation !== null && records[i].revelation !== '' && records[i].revelation !== undefined
+        ),
+      );
+      if (!peakHasRev488b && revCount488b >= 2 && relShiftCount488b >= 2 && otherRelWithRev488b) {
+        issues.push({
+          location: `Scene ${records[peakRelIdx488b].sceneIdx} (${records[peakRelIdx488b].slug}) — peak relationship scene (magnitude ${maxRelMag488b.toFixed(2)}) has no revelation`,
+          rule: 'REVELATION_RELATIONSHIP_PEAK_ABSENT',
+          severity: 'minor',
+          description: `The scene with the largest relationship shift magnitude (${maxRelMag488b.toFixed(2)}) carries no revelation, even though other relationship-shift scenes do carry disclosures. The story's single biggest relational rupture is epistemically empty — no information changes hands at the moment of maximum bond stress. In a strong dramatic structure, the highest-charge relational beat is precisely where a character is most likely to reveal something: a truth they've withheld, a lie they can no longer maintain, or a secret that the bond's rupture finally forces into the open.`,
+          suggestedFix: `Give scene ${records[peakRelIdx488b].sceneIdx} a revelation — even a partial one. The moment when a relationship shifts most dramatically is the most natural place for disclosure: characters under maximum relational stress are most likely to speak truths they have been concealing. A revelation in the peak relational scene makes the bond shift dramatically legible by grounding it in newly disclosed information.`,
+        });
+      }
+    }
+  }
+
+  // ASSERTION_NEGATIVE_DECOUPLED — co-occurrence × negative emotion × assertion absence.
+  // n≥8, ≥2 assertion scenes, ≥2 negative-emotion scenes (emotionalShift='negative').
+  // No assertion scene coincides with a negative emotional shift → fire. Claims are voiced only
+  // in neutral or positive emotional states, never in a moment of defeat, crisis, or loss.
+  // The most powerful assertions are those made under duress — a character insisting on a belief
+  // as the story contradicts it, or voicing a claim precisely as it is being disproven.
+  // Distinct from: TOLD_BELIEF_EMOTIONAL_FLATLINE (Wave 334: all assertion scenes are emotionally
+  // NEUTRAL — assertions carry no charge at all; FLATLINE does not fire when assertions are positive
+  // and never negative; this check does not require neutrality — it fires when assertions are only
+  // positive or neutral but never negative, a different co-occurrence failure mode), NEGATIVE_SCENE_
+  // REVELATION_VOID (Wave 446: checks revelations in negative scenes, not assertions), and any
+  // assertion-suspense or assertion-curiosity checks (those are numeric-delta channels, not valence).
+  if (records.length >= 8) {
+    const assertionSceneSet488c = new Set(toldBeliefs.map(t => t.sceneIdx));
+    const assertionScenes488c = records.filter(r => assertionSceneSet488c.has(r.sceneIdx));
+    const negScenes488c = records.filter(r => r.emotionalShift === 'negative');
+    if (assertionScenes488c.length >= 2 && negScenes488c.length >= 2) {
+      const anyNegAssertion488c = assertionScenes488c.some(r => r.emotionalShift === 'negative');
+      if (!anyNegAssertion488c) {
+        issues.push({
+          location: `${assertionScenes488c.length} assertion scenes — none coincides with a negative emotional shift`,
+          rule: 'ASSERTION_NEGATIVE_DECOUPLED',
+          severity: 'minor',
+          description: `The script has ${assertionScenes488c.length} assertion scenes and ${negScenes488c.length} scenes with negative emotional shifts, but no scene is both. Assertions never land in a moment of defeat, crisis, or loss — claims are voiced only when the story is emotionally neutral or positive. The most dramatically powerful assertions are made under adversity: a character insisting on a belief as the situation deteriorates, voicing a claim precisely as it is being disproven, or staking a position in a moment of despair. When assertions only arrive in calm or triumphant moments, the belief layer is sheltered from the story's harshest emotional tests.`,
+          suggestedFix: `Place at least one assertion in a scene with a negative emotional shift — a character who clings to a belief as the situation deteriorates, who makes a claim in a moment of loss, or who declares a position precisely when the story appears to be refuting it. Assertions under adversity generate dramatic irony that assertions during calm cannot.`,
         });
       }
     }

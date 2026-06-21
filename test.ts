@@ -30554,6 +30554,96 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 488 — beliefPass: revelation temporal cluster, revelation relationship peak absent, assertion negative decoupled', async () => {
+    const makeRec488 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      seededClueIds: [], payoffSetupIds: [], revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], dramaticTurn: 'nothing',
+      purpose: 'development', unresolvedClues: [],
+      ...overrides,
+    });
+    const mkShift488 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
+    const runB488 = async (records: any[]) => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('REVELATION_TEMPORAL_CLUSTER fires when >75% of revelations fall in one structural third', async () => {
+      // n=9, third=3; revelations at pos 0,1,2 (all zone1) → 3/3=100% > 75% → fire
+      const recs488a = Array.from({ length: 9 }, (_, i) =>
+        makeRec488(i, {
+          revelation: [0, 1, 2].includes(i) ? 'Something is revealed here.' : null,
+        }),
+      );
+      const res = await runB488(recs488a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'REVELATION_TEMPORAL_CLUSTER'), 'REVELATION_TEMPORAL_CLUSTER should fire');
+    });
+
+    it('REVELATION_TEMPORAL_CLUSTER does not fire when revelations are distributed across thirds', async () => {
+      // n=9, third=3; revelations at pos 0 (zone1), 3 (zone2), 6 (zone3) → 1/1/1 = 33% each < 75%
+      const recs488anr = Array.from({ length: 9 }, (_, i) =>
+        makeRec488(i, {
+          revelation: [0, 3, 6].includes(i) ? 'Something is revealed.' : null,
+        }),
+      );
+      const res = await runB488(recs488anr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'REVELATION_TEMPORAL_CLUSTER'), 'REVELATION_TEMPORAL_CLUSTER should not fire');
+    });
+
+    it('REVELATION_RELATIONSHIP_PEAK_ABSENT fires when peak-relationship scene has no revelation while others do', async () => {
+      // n=8; pos 0: large relationship shift (2.0), no revelation
+      // pos 3: small relationship shift (0.5) + revelation; pos 5: revelation only
+      // maxRelMag=2.0 at pos 0 (no rev); revCount=2; relShiftCount=2; otherRelWithRev=true → fire
+      const recs488b = Array.from({ length: 8 }, (_, i) =>
+        makeRec488(i, {
+          relationshipShifts: i === 0 ? mkShift488(2.0) : i === 3 ? mkShift488(0.5) : [],
+          revelation: i === 3 ? 'She knew all along.' : i === 5 ? 'He was never there.' : null,
+        }),
+      );
+      const res = await runB488(recs488b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'REVELATION_RELATIONSHIP_PEAK_ABSENT'), 'REVELATION_RELATIONSHIP_PEAK_ABSENT should fire');
+    });
+
+    it('REVELATION_RELATIONSHIP_PEAK_ABSENT does not fire when peak-relationship scene has a revelation', async () => {
+      // Same but pos 0 now also has a revelation → peakHasRev=true → no fire
+      const recs488bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec488(i, {
+          relationshipShifts: i === 0 ? mkShift488(2.0) : i === 3 ? mkShift488(0.5) : [],
+          revelation: [0, 3, 5].includes(i) ? 'Truth emerges.' : null,
+        }),
+      );
+      const res = await runB488(recs488bnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'REVELATION_RELATIONSHIP_PEAK_ABSENT'), 'REVELATION_RELATIONSHIP_PEAK_ABSENT should not fire');
+    });
+
+    it('ASSERTION_NEGATIVE_DECOUPLED fires when no assertion scene coincides with a negative emotional shift', async () => {
+      // n=8; assertions at pos 0 (neutral) and 3 (positive); negative scenes at pos 1 and 5
+      // no assertion is negative → fire
+      const recs488c = Array.from({ length: 8 }, (_, i) =>
+        makeRec488(i, {
+          emotionalShift: i === 3 ? 'positive' : [1, 5].includes(i) ? 'negative' : 'neutral',
+          dialogueHighlights: [0, 3].includes(i) ? ['CHAR: She claims the plan will work.'] : [],
+        }),
+      );
+      const res = await runB488(recs488c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'ASSERTION_NEGATIVE_DECOUPLED'), 'ASSERTION_NEGATIVE_DECOUPLED should fire');
+    });
+
+    it('ASSERTION_NEGATIVE_DECOUPLED does not fire when an assertion lands in a negative-emotion scene', async () => {
+      // n=8; assertion at pos 0 (negative emotional shift) → anyNegAssertion=true → no fire
+      const recs488cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec488(i, {
+          emotionalShift: [0, 5].includes(i) ? 'negative' : 'neutral',
+          dialogueHighlights: [0, 3].includes(i) ? ['CHAR: She claims the plan will work.'] : [],
+        }),
+      );
+      const res = await runB488(recs488cnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'ASSERTION_NEGATIVE_DECOUPLED'), 'ASSERTION_NEGATIVE_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 474 — beliefPass: assertion temporal cluster, revelation emotional aftermath flat, assertion curiosity aftermath void', async () => {
     const makeRec474 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
