@@ -28107,6 +28107,82 @@ The lights go out.`;
     });
   });
 
+  describe('Wave 490 — dialoguePass: dialogue verbal peak uncaused, dialogue negative scene void, dialogue scene temporal cluster', async () => {
+    const makeRec490 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
+      sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false,
+      revelation: null, dramaticTurn: 'nothing', payoffSetupIds: [], relationshipShifts: [],
+      emotionalShift: 'neutral', seededClueIds: [], dialogueHighlights: [], unresolvedClues: [],
+      purpose: '', slug: `s${sceneIdx}`, ...extra,
+    });
+    const runD490 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    // Build fountain with per-scene dialogue line counts; dlgFn(i) returns number of dialogue lines
+    const buildScenes490 = (count: number, dlgFn: (i: number) => number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\n`;
+        const n = dlgFn(i);
+        for (let j = 0; j < n; j++) {
+          f += j % 2 === 0 ? `ALICE\nShe found the documents this morning.\n\n` : `BOB\nWe leave before the gate closes tonight.\n\n`;
+        }
+        if (n === 0) f += `The door crashes open. A figure steps from the dark.\n\n`;
+      }
+      return f;
+    };
+
+    it('DIALOGUE_VERBAL_PEAK_UNCAUSED fires when peak-dialogue scene has no prior causal driver', async () => {
+      // n=8; scene 4 has 6 dialogue lines (peak); all others have 2; records[2] and [3] are flat
+      const f490a = buildScenes490(8, i => i === 4 ? 6 : 2);
+      const recs490a = Array.from({ length: 8 }, (_, i) => makeRec490(i));
+      const res = await runD490(f490a, recs490a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_VERBAL_PEAK_UNCAUSED'), 'DIALOGUE_VERBAL_PEAK_UNCAUSED should fire');
+    });
+
+    it('DIALOGUE_VERBAL_PEAK_UNCAUSED does not fire when prior scene has a structural driver', async () => {
+      // Same but rec[3] (just before peak at 4) has suspenseDelta=2 → hasCause=true → no fire
+      const f490anr = buildScenes490(8, i => i === 4 ? 6 : 2);
+      const recs490anr = Array.from({ length: 8 }, (_, i) => makeRec490(i, i === 3 ? { suspenseDelta: 2 } : {}));
+      const res = await runD490(f490anr, recs490anr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_VERBAL_PEAK_UNCAUSED'), 'DIALOGUE_VERBAL_PEAK_UNCAUSED should not fire');
+    });
+
+    it('DIALOGUE_NEGATIVE_SCENE_VOID fires when all negative-emotion scenes have no dialogue', async () => {
+      // n=8; negative scenes at 1,4 (no dialogue); other 6 scenes have 2 lines each → ≥5 active
+      const f490b = buildScenes490(8, i => [1, 4].includes(i) ? 0 : 2);
+      const recs490b = Array.from({ length: 8 }, (_, i) =>
+        makeRec490(i, [1, 4].includes(i) ? { emotionalShift: 'negative' } : {}));
+      const res = await runD490(f490b, recs490b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_NEGATIVE_SCENE_VOID'), 'DIALOGUE_NEGATIVE_SCENE_VOID should fire');
+    });
+
+    it('DIALOGUE_NEGATIVE_SCENE_VOID does not fire when a negative scene carries dialogue', async () => {
+      // Scene 1 (negative) now has 2 dialogue lines → not all silent → no fire
+      const f490bnr = buildScenes490(8, i => i === 4 ? 0 : 2);
+      const recs490bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec490(i, [1, 4].includes(i) ? { emotionalShift: 'negative' } : {}));
+      const res = await runD490(f490bnr, recs490bnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_NEGATIVE_SCENE_VOID'), 'DIALOGUE_NEGATIVE_SCENE_VOID should not fire');
+    });
+
+    it('DIALOGUE_SCENE_TEMPORAL_CLUSTER fires when >75% of dialogue scenes fall in one third', async () => {
+      // n=12; third=4; dialogue scenes at 0,1,2,3 (all in zone1); scenes 4-11 silent → 4/4=100% > 75%
+      const f490c = buildScenes490(12, i => i < 4 ? 2 : 0);
+      const recs490c = Array.from({ length: 12 }, (_, i) => makeRec490(i));
+      const res = await runD490(f490c, recs490c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_SCENE_TEMPORAL_CLUSTER'), 'DIALOGUE_SCENE_TEMPORAL_CLUSTER should fire');
+    });
+
+    it('DIALOGUE_SCENE_TEMPORAL_CLUSTER does not fire when dialogue scenes are distributed across thirds', async () => {
+      // n=12; third=4; dialogue at 0 (zone1), 4 (zone2), 8 (zone3), 11 (zone3) → max=2/4=50% ≤ 75%
+      const f490cnr = buildScenes490(12, i => [0, 4, 8, 11].includes(i) ? 2 : 0);
+      const recs490cnr = Array.from({ length: 12 }, (_, i) => makeRec490(i));
+      const res = await runD490(f490cnr, recs490cnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_SCENE_TEMPORAL_CLUSTER'), 'DIALOGUE_SCENE_TEMPORAL_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 476 — dialoguePass: clock scene void, positive scene void, dialogue dense aftermath silent', async () => {
     const makeRec476 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
       sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false,

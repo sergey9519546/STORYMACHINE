@@ -94,6 +94,17 @@
 // dialogue lines is immediately followed by a scene with zero dialogue; verbal density consistently
 // triggers a cut to silence rather than escalation; the first sequence/aftermath check in this
 // pass, distinct from the zone-silence and single-peak checks).
+// Wave 490 additions: dialogue verbal peak uncaused (backward-cause × dialogue density peak —
+// n≥8, ≥5 scenes with dialogue; the scene with the highest per-scene dialogue line count at
+// records pos≥2 has no structural driver in the 2 prior records; first backward-cause check
+// in this pass, distinct from DIALOGUE_TENSION_PEAK_SILENT which fires on absence AT the peak
+// not backward-cause BEFORE it), dialogue negative scene void (co-occurrence × negative emotional
+// shift × dialogue absence — all negative-emotion scenes have no dialogue; the negative-valence
+// complement of DIALOGUE_POSITIVE_SCENE_VOID, completing the emotional-register co-occurrence pair),
+// dialogue scene temporal cluster (distribution/timing × dialogue-presence × thirds — n≥9, ≥4
+// scenes with any dialogue, >75% in one structural third; distinct from CLIMAX_VOID and OPENING_
+// SILENT which fire on ZERO dialogue in a zone, and from HEDGE_FRONT_LOADED and QUESTION_BACK_
+// LOADED which track specific dialogue CONTENT not scene-level presence).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2423,6 +2434,131 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `Every one of the ${denseSceneIdxs476c.length} dialogue-dense scenes (≥3 spoken lines) is immediately followed by a scene with no dialogue — verbal density consistently triggers a cut to complete silence. This decouples verbal momentum from its aftermath: a rich exchange of words should provoke a continuation, reaction, or escalation in voice, but instead each dense scene is followed by an entirely unspoken scene. When the pattern is consistent, the verbal layer never compounds across scene boundaries — the script treats spoken density as a terminal event rather than as a force that propagates into what follows.`,
           suggestedFix: `Give at least one dialogue-dense scene a verbally active sequel: let the scene that follows continue or escalate the exchange — a follow-up confrontation, a reaction spoken aloud, or a scene where characters process what was just said. The aftermath of a dense verbal scene is where its stakes are felt; rendering it consistently in silence drains the verbal momentum precisely when it should compound.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 490: DIALOGUE_VERBAL_PEAK_UNCAUSED, DIALOGUE_NEGATIVE_SCENE_VOID, DIALOGUE_SCENE_TEMPORAL_CLUSTER ──
+
+  // DIALOGUE_VERBAL_PEAK_UNCAUSED — backward-cause × dialogue density peak.
+  // n≥8 records, ≥5 scenes with dialogue. Find the scene with the highest per-scene dialogue line
+  // count. If it is at records pos≥2 and neither of the 2 prior records contains a structural
+  // driver (revelation, dramatic turn, suspense rise, clockRaised, seeded clues, or non-neutral
+  // emotion) → fire. The verbally richest scene arrives from narrative vacuum — an eruption of
+  // speech without a story cause that would motivate the expanded exchange.
+  // Distinct from: DIALOGUE_TENSION_PEAK_SILENT (Wave 434: single-peak × suspense channel → dialogue
+  // ABSENCE; checks what's missing AT the peak, not what's missing BEFORE it; different direction
+  // and different cause metric), DIALOGUE_DENSE_AFTERMATH_SILENT (Wave 476: checks what FOLLOWS
+  // dense scenes — aftermath direction; this checks what PRECEDES the peak — backward-cause
+  // direction). First backward-cause check in this pass.
+  if (records.length >= 8 && dialogue.length >= 5) {
+    const lineToScene490a = buildLineToSceneMap(fountain);
+    const dlgPerScene490a = new Map<number, number>();
+    for (const d of dialogue) {
+      const si = lineToScene490a[d.lineNum - 1] ?? -1;
+      if (si >= 0) dlgPerScene490a.set(si, (dlgPerScene490a.get(si) ?? 0) + 1);
+    }
+    const activeScenes490a = [...dlgPerScene490a.entries()].filter(([, cnt]) => cnt > 0);
+    if (activeScenes490a.length >= 5) {
+      const maxDlgCount490a = Math.max(...activeScenes490a.map(([, cnt]) => cnt));
+      const peakSI490a = activeScenes490a.find(([, cnt]) => cnt === maxDlgCount490a)![0];
+      const peakPos490a = records.findIndex(r => r.sceneIdx === peakSI490a);
+      if (peakPos490a >= 2) {
+        const prior1_490a = records[peakPos490a - 1] as any;
+        const prior2_490a = records[peakPos490a - 2] as any;
+        const hasCause490a = [prior1_490a, prior2_490a].some(r =>
+          r !== undefined && (
+            (r.revelation !== null && r.revelation !== '' && r.revelation !== undefined) ||
+            (r.dramaticTurn !== undefined && r.dramaticTurn !== 'nothing' && r.dramaticTurn !== '') ||
+            (r.suspenseDelta ?? 0) > 0 ||
+            r.clockRaised === true ||
+            ((r.seededClueIds ?? []).length > 0) ||
+            r.emotionalShift !== 'neutral'
+          ),
+        );
+        if (!hasCause490a) {
+          const peakRec490a = records[peakPos490a] as any;
+          issues.push({
+            location: `Scene ${peakRec490a.sceneIdx} (${peakRec490a.slug}) — peak dialogue scene (${maxDlgCount490a} lines) has no prior causal driver`,
+            rule: 'DIALOGUE_VERBAL_PEAK_UNCAUSED',
+            severity: 'minor',
+            description: `The most verbally dense scene (scene ${peakRec490a.sceneIdx}, ${maxDlgCount490a} dialogue lines) has no structural driver in the two preceding scenes — no revelation, dramatic turn, suspense rise, deadline, seeded clue, or emotional shift that would motivate an eruption of speech. The verbal peak arrives in narrative dead air: characters suddenly say a great deal without any story event having forced or provoked the expanded exchange. The most dialogue-rich scene in a script should feel earned — it should come BECAUSE something happened that demanded speech.`,
+            suggestedFix: `Give scene ${peakRec490a.sceneIdx - 1} or ${peakRec490a.sceneIdx - 2} a structural catalyst that provokes the verbal outpouring: a revelation that demands confrontation, a dramatic turn that opens new territory for speech, or an emotional escalation that forces characters to articulate what they have been suppressing.`,
+          });
+        }
+      }
+    }
+  }
+
+  // DIALOGUE_NEGATIVE_SCENE_VOID — co-occurrence × negative emotional shift × dialogue absence.
+  // n≥8 records, ≥2 negative-emotion scenes (emotionalShift==='negative'). All negative-emotion
+  // scenes have zero dialogue lines → fire. Defeat, grief, crisis, and loss are rendered entirely
+  // in silence — the story's hardest emotional moments pass without a spoken word.
+  // The negative-valence complement of DIALOGUE_POSITIVE_SCENE_VOID (Wave 476), completing the
+  // emotional-register co-occurrence pair across both polarities.
+  // Distinct from: DIALOGUE_POSITIVE_SCENE_VOID (opposite valence — this is the negative partner),
+  // DIALOGUE_CLIMAX_VOID / DIALOGUE_OPENING_SILENT (zone-absence — different structural criterion,
+  // not valence-based), DIALOGUE_TENSION_PEAK_SILENT (single-peak isolation on the ONE highest-
+  // suspense scene; this fires when ALL negative-emotion scenes are silent, a broader co-occurrence
+  // check), DIALOGUE_REVELATION_SCENE_VOID / CLOCK_SCENE_VOID (event-type, not emotional valence).
+  if (records.length >= 8 && dialogue.length >= 5) {
+    const lineToScene490b = buildLineToSceneMap(fountain);
+    const dlgPerScene490b = new Map<number, number>();
+    for (const d of dialogue) {
+      const si = lineToScene490b[d.lineNum - 1] ?? -1;
+      if (si >= 0) dlgPerScene490b.set(si, (dlgPerScene490b.get(si) ?? 0) + 1);
+    }
+    const negScenes490b = (records as any[]).filter(r => r.emotionalShift === 'negative');
+    if (negScenes490b.length >= 2) {
+      const allNegSilent490b = negScenes490b.every(r => (dlgPerScene490b.get(r.sceneIdx) ?? 0) === 0);
+      if (allNegSilent490b) {
+        issues.push({
+          location: `${negScenes490b.length} negative-emotion scene(s) — all have no dialogue`,
+          rule: 'DIALOGUE_NEGATIVE_SCENE_VOID',
+          severity: 'minor',
+          description: `Every one of the ${negScenes490b.length} scenes with a negative emotional shift contains no dialogue. The story's hardest moments — defeat, grief, crisis, and loss — are rendered entirely in silence, without any character speaking in the moment of despair. Negative emotional scenes are precisely where characters are most likely to crack: to say what they have been holding back, to rage or grieve or demand. When every negative scene is silenced, the hardest beats of the story pass without a voice, and the audience cannot hear characters processing their worst experiences.`,
+          suggestedFix: `Give at least one negative-emotion scene a dialogue line — a character who breaks under pressure, who voices their despair, who lashes out, or who asks the question they have been afraid to ask. Negative emotional scenes are the most dramatically charged moments for speech: the places where the distance between what characters say and what they feel is most compressed and most revealing.`,
+        });
+      }
+    }
+  }
+
+  // DIALOGUE_SCENE_TEMPORAL_CLUSTER — distribution/timing × dialogue-presence × thirds.
+  // n≥9 records, ≥4 scenes with any dialogue. Divide records into three equal structural thirds.
+  // If >75% of dialogue-present scenes fall in a single third → fire. The script concentrates
+  // its verbal activity in one structural zone, leaving the other two-thirds as silent spectacle.
+  // Distinct from: DIALOGUE_CLIMAX_VOID / DIALOGUE_OPENING_SILENT (zone-ABSENCE checks firing
+  // when a specific zone has ZERO dialogue; this fires on over-CONCENTRATION in one zone while
+  // other zones may have some dialogue), DIALOGUE_HEDGE_FRONT_LOADED / DIALOGUE_QUESTION_BACK_
+  // LOADED (distribution of specific dialogue CONTENT patterns — hedge language, question marks;
+  // this measures which SCENES have any dialogue at all, a scene-level presence check, not a
+  // content-pattern distribution), EMOTIONAL_ZONE_CLUSTER in causality.ts (different signal channel).
+  if (records.length >= 9 && dialogue.length >= 4) {
+    const lineToScene490c = buildLineToSceneMap(fountain);
+    const dlgPerScene490c = new Map<number, number>();
+    for (const d of dialogue) {
+      const si = lineToScene490c[d.lineNum - 1] ?? -1;
+      if (si >= 0) dlgPerScene490c.set(si, (dlgPerScene490c.get(si) ?? 0) + 1);
+    }
+    const dlgPositions490c = (records as any[])
+      .map((r, pos) => ({ pos, si: r.sceneIdx }))
+      .filter(({ si }) => (dlgPerScene490c.get(si) ?? 0) > 0)
+      .map(({ pos }) => pos);
+    if (dlgPositions490c.length >= 4) {
+      const third490c = Math.floor(records.length / 3);
+      const zone1490c = dlgPositions490c.filter(p => p < third490c).length;
+      const zone2490c = dlgPositions490c.filter(p => p >= third490c && p < 2 * third490c).length;
+      const zone3490c = dlgPositions490c.filter(p => p >= 2 * third490c).length;
+      const maxZ490c = Math.max(zone1490c, zone2490c, zone3490c);
+      if (maxZ490c / dlgPositions490c.length > 0.75) {
+        const zoneName490c = zone1490c === maxZ490c ? 'opening' : zone2490c === maxZ490c ? 'middle' : 'closing';
+        issues.push({
+          location: `${maxZ490c}/${dlgPositions490c.length} dialogue-present scenes in the ${zoneName490c} third`,
+          rule: 'DIALOGUE_SCENE_TEMPORAL_CLUSTER',
+          severity: 'minor',
+          description: `${Math.round(maxZ490c / dlgPositions490c.length * 100)}% of scenes with any dialogue (${maxZ490c} of ${dlgPositions490c.length}) fall in the ${zoneName490c} structural third. Verbal activity is concentrated in one zone while the other two-thirds of the story pass as near-silent action or montage. Sustained silent stretches across two structural thirds deny the audience verbal access to characters — their interiority, their conflicts, and their desires — for most of the runtime. A script that confines its spoken exchanges to one zone reads as if it has two different registers: one articulate zone surrounded by mute territory.`,
+          suggestedFix: `Add at least one dialogue-bearing scene in each of the ${zoneName490c === 'opening' ? 'middle and closing' : zoneName490c === 'middle' ? 'opening and closing' : 'opening and middle'} thirds currently lacking spoken exchanges. Not every scene needs dialogue, but each structural zone should have at least some verbal access to the story's characters. Move an existing dialogue scene from the ${zoneName490c} cluster, or add new dialogue beats in the silent zones.`,
         });
       }
     }
