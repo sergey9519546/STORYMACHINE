@@ -99,6 +99,17 @@
 // aftermath relationship void (sequence/aftermath × relationship × payoff trigger — no payoff
 // scene is followed by a relationship shift in next 2 scenes; fifth payoff-aftermath check
 // completing the family with the relational channel).
+// Wave 510 additions: seed revelation aftermath absent (sequence/aftermath × revelation × seed
+// trigger — ≥3 qualifying seeds none followed by a revelation in next 2 scenes while ≥2 revelation
+// scenes exist; adds the revelation channel to the seed-aftermath family, completing the five-
+// channel family alongside suspense/emotional/curiosity/dramatic-turn channels), payoff seed
+// aftermath absent (sequence/aftermath × seed × payoff trigger — ≥3 qualifying payoffs none
+// followed by a clue seed in next 2 scenes while ≥2 seed scenes exist; first seed-channel entry
+// in the payoff-aftermath family, distinct from PAYOFF_AFTERMATH_QUESTION_VOID which requires
+// BOTH seed and curiosity absence), seed drought run (run-based × seed × consecutive absence —
+// 5+ consecutive scenes with no seededClueIds while ≥3 seed scenes exist elsewhere; drought
+// mirror of CLUE_SEED_CONSECUTIVE_RUN and more targeted than SETUP_PAYOFF_DEAD_RUN which
+// requires both seeds and payoffs absent simultaneously).
 // Wave 496 additions: payoff temporal cluster (distribution/timing × payoff × thirds — >75%
 // of payoffs fall in one structural third while ≥4 exist; extends the distribution family
 // beyond binary halves to thirds, fires when the middle or closing third dominates which
@@ -2357,6 +2368,114 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `None of the story's ${qualPayoffIdxs496c.length} payoff scenes is followed by a clock raise (clockRaised or positive clockDelta) in the next two scenes, even though ${clockScenes496c.length} clock events exist elsewhere. Thread closures never tighten the story's deadline — payoffs function only as releases of tension, not as catalysts for the next urgency. The most effective payoffs are ones that close something behind the protagonist while opening something more dangerous ahead: the closed thread was the only option that bought time, and now that it is resolved, the clock becomes more audible. When every resolution is followed by clock silence, payoffs function as the story exhaling rather than as accelerants for the next act.`,
           suggestedFix: `Let at least one payoff scene be followed within two scenes by a clock raise — the closed thread reveals that the deadline is now tighter, the paid-off setup removes a buffer the protagonist was relying on, or the resolution unlocks a new escalation that demands immediate action. A payoff that feeds a clock raise converts audience satisfaction into forward dread, which is dramatically richer than satisfaction alone.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 510: SEED_REVELATION_AFTERMATH_ABSENT, PAYOFF_SEED_AFTERMATH_ABSENT, SEED_DROUGHT_RUN ──
+
+  // SEED_REVELATION_AFTERMATH_ABSENT (sequence/aftermath × revelation × seed trigger, n≥8,
+  // ≥3 qualifying seed scenes not in last 2 positions, ≥2 revelation scenes overall):
+  // Every seed scene is followed by 2 scenes with no revelation — planted clues never convert
+  // into disclosures downstream. A seed followed soon by a revelation creates compound narrative
+  // energy: the planted evidence becomes the foundation for the truth that surfaces, making both
+  // the plant and the disclosure more resonant. When every seed is followed by revelation silence,
+  // the evidence-planting and disclosure engines operate as separate machines that never cross-feed.
+  // Sequence/aftermath mode × revelation channel × seed trigger. Distinct from SEED_SUSPENSE_
+  // AFTERMATH_ABSENT (Wave 468: suspense channel), SEED_EMOTIONAL_AFTERMATH_ABSENT (Wave 468:
+  // emotional channel), SEED_CURIOSITY_AFTERMATH_ABSENT (Wave 482: curiosity channel), SEED_
+  // DRAMATIC_TURN_AFTERMATH_ABSENT (Wave 496: dramatic-turn channel): adds revelation, completing
+  // the five-channel seed-aftermath family.
+  if (records.length >= 8) {
+    const revScenes510a = (records as any[]).filter(r =>
+      r.revelation !== null && r.revelation !== undefined && r.revelation !== '',
+    );
+    const qualSeedIdxs510a = (records as any[])
+      .map((r, i) => (((r.seededClueIds ?? []) as string[]).length > 0 && i < records.length - 2 ? i : -1))
+      .filter(i => i >= 0);
+    if (qualSeedIdxs510a.length >= 3 && revScenes510a.length >= 2) {
+      const anyRevAfterSeed510a = qualSeedIdxs510a.some(idx => {
+        const window510a = (records as any[]).slice(idx + 1, idx + 3);
+        return window510a.some((r: any) => r.revelation !== null && r.revelation !== undefined && r.revelation !== '');
+      });
+      if (!anyRevAfterSeed510a) {
+        issues.push({
+          location: `All ${qualSeedIdxs510a.length} seed scene(s) — no revelation within 2 scenes`,
+          rule: 'SEED_REVELATION_AFTERMATH_ABSENT',
+          severity: 'minor',
+          description: `None of the story's ${qualSeedIdxs510a.length} clue-seeding scenes is followed by a revelation in the next two scenes, even though ${revScenes510a.length} revelation scenes exist elsewhere. When a planted thread surfaces as a revelation shortly after it is seeded, the audience sees the evidence convert into knowledge, making both the plant and the disclosure more resonant — the planted clue becomes the evidence base for the truth that surfaces. When every seed is followed by revelation silence, the evidence-planting engine and the disclosure engine operate as entirely separate machines: the audience accumulates threads without seeing them quickly convert into knowledge, and the causal connection between planted evidence and surfaced truth is harder to register.`,
+          suggestedFix: `Let at least one seed be followed within two scenes by a revelation that picks up the planted thread — the clue seeded in the earlier scene surfaces as the disclosure in the next scene or two, converting held evidence into narrative consequence. The revelation doesn't need to exhaust the thread; a partial disclosure that confirms the audience's suspicion while deepening the question is sufficient. What matters is that the seed and its downstream truth are causally visible within a short window.`,
+        });
+      }
+    }
+  }
+
+  // PAYOFF_SEED_AFTERMATH_ABSENT (sequence/aftermath × seed × payoff trigger, n≥8,
+  // ≥3 qualifying payoff scenes not in last 2 positions, ≥2 seed scenes overall):
+  // Every payoff scene is followed by 2 scenes with no new seed — resolutions never generate
+  // new threads downstream. A resolved thread should reveal what now needs tracking: the payoff
+  // opens a gap that gets filled by a fresh seed in the following scenes, converting closure
+  // into re-engagement. When every payoff is followed by seeding silence, resolutions are
+  // pure exhaust — they close loops without reactivating the engine that generated them.
+  // Sequence/aftermath mode × seed channel × payoff trigger. Distinct from PAYOFF_AFTERMATH_
+  // QUESTION_VOID (Wave 426: combined curiosity AND seed absence — a harder condition), PAYOFF_
+  // REVELATION_AFTERMATH_ABSENT (Wave 468: revelation channel), PAYOFF_CLOCK_AFTERMATH_ABSENT
+  // (Wave 496: clock channel): first seed-channel entry in the payoff-aftermath family.
+  if (records.length >= 8) {
+    const seedScenes510b = (records as any[]).filter(r =>
+      ((r.seededClueIds ?? []) as string[]).length > 0,
+    );
+    const qualPayoffIdxs510b = (records as any[])
+      .map((r, i) => (((r.payoffSetupIds ?? []) as string[]).length > 0 && i < records.length - 2 ? i : -1))
+      .filter(i => i >= 0);
+    if (qualPayoffIdxs510b.length >= 3 && seedScenes510b.length >= 2) {
+      const anySeedAfterPayoff510b = qualPayoffIdxs510b.some(idx => {
+        const window510b = (records as any[]).slice(idx + 1, idx + 3);
+        return window510b.some((r: any) => ((r.seededClueIds ?? []) as string[]).length > 0);
+      });
+      if (!anySeedAfterPayoff510b) {
+        issues.push({
+          location: `All ${qualPayoffIdxs510b.length} payoff scene(s) — no new seed within 2 scenes`,
+          rule: 'PAYOFF_SEED_AFTERMATH_ABSENT',
+          severity: 'minor',
+          description: `None of the story's ${qualPayoffIdxs510b.length} payoff scenes is followed by a clue seed (seededClueIds) in the next two scenes, even though ${seedScenes510b.length} seed scenes exist elsewhere — every thread closure is met by planting silence. Resolutions are pure exhaust: they close loops without reactivating the engine that generated them. A resolved thread should reveal what now needs tracking: the evidence that paid off exposes a layer the protagonist hadn't suspected, and that layer plants the next thread in the scenes that follow. When every payoff is followed by seeding silence, the story only ever winds down — it never converts closure into the forward pressure of new questions.`,
+          suggestedFix: `Let at least one payoff fire a new clue in the one or two scenes that follow: the closed thread reveals a new complication that the protagonist now needs to track. The new seed doesn't need to be unrelated to the payoff — it can be the consequence of the resolved thread, a new question that the answer to the old one has opened. A payoff that re-seeds the story converts resolution into momentum rather than into conclusion.`,
+        });
+      }
+    }
+  }
+
+  // SEED_DROUGHT_RUN (run-based × seed × consecutive absence, n≥8, ≥3 seed scenes elsewhere):
+  // 5+ consecutive scenes with no seededClueIds while seed scenes exist elsewhere in the story.
+  // The thread-planting engine goes dark for a sustained stretch, leaving the audience without new
+  // mysteries to track and severing the connective tissue between character action and unresolved
+  // questions. Run-based mode × seed channel. Distinct from SETUP_PAYOFF_DEAD_RUN (Wave 342:
+  // requires BOTH seeds and payoffs absent simultaneously — a harder condition; a drought of
+  // seeding during active payoffs still fires here), CLUE_SEED_CONSECUTIVE_RUN (Wave 454:
+  // consecutive seed PRESENCE — the flood mirror of this drought check).
+  if (records.length >= 8) {
+    const seedScenesElsewhere510c = (records as any[]).filter(r =>
+      ((r.seededClueIds ?? []) as string[]).length > 0,
+    );
+    if (seedScenesElsewhere510c.length >= 3) {
+      let maxDroughtRun510c = 0;
+      let curDroughtRun510c = 0;
+      for (const r of records as any[]) {
+        if (((r.seededClueIds ?? []) as string[]).length === 0) {
+          curDroughtRun510c++;
+          if (curDroughtRun510c > maxDroughtRun510c) maxDroughtRun510c = curDroughtRun510c;
+        } else {
+          curDroughtRun510c = 0;
+        }
+      }
+      if (maxDroughtRun510c >= 5) {
+        issues.push({
+          location: `${maxDroughtRun510c} consecutive scenes — seed drought`,
+          rule: 'SEED_DROUGHT_RUN',
+          severity: 'minor',
+          description: `The script has a run of ${maxDroughtRun510c} consecutive scenes without any clue seeding (seededClueIds empty) while ${seedScenesElsewhere510c.length} seed scenes exist elsewhere — the thread-planting engine goes dark for a sustained stretch. During a five-or-more scene drought, the audience is given no new mysteries to track: the story continues to develop without adding to the question-debt that keeps viewers invested between moments of explicit payoff. The connective tissue between action and unresolved question vanishes from the drought zone, and those scenes risk reading as pure event — things happening without the added layer of what this will mean for what the audience doesn't yet understand.`,
+          suggestedFix: `Plant at least one new clue within the drought run — a detail, a contradiction, a behaviour that registers as evidence for a question the audience hasn't yet been able to formulate. The seed doesn't need to be prominent; a small plant embedded in an action scene is enough to signal that the question-debt is still accumulating and that the scenes the audience is watching now will pay off later.`,
         });
       }
     }

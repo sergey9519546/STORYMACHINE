@@ -21815,6 +21815,84 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 510 — payoffPass: seed revelation aftermath absent, payoff seed aftermath absent, seed drought run', async () => {
+    const makeRec510 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain510 = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\n\nAction line for scene ${i}.`).join('\n\n');
+    const runP510 = async (records: any[]) => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      return payoffPass({ fountain: makeFountain510(records.length), original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // SEED_REVELATION_AFTERMATH_ABSENT fire: n=8; seeds at 0,1,2; revelations at 6,7 only
+    // → no seed followed within 2 scenes by a revelation → fires
+    it('SEED_REVELATION_AFTERMATH_ABSENT fires when no seed is followed within 2 scenes by a revelation', async () => {
+      const recs510a: any[] = Array.from({ length: 8 }, (_, i) => makeRec510(i, {
+        seededClueIds: [0, 1, 2].includes(i) ? ['C1'] : [],
+        revelation: [6, 7].includes(i) ? 'something revealed' : null,
+      }));
+      const res = await runP510(recs510a);
+      assert.ok(res.issues.some((x: any) => x.rule === 'SEED_REVELATION_AFTERMATH_ABSENT'), 'SEED_REVELATION_AFTERMATH_ABSENT should fire');
+    });
+
+    // SEED_REVELATION_AFTERMATH_ABSENT no-fire: revelation at 3 (within 2 of seed at 1 and 2) → no fire
+    it('SEED_REVELATION_AFTERMATH_ABSENT does not fire when at least one seed is followed by a revelation', async () => {
+      const recs510anr: any[] = Array.from({ length: 8 }, (_, i) => makeRec510(i, {
+        seededClueIds: [0, 1, 2].includes(i) ? ['C1'] : [],
+        revelation: i === 3 ? 'partial truth surfaces' : null,
+      }));
+      const res = await runP510(recs510anr);
+      assert.ok(!res.issues.some((x: any) => x.rule === 'SEED_REVELATION_AFTERMATH_ABSENT'), 'SEED_REVELATION_AFTERMATH_ABSENT should not fire');
+    });
+
+    // PAYOFF_SEED_AFTERMATH_ABSENT fire: n=8; payoffs at 0,1,2; seeds only at 6,7
+    // → no payoff followed within 2 scenes by a seed → fires
+    it('PAYOFF_SEED_AFTERMATH_ABSENT fires when no payoff is followed within 2 scenes by a new seed', async () => {
+      const recs510b: any[] = Array.from({ length: 8 }, (_, i) => makeRec510(i, {
+        payoffSetupIds: [0, 1, 2].includes(i) ? ['P1'] : [],
+        seededClueIds: [6, 7].includes(i) ? ['C2'] : [],
+      }));
+      const res = await runP510(recs510b);
+      assert.ok(res.issues.some((x: any) => x.rule === 'PAYOFF_SEED_AFTERMATH_ABSENT'), 'PAYOFF_SEED_AFTERMATH_ABSENT should fire');
+    });
+
+    // PAYOFF_SEED_AFTERMATH_ABSENT no-fire: seed at 3 (within 2 of payoff at 1 and 2) → no fire
+    it('PAYOFF_SEED_AFTERMATH_ABSENT does not fire when at least one payoff is followed by a new seed', async () => {
+      const recs510bnr: any[] = Array.from({ length: 8 }, (_, i) => makeRec510(i, {
+        payoffSetupIds: [0, 1, 2].includes(i) ? ['P1'] : [],
+        seededClueIds: i === 3 ? ['C2'] : [],
+      }));
+      const res = await runP510(recs510bnr);
+      assert.ok(!res.issues.some((x: any) => x.rule === 'PAYOFF_SEED_AFTERMATH_ABSENT'), 'PAYOFF_SEED_AFTERMATH_ABSENT should not fire');
+    });
+
+    // SEED_DROUGHT_RUN fire: n=8; seeds at 0,1,2; scenes 3-7 have no seeds → drought run of 5 → fires
+    it('SEED_DROUGHT_RUN fires when 5+ consecutive scenes have no clue seeding', async () => {
+      const recs510c: any[] = Array.from({ length: 8 }, (_, i) => makeRec510(i, {
+        seededClueIds: i < 3 ? ['C3'] : [],
+      }));
+      const res = await runP510(recs510c);
+      assert.ok(res.issues.some((x: any) => x.rule === 'SEED_DROUGHT_RUN'), 'SEED_DROUGHT_RUN should fire');
+    });
+
+    // SEED_DROUGHT_RUN no-fire: n=8; seeds at 0,1,2,7; max drought run = 4 (scenes 3-6) → no fire
+    it('SEED_DROUGHT_RUN does not fire when the longest seed-free run is only 4', async () => {
+      const recs510cnr: any[] = Array.from({ length: 8 }, (_, i) => makeRec510(i, {
+        seededClueIds: [0, 1, 2, 7].includes(i) ? ['C3'] : [],
+      }));
+      const res = await runP510(recs510cnr);
+      assert.ok(!res.issues.some((x: any) => x.rule === 'SEED_DROUGHT_RUN'), 'SEED_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 496 — payoffPass: payoff temporal cluster, seed dramatic turn aftermath absent, payoff clock aftermath absent', async () => {
     const makeRec496 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
