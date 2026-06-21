@@ -21433,6 +21433,81 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 481 — pacingPass: clock aftermath suspense flat, suspense peak uncaused, emotional peak uncaused', async () => {
+    const makeRec481 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain481 = (n: number) =>
+      Array.from({ length: n }, (_, i) =>
+        `INT. SC${i} - DAY\n\nAction line for scene ${i}.`
+      ).join('\n\n');
+    const runP481 = async (records: any[]) => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      const fountain = makeFountain481(records.length);
+      return pacingPass({ fountain, original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CLOCK_AFTERMATH_SUSPENSE_FLAT fires when no clock scene is followed by a suspense rise within 2 scenes', async () => {
+      // n=10; clock scenes at 2,5,8; aftermath 3-4, 6-7, 9 all have suspenseDelta ≤ 0 → fires
+      const recs481a = Array.from({ length: 10 }, (_, i) => makeRec481(i));
+      recs481a[2] = makeRec481(2, { clockRaised: true });
+      recs481a[5] = makeRec481(5, { clockDelta: 1 });
+      recs481a[8] = makeRec481(8, { clockRaised: true });
+      const res = await runP481(recs481a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_AFTERMATH_SUSPENSE_FLAT'), 'CLOCK_AFTERMATH_SUSPENSE_FLAT should fire');
+    });
+
+    it('CLOCK_AFTERMATH_SUSPENSE_FLAT does not fire when a clock scene is followed by a suspense rise', async () => {
+      // n=10; clock at 2; scene 3 has suspenseDelta=1 (within 1 of clock) → no fire
+      const recs481anr = Array.from({ length: 10 }, (_, i) => makeRec481(i));
+      recs481anr[2] = makeRec481(2, { clockRaised: true });
+      recs481anr[3] = makeRec481(3, { suspenseDelta: 1 });
+      recs481anr[5] = makeRec481(5, { clockDelta: 1 });
+      recs481anr[8] = makeRec481(8, { clockRaised: true });
+      const res = await runP481(recs481anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_AFTERMATH_SUSPENSE_FLAT'), 'CLOCK_AFTERMATH_SUSPENSE_FLAT should not fire');
+    });
+
+    it('SUSPENSE_PEAK_UNCAUSED fires when the highest-suspense scene has no cause in prior 2 scenes', async () => {
+      // n=10; peak suspense at scene 7 (suspenseDelta=5); scenes 5,6,7 have no clock/turn/revelation → fires
+      const recs481b = Array.from({ length: 10 }, (_, i) => makeRec481(i));
+      recs481b[7] = makeRec481(7, { suspenseDelta: 5 });
+      const res = await runP481(recs481b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SUSPENSE_PEAK_UNCAUSED'), 'SUSPENSE_PEAK_UNCAUSED should fire');
+    });
+
+    it('SUSPENSE_PEAK_UNCAUSED does not fire when the highest-suspense scene has a dramatic turn in a prior scene', async () => {
+      // n=10; peak at scene 7; scene 6 has dramaticTurn → cause present → no fire
+      const recs481bnr = Array.from({ length: 10 }, (_, i) => makeRec481(i));
+      recs481bnr[6] = makeRec481(6, { dramaticTurn: 'reversal' });
+      recs481bnr[7] = makeRec481(7, { suspenseDelta: 5 });
+      const res = await runP481(recs481bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SUSPENSE_PEAK_UNCAUSED'), 'SUSPENSE_PEAK_UNCAUSED should not fire');
+    });
+
+    it('EMOTIONAL_PEAK_UNCAUSED fires when the highest-suspense emotional scene has no cause in prior 2 scenes', async () => {
+      // n=10; emotional peak at scene 6 (negative, suspenseDelta=3); scenes 4,5,6 have no clock/turn/revelation → fires
+      const recs481c = Array.from({ length: 10 }, (_, i) => makeRec481(i));
+      recs481c[6] = makeRec481(6, { emotionalShift: 'negative', suspenseDelta: 3 });
+      const res = await runP481(recs481c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'EMOTIONAL_PEAK_UNCAUSED'), 'EMOTIONAL_PEAK_UNCAUSED should fire');
+    });
+
+    it('EMOTIONAL_PEAK_UNCAUSED does not fire when the emotional peak has a revelation in the same scene', async () => {
+      // n=10; emotional peak at scene 6 — scene 6 itself has revelation → cause present → no fire
+      const recs481cnr = Array.from({ length: 10 }, (_, i) => makeRec481(i));
+      recs481cnr[6] = makeRec481(6, { emotionalShift: 'negative', suspenseDelta: 3, revelation: 'the truth' });
+      const res = await runP481(recs481cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'EMOTIONAL_PEAK_UNCAUSED'), 'EMOTIONAL_PEAK_UNCAUSED should not fire');
+    });
+  });
+
   describe('Wave 467 — pacingPass: revelation suspense aftermath flat, clock pressure run, emotional curiosity decoupled', async () => {
     const makeRec467 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

@@ -94,6 +94,16 @@
 // decoupled (≥3 emotional and ≥3 curiosity-positive scenes never coinciding — feeling and
 // wondering always separate; co-occurrence/decoupling × emotional × curiosity, completing the
 // three-way co-occurrence family).
+// Wave 481 additions: clock aftermath suspense flat (≥3 clock-raising scenes none followed by
+// suspense rise in next 2 scenes — deadlines never escalate felt tension downstream; sequence/
+// aftermath × suspense × clock trigger, fifth aftermath check completing the trigger family),
+// suspense peak uncaused (the story's single highest-suspense scene has no clock event,
+// dramatic turn, or revelation in itself or either prior scene — the climax of tension emerges
+// from a dramatic vacuum; backward-cause × suspense peak, first backward-cause check in
+// pacing.ts), emotional peak uncaused (the single scene with highest suspenseDelta among
+// emotionally non-neutral scenes lacks any upstream cause in prior 2 scenes — the emotional
+// climax is unmotivated; backward-cause × emotional peak, second backward-cause check in
+// pacing.ts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2250,6 +2260,141 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `All ${emotionRecs467c.length} emotionally charged scenes (emotionalShift ≠ 'neutral') have flat or negative curiosityDelta, and all ${curioRecs467c.length} curiosity-raising scenes (curiosityDelta > 0) are emotionally neutral — feeling and wondering never occur together in the same beat. When emotional activation and question-raising are systematically in separate scenes, the story keeps its two most important audience-engagement systems apart: the audience can feel or wonder, but never simultaneously. The most compelling scenes combine both — a character's grief or triumph is more immersive when the audience simultaneously doesn't know what comes next.`,
           suggestedFix: "Let at least one emotionally active scene also raise a question: a revelation that strikes with grief, a moment of triumph shadowed by a new unknown, a relationship rupture that opens a mystery. The co-presence of feeling and wondering is one of narrative's most powerful combinations — the audience is simultaneously attached (through emotion) and pulled forward (through curiosity). A scene that achieves both is harder to leave than one that achieves only one.",
+        });
+      }
+    }
+  }
+
+  // ── Wave 481: CLOCK_AFTERMATH_SUSPENSE_FLAT, SUSPENSE_PEAK_UNCAUSED, EMOTIONAL_PEAK_UNCAUSED ──
+  const n481 = records.length;
+
+  // CLOCK_AFTERMATH_SUSPENSE_FLAT (sequence/aftermath × suspense × clock trigger, n≥8,
+  // ≥3 qualifying clock scenes): Three or more clock-raising scenes exist, yet not one of them
+  // is followed by a suspense rise (suspenseDelta > 0) in either of the next two scenes —
+  // deadlines never translate into felt tension downstream. A clock event should accelerate
+  // the story's danger signal: the moment a deadline appears or tightens, the audience should
+  // experience the threat in the following scenes as elevated stakes. When clock pressure
+  // consistently fails to raise suspense in its wake, the deadline operates as exposition rather
+  // than escalation — the audience is informed about time but never feels it as mounting danger.
+  // Sequence/aftermath mode × suspense channel × clock trigger. Distinct from CLOCK_PRESSURE_RUN
+  // (Wave 467: run-based × clock, consecutive presence not aftermath), CURIOSITY_AFTERMATH_FLAT
+  // (Wave 439: high-suspense trigger, not clock), REVELATION_SUSPENSE_AFTERMATH_FLAT (Wave 467:
+  // revelation trigger), SUSPENSE_EMOTIONAL_AFTERMATH_FLAT (Wave 453: suspense peak trigger):
+  // this is the fifth distinct trigger in the aftermath × suspense family, using the clock channel.
+  if (n481 >= 8) {
+    const clockRecs481a = (records as any[]).filter((r, pos) =>
+      (r.clockRaised === true || (r.clockDelta ?? 0) > 0) && pos < n481 - 1,
+    );
+    if (clockRecs481a.length >= 3) {
+      const allClockNoSuspenseAftermath481a = clockRecs481a.every((r: any) => {
+        const pos481a = (records as any[]).indexOf(r);
+        const next1481a = pos481a + 1 < n481 ? (records as any[])[pos481a + 1] : null;
+        const next2481a = pos481a + 2 < n481 ? (records as any[])[pos481a + 2] : null;
+        const susp1481a = next1481a ? (next1481a.suspenseDelta ?? 0) : 0;
+        const susp2481a = next2481a ? (next2481a.suspenseDelta ?? 0) : 0;
+        return susp1481a <= 0 && susp2481a <= 0;
+      });
+      if (allClockNoSuspenseAftermath481a) {
+        issues.push({
+          location: `${clockRecs481a.length} clock scene(s) — suspense aftermath absent`,
+          rule: 'CLOCK_AFTERMATH_SUSPENSE_FLAT',
+          severity: 'minor',
+          description: `None of the story's ${clockRecs481a.length} clock-raising scenes is followed by a suspense rise (suspenseDelta > 0) in either of the next two scenes — every deadline lands without translating into felt danger downstream. A clock event should accelerate the story's tension signal: when a deadline appears or tightens, the scenes that follow should register the threat as elevated stakes — character behavior shifts, options narrow, decisions become costlier. When clock pressure consistently fails to raise suspense in its wake, the deadline mechanism operates as exposition: the audience is told about time, but never made to feel it as mounting danger.`,
+          suggestedFix: 'Let at least one clock event directly trigger a suspense escalation in the scene or two that follow: the deadline is introduced in scene 12, and scenes 13–14 show options closing off, resources disappearing, or a confrontation becoming inevitable. The suspense in the aftermath is the structural proof that the clock is real — without it, the deadline is information, not pressure.',
+        });
+      }
+    }
+  }
+
+  // SUSPENSE_PEAK_UNCAUSED (backward-cause × suspense peak, n≥8, peak at pos≥2): The story's
+  // single highest-suspense scene has no clock event, dramatic turn, or revelation in itself or
+  // in either of the two preceding scenes — the narrative's peak tension emerges from a dramatic
+  // vacuum. A suspense peak should be the culmination of converging causes: a deadline tightening,
+  // a truth exposed, or a pivotal turn that forces a new and more dangerous situation. When the
+  // highest-tension moment in the script has no upstream cause in the surrounding scenes, the peak
+  // reads as arbitrary — it spikes not because the story has driven there but because the writer
+  // decided it should. The audience's tension is most fully earned when they can feel the
+  // approaching peak as inevitable, not feel it as sudden. Backward-cause mode × suspense peak ×
+  // cause-signal set {clock, turn, revelation}. First backward-cause check in pacing.ts. Distinct
+  // from ENDING_ON_PEAK (Wave 302: whether the peak is the final scene — position, not cause),
+  // SUSPENSE_PEAK_SCENE_UNDERWEIGHT (Wave 355: the peak scene's length — page weight, not cause),
+  // all run/aftermath/co-occurrence checks (which target patterns not singular-peak backward cause).
+  if (n481 >= 8) {
+    let peakSuspensePos481b = -1;
+    let peakSuspenseVal481b = -Infinity;
+    for (let i481b = 0; i481b < n481; i481b++) {
+      const sd481b = (records as any[])[i481b].suspenseDelta ?? 0;
+      if (sd481b > peakSuspenseVal481b) {
+        peakSuspenseVal481b = sd481b;
+        peakSuspensePos481b = i481b;
+      }
+    }
+    if (peakSuspenseVal481b > 0 && peakSuspensePos481b >= 2) {
+      const hasCause481b = [-2, -1, 0].some(offset => {
+        const r481b = (records as any[])[peakSuspensePos481b + offset];
+        return (
+          r481b.clockRaised === true ||
+          (r481b.clockDelta ?? 0) > 0 ||
+          (r481b.dramaticTurn ?? 'nothing') !== 'nothing' ||
+          (r481b.revelation !== null && r481b.revelation !== undefined && r481b.revelation !== '')
+        );
+      });
+      if (!hasCause481b) {
+        issues.push({
+          location: `Scene ${peakSuspensePos481b} — highest-suspense scene (suspenseDelta: ${peakSuspenseVal481b})`,
+          rule: 'SUSPENSE_PEAK_UNCAUSED',
+          severity: 'minor',
+          description: `The story's highest-suspense scene (Scene ${peakSuspensePos481b}, suspenseDelta: ${peakSuspenseVal481b}) has no clock event, dramatic turn, or revelation in itself or in either of the two preceding scenes — the narrative's peak tension emerges from a dramatic vacuum. A suspense peak should be the culmination of converging causes: a deadline tightening, a truth exposed, a pivot that forecloses escape. When the tensest moment in the script has no upstream cause signal in the surrounding scenes, the peak reads as arbitrary — it spikes not because the story has driven there, but because the writer chose to raise the temperature.`,
+          suggestedFix: `Add at least one of a clock event, dramatic turn, or revelation to Scene ${peakSuspensePos481b} or the two scenes before it. The peak tension should feel like the inevitable convergence of established pressures: the deadline the audience has been dreading, the truth that forces a confrontation, the pivot that removes the last exit. When the peak arrives with visible cause, the audience feels it as earned; without cause, it lands as manufactured.`,
+        });
+      }
+    }
+  }
+
+  // EMOTIONAL_PEAK_UNCAUSED (backward-cause × emotional peak, n≥8, peak at pos≥2): The single
+  // non-neutral scene with the highest suspense weight has no clock event, dramatic turn, or
+  // revelation in itself or in either of the two preceding scenes — the emotional climax of the
+  // story arrives without narrative motivation. An emotional peak should be the product of
+  // accumulated pressure: a relationship forced to its breaking point by a revelation, a turn
+  // that forces a character to feel the full weight of what they have done, a deadline that makes
+  // the emotional stakes fully visible. When the most emotionally charged scene has no upstream
+  // dramatic cause, the emotion reads as weather rather than consequence — the character feels
+  // because the story needs them to, not because events have driven them there. Backward-cause
+  // mode × emotional peak (emotionalShift ≠ neutral, highest suspenseDelta as tiebreak) × cause
+  // set {clock, turn, revelation}. Second backward-cause check in pacing.ts. Distinct from
+  // SUSPENSE_PEAK_UNCAUSED (Wave 481b: pure suspense peak — this targets the emotional peak,
+  // which may not be the same scene), SUSPENSE_EMOTION_DECOUPLED (Wave 453: co-occurrence
+  // pattern, not single-scene backward cause), EMOTIONAL_FLATLINE_RUN (Wave 453: run-based mode).
+  if (n481 >= 8) {
+    let emotPeakPos481c = -1;
+    let emotPeakSusp481c = -Infinity;
+    for (let i481c = 0; i481c < n481; i481c++) {
+      const r481c = (records as any[])[i481c];
+      if (r481c.emotionalShift !== 'neutral') {
+        const sd481c = r481c.suspenseDelta ?? 0;
+        if (sd481c > emotPeakSusp481c) {
+          emotPeakSusp481c = sd481c;
+          emotPeakPos481c = i481c;
+        }
+      }
+    }
+    if (emotPeakPos481c >= 2 && emotPeakSusp481c > 0) {
+      const hasCause481c = [-2, -1, 0].some(offset => {
+        const r481c = (records as any[])[emotPeakPos481c + offset];
+        return (
+          r481c.clockRaised === true ||
+          (r481c.clockDelta ?? 0) > 0 ||
+          (r481c.dramaticTurn ?? 'nothing') !== 'nothing' ||
+          (r481c.revelation !== null && r481c.revelation !== undefined && r481c.revelation !== '')
+        );
+      });
+      if (!hasCause481c) {
+        issues.push({
+          location: `Scene ${emotPeakPos481c} — highest-suspense emotional scene (emotionalShift: ${(records as any[])[emotPeakPos481c].emotionalShift}, suspenseDelta: ${emotPeakSusp481c})`,
+          rule: 'EMOTIONAL_PEAK_UNCAUSED',
+          severity: 'minor',
+          description: `The story's most dramatically charged emotional scene (Scene ${emotPeakPos481c}, the non-neutral scene with the highest suspenseDelta) has no clock event, dramatic turn, or revelation in itself or in either of the two preceding scenes — the emotional climax arrives without narrative motivation. An emotional peak should be the consequence of accumulated pressure: a revelation that forces a character to confront what they have avoided, a turn that makes the full emotional cost visible, a deadline that strips the last protection. Without an upstream cause, the emotion reads as weather — a feeling that exists because the story needs it rather than because events have driven the character there.`,
+          suggestedFix: `Provide Scene ${emotPeakPos481c}'s emotional peak with a dramatic cause in itself or the prior two scenes: a revelation that reframes everything, a dramatic turn that closes the character's last exit, or a clock event that makes waiting any longer impossible. The cause doesn't need to be the only reason for the emotion — but one visible dramatic trigger in the surrounding scenes transforms the peak from mood into consequence, and consequence is always more moving than mood.`,
         });
       }
     }
