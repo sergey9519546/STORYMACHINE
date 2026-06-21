@@ -25903,6 +25903,92 @@ I always listen.
     });
   });
 
+  describe('Wave 520 — conflictPass: rupture payoff aftermath void, repair front-loaded, curiosity closing zone absent', async () => {
+    const rup520 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
+    const makeRec520 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF520 = async (records: any[]) => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    it('CONFLICT_RUPTURE_PAYOFF_AFTERMATH_VOID fires when every rupture aftermath has no payoff', async () => {
+      // 10 scenes: ruptures at 1,3; payoffs at 6,8 — no payoff in 2-scene windows after ruptures
+      const recs520a = Array.from({ length: 10 }, (_, i) =>
+        makeRec520(i, {
+          relationshipShifts: [1, 3].includes(i) ? rup520(-0.5) : [],
+          payoffSetupIds: [6, 8].includes(i) ? ['setup1'] : [],
+        }),
+      );
+      const res = await runCF520(recs520a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_RUPTURE_PAYOFF_AFTERMATH_VOID'), 'CONFLICT_RUPTURE_PAYOFF_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_RUPTURE_PAYOFF_AFTERMATH_VOID does not fire when a payoff follows a rupture', async () => {
+      // 10 scenes: rupture at 2; payoff at 3 (one scene after) — aftermath contains a payoff
+      const recs520an = Array.from({ length: 10 }, (_, i) =>
+        makeRec520(i, {
+          relationshipShifts: [2, 5].includes(i) ? rup520(-0.5) : [],
+          payoffSetupIds: [3, 8].includes(i) ? ['setup1'] : [],
+        }),
+      );
+      const res = await runCF520(recs520an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_RUPTURE_PAYOFF_AFTERMATH_VOID'), 'CONFLICT_RUPTURE_PAYOFF_AFTERMATH_VOID should not fire');
+    });
+
+    it('CONFLICT_REPAIR_FRONT_LOADED fires when >70% of repairs are in the first half', async () => {
+      // 10 scenes: repairs at 0,1,2,3 (first half) and 8 (second half) — 4/5 = 80% front-loaded
+      const recs520b = Array.from({ length: 10 }, (_, i) =>
+        makeRec520(i, {
+          relationshipShifts: [0, 1, 2, 3, 8].includes(i) ? rup520(0.5) : [],
+        }),
+      );
+      const res = await runCF520(recs520b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_REPAIR_FRONT_LOADED'), 'CONFLICT_REPAIR_FRONT_LOADED should fire');
+    });
+
+    it('CONFLICT_REPAIR_FRONT_LOADED does not fire when repairs are spread across both halves', async () => {
+      // 10 scenes: repairs at 1,2,6,7 — 2/4 = 50%, not front-loaded
+      const recs520bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec520(i, {
+          relationshipShifts: [1, 2, 6, 7].includes(i) ? rup520(0.5) : [],
+        }),
+      );
+      const res = await runCF520(recs520bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_REPAIR_FRONT_LOADED'), 'CONFLICT_REPAIR_FRONT_LOADED should not fire');
+    });
+
+    it('CONFLICT_CURIOSITY_CLOSING_ZONE_ABSENT fires when ≥3 curiosity scenes exist but none in the final third', async () => {
+      // 9 scenes: curiosity at 0,2,4 — final third is scenes 6-8, no curiosity there
+      const recs520c = Array.from({ length: 9 }, (_, i) =>
+        makeRec520(i, { curiosityDelta: [0, 2, 4].includes(i) ? 1 : 0 }),
+      );
+      const res = await runCF520(recs520c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_CURIOSITY_CLOSING_ZONE_ABSENT'), 'CONFLICT_CURIOSITY_CLOSING_ZONE_ABSENT should fire');
+    });
+
+    it('CONFLICT_CURIOSITY_CLOSING_ZONE_ABSENT does not fire when a curiosity scene exists in the final third', async () => {
+      // 9 scenes: curiosity at 0,2,7 — scene 7 is in the final third (6-8)
+      const recs520cn = Array.from({ length: 9 }, (_, i) =>
+        makeRec520(i, { curiosityDelta: [0, 2, 7].includes(i) ? 1 : 0 }),
+      );
+      const res = await runCF520(recs520cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_CURIOSITY_CLOSING_ZONE_ABSENT'), 'CONFLICT_CURIOSITY_CLOSING_ZONE_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 506 — conflictPass: rupture seed aftermath void, revelation repair decoupled, repair closing absent', async () => {
     const rup506 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
     const makeRec506 = (idx: number, overrides: any = {}): any => ({

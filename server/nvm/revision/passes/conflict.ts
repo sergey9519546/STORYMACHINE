@@ -121,6 +121,20 @@
 // the resolution zone contains no bond-warming; distinct from CONFLICT_CLOSING_SUSPENSE_VOID which
 // audits suspense not repair, and CONFLICT_ACT3_ABSENT which audits any conflict not specifically
 // positive-shift absence).
+// Wave 520 additions: rupture payoff aftermath void (sequence/aftermath × payoff × rupture aftermath
+// — n≥8, ≥2 ruptures ≤ -0.3, ≥2 payoff scenes; every rupture followed by 2 scenes with no
+// payoffSetupIds; bond-breaking never immediately precedes thread resolution; final uncovered aftermath
+// channel completing the set alongside curiosity, suspense, clock, revelation, turn, positive-emotion,
+// and seed; distinct from CONFLICT_PAYOFF_DECOUPLED which is same-scene co-occurrence), repair front-
+// loaded (distribution/timing × positive shift × first half — n≥8, ≥4 repair scenes ≥ +0.3, >70% in
+// first half while back half has ≥1; bond healing concentrated in the opening of the story while the
+// climax zone goes without relational warming; distinct from CONFLICT_REPAIR_CLOSING_ABSENT which
+// targets only the closing third, and from ARC_RELATIONAL_FRONT_LOADED which uses a different pass),
+// curiosity closing zone absent (zone presence/absence × curiosityDelta × closing third — n≥9, ≥3
+// curiosity-positive scenes, none in final structural third; the wondering engine stops before the
+// climax; first zone check on the curiosity channel in this pass, distinct from CONFLICT_CLOSING_
+// SUSPENSE_VOID and CONFLICT_REPAIR_CLOSING_ABSENT which audit suspense and repair respectively, and
+// from CONFLICT_AFTERMATH_CURIOSITY_VOID which is an aftermath not a zone check).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2635,6 +2649,116 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
             suggestedFix: `Introduce at least one positive relationship shift in the final third — a small reconciliation, an alliance restored, or a moment of warmth between estranged characters. The repair need not be complete or permanent; even a partial thaw or a single moment of acknowledged warmth in the final act gives the audience the relational counterpoint that makes the climax emotionally complete rather than uniformly harsh.`,
           });
         }
+      }
+    }
+  }
+
+  // ── Wave 520 checks ───────────────────────────────────────────────────────
+  {
+    // CONFLICT_RUPTURE_PAYOFF_AFTERMATH_VOID — sequence/aftermath × payoff × rupture aftermath.
+    // n≥8, ≥2 ruptures (negative shift ≤ -0.3), ≥2 payoff scenes (payoffSetupIds non-empty).
+    // Every rupture is followed by 2 scenes with no payoff delivery → fire. Bond-breaking
+    // never immediately precedes resolution of any planted promise: conflict and payoff always
+    // run on separate timelines. When a bond fractures, the scenes that follow are the highest-
+    // stakes moment to cash a planted promise — the wound is fresh and the audience is maximally
+    // invested. When every rupture's aftermath is payoff-free, the conflict and foreshadowing
+    // layers are causally disconnected.
+    // Distinct from: CONFLICT_PAYOFF_DECOUPLED (Wave 394: co-occurrence × no payoff scene has
+    // a rupture IN THE SAME scene — same-scene absence not aftermath absence), all other aftermath
+    // checks (curiosity, suspense, clock, revelation, turn, positive-emotion, seed — different
+    // aftermath channels). This completes the rupture-aftermath channel set.
+    const n520a = records.length;
+    if (n520a >= 8) {
+      const ruptureRecs520a = (records as any[]).filter(r =>
+        ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+      );
+      const totalPayoffs520a = (records as any[]).filter(
+        r => ((r.payoffSetupIds ?? []) as any[]).length > 0,
+      ).length;
+      if (ruptureRecs520a.length >= 2 && totalPayoffs520a >= 2) {
+        const allNoPayoffAftermath520a = ruptureRecs520a.every((r: any) => {
+          const idx = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            if (idx + off >= records.length) continue;
+            if (((((records as any[])[idx + off] as any).payoffSetupIds ?? []) as any[]).length > 0) {
+              return false;
+            }
+          }
+          return true;
+        });
+        if (allNoPayoffAftermath520a) {
+          issues.push({
+            location: `All ${ruptureRecs520a.length} rupture aftermath windows — no payoff`,
+            rule: 'CONFLICT_RUPTURE_PAYOFF_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `Every bond-rupture in the story (${ruptureRecs520a.length} conflict scene(s)) is followed by two scenes in which no planted narrative promise is resolved, despite the story delivering ${totalPayoffs520a} payoff(s) elsewhere. When a bond fractures, the scenes that follow are the highest-stakes moment available to cash a planted promise — the audience is maximally invested and a payoff landing in that window doubles its impact. When every rupture's aftermath is payoff-free, conflict and narrative promise run on entirely separate tracks: wounds open in one part of the story and setups cash out in another, and neither amplifies the other.`,
+            suggestedFix: `After at least one major rupture, introduce a payoff beat in the following scene — a planted promise that resolves at the moment of relational strain. This doesn't require a triumphant payoff; a threat that was foreshadowed now becoming real, a secret disclosed at exactly the wrong moment, or a resource running out when it was most needed all function as payoffs that land harder against the backdrop of the fresh fracture.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // CONFLICT_REPAIR_FRONT_LOADED — distribution/timing × positive shift × first half.
+    // n≥8, ≥4 repair scenes (positive shift ≥ +0.3). >70% fall in the first half while
+    // the back half carries ≥1 → fire. Bond healing concentrated in the opening of the
+    // story means the story spends its relational warmth early, leaving the climax zone
+    // without the relational counterpoint that makes resolution resonate.
+    // Distinct from: CONFLICT_REPAIR_CLOSING_ABSENT (Wave 506: zone × final third absence —
+    // checks only the closing third, not the global first/second half distribution), ARC_
+    // RELATIONAL_FRONT_LOADED in character-arc.ts (same distribution mode on the relational
+    // channel but in a different pass; this check is specifically on positive shifts ≥ +0.3
+    // in the conflict pass, anchored to the repair signal), CONFLICT_POSITIVE_EMOTION_
+    // AFTERMATH_VOID (aftermath mode, not distribution). First distribution/timing check on
+    // the repair channel in this pass.
+    const n520b = records.length;
+    const half520b = Math.floor(n520b / 2);
+    const repairScenes520b = (records as any[]).map((r, i) => ({
+      i,
+      isRepair: ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount >= 0.3),
+    })).filter(x => x.isRepair);
+    if (n520b >= 8 && repairScenes520b.length >= 4) {
+      const frontRepair520b = repairScenes520b.filter(x => x.i < half520b).length;
+      const backRepair520b = repairScenes520b.length - frontRepair520b;
+      const ratio520b = frontRepair520b / repairScenes520b.length;
+      if (ratio520b > 0.70 && backRepair520b >= 1) {
+        issues.push({
+          location: `repair distribution: ${frontRepair520b} front / ${backRepair520b} back`,
+          rule: 'CONFLICT_REPAIR_FRONT_LOADED',
+          severity: 'minor',
+          description: `${Math.round(ratio520b * 100)}% of the script's bond-repair scenes (${frontRepair520b} of ${repairScenes520b.length}) fall in the first half, leaving the second half with only ${backRepair520b}. A story where relational warmth is concentrated early exhausts its relational optimism before the climax — the audience enters the story's resolution zone without recent evidence that bonds can improve. The climax should be the moment when the question of relational repair is most urgent; instead, the story has already answered that question (and spent the warmth) in its opening movements.`,
+          suggestedFix: `Redistribute repair scenes by moving or adding at least one positive relational shift into the second half — ideally near or in the climax zone. This need not be a complete reconciliation; a moment of acknowledged warmth, an alliance restored, or a small but genuine improvement in a key bond provides the relational counterpoint that makes the climax emotionally complete.`,
+        });
+      }
+    }
+  }
+
+  {
+    // CONFLICT_CURIOSITY_CLOSING_ZONE_ABSENT — zone presence/absence × curiosityDelta × closing third.
+    // n≥9, ≥3 curiosity-positive scenes (curiosityDelta > 0), none in the final structural third → fire.
+    // The story's wondering engine generates forward-pulling open questions throughout but goes
+    // silent precisely in the closing act — where unresolved questions should be at their most
+    // urgent and the audience's need to know should peak.
+    // Distinct from: CONFLICT_CLOSING_SUSPENSE_VOID (Wave 492: zone × suspenseDelta × closing third —
+    // different channel, tension vs. wonder), CONFLICT_REPAIR_CLOSING_ABSENT (Wave 506: zone ×
+    // positive shift × closing third — different channel), CONFLICT_AFTERMATH_CURIOSITY_VOID (Wave
+    // 422: aftermath × curiosity — different mode, this is a zone check not an aftermath check),
+    // CONFLICT_RUPTURE_CURIOSITY_DECOUPLED (Wave 478: co-occurrence × curiosity × rupture — different
+    // mode). First zone check on the curiosityDelta channel in this pass.
+    const n520c = records.length;
+    const third520c = Math.floor(n520c / 3);
+    const curiosScenes520c = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0);
+    if (n520c >= 9 && curiosScenes520c.length >= 3) {
+      const anyInFinal520c = (records as any[]).slice(2 * third520c).some(r => (r.curiosityDelta ?? 0) > 0);
+      if (!anyInFinal520c) {
+        issues.push({
+          location: `final third (scenes ${2 * third520c}–${n520c - 1}): no curiosity rise`,
+          rule: 'CONFLICT_CURIOSITY_CLOSING_ZONE_ABSENT',
+          severity: 'minor',
+          description: `The script raises curiosity in ${curiosScenes520c.length} scene(s) but none fall in the final structural third (scenes ${2 * third520c}–${n520c - 1}). The closing act is where unresolved questions should be at their most urgent — the audience's wondering should peak as the story approaches its resolution. When the curiosity channel goes silent precisely in the closing zone, the story answers its open questions (or simply stops raising new ones) before the climax, and the audience enters the resolution already knowing (or no longer wondering) rather than straining toward disclosure.`,
+          suggestedFix: `Introduce at least one curiosity-raising beat in the final structural third — a partial disclosure that opens a new angle, a detail that reframes what the audience thought they understood, or an unanswered question that the climax must resolve. Wonder that peaks just before the ending is the most powerful engine for keeping the audience invested through the final scenes.`,
+        });
       }
     }
   }
