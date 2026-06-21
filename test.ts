@@ -18713,6 +18713,99 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 500 — themePass: negative emotion aftermath silent, last resonant causeless, payoff aftermath silent', async () => {
+    const makeRec500 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const THEME500 = 'redemption forgiveness courage';
+    const themed500 = ['act of redemption'];
+    const runT500 = async (records: any[]) => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: THEME500 },
+      });
+    };
+
+    it('THEME_NEGATIVE_EMOTION_AFTERMATH_SILENT fires when no negative-shift scene is followed by a resonant scene', async () => {
+      // 9 scenes: negative at 1 and 4; themed at 0 and 7 (neither immediately after neg scenes 1 or 4) → fires
+      const recs500a = Array.from({ length: 9 }, (_, i) =>
+        makeRec500(i, {
+          emotionalShift: [1, 4].includes(i) ? 'negative' : 'neutral',
+          dialogueHighlights: [0, 7].includes(i) ? themed500 : [],
+        }),
+      );
+      const res = await runT500(recs500a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_NEGATIVE_EMOTION_AFTERMATH_SILENT'), 'THEME_NEGATIVE_EMOTION_AFTERMATH_SILENT should fire');
+    });
+
+    it('THEME_NEGATIVE_EMOTION_AFTERMATH_SILENT does not fire when a negative scene is followed by a resonant scene', async () => {
+      // 9 scenes: negative at 1 and 4; scene 2 (after neg 1) is themed → aftermath resonance → no fire
+      const recs500anr = Array.from({ length: 9 }, (_, i) =>
+        makeRec500(i, {
+          emotionalShift: [1, 4].includes(i) ? 'negative' : 'neutral',
+          dialogueHighlights: [2, 7].includes(i) ? themed500 : [],
+        }),
+      );
+      const res = await runT500(recs500anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_NEGATIVE_EMOTION_AFTERMATH_SILENT'), 'THEME_NEGATIVE_EMOTION_AFTERMATH_SILENT should not fire');
+    });
+
+    it('THEME_LAST_RESONANT_CAUSELESS fires when the last resonant scene at idx≥2 has no cause in prior 2 scenes', async () => {
+      // 8 scenes: only scene 5 is themed; scenes 3,4 (prior 2) are flat with no structural cause → fires
+      const recs500b = Array.from({ length: 8 }, (_, i) =>
+        makeRec500(i, {
+          dialogueHighlights: i === 5 ? themed500 : [],
+        }),
+      );
+      const res = await runT500(recs500b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_LAST_RESONANT_CAUSELESS'), 'THEME_LAST_RESONANT_CAUSELESS should fire');
+    });
+
+    it('THEME_LAST_RESONANT_CAUSELESS does not fire when the prior scene has a structural cause', async () => {
+      // 8 scenes: last resonant at scene 5; scene 4 has suspenseDelta>0 (cause) → no fire
+      const recs500bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec500(i, {
+          dialogueHighlights: i === 5 ? themed500 : [],
+          suspenseDelta: i === 4 ? 2 : 0,
+        }),
+      );
+      const res = await runT500(recs500bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_LAST_RESONANT_CAUSELESS'), 'THEME_LAST_RESONANT_CAUSELESS should not fire');
+    });
+
+    it('THEME_PAYOFF_AFTERMATH_SILENT fires when no payoff scene is followed by a resonant scene', async () => {
+      // 9 scenes: payoffs at 1 and 4; themed at 0 and 7 (neither immediately after payoff scenes 1 or 4) → fires
+      const recs500c = Array.from({ length: 9 }, (_, i) =>
+        makeRec500(i, {
+          payoffSetupIds: [1, 4].includes(i) ? ['setup-A'] : [],
+          dialogueHighlights: [0, 7].includes(i) ? themed500 : [],
+        }),
+      );
+      const res = await runT500(recs500c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_PAYOFF_AFTERMATH_SILENT'), 'THEME_PAYOFF_AFTERMATH_SILENT should fire');
+    });
+
+    it('THEME_PAYOFF_AFTERMATH_SILENT does not fire when a payoff scene is followed by a resonant scene', async () => {
+      // 9 scenes: payoffs at 1 and 4; scene 2 (after payoff 1) is themed → aftermath resonance → no fire
+      const recs500cnr = Array.from({ length: 9 }, (_, i) =>
+        makeRec500(i, {
+          payoffSetupIds: [1, 4].includes(i) ? ['setup-A'] : [],
+          dialogueHighlights: [2, 7].includes(i) ? themed500 : [],
+        }),
+      );
+      const res = await runT500(recs500cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_PAYOFF_AFTERMATH_SILENT'), 'THEME_PAYOFF_AFTERMATH_SILENT should not fire');
+    });
+  });
+
   describe('Wave 486 — themePass: positive emotion aftermath silent, first resonant causeless, resonance thirds cluster', async () => {
     const makeRec486 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

@@ -112,6 +112,16 @@
 // cluster (distribution/timing × thirds × resonant scene proportion — >75% of resonant scenes fall
 // in one structural third; distinct from THEME_FRONT_LOADED which compares keyword hit density
 // first-third vs rest, and from zone checks which fire on 0 resonant scenes in a zone).
+// Wave 500 additions: negative emotion aftermath silent (sequence/aftermath × negative emotion
+// trigger → theme — n≥8, ≥2 negative-shift scenes not at last position, none followed by a
+// resonant scene; the negative-polarity aftermath complement to THEME_POSITIVE_EMOTION_AFTERMATH_SILENT,
+// completing the full emotional-polarity pair for the aftermath × emotion channel), last resonant
+// causeless (backward-cause × last resonant scene — the story's valedictory thematic beat lacks
+// any structural catalyst in the 2 prior scenes; the final-scene sibling of THEME_FIRST_RESONANT_
+// CAUSELESS, distinct from THEME_PEAK_UNMOTIVATED which targets the densest scene), payoff aftermath
+// silent (sequence/aftermath × payoff trigger → theme — n≥8, ≥2 qualifying payoff scenes not at
+// last position, none followed by a resonant scene; first aftermath check with the payoff channel,
+// distinct from THEME_REVELATION_AFTERMATH_SILENT which uses the revelation trigger).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2452,6 +2462,122 @@ export async function themePass(input: PassInput): Promise<PassResult> {
           description: `${Math.round(maxZone486c / resonantScenes.length * 100)}% of thematically resonant scenes (${maxZone486c} of ${resonantScenes.length}) fall in the ${dominantZone486c} structural third of the script. The theme is localized — it only speaks in one segment and falls silent for the other two thirds of the runtime. A theme that concentrates in one structural zone cannot accompany the audience through the full arc of the story.`,
           suggestedFix: `Distribute theme touchpoints across all three structural thirds. Add at least one scene in each of the ${dominantZone486c === 'first' ? 'second and third' : dominantZone486c === 'second' ? 'first and third' : 'first and second'} thirds that carries language, action, or image related to "${themeRaw}". Theme should compound and evolve across the full structure, not concentrate in one zone.`,
         });
+      }
+    }
+
+    // ── Wave 500: THEME_NEGATIVE_EMOTION_AFTERMATH_SILENT, THEME_LAST_RESONANT_CAUSELESS,
+    //              THEME_PAYOFF_AFTERMATH_SILENT ──────────────────────────────────────────────
+
+    // THEME_NEGATIVE_EMOTION_AFTERMATH_SILENT (sequence/aftermath × negative emotion trigger →
+    // theme, n≥8, ≥2 negative-shift scenes not at last position, none followed by resonant scene):
+    // Every scene of loss, conflict, or grief passes without the next scene picking up the theme —
+    // dark emotional beats and thematic meaning are permanently disconnected across time. The scene
+    // after a negative-shift moment is a natural fulcrum for thematic weight: the character has just
+    // suffered something, and the next beat is primed for reflection or consequence. Sequence/aftermath
+    // mode × negative emotion trigger × theme aftermath. Distinct from THEME_NEGATIVE_EMOTION_DECOUPLED
+    // (Wave 279: co-occurrence — the negative scene ITSELF is silent; this fires when the NEXT scene
+    // is silent), THEME_POSITIVE_EMOTION_AFTERMATH_SILENT (Wave 486: same mode, opposite polarity —
+    // completes the full emotional-polarity pair for the aftermath × emotion channel), THEME_DRAMATIC_
+    // TURN_AFTERMATH_SILENT (Wave 430: same mode, different trigger — turn vs negative emotion).
+    const n500a = records.length;
+    if (n500a >= 8) {
+      const negIdxs500a: number[] = [];
+      for (let i500a = 0; i500a < n500a - 1; i500a++) {
+        if (records[i500a].emotionalShift === 'negative') negIdxs500a.push(i500a);
+      }
+      if (negIdxs500a.length >= 2) {
+        const anyNegAftermath500a = negIdxs500a.some(i500a => {
+          const next500a = records[i500a + 1];
+          return sceneHasResonance(sceneTexts.get(next500a.sceneIdx) ?? '', expandedKeywords);
+        });
+        if (!anyNegAftermath500a) {
+          issues.push({
+            location: `${negIdxs500a.length} negative-shift scenes — none followed by theme resonance`,
+            rule: 'THEME_NEGATIVE_EMOTION_AFTERMATH_SILENT',
+            severity: 'minor',
+            description: `The script has ${negIdxs500a.length} scenes of negative emotional shift, but not one is followed immediately by a scene that touches "${themeRaw}". The scene after a moment of loss, conflict, or grief is a natural fulcrum for thematic weight: characters have just suffered something, and the next beat is primed for reflection, consequence, or a thematic echo of what just happened. When every dark emotional moment passes without the theme entering the next beat, the story uses loss as incident rather than meaning — the damage lands but the story never asks what it signifies.`,
+            suggestedFix: `After at least one negative-shift scene, let the next scene voice or embody "${themeRaw}" — even a single image, line, or decision that connects the loss to the story's central question. A moment of grief is a lens through which the theme can be seen more clearly; the scene immediately after it is the most receptive moment in the script for that thematic connection.`,
+          });
+        }
+      }
+    }
+
+    // THEME_LAST_RESONANT_CAUSELESS (backward-cause × last resonant scene, n≥6, last resonant
+    // scene at index ≥ 2, prior 2 scenes have no structural cause): The story's final thematic
+    // beat lacks preparation — the last scene to carry the theme appears without any preceding
+    // revelation, reversal, tension, deadline, or emotional charge. The theme's last voicing
+    // should arrive with structural weight, not as a stray coda. A closing thematic moment that
+    // appears causeless reads as an authorial safety valve appended after the real story has ended
+    // rather than as the earned crystallization of everything that preceded it. Backward-cause mode
+    // × last resonant scene. Distinct from THEME_FIRST_RESONANT_CAUSELESS (Wave 486: inaugural
+    // thematic moment, not final), THEME_PEAK_UNMOTIVATED (Wave 430: densest resonant scene, not
+    // last), THEME_ALL_RESONANCE_CAUSELESS (Wave 458: requires every resonant scene to be causeless;
+    // this fires on the last scene alone). First backward-cause check targeting the final resonant
+    // scene position.
+    if (records.length >= 6) {
+      let lastResIdx500b = -1;
+      for (let i500b = records.length - 1; i500b >= 0; i500b--) {
+        if (sceneHasResonance(sceneTexts.get(records[i500b].sceneIdx) ?? '', expandedKeywords)) {
+          lastResIdx500b = i500b;
+          break;
+        }
+      }
+      if (lastResIdx500b >= 2) {
+        const prior1_500b = records[lastResIdx500b - 1];
+        const prior2_500b = records[lastResIdx500b - 2];
+        const hasCause500b = [prior1_500b, prior2_500b].some(r =>
+          r !== undefined && (
+            (r.revelation !== null && r.revelation !== '' && r.revelation !== undefined) ||
+            (r.dramaticTurn !== undefined && r.dramaticTurn !== 'nothing' && r.dramaticTurn !== '') ||
+            r.suspenseDelta > 0 ||
+            r.clockRaised === true ||
+            r.emotionalShift !== 'neutral'
+          ),
+        );
+        if (!hasCause500b) {
+          issues.push({
+            location: `Scene ${records[lastResIdx500b].sceneIdx} (${records[lastResIdx500b].slug}) — last resonant scene, causeless`,
+            rule: 'THEME_LAST_RESONANT_CAUSELESS',
+            severity: 'minor',
+            description: `The last thematically resonant scene (scene ${records[lastResIdx500b].sceneIdx}) appears with no structural preparation — the 2 preceding scenes carry no revelation, dramatic turn, suspense rise, deadline, or emotional shift that would motivate a final thematic statement. The story's last voicing of its central meaning arrives as a coda rather than a conclusion: a thematic beat without narrative cause. When the final thematic moment is causeless, it reads as an authorial safety valve rather than the earned crystallization of everything that preceded it.`,
+            suggestedFix: `Add a structural catalyst in the scene immediately before scene ${records[lastResIdx500b].sceneIdx}: a revelation, a reversal, a moment of tension, or an emotional beat that makes the theme's final statement feel earned rather than appended. The last thematic moment should feel provoked by the story — the culmination of a narrative pressure — not added as a safety net.`,
+          });
+        }
+      }
+    }
+
+    // THEME_PAYOFF_AFTERMATH_SILENT (sequence/aftermath × payoff trigger → theme, n≥8, ≥2
+    // qualifying payoff scenes [payoffSetupIds non-empty, pos < n-1], none followed by a resonant
+    // next scene): Every scene that resolves a planted setup passes without the next scene touching
+    // the theme — payoffs close narrative loops but never prompt thematic reflection. A scene that
+    // delivers on a planted setup is a moment of structural completion: what was promised has arrived.
+    // That completion is a natural gateway for theme because it asks why the payoff mattered — what
+    // it cost and what it means for the characters. Sequence/aftermath mode × payoff trigger × theme
+    // aftermath. Distinct from THEME_REVELATION_AFTERMATH_SILENT (Wave 444: revelation trigger — a
+    // different structural event), THEME_POSITIVE_EMOTION_AFTERMATH_SILENT (Wave 486: positive
+    // emotion trigger, not payoff), THEME_PAYOFF_PEAK_ABSENT (Wave 402: single-peak isolation —
+    // the densest payoff scene itself is mute; this checks what happens AFTER payoff scenes). First
+    // aftermath check with the payoff channel.
+    const n500c = records.length;
+    if (n500c >= 8) {
+      const payoffIdxs500c: number[] = [];
+      for (let i500c = 0; i500c < n500c - 1; i500c++) {
+        if (((records[i500c].payoffSetupIds ?? []) as any[]).length > 0) payoffIdxs500c.push(i500c);
+      }
+      if (payoffIdxs500c.length >= 2) {
+        const anyPayoffAftermath500c = payoffIdxs500c.some(i500c => {
+          const next500c = records[i500c + 1];
+          return sceneHasResonance(sceneTexts.get(next500c.sceneIdx) ?? '', expandedKeywords);
+        });
+        if (!anyPayoffAftermath500c) {
+          issues.push({
+            location: `${payoffIdxs500c.length} payoff scene(s) — none followed by theme resonance`,
+            rule: 'THEME_PAYOFF_AFTERMATH_SILENT',
+            severity: 'minor',
+            description: `The script has ${payoffIdxs500c.length} scenes that deliver on planted setups (non-empty payoffSetupIds), but not one is followed immediately by a scene that touches "${themeRaw}". A payoff scene is a moment of structural completion — what was promised has arrived. That completion is a natural gateway for theme: it asks why the resolution mattered, what it cost, and what it means for the characters. When no payoff scene is followed by a resonant next beat, the story treats resolution as purely mechanical: loops close without meaning being extracted from them.`,
+            suggestedFix: `After at least one payoff scene, let the next scene voice or embody "${themeRaw}" — even a single moment that connects the resolution to the story's central question. A payoff is not just the end of a planted setup; it is a narrative event with meaning. The scene immediately after it is the most natural moment to ask: what did that resolution mean for the theme?`,
+          });
+        }
       }
     }
   }
