@@ -20966,6 +20966,89 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 482 — payoffPass: seed curiosity aftermath absent, seed act 3 void, payoff aftermath relationship void', async () => {
+    const makeRec482 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain482 = (n: number) =>
+      Array.from({ length: n }, (_, i) =>
+        `INT. SC${i} - DAY\n\nAction line for scene ${i}.`
+      ).join('\n\n');
+    const runPay482 = async (records: any[]) => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      const fountain = makeFountain482(records.length);
+      return payoffPass({ fountain, original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('SEED_CURIOSITY_AFTERMATH_ABSENT fires when no seed scene is followed by a curiosity rise within 2 scenes', async () => {
+      // n=10; seeds at 2 and 6; aftermath 3-4 and 7-8 have curiosityDelta ≤ 0 → fires
+      const recs482a = Array.from({ length: 10 }, (_, i) => makeRec482(i));
+      recs482a[2] = makeRec482(2, { seededClueIds: ['c1'] });
+      recs482a[6] = makeRec482(6, { seededClueIds: ['c2'] });
+      const res = await runPay482(recs482a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_CURIOSITY_AFTERMATH_ABSENT'), 'SEED_CURIOSITY_AFTERMATH_ABSENT should fire');
+    });
+
+    it('SEED_CURIOSITY_AFTERMATH_ABSENT does not fire when a seed is followed by a curiosity rise within 2 scenes', async () => {
+      // n=10; seed at 2; scene 3 has curiosityDelta=0.5 → no fire
+      const recs482anr = Array.from({ length: 10 }, (_, i) => makeRec482(i));
+      recs482anr[2] = makeRec482(2, { seededClueIds: ['c1'] });
+      recs482anr[3] = makeRec482(3, { curiosityDelta: 0.5 });
+      recs482anr[6] = makeRec482(6, { seededClueIds: ['c2'] });
+      const res = await runPay482(recs482anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_CURIOSITY_AFTERMATH_ABSENT'), 'SEED_CURIOSITY_AFTERMATH_ABSENT should not fire');
+    });
+
+    it('SEED_ACT3_VOID fires when 4+ seeds exist but none fall in the final 25%', async () => {
+      // n=12 (act3=9); 4 seeds at scenes 1,3,5,7 — all before scene 9 → fires
+      const recs482b = Array.from({ length: 12 }, (_, i) => makeRec482(i));
+      recs482b[1] = makeRec482(1, { seededClueIds: ['c1'] });
+      recs482b[3] = makeRec482(3, { seededClueIds: ['c2'] });
+      recs482b[5] = makeRec482(5, { seededClueIds: ['c3'] });
+      recs482b[7] = makeRec482(7, { seededClueIds: ['c4'] });
+      const res = await runPay482(recs482b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_ACT3_VOID'), 'SEED_ACT3_VOID should fire');
+    });
+
+    it('SEED_ACT3_VOID does not fire when at least one seed falls in the final 25%', async () => {
+      // n=12 (act3=9); seed at scene 10 (in Act 3) → no fire
+      const recs482bnr = Array.from({ length: 12 }, (_, i) => makeRec482(i));
+      recs482bnr[1] = makeRec482(1, { seededClueIds: ['c1'] });
+      recs482bnr[3] = makeRec482(3, { seededClueIds: ['c2'] });
+      recs482bnr[5] = makeRec482(5, { seededClueIds: ['c3'] });
+      recs482bnr[10] = makeRec482(10, { seededClueIds: ['c4'] });
+      const res = await runPay482(recs482bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_ACT3_VOID'), 'SEED_ACT3_VOID should not fire');
+    });
+
+    it('PAYOFF_AFTERMATH_RELATIONSHIP_VOID fires when no payoff is followed by a relationship shift within 2 scenes', async () => {
+      // n=10; payoffs at 2,5,8; aftermath scenes have no relationship shifts → fires
+      const recs482c = Array.from({ length: 10 }, (_, i) => makeRec482(i));
+      recs482c[2] = makeRec482(2, { payoffSetupIds: ['s1'] });
+      recs482c[5] = makeRec482(5, { payoffSetupIds: ['s2'] });
+      recs482c[8] = makeRec482(8, { payoffSetupIds: ['s3'] });
+      const res = await runPay482(recs482c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_AFTERMATH_RELATIONSHIP_VOID'), 'PAYOFF_AFTERMATH_RELATIONSHIP_VOID should fire');
+    });
+
+    it('PAYOFF_AFTERMATH_RELATIONSHIP_VOID does not fire when a payoff is followed by a relationship shift', async () => {
+      // n=10; payoff at 2; scene 3 has a relationship shift → no fire
+      const recs482cnr = Array.from({ length: 10 }, (_, i) => makeRec482(i));
+      recs482cnr[2] = makeRec482(2, { payoffSetupIds: ['s1'] });
+      recs482cnr[3] = makeRec482(3, { relationshipShifts: [{ pairKey: 'A|B', dimension: 'trust', amount: 0.3 }] });
+      recs482cnr[5] = makeRec482(5, { payoffSetupIds: ['s2'] });
+      recs482cnr[8] = makeRec482(8, { payoffSetupIds: ['s3'] });
+      const res = await runPay482(recs482cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_AFTERMATH_RELATIONSHIP_VOID'), 'PAYOFF_AFTERMATH_RELATIONSHIP_VOID should not fire');
+    });
+  });
+
   describe('Wave 468 — payoffPass: payoff revelation aftermath absent, seed suspense aftermath absent, seed emotional aftermath absent', async () => {
     const makeRec468 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

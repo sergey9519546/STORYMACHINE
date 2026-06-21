@@ -91,6 +91,14 @@
 // suspense recoil), seed emotional aftermath absent (sequence/aftermath × emotional × seed
 // trigger — no seed scene is followed by an emotional shift within 2 scenes; second seed-
 // aftermath check, completes the seed aftermath triad alongside seed suspense aftermath).
+// Wave 482 additions: seed curiosity aftermath absent (sequence/aftermath × curiosity × seed
+// trigger — no seed scene is followed by a curiosity rise in next 2 scenes; third seed-aftermath
+// check completing the triad alongside suspense and emotional channels), seed act 3 void (zone
+// presence/absence × seed × Act 3 — ≥4 seeds but none in final 25%, Act 3 plants no new
+// threads while still resolving prior ones; extends zone family with a new zone/channel), payoff
+// aftermath relationship void (sequence/aftermath × relationship × payoff trigger — no payoff
+// scene is followed by a relationship shift in next 2 scenes; fifth payoff-aftermath check
+// completing the family with the relational channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2118,6 +2126,113 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `None of the story's ${seedIdxs468c.length} clue-seeding scenes is followed by an emotional shift (emotionalShift ≠ 'neutral') in the next two scenes — planted threads produce no felt reaction from any character. A new unknown should register emotionally: the character who encounters it should show dread, curiosity, relief, or alarm in the scenes that follow. When every seed is followed by two emotionally neutral scenes, the clue exists purely as information — the audience is asked to hold a thread that no character appears to feel the weight of. Threads the characters visibly react to are threads the audience remembers.`,
           suggestedFix: 'After at least one clue-seeding scene, let a character react emotionally in the next scene or the one after: the evidence they encounter leaves them shaken, hopeful, afraid, or resolute. The emotional response does not need to be dramatic — even quiet unease or grim recognition tells the audience that what was just planted matters. A thread the characters respond to emotionally is far more memorable than one they catalogue without reaction.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 482: SEED_CURIOSITY_AFTERMATH_ABSENT, SEED_ACT3_VOID, PAYOFF_AFTERMATH_RELATIONSHIP_VOID ──
+
+  // SEED_CURIOSITY_AFTERMATH_ABSENT (sequence/aftermath × curiosity × seed trigger, n≥8,
+  // ≥2 seed scenes not in last 2 positions): No clue-seeding scene is followed by a curiosity
+  // rise (curiosityDelta > 0) in either of the next two scenes — planted threads open no
+  // forward questions in the audience. A new clue should activate the audience's "what does
+  // this mean?" reflex: the scenes after the planting should register the new unknown as a
+  // question that pulls them forward. When every seed scene is followed by two scenes of flat
+  // or falling curiosity, the planted threads are filed away rather than ignited — the audience
+  // holds new information without being made to wonder about it. Sequence/aftermath mode ×
+  // curiosity channel × seed trigger. Distinct from CLUE_SEED_CURIOSITY_FLAT (Wave 328: the
+  // seed scene's own curiosityDelta ≤ 0 — same-scene charge, not aftermath), SEED_SUSPENSE_
+  // AFTERMATH_ABSENT (Wave 468: suspense channel, same trigger), SEED_EMOTIONAL_AFTERMATH_ABSENT
+  // (Wave 468: emotional channel, same trigger): this completes the three-channel seed-aftermath
+  // family (suspense / emotional / curiosity).
+  if (records.length >= 8) {
+    const seedIdxs482a = (records as any[])
+      .map((r, i) => (((r.seededClueIds ?? []) as string[]).length > 0 ? i : -1))
+      .filter(i => i >= 0 && i < records.length - 1);
+    if (seedIdxs482a.length >= 2) {
+      const anyCurioAftermath482a = seedIdxs482a.some(idx => {
+        const window482a = (records as any[]).slice(idx + 1, idx + 3);
+        return window482a.some((a: any) => (a.curiosityDelta ?? 0) > 0);
+      });
+      if (!anyCurioAftermath482a) {
+        issues.push({
+          location: `All ${seedIdxs482a.length} seed scene(s) — no curiosity rise in the next two scenes`,
+          rule: 'SEED_CURIOSITY_AFTERMATH_ABSENT',
+          severity: 'minor',
+          description: `None of the story's ${seedIdxs482a.length} clue-seeding scenes is followed by a curiosity rise (curiosityDelta > 0) in the next two scenes — planted threads open no forward questions in the audience. A new clue should activate the "what does this mean?" reflex: the scenes that follow the plant should register the new unknown as a pull forward. When every seed is followed by two scenes of flat or falling curiosity, the evidence is archived rather than ignited — the audience stores the information without being made to wonder about its implications. A thread that doesn't raise curiosity in its wake is a thread the audience will forget.`,
+          suggestedFix: 'After at least one seed scene, let the next scene or the one after raise a direct question the audience is now burning to answer: a character discovers a partial connection, a detail the clue introduced reappears unexpectedly, or a new scene reveals that the planted evidence has implications beyond what was first apparent. The curiosity rise signals to the audience that the thread they just received is alive and pulling — not merely filed.',
+        });
+      }
+    }
+  }
+
+  // SEED_ACT3_VOID (zone presence/absence × seed × Act 3, n≥10, ≥4 seed scenes, none in
+  // final 25%): Four or more clue-seeding scenes exist but not one falls in Act 3 — the
+  // story's final act receives no new planted threads, planting nothing new while it resolves
+  // what was planted earlier. Act 3 can legitimately deliver dense payoffs without adding new
+  // seeds — but when the story has planted four or more clues and every one was introduced in
+  // Acts 1 and 2, the final act operates on a closed information set. A seed planted late in
+  // Act 3 — an unexpected detail that recontextualises what came before — is one of the most
+  // effective ways to make a final act feel structurally alive rather than merely closing.
+  // Zone presence/absence mode × seed channel × Act 3 zone. Distinct from CLUE_SEED_MIDPOINT_
+  // VOID (Wave 370: 40–60% zone void — different zone), LATE_CLUE_PLANT (Wave 356: a clue IN
+  // the final 15% — the opposite problem, too late to pay off; this checks for complete Act 3
+  // absence, not for an excessively late plant), SEED_BACKLOADED (Wave 384: >60% in first half —
+  // distribution proportion check, not zone-void), PAYOFF_ACT3_ABSENT (Wave 370: payoff void in
+  // Act 3 — same zone but payoff channel, not seed channel).
+  if (records.length >= 10) {
+    const act3Start482b = Math.floor(records.length * 0.75);
+    const allSeedRecs482b = (records as any[]).filter(r => ((r.seededClueIds ?? []) as string[]).length > 0);
+    if (allSeedRecs482b.length >= 4) {
+      const act3Seeds482b = allSeedRecs482b.filter(r => {
+        const pos482b = (records as any[]).indexOf(r);
+        return pos482b >= act3Start482b;
+      });
+      if (act3Seeds482b.length === 0) {
+        issues.push({
+          location: `Seeds — none in Act 3 (Scenes ${act3Start482b}–${records.length - 1})`,
+          rule: 'SEED_ACT3_VOID',
+          severity: 'minor',
+          description: `The story has ${allSeedRecs482b.length} clue-seeding scenes — not one falls in Act 3 (Scene ${act3Start482b} onward). The final act operates on a closed information set: it resolves threads planted in Acts 1–2 but introduces nothing new. A seed planted in Act 3 — an unexpected detail that recontextualises what came before — gives the final act structural life beyond mere closure. The audience's forward pull in Act 3 is not only sustained by approaching the climax but by the possibility that the story still has something to reveal about its own setup. Without any late seeding, Act 3 can feel like an engine that is only winding down.`,
+          suggestedFix: `Plant at least one new clue or detail in Act 3 (Scene ${act3Start482b} or later) — not so late that it cannot be addressed, but late enough to complicate the closure. An Act 3 seed might be a detail that reframes the resolution — a truth that makes the payoffs mean something different than the audience expected. The payoff of an Act 3 seed is double: it delivers new information AND changes the meaning of the threads that preceded it.`,
+        });
+      }
+    }
+  }
+
+  // PAYOFF_AFTERMATH_RELATIONSHIP_VOID (sequence/aftermath × relationship × payoff trigger,
+  // n≥8, ≥3 qualifying payoff scenes): Three or more payoff scenes exist, yet not one is
+  // followed by a relationship shift (non-empty relationshipShifts) in either of the next two
+  // scenes — every resolution lands without changing how any two characters feel about each
+  // other. Payoffs are not merely logical closures: a thread resolved should ripple through
+  // the story's relational web. When a secret is revealed, the friendship that held that secret
+  // should shift. When a planted object reappears, the person who hid it should face someone
+  // whose trust is now recalibrated. When resolutions consistently produce no relational
+  // aftermath, the story treats its characters as informational agents rather than people who
+  // feel the weight of each thread closing. Sequence/aftermath mode × relationship channel ×
+  // payoff trigger. Distinct from PAYOFF_RELATIONSHIP_DECOUPLED (Wave 328: no payoff scene
+  // itself moves a bond — same-scene co-occurrence, not aftermath), PAYOFF_EMOTIONAL_RECOIL_
+  // ABSENT (Wave 440: negative-emotion aftermath, not relational), PAYOFF_REVELATION_AFTERMATH_
+  // ABSENT (Wave 468: revelation aftermath), PAYOFF_AFTERMATH_QUESTION_VOID (Wave 426: curiosity/
+  // seed aftermath): this is the fifth payoff-aftermath check, completing the family with the
+  // relational channel.
+  if (records.length >= 8) {
+    const payoffIdxs482c = (records as any[])
+      .map((r, i) => (((r.payoffSetupIds ?? []) as string[]).length > 0 ? i : -1))
+      .filter(i => i >= 0 && i < records.length - 1);
+    if (payoffIdxs482c.length >= 3) {
+      const anyRelAftermath482c = payoffIdxs482c.some(idx => {
+        const window482c = (records as any[]).slice(idx + 1, idx + 3);
+        return window482c.some((a: any) => ((a.relationshipShifts ?? []) as any[]).length > 0);
+      });
+      if (!anyRelAftermath482c) {
+        issues.push({
+          location: `All ${payoffIdxs482c.length} payoff scene(s) — no relationship shift in the next two scenes`,
+          rule: 'PAYOFF_AFTERMATH_RELATIONSHIP_VOID',
+          severity: 'minor',
+          description: `None of the story's ${payoffIdxs482c.length} payoff scenes is followed by a relationship shift in the next two scenes — every resolution lands without changing how any two characters feel about each other. A closed thread should ripple: the revealed secret should strain the friendship that maintained it, the reappearing object should force a reckoning between characters who saw it differently, the fulfilled promise should change what one character owes another. When resolutions consistently produce no relational aftermath, the story treats its threads as information to be processed rather than events that alter people.`,
+          suggestedFix: 'After at least one payoff scene, let the next scene or two register the relational cost or gain of that resolution: the trust that shifts when a secret closes, the alliance that reforms when a thread resolves, the bond that breaks when a callback reveals who a character really is. The relational aftermath of a payoff is what makes the resolution feel earned rather than merely complete.',
         });
       }
     }
