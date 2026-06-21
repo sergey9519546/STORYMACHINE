@@ -35225,6 +35225,123 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 529 — voicePass: question zone middle absent, hesitation run, question aftermath long', async () => {
+    const runV529 = async (fountain: string) => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      return voicePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DIALOGUE_QUESTION_ZONE_MIDDLE_ABSENT fires when middle 50% has no question but outer zones do', async () => {
+      // 12 dialogue lines; midStart=3, midEnd=9; questions at idx 0,1,10,11 (outer zones only) → 4 questions, 0 in middle → fires
+      const f529a = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'Line zero outer query?', '',
+        'BOB', 'Line one outer query?', '',
+        'ALICE', 'Line two no question.', '',
+        'BOB', 'Line three no question.', '',
+        'ALICE', 'Line four no question.', '',
+        'BOB', 'Line five no question.', '',
+        'ALICE', 'Line six no question.', '',
+        'BOB', 'Line seven no question.', '',
+        'ALICE', 'Line eight no question.', '',
+        'BOB', 'Line nine no question.', '',
+        'ALICE', 'Line ten outer query?', '',
+        'BOB', 'Line eleven outer query?',
+      ].join('\n');
+      const res = await runV529(f529a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_QUESTION_ZONE_MIDDLE_ABSENT'), 'DIALOGUE_QUESTION_ZONE_MIDDLE_ABSENT should fire');
+    });
+
+    it('DIALOGUE_QUESTION_ZONE_MIDDLE_ABSENT does not fire when the middle zone has at least one question', async () => {
+      // Same 12 lines; questions at 0,1,10,11 (outer) AND at 5 (middle) → midQCount>0 → no fire
+      const f529anr = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'Line zero outer query?', '',
+        'BOB', 'Line one outer query?', '',
+        'ALICE', 'Line two no question.', '',
+        'BOB', 'Line three no question.', '',
+        'ALICE', 'Line four no question.', '',
+        'BOB', 'Line five middle query?', '',
+        'ALICE', 'Line six no question.', '',
+        'BOB', 'Line seven no question.', '',
+        'ALICE', 'Line eight no question.', '',
+        'BOB', 'Line nine no question.', '',
+        'ALICE', 'Line ten outer query?', '',
+        'BOB', 'Line eleven outer query?',
+      ].join('\n');
+      const res = await runV529(f529anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_QUESTION_ZONE_MIDDLE_ABSENT'), 'DIALOGUE_QUESTION_ZONE_MIDDLE_ABSENT should not fire');
+    });
+
+    it('DIALOGUE_HESITATION_RUN fires when 4+ consecutive dialogue lines each contain a hesitation sound', async () => {
+      // 8 dialogue lines; hesitation at idx 1,2,3,4 (run of 4) → maxHesRun=4 → fires
+      const f529b = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'Well I think this is right.', '',
+        'BOB', 'Um this is not what I expected.', '',
+        'ALICE', 'Uh I do not know what to say.', '',
+        'BOB', 'Er I am not sure about this.', '',
+        'ALICE', 'Hmm I need to think more here.', '',
+        'BOB', 'Okay that is fine enough.', '',
+        'ALICE', 'I suppose that is acceptable.', '',
+        'BOB', 'Let us proceed with the plan.',
+      ].join('\n');
+      const res = await runV529(f529b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_HESITATION_RUN'), 'DIALOGUE_HESITATION_RUN should fire');
+    });
+
+    it('DIALOGUE_HESITATION_RUN does not fire when no hesitation run reaches 4 consecutive lines', async () => {
+      // 8 dialogue lines; hesitation at idx 1,2 then non-hesitation at 3, then hesitation at 4 → max run=2 → no fire
+      const f529bnr = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'Well I think this is right.', '',
+        'BOB', 'Um this is not expected.', '',
+        'ALICE', 'Uh I do not know here.', '',
+        'BOB', 'This is fine and clear.', '',
+        'ALICE', 'Hmm I need more time.', '',
+        'BOB', 'Okay that is all right.', '',
+        'ALICE', 'I suppose that works.', '',
+        'BOB', 'Let us proceed now.',
+      ].join('\n');
+      const res = await runV529(f529bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_HESITATION_RUN'), 'DIALOGUE_HESITATION_RUN should not fire');
+    });
+
+    it('DIALOGUE_QUESTION_AFTERMATH_LONG fires when all questions are followed by responses of ≥10 words', async () => {
+      // 8 dialogue lines; questions at idx 0 and 2 (not last); responses at 1 and 3 each ≥10 words → fires
+      const f529c = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'Do you know what really happened here?', '',
+        'BOB', 'Well I think the situation was quite complex and has multiple contributing factors.', '',
+        'ALICE', 'Why exactly did you make that particular choice back then?', '',
+        'BOB', 'That choice was the result of careful deliberation over a very long period of time.', '',
+        'ALICE', 'Simple statement here now.', '',
+        'BOB', 'Regular reply here now.', '',
+        'ALICE', 'Another line here now.', '',
+        'BOB', 'Final line here.',
+      ].join('\n');
+      const res = await runV529(f529c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_QUESTION_AFTERMATH_LONG'), 'DIALOGUE_QUESTION_AFTERMATH_LONG should fire');
+    });
+
+    it('DIALOGUE_QUESTION_AFTERMATH_LONG does not fire when at least one question is followed by a short response', async () => {
+      // Same setup but response at idx 1 is short (< 10 words) → allLong = false → no fire
+      const f529cnr = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'Do you know what really happened here?', '',
+        'BOB', 'I do not know.', '',
+        'ALICE', 'Why exactly did you make that particular choice back then?', '',
+        'BOB', 'That choice was the result of careful deliberation over a very long period of time.', '',
+        'ALICE', 'Simple statement here now.', '',
+        'BOB', 'Regular reply here now.', '',
+        'ALICE', 'Another line here now.', '',
+        'BOB', 'Final line here.',
+      ].join('\n');
+      const res = await runV529(f529cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_QUESTION_AFTERMATH_LONG'), 'DIALOGUE_QUESTION_AFTERMATH_LONG should not fire');
+    });
+  });
+
   describe('Wave 515 — voicePass: dialogue exclamation run, closing zone long absent, negation run', async () => {
     const runV515 = async (fountain: string) => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');

@@ -115,6 +115,15 @@
 // longest speech ≥10 words is in the first 25%, ≥3 long speeches exist in the rest; the inverse of
 // DIALOGUE_OPENING_ZONE_LONG_ABSENT and distinct from DIALOGUE_LENGTH_OUTLIER which checks ratio to
 // mean rather than zonal position; first single-peak isolation check using positional zone).
+// Wave 529 additions: dialogue question zone middle absent (zone presence/absence × question mark ×
+// middle 50% — ≥12 dialogue lines, ≥4 questions globally, zero in middle 50% while ≥2 exist in outer
+// zones; fills the middle-zone cell in the zone × question-absence grid alongside OPENING_ZONE_... and
+// CLOSING_ZONE_QUESTION_ABSENT), dialogue hesitation run (run-based × hesitation content — ≥8 dialogue
+// lines, ≥3 hesitation lines globally, maxRun ≥4; the first run check on the hesitation channel,
+// distinct from DIALOGUE_HESITATION_FLOOD which is a global proportion check), dialogue question
+// aftermath long (sequence/aftermath × question → long response ≥10 words — ≥8 dialogue lines, ≥2
+// qualifying questions, ALL followed by ≥10-word responses; every question earns a monologue; the
+// long-response inverse of DIALOGUE_QUESTION_AFTERMATH_TERSE completing the question-aftermath pair).
 // Wave 515 additions: dialogue exclamation run (run-based × exclamation mark — ≥10 dialogue lines,
 // ≥3 !-ending lines globally, maxExclRun ≥4; the "!"-channel complement of DIALOGUE_QUESTION_RUN
 // and DIALOGUE_ASSERTION_RUN, completing the end-punctuation run triptych; distinct from DIALOGUE_
@@ -2998,6 +3007,125 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `${maxNeg515c} consecutive dialogue lines each contain a negation (no, not, never, nothing, nobody, etc.) — the dialogue sustains an unbroken wall of refusal and denial with no forward motion across the run. When consecutive lines all reject, deny, or negate without any affirmation or assertion breaking the chain, the scene signals that no one is moving toward anything: the characters are talking around a void rather than toward each other. Negation is dramatically essential — refusal and resistance drive conflict — but a run of ${maxNeg515c} consecutive negations collapses into mutual obstruction without the positive desire that gives refusal its tension.`,
             suggestedFix: `Break the negation run with at least one line that asserts, desires, or commits to something affirmative — even a small forward motion: a want, a declaration, a question that reaches toward rather than refuses. The most powerful dramatic denials land when they arrive after an assertion: "I do want this. But I can't accept those terms." is more potent than four consecutive refusals, because the refusal has something to deny.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 529: DIALOGUE_QUESTION_ZONE_MIDDLE_ABSENT, DIALOGUE_HESITATION_RUN,
+  //              DIALOGUE_QUESTION_AFTERMATH_LONG ──────────────────────────────────────────────────
+  {
+    const dlg529: string[] = [];
+    let inDlg529 = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg529 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg529 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg529 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg529) dlg529.push(t);
+    }
+
+    // DIALOGUE_QUESTION_ZONE_MIDDLE_ABSENT (zone presence/absence × question mark × middle 50%,
+    // ≥12 dialogue lines, ≥4 question-ending lines globally, zero questions in middle 50% while ≥2
+    // exist in the outer zones combined): The dialogue's middle half contains no question-ending
+    // line while questions appear in the opening and closing zones. The interrogative register —
+    // which generates uncertainty, invites response, and signals unresolved tension — is absent from
+    // the script's longest sustained zone. When no character asks a question in the middle half of the
+    // dialogue, the central section operates in a mode of pure assertion or declaration, lacking the
+    // question-and-response structure that drives natural speech. Zone presence/absence mode ×
+    // question-mark channel × middle zone. Distinct from DIALOGUE_CLOSING_ZONE_QUESTION_ABSENT
+    // (Wave 487: closing 25% — same channel, different zone), DIALOGUE_QUESTION_ZONE_CLUSTER
+    // (Wave 473: distribution/timing × thirds — fires when >75% of questions concentrate in one
+    // third; this fires when the middle 50% is completely question-free), DIALOGUE_INTERROGATIVE_
+    // SATURATION (Wave 294: global proportion of ? — no zone sensitivity).
+    if (dlg529.length >= 12) {
+      const qTotal529a = dlg529.filter(t => t.trimEnd().endsWith('?')).length;
+      if (qTotal529a >= 4) {
+        const midStart529a = Math.floor(dlg529.length * 0.25);
+        const midEnd529a = Math.floor(dlg529.length * 0.75);
+        const midQCount529a = dlg529.slice(midStart529a, midEnd529a).filter(t => t.trimEnd().endsWith('?')).length;
+        const outerQCount529a =
+          dlg529.slice(0, midStart529a).filter(t => t.trimEnd().endsWith('?')).length +
+          dlg529.slice(midEnd529a).filter(t => t.trimEnd().endsWith('?')).length;
+        if (midQCount529a === 0 && outerQCount529a >= 2) {
+          issues.push({
+            location: `Middle dialogue (lines ${midStart529a + 1}–${midEnd529a}) — no question-ending line`,
+            rule: 'DIALOGUE_QUESTION_ZONE_MIDDLE_ABSENT',
+            severity: 'minor',
+            description: `The middle 50% of dialogue (lines ${midStart529a + 1}–${midEnd529a}) contains no question-ending line, while ${outerQCount529a} questions appear in the outer zones — the script's longest sustained dialogue section is written without any interrogative moment. Questions are the mechanism by which characters express uncertainty, invite response, and signal unresolved tension. When the entire middle of the dialogue operates in pure assertion without any question-driven exchange, the central section loses the conversational dynamism that makes dialogue feel like a live negotiation rather than a sequence of declarations. The absence is most noticeable because questions exist both before and after — the middle zone has excised the interrogative register entirely.`,
+            suggestedFix: `Add at least one question-ending line in the middle zone (dialogue lines ${midStart529a + 1}–${midEnd529a}) — a character asking for information, challenging an assertion, expressing doubt, or reaching toward the other person. Even a single question in the middle of a scene changes its dynamic: the scene is no longer a succession of mutual declarations but an exchange where one character's certainty creates a gap that another has to fill.`,
+          });
+        }
+      }
+    }
+
+    // DIALOGUE_HESITATION_RUN (run-based × hesitation content, ≥8 dialogue lines, ≥3 hesitation-
+    // containing lines globally, maxHesRun ≥4): Four or more consecutive dialogue lines each contain
+    // a hesitation sound (um, uh, er, hmm, hm). A run of four hesitations collapses the dialogue into
+    // a sustained stammer where no character finds their words across the entire stretch. Individual
+    // hesitations carry dramatic information — the character is uncertain, buying time, suppressing
+    // a response — but a run of four or more consecutive hesitations signals that the scene has
+    // descended into inarticulate floundering without any moment of verbal commitment. Run-based mode
+    // × hesitation-content channel. Distinct from DIALOGUE_HESITATION_FLOOD (Wave 361: global
+    // proportion >25% — a script-wide rate that cannot detect a local run while the overall proportion
+    // stays below threshold), all run-based end-punctuation checks (QUESTION_RUN, ASSERTION_RUN,
+    // EXCLAMATION_RUN, NEGATION_RUN — different signal channel: this is the first run check on the
+    // hesitation CONTENT channel vs end-mark or negation channels).
+    if (dlg529.length >= 8) {
+      const HES_PAT529b = /\b(um|uh|er|hmm|hm)\b/i;
+      const hesTotalCount529b = dlg529.filter(t => HES_PAT529b.test(t)).length;
+      if (hesTotalCount529b >= 3) {
+        let curHes529b = 0, maxHes529b = 0;
+        for (const line of dlg529) {
+          if (HES_PAT529b.test(line)) {
+            if (++curHes529b > maxHes529b) maxHes529b = curHes529b;
+          } else {
+            curHes529b = 0;
+          }
+        }
+        if (maxHes529b >= 4) {
+          issues.push({
+            location: 'Dialogue exchange',
+            rule: 'DIALOGUE_HESITATION_RUN',
+            severity: 'minor',
+            description: `${maxHes529b} consecutive dialogue lines each contain a hesitation sound (um, uh, er, hmm, hm) — the dialogue sustains an unbroken run of verbal uncertainty without any moment of commitment or clarity. Individual hesitations carry dramatic information: a character buying time, suppressing a response, or signaling that they haven't decided what to say yet. At ${maxHes529b} consecutive lines, the sustained stammer signals that the scene has descended into inarticulate floundering — no character finds their words across the entire stretch, and the dialogue loses the verbal agency that makes speech feel dramatic rather than documentary. A scene where everyone is perpetually uncertain has no one willing to commit to anything, and without commitment there is no conflict.`,
+            suggestedFix: `Break the hesitation run with at least one line that commits: a direct assertion, a question without stalling, a response that doesn't buy time before delivering its content. The hesitation before a line is dramatically useful only when the line itself eventually arrives at something definite. Four consecutive lines of "um" and "uh" signal that the scene is stalling the scene rather than using stalling as a technique within it.`,
+          });
+        }
+      }
+    }
+
+    // DIALOGUE_QUESTION_AFTERMATH_LONG (sequence/aftermath × question → extended response ≥10 words,
+    // ≥8 dialogue lines, ≥2 question-ending lines not at last position, ALL followed by ≥10-word
+    // responses): Every question earns a monologue dump in return — interrogation always provokes
+    // extended elaboration rather than the crisp exchange of natural conversation. Where DIALOGUE_
+    // QUESTION_AFTERMATH_TERSE (Wave 501) fires when every question earns a ≤2-word deflection,
+    // this fires at the opposite extreme: every question triggers an extended monologue. When
+    // questions always get long answers, dialogue collapses into a Q&A format where interrogatives
+    // function as setup lines for extended speeches rather than as genuine conversational moves.
+    // The scene loses the conversational ping-pong that makes exchange dynamic. Sequence/aftermath
+    // mode × question trigger × extended response. Distinct from DIALOGUE_QUESTION_AFTERMATH_TERSE
+    // (Wave 501: ≤2-word response — the short-response inverse of this check), DIALOGUE_MONOLOGUE_
+    // UNPROMPTED (Wave 459: backward-cause × long speech, no question before it — long speeches that
+    // aren't question-triggered; this fires when long speeches ARE question-triggered, every time),
+    // DIALOGUE_LENGTH_OUTLIER (Wave 431: single-peak isolation — one speech dominates by ratio).
+    if (dlg529.length >= 8) {
+      const wc529c = dlg529.map(t => t.split(/\s+/).filter(Boolean).length);
+      const qAfterIdxs529c = dlg529
+        .map((t, i) => ({ t, i }))
+        .filter(({ t, i }) => t.trimEnd().endsWith('?') && i < dlg529.length - 1)
+        .map(({ i }) => i);
+      if (qAfterIdxs529c.length >= 2) {
+        const allLong529c = qAfterIdxs529c.every(i => wc529c[i + 1] >= 10);
+        if (allLong529c) {
+          issues.push({
+            location: `Dialogue — ${qAfterIdxs529c.length} question lines all followed by ≥10-word responses`,
+            rule: 'DIALOGUE_QUESTION_AFTERMATH_LONG',
+            severity: 'minor',
+            description: `Every question-ending dialogue line (${qAfterIdxs529c.length} instances) is immediately followed by a response of ≥10 words. Questions are invitations — brief, pointed, forward-facing moves. When every question earns a monologue in return, dialogue loses the conversational ping-pong that makes exchange dynamic. The scene collapses into a Q&A format where the interrogative functions purely as a prompt for extended elaboration: asking becomes a way to cue a speech rather than to receive information. Natural conversation mixes long and short responses depending on what the question demands; a uniform policy of extended answers signals that the dialogue is structured as interview rather than negotiation.`,
+            suggestedFix: `After at least one question, give a short response — an answer that answers, a deflection that deflects in one clause, a counter-question. Not every question needs an aria in response. A well-placed single sentence after a question gives the asker their due and moves the exchange forward; the monologue can then come after a moment of silence or a second, more specific question has established the invitation for it.`,
           });
         }
       }
