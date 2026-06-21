@@ -24776,6 +24776,93 @@ I always listen.
     });
   });
 
+  describe('Wave 491 — characterArcPass: clock peak emotion absent, payoff emotion decoupled, payoff aftermath emotional void', async () => {
+    const makeRec491 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runA491 = async (records: any[]) => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ARC_CLOCK_PEAK_EMOTION_ABSENT fires when the highest-clockDelta scene is emotionally neutral', async () => {
+      // n=8; clockDelta=5 at pos 3 (neutral); emotional scenes at 1 (positive) and 6 (negative)
+      const recs491a = Array.from({ length: 8 }, (_, i) =>
+        makeRec491(i, {
+          clockDelta: i === 3 ? 5 : 0,
+          emotionalShift: i === 1 ? 'positive' : i === 6 ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runA491(recs491a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'ARC_CLOCK_PEAK_EMOTION_ABSENT'), 'ARC_CLOCK_PEAK_EMOTION_ABSENT should fire');
+    });
+
+    it('ARC_CLOCK_PEAK_EMOTION_ABSENT does not fire when the peak-clockDelta scene has emotion', async () => {
+      // Same but scene 3 (peak clockDelta) is now 'negative' → not neutral → no fire
+      const recs491anr = Array.from({ length: 8 }, (_, i) =>
+        makeRec491(i, {
+          clockDelta: i === 3 ? 5 : 0,
+          emotionalShift: i === 1 ? 'positive' : [3, 6].includes(i) ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runA491(recs491anr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'ARC_CLOCK_PEAK_EMOTION_ABSENT'), 'ARC_CLOCK_PEAK_EMOTION_ABSENT should not fire');
+    });
+
+    it('ARC_PAYOFF_EMOTION_DECOUPLED fires when all payoff scenes are emotionally neutral', async () => {
+      // n=8; payoffs at 1,3,5 (all neutral); emotional at 0 (positive) and 6 (negative)
+      const recs491b = Array.from({ length: 8 }, (_, i) =>
+        makeRec491(i, {
+          payoffSetupIds: [1, 3, 5].includes(i) ? ['setup-1'] : [],
+          emotionalShift: i === 0 ? 'positive' : i === 6 ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runA491(recs491b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'ARC_PAYOFF_EMOTION_DECOUPLED'), 'ARC_PAYOFF_EMOTION_DECOUPLED should fire');
+    });
+
+    it('ARC_PAYOFF_EMOTION_DECOUPLED does not fire when at least one payoff scene has emotion', async () => {
+      // Same but scene 3 (payoff) is now 'positive' → not all neutral → no fire
+      const recs491bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec491(i, {
+          payoffSetupIds: [1, 3, 5].includes(i) ? ['setup-1'] : [],
+          emotionalShift: i === 3 ? 'positive' : i === 6 ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runA491(recs491bnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'ARC_PAYOFF_EMOTION_DECOUPLED'), 'ARC_PAYOFF_EMOTION_DECOUPLED should not fire');
+    });
+
+    it('ARC_PAYOFF_AFTERMATH_EMOTIONAL_VOID fires when every payoff scene is followed by a neutral scene', async () => {
+      // n=8; payoffs at 0,2,4 (not last); scenes 1,3,5 (aftermaths) all neutral → fire
+      const recs491c = Array.from({ length: 8 }, (_, i) =>
+        makeRec491(i, {
+          payoffSetupIds: [0, 2, 4].includes(i) ? ['setup-1'] : [],
+        }),
+      );
+      const res = await runA491(recs491c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'ARC_PAYOFF_AFTERMATH_EMOTIONAL_VOID'), 'ARC_PAYOFF_AFTERMATH_EMOTIONAL_VOID should fire');
+    });
+
+    it('ARC_PAYOFF_AFTERMATH_EMOTIONAL_VOID does not fire when a payoff aftermath has emotion', async () => {
+      // Same but scene 1 (aftermath of payoff at 0) is now 'positive' → not all neutral → no fire
+      const recs491cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec491(i, {
+          payoffSetupIds: [0, 2, 4].includes(i) ? ['setup-1'] : [],
+          emotionalShift: i === 1 ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runA491(recs491cnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'ARC_PAYOFF_AFTERMATH_EMOTIONAL_VOID'), 'ARC_PAYOFF_AFTERMATH_EMOTIONAL_VOID should not fire');
+    });
+  });
+
   describe('Wave 477 — characterArcPass: positive relational aftermath void, turn zone cluster, peak positive uncaused', async () => {
     const makeRec477 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

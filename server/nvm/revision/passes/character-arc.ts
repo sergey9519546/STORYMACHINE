@@ -103,6 +103,17 @@
 // positive-emotion scene — the most structurally climactic joy — has no revelation, no dramatic
 // turn, no suspense rise in its 2 preceding scenes; backward-cause × single-peak × positive-
 // emotion, the positive-emotion complement of ARC_PEAK_RELATIONAL_UNCAUSED).
+// Wave 491 additions: clock peak emotion absent (single-peak isolation × clock-delta × emotion —
+// n≥8, ≥2 emotional scenes, the scene with the highest clockDelta is emotionally neutral; the
+// clock-delta cell in the single-peak family alongside ARC_PEAK_SUSPENSE_EMOTION_ABSENT and
+// ARC_PEAK_CURIOSITY_EMOTION_ABSENT; distinct from ARC_CLOCK_EMOTION_DECOUPLED which fires on all
+// clockRaised scenes being neutral vs this firing on the single peak-delta scene), payoff emotion
+// decoupled (co-occurrence × payoff × emotion — n≥8, ≥3 payoff scenes, ≥2 emotional scenes, all
+// payoff scenes neutral; thread resolutions never move the protagonist; the payoff-channel
+// complement of ARC_CLOCK_EMOTION_DECOUPLED), payoff aftermath emotional void (sequence/aftermath
+// × payoff → emotional aftermath — n≥8, ≥3 payoff scenes not at last position, every immediately
+// following scene is neutral; distinct from ARC_PAYOFF_EMOTION_DECOUPLED which checks the payoff
+// scene itself, and from ARC_TURN_EMOTIONAL_AFTERMATH_VOID which uses a dramatic-turn trigger).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2266,6 +2277,101 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `The script's final positive-emotion scene (Scene ${(records as any[])[peakPos477c].sceneIdx}) — the most structurally climactic moment of joy or triumph — has no revelation, no dramatic turn, and no suspense rise in the two preceding scenes. The protagonist's peak positive moment arrives without any narrative driver: no discovery produced the victory, no reversal set it in motion, and no escalating pressure preceded the relief. The most emotionally significant positive beat should be the hardest-won — caused by a specific story event that the audience has watched build. An uncaused climactic joy feels like a tonal gift rather than a dramatic resolution.`,
           suggestedFix: `Plant a causal driver in one or both of the two scenes before the climactic positive moment: a revelation whose truth paves the way for the victory, a dramatic turn that opens the door to the positive outcome, or an escalating suspense beat that the positive scene resolves. The goal is that the audience can trace a line from a specific narrative event to the emotional peak — so the joy feels earned by the story, not granted by the author.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 491: ARC_CLOCK_PEAK_EMOTION_ABSENT, ARC_PAYOFF_EMOTION_DECOUPLED, ARC_PAYOFF_AFTERMATH_EMOTIONAL_VOID ──
+
+  // ARC_CLOCK_PEAK_EMOTION_ABSENT — Single-peak isolation × clock-delta × emotion.
+  // n≥8, ≥2 non-neutral emotional scenes. Find the scene with the highest clockDelta (> 0).
+  // If that scene is emotionally neutral while ≥2 other scenes carry emotion → fire. The story's
+  // maximum deadline escalation passes without the protagonist feeling anything — peak time
+  // pressure is emotionally inert while the arc otherwise carries feeling.
+  // Distinct from: ARC_CLOCK_EMOTION_DECOUPLED (Wave 435: co-occurrence × all clockRaised scenes
+  // neutral; this is single-peak isolation × highest clockDelta — different analytical mode and a
+  // different trigger signal), ARC_PEAK_SUSPENSE_EMOTION_ABSENT / ARC_PEAK_CURIOSITY_EMOTION_ABSENT
+  // (same mode but suspense and curiosity channels respectively; this fills the clockDelta cell in
+  // the single-peak × emotion family). First check in this pass targeting the clockDelta channel
+  // with single-peak isolation mode.
+  {
+    const n491a = records.length;
+    if (n491a >= 8) {
+      const emotionalScenes491a = (records as any[]).filter(r => r.emotionalShift !== 'neutral');
+      if (emotionalScenes491a.length >= 2) {
+        const clockDeltas491a = (records as any[]).map(r => r.clockDelta ?? 0);
+        const maxClockDelta491a = Math.max(...clockDeltas491a);
+        if (maxClockDelta491a > 0) {
+          const peakClockIdx491a = clockDeltas491a.indexOf(maxClockDelta491a);
+          const peakIsNeutral491a = (records as any[])[peakClockIdx491a].emotionalShift === 'neutral';
+          if (peakIsNeutral491a) {
+            const peakRec491a = (records as any[])[peakClockIdx491a];
+            issues.push({
+              location: `Scene ${peakRec491a.sceneIdx} (${peakRec491a.slug}) — peak clockDelta (${maxClockDelta491a}) is emotionally neutral`,
+              rule: 'ARC_CLOCK_PEAK_EMOTION_ABSENT',
+              severity: 'minor',
+              description: `The scene with the greatest time-pressure escalation (clockDelta ${maxClockDelta491a}) is emotionally neutral, while ${emotionalScenes491a.length} other scenes carry emotional charge. The story's maximum deadline moment — the single most urgent clock beat — passes without the protagonist registering any felt response. Clock pressure should generate experienced stakes: urgency that translates into the protagonist's emotional state, turning a logistical escalation into a felt crisis. When the clock peak is emotionally inert while the story otherwise carries feeling, the deadline system is decoupled from the character's inner life at precisely the moment of maximum urgency.`,
+              suggestedFix: `Give scene ${peakRec491a.sceneIdx} an emotional shift — negative (the weight of the deadline landing as dread or despair) or positive (desperate hope or defiance against the clock). The protagonist's peak urgency moment should also be their most emotionally pressured moment: the clock and the feeling should compound rather than run on parallel tracks.`,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // ARC_PAYOFF_EMOTION_DECOUPLED — Co-occurrence × payoff × emotion.
+  // n≥8, ≥3 payoff scenes (payoffSetupIds.length > 0), ≥2 non-neutral emotional scenes.
+  // All payoff scenes are emotionally neutral → fire. Thread resolutions never move the
+  // protagonist — every promise kept is delivered without any felt charge.
+  // Distinct from: ARC_CLOCK_EMOTION_DECOUPLED (Wave 435: clock-raise × emotion; this is the
+  // payoff-channel parallel completing the event-type × emotion co-occurrence family), ARC_CURIOSITY_
+  // RELATIONAL_DECOUPLED / ARC_SUSPENSE_RELATIONAL_DECOUPLED (co-occurrence × relational output
+  // channel, not emotional output), PAYOFF_NO_EMOTION in causality.ts (same logical test from the
+  // causality pass's perspective; this is the character-arc framing — asking whether the protagonist's
+  // arc ever feels the promise being kept, not just whether the story is causally inert at payoffs).
+  {
+    const payoffScenes491b = (records as any[]).filter(r => (r.payoffSetupIds ?? []).length > 0);
+    const emotionalScenes491b = (records as any[]).filter(r => r.emotionalShift !== 'neutral');
+    if (records.length >= 8 && payoffScenes491b.length >= 3 && emotionalScenes491b.length >= 2) {
+      const allPayoffNeutral491b = payoffScenes491b.every(r => r.emotionalShift === 'neutral');
+      if (allPayoffNeutral491b) {
+        issues.push({
+          location: `${payoffScenes491b.length} payoff scene(s) — all emotionally neutral`,
+          rule: 'ARC_PAYOFF_EMOTION_DECOUPLED',
+          severity: 'minor',
+          description: `Every one of the ${payoffScenes491b.length} thread-resolution scenes is emotionally neutral, while ${emotionalScenes491b.length} other scenes carry emotional charge. The protagonist never feels the satisfaction, relief, grief, or triumph of a resolved thread — payoffs deliver their dramatic resolution without any accompanying emotional stake. A payoff is among the most charged moments of a story: it answers a question the audience has been carrying, confirms or destroys what they hoped for, and completes an arc. When the protagonist registers no feeling at payoff moments, the story's structural satisfactions are delivered without emotional weight.`,
+          suggestedFix: `Give at least one payoff scene a non-neutral emotional shift — positive (relief, satisfaction, triumph when a hope is answered) or negative (grief, loss, bitter irony when the resolution costs more than expected). The protagonist's emotional state during a payoff signals to the audience what the resolution means: it teaches them how to feel about the story keeping its promises.`,
+        });
+      }
+    }
+  }
+
+  // ARC_PAYOFF_AFTERMATH_EMOTIONAL_VOID — Sequence/aftermath × payoff → emotional aftermath.
+  // n≥8, ≥3 payoff scenes (payoffSetupIds.length > 0) not at last position. The scene immediately
+  // following each payoff is emotionally neutral → fire. Thread resolutions don't produce any
+  // felt reaction in the next beat — each resolved promise is followed by an inert scene.
+  // Distinct from: ARC_PAYOFF_EMOTION_DECOUPLED (co-occurrence checking the payoff scene ITSELF;
+  // this checks the NEXT scene — aftermath direction, different temporal slot), ARC_TURN_EMOTIONAL_
+  // AFTERMATH_VOID (Wave 449: same analytical mode but dramatic-turn trigger → emotion output; this
+  // is payoff trigger → emotion output), ARC_REVELATION_RELATIONAL_AFTERMATH_VOID (Wave 463: same
+  // mode but revelation trigger and relational output channel — both trigger and channel differ).
+  {
+    const qualPayoffs491c = (records as any[])
+      .map((r, pos) => ({ r, pos }))
+      .filter(({ r, pos }) => (r.payoffSetupIds ?? []).length > 0 && pos < records.length - 1);
+    if (records.length >= 8 && qualPayoffs491c.length >= 3) {
+      const allPayoffAftermathNeutral491c = qualPayoffs491c.every(({ pos }) => {
+        const next = (records as any[])[pos + 1];
+        return next.emotionalShift === 'neutral';
+      });
+      if (allPayoffAftermathNeutral491c) {
+        issues.push({
+          location: `${qualPayoffs491c.length} payoff scene(s) — each followed immediately by an emotionally neutral scene`,
+          rule: 'ARC_PAYOFF_AFTERMATH_EMOTIONAL_VOID',
+          severity: 'minor',
+          description: `Every qualifying payoff scene (${qualPayoffs491c.length} total) is immediately followed by an emotionally neutral scene — thread resolutions never produce any felt reaction in the protagonist or the story world in the next beat. The scene after a payoff is when the resolution lands most concretely: what did the protagonist gain or lose? How does fulfilling this promise change their state? When the payoff aftermath is always neutral, resolutions are delivered and then absorbed without register — the audience gets no signal about how to feel about the story having kept its promises.`,
+          suggestedFix: `After at least one payoff scene, give the immediately following scene a non-neutral emotional shift: positive emotion (relief or triumph when the resolution is hoped-for) or negative (grief or bitterness when it comes at a cost or fails an expectation). The beat after a resolved thread is the most natural place for emotional landing.`,
         });
       }
     }
