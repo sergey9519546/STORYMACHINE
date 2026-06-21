@@ -32892,6 +32892,94 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 516 — beliefPass: revelation relationship aftermath void, revelation clock aftermath void, revelation seed aftermath void', async () => {
+    const makeRec516 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      seededClueIds: [], payoffSetupIds: [], revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], dramaticTurn: 'nothing',
+      purpose: 'development', unresolvedClues: [],
+      ...overrides,
+    });
+    const runB516 = async (records: any[]) => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('REVELATION_RELATIONSHIP_AFTERMATH_VOID fires when no revelation is followed by a relationship shift', async () => {
+      // 9 scenes: revelations at 2 and 5; relShifts at 0 and 7 (not at positions 3 or 6, immediately after revelations) → fires
+      const recs516a = Array.from({ length: 9 }, (_, i) =>
+        makeRec516(i, {
+          revelation: [2, 5].includes(i) ? 'Truth is revealed.' : null,
+          relationshipShifts: [0, 7].includes(i) ? [{ from: 'A', to: 'B', delta: 1 }] : [],
+        }),
+      );
+      const res = await runB516(recs516a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_RELATIONSHIP_AFTERMATH_VOID'), 'REVELATION_RELATIONSHIP_AFTERMATH_VOID should fire');
+    });
+
+    it('REVELATION_RELATIONSHIP_AFTERMATH_VOID does not fire when a revelation is followed by a relationship shift', async () => {
+      // 9 scenes: revelations at 2 and 5; relShift at 3 (immediately after revelation 2) → aftermath exists → no fire
+      const recs516anr = Array.from({ length: 9 }, (_, i) =>
+        makeRec516(i, {
+          revelation: [2, 5].includes(i) ? 'Truth is revealed.' : null,
+          relationshipShifts: [3, 7].includes(i) ? [{ from: 'A', to: 'B', delta: 1 }] : [],
+        }),
+      );
+      const res = await runB516(recs516anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_RELATIONSHIP_AFTERMATH_VOID'), 'REVELATION_RELATIONSHIP_AFTERMATH_VOID should not fire');
+    });
+
+    it('REVELATION_CLOCK_AFTERMATH_VOID fires when no revelation is followed by a raised clock', async () => {
+      // 9 scenes: revelations at 2 and 5; clockRaised at 0 and 7 (not at positions 3 or 6) → fires
+      const recs516b = Array.from({ length: 9 }, (_, i) =>
+        makeRec516(i, {
+          revelation: [2, 5].includes(i) ? 'Truth is revealed.' : null,
+          clockRaised: [0, 7].includes(i),
+        }),
+      );
+      const res = await runB516(recs516b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_CLOCK_AFTERMATH_VOID'), 'REVELATION_CLOCK_AFTERMATH_VOID should fire');
+    });
+
+    it('REVELATION_CLOCK_AFTERMATH_VOID does not fire when a revelation is followed by a raised clock', async () => {
+      // 9 scenes: revelations at 2 and 5; clockRaised at 3 (immediately after revelation 2) → aftermath exists → no fire
+      const recs516bnr = Array.from({ length: 9 }, (_, i) =>
+        makeRec516(i, {
+          revelation: [2, 5].includes(i) ? 'Truth is revealed.' : null,
+          clockRaised: [3, 7].includes(i),
+        }),
+      );
+      const res = await runB516(recs516bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_CLOCK_AFTERMATH_VOID'), 'REVELATION_CLOCK_AFTERMATH_VOID should not fire');
+    });
+
+    it('REVELATION_SEED_AFTERMATH_VOID fires when no revelation is followed by a seeded clue', async () => {
+      // 9 scenes: revelations at 2 and 5; seeds at 0 and 7 (not at positions 3 or 6) → fires
+      const recs516c = Array.from({ length: 9 }, (_, i) =>
+        makeRec516(i, {
+          revelation: [2, 5].includes(i) ? 'Truth is revealed.' : null,
+          seededClueIds: [0, 7].includes(i) ? ['clue-A'] : [],
+        }),
+      );
+      const res = await runB516(recs516c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_SEED_AFTERMATH_VOID'), 'REVELATION_SEED_AFTERMATH_VOID should fire');
+    });
+
+    it('REVELATION_SEED_AFTERMATH_VOID does not fire when a revelation is followed by a seeded clue', async () => {
+      // 9 scenes: revelations at 2 and 5; seed at 3 (immediately after revelation 2) → aftermath exists → no fire
+      const recs516cnr = Array.from({ length: 9 }, (_, i) =>
+        makeRec516(i, {
+          revelation: [2, 5].includes(i) ? 'Truth is revealed.' : null,
+          seededClueIds: [3, 7].includes(i) ? ['clue-B'] : [],
+        }),
+      );
+      const res = await runB516(recs516cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_SEED_AFTERMATH_VOID'), 'REVELATION_SEED_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 502 — beliefPass: revelation-seed decoupled, revelation curiosity aftermath void, assertion consecutive flood', async () => {
     const makeRec502 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

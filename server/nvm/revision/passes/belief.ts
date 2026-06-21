@@ -123,6 +123,19 @@
 // n≥8, ≥4 assertion scenes, longest consecutive run ≥ 3; claims pile up without processing
 // room, the run-based complement of ASSERTION_SINGLETON_RUN and the assertion-channel mirror
 // of REVELATION_CONSECUTIVE_FLOOD).
+// Wave 516 additions: revelation relationship aftermath void (sequence/aftermath × revelation →
+// relationship-shift aftermath — n≥8, ≥2 qualifying revelation scenes not at last position, ≥2
+// relationship-shift scenes exist globally, none of the scenes immediately following a revelation
+// carry a non-empty relationshipShifts; the relationship-channel aftermath complement of
+// REVELATION_RELATIONSHIP_DECOUPLED which checks co-occurrence in the same scene), revelation
+// clock aftermath void (sequence/aftermath × revelation → clock aftermath — n≥8, ≥2 qualifying
+// revelation scenes not at last position, ≥2 clockRaised scenes globally, none of the following
+// scenes have clockRaised=true; the clock-channel aftermath complement of REVELATION_CLOCK_DECOUPLED
+// which checks co-occurrence in the same scene), revelation seed aftermath void (sequence/aftermath
+// × revelation → seed aftermath — n≥8, ≥2 qualifying revelation scenes not at last position, ≥2
+// seeded scenes globally, none of the following scenes have seededClueIds non-empty; the aftermath
+// sibling of REVELATION_SEED_DECOUPLED which checks co-occurrence in the same scene and distinct
+// from REVELATION_CURIOSITY_AFTERMATH_VOID which uses the curiosity channel as aftermath signal).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2456,6 +2469,137 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
           description: `The script contains a run of ${maxAssRun502c} consecutive scenes in which characters state beliefs. Assertion floods — three or more consecutive belief-statement scenes — read as lectures or manifestos: the dramatic argument is repeated without plot movement, complication, or contradiction to test it. Each assertion in the run competes with the others for attention, and the audience loses the ability to sit with any single claim before the next one arrives.`,
           suggestedFix: `Break up consecutive assertion scenes with at least one intervening scene of plot action, complication, or quiet observation. Assertions are strongest when they are spaced apart so each has room to resonate — and when what happens between them appears to confirm, contradict, or complicate the claim just made.`,
         });
+      }
+    }
+  }
+
+  // ── Wave 516: REVELATION_RELATIONSHIP_AFTERMATH_VOID, REVELATION_CLOCK_AFTERMATH_VOID,
+  //              REVELATION_SEED_AFTERMATH_VOID ──────────────────────────────────────────────────
+
+  // REVELATION_RELATIONSHIP_AFTERMATH_VOID (sequence/aftermath × revelation → relationship-shift
+  // aftermath, n≥8, ≥2 qualifying revelation scenes [revelation non-null, pos < n-1], ≥2 scenes
+  // with non-empty relationshipShifts globally, none of the scenes immediately following a revelation
+  // carry a non-empty relationshipShifts): A disclosure changes what characters know about each
+  // other, yet no relationship bond shifts in the scene that follows. The revelation event is the
+  // moment most primed to alter how characters relate — a revealed truth reframes every prior
+  // interaction and pressures each relationship in its wake. When the scene after every disclosure
+  // carries no relationship shift, the belief layer and the relational layer are temporally
+  // decoupled: revelations are absorbed in isolation, never rippling into the bonds that define
+  // the story's emotional architecture. Distinctness: REVELATION_RELATIONSHIP_DECOUPLED (Wave 309:
+  // co-occurrence × same scene — the revelation scene itself has no relationship shift; this fires
+  // when the FOLLOWING scene has no shift — the aftermath direction, one temporal step later).
+  // ASSERTION_AFTERMATH_VOID (Wave 418: assertion trigger, not revelation; different trigger channel).
+  // REVELATION_RELATIONSHIP_PEAK_ABSENT (Wave 488: single-peak isolation — the specific peak
+  // relationship scene has no revelation; this checks the aftermath direction across all qualifying
+  // revelations, not just the peak).
+  {
+    const n516a = records.length;
+    if (n516a >= 8) {
+      const qualRev516a = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) =>
+          r.revelation !== null && r.revelation !== '' && r.revelation !== undefined && pos < n516a - 1,
+        );
+      const relShiftScenes516a = (records as any[]).filter(
+        r => ((r.relationshipShifts ?? []) as any[]).length > 0,
+      );
+      if (qualRev516a.length >= 2 && relShiftScenes516a.length >= 2) {
+        const anyRelAftermath516a = qualRev516a.some(({ pos }) => {
+          const next = (records as any[])[pos + 1];
+          return ((next.relationshipShifts ?? []) as any[]).length > 0;
+        });
+        if (!anyRelAftermath516a) {
+          issues.push({
+            location: `${qualRev516a.length} revelation scene(s) — none followed by a relationship shift`,
+            rule: 'REVELATION_RELATIONSHIP_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `The script has ${qualRev516a.length} revelation scenes and ${relShiftScenes516a.length} scenes with relationship shifts, but no revelation is followed immediately by a scene in which a bond changes. A disclosure is the moment most primed to alter how characters relate — a revealed truth reframes every prior interaction and pressures each relationship in its wake. When the scene after every disclosure carries no relationship shift, revelations are absorbed in emotional isolation: the belief layer and the relational layer are temporally decoupled, and the story loses the chain of cause-and-effect that makes disclosure feel consequential.`,
+            suggestedFix: `After at least one revelation scene, let the next scene show a relationship shift — a bond growing closer, more distant, or fundamentally altered by what was just revealed. A character who learns a truth should act differently toward the person who withheld it, lied about it, or was unaware of it. The scene immediately following a disclosure is the story's most natural moment to show that the reveal mattered to the people involved.`,
+          });
+        }
+      }
+    }
+  }
+
+  // REVELATION_CLOCK_AFTERMATH_VOID (sequence/aftermath × revelation → clock aftermath, n≥8, ≥2
+  // qualifying revelation scenes [revelation non-null, pos < n-1], ≥2 scenes with clockRaised=true
+  // globally, none of the scenes immediately following a revelation have clockRaised=true): Every
+  // disclosure passes without a deadline being raised in the next beat. A revelation can be the
+  // trigger that creates urgency — a truth is unveiled that forces action before time runs out.
+  // When no revelation is followed by a raised clock, the disclosure engine and the urgency engine
+  // are temporally decoupled: information surfaces without ever precipitating a deadline that would
+  // give the revelation consequence under time pressure. Distinctness: REVELATION_CLOCK_DECOUPLED
+  // (Wave 362: co-occurrence × same scene — the revelation scene itself lacks clockRaised; this
+  // fires when the FOLLOWING scene has no clockRaised — the aftermath direction). TOLD_BELIEF_CLOCK_
+  // DECOUPLED (Wave 376: assertion trigger, clock co-occurrence in same scene — different trigger
+  // and different temporal direction). The first check examining clock aftermath specifically
+  // conditioned on a revelation trigger.
+  {
+    const n516b = records.length;
+    if (n516b >= 8) {
+      const qualRev516b = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) =>
+          r.revelation !== null && r.revelation !== '' && r.revelation !== undefined && pos < n516b - 1,
+        );
+      const clockScenes516b = (records as any[]).filter(r => r.clockRaised === true);
+      if (qualRev516b.length >= 2 && clockScenes516b.length >= 2) {
+        const anyClockAftermath516b = qualRev516b.some(({ pos }) => {
+          const next = (records as any[])[pos + 1];
+          return next.clockRaised === true;
+        });
+        if (!anyClockAftermath516b) {
+          issues.push({
+            location: `${qualRev516b.length} revelation scene(s) — none followed by a raised clock`,
+            rule: 'REVELATION_CLOCK_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `The script has ${qualRev516b.length} revelation scenes and ${clockScenes516b.length} clock-raising scenes, but no revelation is immediately followed by a deadline. Revelations are a natural catalyst for urgency: a truth unveiled often forces action before time runs out — the disclosure creates a window of consequence that closes. When the scene after every revelation carries no clock raise, the disclosure and urgency engines are temporally decoupled: information surfaces without ever precipitating the time pressure that would give it dramatic consequence.`,
+            suggestedFix: `After at least one revelation, let the next scene raise a clock or deadline — a character who learns a truth should feel its urgency immediately, acting before the window of consequence closes. Even a soft deadline ("we need to settle this before the meeting tomorrow") transforms a disclosure from an information event into a dramatic driver with a ticking clock.`,
+          });
+        }
+      }
+    }
+  }
+
+  // REVELATION_SEED_AFTERMATH_VOID (sequence/aftermath × revelation → seed aftermath, n≥8, ≥2
+  // qualifying revelation scenes [revelation non-null, pos < n-1], ≥2 scenes with seededClueIds
+  // non-empty globally, none of the scenes immediately following a revelation have seededClueIds
+  // non-empty): Every disclosure passes without a new clue being planted in the next scene. The
+  // most powerful mystery engines operate as a chain: a revelation resolves one unknown while the
+  // next scene plants the seed of the next. When no revelation is followed by a seed, the
+  // disclosure event closes a loop without reopening a new one — the audience gets an answer
+  // without being primed toward a new question. Distinctness: REVELATION_SEED_DECOUPLED (Wave 502:
+  // co-occurrence × same scene — revelation and seed never appear in the SAME scene; this checks
+  // the FOLLOWING scene — the aftermath direction, one temporal step later). REVELATION_CURIOSITY_
+  // AFTERMATH_VOID (Wave 502: aftermath direction × revelation × curiosity channel — checks average
+  // curiosityDelta of the following scenes; this checks a specific structural signal: seededClueIds
+  // in the following scene, not the curiosity metric). PAYOFF_SEED_AFTERMATH_ABSENT in payoff.ts
+  // (payoff trigger → seed aftermath — a different trigger).
+  {
+    const n516c = records.length;
+    if (n516c >= 8) {
+      const qualRev516c = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) =>
+          r.revelation !== null && r.revelation !== '' && r.revelation !== undefined && pos < n516c - 1,
+        );
+      const seedScenes516c = (records as any[]).filter(
+        r => ((r.seededClueIds ?? []) as any[]).length > 0,
+      );
+      if (qualRev516c.length >= 2 && seedScenes516c.length >= 2) {
+        const anySeedAftermath516c = qualRev516c.some(({ pos }) => {
+          const next = (records as any[])[pos + 1];
+          return ((next.seededClueIds ?? []) as any[]).length > 0;
+        });
+        if (!anySeedAftermath516c) {
+          issues.push({
+            location: `${qualRev516c.length} revelation scene(s) — none followed by a seeded clue`,
+            rule: 'REVELATION_SEED_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `The script has ${qualRev516c.length} revelation scenes and ${seedScenes516c.length} clue-seeding scenes, but no revelation is followed immediately by a scene that plants a new clue. The most effective mystery engines operate as a chain: a disclosure resolves one unknown while the next scene plants the seed of the next question. When no revelation is followed by a fresh seed, the disclosure event closes a loop without reopening a new one — the audience receives an answer without being primed toward the next unknown. Each resolution that is not paired with a new seed drains the script's forward momentum.`,
+            suggestedFix: `After at least one revelation, let the next scene plant a new seed — a detail, object, or moment of behavior that the audience will want to understand. The scene immediately after a disclosure is the most receptive to a new mystery seed: the audience's curiosity has just been satisfied and is now hungry again. A revelation without a following seed treats closure as the end of the mystery rather than the beginning of the next layer.`,
+          });
+        }
       }
     }
   }
