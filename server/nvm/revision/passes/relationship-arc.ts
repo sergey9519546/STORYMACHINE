@@ -130,6 +130,18 @@
 // run (run-based × shift dimension — ≥4 consecutive shift scenes all using only one relationship
 // dimension while ≥2 distinct dimensions exist globally; a local single-axis burst distinct from
 // SHIFT_DIMENSION_CONCENTRATION which audits the whole-story proportion).
+// Wave 539 additions: pair seed flat (co-occurrence × seed × per-pair — a pair with ≥3 shifts
+// has none of its shift scenes coinciding with any seededClueId, while ≥3 seed scenes exist
+// globally; per-pair complement of RELATIONSHIP_SEED_DECOUPLED, adds the seed channel to the
+// per-pair co-occurrence family alongside clock/turn/revelation/suspense/curiosity/emotion),
+// pair payoff flat (co-occurrence × payoff × per-pair — a pair with ≥3 shifts has none of its
+// shift scenes coinciding with any payoffSetupId, while ≥3 payoff scenes exist globally; per-pair
+// complement of RELATIONSHIP_PAYOFF_DECOUPLED, adds the payoff channel to the per-pair family),
+// pair shift run (run-based × single-pair monopoly — ≥4 consecutive shift scenes all involve
+// only a single pair while ≥2 pairs with ≥2 shifts exist; one pair monopolizes a sustained
+// relational stretch; distinct from RELATIONSHIP_DIMENSION_RUN which tracks dimension monopoly,
+// PAIR_RUPTURE_RUN which tracks consecutive negative shifts from any pair, and DEPTH_GAP which
+// measures total amplitude concentration across the whole story).
 // Wave 525 additions: relationship shift seed aftermath void (sequence/aftermath × seed × shift
 // trigger — ≥3 shift scenes not in last 2 positions, ≥2 seed scenes, every shift followed by 2
 // scenes with no seededClueIds; bond-moving never activates foreshadowing in its aftermath; adds
@@ -2877,6 +2889,129 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
             severity: 'minor',
             description: `The script's ${shiftScenes525c.length} relationship-shift scenes and ${seedScenes525c.length} clue-planting scenes never coincide — bond-moving and foreshadowing are fully decoupled. The highest-impact planting locations are scenes with emotional charge, and a relationship shift is exactly that: the moment a bond moves, the audience is maximally invested in what is happening between these characters and what it might mean. Planting a clue in that context is a double investment — the audience receives both the interpersonal event and the foreshadowing of what it implies. When the two channels are always in separate scenes, each operates at half its potential.`,
             suggestedFix: `Let at least one relationship-shift scene also contain a seeded clue: a detail planted in the scene where a bond moves, a contingency prepared at the moment of fracture or repair, or a foreshadowing element that becomes significant in light of the changed dynamic. The seed in the shift scene tells the audience to carry something forward from the moment when they are already most emotionally primed.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 539: PAIR_SEED_FLAT, PAIR_PAYOFF_FLAT, PAIR_SHIFT_RUN ──
+
+  // PAIR_SEED_FLAT (co-occurrence × seed × per-pair, n≥8, ≥1 pair with ≥3 shifts, ≥3 seed scenes):
+  // At least one pair accumulates 3+ shifts but not one of them lands in a clue-planting scene,
+  // even though the story plants seeds elsewhere. This bond's movements never coincide with
+  // foreshadowing — the most emotionally charged planting contexts (those where a bond moves) are
+  // always seed-free for this pair, so the audience never receives both a relational event and a
+  // planted clue in the same beat. Per-pair complement of RELATIONSHIP_SEED_DECOUPLED (Wave 525),
+  // which fires when NO shift from ANY pair overlaps a seed — this fires when ONE pair's shifts
+  // are all seed-decoupled even though another pair's shift may coincide with a seed. Distinct from
+  // PAIR_CLOCK_FLAT (clock), PAIR_REVELATION_FLAT (revelation), PAIR_DRAMATIC_TURN_FLAT (turn).
+  if (records.length >= 8) {
+    const seedIdxSet539a = new Set<number>(
+      (records as any[]).filter(r => ((r.seededClueIds ?? []) as string[]).length > 0).map(r => r.sceneIdx),
+    );
+    if (seedIdxSet539a.size >= 3) {
+      const flatSeedPairs539a: string[] = [];
+      for (const [pairKey539a, stats539a] of pairStats) {
+        if (stats539a.shifts.length >= 3 &&
+            stats539a.shifts.every(s => !seedIdxSet539a.has(s.sceneIdx))) {
+          flatSeedPairs539a.push(pairKey539a);
+        }
+      }
+      if (flatSeedPairs539a.length > 0) {
+        issues.push({
+          location: `Pair(s) ${flatSeedPairs539a.join(', ')} — seed-decoupled shifts`,
+          rule: 'PAIR_SEED_FLAT',
+          severity: 'minor',
+          description: `${flatSeedPairs539a.length === 1 ? 'One pair' : `${flatSeedPairs539a.length} pairs`} (${flatSeedPairs539a.join('; ')}) move${flatSeedPairs539a.length === 1 ? 's' : ''} 3 or more times, yet not one of those shifts lands in a clue-planting scene, even though the story plants seeds elsewhere. This bond's movements never coincide with foreshadowing — the scenes where this relationship changes are always seed-free, so the audience never receives both a relational event and a planted clue in the same beat. The most emotionally charged planting contexts are precisely those where bonds move; when foreshadowing and bond change are always decoupled for a specific pair, each operates at a fraction of its potential compound impact.`,
+          suggestedFix: `Let at least one of this pair's shift scenes also plant a clue — a detail seeded at the moment of fracture or repair that will become significant later. The planted seed in the context of a bond change is doubly loaded: the audience carries the foreshadowed element forward from the moment they are already most invested in this relationship.`,
+        });
+      }
+    }
+  }
+
+  // PAIR_PAYOFF_FLAT (co-occurrence × payoff × per-pair, n≥8, ≥1 pair with ≥3 shifts, ≥3 payoff
+  // scenes): At least one pair accumulates 3+ shifts but not one of them lands in a scene that
+  // resolves a planted promise, even though payoffs exist elsewhere. This bond never moves at the
+  // moment of delivery — thread resolutions and this pair's relational changes are always in
+  // separate scenes, so the audience never experiences the compound beat where a delivered promise
+  // also reshapes a specific bond. Per-pair complement of RELATIONSHIP_PAYOFF_DECOUPLED (Wave 511),
+  // which fires when NO shift from ANY pair overlaps a payoff — this fires when ONE pair is
+  // payoff-decoupled even though another pair's shift may coincide with a payoff. Distinct from
+  // PAIR_SEED_FLAT (seed channel) and all other per-pair channel-flat checks.
+  if (records.length >= 8) {
+    const payoffIdxSet539b = new Set<number>(
+      (records as any[]).filter(r => ((r.payoffSetupIds ?? []) as string[]).length > 0).map(r => r.sceneIdx),
+    );
+    if (payoffIdxSet539b.size >= 3) {
+      const flatPayoffPairs539b: string[] = [];
+      for (const [pairKey539b, stats539b] of pairStats) {
+        if (stats539b.shifts.length >= 3 &&
+            stats539b.shifts.every(s => !payoffIdxSet539b.has(s.sceneIdx))) {
+          flatPayoffPairs539b.push(pairKey539b);
+        }
+      }
+      if (flatPayoffPairs539b.length > 0) {
+        issues.push({
+          location: `Pair(s) ${flatPayoffPairs539b.join(', ')} — payoff-decoupled shifts`,
+          rule: 'PAIR_PAYOFF_FLAT',
+          severity: 'minor',
+          description: `${flatPayoffPairs539b.length === 1 ? 'One pair' : `${flatPayoffPairs539b.length} pairs`} (${flatPayoffPairs539b.join('; ')}) move${flatPayoffPairs539b.length === 1 ? 's' : ''} 3 or more times, yet not one of those shifts coincides with a payoff scene, even though the story delivers planted promises elsewhere. This bond never moves at the moment a thread is resolved — the pair's relational changes and the story's deliveries are always in separate scenes, missing the compound beat where a resolution both closes a narrative thread and reshapes an interpersonal dynamic simultaneously. A payoff that lands alongside a relationship shift earns double resonance: the thread closes inside a freshly changed interpersonal context, giving the delivery emotional weight that pure informational closure cannot provide.`,
+          suggestedFix: `Let at least one of this pair's shift scenes also deliver a payoff — let a planted promise resolve in the moment the bond between these two characters moves. The coincidence of delivery and relational change is one of the most powerful compound beats available: the audience receives closure and interpersonal consequence in the same instant.`,
+        });
+      }
+    }
+  }
+
+  // PAIR_SHIFT_RUN (run-based × single-pair monopoly, n≥8, ≥2 pairs with ≥2 shifts each): A run
+  // of ≥4 consecutive shift scenes all involve shifts from only one pair while ≥2 pairs with ≥2
+  // shifts exist globally. One pair monopolizes a sustained stretch of relational activity —
+  // every bond change in that run belongs to the same relationship, leaving all other pairs
+  // relationally frozen for the duration. Even a story with a clear "main pair" benefits from
+  // secondary bonds providing texture within the primary pair's most active stretches; when
+  // other pairs are completely absent from a 4+-scene relational run, the world feels like it
+  // contracts to a single relationship rather than a populated ensemble.
+  // Distinct from: RELATIONSHIP_DIMENSION_RUN (Wave 497 — dimension monopoly, not pair monopoly),
+  // PAIR_RUPTURE_RUN (Wave 441 — consecutive negative shifts, any pair), RELATIONSHIP_WARMTH_RUN
+  // (Wave 455 — consecutive positive shifts, any pair), DEPTH_GAP (amplitude concentration across
+  // the whole story, not a local consecutive-scene run).
+  {
+    const n539c = records.length;
+    if (n539c >= 8) {
+      const multiPairs539c = [...pairStats.entries()].filter(([, s]) => s.shifts.length >= 2);
+      if (multiPairs539c.length >= 2) {
+        let curPairRun539c = 0;
+        let curPairKey539c: string | null = null;
+        let maxPairRun539c = 0;
+        let maxPairRunKey539c = '';
+        for (const r of records as any[]) {
+          const shifts = (r.relationshipShifts ?? []) as Array<{ pairKey: string }>;
+          if (shifts.length === 0) continue;
+          const pairs539c = new Set(shifts.map(s => s.pairKey).filter(Boolean));
+          if (pairs539c.size === 1) {
+            const pk = [...pairs539c][0];
+            if (pk === curPairKey539c) {
+              curPairRun539c++;
+            } else {
+              curPairRun539c = 1;
+              curPairKey539c = pk;
+            }
+            if (curPairRun539c > maxPairRun539c) {
+              maxPairRun539c = curPairRun539c;
+              maxPairRunKey539c = pk;
+            }
+          } else {
+            curPairRun539c = 0;
+            curPairKey539c = null;
+          }
+        }
+        if (maxPairRun539c >= 4) {
+          issues.push({
+            location: `${maxPairRun539c} consecutive shift scene(s) all from pair ${maxPairRunKey539c}`,
+            rule: 'PAIR_SHIFT_RUN',
+            severity: 'minor',
+            description: `${maxPairRun539c} consecutive scenes that carry relationship shifts all involve only the ${maxPairRunKey539c} pair, even though other pairs are active elsewhere in the story. One relationship monopolizes a sustained relational stretch — every bond change in that run belongs to this single pair, leaving all other relationships frozen for the duration. Even in a story with a dominant primary pair, secondary bonds providing texture within the main pair's most active stretches signal that the world is populated rather than contracted. A 4+-scene single-pair run makes the story feel temporarily like a two-hander with the rest of the cast as backdrop.`,
+            suggestedFix: `Insert at least one shift from a different pair within the ${maxPairRun539c}-scene run — a secondary bond reacting to the same events that are moving the primary pair, or an independent relational development happening in parallel. The secondary shift need not be large; even a single small shift from another pair breaks the monopoly and restores the sense that the story's relational world is an ensemble rather than a spotlight.`,
           });
         }
       }

@@ -21752,6 +21752,105 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 539 — relationshipArcPass: pair seed flat, pair payoff flat, pair shift run', async () => {
+    const mkShift539 = (pairKey: string, amount: number) => [{ pairKey, dimension: 'trust', amount }];
+    const makeRec539 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runRA539 = async (records: any[]) => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    it('PAIR_SEED_FLAT fires when a pair\'s shifts never overlap with seed scenes', async () => {
+      // 8 scenes: A|B shifts at 0,1,2; C|D shift at 5 (with seed); seeds at 3,5,6
+      // A|B has 3 shifts, none in seed positions {3,5,6} → fires for A|B
+      // C|D shift at 5 overlaps seed → RELATIONSHIP_SEED_DECOUPLED won't fire
+      const recs539a = Array.from({ length: 8 }, (_, i) =>
+        makeRec539(i, {
+          relationshipShifts: [0, 1, 2].includes(i) ? mkShift539('A|B', 0.3) :
+                              i === 5 ? mkShift539('C|D', 0.3) : [],
+          seededClueIds: [3, 5, 6].includes(i) ? ['c1'] : [],
+        }),
+      );
+      const res = await runRA539(recs539a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAIR_SEED_FLAT'), 'PAIR_SEED_FLAT should fire');
+    });
+
+    it('PAIR_SEED_FLAT does not fire when a pair shift overlaps a seed scene', async () => {
+      // 8 scenes: A|B shifts at 0,1,2; seeds at 1,5,6 — seed at 1 overlaps A|B shift at 1 → no fire
+      const recs539an = Array.from({ length: 8 }, (_, i) =>
+        makeRec539(i, {
+          relationshipShifts: [0, 1, 2].includes(i) ? mkShift539('A|B', 0.3) : [],
+          seededClueIds: [1, 5, 6].includes(i) ? ['c1'] : [],
+        }),
+      );
+      const res = await runRA539(recs539an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAIR_SEED_FLAT'), 'PAIR_SEED_FLAT should not fire');
+    });
+
+    it('PAIR_PAYOFF_FLAT fires when a pair\'s shifts never overlap with payoff scenes', async () => {
+      // 8 scenes: A|B shifts at 0,1,2; C|D shift at 5 (with payoff); payoffs at 3,5,6
+      // A|B has 3 shifts, none in payoff positions {3,5,6} → fires for A|B
+      const recs539b = Array.from({ length: 8 }, (_, i) =>
+        makeRec539(i, {
+          relationshipShifts: [0, 1, 2].includes(i) ? mkShift539('A|B', 0.3) :
+                              i === 5 ? mkShift539('C|D', 0.3) : [],
+          payoffSetupIds: [3, 5, 6].includes(i) ? ['s1'] : [],
+        }),
+      );
+      const res = await runRA539(recs539b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAIR_PAYOFF_FLAT'), 'PAIR_PAYOFF_FLAT should fire');
+    });
+
+    it('PAIR_PAYOFF_FLAT does not fire when a pair shift overlaps a payoff scene', async () => {
+      // 8 scenes: A|B shifts at 0,1,2; payoffs at 1,5,6 — payoff at 1 overlaps A|B shift → no fire
+      const recs539bn = Array.from({ length: 8 }, (_, i) =>
+        makeRec539(i, {
+          relationshipShifts: [0, 1, 2].includes(i) ? mkShift539('A|B', 0.3) : [],
+          payoffSetupIds: [1, 5, 6].includes(i) ? ['s1'] : [],
+        }),
+      );
+      const res = await runRA539(recs539bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAIR_PAYOFF_FLAT'), 'PAIR_PAYOFF_FLAT should not fire');
+    });
+
+    it('PAIR_SHIFT_RUN fires when 4+ consecutive shift scenes all involve one pair', async () => {
+      // 8 scenes: A|B shifts at 0,1,2,3 (4 consecutive); C|D shifts at 5,6 (≥2 pairs with ≥2 shifts)
+      const recs539c = Array.from({ length: 8 }, (_, i) =>
+        makeRec539(i, {
+          relationshipShifts: [0, 1, 2, 3].includes(i) ? mkShift539('A|B', 0.2) :
+                              [5, 6].includes(i) ? mkShift539('C|D', 0.2) : [],
+        }),
+      );
+      const res = await runRA539(recs539c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAIR_SHIFT_RUN'), 'PAIR_SHIFT_RUN should fire');
+    });
+
+    it('PAIR_SHIFT_RUN does not fire when a second pair breaks the run', async () => {
+      // 8 scenes: A|B at 0,1,3,4; C|D at 2,6 — C|D at 2 breaks A|B run (max run = 2)
+      const recs539cn = Array.from({ length: 8 }, (_, i) =>
+        makeRec539(i, {
+          relationshipShifts: [0, 1, 3, 4].includes(i) ? mkShift539('A|B', 0.2) :
+                              [2, 6].includes(i) ? mkShift539('C|D', 0.2) : [],
+        }),
+      );
+      const res = await runRA539(recs539cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAIR_SHIFT_RUN'), 'PAIR_SHIFT_RUN should not fire');
+    });
+  });
+
   describe('Wave 525 — relationshipArcPass: shift seed aftermath void, shift payoff aftermath void, seed decoupled', async () => {
     const mkShift525 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
     const makeRec525 = (idx: number, overrides: any = {}): any => ({
