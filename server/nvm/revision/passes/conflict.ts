@@ -97,6 +97,17 @@
 // major rupture, revelation, or dramatic turn in its prior 2 scenes; reconciliations are
 // systematically spontaneous; the positive-shift complement of CONFLICT_RUPTURE_CAUSE_VOID which
 // audits all NEGATIVE shifts, and of CONFLICT_PEAK_RUPTURE_UNCAUSED which audits only the peak).
+// Wave 492 additions: dramatic-turn repair decoupled (co-occurrence × dramatic-turn × positive
+// relationship shift — ≥2 dramatic-turn scenes and ≥2 repair scenes share zero overlap; story
+// pivots never coincide with bond-warming; distinct from CONFLICT_DRAMATIC_TURN_VOID which audits
+// negative shifts in turn scenes, and CONFLICT_REPAIR_UNCAUSED which audits backward-cause),
+// closing suspense void (zone presence/absence × suspense × closing third — the final third has
+// no scene with positive suspenseDelta while the earlier two-thirds have ≥2 such scenes; the
+// climax approach carries no new tension build; distinct from ESCALATION_PLATEAU which compares
+// averages and CONFLICT_ACT3_ABSENT which audits any conflict signal), calm stretch (run-based
+// × non-conflict gap — ≥5 consecutive non-conflict scenes while ≥4 overall conflict scenes exist;
+// a sustained lull breaks dramatic rhythm; the complement of CONFLICT_BREATHING_ROOM_ABSENT which
+// fires when ruptures are too close, not when they are too sparse).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2369,6 +2380,116 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
           description: `Every scene where a bond warms or repairs (${qualPosShift478c.length} positive relationship shifts) has no major rupture, revelation, or dramatic turn in the two preceding scenes — every reconciliation is systematically spontaneous. A repaired bond is most dramatically resonant when it is earned: preceded by a fracture that forced the reckoning, a truth revealed that changed the equation, or a pivot that brought the characters together. When every repair arrives without visible prior cause, reconciliation reads as an authorial gift rather than a hard-won dramatic resolution — the bonds warm for no reason the audience has watched unfold.`,
           suggestedFix: `Plant a causal driver before at least one positive relational shift: a fracture in the prior scene that the positive shift begins to resolve, a revelation that reframes who the characters are to each other, or a dramatic turn that forces them to cooperate. A repair earned by prior conflict or revelation makes the warming of the bond feel possible and meaningful; one that arrives from a calm run-up reads as sentiment rather than drama.`,
         });
+      }
+    }
+  }
+
+  // ── Wave 492: CONFLICT_DRAMATIC_TURN_REPAIR_DECOUPLED, CONFLICT_CLOSING_SUSPENSE_VOID, CONFLICT_CALM_STRETCH ──
+
+  // CONFLICT_DRAMATIC_TURN_REPAIR_DECOUPLED (minor, n≥8, ≥2 turn scenes, ≥2 repair scenes):
+  // Story pivots (scenes with a dramatic turn ≠ 'nothing') never coincide with a bond-warming
+  // moment (positive relationship shift ≥ +0.3). When the plot turns, relationships stay cold;
+  // when bonds warm, nothing structurally pivots. Structural pivots are most resonant when they
+  // also shift the relational landscape — a turn that simultaneously warms a bond doubles its
+  // impact. Distinctness: CONFLICT_DRAMATIC_TURN_VOID (Wave 338) audits turn scenes for absent
+  // NEGATIVE shifts (pivots that don't crack bonds); this audits turn scenes for absent POSITIVE
+  // shifts (pivots that don't heal bonds). CONFLICT_REPAIR_UNCAUSED (Wave 478) checks backward-
+  // cause before repair scenes; this checks the IN-SCENE channel (turn present in same scene as
+  // positive shift). First co-occurrence check joining the turn and positive-shift channels.
+  {
+    const n492a = records.length;
+    if (n492a >= 8) {
+      const turnScenes492a = (records as any[]).filter(r =>
+        (r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '',
+      );
+      const repairScenes492a = (records as any[]).filter(r =>
+        ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount >= 0.3),
+      );
+      if (turnScenes492a.length >= 2 && repairScenes492a.length >= 2) {
+        const repairSceneIdxs492a = new Set(repairScenes492a.map((r: any) => r.sceneIdx));
+        const anyTurnRepair492a = turnScenes492a.some((r: any) => repairSceneIdxs492a.has(r.sceneIdx));
+        if (!anyTurnRepair492a) {
+          issues.push({
+            location: `${turnScenes492a.length} dramatic-turn scene(s) — no positive relationship shift`,
+            rule: 'CONFLICT_DRAMATIC_TURN_REPAIR_DECOUPLED',
+            severity: 'minor',
+            description: `The story has ${turnScenes492a.length} dramatic-turn scene(s) and ${repairScenes492a.length} repair scene(s) (positive relationship shift ≥ +0.3) but none overlap — when the plot pivots, no bond warms, and when bonds warm, nothing pivots. Structural turns are most resonant when they also shift the relational landscape: a dramatic turn that simultaneously repairs a bond doubles its impact, making the story's pivot both a plot event and an emotional event. When the two engines run on entirely separate tracks, neither feels as consequential as it could — the turn is purely mechanical, the repair is purely sentimental.`,
+            suggestedFix: `Let at least one dramatic-turn scene also carry a positive relationship shift: a pivot that reveals an ally was hiding their loyalty, a turn that forces two estranged characters to cooperate and warms their bond in the process, or a reversal that removes an external threat and allows a reconciliation. A turn and a repair happening in the same scene compound each other's dramatic weight.`,
+          });
+        }
+      }
+    }
+  }
+
+  // CONFLICT_CLOSING_SUSPENSE_VOID (minor, n≥9): The final third has no scene with a positive
+  // suspenseDelta (no rising tension in the home stretch) while the first two-thirds contain
+  // at least 2 such scenes. The climax approach carries no new escalating tension build —
+  // suspense is generated in the opening and middle but then exhausted or absent as the story
+  // moves toward resolution, leaving the finale without the visceral urgency of rising stakes.
+  // Distinctness: ESCALATION_PLATEAU (Wave 144) compares first-half peak suspense vs second-half
+  // average — an average-aggregate check; this is a zone check on the presence of any positive
+  // suspense in the final third vs prior zones. CONFLICT_ACT3_ABSENT (Wave 257) audits the
+  // final 25% for any conflict signal (suspense or relational); this is specifically escalating
+  // suspense (positive suspenseDelta) in the final 33%. CLIMAX_APPROACH_FLAT audits the last
+  // 3 scenes vs overall average; this audits the full final third for zero escalation instances.
+  {
+    const n492b = records.length;
+    if (n492b >= 9) {
+      const third492b = Math.floor(n492b / 3);
+      const openMid492b = (records as any[]).slice(0, 2 * third492b);
+      const closing492b = (records as any[]).slice(2 * third492b);
+      const openMidPosSuspense492b = openMid492b.filter(r => (r.suspenseDelta ?? 0) > 0).length;
+      const closingPosSuspense492b = closing492b.filter(r => (r.suspenseDelta ?? 0) > 0).length;
+      if (openMidPosSuspense492b >= 2 && closingPosSuspense492b === 0) {
+        issues.push({
+          location: `Closing third (scenes ${2 * third492b}–${n492b - 1}) — no positive suspenseDelta`,
+          rule: 'CONFLICT_CLOSING_SUSPENSE_VOID',
+          severity: 'minor',
+          description: `The final third of the story (scenes ${2 * third492b}–${n492b - 1}) contains no scene with rising suspense (positive suspenseDelta), even though ${openMidPosSuspense492b} suspense-escalating scene(s) exist in the opening and middle. The climax approach carries no new tension build — the home stretch generates no visceral urgency. Suspense is an audience-facing signal of mounting threat; when it vanishes in the final third while the earlier acts used it freely, the story's closing movement risks feeling like a release from tension rather than its peak. The final third should carry the story's highest sustained suspense, not its lowest.`,
+          suggestedFix: `Introduce at least one scene in the final third that escalates suspense — a threat that tightens, a revelation that raises the stakes, a confrontation that forces the protagonist into a position with no easy exit. The closing act should feel like pressure accumulating toward an inevitable breaking point, not like a wind-down from the tensions the earlier acts established.`,
+        });
+      }
+    }
+  }
+
+  // CONFLICT_CALM_STRETCH (minor, n≥10, ≥4 conflict scenes): The longest consecutive run of
+  // non-conflict scenes (no rupture, no suspenseDelta < -1) reaches ≥5 scenes while the story
+  // carries ≥4 overall conflict scenes. A sustained lull of 5+ scenes breaks the dramatic rhythm —
+  // the audience loses the sense of accumulating pressure and the story feels like it has entered a
+  // plateau. Run-based × non-conflict gap channel. Distinctness: CONFLICT_BREATHING_ROOM_ABSENT
+  // (Wave 436) fires when the maximum INTER-RUPTURE gap is ≤1 (ruptures too close — no breathing
+  // room); this fires when that gap is ≥5 (ruptures too far apart — too much calm). CONFLICT_
+  // FIRST/SECOND_HALF_MONOPOLY (Waves 338/380) use a binary 70% threshold over halves; this
+  // is a run-length check that fires regardless of where in the script the long calm falls, even
+  // mid-script. CONFLICT_RUPTURE_TEMPORAL_CLUSTER (Wave 478) uses thirds distribution; this is
+  // a consecutive-scene run count with a gap threshold, firing when any single stretch exceeds it.
+  {
+    const n492c = records.length;
+    if (n492c >= 10) {
+      const isConflict492c = (r: any): boolean =>
+        ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3) ||
+        (r.suspenseDelta ?? 0) < -1;
+      const totalConflict492c = (records as any[]).filter(isConflict492c).length;
+      if (totalConflict492c >= 4) {
+        let maxGap492c = 0;
+        let currentGap492c = 0;
+        for (const r of records as any[]) {
+          if (isConflict492c(r)) {
+            currentGap492c = 0;
+          } else {
+            currentGap492c++;
+            if (currentGap492c > maxGap492c) maxGap492c = currentGap492c;
+          }
+        }
+        if (maxGap492c >= 5) {
+          issues.push({
+            location: `Non-conflict stretch — ${maxGap492c} consecutive calm scene(s)`,
+            rule: 'CONFLICT_CALM_STRETCH',
+            severity: 'minor',
+            description: `The story's longest consecutive run of non-conflict scenes reaches ${maxGap492c} scenes (no bond-rupture, no reversal), while the script contains ${totalConflict492c} conflict scenes overall. A calm stretch of 5+ scenes breaks dramatic rhythm — the audience loses the sense of pressure accumulating toward a reckoning and the story feels like it has entered a plateau. While pacing requires breathing room between ruptures, a run this long signals that the conflict engine has stalled rather than paused: the protagonist is neither tested nor threatened for a substantial stretch of story, draining urgency from the surrounding arcs.`,
+            suggestedFix: `Break the longest calm stretch with at least one conflict signal — a moment of friction, a negative relational beat, or a reversal that reminds the audience the story's stakes are still live. Even a minor confrontation or threat mid-stretch restores the sense that tension is still building rather than exhausted. The goal is not to eliminate breathing room, but to prevent any single stretch from growing long enough that the audience stops expecting the next rupture.`,
+          });
+        }
       }
     }
   }

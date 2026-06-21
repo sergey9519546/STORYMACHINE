@@ -24212,6 +24212,85 @@ I always listen.
     });
   });
 
+  describe('Wave 492 — conflictPass: dramatic-turn repair decoupled, closing suspense void, calm stretch', async () => {
+    const rup492 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
+    const makeRec492 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runC492 = async (records: any[]) => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      return conflictPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // CONFLICT_DRAMATIC_TURN_REPAIR_DECOUPLED fire:
+    // n=8; turn scenes at 1,3 (no repair); repair scenes at 5,6 (no turn) — zero overlap
+    it('CONFLICT_DRAMATIC_TURN_REPAIR_DECOUPLED fires when turn and repair scenes never overlap', async () => {
+      const recs492a: any[] = Array.from({ length: 8 }, (_, i) => makeRec492(i, {
+        dramaticTurn: [1, 3].includes(i) ? 'reversal' : 'nothing',
+        relationshipShifts: [5, 6].includes(i) ? rup492(0.5) : [],
+      }));
+      const res = await runC492(recs492a);
+      assert.ok(res.issues.some((x: any) => x.rule === 'CONFLICT_DRAMATIC_TURN_REPAIR_DECOUPLED'), 'CONFLICT_DRAMATIC_TURN_REPAIR_DECOUPLED should fire');
+    });
+
+    // CONFLICT_DRAMATIC_TURN_REPAIR_DECOUPLED no-fire:
+    // scene 3 is both a dramatic turn AND has a repair — overlap exists
+    it('CONFLICT_DRAMATIC_TURN_REPAIR_DECOUPLED does not fire when a turn scene also repairs a bond', async () => {
+      const recs492an: any[] = Array.from({ length: 8 }, (_, i) => makeRec492(i, {
+        dramaticTurn: [1, 3].includes(i) ? 'reversal' : 'nothing',
+        relationshipShifts: [3, 6].includes(i) ? rup492(0.5) : [],
+      }));
+      const res = await runC492(recs492an);
+      assert.ok(!res.issues.some((x: any) => x.rule === 'CONFLICT_DRAMATIC_TURN_REPAIR_DECOUPLED'), 'CONFLICT_DRAMATIC_TURN_REPAIR_DECOUPLED should not fire');
+    });
+
+    // CONFLICT_CLOSING_SUSPENSE_VOID fire:
+    // n=9; third=3; closing=[6,7,8]; suspense scenes at 0,2,4 (opening+middle only); closing has 0
+    it('CONFLICT_CLOSING_SUSPENSE_VOID fires when closing third has no positive suspenseDelta', async () => {
+      const recs492b: any[] = Array.from({ length: 9 }, (_, i) => makeRec492(i, {
+        suspenseDelta: [0, 2, 4].includes(i) ? 1 : 0,
+      }));
+      const res = await runC492(recs492b);
+      assert.ok(res.issues.some((x: any) => x.rule === 'CONFLICT_CLOSING_SUSPENSE_VOID'), 'CONFLICT_CLOSING_SUSPENSE_VOID should fire');
+    });
+
+    // CONFLICT_CLOSING_SUSPENSE_VOID no-fire:
+    // scene 7 (in closing third) has positive suspenseDelta — closing not void
+    it('CONFLICT_CLOSING_SUSPENSE_VOID does not fire when closing third has a positive suspenseDelta scene', async () => {
+      const recs492bn: any[] = Array.from({ length: 9 }, (_, i) => makeRec492(i, {
+        suspenseDelta: [0, 2, 7].includes(i) ? 1 : 0,
+      }));
+      const res = await runC492(recs492bn);
+      assert.ok(!res.issues.some((x: any) => x.rule === 'CONFLICT_CLOSING_SUSPENSE_VOID'), 'CONFLICT_CLOSING_SUSPENSE_VOID should not fire');
+    });
+
+    // CONFLICT_CALM_STRETCH fire:
+    // n=12; conflict at 0,1,10,11; scenes 2–9 are all calm — 8 consecutive non-conflict scenes
+    it('CONFLICT_CALM_STRETCH fires when ≥5 consecutive non-conflict scenes exist', async () => {
+      const recs492c: any[] = Array.from({ length: 12 }, (_, i) => makeRec492(i, {
+        relationshipShifts: [0, 1, 10, 11].includes(i) ? rup492(-0.5) : [],
+      }));
+      const res = await runC492(recs492c);
+      assert.ok(res.issues.some((x: any) => x.rule === 'CONFLICT_CALM_STRETCH'), 'CONFLICT_CALM_STRETCH should fire');
+    });
+
+    // CONFLICT_CALM_STRETCH no-fire:
+    // n=12; conflict scenes at 0,3,6,9 — max gap is 2 consecutive calm scenes, below threshold
+    it('CONFLICT_CALM_STRETCH does not fire when no non-conflict run reaches 5 consecutive scenes', async () => {
+      const recs492cn: any[] = Array.from({ length: 12 }, (_, i) => makeRec492(i, {
+        relationshipShifts: [0, 3, 6, 9].includes(i) ? rup492(-0.5) : [],
+      }));
+      const res = await runC492(recs492cn);
+      assert.ok(!res.issues.some((x: any) => x.rule === 'CONFLICT_CALM_STRETCH'), 'CONFLICT_CALM_STRETCH should not fire');
+    });
+  });
+
   describe('Wave 478 — conflictPass: rupture temporal cluster, positive emotion aftermath void, repair uncaused', async () => {
     const rup478 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
     const makeRec478 = (idx: number, overrides: any = {}): any => ({
