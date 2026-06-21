@@ -26631,6 +26631,80 @@ I always listen.
     });
   });
 
+  describe('Wave 519 — characterArcPass: curiosity drought run, suspense front-loaded, clock opening zone absent', async () => {
+    const makeRec519 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCA519 = async (records: any[]) => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: '', original: '', records,
+        structure: { revelationCount: 0, completionPercent: 50, approachingClimax: false } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    it('ARC_CURIOSITY_DROUGHT_RUN fires when curiosity-positive scenes exist but ≥6 consecutive scenes have no curiosity rise', async () => {
+      // 12 scenes: curiosity at 0 and 1, then a 6-scene drought, then curiosity at 8 — longest dry run = 6
+      const recs519a = Array.from({ length: 12 }, (_, i) =>
+        makeRec519(i, { curiosityDelta: [0, 1, 8].includes(i) ? 1 : 0 }),
+      );
+      const res = await runCA519(recs519a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_CURIOSITY_DROUGHT_RUN'), 'ARC_CURIOSITY_DROUGHT_RUN should fire');
+    });
+
+    it('ARC_CURIOSITY_DROUGHT_RUN does not fire when the longest curiosity-flat run is < 6', async () => {
+      // 12 scenes: curiosity at 0, 3, 6, 9 — longest dry run = 2 scenes between each
+      const recs519an = Array.from({ length: 12 }, (_, i) =>
+        makeRec519(i, { curiosityDelta: i % 3 === 0 ? 1 : 0 }),
+      );
+      const res = await runCA519(recs519an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_CURIOSITY_DROUGHT_RUN'), 'ARC_CURIOSITY_DROUGHT_RUN should not fire');
+    });
+
+    it('ARC_SUSPENSE_FRONT_LOADED fires when >70% of suspense scenes fall in the first half', async () => {
+      // 10 scenes: suspense in 0,1,2,3 (first half) and 7 (second half) — 4/5 = 80% front-loaded
+      const recs519b = Array.from({ length: 10 }, (_, i) =>
+        makeRec519(i, { suspenseDelta: [0, 1, 2, 3, 7].includes(i) ? 1 : 0 }),
+      );
+      const res = await runCA519(recs519b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_SUSPENSE_FRONT_LOADED'), 'ARC_SUSPENSE_FRONT_LOADED should fire');
+    });
+
+    it('ARC_SUSPENSE_FRONT_LOADED does not fire when suspense is evenly distributed', async () => {
+      // 10 scenes: suspense in 1,2,6,7 — 2/4 = 50% front-loaded (not >70%)
+      const recs519bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec519(i, { suspenseDelta: [1, 2, 6, 7].includes(i) ? 1 : 0 }),
+      );
+      const res = await runCA519(recs519bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_SUSPENSE_FRONT_LOADED'), 'ARC_SUSPENSE_FRONT_LOADED should not fire');
+    });
+
+    it('ARC_CLOCK_OPENING_ZONE_ABSENT fires when ≥3 clockRaised scenes exist but none in the opening third', async () => {
+      // 9 scenes: opening third = scenes 0-2; clockRaised only in scenes 4, 6, 8
+      const recs519c = Array.from({ length: 9 }, (_, i) =>
+        makeRec519(i, { clockRaised: [4, 6, 8].includes(i) }),
+      );
+      const res = await runCA519(recs519c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_CLOCK_OPENING_ZONE_ABSENT'), 'ARC_CLOCK_OPENING_ZONE_ABSENT should fire');
+    });
+
+    it('ARC_CLOCK_OPENING_ZONE_ABSENT does not fire when a clock scene exists in the opening third', async () => {
+      // 9 scenes: clockRaised in scenes 1, 4, 7 — scene 1 is in the opening third (0-2)
+      const recs519cn = Array.from({ length: 9 }, (_, i) =>
+        makeRec519(i, { clockRaised: [1, 4, 7].includes(i) }),
+      );
+      const res = await runCA519(recs519cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_CLOCK_OPENING_ZONE_ABSENT'), 'ARC_CLOCK_OPENING_ZONE_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 505 — characterArcPass: seed emotional aftermath void, clock curiosity aftermath void, payoff drought run', async () => {
     const makeRec505 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

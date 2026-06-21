@@ -127,6 +127,20 @@
 // resolution goes dark for too long; distinct from ARC_RELATIONAL_DROUGHT_RUN which targets the
 // relational channel, PAYOFF_BACK_LOADED in causality.ts which is a zone check, and all negative/
 // positive emotion run checks which target the emotion channel).
+// Wave 519 additions: curiosity drought run (run-based × curiosityDelta × absence — n≥10,
+// ≥3 curiosity-positive scenes, longest run with curiosityDelta ≤ 0 ≥ 6; the wonder engine
+// stalls for an extended stretch; first run-based check on the curiosity channel, distinct from
+// ARC_RELATIONAL_DROUGHT_RUN and ARC_PAYOFF_DROUGHT_RUN which target different channels, and
+// from all curiosity co-occurrence/zone/average-mode checks), suspense front-loaded (distribution/
+// timing × suspenseDelta × first half — n≥8, ≥4 suspense scenes, >70% in first half while back
+// half has ≥1; tension exhausted before climax; first distribution check on suspense channel,
+// distinct from ARC_EMOTIONAL_FRONT_LOADED and ARC_RELATIONAL_FRONT_LOADED on different channels,
+// and from ARC_PEAK_SUSPENSE_EMOTION_ABSENT which uses single-peak mode), clock opening zone
+// absent (zone presence/absence × clockRaised × opening third — n≥9, ≥3 clockRaised scenes, none
+// in opening structural third; deadline urgency absent from setup; first zone-based check on clock
+// channel targeting opening third, distinct from ARC_CLOCK_EMOTION_DECOUPLED co-occurrence, ARC_
+// CLOCK_PEAK_EMOTION_ABSENT single-peak, ARC_CLOCK_CURIOSITY_AFTERMATH_VOID aftermath, and all
+// relational zone checks which target the relational channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2507,6 +2521,100 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
             suggestedFix: `Introduce a payoff scene within the ${maxPayoffDrought505c}-scene drought window to confirm that at least one planted promise is still alive and being honored. Not every payoff needs to be a climactic reveal — a smaller thread resolving, a detail from an earlier scene returning with new significance, or a partial disclosure can serve as a payoff beat that keeps the audience's sense of forward motion intact.`,
           });
         }
+      }
+    }
+  }
+
+  // ── Wave 519 checks ──────────────────────────────────────────────────────
+  {
+    // ARC_CURIOSITY_DROUGHT_RUN — run-based × curiosityDelta × absence
+    // Checks whether curiosity-positive scenes exist but the script contains an extended
+    // consecutive run where curiosity never rises. Wonder that appears then vanishes for
+    // ≥6 scenes in a row signals a curiosity engine that keeps stalling, leaving the
+    // audience unhooked between peaks.
+    // Distinctness: first run-based check on the curiosity channel. ARC_RELATIONAL_DROUGHT_RUN
+    // and ARC_PAYOFF_DROUGHT_RUN use the same mode on relational/payoff channels. All other
+    // curiosity checks (ARC_CURIOSITY_PLATEAU, ARC_PEAK_CURIOSITY_EMOTION_ABSENT, ARC_CURIOSITY_
+    // RELATIONAL_DECOUPLED, ARC_REVELATION_CURIOSITY_DECOUPLED, ARC_CLOCK_CURIOSITY_AFTERMATH_VOID)
+    // use zone, single-peak, co-occurrence, or average modes.
+    const n519a = records.length;
+    const curiosPos519 = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0);
+    if (n519a >= 10 && curiosPos519.length >= 3) {
+      let maxCuriousDrought519 = 0;
+      let curRun519 = 0;
+      for (const r of (records as any[])) {
+        if ((r.curiosityDelta ?? 0) <= 0) {
+          curRun519++;
+          if (curRun519 > maxCuriousDrought519) maxCuriousDrought519 = curRun519;
+        } else {
+          curRun519 = 0;
+        }
+      }
+      if (maxCuriousDrought519 >= 6) {
+        issues.push({
+          location: `longest curiosity-flat run: ${maxCuriousDrought519} scenes`,
+          rule: 'ARC_CURIOSITY_DROUGHT_RUN',
+          severity: 'minor',
+          description: `The script's curiosity engine fires in ${curiosPos519.length} scenes but then stalls for a run of ${maxCuriousDrought519} consecutive scenes where curiosityDelta never rises above zero. A drought of ${maxCuriousDrought519} scenes means the audience's open questions go unrefreshed for a substantial stretch. Unlike a deliberate pause, a curiosity drought of this length risks the audience abandoning or prematurely resolving the story's open threads, draining forward momentum.`,
+          suggestedFix: `Introduce at least one curiosity-raising moment within the ${maxCuriousDrought519}-scene drought — a partial disclosure, a new question surfaced, or a detail that reframes what the audience thought they understood. This restarts the wondering engine and maintains the sense that the story is still concealing things worth discovering.`,
+        });
+      }
+    }
+  }
+
+  {
+    // ARC_SUSPENSE_FRONT_LOADED — distribution/timing × suspenseDelta × first half
+    // Fires when >70% of suspense-raising scenes are concentrated in the first half while
+    // the back half carries only a fraction. Suspense that peaks early and dwindles as the
+    // story approaches its climax inverts the expected dramatic curve.
+    // Distinctness: first distribution/timing check on the suspense channel. ARC_EMOTIONAL_
+    // FRONT_LOADED and ARC_RELATIONAL_FRONT_LOADED use the same mode on other channels.
+    // ARC_PEAK_SUSPENSE_EMOTION_ABSENT uses single-peak not distribution. ARC_SUSPENSE_EMOTION_
+    // DECOUPLED uses co-occurrence. No prior check measures suspense concentration across
+    // the temporal axis in distribution terms.
+    const n519b = records.length;
+    const half519b = Math.floor(n519b / 2);
+    const suspenseScenes519b = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 0);
+    if (n519b >= 8 && suspenseScenes519b.length >= 4) {
+      const frontCount519b = (records as any[]).slice(0, half519b).filter(r => (r.suspenseDelta ?? 0) > 0).length;
+      const backCount519b = suspenseScenes519b.length - frontCount519b;
+      const ratio519b = frontCount519b / suspenseScenes519b.length;
+      if (ratio519b > 0.70 && backCount519b >= 1) {
+        issues.push({
+          location: `suspense distribution: ${frontCount519b} front / ${backCount519b} back`,
+          rule: 'ARC_SUSPENSE_FRONT_LOADED',
+          severity: 'minor',
+          description: `${Math.round(ratio519b * 100)}% of the script's suspense-raising moments (${frontCount519b} of ${suspenseScenes519b.length}) fall in the first half, leaving the back half with only ${backCount519b}. A story where tension accumulates early then dissipates toward the climax inverts the expected dramatic curve — the audience is most on edge at the start and progressively calmer as events approach resolution. Suspense should intensify into the climax, not exhaust itself before it.`,
+          suggestedFix: `Redistribute suspense by adding or relocating tension-raising scenes into the second half, especially the final third. A new obstacle, a narrowing escape window, or a secret threatening to surface can re-establish the rising tension that should accelerate as the story approaches its climax.`,
+        });
+      }
+    }
+  }
+
+  {
+    // ARC_CLOCK_OPENING_ZONE_ABSENT — zone presence/absence × clockRaised × opening third
+    // Detects scripts where deadline pressure exists but never appears in the opening structural
+    // third. A clock that doesn't tick until Act 2 means the audience spends the setup without
+    // urgency — they don't know time is running out, so the protagonist's choices carry no
+    // cost-of-delay.
+    // Distinctness: first zone check on the clockRaised channel targeting the opening third.
+    // ARC_LATE_RELATIONAL_VOID, ARC_RELATIONAL_MIDPOINT_VOID, and ARC_RELATIONAL_FIRST_HALF_FLAT
+    // all use zone mode on the relational channel. ARC_CLOCK_EMOTION_DECOUPLED uses co-occurrence,
+    // ARC_CLOCK_PEAK_EMOTION_ABSENT uses single-peak, ARC_CLOCK_CURIOSITY_AFTERMATH_VOID uses
+    // average/aftermath — none target an opening-zone absence on the clock channel.
+    const n519c = records.length;
+    const openingThird519c = Math.floor(n519c / 3);
+    const clockScenes519c = (records as any[]).filter(r => r.clockRaised === true);
+    if (n519c >= 9 && clockScenes519c.length >= 3) {
+      const clockInOpening519c = (records as any[]).slice(0, openingThird519c).some(r => r.clockRaised === true);
+      if (!clockInOpening519c) {
+        issues.push({
+          location: `opening third (scenes 1–${openingThird519c}): no clock raised`,
+          rule: 'ARC_CLOCK_OPENING_ZONE_ABSENT',
+          severity: 'minor',
+          description: `The script raises ${clockScenes519c.length} deadline beats but none appear in the opening structural third (scenes 1–${openingThird519c}). Introducing a clock is how a story tells the audience that choices cost time — without it, the protagonist's actions in the setup carry no urgency. When the deadline only surfaces in Act 2 or later, the audience must retroactively apply time pressure to scenes they experienced as open-ended, weakening the structural logic of the story's first movement.`,
+          suggestedFix: `Introduce at least one clockRaised beat in the opening structural third — a looming deadline established early, a window closing, or a timer started. This does not require the full stakes to be visible; even a hint that time is limited changes how the audience weighs every subsequent scene in the setup.`,
+        });
       }
     }
   }
