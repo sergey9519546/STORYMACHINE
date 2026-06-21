@@ -102,6 +102,17 @@
 // climax trigger — the peak-suspense scene in the final 30% is followed by 2 scenes with no
 // emotional shift and no relationship shift; the climax produces no human ripple; first aftermath
 // check triggered by the story's climax position).
+// Wave 499 additions: clock curiosity decoupled (co-occurrence/decoupling × clock × curiosity —
+// ≥2 clock scenes and ≥2 curiosity-spike scenes but no scene carries both; urgency and wonder
+// never coincide, extending the co-occurrence family beyond the revelation-centric checks by
+// placing the clock channel as the trigger rather than revelation), revelation aftermath clock void
+// (sequence/aftermath × revelation trigger × clock aftermath — ≥3 qualifying revelation scenes
+// [pos < n-2], ≥2 clock scenes globally, none followed by a clock raise in the next 2 scenes;
+// disclosures never trigger urgency, the first aftermath check on the clock channel with a
+// revelation trigger, distinct from REVELATION_CLOCK_DECOUPLED which checks simultaneous
+// co-occurrence), suspense run (run-based × suspense channel — longest consecutive run of scenes
+// with suspenseDelta > 0 ≥ 5; the tension dial stuck at high across an unbroken sequence, the
+// first run-based check on the suspense channel, distinct from the emotional-valence run checks).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2320,6 +2331,122 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `The story's climactic peak (Scene ${climaxPos485c}, suspenseDelta: ${climaxSusp485c}) is followed by two scenes that carry neither an emotional shift nor a relationship shift — the climax produces no human ripple. A climactic moment should detonate consequences: characters should feel what just happened, bonds should shift under the weight of what was resolved. When the two scenes after the highest-tension finale beat are emotionally neutral and relationally static, the climax has been delivered but not processed — the story reaches its peak and then returns to baseline without any character acknowledging what just occurred.`,
           suggestedFix: `Let Scenes ${climaxPos485c + 1}–${climaxPos485c + 2} carry at least one emotional or relational consequence of what happened at the climax: a character registers relief, grief, or resolution; a bond shifts in the wake of what was just decided or revealed. The aftermath of a climax is where the audience learns what the story meant to the people who lived it — the scenes immediately after the peak are structurally as important as the peak itself.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 499: CLOCK_CURIOSITY_DECOUPLED, REVELATION_AFTERMATH_CLOCK_VOID, SUSPENSE_RUN ──
+
+  // CLOCK_CURIOSITY_DECOUPLED (co-occurrence/decoupling × clock × curiosity, n≥10, ≥2 clock
+  // scenes [clockRaised or clockDelta > 0], ≥2 curiosity-spike scenes [curiosityDelta > 0], no
+  // scene carries both): The story has deadline moments and wonder-generating moments, but never
+  // in the same scene — urgency and curiosity never coincide. A scene that simultaneously raises
+  // a clock and spikes curiosity is doubly productive: the audience feels time running out AND
+  // wonders what will happen next, creating compound tension greater than either channel alone.
+  // When the two engines always operate in separate scenes, clocks generate urgency without
+  // wonder and curiosity moments generate wonder without urgency — both run at half their
+  // potential intensity. Co-occurrence/decoupling mode × clock × curiosity. Distinct from
+  // REVELATION_CLOCK_DECOUPLED (Wave 485: revelation × clock; same mode, different channel pair
+  // — this uses curiosity instead of revelation as the co-occurrence target), REVELATION_CURIOSITY_
+  // DECOUPLED (Wave 443: revelation × curiosity; same mode, different trigger — this uses clock
+  // not revelation), ACT_2B_CURIOSITY_VOID (zone-scoped presence/absence, not co-occurrence),
+  // DRAMATIC_TURN_CAUSELESS (backward-cause, not co-occurrence). First co-occurrence check with
+  // clock as one channel and curiosity as the other.
+  if (n >= 10) {
+    const clockScenes499a = (records as any[]).filter(r =>
+      r.clockRaised === true || (r.clockDelta ?? 0) > 0,
+    );
+    const curiosityScenes499a = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0);
+    if (clockScenes499a.length >= 2 && curiosityScenes499a.length >= 2) {
+      const anyCoOccur499a = (records as any[]).some(
+        r => (r.clockRaised === true || (r.clockDelta ?? 0) > 0) && (r.curiosityDelta ?? 0) > 0,
+      );
+      if (!anyCoOccur499a) {
+        issues.push({
+          location: `${clockScenes499a.length} clock scene(s) and ${curiosityScenes499a.length} curiosity-spike scene(s) — never co-occurring`,
+          rule: 'CLOCK_CURIOSITY_DECOUPLED',
+          severity: 'minor',
+          description: `The script has ${clockScenes499a.length} clock scene(s) (clockRaised or clockDelta > 0) and ${curiosityScenes499a.length} curiosity-spike scene(s) (curiosityDelta > 0), but no scene simultaneously delivers deadline pressure and a curiosity spike — urgency and wonder operate in permanently separate moments. A scene that raises a clock while also generating audience questions is doubly productive: time runs out AND the audience wonders what will happen next, creating compound tension more intense than either channel alone. When the two engines are always decoupled, clocks generate urgency without wonder and curiosity scenes generate wonder without urgency — both run at half their potential intensity.`,
+          suggestedFix: 'Arrange at least one scene that both raises or extends the clock and spikes curiosity simultaneously: the countdown starts just as a new question is opened, or the deadline itself raises the question of whether something can be accomplished in time. A clock event tied to an unanswered question forces the audience to hold both pressure and wonder at once — which is more uncomfortable and more gripping than either alone.',
+        });
+      }
+    }
+  }
+
+  // REVELATION_AFTERMATH_CLOCK_VOID (sequence/aftermath × revelation trigger × clock aftermath,
+  // n≥8, ≥3 qualifying revelation scenes [pos < n-2], ≥2 clock scenes globally, no qualifying
+  // revelation scene followed by clockRaised or clockDelta > 0 in the next 2 scenes): Every
+  // disclosure lands and the urgency machinery stays quiet for the next two scenes — revelations
+  // never trigger a countdown. In a well-constructed story a revelation often starts a clock: once
+  // characters know the truth, the window to act on it should close. When no disclosure ever sets
+  // a clock ticking in the two scenes immediately following it, the story treats information as
+  // inert — something to be absorbed rather than acted upon against a deadline. Sequence/aftermath
+  // mode × revelation trigger × clock aftermath. Distinct from REVELATION_CLOCK_DECOUPLED (Wave
+  // 485: co-occurrence — checks whether revelation and clock appear on the SAME scene; this checks
+  // whether clock appears in the 2 scenes AFTER a revelation), INCITING_AFTERMATH_STALL (Wave 429:
+  // single inciting incident trigger, checks suspense/curiosity aftermath — different trigger type,
+  // different aftermath channel), CLIMAX_AFTERMATH_FLAT (Wave 485: climax trigger, checks
+  // emotional/relational aftermath — different trigger and different aftermath channel). First
+  // aftermath check using the clock channel as the aftermath signal.
+  if (n >= 8) {
+    const qualRevScenes499b = (records as any[]).filter((r, pos) => !!r.revelation && pos < n - 2);
+    const clockScenes499b = (records as any[]).filter(r =>
+      r.clockRaised === true || (r.clockDelta ?? 0) > 0,
+    );
+    if (qualRevScenes499b.length >= 3 && clockScenes499b.length >= 2) {
+      const anyRevFollowedByClock499b = qualRevScenes499b.some(r => {
+        const pos = (records as any[]).indexOf(r);
+        const next1 = (records as any[])[pos + 1];
+        const next2 = (records as any[])[pos + 2];
+        return (next1?.clockRaised === true || (next1?.clockDelta ?? 0) > 0) ||
+               (next2?.clockRaised === true || (next2?.clockDelta ?? 0) > 0);
+      });
+      if (!anyRevFollowedByClock499b) {
+        issues.push({
+          location: `${qualRevScenes499b.length} revelation scene(s) — none followed by a clock raise in the next 2 scenes`,
+          rule: 'REVELATION_AFTERMATH_CLOCK_VOID',
+          severity: 'minor',
+          description: `The script has ${qualRevScenes499b.length} revelation scene(s), but in none of them does a clock event appear in the next two scenes — disclosures never trigger urgency. In a well-constructed story, a revelation often starts a countdown: once characters know the truth, the window to act on it matters and should close. When no disclosure ever sets a clock ticking in the scenes immediately following it, the story treats information as inert — something to be absorbed without consequence for available time. The revelation scenes land without urgency, and the clock scenes operate without being prompted by new information.`,
+          suggestedFix: 'After at least one disclosure, introduce a clock raise in the next one or two scenes: the revelation creates a deadline (the character now knows the bomb is real and has thirty minutes), or the disclosure accelerates an existing countdown (learning the truth reveals they have less time than they thought). The revelation that starts a clock transforms information into pressure and makes the disclosure structurally load-bearing rather than merely informational.',
+        });
+      }
+    }
+  }
+
+  // SUSPENSE_RUN (run-based × suspense channel, n≥8, ≥4 scenes with suspenseDelta > 0, longest
+  // consecutive run of suspenseDelta > 0 ≥ 5): Five or more consecutive scenes all spike suspense
+  // without a single release, relief, or recalibration. Sustained high suspense produces a
+  // paradoxical effect: instead of each scene feeling more tense than the last, prolonged
+  // elevation becomes the ambient baseline and individual spikes lose impact. An audience
+  // experiencing five or more consecutive suspenseful scenes stops registering each beat as a
+  // specific escalation and begins processing the tension as the story's permanent condition.
+  // Tension requires contrast to register — a single scene of release between spikes makes the
+  // surrounding tension land with more specific force. Run-based mode × suspense channel.
+  // Distinct from POSITIVE_SCENE_RUN (Wave 471: emotional positive valence, not suspense),
+  // NEGATIVE_SCENE_RUN (Wave 485: emotional negative valence, not suspense), PURPOSE_MONOTONE_RUN
+  // (Wave 429: purpose channel, not suspense), OPENING_SUSPENSE_FLATLINE (Wave 292: checks ABSENCE
+  // of suspense in the opening 3 scenes, not a run of presence), ACT_2A_SUSPENSE_VOID (Wave 278:
+  // zone-scoped absence, not run). First run-based check on the suspense channel.
+  if (n >= 8) {
+    const totalSuspenseScenes499c = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 0).length;
+    if (totalSuspenseScenes499c >= 4) {
+      let maxSuspRun499c = 0, curSuspRun499c = 0;
+      for (const r of (records as any[])) {
+        if ((r.suspenseDelta ?? 0) > 0) {
+          curSuspRun499c++;
+          if (curSuspRun499c > maxSuspRun499c) maxSuspRun499c = curSuspRun499c;
+        } else {
+          curSuspRun499c = 0;
+        }
+      }
+      if (maxSuspRun499c >= 5) {
+        issues.push({
+          location: `Consecutive suspense scenes — run of ${maxSuspRun499c}`,
+          rule: 'SUSPENSE_RUN',
+          severity: 'minor',
+          description: `${maxSuspRun499c} consecutive scenes all carry suspenseDelta > 0 — an unbroken run of escalating tension without any release, relief, or recalibration. Sustained high suspense produces a paradoxical effect: instead of each scene feeling more tense than the last, prolonged elevation becomes the ambient baseline and individual spikes lose impact. An audience experiencing five or more consecutive suspenseful scenes stops registering each beat as a specific escalation and begins processing the tension as the story's permanent condition. Tension requires contrast to register — a single scene of release or recalibration between suspense spikes makes the surrounding tension land with more specific force.`,
+          suggestedFix: `Break the run of ${maxSuspRun499c} suspenseful scenes with at least one scene where suspenseDelta ≤ 0 — not a false resolution, but a breath: a scene that lets the audience recalibrate before the next spike. The interlude doesn't need to be warm or peaceful; it just needs to release the mechanical tension so that the next escalation registers as a specific event rather than a continuation of ambient pressure.`,
         });
       }
     }

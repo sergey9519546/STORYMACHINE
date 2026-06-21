@@ -19365,6 +19365,80 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 499 — structurePass: clock curiosity decoupled, revelation aftermath clock void, suspense run', async () => {
+    const makeRec499 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const runST499 = async (records: any[]) => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      return structurePass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CLOCK_CURIOSITY_DECOUPLED fires when clock scenes and curiosity scenes never coincide', async () => {
+      // 12 scenes: clock at 3,7 (no curiosity); curiosity at 5,9 (no clock) → no co-occurrence → fires
+      const recs499a = Array.from({ length: 12 }, (_, i) => makeRec499(i, {
+        clockRaised: [3, 7].includes(i),
+        curiosityDelta: [5, 9].includes(i) ? 2 : 0,
+      }));
+      const res = await runST499(recs499a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_CURIOSITY_DECOUPLED'), 'CLOCK_CURIOSITY_DECOUPLED should fire');
+    });
+
+    it('CLOCK_CURIOSITY_DECOUPLED does not fire when a clock scene also spikes curiosity', async () => {
+      // 12 scenes: scene 5 has clockRaised AND curiosityDelta > 0 → co-occurrence → no fire
+      const recs499anr = Array.from({ length: 12 }, (_, i) => makeRec499(i, {
+        clockRaised: [3, 5].includes(i),
+        curiosityDelta: [5, 9].includes(i) ? 2 : 0,
+      }));
+      const res = await runST499(recs499anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_CURIOSITY_DECOUPLED'), 'CLOCK_CURIOSITY_DECOUPLED should not fire');
+    });
+
+    it('REVELATION_AFTERMATH_CLOCK_VOID fires when no revelation is followed by a clock raise in the next 2 scenes', async () => {
+      // 10 scenes: revelations at 1,3,5 (all pos < 8=n-2); clock at 8,9 (beyond the 2-scene window of any revelation) → fires
+      const recs499b = Array.from({ length: 10 }, (_, i) => makeRec499(i, {
+        revelation: [1, 3, 5].includes(i) ? 'a disclosure' : null,
+        clockRaised: [8, 9].includes(i),
+      }));
+      const res = await runST499(recs499b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_AFTERMATH_CLOCK_VOID'), 'REVELATION_AFTERMATH_CLOCK_VOID should fire');
+    });
+
+    it('REVELATION_AFTERMATH_CLOCK_VOID does not fire when a revelation is followed by a clock raise within 2 scenes', async () => {
+      // 10 scenes: revelations at 1,3,5; clock at 7 (pos 5+2=7, within window of revelation at 5) and 9 → no fire
+      const recs499bnr = Array.from({ length: 10 }, (_, i) => makeRec499(i, {
+        revelation: [1, 3, 5].includes(i) ? 'a disclosure' : null,
+        clockRaised: [7, 9].includes(i),
+      }));
+      const res = await runST499(recs499bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_AFTERMATH_CLOCK_VOID'), 'REVELATION_AFTERMATH_CLOCK_VOID should not fire');
+    });
+
+    it('SUSPENSE_RUN fires when 5 or more consecutive scenes all spike suspense', async () => {
+      // 10 scenes: scenes 3-7 all have suspenseDelta > 0 (run of 5) → fires
+      const recs499c = Array.from({ length: 10 }, (_, i) => makeRec499(i, {
+        suspenseDelta: i >= 3 && i <= 7 ? 2 : 0,
+      }));
+      const res = await runST499(recs499c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SUSPENSE_RUN'), 'SUSPENSE_RUN should fire');
+    });
+
+    it('SUSPENSE_RUN does not fire when suspense scenes are non-consecutive', async () => {
+      // 10 scenes: suspenseDelta > 0 at 2,4,6,8 (alternating, max run = 1) → no fire
+      const recs499cnr = Array.from({ length: 10 }, (_, i) => makeRec499(i, {
+        suspenseDelta: [2, 4, 6, 8].includes(i) ? 2 : 0,
+      }));
+      const res = await runST499(recs499cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SUSPENSE_RUN'), 'SUSPENSE_RUN should not fire');
+    });
+  });
+
   describe('Wave 485 — structurePass: negative scene run, revelation clock decoupled, climax aftermath flat', async () => {
     const makeRec485 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
