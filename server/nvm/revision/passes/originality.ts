@@ -99,6 +99,15 @@
 // ≥40 words — one sprawling over-written set piece surrounded by sparse prose; single-peak
 // isolation × action prose × paragraph length, first single-peak isolation check in
 // originality.ts).
+// Wave 494 additions: dialogue question run (≥4 consecutive dialogue speeches each ending with
+// "?" — a rapid-fire exchange where nobody answers anything; run-based × dialogue × question
+// punctuation, distinct from DIALOGUE_QUESTION_FLOOD which audits proportion and DIALOGUE_
+// FILLER_RUN which audits opener word), dialogue short run (≥5 consecutive dialogue speeches
+// each ≤3 words total — staccato burst of pure one-liners draining character voice; run-based ×
+// dialogue × speech brevity, distinct from DIALOGUE_SHORT_LINE_DOMINANCE which uses global
+// proportion), dialogue speaker solo (one character delivers >60% of all dialogue lines while
+// ≥3 speakers and ≥10 dialogue lines exist — monologue dominance; underweight/bloat × dialogue
+// × speaker distribution, first per-speaker distribution check in originality.ts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2605,6 +2614,156 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `One action paragraph runs to ${peakWords480c} words — ${(peakWords480c / othersAvg480c).toFixed(1)}× the average of ${othersAvg480c.toFixed(1)} words for all other action paragraphs. The prose layer's visual register is wildly inconsistent: the reader speeds through notation and brief cuts, then encounters a single sprawling description that reads at a different tempo and in a different register from the surrounding pages. A single outlier this large signals either a showpiece the writer couldn't trim or a passage written at a different time in a different mode — neither serves the unified reading experience a produced script requires.`,
           suggestedFix: 'Break the long paragraph into smaller beats with visual cuts between them, or trim back to the three or four essential images and trust the director to fill the rest. A paragraph should rarely exceed 50 words in a produced screenplay; six to twelve words per line, with a blank line between beats, matches the reading rhythm the rest of the script has established. If the passage is a showpiece chase or action set piece, apply the same economy — specific images in short blocks — rather than novelistic prose.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 494: DIALOGUE_QUESTION_RUN, DIALOGUE_SHORT_RUN, DIALOGUE_SPEAKER_SOLO ──
+
+  // DIALOGUE_QUESTION_RUN (run-based × dialogue × question punctuation, ≥6 total speeches,
+  // maxConsecutiveRun ≥ 4): Four or more consecutive dialogue speeches each end with "?" —
+  // a pure interrogative exchange where nobody answers anything. Characters volley question
+  // after question without ever staking a claim, asserting a fact, or making a demand.
+  // A question-only run signals that the writer is building suspense by withholding rather
+  // than building suspense by confrontation: the characters are circling without landing.
+  // Distinctness: DIALOGUE_QUESTION_FLOOD (Wave 466) fires when >35% of all dialogue lines
+  // end with "?" — a global proportion; this fires when a LOCAL run reaches ≥4 consecutive
+  // speeches ending with "?", which can fire in a question-dense script that isn't globally
+  // dominated by questions. DIALOGUE_FILLER_RUN (Wave 480) checks the opening word, not
+  // the closing punctuation. DIALOGUE_QUESTION_DROUGHT (Wave 396) checks the opposite extreme.
+  {
+    let inDlg494a = false;
+    let curSpeechText494a = '';
+    let curQRun494a = 0;
+    let maxQRun494a = 0;
+    let totalSpeeches494a = 0;
+    const flushSpeech494a = () => {
+      if (!inDlg494a || !curSpeechText494a.trim()) return;
+      totalSpeeches494a++;
+      if (curSpeechText494a.trim().endsWith('?')) {
+        curQRun494a++;
+        if (curQRun494a > maxQRun494a) maxQRun494a = curQRun494a;
+      } else {
+        curQRun494a = 0;
+      }
+      curSpeechText494a = '';
+    };
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { flushSpeech494a(); inDlg494a = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { flushSpeech494a(); inDlg494a = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { flushSpeech494a(); inDlg494a = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (!inDlg494a) continue;
+      curSpeechText494a += ' ' + t;
+    }
+    flushSpeech494a();
+    if (totalSpeeches494a >= 6 && maxQRun494a >= 4) {
+      issues.push({
+        location: `${maxQRun494a} consecutive speech(es) ending with "?"`,
+        rule: 'DIALOGUE_QUESTION_RUN',
+        severity: 'minor',
+        description: `${maxQRun494a} consecutive dialogue speeches each end with a question mark — a sustained interrogative exchange where no character answers anything. Characters volley questions without asserting, demanding, or staking a claim; the exchange builds suspense by withholding rather than by confrontation. A run of four or more questions in a row signals that the scene is generating pressure through information-deficit alone, without the friction of competing assertions. Interrogative exchanges work when one character's question challenges another's certainty — the question opens a wound the second speaker then has to navigate; when questions just follow questions, no pressure accumulates.`,
+        suggestedFix: `Break the question run by having at least one speaker in the sequence answer, assert, or deflect rather than ask. A statement in the middle of a question string — even a refusal to answer — changes the dynamics: "What do you want?" / "I want you to stop." / "Stop what?" creates tension because the one assertion lands in the middle of the interrogative current. The question before and after the assertion hit harder because something was at stake between them.`,
+      });
+    }
+  }
+
+  // DIALOGUE_SHORT_RUN (run-based × dialogue × speech brevity, ≥8 total speeches,
+  // maxConsecutiveRun ≥ 5 each ≤3 words total): Five or more consecutive dialogue speeches
+  // each contain three words or fewer — a staccato burst of pure one-liners that drains
+  // character voice to its most telegraphic. Individual short speeches are powerful and efficient;
+  // a run of five or more in succession signals that the scene has gone into pure terse exchange
+  // mode, with no character having enough space to reveal intention, backstory, or complication.
+  // Character voice requires enough words to carry rhythm, register, and specificity; a run of
+  // three-word-and-under speeches reduces every speaker to the same register of clipped urgency.
+  // Distinctness: DIALOGUE_SHORT_LINE_DOMINANCE (Wave 396) fires when >75% of ALL dialogue lines
+  // across the script are ≤4 words — a global proportion; this fires when a local burst reaches
+  // ≥5 consecutive speeches of ≤3 words, which can fire in a script not globally dominated by
+  // short lines. DIALOGUE_FILLER_RUN (Wave 480) checks opener word, not word count.
+  // DIALOGUE_QUESTION_RUN (Wave 494a) checks closing punctuation, not speech length.
+  {
+    let inDlg494b = false;
+    let curSpeechWords494b = 0;
+    let hasDlgLine494b = false;
+    let curShortRun494b = 0;
+    let maxShortRun494b = 0;
+    let totalSpeeches494b = 0;
+    const flushSpeech494b = () => {
+      if (!inDlg494b || !hasDlgLine494b) return;
+      totalSpeeches494b++;
+      if (curSpeechWords494b <= 3) {
+        curShortRun494b++;
+        if (curShortRun494b > maxShortRun494b) maxShortRun494b = curShortRun494b;
+      } else {
+        curShortRun494b = 0;
+      }
+      curSpeechWords494b = 0;
+      hasDlgLine494b = false;
+    };
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { flushSpeech494b(); inDlg494b = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { flushSpeech494b(); inDlg494b = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { flushSpeech494b(); inDlg494b = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (!inDlg494b) continue;
+      curSpeechWords494b += t.split(/\s+/).filter(Boolean).length;
+      hasDlgLine494b = true;
+    }
+    flushSpeech494b();
+    if (totalSpeeches494b >= 8 && maxShortRun494b >= 5) {
+      issues.push({
+        location: `${maxShortRun494b} consecutive speech(es) of ≤3 words`,
+        rule: 'DIALOGUE_SHORT_RUN',
+        severity: 'minor',
+        description: `${maxShortRun494b} consecutive dialogue speeches each contain three words or fewer — a staccato burst that compresses character voice into pure telegraphy. Individual short speeches are powerful; five or more in a row signal that the scene has entered a mode where no character has room to reveal intention, register, or complication. When every speech in a run is this compressed, all speakers collapse into the same clipped register: the distinct rhythms, vocabulary levels, and emotional textures that differentiate characters on the page become impossible to maintain in three words or fewer. A sustained staccato run also removes breathing room for subtext, since subtext requires the space between a speech's apparent surface and its implied meaning — which three words rarely contain.`,
+        suggestedFix: `Break the short-speech run by letting at least one speaker in the sequence expand into four or more words: enough space to let register, diction, and character specificity emerge. A longer speech in the middle of a terse exchange creates rhythm contrast — the expansion lands harder for the compression around it — and gives the actor and director a moment of character interiority amid the staccato exchange.`,
+      });
+    }
+  }
+
+  // DIALOGUE_SPEAKER_SOLO (underweight/bloat × dialogue × speaker distribution, ≥3 speakers,
+  // ≥10 dialogue lines, dominant speaker >60% of total lines): One character delivers more than
+  // 60% of all dialogue lines while at least two other speakers exist. The script's conversation
+  // is a monologue disguised as dialogue — one voice carries the dramatic material while the
+  // others function as reactive sounding boards or prompts. When one speaker dominates to this
+  // degree, the story's dramatic material flows entirely through one perspective, the other
+  // characters' interiority is underdeveloped, and the audience hears one consciousness
+  // interpreting events rather than multiple consciousnesses in conflict. Underweight/bloat
+  // mode × dialogue layer × speaker distribution. Distinctness: DIALOGUE_SHORT_LINE_DOMINANCE
+  // (Wave 396) checks line length, not speaker; DIALOGUE_MONOLOGUE_DROUGHT (Wave 438) checks
+  // whether any single speech is >15 words, not who speaks how often; no existing check in this
+  // pass audits per-speaker share of the dialogue budget.
+  {
+    const speakerLines494c = new Map<string, number>();
+    let currentSpeaker494c: string | null = null;
+    let totalDlgLines494c = 0;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { currentSpeaker494c = null; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { currentSpeaker494c = null; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) {
+        currentSpeaker494c = t.replace(/\s*\(.*\)\s*$/, '').trim();
+        continue;
+      }
+      if (t.startsWith('(')) continue;
+      if (!currentSpeaker494c) continue;
+      speakerLines494c.set(currentSpeaker494c, (speakerLines494c.get(currentSpeaker494c) ?? 0) + 1);
+      totalDlgLines494c++;
+    }
+    if (speakerLines494c.size >= 3 && totalDlgLines494c >= 10) {
+      const maxLines494c = Math.max(...speakerLines494c.values());
+      if (maxLines494c / totalDlgLines494c > 0.6) {
+        const dominantSpeaker494c =
+          [...speakerLines494c.entries()].find(([, v]) => v === maxLines494c)![0];
+        issues.push({
+          location: `${dominantSpeaker494c} — ${maxLines494c}/${totalDlgLines494c} dialogue lines (${(maxLines494c / totalDlgLines494c * 100).toFixed(0)}%)`,
+          rule: 'DIALOGUE_SPEAKER_SOLO',
+          severity: 'minor',
+          description: `${dominantSpeaker494c} delivers ${maxLines494c} of ${totalDlgLines494c} dialogue lines (${(maxLines494c / totalDlgLines494c * 100).toFixed(0)}%) — more than 60% of the script's entire conversation — while ${speakerLines494c.size - 1} other speaking character(s) share the remainder. The script's dramatic material flows almost entirely through one voice; the other characters function as prompts and reactive sounding boards rather than as independent consciousnesses. When one speaker dominates to this degree, the audience hears one perspective interpreting events, the other characters' inner lives remain underdeveloped, and the story's conflicts feel like internal debates rather than genuine clashes between distinct wills.`,
+          suggestedFix: `Redistribute the dramatic weight: let other characters carry scenes, lead confrontations, or disclose information independently of the dominant speaker. A character who has been a reactive prompt can be elevated by giving them a scene they initiate, information only they hold, or an emotional position that directly challenges the dominant speaker's assumptions. The goal is not equal distribution — the protagonist may naturally carry more — but the non-dominant speakers should each have at least one scene where their interiority lands on the audience without the dominant voice framing it.`,
         });
       }
     }

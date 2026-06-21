@@ -22503,6 +22503,220 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 494 — originalityPass: dialogue question run, dialogue short run, dialogue speaker solo', async () => {
+    const runO494 = async (fountain: string) => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      return originalityPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // DIALOGUE_QUESTION_RUN fire: 7 speeches, 4 consecutive end with "?" (speeches 1-4)
+    it('DIALOGUE_QUESTION_RUN fires when 4 or more consecutive speeches end with "?"', async () => {
+      const f494a = `INT. ROOM - DAY
+
+ANNA
+Are you sure?
+
+MARK
+Did you check?
+
+ANNA
+When did it happen?
+
+MARK
+Why didn't you tell me?
+
+ANNA
+I don't know.
+
+MARK
+Fine.
+
+ANNA
+Let's move on.
+`;
+      const res = await runO494(f494a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_QUESTION_RUN'), 'DIALOGUE_QUESTION_RUN should fire');
+    });
+
+    // DIALOGUE_QUESTION_RUN no-fire: question speeches separated by a statement
+    it('DIALOGUE_QUESTION_RUN does not fire when question speeches are separated by statements', async () => {
+      const f494anr = `INT. ROOM - DAY
+
+ANNA
+Are you sure?
+
+MARK
+Yes.
+
+ANNA
+When did it happen?
+
+MARK
+Yesterday.
+
+ANNA
+Where were you?
+
+MARK
+Here.
+`;
+      const res = await runO494(f494anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_QUESTION_RUN'), 'DIALOGUE_QUESTION_RUN should not fire');
+    });
+
+    // DIALOGUE_SHORT_RUN fire: 8 speeches, 5 consecutive each ≤3 words (speeches 2-6)
+    it('DIALOGUE_SHORT_RUN fires when 5 or more consecutive speeches are ≤3 words', async () => {
+      const f494b = `INT. ROOM - DAY
+
+ANNA
+I need to tell you something important about what happened last night.
+
+MARK
+Yes?
+
+ANNA
+Really?
+
+MARK
+No way.
+
+ANNA
+Go on.
+
+MARK
+Are you sure?
+
+ANNA
+Absolutely certain.
+
+MARK
+Tell me everything about this situation please.
+`;
+      const res = await runO494(f494b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_SHORT_RUN'), 'DIALOGUE_SHORT_RUN should fire');
+    });
+
+    // DIALOGUE_SHORT_RUN no-fire: short speeches interleaved with longer ones
+    it('DIALOGUE_SHORT_RUN does not fire when short speeches are separated by longer ones', async () => {
+      const f494bnr = `INT. ROOM - DAY
+
+ANNA
+Yes.
+
+MARK
+I think we need to talk about what happened yesterday.
+
+ANNA
+No.
+
+MARK
+That's not fair and you know it.
+
+ANNA
+Fine.
+
+MARK
+We should sit down and discuss this properly.
+
+ANNA
+Okay.
+
+MARK
+Good.
+
+ANNA
+Agreed then.
+
+MARK
+Thank you for listening.
+`;
+      const res = await runO494(f494bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_SHORT_RUN'), 'DIALOGUE_SHORT_RUN should not fire');
+    });
+
+    // DIALOGUE_SPEAKER_SOLO fire: ANNA has 8 of 10 lines (80%) with 3 speakers
+    it('DIALOGUE_SPEAKER_SOLO fires when one speaker has more than 60% of all dialogue lines', async () => {
+      const f494c = `INT. ROOM - DAY
+
+ANNA
+I was there and I saw everything.
+
+ANNA
+He came in through the back.
+
+ANNA
+Nobody noticed him at first.
+
+ANNA
+Then he spoke.
+
+ANNA
+He said something strange.
+
+ANNA
+I couldn't hear all of it.
+
+ANNA
+But I knew it was important.
+
+ANNA
+And then he left.
+
+MARK
+Really?
+
+BOB
+Wow.
+`;
+      const res = await runO494(f494c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_SPEAKER_SOLO'), 'DIALOGUE_SPEAKER_SOLO should fire');
+    });
+
+    // DIALOGUE_SPEAKER_SOLO no-fire: ANNA has 6/12 lines (50%) — under the 60% threshold
+    it('DIALOGUE_SPEAKER_SOLO does not fire when no single speaker exceeds 60% of dialogue lines', async () => {
+      const f494cnr = `INT. ROOM - DAY
+
+ANNA
+I was there.
+
+ANNA
+I saw him.
+
+ANNA
+He came in.
+
+ANNA
+Nobody noticed.
+
+ANNA
+Then he spoke.
+
+ANNA
+And left.
+
+MARK
+That sounds strange.
+
+MARK
+Why didn't you say anything?
+
+MARK
+We should have known.
+
+BOB
+I agree with Mark.
+
+BOB
+This is serious.
+
+BOB
+We need to act.
+`;
+      const res = await runO494(f494cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_SPEAKER_SOLO'), 'DIALOGUE_SPEAKER_SOLO should not fire');
+    });
+  });
+
   describe('Wave 480 — originalityPass: dialogue filler run, action average line brevity, action peak paragraph', async () => {
     const runO480 = async (fountain: string) => {
       const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
