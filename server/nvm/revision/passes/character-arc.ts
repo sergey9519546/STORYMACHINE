@@ -127,6 +127,21 @@
 // resolution goes dark for too long; distinct from ARC_RELATIONAL_DROUGHT_RUN which targets the
 // relational channel, PAYOFF_BACK_LOADED in causality.ts which is a zone check, and all negative/
 // positive emotion run checks which target the emotion channel).
+// Wave 533 additions: curiosity peak relational void (single-peak isolation × curiosityDelta ×
+// relationship — n≥8, ≥2 relationship-shift scenes, ≥2 curiosity scenes, the scene with the
+// highest curiosityDelta has no relationship shift; the story's maximum wonder moment is
+// interpersonally inert; first single-peak check on the curiosity channel in this pass, distinct
+// from ARC_CLOCK_PEAK_EMOTION_ABSENT and ARC_PEAK_SUSPENSE_EMOTION_ABSENT which use different peak
+// signals and aftermath channels), dramatic-turn emotional aftermath void (sequence/aftermath ×
+// dramatic-turn → emotional aftermath — n≥8, ≥3 dramatic-turn scenes not at last position, none
+// of the immediately following scenes carries a non-neutral emotional shift; pivots land without
+// felt consequence; first aftermath check with dramatic-turn as trigger in this pass, distinct from
+// ARC_DRAMATIC_TURN_AFTERMATH_VOID in causality.ts which checks causal logic and from ARC_SEED_
+// EMOTIONAL_AFTERMATH_VOID which uses seed as trigger), curiosity back-loaded (distribution/timing
+// × curiosityDelta × second half — n≥8, ≥4 curiosity scenes, >70% in second half while first half
+// has ≥1; wonder ignites only late, never sustaining early investment; the back-half distribution
+// complement of ARC_SUSPENSE_FRONT_LOADED, distinct from ARC_CURIOSITY_DROUGHT_RUN which is run-
+// based and from CURIOSITY_FRONT_LOADED in causality.ts which is the opposite direction).
 // Wave 519 additions: curiosity drought run (run-based × curiosityDelta × absence — n≥10,
 // ≥3 curiosity-positive scenes, longest run with curiosityDelta ≤ 0 ≥ 6; the wonder engine
 // stalls for an extended stretch; first run-based check on the curiosity channel, distinct from
@@ -2614,6 +2629,122 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `The script raises ${clockScenes519c.length} deadline beats but none appear in the opening structural third (scenes 1–${openingThird519c}). Introducing a clock is how a story tells the audience that choices cost time — without it, the protagonist's actions in the setup carry no urgency. When the deadline only surfaces in Act 2 or later, the audience must retroactively apply time pressure to scenes they experienced as open-ended, weakening the structural logic of the story's first movement.`,
           suggestedFix: `Introduce at least one clockRaised beat in the opening structural third — a looming deadline established early, a window closing, or a timer started. This does not require the full stakes to be visible; even a hint that time is limited changes how the audience weighs every subsequent scene in the setup.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 533: ARC_CURIOSITY_PEAK_RELATIONAL_VOID, ARC_DRAMATIC_TURN_EMOTIONAL_AFTERMATH_VOID,
+  //              ARC_CURIOSITY_BACK_LOADED ─────────────────────────────────────────────────────────
+
+  // ARC_CURIOSITY_PEAK_RELATIONAL_VOID — Single-peak isolation × curiosityDelta × relationship.
+  // n≥8, ≥2 scenes with non-empty relationshipShifts, ≥2 scenes with curiosityDelta > 0. The scene
+  // with the highest curiosityDelta has no relationship shift. The story's single most intriguing
+  // moment — the peak of audience wonder — arrives without any bond dimension: no relationship is
+  // tested, altered, or deepened at the apex of the story's mystery engine. The most powerful wonder
+  // moments tend to be socially inhabited: what we want to know about the plot is often entangled
+  // with what we want to know about the people and their relationships. When the peak of curiosity
+  // is relationally inert, the story's maximum intrigue is a purely intellectual event.
+  // Distinct from: ARC_CLOCK_PEAK_EMOTION_ABSENT (single-peak × clockDelta × emotion — different
+  // peak signal and different correlated channel), ARC_PEAK_SUSPENSE_EMOTION_ABSENT (single-peak ×
+  // suspenseDelta × emotion — different peak signal), ARC_SUSPENSE_RELATIONAL_DECOUPLED (co-
+  // occurrence × suspense × relationship — different mode: aggregate, not single-peak). First
+  // single-peak isolation check on the curiosity channel in this pass.
+  {
+    const n533a = records.length;
+    if (n533a >= 8) {
+      const relScenes533a = (records as any[]).filter(r => ((r.relationshipShifts ?? []) as any[]).length > 0);
+      const curScenes533a = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0);
+      if (relScenes533a.length >= 2 && curScenes533a.length >= 2) {
+        const maxCur533a = Math.max(...(records as any[]).map(r => r.curiosityDelta ?? 0));
+        const peakCurIdx533a = (records as any[]).findIndex(r => (r.curiosityDelta ?? 0) === maxCur533a);
+        if (peakCurIdx533a >= 0) {
+          const peakRec533a = (records as any[])[peakCurIdx533a];
+          const peakHasRel533a = ((peakRec533a.relationshipShifts ?? []) as any[]).length > 0;
+          if (!peakHasRel533a) {
+            issues.push({
+              location: `Scene ${peakRec533a.sceneIdx} (${peakRec533a.slug}) — peak curiosityDelta (${maxCur533a}) with no relationship shift`,
+              rule: 'ARC_CURIOSITY_PEAK_RELATIONAL_VOID',
+              severity: 'minor',
+              description: `The scene with the story's highest curiosityDelta (${maxCur533a} at scene ${peakRec533a.sceneIdx}) carries no relationship shift, despite the story having ${relScenes533a.length} scene(s) where bonds do move. The story's maximum moment of audience wonder — the apex of the mystery engine — is interpersonally inert: no bond is tested, deepened, or altered at the peak of intrigue. The most powerful wonder moments tend to be socially inhabited, because what we want to know about the plot is often entangled with what we want to know about the people. When the peak of curiosity is relationally void, the story's maximum intrigue is a purely intellectual event — audiences are gripped by the question but not by who will be affected by its answer.`,
+              suggestedFix: `Give the scene with the highest curiosityDelta a relationship dimension: a bond tested by the mystery, a character whose relationship to another shifts as the intrigue peaks, or a disclosure that simultaneously raises a question and moves a human connection. The peak of audience wondering is the moment the story can most powerfully root the mystery in the people the audience cares about — the wonder becomes both intellectual and emotional.`,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // ARC_DRAMATIC_TURN_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × dramatic-turn → emotional
+  // aftermath. n≥8, ≥3 qualifying dramatic-turn scenes (dramaticTurn not 'nothing'/empty, not at
+  // last position). None of the immediately following scenes carries a non-neutral emotional shift.
+  // A dramatic turn — a reversal, pivot, or structural gear-shift — is among the most emotionally
+  // charged events in a story. The scene that immediately follows a turn is when the audience (and
+  // the protagonist) absorb what just happened: the new reality should produce a felt emotional
+  // response. When every dramatic-turn aftermath is emotionally neutral, the story's pivots are
+  // structurally present but affectively inert — gear-shifts that move the plot without moving anyone.
+  // Distinct from: ARC_POSITIVE_RELATIONAL_AFTERMATH_VOID (Wave 477: aftermath × positive emotion →
+  // relationship; different trigger and channel), ARC_SEED_EMOTIONAL_AFTERMATH_VOID (Wave 505: seed
+  // trigger — this is dramatic-turn trigger), ARC_DRAMATIC_TURN_AFTERMATH_VOID in causality.ts
+  // (causality pass: checks causal channels — suspense, emotion, relationship simultaneously in the
+  // 2 following scenes; this checks ONLY emotional shift in the IMMEDIATELY following scene and uses
+  // a lower threshold of ≥3 turns). First aftermath check using dramatic-turn as trigger in this pass.
+  {
+    const n533b = records.length;
+    if (n533b >= 8) {
+      const turnAndNext533b = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) =>
+          r.dramaticTurn !== undefined && r.dramaticTurn !== null &&
+          r.dramaticTurn !== 'nothing' && r.dramaticTurn !== '' &&
+          pos < n533b - 1,
+        );
+      if (turnAndNext533b.length >= 3) {
+        const anyTurnAftermathEmotional533b = turnAndNext533b.some(({ pos }) => {
+          const nextRec = (records as any[])[pos + 1];
+          return nextRec.emotionalShift !== 'neutral' && nextRec.emotionalShift !== undefined;
+        });
+        if (!anyTurnAftermathEmotional533b) {
+          issues.push({
+            location: `${turnAndNext533b.length} dramatic-turn scene(s) — none followed by an emotional (non-neutral) scene`,
+            rule: 'ARC_DRAMATIC_TURN_EMOTIONAL_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `The script has ${turnAndNext533b.length} qualifying dramatic-turn scenes, but not one is followed by a scene carrying a non-neutral emotional shift. A dramatic turn — a reversal, pivot, or structural gear-shift — is among the most emotionally charged events in a story. The scene immediately following a turn is where the audience and the protagonist absorb what just happened: the new reality should produce a felt emotional response, whether that is the relief of an obstacle removed, the dread of a new threat, or the grief of a loss. When every dramatic-turn aftermath is emotionally neutral, the story's pivots are structurally present but affectively inert — gear-shifts that move the plot without moving anyone.`,
+            suggestedFix: `Ensure at least one dramatic-turn scene is immediately followed by a scene with a non-neutral emotional shift — positive or negative. The emotional aftermath of a pivot does not need to be prolonged: even a single scene in which the protagonist (or another character) feels the weight of what has just changed gives the turn its human dimension. Structural pivots are most powerful when the audience not only understands the new situation but feels it.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ARC_CURIOSITY_BACK_LOADED — Distribution/timing × curiosityDelta × second half.
+  // n≥8, ≥4 scenes with curiosityDelta > 0 (wonder-generating scenes). >70% of those scenes fall
+  // in the second half while the first half has ≥1. The story's wonder engine starts cold: the
+  // audience spends the first half without significant intrigue, then receives a burst of questioning
+  // energy only in the back half. Curiosity needs to be established early to sustain investment —
+  // when wonder only arrives late, the audience has spent the first half without the questions that
+  // make the second half's answers satisfying.
+  // Distinct from: ARC_CURIOSITY_DROUGHT_RUN (Wave 519: run-based × consecutive absence — measures
+  // sustained multi-scene stretches of zero curiosity, not arc-wide back-concentration), ARC_SUSPENSE_
+  // FRONT_LOADED (Wave 519: distribution/timing × suspense × first half — different channel and
+  // different polarity of concentration), CURIOSITY_FRONT_LOADED in causality.ts (Wave 268: checks
+  // all curiosity spikes in first half — the opposite concentration pattern; this checks back-
+  // concentration, completing the front-vs-back curiosity distribution pair across the two passes).
+  {
+    const n533c = records.length;
+    const half533c = Math.floor(n533c / 2);
+    const curScenes533c = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0);
+    if (n533c >= 8 && curScenes533c.length >= 4) {
+      const backCount533c = (records as any[]).slice(half533c).filter(r => (r.curiosityDelta ?? 0) > 0).length;
+      const frontCount533c = curScenes533c.length - backCount533c;
+      const backRatio533c = backCount533c / curScenes533c.length;
+      if (backRatio533c > 0.70 && frontCount533c >= 1) {
+        issues.push({
+          location: `curiosity distribution: ${frontCount533c} front-half / ${backCount533c} back-half`,
+          rule: 'ARC_CURIOSITY_BACK_LOADED',
+          severity: 'minor',
+          description: `${Math.round(backRatio533c * 100)}% of the script's curiosity-generating moments (${backCount533c} of ${curScenes533c.length}) fall in the second half, leaving the first half with only ${frontCount533c}. The wonder engine starts cold: the audience spends the setup with minimal intrigue and only receives the questions that make a story compelling in the back half. Curiosity needs to be seeded early — the questions that the first half poses are what make the second half's answers feel earned and satisfying. When wondering only arrives late, the audience has no established stakes of "what happens next" to carry them through the opening act.`,
+          suggestedFix: `Redistribute curiosity-generating moments into the first half of the story: plant a mystery, introduce a character whose motives are unclear, or open a question whose stakes become clear only later. The first half should establish questions that the second half answers — curiosity concentrated entirely in the back half means the story has made its audience wait for the experience that justifies their investment.`,
         });
       }
     }

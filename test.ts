@@ -27404,6 +27404,88 @@ I always listen.
     });
   });
 
+  describe('Wave 533 — characterArcPass: curiosity peak relational void, dramatic-turn emotional aftermath void, curiosity back-loaded', async () => {
+    const makeRec533 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCA533 = async (records: any[]) => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ARC_CURIOSITY_PEAK_RELATIONAL_VOID fires when peak curiosity scene has no relationship shift', async () => {
+      // 8 scenes: curiosity peaks at pos 3 (curiosityDelta=5, no relShift);
+      // relShifts at pos 1,6; another curiosity scene at pos 5 (curiosityDelta=1) → fires.
+      // pairKey required by existing charsWithRelArc logic in characterArcPass.
+      const recs533a = Array.from({ length: 8 }, (_, i) =>
+        makeRec533(i, {
+          curiosityDelta: i === 3 ? 5 : i === 5 ? 1 : 0,
+          relationshipShifts: [1, 6].includes(i) ? [{ from: 'A', to: 'B', nature: 'closer', pairKey: 'A|B' }] : [],
+        })
+      );
+      const res = await runCA533(recs533a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_CURIOSITY_PEAK_RELATIONAL_VOID'), 'ARC_CURIOSITY_PEAK_RELATIONAL_VOID should fire');
+    });
+
+    it('ARC_CURIOSITY_PEAK_RELATIONAL_VOID does not fire when peak curiosity scene has a relationship shift', async () => {
+      // Same but the peak curiosity scene (pos 3) now has a relShift → no fire
+      const recs533anr = Array.from({ length: 8 }, (_, i) =>
+        makeRec533(i, {
+          curiosityDelta: i === 3 ? 5 : i === 5 ? 1 : 0,
+          relationshipShifts: [1, 3, 6].includes(i) ? [{ from: 'A', to: 'B', nature: 'closer', pairKey: 'A|B' }] : [],
+        })
+      );
+      const res = await runCA533(recs533anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_CURIOSITY_PEAK_RELATIONAL_VOID'), 'ARC_CURIOSITY_PEAK_RELATIONAL_VOID should not fire');
+    });
+
+    it('ARC_DRAMATIC_TURN_EMOTIONAL_AFTERMATH_VOID fires when all dramatic-turn aftermaths are emotionally neutral', async () => {
+      // 9 scenes: dramatic turns at pos 1,3,5 (not at last pos 8);
+      // following scenes (pos 2,4,6) all have emotionalShift='neutral' → fires
+      const recs533b = Array.from({ length: 9 }, (_, i) =>
+        makeRec533(i, { dramaticTurn: [1, 3, 5].includes(i) ? 'reversal' : 'nothing' })
+      );
+      const res = await runCA533(recs533b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_DRAMATIC_TURN_EMOTIONAL_AFTERMATH_VOID'), 'ARC_DRAMATIC_TURN_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_DRAMATIC_TURN_EMOTIONAL_AFTERMATH_VOID does not fire when a dramatic-turn aftermath is emotional', async () => {
+      // Same but scene 2 (after turn at 1) now has emotionalShift='negative' → anyTurnAftermathEmotional=true → no fire
+      const recs533bnr = Array.from({ length: 9 }, (_, i) =>
+        makeRec533(i, {
+          dramaticTurn: [1, 3, 5].includes(i) ? 'reversal' : 'nothing',
+          emotionalShift: i === 2 ? 'negative' : 'neutral',
+        })
+      );
+      const res = await runCA533(recs533bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_DRAMATIC_TURN_EMOTIONAL_AFTERMATH_VOID'), 'ARC_DRAMATIC_TURN_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('ARC_CURIOSITY_BACK_LOADED fires when >70% of curiosity scenes are in second half', async () => {
+      // 10 scenes; half=5; curiosity at pos 1,6,7,8 → frontCount=1, backCount=3; 3/4=75% > 70% → fires
+      const recs533c = Array.from({ length: 10 }, (_, i) =>
+        makeRec533(i, { curiosityDelta: [1, 6, 7, 8].includes(i) ? 2 : 0 })
+      );
+      const res = await runCA533(recs533c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_CURIOSITY_BACK_LOADED'), 'ARC_CURIOSITY_BACK_LOADED should fire');
+    });
+
+    it('ARC_CURIOSITY_BACK_LOADED does not fire when curiosity is spread across both halves', async () => {
+      // 10 scenes; half=5; curiosity at pos 1,2,6,7 → frontCount=2, backCount=2; 2/4=50% ≤ 70% → no fire
+      const recs533cnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec533(i, { curiosityDelta: [1, 2, 6, 7].includes(i) ? 2 : 0 })
+      );
+      const res = await runCA533(recs533cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_CURIOSITY_BACK_LOADED'), 'ARC_CURIOSITY_BACK_LOADED should not fire');
+    });
+  });
+
   describe('Wave 519 — characterArcPass: curiosity drought run, suspense front-loaded, clock opening zone absent', async () => {
     const makeRec519 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
