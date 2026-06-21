@@ -112,6 +112,18 @@
 // ≥3 seed scenes not at last position, avg curiosityDelta of scene immediately following each seed ≤ 0;
 // distinct from SEED_SCENE_CURIOSITY_VOID which checks the seed scene's OWN curiosityDelta and from
 // CURIOSITY_SPIKE_NO_FALLOUT which checks what follows a curiosity spike rather than a seed scene).
+// Wave 503 additions: revelation aftermath suspense void (sequence/aftermath × revelation → suspense
+// aftermath — n≥8, ≥3 revelation scenes not at last position, avg suspenseDelta of scene immediately
+// following each revelation ≤ 0; revelations that consistently fail to tighten stakes disconnect the
+// mystery and tension engines; distinct from REVELATION_CURIOSITY_AFTERMATH_VOID in belief.ts which
+// audits the curiosity channel, and from all within-revelation-scene checks), clock final third absent
+// (zone presence/absence × clock × closing third — n≥9, ≥2 clock scenes, none in the final third;
+// deadline machinery vanishes when stakes should peak; distinct from CLOCK_CLUSTERING which flags
+// early overload and CLOCK_SINGLE_SCENE which flags minimum count), positive emotion unbroken run
+// (run-based × valence × positive emotion — n≥8, ≥3 positive scenes, longest consecutive run of
+// positive-emotion scenes ≥ 4; a sustained positive run means the protagonist's world is going well
+// without adversity for too long; distinct from EMOTIONAL_NEUTRAL_RUN, SUSPENSE_DECLINE_RUN, and
+// EMOTIONAL_POSITIVE_DESERT which use different modes on the emotional channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2581,6 +2593,129 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `The scene immediately following each of the ${seedAndNext489c.length} qualifying clue-planting scene(s) averages a curiosityDelta of ${avgCurAftermath489c.toFixed(2)}. Foreshadowing consistently fails to open wondering in what follows — seeds are planted and the next beat closes the epistemic field rather than igniting it. The scene after a planted clue is the moment of peak audience curiosity: they have just received a mystery, and the next scene should deepen or redirect that wondering. When the seed-aftermath is curiosity-neutral or curiosity-negative, the planted clue functions as an inert deposit rather than a wonder-generator.`,
             suggestedFix: `Engineer at least one seed scene whose immediately following scene increases curiosity: introduce a character who reacts to the planted clue with suspicion, add a new complication that makes the clue more urgent, or open a new question that the clue makes the audience want answered. The most effective foreshadowing creates a wondering cascade — the clue lands, and what follows makes the audience want to know more, not less.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 503 checks ──────────────────────────────────────────────────────────
+
+  // REVELATION_AFTERMATH_SUSPENSE_VOID — Sequence/aftermath × revelation → suspense aftermath.
+  // n≥8, ≥3 revelation scenes (revelation not null/empty/undefined) not at last position.
+  // Average suspenseDelta of the scene immediately following each revelation ≤ 0.
+  // A revelation is a high-stakes disclosure: the truth surfacing should tighten the story's grip,
+  // raise the pressure, and make the audience feel that consequences are now in motion. When the
+  // scene following a revelation consistently carries zero or negative suspenseDelta, the mystery
+  // engine is causally disconnected from the tension engine: truths land without generating the
+  // urgency that propels audience investment forward.
+  // Distinct from: REVELATION_CURIOSITY_AFTERMATH_VOID (belief.ts Wave 502 — different pass and
+  // different aftermath channel: curiosity, not suspense), SUSPENSE_SPIKE_NO_FALLOUT (Wave 349:
+  // checks what follows a SUSPENSE SPIKE, not a revelation — different trigger), DRAMATIC_TURN_
+  // AFTERMATH_VOID (Wave 296: aftermath of a dramatic turn — different trigger), SEED_AFTERMATH_
+  // CURIOSITY_VOID (Wave 489: different trigger (seed) and different channel (curiosity)), all
+  // revelation co-occurrence and single-scene correlation checks (own-scene analysis of the
+  // revelation scene, not the scene that follows it).
+  {
+    const n503a = records.length;
+    if (n503a >= 8) {
+      const revAndNext503a = (records as any[])
+        .map((r, pos) => ({
+          pos,
+          hasRev: r.revelation !== null && r.revelation !== '' && r.revelation !== undefined,
+        }))
+        .filter(x => x.hasRev && x.pos < n503a - 1);
+      if (revAndNext503a.length >= 3) {
+        const totalSusp503a = revAndNext503a.reduce(
+          (sum, x) => sum + (((records as any[])[x.pos + 1] as any).suspenseDelta ?? 0),
+          0,
+        );
+        const avgSusp503a = totalSusp503a / revAndNext503a.length;
+        if (avgSusp503a <= 0) {
+          issues.push({
+            location: `${revAndNext503a.length} revelation scenes examined — avg post-revelation suspenseDelta ${avgSusp503a.toFixed(2)}`,
+            rule: 'REVELATION_AFTERMATH_SUSPENSE_VOID',
+            severity: 'minor',
+            description: `Across ${revAndNext503a.length} revelations, the scene immediately following each averages a suspenseDelta of ${avgSusp503a.toFixed(2)} (≤ 0). Revelations should tighten the story's grip: when truth surfaces, the stakes clarify and the audience should feel mounting urgency about what comes next. When post-revelation scenes consistently carry zero or negative tension, the mystery engine and the suspense engine are causally disconnected — disclosures arrive but the pressure they should generate never follows.`,
+            suggestedFix: `After each revelation, ensure the next scene raises at least a small amount of tension: a character who realises what the revealed truth means for them, a consequence that makes the situation more dangerous or urgent, or a new complication that the disclosure has set in motion. Revelations gain their power from the ripple they send through the scenes that follow.`,
+          });
+        }
+      }
+    }
+  }
+
+  // CLOCK_FINAL_THIRD_ABSENT — Zone presence/absence × clock × closing third.
+  // n≥9, ≥2 clock scenes (clockRaised = true). None in the final structural third → fire.
+  // The closing act is where deadline pressure should be highest — the story's ticking clocks
+  // should be felt most acutely as the protagonist runs out of room. When no clock scene appears
+  // in the final third, the urgency machinery goes silent exactly when stakes should peak. The
+  // audience crosses into the resolution without any active deadline, which removes the structural
+  // compulsion that drives engagement toward the climax.
+  // Distinct from: CLOCK_CLUSTERING (Wave 282: >40% of clocks in first 40% — early overload, not
+  // late absence), CLOCK_SINGLE_SCENE (Wave 268: only 1 clock raised in a long story — minimum
+  // count, not zone presence), CLOCK_DELTA_WITHOUT_RAISE (Wave 296: time-pressure effects before a
+  // clock is established — ordering/logic), CLOCK_PEAK_UNCAUSED (Wave 489: backward-cause on the
+  // scene with highest clockDelta), all per-clock-scene signal checks (average/aggregate or co-
+  // occurrence of other channels within clock scenes, not temporal placement). This is the first
+  // zone presence/absence check applied specifically to the CLOSING third of the clock channel.
+  {
+    const n503b = records.length;
+    if (n503b >= 9) {
+      const clockPositions503b = (records as any[])
+        .map((r, pos) => ({ pos, raised: !!(r.clockRaised) }))
+        .filter(x => x.raised)
+        .map(x => x.pos);
+      if (clockPositions503b.length >= 2) {
+        const third503b = Math.floor(n503b / 3);
+        const inFinal503b = clockPositions503b.some(p => p >= 2 * third503b);
+        if (!inFinal503b) {
+          issues.push({
+            location: `${clockPositions503b.length} clock scene(s) — none in the final structural third (scenes ${2 * third503b}–${n503b - 1})`,
+            rule: 'CLOCK_FINAL_THIRD_ABSENT',
+            severity: 'minor',
+            description: `The script has ${clockPositions503b.length} scene(s) in which a deadline or urgency clock is raised, but none falls in the final structural third (scenes ${2 * third503b}–${n503b - 1}). Deadline machinery should be felt most acutely in the closing act: the protagonist's time running out, the ticking pressure cresting, the audience feeling the walls close in. When no clock appears in the final third, the story's urgency engine falls silent exactly when stakes should be highest — the resolution arrives without any active deadline compelling the protagonist forward.`,
+            suggestedFix: `Ensure at least one clock or deadline scene lands in the final structural third. This does not require a new plot device: an existing clock from earlier can be re-invoked, a character can remind the protagonist of the remaining time, or a new constraint can be introduced that compresses the closing act. The function of a late-act clock is to give the audience a felt countdown toward the climax.`,
+          });
+        }
+      }
+    }
+  }
+
+  // POSITIVE_EMOTION_UNBROKEN_RUN — Run-based × valence × positive emotion.
+  // n≥8, ≥3 positive-emotion scenes total. Longest consecutive run of scenes where emotionalShift
+  // is 'positive' ≥ 4 → fire. A story's emotional arc needs adversity, reversal, and setback
+  // distributed through its positive passages. When four or more consecutive scenes all register a
+  // positive emotional shift, the protagonist's world is going well without complication for too
+  // long — the dramatic engine idles, stakes evaporate, and audience investment weakens because
+  // there is no felt cost or obstacle to track across the run.
+  // Distinct from: EMOTIONAL_NEUTRAL_RUN (Wave 324: run of neutral — emotionally flat, not positive;
+  // a run of positive emotion is a different failure: the story is emotionally present but uniformly
+  // favourable rather than flat), SUSPENSE_UNRELEASED_RUN (Wave 324: run-based on suspense, not
+  // emotion), CURIOSITY_DECLINE_RUN / SUSPENSE_DECLINE_RUN (Wave 433/447: negative-valence decline
+  // runs in non-emotional channels), EMOTIONAL_POSITIVE_DESERT (Wave 282: zone ABSENCE of positive
+  // scenes — the opposite problem), EMOTIONAL_ZONE_CLUSTER (Wave 475: distribution/timing on charged
+  // scenes across thirds — different mode from consecutive-run analysis).
+  {
+    const n503c = records.length;
+    if (n503c >= 8) {
+      const posScenes503c = (records as any[]).filter((r: any) => r.emotionalShift === 'positive');
+      if (posScenes503c.length >= 3) {
+        let maxPosRun503c = 0;
+        let curPosRun503c = 0;
+        for (const r of records as any[]) {
+          if (r.emotionalShift === 'positive') {
+            if (++curPosRun503c > maxPosRun503c) maxPosRun503c = curPosRun503c;
+          } else {
+            curPosRun503c = 0;
+          }
+        }
+        if (maxPosRun503c >= 4) {
+          issues.push({
+            location: `longest consecutive positive-emotion run: ${maxPosRun503c} scenes`,
+            rule: 'POSITIVE_EMOTION_UNBROKEN_RUN',
+            severity: 'minor',
+            description: `The script contains a run of ${maxPosRun503c} consecutive scenes in which the emotional register is positive. A sustained positive run means the protagonist's world is going well without adversity, reversal, setback, or complication for ${maxPosRun503c} scenes — the dramatic engine idles. Audiences invest in stories through the felt cost of goals: when there is no obstacle, no failure, and no price to pay for four or more scenes in a row, the emotional arc loses its tension and the audience's investment weakens.`,
+            suggestedFix: `Interrupt the positive run with at least one scene of adversity, cost, or complication — a setback, a revelation that complicates the good news, a relationship friction, or a consequence that makes the protagonist's positive progress feel precarious. Even a brief negative or neutral inflection breaks the complacency of a long positive run and restores the push-pull that makes the positive moments feel earned.`,
           });
         }
       }

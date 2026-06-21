@@ -30766,6 +30766,82 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 503 — causalityPass: revelation aftermath suspense void, clock final third absent, positive emotion unbroken run', async () => {
+    const makeRec503 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      seededClueIds: [], payoffSetupIds: [], revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], dramaticTurn: 'nothing',
+      purpose: 'development', unresolvedClues: [],
+      ...overrides,
+    });
+    const runC503 = async (records: any[]) => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: records.map(() => ({})), approvedSpans: [] });
+    };
+
+    it('REVELATION_AFTERMATH_SUSPENSE_VOID fires when post-revelation suspense average is <= 0', async () => {
+      // n=10; revelations at pos 1,3,5; next scenes (2,4,6) all suspenseDelta=0 → avg=0 <= 0 → fire
+      const recs503a = Array.from({ length: 10 }, (_, i) =>
+        makeRec503(i, {
+          revelation: [1, 3, 5].includes(i) ? 'A secret is revealed.' : null,
+          suspenseDelta: 0,
+        }),
+      );
+      const res = await runC503(recs503a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'REVELATION_AFTERMATH_SUSPENSE_VOID'), 'REVELATION_AFTERMATH_SUSPENSE_VOID should fire');
+    });
+
+    it('REVELATION_AFTERMATH_SUSPENSE_VOID does not fire when post-revelation suspense average is > 0', async () => {
+      // n=10; revelations at pos 1,3,5; scene 2 has suspenseDelta=3 (others 0) → avg=1 > 0 → no fire
+      const recs503anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec503(i, {
+          revelation: [1, 3, 5].includes(i) ? 'Hidden truth.' : null,
+          suspenseDelta: i === 2 ? 3 : 0,
+        }),
+      );
+      const res = await runC503(recs503anr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'REVELATION_AFTERMATH_SUSPENSE_VOID'), 'REVELATION_AFTERMATH_SUSPENSE_VOID should not fire');
+    });
+
+    it('CLOCK_FINAL_THIRD_ABSENT fires when no clock scene falls in the final structural third', async () => {
+      // n=9; third=3; clocks at pos 0,2 (zone1 and zone1) — none at pos 6,7,8 → fire
+      const recs503b = Array.from({ length: 9 }, (_, i) =>
+        makeRec503(i, { clockRaised: [0, 2].includes(i) }),
+      );
+      const res = await runC503(recs503b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'CLOCK_FINAL_THIRD_ABSENT'), 'CLOCK_FINAL_THIRD_ABSENT should fire');
+    });
+
+    it('CLOCK_FINAL_THIRD_ABSENT does not fire when a clock scene exists in the final third', async () => {
+      // n=9; third=3; clocks at pos 0,7 (zone1 and zone3) → inFinal=true → no fire
+      const recs503bnr = Array.from({ length: 9 }, (_, i) =>
+        makeRec503(i, { clockRaised: [0, 7].includes(i) }),
+      );
+      const res = await runC503(recs503bnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'CLOCK_FINAL_THIRD_ABSENT'), 'CLOCK_FINAL_THIRD_ABSENT should not fire');
+    });
+
+    it('POSITIVE_EMOTION_UNBROKEN_RUN fires when 4+ consecutive positive-emotion scenes exist', async () => {
+      // n=10; positive at pos 2,3,4,5 (run=4); also pos 8 (total=5 >= 3) → maxRun=4 >= 4 → fire
+      const recs503c = Array.from({ length: 10 }, (_, i) =>
+        makeRec503(i, { emotionalShift: [2, 3, 4, 5, 8].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runC503(recs503c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'POSITIVE_EMOTION_UNBROKEN_RUN'), 'POSITIVE_EMOTION_UNBROKEN_RUN should fire');
+    });
+
+    it('POSITIVE_EMOTION_UNBROKEN_RUN does not fire when no positive run reaches 4 consecutive scenes', async () => {
+      // n=10; positive at pos 2,3,6,7 (two runs of 2) — maxRun=2 < 4 → no fire
+      const recs503cnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec503(i, { emotionalShift: [2, 3, 6, 7].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runC503(recs503cnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'POSITIVE_EMOTION_UNBROKEN_RUN'), 'POSITIVE_EMOTION_UNBROKEN_RUN should not fire');
+    });
+  });
+
   describe('Wave 489 — causalityPass: dramatic turn temporal cluster, clock peak uncaused, seed aftermath curiosity void', async () => {
     const makeRec489 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
