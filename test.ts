@@ -21143,6 +21143,87 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 511 — relationshipArcPass: shift dramatic turn aftermath void, rupture thirds cluster, relationship payoff decoupled', async () => {
+    const mkShift511 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
+    const makeRec511 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const runRA511 = async (records: any[]) => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // RELATIONSHIP_SHIFT_DRAMATIC_TURN_AFTERMATH_VOID fire:
+    // n=10; shifts at 1,3; turns at 7,9 (not within 2 of any shift)
+    it('RELATIONSHIP_SHIFT_DRAMATIC_TURN_AFTERMATH_VOID fires when no shift is followed by a turn within 2 scenes', async () => {
+      const recs511a: any[] = Array.from({ length: 10 }, (_, i) => makeRec511(i, {
+        relationshipShifts: [1, 3].includes(i) ? mkShift511(-0.5) : [],
+        dramaticTurn: [7, 9].includes(i) ? 'reversal' : 'nothing',
+      }));
+      const res = await runRA511(recs511a);
+      assert.ok(res.issues.some((x: any) => x.rule === 'RELATIONSHIP_SHIFT_DRAMATIC_TURN_AFTERMATH_VOID'), 'RELATIONSHIP_SHIFT_DRAMATIC_TURN_AFTERMATH_VOID should fire');
+    });
+
+    // RELATIONSHIP_SHIFT_DRAMATIC_TURN_AFTERMATH_VOID no-fire:
+    // turn at scene 4 (within 2 of shift at 3) → anyTurnAfterShift=true → no fire
+    it('RELATIONSHIP_SHIFT_DRAMATIC_TURN_AFTERMATH_VOID does not fire when at least one shift is followed by a turn', async () => {
+      const recs511an: any[] = Array.from({ length: 10 }, (_, i) => makeRec511(i, {
+        relationshipShifts: [1, 3].includes(i) ? mkShift511(-0.5) : [],
+        dramaticTurn: [4, 7].includes(i) ? 'reversal' : 'nothing',
+      }));
+      const res = await runRA511(recs511an);
+      assert.ok(!res.issues.some((x: any) => x.rule === 'RELATIONSHIP_SHIFT_DRAMATIC_TURN_AFTERMATH_VOID'), 'RELATIONSHIP_SHIFT_DRAMATIC_TURN_AFTERMATH_VOID should not fire');
+    });
+
+    // RUPTURE_THIRDS_CLUSTER fire:
+    // n=12; third=4; ruptures (≤-0.3) at 0,1,2,3 all in zone1 → 4/4=100% > 75%
+    it('RUPTURE_THIRDS_CLUSTER fires when >75% of rupture scenes cluster in one structural third', async () => {
+      const recs511b: any[] = Array.from({ length: 12 }, (_, i) => makeRec511(i, {
+        relationshipShifts: [0, 1, 2, 3].includes(i) ? mkShift511(-0.5) : [],
+      }));
+      const res = await runRA511(recs511b);
+      assert.ok(res.issues.some((x: any) => x.rule === 'RUPTURE_THIRDS_CLUSTER'), 'RUPTURE_THIRDS_CLUSTER should fire');
+    });
+
+    // RUPTURE_THIRDS_CLUSTER no-fire:
+    // n=12; third=4; ruptures at 0,4,8,11 → zone1=1,zone2=1,zone3=2 → max=2/4=50% → no fire
+    it('RUPTURE_THIRDS_CLUSTER does not fire when ruptures are distributed across thirds', async () => {
+      const recs511bn: any[] = Array.from({ length: 12 }, (_, i) => makeRec511(i, {
+        relationshipShifts: [0, 4, 8, 11].includes(i) ? mkShift511(-0.5) : [],
+      }));
+      const res = await runRA511(recs511bn);
+      assert.ok(!res.issues.some((x: any) => x.rule === 'RUPTURE_THIRDS_CLUSTER'), 'RUPTURE_THIRDS_CLUSTER should not fire');
+    });
+
+    // RELATIONSHIP_PAYOFF_DECOUPLED fire:
+    // n=8; shifts at 0,1,2 (no payoffs); payoffs at 5,6,7 (no shifts) → no overlap → fires
+    it('RELATIONSHIP_PAYOFF_DECOUPLED fires when shift scenes and payoff scenes never coincide', async () => {
+      const recs511c: any[] = Array.from({ length: 8 }, (_, i) => makeRec511(i, {
+        relationshipShifts: [0, 1, 2].includes(i) ? mkShift511(-0.4) : [],
+        payoffSetupIds: [5, 6, 7].includes(i) ? ['P1'] : [],
+      }));
+      const res = await runRA511(recs511c);
+      assert.ok(res.issues.some((x: any) => x.rule === 'RELATIONSHIP_PAYOFF_DECOUPLED'), 'RELATIONSHIP_PAYOFF_DECOUPLED should fire');
+    });
+
+    // RELATIONSHIP_PAYOFF_DECOUPLED no-fire:
+    // scene 2 has both shift and payoff → overlap → no fire
+    it('RELATIONSHIP_PAYOFF_DECOUPLED does not fire when at least one scene has both a shift and a payoff', async () => {
+      const recs511cn: any[] = Array.from({ length: 8 }, (_, i) => makeRec511(i, {
+        relationshipShifts: [0, 1, 2].includes(i) ? mkShift511(-0.4) : [],
+        payoffSetupIds: [2, 5, 6].includes(i) ? ['P1'] : [],
+      }));
+      const res = await runRA511(recs511cn);
+      assert.ok(!res.issues.some((x: any) => x.rule === 'RELATIONSHIP_PAYOFF_DECOUPLED'), 'RELATIONSHIP_PAYOFF_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 497 — relationshipArcPass: shift clock aftermath void, warmth cluster, dimension run', async () => {
     const mkShift497 = (dim: string, amount: number) => [{ pairKey: 'A|B', dimension: dim, amount }];
     const makeRec497 = (idx: number, overrides: any = {}): any => ({

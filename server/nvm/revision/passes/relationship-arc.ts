@@ -109,6 +109,18 @@
 // checks), relationship Act 2a void (zone presence/absence × Act 2a — no shift in the 25%–50%
 // zone while ≥3 shifts exist in the rest; completes the zone set alongside Act 1 void, midpoint
 // freeze, Act 2b desert, and relationship climax void).
+// Wave 511 additions: relationship shift dramatic turn aftermath void (sequence/aftermath ×
+// dramatic-turn channel — no shift scene followed by a dramatic turn in next 2 scenes while
+// ≥2 turns exist; adds turn as seventh channel in the shift-aftermath family alongside clock,
+// curiosity, suspense, emotional, and revelation, distinct from RELATIONSHIP_DRAMATIC_TURN_
+// DECOUPLED which audits same-scene co-occurrence), rupture thirds cluster (distribution/timing
+// × negative shift × thirds — >75% of rupture scenes — any shift ≤ -0.3 — fall within one
+// structural third while ≥4 ruptures exist; negative-shift sibling of RELATIONSHIP_WARMTH_
+// CLUSTER, distinct from RELATIONSHIP_SHIFT_THIRDS_CLUSTER which aggregates all valences and
+// PAIR_RUPTURE_RUN which tracks consecutive local presence), relationship payoff decoupled
+// (co-occurrence/decoupling × payoff × shift — ≥3 shift scenes and ≥3 payoff scenes never
+// in same scene; first check in relationship-arc.ts to use the payoff signal, distinct from
+// all existing co-occurrence checks that pair shift with turn/clock/curiosity/revelation/suspense).
 // Wave 497 additions: relationship shift clock aftermath void (sequence/aftermath × clock channel
 // — no shift scene followed by a clock raise in next 2 scenes while ≥2 clock scenes exist; adds
 // clock to the shift-aftermath family alongside curiosity, suspense, emotional, and revelation),
@@ -2605,6 +2617,129 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
             severity: 'minor',
             description: `${maxDimRun497c} consecutive scenes that carry relationship shifts each operate exclusively on the "${maxDimRunDim497c}" dimension — the relational texture narrows to a single axis for a sustained stretch. Even though the story uses multiple relationship dimensions overall, this local burst collapses them all to one register: the audience experiences the same kind of bond change four or more times in a row, losing the multi-axis texture that makes relationships feel fully inhabited. The "${maxDimRunDim497c}" dimension is a legitimate site of dramatic conflict, but a run of this length signals that the story is testing one register at the expense of the others — trust vs. respect vs. intimacy vs. loyalty — and the relational world becomes temporarily one-dimensional.`,
             suggestedFix: `Break the dimension run by letting at least one of the consecutive shift scenes also carry a shift in a different dimension — a moment where the "${maxDimRunDim497c}" shift also has an implication for respect, intimacy, or loyalty. Two-dimension scenes add texture and signal that real relationships are never just one thing. Even a small secondary-dimension shift in the middle of the run restores the sense that the bonds are complex.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 511: RELATIONSHIP_SHIFT_DRAMATIC_TURN_AFTERMATH_VOID, RUPTURE_THIRDS_CLUSTER, RELATIONSHIP_PAYOFF_DECOUPLED ──
+
+  // RELATIONSHIP_SHIFT_DRAMATIC_TURN_AFTERMATH_VOID (sequence/aftermath × dramatic-turn channel
+  // × shift trigger, n≥8, ≥2 qualifying shift scenes not in last 2 positions, ≥2 turn scenes):
+  // No relationship-shift scene is followed by a dramatic turn in the next two scenes while turns
+  // exist elsewhere. Bond changes should have pivotal consequences: a fracture that redirects the
+  // protagonist's path, a repair that closes off one direction and opens another. When every shift
+  // is followed by turn silence, relationships move but never pivot the story — they register
+  // emotionally but not structurally. Sequence/aftermath mode × dramatic-turn channel × shift
+  // trigger. Distinct from RELATIONSHIP_DRAMATIC_TURN_DECOUPLED (Wave 357: no shift coincides
+  // WITH a turn IN the same scene — co-occurrence, not aftermath), RELATIONSHIP_SHIFT_CLOCK_
+  // AFTERMATH_VOID (Wave 497: clock channel), RELATIONSHIP_SHIFT_CURIOSITY_VOID (Wave 455:
+  // curiosity channel), RELATIONSHIP_SHIFT_SUSPENSE_AFTERMATH_VOID (Wave 469: suspense channel),
+  // RELATIONSHIP_SHIFT_EMOTIONAL_AFTERMATH_VOID (Wave 469: emotional channel), RELATIONSHIP_
+  // SHIFT_REVELATION_AFTERMATH_VOID (Wave 483: revelation channel): seventh channel in the
+  // shift-aftermath family.
+  {
+    const n511a = records.length;
+    if (n511a >= 8) {
+      const turnScenes511a = (records as any[]).filter(r =>
+        (r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '',
+      );
+      const qualShiftScenes511a = (records as any[]).filter((r, pos) =>
+        ((r.relationshipShifts ?? []) as any[]).length > 0 && pos < n511a - 2,
+      );
+      if (qualShiftScenes511a.length >= 2 && turnScenes511a.length >= 2) {
+        const anyTurnAfterShift511a = qualShiftScenes511a.some((r: any) => {
+          const pos511a = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos511a + off];
+            if (nxt && (nxt.dramaticTurn ?? 'nothing') !== 'nothing' && nxt.dramaticTurn !== '') return true;
+          }
+          return false;
+        });
+        if (!anyTurnAfterShift511a) {
+          issues.push({
+            location: `All ${qualShiftScenes511a.length} qualifying shift scene(s) — no dramatic turn within 2 scenes`,
+            rule: 'RELATIONSHIP_SHIFT_DRAMATIC_TURN_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `None of the story's ${qualShiftScenes511a.length} relationship-shift scenes is followed by a dramatic turn in the next two scenes, even though ${turnScenes511a.length} dramatic turns exist elsewhere. Bond changes should have pivotal structural consequences: a fracture that redirects the protagonist's path, a repair that closes off one direction and opens another. When every relational shift is followed by turn silence, relationships move but never pivot the story — they register emotionally without causing the narrative direction to change. The link between relational change and story structure remains unwritten.`,
+            suggestedFix: `Let at least one relationship shift be followed within two scenes by a dramatic turn — the bond change (fracture or repair) precipitates the decision or revelation that turns the story's direction. The turn doesn't need to be caused exclusively by the shift; it can be the moment when the protagonist, now relationally altered, makes the choice that changes everything. A shift that feeds a turn converts emotional consequence into structural consequence.`,
+          });
+        }
+      }
+    }
+  }
+
+  // RUPTURE_THIRDS_CLUSTER (distribution/timing × negative shift × thirds, n≥9, ≥4 rupture
+  // scenes — any shift with amount ≤ -0.3 — >75% in one structural third): The story's major
+  // ruptures concentrate in one structural third. Fractures work best when distributed: early
+  // ruptures give the audience bonds to fear are permanent, mid-story ruptures escalate while
+  // prior warmth is still in memory, and late ruptures make the climax feel genuinely dangerous.
+  // When most ruptures cluster in one zone, the other two-thirds are relationally inert in the
+  // negative register. Distribution/timing mode × negative-shift channel × thirds. Distinct from
+  // RELATIONSHIP_WARMTH_CLUSTER (Wave 497: positive-shift sibling — this is the negative mirror),
+  // RELATIONSHIP_SHIFT_THIRDS_CLUSTER (Wave 483: aggregates ALL shifts regardless of valence),
+  // PAIR_RUPTURE_RUN (Wave 441: consecutive local run, not thirds zone-distribution).
+  {
+    const n511b = records.length;
+    if (n511b >= 9) {
+      const rupturePositions511b = (records as any[])
+        .map((r, pos) => ({
+          pos,
+          isRupture: ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+        }))
+        .filter(x => x.isRupture)
+        .map(x => x.pos);
+      if (rupturePositions511b.length >= 4) {
+        const third511b = Math.floor(n511b / 3);
+        const zone1511b = rupturePositions511b.filter(p => p < third511b).length;
+        const zone2511b = rupturePositions511b.filter(p => p >= third511b && p < 2 * third511b).length;
+        const zone3511b = rupturePositions511b.filter(p => p >= 2 * third511b).length;
+        const maxZ511b = Math.max(zone1511b, zone2511b, zone3511b);
+        if (maxZ511b / rupturePositions511b.length > 0.75) {
+          const zLabel511b = zone1511b === maxZ511b ? 'opening' : zone2511b === maxZ511b ? 'middle' : 'closing';
+          issues.push({
+            location: `${maxZ511b}/${rupturePositions511b.length} rupture scene(s) clustered in the ${zLabel511b} third`,
+            rule: 'RUPTURE_THIRDS_CLUSTER',
+            severity: 'minor',
+            description: `${maxZ511b} of ${rupturePositions511b.length} major rupture scenes (${(maxZ511b / rupturePositions511b.length * 100).toFixed(0)}%) fall within the ${zLabel511b} third — the story's fractures are architecturally zone-ghettoized. Ruptures work best when distributed across the story: early fractures give the audience bonds to fear are permanent, mid-story breaks escalate while prior warmth is still in memory, and late ruptures make the climax feel genuinely dangerous rather than inevitable. When most fractures cluster in one zone, the other zones are relationally inert in the negative register — either the story breaks bonds before it has established them (opening cluster), or it breaks them all at once in the middle losing cumulative force, or it saves all its damage for the end where it arrives without prior fracture history.`,
+            suggestedFix: `Redistribute at least one or two ruptures into the zones currently without fractures. An early rupture gives the audience something to mourn and track; a mid-story rupture escalates amid the residue of earlier warmth; a late rupture lands inside a relationship the audience has watched both fracture and repair — making the final break (or final repair) dramatically meaningful rather than just the sum of one zone's damage.`,
+          });
+        }
+      }
+    }
+  }
+
+  // RELATIONSHIP_PAYOFF_DECOUPLED (co-occurrence/decoupling × payoff × relationship shift, n≥8,
+  // ≥3 shift scenes and ≥3 payoff scenes): Relationship-shift scenes and payoff scenes never
+  // coincide — bonds never move at the moment a setup is resolved. The most resonant payoffs
+  // happen inside relational motion: a resolution that also cracks or repairs a bond earns
+  // double force — both the informational closure of the thread and the interpersonal cost or
+  // gain of the bond shift land simultaneously. When every payoff lands in a relationally static
+  // scene and every shift scene carries no payoff, both channels lose their fullest potential.
+  // Co-occurrence/decoupling mode × payoff × relationship shift. First check in relationship-arc.ts
+  // to use the payoff signal. Distinct from all existing co-occurrence checks which pair shift with
+  // turn/clock/curiosity/revelation/suspense — this adds the payoff channel.
+  {
+    const n511c = records.length;
+    if (n511c >= 8) {
+      const shiftScenes511c = (records as any[]).filter(r =>
+        ((r.relationshipShifts ?? []) as any[]).length > 0,
+      );
+      const payoffScenes511c = (records as any[]).filter(r =>
+        ((r.payoffSetupIds ?? []) as string[]).length > 0,
+      );
+      if (shiftScenes511c.length >= 3 && payoffScenes511c.length >= 3) {
+        const shiftIdxSet511c = new Set(shiftScenes511c.map((r: any) => (records as any[]).indexOf(r)));
+        const payoffIdxSet511c = new Set(payoffScenes511c.map((r: any) => (records as any[]).indexOf(r)));
+        const hasOverlap511c = [...shiftIdxSet511c].some(idx => payoffIdxSet511c.has(idx));
+        if (!hasOverlap511c) {
+          issues.push({
+            location: `${shiftScenes511c.length} shift scene(s) and ${payoffScenes511c.length} payoff scene(s) — no overlap`,
+            rule: 'RELATIONSHIP_PAYOFF_DECOUPLED',
+            severity: 'minor',
+            description: `The script's ${shiftScenes511c.length} relationship-shift scenes and ${payoffScenes511c.length} payoff scenes never coincide — bonds never move at the moment a setup is resolved. A payoff that also shifts a relationship earns double force: the closure of the thread and the interpersonal cost or reward of the bond change land simultaneously, each amplifying the other. When every payoff lands in a relationally static scene and every shift scene carries no payoff, both channels are weaker than they could be — resolutions feel informationally complete but emotionally unmoored, and bond shifts feel emotionally present but causally thin.`,
+            suggestedFix: `Arrange at least one payoff to coincide with a relationship shift — the resolved setup should also crack or repair a bond at the same moment. The payoff need not be about the relationship directly; a thread resolution that the two characters witness together can move their dynamic at the same time as it closes the informational loop. A payoff that also shifts a relationship is the story telling two things at once, and the audience receives both with compounded resonance.`,
           });
         }
       }
