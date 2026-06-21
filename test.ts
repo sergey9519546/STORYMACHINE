@@ -32766,6 +32766,95 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 531 — causalityPass: suspense spike relationship void, clock temporal cluster, seed aftermath suspense void', async () => {
+    const makeRec531 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      seededClueIds: [], payoffSetupIds: [], revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], dramaticTurn: 'nothing',
+      purpose: 'development', unresolvedClues: [],
+      ...overrides,
+    });
+    const runC531 = async (records: any[]) => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('SUSPENSE_SPIKE_RELATIONSHIP_VOID fires when all high-suspense scenes lack relationship shifts', async () => {
+      // 8 scenes: suspense spikes (suspenseDelta=2) at positions 1,3 (no relShifts);
+      // rel shifts at positions 5,7; zero overlap → fires.
+      // amount:0.1 (<0.4) keeps MOTIVATION_REVERSAL_UNCAUSED from processing these shifts.
+      const recs531a = Array.from({ length: 8 }, (_, i) =>
+        makeRec531(i, {
+          suspenseDelta: [1, 3].includes(i) ? 2 : 0,
+          relationshipShifts: [5, 7].includes(i) ? [{ from: 'A', to: 'B', nature: 'closer', amount: 0.1, pairKey: 'A-B' }] : [],
+        })
+      );
+      const res = await runC531(recs531a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SUSPENSE_SPIKE_RELATIONSHIP_VOID'), 'SUSPENSE_SPIKE_RELATIONSHIP_VOID should fire');
+    });
+
+    it('SUSPENSE_SPIKE_RELATIONSHIP_VOID does not fire when a high-suspense scene has a relationship shift', async () => {
+      // 8 scenes: suspense spikes at 1,3; rel shifts at 1,5 — position 1 has BOTH → overlap → no fire
+      // amount:0.1 (<0.4) keeps MOTIVATION_REVERSAL_UNCAUSED from processing these shifts.
+      const recs531ano = Array.from({ length: 8 }, (_, i) =>
+        makeRec531(i, {
+          suspenseDelta: [1, 3].includes(i) ? 2 : 0,
+          relationshipShifts: [1, 5].includes(i) ? [{ from: 'A', to: 'B', nature: 'closer', amount: 0.1, pairKey: 'A-B' }] : [],
+        })
+      );
+      const res = await runC531(recs531ano);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SUSPENSE_SPIKE_RELATIONSHIP_VOID'), 'SUSPENSE_SPIKE_RELATIONSHIP_VOID should not fire');
+    });
+
+    it('CLOCK_TEMPORAL_CLUSTER fires when >75% of clock-raised scenes are in one structural third', async () => {
+      // 9 scenes (third=3): clockRaised at positions 0,1,2 — all in opening third;
+      // zone1=3, zone2=0, zone3=0; 3/3 = 100% > 75% → fires
+      const recs531b = Array.from({ length: 9 }, (_, i) =>
+        makeRec531(i, { clockRaised: [0, 1, 2].includes(i) })
+      );
+      const res = await runC531(recs531b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_TEMPORAL_CLUSTER'), 'CLOCK_TEMPORAL_CLUSTER should fire');
+    });
+
+    it('CLOCK_TEMPORAL_CLUSTER does not fire when clock scenes are spread across thirds', async () => {
+      // 9 scenes (third=3): clockRaised at positions 0,1,5 — zone1=2, zone2=1, zone3=0;
+      // 2/3 ≈ 0.67 ≤ 0.75 → no fire
+      const recs531bno = Array.from({ length: 9 }, (_, i) =>
+        makeRec531(i, { clockRaised: [0, 1, 5].includes(i) })
+      );
+      const res = await runC531(recs531bno);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_TEMPORAL_CLUSTER'), 'CLOCK_TEMPORAL_CLUSTER should not fire');
+    });
+
+    it('SEED_AFTERMATH_SUSPENSE_VOID fires when avg next-scene suspenseDelta after seeds ≤ 0', async () => {
+      // 9 scenes: seeds at positions 0,2,4 (not at last pos 8);
+      // next scenes (1,3,5) have suspenseDelta -1,0,0; avg = (-1+0+0)/3 = -0.33 ≤ 0 → fires
+      const recs531c = Array.from({ length: 9 }, (_, i) =>
+        makeRec531(i, {
+          seededClueIds: [0, 2, 4].includes(i) ? ['clue-X'] : [],
+          suspenseDelta: i === 1 ? -1 : 0,
+        })
+      );
+      const res = await runC531(recs531c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_AFTERMATH_SUSPENSE_VOID'), 'SEED_AFTERMATH_SUSPENSE_VOID should fire');
+    });
+
+    it('SEED_AFTERMATH_SUSPENSE_VOID does not fire when avg next-scene suspenseDelta after seeds > 0', async () => {
+      // 9 scenes: seeds at positions 0,2,4; next scenes (1,3,5) have suspenseDelta 1,1,-1;
+      // avg = (1+1-1)/3 = 0.33 > 0 → no fire
+      const recs531cno = Array.from({ length: 9 }, (_, i) =>
+        makeRec531(i, {
+          seededClueIds: [0, 2, 4].includes(i) ? ['clue-X'] : [],
+          suspenseDelta: i === 1 ? 1 : i === 3 ? 1 : i === 5 ? -1 : 0,
+        })
+      );
+      const res = await runC531(recs531cno);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_AFTERMATH_SUSPENSE_VOID'), 'SEED_AFTERMATH_SUSPENSE_VOID should not fire');
+    });
+  });
+
   describe('Wave 517 — causalityPass: payoff aftermath suspense void, negative emotion unbroken run, emotional closing third absent', async () => {
     const makeRec517 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

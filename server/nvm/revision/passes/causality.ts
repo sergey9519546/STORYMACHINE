@@ -124,6 +124,18 @@
 // positive-emotion scenes ≥ 4; a sustained positive run means the protagonist's world is going well
 // without adversity for too long; distinct from EMOTIONAL_NEUTRAL_RUN, SUSPENSE_DECLINE_RUN, and
 // EMOTIONAL_POSITIVE_DESERT which use different modes on the emotional channel).
+// Wave 531 additions: suspense spike relationship void (co-occurrence/decoupling × high-suspense ×
+// relationship — n≥8, ≥2 scenes with suspenseDelta > 1 AND ≥2 scenes with relationship shifts, yet
+// no high-suspense scene carries a relationship shift; danger operates in a social vacuum; completes
+// the suspense-spike co-occurrence set alongside SUSPENSE_SPIKE_NO_EMOTION, SUSPENSE_SPIKE_NO_
+// CURIOSITY, and SUSPENSE_SPIKE_NO_FALLOUT), clock temporal cluster (distribution/timing × clock ×
+// thirds — n≥9, ≥3 clockRaised scenes, >75% in one structural third; the clock-channel complement
+// of EMOTIONAL_ZONE_CLUSTER, SEED_TEMPORAL_CLUSTER, PAYOFF_ZONE_CLUSTER, and DRAMATIC_TURN_
+// TEMPORAL_CLUSTER, completing the distribution/timing thirds family for the major structural
+// signals; distinct from CLOCK_CLUSTERING which uses a binary first-40% partition), seed aftermath
+// suspense void (sequence/aftermath × seed → suspenseDelta aftermath — n≥8, ≥3 seed scenes not at
+// last position, avg suspenseDelta of immediately-following scene ≤ 0; the suspense-channel
+// complement of SEED_AFTERMATH_CURIOSITY_VOID, completing the seed-aftermath channel pair).
 // Wave 517 additions: payoff aftermath suspense void (average/aggregate × payoff → suspense aftermath
 // — n≥8, ≥3 payoff scenes not at last position, avg suspenseDelta of immediately following scenes ≤ 0;
 // resolutions complete promises but never re-tighten stakes; distinct from PAYOFF_SUSPENSE_VOID which
@@ -2846,6 +2858,119 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `The script has ${chargedPositions517c.length} emotionally charged scenes (positive or negative emotional shift), but none fall in the final structural third (scenes ${2 * third517c}–${n517c - 1}). The closing act should be the most emotionally engaged zone of the screenplay: the protagonist reaches their climax and denouement with the full accumulated weight of everything that has happened, and the audience needs to feel the conclusion rather than merely observe it. When the closing third is emotionally inert, the resolution becomes a purely intellectual event — the audience is told what happened but not moved by it.`,
             suggestedFix: `Ensure at least one scene in the closing third carries an emotional shift — positive or negative. A climax is not just a plot event but an emotional event: the protagonist's decisive action, the revelation that reframes everything, or the loss or triumph that the whole story has been building toward should be felt. Even a single scene of emotional charge in the final act anchors the resolution in the audience's nervous system rather than their intellect.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID ──
+
+  // SUSPENSE_SPIKE_RELATIONSHIP_VOID — Co-occurrence/decoupling × high suspense × relationship.
+  // n≥8, ≥2 scenes with suspenseDelta > 1 (genuine high-suspense spikes), ≥2 scenes with non-empty
+  // relationshipShifts. None of the high-suspense scenes carries a relationship shift → fire.
+  // Crisis and danger are among the most powerful catalysts for relationship movement: what people
+  // do under pressure reveals who they are, and stress is how bonds are made and broken. When every
+  // high-suspense scene is also relationship-free, the story's most tense moments operate in a social
+  // vacuum — danger has no interpersonal dimension and the audience cannot feel the human stakes.
+  // Distinct from: SUSPENSE_SPIKE_NO_EMOTION (Wave 391: co-occurrence × high suspense × emotion —
+  // different channel), SUSPENSE_SPIKE_NO_CURIOSITY (Wave 377: co-occurrence × high suspense ×
+  // curiosity — different channel), DRAMATIC_TURN_RELATIONSHIP_VOID (Wave 447: co-occurrence ×
+  // dramatic-turn × relationship — different trigger), CLOCK_RAISE_RELATIONSHIP_VOID (Wave 419:
+  // co-occurrence × clock × relationship — different trigger). This completes the suspense-spike
+  // co-occurrence set across the emotion, curiosity, fallout, and relationship channels.
+  {
+    const n531a = records.length;
+    if (n531a >= 8) {
+      const highSuspScenes531a = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 1);
+      if (highSuspScenes531a.length >= 2) {
+        const relShiftScenes531a = (records as any[]).filter(r => ((r.relationshipShifts ?? []) as any[]).length > 0);
+        if (relShiftScenes531a.length >= 2) {
+          const anyOverlap531a = highSuspScenes531a.some(r => ((r.relationshipShifts ?? []) as any[]).length > 0);
+          if (!anyOverlap531a) {
+            issues.push({
+              location: `${highSuspScenes531a.length} high-suspense scene(s) — none carries a relationship shift (${relShiftScenes531a.length} relationship-shift scene(s) exist elsewhere)`,
+              rule: 'SUSPENSE_SPIKE_RELATIONSHIP_VOID',
+              severity: 'minor',
+              description: `The script has ${highSuspScenes531a.length} high-suspense scene(s) (suspenseDelta > 1) and ${relShiftScenes531a.length} scene(s) with relationship shifts, but these two channels never co-occur. Every moment of peak danger, threat, or urgency is interpersonally inert — no bond is tested, strained, or changed when stakes are highest. Crisis and danger are among the most powerful catalysts for relationship movement: fear reveals character, shared threat builds solidarity, and betrayal under pressure destroys trust. A story where all tension spikes occur in a relational vacuum misses the opportunity to make danger personally felt and to use the story's most intense moments as engines of interpersonal change.`,
+              suggestedFix: `Introduce a relationship dimension to at least one of the high-suspense scenes: let the danger force a choice between characters, expose a hidden conflict, produce an act of loyalty or betrayal, or tighten an alliance under fire. Even a small relationship shift — a trust strained, a bond deepened by shared fear — roots the suspense spike in the interpersonal fabric that makes the audience care about the outcome beyond the immediate physical stakes.`,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // CLOCK_TEMPORAL_CLUSTER — Distribution/timing × clock × thirds.
+  // n≥9, ≥3 scenes with clockRaised=true. >75% of clock-raised scenes fall in a single structural
+  // third → fire. When deadline-establishing scenes cluster in one zone, the urgency architecture is
+  // confined — the other two-thirds carry no raised clock pressure, and the story asks the audience
+  // to sustain deadline anxiety from a signal that is architecturally absent in most of the arc.
+  // Distinct from: CLOCK_CLUSTERING (Wave 282: >50% of clocks in the first 40% — binary first-half
+  // partition, fixed zone, and different threshold; this checks arc-wide concentration across any
+  // zone with a stricter >75% threshold), CLOCK_FINAL_THIRD_ABSENT (Wave 503: zone presence/absence
+  // — fires when closing third has ZERO clock scenes; this fires when one third has >75% of all clock
+  // scenes regardless of which third), DRAMATIC_TURN_TEMPORAL_CLUSTER (Wave 489: same analytical
+  // mode × dramatic-turn channel — different signal; this completes the distribution/timing thirds
+  // family adding the clock channel).
+  {
+    const n531b = records.length;
+    if (n531b >= 9) {
+      const clockPositions531b = (records as any[])
+        .map((r, pos) => ({ pos, raised: (r.clockRaised) === true }))
+        .filter(x => x.raised)
+        .map(x => x.pos);
+      if (clockPositions531b.length >= 3) {
+        const third531b = Math.floor(n531b / 3);
+        const zone1531b = clockPositions531b.filter(p => p < third531b).length;
+        const zone2531b = clockPositions531b.filter(p => p >= third531b && p < 2 * third531b).length;
+        const zone3531b = clockPositions531b.filter(p => p >= 2 * third531b).length;
+        const maxZ531b = Math.max(zone1531b, zone2531b, zone3531b);
+        if (maxZ531b / clockPositions531b.length > 0.75) {
+          const zoneName531b = zone1531b === maxZ531b ? 'opening' : zone2531b === maxZ531b ? 'middle' : 'closing';
+          issues.push({
+            location: `${maxZ531b}/${clockPositions531b.length} clock-raised scene(s) in the ${zoneName531b} third`,
+            rule: 'CLOCK_TEMPORAL_CLUSTER',
+            severity: 'minor',
+            description: `${maxZ531b} of ${clockPositions531b.length} deadline-establishing scenes (${(maxZ531b / clockPositions531b.length * 100).toFixed(0)}%) fall in the ${zoneName531b} structural third. The story concentrates its urgency architecture in one zone while the other two-thirds carry no raised deadline pressure. Clock scenes are the story's urgency anchors: when they cluster in a single zone, the portions outside that zone lose the ticking-clock pressure that sustains forward momentum and gives the audience a felt sense that time is running out. A story where all deadlines are established in the ${zoneName531b} zone creates a lopsided urgency profile — intense in one section, structurally inert in the others.`,
+            suggestedFix: `Redistribute at least one clock-raise scene into the zone(s) currently without deadline pressure. Not every new clock needs to be a major deadline: a secondary ticking constraint, a reminder of an existing deadline in a new context, or a sub-urgency that tightens the audience's time-awareness can serve as a distributional anchor. The goal is a script where deadline pressure is structurally distributed across all three zones, giving the audience a consistent sense that time is a governing force rather than a localized one.`,
+          });
+        }
+      }
+    }
+  }
+
+  // SEED_AFTERMATH_SUSPENSE_VOID — Sequence/aftermath × seed → suspenseDelta aftermath.
+  // n≥8, ≥3 seed scenes (seededClueIds.length > 0) not at last position. Average suspenseDelta of
+  // the scene immediately following each seed scene ≤ 0 → fire. The scene after a planted clue
+  // carries a structural promise: something is coming. That promise should add forward pressure even
+  // before the payoff arrives. When seeds are planted and the immediately following scene has zero or
+  // negative suspenseDelta, the clue functions as ambient decoration rather than as the first push of
+  // accumulating dread — the audience receives the foreshadowing but feels no increase in stakes.
+  // Distinct from: SEED_AFTERMATH_CURIOSITY_VOID (Wave 489: same aftermath structure × curiosity
+  // channel — checks whether the next scene's curiosityDelta ≤ 0; this checks suspenseDelta), CLUE_
+  // SEED_SUSPENSE_VOID (Wave 335: checks suspenseDelta of the SEED SCENE ITSELF — own-scene
+  // co-occurrence, not aftermath; different analytical mode and time slot), SUSPENSE_SPIKE_NO_FALLOUT
+  // (Wave 349: checks what follows a suspense SPIKE, not a seed scene — different trigger), SEED_
+  // SCENE_CURIOSITY_VOID (Wave 363: own-scene curiosity analysis — different channel and different mode).
+  {
+    const n531c = records.length;
+    if (n531c >= 8) {
+      const seedAndNext531c = (records as any[])
+        .map((r, pos) => ({ pos, count: ((r.seededClueIds ?? []) as any[]).length }))
+        .filter(x => x.count > 0 && x.pos < n531c - 1);
+      if (seedAndNext531c.length >= 3) {
+        const totalSuspAftermath531c = seedAndNext531c.reduce((sum, x) => {
+          return sum + (((records as any[])[x.pos + 1] as any).suspenseDelta ?? 0);
+        }, 0);
+        const avgSuspAftermath531c = totalSuspAftermath531c / seedAndNext531c.length;
+        if (avgSuspAftermath531c <= 0) {
+          issues.push({
+            location: `${seedAndNext531c.length} seed scene(s) — avg next-scene suspenseDelta ${avgSuspAftermath531c.toFixed(2)}`,
+            rule: 'SEED_AFTERMATH_SUSPENSE_VOID',
+            severity: 'minor',
+            description: `The scene immediately following each of the ${seedAndNext531c.length} qualifying clue-planting scene(s) averages a suspenseDelta of ${avgSuspAftermath531c.toFixed(2)}. Foreshadowing consistently fails to tighten the story's grip in what follows — seeds are planted, but the next beat releases or holds tension rather than pressing it forward. The scene after a planted clue should carry a felt increase in pressure: the audience has received a mystery or a warning, and the narrative should lean into that promise by adding urgency to what follows. When the seed-aftermath is suspense-neutral or suspense-negative, foreshadowing functions as inert information deposit rather than as the opening push of an accumulating dread engine.`,
+            suggestedFix: `Ensure at least one seed scene is followed by a scene with a positive suspenseDelta: introduce a complication that makes the seeded element feel more threatening, raise a secondary deadline connected to the planted clue, or have a character react to the implications of what was planted in a way that increases felt stakes. The most effective foreshadowing is not just informational — it makes the audience feel the weight of what is coming rather than merely registering that something has been set up.`,
           });
         }
       }
