@@ -21390,6 +21390,86 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 496 — payoffPass: payoff temporal cluster, seed dramatic turn aftermath absent, payoff clock aftermath absent', async () => {
+    const makeRec496 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runPO496 = async (records: any[]) => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      return payoffPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // PAYOFF_TEMPORAL_CLUSTER fire: n=9; third=3; payoffs at 0,1,2,6 → zone1=3, zone3=1, 3/4=75%>75%? No: need >75%.
+    // Use 5 payoffs: 0,1,2,3,8 → zone1=[0-2]=3, zone2=[3-5]=1, zone3=[6-8]=1; 3/5=60%... need >75%.
+    // Use 4 payoffs all in zone1: 0,1,2,3 of n=12 (third=4): zone1=4, max=4/4=100% → fire
+    it('PAYOFF_TEMPORAL_CLUSTER fires when >75% of payoffs are in one structural third', async () => {
+      const recs496a: any[] = Array.from({ length: 12 }, (_, i) => makeRec496(i, {
+        payoffSetupIds: [0, 1, 2, 3].includes(i) ? ['s1'] : [],
+      }));
+      const res = await runPO496(recs496a);
+      assert.ok(res.issues.some((x: any) => x.rule === 'PAYOFF_TEMPORAL_CLUSTER'), 'PAYOFF_TEMPORAL_CLUSTER should fire');
+    });
+
+    // PAYOFF_TEMPORAL_CLUSTER no-fire: 4 payoffs spread across thirds (one each in zones 1-3 plus extra)
+    it('PAYOFF_TEMPORAL_CLUSTER does not fire when payoffs are spread across thirds', async () => {
+      // n=12; third=4; payoffs at 1,5,9,11 → zone1=1,zone2=2,zone3=1; max=2/4=50% → no fire
+      const recs496an: any[] = Array.from({ length: 12 }, (_, i) => makeRec496(i, {
+        payoffSetupIds: [1, 5, 9, 11].includes(i) ? ['s1'] : [],
+      }));
+      const res = await runPO496(recs496an);
+      assert.ok(!res.issues.some((x: any) => x.rule === 'PAYOFF_TEMPORAL_CLUSTER'), 'PAYOFF_TEMPORAL_CLUSTER should not fire');
+    });
+
+    // SEED_DRAMATIC_TURN_AFTERMATH_ABSENT fire:
+    // n=10; seeds at 1,3,5 (all qualify, not in last 2); turns at 8,9 (not within 2 of any seed)
+    it('SEED_DRAMATIC_TURN_AFTERMATH_ABSENT fires when no seed is followed by a dramatic turn within 2 scenes', async () => {
+      const recs496b: any[] = Array.from({ length: 10 }, (_, i) => makeRec496(i, {
+        seededClueIds: [1, 3, 5].includes(i) ? ['clue1'] : [],
+        dramaticTurn: [8, 9].includes(i) ? 'reversal' : 'nothing',
+      }));
+      const res = await runPO496(recs496b);
+      assert.ok(res.issues.some((x: any) => x.rule === 'SEED_DRAMATIC_TURN_AFTERMATH_ABSENT'), 'SEED_DRAMATIC_TURN_AFTERMATH_ABSENT should fire');
+    });
+
+    // SEED_DRAMATIC_TURN_AFTERMATH_ABSENT no-fire: turn at scene 4 follows seed at scene 3
+    it('SEED_DRAMATIC_TURN_AFTERMATH_ABSENT does not fire when at least one seed is followed by a dramatic turn', async () => {
+      const recs496bn: any[] = Array.from({ length: 10 }, (_, i) => makeRec496(i, {
+        seededClueIds: [1, 3, 5].includes(i) ? ['clue1'] : [],
+        dramaticTurn: [4, 8].includes(i) ? 'reversal' : 'nothing',
+      }));
+      const res = await runPO496(recs496bn);
+      assert.ok(!res.issues.some((x: any) => x.rule === 'SEED_DRAMATIC_TURN_AFTERMATH_ABSENT'), 'SEED_DRAMATIC_TURN_AFTERMATH_ABSENT should not fire');
+    });
+
+    // PAYOFF_CLOCK_AFTERMATH_ABSENT fire:
+    // n=10; payoffs at 1,3,5; clock at 8 only (not within 2 of any payoff)
+    it('PAYOFF_CLOCK_AFTERMATH_ABSENT fires when no payoff is followed by a clock raise within 2 scenes', async () => {
+      const recs496c: any[] = Array.from({ length: 10 }, (_, i) => makeRec496(i, {
+        payoffSetupIds: [1, 3, 5].includes(i) ? ['s1'] : [],
+        clockRaised: i === 8,
+        clockDelta: i === 9 ? 1 : 0,
+      }));
+      const res = await runPO496(recs496c);
+      assert.ok(res.issues.some((x: any) => x.rule === 'PAYOFF_CLOCK_AFTERMATH_ABSENT'), 'PAYOFF_CLOCK_AFTERMATH_ABSENT should fire');
+    });
+
+    // PAYOFF_CLOCK_AFTERMATH_ABSENT no-fire: clock at scene 4 follows payoff at scene 3
+    it('PAYOFF_CLOCK_AFTERMATH_ABSENT does not fire when at least one payoff is followed by a clock raise', async () => {
+      const recs496cn: any[] = Array.from({ length: 10 }, (_, i) => makeRec496(i, {
+        payoffSetupIds: [1, 3, 5].includes(i) ? ['s1'] : [],
+        clockRaised: [4, 8].includes(i),
+      }));
+      const res = await runPO496(recs496cn);
+      assert.ok(!res.issues.some((x: any) => x.rule === 'PAYOFF_CLOCK_AFTERMATH_ABSENT'), 'PAYOFF_CLOCK_AFTERMATH_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 482 — payoffPass: seed curiosity aftermath absent, seed act 3 void, payoff aftermath relationship void', async () => {
     const makeRec482 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

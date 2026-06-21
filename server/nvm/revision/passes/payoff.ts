@@ -99,6 +99,16 @@
 // aftermath relationship void (sequence/aftermath × relationship × payoff trigger — no payoff
 // scene is followed by a relationship shift in next 2 scenes; fifth payoff-aftermath check
 // completing the family with the relational channel).
+// Wave 496 additions: payoff temporal cluster (distribution/timing × payoff × thirds — >75%
+// of payoffs fall in one structural third while ≥4 exist; extends the distribution family
+// beyond binary halves to thirds, fires when the middle or closing third dominates which
+// PAYOFF_FRONT_LOADED/BACKLOADED cannot detect), seed dramatic turn aftermath absent (sequence/
+// aftermath × dramatic turn × seed trigger — ≥3 qualifying seeds none followed by a turn in
+// the next 2 scenes while ≥2 turns exist; adds the dramatic-turn channel to the seed-aftermath
+// family alongside suspense, emotional, and curiosity), payoff clock aftermath absent (sequence/
+// aftermath × clock × payoff trigger — ≥3 qualifying payoffs none followed by a clock raise in
+// the next 2 scenes while ≥2 clock scenes exist; adds the clock channel to the payoff-aftermath
+// family and is distinct from PAYOFF_CLOCK_DECOUPLED which audits same-scene co-occurrence).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2233,6 +2243,120 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `None of the story's ${payoffIdxs482c.length} payoff scenes is followed by a relationship shift in the next two scenes — every resolution lands without changing how any two characters feel about each other. A closed thread should ripple: the revealed secret should strain the friendship that maintained it, the reappearing object should force a reckoning between characters who saw it differently, the fulfilled promise should change what one character owes another. When resolutions consistently produce no relational aftermath, the story treats its threads as information to be processed rather than events that alter people.`,
           suggestedFix: 'After at least one payoff scene, let the next scene or two register the relational cost or gain of that resolution: the trust that shifts when a secret closes, the alliance that reforms when a thread resolves, the bond that breaks when a callback reveals who a character really is. The relational aftermath of a payoff is what makes the resolution feel earned rather than merely complete.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 496: PAYOFF_TEMPORAL_CLUSTER, SEED_DRAMATIC_TURN_AFTERMATH_ABSENT, PAYOFF_CLOCK_AFTERMATH_ABSENT ──
+
+  // PAYOFF_TEMPORAL_CLUSTER (distribution/timing × payoff × thirds, n≥9, ≥4 payoff scenes):
+  // More than 75% of all payoff scenes fall within a single structural third — the resolution
+  // engine is zone-ghettoized. When closures cluster in one third, the story delivers all its
+  // thread resolutions in a burst and goes silent on payoffs in the other two-thirds. The first
+  // and second thirds need payoffs to deliver early gratification and maintain the audience's
+  // thread-tracking investment; the final third needs payoffs to make the climax feel earned.
+  // When one third monopolizes resolution, the others feel either like pure setup (no closure
+  // ever arrives there) or pure climax (no setup work remains). Distribution/timing mode ×
+  // payoff channel × thirds partition. Distinct from PAYOFF_FRONT_LOADED (Wave 261: >70% in
+  // first HALF — binary partition; this uses thirds so a middle-third or closing-third cluster
+  // can also fire, which PAYOFF_FRONT_LOADED cannot detect) and PAYOFF_BACKLOADED (Wave 440:
+  // >70% in second half — same binary limitation), PAYOFF_CONSECUTIVE_RUN (Wave 426: run-based,
+  // not zone-distribution), PAYOFF_ACT3_ABSENT (zone-void, not ratio).
+  if (records.length >= 9) {
+    const allPayoffPositions496a = (records as any[])
+      .map((r, pos) => ({ pos, hasPayoff: ((r.payoffSetupIds ?? []) as string[]).length > 0 }))
+      .filter(x => x.hasPayoff)
+      .map(x => x.pos);
+    if (allPayoffPositions496a.length >= 4) {
+      const third496a = Math.floor(records.length / 3);
+      const z1Count496a = allPayoffPositions496a.filter(p => p < third496a).length;
+      const z2Count496a = allPayoffPositions496a.filter(p => p >= third496a && p < 2 * third496a).length;
+      const z3Count496a = allPayoffPositions496a.filter(p => p >= 2 * third496a).length;
+      const maxZ496a = Math.max(z1Count496a, z2Count496a, z3Count496a);
+      if (maxZ496a / allPayoffPositions496a.length > 0.75) {
+        const zoneName496a = z1Count496a === maxZ496a ? 'opening' : z2Count496a === maxZ496a ? 'middle' : 'closing';
+        issues.push({
+          location: `${maxZ496a}/${allPayoffPositions496a.length} payoff scene(s) in the ${zoneName496a} third`,
+          rule: 'PAYOFF_TEMPORAL_CLUSTER',
+          severity: 'minor',
+          description: `${maxZ496a} of ${allPayoffPositions496a.length} payoff scenes (${(maxZ496a / allPayoffPositions496a.length * 100).toFixed(0)}%) fall within the ${zoneName496a} third — the resolution engine is architecturally ghettoized into one structural zone. The audience's thread-tracking investment depends on receiving payoffs throughout the story: early payoffs deliver the gratification that rewards the audience for tracking threads, mid-story payoffs demonstrate the relevance of planted setups, and late payoffs make the climax feel like the convergence of everything that was seeded. When one third captures almost all resolutions, the other two-thirds are either pure setup (no closure arrives) or pure conclusion (no setup remains to build on).`,
+          suggestedFix: `Redistribute payoffs across all three structural thirds — move at least one or two resolutions into the zones currently empty of closure. A payoff that fires early in the story rewards the audience for holding threads from Act 1 and signals that the setup-and-payoff engine is actively working; a mid-story payoff is a breath of satisfaction in the complication zone that recharges patience for the remaining threads. Concentration in any one third creates a lopsided rhythm.`,
+        });
+      }
+    }
+  }
+
+  // SEED_DRAMATIC_TURN_AFTERMATH_ABSENT (sequence/aftermath × dramatic turn × seed trigger,
+  // n≥8, ≥3 qualifying seed scenes not in last 2 positions, ≥2 dramatic-turn scenes overall):
+  // Every clue-seeding scene is followed by 2 scenes with no dramatic turn — planted threads
+  // never precipitate a story pivot. A seed placed just before a dramatic turn carries double
+  // energy: the new clue transforms the protagonist's understanding at exactly the moment the
+  // story changes direction, making both the turn and the thread more resonant. When every seed
+  // is followed by 2 calm scenes, the planting happens in slack narrative space where the
+  // thread is received without structural consequence. Sequence/aftermath mode × dramatic-turn
+  // channel × seed trigger. Distinct from CLUE_SEED_DRAMATIC_TURN_DECOUPLED (Wave 342: no seed
+  // scene itself coincides with a turn — same-scene co-occurrence; this audits the 2 scenes
+  // AFTER the seed), SEED_SUSPENSE_AFTERMATH_ABSENT (Wave 468: suspense channel), SEED_EMOTIONAL_
+  // AFTERMATH_ABSENT (Wave 468: emotional channel), SEED_CURIOSITY_AFTERMATH_ABSENT (Wave 482:
+  // curiosity channel): this adds dramatic-turn to the seed-aftermath family.
+  if (records.length >= 8) {
+    const turnScenes496b = (records as any[]).filter(r =>
+      (r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '',
+    );
+    const qualSeedIdxs496b = (records as any[])
+      .map((r, i) => (((r.seededClueIds ?? []) as string[]).length > 0 && i < records.length - 2 ? i : -1))
+      .filter(i => i >= 0);
+    if (qualSeedIdxs496b.length >= 3 && turnScenes496b.length >= 2) {
+      const anyTurnAfterSeed496b = qualSeedIdxs496b.some(idx => {
+        const window496b = (records as any[]).slice(idx + 1, idx + 3);
+        return window496b.some((r: any) => (r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '');
+      });
+      if (!anyTurnAfterSeed496b) {
+        issues.push({
+          location: `All ${qualSeedIdxs496b.length} seed scene(s) — no dramatic turn within 2 scenes`,
+          rule: 'SEED_DRAMATIC_TURN_AFTERMATH_ABSENT',
+          severity: 'minor',
+          description: `None of the story's ${qualSeedIdxs496b.length} clue-seeding scenes is followed by a dramatic turn in the next two scenes, even though ${turnScenes496b.length} turns exist elsewhere in the story. A seed placed just before a dramatic turn carries double energy: the clue recontextualises what the audience sees at exactly the moment the story changes direction, making both the thread and the pivot more resonant. When every seed is followed by two calm non-pivot scenes, the planting occurs in slack narrative space — received without structural consequence and quickly absorbed as routine information rather than as a thread attached to the story's changing direction.`,
+          suggestedFix: `Let at least one clue-seeding scene be followed within two scenes by a dramatic turn — the thread planted now becomes part of what the pivot reveals, demands, or reframes. A seed that feeds into a turning point is a seed the audience cannot forget: when the turn arrives, the earlier plant is activated in retroactive significance, and the thread's existence changes the meaning of the pivot itself.`,
+        });
+      }
+    }
+  }
+
+  // PAYOFF_CLOCK_AFTERMATH_ABSENT (sequence/aftermath × clock × payoff trigger, n≥8,
+  // ≥3 qualifying payoff scenes not in last 2 positions, ≥2 clock scenes overall):
+  // Every payoff scene is followed by 2 scenes with no clock event — thread closures never
+  // tighten the story's deadline. A well-placed payoff should do more than close a thread: it
+  // should accelerate the story's urgency. A revelation paid off just before a clock raise
+  // converts a moment of narrative satisfaction into a moment of escalating pressure — the
+  // closure is the fuse. When every payoff lands without a clock consequence in the scenes
+  // that follow, resolutions function as releases of tension rather than as catalysts for
+  // the next escalation. Sequence/aftermath mode × clock channel × payoff trigger. Distinct
+  // from PAYOFF_CLOCK_DECOUPLED (Wave 356: no payoff coincides with a clock IN the same
+  // scene — co-occurrence; this audits the 2 scenes FOLLOWING each payoff), PAYOFF_SUSPENSE_
+  // RECOIL_ABSENT (Wave 440: suspense channel), PAYOFF_REVELATION_AFTERMATH_ABSENT (Wave 468:
+  // revelation channel), PAYOFF_AFTERMATH_RELATIONSHIP_VOID (Wave 482: relational channel):
+  // this adds clock to the payoff-aftermath family.
+  if (records.length >= 8) {
+    const clockScenes496c = (records as any[]).filter(r =>
+      r.clockRaised === true || (r.clockDelta ?? 0) > 0,
+    );
+    const qualPayoffIdxs496c = (records as any[])
+      .map((r, i) => (((r.payoffSetupIds ?? []) as string[]).length > 0 && i < records.length - 2 ? i : -1))
+      .filter(i => i >= 0);
+    if (qualPayoffIdxs496c.length >= 3 && clockScenes496c.length >= 2) {
+      const anyClockAfterPayoff496c = qualPayoffIdxs496c.some(idx => {
+        const window496c = (records as any[]).slice(idx + 1, idx + 3);
+        return window496c.some((r: any) => r.clockRaised === true || (r.clockDelta ?? 0) > 0);
+      });
+      if (!anyClockAfterPayoff496c) {
+        issues.push({
+          location: `All ${qualPayoffIdxs496c.length} payoff scene(s) — no clock raise within 2 scenes`,
+          rule: 'PAYOFF_CLOCK_AFTERMATH_ABSENT',
+          severity: 'minor',
+          description: `None of the story's ${qualPayoffIdxs496c.length} payoff scenes is followed by a clock raise (clockRaised or positive clockDelta) in the next two scenes, even though ${clockScenes496c.length} clock events exist elsewhere. Thread closures never tighten the story's deadline — payoffs function only as releases of tension, not as catalysts for the next urgency. The most effective payoffs are ones that close something behind the protagonist while opening something more dangerous ahead: the closed thread was the only option that bought time, and now that it is resolved, the clock becomes more audible. When every resolution is followed by clock silence, payoffs function as the story exhaling rather than as accelerants for the next act.`,
+          suggestedFix: `Let at least one payoff scene be followed within two scenes by a clock raise — the closed thread reveals that the deadline is now tighter, the paid-off setup removes a buffer the protagonist was relying on, or the resolution unlocks a new escalation that demands immediate action. A payoff that feeds a clock raise converts audience satisfaction into forward dread, which is dramatically richer than satisfaction alone.`,
         });
       }
     }
