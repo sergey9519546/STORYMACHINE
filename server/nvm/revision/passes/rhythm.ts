@@ -106,6 +106,20 @@
 // high (average/aggregate × sentence count per line — ≥8 action lines averaging >3 sentences each,
 // multi-clause overload that collapses the shot-by-shot grammar of cinematic action; the average/
 // aggregate complement of SINGLE_SENTENCE_FLOOD and SENTENCE_COUNT_PEAK).
+// Wave 540 additions: action consecutive medium run (run-based × medium word count 5–11w — 6+
+// consecutive action lines each between 5–11 words while ≥1 short ≤4w and ≥1 long ≥12w exist
+// globally; the extremes exist but are excluded from this stretch, a "middle rut" that misses
+// both the staccato and the dense registers; distinct from CONSECUTIVE_LONG_RUN ≥9w and
+// CONSECUTIVE_SHORT_RUN ≤4w which target the opposite density extremes), action short expansion
+// absent (sequence/aftermath × short→long direction — ≥8 action lines with ≥2 short ≤4w and
+// ≥2 long ≥9w; every short line is followed within 2 lines only by non-long lines, so staccato
+// beats never expand into elaboration in their aftermath; distinct from ACTION_LONG_RECOVERY_ABSENT
+// which checks the opposite long→short direction and IMPACT_BEAT_UNCAUSED which is backward-cause),
+// action word-count modal lock (average/aggregate × most-frequent word count — ≥10 action lines
+// where >40% share the exact same word count, a metronomic spike at one length creating an even
+// stronger uniformity signal than WORDCOUNT_FLATLINE which checks SD globally; distinct from
+// SINGLE_SENTENCE_FLOOD which counts sentence structure not word count and from all run-based
+// checks which require consecutive lines).
 // Wave 526 additions: action word-count ascent run (run-based × strictly increasing word count —
 // 5+ consecutive action lines each longer than the prior; ascending mirror of ACTION_WORD_COUNT_
 // DESCENT_RUN, distinguishing directional expansion from density-based CONSECUTIVE_LONG_RUN),
@@ -2328,6 +2342,116 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${commaDenseCount526c} of ${actionLines.length} action lines (${(commaDenseCount526c / actionLines.length * 100).toFixed(0)}%) contain three or more commas each — list-heavy, breathless writing that fragments action into catalogued enumerations rather than continuous movement. An action line with three or more commas is effectively a shopping list: a sequence of items, gestures, or details enumerated rather than staged. A single comma structures a sentence; two commas indicate complexity; three or more signal that the line has abandoned forward motion and begun accumulating. When this pattern dominates more than 30% of the action prose, the script imposes an ongoing parsing burden — each line requiring the reader to process a series of coordinated details rather than experience a single, specific image. The effect is exhausting rather than energizing, and the catalogue register is more suited to notes than to dramatic staging.`,
         suggestedFix: `Revise comma-heavy action lines by choosing one or two details and cutting the rest, or by reorganizing a multi-comma enumeration into separate action lines — each one a distinct beat. "He opens the door, steps into the hallway, checks both directions, and freezes" becomes two lines: "He steps into the hallway." / "He freezes." The fewer commas, the cleaner the cut, and the more each action lands with its own weight.`,
+      });
+    }
+  }
+
+  // ACTION_CONSECUTIVE_MEDIUM_RUN (run-based × medium word count 5–11w, ≥8 action lines,
+  // ≥1 short ≤4w AND ≥1 long ≥12w existing globally): Six or more consecutive action lines
+  // each fall between 5 and 11 words — the story's prose never samples the staccato (≤4w) or
+  // the dense (≥12w) register for a sustained stretch, even though both extremes exist elsewhere.
+  // A 6+-line medium rut is a rhythmic dead zone: the prose advances with steady pace but no
+  // contrast, losing both the percussive impact of a short line and the elaborative weight of a
+  // long one. The run signals that the writer has settled into a comfortable middle cadence and
+  // forgotten that rhythm requires extremes to define the center.
+  // Distinct from: CONSECUTIVE_LONG_RUN (Wave 456: ≥9w threshold — density check, not mid-range),
+  // CONSECUTIVE_SHORT_RUN (Wave 484: ≤4w — the opposite density extreme), ACTION_WORD_COUNT_ASCENT/
+  // DESCENT_RUN (Wave 512/526: directional sequences — increasing or decreasing, not banded),
+  // WORDCOUNT_FLATLINE (Wave 442: SD-based global uniformity, fires when ALL lines are metronomic
+  // not just a consecutive stretch).
+  if (actionLines.length >= 8) {
+    const hasShortsGlobal540a = wordCounts.some(w => w <= 4);
+    const hasLongsGlobal540a = wordCounts.some(w => w >= 12);
+    if (hasShortsGlobal540a && hasLongsGlobal540a) {
+      let maxMedRun540a = 0;
+      let curMedRun540a = 0;
+      for (const w of wordCounts) {
+        if (w >= 5 && w <= 11) {
+          curMedRun540a++;
+          if (curMedRun540a > maxMedRun540a) maxMedRun540a = curMedRun540a;
+        } else {
+          curMedRun540a = 0;
+        }
+      }
+      if (maxMedRun540a >= 6) {
+        issues.push({
+          location: `${maxMedRun540a} consecutive action line(s) in the 5–11 word range`,
+          rule: 'ACTION_CONSECUTIVE_MEDIUM_RUN',
+          severity: 'minor',
+          description: `${maxMedRun540a} consecutive action lines each fall between 5 and 11 words — the script maintains a comfortable mid-range cadence for a sustained stretch without sampling either the staccato register (≤4 words) or the dense descriptive register (≥12 words), even though both extremes appear elsewhere in the script. Rhythm depends on contrast: a short line lands with percussive impact because it interrupts a longer sentence, and a long line carries elaborative weight because it stretches past the surrounding brevity. In a ${maxMedRun540a}-line medium run, every beat arrives with the same pace — steady but undifferentiated — and the cumulative effect is a plateau of prose that reads as moderate rather than dramatic.`,
+          suggestedFix: `Break the medium run by introducing at least one short (≤4 words) or long (≥12 words) action line within the ${maxMedRun540a}-line sequence. A single staccato beat mid-run resets the reader's expectation and makes the surrounding medium lines feel deliberate rather than habitual; a single long line anchors the run with a fully-realized image that the brevity around it makes more vivid.`,
+        });
+      }
+    }
+  }
+
+  // ACTION_SHORT_EXPANSION_ABSENT (sequence/aftermath × short→long direction, ≥8 action lines,
+  // ≥2 short ≤4w and ≥2 long ≥9w): Every short action line (≤4 words) that has at least one
+  // action line after it is followed within 2 action lines only by non-long lines — no staccato
+  // beat expands into elaboration in its aftermath. A short line is a percussive compression: it
+  // delivers a single beat with force and then waits for a follow-through. When no short line is
+  // ever followed by a long line that elaborates, expands, or contextualizes what the brief beat
+  // just compressed, the staccato register operates as pure punctuation rather than as a setup for
+  // the next full image. The script misses the most powerful short-line rhythm: compression →
+  // release, the brief beat landing and then opening out into a long elaboration.
+  // Distinct from: ACTION_LONG_RECOVERY_ABSENT (Wave 442: long→short direction — the post-long
+  // brevity check; this is the opposite direction, checking post-short elaboration), IMPACT_BEAT_
+  // UNCAUSED (Wave 470: backward-cause × short — checks that a short beat was PRECEDED by a long;
+  // this checks that a short beat is FOLLOWED by a long), CONSECUTIVE_SHORT_RUN (run-based).
+  if (actionLines.length >= 8) {
+    const shortIdxs540b = wordCounts.reduce((acc, w, i) => { if (w <= 4) acc.push(i); return acc; }, [] as number[]);
+    const longIdxSet540b = new Set(wordCounts.reduce((acc, w, i) => { if (w >= 9) acc.push(i); return acc; }, [] as number[]));
+    if (shortIdxs540b.length >= 2 && longIdxSet540b.size >= 2) {
+      const qualShort540b = shortIdxs540b.filter(i => i < wordCounts.length - 1);
+      if (qualShort540b.length >= 2) {
+        const allShortNoExpansion540b = qualShort540b.every(i => {
+          for (let off = 1; off <= 2; off++) {
+            if (i + off < wordCounts.length && longIdxSet540b.has(i + off)) return false;
+          }
+          return true;
+        });
+        if (allShortNoExpansion540b) {
+          issues.push({
+            location: `${qualShort540b.length} short action line(s) ≤4 words — no long ≥9w in any aftermath window`,
+            rule: 'ACTION_SHORT_EXPANSION_ABSENT',
+            severity: 'minor',
+            description: `Every short action line (≤4 words, ${qualShort540b.length} qualifying line(s)) is followed within two action lines only by lines that are also short or medium — no staccato beat expands into a long elaborative line (≥9 words) in its aftermath, despite ${longIdxSet540b.size} long lines existing elsewhere in the script. The compression→release rhythm is the most powerful short-line technique available: a brief beat isolates a single action or sensation, and the long line that follows fills in the space opened by that compression, contextualizing or expanding what the brevity suggested. When no short line is ever followed by an elaboration, the staccato register functions only as punctuation rather than as setup — the audience receives the brief beat but never the release that makes the brevity meaningful.`,
+            suggestedFix: `After at least one short action line, write a long action line (≥9 words) within the following two beats — an expansion that elaborates, contextualizes, or extends what the brief beat compressed. "She stops." / followed by / "The hallway stretches ahead of her, longer than it was before, the far door smaller than it should be from here." The long line after the short one earns the compression retrospectively.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ACTION_WORD_COUNT_MODAL_LOCK (average/aggregate × most-frequent word count, ≥10 action
+  // lines, >40% share the exact same word count): More than four in ten action lines share
+  // precisely the same word count — a modal spike at a single length that produces a
+  // metronomic cadence even stronger than the SD-based uniformity captured by WORDCOUNT_FLATLINE.
+  // When the same word count dominates this heavily, every line with that count reads as part of
+  // the same metronomic rhythm, and the audience's ear adapts to its beat long before the script
+  // ends. Readers stop perceiving individual lines and start tracking an expectation — the next
+  // line will be N words — and when that expectation is met more than 40% of the time, the prose
+  // loses the quality of surprise that rhythm requires.
+  // Distinct from: WORDCOUNT_FLATLINE (Wave 442: SD < 2.5 — measures spread across all lines,
+  // fires for broad low-variance distributions that need not spike at any one value; this fires
+  // when one specific word count accounts for >40% regardless of the distribution's spread),
+  // SINGLE_SENTENCE_FLOOD (Wave 277: sentence structure not word count), CONSECUTIVE runs (require
+  // adjacency — this is a global aggregate check regardless of line order).
+  if (actionLines.length >= 10) {
+    const countFreq540c = new Map<number, number>();
+    for (const w of wordCounts) countFreq540c.set(w, (countFreq540c.get(w) ?? 0) + 1);
+    let maxFreq540c = 0;
+    let modalLen540c = 0;
+    for (const [len, freq] of countFreq540c) {
+      if (freq > maxFreq540c) { maxFreq540c = freq; modalLen540c = len; }
+    }
+    if (maxFreq540c / wordCounts.length > 0.40) {
+      issues.push({
+        location: `${maxFreq540c}/${wordCounts.length} action lines share the ${modalLen540c}-word count`,
+        rule: 'ACTION_WORD_COUNT_MODAL_LOCK',
+        severity: 'minor',
+        description: `${maxFreq540c} of ${wordCounts.length} action lines (${(maxFreq540c / wordCounts.length * 100).toFixed(0)}%) share exactly the same word count of ${modalLen540c} words — a modal spike that produces a metronomic cadence. When more than 40% of action lines carry the same word count, the prose converges on a single beat length that the reader internalizes well before the script ends: each new line arriving at the expected length confirms a rhythm rather than varying it. Screenplay action should surprise the eye with its density changes — short lines compressing impact, long lines expanding space and context — and a modal lock on one word count drains that variability, making the prose feel stamped from a template rather than calibrated to each beat's dramatic weight.`,
+        suggestedFix: `Redistribute the ${modalLen540c}-word lines: convert a portion of them to shorter beats (remove a descriptive clause, reduce an action to its essential verb) or longer beats (add the specific spatial or physical detail that makes the moment real). Aim for no word count to account for more than 25% of all action lines — the prose should feel like it is calibrated beat by beat, not measured out in uniform portions.`,
       });
     }
   }

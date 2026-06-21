@@ -20405,6 +20405,61 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 540 — rhythmPass: consecutive medium run, short expansion absent, word-count modal lock', async () => {
+    const runR540 = async (fountain: string) => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    const makeF540 = (wcs: number[]) => {
+      const lines = wcs.map((n, i) => `INT. SC${i} - DAY\n\n${Array(n).fill('word').join(' ')}.`);
+      return lines.join('\n\n');
+    };
+
+    it('ACTION_CONSECUTIVE_MEDIUM_RUN fires when 6+ consecutive lines are all 5–11 words', async () => {
+      // 10 lines: 3(short), 7,7,7,7,7,7(6 medium), 14(long), 4, 8
+      // hasShortsGlobal=true(3,4), hasLongsGlobal=true(14), medRun=6 ≥ 6 → fires
+      const f540a = makeF540([3, 7, 7, 7, 7, 7, 7, 14, 4, 8]);
+      const res = await runR540(f540a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_CONSECUTIVE_MEDIUM_RUN'), 'ACTION_CONSECUTIVE_MEDIUM_RUN should fire');
+    });
+
+    it('ACTION_CONSECUTIVE_MEDIUM_RUN does not fire when the medium run is shorter than 6', async () => {
+      // 10 lines: 3, 7,7,7,7(run of 4), 14, 5,6,7,3 — max medium run = 4 < 6
+      const f540anr = makeF540([3, 7, 7, 7, 7, 14, 5, 6, 7, 3]);
+      const res = await runR540(f540anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_CONSECUTIVE_MEDIUM_RUN'), 'ACTION_CONSECUTIVE_MEDIUM_RUN should not fire');
+    });
+
+    it('ACTION_SHORT_EXPANSION_ABSENT fires when no short line is followed by a long line within 2', async () => {
+      // 10 lines: 3,5,7,3,6,8,9,5,7,9 — short at 0,3; long(≥9) at 6,9
+      // short at 0: aftermath 1(5w),2(7w) — no long; short at 3: aftermath 4(6w),5(8w) — no long → fires
+      const f540b = makeF540([3, 5, 7, 3, 6, 8, 9, 5, 7, 9]);
+      const res = await runR540(f540b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_SHORT_EXPANSION_ABSENT'), 'ACTION_SHORT_EXPANSION_ABSENT should fire');
+    });
+
+    it('ACTION_SHORT_EXPANSION_ABSENT does not fire when a short line is followed by a long line', async () => {
+      // 10 lines: 3,9,7,3,6,8,9,5,7,9 — short at 0; aftermath at 1 = 9w (≥9) → expansion found
+      const f540bnr = makeF540([3, 9, 7, 3, 6, 8, 9, 5, 7, 9]);
+      const res = await runR540(f540bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_SHORT_EXPANSION_ABSENT'), 'ACTION_SHORT_EXPANSION_ABSENT should not fire');
+    });
+
+    it('ACTION_WORD_COUNT_MODAL_LOCK fires when >40% of ≥10 lines share the same word count', async () => {
+      // 10 lines: 5 lines of 7w (50% > 40%) + 5 varied lines
+      const f540c = makeF540([7, 7, 7, 7, 7, 5, 6, 8, 9, 3]);
+      const res = await runR540(f540c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_WORD_COUNT_MODAL_LOCK'), 'ACTION_WORD_COUNT_MODAL_LOCK should fire');
+    });
+
+    it('ACTION_WORD_COUNT_MODAL_LOCK does not fire when ≤40% of lines share the same word count', async () => {
+      // 10 lines: 4 lines of 7w (40% = not strictly > 40%) + 6 varied lines
+      const f540cnr = makeF540([7, 7, 7, 7, 5, 6, 8, 9, 3, 4]);
+      const res = await runR540(f540cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_WORD_COUNT_MODAL_LOCK'), 'ACTION_WORD_COUNT_MODAL_LOCK should not fire');
+    });
+  });
+
   describe('Wave 526 — rhythmPass: word-count ascent run, finale long absent, comma dense flood', async () => {
     const runR526 = async (fountain: string) => {
       const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
