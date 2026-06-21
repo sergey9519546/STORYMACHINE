@@ -108,6 +108,18 @@
 // proportion), dialogue speaker solo (one character delivers >60% of all dialogue lines while
 // ≥3 speakers and ≥10 dialogue lines exist — monologue dominance; underweight/bloat × dialogue
 // × speaker distribution, first per-speaker distribution check in originality.ts).
+// Wave 508 additions: dialogue same-speaker run (run-based × dialogue × speaker alternation —
+// ≥5 consecutive speeches by the same speaker while ≥3 speakers and ≥12 total lines exist; a
+// local monologue within an apparently multi-character exchange; distinct from DIALOGUE_SPEAKER_
+// SOLO which measures global share and DIALOGUE_SHORT_RUN/FILLER_RUN which measure content not
+// speaker identity), action then-opener flood (underweight/bloat × action prose × temporal
+// sequential opener — >25% of ≥8 action lines begin with "Then "; the writer narrates a
+// sequence instead of presenting images; distinct from ACTION_PRONOUN_OPENER_FLOOD, GERUND_
+// OPENER_DOMINANCE, and all other opener-pattern checks), dialogue wish statement flood
+// (underweight/bloat × dialogue × counterfactual/regret register — >20% of ≥8 dialogue lines
+// contain wish/if-only/should-have counterfactual language; characters speak in backward-looking
+// regret rather than present-tense confrontation; distinct from PRESENT_PERFECT_FLOOD which
+// measures past tense broadly and FUTURE_TENSE_FLOOD which measures forward projection).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2766,6 +2778,151 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
           suggestedFix: `Redistribute the dramatic weight: let other characters carry scenes, lead confrontations, or disclose information independently of the dominant speaker. A character who has been a reactive prompt can be elevated by giving them a scene they initiate, information only they hold, or an emotional position that directly challenges the dominant speaker's assumptions. The goal is not equal distribution — the protagonist may naturally carry more — but the non-dominant speakers should each have at least one scene where their interiority lands on the audience without the dominant voice framing it.`,
         });
       }
+    }
+  }
+
+  // ── Wave 508 checks ──────────────────────────────────────────────────────────
+
+  // DIALOGUE_SAME_SPEAKER_RUN — Run-based × dialogue × speaker alternation void.
+  // ≥5 consecutive dialogue speeches by the same speaker while ≥3 total speakers and
+  // ≥12 total dialogue lines exist → fire. A run of five or more speeches by the same
+  // character within an apparently multi-speaker script is a local monologue: it freezes
+  // out the other characters for long enough that the exchange loses its dialogic quality
+  // entirely. The other characters are present but voiceless; the scene converts from
+  // confrontation to lecture. Even a genuinely one-sided exchange — an interrogation, a
+  // command — needs interjections, interruptions, or brief responses to keep the sense
+  // that other characters have wills of their own.
+  // Distinct from: DIALOGUE_SPEAKER_SOLO (Wave 494: global share >60% across the entire
+  // script — a different mode measuring the cumulative dominance of one voice; this fires
+  // on any single LOCAL run regardless of global balance), DIALOGUE_MONOLOGUE_DROUGHT (Wave
+  // 438: absence of long individual speeches — opposite problem), DIALOGUE_SHORT_RUN (Wave
+  // 494: brevity × speech length, not speaker identity), DIALOGUE_QUESTION_RUN (Wave 494:
+  // punctuation, not speaker identity), DIALOGUE_FILLER_RUN (Wave 480: opener word, not
+  // speaker identity). First run-based check on speaker-identity continuity.
+  {
+    const speakerCuePat508a = /^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/;
+    let currentSpeaker508a: string | null = null;
+    let prevSpeaker508a: string | null = null;
+    let curSpeakerRun508a = 0;
+    let maxSpeakerRun508a = 0;
+    let maxSpeakerName508a = '';
+    const speakerSet508a = new Set<string>();
+    let totalSpeechLines508a = 0;
+    let inDlg508a = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg508a = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg508a = false; continue; }
+      if (speakerCuePat508a.test(t)) {
+        const spk508a = t.replace(/\s*\(.*\)\s*$/, '').trim();
+        speakerSet508a.add(spk508a);
+        if (spk508a !== prevSpeaker508a) {
+          if (prevSpeaker508a !== null && curSpeakerRun508a > maxSpeakerRun508a) {
+            maxSpeakerRun508a = curSpeakerRun508a;
+            maxSpeakerName508a = prevSpeaker508a;
+          }
+          prevSpeaker508a = spk508a;
+          curSpeakerRun508a = 0;
+        }
+        currentSpeaker508a = spk508a;
+        inDlg508a = true;
+        continue;
+      }
+      if (t.startsWith('(')) continue;
+      if (!inDlg508a || !currentSpeaker508a) continue;
+      curSpeakerRun508a++;
+      totalSpeechLines508a++;
+    }
+    if (prevSpeaker508a !== null && curSpeakerRun508a > maxSpeakerRun508a) {
+      maxSpeakerRun508a = curSpeakerRun508a;
+      maxSpeakerName508a = prevSpeaker508a;
+    }
+    if (speakerSet508a.size >= 3 && totalSpeechLines508a >= 12 && maxSpeakerRun508a >= 5) {
+      issues.push({
+        location: `${maxSpeakerName508a} — ${maxSpeakerRun508a} consecutive dialogue line(s)`,
+        rule: 'DIALOGUE_SAME_SPEAKER_RUN',
+        severity: 'minor',
+        description: `${maxSpeakerName508a} delivers ${maxSpeakerRun508a} consecutive dialogue lines without any other character speaking — a local monologue within a multi-speaker script. A run of five or more lines by one character freezes out all other voices: the scene converts from exchange to lecture, and the other characters become silent props rather than wills in opposition. Even a genuinely one-sided exchange — an interrogation, a confession, a command — benefits from interjections, interruptions, or brief reactions to maintain the sense that the listener has a will of their own.`,
+        suggestedFix: `Break the ${maxSpeakerName508a} monologue with at least one interjection, interruption, or brief response from another character. It need not be substantial: a deflection, a half-sentence, an objection, or even a "(CONT'D)" acknowledgement of a listener's reaction. The goal is to preserve the felt sense of an exchange — two or more wills present — rather than one consciousness speaking into silence.`,
+      });
+    }
+  }
+
+  // ACTION_THEN_OPENER_FLOOD — Underweight/bloat × action prose × "Then" sequential openers.
+  // >25% of ≥8 action lines begin with "Then " → fire. The word "Then" at the start of an
+  // action line signals that the writer is narrating a sequence of events rather than presenting
+  // images. "Then she opens the door." "Then the lights go out." These lines impose a past-tense
+  // chronological-narrative register onto what should be the unfolding cinematic present: the
+  // reader is told WHEN things happen (after the previous thing) instead of being SHOWN what is
+  // happening now. "Then" starters drain visual immediacy from the action prose.
+  // Distinct from: ACTION_PRONOUN_OPENER_FLOOD (Wave 466: "He"/"She" — subject-first grammar,
+  // not temporal sequencing), GERUND_OPENER_DOMINANCE (Wave 259: "-ing" participial phrases,
+  // not temporal connectors), COPULA_ACTION_DOMINANCE (Wave 259: linking verbs — predicate form),
+  // PASSIVE_VERB_DOMINANCE (Wave 438: passive construction — verb form), FILTERING_VERB_OVERUSE
+  // (Wave 259: perception verbs — entirely different pattern). First check in this pass auditing
+  // temporal-connector starters in action prose.
+  {
+    const thenOpenerRe508b = /^Then\b/i;
+    let actionTotal508b = 0;
+    let thenCount508b = 0;
+    let inDlg508b = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg508b = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg508b = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg508b = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (inDlg508b) continue;
+      actionTotal508b++;
+      if (thenOpenerRe508b.test(t)) thenCount508b++;
+    }
+    if (actionTotal508b >= 8 && thenCount508b / actionTotal508b > 0.25) {
+      issues.push({
+        location: `${thenCount508b} of ${actionTotal508b} action lines begin with "Then"`,
+        rule: 'ACTION_THEN_OPENER_FLOOD',
+        severity: 'minor',
+        description: `${thenCount508b} of ${actionTotal508b} action lines (${Math.round(thenCount508b / actionTotal508b * 100)}%) begin with "Then" — the writer is narrating a chronological sequence rather than presenting images. "Then she opens the door" imposes a past-tense storytelling register onto what should be the kinetic cinematic present: the reader is told WHEN each action follows the last rather than being dropped into the immediate moment of it happening. Sustained use of "Then" as an action-line starter drains visual immediacy and signals that the screenplay's prose layer is thinking like prose fiction rather than like visual staging.`,
+        suggestedFix: `Cut the leading "Then" and start the action with its subject or verb: "Then she opens the door" → "She opens the door" or "The door swings open." If temporal sequence needs marking, use a physical cause instead of a temporal connector: "Startled by the knock, she opens the door" places the action in the present without narrating its order in the sequence.`,
+      });
+    }
+  }
+
+  // DIALOGUE_WISH_STATEMENT_FLOOD — Underweight/bloat × dialogue × counterfactual/regret register.
+  // >20% of ≥8 dialogue lines contain counterfactual/wish language ("wish," "if only," "should
+  // have," "could have," "would have," "used to," "wanted to") → fire. Characters speak
+  // predominantly in backward-looking regret rather than in present-tense confrontation. When
+  // more than a fifth of all dialogue is counterfactual — mourning what was or imagining what
+  // might have been — the scene loses the kinetic quality of present-tense dramatic confrontation
+  // and becomes therapy rather than action. Characters process the past instead of fighting for
+  // the present.
+  // Distinct from: PRESENT_PERFECT_FLOOD (Wave 364: >25% of lines use "have"/"had" — broader
+  // past-tense orientation, not specifically counterfactual regret constructions), FUTURE_TENSE_
+  // FLOOD (Wave 283: >35% of lines in future tense — forward projection, not backward longing),
+  // REPORTED_SPEECH_FLOOD (Wave 406: recounting what others said — different form of past-
+  // orientation). First check in this pass targeting the counterfactual/wish register specifically.
+  {
+    const wishRe508c = /\b(wish|if only|should have|could have|would have|used to|wanted to|meant to|tried to|supposed to)\b/i;
+    let dlgTotal508c = 0;
+    let wishCount508c = 0;
+    let inDlg508c = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg508c = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg508c = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg508c = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (!inDlg508c) continue;
+      dlgTotal508c++;
+      if (wishRe508c.test(t)) wishCount508c++;
+    }
+    if (dlgTotal508c >= 8 && wishCount508c / dlgTotal508c > 0.20) {
+      issues.push({
+        location: `${wishCount508c} of ${dlgTotal508c} dialogue lines carry counterfactual/wish language`,
+        rule: 'DIALOGUE_WISH_STATEMENT_FLOOD',
+        severity: 'minor',
+        description: `${wishCount508c} of ${dlgTotal508c} dialogue lines (${Math.round(wishCount508c / dlgTotal508c * 100)}%) contain counterfactual or regret language — "wish," "if only," "should have," "could have," "would have," "used to," "wanted to." Characters speak predominantly in backward-looking regret rather than in present-tense confrontation. When more than a fifth of all dialogue is counterfactual, scenes lose the kinetic quality of characters fighting for the present and become therapy sessions: people processing the past together rather than clashing over what is happening now. Drama lives in the present tense — in what characters need, want, and fear RIGHT NOW, not in their longing for what was or was not.`,
+        suggestedFix: `Recast counterfactual statements as present-tense stakes or present-tense conflict: "I wish you had stayed" → "Why are you leaving?" or "I need you to stay." Move the character's backward-looking regret into a forward-looking demand, question, or claim. Counterfactual dialogue is most powerful when it is isolated — one character's "if only" lands harder when surrounded by characters who are fighting for the now rather than mourning what's past.`,
+      });
     }
   }
 

@@ -23085,6 +23085,173 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 508 — originalityPass: dialogue same-speaker run, action then-opener flood, dialogue wish-statement flood', async () => {
+    const runO508 = async (fountain: string, records: any[] = []) => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      return originalityPass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // DIALOGUE_SAME_SPEAKER_RUN fire: 3 speakers, 12 total lines, ALICE has 5 consecutive lines → fires
+    it('DIALOGUE_SAME_SPEAKER_RUN fires when one speaker dominates with 5+ consecutive speech lines', async () => {
+      const fountain508a = [
+        'INT. ROOM - DAY',
+        '',
+        'ALICE',
+        'First line of dialogue.',
+        'Second line of dialogue.',
+        'Third line of dialogue.',
+        'Fourth line of dialogue.',
+        'Fifth line of dialogue.',
+        '',
+        'BOB',
+        'Okay then.',
+        '',
+        'CAROL',
+        'Right, sure.',
+        '',
+        'ALICE',
+        'Something else.',
+        '',
+        'BOB',
+        'A short reply.',
+        '',
+        'CAROL',
+        'Final note here.',
+        '',
+        'ALICE',
+        'And more words.',
+        'Plus this too.',
+      ].join('\n');
+      const res = await runO508(fountain508a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_SAME_SPEAKER_RUN'), 'DIALOGUE_SAME_SPEAKER_RUN should fire');
+    });
+
+    // DIALOGUE_SAME_SPEAKER_RUN no-fire: 3 speakers, 12 total lines, max run is 4 → no fire
+    it('DIALOGUE_SAME_SPEAKER_RUN does not fire when max consecutive run is 4', async () => {
+      const fountain508anr = [
+        'INT. ROOM - DAY',
+        '',
+        'ALICE',
+        'First line of dialogue.',
+        'Second line of dialogue.',
+        'Third line of dialogue.',
+        'Fourth line of dialogue.',
+        '',
+        'BOB',
+        'Okay then.',
+        '',
+        'CAROL',
+        'Right, sure.',
+        '',
+        'ALICE',
+        'Something else.',
+        '',
+        'BOB',
+        'A short reply.',
+        '',
+        'CAROL',
+        'Final note here.',
+        '',
+        'ALICE',
+        'And more words.',
+        'Plus this too.',
+        'And one final thought.',
+      ].join('\n');
+      const res = await runO508(fountain508anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_SAME_SPEAKER_RUN'), 'DIALOGUE_SAME_SPEAKER_RUN should not fire');
+    });
+
+    // ACTION_THEN_OPENER_FLOOD fire: 8 action lines, 3 start with "Then " → 37.5% > 25% → fires
+    it('ACTION_THEN_OPENER_FLOOD fires when over 25% of action lines begin with "Then"', async () => {
+      const fountain508b = [
+        'INT. ROOM - DAY',
+        '',
+        'She walks in slowly.',
+        'She looks around the room.',
+        'Then she notices the open window.',
+        'She crosses toward it.',
+        'Then she opens the drawer beside it.',
+        'She reaches inside carefully.',
+        'Then she finds the key.',
+        'She pockets it quickly.',
+      ].join('\n');
+      const res = await runO508(fountain508b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_THEN_OPENER_FLOOD'), 'ACTION_THEN_OPENER_FLOOD should fire');
+    });
+
+    // ACTION_THEN_OPENER_FLOOD no-fire: 8 action lines, 1 starts with "Then " → 12.5% ≤ 25% → no fire
+    it('ACTION_THEN_OPENER_FLOOD does not fire when only 1 of 8 action lines begins with "Then"', async () => {
+      const fountain508bnr = [
+        'INT. ROOM - DAY',
+        '',
+        'She walks in slowly.',
+        'She looks around the room.',
+        'Then she notices the open window.',
+        'She crosses toward it.',
+        'She opens the drawer beside it.',
+        'She reaches inside carefully.',
+        'She finds the key.',
+        'She pockets it quickly.',
+      ].join('\n');
+      const res = await runO508(fountain508bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_THEN_OPENER_FLOOD'), 'ACTION_THEN_OPENER_FLOOD should not fire');
+    });
+
+    // DIALOGUE_WISH_STATEMENT_FLOOD fire: 10 dialogue lines, 3 contain wish language → 30% > 20% → fires
+    it('DIALOGUE_WISH_STATEMENT_FLOOD fires when over 20% of dialogue lines contain counterfactual language', async () => {
+      const fountain508c = [
+        'INT. ROOM - DAY',
+        '',
+        'ALICE',
+        'I should have known better.',
+        'But here we are now.',
+        'It is what it is.',
+        '',
+        'BOB',
+        'I could have done more.',
+        'We all make mistakes.',
+        'Life goes on.',
+        '',
+        'CAROL',
+        'I wish things were different.',
+        'But they are not.',
+        'Forward is the only way.',
+        '',
+        'ALICE',
+        'That is all we can do.',
+      ].join('\n');
+      const res = await runO508(fountain508c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_WISH_STATEMENT_FLOOD'), 'DIALOGUE_WISH_STATEMENT_FLOOD should fire');
+    });
+
+    // DIALOGUE_WISH_STATEMENT_FLOOD no-fire: 10 dialogue lines, 1 contains wish language → 10% ≤ 20% → no fire
+    it('DIALOGUE_WISH_STATEMENT_FLOOD does not fire when only 1 of 10 dialogue lines contains wish language', async () => {
+      const fountain508cnr = [
+        'INT. ROOM - DAY',
+        '',
+        'ALICE',
+        'I should have known better.',
+        'But here we are now.',
+        'It is what it is.',
+        '',
+        'BOB',
+        'We move forward regardless.',
+        'Life continues on.',
+        'We keep going.',
+        '',
+        'CAROL',
+        'That is the way things go.',
+        'There is nothing else to say.',
+        '',
+        'ALICE',
+        'Yes exactly right.',
+        'We can do this.',
+      ].join('\n');
+      const res = await runO508(fountain508cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_WISH_STATEMENT_FLOOD'), 'DIALOGUE_WISH_STATEMENT_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 494 — originalityPass: dialogue question run, dialogue short run, dialogue speaker solo', async () => {
     const runO494 = async (fountain: string) => {
       const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
