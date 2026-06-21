@@ -25723,6 +25723,88 @@ I always listen.
     });
   });
 
+  describe('Wave 505 — characterArcPass: seed emotional aftermath void, clock curiosity aftermath void, payoff drought run', async () => {
+    const makeRec505 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runA505 = async (records: any[]) => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ARC_SEED_EMOTIONAL_AFTERMATH_VOID fires when all seed scenes are followed by neutral scenes', async () => {
+      // n=10; seeds at pos 2,5 (not last); pos 3,6 are neutral; total ≥ 2 → all neutral aftermath → fire
+      const recs505a = Array.from({ length: 10 }, (_, i) =>
+        makeRec505(i, {
+          seededClueIds: [2, 5].includes(i) ? ['clue-A'] : [],
+          emotionalShift: [1, 7].includes(i) ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runA505(recs505a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'ARC_SEED_EMOTIONAL_AFTERMATH_VOID'), 'ARC_SEED_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_SEED_EMOTIONAL_AFTERMATH_VOID does not fire when a seed is followed by a non-neutral scene', async () => {
+      // n=10; seeds at pos 2,5; pos 3 is 'positive' (emotional aftermath) → not all neutral → no fire
+      const recs505anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec505(i, {
+          seededClueIds: [2, 5].includes(i) ? ['clue-B'] : [],
+          emotionalShift: i === 3 ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runA505(recs505anr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'ARC_SEED_EMOTIONAL_AFTERMATH_VOID'), 'ARC_SEED_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('ARC_CLOCK_CURIOSITY_AFTERMATH_VOID fires when avg post-clock curiosity is <= 0', async () => {
+      // n=10; clocks raised at pos 2,5 (not last); scenes 3,6 both have curiosityDelta=0 → avg=0 ≤ 0 → fire
+      const recs505b = Array.from({ length: 10 }, (_, i) =>
+        makeRec505(i, {
+          clockRaised: [2, 5].includes(i),
+          curiosityDelta: 0,
+        }),
+      );
+      const res = await runA505(recs505b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'ARC_CLOCK_CURIOSITY_AFTERMATH_VOID'), 'ARC_CLOCK_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_CLOCK_CURIOSITY_AFTERMATH_VOID does not fire when avg post-clock curiosity is > 0', async () => {
+      // n=10; clocks at pos 2,5; scene 3 has curiosityDelta=3, scene 6 has 0 → avg=1.5 > 0 → no fire
+      const recs505bnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec505(i, {
+          clockRaised: [2, 5].includes(i),
+          curiosityDelta: i === 3 ? 3 : 0,
+        }),
+      );
+      const res = await runA505(recs505bnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'ARC_CLOCK_CURIOSITY_AFTERMATH_VOID'), 'ARC_CLOCK_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('ARC_PAYOFF_DROUGHT_RUN fires when the longest payoff-free run is >= 6', async () => {
+      // n=12; payoffs at pos 1 and 9 → gap of 7 between them (pos 2-8) → maxDrought=7 ≥ 6 → fire
+      const recs505c = Array.from({ length: 12 }, (_, i) =>
+        makeRec505(i, { payoffSetupIds: [1, 9].includes(i) ? ['setup-Y'] : [] }),
+      );
+      const res = await runA505(recs505c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'ARC_PAYOFF_DROUGHT_RUN'), 'ARC_PAYOFF_DROUGHT_RUN should fire');
+    });
+
+    it('ARC_PAYOFF_DROUGHT_RUN does not fire when no payoff-free run reaches 6', async () => {
+      // n=12; payoffs at pos 1,4,8 → gaps: 2 (2-3), 3 (5-7), 3 (9-11) → maxDrought=3 < 6 → no fire
+      const recs505cnr = Array.from({ length: 12 }, (_, i) =>
+        makeRec505(i, { payoffSetupIds: [1, 4, 8].includes(i) ? ['setup-Z'] : [] }),
+      );
+      const res = await runA505(recs505cnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'ARC_PAYOFF_DROUGHT_RUN'), 'ARC_PAYOFF_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 491 — characterArcPass: clock peak emotion absent, payoff emotion decoupled, payoff aftermath emotional void', async () => {
     const makeRec491 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

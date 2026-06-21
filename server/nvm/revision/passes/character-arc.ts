@@ -114,6 +114,19 @@
 // × payoff → emotional aftermath — n≥8, ≥3 payoff scenes not at last position, every immediately
 // following scene is neutral; distinct from ARC_PAYOFF_EMOTION_DECOUPLED which checks the payoff
 // scene itself, and from ARC_TURN_EMOTIONAL_AFTERMATH_VOID which uses a dramatic-turn trigger).
+// Wave 505 additions: seed emotional aftermath void (sequence/aftermath × seed → emotional
+// aftermath — n≥8, ≥2 seed scenes not at last position, all followed by emotionally neutral
+// scenes; foreshadowing never triggers felt consequence; distinct from all aftermath checks with
+// revelation, turn, payoff, or positive triggers, and from all co-occurrence checks using the seed
+// channel), clock curiosity aftermath void (average/aggregate × clockRaised → curiosity aftermath
+// — n≥8, ≥2 clockRaised scenes not at last position, avg curiosityDelta of next scene ≤ 0;
+// deadlines never open wondering in the protagonist; distinct from ARC_CLOCK_EMOTION_DECOUPLED
+// and ARC_CLOCK_PEAK_EMOTION_ABSENT which check the clock scene itself, and from SEED_AFTERMATH_
+// CURIOSITY_VOID in causality.ts which uses seed trigger not clock), payoff drought run (run-based
+// × payoff absence — n≥10, ≥2 payoff scenes, longest consecutive run with no payoff ≥ 6; thread
+// resolution goes dark for too long; distinct from ARC_RELATIONAL_DROUGHT_RUN which targets the
+// relational channel, PAYOFF_BACK_LOADED in causality.ts which is a zone check, and all negative/
+// positive emotion run checks which target the emotion channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2373,6 +2386,127 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
           description: `Every qualifying payoff scene (${qualPayoffs491c.length} total) is immediately followed by an emotionally neutral scene — thread resolutions never produce any felt reaction in the protagonist or the story world in the next beat. The scene after a payoff is when the resolution lands most concretely: what did the protagonist gain or lose? How does fulfilling this promise change their state? When the payoff aftermath is always neutral, resolutions are delivered and then absorbed without register — the audience gets no signal about how to feel about the story having kept its promises.`,
           suggestedFix: `After at least one payoff scene, give the immediately following scene a non-neutral emotional shift: positive emotion (relief or triumph when the resolution is hoped-for) or negative (grief or bitterness when it comes at a cost or fails an expectation). The beat after a resolved thread is the most natural place for emotional landing.`,
         });
+      }
+    }
+  }
+
+  // ── Wave 505 checks ──────────────────────────────────────────────────────────
+
+  // ARC_SEED_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × seed → emotional aftermath.
+  // n≥8, ≥2 seed scenes (seededClueIds.length > 0) not at last position. All seed scenes are
+  // immediately followed by an emotionally neutral scene → fire. When the protagonist plants
+  // foreshadowing (a clue, a mysterious object, a portent), the next scene should register
+  // emotional consequence — a felt unease, a quickened anticipation, or a reaction that shows
+  // the planted material has registered in the protagonist's inner life. When seeds consistently
+  // precede neutral scenes, the foreshadowing is mechanically present but emotionally inert —
+  // the character is planting clues without the narrative registering that planting as meaningful.
+  // Distinct from: ARC_REVELATION_RELATIONAL_AFTERMATH_VOID (Wave 463: revelation trigger ×
+  // relational channel — different trigger and different channel), ARC_TURN_EMOTIONAL_AFTERMATH_VOID
+  // (Wave 449: turn trigger), ARC_PAYOFF_AFTERMATH_EMOTIONAL_VOID (Wave 491: payoff trigger),
+  // ARC_POSITIVE_RELATIONAL_AFTERMATH_VOID (Wave 477: positive-emotion trigger, relational channel),
+  // SEED_AFTERMATH_CURIOSITY_VOID in causality.ts (sequence/aftermath × seed → curiosity in the
+  // structural channel — different pass and different aftermath channel: curiosity, not emotion).
+  {
+    const n505a = records.length;
+    if (n505a >= 8) {
+      const seedAndNext505a = (records as any[])
+        .map((r, pos) => ({ pos, hasSeed: ((r.seededClueIds ?? []) as any[]).length > 0 }))
+        .filter(x => x.hasSeed && x.pos < n505a - 1);
+      if (seedAndNext505a.length >= 2) {
+        const allSeedAfterNeutral505a = seedAndNext505a.every(
+          x => (records as any[])[x.pos + 1].emotionalShift === 'neutral',
+        );
+        if (allSeedAfterNeutral505a) {
+          issues.push({
+            location: `${seedAndNext505a.length} seed scene(s) — all followed by emotionally neutral scenes`,
+            rule: 'ARC_SEED_EMOTIONAL_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `Every one of the ${seedAndNext505a.length} clue-planting scene(s) is immediately followed by a scene with a neutral emotional register. When the protagonist plants foreshadowing, the next scene should carry emotional consequence — unease, anticipation, or a reaction that confirms the planted material has registered in their inner life. When seeds consistently precede emotional vacuums, the foreshadowing is mechanically woven but affectively inert: the character plants clues without any felt sense that the planting matters.`,
+            suggestedFix: `After at least one seed scene, give the immediately following scene a non-neutral emotional register — the protagonist who planted the clue should feel something in the next beat: unease about what they've set in motion, anticipation about whether it will pay off, or discomfort at the implications of what they've foreshadowed. Foreshadowing lands hardest when its aftermath carries emotional weight.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ARC_CLOCK_CURIOSITY_AFTERMATH_VOID — Average/aggregate × clockRaised → curiosity aftermath.
+  // n≥8, ≥2 clockRaised scenes not at last position. Average curiosityDelta of the scene
+  // immediately following each clock-raised scene ≤ 0 → fire. When a deadline is established,
+  // the next scene should ignite wondering in the protagonist: what are the options? how much
+  // time remains? what must be sacrificed? A clock that never generates curiosity in its aftermath
+  // functions as a mechanical constraint rather than a narrative opening — it closes possibilities
+  // without prompting the audience (through the protagonist's wondering) to explore them.
+  // Distinct from: ARC_CLOCK_EMOTION_DECOUPLED (Wave 435: co-occurrence × clockRaised × emotion —
+  // checks the clock scene's OWN emotion, not the NEXT scene's curiosity), ARC_CLOCK_PEAK_EMOTION_
+  // ABSENT (Wave 491: single-peak × clockDelta × the peak scene's own emotion), CLOCK_RAISE_
+  // CURIOSITY_VOID in causality.ts (average/aggregate × clockRaised × the clock scene's OWN
+  // curiosityDelta — different pass and different time slot: own scene not next scene), SEED_
+  // AFTERMATH_CURIOSITY_VOID in causality.ts (different trigger: seed, not clock). First check
+  // in this pass pairing a clock trigger with a curiosity aftermath reading.
+  {
+    const n505b = records.length;
+    if (n505b >= 8) {
+      const clockAndNext505b = (records as any[])
+        .map((r, pos) => ({ pos, raised: !!(r.clockRaised) }))
+        .filter(x => x.raised && x.pos < n505b - 1);
+      if (clockAndNext505b.length >= 2) {
+        const totalCurAfter505b = clockAndNext505b.reduce(
+          (sum, x) => sum + (((records as any[])[x.pos + 1] as any).curiosityDelta ?? 0),
+          0,
+        );
+        const avgCurAfter505b = totalCurAfter505b / clockAndNext505b.length;
+        if (avgCurAfter505b <= 0) {
+          issues.push({
+            location: `${clockAndNext505b.length} clock scene(s) — avg post-clock curiosityDelta ${avgCurAfter505b.toFixed(2)}`,
+            rule: 'ARC_CLOCK_CURIOSITY_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `Across ${clockAndNext505b.length} scenes in which a clock or deadline is raised, the scene immediately following each averages a curiosityDelta of ${avgCurAfter505b.toFixed(2)} (≤ 0). When a deadline is established, the next beat should ignite wondering — what are the protagonist's options? how much time remains? what must be sacrificed? A clock that consistently generates zero or negative curiosity in its aftermath functions as a mechanical constraint rather than a dramatic opening: it imposes urgency without the wondering that gives urgency its meaning.`,
+            suggestedFix: `After at least one clock-raised scene, ensure the next scene carries positive curiosity — a character actively thinking through their options, a discovery that raises a new question about how the deadline can be met, or a complication that makes the constraint feel genuinely open-ended rather than predetermined. Clocks are most powerful when they generate wondering, not just pressure.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ARC_PAYOFF_DROUGHT_RUN — Run-based × payoff absence × consecutive run.
+  // n≥10, ≥2 payoff scenes (payoffSetupIds.length > 0). Longest consecutive run of scenes with
+  // no payoff event ≥ 6 → fire. A payoff drought of six or more scenes means the story goes
+  // through a significant stretch without resolving any planted promise — the foreshadowing
+  // engine runs but the delivery engine is idle for too long. Audiences track setup-payoff
+  // contracts; when payoffs are absent for an extended run, the sense that the story is building
+  // toward something degrades, because no promise is ever being cashed.
+  // Distinct from: ARC_RELATIONAL_DROUGHT_RUN (Wave 449: run-based × relational channel — different
+  // channel), ARC_NEGATIVE_EMOTION_RUN / ARC_POSITIVE_EMOTION_RUN (Wave 379/393: run-based on
+  // emotion channel), PAYOFF_BACK_LOADED in causality.ts (Zone presence/absence — first half vs.
+  // second half binary split; this measures consecutive run length regardless of which structural
+  // half), PAYOFF_ZONE_CLUSTER in causality.ts (distribution/timing × thirds — a different mode).
+  {
+    const n505c = records.length;
+    if (n505c >= 10) {
+      const payoffSceneSet505c = new Set(
+        (records as any[])
+          .filter(r => ((r.payoffSetupIds ?? []) as any[]).length > 0)
+          .map(r => r.sceneIdx),
+      );
+      if (payoffSceneSet505c.size >= 2) {
+        let maxPayoffDrought505c = 0;
+        let curDrought505c = 0;
+        for (const r of records as any[]) {
+          if (payoffSceneSet505c.has(r.sceneIdx)) {
+            curDrought505c = 0;
+          } else {
+            if (++curDrought505c > maxPayoffDrought505c) maxPayoffDrought505c = curDrought505c;
+          }
+        }
+        if (maxPayoffDrought505c >= 6) {
+          issues.push({
+            location: `longest payoff-free run: ${maxPayoffDrought505c} scenes`,
+            rule: 'ARC_PAYOFF_DROUGHT_RUN',
+            severity: 'minor',
+            description: `The script contains a run of ${maxPayoffDrought505c} consecutive scenes in which no planted narrative promise is resolved. A payoff drought of ${maxPayoffDrought505c} scenes means the story goes through a significant stretch with the foreshadowing engine running but the delivery engine idle. Audiences track setup-payoff contracts; when no promise is cashed for an extended run, the sense that the story is building toward something degrades — the planted threads feel increasingly like dead weight rather than live lines of expectation.`,
+            suggestedFix: `Introduce a payoff scene within the ${maxPayoffDrought505c}-scene drought window to confirm that at least one planted promise is still alive and being honored. Not every payoff needs to be a climactic reveal — a smaller thread resolving, a detail from an earlier scene returning with new significance, or a partial disclosure can serve as a payoff beat that keeps the audience's sense of forward motion intact.`,
+          });
+        }
       }
     }
   }
