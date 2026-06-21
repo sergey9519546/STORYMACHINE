@@ -122,6 +122,16 @@
 // silent (sequence/aftermath × payoff trigger → theme — n≥8, ≥2 qualifying payoff scenes not at
 // last position, none followed by a resonant scene; first aftermath check with the payoff channel,
 // distinct from THEME_REVELATION_AFTERMATH_SILENT which uses the revelation trigger).
+// Wave 528 additions: relationship shift aftermath silent (sequence/aftermath × relationship shift
+// trigger → theme — n≥8, ≥2 qualifying relationship-shift scenes none followed by a resonant scene;
+// the first aftermath check triggered by relationshipShifts, distinct from THEME_RELATIONSHIP_DECOUPLED
+// which fires when the shift scene ITSELF is silent), midpoint resonant causeless (backward-cause ×
+// midpoint zone resonant scene — the first resonant scene in the 40%–60% midpoint zone lacks any
+// structural catalyst in the 2 prior scenes while catalysts exist elsewhere; fills the midpoint-zone
+// cell in the backward-cause family alongside FIRST/LAST/PEAK_UNMOTIVATED), theme back heavy
+// (distribution/timing × second-half proportion — >65% of ≥3 resonant scenes fall in the second half
+// while ≥1 exists in the first half; theme is back-loaded across acts, distinct from THIRDS_CLUSTER
+// which fires on >75% in any single third and from FRONT_LOADED which compares keyword density).
 // Wave 514 additions: seed aftermath silent (sequence/aftermath × seed trigger → theme — n≥8, ≥2
 // qualifying seed scenes [seededClueIds non-empty] not at last position, none followed by a resonant
 // scene; the seed-channel aftermath complement to THEME_PAYOFF_AFTERMATH_SILENT; distinct from
@@ -2699,6 +2709,155 @@ export async function themePass(input: PassInput): Promise<PassResult> {
             suggestedFix: `After at least one curiosity-raising scene, let the next scene voice or embody "${themeRaw}" — a moment that connects the story's open question to its central theme. The scene immediately following a curiosity spike is the most receptive moment for thematic anchoring: the audience is actively wondering "what does this mean?" and the answer can be thematic as well as plot-level.`,
           });
         }
+      }
+    }
+
+    // ── Wave 528: THEME_RELATIONSHIP_SHIFT_AFTERMATH_SILENT, THEME_MIDPOINT_RESONANT_CAUSELESS,
+    //              THEME_BACK_HEAVY ──────────────────────────────────────────────────────────────
+
+    // THEME_RELATIONSHIP_SHIFT_AFTERMATH_SILENT (sequence/aftermath × relationship shift trigger
+    // → theme, n≥8, ≥2 qualifying relationship-shift scenes [pos < n-1], none followed by a
+    // resonant scene): Every scene that moves a relationship between characters passes without
+    // the next scene touching the theme. A relationship shift is the human core of the story's
+    // machinery: when two characters grow closer, more distant, more hostile, or more trusting,
+    // the story is articulating the emotional cost of its events. The scene that follows a
+    // relational beat is the natural moment to ask what the shift means — to connect the
+    // interpersonal movement to the theme's central question. When no relational shift is followed
+    // by a resonant next beat, the story treats relationships as plot mechanics rather than as
+    // vehicles for meaning. Sequence/aftermath mode × relationship-shift trigger × theme aftermath.
+    // Distinct from THEME_RELATIONSHIP_DECOUPLED (Wave 458: co-occurrence mode — the relationship
+    // shift scene ITSELF carries no theme; this fires when the FOLLOWING scene is silent, one
+    // temporal step later), all other aftermath checks (different triggers: seed, payoff, curiosity,
+    // suspense, emotion, revelation, clock, dramatic-turn — relationship is a new trigger channel).
+    const n528a = records.length;
+    if (n528a >= 8) {
+      const relIdxs528a: number[] = [];
+      for (let i528a = 0; i528a < n528a - 1; i528a++) {
+        if (((records[i528a].relationshipShifts ?? []) as any[]).length > 0) relIdxs528a.push(i528a);
+      }
+      if (relIdxs528a.length >= 2) {
+        const anyRelAftermath528a = relIdxs528a.some(i528a => {
+          const next528a = records[i528a + 1];
+          return sceneHasResonance(sceneTexts.get(next528a.sceneIdx) ?? '', expandedKeywords);
+        });
+        if (!anyRelAftermath528a) {
+          issues.push({
+            location: `${relIdxs528a.length} relationship-shift scene(s) — none followed by theme resonance`,
+            rule: 'THEME_RELATIONSHIP_SHIFT_AFTERMATH_SILENT',
+            severity: 'minor',
+            description: `The script has ${relIdxs528a.length} scenes that move a relationship between characters (non-empty relationshipShifts), but not one is followed immediately by a scene that touches "${themeRaw}". A relationship shift is the human core of the story's machinery: when characters grow closer, more distant, or more hostile, the story is articulating the emotional cost of its events. The scene that follows a relational beat is the natural moment to connect that interpersonal movement to what the story is about. When no relationship shift is followed by a resonant next beat, the story treats relational movement as plot mechanics rather than as vehicles for the theme — bonds change but the change is never made to mean anything.`,
+            suggestedFix: `After at least one relationship-shift scene, let the next scene voice or embody "${themeRaw}" — even briefly. A character reflecting on what just changed between them and someone else is a natural gateway for thematic language: the shift gives a context in which the theme's central question has immediate personal stakes. The relationship scene and its thematic aftermath together form one complete dramatic unit: the shift in bond plus the meaning of that shift.`,
+          });
+        }
+      }
+    }
+
+    // THEME_MIDPOINT_RESONANT_CAUSELESS (backward-cause × midpoint zone resonant scene,
+    // n≥8, ≥2 global structural catalysts, ≥1 resonant scene in the 40%–60% midpoint zone,
+    // no midpoint resonant scene preceded by a catalyst in its prior 2 scenes): The first
+    // thematically resonant scene in the story's structural midpoint (40%–60%) lacks any
+    // upstream cause — no revelation, dramatic turn, suspense rise, clock, or emotional shift
+    // in the 2 preceding scenes — even though structural catalysts exist elsewhere. The midpoint
+    // is where the story's central question is supposed to crystallize: the protagonist has
+    // committed, the opposition has materialized, and the theme should arrive with the full
+    // weight of the structural turn. When the midpoint's first thematic beat is causeless,
+    // it lands in the script as an editorial insertion at the pivot rather than as a consequence
+    // of the pivot. Backward-cause mode × midpoint structural position × first resonant scene
+    // in zone. Distinct from THEME_PEAK_UNMOTIVATED (Wave 430: the single densest scene in the
+    // whole script), THEME_FIRST_RESONANT_CAUSELESS (Wave 486: the very first resonant scene in
+    // the story), THEME_LAST_RESONANT_CAUSELESS (Wave 500: the final thematic beat), THEME_ALL_
+    // RESONANCE_CAUSELESS (Wave 458: every resonant scene causeless — fires only when no exception
+    // exists; this fires when the midpoint resonant scene specifically is causeless even if many
+    // others ARE motivated).
+    const n528b = records.length;
+    if (n528b >= 8) {
+      const midStart528b = Math.floor(n528b * 0.40);
+      const midEnd528b = Math.floor(n528b * 0.60);
+      const midResonantIdxs528b = records
+        .map((r, i) => ({ r, i }))
+        .filter(({ r, i }) =>
+          i >= midStart528b && i <= midEnd528b &&
+          sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        )
+        .map(({ i }) => i);
+      const hasCatalystGlobally528b = records.some(r =>
+        (r.revelation !== null && r.revelation !== '' && r.revelation !== undefined) ||
+        (r.dramaticTurn !== undefined && r.dramaticTurn !== 'nothing' && r.dramaticTurn !== '') ||
+        r.suspenseDelta > 0 ||
+        r.clockRaised === true ||
+        r.emotionalShift !== 'neutral',
+      );
+      // Need ≥2 catalysts globally so that causelessness is meaningful
+      const globalCatalystCount528b = records.filter(r =>
+        (r.revelation !== null && r.revelation !== '' && r.revelation !== undefined) ||
+        (r.dramaticTurn !== undefined && r.dramaticTurn !== 'nothing' && r.dramaticTurn !== '') ||
+        r.suspenseDelta > 0 ||
+        r.clockRaised === true ||
+        r.emotionalShift !== 'neutral',
+      ).length;
+      if (midResonantIdxs528b.length > 0 && globalCatalystCount528b >= 2) {
+        const firstMidRes528b = midResonantIdxs528b[0];
+        const hasCause528b = firstMidRes528b >= 2 && [records[firstMidRes528b - 1], records[firstMidRes528b - 2]].some(r =>
+          r !== undefined && (
+            (r.revelation !== null && r.revelation !== '' && r.revelation !== undefined) ||
+            (r.dramaticTurn !== undefined && r.dramaticTurn !== 'nothing' && r.dramaticTurn !== '') ||
+            r.suspenseDelta > 0 ||
+            r.clockRaised === true ||
+            r.emotionalShift !== 'neutral'
+          ),
+        );
+        if (!hasCause528b) {
+          const midScene528b = records[firstMidRes528b];
+          issues.push({
+            location: `Scene ${midScene528b.sceneIdx} (${midScene528b.slug}) — first midpoint resonant scene, causeless`,
+            rule: 'THEME_MIDPOINT_RESONANT_CAUSELESS',
+            severity: 'minor',
+            description: `The first thematically resonant scene in the story's midpoint zone (40%–60%) — scene ${midScene528b.sceneIdx} — appears without any structural preparation: the 2 preceding scenes carry no revelation, dramatic turn, suspense rise, deadline, or emotional shift that would motivate the theme's surfacing at this structural pivot, even though such catalysts exist elsewhere in the story. The midpoint is where the story's central question should crystallize with the full weight of the turn: the protagonist has committed, the opposition has materialized, and the theme should land as a consequence of the structural moment, not as an editorial aside dropped into the middle. A causeless thematic beat at the midpoint reads as a thesis statement placed at the center of the script rather than earned by what happened in the preceding scenes.`,
+            suggestedFix: `Add a structural catalyst in one of the two scenes before scene ${midScene528b.sceneIdx}: a revelation that makes the theme's question land with midpoint urgency, a dramatic turn that forces the characters to confront what the story is about, or a moment of tension or emotional charge that the midpoint's thematic beat then responds to. The midpoint resonant scene should feel provoked by the pivot, not inserted at it.`,
+          });
+        }
+      }
+    }
+
+    // THEME_BACK_HEAVY (distribution/timing × second-half proportion × resonant scene count,
+    // n≥8, ≥3 resonant scenes, ≥1 in first half [pos < n/2], >65% in second half [pos ≥ n/2]):
+    // More than two-thirds of the script's resonant scenes fall in the second half while the
+    // first half has at least one. Theme is structurally back-loaded: the story's opening
+    // movement is largely thematically silent, and meaning concentrates in the second half
+    // and resolution. The audience spends the first half of the narrative without the thematic
+    // anchor that would give dramatic events their meaning — what the story is about only
+    // becomes clear in the back half, leaving the opening acts to feel like setup for a
+    // thematic statement that arrives too late to permeate the whole story. Distribution/
+    // timing mode × second-half proportion × resonant scene membership. Distinct from
+    // THEME_RESONANCE_THIRDS_CLUSTER (Wave 486: >75% in one structural third — fires when
+    // one of three thirds is dominant, not when two of them [second half] are collectively
+    // dominant at a lower threshold), THEME_FRONT_LOADED (Wave 148: keyword hit DENSITY in
+    // first third vs rest — the exact opposite distribution problem; density-based not
+    // scene-count proportion; fires on first-half front-loading not second-half back-loading),
+    // THEME_ACT_1_DENSITY_DROP (Wave 374: first 25% zone vs overall — zone density check not
+    // a half-split proportion), THEME_PEAK_BEFORE_MIDPOINT (Wave 321: the single densest theme
+    // scene is in first half — single-peak position check, not overall scene distribution).
+    if (records.length >= 8 && resonantScenes.length >= 3) {
+      const halfIdx528c = Math.floor(records.length / 2);
+      const firstHalfResonant528c = resonantScenes.filter(r => {
+        const pos = records.indexOf(r);
+        return pos < halfIdx528c;
+      });
+      const secondHalfResonant528c = resonantScenes.filter(r => {
+        const pos = records.indexOf(r);
+        return pos >= halfIdx528c;
+      });
+      if (
+        firstHalfResonant528c.length >= 1 &&
+        secondHalfResonant528c.length / resonantScenes.length > 0.65
+      ) {
+        issues.push({
+          location: `${secondHalfResonant528c.length}/${resonantScenes.length} resonant scenes in second half`,
+          rule: 'THEME_BACK_HEAVY',
+          severity: 'minor',
+          description: `${secondHalfResonant528c.length} of the story's ${resonantScenes.length} thematically resonant scenes (${(secondHalfResonant528c.length / resonantScenes.length * 100).toFixed(0)}%) fall in the second half of the script, while only ${firstHalfResonant528c.length} appear in the first half. Theme is structurally back-loaded: the first half of the narrative is largely thematically silent, and meaning concentrates in the second half and resolution. The audience spends the story's opening movement without the thematic anchor that would give dramatic events their significance — what the story is about only becomes clear once the narrative is past its midpoint, leaving the first half to feel like mechanical setup for a meaning that arrives too late to permeate the whole. The most durable thematic work permeates the whole story: the audience needs the theme's frame early enough to feel each subsequent event as part of the pattern.`,
+          suggestedFix: `Distribute theme earlier: let at least two or three scenes in the first half voice or embody "${themeRaw}" — even briefly. The first half doesn't need the full thematic statement, but it needs enough resonance to let the audience begin forming the question that the second half will answer. A theme heard first at the 60% mark arrives as a thesis; a theme woven through from the beginning arrives as a truth.`,
+        });
       }
     }
   }

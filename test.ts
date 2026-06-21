@@ -18713,6 +18713,105 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 528 — themePass: relationship shift aftermath silent, midpoint resonant causeless, back heavy', async () => {
+    const makeRec528 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const THEME528 = 'redemption forgiveness courage';
+    const themed528 = ['act of redemption'];
+    const runT528 = async (records: any[]) => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: THEME528 },
+      });
+    };
+
+    // THEME_RELATIONSHIP_SHIFT_AFTERMATH_SILENT fire:
+    // 9 scenes; relationship shifts at 1 and 4; themed at 0 and 7 (not positions 2 or 5) → fires
+    it('THEME_RELATIONSHIP_SHIFT_AFTERMATH_SILENT fires when no relationship shift is followed by a resonant scene', async () => {
+      const recs528a = Array.from({ length: 9 }, (_, i) =>
+        makeRec528(i, {
+          relationshipShifts: [1, 4].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.5 }] : [],
+          dialogueHighlights: [0, 7].includes(i) ? themed528 : [],
+        }),
+      );
+      const res = await runT528(recs528a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_RELATIONSHIP_SHIFT_AFTERMATH_SILENT'), 'THEME_RELATIONSHIP_SHIFT_AFTERMATH_SILENT should fire');
+    });
+
+    // THEME_RELATIONSHIP_SHIFT_AFTERMATH_SILENT no-fire:
+    // shifts at 1 and 4; scene 2 (after shift 1) is themed → aftermath resonance exists → no fire
+    it('THEME_RELATIONSHIP_SHIFT_AFTERMATH_SILENT does not fire when a relationship shift is followed by a resonant scene', async () => {
+      const recs528anr = Array.from({ length: 9 }, (_, i) =>
+        makeRec528(i, {
+          relationshipShifts: [1, 4].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.5 }] : [],
+          dialogueHighlights: [2, 7].includes(i) ? themed528 : [],
+        }),
+      );
+      const res = await runT528(recs528anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_RELATIONSHIP_SHIFT_AFTERMATH_SILENT'), 'THEME_RELATIONSHIP_SHIFT_AFTERMATH_SILENT should not fire');
+    });
+
+    // THEME_MIDPOINT_RESONANT_CAUSELESS fire:
+    // n=10; midpoint zone (40%-60%) = pos 4,5,6; resonant at 4; prior scenes (2,3) have no catalysts;
+    // global catalysts at 0,9 (suspense) → globalCatalystCount≥2; firstMidRes=4≥2; !hasCause → fires
+    it('THEME_MIDPOINT_RESONANT_CAUSELESS fires when the midpoint resonant scene has no structural catalyst in prior 2 scenes', async () => {
+      const recs528b = Array.from({ length: 10 }, (_, i) =>
+        makeRec528(i, {
+          suspenseDelta: [0, 9].includes(i) ? 2 : 0,
+          dialogueHighlights: i === 4 ? themed528 : [],
+        }),
+      );
+      const res = await runT528(recs528b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_MIDPOINT_RESONANT_CAUSELESS'), 'THEME_MIDPOINT_RESONANT_CAUSELESS should fire');
+    });
+
+    // THEME_MIDPOINT_RESONANT_CAUSELESS no-fire:
+    // same setup but scene 3 (prior to midpoint resonant scene 4) has suspense → hasCause → no fire
+    it('THEME_MIDPOINT_RESONANT_CAUSELESS does not fire when the midpoint resonant scene has a catalyst in prior 2 scenes', async () => {
+      const recs528bnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec528(i, {
+          suspenseDelta: [0, 3, 9].includes(i) ? 2 : 0,
+          dialogueHighlights: i === 4 ? themed528 : [],
+        }),
+      );
+      const res = await runT528(recs528bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_MIDPOINT_RESONANT_CAUSELESS'), 'THEME_MIDPOINT_RESONANT_CAUSELESS should not fire');
+    });
+
+    // THEME_BACK_HEAVY fire:
+    // n=10; halfIdx=5; resonant at 1,6,7,8,9 → first half: 1, second half: 4, total: 5 → 80% > 65% → fires
+    it('THEME_BACK_HEAVY fires when more than 65% of resonant scenes fall in the second half', async () => {
+      const recs528c = Array.from({ length: 10 }, (_, i) =>
+        makeRec528(i, {
+          dialogueHighlights: [1, 6, 7, 8, 9].includes(i) ? themed528 : [],
+        }),
+      );
+      const res = await runT528(recs528c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_BACK_HEAVY'), 'THEME_BACK_HEAVY should fire');
+    });
+
+    // THEME_BACK_HEAVY no-fire:
+    // resonant at 1,2,6,7,8 → first half: 2, second half: 3, total: 5 → 60% ≤ 65% → no fire
+    it('THEME_BACK_HEAVY does not fire when resonant scenes are distributed across both halves', async () => {
+      const recs528cnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec528(i, {
+          dialogueHighlights: [1, 2, 6, 7, 8].includes(i) ? themed528 : [],
+        }),
+      );
+      const res = await runT528(recs528cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_BACK_HEAVY'), 'THEME_BACK_HEAVY should not fire');
+    });
+  });
+
   describe('Wave 514 — themePass: seed aftermath silent, high-suspense aftermath silent, curiosity aftermath silent', async () => {
     const makeRec514 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
