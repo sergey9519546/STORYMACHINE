@@ -120,6 +120,20 @@
 // contain wish/if-only/should-have counterfactual language; characters speak in backward-looking
 // regret rather than present-tense confrontation; distinct from PRESENT_PERFECT_FLOOD which
 // measures past tense broadly and FUTURE_TENSE_FLOOD which measures forward projection).
+// Wave 536 additions: dialogue negative imperative flood (underweight/bloat × dialogue × negative
+// command register — >20% of ≥8 dialogue lines open with a prohibition or negative imperative:
+// "don't," "never," "stop," "can't you," "won't you," "you can't," "you don't," "do not," "no
+// more"; characters communicate through refusal and denial at the expense of assertive, relational,
+// or exploratory registers; distinct from DIALOGUE_COMMAND_FLOOD which targets positive imperatives
+// and from DIALOGUE_HEDGING_FLOOD which targets uncertainty vocabulary), dialogue exclamation run
+// (run-based × dialogue × exclamation endings — ≥4 consecutive dialogue lines each ending with
+// "!"; a sustained exclamatory streak that drains emphasis; distinct from DIALOGUE_QUESTION_RUN
+// [question endings], DIALOGUE_AGREEMENT_RUN [agreement openers], DIALOGUE_FILLER_RUN [filler
+// openers], and DIALOGUE_SAME_SPEAKER_RUN [speaker repetition]), dialogue short speech flood
+// (underweight/bloat × dialogue × speech length — >60% of ≥8 dialogue lines contain ≤3 words;
+// characters communicate in fragments — one-word, two-word, or three-word utterances — without
+// substantive expression; distinct from ONE_WORD_LINE_DOMINANCE in dialogue.ts which uses a 35%
+// threshold for single-word lines, since this extends the threshold to ≤3 words at a 60% rate).
 // Wave 522 additions: dialogue hedging flood (underweight/bloat × dialogue × uncertainty register —
 // >25% of ≥8 dialogue lines contain hedging/uncertainty vocabulary: "maybe," "perhaps," "I think,"
 // "I guess," "probably," "possibly," "sort of," "kind of," "apparently," "might be," "seem to";
@@ -3048,6 +3062,119 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${cmdCount522c} of ${dlgTotal522c} dialogue lines (${Math.round(cmdCount522c / dlgTotal522c * 100)}%) open with an imperative command verb — "go," "stop," "come," "get," "find," "listen," "turn," etc. Characters who communicate predominantly through directives flatten the dialogue's emotional range: there is no interiority, no desire expressed as longing, no question genuinely asked — only orders. Command-dominant dialogue removes the exploratory, relational, and emotional registers that reveal character. It is also dramatically limiting: when characters only issue directives, scenes feel like logistics rather than confrontation between people who want different things.`,
         suggestedFix: `Redistribute the dialogue register by introducing lines that express desire, uncertainty, or observation rather than pure command: "I need you to go" instead of "Go"; "Why won't you listen?" instead of "Listen." Imperatives are most powerful when they are isolated against a background of more varied expression — the command that comes after genuine emotional engagement lands with far more weight than the twelfth imperative in a row.`,
+      });
+    }
+  }
+
+  // ── Wave 536: DIALOGUE_NEGATIVE_IMPERATIVE_FLOOD, DIALOGUE_EXCLAMATION_RUN,
+  //              DIALOGUE_SHORT_SPEECH_FLOOD ──────────────────────────────────────────────────────────
+
+  // DIALOGUE_NEGATIVE_IMPERATIVE_FLOOD — Underweight/bloat × dialogue × negative command register.
+  // >20% of ≥8 dialogue lines open with a prohibition or negative imperative — "don't," "never,"
+  // "stop," "can't you," "won't you," "you can't," "you don't," "do not," "no more." Characters
+  // whose communication is dominated by prohibition and refusal flatten the dialogue's emotional
+  // and exploratory range: there is no desire expressed as longing, no question genuinely asked,
+  // no assertion made positively — only the denial of action and the refusal of engagement.
+  // Distinct from: DIALOGUE_COMMAND_FLOOD (Wave 522: positive imperative openers — "go," "get,"
+  // "find"; this is the negative-polarity complement), DIALOGUE_HEDGING_FLOOD (Wave 522: uncertainty
+  // vocabulary — "maybe," "I think"; different register, permission-seeking vs. prohibition).
+  {
+    const negImpRe536a = /^(don't|never |stop |can't you|won't you|you can't|you don't|do not |no more|please don't|i won't|i can't|i don't)/i;
+    let dlgTotal536a = 0;
+    let negImpCount536a = 0;
+    let inDlg536a = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg536a = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg536a = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg536a = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (!inDlg536a) continue;
+      dlgTotal536a++;
+      if (negImpRe536a.test(t)) negImpCount536a++;
+    }
+    if (dlgTotal536a >= 8 && negImpCount536a / dlgTotal536a > 0.20) {
+      issues.push({
+        location: `${negImpCount536a} of ${dlgTotal536a} dialogue lines open with a negative imperative or prohibition`,
+        rule: 'DIALOGUE_NEGATIVE_IMPERATIVE_FLOOD',
+        severity: 'minor',
+        description: `${negImpCount536a} of ${dlgTotal536a} dialogue lines (${Math.round(negImpCount536a / dlgTotal536a * 100)}%) open with a prohibition or negative imperative — "don't," "never," "stop," "you can't," "I won't," etc. Characters who communicate predominantly through refusal and denial flatten the dialogue's emotional register: there is no desire expressed as longing, no genuine curiosity, no positive assertion — only the prohibition of action and the refusal of engagement. Prohibition-dominant dialogue is also dramatically limiting: when characters only say what they will not do, the scene lacks the positive wanting that drives dramatic transaction. Dramatic conflict requires characters who want specific things and act on those wants — not just characters who refuse each other's wants.`,
+        suggestedFix: `Redistribute the dialogue register: for every prohibition, introduce a desire expressed positively — "I want you to stay" instead of "Don't go," "I need this to work" instead of "You can't stop me." The most effective negative imperatives are isolated against a background of positive assertion, where the prohibition arrives as a revelation of what was silently wanted rather than as the default register of speech.`,
+      });
+    }
+  }
+
+  // DIALOGUE_EXCLAMATION_RUN — Run-based × dialogue × exclamation endings.
+  // ≥4 consecutive dialogue lines each ending with "!" — a sustained exclamatory streak that drains
+  // emphasis through repetition. A single exclamation has force; four or more in a row normalize
+  // exclamation as the baseline register, so no individual line retains its urgency or emotional
+  // weight. The audience becomes habituated to the exclamation as a verbal tic rather than as a
+  // genuine signal of elevated emotion.
+  // Distinct from: DIALOGUE_QUESTION_RUN (Wave 494: question endings — different punctuation),
+  // DIALOGUE_AGREEMENT_RUN (Wave 522: agreement openers — different position and content),
+  // DIALOGUE_FILLER_RUN (Wave 480: filler openers — opener not ending), DIALOGUE_SAME_SPEAKER_RUN
+  // (Wave 508: speaker repetition — different signal). First run-based check on exclamation endings.
+  {
+    let maxExclRun536b = 0;
+    let curExclRun536b = 0;
+    let inDlg536b = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg536b = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg536b = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg536b = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (!inDlg536b) continue;
+      if (t.endsWith('!')) {
+        curExclRun536b++;
+        if (curExclRun536b > maxExclRun536b) maxExclRun536b = curExclRun536b;
+      } else {
+        curExclRun536b = 0;
+      }
+    }
+    if (maxExclRun536b >= 4) {
+      issues.push({
+        location: `longest exclamation run: ${maxExclRun536b} consecutive exclamatory dialogue lines`,
+        rule: 'DIALOGUE_EXCLAMATION_RUN',
+        severity: 'minor',
+        description: `The script contains a run of ${maxExclRun536b} consecutive dialogue lines each ending with an exclamation mark. A sustained exclamatory streak drains the punctuation of its meaning: when every line exclaims, no individual line retains the urgency or emotional weight that a single "!" is supposed to signal. The audience becomes habituated to exclamation as the baseline register of speech — a verbal tic rather than a genuine marker of elevated emotion, urgency, or surprise. The most powerful use of exclamation in dialogue is isolated: the single "!" that arrives after several declarative lines commands attention precisely because it breaks the pattern.`,
+        suggestedFix: `Break the exclamation run by varying the punctuation of adjacent lines — allow some to conclude with a period (declarative), a question mark (genuine inquiry), or no terminal punctuation (trailing thought). A run of ${maxExclRun536b} exclamations can be reduced by replacing at least half with declarative or questioning statements; the exclamations that remain will immediately recover their force.`,
+      });
+    }
+  }
+
+  // DIALOGUE_SHORT_SPEECH_FLOOD — Underweight/bloat × dialogue × speech brevity.
+  // >60% of ≥8 dialogue lines contain ≤3 words — characters communicate in fragments without
+  // substantive expression. Dialogue that consists overwhelmingly of one-, two-, or three-word
+  // utterances ("Yes." / "I know." / "Get out.") evacuates the spoken language of specificity,
+  // nuance, and character voice. Short speeches can be powerful in isolation; when they dominate
+  // a screenplay at >60%, the verbal texture of the story is reduced to the barest transactional
+  // minimum — characters gesture at communication rather than enacting it.
+  // Distinct from: ONE_WORD_LINE_DOMINANCE in dialogue.ts (Wave 311: ≤1 word at >35% rate — this
+  // extends the brevity threshold to ≤3 words at a >60% rate, catching telegraphic micro-speeches
+  // not captured by the single-word check), DIALOGUE_COMMAND_FLOOD (opener pattern not length).
+  {
+    let dlgTotal536c = 0;
+    let shortCount536c = 0;
+    let inDlg536c = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg536c = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg536c = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg536c = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (!inDlg536c) continue;
+      dlgTotal536c++;
+      const wordCount536c = t.split(/\s+/).filter((w: string) => w.length > 0).length;
+      if (wordCount536c <= 3) shortCount536c++;
+    }
+    if (dlgTotal536c >= 8 && shortCount536c / dlgTotal536c > 0.60) {
+      issues.push({
+        location: `${shortCount536c} of ${dlgTotal536c} dialogue lines contain ≤3 words`,
+        rule: 'DIALOGUE_SHORT_SPEECH_FLOOD',
+        severity: 'minor',
+        description: `${shortCount536c} of ${dlgTotal536c} dialogue lines (${Math.round(shortCount536c / dlgTotal536c * 100)}%) contain three words or fewer. Dialogue dominated by micro-speeches — "Yes." / "I know." / "Fine." / "Get out." — evacuates the spoken language of specificity, nuance, and individual character voice. Very short speeches are powerful in isolation, as the punctuation of an otherwise richer exchange; when they constitute the overwhelming majority of the dialogue, the verbal texture of the story is reduced to the barest transactional minimum. Characters who communicate almost exclusively in fragments cannot reveal the complexity of what they want or who they are — the most specific character voices require at least some speeches of sufficient length to carry a full thought.`,
+        suggestedFix: `Expand at least half of the three-word-or-under lines into fuller speeches that reveal what is behind the brevity: what the character is refusing to say fully, what they want and cannot ask for directly, or what they observe that opens a new angle on the scene. Short speeches can be an effective rhetorical device — a sudden burst of brevity after longer exchanges — but they need a context of richer verbal expression to carry their weight.`,
       });
     }
   }

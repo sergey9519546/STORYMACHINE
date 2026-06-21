@@ -24206,6 +24206,60 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 536 — originalityPass: dialogue negative imperative flood, dialogue exclamation run, dialogue short speech flood', async () => {
+    const runO536 = async (fountain: string) => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      return originalityPass({
+        fountain, original: fountain, records: [],
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    it('DIALOGUE_NEGATIVE_IMPERATIVE_FLOOD fires when >20% of dialogue lines open with a negative imperative', async () => {
+      // 10 dialogue lines; 3 open with negative imperatives (30% > 20%)
+      const f536a = `INT. ROOM - DAY\n\nALICE\nDon't go anywhere near there.\n\nBOB\nI understand your concern.\n\nALICE\nNever trust anyone in this house.\n\nBOB\nThat's a bit extreme.\n\nALICE\nYou can't leave without my permission.\n\nBOB\nThen I'll stay.\n\nALICE\nGood, sit down.\n\nBOB\nFine with me.\n\nALICE\nWe need to talk.\n\nBOB\nI'm listening.\n\n`;
+      const res = await runO536(f536a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_NEGATIVE_IMPERATIVE_FLOOD'), 'DIALOGUE_NEGATIVE_IMPERATIVE_FLOOD should fire');
+    });
+
+    it('DIALOGUE_NEGATIVE_IMPERATIVE_FLOOD does not fire when negative imperatives are below threshold', async () => {
+      // 10 dialogue lines; only 1 opens with a negative imperative (10% ≤ 20%)
+      const f536an = `INT. ROOM - DAY\n\nALICE\nWe should leave now.\n\nBOB\nI agree with you.\n\nALICE\nDon't forget the map.\n\nBOB\nI have it right here.\n\nALICE\nGood, let's go then.\n\nBOB\nLead the way.\n\nALICE\nI'll follow your plan.\n\nBOB\nPerfect, we're ready.\n\nALICE\nOne more thing.\n\nBOB\nWhat is it?\n\n`;
+      const res = await runO536(f536an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_NEGATIVE_IMPERATIVE_FLOOD'), 'DIALOGUE_NEGATIVE_IMPERATIVE_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_EXCLAMATION_RUN fires when ≥4 consecutive dialogue lines end with "!"', async () => {
+      // 4 consecutive dialogue lines all ending with "!"
+      const f536b = `INT. ROOM - DAY\n\nALICE\nWe have to go now!\n\nBOB\nI can't believe it!\n\nALICE\nThis is incredible!\n\nBOB\nWe made it!\n\nALICE\nI'm glad that's over.\n\nBOB\nMe too.\n\n`;
+      const res = await runO536(f536b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_EXCLAMATION_RUN'), 'DIALOGUE_EXCLAMATION_RUN should fire');
+    });
+
+    it('DIALOGUE_EXCLAMATION_RUN does not fire when exclamation run is < 4', async () => {
+      // Only 2 consecutive exclamatory lines, then a declarative break
+      const f536bn = `INT. ROOM - DAY\n\nALICE\nWe have to go now!\n\nBOB\nI can't believe it!\n\nALICE\nThis is very unexpected.\n\nBOB\nI know, right.\n\nALICE\nLet's figure this out!\n\nBOB\nYes, we should.\n\n`;
+      const res = await runO536(f536bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_EXCLAMATION_RUN'), 'DIALOGUE_EXCLAMATION_RUN should not fire');
+    });
+
+    it('DIALOGUE_SHORT_SPEECH_FLOOD fires when >60% of dialogue lines have ≤3 words', async () => {
+      // 10 dialogue lines; 7 have ≤3 words (70% > 60%)
+      const f536c = `INT. ROOM - DAY\n\nALICE\nYes.\n\nBOB\nI know.\n\nALICE\nGet out.\n\nBOB\nFine.\n\nALICE\nLet's go.\n\nBOB\nNo way.\n\nALICE\nTrust me.\n\nBOB\nI have been waiting here for a very long time.\n\nALICE\nSorry.\n\nBOB\nOkay then.\n\n`;
+      const res = await runO536(f536c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_SHORT_SPEECH_FLOOD'), 'DIALOGUE_SHORT_SPEECH_FLOOD should fire');
+    });
+
+    it('DIALOGUE_SHORT_SPEECH_FLOOD does not fire when short speeches are below 60%', async () => {
+      // 10 dialogue lines; only 3 have ≤3 words (30% ≤ 60%)
+      const f536cn = `INT. ROOM - DAY\n\nALICE\nI think we should reconsider the entire plan before we act.\n\nBOB\nYou might be right about that.\n\nALICE\nThe evidence suggests we need to wait.\n\nBOB\nOkay.\n\nALICE\nThere's too much at stake to rush this decision.\n\nBOB\nI understand your concern.\n\nALICE\nWe have to be absolutely sure before we move.\n\nBOB\nFine.\n\nALICE\nThank you for listening to me.\n\nBOB\nAlways.\n\n`;
+      const res = await runO536(f536cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_SHORT_SPEECH_FLOOD'), 'DIALOGUE_SHORT_SPEECH_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 522 — originalityPass: dialogue hedging flood, dialogue agreement run, dialogue command flood', async () => {
     const runO522 = async (fountain: string) => {
       const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
