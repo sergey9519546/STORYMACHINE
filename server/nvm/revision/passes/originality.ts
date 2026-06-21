@@ -120,6 +120,22 @@
 // contain wish/if-only/should-have counterfactual language; characters speak in backward-looking
 // regret rather than present-tense confrontation; distinct from PRESENT_PERFECT_FLOOD which
 // measures past tense broadly and FUTURE_TENSE_FLOOD which measures forward projection).
+// Wave 522 additions: dialogue hedging flood (underweight/bloat × dialogue × uncertainty register —
+// >25% of ≥8 dialogue lines contain hedging/uncertainty vocabulary: "maybe," "perhaps," "I think,"
+// "I guess," "probably," "possibly," "sort of," "kind of," "apparently," "might be," "seem to";
+// characters never commit to a position; distinct from DIALOGUE_WISH_STATEMENT_FLOOD which targets
+// backward regret, DIALOGUE_FILLER_OPENER which targets non-committal openers, and DIALOGUE_I_
+// DOMINANCE which targets personal pronoun count), dialogue agreement run (run-based × dialogue ×
+// affirmation openers — ≥4 consecutive dialogue lines opening with agreement words "yes," "right,"
+// "okay," "sure," "of course," "absolutely," "exactly," "fine," "i agree," "i know"; characters
+// only affirm each other without conflict; distinct from DIALOGUE_FILLER_RUN, DIALOGUE_QUESTION_RUN,
+// and DIALOGUE_SAME_SPEAKER_RUN which target different patterns), dialogue command flood
+// (underweight/bloat × dialogue × imperative register — >25% of ≥8 dialogue lines begin with a
+// strong command verb "go," "stop," "come," "get," "take," "give," "look," "leave," "run," "find,"
+// "listen," "turn," "move," "wait," "stay," "tell," "show," "put," "open," "close," "help,"
+// "bring," "hold," "let's"; characters only issue orders, no emotional or exploratory register;
+// distinct from DIALOGUE_HEDGING_FLOOD which targets uncertainty, DIALOGUE_QUESTION_FLOOD which
+// targets questions, and all action-line opener checks which target non-dialogue text).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2922,6 +2938,116 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${wishCount508c} of ${dlgTotal508c} dialogue lines (${Math.round(wishCount508c / dlgTotal508c * 100)}%) contain counterfactual or regret language — "wish," "if only," "should have," "could have," "would have," "used to," "wanted to." Characters speak predominantly in backward-looking regret rather than in present-tense confrontation. When more than a fifth of all dialogue is counterfactual, scenes lose the kinetic quality of characters fighting for the present and become therapy sessions: people processing the past together rather than clashing over what is happening now. Drama lives in the present tense — in what characters need, want, and fear RIGHT NOW, not in their longing for what was or was not.`,
         suggestedFix: `Recast counterfactual statements as present-tense stakes or present-tense conflict: "I wish you had stayed" → "Why are you leaving?" or "I need you to stay." Move the character's backward-looking regret into a forward-looking demand, question, or claim. Counterfactual dialogue is most powerful when it is isolated — one character's "if only" lands harder when surrounded by characters who are fighting for the now rather than mourning what's past.`,
+      });
+    }
+  }
+
+  // ── Wave 522 checks ──────────────────────────────────────────────────────
+
+  // DIALOGUE_HEDGING_FLOOD — underweight/bloat × dialogue × uncertainty register.
+  // >25% of ≥8 dialogue lines contain hedging/uncertainty vocabulary. Characters who
+  // perpetually hedge never commit to a position — every declaration is qualified,
+  // every confrontation softened, every desire wrapped in doubt. Sustained hedging
+  // drains the dramatic confrontation from dialogue and replaces it with equivocation.
+  // Distinct from: DIALOGUE_WISH_STATEMENT_FLOOD (Wave 508: backward regret/counterfactual
+  // — "I wish/should have" — different register, past not present uncertainty), DIALOGUE_
+  // FILLER_OPENER (non-committal openers like "well/um/uh" — opener pattern not content),
+  // DIALOGUE_I_DOMINANCE (personal pronoun count). First check on uncertainty/hedging register.
+  {
+    const hedgeRe522a = /\b(maybe|perhaps|sort of|kind of|i guess|i suppose|i think|probably|possibly|might be|seem to|apparently|not sure|don't know|i'm not sure)\b/i;
+    let dlgTotal522a = 0;
+    let hedgeCount522a = 0;
+    let inDlg522a = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg522a = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg522a = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg522a = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (!inDlg522a) continue;
+      dlgTotal522a++;
+      if (hedgeRe522a.test(t)) hedgeCount522a++;
+    }
+    if (dlgTotal522a >= 8 && hedgeCount522a / dlgTotal522a > 0.25) {
+      issues.push({
+        location: `${hedgeCount522a} of ${dlgTotal522a} dialogue lines carry hedging/uncertainty language`,
+        rule: 'DIALOGUE_HEDGING_FLOOD',
+        severity: 'minor',
+        description: `${hedgeCount522a} of ${dlgTotal522a} dialogue lines (${Math.round(hedgeCount522a / dlgTotal522a * 100)}%) contain hedging or uncertainty language — "maybe," "perhaps," "I think," "I guess," "probably," "possibly," "sort of," "kind of," "apparently," "seem to," "not sure." When more than a quarter of all dialogue is hedged, characters never commit to a position: every statement is qualified, every confrontation softened, every desire wrapped in doubt. Drama requires characters who want things urgently and say so — equivocation at this scale drains the dialogue of the directness that makes confrontation feel real. Sustained hedging teaches the audience that these characters do not fully believe what they say.`,
+        suggestedFix: `Replace hedged statements with committed ones: "Maybe you're right" → "You're right" or "You're wrong." Let characters take positions even when uncertain — it is more dramatic to be wrong with conviction than to be perpetually noncommittal. Reserve hedging for a character whose specific trait is passivity or uncertainty, and let that trait have contrast against the rest of the dialogue.`,
+      });
+    }
+  }
+
+  // DIALOGUE_AGREEMENT_RUN — run-based × dialogue × affirmation openers.
+  // ≥4 consecutive dialogue lines opening with affirmation/agreement words. Characters
+  // who only affirm each other create a scene with no friction: the scene becomes a
+  // confirmation chamber rather than a dramatic space where something is at stake.
+  // Distinct from: DIALOGUE_FILLER_RUN (Wave 480: "well/uh/yeah" non-committal openers —
+  // fillers, not explicit agreement), DIALOGUE_QUESTION_RUN (Wave 494: "?" ending —
+  // different pattern and ending not opener), DIALOGUE_SAME_SPEAKER_RUN (Wave 508: speaker
+  // identity — who speaks, not content), all other run checks. First run check on affirmation
+  // opener pattern.
+  {
+    const agreeRe522b = /^(yes[,!\.]|right[,!\.]|okay[,!\.]|ok[,!\.]|sure[,!\.]|of course|absolutely|exactly[,!\.]|fine[,!\.]|i agree|i know[,!\.]|agreed[,!]|certainly|definitely|indeed)/i;
+    let maxAgreeRun522b = 0;
+    let curAgreeRun522b = 0;
+    let inDlg522b = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg522b = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg522b = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg522b = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (!inDlg522b) { curAgreeRun522b = 0; continue; }
+      if (agreeRe522b.test(t)) {
+        curAgreeRun522b++;
+        if (curAgreeRun522b > maxAgreeRun522b) maxAgreeRun522b = curAgreeRun522b;
+      } else {
+        curAgreeRun522b = 0;
+      }
+    }
+    if (maxAgreeRun522b >= 4) {
+      issues.push({
+        location: `longest agreement run: ${maxAgreeRun522b} consecutive dialogue lines`,
+        rule: 'DIALOGUE_AGREEMENT_RUN',
+        severity: 'minor',
+        description: `The script contains a run of ${maxAgreeRun522b} consecutive dialogue lines each opening with an affirmation or agreement ("yes," "right," "okay," "sure," "of course," "absolutely," "exactly," "of course," "agreed," etc.). An extended agreement run means characters are only confirming each other rather than clashing, negotiating, or competing — the scene becomes a confirmation chamber with no friction. Drama is built on want, resistance, and transaction; when characters only agree, none of those engines is running. A run of ${maxAgreeRun522b} affirmations suggests a scene that is narrating consensus rather than staging conflict.`,
+        suggestedFix: `Break the agreement run with at least one line of pushback, qualification, or condition: instead of "Yes, right, of course, absolutely," give a character a "yes, but..." or a "right, except..." that introduces friction. Agreement can be the destination of a scene, but it should be achieved against resistance, not simply stated as the starting position of every speaker.`,
+      });
+    }
+  }
+
+  // DIALOGUE_COMMAND_FLOOD — underweight/bloat × dialogue × imperative/command register.
+  // >25% of ≥8 dialogue lines open with a strong command verb. Characters who communicate
+  // exclusively through imperatives — issuing orders at every turn — flatten the dialogue's
+  // emotional and exploratory range. Command-dominant dialogue removes interiority: there
+  // is no uncertainty, no desire expressed as longing, no question genuinely asked — only
+  // directives. Distinct from: DIALOGUE_HEDGING_FLOOD (uncertainty register, opposite of
+  // command), DIALOGUE_QUESTION_FLOOD (questions are requesting, not commanding), ACTION_
+  // PRONOUN_OPENER_FLOOD (action lines not dialogue). First check on the imperative register.
+  {
+    const cmdRe522c = /^(go |stop |come |get |take |give |look |leave |run |find |listen |turn |move |wait |stay |tell |show |put |open |close |help |bring |hold |let's |let me |don't |do |check |watch |read |write |call |pick |pull |push |jump |sit |stand )/i;
+    let dlgTotal522c = 0;
+    let cmdCount522c = 0;
+    let inDlg522c = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg522c = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg522c = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg522c = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (!inDlg522c) continue;
+      dlgTotal522c++;
+      if (cmdRe522c.test(t)) cmdCount522c++;
+    }
+    if (dlgTotal522c >= 8 && cmdCount522c / dlgTotal522c > 0.25) {
+      issues.push({
+        location: `${cmdCount522c} of ${dlgTotal522c} dialogue lines open with a command verb`,
+        rule: 'DIALOGUE_COMMAND_FLOOD',
+        severity: 'minor',
+        description: `${cmdCount522c} of ${dlgTotal522c} dialogue lines (${Math.round(cmdCount522c / dlgTotal522c * 100)}%) open with an imperative command verb — "go," "stop," "come," "get," "find," "listen," "turn," etc. Characters who communicate predominantly through directives flatten the dialogue's emotional range: there is no interiority, no desire expressed as longing, no question genuinely asked — only orders. Command-dominant dialogue removes the exploratory, relational, and emotional registers that reveal character. It is also dramatically limiting: when characters only issue directives, scenes feel like logistics rather than confrontation between people who want different things.`,
+        suggestedFix: `Redistribute the dialogue register by introducing lines that express desire, uncertainty, or observation rather than pure command: "I need you to go" instead of "Go"; "Why won't you listen?" instead of "Listen." Imperatives are most powerful when they are isolated against a background of more varied expression — the command that comes after genuine emotional engagement lands with far more weight than the twelfth imperative in a row.`,
       });
     }
   }

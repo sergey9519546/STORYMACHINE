@@ -23659,6 +23659,60 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 522 — originalityPass: dialogue hedging flood, dialogue agreement run, dialogue command flood', async () => {
+    const runO522 = async (fountain: string) => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      return originalityPass({
+        fountain, original: fountain, records: [],
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    it('DIALOGUE_HEDGING_FLOOD fires when >25% of dialogue lines contain hedging language', async () => {
+      // 10 dialogue lines; 3 with hedging words (>25%)
+      const f522a = `INT. ROOM - DAY\n\nALICE\nMaybe you're right about this.\n\nBOB\nI think we should go now.\n\nALICE\nI guess that's the plan.\n\nBOB\nWe should leave.\n\nALICE\nLet's go then.\n\nBOB\nThe door is open.\n\nALICE\nI see the exit.\n\nBOB\nWe can make it.\n\nALICE\nOkay let's move.\n\nBOB\nReady to leave.\n\n`;
+      const res = await runO522(f522a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_HEDGING_FLOOD'), 'DIALOGUE_HEDGING_FLOOD should fire');
+    });
+
+    it('DIALOGUE_HEDGING_FLOOD does not fire when hedging is below the threshold', async () => {
+      // 10 dialogue lines; only 1 with hedging word (<= 25%)
+      const f522an = `INT. ROOM - DAY\n\nALICE\nYou are wrong about this.\n\nBOB\nWe should leave now.\n\nALICE\nMaybe not.\n\nBOB\nWe can make it.\n\nALICE\nLet's go.\n\nBOB\nThe door is open.\n\nALICE\nI see the exit.\n\nBOB\nWe have to move.\n\nALICE\nRight now.\n\nBOB\nI agree.\n\n`;
+      const res = await runO522(f522an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_HEDGING_FLOOD'), 'DIALOGUE_HEDGING_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_AGREEMENT_RUN fires when ≥4 consecutive dialogue lines open with affirmation', async () => {
+      // 4 consecutive dialogue lines each starting with an agreement word
+      const f522b = `INT. ROOM - DAY\n\nALICE\nWe need to go.\n\nBOB\nYes, let's go.\n\nALICE\nRight, it's time.\n\nBOB\nOkay, I'm ready.\n\nALICE\nAbsolutely, let's move.\n\nBOB\nI disagree with that plan.\n\n`;
+      const res = await runO522(f522b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_AGREEMENT_RUN'), 'DIALOGUE_AGREEMENT_RUN should fire');
+    });
+
+    it('DIALOGUE_AGREEMENT_RUN does not fire when agreement run is < 4', async () => {
+      // Only 2 consecutive agreement openers, then a non-agreement line
+      const f522bn = `INT. ROOM - DAY\n\nALICE\nWe should leave.\n\nBOB\nYes, agreed.\n\nALICE\nOkay then.\n\nBOB\nI'm not sure about that.\n\nALICE\nWhy not?\n\nBOB\nBecause it's risky.\n\n`;
+      const res = await runO522(f522bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_AGREEMENT_RUN'), 'DIALOGUE_AGREEMENT_RUN should not fire');
+    });
+
+    it('DIALOGUE_COMMAND_FLOOD fires when >25% of dialogue lines open with a command verb', async () => {
+      // 10 dialogue lines; 4 with command verb openers (>25%)
+      const f522c = `INT. ROOM - DAY\n\nALICE\nGo to the door now.\n\nBOB\nStop right there.\n\nALICE\nFind the key immediately.\n\nBOB\nListen to what I'm saying.\n\nALICE\nI need to tell you something.\n\nBOB\nThat's not true.\n\nALICE\nYou have to believe me.\n\nBOB\nWhy would I?\n\nALICE\nBecause it's the truth.\n\nBOB\nI don't think so.\n\n`;
+      const res = await runO522(f522c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_COMMAND_FLOOD'), 'DIALOGUE_COMMAND_FLOOD should fire');
+    });
+
+    it('DIALOGUE_COMMAND_FLOOD does not fire when commands are below the threshold', async () => {
+      // 10 dialogue lines; only 1 with command verb opener
+      const f522cn = `INT. ROOM - DAY\n\nALICE\nI think we should leave.\n\nBOB\nThat's not a good idea.\n\nALICE\nWhy not?\n\nBOB\nGo ahead if you want.\n\nALICE\nI'm worried about the others.\n\nBOB\nThey'll be fine.\n\nALICE\nYou don't know that.\n\nBOB\nI know more than you think.\n\nALICE\nThen tell me.\n\nBOB\nNot yet.\n\n`;
+      const res = await runO522(f522cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_COMMAND_FLOOD'), 'DIALOGUE_COMMAND_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 508 — originalityPass: dialogue same-speaker run, action then-opener flood, dialogue wish-statement flood', async () => {
     const runO508 = async (fountain: string, records: any[] = []) => {
       const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
