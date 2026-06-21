@@ -93,6 +93,16 @@
 // (average/aggregate × per-character — max per-character average speech length ≥3× the min across
 // ≥3 chars with ≥3 lines each; one character has verbal architecture, another is a fragment-prop;
 // first per-character average-aggregate check in this pass).
+// Wave 487 additions: dialogue monologue aftermath terse (sequence/aftermath × long speech → terse
+// response — n≥8 dialogue lines, ≥2 long speeches ≥10 words not at last position, all followed by
+// ≤2-word responses; distinct from DIALOGUE_MONOLOGUE_UNPROMPTED which checks backward-cause before
+// the monologue, and from DIALOGUE_MONOSYLLABIC_FLOOD which is a global proportion check),
+// dialogue exclamation zone cluster (distribution/timing × exclamation mark × thirds — ≥12 dialogue
+// lines, ≥4 !-ending lines, >75% in one third; the exclamation-channel complement of DIALOGUE_
+// QUESTION_ZONE_CLUSTER, completing the punctuation zone distribution pair), dialogue closing zone
+// question absent (zone presence/absence × closing zone × question absence — ≥12 dialogue lines,
+// ≥3 questions in the corpus, zero in the final 25%; the closing-zone complement of DIALOGUE_OPENING_
+// ZONE_LONG_ABSENT, filling the closing-zone × question-absence cell).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2588,6 +2598,133 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
             suggestedFix: `Give ${minChar473c.name} at least two or three more substantial speeches — moments where they develop a thought, articulate a position, or expand an idea — to establish that they are capable of extended expression when the scene demands it. Conversely, if ${maxChar473c.name} is deliberately written as a monologist and ${minChar473c.name} as terse, make that contrast explicitly motivated: a scene where the terse character is forced to expand reveals character through violation of their habitual register and shows that both voices have dramatic capacity.`,
           });
         }
+      }
+    }
+  }
+
+  // ── Wave 487: DIALOGUE_MONOLOGUE_AFTERMATH_TERSE, DIALOGUE_EXCLAMATION_ZONE_CLUSTER, DIALOGUE_CLOSING_ZONE_QUESTION_ABSENT ──
+  {
+    // DIALOGUE_MONOLOGUE_AFTERMATH_TERSE — sequence/aftermath × long speech → response brevity.
+    // ≥8 dialogue lines, ≥2 long speeches (≥10 words) not at the last position. For each long
+    // speech, check if the immediately following dialogue line is ≤2 words. If EVERY long speech
+    // is followed by a ≤2-word response, expansion never earns a substantive reply — the script
+    // always compresses immediately after a monologue, leaving the extended thought unanswered.
+    // Distinct from: DIALOGUE_MONOLOGUE_UNPROMPTED (Wave 459: backward-cause — whether the long
+    // speech was preceded by a question; this checks what follows it), DIALOGUE_MONOSYLLABIC_FLOOD
+    // (Wave 417: global proportion of ≤2-word lines regardless of what precedes them; this fires
+    // only when brevity specifically follows a long speech), DIALOGUE_DECLARATIVE_AFTERMATH_QUESTION
+    // (Wave 445: what kind of line follows a declarative; this checks length of response after a
+    // long speech), DIALOGUE_LENGTH_OUTLIER (Wave 431: single-peak on word count, not aftermath).
+    const allDlg487a: string[] = [];
+    let inDlg487a = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg487a = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg487a = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg487a = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg487a) allDlg487a.push(t);
+    }
+    if (allDlg487a.length >= 8) {
+      const wc487a = allDlg487a.map(t => t.split(/\s+/).filter(Boolean).length);
+      const longIdxs487a = wc487a
+        .map((wc, i) => ({ wc, i }))
+        .filter(({ wc, i }) => wc >= 10 && i < allDlg487a.length - 1)
+        .map(({ i }) => i);
+      if (longIdxs487a.length >= 2) {
+        const allTerse487a = longIdxs487a.every(i => wc487a[i + 1] <= 2);
+        if (allTerse487a) {
+          issues.push({
+            location: `Dialogue — ${longIdxs487a.length} long speeches (≥10 words) all followed by ≤2-word responses`,
+            rule: 'DIALOGUE_MONOLOGUE_AFTERMATH_TERSE',
+            severity: 'minor',
+            description: `Every long speech (≥10 words) in the script is immediately followed by a response of ≤2 words — ${longIdxs487a.length} instances. When every extended expression earns only a grunt or a fragment in reply, the story signals that monologues are announcements, not invitations: the character speaks at length, and the world shrugs. Dramatic expansion should sometimes provoke substantive engagement — a counter-argument, a question, an emotional response of comparable weight. A pattern of terse-aftermath-always collapses the conversational register into a formulaic loop of monologue and dismissal.`,
+            suggestedFix: `After at least one extended speech, give the responding character a substantive reply: a counter-argument, a question, or an emotional reaction of ≥6 words. The response doesn't need to match the monologue's length, but it should signal that the content of the long speech was heard and engaged with rather than absorbed in silence or shrugged off.`,
+          });
+        }
+      }
+    }
+
+    // DIALOGUE_EXCLAMATION_ZONE_CLUSTER — Distribution/timing × exclamation-mark channel × thirds.
+    // ≥12 dialogue lines, ≥4 !-ending dialogue lines. Divide dialogue into three equal thirds.
+    // If >75% of exclamation-ending lines fall in a single third → fire. Exclamation marks signal
+    // heightened intensity: declarations, commands, and outbursts. When exclamatory energy clusters
+    // in one positional zone, the script maps emotional intensity onto a single structural segment
+    // instead of distributing it according to dramatic pressure.
+    // Distinct from: DIALOGUE_QUESTION_ZONE_CLUSTER (Wave 473: same analytical mode on the ? channel;
+    // this covers the ! channel, completing the punctuation zone distribution pair), ALL-CAPS_SHOUT
+    // (Wave 308: ≥3 lines with an all-caps word — visual typography signal, not end-punctuation),
+    // EM_DASH_DIALOGUE_FLOOD (Wave 308: global proportion of interruption dashes — different signal
+    // and no zone dimension), DIALOGUE_EMPHATIC_PUNCTUATION_FLOOD (Wave 375: >20% of lines carry !!
+    // or ?! — doubled marks, not single !, and a proportion check not a zone check).
+    const allDlg487b: string[] = [];
+    let inDlg487b = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg487b = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg487b = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg487b = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg487b) allDlg487b.push(t);
+    }
+    if (allDlg487b.length >= 12) {
+      const exclIdxs487b = allDlg487b
+        .map((t, i) => ({ t, i }))
+        .filter(({ t }) => t.trimEnd().endsWith('!'))
+        .map(({ i }) => i);
+      if (exclIdxs487b.length >= 4) {
+        const third487b = Math.floor(allDlg487b.length / 3);
+        const zone1487b = exclIdxs487b.filter(i => i < third487b).length;
+        const zone2487b = exclIdxs487b.filter(i => i >= third487b && i < 2 * third487b).length;
+        const zone3487b = exclIdxs487b.filter(i => i >= 2 * third487b).length;
+        const maxZone487b = Math.max(zone1487b, zone2487b, zone3487b);
+        if (maxZone487b / exclIdxs487b.length > 0.75) {
+          const zoneName487b = zone1487b === maxZone487b ? 'opening' : zone2487b === maxZone487b ? 'middle' : 'closing';
+          issues.push({
+            location: `Dialogue — ${maxZone487b}/${exclIdxs487b.length} exclamation lines in the ${zoneName487b} third`,
+            rule: 'DIALOGUE_EXCLAMATION_ZONE_CLUSTER',
+            severity: 'minor',
+            description: `${maxZone487b} of ${exclIdxs487b.length} exclamation-ending dialogue lines (${Math.round(maxZone487b / exclIdxs487b.length * 100)}%) fall within the ${zoneName487b} third of the dialogue. Emotional intensity — declarations, outbursts, commands — is concentrated in one structural zone rather than distributed by dramatic pressure. The other two zones run flat, and then the ${zoneName487b} third erupts with heightened exclamatory energy. When exclamatory speech is zonal rather than organic, the script treats intensity as a phase rather than a dramatic response.`,
+            suggestedFix: `Move at least one or two exclamatory lines from the ${zoneName487b} cluster into the zones where exclamation is currently absent. Heightened intensity should arise wherever the drama demands it — wherever a character is genuinely moved, angered, or relieved — not be reserved for a single segment of the script.`,
+          });
+        }
+      }
+    }
+
+    // DIALOGUE_CLOSING_ZONE_QUESTION_ABSENT — Zone presence/absence × closing zone × question absence.
+    // ≥12 dialogue lines total, ≥3 question-ending lines exist in the corpus, but NONE appear in
+    // the final 25% of dialogue lines. The script uses interrogatives throughout but goes entirely
+    // question-free in the closing stretch — the dialogue's final quarter contains no uncertainty,
+    // no inquiry, no dramatic neediness. This is the closing-zone complement of DIALOGUE_OPENING_
+    // ZONE_LONG_ABSENT and the zone-absence mirror of DIALOGUE_QUESTION_ZONE_CLUSTER.
+    // Distinct from: DIALOGUE_QUESTION_ZONE_CLUSTER (Wave 473: fires when questions cluster in ONE
+    // zone; this fires when questions are ABSENT from a specific zone — zero occurrence, not
+    // clustering); DIALOGUE_OPENING_ZONE_LONG_ABSENT (Wave 473: different zone, different signal —
+    // opening, long speeches); DIALOGUE_INTERROGATIVE_SATURATION (Wave 294: global proportion >30%
+    // — measures rate, not zonal distribution); DIALOGUE_QUESTION_RUN (Wave 445: consecutive local
+    // cluster, not zone-based).
+    const allDlg487c: string[] = [];
+    let inDlg487c = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg487c = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg487c = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg487c = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg487c) allDlg487c.push(t);
+    }
+    if (allDlg487c.length >= 12) {
+      const closingStart487c = Math.floor(allDlg487c.length * 0.75);
+      const totalQuestions487c = allDlg487c.filter(t => t.trimEnd().endsWith('?')).length;
+      const closingQuestions487c = allDlg487c.slice(closingStart487c).filter(t => t.trimEnd().endsWith('?')).length;
+      if (totalQuestions487c >= 3 && closingQuestions487c === 0) {
+        issues.push({
+          location: `Dialogue — ${totalQuestions487c} questions exist but none in the final 25% (${allDlg487c.length - closingStart487c} lines)`,
+          rule: 'DIALOGUE_CLOSING_ZONE_QUESTION_ABSENT',
+          severity: 'minor',
+          description: `The script contains ${totalQuestions487c} question-ending dialogue lines, but none appear in the final 25% of dialogue (the last ${allDlg487c.length - closingStart487c} lines). The closing stretch of dialogue is entirely question-free — there is no uncertainty, inquiry, or dramatic neediness in the final register. When the closing zone goes interrogative-silent while the rest of the script uses questions freely, the dialogue closes in a posture of pure assertion: characters stop asking and start declaring. If this is a deliberate choice (earned resolution), make it visible with a scene where a character explicitly stops asking. If not, the closing is tonally flat.`,
+          suggestedFix: `Add at least one question in the final 25% of dialogue lines — a character asking for confirmation, expressing residual uncertainty, or posing the final question that the story answers (or leaves open). Closing questions are among the most resonant in a script because they land last; a story that closes on assertion alone can feel sealed rather than expansive.`,
+        });
       }
     }
   }

@@ -31608,6 +31608,138 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 487 — voicePass: dialogue monologue aftermath terse, dialogue exclamation zone cluster, dialogue closing zone question absent', async () => {
+    const runV487 = async (fountain: string) => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      return voicePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DIALOGUE_MONOLOGUE_AFTERMATH_TERSE fires when all long speeches are followed by ≤2-word responses', async () => {
+      // 8 dialogue lines; long speeches at idx 0 and 2 (both ≥10 words, not last);
+      // both followed by ≤2-word responses ("Yes." and "Fine.") → fire
+      const f487a = [
+        'INT. ROOM - DAY', '',
+        'He enters the room.', '',
+        'ALICE', 'This is a very long speech that goes on for quite a while and covers important matters at length.', '',
+        'BOB', 'Yes.', '',
+        'ALICE', 'Another extremely long speech where Alice elaborates at great length about the situation unfolding here.', '',
+        'BOB', 'Fine.', '',
+        'ALICE', 'Brief speech.', '',
+        'BOB', 'Brief answer.', '',
+        'ALICE', 'Another brief.', '',
+        'BOB', 'Short reply.',
+      ].join('\n');
+      const res = await runV487(f487a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_MONOLOGUE_AFTERMATH_TERSE'), 'DIALOGUE_MONOLOGUE_AFTERMATH_TERSE should fire');
+    });
+
+    it('DIALOGUE_MONOLOGUE_AFTERMATH_TERSE does not fire when a long speech gets a substantive response', async () => {
+      // idx 2 long speech followed by a 9-word response → not all terse → no fire
+      const f487anr = [
+        'INT. ROOM - DAY', '',
+        'He enters the room.', '',
+        'ALICE', 'This is a very long speech that goes on for quite a while and covers important matters at length.', '',
+        'BOB', 'Yes.', '',
+        'ALICE', 'Another extremely long speech where Alice elaborates at great length about the situation unfolding here.', '',
+        'BOB', 'That is a genuinely good point worth considering here.', '',
+        'ALICE', 'Brief speech.', '',
+        'BOB', 'Brief answer.', '',
+        'ALICE', 'Another brief.', '',
+        'BOB', 'Short reply.',
+      ].join('\n');
+      const res = await runV487(f487anr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_MONOLOGUE_AFTERMATH_TERSE'), 'DIALOGUE_MONOLOGUE_AFTERMATH_TERSE should not fire');
+    });
+
+    it('DIALOGUE_EXCLAMATION_ZONE_CLUSTER fires when >75% of exclamation lines fall in one third', async () => {
+      // 12 dialogue lines; third=4; 4 exclamations all at zone1 (idx 0-3) → 4/4=100% > 75% → fire
+      const f487b = [
+        'INT. ROOM - DAY', '',
+        'He enters.', '',
+        'ALICE', 'Incredible result!', '',
+        'BOB', 'Amazing news!', '',
+        'ALICE', 'What a day!', '',
+        'BOB', 'Truly remarkable!', '',
+        'ALICE', 'Regular line here.', '',
+        'BOB', 'Plain response.', '',
+        'ALICE', 'Another regular line.', '',
+        'BOB', 'Simple answer.', '',
+        'ALICE', 'Normal statement.', '',
+        'BOB', 'Ordinary remark.', '',
+        'ALICE', 'Common dialogue.', '',
+        'BOB', 'Standard reply.',
+      ].join('\n');
+      const res = await runV487(f487b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_EXCLAMATION_ZONE_CLUSTER'), 'DIALOGUE_EXCLAMATION_ZONE_CLUSTER should fire');
+    });
+
+    it('DIALOGUE_EXCLAMATION_ZONE_CLUSTER does not fire when exclamation lines are distributed across thirds', async () => {
+      // 12 dialogue lines; 4 exclamations: zone1=1 (idx 1), zone2=1 (idx 5), zone3=2 (idx 8, 11) → max=2/4=50% < 75%
+      const f487bnr = [
+        'INT. ROOM - DAY', '',
+        'He enters.', '',
+        'ALICE', 'Regular line.', '',
+        'BOB', 'Amazing news!', '',
+        'ALICE', 'Normal line.', '',
+        'BOB', 'Another normal.', '',
+        'ALICE', 'Regular again.', '',
+        'BOB', 'What a moment!', '',
+        'ALICE', 'Plain line here.', '',
+        'BOB', 'Simple statement.', '',
+        'ALICE', 'Truly remarkable!', '',
+        'BOB', 'Normal remark.', '',
+        'ALICE', 'Common line.', '',
+        'BOB', 'Great outcome!',
+      ].join('\n');
+      const res = await runV487(f487bnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_EXCLAMATION_ZONE_CLUSTER'), 'DIALOGUE_EXCLAMATION_ZONE_CLUSTER should not fire');
+    });
+
+    it('DIALOGUE_CLOSING_ZONE_QUESTION_ABSENT fires when no questions appear in the final 25% of dialogue', async () => {
+      // 12 dialogue lines; questions at idx 2, 5, 8 — closingStart=9; final zone (9-11) has 0 questions → fire
+      const f487c = [
+        'INT. ROOM - DAY', '',
+        'He enters.', '',
+        'ALICE', 'Regular line.', '',
+        'BOB', 'Regular line.', '',
+        'ALICE', 'What are you thinking?', '',
+        'BOB', 'Regular line.', '',
+        'ALICE', 'Regular line.', '',
+        'BOB', 'Can you explain that?', '',
+        'ALICE', 'Regular line.', '',
+        'BOB', 'Regular line.', '',
+        'ALICE', 'Did you see that before?', '',
+        'BOB', 'Regular line.', '',
+        'ALICE', 'Regular closing.', '',
+        'BOB', 'Final statement here.',
+      ].join('\n');
+      const res = await runV487(f487c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_CLOSING_ZONE_QUESTION_ABSENT'), 'DIALOGUE_CLOSING_ZONE_QUESTION_ABSENT should fire');
+    });
+
+    it('DIALOGUE_CLOSING_ZONE_QUESTION_ABSENT does not fire when a question exists in the final 25%', async () => {
+      // Same layout but idx 10 is a question → closingQuestions=1 > 0 → no fire
+      const f487cnr = [
+        'INT. ROOM - DAY', '',
+        'He enters.', '',
+        'ALICE', 'Regular line.', '',
+        'BOB', 'Regular line.', '',
+        'ALICE', 'What are you thinking?', '',
+        'BOB', 'Regular line.', '',
+        'ALICE', 'Regular line.', '',
+        'BOB', 'Can you explain that?', '',
+        'ALICE', 'Regular line.', '',
+        'BOB', 'Regular line.', '',
+        'ALICE', 'Did you see that before?', '',
+        'BOB', 'Regular line.', '',
+        'ALICE', 'Are we done here?', '',
+        'BOB', 'Final statement here.',
+      ].join('\n');
+      const res = await runV487(f487cnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_CLOSING_ZONE_QUESTION_ABSENT'), 'DIALOGUE_CLOSING_ZONE_QUESTION_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 473 — voicePass: dialogue question zone cluster, dialogue opening zone long absent, dialogue per-character length skew', async () => {
     const runV473 = async (fountain: string) => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
