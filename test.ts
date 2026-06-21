@@ -32889,6 +32889,129 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 501 — voicePass: dialogue question aftermath terse, opening zone exclamation absent, peak long early', async () => {
+    const runV501 = async (fountain: string) => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      return voicePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DIALOGUE_QUESTION_AFTERMATH_TERSE fires when all question lines are followed by ≤2-word responses', async () => {
+      // 8 dialogue lines; questions at idx 0 and 2, both followed by ≤2-word responses → fires
+      const f501a = [
+        'INT. ROOM - DAY', '',
+        'He enters the room.', '',
+        'ALICE', 'What happened last night?', '',
+        'BOB', 'Nothing.', '',
+        'ALICE', 'Are you sure about that?', '',
+        'BOB', 'Yes.', '',
+        'ALICE', 'A longer statement without any question here.', '',
+        'BOB', 'Indeed.', '',
+        'ALICE', 'Another plain declaration of obvious fact.', '',
+        'BOB', 'Fine.',
+      ].join('\n');
+      const res = await runV501(f501a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_QUESTION_AFTERMATH_TERSE'), 'DIALOGUE_QUESTION_AFTERMATH_TERSE should fire');
+    });
+
+    it('DIALOGUE_QUESTION_AFTERMATH_TERSE does not fire when a question gets a substantive response', async () => {
+      // Same but question at idx 2 gets a 7-word response → not all terse → no fire
+      const f501anr = [
+        'INT. ROOM - DAY', '',
+        'He enters the room.', '',
+        'ALICE', 'What happened last night?', '',
+        'BOB', 'Nothing.', '',
+        'ALICE', 'Are you sure about that?', '',
+        'BOB', 'I am completely certain about that now.', '',
+        'ALICE', 'A longer statement without any question here.', '',
+        'BOB', 'Indeed.', '',
+        'ALICE', 'Another plain declaration of obvious fact.', '',
+        'BOB', 'Fine.',
+      ].join('\n');
+      const res = await runV501(f501anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_QUESTION_AFTERMATH_TERSE'), 'DIALOGUE_QUESTION_AFTERMATH_TERSE should not fire');
+    });
+
+    it('DIALOGUE_OPENING_ZONE_EXCLAMATION_ABSENT fires when ≥4 exclamations exist but none in opening 25%', async () => {
+      // 12 dialogue lines; openEnd=3; 4 exclamations all at idx 3,4,6,9 (≥openEnd) → fires
+      const f501b = [
+        'INT. ROOM - DAY', '',
+        'He enters.', '',
+        'ALICE', 'Regular opening line.', '',
+        'BOB', 'Another regular line.', '',
+        'ALICE', 'Plain start here.', '',
+        'BOB', 'Now things heat up indeed!', '',
+        'ALICE', 'What a revelation there!', '',
+        'BOB', 'Normal middle statement.', '',
+        'ALICE', 'Incredible result achieved!', '',
+        'BOB', 'Ordinary remark here.', '',
+        'ALICE', 'Normal line again.', '',
+        'BOB', 'What an outcome!', '',
+        'ALICE', 'Final plain remark.', '',
+        'BOB', 'Last line here.',
+      ].join('\n');
+      const res = await runV501(f501b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_OPENING_ZONE_EXCLAMATION_ABSENT'), 'DIALOGUE_OPENING_ZONE_EXCLAMATION_ABSENT should fire');
+    });
+
+    it('DIALOGUE_OPENING_ZONE_EXCLAMATION_ABSENT does not fire when an exclamation exists in the opening 25%', async () => {
+      // Same but idx 2 ends with '!' (in opening zone, < openEnd=3) → openingExcl=1 > 0 → no fire
+      const f501bnr = [
+        'INT. ROOM - DAY', '',
+        'He enters.', '',
+        'ALICE', 'Regular opening line.', '',
+        'BOB', 'Another regular line.', '',
+        'ALICE', 'What a start this is!', '',
+        'BOB', 'Now things heat up indeed!', '',
+        'ALICE', 'What a revelation there!', '',
+        'BOB', 'Normal middle statement.', '',
+        'ALICE', 'Incredible result achieved!', '',
+        'BOB', 'Ordinary remark here.', '',
+        'ALICE', 'Normal line again.', '',
+        'BOB', 'What an outcome!', '',
+        'ALICE', 'Final plain remark.', '',
+        'BOB', 'Last line here.',
+      ].join('\n');
+      const res = await runV501(f501bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_OPENING_ZONE_EXCLAMATION_ABSENT'), 'DIALOGUE_OPENING_ZONE_EXCLAMATION_ABSENT should not fire');
+    });
+
+    it('DIALOGUE_PEAK_LONG_EARLY fires when the longest speech (≥10 words) is in the opening 25% while ≥3 long speeches exist later', async () => {
+      // 8 dialogue lines; openEnd=2; idx 0 has 17 words (peak, in opening); idx 2,4,6 each ≥10 words → fires
+      const f501c = [
+        'INT. ROOM - DAY', '',
+        'He enters the room.', '',
+        'ALICE', 'This is a very long elaborate speech that Alice delivers at the very opening here.', '',
+        'BOB', 'Short reply.', '',
+        'ALICE', 'This is a long middle speech covering several important points here.', '',
+        'BOB', 'Brief response.', '',
+        'ALICE', 'Another long speech going into detail about everything that has happened so far.', '',
+        'BOB', 'Short answer.', '',
+        'ALICE', 'Also elaborating about the final resolution of all the issues presented here.', '',
+        'BOB', 'Ok.',
+      ].join('\n');
+      const res = await runV501(f501c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_PEAK_LONG_EARLY'), 'DIALOGUE_PEAK_LONG_EARLY should fire');
+    });
+
+    it('DIALOGUE_PEAK_LONG_EARLY does not fire when the longest speech is outside the opening 25%', async () => {
+      // 8 dialogue lines; openEnd=2; idx 4 has the longest speech (at idx 4 ≥ openEnd=2) → no fire
+      const f501cnr = [
+        'INT. ROOM - DAY', '',
+        'He enters the room.', '',
+        'ALICE', 'Short opening here.', '',
+        'BOB', 'Brief reply.', '',
+        'ALICE', 'This is a long middle speech covering several important points here.', '',
+        'BOB', 'Brief response.', '',
+        'ALICE', 'This is the very longest elaborate speech Alice delivers now at this dramatic juncture.', '',
+        'BOB', 'Short answer.', '',
+        'ALICE', 'Also elaborating about the final resolution of all the issues presented here.', '',
+        'BOB', 'Ok.',
+      ].join('\n');
+      const res = await runV501(f501cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_PEAK_LONG_EARLY'), 'DIALOGUE_PEAK_LONG_EARLY should not fire');
+    });
+  });
+
   describe('Wave 487 — voicePass: dialogue monologue aftermath terse, dialogue exclamation zone cluster, dialogue closing zone question absent', async () => {
     const runV487 = async (fountain: string) => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');

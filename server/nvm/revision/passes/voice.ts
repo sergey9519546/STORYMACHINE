@@ -103,6 +103,18 @@
 // question absent (zone presence/absence × closing zone × question absence — ≥12 dialogue lines,
 // ≥3 questions in the corpus, zero in the final 25%; the closing-zone complement of DIALOGUE_OPENING_
 // ZONE_LONG_ABSENT, filling the closing-zone × question-absence cell).
+// Wave 501 additions: dialogue question aftermath terse (sequence/aftermath × question → response
+// brevity — ≥8 dialogue lines, ≥2 question-ending lines not at last position, ALL followed by ≤2-word
+// responses; questions never earn substantive engagement; the question-trigger sibling of DIALOGUE_
+// MONOLOGUE_AFTERMATH_TERSE and distinct from DIALOGUE_DECLARATIVE_AFTERMATH_QUESTION which checks
+// the opposite temporal direction), dialogue opening zone exclamation absent (zone presence/absence
+// × opening 25% × ! absent — ≥12 dialogue lines, ≥4 !-ending lines globally, none in the first 25%;
+// the opening-zone × ! cell, completing the zone-presence/absence × punctuation matrix alongside
+// DIALOGUE_CLOSING_ZONE_QUESTION_ABSENT and DIALOGUE_OPENING_ZONE_LONG_ABSENT), dialogue peak long
+// early (single-peak isolation × speech length × opening zone — ≥8 dialogue lines, the single
+// longest speech ≥10 words is in the first 25%, ≥3 long speeches exist in the rest; the inverse of
+// DIALOGUE_OPENING_ZONE_LONG_ABSENT and distinct from DIALOGUE_LENGTH_OUTLIER which checks ratio to
+// mean rather than zonal position; first single-peak isolation check using positional zone).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2724,6 +2736,135 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `The script contains ${totalQuestions487c} question-ending dialogue lines, but none appear in the final 25% of dialogue (the last ${allDlg487c.length - closingStart487c} lines). The closing stretch of dialogue is entirely question-free — there is no uncertainty, inquiry, or dramatic neediness in the final register. When the closing zone goes interrogative-silent while the rest of the script uses questions freely, the dialogue closes in a posture of pure assertion: characters stop asking and start declaring. If this is a deliberate choice (earned resolution), make it visible with a scene where a character explicitly stops asking. If not, the closing is tonally flat.`,
           suggestedFix: `Add at least one question in the final 25% of dialogue lines — a character asking for confirmation, expressing residual uncertainty, or posing the final question that the story answers (or leaves open). Closing questions are among the most resonant in a script because they land last; a story that closes on assertion alone can feel sealed rather than expansive.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 501: DIALOGUE_QUESTION_AFTERMATH_TERSE, DIALOGUE_OPENING_ZONE_EXCLAMATION_ABSENT,
+  //              DIALOGUE_PEAK_LONG_EARLY ────────────────────────────────────────────────────
+  {
+    // DIALOGUE_QUESTION_AFTERMATH_TERSE (sequence/aftermath × question → response brevity, ≥8
+    // dialogue lines, ≥2 question-ending lines not at last position, ALL followed by ≤2-word
+    // responses): Every interrogative line earns only a grunt or a fragment in return — questions
+    // never provoke substantive engagement. Where DIALOGUE_MONOLOGUE_AFTERMATH_TERSE (Wave 487)
+    // fires when long speeches are dismissed by terse replies, this fires when QUESTIONS are
+    // consistently dismissed. A question is an invitation to the scene partner; when every invitation
+    // receives a monosyllabic deflection, the dialogue signals that inquiry is futile — nobody truly
+    // wants to know anything. Sequence/aftermath mode × question trigger × response brevity. Distinct
+    // from DIALOGUE_MONOLOGUE_AFTERMATH_TERSE (Wave 487: long speech trigger, not question), DIALOGUE_
+    // DECLARATIVE_AFTERMATH_QUESTION (Wave 445: declarative → question direction — opposite temporal
+    // trigger), DIALOGUE_QUESTION_RUN (Wave 445: consecutive questions, not aftermath of a question),
+    // DIALOGUE_INTERROGATIVE_SATURATION (Wave 294: global proportion of ?, not aftermath check).
+    const allDlg501a: string[] = [];
+    let inDlg501a = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg501a = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg501a = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg501a = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg501a) allDlg501a.push(t);
+    }
+    if (allDlg501a.length >= 8) {
+      const wc501a = allDlg501a.map(t => t.split(/\s+/).filter(Boolean).length);
+      const qIdxs501a = allDlg501a
+        .map((t, i) => ({ t, i }))
+        .filter(({ t, i }) => t.trimEnd().endsWith('?') && i < allDlg501a.length - 1)
+        .map(({ i }) => i);
+      if (qIdxs501a.length >= 2) {
+        const allTerse501a = qIdxs501a.every(i => wc501a[i + 1] <= 2);
+        if (allTerse501a) {
+          issues.push({
+            location: `Dialogue — ${qIdxs501a.length} question lines all followed by ≤2-word responses`,
+            rule: 'DIALOGUE_QUESTION_AFTERMATH_TERSE',
+            severity: 'minor',
+            description: `Every question-ending dialogue line (${qIdxs501a.length} instances) is immediately followed by a response of ≤2 words. Questions are invitations to the scene partner — a request for information, opinion, or feeling. When every inquiry earns only a grunt, a monosyllable, or a fragment, the dialogue signals that asking is futile: nobody truly wants to know anything, and nobody is compelled to answer. A pattern of perpetually deflected questions collapses the conversational energy into a one-directional interrogation where the asker gets nothing back.`,
+            suggestedFix: `After at least one question, give the responding character a substantive reply of ≥4 words — an answer, a counter-question, an evasion that takes a full clause to execute, or an emotional response. Even evasion can be extended: "I really don't want to talk about that right now." is three times longer than "No." and carries more dramatic information about what the character doesn't want to face.`,
+          });
+        }
+      }
+    }
+
+    // DIALOGUE_OPENING_ZONE_EXCLAMATION_ABSENT (zone presence/absence × opening 25% × ! absent,
+    // ≥12 dialogue lines, ≥4 exclamation-ending lines globally, none in first 25%): The opening
+    // quarter of dialogue contains no exclamatory speech while intensity is present in the rest —
+    // the script opens in a uniformly subdued register, then exclaims only once it has settled in.
+    // Exclamation marks signal heightened intensity: genuine declarations, commands, and outbursts.
+    // When the opening zone is exclamation-free while ≥4 exclamations appear later, the dialogue
+    // begins in an artificially calm register disconnected from the emotional arc. Zone presence/
+    // absence mode × opening 25% × exclamation. Distinct from DIALOGUE_EXCLAMATION_ZONE_CLUSTER
+    // (Wave 487: distribution/timing × thirds — >75% of exclamations in one zone; this fires when
+    // ZERO exclamations exist in the opening zone), DIALOGUE_CLOSING_ZONE_QUESTION_ABSENT (Wave 487:
+    // same mode, different zone+signal: closing zone × ? absent), DIALOGUE_OPENING_ZONE_LONG_ABSENT
+    // (Wave 473: same zone, different signal: speech length, not punctuation). Fills the opening-zone
+    // × ! cell in the zone-presence/absence × punctuation matrix.
+    const allDlg501b: string[] = [];
+    let inDlg501b = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg501b = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg501b = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg501b = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg501b) allDlg501b.push(t);
+    }
+    if (allDlg501b.length >= 12) {
+      const openEnd501b = Math.floor(allDlg501b.length * 0.25);
+      const exclIdxs501b = allDlg501b
+        .map((t, i) => ({ t, i }))
+        .filter(({ t }) => t.trimEnd().endsWith('!'))
+        .map(({ i }) => i);
+      if (exclIdxs501b.length >= 4) {
+        const openingExcl501b = exclIdxs501b.filter(i => i < openEnd501b).length;
+        if (openingExcl501b === 0) {
+          issues.push({
+            location: `Dialogue — ${exclIdxs501b.length} exclamation lines, none in the opening 25% (${openEnd501b} lines)`,
+            rule: 'DIALOGUE_OPENING_ZONE_EXCLAMATION_ABSENT',
+            severity: 'minor',
+            description: `The script has ${exclIdxs501b.length} exclamation-ending dialogue lines, but none appear in the opening 25% of dialogue (the first ${openEnd501b} lines). The opening zone is uniformly subdued — there is no heightened intensity, declaration, or outburst — while exclamatory speech appears freely in the rest. When the opening register is exclamation-free while the remainder of the script uses emotional punctuation, the dialogue opens in an artificially calm mode that misrepresents how intensely the scene will eventually play.`,
+            suggestedFix: `Add at least one exclamation-ending line in the first ${openEnd501b} dialogue lines — a moment of genuine intensity, declaration, or feeling that establishes the register the scene can play in. The opening lines of dialogue set the audience's expectation for the scene's emotional range; if the opening is all plain statements, the later exclamations can feel unearned or disproportionate.`,
+          });
+        }
+      }
+    }
+
+    // DIALOGUE_PEAK_LONG_EARLY (single-peak isolation × speech length × opening zone, ≥8 dialogue
+    // lines, the script's longest dialogue speech ≥10 words is in the first 25%, ≥3 long speeches
+    // ≥10 words exist in the remaining 75%): The most verbally elaborate speech is front-loaded in
+    // the opening zone while long speeches continue throughout — the maximum verbosity arrives before
+    // the scene has fully developed the dramatic stakes that would justify it. A long speech earns
+    // its length by arriving under pressure: the audience must already care about what the character
+    // is saying. When the longest speech comes in the first 25% of dialogue, it arrives before the
+    // scene has had time to generate investment, making the elaboration feel like exposition rather
+    // than dramatic expression. Single-peak isolation mode × speech length × positional zone. Distinct
+    // from DIALOGUE_OPENING_ZONE_LONG_ABSENT (Wave 473: fires when ZERO long speeches exist in the
+    // opening zone — the opposite failure mode), DIALOGUE_LENGTH_OUTLIER (Wave 431: checks ratio to
+    // mean, position-agnostic), ACTION_DENSITY_PEAK_LATE (rhythm.ts: action lines, not dialogue).
+    // First single-peak isolation check using positional zone in this pass.
+    const allDlg501c: string[] = [];
+    let inDlg501c = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg501c = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg501c = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg501c = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg501c) allDlg501c.push(t);
+    }
+    if (allDlg501c.length >= 8) {
+      const wc501c = allDlg501c.map(t => t.split(/\s+/).filter(Boolean).length);
+      const peakWC501c = Math.max(...wc501c);
+      const peakPos501c = wc501c.indexOf(peakWC501c);
+      const openEnd501c = Math.floor(allDlg501c.length * 0.25);
+      const restLong501c = wc501c.slice(openEnd501c).filter(w => w >= 10).length;
+      if (peakWC501c >= 10 && peakPos501c < openEnd501c && restLong501c >= 3) {
+        issues.push({
+          location: `Dialogue — longest speech (${peakWC501c} words) at line ${peakPos501c + 1} of ${allDlg501c.length} (opening 25%)`,
+          rule: 'DIALOGUE_PEAK_LONG_EARLY',
+          severity: 'minor',
+          description: `The script's longest dialogue speech (${peakWC501c} words, dialogue line ${peakPos501c + 1}) falls in the opening 25% of dialogue, while ${restLong501c} other long speeches (≥10 words) appear in the remaining 75%. The maximum verbal elaboration arrives before the scene has developed the dramatic stakes that would justify it. A long speech earns its length by arriving under pressure — when the audience already cares about what the character is saying. Front-loading the peak length makes the opening's elaboration feel like exposition rather than expression, and makes the later long speeches feel like diminished repetitions of an early extravagance.`,
+          suggestedFix: `Move the most elaborate speech later in the scene, or trim the opening speech to match the register of the opening zone and save the maximum verbal elaboration for a later moment when dramatic pressure has had time to build. A long speech delivered under developing pressure lands with more weight than the same speech delivered when the audience is still orienting to the scene.`,
         });
       }
     }
