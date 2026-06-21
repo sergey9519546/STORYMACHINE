@@ -20232,6 +20232,106 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 526 — rhythmPass: word-count ascent run, finale long absent, comma dense flood', async () => {
+    const runR526 = async (fountain: string) => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    // Helper: build fountain with N action lines of given word counts
+    const makeF526 = (wordCountsArr: number[]) => {
+      const lines = wordCountsArr.map((n, i) => `INT. SC${i} - DAY\n\n${Array(n).fill('word').join(' ')}.`);
+      return lines.join('\n\n');
+    };
+
+    it('ACTION_WORD_COUNT_ASCENT_RUN fires when 5+ consecutive action lines each strictly longer than prior', async () => {
+      // 10 action lines: first 5 are 3,5,7,9,11,13 words (ascending run of 6), then 2,4,6,8 words
+      const f526a = makeF526([3, 5, 7, 9, 11, 13, 2, 4, 6, 8]);
+      const res = await runR526(f526a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_WORD_COUNT_ASCENT_RUN'), 'ACTION_WORD_COUNT_ASCENT_RUN should fire');
+    });
+
+    it('ACTION_WORD_COUNT_ASCENT_RUN does not fire when no ascending run reaches 5', async () => {
+      // 10 action lines: 3,5,7,2,4,6,3,5,7,4 — longest ascending run = 3 (3,5,7)
+      const f526anr = makeF526([3, 5, 7, 2, 4, 6, 3, 5, 7, 4]);
+      const res = await runR526(f526anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_WORD_COUNT_ASCENT_RUN'), 'ACTION_WORD_COUNT_ASCENT_RUN should not fire');
+    });
+
+    it('ACTION_FINALE_LONG_ABSENT fires when finale 25% has no line ≥12w but ≥3 exist in first 75%', async () => {
+      // 12 action lines: first 9 include 3 long lines (14w each), last 3 all ≤8w
+      const f526b = makeF526([14, 5, 14, 6, 14, 7, 5, 6, 7, 5, 6, 7]);
+      const res = await runR526(f526b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_FINALE_LONG_ABSENT'), 'ACTION_FINALE_LONG_ABSENT should fire');
+    });
+
+    it('ACTION_FINALE_LONG_ABSENT does not fire when finale 25% has at least one long line ≥12w', async () => {
+      // 12 action lines: first 9 have 3 long lines, last 3 have 1 long line (14w)
+      const f526bnr = makeF526([14, 5, 14, 6, 14, 7, 5, 6, 7, 5, 6, 14]);
+      const res = await runR526(f526bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_FINALE_LONG_ABSENT'), 'ACTION_FINALE_LONG_ABSENT should not fire');
+    });
+
+    it('ACTION_COMMA_DENSE_FLOOD fires when >30% of ≥8 action lines have ≥3 commas', async () => {
+      // 10 action lines: 4 lines with 3+ commas (40% > 30%)
+      const lines526c = [
+        'INT. ROOM - DAY',
+        '',
+        'He opens the drawer, takes the letter, reads it, then folds it.',
+        '',
+        'She turns, smiles, nods, and waits.',
+        '',
+        'The window, the door, the phone, the clock.',
+        '',
+        'He stands, looks at her, sighs, and sits back down.',
+        '',
+        'Short line.',
+        '',
+        'Another short one.',
+        '',
+        'One more line here.',
+        '',
+        'Final line now.',
+        '',
+        'End line.',
+        '',
+        'Last line.',
+      ];
+      const f526c = lines526c.join('\n');
+      const res = await runR526(f526c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_COMMA_DENSE_FLOOD'), 'ACTION_COMMA_DENSE_FLOOD should fire');
+    });
+
+    it('ACTION_COMMA_DENSE_FLOOD does not fire when ≤30% of action lines have ≥3 commas', async () => {
+      // 10 action lines: only 1 line with 3+ commas (10% ≤ 30%)
+      const lines526cnr = [
+        'INT. ROOM - DAY',
+        '',
+        'He opens the drawer, takes the letter, reads it, then folds it.',
+        '',
+        'She turns and smiles.',
+        '',
+        'The window is open.',
+        '',
+        'He stands and looks at her.',
+        '',
+        'Short line.',
+        '',
+        'Another short one.',
+        '',
+        'One more line here.',
+        '',
+        'Final line now.',
+        '',
+        'End line.',
+        '',
+        'Last line.',
+      ];
+      const f526cnr = lines526cnr.join('\n');
+      const res = await runR526(f526cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_COMMA_DENSE_FLOOD'), 'ACTION_COMMA_DENSE_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 512 — rhythmPass: middle short absent, word-count descent run, certainty adverb flood', async () => {
     const runR512 = async (fountain: string) => {
       const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');

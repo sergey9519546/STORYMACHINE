@@ -106,6 +106,14 @@
 // high (average/aggregate × sentence count per line — ≥8 action lines averaging >3 sentences each,
 // multi-clause overload that collapses the shot-by-shot grammar of cinematic action; the average/
 // aggregate complement of SINGLE_SENTENCE_FLOOD and SENTENCE_COUNT_PEAK).
+// Wave 526 additions: action word-count ascent run (run-based × strictly increasing word count —
+// 5+ consecutive action lines each longer than the prior; ascending mirror of ACTION_WORD_COUNT_
+// DESCENT_RUN, distinguishing directional expansion from density-based CONSECUTIVE_LONG_RUN),
+// action finale long absent (zone presence/absence × long channel ≥12w × finale 25% — no long
+// line in the closing 25% while ≥3 exist in the first 75%; completes the zone × long-channel grid
+// alongside OPENING_LONG_ABSENT and MIDDLE_LONG_ABSENT), action comma dense flood (proportion ×
+// comma-count ≥3 — >30% of ≥8 action lines carry 3+ commas each; list-heavy enumeration distinct
+// from COMMA_SPLICE_OVERUSE clause-structure check and POLYSYNDETON_OVERLOAD coordinator chain).
 // Wave 512 additions: action middle short absent (zone presence/absence × short channel ≤4w ×
 // middle zone — middle 50% of action lines has no short line while ≥2 exist in the outer zones;
 // completes the zone × short-channel grid alongside OPENING_SHORT_ABSENT and FINALE_SHORT_ABSENT,
@@ -2222,6 +2230,104 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${certaintyCount512c} of ${actionLines.length} action lines (${(certaintyCount512c / actionLines.length * 100).toFixed(0)}%) contain a certainty or stance adverb — "clearly," "obviously," "certainly," "naturally," "inevitably," or similar — placing the narrator inside the prose as an interpreter of the image rather than as a camera recording it. Cinematic action prose is supposed to present events and let the audience draw conclusions; when the prose asserts that something is "clearly" the case or "obviously" significant, it preempts the audience's inference and collapses the interpretive space that makes images powerful. Certainty adverbs also signal authorial anxiety: the writer doesn't fully trust the staging to communicate what it means.`,
         suggestedFix: `Remove or replace each certainty adverb with either more specific staging (show the thing that makes it obvious) or a plain indicative statement that presents the event without asserting how to read it. "She clearly can't believe it" becomes "She stares. Blinks." — the staging creates the certainty the adverb was trying to tell. Every certainty adverb is a prompt to ask: what specific image or action makes this obvious? Stage that instead.`,
+      });
+    }
+  }
+
+  // ── Wave 526: ACTION_WORD_COUNT_ASCENT_RUN, ACTION_FINALE_LONG_ABSENT, ACTION_COMMA_DENSE_FLOOD ──
+
+  // ACTION_WORD_COUNT_ASCENT_RUN (run-based × word count × strictly increasing sequence,
+  // ≥8 action lines, longest ascending run ≥5): Five or more consecutive action lines where
+  // each line is strictly longer in word count than the previous one — a sustained expansion
+  // that, like its descent mirror, becomes mechanical when prolonged. A two- or three-line
+  // ascent has purpose: prose building toward something, elaboration gathering momentum. At
+  // five or more steps the reader anticipates the next longer line before it arrives and the
+  // accumulative effect drains the technique of its kinetic force. Run-based mode × word-count
+  // channel × strictly increasing direction. Distinct from ACTION_WORD_COUNT_DESCENT_RUN
+  // (Wave 512: strictly DECREASING sequence — the opposite direction on the same channel),
+  // CONSECUTIVE_LONG_RUN (Wave 456: consecutive lines each ≥9 words regardless of direction
+  // — a density threshold check not a directional-sequence check), ACTION_FINALE_BLOAT
+  // (Wave 428: finale-zone average vs first-75% average — zone comparison, not a run).
+  if (actionLines.length >= 8) {
+    let maxAscentRun526a = 0;
+    let curAscentRun526a = 1;
+    for (let i = 1; i < wordCounts.length; i++) {
+      if (wordCounts[i] > wordCounts[i - 1]) {
+        curAscentRun526a++;
+      } else {
+        if (curAscentRun526a > maxAscentRun526a) maxAscentRun526a = curAscentRun526a;
+        curAscentRun526a = 1;
+      }
+    }
+    if (curAscentRun526a > maxAscentRun526a) maxAscentRun526a = curAscentRun526a;
+    if (maxAscentRun526a >= 5) {
+      issues.push({
+        location: `${maxAscentRun526a} consecutive action lines — strictly increasing word count`,
+        rule: 'ACTION_WORD_COUNT_ASCENT_RUN',
+        severity: 'minor',
+        description: `The script has a run of ${maxAscentRun526a} consecutive action lines where each is strictly longer in word count than the one before it — a sustained expansion that builds from sparse notation up to dense description over five or more beats. A two- or three-line ascent is a controlled technique: the reader feels the beat building with increasing weight as the prose elaborates. At ${maxAscentRun526a} lines, the pattern becomes mechanical — the reader anticipates the next longer line before it arrives, and the predictable rhythm of the ascent drains the expansion of its kinetic force. The technique works once; repeated five or more times without interruption, it signals a formula rather than a choice.`,
+        suggestedFix: `Interrupt the ascent at or before the fifth step: either break the sequence with a shorter or equal-length line that resets the reader's expectation, or collapse the last three steps of the ascent into a single beat. The moment the ascent is predictable is the moment it stops serving rhythm — a short staccato beat after a rising phrase resets the reader and makes the next expansion feel earned rather than inevitable.`,
+      });
+    }
+  }
+
+  // ACTION_FINALE_LONG_ABSENT (zone presence/absence × long-line channel × finale 25%,
+  // ≥10 action lines, ≥3 long lines ≥12 words in the first 75%): The final 25% of action
+  // lines contains no long line (≥12 words) while at least three long lines exist in the
+  // first three-quarters. The finale zone never samples the descriptive register — the
+  // climax is written entirely in short or medium beats without any line that constructs a
+  // detailed image. A finale with no long action line risks feeling telegraphic at exactly
+  // the moment when the script should deliver its most precisely-realized staging. Precision
+  // does not require brevity alone: the climax benefits from at least one fully-committed
+  // descriptive beat that anchors the spatial and physical reality of the resolution. Zone
+  // presence/absence mode × long-line channel × finale zone. Distinct from
+  // ACTION_OPENING_LONG_ABSENT (Wave 498: opening 25% — same channel, different zone),
+  // ACTION_MIDDLE_LONG_ABSENT (Wave 470: middle 50% — same channel, different zone; this
+  // check completes the zone × long-channel grid), ACTION_FINALE_SHORT_ABSENT (Wave 484:
+  // finale zone × SHORT channel — same zone, opposite channel), ACTION_FINALE_BLOAT
+  // (Wave 428: finale-zone average word count vs first 75% — comparison of zone averages,
+  // not zone presence/absence of long lines).
+  if (actionLines.length >= 10) {
+    const finaleStart526b = Math.floor(actionLines.length * 0.75);
+    const finaleLongCount526b = wordCounts.slice(finaleStart526b).filter(w => w >= 12).length;
+    const preLongCount526b = wordCounts.slice(0, finaleStart526b).filter(w => w >= 12).length;
+    if (finaleLongCount526b === 0 && preLongCount526b >= 3) {
+      issues.push({
+        location: `Finale action lines (${finaleStart526b + 1}–${actionLines.length}) — no long line ≥12 words`,
+        rule: 'ACTION_FINALE_LONG_ABSENT',
+        severity: 'minor',
+        description: `The final 25% of action lines (lines ${finaleStart526b + 1}–${actionLines.length}) contains no line of 12 words or more — the script's finale is written entirely in short and medium beats — while ${preLongCount526b} long action lines appear in the first three-quarters. The finale is where the script delivers its most specific and physically-realized staging: the space where action lands, the texture of a confrontation, the exact geometry of a resolution. When the entire finale is telegraphic notation with no fully-constructed descriptive line, the climax is gestured at rather than rendered. A short line can deliver a beat with force, but without at least one long line anchoring the physical reality, the finale risks feeling like a summary of events rather than the events themselves.`,
+        suggestedFix: `Add at least one action line of 12+ words in the finale (action lines ${finaleStart526b + 1}–${actionLines.length}) — a line that renders the space, the physical action, or the specific detail that makes the climactic moment real rather than merely described. This does not need to be decorative; it needs to commit to the scene's specific reality in the way that only a fully-constructed sentence can.`,
+      });
+    }
+  }
+
+  // ACTION_COMMA_DENSE_FLOOD (proportion × comma count ≥3 × action lines, ≥8 action lines,
+  // >30% contain ≥3 commas each): More than three in ten action lines pack at least three
+  // commas — list-heavy, breathless writing that fragments action into enumerations rather
+  // than presenting it as continuous movement. Each action line with three or more commas
+  // is effectively a catalogue: a sequence of items, gestures, or details enumerated
+  // rather than staged. A single comma structures a sentence; two commas indicate
+  // complexity; at three or more, the line has stopped being a sentence describing an
+  // action and has become a shopping list of concurrent observations. When this pattern
+  // dominates more than 30% of the action prose, the script imposes an exhausting parsing
+  // burden — each line demanding the reader to process a series of coordinated details
+  // instead of experiencing a single, specific image. Proportion mode × comma-density
+  // signal × action lines. Distinct from COMMA_SPLICE_OVERUSE (Wave 386: two pronoun-
+  // subject clauses joined by a comma — a grammatical error pattern targeting clause
+  // structure not raw comma count), POLYSYNDETON_OVERLOAD (Wave 344: three or more "and"
+  // coordinators — a coordinator-chain pattern, different character than comma enumeration),
+  // TRIADIC_LIST_OVERLOAD (Wave 372: specifically "X, Y, and Z" three-item enumerations —
+  // targets the Oxford-comma list structure, not comma density per se).
+  if (actionLines.length >= 8) {
+    const commaDenseCount526c = actionLines.filter(l => (l.text.match(/,/g) ?? []).length >= 3).length;
+    if (commaDenseCount526c / actionLines.length > 0.30) {
+      issues.push({
+        location: `${commaDenseCount526c}/${actionLines.length} action line(s) with ≥3 commas`,
+        rule: 'ACTION_COMMA_DENSE_FLOOD',
+        severity: 'minor',
+        description: `${commaDenseCount526c} of ${actionLines.length} action lines (${(commaDenseCount526c / actionLines.length * 100).toFixed(0)}%) contain three or more commas each — list-heavy, breathless writing that fragments action into catalogued enumerations rather than continuous movement. An action line with three or more commas is effectively a shopping list: a sequence of items, gestures, or details enumerated rather than staged. A single comma structures a sentence; two commas indicate complexity; three or more signal that the line has abandoned forward motion and begun accumulating. When this pattern dominates more than 30% of the action prose, the script imposes an ongoing parsing burden — each line requiring the reader to process a series of coordinated details rather than experience a single, specific image. The effect is exhausting rather than energizing, and the catalogue register is more suited to notes than to dramatic staging.`,
+        suggestedFix: `Revise comma-heavy action lines by choosing one or two details and cutting the rest, or by reorganizing a multi-comma enumeration into separate action lines — each one a distinct beat. "He opens the door, steps into the hallway, checks both directions, and freezes" becomes two lines: "He steps into the hallway." / "He freezes." The fewer commas, the cleaner the cut, and the more each action lands with its own weight.`,
       });
     }
   }
