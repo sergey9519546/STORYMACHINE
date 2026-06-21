@@ -130,6 +130,20 @@
 // scene — the story's greatest question-raise arrives without informational cause; backward-cause
 // × curiosity peak, third backward-cause check completing the peak-cause family alongside
 // SUSPENSE_PEAK_UNCAUSED and EMOTIONAL_PEAK_UNCAUSED).
+// Wave 537 additions: revelation curiosity aftermath flat (sequence/aftermath × curiosity ×
+// revelation trigger — n≥8, ≥3 revelation scenes not in last 2 positions, every revelation
+// followed by 2 scenes with curiosityDelta ≤ 0; disclosures never ignite wondering in what
+// follows; completes the revelation-aftermath family alongside revelation→suspense and revelation→
+// emotion, and mirrors clock→curiosity and payoff→curiosity with revelation as the trigger),
+// payoff opening zone absent (zone presence/absence × payoff × opening third — n≥9, ≥3 payoff
+// scenes, none in opening structural third; all resolutions deferred past the opening; first zone-
+// absence check on the payoff channel in this pass, distinct from PAYOFF_TEMPORAL_CLUSTER in
+// payoff.ts which is concentration not absence, and from PAYOFF_BACK_LOADED in intention.ts which
+// uses a binary first/second-half distribution ratio), revelation middle zone absent (zone presence/
+// absence × revelation × middle third — n≥9, ≥3 revelation scenes, none in the middle structural
+// third; the disclosure engine skips the complication zone entirely; distinct from REVELATION_
+// TEMPORAL_CLUSTER in belief.ts which is concentration not absence, and from REVELATION_SUSPENSE_
+// AFTERMATH_FLAT which is aftermath mode; first zone check on revelation in this pass).
 // Wave 523 additions: clock aftermath emotion flat (sequence/aftermath × emotion × clock trigger
 // — n≥8, ≥3 clockRaised scenes not in last 2 positions, every clockRaised scene followed by 2
 // emotionally neutral scenes; deadlines never register in the protagonist's felt state; completes
@@ -2767,6 +2781,126 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `The scenes immediately following the story's ${qualPayoffRecs523c.length} payoff scenes average a suspenseDelta of ${avgNextSusp523c.toFixed(2)} — callbacks never generate forward tension in what immediately follows. A delivered promise should either resolve tension (the threat was cashed and the audience can exhale) or escalate it (the payoff reveals a deeper problem and raises the stakes). When every payoff is followed by a suspense-neutral scene, deliveries flatten rather than pivot the pacing; the audience receives the resolution and then drifts forward without any ratcheting effect. Payoffs that don't affect the tension level in what follows feel like isolated episodes rather than story-structural turning points.`,
             suggestedFix: `After at least one payoff scene, let the following scene carry a positive suspenseDelta — either by having the payoff reveal an escalating threat, or by having a character respond to the delivery in a way that raises the stakes. A payoff followed by a suspense rise is a ratchet: it both satisfies a prior setup and applies new pressure, converting closure into acceleration rather than rest.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 537: REVELATION_CURIOSITY_AFTERMATH_FLAT, PAYOFF_OPENING_ZONE_ABSENT,
+  //              REVELATION_MIDDLE_ZONE_ABSENT ──────────────────────────────────────────────────────
+
+  // REVELATION_CURIOSITY_AFTERMATH_FLAT — Sequence/aftermath × curiosity × revelation trigger.
+  // n≥8, ≥3 revelation scenes (revelation non-null/empty) not in last 2 positions. Every
+  // revelation is followed by 2 scenes with curiosityDelta ≤ 0 → fire. Disclosures never ignite
+  // wondering in what follows: every truth surfaced lands without generating a new open question
+  // in the next two scenes. A revelation should not only satisfy prior wondering — it should open
+  // new curiosity: what does this mean? what happens now that we know? what was concealed alongside
+  // it? When every revelation is followed by curiosity-flat scenes, the disclosure engine delivers
+  // closure without generating the forward pull that keeps the audience invested through what follows.
+  // Distinct from: REVELATION_SUSPENSE_AFTERMATH_FLAT (Wave 467: suspense channel — different
+  // aftermath signal), REVELATION_EMOTIONAL_AFTERMATH_FLAT (Wave 495: emotion channel), CLOCK_
+  // AFTERMATH_CURIOSITY_FLAT (Wave 495: clock trigger), PAYOFF_AFTERMATH_CURIOSITY_FLAT (Wave 509:
+  // payoff trigger). Completes the revelation-aftermath family across all three channels.
+  {
+    const n537a = records.length;
+    if (n537a >= 8) {
+      const qualRevRecs537a = (records as any[]).filter((r, pos) =>
+        r.revelation !== null && r.revelation !== '' && r.revelation !== undefined && pos < n537a - 2,
+      );
+      if (qualRevRecs537a.length >= 3) {
+        const allRevNoCurAftermath537a = qualRevRecs537a.every((r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos + off];
+            if (nxt && (nxt.curiosityDelta ?? 0) > 0) return false;
+          }
+          return true;
+        });
+        if (allRevNoCurAftermath537a) {
+          issues.push({
+            location: `${qualRevRecs537a.length} revelation scene(s) — curiosity aftermath absent in all 2-scene windows`,
+            rule: 'REVELATION_CURIOSITY_AFTERMATH_FLAT',
+            severity: 'minor',
+            description: `Every one of the story's ${qualRevRecs537a.length} revelation scenes is followed by two scenes with no curiosity rise (curiosityDelta ≤ 0 in both). Disclosures consistently land without generating a new open question in the scenes that follow — the truth surfaces and the audience's wondering closes rather than deepens. The most powerful revelations do two things at once: they answer a prior question AND open a new one. When every disclosed truth is followed by curiosity-flat scenes, the revelation engine is delivering closure without forward pull, and the audience exits each disclosure slightly less engaged with what comes next rather than more.`,
+            suggestedFix: `After at least one revelation, let the following scene carry a positive curiosityDelta: introduce an implication of the disclosed truth that raises a new question, have a character react in a way that makes the audience wonder about their motives, or let the revelation expose a new layer of the situation that the audience did not know to ask about. The best revelations create more questions than they answer.`,
+          });
+        }
+      }
+    }
+  }
+
+  // PAYOFF_OPENING_ZONE_ABSENT — Zone presence/absence × payoff × opening third.
+  // n≥9, ≥3 payoff scenes (payoffSetupIds non-empty). None of the payoff scenes falls in the
+  // opening structural third (positions 0 to floor(n/3)−1) → fire. All thread resolutions are
+  // deferred past the opening act: the story's first structural third passes without delivering
+  // any planted promise. The opening third is where the audience forms expectations; an opening
+  // that plants threads without resolving even one teaches the audience to expect pure accumulation
+  // without early proof that the story delivers. An early payoff — even a minor one — confirms the
+  // story's contract and raises confidence in the planted material that remains unresolved.
+  // Distinct from: PAYOFF_TEMPORAL_CLUSTER in payoff.ts (distribution × concentration — checks
+  // whether >75% of payoffs are in one third; fires on overconcentration, not on specific-zone
+  // absence), PAYOFF_BACK_LOADED in intention.ts (distribution × first/second half ratio — checks
+  // binary half split, not thirds-based zone absence). First zone-absence check on the payoff
+  // channel in this pass.
+  {
+    const n537b = records.length;
+    if (n537b >= 9) {
+      const payoffPositions537b = (records as any[])
+        .map((r, pos) => ({ pos, isPayoff: ((r.payoffSetupIds ?? []) as any[]).length > 0 }))
+        .filter(x => x.isPayoff)
+        .map(x => x.pos);
+      if (payoffPositions537b.length >= 3) {
+        const openingThird537b = Math.floor(n537b / 3);
+        const anyInOpening537b = payoffPositions537b.some(p => p < openingThird537b);
+        if (!anyInOpening537b) {
+          issues.push({
+            location: `Opening third (scenes 0–${openingThird537b - 1}) has no payoff scenes (${payoffPositions537b.length} payoff(s) start at scene ${payoffPositions537b[0]})`,
+            rule: 'PAYOFF_OPENING_ZONE_ABSENT',
+            severity: 'minor',
+            description: `The story has ${payoffPositions537b.length} thread-resolution scenes, but none fall in the opening structural third (scenes 0–${openingThird537b - 1}). All planted promises are deferred past the opening act. The first structural third is where the audience learns to trust the story — whether it plants threads that actually resolve. When the opening passes without delivering even one minor payoff, the audience may track the seeded material with less confidence, unsure whether the story will follow through. An early resolution, even minor, confirms the story's contract and raises the audience's investment in the threads that remain open.`,
+            suggestedFix: `Move or add at least one payoff scene into the opening structural third: a minor thread resolved, a small promise kept, or an early confirmation that a seeded element has been heard and will be answered. The opening payoff does not need to resolve the main dramatic question — it can be a small satisfaction that earns the audience's trust while the major threads remain live and unresolved.`,
+          });
+        }
+      }
+    }
+  }
+
+  // REVELATION_MIDDLE_ZONE_ABSENT — Zone presence/absence × revelation × middle third.
+  // n≥9, ≥3 revelation scenes (revelation non-null/empty). None falls in the middle structural
+  // third (positions floor(n/3) to 2×floor(n/3)−1) → fire. The story's disclosure engine skips
+  // the complication zone: truths surface in the opening or closing acts but the central section
+  // — where complications deepen and the protagonist's situation becomes most pressured — passes
+  // without any revelation. The middle third is the structural space where revelations are most
+  // powerful: they change what the audience understands mid-game, when there is still time for
+  // the disclosed truth to complicate the protagonist's course. When the middle is disclosure-free,
+  // that zone's complications arrive without any informational shift that would change what the
+  // audience or protagonist is tracking.
+  // Distinct from: REVELATION_TEMPORAL_CLUSTER in belief.ts (distribution × concentration × thirds
+  // — checks whether >75% of revelations are in one zone; fires on overconcentration, not on
+  // specific-zone absence; this fires when middle specifically has zero), REVELATION_SUSPENSE_
+  // AFTERMATH_FLAT (sequence/aftermath — different mode), CURIOSITY_FRONTLOAD (Wave 425: curiosity
+  // channel in first half, not revelation in middle third). First zone check on revelation in this pass.
+  {
+    const n537c = records.length;
+    if (n537c >= 9) {
+      const revPositions537c = (records as any[])
+        .map((r, pos) => ({
+          pos,
+          hasRev: r.revelation !== null && r.revelation !== '' && r.revelation !== undefined,
+        }))
+        .filter(x => x.hasRev)
+        .map(x => x.pos);
+      if (revPositions537c.length >= 3) {
+        const third537c = Math.floor(n537c / 3);
+        const anyInMiddle537c = revPositions537c.some(p => p >= third537c && p < 2 * third537c);
+        if (!anyInMiddle537c) {
+          issues.push({
+            location: `Middle third (scenes ${third537c}–${2 * third537c - 1}) has no revelation scenes (${revPositions537c.length} revelation(s) outside this zone)`,
+            rule: 'REVELATION_MIDDLE_ZONE_ABSENT',
+            severity: 'minor',
+            description: `The story has ${revPositions537c.length} revelation scene(s), but none fall in the middle structural third (scenes ${third537c}–${2 * third537c - 1}). The disclosure engine skips the complication zone entirely: truths surface in the opening or closing acts but the central section — where complications deepen and the protagonist's situation becomes most pressured — passes without any informational shift. The middle third is where revelations are most structurally powerful: a truth disclosed mid-game changes what the protagonist is tracking and makes the complication zone feel like discovery rather than accumulation. When the middle has no revelations, the complication zone relies on action alone without the informational dimension that changes what the audience understands about what they are watching.`,
+            suggestedFix: `Introduce at least one revelation in the middle structural third: a truth disclosed at the moment the protagonist's situation is most pressured, a secret that reframes the earlier complications, or a disclosure that changes what the protagonist must do and how urgently. A mid-story revelation is the most powerful tool for converting accumulating pressure into informational gear-change.`,
           });
         }
       }

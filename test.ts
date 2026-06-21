@@ -23400,6 +23400,84 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 537 — pacingPass: revelation curiosity aftermath flat, payoff opening zone absent, revelation middle zone absent', async () => {
+    const makeRec537 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain537 = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\n\nAction line for scene ${i}.`).join('\n\n');
+    const runPA537 = async (records: any[]) => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: makeFountain537(records.length), original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+      });
+    };
+
+    it('REVELATION_CURIOSITY_AFTERMATH_FLAT fires when all revelations are followed by curiosity-flat scenes', async () => {
+      // 10 scenes: revelations at pos 1,3,5 (not in last 2); following 2 scenes all have curiosityDelta=0 → fires
+      const recs537a = Array.from({ length: 10 }, (_, i) =>
+        makeRec537(i, { revelation: [1, 3, 5].includes(i) ? 'The truth.' : null })
+      );
+      const res = await runPA537(recs537a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_CURIOSITY_AFTERMATH_FLAT'), 'REVELATION_CURIOSITY_AFTERMATH_FLAT should fire');
+    });
+
+    it('REVELATION_CURIOSITY_AFTERMATH_FLAT does not fire when a revelation is followed by a curiosity rise', async () => {
+      // Same but scene 2 (after revelation at 1) has curiosityDelta=1 → anyRevNoCurAftermath=false → no fire
+      const recs537anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec537(i, {
+          revelation: [1, 3, 5].includes(i) ? 'The truth.' : null,
+          curiosityDelta: i === 2 ? 1 : 0,
+        })
+      );
+      const res = await runPA537(recs537anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_CURIOSITY_AFTERMATH_FLAT'), 'REVELATION_CURIOSITY_AFTERMATH_FLAT should not fire');
+    });
+
+    it('PAYOFF_OPENING_ZONE_ABSENT fires when no payoff scenes are in the opening third', async () => {
+      // 9 scenes (third=3); payoffs at pos 3,5,7 (all in middle/closing thirds) → none in opening → fires
+      const recs537b = Array.from({ length: 9 }, (_, i) =>
+        makeRec537(i, { payoffSetupIds: [3, 5, 7].includes(i) ? ['setup-A'] : [] })
+      );
+      const res = await runPA537(recs537b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_OPENING_ZONE_ABSENT'), 'PAYOFF_OPENING_ZONE_ABSENT should fire');
+    });
+
+    it('PAYOFF_OPENING_ZONE_ABSENT does not fire when a payoff is in the opening third', async () => {
+      // 9 scenes (third=3); payoff at pos 1 (opening third) + pos 5,7 → anyInOpening=true → no fire
+      const recs537bnr = Array.from({ length: 9 }, (_, i) =>
+        makeRec537(i, { payoffSetupIds: [1, 5, 7].includes(i) ? ['setup-A'] : [] })
+      );
+      const res = await runPA537(recs537bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_OPENING_ZONE_ABSENT'), 'PAYOFF_OPENING_ZONE_ABSENT should not fire');
+    });
+
+    it('REVELATION_MIDDLE_ZONE_ABSENT fires when no revelation scenes are in the middle third', async () => {
+      // 9 scenes (third=3): middle third = pos 3,4,5; revelations at pos 0,1,7 → none in middle → fires
+      const recs537c = Array.from({ length: 9 }, (_, i) =>
+        makeRec537(i, { revelation: [0, 1, 7].includes(i) ? 'Truth.' : null })
+      );
+      const res = await runPA537(recs537c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_MIDDLE_ZONE_ABSENT'), 'REVELATION_MIDDLE_ZONE_ABSENT should fire');
+    });
+
+    it('REVELATION_MIDDLE_ZONE_ABSENT does not fire when a revelation is in the middle third', async () => {
+      // 9 scenes (third=3): revelation at pos 4 (middle third) + pos 0,7 → anyInMiddle=true → no fire
+      const recs537cnr = Array.from({ length: 9 }, (_, i) =>
+        makeRec537(i, { revelation: [0, 4, 7].includes(i) ? 'Truth.' : null })
+      );
+      const res = await runPA537(recs537cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_MIDDLE_ZONE_ABSENT'), 'REVELATION_MIDDLE_ZONE_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 523 — pacingPass: clock aftermath emotion flat, payoff aftermath emotion flat, payoff aftermath suspense flat', async () => {
     const makeRec523 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
