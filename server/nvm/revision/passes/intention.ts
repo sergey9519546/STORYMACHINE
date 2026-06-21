@@ -115,6 +115,20 @@
 // (co-occurrence/decoupling × payoff × seed — n≥8, ≥2 payoff scenes, ≥2 seed scenes, zero
 // overlap; resolutions never simultaneously plant new threads; distinct from PAYOFF_DRAMA_DECOUPLED
 // which pairs payoff × dramatic turn, and SEED_DRAMA_DECOUPLED which pairs seed × dramatic turn).
+// Wave 535 additions: payoff clock decoupled (co-occurrence/decoupling × payoff × clockRaised —
+// n≥8, ≥3 payoff scenes, ≥2 clockRaised scenes, zero overlap; thread resolutions never coincide
+// with deadline pressure; completes the payoff co-occurrence family alongside payoff × dramatic-
+// turn, revelation, seed, and emotion; distinct from PAYOFF_SUSPENSE_FLAT which uses average mode
+// on suspenseDelta not co-occurrence on clockRaised), payoff peak uncaused (backward-cause ×
+// single-peak × payoff — n≥8, ≥2 payoff scenes at pos≥2; the scene with the most payoffSetupIds
+// has no revelation, dramatic-turn, suspense rise, or clockRaise in either prior scene; the
+// heaviest resolution arrives without preparation; the payoff-peak complement of SEED_PEAK_UNCAUSED
+// which audits the seed peak, and of PROACTIVE_PAYOFF_PEAK_DECOUPLED which checks the payoff peak
+// for absence of initiative rather than backward-cause), payoff back-loaded (distribution/timing ×
+// payoff × second half — n≥8, ≥4 payoff scenes, >70% in second half while first half has ≥1;
+// all resolutions deferred to the back half; the back-loaded complement of SEED_FRONTLOADED which
+// audits the seed channel front-loaded; distinct from PAYOFF_EMOTION_DECOUPLED which is co-
+// occurrence and from PAYOFF_SUSPENSE_AFTERMATH_VOID which is aftermath mode).
 // Wave 521 additions: seed peak uncaused (backward-cause × single-peak × seed — n≥8, ≥2 seed
 // scenes, the single scene planting the most clues has no revelation, dramatic turn, suspense rise,
 // or clockRaise in either of the 2 preceding scenes; foreshadowing peaks without preparation; first
@@ -2735,6 +2749,127 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
             suggestedFix: `Fuse at least one payoff scene with an emotional charge: a promise resolved at the moment the protagonist feels the weight of what it cost, a secret disclosed in a scene of joy or grief, or a thread tied off in the same moment the character registers its significance emotionally. A payoff that registers both as closure and as feeling lands on two simultaneous registers and is far harder to forget.`,
           });
         }
+      }
+    }
+  }
+
+  // ── Wave 535: PAYOFF_CLOCK_DECOUPLED, PAYOFF_PEAK_UNCAUSED, PAYOFF_BACK_LOADED ──────────────────
+
+  // PAYOFF_CLOCK_DECOUPLED — Co-occurrence/decoupling × payoff × clockRaised.
+  // n≥8, ≥3 payoff scenes (payoffSetupIds non-empty), ≥2 clockRaised scenes. No payoff scene
+  // also has clockRaised=true → fire. Thread resolutions and deadline urgency never co-occur:
+  // the moments when planted promises are delivered are always structurally separate from the
+  // moments when the clock is ticking. A payoff that lands while the clock is running carries
+  // compressed dramatic weight — the promise is fulfilled precisely as the deadline looms, fusing
+  // the satisfaction of resolution with the urgency of consequence. When clock and payoff are
+  // always decoupled, the story keeps its resolution energy and its urgency energy in separate
+  // structural compartments, never letting them compound each other.
+  // Distinct from: PAYOFF_DRAMA_DECOUPLED (co-occurrence × payoff × dramatic turn), PAYOFF_
+  // REVELATION_DECOUPLED (co-occurrence × payoff × revelation), PAYOFF_SEED_DECOUPLED
+  // (co-occurrence × payoff × seed), PAYOFF_EMOTION_DECOUPLED (Wave 521: co-occurrence × payoff
+  // × emotionalShift). This completes the payoff co-occurrence family by adding the clock channel.
+  // PAYOFF_SUSPENSE_FLAT uses average mode on suspenseDelta — different analytical mode.
+  {
+    const n535a = records.length;
+    if (n535a >= 8) {
+      const payoffScenes535a = (records as any[]).filter(
+        r => ((r.payoffSetupIds ?? []) as any[]).length > 0,
+      );
+      const clockScenes535a = (records as any[]).filter(r => r.clockRaised === true);
+      if (payoffScenes535a.length >= 3 && clockScenes535a.length >= 2) {
+        const anyOverlap535a = payoffScenes535a.some(r => r.clockRaised === true);
+        if (!anyOverlap535a) {
+          issues.push({
+            location: `${payoffScenes535a.length} payoff scene(s) and ${clockScenes535a.length} clock-raised scene(s) — no overlap`,
+            rule: 'PAYOFF_CLOCK_DECOUPLED',
+            severity: 'minor',
+            description: `The script has ${payoffScenes535a.length} thread-resolution scene(s) and ${clockScenes535a.length} deadline-establishing scene(s), but they never co-occur. Every planted promise is delivered in a scene without a ticking clock, while every deadline is raised in a scene without a resolution landing. A payoff that fires while the clock is running creates the most dramatically compressed version of each event: the promise is fulfilled precisely as the urgency peaks, fusing the satisfaction of closure with the pressure of consequence. When clock and payoff are always decoupled, the story keeps its resolution energy and its urgency energy in separate structural compartments and never lets them compound each other.`,
+            suggestedFix: `Fuse at least one payoff with a clockRaised moment: the scene where a planted thread is resolved should also be a scene where a deadline is established or re-established. Even a small clock — a decision window closing, a constraint tightening — changes the emotional register of the payoff from mere satisfaction to satisfaction-under-pressure, which is harder to forget.`,
+          });
+        }
+      }
+    }
+  }
+
+  // PAYOFF_PEAK_UNCAUSED — Backward-cause × single-peak × payoff.
+  // n≥8, ≥2 payoff scenes (payoffSetupIds non-empty) with at least one at pos≥2. Find the scene
+  // with the most payoffSetupIds (the heaviest resolution moment in the story). If it is at pos≥2
+  // and neither of the 2 preceding scenes has a revelation, dramatic turn, suspense rise, or clock
+  // raise → fire. The story's densest convergence of resolved setups arrives without a structural
+  // build — the richest payoff lands in a causal vacuum with no escalation, revelation, or urgency
+  // shift preparing the audience for the maximum density of delivered promises.
+  // Distinct from: SEED_PEAK_UNCAUSED (Wave 521: same analytical mode × seed channel — this is
+  // the payoff-peak complement), PROACTIVE_PAYOFF_PEAK_DECOUPLED (co-occurrence × proactive × payoff
+  // peak — same peak signal but checks whether the scene coincides with initiative, not backward-cause),
+  // PAYOFF_DRAMA_DECOUPLED / PAYOFF_REVELATION_DECOUPLED (co-occurrence mode, not backward-cause).
+  // First backward-cause check with payoff density as the peak signal in this pass.
+  {
+    const n535b = records.length;
+    if (n535b >= 8) {
+      const payoffCounts535b = (records as any[]).map(r =>
+        ((r.payoffSetupIds ?? []) as any[]).length,
+      );
+      const maxPayoff535b = Math.max(...payoffCounts535b);
+      if (maxPayoff535b > 0) {
+        const peakPos535b = payoffCounts535b.indexOf(maxPayoff535b);
+        const qualifyingPayoffs535b = payoffCounts535b.filter(c => c > 0).length;
+        if (qualifyingPayoffs535b >= 2 && peakPos535b >= 2) {
+          const prior1_535b = (records as any[])[peakPos535b - 1];
+          const prior2_535b = (records as any[])[peakPos535b - 2];
+          const hasCause535b = [prior1_535b, prior2_535b].some(r =>
+            r !== undefined && (
+              (r.revelation !== null && r.revelation !== '' && r.revelation !== undefined) ||
+              (r.dramaticTurn !== undefined && r.dramaticTurn !== 'nothing' && r.dramaticTurn !== '') ||
+              (r.suspenseDelta ?? 0) > 0 ||
+              r.clockRaised === true
+            ),
+          );
+          if (!hasCause535b) {
+            const peakRec535b = (records as any[])[peakPos535b];
+            issues.push({
+              location: `Scene ${peakRec535b.sceneIdx} (${peakRec535b.slug}) — peak payoff density (${maxPayoff535b} resolved setups) without prior causal driver`,
+              rule: 'PAYOFF_PEAK_UNCAUSED',
+              severity: 'minor',
+              description: `The scene with the story's highest payoff density (${maxPayoff535b} planted promise(s) resolved at scene ${peakRec535b.sceneIdx}) has no structural driver in the two preceding scenes — no revelation, dramatic turn, suspense rise, or clock raise in the scenes immediately before the densest convergence of resolutions. The story's richest payoff moment arrives without a causal build: the maximum density of delivered promises lands in a structural vacuum rather than at the crest of an escalating wave. A payoff peak lands hardest when it follows a moment of heightened urgency or revelation that makes the audience feel the resolutions are arriving at exactly the right moment.`,
+              suggestedFix: `Give scene ${peakRec535b.sceneIdx - 1} or ${peakRec535b.sceneIdx - 2} a structural driver that motivates the dense payoff peak: a revelation that makes the resolutions feel inevitable, a dramatic turn that brings them to the surface, or a surge in suspense that makes the payoff both timely and necessary. The densest resolution moment in the story should feel earned through escalation, not arbitrary.`,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // PAYOFF_BACK_LOADED — Distribution/timing × payoff × second half.
+  // n≥8, ≥4 payoff scenes (payoffSetupIds non-empty). >70% fall in the second half while the first
+  // half has ≥1 → fire. All thread resolutions are deferred to the back half: the audience spends
+  // the first half accumulating planted promises without receiving any meaningful evidence that the
+  // story keeps what it plants. When >70% of payoffs occur in the second half, the story's first
+  // half is structurally payoff-free — the planted threads age without any intermediate resolution
+  // that would prove the foreshadowing is active and alive.
+  // Distinct from: SEED_FRONTLOADED (Wave 521: distribution × seed × first half — seed channel,
+  // opposite concentration direction), PAYOFF_EMOTION_DECOUPLED (Wave 521: co-occurrence — different
+  // mode), PAYOFF_SUSPENSE_AFTERMATH_VOID (Wave 507: aftermath mode — different mode and channel).
+  // First distribution/timing check on the payoff channel in this pass. Completes the front/back
+  // distribution pair for the seed-payoff system: seeds front-loaded + payoffs back-loaded = the
+  // most extreme version of delayed gratification architecture.
+  {
+    const n535c = records.length;
+    const half535c = Math.floor(n535c / 2);
+    const payoffIdxs535c = (records as any[]).map((r, i) => ({
+      i, isPayoff: ((r.payoffSetupIds ?? []) as any[]).length > 0,
+    })).filter(x => x.isPayoff);
+    if (n535c >= 8 && payoffIdxs535c.length >= 4) {
+      const backPayoffs535c = payoffIdxs535c.filter(x => x.i >= half535c).length;
+      const frontPayoffs535c = payoffIdxs535c.length - backPayoffs535c;
+      const backRatio535c = backPayoffs535c / payoffIdxs535c.length;
+      if (backRatio535c > 0.70 && frontPayoffs535c >= 1) {
+        issues.push({
+          location: `payoff distribution: ${frontPayoffs535c} front-half / ${backPayoffs535c} back-half`,
+          rule: 'PAYOFF_BACK_LOADED',
+          severity: 'minor',
+          description: `${Math.round(backRatio535c * 100)}% of the script's thread-resolution scenes (${backPayoffs535c} of ${payoffIdxs535c.length}) fall in the second half, leaving the first half with only ${frontPayoffs535c}. The story defers nearly all its payoffs to the final movements: the audience spends the first half accumulating planted promises without receiving any meaningful evidence that the story keeps what it plants. A completely back-loaded payoff architecture trains the audience to expect nothing to resolve until the end — reducing the structural satisfaction that intermediate resolutions provide, and making the first half feel like pure accumulation without any delivered promise to confirm the foreshadowing is still live.`,
+          suggestedFix: `Distribute at least one or two payoff scenes into the first half — a minor thread resolved early, an early confirmation that the story delivers on what it plants, or a partial payoff that renews audience faith in the planted material. The most satisfying payoff architectures prove the story's contract in the first half with minor resolutions, while reserving the major payoffs for the climactic zone.`,
+        });
       }
     }
   }

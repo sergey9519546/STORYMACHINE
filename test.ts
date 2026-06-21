@@ -25801,6 +25801,93 @@ I always listen.
     });
   });
 
+  describe('Wave 535 — intentionPass: payoff clock decoupled, payoff peak uncaused, payoff back-loaded', async () => {
+    const makeRec535 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN535 = async (records: any[]) => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    it('PAYOFF_CLOCK_DECOUPLED fires when no payoff scene also has clockRaised', async () => {
+      // 8 scenes: payoffs at pos 1,3,5 (no clock); clock at pos 0,6 (no payoff) → no overlap → fires
+      const recs535a = Array.from({ length: 8 }, (_, i) =>
+        makeRec535(i, {
+          payoffSetupIds: [1, 3, 5].includes(i) ? ['setup-A'] : [],
+          clockRaised: [0, 6].includes(i),
+        })
+      );
+      const res = await runIN535(recs535a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CLOCK_DECOUPLED'), 'PAYOFF_CLOCK_DECOUPLED should fire');
+    });
+
+    it('PAYOFF_CLOCK_DECOUPLED does not fire when a payoff scene also has clockRaised', async () => {
+      // Same but pos 1 (payoff) now also has clockRaised → overlap → no fire
+      const recs535anr = Array.from({ length: 8 }, (_, i) =>
+        makeRec535(i, {
+          payoffSetupIds: [1, 3, 5].includes(i) ? ['setup-A'] : [],
+          clockRaised: [0, 1, 6].includes(i),
+        })
+      );
+      const res = await runIN535(recs535anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CLOCK_DECOUPLED'), 'PAYOFF_CLOCK_DECOUPLED should not fire');
+    });
+
+    it('PAYOFF_PEAK_UNCAUSED fires when the peak payoff scene has no cause in prior 2 scenes', async () => {
+      // 8 scenes: payoffs at pos 2 (1 setup) and pos 5 (2 setups = peak, at pos≥2);
+      // scenes 3,4 (prior to peak at 5) have no revelation/turn/suspense/clock → fires
+      const recs535b = Array.from({ length: 8 }, (_, i) =>
+        makeRec535(i, {
+          payoffSetupIds: i === 2 ? ['setup-A'] : i === 5 ? ['setup-B', 'setup-C'] : [],
+        })
+      );
+      const res = await runIN535(recs535b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_PEAK_UNCAUSED'), 'PAYOFF_PEAK_UNCAUSED should fire');
+    });
+
+    it('PAYOFF_PEAK_UNCAUSED does not fire when a prior scene provides a causal driver', async () => {
+      // Same but scene 4 (prior to peak at 5) has suspenseDelta=1 → hasCause=true → no fire
+      const recs535bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec535(i, {
+          payoffSetupIds: i === 2 ? ['setup-A'] : i === 5 ? ['setup-B', 'setup-C'] : [],
+          suspenseDelta: i === 4 ? 1 : 0,
+        })
+      );
+      const res = await runIN535(recs535bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_PEAK_UNCAUSED'), 'PAYOFF_PEAK_UNCAUSED should not fire');
+    });
+
+    it('PAYOFF_BACK_LOADED fires when >70% of payoff scenes are in second half', async () => {
+      // 10 scenes; half=5; payoffs at pos 1,5,6,7 → frontCount=1, backCount=3; 3/4=75% > 70% → fires
+      const recs535c = Array.from({ length: 10 }, (_, i) =>
+        makeRec535(i, { payoffSetupIds: [1, 5, 6, 7].includes(i) ? ['setup-A'] : [] })
+      );
+      const res = await runIN535(recs535c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_BACK_LOADED'), 'PAYOFF_BACK_LOADED should fire');
+    });
+
+    it('PAYOFF_BACK_LOADED does not fire when payoffs are distributed across both halves', async () => {
+      // 10 scenes; half=5; payoffs at pos 1,2,6,7 → frontCount=2, backCount=2; 2/4=50% ≤ 70% → no fire
+      const recs535cnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec535(i, { payoffSetupIds: [1, 2, 6, 7].includes(i) ? ['setup-A'] : [] })
+      );
+      const res = await runIN535(recs535cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_BACK_LOADED'), 'PAYOFF_BACK_LOADED should not fire');
+    });
+  });
+
   describe('Wave 521 — intentionPass: seed peak uncaused, seed front-loaded, payoff emotion decoupled', async () => {
     const makeRec521 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
