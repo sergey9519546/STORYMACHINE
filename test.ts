@@ -25080,6 +25080,91 @@ I always listen.
     });
   });
 
+  describe('Wave 506 — conflictPass: rupture seed aftermath void, revelation repair decoupled, repair closing absent', async () => {
+    const rup506 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
+    const makeRec506 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runC506 = async (records: any[]) => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      return conflictPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CONFLICT_RUPTURE_SEED_AFTERMATH_VOID fires when all ruptures are followed by 2 seed-free scenes', async () => {
+      // n=10; ruptures at pos 1,4; seeds at pos 6,8; no seed in 2-scene windows after 1 (2,3) or 4 (5,6)
+      // Wait: pos 6 is in window after 4 (off=1→5, off=2→6). Pos 6 has seed! So need to adjust.
+      // Use ruptures at 1,4; seeds at 7,9 (windows after 1: 2,3; after 4: 5,6 — no seeds there) → fire
+      const recs506a = Array.from({ length: 10 }, (_, i) =>
+        makeRec506(i, {
+          relationshipShifts: [1, 4].includes(i) ? rup506(-0.5) : [],
+          seededClueIds: [7, 9].includes(i) ? ['clue-A'] : [],
+        }),
+      );
+      const res = await runC506(recs506a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'CONFLICT_RUPTURE_SEED_AFTERMATH_VOID'), 'CONFLICT_RUPTURE_SEED_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_RUPTURE_SEED_AFTERMATH_VOID does not fire when a rupture is followed by a seed within 2 scenes', async () => {
+      // n=10; ruptures at 1,4; seed at 2 (1 scene after rupture at 1) → not all void → no fire
+      const recs506anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec506(i, {
+          relationshipShifts: [1, 4].includes(i) ? rup506(-0.5) : [],
+          seededClueIds: i === 2 ? ['clue-B'] : [],
+        }),
+      );
+      const res = await runC506(recs506anr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'CONFLICT_RUPTURE_SEED_AFTERMATH_VOID'), 'CONFLICT_RUPTURE_SEED_AFTERMATH_VOID should not fire');
+    });
+
+    it('CONFLICT_REVELATION_REPAIR_DECOUPLED fires when no scene has both revelation and positive shift', async () => {
+      // n=10; revelations at 2,5; repairs at 7,9 — zero overlap → fire
+      const recs506b = Array.from({ length: 10 }, (_, i) =>
+        makeRec506(i, {
+          revelation: [2, 5].includes(i) ? 'The truth comes out.' : null,
+          relationshipShifts: [7, 9].includes(i) ? rup506(0.5) : [],
+        }),
+      );
+      const res = await runC506(recs506b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'CONFLICT_REVELATION_REPAIR_DECOUPLED'), 'CONFLICT_REVELATION_REPAIR_DECOUPLED should fire');
+    });
+
+    it('CONFLICT_REVELATION_REPAIR_DECOUPLED does not fire when a revelation coincides with a repair', async () => {
+      // n=10; scene 5 has both revelation and positive shift → anyRevRepair=true → no fire
+      const recs506bnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec506(i, {
+          revelation: [2, 5].includes(i) ? 'Truth surfaces.' : null,
+          relationshipShifts: [5, 9].includes(i) ? rup506(0.5) : [],
+        }),
+      );
+      const res = await runC506(recs506bnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'CONFLICT_REVELATION_REPAIR_DECOUPLED'), 'CONFLICT_REVELATION_REPAIR_DECOUPLED should not fire');
+    });
+
+    it('CONFLICT_REPAIR_CLOSING_ABSENT fires when no repair scene falls in the final third', async () => {
+      // n=9; third=3; repairs at pos 0,2 (zone1) — none at pos 6,7,8 → fire
+      const recs506c = Array.from({ length: 9 }, (_, i) =>
+        makeRec506(i, { relationshipShifts: [0, 2].includes(i) ? rup506(0.5) : [] }),
+      );
+      const res = await runC506(recs506c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'CONFLICT_REPAIR_CLOSING_ABSENT'), 'CONFLICT_REPAIR_CLOSING_ABSENT should fire');
+    });
+
+    it('CONFLICT_REPAIR_CLOSING_ABSENT does not fire when a repair scene exists in the final third', async () => {
+      // n=9; third=3; repairs at pos 0,7 (zone1 and zone3=2*3=6 → pos 7 >= 6) → inFinal=true → no fire
+      const recs506cnr = Array.from({ length: 9 }, (_, i) =>
+        makeRec506(i, { relationshipShifts: [0, 7].includes(i) ? rup506(0.5) : [] }),
+      );
+      const res = await runC506(recs506cnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'CONFLICT_REPAIR_CLOSING_ABSENT'), 'CONFLICT_REPAIR_CLOSING_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 492 — conflictPass: dramatic-turn repair decoupled, closing suspense void, calm stretch', async () => {
     const rup492 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
     const makeRec492 = (idx: number, overrides: any = {}): any => ({

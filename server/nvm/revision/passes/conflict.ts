@@ -108,6 +108,19 @@
 // × non-conflict gap — ≥5 consecutive non-conflict scenes while ≥4 overall conflict scenes exist;
 // a sustained lull breaks dramatic rhythm; the complement of CONFLICT_BREATHING_ROOM_ABSENT which
 // fires when ruptures are too close, not when they are too sparse).
+// Wave 506 additions: rupture seed aftermath void (sequence/aftermath × seed × rupture aftermath —
+// n≥8, ≥2 ruptures ≤ -0.3, ≥2 seed scenes; every rupture followed by 2 scenes with no seededClueIds;
+// bond-breaking never plants a clue foreshadowing resolution of the fracture; completes the aftermath
+// channel set by adding the seed channel alongside curiosity, suspense, clock, revelation, turn, and
+// positive-emotion; distinct from CONFLICT_CLUE_DECOUPLED which is same-scene co-occurrence),
+// revelation repair decoupled (co-occurrence × revelation × positive shift — n≥8, ≥2 revelation
+// scenes, ≥2 repair scenes ≥ +0.3, zero overlap; truths never surface as bonds heal; distinct from
+// CONFLICT_REVELATION_DECOUPLED which pairs revelation with negative shifts, and CONFLICT_DRAMATIC_
+// TURN_REPAIR_DECOUPLED which pairs turn with positive shifts), repair closing absent (zone presence/
+// absence × positive shift × closing third — n≥9, ≥2 repair scenes ≥ +0.3, none in final third;
+// the resolution zone contains no bond-warming; distinct from CONFLICT_CLOSING_SUSPENSE_VOID which
+// audits suspense not repair, and CONFLICT_ACT3_ABSENT which audits any conflict not specifically
+// positive-shift absence).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2488,6 +2501,138 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `The story's longest consecutive run of non-conflict scenes reaches ${maxGap492c} scenes (no bond-rupture, no reversal), while the script contains ${totalConflict492c} conflict scenes overall. A calm stretch of 5+ scenes breaks dramatic rhythm — the audience loses the sense of pressure accumulating toward a reckoning and the story feels like it has entered a plateau. While pacing requires breathing room between ruptures, a run this long signals that the conflict engine has stalled rather than paused: the protagonist is neither tested nor threatened for a substantial stretch of story, draining urgency from the surrounding arcs.`,
             suggestedFix: `Break the longest calm stretch with at least one conflict signal — a moment of friction, a negative relational beat, or a reversal that reminds the audience the story's stakes are still live. Even a minor confrontation or threat mid-stretch restores the sense that tension is still building rather than exhausted. The goal is not to eliminate breathing room, but to prevent any single stretch from growing long enough that the audience stops expecting the next rupture.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 506 checks ──────────────────────────────────────────────────────────
+
+  // CONFLICT_RUPTURE_SEED_AFTERMATH_VOID — Sequence/aftermath × seed × rupture aftermath.
+  // n≥8, ≥2 ruptures (negative shift ≤ -0.3) in the story, ≥2 seed scenes exist.
+  // Every rupture is followed by 2 scenes with no seededClueIds → fire. Bond-breaking
+  // never plants a clue that could foreshadow how the fracture will eventually be resolved.
+  // When a bond breaks, the optimal narrative move is to seed a thread that shows the audience
+  // a potential path to (or complication of) repair. When seeds never follow ruptures, the
+  // conflict layer and the foreshadowing layer are causally disconnected: the story generates
+  // wounds but plants no clues about their consequences.
+  // Distinct from: CONFLICT_CLUE_DECOUPLED (Wave 394: co-occurrence × seededClueIds × rupture
+  // IN THE SAME scene — same-scene absence, not aftermath absence), CONFLICT_RUPTURE_AFTERMATH_VOID
+  // (Wave 394: aftermath × neutral emotion + no relational shift, not seed), CONFLICT_AFTERMATH_
+  // CURIOSITY_VOID / CONFLICT_RUPTURE_SUSPENSE_VOID / CONFLICT_RUPTURE_CLOCK_AFTERMATH_VOID /
+  // CONFLICT_RUPTURE_REVELATION_AFTERMATH_VOID / CONFLICT_RUPTURE_DRAMATIC_TURN_AFTERMATH_VOID /
+  // CONFLICT_POSITIVE_EMOTION_AFTERMATH_VOID (all use different aftermath channels). This completes
+  // the rupture-aftermath channel set by adding the seed foreshadowing channel.
+  {
+    const n506a = records.length;
+    if (n506a >= 8) {
+      const ruptureRecs506a = (records as any[]).filter(r =>
+        ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+      );
+      const totalSeeds506a = (records as any[]).filter(
+        r => ((r.seededClueIds ?? []) as any[]).length > 0,
+      ).length;
+      if (ruptureRecs506a.length >= 2 && totalSeeds506a >= 2) {
+        const allNoSeedAftermath506a = ruptureRecs506a.every((r: any) => {
+          const idx = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            if (idx + off >= records.length) continue;
+            if (((((records as any[])[idx + off] as any).seededClueIds ?? []) as any[]).length > 0) {
+              return false;
+            }
+          }
+          return true;
+        });
+        if (allNoSeedAftermath506a) {
+          issues.push({
+            location: `All ${ruptureRecs506a.length} rupture aftermath windows — no seeded clue`,
+            rule: 'CONFLICT_RUPTURE_SEED_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `Every bond-rupture in the story (${ruptureRecs506a.length} conflict scene(s)) is followed by two scenes in which no clue is planted, despite the story seeding ${totalSeeds506a} clue(s) elsewhere. Bond-breaking should generate foreshadowing — when a relationship fractures, the scenes that follow are the natural place to plant a clue about how that fracture might be resolved, complicated, or made permanent. When every rupture's aftermath is seed-free, the conflict layer and the foreshadowing layer run on completely separate tracks: wounds open but the story plants no thread about their future.`,
+            suggestedFix: `After at least one rupture, seed a clue in the following scene that gestures toward the broken bond's future — an object that the estranged characters share, a piece of information that one character has that the other needs, or a hint about what repair might require. Foreshadowing in the wake of conflict is the most emotionally primed placement for a planted clue.`,
+          });
+        }
+      }
+    }
+  }
+
+  // CONFLICT_REVELATION_REPAIR_DECOUPLED — Co-occurrence × revelation × positive relationship shift.
+  // n≥8, ≥2 revelation scenes (revelation not null/empty), ≥2 repair scenes (positive shift ≥ +0.3).
+  // No scene has both a revelation and a positive relationship shift → fire. Truths never surface at
+  // the same moment a bond heals — disclosures and reconciliations are always in separate scenes.
+  // Revelations are the most natural catalyst for relational repair: learning a hidden truth can
+  // resolve a misunderstanding, forgive a betrayal, or transform enmity into alliance. When the
+  // two channels never co-occur, the story has revelations that don't move bonds toward warmth,
+  // and repairs that don't come from understanding.
+  // Distinct from: CONFLICT_REVELATION_DECOUPLED (Wave 380: revelation × RUPTURE co-occurrence —
+  // checks whether ruptures and revelations share a scene, the NEGATIVE shift direction; this checks
+  // the POSITIVE shift direction), CONFLICT_DRAMATIC_TURN_REPAIR_DECOUPLED (Wave 492: co-occurrence
+  // × dramatic-turn × repair — different trigger channel), CONFLICT_REPAIR_UNCAUSED (Wave 478:
+  // backward-cause before repair — checks what PRECEDES repair, not what co-occurs with it),
+  // CONFLICT_RUPTURE_REVELATION_AFTERMATH_VOID (Wave 464: aftermath × revelation after a RUPTURE —
+  // different direction and different temporal position). First co-occurrence check in this pass
+  // joining the revelation channel with the positive-shift/repair channel.
+  {
+    const n506b = records.length;
+    if (n506b >= 8) {
+      const revScenes506b = (records as any[]).filter(
+        r => r.revelation !== null && r.revelation !== '' && r.revelation !== undefined,
+      );
+      const repairScenes506b = (records as any[]).filter(r =>
+        ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount >= 0.3),
+      );
+      if (revScenes506b.length >= 2 && repairScenes506b.length >= 2) {
+        const repairSceneIdxs506b = new Set(repairScenes506b.map((r: any) => r.sceneIdx));
+        const anyRevRepair506b = revScenes506b.some((r: any) => repairSceneIdxs506b.has(r.sceneIdx));
+        if (!anyRevRepair506b) {
+          issues.push({
+            location: `${revScenes506b.length} revelation scene(s) and ${repairScenes506b.length} repair scene(s) — zero overlap`,
+            rule: 'CONFLICT_REVELATION_REPAIR_DECOUPLED',
+            severity: 'minor',
+            description: `The story has ${revScenes506b.length} revelation scene(s) and ${repairScenes506b.length} bond-repair scene(s) (positive relationship shift ≥ +0.3) but none overlap — truths never surface at the same moment a bond heals. Revelations are the most natural catalyst for relational repair: a hidden truth that explains a betrayal, a disclosure that forgives a wound, or a secret that transforms an adversary into an ally. When disclosures and reconciliations always happen in separate scenes, neither gains the doubled dramatic impact of a scene where truth and healing arrive simultaneously.`,
+            suggestedFix: `Let at least one revelation scene also carry a positive relationship shift — a scene where a character's honesty repairs a fractured bond, where a secret disclosed breaks down a wall between two people, or where the truth changes the relational temperature from cold to warm. Revelation-plus-repair scenes are among the most emotionally powerful structural beats in any screenplay.`,
+          });
+        }
+      }
+    }
+  }
+
+  // CONFLICT_REPAIR_CLOSING_ABSENT — Zone presence/absence × positive shift × closing third.
+  // n≥9, ≥2 repair scenes (positive shift ≥ +0.3). None in the final structural third → fire.
+  // The resolution zone contains no bond-warming. The protagonist crosses into the story's
+  // climax with every fractured relationship still unrepaired. The closing act is where bonds
+  // are expected to either resolve (repair or confirm rupture) or carry the story's final
+  // emotional statement. When no positive relational shift appears in the final third, the
+  // resolution is all wound — the audience is left without any relational counterpoint to the
+  // accumulated damage, and the emotional arc ends on unrelieved conflict.
+  // Distinct from: CONFLICT_CLOSING_SUSPENSE_VOID (Wave 492: zone × suspense — different channel,
+  // audits escalating tension not bond-warming), CONFLICT_ACT3_ABSENT (Wave 257: any conflict
+  // signal — ruptures or reversal — in final 25%; this fires on the ABSENCE of POSITIVE shift in
+  // final THIRD, complementary zone coverage), CONFLICT_LATE_RELATIONAL_VOID in character-arc.ts
+  // (final quarter, any shift direction; this is specifically positive-shift in final third),
+  // CONFLICT_RELATIONAL_FRONT_LOADED / ARC_RELATIONAL_BACK_LOADED (different pass, distribution
+  // mode across halves). First zone presence/absence check in this pass on the repair channel.
+  {
+    const n506c = records.length;
+    if (n506c >= 9) {
+      const third506c = Math.floor(n506c / 3);
+      const repairPositions506c = (records as any[])
+        .map((r, pos) => ({
+          pos,
+          isRepair: ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount >= 0.3),
+        }))
+        .filter(x => x.isRepair)
+        .map(x => x.pos);
+      if (repairPositions506c.length >= 2) {
+        const anyInFinal506c = repairPositions506c.some(p => p >= 2 * third506c);
+        if (!anyInFinal506c) {
+          issues.push({
+            location: `${repairPositions506c.length} repair scene(s) — none in the final third (scenes ${2 * third506c}–${n506c - 1})`,
+            rule: 'CONFLICT_REPAIR_CLOSING_ABSENT',
+            severity: 'minor',
+            description: `The script has ${repairPositions506c.length} scene(s) with a positive relationship shift (bond-repair or bond-warming), but none falls in the final structural third (scenes ${2 * third506c}–${n506c - 1}). The closing act — where the story's emotional arc is meant to resolve — contains no relational healing. The protagonist crosses into the climax with every fractured relationship still unrepaired, leaving the resolution zone as pure wound. A screenplay's final third should carry at least the beginning of relational resolution: even a partial repair, a moment of acknowledged warmth, or an alliance restored can provide the emotional counterpoint that gives the climax its weight.`,
+            suggestedFix: `Introduce at least one positive relationship shift in the final third — a small reconciliation, an alliance restored, or a moment of warmth between estranged characters. The repair need not be complete or permanent; even a partial thaw or a single moment of acknowledged warmth in the final act gives the audience the relational counterpoint that makes the climax emotionally complete rather than uniformly harsh.`,
           });
         }
       }
