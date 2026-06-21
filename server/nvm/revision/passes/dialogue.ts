@@ -120,6 +120,19 @@
 // have zero dialogue lines; thread resolutions are rendered in silence; distinct from REVELATION_
 // SCENE_VOID, DRAMATIC_TURN_SCENE_VOID, CLOCK_SCENE_VOID which audit different event types, and
 // from POSITIVE_SCENE_VOID / NEGATIVE_SCENE_VOID which audit emotional register not event type).
+// Wave 518 additions: seed scene dialogue absent (co-occurrence/decoupling × seed event × dialogue
+// absence — n≥8, ≥2 seed scenes, ≥3 scenes with dialogue, all seed scenes have zero dialogue; clue-
+// planting happens in silence; the seed-channel parallel of PAYOFF_SCENE_DIALOGUE_ABSENT, completing
+// the event-type co-occurrence set alongside payoff/revelation/dramatic-turn/clock voids), relationship
+// shift scene dialogue absent (co-occurrence/decoupling × relationship-shift event × dialogue absence
+// — n≥8, ≥2 relationship-shift scenes, ≥3 scenes with dialogue, all relationship-shift scenes have
+// zero dialogue; bond changes happen in silence; the relationship-channel co-occurrence completion
+// alongside event-type and emotional-register co-occurrence checks), dialogue revelation aftermath
+// silent (sequence/aftermath × revelation → dialogue absence in next scene — n≥8, ≥2 qualifying
+// revelation scenes not at last position, ≥3 scenes with dialogue, none of the following scenes have
+// any dialogue; distinct from DIALOGUE_REVELATION_SCENE_VOID which is co-occurrence within the
+// revelation scene itself, and from DIALOGUE_DENSE_AFTERMATH_SILENT which uses dense-dialogue as
+// trigger; first aftermath check conditioned on a revelation trigger in this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2711,6 +2724,116 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `Every one of the ${payoffScenes504c.length} payoff scenes — scenes that resolve a previously planted narrative promise — contains no dialogue. Thread resolutions land in complete silence: the moments the audience has been waiting for since the setup pass without any character naming, acknowledging, or responding to what has just been resolved. Payoff scenes are the dramatic culmination of foreshadowed expectations; they deserve speech that registers the weight of what is being fulfilled or denied.`,
             suggestedFix: `Give at least one payoff scene a dialogue line that acknowledges what has just been resolved — a character who names the significance of what happened, who responds to the fulfilled or broken promise, or whose speech demonstrates that the thread has landed with emotional weight. Payoffs are most powerful when a voice confirms what the audience has been waiting to see.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 518: SEED_SCENE_DIALOGUE_ABSENT, RELATIONSHIP_SHIFT_SCENE_DIALOGUE_ABSENT,
+  //              DIALOGUE_REVELATION_AFTERMATH_SILENT ─────────────────────────────────────────────
+  {
+    const n518 = records.length;
+    const lineToScene518 = buildLineToSceneMap(fountain);
+    const dlgPerScene518 = new Map<number, number>();
+    for (const d of dialogue) {
+      const si = lineToScene518[d.lineNum - 1] ?? -1;
+      if (si >= 0) dlgPerScene518.set(si, (dlgPerScene518.get(si) ?? 0) + 1);
+    }
+    const scenesWithDlg518 = (records as any[]).filter(
+      r => (dlgPerScene518.get(r.sceneIdx) ?? 0) > 0,
+    ).length;
+
+    if (n518 >= 8 && scenesWithDlg518 >= 3) {
+      // SEED_SCENE_DIALOGUE_ABSENT (co-occurrence/decoupling × seed event × dialogue absence, n≥8,
+      // ≥2 seed scenes, ≥3 scenes with dialogue, all seed scenes have zero dialogue lines): Clue-
+      // planting happens entirely in silence without any character voice confirming what is being
+      // planted or acknowledging its significance. Seeds are the promises a screenplay makes to its
+      // audience; when every seed scene is silent, those promises are buried without verbal
+      // registration, reducing the planted material's emotional accessibility and memorability.
+      // Distinct from: PAYOFF_SCENE_DIALOGUE_ABSENT (Wave 504: payoff event — resolution vs.
+      // planting), DIALOGUE_REVELATION_SCENE_VOID (Wave 448: revelation event), DIALOGUE_DRAMATIC_
+      // TURN_SCENE_VOID (Wave 462: dramatic turn), DIALOGUE_CLOCK_SCENE_VOID (Wave 476: clock).
+      // Fills the seed-channel cell in the event-type co-occurrence set alongside payoff/revelation/
+      // dramatic-turn/clock voids.
+      const seedScenes518a = (records as any[]).filter(
+        r => ((r.seededClueIds ?? []) as any[]).length > 0,
+      );
+      if (seedScenes518a.length >= 2) {
+        const allSeedSilent518a = seedScenes518a.every(
+          r => (dlgPerScene518.get(r.sceneIdx) ?? 0) === 0,
+        );
+        if (allSeedSilent518a) {
+          issues.push({
+            location: `${seedScenes518a.length} seed scene(s) — all have no dialogue`,
+            rule: 'SEED_SCENE_DIALOGUE_ABSENT',
+            severity: 'minor',
+            description: `Every one of the ${seedScenes518a.length} scenes that plant narrative clues or setups (non-empty seededClueIds) contains no dialogue. Clue-planting happens entirely in silence — the story embeds its most significant foreshadowing beats without any character voice confirming, noticing, or touching what is being planted. Seeds are the promises a screenplay makes to its audience; when every seed scene is silent, those promises are buried without verbal registration, reducing the planted material's memorability and emotional accessibility for the eventual payoff.`,
+            suggestedFix: `Give at least one seed scene a dialogue line that touches the planted clue — a character who notices a detail and says nothing more, who asks an innocent question that gains full meaning only in retrospect, or who names something that the audience will later understand differently. The most powerful seeds are planted in dialogue that is innocuous on first viewing but retrospectively charged.`,
+          });
+        }
+      }
+
+      // RELATIONSHIP_SHIFT_SCENE_DIALOGUE_ABSENT (co-occurrence/decoupling × relationship-shift
+      // event × dialogue absence, n≥8, ≥2 relationship-shift scenes, ≥3 scenes with dialogue, all
+      // relationship-shift scenes have zero dialogue lines): Bond changes happen entirely in silence
+      // without any character speaking to or about one another in the moment of the shift. Relationship
+      // shifts are among the most human events a story can depict; they are most powerfully felt when
+      // characters speak to each other in the moment of change. Distinct from all existing co-occurrence
+      // checks (each uses a different event type or emotional register): PAYOFF_SCENE_DIALOGUE_ABSENT
+      // (payoff), REVELATION_SCENE_VOID (revelation), DRAMATIC_TURN_SCENE_VOID (dramatic turn),
+      // CLOCK_SCENE_VOID (clock), POSITIVE_SCENE_VOID / NEGATIVE_SCENE_VOID (emotional register).
+      // Fills the relationship-shift cell in the event-type co-occurrence family.
+      const relScenes518b = (records as any[]).filter(
+        r => ((r.relationshipShifts ?? []) as any[]).length > 0,
+      );
+      if (relScenes518b.length >= 2) {
+        const allRelSilent518b = relScenes518b.every(
+          r => (dlgPerScene518.get(r.sceneIdx) ?? 0) === 0,
+        );
+        if (allRelSilent518b) {
+          issues.push({
+            location: `${relScenes518b.length} relationship-shift scene(s) — all have no dialogue`,
+            rule: 'RELATIONSHIP_SHIFT_SCENE_DIALOGUE_ABSENT',
+            severity: 'minor',
+            description: `Every one of the ${relScenes518b.length} scenes in which a character bond shifts contains no dialogue. Bond changes — moments when characters grow closer, more distant, or fundamentally altered in how they relate — happen entirely in silence without any character speaking in the moment of change. Relationship shifts are most powerfully felt when characters speak to each other while the bond moves: the bond's weight is confirmed by what is said or pointedly not said between the people involved.`,
+            suggestedFix: `Give at least one relationship-shift scene a line of dialogue — a character who speaks directly to the person the bond is shifting with, whose words carry the weight of what is changing between them. The line does not need to name the shift explicitly; even an indirect, oblique exchange that registers the altered dynamic between characters gives the bond change its human dimension.`,
+          });
+        }
+      }
+    }
+
+    // DIALOGUE_REVELATION_AFTERMATH_SILENT (sequence/aftermath × revelation → dialogue absence in
+    // next scene, n≥8, ≥2 qualifying revelation scenes [revelation non-null, pos < n-1], ≥3 scenes
+    // with any dialogue, none of the immediately following scenes have dialogue): When a truth is
+    // disclosed, the next beat passes in silence without any character voice responding, negotiating,
+    // or processing what was just revealed. Revelations are among the most charged events in a
+    // screenplay — the moment when what was hidden becomes known — and the scene that follows is the
+    // most natural place for verbal registration. When that scene is silent, the revelation's weight
+    // has nowhere to go. Distinct from: DIALOGUE_REVELATION_SCENE_VOID (Wave 448: co-occurrence — the
+    // revelation scene ITSELF has no dialogue; this checks the FOLLOWING scene — aftermath direction).
+    // DIALOGUE_DENSE_AFTERMATH_SILENT (Wave 476: dense dialogue trigger → silent aftermath — different
+    // trigger event). REVELATION_RELATIONSHIP_AFTERMATH_VOID in belief.ts (aftermath × revelation ×
+    // relationship channel — different aftermath signal). First aftermath check in this pass conditioned
+    // on a revelation trigger.
+    if (n518 >= 8 && scenesWithDlg518 >= 3) {
+      const qualRevs518c = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) =>
+          r.revelation !== null && r.revelation !== '' && r.revelation !== undefined && pos < n518 - 1,
+        );
+      if (qualRevs518c.length >= 2) {
+        const anyRevAftermath518c = qualRevs518c.some(({ pos }) => {
+          const nextSceneIdx = (records as any[])[pos + 1].sceneIdx;
+          return (dlgPerScene518.get(nextSceneIdx) ?? 0) > 0;
+        });
+        if (!anyRevAftermath518c) {
+          issues.push({
+            location: `${qualRevs518c.length} revelation scene(s) — none followed by a scene with dialogue`,
+            rule: 'DIALOGUE_REVELATION_AFTERMATH_SILENT',
+            severity: 'minor',
+            description: `The script has ${qualRevs518c.length} revelation scenes, but every one is followed immediately by a scene with no dialogue. When a truth is disclosed, the next beat passes in silence without any character voice responding to, processing, or negotiating what was just revealed. The scene after a revelation is the most charged moment for verbal registration: the audience watches to hear how characters respond to the truth that has just surfaced. When that moment is silent, the revelation's emotional weight has no verbal outlet, and its impact is diminished.`,
+            suggestedFix: `After at least one revelation scene, let the following scene carry dialogue — a character's response to what was disclosed, even if indirect, evasive, or oblique. A single line that shows a character has processed the truth (or is trying not to) gives the revelation its aftermath. Silence after a disclosure can be powerful, but only as a deliberate dramatic choice; the default should be to give the truth somewhere to land in spoken language.`,
           });
         }
       }

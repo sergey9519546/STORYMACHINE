@@ -30131,6 +30131,88 @@ The lights go out.`;
     });
   });
 
+  describe('Wave 518 — dialoguePass: seed scene dialogue absent, relationship shift scene dialogue absent, revelation aftermath silent', async () => {
+    const makeRec518 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
+      sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false,
+      revelation: null, dramaticTurn: 'nothing', payoffSetupIds: [], relationshipShifts: [],
+      emotionalShift: 'neutral', seededClueIds: [], dialogueHighlights: [], unresolvedClues: [],
+      purpose: '', slug: `s${sceneIdx}`, ...extra,
+    });
+    const runD518 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    // Build n scenes; dlgFn(i) returns number of dialogue line-pairs for scene i
+    const buildScenes518 = (count: number, dlgFn: (i: number) => number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\n`;
+        const n = dlgFn(i);
+        for (let j = 0; j < n; j++) {
+          f += j % 2 === 0
+            ? `ALICE\nShe found the documents early this morning.\n\n`
+            : `BOB\nWe should leave before they close the gate.\n\n`;
+        }
+        if (n === 0) f += `The door crashes open. A figure steps from the dark.\n\n`;
+      }
+      return f;
+    };
+
+    it('SEED_SCENE_DIALOGUE_ABSENT fires when all seed scenes have no dialogue', async () => {
+      // n=10; seeds at sceneIdx 2,5 (no dialogue); other scenes (0,1,3,4,6,7,8,9) have 2 lines → fire
+      const f518a = buildScenes518(10, i => [2, 5].includes(i) ? 0 : 2);
+      const recs518a = Array.from({ length: 10 }, (_, i) =>
+        makeRec518(i, [2, 5].includes(i) ? { seededClueIds: ['clue-A'] } : {}));
+      const res = await runD518(f518a, recs518a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'SEED_SCENE_DIALOGUE_ABSENT'), 'SEED_SCENE_DIALOGUE_ABSENT should fire');
+    });
+
+    it('SEED_SCENE_DIALOGUE_ABSENT does not fire when a seed scene has dialogue', async () => {
+      // Same but sceneIdx 2 (seed) now has 2 dialogue lines → not all seeds silent → no fire
+      const f518anr = buildScenes518(10, i => i === 5 ? 0 : 2);
+      const recs518anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec518(i, [2, 5].includes(i) ? { seededClueIds: ['clue-A'] } : {}));
+      const res = await runD518(f518anr, recs518anr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'SEED_SCENE_DIALOGUE_ABSENT'), 'SEED_SCENE_DIALOGUE_ABSENT should not fire');
+    });
+
+    it('RELATIONSHIP_SHIFT_SCENE_DIALOGUE_ABSENT fires when all relationship-shift scenes have no dialogue', async () => {
+      // n=10; rel-shift scenes at sceneIdx 2,5 (no dialogue); others have 2 lines → fire
+      const f518b = buildScenes518(10, i => [2, 5].includes(i) ? 0 : 2);
+      const recs518b = Array.from({ length: 10 }, (_, i) =>
+        makeRec518(i, [2, 5].includes(i) ? { relationshipShifts: [{ from: 'A', to: 'B', delta: 1 }] } : {}));
+      const res = await runD518(f518b, recs518b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'RELATIONSHIP_SHIFT_SCENE_DIALOGUE_ABSENT'), 'RELATIONSHIP_SHIFT_SCENE_DIALOGUE_ABSENT should fire');
+    });
+
+    it('RELATIONSHIP_SHIFT_SCENE_DIALOGUE_ABSENT does not fire when a relationship-shift scene has dialogue', async () => {
+      // Same but sceneIdx 2 (rel-shift) now has dialogue → not all silent → no fire
+      const f518bnr = buildScenes518(10, i => i === 5 ? 0 : 2);
+      const recs518bnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec518(i, [2, 5].includes(i) ? { relationshipShifts: [{ from: 'A', to: 'B', delta: 1 }] } : {}));
+      const res = await runD518(f518bnr, recs518bnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'RELATIONSHIP_SHIFT_SCENE_DIALOGUE_ABSENT'), 'RELATIONSHIP_SHIFT_SCENE_DIALOGUE_ABSENT should not fire');
+    });
+
+    it('DIALOGUE_REVELATION_AFTERMATH_SILENT fires when no revelation is followed by a scene with dialogue', async () => {
+      // n=10; revelations at pos 2,5; next scenes (3,6) have no dialogue; other scenes have 2 lines → fire
+      const f518c = buildScenes518(10, i => [3, 6].includes(i) ? 0 : 2);
+      const recs518c = Array.from({ length: 10 }, (_, i) =>
+        makeRec518(i, [2, 5].includes(i) ? { revelation: 'Truth revealed.' } : {}));
+      const res = await runD518(f518c, recs518c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_REVELATION_AFTERMATH_SILENT'), 'DIALOGUE_REVELATION_AFTERMATH_SILENT should fire');
+    });
+
+    it('DIALOGUE_REVELATION_AFTERMATH_SILENT does not fire when a revelation is followed by a scene with dialogue', async () => {
+      // Same but scene 3 (after revelation at 2) has dialogue → anyRevAftermath=true → no fire
+      const f518cnr = buildScenes518(10, i => i === 6 ? 0 : 2);
+      const recs518cnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec518(i, [2, 5].includes(i) ? { revelation: 'Truth revealed.' } : {}));
+      const res = await runD518(f518cnr, recs518cnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_REVELATION_AFTERMATH_SILENT'), 'DIALOGUE_REVELATION_AFTERMATH_SILENT should not fire');
+    });
+  });
+
   describe('Wave 504 — dialoguePass: dialogue silence run, dialogue density front heavy, payoff scene dialogue absent', async () => {
     const makeRec504 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
       sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false,
