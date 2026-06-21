@@ -109,6 +109,15 @@
 // checks), relationship Act 2a void (zone presence/absence × Act 2a — no shift in the 25%–50%
 // zone while ≥3 shifts exist in the rest; completes the zone set alongside Act 1 void, midpoint
 // freeze, Act 2b desert, and relationship climax void).
+// Wave 497 additions: relationship shift clock aftermath void (sequence/aftermath × clock channel
+// — no shift scene followed by a clock raise in next 2 scenes while ≥2 clock scenes exist; adds
+// clock to the shift-aftermath family alongside curiosity, suspense, emotional, and revelation),
+// relationship warmth cluster (distribution/timing × positive shift × thirds — >75% of positive
+// shifts in one third while ≥4 positive shifts exist; the positive-shift sibling of RELATIONSHIP_
+// SHIFT_THIRDS_CLUSTER which aggregates all shifts regardless of valence), relationship dimension
+// run (run-based × shift dimension — ≥4 consecutive shift scenes all using only one relationship
+// dimension while ≥2 distinct dimensions exist globally; a local single-axis burst distinct from
+// SHIFT_DIMENSION_CONCENTRATION which audits the whole-story proportion).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2445,6 +2454,160 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         description: `No relationship shift occurs in the Act 2a zone (Scenes ${act2aStart483c}–${act2aEnd483c - 1}, 25%–50%) while ${outsideShifts483c} shifts appear in the rest of the story. The early-conflict zone is where established bonds should be tested: Act 1 introduced the relationships, and the complication that opens Act 2 should start cracking them. When Act 2a is relationally silent, the story's central complications begin but none of the human bonds move in response — the characters are under pressure but the pressure doesn't affect how they relate to each other.`,
         suggestedFix: `Add at least one relationship shift in Scenes ${act2aStart483c}–${act2aEnd483c - 1}: an early complication that puts two characters at odds, a moment of unexpected alliance under pressure, or a subtle warming or cooling that foreshadows a larger Act 2b rupture or repair. The shift doesn't need to be large — even a minor bond move in the early-conflict zone tells the audience that the story's pressure is affecting the relationships, not just the plot.`,
       });
+    }
+  }
+
+  // ── Wave 497: RELATIONSHIP_SHIFT_CLOCK_AFTERMATH_VOID, RELATIONSHIP_WARMTH_CLUSTER, RELATIONSHIP_DIMENSION_RUN ──
+
+  // RELATIONSHIP_SHIFT_CLOCK_AFTERMATH_VOID (sequence/aftermath × clock channel × shift trigger,
+  // n≥8, ≥2 qualifying shift scenes, ≥2 clock scenes overall): No relationship-shift scene is
+  // followed by a clock raise (clockRaised or clockDelta > 0) in either of the next two scenes,
+  // even though the story uses clocks elsewhere. Bond changes never tighten a deadline in their
+  // wake — when a pair's dynamic shifts, the story's urgency system is unaffected. A relational
+  // fracture or repair should have temporal consequences: the lost ally shortens time, the betrayal
+  // forces a crisis response, the new bond creates an obligation that must be met before a deadline.
+  // When every shift is followed by clock silence, the relational and urgency engines run in
+  // entirely separate tracks. Sequence/aftermath mode × clock channel × shift trigger. Distinct from
+  // RELATIONSHIP_CLOCK_DECOUPLED (Wave 371: no shift scene coincides with a clock IN the same scene
+  // — co-occurrence, not aftermath), RELATIONSHIP_SHIFT_CURIOSITY_VOID (Wave 455: curiosity channel),
+  // RELATIONSHIP_SHIFT_SUSPENSE_AFTERMATH_VOID (Wave 469: suspense channel), RELATIONSHIP_SHIFT_
+  // EMOTIONAL_AFTERMATH_VOID (Wave 469: emotional channel), RELATIONSHIP_SHIFT_REVELATION_AFTERMATH_
+  // VOID (Wave 483: revelation channel): this adds clock as the sixth channel in the shift-aftermath
+  // family.
+  {
+    const n497a = records.length;
+    if (n497a >= 8) {
+      const clockScenes497a = (records as any[]).filter(r =>
+        r.clockRaised === true || (r.clockDelta ?? 0) > 0,
+      );
+      const qualShiftScenes497a = (records as any[]).filter((r, pos) =>
+        ((r.relationshipShifts ?? []) as any[]).length > 0 && pos < n497a - 2,
+      );
+      if (qualShiftScenes497a.length >= 2 && clockScenes497a.length >= 2) {
+        const anyClockAfterShift497a = qualShiftScenes497a.some((r: any) => {
+          const pos497a = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos497a + off];
+            if (nxt && (nxt.clockRaised === true || (nxt.clockDelta ?? 0) > 0)) return true;
+          }
+          return false;
+        });
+        if (!anyClockAfterShift497a) {
+          issues.push({
+            location: `All ${qualShiftScenes497a.length} qualifying shift scene(s) — no clock raise within 2 scenes`,
+            rule: 'RELATIONSHIP_SHIFT_CLOCK_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `None of the story's ${qualShiftScenes497a.length} relationship-shift scenes is followed by a clock raise in the next two scenes, even though ${clockScenes497a.length} clock events exist elsewhere. Bond changes — ruptures and repairs alike — have no temporal consequence: when a pair's dynamic shifts, the urgency of the story's situation is unaffected. A relational fracture or warming should press on the protagonist's time: the lost ally shortens a runway, a new bond creates an obligation with a deadline, a betrayal triggers a crisis that forces immediate action. When every shift is followed by clock silence, the emotional and urgency engines run entirely apart.`,
+            suggestedFix: `After at least one relationship shift, let the next scene or two raise the clock — the bond change reveals that the timeline has changed: the fractured alliance removes a buffer, the new partnership creates an expectation that must be met before time runs out, the revealed betrayal starts a countdown. A shift followed by a clock raise tells the audience that relationships have stakes beyond feelings — they have operational consequences.`,
+          });
+        }
+      }
+    }
+  }
+
+  // RELATIONSHIP_WARMTH_CLUSTER (distribution/timing × positive shift × thirds, n≥9,
+  // ≥4 positive-shift scenes, >75% in one third): More than three-quarters of all positive
+  // relationship shifts fall within a single structural third — warmth and repair are
+  // architecturally zone-ghettoized. A story's relational warmings should ideally be distributed
+  // to provide emotional contrast, investment hooks, and earned climax repairs. When almost all
+  // warmth concentrates in one structural zone, the audience experiences either an opening in
+  // which every relationship warms quickly (deflating later tension), a middle burst of warmth
+  // surrounded by cold zones (the warm patch feels disconnected), or a finale-concentrated warmth
+  // that arrives without enough prior relational investment. Distribution/timing mode × positive
+  // relationship shift × thirds. Distinct from RELATIONSHIP_SHIFT_THIRDS_CLUSTER (Wave 483: audits
+  // ALL shifts regardless of valence — this focuses specifically on the positive channel, which
+  // can cluster differently from the combined channel), RELATIONSHIP_WARMTH_RUN (Wave 455: run-based
+  // consecutive positive scenes, not zone distribution), POSITIVE_ONLY_PAIR_MAJORITY (Wave 290:
+  // whether pairs ever go negative, not where warmth concentrates in time).
+  {
+    const n497b = records.length;
+    if (n497b >= 9) {
+      const posShiftPositions497b = (records as any[])
+        .map((r, pos) => ({
+          pos,
+          hasWarmth: ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount > 0),
+        }))
+        .filter(x => x.hasWarmth)
+        .map(x => x.pos);
+      if (posShiftPositions497b.length >= 4) {
+        const third497b = Math.floor(n497b / 3);
+        const zone1497b = posShiftPositions497b.filter(p => p < third497b).length;
+        const zone2497b = posShiftPositions497b.filter(p => p >= third497b && p < 2 * third497b).length;
+        const zone3497b = posShiftPositions497b.filter(p => p >= 2 * third497b).length;
+        const maxZ497b = Math.max(zone1497b, zone2497b, zone3497b);
+        if (maxZ497b / posShiftPositions497b.length > 0.75) {
+          const zLabel497b = zone1497b === maxZ497b ? 'opening' : zone2497b === maxZ497b ? 'middle' : 'closing';
+          issues.push({
+            location: `${maxZ497b}/${posShiftPositions497b.length} positive shift scene(s) clustered in the ${zLabel497b} third`,
+            rule: 'RELATIONSHIP_WARMTH_CLUSTER',
+            severity: 'minor',
+            description: `${maxZ497b} of ${posShiftPositions497b.length} positive relationship shifts (${(maxZ497b / posShiftPositions497b.length * 100).toFixed(0)}%) fall within the ${zLabel497b} third — all the story's warmth and repair concentrates in one structural zone. Relational warmings work best when distributed across the story: early warmings give the audience bonds to invest in before the complications arrive, mid-story warmings provide contrast and breathing room among the ruptures, and late warmings make the finale feel earned rather than manufactured. When warmth concentrates in one zone, either the story warms too early (before tension has a chance to build on the relationships), warms in a disconnected middle burst, or saves all relational positivity for the end — where it arrives without the prior warmth that makes it meaningful.`,
+            suggestedFix: `Redistribute at least one or two positive shifts into the zones currently lacking warmth. A small warming in the opening third gives the audience a pair to root for; a mid-story warming provides relief in the darkest zone; a closing warming is only resonant if the audience has seen the pair earn their way back from earlier tension. Warmth that arrives without prior investment reads as sentimental; warmth that arrives after relationship history reads as cathartic.`,
+          });
+        }
+      }
+    }
+  }
+
+  // RELATIONSHIP_DIMENSION_RUN (run-based × shift dimension, n≥8, ≥4 consecutive shift scenes
+  // all using only one relationship dimension, ≥2 distinct dimensions exist globally): Four or
+  // more consecutive scenes that carry relationship shifts each operate on only a single shared
+  // dimension (e.g., all "trust," all "respect") — the story's relational texture goes one-axis
+  // for a sustained stretch. While a pair that exclusively tests trust is dramatically coherent,
+  // a global burst where every shift scene operates on the same dimension suggests the story's
+  // relational complexity has narrowed to a single register: the audience experiences only one
+  // kind of bond change for a sustained sequence, losing the multi-axis texture that makes
+  // relationships feel fully inhabited. Run-based mode × shift dimension × consecutive scenes.
+  // Distinct from SHIFT_DIMENSION_CONCENTRATION (Wave 290: ALL shifts across the whole story
+  // share one dimension — a global proportion check, not a local consecutive run; that fires
+  // when the story never diversifies, this fires when diversification exists globally but
+  // collapses locally). The pair-based PAIR_CLOCK_FLAT, PAIR_DRAMA_FLAT etc. are per-pair; this
+  // is a global consecutive-run check on the dimension channel.
+  {
+    const n497c = records.length;
+    if (n497c >= 8) {
+      const globalDims497c = new Set<string>();
+      for (const r of records as any[]) {
+        for (const s of (r.relationshipShifts ?? []) as Array<{ dimension: string }>) {
+          if (s.dimension) globalDims497c.add(s.dimension);
+        }
+      }
+      if (globalDims497c.size >= 2) {
+        let curDimRun497c = 0;
+        let curDim497c: string | null = null;
+        let maxDimRun497c = 0;
+        let maxDimRunDim497c = '';
+        for (const r of records as any[]) {
+          const shifts = (r.relationshipShifts ?? []) as Array<{ dimension: string }>;
+          if (shifts.length === 0) continue;
+          const dims497c = new Set(shifts.map(s => s.dimension).filter(Boolean));
+          if (dims497c.size === 1) {
+            const dim = [...dims497c][0];
+            if (dim === curDim497c) {
+              curDimRun497c++;
+            } else {
+              curDimRun497c = 1;
+              curDim497c = dim;
+            }
+            if (curDimRun497c > maxDimRun497c) {
+              maxDimRun497c = curDimRun497c;
+              maxDimRunDim497c = dim;
+            }
+          } else {
+            curDimRun497c = 0;
+            curDim497c = null;
+          }
+        }
+        if (maxDimRun497c >= 4) {
+          issues.push({
+            location: `${maxDimRun497c} consecutive shift scene(s) all operating on the "${maxDimRunDim497c}" dimension`,
+            rule: 'RELATIONSHIP_DIMENSION_RUN',
+            severity: 'minor',
+            description: `${maxDimRun497c} consecutive scenes that carry relationship shifts each operate exclusively on the "${maxDimRunDim497c}" dimension — the relational texture narrows to a single axis for a sustained stretch. Even though the story uses multiple relationship dimensions overall, this local burst collapses them all to one register: the audience experiences the same kind of bond change four or more times in a row, losing the multi-axis texture that makes relationships feel fully inhabited. The "${maxDimRunDim497c}" dimension is a legitimate site of dramatic conflict, but a run of this length signals that the story is testing one register at the expense of the others — trust vs. respect vs. intimacy vs. loyalty — and the relational world becomes temporarily one-dimensional.`,
+            suggestedFix: `Break the dimension run by letting at least one of the consecutive shift scenes also carry a shift in a different dimension — a moment where the "${maxDimRunDim497c}" shift also has an implication for respect, intimacy, or loyalty. Two-dimension scenes add texture and signal that real relationships are never just one thing. Even a small secondary-dimension shift in the middle of the run restores the sense that the bonds are complex.`,
+          });
+        }
+      }
     }
   }
 

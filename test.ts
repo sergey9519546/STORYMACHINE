@@ -20801,6 +20801,89 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 497 — relationshipArcPass: shift clock aftermath void, warmth cluster, dimension run', async () => {
+    const mkShift497 = (dim: string, amount: number) => [{ pairKey: 'A|B', dimension: dim, amount }];
+    const makeRec497 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const runRA497 = async (records: any[]) => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // RELATIONSHIP_SHIFT_CLOCK_AFTERMATH_VOID fire:
+    // n=10; shifts at 1,3; clocks at 8,9 (not within 2 of shifts)
+    it('RELATIONSHIP_SHIFT_CLOCK_AFTERMATH_VOID fires when no shift is followed by a clock raise within 2 scenes', async () => {
+      const recs497a: any[] = Array.from({ length: 10 }, (_, i) => makeRec497(i, {
+        relationshipShifts: [1, 3].includes(i) ? mkShift497('trust', -0.5) : [],
+        clockRaised: [8, 9].includes(i),
+      }));
+      const res = await runRA497(recs497a);
+      assert.ok(res.issues.some((x: any) => x.rule === 'RELATIONSHIP_SHIFT_CLOCK_AFTERMATH_VOID'), 'RELATIONSHIP_SHIFT_CLOCK_AFTERMATH_VOID should fire');
+    });
+
+    // RELATIONSHIP_SHIFT_CLOCK_AFTERMATH_VOID no-fire: clock at scene 4 follows shift at scene 3
+    it('RELATIONSHIP_SHIFT_CLOCK_AFTERMATH_VOID does not fire when at least one shift is followed by a clock raise', async () => {
+      const recs497an: any[] = Array.from({ length: 10 }, (_, i) => makeRec497(i, {
+        relationshipShifts: [1, 3].includes(i) ? mkShift497('trust', -0.5) : [],
+        clockRaised: [4, 8].includes(i),
+      }));
+      const res = await runRA497(recs497an);
+      assert.ok(!res.issues.some((x: any) => x.rule === 'RELATIONSHIP_SHIFT_CLOCK_AFTERMATH_VOID'), 'RELATIONSHIP_SHIFT_CLOCK_AFTERMATH_VOID should not fire');
+    });
+
+    // RELATIONSHIP_WARMTH_CLUSTER fire:
+    // n=12; third=4; positive shifts at 0,1,2,3 all in zone1 → 4/4=100% > 75%
+    it('RELATIONSHIP_WARMTH_CLUSTER fires when >75% of positive shifts are in one structural third', async () => {
+      const recs497b: any[] = Array.from({ length: 12 }, (_, i) => makeRec497(i, {
+        relationshipShifts: [0, 1, 2, 3].includes(i) ? mkShift497('trust', 0.5) : [],
+      }));
+      const res = await runRA497(recs497b);
+      assert.ok(res.issues.some((x: any) => x.rule === 'RELATIONSHIP_WARMTH_CLUSTER'), 'RELATIONSHIP_WARMTH_CLUSTER should fire');
+    });
+
+    // RELATIONSHIP_WARMTH_CLUSTER no-fire: 4 positive shifts spread across thirds
+    it('RELATIONSHIP_WARMTH_CLUSTER does not fire when positive shifts are distributed across thirds', async () => {
+      // n=12; third=4; positive shifts at 1,5,9,11 → zone1=1,zone2=2,zone3=1; max=2/4=50% → no fire
+      const recs497bn: any[] = Array.from({ length: 12 }, (_, i) => makeRec497(i, {
+        relationshipShifts: [1, 5, 9, 11].includes(i) ? mkShift497('trust', 0.5) : [],
+      }));
+      const res = await runRA497(recs497bn);
+      assert.ok(!res.issues.some((x: any) => x.rule === 'RELATIONSHIP_WARMTH_CLUSTER'), 'RELATIONSHIP_WARMTH_CLUSTER should not fire');
+    });
+
+    // RELATIONSHIP_DIMENSION_RUN fire:
+    // n=10; shifts at scenes 0,2,4,6,8 (all single-dimension "trust") while scene 1 has "respect"
+    // → globalDims={'trust','respect'} (≥2), consecutive trust shift scenes: 0,2,4,6,8 → run of 5
+    it('RELATIONSHIP_DIMENSION_RUN fires when 4+ consecutive shift scenes all use one dimension', async () => {
+      const recs497c: any[] = Array.from({ length: 10 }, (_, i) => makeRec497(i, {
+        relationshipShifts: i === 1
+          ? [{ pairKey: 'A|C', dimension: 'respect', amount: 0.3 }]
+          : [0, 2, 4, 6, 8].includes(i) ? mkShift497('trust', -0.4) : [],
+      }));
+      const res = await runRA497(recs497c);
+      assert.ok(res.issues.some((x: any) => x.rule === 'RELATIONSHIP_DIMENSION_RUN'), 'RELATIONSHIP_DIMENSION_RUN should fire');
+    });
+
+    // RELATIONSHIP_DIMENSION_RUN no-fire: run is only 3 consecutive trust-only shift scenes
+    it('RELATIONSHIP_DIMENSION_RUN does not fire when no run of 4 consecutive single-dimension shift scenes exists', async () => {
+      // shift scenes: 0(trust), 1(trust+respect breaks run), 2(trust), 3(trust), 4(trust) → max run=3
+      const recs497cn: any[] = Array.from({ length: 10 }, (_, i) => makeRec497(i, {
+        relationshipShifts: i === 1
+          ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.3 }, { pairKey: 'A|C', dimension: 'respect', amount: 0.2 }]
+          : [0, 2, 3, 4].includes(i) ? mkShift497('trust', -0.4) : [],
+      }));
+      const res = await runRA497(recs497cn);
+      assert.ok(!res.issues.some((x: any) => x.rule === 'RELATIONSHIP_DIMENSION_RUN'), 'RELATIONSHIP_DIMENSION_RUN should not fire');
+    });
+  });
+
   describe('Wave 483 — relationshipArcPass: shift revelation aftermath void, shift thirds cluster, Act 2a void', async () => {
     const mkShift483 = (pairKey: string, amount: number) => [{ pairKey, dimension: 'trust', amount }];
     const makeRec483 = (idx: number, overrides: any = {}): any => ({
