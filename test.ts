@@ -34123,6 +34123,133 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 515 — voicePass: dialogue exclamation run, closing zone long absent, negation run', async () => {
+    const runV515 = async (fountain: string) => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      return voicePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DIALOGUE_EXCLAMATION_RUN fires when ≥4 consecutive dialogue lines end with "!"', async () => {
+      // 10 dialogue lines; !-run at idx 3,4,5,6 (length 4); total exclamations = 4 ≥ 3 → fires
+      const f515a = [
+        'INT. ROOM - DAY', '',
+        'He enters.', '',
+        'ALICE', 'First plain statement here.', '',
+        'BOB', 'Regular reply back.', '',
+        'ALICE', 'Another normal line there.', '',
+        'BOB', 'What excitement this is!', '',
+        'ALICE', 'This is incredible!', '',
+        'BOB', 'Amazing absolutely amazing!', '',
+        'ALICE', 'Extraordinary beyond belief!', '',
+        'BOB', 'Final normal statement.', '',
+        'ALICE', 'Closing line here.', '',
+        'BOB', 'One more line added.',
+      ].join('\n');
+      const res = await runV515(f515a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_EXCLAMATION_RUN'), 'DIALOGUE_EXCLAMATION_RUN should fire');
+    });
+
+    it('DIALOGUE_EXCLAMATION_RUN does not fire when the max consecutive exclamation run is < 4', async () => {
+      // 10 dialogue lines; !-lines scattered at idx 1,3,5 (no consecutive run ≥ 4) → no fire
+      const f515anr = [
+        'INT. ROOM - DAY', '',
+        'He enters.', '',
+        'ALICE', 'First plain statement here.', '',
+        'BOB', 'What a start this is!', '',
+        'ALICE', 'Normal middle line.', '',
+        'BOB', 'How exciting!', '',
+        'ALICE', 'Normal line after that.', '',
+        'BOB', 'Indeed remarkable!', '',
+        'ALICE', 'Final normal statement.', '',
+        'BOB', 'Closing line here.', '',
+        'ALICE', 'One more line.', '',
+        'BOB', 'Last line added.',
+      ].join('\n');
+      const res = await runV515(f515anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_EXCLAMATION_RUN'), 'DIALOGUE_EXCLAMATION_RUN should not fire');
+    });
+
+    it('DIALOGUE_CLOSING_ZONE_LONG_ABSENT fires when all ≥3 long speeches (≥10w) are in the opening/middle', async () => {
+      // 12 dialogue lines; closeStart=9; 3 long speeches at idx 0,2,4; closing zone (9-11) all terse → fires
+      const f515b = [
+        'INT. ROOM - DAY', '',
+        'He enters the room.', '',
+        'ALICE', 'This is a very long speech delivering important information with many words here.', '',
+        'BOB', 'Short reply.', '',
+        'ALICE', 'Another long speech with plenty of words covering many important points indeed now.', '',
+        'BOB', 'Brief reply.', '',
+        'ALICE', 'Yet another long speech exceeding ten words providing more detailed explanation here.', '',
+        'BOB', 'Terse answer.', '',
+        'ALICE', 'Middle section line.', '',
+        'BOB', 'Continued line.', '',
+        'ALICE', 'Short close.', '',
+        'BOB', 'Brief end.', '',
+        'ALICE', 'Final words.', '',
+        'BOB', 'Done.',
+      ].join('\n');
+      const res = await runV515(f515b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_CLOSING_ZONE_LONG_ABSENT'), 'DIALOGUE_CLOSING_ZONE_LONG_ABSENT should fire');
+    });
+
+    it('DIALOGUE_CLOSING_ZONE_LONG_ABSENT does not fire when a long speech exists in the closing 25%', async () => {
+      // Same structure but closing zone (idx 10) has a long speech ≥10 words → no fire
+      const f515bnr = [
+        'INT. ROOM - DAY', '',
+        'He enters the room.', '',
+        'ALICE', 'This is a very long speech delivering important information with many words here.', '',
+        'BOB', 'Short reply.', '',
+        'ALICE', 'Another long speech with plenty of words covering many important points indeed now.', '',
+        'BOB', 'Brief reply.', '',
+        'ALICE', 'Yet another long speech exceeding ten words providing more detailed explanation here.', '',
+        'BOB', 'Terse answer.', '',
+        'ALICE', 'Middle section line.', '',
+        'BOB', 'Continued line.', '',
+        'ALICE', 'Short close.', '',
+        'BOB', 'A substantive long speech near the end of the scene about the resolution here.', '',
+        'ALICE', 'Final words.', '',
+        'BOB', 'Done.',
+      ].join('\n');
+      const res = await runV515(f515bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_CLOSING_ZONE_LONG_ABSENT'), 'DIALOGUE_CLOSING_ZONE_LONG_ABSENT should not fire');
+    });
+
+    it('DIALOGUE_NEGATION_RUN fires when ≥4 consecutive dialogue lines contain a negation', async () => {
+      // 8 dialogue lines; negation run at idx 2,3,4,5 (won't, not, can't, nobody) → maxNegRun=4 → fires
+      const f515c = [
+        'INT. ROOM - DAY', '',
+        'He enters.', '',
+        'ALICE', 'A normal opening statement here.', '',
+        'BOB', 'Reply here today.', '',
+        'ALICE', "She won't do that.", '',
+        'BOB', "It's not right here.", '',
+        'ALICE', "She can't accept.", '',
+        'BOB', 'Nobody will know.', '',
+        'ALICE', 'Normal middle line.', '',
+        'BOB', 'Final line here.',
+      ].join('\n');
+      const res = await runV515(f515c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_NEGATION_RUN'), 'DIALOGUE_NEGATION_RUN should fire');
+    });
+
+    it('DIALOGUE_NEGATION_RUN does not fire when negations are scattered with no consecutive run ≥ 4', async () => {
+      // 8 dialogue lines; negations at idx 1,3,5 scattered (max run = 1) → no fire
+      const f515cnr = [
+        'INT. ROOM - DAY', '',
+        'He enters.', '',
+        'ALICE', 'A normal opening statement here.', '',
+        'BOB', "She won't do that.", '',
+        'ALICE', 'I think it is alright.', '',
+        'BOB', "It's not right here.", '',
+        'ALICE', 'Normal line here.', '',
+        'BOB', "She can't accept.", '',
+        'ALICE', 'Normal middle line.', '',
+        'BOB', 'Final line here.',
+      ].join('\n');
+      const res = await runV515(f515cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_NEGATION_RUN'), 'DIALOGUE_NEGATION_RUN should not fire');
+    });
+  });
+
   describe('Wave 501 — voicePass: dialogue question aftermath terse, opening zone exclamation absent, peak long early', async () => {
     const runV501 = async (fountain: string) => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');

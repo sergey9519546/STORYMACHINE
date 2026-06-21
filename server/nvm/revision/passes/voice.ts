@@ -115,6 +115,19 @@
 // longest speech ≥10 words is in the first 25%, ≥3 long speeches exist in the rest; the inverse of
 // DIALOGUE_OPENING_ZONE_LONG_ABSENT and distinct from DIALOGUE_LENGTH_OUTLIER which checks ratio to
 // mean rather than zonal position; first single-peak isolation check using positional zone).
+// Wave 515 additions: dialogue exclamation run (run-based × exclamation mark — ≥10 dialogue lines,
+// ≥3 !-ending lines globally, maxExclRun ≥4; the "!"-channel complement of DIALOGUE_QUESTION_RUN
+// and DIALOGUE_ASSERTION_RUN, completing the end-punctuation run triptych; distinct from DIALOGUE_
+// EXCLAMATION_ZONE_CLUSTER which checks third-level distribution, not consecutive adjacency),
+// dialogue closing zone long absent (zone presence/absence × closing 25% × long speech absent —
+// ≥12 dialogue lines, ≥3 long speeches ≥10 words globally, none in the closing 25%; fills the
+// closing-zone × speech-length cell alongside DIALOGUE_CLOSING_ZONE_QUESTION_ABSENT; distinct from
+// DIALOGUE_OPENING_ZONE_LONG_ABSENT which checks the opening zone and DIALOGUE_PEAK_LONG_EARLY
+// which finds the single peak in the opening zone), dialogue negation run (run-based × negation
+// content — ≥8 dialogue lines, ≥3 negation-containing lines globally, maxNegRun ≥4; the first
+// run-based check on the negation content channel rather than end-punctuation; distinct from
+// DIALOGUE_NEGATION_FLOOD which is a global proportion check that cannot detect concentrated
+// local runs while the overall proportion stays below threshold).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2866,6 +2879,127 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
           description: `The script's longest dialogue speech (${peakWC501c} words, dialogue line ${peakPos501c + 1}) falls in the opening 25% of dialogue, while ${restLong501c} other long speeches (≥10 words) appear in the remaining 75%. The maximum verbal elaboration arrives before the scene has developed the dramatic stakes that would justify it. A long speech earns its length by arriving under pressure — when the audience already cares about what the character is saying. Front-loading the peak length makes the opening's elaboration feel like exposition rather than expression, and makes the later long speeches feel like diminished repetitions of an early extravagance.`,
           suggestedFix: `Move the most elaborate speech later in the scene, or trim the opening speech to match the register of the opening zone and save the maximum verbal elaboration for a later moment when dramatic pressure has had time to build. A long speech delivered under developing pressure lands with more weight than the same speech delivered when the audience is still orienting to the scene.`,
         });
+      }
+    }
+  }
+
+  // ── Wave 515: DIALOGUE_EXCLAMATION_RUN, DIALOGUE_CLOSING_ZONE_LONG_ABSENT,
+  //              DIALOGUE_NEGATION_RUN ──────────────────────────────────────────────────────────
+  {
+    const dlg515: string[] = [];
+    let inDlg515 = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg515 = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg515 = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg515 = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg515) dlg515.push(t);
+    }
+
+    // DIALOGUE_EXCLAMATION_RUN (run-based × exclamation mark, ≥10 dialogue lines, ≥3 !-ending
+    // lines globally, maxExclRun ≥4): Four or more consecutive dialogue lines each end with "!".
+    // A sustained run of exclamations collapses emotional intensity into a monotone outcry where
+    // every line peaks at the same register, draining force from each individual exclamation.
+    // Intensification only works when it rises from a baseline; when the baseline IS the peak,
+    // the register is uniformly heightened and the audience stops reading the exclamation as
+    // emphasis. Distinctness: DIALOGUE_EXCLAMATION_ZONE_CLUSTER (Wave 487: distribution/timing
+    // × thirds — fires when >75% of !-ending lines cluster in one structural third of the script;
+    // does not detect local consecutive runs within a narrow span). DIALOGUE_OPENING_ZONE_
+    // EXCLAMATION_ABSENT (Wave 501: zone presence/absence × opening zone — zero !-lines in the
+    // first 25%). DIALOGUE_QUESTION_RUN (Wave 445: run-based × "?" channel) and DIALOGUE_
+    // ASSERTION_RUN (Wave 459: run-based × plain declarative) are the two existing run-based
+    // end-punctuation checks; this adds the "!" member to complete the triptych. No existing
+    // check catches ≥4 consecutive !-ending lines regardless of their total proportion.
+    if (dlg515.length >= 10) {
+      const exclTotal515a = dlg515.filter(t => t.trimEnd().endsWith('!')).length;
+      if (exclTotal515a >= 3) {
+        let curExcl515a = 0, maxExcl515a = 0;
+        for (const line of dlg515) {
+          if (line.trimEnd().endsWith('!')) {
+            if (++curExcl515a > maxExcl515a) maxExcl515a = curExcl515a;
+          } else {
+            curExcl515a = 0;
+          }
+        }
+        if (maxExcl515a >= 4) {
+          issues.push({
+            location: 'Dialogue exchange',
+            rule: 'DIALOGUE_EXCLAMATION_RUN',
+            severity: 'minor',
+            description: `${maxExcl515a} consecutive dialogue lines each end with an exclamation mark — every line in the run peaks at the same register of intensity, draining force from each individual exclamation. Intensification requires a baseline to rise from; when every line is already at maximum punctuated emphasis, there is no arc — only sustained outcry. A run of ${maxExcl515a} consecutive exclamations signals that the scene is locked in a single emotional register rather than moving through one.`,
+            suggestedFix: `Break the exclamation chain by inserting at least one plain declarative or questioning line in the run — a moment where the register drops or pivots before the next emotional spike. Exclamation marks land hardest when they arrive after a breath of less heightened speech; without the contrast, they become ambient noise rather than dramatic emphasis.`,
+          });
+        }
+      }
+    }
+
+    // DIALOGUE_CLOSING_ZONE_LONG_ABSENT (zone presence/absence × closing 25% × long speech
+    // absent, ≥12 dialogue lines, ≥3 long speeches ≥10 words globally, none in closing 25%):
+    // The scene's verbal elaboration is front-heavy — characters speak at length in the opening
+    // and middle but reduce to brief fragments as the scene resolves. When the closing zone
+    // contains no long speeches while ≥3 exist globally, the dialogue loses expressive range at
+    // the moment when the scene should be crystallizing its meaning most fully. Zone presence/
+    // absence mode × closing 25% × long speech. Distinctness: DIALOGUE_OPENING_ZONE_LONG_ABSENT
+    // (Wave 473: opening zone × long speech absent — the inverse failure, where the opening is
+    // terse while the rest elaborates). DIALOGUE_PEAK_LONG_EARLY (Wave 501: single-peak isolation
+    // × opening zone — the SINGLE longest speech is in the first 25%; this fires when ZERO long
+    // speeches exist in the CLOSING 25% while ≥3 appear globally — a different failure mode).
+    // DIALOGUE_LENGTH_OUTLIER (Wave 431: ratio to mean, position-agnostic). Fills the closing-zone
+    // × long-speech cell alongside DIALOGUE_CLOSING_ZONE_QUESTION_ABSENT (Wave 487: closing-zone
+    // × question absent — same zone, different signal).
+    if (dlg515.length >= 12) {
+      const closeStart515b = Math.floor(dlg515.length * 0.75);
+      const wc515b = dlg515.map(t => t.split(/\s+/).filter(Boolean).length);
+      const globalLong515b = wc515b.filter(w => w >= 10).length;
+      if (globalLong515b >= 3) {
+        const closingLong515b = wc515b.slice(closeStart515b).filter(w => w >= 10).length;
+        if (closingLong515b === 0) {
+          issues.push({
+            location: `Dialogue — ${globalLong515b} long speeches globally, none in closing 25% (last ${dlg515.length - closeStart515b} lines)`,
+            rule: 'DIALOGUE_CLOSING_ZONE_LONG_ABSENT',
+            severity: 'minor',
+            description: `The script has ${globalLong515b} long dialogue speeches (≥10 words) but none fall in the closing 25% of dialogue (the last ${dlg515.length - closeStart515b} lines). The scene's verbal elaboration is front-heavy: characters speak at length in the opening and middle, then reduce to brief fragments as the scene resolves. A closing zone without any substantive speeches signals that the dialogue surrenders its expressive range at the moment when the scene should be crystallizing its meaning most fully — the final beats default to terseness rather than culmination.`,
+            suggestedFix: `Add at least one substantive speech (≥10 words) in the closing 25% of dialogue — a moment of full verbal commitment near the scene's resolution. The final zone is where meaning is most under pressure; terse fragments can land powerfully only when they follow a longer statement that the terseness then condenses. Brief closings feel earned only when they arrive after elaboration, not as a default silence.`,
+          });
+        }
+      }
+    }
+
+    // DIALOGUE_NEGATION_RUN (run-based × negation content, ≥8 dialogue lines, ≥3 negation-
+    // containing lines globally, maxNegRun ≥4): Four or more consecutive dialogue lines each
+    // contain a negation word. A sustained run of denials and refusals collapses dialogue into
+    // a wall of rejection — no one asserts, moves, or commits to anything affirmative across
+    // the stretch. While individual negations are dramatically essential (refusal, denial,
+    // resistance), four consecutive lines of negation signal that the scene is stuck in a mode
+    // of mutual obstruction with no forward motion. Distinctness: DIALOGUE_NEGATION_FLOOD (Wave
+    // 417: global proportion >40% containing negation — a script-wide rate that cannot detect
+    // a concentrated local run while overall proportion stays below threshold). DIALOGUE_QUESTION_
+    // RUN (Wave 445: run-based × "?" channel), DIALOGUE_ASSERTION_RUN (Wave 459: run-based ×
+    // plain declarative), and DIALOGUE_EXCLAMATION_RUN (this wave: run-based × "!" channel) are
+    // the end-punctuation run family; this is the first run-based check on the negation CONTENT
+    // channel rather than end-punctuation marks — a distinct signal dimension.
+    if (dlg515.length >= 8) {
+      const NEG_PAT515c = /\b(no|not|never|nothing|nobody|none|nor|neither|without|can't|won't|don't|isn't|aren't|wasn't|weren't|hasn't|haven't|hadn't|couldn't|wouldn't|shouldn't|doesn't|didn't|cannot|no one)\b/i;
+      const negTotal515c = dlg515.filter(t => NEG_PAT515c.test(t)).length;
+      if (negTotal515c >= 3) {
+        let curNeg515c = 0, maxNeg515c = 0;
+        for (const line of dlg515) {
+          if (NEG_PAT515c.test(line)) {
+            if (++curNeg515c > maxNeg515c) maxNeg515c = curNeg515c;
+          } else {
+            curNeg515c = 0;
+          }
+        }
+        if (maxNeg515c >= 4) {
+          issues.push({
+            location: 'Dialogue exchange',
+            rule: 'DIALOGUE_NEGATION_RUN',
+            severity: 'minor',
+            description: `${maxNeg515c} consecutive dialogue lines each contain a negation (no, not, never, nothing, nobody, etc.) — the dialogue sustains an unbroken wall of refusal and denial with no forward motion across the run. When consecutive lines all reject, deny, or negate without any affirmation or assertion breaking the chain, the scene signals that no one is moving toward anything: the characters are talking around a void rather than toward each other. Negation is dramatically essential — refusal and resistance drive conflict — but a run of ${maxNeg515c} consecutive negations collapses into mutual obstruction without the positive desire that gives refusal its tension.`,
+            suggestedFix: `Break the negation run with at least one line that asserts, desires, or commits to something affirmative — even a small forward motion: a want, a declaration, a question that reaches toward rather than refuses. The most powerful dramatic denials land when they arrive after an assertion: "I do want this. But I can't accept those terms." is more potent than four consecutive refusals, because the refusal has something to deny.`,
+          });
+        }
       }
     }
   }
