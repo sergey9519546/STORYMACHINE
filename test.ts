@@ -19552,6 +19552,80 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 527 — structurePass: clock run, turn emotion decoupled, revelation aftermath emotion void', async () => {
+    const makeRec527 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const runST527 = async (records: any[]) => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      return structurePass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // CLOCK_RUN fire: n=10; clockRaised at 2,3,4,5,6 (5 consecutive) → maxRun=5 → fires
+    it('CLOCK_RUN fires when 5+ consecutive scenes all have clockRaised', async () => {
+      const recs527a = Array.from({ length: 10 }, (_, i) => makeRec527(i, {
+        clockRaised: i >= 2 && i <= 6,
+      }));
+      const res = await runST527(recs527a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_RUN'), 'CLOCK_RUN should fire');
+    });
+
+    // CLOCK_RUN no-fire: clockRaised at 1,3,5,7 (alternating) → maxRun=1 → no fire
+    it('CLOCK_RUN does not fire when no 5 consecutive clock scenes exist', async () => {
+      const recs527anr = Array.from({ length: 10 }, (_, i) => makeRec527(i, {
+        clockRaised: [1, 3, 5, 7].includes(i),
+      }));
+      const res = await runST527(recs527anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_RUN'), 'CLOCK_RUN should not fire');
+    });
+
+    // TURN_EMOTION_DECOUPLED fire: n=10; turns at 1,4; emotional at 7,9 → no overlap → fires
+    it('TURN_EMOTION_DECOUPLED fires when dramatic turns and emotional scenes never coincide', async () => {
+      const recs527b = Array.from({ length: 10 }, (_, i) => makeRec527(i, {
+        dramaticTurn: [1, 4].includes(i) ? 'reversal' : 'nothing',
+        emotionalShift: [7, 9].includes(i) ? 'positive' : 'neutral',
+      }));
+      const res = await runST527(recs527b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TURN_EMOTION_DECOUPLED'), 'TURN_EMOTION_DECOUPLED should fire');
+    });
+
+    // TURN_EMOTION_DECOUPLED no-fire: scene 4 has both turn AND emotional → co-occurrence → no fire
+    it('TURN_EMOTION_DECOUPLED does not fire when at least one turn scene is also emotionally charged', async () => {
+      const recs527bnr = Array.from({ length: 10 }, (_, i) => makeRec527(i, {
+        dramaticTurn: [1, 4].includes(i) ? 'reversal' : 'nothing',
+        emotionalShift: [4, 7].includes(i) ? 'negative' : 'neutral',
+      }));
+      const res = await runST527(recs527bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TURN_EMOTION_DECOUPLED'), 'TURN_EMOTION_DECOUPLED should not fire');
+    });
+
+    // REVELATION_AFTERMATH_EMOTION_VOID fire: n=10; revelations at 1,3,5; emotional at 8,9 (outside all 2-scene windows)
+    it('REVELATION_AFTERMATH_EMOTION_VOID fires when no revelation is followed by emotional charge within 2 scenes', async () => {
+      const recs527c = Array.from({ length: 10 }, (_, i) => makeRec527(i, {
+        revelation: [1, 3, 5].includes(i) ? 'truth revealed' : null,
+        emotionalShift: [8, 9].includes(i) ? 'positive' : 'neutral',
+      }));
+      const res = await runST527(recs527c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_AFTERMATH_EMOTION_VOID'), 'REVELATION_AFTERMATH_EMOTION_VOID should fire');
+    });
+
+    // REVELATION_AFTERMATH_EMOTION_VOID no-fire: revelation at 1, emotional at 2 → scene 2 is in the window → no fire
+    it('REVELATION_AFTERMATH_EMOTION_VOID does not fire when at least one revelation is followed by emotional charge', async () => {
+      const recs527cnr = Array.from({ length: 10 }, (_, i) => makeRec527(i, {
+        revelation: [1, 3, 5].includes(i) ? 'truth revealed' : null,
+        emotionalShift: [2, 9].includes(i) ? 'negative' : 'neutral',
+      }));
+      const res = await runST527(recs527cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_AFTERMATH_EMOTION_VOID'), 'REVELATION_AFTERMATH_EMOTION_VOID should not fire');
+    });
+  });
+
   describe('Wave 513 — structurePass: clock turn decoupled, curiosity run, turn aftermath suspense void', async () => {
     const makeRec513 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
