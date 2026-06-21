@@ -85,6 +85,15 @@
 // co-occurrence/decoupling × payoff × dramatic turn), revelation frontloaded (≥4 revelations
 // with >70% in the first half — the story discloses its truths early and the back half runs on
 // established fact; distribution/timing × revelation channel).
+// Wave 479 additions: revelation run (≥3 consecutive revelation scenes — rapid information
+// dump that crowds out audience processing time; run-based × revelation channel, third
+// run-based check completing the family alongside PROACTIVE_DESERT_RUN and SEED_RUN_ISOLATED),
+// payoff final zone void (≥4 payoffs, none in the final 25% — Act 3 resolves no planted
+// threads, the climax carries no callback weight; zone presence/absence × payoff × Act 3,
+// extending the zone family to the payoff channel), revelation curiosity flat (≥3 revelation
+// scenes averaging curiosityDelta ≤ 0 — disclosures collectively fail to open new questions;
+// average/aggregate × revelation × curiosity, new average/aggregate check on the revelation
+// channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2229,6 +2238,115 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `${firstHalfRevs465c} of the story's ${revRecs465c.length} revelations (${Math.round(firstHalfRevs465c / revRecs465c.length * 100)}%) fall in the first half — discoveries are front-loaded. When the narrative hands out most of its truths in the setup and early conflict, the protagonist enters Act 2b and Act 3 with the full picture already assembled: the back half runs on established fact rather than discovery, and the climax becomes a matter of execution rather than revelation. An audience that already knows what the protagonist is dealing with loses the forward pull of wondering what is still true.`,
           suggestedFix: 'Hold back at least one or two major truths for the back half: a revelation that recontextualizes everything should arrive in Act 2b or Act 3, not Act 1, so the protagonist (and audience) is still learning something significant as the stakes peak. A discovery near the climax reframes the entire story and makes the ending feel earned by surprise rather than by the mechanical execution of a known plan.',
+        });
+      }
+    }
+  }
+
+  // ── Wave 479: REVELATION_RUN, PAYOFF_FINAL_ZONE_VOID, REVELATION_CURIOSITY_FLAT ──
+  const n479 = records.length;
+
+  // REVELATION_RUN (run-based × revelation channel, n≥8, ≥3 consecutive revelation scenes):
+  // Three or more scenes in an unbroken row each contain a revelation — the story delivers
+  // information in a rapid dump rather than spacing discoveries to build layered suspense.
+  // Each disclosure needs space around it: a scene of reaction, a shift in strategy, an
+  // emotional beat before the next truth lands. When revelations stack consecutively the
+  // audience's processing time is crowded out, each disclosure dilutes the impact of the
+  // last, and the cumulative effect is numbness rather than mounting wonder or dread.
+  // Run-based mode × revelation channel. Distinctness rationale: SEED_RUN_ISOLATED (Wave 437)
+  // checks consecutive seeding scenes (planting), not disclosure scenes (revealing). This is
+  // the third run-based check, completing the family alongside PROACTIVE_DESERT_RUN (Wave 258:
+  // consecutive passive scenes) and SEED_RUN_ISOLATED (Wave 437: consecutive seed scenes).
+  if (n479 >= 8) {
+    let maxRevRun479a = 0;
+    let curRevRun479a = 0;
+    let maxRevRunStart479a = 0;
+    let curRevRunStart479a = 0;
+    for (let i479a = 0; i479a < n479; i479a++) {
+      const r479a = (records as any[])[i479a];
+      const hasRev479a = r479a.revelation !== null && r479a.revelation !== undefined && r479a.revelation !== '';
+      if (hasRev479a) {
+        if (curRevRun479a === 0) curRevRunStart479a = i479a;
+        curRevRun479a++;
+        if (curRevRun479a > maxRevRun479a) {
+          maxRevRun479a = curRevRun479a;
+          maxRevRunStart479a = curRevRunStart479a;
+        }
+      } else {
+        curRevRun479a = 0;
+      }
+    }
+    if (maxRevRun479a >= 3) {
+      issues.push({
+        location: `Revelation run — Scenes ${maxRevRunStart479a}–${maxRevRunStart479a + maxRevRun479a - 1} (${maxRevRun479a} consecutive)`,
+        rule: 'REVELATION_RUN',
+        severity: 'minor',
+        description: `${maxRevRun479a} scenes in a row each contain a revelation — the story delivers information in an unbroken dump rather than distributing discoveries to build layered suspense. A rapid-fire succession of revelations crowds out the audience's processing time: each disclosure needs space around it to land with weight, raise questions, and shift allegiances before the next truth arrives. When revelations stack back-to-back, each one dilutes the impact of the previous; the cumulative effect is numbness rather than mounting dread or wonder.`,
+        suggestedFix: 'Separate revelations with scenes of reaction, consequence, and escalation. Let each truth breathe: after a disclosure, show the protagonist absorbing the new reality — a decision made under shifted information, an emotional fallout, a strategy pivot — before the next layer peels back. A revelation followed by two scenes of aftermath lands harder than three revelations stacked in quick succession.',
+      });
+    }
+  }
+
+  // PAYOFF_FINAL_ZONE_VOID (zone presence/absence × payoff × Act 3, n≥10, ≥4 payoff scenes,
+  // none in final 25%): The story has four or more payoff scenes but not one falls in the
+  // final quarter — Act 3 resolves no planted threads, and the climax carries its weight on
+  // new invention rather than on accumulated promises fulfilled. An ending that resolves nothing
+  // previously seeded feels narratively lightweight: the audience entered Act 3 still holding
+  // threads and exits holding them still. Payoffs at the climax transform setup into destiny —
+  // the audience's long-held anticipation becomes the very fuel that makes the ending feel
+  // earned rather than imposed. Zone presence/absence mode × payoff channel × Act 3.
+  // Distinctness rationale: REVELATION_FRONTLOADED (Wave 465) checks the ratio of revelations
+  // in the first half — a distribution check, not a zone-void check. PAYOFF_WITHOUT_EFFORT
+  // (Wave 272) checks that payoffs are preceded by protagonist action — a backward-cause check.
+  // PROACTIVE_ACT_2B_VOID (Wave 381) checks the 50–75% zone — this is a separate zone. This
+  // extends the zone family to the payoff channel and the Act 3 zone.
+  if (n479 >= 10) {
+    const finalZoneStart479b = Math.floor(n479 * 0.75);
+    const allPayoffRecs479b = (records as any[]).filter(r => ((r.payoffSetupIds ?? []) as string[]).length > 0);
+    if (allPayoffRecs479b.length >= 4) {
+      const finalZonePayoffs479b = allPayoffRecs479b.filter(r => {
+        const pos479b = (records as any[]).indexOf(r);
+        return pos479b >= finalZoneStart479b;
+      });
+      if (finalZonePayoffs479b.length === 0) {
+        issues.push({
+          location: `Payoffs — none in final zone (Scenes ${finalZoneStart479b}–${n479 - 1})`,
+          rule: 'PAYOFF_FINAL_ZONE_VOID',
+          severity: 'minor',
+          description: `The story has ${allPayoffRecs479b.length} payoff scenes — every thread resolution fires before the final 25% of the story. Act 3 operates without a single planted-thread callback, leaving the climax to carry its weight on new invention rather than on accumulated promises fulfilled. An ending that resolves nothing previously seeded feels narratively lightweight: the audience entered Act 3 still holding threads and exits holding them still. Payoffs at the climax transform setup into destiny — the audience's long-held anticipation becomes the fuel that makes the ending feel earned rather than imposed.`,
+          suggestedFix: `Move at least one payoff into Act 3 (Scene ${finalZoneStart479b} onward) — ideally the highest-stakes planted thread. A seeded thread that resolves at the climax reframes everything that came before: the audience realises the story was leading here all along. Multiple Act 3 payoffs converging at once — threads planted in Act 1 snapping shut simultaneously — is the structural engine behind most satisfying endings.`,
+        });
+      }
+    }
+  }
+
+  // REVELATION_CURIOSITY_FLAT (average/aggregate × revelation × curiosity, n≥8, ≥3 revelation
+  // scenes, avg curiosityDelta across all revelation scenes ≤ 0): Averaged across all revelation
+  // scenes, curiosity does not rise — disclosures collectively generate no forward momentum.
+  // A revelation should do double work: close one question and open another. When the average
+  // curiosityDelta at revelation scenes is flat or negative, the story transitions from suspense
+  // to closure mode with each disclosure, depleting the audience's forward pull rather than
+  // layering it. The ideal revelation shifts "what's happening?" into "but wait — then what
+  // about X?" so each truth accelerates the need to see the next scene.
+  // Average/aggregate mode × revelation channel × curiosity. Distinctness rationale:
+  // PROACTIVE_CURIOSITY_DECOUPLED (Wave 353) checks the average curiosityDelta of proactive
+  // scenes — this checks revelation scenes specifically. REVELATION_FRONTLOADED (Wave 465)
+  // checks when revelations occur, not what curiosity they produce. PROACTIVE_AFTERMATH_
+  // CURIOSITY_ABSENT (Wave 423) checks whether proactive acts are followed by curiosity rises
+  // in subsequent scenes — this checks the revelation scenes themselves, not their aftermath.
+  if (n479 >= 8) {
+    const revRecs479c = (records as any[]).filter(r =>
+      r.revelation !== null && r.revelation !== undefined && r.revelation !== '',
+    );
+    if (revRecs479c.length >= 3) {
+      const avgRevCuriosity479c = revRecs479c.reduce((sum: number, r: any) => sum + (r.curiosityDelta ?? 0), 0) / revRecs479c.length;
+      if (avgRevCuriosity479c <= 0) {
+        issues.push({
+          location: `Revelation scenes — avg curiosityDelta ${avgRevCuriosity479c.toFixed(2)} (≤ 0)`,
+          rule: 'REVELATION_CURIOSITY_FLAT',
+          severity: 'minor',
+          description: `Across all ${revRecs479c.length} revelation scenes the average curiosityDelta is ${avgRevCuriosity479c.toFixed(2)} — disclosures collectively generate no forward curiosity. A revelation should do double work: close one question and open another. When truths land without raising new mystery, the story transitions to closure mode scene by scene, depleting the audience's forward pull. The ideal revelation shifts "what's happening?" into "but wait — then what about X?" so the disclosure accelerates the audience's need to see the next scene.`,
+          suggestedFix: "Reframe revelations to plant new questions even as they answer old ones: 'the killer is revealed — but why did they bury the evidence?' opens a deeper layer. Let each revelation shift the protagonist's goal rather than merely confirm a suspicion; a truth that resets the chase generates curiosity, while a truth that merely confirms a guess does not.",
         });
       }
     }

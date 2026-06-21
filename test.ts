@@ -22926,6 +22926,84 @@ I always listen.
     });
   });
 
+  describe('Wave 479 — intentionPass: revelation run, payoff final zone void, revelation curiosity flat', async () => {
+    const makeRec479 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runInt479 = async (records: any[]) => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      return intentionPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('REVELATION_RUN fires when 3 or more consecutive scenes each have a revelation', async () => {
+      // n=10; revelations at scenes 3,4,5 (3 consecutive) → fires
+      const recs479a = Array.from({ length: 10 }, (_, i) => makeRec479(i));
+      recs479a[3] = makeRec479(3, { revelation: 'truth A' });
+      recs479a[4] = makeRec479(4, { revelation: 'truth B' });
+      recs479a[5] = makeRec479(5, { revelation: 'truth C' });
+      const res = await runInt479(recs479a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_RUN'), 'REVELATION_RUN should fire');
+    });
+
+    it('REVELATION_RUN does not fire when revelations are not in consecutive scenes', async () => {
+      // n=10; revelations at scenes 1,4,7 (all separated) → no fire
+      const recs479anr = Array.from({ length: 10 }, (_, i) => makeRec479(i));
+      recs479anr[1] = makeRec479(1, { revelation: 'truth A' });
+      recs479anr[4] = makeRec479(4, { revelation: 'truth B' });
+      recs479anr[7] = makeRec479(7, { revelation: 'truth C' });
+      const res = await runInt479(recs479anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_RUN'), 'REVELATION_RUN should not fire');
+    });
+
+    it('PAYOFF_FINAL_ZONE_VOID fires when 4+ payoffs exist but none fall in the final 25%', async () => {
+      // n=12 (finalZone=9); 4 payoffs at scenes 1,3,5,7 — all before scene 9 → fires
+      const recs479b = Array.from({ length: 12 }, (_, i) => makeRec479(i));
+      recs479b[1] = makeRec479(1, { payoffSetupIds: ['s1'] });
+      recs479b[3] = makeRec479(3, { payoffSetupIds: ['s2'] });
+      recs479b[5] = makeRec479(5, { payoffSetupIds: ['s3'] });
+      recs479b[7] = makeRec479(7, { payoffSetupIds: ['s4'] });
+      const res = await runInt479(recs479b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_FINAL_ZONE_VOID'), 'PAYOFF_FINAL_ZONE_VOID should fire');
+    });
+
+    it('PAYOFF_FINAL_ZONE_VOID does not fire when at least one payoff falls in the final zone', async () => {
+      // n=12 (finalZone=9); 4 payoffs — one at scene 10 (in final zone) → no fire
+      const recs479bnr = Array.from({ length: 12 }, (_, i) => makeRec479(i));
+      recs479bnr[1] = makeRec479(1, { payoffSetupIds: ['s1'] });
+      recs479bnr[3] = makeRec479(3, { payoffSetupIds: ['s2'] });
+      recs479bnr[5] = makeRec479(5, { payoffSetupIds: ['s3'] });
+      recs479bnr[10] = makeRec479(10, { payoffSetupIds: ['s4'] });
+      const res = await runInt479(recs479bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_FINAL_ZONE_VOID'), 'PAYOFF_FINAL_ZONE_VOID should not fire');
+    });
+
+    it('REVELATION_CURIOSITY_FLAT fires when revelation scenes average curiosityDelta <= 0', async () => {
+      // n=10; 3 revelation scenes all with curiosityDelta=0 → avg=0 ≤ 0 → fires
+      const recs479c = Array.from({ length: 10 }, (_, i) => makeRec479(i));
+      recs479c[2] = makeRec479(2, { revelation: 'truth A', curiosityDelta: 0 });
+      recs479c[5] = makeRec479(5, { revelation: 'truth B', curiosityDelta: -0.2 });
+      recs479c[8] = makeRec479(8, { revelation: 'truth C', curiosityDelta: 0 });
+      const res = await runInt479(recs479c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_CURIOSITY_FLAT'), 'REVELATION_CURIOSITY_FLAT should fire');
+    });
+
+    it('REVELATION_CURIOSITY_FLAT does not fire when revelation scenes raise curiosity on average', async () => {
+      // n=10; 3 revelation scenes with curiosityDelta 0.3, -0.1, 0.4 → avg=0.2 > 0 → no fire
+      const recs479cnr = Array.from({ length: 10 }, (_, i) => makeRec479(i));
+      recs479cnr[2] = makeRec479(2, { revelation: 'truth A', curiosityDelta: 0.3 });
+      recs479cnr[5] = makeRec479(5, { revelation: 'truth B', curiosityDelta: -0.1 });
+      recs479cnr[8] = makeRec479(8, { revelation: 'truth C', curiosityDelta: 0.4 });
+      const res = await runInt479(recs479cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_CURIOSITY_FLAT'), 'REVELATION_CURIOSITY_FLAT should not fire');
+    });
+  });
+
   describe('Wave 465 — intentionPass: proactive clock aftermath absent, payoff drama decoupled, revelation frontloaded', async () => {
     const makeRec465 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
