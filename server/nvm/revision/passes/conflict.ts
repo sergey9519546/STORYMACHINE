@@ -121,6 +121,21 @@
 // the resolution zone contains no bond-warming; distinct from CONFLICT_CLOSING_SUSPENSE_VOID which
 // audits suspense not repair, and CONFLICT_ACT3_ABSENT which audits any conflict not specifically
 // positive-shift absence).
+// Wave 534 additions: clock rupture decoupled (co-occurrence/decoupling × clock × rupture — n≥8,
+// ≥2 clockRaised scenes AND ≥2 rupture scenes [shift ≤ −0.3], zero overlap; deadline urgency never
+// coincides with bond-breaking; the clock channel completes the co-occurrence decoupling family
+// alongside revelation, seed, payoff, and dramatic-turn; distinct from CONFLICT_CLOCK_ABSENT which
+// audits absence of both channels together and from all aftermath checks which use clock as trigger),
+// rupture curiosity void (co-occurrence/decoupling × rupture × curiosityDelta — n≥8, ≥2 rupture
+// scenes, ≥2 curiosity scenes, every rupture has curiosityDelta ≤ 0; bond-breaking never ignites
+// wondering; distinct from CONFLICT_RUPTURE_AFTERMATH_CURIOSITY_VOID which is aftermath mode [what
+// follows the rupture] and from CONFLICT_CLUE_DECOUPLED which is seed not curiosity; fills the
+// rupture × curiosity co-occurrence cell alongside rupture × revelation/seed/payoff/turn), curiosity
+// front-loaded (distribution/timing × curiosityDelta × first half — n≥8, ≥4 curiosity scenes, >70%
+// in first half while back half has ≥1; wonder exhausted before climax; distinct from CONFLICT_
+// CURIOSITY_CLOSING_ZONE_ABSENT which is zone-absence not distribution-ratio, from CONFLICT_REPAIR_
+// FRONT_LOADED which targets positive shifts not curiosity, and from ARC_CURIOSITY_BACK_LOADED which
+// targets opposite concentration direction; first distribution/timing check on curiosity in this pass).
 // Wave 520 additions: rupture payoff aftermath void (sequence/aftermath × payoff × rupture aftermath
 // — n≥8, ≥2 ruptures ≤ -0.3, ≥2 payoff scenes; every rupture followed by 2 scenes with no
 // payoffSetupIds; bond-breaking never immediately precedes thread resolution; final uncovered aftermath
@@ -2758,6 +2773,118 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `The script raises curiosity in ${curiosScenes520c.length} scene(s) but none fall in the final structural third (scenes ${2 * third520c}–${n520c - 1}). The closing act is where unresolved questions should be at their most urgent — the audience's wondering should peak as the story approaches its resolution. When the curiosity channel goes silent precisely in the closing zone, the story answers its open questions (or simply stops raising new ones) before the climax, and the audience enters the resolution already knowing (or no longer wondering) rather than straining toward disclosure.`,
           suggestedFix: `Introduce at least one curiosity-raising beat in the final structural third — a partial disclosure that opens a new angle, a detail that reframes what the audience thought they understood, or an unanswered question that the climax must resolve. Wonder that peaks just before the ending is the most powerful engine for keeping the audience invested through the final scenes.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 534: CONFLICT_CLOCK_RUPTURE_DECOUPLED, CONFLICT_RUPTURE_CURIOSITY_VOID,
+  //              CONFLICT_CURIOSITY_FRONT_LOADED ──────────────────────────────────────────────────────
+
+  // CONFLICT_CLOCK_RUPTURE_DECOUPLED — Co-occurrence/decoupling × clock × rupture.
+  // n≥8, ≥2 clockRaised scenes, ≥2 rupture scenes (any relationshipShift with amount ≤ -0.3).
+  // No scene is simultaneously a clock-raise and a rupture → fire. Deadline urgency and bond-
+  // breaking are two of the strongest narrative pressure signals; when they never co-occur, time
+  // pressure and relational fracture operate in completely separate structural zones of the story.
+  // The scene where a deadline is raised is also the prime opportunity for a relationship to break
+  // under pressure — clock and rupture together produce the most intense narrative compression.
+  // When they are always decoupled, the story never puts a character in the position of having to
+  // break a bond precisely as the clock ticks.
+  // Distinct from: CONFLICT_REVELATION_DECOUPLED (co-occurrence × revelation × rupture — different
+  // signal pair; this is the clock-channel completion of the co-occurrence decoupling family),
+  // CONFLICT_CLOCK_ABSENT (checks whether the clock channel is used at all — not a decoupling check),
+  // CONFLICT_CLOCK_AFTERMATH_VOID (Wave 450: aftermath mode × clock → rupture in next 2 scenes —
+  // different mode and direction), and all other aftermath/zone checks that use clock as trigger.
+  {
+    const n534a = records.length;
+    if (n534a >= 8) {
+      const clockScenes534a = (records as any[]).filter(r => r.clockRaised === true);
+      const ruptureScenes534a = (records as any[]).filter(r =>
+        ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+      );
+      if (clockScenes534a.length >= 2 && ruptureScenes534a.length >= 2) {
+        const anyOverlap534a = clockScenes534a.some(r =>
+          ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+        );
+        if (!anyOverlap534a) {
+          issues.push({
+            location: `${clockScenes534a.length} clock-raised scene(s) and ${ruptureScenes534a.length} rupture scene(s) — no overlap`,
+            rule: 'CONFLICT_CLOCK_RUPTURE_DECOUPLED',
+            severity: 'minor',
+            description: `The script has ${clockScenes534a.length} deadline-raising scene(s) and ${ruptureScenes534a.length} relationship-rupture scene(s), but these two channels never co-occur. Clock pressure and bond-breaking are two of the strongest narrative compression signals; when they always occupy separate scenes, the story's urgency and its relational conflict operate in completely isolated structural zones. The moment when a deadline is raised is the prime opportunity for a relationship to fracture under pressure — a character forced to break a bond precisely as the clock ticks is under the most dramatic compression a story can generate. When clock and rupture are always decoupled, the audience never experiences that double pressure.`,
+            suggestedFix: `Introduce at least one scene where a deadline is raised and a bond simultaneously fractures — a confrontation about the ticking clock that destroys a trust, a choice made under time pressure that breaks a relationship, or an alliance that collapses as the clock runs out. Clock-and-rupture scenes are among the most dramatically dense moments in any story, and a single overlap between these two channels creates the kind of pressure that audiences find most gripping.`,
+          });
+        }
+      }
+    }
+  }
+
+  // CONFLICT_RUPTURE_CURIOSITY_VOID — Co-occurrence/decoupling × rupture × curiosityDelta.
+  // n≥8, ≥2 rupture scenes (any relationshipShift with amount ≤ -0.3), ≥2 scenes with
+  // curiosityDelta > 0. Every rupture scene has curiosityDelta ≤ 0 → fire. Bond-breaking never
+  // simultaneously ignites wondering — fractures are informationally inert in the moment they
+  // happen. A rupture scene is one of the most charged events in a story's emotional architecture;
+  // it is also a natural source of new questions: why did this bond break, what does it mean for
+  // what comes next, who is responsible? When every rupture has zero or negative curiosity, the
+  // fracture is emotionally felt but epistemically closed — the audience mourns the break but is
+  // not propelled into wondering about its consequences or causes.
+  // Distinct from: CONFLICT_AFTERMATH_CURIOSITY_VOID (Wave 422: aftermath mode — checks the NEXT
+  // 2 scenes' curiosity, not the rupture scene's OWN curiosityDelta; different analytical mode and
+  // time slot), CONFLICT_CLUE_DECOUPLED (co-occurrence × rupture × seed — different correlated signal;
+  // this is the curiosity-channel complement in the rupture co-occurrence family alongside revelation,
+  // seed, payoff, and dramatic-turn). First co-occurrence check pairing rupture × curiosityDelta in
+  // this pass.
+  {
+    const n534b = records.length;
+    if (n534b >= 8) {
+      const ruptureScenes534b = (records as any[]).filter(r =>
+        ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+      );
+      const curiosityScenes534b = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0);
+      if (ruptureScenes534b.length >= 2 && curiosityScenes534b.length >= 2) {
+        const anyRuptureHasCuriosity534b = ruptureScenes534b.some(r => (r.curiosityDelta ?? 0) > 0);
+        if (!anyRuptureHasCuriosity534b) {
+          issues.push({
+            location: `${ruptureScenes534b.length} rupture scene(s) — all have curiosityDelta ≤ 0 (${curiosityScenes534b.length} curiosity scene(s) exist elsewhere)`,
+            rule: 'CONFLICT_RUPTURE_CURIOSITY_VOID',
+            severity: 'minor',
+            description: `The script has ${ruptureScenes534b.length} relationship-rupture scene(s) and ${curiosityScenes534b.length} curiosity-generating scene(s), but these two channels never co-occur. Every scene where a bond breaks or fractures has a curiosityDelta ≤ 0 — fractures are emotionally felt but informationally closed in the moment they happen. A rupture is not only an emotional event but a narrative one: why did this bond break? What does the break mean for what follows? Who is responsible, and can it be repaired? When ruptures never ignite wondering, the story misses the opportunity to make each fracture not just a wound but a question — turning damage into the engine that drives the audience forward.`,
+            suggestedFix: `Introduce at least one rupture scene with a positive curiosityDelta: let the fracture open a mystery (who caused this, what was withheld that led to this break), introduce a new unanswered question that the rupture creates, or let the break reveal a layer of the situation that the audience did not understand before. The most powerful rupture scenes damage the characters AND make the audience desperate to know what happens next.`,
+          });
+        }
+      }
+    }
+  }
+
+  // CONFLICT_CURIOSITY_FRONT_LOADED — Distribution/timing × curiosityDelta × first half.
+  // n≥8, ≥4 scenes with curiosityDelta > 0. >70% of those scenes fall in the first half while
+  // the second half carries ≥1. The story's wondering engine exhausts itself before the climax —
+  // curiosity is generated primarily in the opening movements and dwindles as stakes increase.
+  // The most powerful question-opening should accelerate into and through the climax: the audience
+  // needs to be asking questions when they need answers most urgently. When >70% of the curiosity
+  // is front-loaded, the back half's escalating action occurs in a narrowing epistemic field.
+  // Distinct from: CONFLICT_CURIOSITY_CLOSING_ZONE_ABSENT (Wave 520: zone presence/absence ×
+  // closing third — fires when closing third has zero curiosity; this fires when global first-half
+  // concentration exceeds 70%, regardless of which zone is empty), CONFLICT_REPAIR_FRONT_LOADED
+  // (Wave 520: distribution × repair channel — positive relational shifts, not curiosity), ARC_
+  // CURIOSITY_BACK_LOADED (Wave 533: distribution × curiosity × second half — opposite concentration;
+  // that fires when back-half concentration exceeds 70%). First distribution/timing check on the
+  // curiosity channel in this pass.
+  {
+    const n534c = records.length;
+    const half534c = Math.floor(n534c / 2);
+    const curiosityScenes534c = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0);
+    if (n534c >= 8 && curiosityScenes534c.length >= 4) {
+      const frontCount534c = (records as any[]).slice(0, half534c).filter(r => (r.curiosityDelta ?? 0) > 0).length;
+      const backCount534c = curiosityScenes534c.length - frontCount534c;
+      const ratio534c = frontCount534c / curiosityScenes534c.length;
+      if (ratio534c > 0.70 && backCount534c >= 1) {
+        issues.push({
+          location: `curiosity distribution: ${frontCount534c} front-half / ${backCount534c} back-half`,
+          rule: 'CONFLICT_CURIOSITY_FRONT_LOADED',
+          severity: 'minor',
+          description: `${Math.round(ratio534c * 100)}% of the script's curiosity-generating scenes (${frontCount534c} of ${curiosityScenes534c.length}) fall in the first half, leaving the second half with only ${backCount534c}. The story's wondering engine exhausts itself before the climax — open questions accumulate in the opening movements then dwindle as the stakes should be intensifying. The most urgent need to know should arise as the story approaches resolution, not during the setup: the questions that make the audience desperate to reach the ending should be generated in or sustained into the second half. When curiosity is front-loaded, the back half's escalating conflict occurs in a narrowing epistemic field, with the audience already informed enough to stop wondering.`,
+          suggestedFix: `Redistribute at least some curiosity-generating beats into the second half — a new angle on an existing mystery, a revelation that opens more questions than it answers, or a character action whose full meaning remains unclear until the very end. Sustained wonder through the climax zone is what keeps the audience invested not just in what happens next but in what it all means.`,
         });
       }
     }

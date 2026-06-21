@@ -26590,6 +26590,95 @@ I always listen.
     });
   });
 
+  describe('Wave 534 — conflictPass: clock rupture decoupled, rupture curiosity void, curiosity front-loaded', async () => {
+    const rup534 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
+    const makeRec534 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF534 = async (records: any[]) => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    it('CONFLICT_CLOCK_RUPTURE_DECOUPLED fires when clock and rupture scenes never overlap', async () => {
+      // 8 scenes: clock at pos 0,1 (no rupture); rupture at pos 4,6 (no clock) → no overlap → fires
+      const recs534a = Array.from({ length: 8 }, (_, i) =>
+        makeRec534(i, {
+          clockRaised: [0, 1].includes(i),
+          relationshipShifts: [4, 6].includes(i) ? rup534(-0.5) : [],
+        })
+      );
+      const res = await runCF534(recs534a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_CLOCK_RUPTURE_DECOUPLED'), 'CONFLICT_CLOCK_RUPTURE_DECOUPLED should fire');
+    });
+
+    it('CONFLICT_CLOCK_RUPTURE_DECOUPLED does not fire when a clock scene also has a rupture', async () => {
+      // Same but pos 1 has both clockRaised AND rupture → overlap → no fire
+      const recs534anr = Array.from({ length: 8 }, (_, i) =>
+        makeRec534(i, {
+          clockRaised: [0, 1].includes(i),
+          relationshipShifts: [1, 4, 6].includes(i) ? rup534(-0.5) : [],
+        })
+      );
+      const res = await runCF534(recs534anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_CLOCK_RUPTURE_DECOUPLED'), 'CONFLICT_CLOCK_RUPTURE_DECOUPLED should not fire');
+    });
+
+    it('CONFLICT_RUPTURE_CURIOSITY_VOID fires when all rupture scenes have curiosityDelta ≤ 0', async () => {
+      // 8 scenes: ruptures at pos 2,5 (curiosityDelta=0); curiosity scenes at pos 0,3 (curiosityDelta=1)
+      // → no rupture has curiosity → fires
+      const recs534b = Array.from({ length: 8 }, (_, i) =>
+        makeRec534(i, {
+          relationshipShifts: [2, 5].includes(i) ? rup534(-0.4) : [],
+          curiosityDelta: [0, 3].includes(i) ? 1 : 0,
+        })
+      );
+      const res = await runCF534(recs534b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_RUPTURE_CURIOSITY_VOID'), 'CONFLICT_RUPTURE_CURIOSITY_VOID should fire');
+    });
+
+    it('CONFLICT_RUPTURE_CURIOSITY_VOID does not fire when a rupture scene has positive curiosityDelta', async () => {
+      // Same but pos 2 (rupture) now has curiosityDelta=1 → anyRuptureHasCuriosity=true → no fire
+      const recs534bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec534(i, {
+          relationshipShifts: [2, 5].includes(i) ? rup534(-0.4) : [],
+          curiosityDelta: [0, 2, 3].includes(i) ? 1 : 0,
+        })
+      );
+      const res = await runCF534(recs534bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_RUPTURE_CURIOSITY_VOID'), 'CONFLICT_RUPTURE_CURIOSITY_VOID should not fire');
+    });
+
+    it('CONFLICT_CURIOSITY_FRONT_LOADED fires when >70% of curiosity scenes are in first half', async () => {
+      // 10 scenes; half=5; curiosityDelta>0 at pos 0,1,2,8 → frontCount=3, backCount=1; 3/4=75% > 70% → fires
+      const recs534c = Array.from({ length: 10 }, (_, i) =>
+        makeRec534(i, { curiosityDelta: [0, 1, 2, 8].includes(i) ? 1 : 0 })
+      );
+      const res = await runCF534(recs534c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_CURIOSITY_FRONT_LOADED'), 'CONFLICT_CURIOSITY_FRONT_LOADED should fire');
+    });
+
+    it('CONFLICT_CURIOSITY_FRONT_LOADED does not fire when curiosity is spread across both halves', async () => {
+      // 10 scenes; half=5; curiosityDelta>0 at pos 0,1,6,7 → frontCount=2, backCount=2; 2/4=50% ≤ 70% → no fire
+      const recs534cnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec534(i, { curiosityDelta: [0, 1, 6, 7].includes(i) ? 1 : 0 })
+      );
+      const res = await runCF534(recs534cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_CURIOSITY_FRONT_LOADED'), 'CONFLICT_CURIOSITY_FRONT_LOADED should not fire');
+    });
+  });
+
   describe('Wave 520 — conflictPass: rupture payoff aftermath void, repair front-loaded, curiosity closing zone absent', async () => {
     const rup520 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
     const makeRec520 = (idx: number, overrides: any = {}): any => ({
