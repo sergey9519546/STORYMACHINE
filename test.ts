@@ -20064,6 +20064,174 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 512 — rhythmPass: middle short absent, word-count descent run, certainty adverb flood', async () => {
+    const runR512 = async (fountain: string) => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // ACTION_MIDDLE_SHORT_ABSENT fire:
+    // 10 action lines; midStart=2, midEnd=7; outer short lines at 0,1,7,8,9; middle (2-6) all >4w
+    it('ACTION_MIDDLE_SHORT_ABSENT fires when the middle 50% has no short line but ≥2 exist in outer zones', async () => {
+      const f512a = [
+        'INT. ROOM - DAY',
+        '',
+        'He turns.',
+        '',
+        'She waits.',
+        '',
+        'The afternoon sun slants through the window and catches the dust motes rising.',
+        '',
+        'A car passes slowly in the street outside the window.',
+        '',
+        'Papers scatter across the desk in a thin uneven layer.',
+        '',
+        'The phone on the table begins to ring with a persistent low tone.',
+        '',
+        'Both of them stare at it without moving to answer it.',
+        '',
+        'Silence.',
+        '',
+        'Wait.',
+        '',
+        'Then: a knock.',
+      ].join('\n');
+      const res = await runR512(f512a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_MIDDLE_SHORT_ABSENT'), 'ACTION_MIDDLE_SHORT_ABSENT should fire');
+    });
+
+    // ACTION_MIDDLE_SHORT_ABSENT no-fire: short line "Papers." in the middle zone → midShortCount=1 → no fire
+    it('ACTION_MIDDLE_SHORT_ABSENT does not fire when a short line exists in the middle zone', async () => {
+      const f512anr = [
+        'INT. ROOM - DAY',
+        '',
+        'He turns.',
+        '',
+        'She waits.',
+        '',
+        'The afternoon sun slants through the window and catches the dust motes rising.',
+        '',
+        'A car passes slowly in the street outside the window.',
+        '',
+        'Papers.',
+        '',
+        'The phone on the table begins to ring with a persistent low tone.',
+        '',
+        'Both of them stare at it without moving to answer it.',
+        '',
+        'Silence.',
+        '',
+        'Wait.',
+        '',
+        'Then: a knock.',
+      ].join('\n');
+      const res = await runR512(f512anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_MIDDLE_SHORT_ABSENT'), 'ACTION_MIDDLE_SHORT_ABSENT should not fire');
+    });
+
+    // ACTION_WORD_COUNT_DESCENT_RUN fire:
+    // 8 action lines; first 6 are strictly decreasing (11, 7, 6, 3, 2, 1) → maxDescentRun=6 ≥ 5 → fires
+    it('ACTION_WORD_COUNT_DESCENT_RUN fires when 5+ consecutive action lines are each strictly shorter', async () => {
+      const f512b = [
+        'INT. ROOM - DAY',
+        '',
+        'She crosses the room with careful deliberate steps toward the door.',
+        '',
+        'She pauses in the doorway looking back at him.',
+        '',
+        'He watches from across the room.',
+        '',
+        'Nobody speaks now.',
+        '',
+        'Both frozen.',
+        '',
+        'Still.',
+        '',
+        'She turns.',
+        '',
+        'And leaves.',
+      ].join('\n');
+      const res = await runR512(f512b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_WORD_COUNT_DESCENT_RUN'), 'ACTION_WORD_COUNT_DESCENT_RUN should fire');
+    });
+
+    // ACTION_WORD_COUNT_DESCENT_RUN no-fire: max descent run is 4 (breaks at "She turns." = 2w = "Both frozen." 2w)
+    it('ACTION_WORD_COUNT_DESCENT_RUN does not fire when the longest descent run is only 4', async () => {
+      const f512bnr = [
+        'INT. ROOM - DAY',
+        '',
+        'She crosses the room with careful deliberate steps toward the door.',
+        '',
+        'She pauses in the doorway looking back.',
+        '',
+        'He watches from across the room.',
+        '',
+        'Nobody speaks.',
+        '',
+        'She turns.',
+        '',
+        'And walks away from him.',
+        '',
+        'He watches her go.',
+        '',
+        'Alone again now.',
+      ].join('\n');
+      const res = await runR512(f512bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_WORD_COUNT_DESCENT_RUN'), 'ACTION_WORD_COUNT_DESCENT_RUN should not fire');
+    });
+
+    // ACTION_CERTAINTY_ADVERB_FLOOD fire:
+    // 8 action lines, 3 contain certainty adverbs (clearly, Obviously, Naturally) → 37.5% > 20% → fires
+    it('ACTION_CERTAINTY_ADVERB_FLOOD fires when >20% of action lines contain certainty adverbs', async () => {
+      const f512c = [
+        'INT. ROOM - DAY',
+        '',
+        'She clearly does not expect this.',
+        '',
+        'He looks up from his work.',
+        '',
+        'Obviously this changes everything between them.',
+        '',
+        'The file sits open on the desk.',
+        '',
+        'He opens it slowly and reads.',
+        '',
+        'Naturally she reaches for the folder first.',
+        '',
+        'He backs away from the table.',
+        '',
+        'The door remains closed.',
+      ].join('\n');
+      const res = await runR512(f512c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_CERTAINTY_ADVERB_FLOOD'), 'ACTION_CERTAINTY_ADVERB_FLOOD should fire');
+    });
+
+    // ACTION_CERTAINTY_ADVERB_FLOOD no-fire: 8 action lines, only 1 contains "clearly" → 12.5% ≤ 20% → no fire
+    it('ACTION_CERTAINTY_ADVERB_FLOOD does not fire when only 1 of 8 action lines has a certainty adverb', async () => {
+      const f512cnr = [
+        'INT. ROOM - DAY',
+        '',
+        'She clearly does not expect this.',
+        '',
+        'He looks up from his work.',
+        '',
+        'The room is quiet and tense.',
+        '',
+        'A file sits open on the desk.',
+        '',
+        'He opens it slowly and reads.',
+        '',
+        'She reaches for the folder first.',
+        '',
+        'He backs away from the table.',
+        '',
+        'The door remains closed.',
+      ].join('\n');
+      const res = await runR512(f512cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_CERTAINTY_ADVERB_FLOOD'), 'ACTION_CERTAINTY_ADVERB_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 498 — rhythmPass: opening long absent, density peak late, short multiclausal', async () => {
     const runR498 = async (fountain: string) => {
       const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');

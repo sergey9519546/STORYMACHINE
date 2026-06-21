@@ -106,6 +106,18 @@
 // high (average/aggregate × sentence count per line — ≥8 action lines averaging >3 sentences each,
 // multi-clause overload that collapses the shot-by-shot grammar of cinematic action; the average/
 // aggregate complement of SINGLE_SENTENCE_FLOOD and SENTENCE_COUNT_PEAK).
+// Wave 512 additions: action middle short absent (zone presence/absence × short channel ≤4w ×
+// middle zone — middle 50% of action lines has no short line while ≥2 exist in the outer zones;
+// completes the zone × short-channel grid alongside OPENING_SHORT_ABSENT and FINALE_SHORT_ABSENT,
+// with the same zone-pairing logic as ACTION_MIDDLE_LONG_ABSENT but on the short channel),
+// action word-count descent run (run-based × word count × strictly decreasing — 5+ consecutive
+// action lines each strictly shorter than the prior, a sustained compression that risks becoming
+// mechanical; distinct from CONSECUTIVE_SHORT_RUN which checks for short lines not decreasing
+// sequence), action certainty adverb flood (proportion × certainty/stance adverbs — >20% of ≥8
+// action lines contain certainty adverbs like clearly/obviously/certainly/naturally, a narrator-
+// voice intrusion that tells the audience what to conclude rather than showing the event; distinct
+// from ADVERB_CLUSTERING which counts all adverbs, SUDDENLY_OVERUSE which is urgency register, and
+// INTENSIFIER_FLOOD which is degree modifiers — this is the epistemic-stance register).
 // Wave 498 additions: opening long absent (zone presence/absence × long channel ≥12w × opening
 // 25% — no long action line in the opening while ≥3 exist later; the opening-zone long companion
 // to OPENING_SHORT_ABSENT, completing the opening-zone cell for the long-line channel; distinct
@@ -2123,6 +2135,93 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${shortMulticlauseCount498c} action lines are simultaneously short (≤5 words) and multi-sentence (≥2 sentence-ending marks) — lines like "He runs. Falls." or "She sees it. Freezes." The fragment-stacking form breaks a single dramatic beat into clause splinters that are neither the full statement of a long line nor the clean punch of a one-clause beat. These lines commit to brevity but double up within it: two distinct actions share a short line with no room to give either one spatial or physical specificity. The result is a form that is simultaneously rushed (too compressed) and cluttered (too many separate actions), delivering two beats at the speed of one while also providing the staging of neither.`,
         suggestedFix: 'Separate each fragment-stacked line into two distinct action lines (each one a camera beat) or merge both actions into a single well-constructed clause that gives the movement full physical specificity. "He runs. Falls." becomes either two lines — "He breaks for the door." / "He goes down hard." — or one line: "He sprints for the door and catches his heel on the mat, sprawling." The two-line version cuts faster; the one-line version delivers more staging. Either is preferable to the fragment stack.',
+      });
+    }
+  }
+
+  // ── Wave 512: ACTION_MIDDLE_SHORT_ABSENT, ACTION_WORD_COUNT_DESCENT_RUN, ACTION_CERTAINTY_ADVERB_FLOOD ──
+
+  // ACTION_MIDDLE_SHORT_ABSENT (zone presence/absence × short channel × middle zone, ≥10 action
+  // lines, ≥2 short ≤4w lines in the combined outer zones): The middle 50% of action lines contains
+  // no short line (≤4 words) while at least two short lines exist in the outer zones combined. The
+  // middle zone is uniformly dense and never drops to a staccato beat, leaving the script's
+  // longest sustained section without the pacing contrast that a compressed line provides. A short
+  // line in the middle of prose signals a gear-change: something happens too quickly for elaboration,
+  // a reaction is registered in isolation, a beat lands without commentary. When the middle zone
+  // has none of this, it risks feeling metronomically even. Zone presence/absence mode × short-line
+  // channel × middle zone. Distinct from OPENING_SHORT_ABSENT (Wave 456: opening zone), FINALE_
+  // SHORT_ABSENT (Wave 484: finale zone), ACTION_MIDDLE_LONG_ABSENT (Wave 470: same zone, long channel).
+  if (actionLines.length >= 10) {
+    const midStart512a = Math.floor(actionLines.length * 0.25);
+    const midEnd512a = Math.floor(actionLines.length * 0.75);
+    const midShortCount512a = wordCounts.slice(midStart512a, midEnd512a).filter(w => w <= 4).length;
+    const outerShortCount512a =
+      wordCounts.slice(0, midStart512a).filter(w => w <= 4).length +
+      wordCounts.slice(midEnd512a).filter(w => w <= 4).length;
+    if (midShortCount512a === 0 && outerShortCount512a >= 2) {
+      issues.push({
+        location: `Middle action lines (${midStart512a + 1}–${midEnd512a}) — no short line ≤4 words`,
+        rule: 'ACTION_MIDDLE_SHORT_ABSENT',
+        severity: 'minor',
+        description: `The middle 50% of action lines (lines ${midStart512a + 1}–${midEnd512a}) contains no short line of 4 words or fewer, while ${outerShortCount512a} short lines exist in the outer zones — the script's longest sustained section is written without any compressed beat. Short lines serve a pacing function in the middle of prose: they signal a gear-change, register a reaction in isolation, or land a beat without commentary. When the middle zone is uniformly dense, it risks feeling metronomically even — each line demands similar reading time, and the absence of the staccato beat removes the contrast that makes the surrounding longer lines feel deliberate rather than routine.`,
+        suggestedFix: `Add at least one short action line (≤4 words) in the middle section (action lines ${midStart512a + 1}–${midEnd512a}) — a one-word reaction, a two-word observation, a three-word beat that interrupts the density. The short line doesn't need to be climactic; it needs to change the reader's rhythm and signal that something just happened in a single beat.`,
+      });
+    }
+  }
+
+  // ACTION_WORD_COUNT_DESCENT_RUN (run-based × word count × strictly decreasing, ≥8 action lines):
+  // 5+ consecutive action lines each strictly shorter in word count than the preceding line — a
+  // sustained compression that narrows the prose from description to fragment. A descent of five or
+  // more is a deliberate structural pattern: the reader anticipates each shorter line before it
+  // arrives, and the surprise-and-release that makes compression effective is consumed by the
+  // mechanical predictability of a sustained descent. Run-based mode × word count × strictly
+  // decreasing sequence. Distinct from CONSECUTIVE_SHORT_RUN (Wave 484: consecutive short ≤4w
+  // lines regardless of whether they are decreasing — any short lines qualify, not a descent),
+  // ACTION_WORD_COUNT_FLOOR (Wave 291: all action lines ≤5w globally, not a local descent),
+  // SCENE_COMPRESSION_SPIRAL in pacing.ts (scene-level length, not action-line word count).
+  if (actionLines.length >= 8) {
+    let maxDescentRun512b = 1;
+    let curDescentRun512b = 1;
+    for (let i512b = 1; i512b < wordCounts.length; i512b++) {
+      if (wordCounts[i512b] < wordCounts[i512b - 1]) {
+        curDescentRun512b++;
+        if (curDescentRun512b > maxDescentRun512b) maxDescentRun512b = curDescentRun512b;
+      } else {
+        curDescentRun512b = 1;
+      }
+    }
+    if (maxDescentRun512b >= 5) {
+      issues.push({
+        location: `${maxDescentRun512b} consecutive action lines — strictly decreasing word count`,
+        rule: 'ACTION_WORD_COUNT_DESCENT_RUN',
+        severity: 'minor',
+        description: `The script has a run of ${maxDescentRun512b} consecutive action lines where each is strictly shorter in word count than the one before it — a sustained compression that narrows the prose from description down to near-silence over five or more beats. A two- or three-line descent is a controlled technique: the reader feels the beat landing with increasing force as the prose tightens. At ${maxDescentRun512b} lines, the pattern becomes mechanical — the reader anticipates the next shorter line before it arrives, and the predictable rhythm of the descent drains the compression of its kinetic force. The technique works once; repeated five or more times without interruption, it signals a formula rather than a choice.`,
+        suggestedFix: `Interrupt the descent at or before the fifth step: either break the sequence with a longer or equal-length line that resets the reader's expectation, or collapse the last three steps of the descent into a single beat. The moment the descent is predictable is the moment it stops serving rhythm — a held note after a falling phrase is often more powerful than the phrase continuing to fall.`,
+      });
+    }
+  }
+
+  // ACTION_CERTAINTY_ADVERB_FLOOD (proportion × certainty/stance adverbs × action lines, ≥8 action
+  // lines, >20% contain stance certainty adverbs): More than one in five action lines explicitly
+  // tell the reader what to conclude through certainty adverbs (clearly, obviously, certainly,
+  // naturally, undeniably, inevitably, predictably, unsurprisingly, plainly, evidently).
+  // These words place the narrator as an interpreter rather than a camera — they tell the audience
+  // how to read an event instead of presenting the event and letting the audience conclude. Unlike
+  // intensifiers (very, really) that amplify adjectives, certainty adverbs assert epistemic stance
+  // about what the image means. Proportion mode × certainty/stance adverb register. Distinct from
+  // ADVERB_CLUSTERING (Wave 151: all adverbs by density — not the stance category), SUDDENLY_OVERUSE
+  // (Wave 319: urgency adverbs — different semantic register), INTENSIFIER_FLOOD (Wave 358: degree
+  // modifiers like "very/really/quite" — different semantic category from epistemic stance).
+  if (actionLines.length >= 8) {
+    const certaintyRe512c = /\b(clearly|obviously|certainly|naturally|undeniably|inevitably|predictably|unsurprisingly|plainly|evidently|manifestly)\b/i;
+    const certaintyCount512c = actionLines.filter(l => certaintyRe512c.test(l.text)).length;
+    if (certaintyCount512c / actionLines.length > 0.20) {
+      issues.push({
+        location: `${certaintyCount512c}/${actionLines.length} action line(s) with certainty adverbs`,
+        rule: 'ACTION_CERTAINTY_ADVERB_FLOOD',
+        severity: 'minor',
+        description: `${certaintyCount512c} of ${actionLines.length} action lines (${(certaintyCount512c / actionLines.length * 100).toFixed(0)}%) contain a certainty or stance adverb — "clearly," "obviously," "certainly," "naturally," "inevitably," or similar — placing the narrator inside the prose as an interpreter of the image rather than as a camera recording it. Cinematic action prose is supposed to present events and let the audience draw conclusions; when the prose asserts that something is "clearly" the case or "obviously" significant, it preempts the audience's inference and collapses the interpretive space that makes images powerful. Certainty adverbs also signal authorial anxiety: the writer doesn't fully trust the staging to communicate what it means.`,
+        suggestedFix: `Remove or replace each certainty adverb with either more specific staging (show the thing that makes it obvious) or a plain indicative statement that presents the event without asserting how to read it. "She clearly can't believe it" becomes "She stares. Blinks." — the staging creates the certainty the adverb was trying to tell. Every certainty adverb is a prompt to ask: what specific image or action makes this obvious? Stage that instead.`,
       });
     }
   }
