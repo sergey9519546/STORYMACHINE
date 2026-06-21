@@ -124,6 +124,18 @@
 // positive-emotion scenes ≥ 4; a sustained positive run means the protagonist's world is going well
 // without adversity for too long; distinct from EMOTIONAL_NEUTRAL_RUN, SUSPENSE_DECLINE_RUN, and
 // EMOTIONAL_POSITIVE_DESERT which use different modes on the emotional channel).
+// Wave 517 additions: payoff aftermath suspense void (average/aggregate × payoff → suspense aftermath
+// — n≥8, ≥3 payoff scenes not at last position, avg suspenseDelta of immediately following scenes ≤ 0;
+// resolutions complete promises but never re-tighten stakes; distinct from PAYOFF_SUSPENSE_VOID which
+// checks the payoff scene's OWN suspenseDelta and from REVELATION_AFTERMATH_SUSPENSE_VOID which uses
+// revelation as trigger), negative emotion unbroken run (run-based × valence × negative emotion —
+// n≥8, ≥3 negative-emotion scenes, maxNegRun ≥ 4; sustained adversity without relief, the negative-
+// polarity complement of POSITIVE_EMOTION_UNBROKEN_RUN completing the positive/negative/neutral run
+// family for the emotion channel), emotional closing third absent (zone presence/absence × closing
+// third × emotional charge — n≥9, ≥3 emotionally charged scenes, none in the final third; the
+// resolution arrives without felt emotional engagement; the emotional complement of CLOCK_FINAL_THIRD_
+// ABSENT; distinct from EMOTIONAL_ZONE_CLUSTER which flags concentration and EMOTIONAL_NEUTRAL_RUN
+// which is run-based).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2716,6 +2728,124 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `The script contains a run of ${maxPosRun503c} consecutive scenes in which the emotional register is positive. A sustained positive run means the protagonist's world is going well without adversity, reversal, setback, or complication for ${maxPosRun503c} scenes — the dramatic engine idles. Audiences invest in stories through the felt cost of goals: when there is no obstacle, no failure, and no price to pay for four or more scenes in a row, the emotional arc loses its tension and the audience's investment weakens.`,
             suggestedFix: `Interrupt the positive run with at least one scene of adversity, cost, or complication — a setback, a revelation that complicates the good news, a relationship friction, or a consequence that makes the protagonist's positive progress feel precarious. Even a brief negative or neutral inflection breaks the complacency of a long positive run and restores the push-pull that makes the positive moments feel earned.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 517: PAYOFF_AFTERMATH_SUSPENSE_VOID, NEGATIVE_EMOTION_UNBROKEN_RUN,
+  //              EMOTIONAL_CLOSING_THIRD_ABSENT ──────────────────────────────────────────────────
+
+  // PAYOFF_AFTERMATH_SUSPENSE_VOID — Average/aggregate × payoff → suspense aftermath.
+  // n≥8, ≥3 payoff scenes (payoffSetupIds non-empty) not at last position. If the average
+  // suspenseDelta of the scene immediately following each qualifying payoff is ≤ 0 → fire.
+  // A payoff is a structural completion: something the audience has been promised has arrived.
+  // That arrival should redirect or tighten the dramatic stakes — the closed loop should
+  // generate new pressure. When post-payoff scenes consistently carry zero or falling tension,
+  // resolutions become endpoints rather than pivot points, and the audience's engagement
+  // diminishes with each closed loop that generates nothing new. Distinct from: PAYOFF_SUSPENSE_
+  // VOID (Wave 419: average/aggregate × the payoff scene's OWN suspenseDelta — within the scene;
+  // this checks the FOLLOWING scene's suspenseDelta — aftermath direction). REVELATION_AFTERMATH_
+  // SUSPENSE_VOID (Wave 503: same mode and aftermath channel, revelation trigger — different
+  // trigger event). SEED_AFTERMATH_CURIOSITY_VOID (Wave 489: seed trigger, curiosity channel).
+  {
+    const n517a = records.length;
+    if (n517a >= 8) {
+      const qualPayoffs517a = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) => ((r.payoffSetupIds ?? []) as any[]).length > 0 && pos < n517a - 1);
+      if (qualPayoffs517a.length >= 3) {
+        const total517a = qualPayoffs517a.reduce(
+          (sum, { pos }) => sum + (((records as any[])[pos + 1] as any).suspenseDelta ?? 0),
+          0,
+        );
+        const avg517a = total517a / qualPayoffs517a.length;
+        if (avg517a <= 0) {
+          issues.push({
+            location: `${qualPayoffs517a.length} payoff scenes examined — avg post-payoff suspenseDelta ${avg517a.toFixed(2)}`,
+            rule: 'PAYOFF_AFTERMATH_SUSPENSE_VOID',
+            severity: 'minor',
+            description: `Across ${qualPayoffs517a.length} payoff scenes, the scene immediately following each averages a suspenseDelta of ${avg517a.toFixed(2)} (≤ 0). Payoffs should function as pivot points: a thread resolution closes one question but should redirect or tighten dramatic stakes so the next scene carries fresh pressure. When post-payoff scenes consistently carry zero or falling tension, resolutions become endpoints rather than pivots — the promise is delivered but the energy it releases goes nowhere, and the audience's engagement diminishes with each closed loop that generates nothing new.`,
+            suggestedFix: `After each payoff scene, ensure the next scene raises at least a small amount of tension — a complication set in motion by the resolution, a new threat surfacing because a prior protection has been removed, or a consequence of the closed loop that re-pressurises the story. Payoffs are most dramatically productive when they generate new problems rather than simply marking the end of old ones.`,
+          });
+        }
+      }
+    }
+  }
+
+  // NEGATIVE_EMOTION_UNBROKEN_RUN — Run-based × valence × negative emotion.
+  // n≥8, ≥3 negative-emotion scenes total. Longest consecutive run of scenes where emotionalShift
+  // is 'negative' ≥ 4 → fire. A story's emotional arc needs both adversity and relief: the
+  // protagonist must fall, but must also find moments of provisional success or temporary respite
+  // that prevent the arc from collapsing into monotone suffering. Four or more consecutive
+  // negative-emotion scenes produce sustained freefall without modulation — stakes cannot escalate
+  // when the floor is already continuous loss, and the audience desensitises to the same polarity
+  // repeated without contrast. Distinct from: POSITIVE_EMOTION_UNBROKEN_RUN (Wave 503: run of
+  // positive — the opposite polarity; this checks the negative-polarity sibling, completing the
+  // positive/negative pair for the emotion run family). EMOTIONAL_NEUTRAL_RUN (Wave 324: run of
+  // neutral — flat rather than continuously negative; a fundamentally different register). SUSPENSE_
+  // DECLINE_RUN (Wave 447: run of falling suspense — tension channel, not emotional shift). No
+  // existing check detects 4+ consecutive scenes with emotionalShift='negative' as a run.
+  {
+    const n517b = records.length;
+    if (n517b >= 8) {
+      const negScenes517b = (records as any[]).filter((r: any) => r.emotionalShift === 'negative');
+      if (negScenes517b.length >= 3) {
+        let maxNegRun517b = 0;
+        let curNegRun517b = 0;
+        for (const r of records as any[]) {
+          if (r.emotionalShift === 'negative') {
+            if (++curNegRun517b > maxNegRun517b) maxNegRun517b = curNegRun517b;
+          } else {
+            curNegRun517b = 0;
+          }
+        }
+        if (maxNegRun517b >= 4) {
+          issues.push({
+            location: `longest consecutive negative-emotion run: ${maxNegRun517b} scenes`,
+            rule: 'NEGATIVE_EMOTION_UNBROKEN_RUN',
+            severity: 'minor',
+            description: `The script contains a run of ${maxNegRun517b} consecutive scenes in which the emotional register is negative. Sustained adversity without modulation desensitises the audience: when the fourth consecutive scene of loss, failure, or suffering arrives, it registers as more of the same rather than as an escalation. A story's emotional arc needs provisional successes, unexpected help, or moments of relief distributed through its negative passages — not to eliminate pressure, but to provide the contrast that makes the next negative beat land harder.`,
+            suggestedFix: `Interrupt the negative run with at least one scene of provisional success, unexpected help, or a moment when the protagonist's situation briefly improves — even if later reversed. A single scene where something goes right in the middle of a sustained fall restores the audience's sense that the protagonist can still affect their situation, and makes the return to adversity feel like a genuine reversal rather than a continuation of the same slide.`,
+          });
+        }
+      }
+    }
+  }
+
+  // EMOTIONAL_CLOSING_THIRD_ABSENT — Zone presence/absence × closing third × emotional charge.
+  // n≥9, ≥3 emotionally charged scenes (emotionalShift 'positive' or 'negative') globally.
+  // If none fall in the final structural third → fire. The resolution of a screenplay should
+  // be its most emotionally engaged zone: the protagonist reaches their climax and denouement
+  // with the full accumulated weight of everything that has happened, and the audience expects
+  // to feel the conclusion. When the closing third contains no emotionally charged scenes, the
+  // resolution plays without any felt response — the audience is told what happened but not
+  // moved by it. Distinct from: CLOCK_FINAL_THIRD_ABSENT (Wave 503: zone presence/absence ×
+  // closing third × clock channel — urgency complement; this is the emotional-engagement
+  // parallel). EMOTIONAL_ZONE_CLUSTER (Wave 475: distribution/timing × charged scenes across
+  // thirds — fires when emotional scenes are CONCENTRATED in one zone, not absent from a
+  // specific zone; this fires when the closing zone has ZERO charged scenes). EMOTIONAL_NEUTRAL_
+  // RUN (Wave 324: run-based × consecutive neutral — temporal adjacency, not zone absence).
+  // EMOTIONAL_POSITIVE_DESERT (Wave 282: Act 2 × positive emotion only — different zone and
+  // different valence scope). First zone-presence/absence check on emotional charge in the
+  // closing third.
+  {
+    const n517c = records.length;
+    if (n517c >= 9) {
+      const chargedPositions517c = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r }) => r.emotionalShift === 'positive' || r.emotionalShift === 'negative');
+      if (chargedPositions517c.length >= 3) {
+        const third517c = Math.floor(n517c / 3);
+        const inFinal517c = chargedPositions517c.some(({ pos }) => pos >= 2 * third517c);
+        if (!inFinal517c) {
+          issues.push({
+            location: `${chargedPositions517c.length} emotionally charged scene(s) — none in the final third (scenes ${2 * third517c}–${n517c - 1})`,
+            rule: 'EMOTIONAL_CLOSING_THIRD_ABSENT',
+            severity: 'minor',
+            description: `The script has ${chargedPositions517c.length} emotionally charged scenes (positive or negative emotional shift), but none fall in the final structural third (scenes ${2 * third517c}–${n517c - 1}). The closing act should be the most emotionally engaged zone of the screenplay: the protagonist reaches their climax and denouement with the full accumulated weight of everything that has happened, and the audience needs to feel the conclusion rather than merely observe it. When the closing third is emotionally inert, the resolution becomes a purely intellectual event — the audience is told what happened but not moved by it.`,
+            suggestedFix: `Ensure at least one scene in the closing third carries an emotional shift — positive or negative. A climax is not just a plot event but an emotional event: the protagonist's decisive action, the revelation that reframes everything, or the loss or triumph that the whole story has been building toward should be felt. Even a single scene of emotional charge in the final act anchors the resolution in the audience's nervous system rather than their intellect.`,
           });
         }
       }

@@ -31837,6 +31837,91 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 517 — causalityPass: payoff aftermath suspense void, negative emotion unbroken run, emotional closing third absent', async () => {
+    const makeRec517 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      seededClueIds: [], payoffSetupIds: [], revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], dramaticTurn: 'nothing',
+      purpose: 'development', unresolvedClues: [],
+      ...overrides,
+    });
+    const runC517 = async (records: any[]) => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PAYOFF_AFTERMATH_SUSPENSE_VOID fires when avg post-payoff suspenseDelta ≤ 0', async () => {
+      // 9 scenes: payoffs at 1,3,5 (not at last pos 8); next scenes (2,4,6) have suspenseDelta 0,-1,0
+      // avg = (0 + -1 + 0) / 3 = -0.33 ≤ 0 → fires
+      const recs517a = Array.from({ length: 9 }, (_, i) =>
+        makeRec517(i, {
+          payoffSetupIds: [1, 3, 5].includes(i) ? ['setup-A'] : [],
+          suspenseDelta: i === 4 ? -1 : 0,
+        }),
+      );
+      const res = await runC517(recs517a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_AFTERMATH_SUSPENSE_VOID'), 'PAYOFF_AFTERMATH_SUSPENSE_VOID should fire');
+    });
+
+    it('PAYOFF_AFTERMATH_SUSPENSE_VOID does not fire when avg post-payoff suspenseDelta > 0', async () => {
+      // 9 scenes: payoffs at 1,3,5; scene 4 (after payoff at 3) has suspenseDelta=2 → avg > 0 → no fire
+      const recs517anr = Array.from({ length: 9 }, (_, i) =>
+        makeRec517(i, {
+          payoffSetupIds: [1, 3, 5].includes(i) ? ['setup-A'] : [],
+          suspenseDelta: i === 4 ? 2 : 0,
+        }),
+      );
+      const res = await runC517(recs517anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_AFTERMATH_SUSPENSE_VOID'), 'PAYOFF_AFTERMATH_SUSPENSE_VOID should not fire');
+    });
+
+    it('NEGATIVE_EMOTION_UNBROKEN_RUN fires when ≥4 consecutive negative-emotion scenes exist', async () => {
+      // 9 scenes: negative at 2,3,4,5 (run=4 ≥ 4), total negScenes=4 ≥ 3 → fires
+      const recs517b = Array.from({ length: 9 }, (_, i) =>
+        makeRec517(i, {
+          emotionalShift: [2, 3, 4, 5].includes(i) ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runC517(recs517b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'NEGATIVE_EMOTION_UNBROKEN_RUN'), 'NEGATIVE_EMOTION_UNBROKEN_RUN should fire');
+    });
+
+    it('NEGATIVE_EMOTION_UNBROKEN_RUN does not fire when max consecutive negative run < 4', async () => {
+      // 9 scenes: negative at 2,4,6 (scattered, maxRun=1), total=3 ≥ 3 → no fire
+      const recs517bnr = Array.from({ length: 9 }, (_, i) =>
+        makeRec517(i, {
+          emotionalShift: [2, 4, 6].includes(i) ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runC517(recs517bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'NEGATIVE_EMOTION_UNBROKEN_RUN'), 'NEGATIVE_EMOTION_UNBROKEN_RUN should not fire');
+    });
+
+    it('EMOTIONAL_CLOSING_THIRD_ABSENT fires when all emotionally charged scenes are outside the final third', async () => {
+      // 9 scenes: third=3, final third=idx 6,7,8; charged (positive/negative) at 1,3,5 → none in final → fires
+      const recs517c = Array.from({ length: 9 }, (_, i) =>
+        makeRec517(i, {
+          emotionalShift: [1, 3, 5].includes(i) ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runC517(recs517c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'EMOTIONAL_CLOSING_THIRD_ABSENT'), 'EMOTIONAL_CLOSING_THIRD_ABSENT should fire');
+    });
+
+    it('EMOTIONAL_CLOSING_THIRD_ABSENT does not fire when a charged scene exists in the final third', async () => {
+      // 9 scenes: charged at 1,3,5 plus 7 (in final third idx 6-8) → inFinal=true → no fire
+      const recs517cnr = Array.from({ length: 9 }, (_, i) =>
+        makeRec517(i, {
+          emotionalShift: [1, 3, 5, 7].includes(i) ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runC517(recs517cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'EMOTIONAL_CLOSING_THIRD_ABSENT'), 'EMOTIONAL_CLOSING_THIRD_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 503 — causalityPass: revelation aftermath suspense void, clock final third absent, positive emotion unbroken run', async () => {
     const makeRec503 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
