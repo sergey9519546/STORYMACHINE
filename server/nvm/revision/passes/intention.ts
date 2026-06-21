@@ -104,6 +104,17 @@
 // (≥3 consecutive payoff scenes — thread-closures dump in a burst overwhelming individual
 // resolution weight; run-based × payoff channel, completing the run family alongside
 // PROACTIVE_DESERT_RUN, SEED_RUN_ISOLATED, and REVELATION_RUN).
+// Wave 507 additions: payoff suspense aftermath void (average/aggregate × payoff → suspense
+// aftermath — n≥8, ≥3 payoff scenes not at last position, avg suspenseDelta of immediately
+// following scene ≤ 0; thread resolutions never carry forward tension into what follows; distinct
+// from PAYOFF_CURIOSITY_FLAT which checks the payoff scene's OWN curiosity, and from PROACTIVE_
+// SUSPENSE_AFTERMATH_ABSENT which uses an initiative trigger not a payoff trigger), revelation
+// closing void (zone presence/absence × revelation × closing third — n≥9, ≥3 revelations, none
+// in the final third; the resolution zone discloses nothing; distinct from REVELATION_FRONTLOADED
+// which uses a 70% first-half ratio and REVELATION_RUN which is run-based), payoff seed decoupled
+// (co-occurrence/decoupling × payoff × seed — n≥8, ≥2 payoff scenes, ≥2 seed scenes, zero
+// overlap; resolutions never simultaneously plant new threads; distinct from PAYOFF_DRAMA_DECOUPLED
+// which pairs payoff × dramatic turn, and SEED_DRAMA_DECOUPLED which pairs seed × dramatic turn).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2479,6 +2490,121 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
           description: `${maxPayoffRun493c} scenes in a row each resolve a planted setup — the story closes threads in a rapid burst rather than distributing resolutions to give each its full weight. Each payoff needs space to land: a scene of reaction and consequence, the audience absorbing that a long-held anticipation has been fulfilled, before the next callback fires. When payoffs stack consecutively, each resolution dilutes the one before; the cumulative effect is mechanical satisfaction rather than emotional culmination. Payoffs are the structural rewards the audience has been accumulating — spending them all at once leaves no time for the full weight of each to register, and the audience exits the burst having processed the information without feeling the full satisfaction each individual payoff warranted.`,
           suggestedFix: `Break the payoff cluster with at least one non-payoff scene between consecutive resolutions — a scene of reaction (a character absorbing what just resolved), a consequence beat (the practical impact of the closure), or an escalation (the resolution raising a new problem). Spreading payoffs across the second half rather than clustering them in a burst maintains the sense that the story is continuously delivering on its promises rather than paying its narrative debts all at once.`,
         });
+      }
+    }
+  }
+
+  // ── Wave 507 checks ──────────────────────────────────────────────────────────
+
+  // PAYOFF_SUSPENSE_AFTERMATH_VOID — Average/aggregate × payoff → suspense aftermath.
+  // n≥8, ≥3 payoff scenes (payoffSetupIds.length > 0) not at last position. Average suspenseDelta
+  // of the scene immediately following each payoff ≤ 0 → fire. When a planted thread resolves,
+  // the next scene should carry some forward tension: the relief is uneasy, the resolution has
+  // raised new stakes, or the closure has tightened the story's grip. When payoffs consistently
+  // generate zero or negative suspense in their wake, they terminate narrative threads without
+  // any forward momentum — each callback closes a loop and the story relaxes rather than propelling.
+  // Distinct from: PAYOFF_CURIOSITY_FLAT (Wave 493: checks the payoff scene's OWN curiosityDelta —
+  // a different channel and different time slot), PROACTIVE_SUSPENSE_AFTERMATH_ABSENT (Wave 409:
+  // initiative trigger, not payoff trigger), CONFLICT_RUPTURE_SUSPENSE_VOID in conflict.ts (rupture
+  // trigger, not payoff). First average/aggregate check pairing payoff with suspense aftermath.
+  {
+    const n507a = records.length;
+    if (n507a >= 8) {
+      const payoffAndNext507a = (records as any[])
+        .map((r, pos) => ({ pos, hasPayoff: ((r.payoffSetupIds ?? []) as any[]).length > 0 }))
+        .filter(x => x.hasPayoff && x.pos < n507a - 1);
+      if (payoffAndNext507a.length >= 3) {
+        const totalSusp507a = payoffAndNext507a.reduce(
+          (sum, x) => sum + (((records as any[])[x.pos + 1] as any).suspenseDelta ?? 0),
+          0,
+        );
+        const avgSusp507a = totalSusp507a / payoffAndNext507a.length;
+        if (avgSusp507a <= 0) {
+          issues.push({
+            location: `${payoffAndNext507a.length} payoff scenes — avg next-scene suspenseDelta ${avgSusp507a.toFixed(2)}`,
+            rule: 'PAYOFF_SUSPENSE_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `Across ${payoffAndNext507a.length} payoff scenes, the scene immediately following each averages a suspenseDelta of ${avgSusp507a.toFixed(2)} (≤ 0). When a planted thread resolves, the scene that follows should carry forward tension: an uneasy relief, a newly raised stake, or a consequence that tightens the story's grip. When payoffs consistently generate zero or negative suspense in their aftermath, each callback closes a loop and the story relaxes — the audience is satisfied but not propelled into the next beat. The scene after a payoff is among the most important in the story for sustaining momentum.`,
+            suggestedFix: `After at least one payoff scene, ensure the immediately following scene raises some suspense — a character who is unsettled by what just resolved, a consequence that creates a new problem, or a ripple from the resolution that tightens rather than loosens the situation. Payoffs that lead to even slightly elevated tension sustain forward momentum; payoffs that lead to calm signal that the story is winding down.`,
+          });
+        }
+      }
+    }
+  }
+
+  // REVELATION_CLOSING_VOID — Zone presence/absence × revelation × closing third.
+  // n≥9, ≥3 revelations. None in the final structural third → fire. The resolution zone contains
+  // no disclosure. The protagonist crosses into the climax having already received all the story's
+  // truths — the closing act can rely only on previously revealed information without any new
+  // discovery reshaping the audience's understanding at the last moment. A revelation in the final
+  // third is the classic engine of dramatic climax: the audience's existing understanding is
+  // overturned precisely as the story peaks. When the closing third is revelation-free, the
+  // climax must generate its weight from action alone, without the epistemic reversal that gives
+  // the final act its deepest impact.
+  // Distinct from: REVELATION_FRONTLOADED (Wave 465: checks whether >70% of revelations fall in
+  // the first half — a distribution ratio check, not a zone-void check), REVELATION_TEMPORAL_CLUSTER
+  // in belief.ts (>75% in one third — over-concentration, not absence; different pass), REVELATION_RUN
+  // (Wave 479: consecutive run-based, not zone-based), REVELATION_LATE_CLUSTER in character-arc.ts
+  // (>60% in final 25% — over-concentration in final zone, the opposite problem; different pass).
+  {
+    const n507b = records.length;
+    if (n507b >= 9) {
+      const revRecs507b = (records as any[]).filter(
+        r => r.revelation !== null && r.revelation !== '' && r.revelation !== undefined,
+      );
+      if (revRecs507b.length >= 3) {
+        const third507b = Math.floor(n507b / 3);
+        const anyRevInFinal507b = revRecs507b.some(r => {
+          const pos = (records as any[]).indexOf(r);
+          return pos >= 2 * third507b;
+        });
+        if (!anyRevInFinal507b) {
+          issues.push({
+            location: `${revRecs507b.length} revelation(s) — none in final third (scenes ${2 * third507b}–${n507b - 1})`,
+            rule: 'REVELATION_CLOSING_VOID',
+            severity: 'minor',
+            description: `The story has ${revRecs507b.length} revelations but none falls in the final structural third (scenes ${2 * third507b}–${n507b - 1}). The resolution zone contains no disclosure: the protagonist enters the climax having already received all the story's truths. A revelation in the final third is the classic engine of dramatic climax — the audience's existing understanding is overturned precisely as the story peaks, giving the ending the deepest possible sense of consequence and surprise. When the closing third is revelation-free, the climax must carry its weight on action alone, without the epistemic reversal that gives the final act its most powerful charge.`,
+            suggestedFix: `Move at least one revelation into the final third, or introduce a new disclosure that can only happen once all the prior truths have been established. The most effective closing-act revelation recontextualizes everything the audience thought they knew — the identity of the real antagonist, the true cost of the protagonist's goal, or the secret that explains why the story was heading here all along.`,
+          });
+        }
+      }
+    }
+  }
+
+  // PAYOFF_SEED_DECOUPLED — Co-occurrence/decoupling × payoff × seed.
+  // n≥8, ≥2 payoff scenes (payoffSetupIds.length > 0), ≥2 seed scenes (seededClueIds.length > 0).
+  // No scene has both → fire. Thread resolutions never simultaneously plant new threads. The most
+  // structurally efficient scenes close a loop while opening another: the payoff of an old setup
+  // raises a new question, or the resolution of a mystery seeds a fresh thread that the audience
+  // can carry forward. When payoffs and seeds never coincide, closures are purely terminal — they
+  // end threads without restocking the story's forward momentum. The audience experiences each
+  // payoff as a narrative dead end rather than as a pivot to the next layer of the story.
+  // Distinct from: PAYOFF_DRAMA_DECOUPLED (Wave 465: co-occurrence × payoff × dramatic turn —
+  // different paired channel), SEED_DRAMA_DECOUPLED (Wave 423: co-occurrence × seed × dramatic
+  // turn — seed trigger and turn channel), REVELATION_SEED_DECOUPLED in belief.ts (Wave 502:
+  // co-occurrence × revelation × seed — different trigger channel and different pass file), this
+  // is the first co-occurrence check in this pass pairing the payoff channel with the seed channel.
+  {
+    const n507c = records.length;
+    if (n507c >= 8) {
+      const payoffRecs507c = (records as any[]).filter(
+        r => ((r.payoffSetupIds ?? []) as any[]).length > 0,
+      );
+      const seedRecs507c = (records as any[]).filter(
+        r => ((r.seededClueIds ?? []) as any[]).length > 0,
+      );
+      if (payoffRecs507c.length >= 2 && seedRecs507c.length >= 2) {
+        const seedSceneIdxs507c = new Set(seedRecs507c.map((r: any) => r.sceneIdx));
+        const anyPayoffSeed507c = payoffRecs507c.some((r: any) => seedSceneIdxs507c.has(r.sceneIdx));
+        if (!anyPayoffSeed507c) {
+          issues.push({
+            location: `${payoffRecs507c.length} payoff scenes and ${seedRecs507c.length} seed scenes — zero overlap`,
+            rule: 'PAYOFF_SEED_DECOUPLED',
+            severity: 'minor',
+            description: `The story has ${payoffRecs507c.length} payoff scenes and ${seedRecs507c.length} clue-seeding scenes, but none overlap — resolutions and new threads are always in separate scenes. The most structurally efficient beats close a loop while opening another: a payoff that simultaneously plants a new question carries double momentum. When payoffs and seeds are fully decoupled, closures are purely terminal — each thread resolution is a dead end rather than a pivot to the next layer of the story's mystery. The audience experiences each payoff as a finality rather than as a discovery that changes what they are waiting for next.`,
+            suggestedFix: `Let at least one payoff scene also seed a new thread: a resolved mystery that reveals a deeper one, a delivered promise that simultaneously hints at an unfulfilled one, or a callback that closes one question and opens another. The payoff-plus-seed pattern is the most efficient structural beat in any mystery-bearing screenplay: it satisfies the audience's forward anticipation while immediately replenishing it.`,
+          });
+        }
       }
     }
   }

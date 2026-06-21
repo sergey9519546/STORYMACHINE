@@ -24459,6 +24459,88 @@ I always listen.
     });
   });
 
+  describe('Wave 507 — intentionPass: payoff suspense aftermath void, revelation closing void, payoff seed decoupled', async () => {
+    const makeRec507 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runI507 = async (records: any[]) => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      return intentionPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('PAYOFF_SUSPENSE_AFTERMATH_VOID fires when avg post-payoff suspense is <= 0', async () => {
+      // n=10; payoffs at pos 1,3,5 (not last); next scenes (2,4,6) all suspenseDelta=0 → avg=0 ≤ 0 → fire
+      const recs507a = Array.from({ length: 10 }, (_, i) =>
+        makeRec507(i, {
+          payoffSetupIds: [1, 3, 5].includes(i) ? ['setup-A'] : [],
+          suspenseDelta: 0,
+        }),
+      );
+      const res = await runI507(recs507a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'PAYOFF_SUSPENSE_AFTERMATH_VOID'), 'PAYOFF_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('PAYOFF_SUSPENSE_AFTERMATH_VOID does not fire when avg post-payoff suspense is > 0', async () => {
+      // n=10; payoffs at 1,3,5; scene 2 has suspenseDelta=3 (others 0) → avg=1 > 0 → no fire
+      const recs507anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec507(i, {
+          payoffSetupIds: [1, 3, 5].includes(i) ? ['setup-B'] : [],
+          suspenseDelta: i === 2 ? 3 : 0,
+        }),
+      );
+      const res = await runI507(recs507anr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'PAYOFF_SUSPENSE_AFTERMATH_VOID'), 'PAYOFF_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('REVELATION_CLOSING_VOID fires when no revelation falls in the final third', async () => {
+      // n=9; third=3; revelations at pos 0,1,2 (all zone1); none at pos 6,7,8 → fire
+      const recs507b = Array.from({ length: 9 }, (_, i) =>
+        makeRec507(i, { revelation: [0, 1, 2].includes(i) ? 'A truth is revealed.' : null }),
+      );
+      const res = await runI507(recs507b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'REVELATION_CLOSING_VOID'), 'REVELATION_CLOSING_VOID should fire');
+    });
+
+    it('REVELATION_CLOSING_VOID does not fire when a revelation falls in the final third', async () => {
+      // n=9; third=3; revelation at pos 7 (zone3: 7 >= 2*3=6) → anyRevInFinal=true → no fire
+      const recs507bnr = Array.from({ length: 9 }, (_, i) =>
+        makeRec507(i, { revelation: [0, 3, 7].includes(i) ? 'Truth emerges.' : null }),
+      );
+      const res = await runI507(recs507bnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'REVELATION_CLOSING_VOID'), 'REVELATION_CLOSING_VOID should not fire');
+    });
+
+    it('PAYOFF_SEED_DECOUPLED fires when no scene has both a payoff and a seed', async () => {
+      // n=10; payoffs at 2,5; seeds at 3,7 — zero overlap → fire
+      const recs507c = Array.from({ length: 10 }, (_, i) =>
+        makeRec507(i, {
+          payoffSetupIds: [2, 5].includes(i) ? ['setup-X'] : [],
+          seededClueIds: [3, 7].includes(i) ? ['clue-Y'] : [],
+        }),
+      );
+      const res = await runI507(recs507c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'PAYOFF_SEED_DECOUPLED'), 'PAYOFF_SEED_DECOUPLED should fire');
+    });
+
+    it('PAYOFF_SEED_DECOUPLED does not fire when a scene has both a payoff and a seed', async () => {
+      // n=10; scene 5 has both payoffSetupIds and seededClueIds → anyPayoffSeed=true → no fire
+      const recs507cnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec507(i, {
+          payoffSetupIds: [2, 5].includes(i) ? ['setup-X'] : [],
+          seededClueIds: [5, 7].includes(i) ? ['clue-Z'] : [],
+        }),
+      );
+      const res = await runI507(recs507cnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'PAYOFF_SEED_DECOUPLED'), 'PAYOFF_SEED_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 493 — intentionPass: payoff curiosity flat, seed Act 1 void, payoff run', async () => {
     const makeRec493 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
