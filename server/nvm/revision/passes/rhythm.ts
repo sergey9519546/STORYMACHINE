@@ -106,6 +106,19 @@
 // high (average/aggregate × sentence count per line — ≥8 action lines averaging >3 sentences each,
 // multi-clause overload that collapses the shot-by-shot grammar of cinematic action; the average/
 // aggregate complement of SINGLE_SENTENCE_FLOOD and SENTENCE_COUNT_PEAK).
+// Wave 498 additions: opening long absent (zone presence/absence × long channel ≥12w × opening
+// 25% — no long action line in the opening while ≥3 exist later; the opening-zone long companion
+// to OPENING_SHORT_ABSENT, completing the opening-zone cell for the long-line channel; distinct
+// from ACTION_MIDDLE_LONG_ABSENT which covers the middle zone), density peak late (distribution/
+// timing × word count × finale zone — the script's single longest action line ≥15w falls in the
+// final 25% while ≥3 long lines ≥12w exist in the first 75%; the climax carries the most
+// elaborate prose while the rest of the script is sparser; the late-zone mirror of DENSITY_PEAK_
+// EARLY and distinct from ACTION_FINALE_BLOAT which compares zone averages rather than isolating
+// the single peak), short multiclausal (co-occurrence × short word count × sentence-end punctuation
+// — ≥4 action lines each ≤5 words yet containing ≥2 sentence-ending marks; fragment-stacking
+// that breaks a single dramatic beat into clause splinters; distinct from ACTION_QUESTION_INTRUSION
+// which counts any "?" in action and from CONSECUTIVE_SHORT_RUN which measures run length not
+// clause structure).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2019,6 +2032,97 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Action lines average ${avgSentences484c.toFixed(1)} sentences each across ${actionLines.length} lines — the prose is structured as multi-clause paragraphs rather than shot-by-shot beats. A cinematic action line should typically represent one thing the camera records: one physical action, one visual detail, one spatial movement. When the average line packs three or more sentences, the script's implicit shot grammar collapses into prose narrative: the reader cannot feel where one camera position ends and the next begins, and the director receives paragraphs to block rather than units of staging to assemble.`,
         suggestedFix: 'Break multi-sentence action lines into separate lines, each representing one distinct visual beat: instead of "She opens the door. The room is dark. A shape moves in the corner." write three separate action lines, each one a beat the camera can hold. The white space between them — the blank lines in the script — is where the cuts live. Three separate short lines read faster and cut cleaner than one long line with three sentences inside it.',
+      });
+    }
+  }
+
+  // ── Wave 498: ACTION_OPENING_LONG_ABSENT, ACTION_DENSITY_PEAK_LATE, ACTION_SHORT_MULTICLAUSAL ──
+
+  // ACTION_OPENING_LONG_ABSENT (zone presence/absence × long-line channel × opening 25%,
+  // ≥10 action lines, ≥3 long lines ≥12 words in the rest): The first 25% of action lines
+  // contains no long line (≥12 words) while at least three long lines exist in the rest of the
+  // script. The opening zone never samples the descriptive register — it is written entirely
+  // in short or medium beats without any spatial, visual, or atmospheric richness. The opening
+  // quarter is where the script establishes its world: the specific textures and details that
+  // give the audience a sense of physical reality. When the entire opening is written in
+  // telegraphic notation with no long descriptive line, the world is gestured at rather than
+  // rendered. Zone presence/absence mode × long-line channel × opening zone. Distinct from
+  // ACTION_OPENING_SHORT_ABSENT (Wave 456: opening zone × short channel — this is the same
+  // zone on the LONG channel), ACTION_MIDDLE_LONG_ABSENT (Wave 470: middle zone × long channel
+  // — same channel, different zone), LONGEST_ACTION_OUTLIER (Wave 428: single-peak isolation,
+  // not zone presence), DENSITY_PEAK_EARLY (Wave 470: the peak is IN the opening — the
+  // inverse of this check, which fires when the opening is ABSENT of long lines).
+  if (actionLines.length >= 10) {
+    const openEnd498a = Math.floor(actionLines.length * 0.25);
+    const openLongCount498a = wordCounts.slice(0, openEnd498a).filter(w => w >= 12).length;
+    const restLongCount498a = wordCounts.slice(openEnd498a).filter(w => w >= 12).length;
+    if (openLongCount498a === 0 && restLongCount498a >= 3) {
+      issues.push({
+        location: `Opening action lines (1–${openEnd498a}) — no long line ≥12 words`,
+        rule: 'ACTION_OPENING_LONG_ABSENT',
+        severity: 'minor',
+        description: `The first 25% of action lines (lines 1–${openEnd498a}) contains no line of 12 words or more — the script's opening is written entirely in short and medium beats — while ${restLongCount498a} long action lines appear later. The opening quarter is where the physical world is established: specific textures, spatial relationships, and atmospheric details that give the audience a sense of real place. When the entire opening is telegraphic notation without any line that constructs an image in full, the world is gestured at rather than built. A reader can absorb shorthand once they feel grounded; without at least one fully rendered line in the opening, they are told where they are without being made to see it.`,
+        suggestedFix: `Add at least one action line of 12+ words in the opening quarter (first ${openEnd498a} lines) — a line that renders the space, the light, the texture, or the atmosphere in concrete specific detail. This doesn't need to be a full set-piece description; even one line that names a specific, unexpected visual detail ("The linoleum curls at the corner where a water stain has dried into a dark ring.") grounds the reader more fully than three lines of bare notation.`,
+      });
+    }
+  }
+
+  // ACTION_DENSITY_PEAK_LATE (distribution/timing × word count × finale zone, ≥10 action lines,
+  // peak ≥15 words in final 25%, ≥3 long lines ≥12 words in first 75%): The script's single
+  // longest action line falls in the final 25% while the first three-quarters use long lines more
+  // sparingly. The climax carries the most elaborately written action prose when it should use the
+  // most economical — pace accelerates toward the climax, and elaborate prose slows reading speed
+  // exactly when the story's rhythm should be sharpening. A script that saves its longest prose
+  // description for the final act may be producing it at the wrong moment: what works as rich
+  // texture in Act 1 functions as a speed bump in Act 3. Distribution/timing mode × word count ×
+  // finale zone × single-peak position. Distinct from DENSITY_PEAK_EARLY (Wave 470: peak in first
+  // 25% — this is the late-zone mirror), ACTION_FINALE_BLOAT (Wave 428: finale AVERAGE vs first
+  // three-quarters average — comparison of zone means, not single-peak isolation), LONGEST_ACTION_
+  // OUTLIER (Wave 428: whether the peak is an outlier ratio from the average — position-agnostic).
+  if (actionLines.length >= 10) {
+    const peakWC498b = Math.max(...wordCounts);
+    const peakPos498b = wordCounts.indexOf(peakWC498b);
+    const finaleStart498b = Math.floor(actionLines.length * 0.75);
+    const restLongCount498b = wordCounts.slice(0, finaleStart498b).filter(w => w >= 12).length;
+    if (peakWC498b >= 15 && peakPos498b >= finaleStart498b && restLongCount498b >= 3) {
+      issues.push({
+        location: `Action line ${peakPos498b + 1} (in final 25%) — longest at ${peakWC498b} words`,
+        rule: 'ACTION_DENSITY_PEAK_LATE',
+        severity: 'minor',
+        description: `The script's longest action line (action line ${peakPos498b + 1}, ${peakWC498b} words) falls in the final 25% of action prose, while ${restLongCount498b} long lines (≥12 words) appear in the first three-quarters. The most elaborate action description arrives at the climax rather than in the earlier acts. Script pace is supposed to tighten toward the ending: scenes get shorter, action beats more economical, staging more pointed. When the longest, most densely written action line falls in the finale, it works against this rhythm — the prose requires the reader to slow down exactly where the story should be accelerating. The climax deserves the most precise and specific staging, but precision is achieved through selection, not through length.`,
+        suggestedFix: `Trim or redistribute the finale's longest action line — break it into shorter separate beats (each one a cut), move its richest descriptive work to an earlier act where pacing can afford elaboration, or distill it to its three or four most specific images and cut the rest. The first act can absorb long descriptive lines as world-building; the climax should work with economy.`,
+      });
+    }
+  }
+
+  // ACTION_SHORT_MULTICLAUSAL (co-occurrence × short word count × sentence-end punctuation,
+  // ≥8 action lines, ≥4 lines with ≤5 words AND ≥2 sentence-ending marks): At least four action
+  // lines are simultaneously short (≤5 words) and multi-sentence (≥2 sentence-ending punctuation
+  // marks) — fragment-stacking that breaks a single dramatic beat into clause splinters. These
+  // are lines like "He runs. Falls." or "She sees it. Freezes." — short in word count but packing
+  // two distinct actions into the same line, each terminated separately. This form has a specific
+  // rhythmic failure: the two-beat fragment is neither the sustained read of a full action line
+  // nor the sharp economy of a single-word or single-clause line. It commits to brevity but then
+  // doubles up within it, creating the worst of both registers: dense in event, thin in detail.
+  // Co-occurrence mode × short word count × sentence-end punctuation count. Distinct from
+  // ACTION_QUESTION_INTRUSION (Wave 305: counts "?" in action lines regardless of length),
+  // CONSECUTIVE_SHORT_RUN (Wave 484: counts consecutive ≤4w lines regardless of clause structure),
+  // SENTENCE_COUNT_PEAK (Wave 456: audits the single outlier line by sentence count — not the
+  // count of co-occurrence lines globally). First check combining both length and sentence-density
+  // co-occurrence at the action line level.
+  if (actionLines.length >= 8) {
+    const shortMulticlauseCount498c = actionLines.filter(l => {
+      const wc = wordCounts[actionLines.indexOf(l)];
+      const sentEnds = (l.text.match(/[.!?]+/g) ?? []).length;
+      return wc <= 5 && sentEnds >= 2;
+    }).length;
+    if (shortMulticlauseCount498c >= 4) {
+      issues.push({
+        location: `${shortMulticlauseCount498c} action line(s) of ≤5 words with ≥2 sentence-ending marks`,
+        rule: 'ACTION_SHORT_MULTICLAUSAL',
+        severity: 'minor',
+        description: `${shortMulticlauseCount498c} action lines are simultaneously short (≤5 words) and multi-sentence (≥2 sentence-ending marks) — lines like "He runs. Falls." or "She sees it. Freezes." The fragment-stacking form breaks a single dramatic beat into clause splinters that are neither the full statement of a long line nor the clean punch of a one-clause beat. These lines commit to brevity but double up within it: two distinct actions share a short line with no room to give either one spatial or physical specificity. The result is a form that is simultaneously rushed (too compressed) and cluttered (too many separate actions), delivering two beats at the speed of one while also providing the staging of neither.`,
+        suggestedFix: 'Separate each fragment-stacked line into two distinct action lines (each one a camera beat) or merge both actions into a single well-constructed clause that gives the movement full physical specificity. "He runs. Falls." becomes either two lines — "He breaks for the door." / "He goes down hard." — or one line: "He sprints for the door and catches his heel on the mat, sprawling." The two-line version cuts faster; the one-line version delivers more staging. Either is preferable to the fragment stack.',
       });
     }
   }

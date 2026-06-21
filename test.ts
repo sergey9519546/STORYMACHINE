@@ -19897,6 +19897,181 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 498 — rhythmPass: opening long absent, density peak late, short multiclausal', async () => {
+    const runR498 = async (fountain: string) => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('ACTION_OPENING_LONG_ABSENT fires when first 25% of action lines has no long line but ≥3 exist later', async () => {
+      // 10 action lines: positions 0-1 short (≤11w), positions 2-4 each ≥12 words
+      // openEnd = floor(10*0.25) = 2 → openLongCount = 0, restLongCount = 3 → fires
+      const f498a = [
+        'INT. ROOM - DAY',
+        '',
+        'She enters.',
+        '',
+        'He looks.',
+        '',
+        'The old wooden clock on the far wall ticks with a measured mechanical rhythm.',
+        '',
+        'Outside the smudged window a yellow cab idles at the curb while the driver checks his phone.',
+        '',
+        'A pigeon settles on the narrow ledge and pecks at something invisible in the cracked gray mortar.',
+        '',
+        'Footsteps in the hall.',
+        '',
+        'A key in the lock.',
+        '',
+        'The door swings open.',
+        '',
+        'Light floods in.',
+        '',
+        'He turns.',
+      ].join('\n');
+      const res = await runR498(f498a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_OPENING_LONG_ABSENT'), 'ACTION_OPENING_LONG_ABSENT should fire');
+    });
+
+    it('ACTION_OPENING_LONG_ABSENT does not fire when a long line exists in the opening 25%', async () => {
+      // 10 action lines: position 0 has 16 words (≥12, in first 2 = opening 25%) → openLongCount = 1 → no fire
+      const f498anr = [
+        'INT. ROOM - DAY',
+        '',
+        'The morning light falls through the dusty venetian blinds and stripes the floor in pale gold.',
+        '',
+        'He looks.',
+        '',
+        'The clock ticks.',
+        '',
+        'A key in the lock.',
+        '',
+        'The door swings open.',
+        '',
+        'Light floods in.',
+        '',
+        'She moves to the window.',
+        '',
+        'He turns around.',
+        '',
+        'Footsteps fade.',
+        '',
+        'Silence returns.',
+      ].join('\n');
+      const res = await runR498(f498anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_OPENING_LONG_ABSENT'), 'ACTION_OPENING_LONG_ABSENT should not fire');
+    });
+
+    it('ACTION_DENSITY_PEAK_LATE fires when longest action line (≥15 words) falls in the final 25%', async () => {
+      // 10 action lines: positions 0,2,4 have 12 words (long, first 7); position 9 has 16 words (peak)
+      // finaleStart = floor(10*0.75) = 7; peakWC=16≥15, peakPos=9≥7, restLongCount=3 → fires
+      const f498b = [
+        'INT. OFFICE - DAY',
+        '',
+        'The old desk sits beneath the window where the light is brightest.',
+        '',
+        'He pauses.',
+        '',
+        'Stacks of papers cover every surface and have spilled onto the floor.',
+        '',
+        'She steps back.',
+        '',
+        'She reaches across the crowded desk and retrieves a single yellow envelope.',
+        '',
+        'He waits.',
+        '',
+        'She opens it.',
+        '',
+        'He looks away.',
+        '',
+        'Stillness.',
+        '',
+        "The building's entire south facade collapses into the street below with a single deep percussive boom.",
+      ].join('\n');
+      const res = await runR498(f498b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_DENSITY_PEAK_LATE'), 'ACTION_DENSITY_PEAK_LATE should fire');
+    });
+
+    it('ACTION_DENSITY_PEAK_LATE does not fire when the longest action line falls in the first 75%', async () => {
+      // 10 action lines: position 0 has 16 words (longest, peakPos=0 < finaleStart=7) → no fire
+      const f498bnr = [
+        'INT. OFFICE - DAY',
+        '',
+        "The building's entire south facade collapses into the street below with a single deep percussive boom.",
+        '',
+        'He pauses.',
+        '',
+        'Stacks of papers cover every surface and have spilled onto the floor.',
+        '',
+        'She steps back.',
+        '',
+        'She reaches across the desk and retrieves the yellow envelope from the stack.',
+        '',
+        'He waits.',
+        '',
+        'She opens it.',
+        '',
+        'He looks away.',
+        '',
+        'Stillness.',
+        '',
+        'He leaves.',
+      ].join('\n');
+      const res = await runR498(f498bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_DENSITY_PEAK_LATE'), 'ACTION_DENSITY_PEAK_LATE should not fire');
+    });
+
+    it('ACTION_SHORT_MULTICLAUSAL fires when ≥4 action lines are ≤5 words with ≥2 sentence-end marks', async () => {
+      // 8 action lines: 4 lines are ≤5 words AND have ≥2 sentence-end punctuation marks → fires
+      const f498c = [
+        'INT. HALLWAY - NIGHT',
+        '',
+        'She stops. Looks.',
+        '',
+        'He grabs. Pulls.',
+        '',
+        'Door slams. Silence.',
+        '',
+        'Light dies. Gone.',
+        '',
+        'The long corridor stretches ahead into darkness.',
+        '',
+        'Nothing moves.',
+        '',
+        'Then something shifts in the shadows near the end.',
+        '',
+        'She waits.',
+      ].join('\n');
+      const res = await runR498(f498c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_SHORT_MULTICLAUSAL'), 'ACTION_SHORT_MULTICLAUSAL should fire');
+    });
+
+    it('ACTION_SHORT_MULTICLAUSAL does not fire when fewer than 4 lines meet the short-multiclausal condition', async () => {
+      // 8 action lines: only 3 with ≤5 words AND ≥2 sentence-end marks (4th short line has 1 end) → no fire
+      const f498cnr = [
+        'INT. HALLWAY - NIGHT',
+        '',
+        'She stops. Looks.',
+        '',
+        'He grabs. Pulls.',
+        '',
+        'Door slams. Silence.',
+        '',
+        'Light fades slowly away.',
+        '',
+        'The long corridor stretches ahead into darkness.',
+        '',
+        'Nothing moves.',
+        '',
+        'Then something shifts in the shadows near the end.',
+        '',
+        'She waits.',
+      ].join('\n');
+      const res = await runR498(f498cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_SHORT_MULTICLAUSAL'), 'ACTION_SHORT_MULTICLAUSAL should not fire');
+    });
+  });
+
   describe('Wave 484 — rhythmPass: consecutive short run, finale short absent, sentence average high', async () => {
     const runR484 = async (fountain: string) => {
       const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
