@@ -18713,6 +18713,107 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 486 — themePass: positive emotion aftermath silent, first resonant causeless, resonance thirds cluster', async () => {
+    const makeRec486 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const THEME486 = 'redemption forgiveness courage';
+    const themed486 = ['act of redemption'];
+    const runT486 = async (records: any[]) => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: THEME486 },
+      });
+    };
+
+    it('THEME_POSITIVE_EMOTION_AFTERMATH_SILENT fires when no positive-shift scene is followed by a resonant scene', async () => {
+      // 9 scenes: positive at 1 and 4; themed at 0 and 7 (no positive shifts, not adjacent to pos shifts)
+      // pos scene 1 → next is scene 2 (not themed); pos scene 4 → next is scene 5 (not themed) → fire
+      const recs486a = Array.from({ length: 9 }, (_, i) =>
+        makeRec486(i, {
+          emotionalShift: [1, 4].includes(i) ? 'positive' : 'neutral',
+          dialogueHighlights: [0, 7].includes(i) ? themed486 : [],
+        }),
+      );
+      const res = await runT486(recs486a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'THEME_POSITIVE_EMOTION_AFTERMATH_SILENT'), 'THEME_POSITIVE_EMOTION_AFTERMATH_SILENT should fire');
+    });
+
+    it('THEME_POSITIVE_EMOTION_AFTERMATH_SILENT does not fire when at least one positive scene is followed by a resonant scene', async () => {
+      // 9 scenes: positive at 1 and 4; scene 2 (after pos 1) is themed → aftermath resonance exists → no fire
+      const recs486anr = Array.from({ length: 9 }, (_, i) =>
+        makeRec486(i, {
+          emotionalShift: [1, 4].includes(i) ? 'positive' : 'neutral',
+          dialogueHighlights: [2, 7].includes(i) ? themed486 : [],
+        }),
+      );
+      const res = await runT486(recs486anr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'THEME_POSITIVE_EMOTION_AFTERMATH_SILENT'), 'THEME_POSITIVE_EMOTION_AFTERMATH_SILENT should not fire');
+    });
+
+    it('THEME_FIRST_RESONANT_CAUSELESS fires when the first resonant scene at pos≥2 has no cause in prior 2 scenes', async () => {
+      // 8 scenes: first resonant scene is at index 3; scenes 1 and 2 are neutral/flat (no cause) → fire
+      const recs486b = Array.from({ length: 8 }, (_, i) =>
+        makeRec486(i, {
+          dialogueHighlights: i === 3 ? themed486 : [],
+          // scenes 1,2 have no revelation, no turn, no suspense, no emotion, no clock
+        }),
+      );
+      const res = await runT486(recs486b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'THEME_FIRST_RESONANT_CAUSELESS'), 'THEME_FIRST_RESONANT_CAUSELESS should fire');
+    });
+
+    it('THEME_FIRST_RESONANT_CAUSELESS does not fire when prior scene has a structural cause', async () => {
+      // 8 scenes: first resonant at index 3; scene 2 has suspenseDelta>0 (cause) → no fire
+      const recs486bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec486(i, {
+          dialogueHighlights: i === 3 ? themed486 : [],
+          suspenseDelta: i === 2 ? 1 : 0,
+        }),
+      );
+      const res = await runT486(recs486bnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'THEME_FIRST_RESONANT_CAUSELESS'), 'THEME_FIRST_RESONANT_CAUSELESS should not fire');
+    });
+
+    it('THEME_RESONANCE_THIRDS_CLUSTER fires when >75% of resonant scenes are in one structural third', async () => {
+      // 9 scenes: thirds at [0-2],[3-5],[6-8]; themed at 0,1,2 (all in first third) + one at 7
+      // first-third: 3 resonant; second-third: 0; final-third: 1 → total 4; 3/4 = 75% not >75%
+      // Let's use 4 in first third, 1 elsewhere: 4/5 = 80% > 75% → fire
+      // 9 scenes, thirds at [0-2],[3-5],[6-8]. themed at 0,1,2,3 in first+start-of-second, 1 at 8
+      // Actually use 10 scenes: thirds [0-3],[4-6],[7-9]; themed at 0,1,2,3 (first third) + 1 at 8
+      // 4/5 = 80% > 75%. Let me use 9 scenes: third=3; themed at 0,1,2 (first third=3 scenes)
+      // plus 1 more in first third (0,1,2) won't work with only 3 slots — use themed at 0,1,2,3
+      // But index 3 is start of second third. Redesign: 12 scenes, third=4; themed at 0,1,2,3 = first third
+      // plus one more at index 10 (third third). 4 in first, 0 in second, 1 in third → 4/5 = 80% → fire
+      const recs486c = Array.from({ length: 12 }, (_, i) =>
+        makeRec486(i, {
+          dialogueHighlights: [0, 1, 2, 3, 10].includes(i) ? themed486 : [],
+        }),
+      );
+      const res = await runT486(recs486c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'THEME_RESONANCE_THIRDS_CLUSTER'), 'THEME_RESONANCE_THIRDS_CLUSTER should fire');
+    });
+
+    it('THEME_RESONANCE_THIRDS_CLUSTER does not fire when resonant scenes are distributed across thirds', async () => {
+      // 12 scenes, third=4; themed at 1 (first), 5 (second), 9 (third) → 1/1/1 → 33% each < 75% → no fire
+      const recs486cnr = Array.from({ length: 12 }, (_, i) =>
+        makeRec486(i, {
+          dialogueHighlights: [1, 5, 9].includes(i) ? themed486 : [],
+        }),
+      );
+      const res = await runT486(recs486cnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'THEME_RESONANCE_THIRDS_CLUSTER'), 'THEME_RESONANCE_THIRDS_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 472 — themePass: positive emotion decoupled, resonant valence uniform, dialogue peak silent', async () => {
     const makeRec472 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

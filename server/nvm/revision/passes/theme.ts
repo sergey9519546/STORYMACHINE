@@ -102,6 +102,16 @@
 // channel — the scene with the most dialogue highlights carries no theme while ≥2 others do; the
 // script's most verbally active moment is thematically mute; fills the dialogue-channel cell in the
 // single-peak isolation family alongside seed/payoff/curiosity/suspense/relationship/clock peaks).
+// Wave 486 additions: positive emotion aftermath silent (sequence/aftermath × positive emotion
+// trigger → theme — n≥8, ≥2 positive-shift scenes not at last position, none followed by a
+// resonant scene; the aftermath × positive-emotion channel, distinct from THEME_POSITIVE_EMOTION_DECOUPLED
+// which fires when the positive scene itself is silent), first resonant causeless (backward-cause
+// × first resonant scene — the story's inaugural thematic moment lacks any structural catalyst in
+// the 2 prior scenes; distinct from THEME_PEAK_UNMOTIVATED which targets the densest scene and from
+// THEME_ALL_RESONANCE_CAUSELESS which requires every resonant scene to be causeless), resonance thirds
+// cluster (distribution/timing × thirds × resonant scene proportion — >75% of resonant scenes fall
+// in one structural third; distinct from THEME_FRONT_LOADED which compares keyword hit density
+// first-third vs rest, and from zone checks which fire on 0 resonant scenes in a zone).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2336,6 +2346,112 @@ export async function themePass(input: PassInput): Promise<PassResult> {
             suggestedFix: `Give scene ${peakDlgScene472c.sceneIdx} at least one line of dialogue that touches "${themeRaw}": a character statement, question, or argument that invokes the theme directly or obliquely. The most dialogue-rich scene in the script is the most natural place for thematic language to appear — it's where characters are already speaking most fully, and thematic depth costs only one line.`,
           });
         }
+      }
+    }
+
+    // ── Wave 486: POSITIVE_EMOTION_AFTERMATH_SILENT, FIRST_RESONANT_CAUSELESS, RESONANCE_THIRDS_CLUSTER ──
+
+    // THEME_POSITIVE_EMOTION_AFTERMATH_SILENT — sequence/aftermath × positive emotion trigger → theme.
+    // n≥8, ≥2 positive-shift scenes not at the last position. For every such scene, check whether the
+    // immediately following scene is thematically resonant. If no positive-shift scene is followed by a
+    // resonant scene, the post-uplift beat never picks up the theme — emotional highs and thematic meaning
+    // are permanently decoupled across time rather than co-incident.
+    // Distinctness: THEME_POSITIVE_EMOTION_DECOUPLED fires when the positive scene ITSELF is thematically
+    // silent (co-occurrence check); this fires when the NEXT scene is silent (aftermath check). Different
+    // temporal relationship — decoupling vs aftermath silence. Fills the aftermath × positive-emotion
+    // channel alongside THEME_CLOCK_AFTERMATH_SILENT, THEME_REVELATION_AFTERMATH_SILENT,
+    // THEME_DRAMATIC_TURN_AFTERMATH_SILENT, THEME_PEAK_SUSPENSE_AFTERMATH_SILENT.
+    const n486a = records.length;
+    if (n486a >= 8) {
+      const posIdxs486a: number[] = [];
+      for (let i486a = 0; i486a < n486a - 1; i486a++) {
+        if (records[i486a].emotionalShift === 'positive') posIdxs486a.push(i486a);
+      }
+      if (posIdxs486a.length >= 2) {
+        const anyPosAftermath486a = posIdxs486a.some(i486a => {
+          const next486a = records[i486a + 1];
+          return sceneHasResonance(sceneTexts.get(next486a.sceneIdx) ?? '', expandedKeywords);
+        });
+        if (!anyPosAftermath486a) {
+          issues.push({
+            location: `${posIdxs486a.length} positive-shift scenes — none followed by theme resonance`,
+            rule: 'THEME_POSITIVE_EMOTION_AFTERMATH_SILENT',
+            severity: 'minor',
+            description: `The script has ${posIdxs486a.length} positive-emotion scenes, but not one is followed immediately by a scene that touches "${themeRaw}". Post-uplift beats are among the most natural moments for thematic reflection — characters have just experienced something hopeful or triumphant, and the next scene is primed to carry meaning. When every positive-shift moment passes without the theme entering the next beat, the story's emotional highs and its central idea remain permanently disconnected.`,
+            suggestedFix: `After at least one positive-emotion scene, let the next scene voice or embody "${themeRaw}" — even a single image, line, or decision that connects the uplift to the story's central question. The moment after a positive turn is the most receptive audience state for thematic reinforcement.`,
+          });
+        }
+      }
+    }
+
+    // THEME_FIRST_RESONANT_CAUSELESS — backward-cause × first resonant scene.
+    // n≥6, first resonant scene at array pos≥2. Check whether either of the 2 prior scenes
+    // contains a structural cause: revelation, dramatic turn (≠'nothing'), suspense rise
+    // (suspenseDelta>0), clockRaised, or any non-neutral emotional shift. When the story's
+    // inaugural thematic moment is structurally causeless, the theme debuts as an editorial
+    // insertion rather than emerging from narrative pressure.
+    // Distinctness: THEME_PEAK_UNMOTIVATED fires on the single densest scene (most keyword hits);
+    // THEME_ALL_RESONANCE_CAUSELESS fires only when every resonant scene is causeless. This
+    // specifically targets the very first resonant scene — a weaker, earlier failure mode that
+    // the other two checks cannot catch. THEME_LATE_DEBUT checks the first resonant scene's
+    // POSITION (too late); this checks its CAUSE regardless of position.
+    if (records.length >= 6) {
+      const firstResIdx486b = records.findIndex(r =>
+        sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+      );
+      if (firstResIdx486b >= 2) {
+        const prior1_486b = records[firstResIdx486b - 1];
+        const prior2_486b = records[firstResIdx486b - 2];
+        const hasCause486b = [prior1_486b, prior2_486b].some(r =>
+          r !== undefined && (
+            (r.revelation !== null && r.revelation !== '' && r.revelation !== undefined) ||
+            (r.dramaticTurn !== undefined && r.dramaticTurn !== 'nothing' && r.dramaticTurn !== '') ||
+            r.suspenseDelta > 0 ||
+            r.clockRaised === true ||
+            r.emotionalShift !== 'neutral'
+          ),
+        );
+        if (!hasCause486b) {
+          issues.push({
+            location: `Scene ${records[firstResIdx486b].sceneIdx} (${records[firstResIdx486b].slug}) — first resonant scene, causeless`,
+            rule: 'THEME_FIRST_RESONANT_CAUSELESS',
+            severity: 'minor',
+            description: `The first thematically resonant scene (scene ${records[firstResIdx486b].sceneIdx}) appears with no structural preparation — the 2 preceding scenes carry no revelation, dramatic turn, suspense rise, deadline, or emotional shift that would motivate a thematic surfacing. When the theme debuts without cause, it arrives as an editorial insertion rather than emerging from narrative pressure.`,
+            suggestedFix: `Add a structural catalyst in the scene immediately before scene ${records[firstResIdx486b].sceneIdx}: a revelation, a reversal, a moment of tension, or an emotional beat that makes the theme's debut feel earned. The first thematic moment should feel provoked by the story, not appended to it.`,
+          });
+        }
+      }
+    }
+
+    // THEME_RESONANCE_THIRDS_CLUSTER — distribution/timing × thirds × resonant scene proportion.
+    // n≥9, ≥3 resonant scenes. Divide records into three equal structural thirds. Count resonant
+    // scenes in each third. If >75% of all resonant scenes fall in a single third, the theme is
+    // structurally localized — it speaks in only one segment and falls silent for two thirds of runtime.
+    // Distinctness: THEME_FRONT_LOADED compares keyword hit DENSITY (hits/scene) in the first third
+    // vs the rest, requires ≥2 hits/scene density to fire, and only contrasts first-third vs rest
+    // (not all three thirds). This check uses scene MEMBERSHIP PROPORTION across all three thirds
+    // and fires even when the dominant zone is the middle or final third. THEME_CLOSING_QUARTER_SILENT,
+    // THEME_MIDPOINT_SILENT etc. fire on ZERO resonant scenes in a zone; this fires when one zone
+    // is overwhelmingly dominant (≥1 in each zone but concentration >75% in one). THEME_RESONANT_
+    // CLUSTER_FLOOD fires on ≥4 consecutive resonant scenes (run-based, adjacency); this uses
+    // structural position thirds, not adjacency.
+    if (records.length >= 9 && resonantScenes.length >= 3) {
+      const third486c = Math.floor(records.length / 3);
+      const resonantSet486c = new Set(resonantScenes.map(r => r.sceneIdx));
+      const zone1Count486c = records.slice(0, third486c).filter(r => resonantSet486c.has(r.sceneIdx)).length;
+      const zone2Count486c = records.slice(third486c, 2 * third486c).filter(r => resonantSet486c.has(r.sceneIdx)).length;
+      const zone3Count486c = records.slice(2 * third486c).filter(r => resonantSet486c.has(r.sceneIdx)).length;
+      const maxZone486c = Math.max(zone1Count486c, zone2Count486c, zone3Count486c);
+      if (maxZone486c / resonantScenes.length > 0.75) {
+        const dominantZone486c = zone1Count486c === maxZone486c ? 'first'
+          : zone2Count486c === maxZone486c ? 'second' : 'third';
+        issues.push({
+          location: `Thematic distribution — ${maxZone486c}/${resonantScenes.length} resonant scenes in ${dominantZone486c} third (zones: ${zone1Count486c}/${zone2Count486c}/${zone3Count486c})`,
+          rule: 'THEME_RESONANCE_THIRDS_CLUSTER',
+          severity: 'minor',
+          description: `${Math.round(maxZone486c / resonantScenes.length * 100)}% of thematically resonant scenes (${maxZone486c} of ${resonantScenes.length}) fall in the ${dominantZone486c} structural third of the script. The theme is localized — it only speaks in one segment and falls silent for the other two thirds of the runtime. A theme that concentrates in one structural zone cannot accompany the audience through the full arc of the story.`,
+          suggestedFix: `Distribute theme touchpoints across all three structural thirds. Add at least one scene in each of the ${dominantZone486c === 'first' ? 'second and third' : dominantZone486c === 'second' ? 'first and third' : 'first and second'} thirds that carries language, action, or image related to "${themeRaw}". Theme should compound and evolve across the full structure, not concentrate in one zone.`,
+        });
       }
     }
   }
