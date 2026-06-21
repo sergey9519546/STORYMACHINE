@@ -102,6 +102,16 @@
 // climax trigger — the peak-suspense scene in the final 30% is followed by 2 scenes with no
 // emotional shift and no relationship shift; the climax produces no human ripple; first aftermath
 // check triggered by the story's climax position).
+// Wave 513 additions: clock turn decoupled (co-occurrence/decoupling × clock × dramatic-turn —
+// ≥2 clock scenes and ≥2 turn scenes but no scene carries both; urgency and direction-change
+// never coincide, completing the clock co-occurrence family alongside clock × curiosity [Wave 499]
+// and clock × revelation [Wave 485]), curiosity run (run-based × curiosity channel — 5+ consecutive
+// curiosity-positive scenes while ≥4 curiosity scenes exist; first run check on the curiosity
+// channel, completing the channel-run family alongside SUSPENSE_RUN, POSITIVE_SCENE_RUN, NEGATIVE_
+// SCENE_RUN), turn aftermath suspense void (sequence/aftermath × suspense × dramatic-turn trigger —
+// ≥2 qualifying turn scenes none followed by a suspense spike in next 2 scenes while ≥3 suspense
+// scenes exist; first aftermath check using the dramatic-turn trigger, distinct from REVELATION_
+// AFTERMATH_CLOCK_VOID [revelation trigger] and INCITING_AFTERMATH_STALL [inciting incident trigger]).
 // Wave 499 additions: clock curiosity decoupled (co-occurrence/decoupling × clock × curiosity —
 // ≥2 clock scenes and ≥2 curiosity-spike scenes but no scene carries both; urgency and wonder
 // never coincide, extending the co-occurrence family beyond the revelation-centric checks by
@@ -2447,6 +2457,116 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `${maxSuspRun499c} consecutive scenes all carry suspenseDelta > 0 — an unbroken run of escalating tension without any release, relief, or recalibration. Sustained high suspense produces a paradoxical effect: instead of each scene feeling more tense than the last, prolonged elevation becomes the ambient baseline and individual spikes lose impact. An audience experiencing five or more consecutive suspenseful scenes stops registering each beat as a specific escalation and begins processing the tension as the story's permanent condition. Tension requires contrast to register — a single scene of release or recalibration between suspense spikes makes the surrounding tension land with more specific force.`,
           suggestedFix: `Break the run of ${maxSuspRun499c} suspenseful scenes with at least one scene where suspenseDelta ≤ 0 — not a false resolution, but a breath: a scene that lets the audience recalibrate before the next spike. The interlude doesn't need to be warm or peaceful; it just needs to release the mechanical tension so that the next escalation registers as a specific event rather than a continuation of ambient pressure.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 513: CLOCK_TURN_DECOUPLED, CURIOSITY_RUN, TURN_AFTERMATH_SUSPENSE_VOID ──
+
+  // CLOCK_TURN_DECOUPLED (co-occurrence/decoupling × clock × dramatic-turn, n≥10, ≥2 clock
+  // scenes [clockRaised or clockDelta > 0], ≥2 dramatic-turn scenes, no scene carries both):
+  // The story has deadline events and pivotal reversals, but never in the same scene — urgency
+  // and direction-change always operate apart. A clock event at the moment of a dramatic turn
+  // is compounded: the story changes direction AND the window to respond shrinks simultaneously,
+  // creating a beat where both the narrative stakes and the temporal stakes are raised together.
+  // When the two always operate separately, clocks tighten time without pivoting the story and
+  // turns change direction without adding urgency — both are weaker than if they coincided.
+  // Co-occurrence/decoupling mode × clock × dramatic-turn. Distinct from REVELATION_CLOCK_
+  // DECOUPLED (Wave 485: revelation × clock), CLOCK_CURIOSITY_DECOUPLED (Wave 499: clock ×
+  // curiosity), REVELATION_TURN_DECOUPLED (Wave 471: revelation × turn) — first check combining
+  // clock with the dramatic-turn channel.
+  if (n >= 10) {
+    const clockScenes513a = (records as any[]).filter(r =>
+      r.clockRaised === true || (r.clockDelta ?? 0) > 0,
+    );
+    const turnScenes513a = (records as any[]).filter(r =>
+      (r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '',
+    );
+    if (clockScenes513a.length >= 2 && turnScenes513a.length >= 2) {
+      const anyCoOccur513a = (records as any[]).some(
+        r => (r.clockRaised === true || (r.clockDelta ?? 0) > 0) &&
+             (r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '',
+      );
+      if (!anyCoOccur513a) {
+        issues.push({
+          location: `${clockScenes513a.length} clock scene(s) and ${turnScenes513a.length} dramatic-turn scene(s) — never co-occurring`,
+          rule: 'CLOCK_TURN_DECOUPLED',
+          severity: 'minor',
+          description: `The script has ${clockScenes513a.length} clock scene(s) and ${turnScenes513a.length} dramatic-turn scene(s), but no scene simultaneously delivers both deadline pressure and a story pivot — urgency and direction-change always operate in separate moments. A clock event at the moment of a dramatic turn is doubly weighted: the story changes direction AND the window to act on the new direction shrinks at the same time, creating a beat where both narrative and temporal stakes are raised simultaneously. When the two always operate apart, clock scenes tighten time without pivoting the story, and turn scenes change direction without adding urgency — both run at reduced intensity.`,
+          suggestedFix: 'Let at least one dramatic turn also raise the clock — the moment the story changes direction is also the moment time becomes shorter. The turn reveals that the situation is different from what the protagonist believed, and the revelation also removes time: the option that was available yesterday is no longer available, the window the protagonist was relying on has closed, or the new threat requires an immediate response. A pivot under deadline pressure is always more kinetic than a pivot in open time.',
+        });
+      }
+    }
+  }
+
+  // CURIOSITY_RUN (run-based × curiosity channel, n≥8, ≥4 curiosity-positive scenes
+  // [curiosityDelta > 0], longest consecutive run ≥5): Five or more consecutive scenes all
+  // spike curiosity without a resolution, redirect, or recalibration. Sustained wondering
+  // generates its own paradox: five or more scenes in a row that only open questions without
+  // answering any create a rising question-debt the audience stops trusting will be repaid.
+  // Each additional curiosity-raising scene in the run signals that the story is accumulating
+  // questions mechanically rather than generating them as consequences of events. Run-based
+  // mode × curiosity channel. Distinct from SUSPENSE_RUN (Wave 499: suspense channel), POSITIVE_
+  // SCENE_RUN (Wave 471: emotional positive valence, not curiosity), NEGATIVE_SCENE_RUN (Wave 485:
+  // emotional negative valence), PURPOSE_MONOTONE_RUN (Wave 429: purpose channel). First run-based
+  // check on the curiosity channel.
+  if (n >= 8) {
+    const totalCurScenes513b = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0).length;
+    if (totalCurScenes513b >= 4) {
+      let maxCurRun513b = 0, curCurRun513b = 0;
+      for (const r of records as any[]) {
+        if ((r.curiosityDelta ?? 0) > 0) {
+          curCurRun513b++;
+          if (curCurRun513b > maxCurRun513b) maxCurRun513b = curCurRun513b;
+        } else {
+          curCurRun513b = 0;
+        }
+      }
+      if (maxCurRun513b >= 5) {
+        issues.push({
+          location: `Consecutive curiosity scenes — run of ${maxCurRun513b}`,
+          rule: 'CURIOSITY_RUN',
+          severity: 'minor',
+          description: `${maxCurRun513b} consecutive scenes all carry curiosityDelta > 0 — an unbroken run of question-opening without any resolution, redirect, or recalibration. Sustained wondering generates its own paradox: five or more consecutive scenes that only open questions and never answer them create a rising question-debt that the audience begins to distrust. Instead of each question feeling like a fresh mystery, the run of unanswered questions starts to feel like a structural pattern — the story is accumulating mystery as a technique rather than as a consequence of events. Curiosity requires contrast to register as anticipation rather than as anxiety.`,
+          suggestedFix: `Break the run of ${maxCurRun513b} curiosity scenes with at least one scene where curiosityDelta ≤ 0 — not a resolution of everything, but a beat where one of the open questions is addressed (even partially) or the story pauses the wondering to let the audience absorb what they've already been given. A small answer inside a long question-run converts the accumulation from anxiety into investment, because the audience now believes the questions are going somewhere.`,
+        });
+      }
+    }
+  }
+
+  // TURN_AFTERMATH_SUSPENSE_VOID (sequence/aftermath × suspense × dramatic-turn trigger, n≥8,
+  // ≥2 qualifying turn scenes [pos < n-2], ≥3 suspense scenes overall, no qualifying turn
+  // scene followed by suspenseDelta > 0 in next 2 scenes): Every dramatic turn is followed by
+  // two scenes without a suspense spike — pivots never escalate danger in their wake. A dramatic
+  // turn should reorient the stakes: the reversal reveals that the situation is more dangerous than
+  // the protagonist knew, and the scenes immediately after confirm this with rising tension. When
+  // every turn is followed by suspense silence, pivots redirect without sharpening — the story
+  // changes direction but the felt pressure doesn't climb. Sequence/aftermath mode × suspense ×
+  // dramatic-turn trigger. Distinct from REVELATION_AFTERMATH_CLOCK_VOID (Wave 499: revelation
+  // trigger × clock channel), INCITING_AFTERMATH_STALL (Wave 429: inciting-incident trigger ×
+  // curiosity/suspense channels), CLIMAX_AFTERMATH_FLAT (Wave 485: climax trigger × emotional/
+  // relational channels) — first aftermath check using the dramatic-turn trigger.
+  if (n >= 8) {
+    const suspScenes513c = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 0);
+    const qualTurnScenes513c = (records as any[]).filter((r, pos) =>
+      (r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '' && pos < n - 2,
+    );
+    if (qualTurnScenes513c.length >= 2 && suspScenes513c.length >= 3) {
+      const anyTurnFollowedBySusp513c = qualTurnScenes513c.some((r: any) => {
+        const pos513c = (records as any[]).indexOf(r);
+        const next1 = (records as any[])[pos513c + 1];
+        const next2 = (records as any[])[pos513c + 2];
+        return (next1 && (next1.suspenseDelta ?? 0) > 0) ||
+               (next2 && (next2.suspenseDelta ?? 0) > 0);
+      });
+      if (!anyTurnFollowedBySusp513c) {
+        issues.push({
+          location: `All ${qualTurnScenes513c.length} dramatic turn scene(s) — no suspense spike within 2 scenes`,
+          rule: 'TURN_AFTERMATH_SUSPENSE_VOID',
+          severity: 'minor',
+          description: `None of the story's ${qualTurnScenes513c.length} dramatic turns is followed by a suspense spike (suspenseDelta > 0) in the next two scenes, even though ${suspScenes513c.length} suspense scenes exist elsewhere. A pivot should reorient the stakes: the reversal reveals that the situation is more dangerous than the protagonist understood, and the scenes immediately after confirm this with rising pressure. When every turn is followed by two scenes of suspense silence, pivots redirect the narrative direction without escalating the felt danger — the story changes course but the tension doesn't climb. The turn's structural weight is not confirmed by the story's immediate pressure response.`,
+          suggestedFix: `Let at least one dramatic turn be followed within two scenes by a suspense spike: the reversal should expose a new threat, remove a protection, or accelerate a danger that arrives in the next scene or two. The suspense spike doesn't need to be climactic; a single scene of rising pressure after a turn signals that the pivot had real consequences — the world is now more dangerous because the direction changed, and the audience feels this immediately.`,
         });
       }
     }

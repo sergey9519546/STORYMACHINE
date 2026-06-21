@@ -19458,6 +19458,80 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 513 — structurePass: clock turn decoupled, curiosity run, turn aftermath suspense void', async () => {
+    const makeRec513 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const runST513 = async (records: any[]) => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      return structurePass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // CLOCK_TURN_DECOUPLED fire: n=10; clocks at 3,7; turns at 1,5 → no co-occurrence → fires
+    it('CLOCK_TURN_DECOUPLED fires when clock scenes and dramatic-turn scenes never coincide', async () => {
+      const recs513a = Array.from({ length: 10 }, (_, i) => makeRec513(i, {
+        clockRaised: [3, 7].includes(i),
+        dramaticTurn: [1, 5].includes(i) ? 'reversal' : 'nothing',
+      }));
+      const res = await runST513(recs513a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_TURN_DECOUPLED'), 'CLOCK_TURN_DECOUPLED should fire');
+    });
+
+    // CLOCK_TURN_DECOUPLED no-fire: scene 3 has both clockRaised AND dramaticTurn → co-occurrence → no fire
+    it('CLOCK_TURN_DECOUPLED does not fire when at least one scene has both a clock event and a turn', async () => {
+      const recs513anr = Array.from({ length: 10 }, (_, i) => makeRec513(i, {
+        clockRaised: [3, 7].includes(i),
+        dramaticTurn: [3, 5].includes(i) ? 'reversal' : 'nothing',
+      }));
+      const res = await runST513(recs513anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_TURN_DECOUPLED'), 'CLOCK_TURN_DECOUPLED should not fire');
+    });
+
+    // CURIOSITY_RUN fire: n=10; curiosity at 3,4,5,6,7 (run of 5) → totalCuriosity=5≥4, maxRun=5 → fires
+    it('CURIOSITY_RUN fires when 5 or more consecutive scenes all spike curiosity', async () => {
+      const recs513b = Array.from({ length: 10 }, (_, i) => makeRec513(i, {
+        curiosityDelta: i >= 3 && i <= 7 ? 2 : 0,
+      }));
+      const res = await runST513(recs513b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CURIOSITY_RUN'), 'CURIOSITY_RUN should fire');
+    });
+
+    // CURIOSITY_RUN no-fire: curiosity at 2,4,6,8 (alternating) → max run=1 → no fire
+    it('CURIOSITY_RUN does not fire when curiosity scenes are non-consecutive', async () => {
+      const recs513bnr = Array.from({ length: 10 }, (_, i) => makeRec513(i, {
+        curiosityDelta: [2, 4, 6, 8].includes(i) ? 2 : 0,
+      }));
+      const res = await runST513(recs513bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CURIOSITY_RUN'), 'CURIOSITY_RUN should not fire');
+    });
+
+    // TURN_AFTERMATH_SUSPENSE_VOID fire: n=10; turns at 1,3; suspense at 7,8,9 (beyond 2-scene window)
+    it('TURN_AFTERMATH_SUSPENSE_VOID fires when no dramatic turn is followed by a suspense spike', async () => {
+      const recs513c = Array.from({ length: 10 }, (_, i) => makeRec513(i, {
+        dramaticTurn: [1, 3].includes(i) ? 'reversal' : 'nothing',
+        suspenseDelta: [7, 8, 9].includes(i) ? 2 : 0,
+      }));
+      const res = await runST513(recs513c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TURN_AFTERMATH_SUSPENSE_VOID'), 'TURN_AFTERMATH_SUSPENSE_VOID should fire');
+    });
+
+    // TURN_AFTERMATH_SUSPENSE_VOID no-fire: suspense at 4 (within 2 of turn at 3) → no fire
+    it('TURN_AFTERMATH_SUSPENSE_VOID does not fire when at least one turn is followed by a suspense spike', async () => {
+      const recs513cnr = Array.from({ length: 10 }, (_, i) => makeRec513(i, {
+        dramaticTurn: [1, 3].includes(i) ? 'reversal' : 'nothing',
+        suspenseDelta: [4, 7, 8].includes(i) ? 2 : 0,
+      }));
+      const res = await runST513(recs513cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TURN_AFTERMATH_SUSPENSE_VOID'), 'TURN_AFTERMATH_SUSPENSE_VOID should not fire');
+    });
+  });
+
   describe('Wave 499 — structurePass: clock curiosity decoupled, revelation aftermath clock void, suspense run', async () => {
     const makeRec499 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
