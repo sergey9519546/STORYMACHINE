@@ -29141,6 +29141,87 @@ The lights go out.`;
     });
   });
 
+  describe('Wave 504 — dialoguePass: dialogue silence run, dialogue density front heavy, payoff scene dialogue absent', async () => {
+    const makeRec504 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
+      sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false,
+      revelation: null, dramaticTurn: 'nothing', payoffSetupIds: [], relationshipShifts: [],
+      emotionalShift: 'neutral', seededClueIds: [], dialogueHighlights: [], unresolvedClues: [],
+      purpose: '', slug: `s${sceneIdx}`, ...extra,
+    });
+    const runD504 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    // Build n scenes; dlgFn(i) returns number of dialogue line-pairs to emit for scene i
+    const buildScenes504 = (count: number, dlgFn: (i: number) => number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\n`;
+        const n = dlgFn(i);
+        for (let j = 0; j < n; j++) {
+          f += j % 2 === 0
+            ? `ALICE\nShe found the documents early this morning.\n\n`
+            : `BOB\nWe should leave before they close the gate.\n\n`;
+        }
+        if (n === 0) f += `The door crashes open. A figure steps from the dark.\n\n`;
+      }
+      return f;
+    };
+
+    it('DIALOGUE_SILENCE_RUN fires when 3+ consecutive scenes have no dialogue', async () => {
+      // n=10; dialogue at 0,1,2,7 (4 scenes with dlg ≥ 4); silence at 3,4,5 → run=3 ≥ 3 → fire
+      const f504a = buildScenes504(10, i => [0, 1, 2, 7].includes(i) ? 2 : 0);
+      const recs504a = Array.from({ length: 10 }, (_, i) => makeRec504(i));
+      const res = await runD504(f504a, recs504a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_SILENCE_RUN'), 'DIALOGUE_SILENCE_RUN should fire');
+    });
+
+    it('DIALOGUE_SILENCE_RUN does not fire when no consecutive silent run reaches 3', async () => {
+      // n=10; dialogue at 0,1,2,4,6,8 (6 scenes); silence at 3,5,7,9 → max run=1 < 3 → no fire
+      const f504anr = buildScenes504(10, i => [0, 1, 2, 4, 6, 8].includes(i) ? 2 : 0);
+      const recs504anr = Array.from({ length: 10 }, (_, i) => makeRec504(i));
+      const res = await runD504(f504anr, recs504anr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_SILENCE_RUN'), 'DIALOGUE_SILENCE_RUN should not fire');
+    });
+
+    it('DIALOGUE_DENSITY_FRONT_HEAVY fires when first-half density is >= 2x the second-half density', async () => {
+      // n=10; half=5; first half (0-4) each 4 lines → avg=4.0; second half (5-9) each 1 line → avg=1.0
+      // 4.0 >= 1.0 AND 4.0 >= 2*1.0=2.0 → fire; total dialogue scenes=10 >= 5
+      const f504b = buildScenes504(10, i => i < 5 ? 4 : 1);
+      const recs504b = Array.from({ length: 10 }, (_, i) => makeRec504(i));
+      const res = await runD504(f504b, recs504b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_DENSITY_FRONT_HEAVY'), 'DIALOGUE_DENSITY_FRONT_HEAVY should fire');
+    });
+
+    it('DIALOGUE_DENSITY_FRONT_HEAVY does not fire when second-half density is within 2x of first half', async () => {
+      // n=10; half=5; first half each 3 lines → avg=3.0; second half each 2 lines → avg=2.0
+      // 3.0 >= 1.0 but 3.0 < 2*2.0=4.0 → no fire
+      const f504bnr = buildScenes504(10, i => i < 5 ? 3 : 2);
+      const recs504bnr = Array.from({ length: 10 }, (_, i) => makeRec504(i));
+      const res = await runD504(f504bnr, recs504bnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_DENSITY_FRONT_HEAVY'), 'DIALOGUE_DENSITY_FRONT_HEAVY should not fire');
+    });
+
+    it('PAYOFF_SCENE_DIALOGUE_ABSENT fires when all payoff scenes have no dialogue', async () => {
+      // n=10; payoff at sceneIdx 3,6 (no dialogue there); scenes 0,1,2,4,5,7 have 2 lines each
+      // payoffScenes=2 >= 2; scenesWithDlg=6 >= 3; all payoffs silent → fire
+      const f504c = buildScenes504(10, i => [3, 6].includes(i) ? 0 : 2);
+      const recs504c = Array.from({ length: 10 }, (_, i) =>
+        makeRec504(i, [3, 6].includes(i) ? { payoffSetupIds: ['setup-X'] } : {}));
+      const res = await runD504(f504c, recs504c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'PAYOFF_SCENE_DIALOGUE_ABSENT'), 'PAYOFF_SCENE_DIALOGUE_ABSENT should fire');
+    });
+
+    it('PAYOFF_SCENE_DIALOGUE_ABSENT does not fire when a payoff scene has dialogue', async () => {
+      // Same but scene 3 (payoff) now has 2 dialogue lines → not all payoffs silent → no fire
+      const f504cnr = buildScenes504(10, i => i === 6 ? 0 : 2);
+      const recs504cnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec504(i, [3, 6].includes(i) ? { payoffSetupIds: ['setup-X'] } : {}));
+      const res = await runD504(f504cnr, recs504cnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'PAYOFF_SCENE_DIALOGUE_ABSENT'), 'PAYOFF_SCENE_DIALOGUE_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 490 — dialoguePass: dialogue verbal peak uncaused, dialogue negative scene void, dialogue scene temporal cluster', async () => {
     const makeRec490 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
       sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false,

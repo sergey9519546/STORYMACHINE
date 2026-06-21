@@ -105,6 +105,21 @@
 // scenes with any dialogue, >75% in one structural third; distinct from CLIMAX_VOID and OPENING_
 // SILENT which fire on ZERO dialogue in a zone, and from HEDGE_FRONT_LOADED and QUESTION_BACK_
 // LOADED which track specific dialogue CONTENT not scene-level presence).
+// Wave 504 additions: dialogue silence run (run-based × dialogue absence × consecutive scene-level
+// silence — n≥8, ≥4 scenes with dialogue, longest consecutive zero-dialogue scene run ≥ 3; distinct
+// from OPENING_SILENT and CLIMAX_VOID which check ZONE absence in a fixed 20% window, from SCENE_
+// TEMPORAL_CLUSTER which checks overconcentration across thirds, and from DENSE_AFTERMATH_SILENT
+// which checks aftermath of a single dense scene rather than sustained multi-scene silence), dialogue
+// density front heavy (average/aggregate × dialogue density × first-vs-second-half — n≥8, ≥5 scenes
+// with dialogue, avg lines/scene in first half ≥ 1.0 AND ≥ 2× the second-half average; verbal
+// activity front-loads and the story goes quieter as stakes rise; distinct from SCENE_TEMPORAL_
+// CLUSTER which measures thirds-level presence not density ratio, from all flood/rate checks which
+// measure global pass-level rates, and from HEDGE_FRONT_LOADED which measures a specific content
+// pattern not raw line density), payoff scene dialogue absent (co-occurrence/decoupling × payoff
+// event × dialogue absence — n≥8, ≥2 payoff scenes, ≥3 scenes with dialogue, all payoff scenes
+// have zero dialogue lines; thread resolutions are rendered in silence; distinct from REVELATION_
+// SCENE_VOID, DRAMATIC_TURN_SCENE_VOID, CLOCK_SCENE_VOID which audit different event types, and
+// from POSITIVE_SCENE_VOID / NEGATIVE_SCENE_VOID which audit emotional register not event type).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2560,6 +2575,144 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
           description: `${Math.round(maxZ490c / dlgPositions490c.length * 100)}% of scenes with any dialogue (${maxZ490c} of ${dlgPositions490c.length}) fall in the ${zoneName490c} structural third. Verbal activity is concentrated in one zone while the other two-thirds of the story pass as near-silent action or montage. Sustained silent stretches across two structural thirds deny the audience verbal access to characters — their interiority, their conflicts, and their desires — for most of the runtime. A script that confines its spoken exchanges to one zone reads as if it has two different registers: one articulate zone surrounded by mute territory.`,
           suggestedFix: `Add at least one dialogue-bearing scene in each of the ${zoneName490c === 'opening' ? 'middle and closing' : zoneName490c === 'middle' ? 'opening and closing' : 'opening and middle'} thirds currently lacking spoken exchanges. Not every scene needs dialogue, but each structural zone should have at least some verbal access to the story's characters. Move an existing dialogue scene from the ${zoneName490c} cluster, or add new dialogue beats in the silent zones.`,
         });
+      }
+    }
+  }
+
+  // ── Wave 504 checks ──────────────────────────────────────────────────────────
+
+  // DIALOGUE_SILENCE_RUN — Run-based × dialogue absence × consecutive scene-level silence.
+  // n≥8 records, ≥4 scenes with any dialogue (story is verbally active). Longest consecutive run
+  // of records with zero dialogue lines ≥ 3 → fire. A sustained three-scene silence means the story
+  // passes through a significant stretch without any spoken language despite being verbally active
+  // elsewhere. Three or more consecutive silent scenes signal that the story has retreated into pure
+  // visual/action narration for a run long enough to lose verbal character access — no interiority
+  // expressed through speech, no confrontation, no processing, no exchange.
+  // Distinct from: DIALOGUE_OPENING_SILENT (zone presence/absence — the FIRST 20% of scenes has no
+  // dialogue; a fixed window, not a consecutive run), DIALOGUE_CLIMAX_VOID (zone presence/absence —
+  // the FINAL 20% of scenes; same mode, different zone), DIALOGUE_SCENE_TEMPORAL_CLUSTER (distribution
+  // across thirds — a different mode measuring overconcentration rather than consecutive absence),
+  // DIALOGUE_DENSE_AFTERMATH_SILENT (sequence/aftermath — ONE dense scene followed by ONE silent scene;
+  // this fires when THREE consecutive scenes are all silent, regardless of what preceded them).
+  {
+    const n504a = records.length;
+    if (n504a >= 8) {
+      const lineToScene504a = buildLineToSceneMap(fountain);
+      const dlgPerScene504a = new Map<number, number>();
+      for (const d of dialogue) {
+        const si = lineToScene504a[d.lineNum - 1] ?? -1;
+        if (si >= 0) dlgPerScene504a.set(si, (dlgPerScene504a.get(si) ?? 0) + 1);
+      }
+      const scenesWithDlg504a = (records as any[]).filter(
+        r => (dlgPerScene504a.get(r.sceneIdx) ?? 0) > 0,
+      ).length;
+      if (scenesWithDlg504a >= 4) {
+        let maxSilRun504a = 0;
+        let curSilRun504a = 0;
+        for (const r of records as any[]) {
+          if ((dlgPerScene504a.get(r.sceneIdx) ?? 0) === 0) {
+            if (++curSilRun504a > maxSilRun504a) maxSilRun504a = curSilRun504a;
+          } else {
+            curSilRun504a = 0;
+          }
+        }
+        if (maxSilRun504a >= 3) {
+          issues.push({
+            location: `longest consecutive zero-dialogue run: ${maxSilRun504a} scenes`,
+            rule: 'DIALOGUE_SILENCE_RUN',
+            severity: 'minor',
+            description: `The script contains a consecutive run of ${maxSilRun504a} scenes with no dialogue at all, despite being verbally active elsewhere. A sustained ${maxSilRun504a}-scene silence locks the audience out of character interiority, confrontation, and exchange for a significant stretch — retreating into pure visual narration or action for a run long enough to drain verbal character access. In a script that has other scenes with spoken exchanges, such a concentrated silent zone signals that the story has lost its verbal channel for too long.`,
+            suggestedFix: `Break up the ${maxSilRun504a}-scene silent run by adding at least one dialogue exchange within the stretch. It does not need to be long — a brief confrontation, a reaction line, or a spoken acknowledgement of what has just happened can restore verbal character access without interrupting the visual momentum. Three or more consecutive silent scenes should each serve a specific narrative purpose that justifies the silence.`,
+          });
+        }
+      }
+    }
+  }
+
+  // DIALOGUE_DENSITY_FRONT_HEAVY — Average/aggregate × dialogue density × first-vs-second-half.
+  // n≥8 records, ≥5 scenes with any dialogue. Compare average dialogue lines per scene in the first
+  // half of records vs. the second half. If the first-half average is ≥ 1.0 AND is ≥ 2× the second-
+  // half average → fire. The story front-loads its verbal activity: the dialogue grows sparse as
+  // stakes rise, which is the opposite of what dramatic escalation demands. The second half — where
+  // confrontations peak, resolutions land, and characters are under the most pressure — should
+  // carry at least as much verbal energy as the first half.
+  // Distinct from: DIALOGUE_SCENE_TEMPORAL_CLUSTER (distribution/timing × scene presence × thirds —
+  // measures which thirds have any dialogue-present scenes, not the density per scene; a different
+  // mode, different granularity), DIALOGUE_HEDGE_FRONT_LOADED (distribution of hedging language
+  // specifically — a content pattern, not raw line density), LONG_SPEECH_DOMINANCE (global rate of
+  // long lines, not zone-density imbalance), all flood/rate checks (single-pass global proportions,
+  // not half-vs-half density comparison). First average/aggregate check applied to scene-level
+  // density across halves in this pass.
+  {
+    const n504b = records.length;
+    if (n504b >= 8) {
+      const lineToScene504b = buildLineToSceneMap(fountain);
+      const dlgPerScene504b = new Map<number, number>();
+      for (const d of dialogue) {
+        const si = lineToScene504b[d.lineNum - 1] ?? -1;
+        if (si >= 0) dlgPerScene504b.set(si, (dlgPerScene504b.get(si) ?? 0) + 1);
+      }
+      const allCounts504b = (records as any[]).map((r: any) => dlgPerScene504b.get(r.sceneIdx) ?? 0);
+      const totalDlgScenes504b = allCounts504b.filter(c => c > 0).length;
+      if (totalDlgScenes504b >= 5) {
+        const half504b = Math.floor(n504b / 2);
+        const firstHalf504b = allCounts504b.slice(0, half504b);
+        const secondHalf504b = allCounts504b.slice(half504b);
+        const avgFirst504b = firstHalf504b.reduce((s: number, c: number) => s + c, 0) / firstHalf504b.length;
+        const avgSecond504b = secondHalf504b.reduce((s: number, c: number) => s + c, 0) / secondHalf504b.length;
+        if (avgFirst504b >= 1.0 && avgFirst504b >= 2 * avgSecond504b) {
+          issues.push({
+            location: `first-half avg ${avgFirst504b.toFixed(1)} dialogue lines/scene vs. second-half avg ${avgSecond504b.toFixed(1)}`,
+            rule: 'DIALOGUE_DENSITY_FRONT_HEAVY',
+            severity: 'minor',
+            description: `The first half of the script averages ${avgFirst504b.toFixed(1)} dialogue lines per scene while the second half averages only ${avgSecond504b.toFixed(1)} — a ratio of ${(avgFirst504b / Math.max(avgSecond504b, 0.01)).toFixed(1)}× front-loading. Verbal activity declines as the story's stakes rise. The second half — where confrontations peak, resolutions land, and characters are under the most pressure — should carry at least as much spoken energy as the first half. When dialogue grows sparse precisely as tension increases, the story retreats into silence at the moments characters most need to articulate, confront, and reveal.`,
+            suggestedFix: `Add dialogue to second-half scenes that are currently silent or sparse. Focus on the moments of highest pressure: the confrontation that was brewing in the first half, the revelation that demands a spoken response, or the resolution that a character needs to voice. The second half is not the place for silence unless that silence is itself a dramatic statement.`,
+          });
+        }
+      }
+    }
+  }
+
+  // PAYOFF_SCENE_DIALOGUE_ABSENT — Co-occurrence/decoupling × payoff event × dialogue absence.
+  // n≥8 records, ≥2 payoff scenes (payoffSetupIds.length > 0), ≥3 scenes with any dialogue.
+  // All payoff scenes have zero dialogue lines → fire. The story resolves its planted narrative
+  // promises entirely in silence — no character names, acknowledges, or responds to the thread
+  // that has been resolved. Payoff scenes are the dramatic culmination of foreshadowed promises:
+  // the moment the audience has been waiting for since the setup. When all payoffs land silently,
+  // they arrive without the human voice that confirms what just happened and registers the cost.
+  // Distinct from: DIALOGUE_REVELATION_SCENE_VOID (Wave 448: revelation events, not payoff events —
+  // a different narrative event type), DIALOGUE_DRAMATIC_TURN_SCENE_VOID (Wave 462: dramatic turns),
+  // DIALOGUE_CLOCK_SCENE_VOID (Wave 476: clock scenes), DIALOGUE_POSITIVE_SCENE_VOID and DIALOGUE_
+  // NEGATIVE_SCENE_VOID (emotional register, not event type), PAYOFF_NO_EMOTION and PAYOFF_SUSPENSE_
+  // VOID in causality.ts (those check the payoff scene's OWN signal channels, not dialogue presence).
+  {
+    const n504c = records.length;
+    if (n504c >= 8) {
+      const lineToScene504c = buildLineToSceneMap(fountain);
+      const dlgPerScene504c = new Map<number, number>();
+      for (const d of dialogue) {
+        const si = lineToScene504c[d.lineNum - 1] ?? -1;
+        if (si >= 0) dlgPerScene504c.set(si, (dlgPerScene504c.get(si) ?? 0) + 1);
+      }
+      const payoffScenes504c = (records as any[]).filter(
+        r => ((r.payoffSetupIds ?? []) as any[]).length > 0,
+      );
+      const scenesWithDlg504c = (records as any[]).filter(
+        r => (dlgPerScene504c.get(r.sceneIdx) ?? 0) > 0,
+      ).length;
+      if (payoffScenes504c.length >= 2 && scenesWithDlg504c >= 3) {
+        const allPayoffSilent504c = payoffScenes504c.every(
+          r => (dlgPerScene504c.get(r.sceneIdx) ?? 0) === 0,
+        );
+        if (allPayoffSilent504c) {
+          issues.push({
+            location: `${payoffScenes504c.length} payoff scene(s) — all have no dialogue`,
+            rule: 'PAYOFF_SCENE_DIALOGUE_ABSENT',
+            severity: 'minor',
+            description: `Every one of the ${payoffScenes504c.length} payoff scenes — scenes that resolve a previously planted narrative promise — contains no dialogue. Thread resolutions land in complete silence: the moments the audience has been waiting for since the setup pass without any character naming, acknowledging, or responding to what has just been resolved. Payoff scenes are the dramatic culmination of foreshadowed expectations; they deserve speech that registers the weight of what is being fulfilled or denied.`,
+            suggestedFix: `Give at least one payoff scene a dialogue line that acknowledges what has just been resolved — a character who names the significance of what happened, who responds to the fulfilled or broken promise, or whose speech demonstrates that the thread has landed with emotional weight. Payoffs are most powerful when a voice confirms what the audience has been waiting to see.`,
+          });
+        }
       }
     }
   }
