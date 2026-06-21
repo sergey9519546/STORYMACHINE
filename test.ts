@@ -20462,6 +20462,91 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 483 — relationshipArcPass: shift revelation aftermath void, shift thirds cluster, Act 2a void', async () => {
+    const mkShift483 = (pairKey: string, amount: number) => [{ pairKey, dimension: 'trust', amount }];
+    const makeRec483 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const makeFountain483 = (n: number) =>
+      Array.from({ length: n }, (_, i) =>
+        `INT. SC${i} - DAY\n\nAction line for scene ${i}.`
+      ).join('\n\n');
+    const runR483 = async (records: any[]) => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      const fountain = makeFountain483(records.length);
+      return relationshipArcPass({ fountain, original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('RELATIONSHIP_SHIFT_REVELATION_AFTERMATH_VOID fires when no shift is followed by a revelation within 2 scenes', async () => {
+      // n=10; shifts at 2 and 6; aftermath 3-4 and 7-8 all have revelation=null → fires
+      const recs483a = Array.from({ length: 10 }, (_, i) => makeRec483(i));
+      recs483a[2] = makeRec483(2, { relationshipShifts: mkShift483('A|B', 0.4) });
+      recs483a[6] = makeRec483(6, { relationshipShifts: mkShift483('A|B', -0.4) });
+      const res = await runR483(recs483a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_REVELATION_AFTERMATH_VOID'), 'RELATIONSHIP_SHIFT_REVELATION_AFTERMATH_VOID should fire');
+    });
+
+    it('RELATIONSHIP_SHIFT_REVELATION_AFTERMATH_VOID does not fire when a shift is followed by a revelation within 2 scenes', async () => {
+      // n=10; shift at 2; scene 3 has revelation → no fire
+      const recs483anr = Array.from({ length: 10 }, (_, i) => makeRec483(i));
+      recs483anr[2] = makeRec483(2, { relationshipShifts: mkShift483('A|B', 0.4) });
+      recs483anr[3] = makeRec483(3, { revelation: 'the truth' });
+      recs483anr[6] = makeRec483(6, { relationshipShifts: mkShift483('A|B', -0.4) });
+      const res = await runR483(recs483anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_REVELATION_AFTERMATH_VOID'), 'RELATIONSHIP_SHIFT_REVELATION_AFTERMATH_VOID should not fire');
+    });
+
+    it('RELATIONSHIP_SHIFT_THIRDS_CLUSTER fires when >75% of shifts are in one structural third', async () => {
+      // n=12 (third=4); 4 shifts at scenes 0,1,2,3 (all in first third=100%) → fires
+      const recs483b = Array.from({ length: 12 }, (_, i) => makeRec483(i));
+      recs483b[0] = makeRec483(0, { relationshipShifts: mkShift483('A|B', 0.3) });
+      recs483b[1] = makeRec483(1, { relationshipShifts: mkShift483('A|B', -0.3) });
+      recs483b[2] = makeRec483(2, { relationshipShifts: mkShift483('C|D', 0.4) });
+      recs483b[3] = makeRec483(3, { relationshipShifts: mkShift483('C|D', -0.4) });
+      const res = await runR483(recs483b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_THIRDS_CLUSTER'), 'RELATIONSHIP_SHIFT_THIRDS_CLUSTER should fire');
+    });
+
+    it('RELATIONSHIP_SHIFT_THIRDS_CLUSTER does not fire when shifts are distributed across thirds', async () => {
+      // n=12 (third=4); 4 shifts at scenes 1,5,8,11 — one in each third → no fire
+      const recs483bnr = Array.from({ length: 12 }, (_, i) => makeRec483(i));
+      recs483bnr[1] = makeRec483(1, { relationshipShifts: mkShift483('A|B', 0.3) });
+      recs483bnr[5] = makeRec483(5, { relationshipShifts: mkShift483('A|B', -0.3) });
+      recs483bnr[8] = makeRec483(8, { relationshipShifts: mkShift483('C|D', 0.4) });
+      recs483bnr[11] = makeRec483(11, { relationshipShifts: mkShift483('C|D', -0.4) });
+      const res = await runR483(recs483bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_THIRDS_CLUSTER'), 'RELATIONSHIP_SHIFT_THIRDS_CLUSTER should not fire');
+    });
+
+    it('RELATIONSHIP_ACT2A_VOID fires when no shift falls in the 25%-50% zone but 3+ exist elsewhere', async () => {
+      // n=12 (act2a=3-6); 4 shifts at scenes 0,1,8,10 — none in scenes 3-6 → fires
+      const recs483c = Array.from({ length: 12 }, (_, i) => makeRec483(i));
+      recs483c[0] = makeRec483(0, { relationshipShifts: mkShift483('A|B', 0.3) });
+      recs483c[1] = makeRec483(1, { relationshipShifts: mkShift483('A|B', -0.3) });
+      recs483c[8] = makeRec483(8, { relationshipShifts: mkShift483('C|D', 0.4) });
+      recs483c[10] = makeRec483(10, { relationshipShifts: mkShift483('C|D', -0.4) });
+      const res = await runR483(recs483c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_ACT2A_VOID'), 'RELATIONSHIP_ACT2A_VOID should fire');
+    });
+
+    it('RELATIONSHIP_ACT2A_VOID does not fire when a shift falls in the 25%-50% zone', async () => {
+      // n=12 (act2a=3-6); shift at scene 4 (in Act 2a) → no fire
+      const recs483cnr = Array.from({ length: 12 }, (_, i) => makeRec483(i));
+      recs483cnr[0] = makeRec483(0, { relationshipShifts: mkShift483('A|B', 0.3) });
+      recs483cnr[4] = makeRec483(4, { relationshipShifts: mkShift483('A|B', -0.3) });
+      recs483cnr[8] = makeRec483(8, { relationshipShifts: mkShift483('C|D', 0.4) });
+      recs483cnr[10] = makeRec483(10, { relationshipShifts: mkShift483('C|D', -0.4) });
+      const res = await runR483(recs483cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_ACT2A_VOID'), 'RELATIONSHIP_ACT2A_VOID should not fire');
+    });
+  });
+
   describe('Wave 469 — relationshipArcPass: shift suspense aftermath void, shift emotional aftermath void, Act 1 void', async () => {
     const mkShift469 = (pairKey: string, amount: number) => [{ pairKey, dimension: 'trust', amount }];
     const makeRec469 = (idx: number, overrides: any = {}): any => ({

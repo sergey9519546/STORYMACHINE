@@ -101,6 +101,14 @@
 // family), relationship Act 1 void (zone presence/absence × first-quarter — no shift in the first
 // 25% while ≥3 shifts exist in the rest; fills the zone set alongside midpoint freeze, Act 2b
 // desert, and relationship climax void).
+// Wave 483 additions: relationship shift revelation aftermath void (sequence/aftermath × revelation
+// channel — no shift scene followed by a revelation in next 2 scenes; adds the disclosure channel
+// to the shift-aftermath family alongside curiosity/suspense/emotional), relationship shift thirds
+// cluster (distribution/timing × thirds — ≥4 shifts with >75% in one structural third; first
+// thirds-distribution check for bond activity, distinct from existing half-based distribution
+// checks), relationship Act 2a void (zone presence/absence × Act 2a — no shift in the 25%–50%
+// zone while ≥3 shifts exist in the rest; completes the zone set alongside Act 1 void, midpoint
+// freeze, Act 2b desert, and relationship climax void).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2317,6 +2325,125 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `No relationship shift occurs in the first ${act1End469c} scenes (Act 1, the first 25%) while ${laterShiftCount469c} shifts appear in the remaining scenes — the story opens with no relational movement. The audience enters the complication zone without any sense of which bonds are at stake, without a dynamic to root for or a rift to track. Act 1 is where the relationships that will later be tested should be established, defined, or at least gestured at through the first cracks or warmings. A completely relationally silent opening means the audience has nothing invested in the people before the story begins pushing them.`,
         suggestedFix: `Introduce at least one relational moment in Act 1 (Scenes 0–${act1End469c - 1}): a small warming between two characters that the audience will carry, a first hint of friction that will later become a rupture, or a demonstration of an established bond that later gets tested. The shift does not need to be large — even a minor positive or negative nudge gives the audience a relational anchor before the story's complications begin.`,
+      });
+    }
+  }
+
+  // ── Wave 483: RELATIONSHIP_SHIFT_REVELATION_AFTERMATH_VOID, RELATIONSHIP_SHIFT_THIRDS_CLUSTER, RELATIONSHIP_ACT2A_VOID ──
+
+  // RELATIONSHIP_SHIFT_REVELATION_AFTERMATH_VOID (sequence/aftermath × revelation channel ×
+  // shift trigger, n≥8, ≥2 qualifying shift scenes): No relationship-shift scene is followed
+  // by a revelation (revelation field non-null) in either of the next two scenes — bonds move
+  // without uncovering truths downstream. A relational shift is a moment of altered knowing as
+  // much as altered feeling: when a pair's dynamic changes, the new alignment should reveal
+  // something — about who they are to each other, about what one of them has been hiding, about
+  // what the changed bond makes possible or necessary. When every bond shift is followed by two
+  // scenes with no disclosure, the relational world and the informational world are kept entirely
+  // separate. Sequence/aftermath mode × revelation channel × shift trigger. Distinct from
+  // RELATIONSHIP_REVELATION_SILENT (Wave 329: no revelation-tagged scene carries a shift —
+  // co-occurrence, not aftermath), SHIFT_CURIOSITY_VOID (Wave 455: curiosity not revelation),
+  // SHIFT_SUSPENSE_AFTERMATH_VOID (Wave 469: suspense not revelation), SHIFT_EMOTIONAL_AFTERMATH_
+  // VOID (Wave 469: emotional not revelation): this adds the disclosure channel to the shift-
+  // aftermath family alongside curiosity, suspense, and emotional.
+  if (records.length >= 8) {
+    const shiftScenes483a = (records as any[]).filter(
+      r => ((r.relationshipShifts ?? []) as any[]).length > 0 && (r.sceneIdx + 2) < records.length,
+    );
+    if (shiftScenes483a.length >= 2) {
+      const anyRevAftermath483a = shiftScenes483a.some((r: any) => {
+        const next1483a = (records as any[])[r.sceneIdx + 1];
+        const next2483a = (records as any[])[r.sceneIdx + 2];
+        const hasRev = (x: any) => x && x.revelation !== null && x.revelation !== undefined && x.revelation !== '';
+        return hasRev(next1483a) || hasRev(next2483a);
+      });
+      if (!anyRevAftermath483a) {
+        issues.push({
+          location: `All ${shiftScenes483a.length} qualifying shift scene(s) — no revelation in aftermath`,
+          rule: 'RELATIONSHIP_SHIFT_REVELATION_AFTERMATH_VOID',
+          severity: 'minor',
+          description: `None of the story's ${shiftScenes483a.length} relationship-shift scenes (with room after them) is followed by a revelation in the next two scenes — bond changes never uncover truths downstream. When a pair's dynamic shifts, the new alignment should make something discoverable: a secret the changed dynamic now allows to surface, a truth one character can finally admit when the relationship reconfigures around them, a disclosure that the shifted trust — or distrust — makes newly possible or necessary. When every relational shift is followed by two scenes without any disclosure, the bonds and the informational world run on completely separate tracks.`,
+          suggestedFix: "After at least one relationship shift, let the changed dynamic precipitate a revelation in the next scene or two: a character who now trusts (or mistrusts) differently finally says or discovers what they couldn't before. The disclosure doesn't need to be the story's biggest secret — even a small truth that emerges from the shifted bond teaches the audience that relational change has informational consequences.",
+        });
+      }
+    }
+  }
+
+  // RELATIONSHIP_SHIFT_THIRDS_CLUSTER (distribution/timing × thirds × shift signal, n≥8,
+  // ≥4 shift scenes, >75% in one third): More than three-quarters of all shift scenes fall
+  // within a single structural third of the story — bond activity is packed into one zone
+  // while the other two are relationally sparse. Relationships need room to develop across
+  // the whole story: early shifts establish dynamics, mid-story shifts complicate them, late
+  // shifts close them. When the relational machine fires in a single concentrated burst, the
+  // audience receives one intense sequence of bond activity and then waits — or arrives to a
+  // burst after waiting. Distribution/timing mode × thirds × shift signal. Distinct from
+  // MIDPOINT_FREEZE (Wave 276: middle 50% void — zone absence, not thirds concentration),
+  // RELATIONSHIP_GLOBAL_AMPLITUDE_FRONTLOAD (Wave 343: first half vs second half intensity —
+  // half-based, not thirds), RELATIONSHIP_OPENING_BURST (Wave 290: all shifts in first 25% —
+  // subset case; the thirds cluster fires at >75% in any third), RELATIONSHIP_ACT2B_DESERT
+  // (Wave 318: 50–75% zone void — absence, not concentration).
+  {
+    const n483b = records.length;
+    if (n483b >= 8) {
+      const shiftPositions483b = (records as any[])
+        .map((r, pos) => (((r.relationshipShifts ?? []) as any[]).length > 0 ? pos : -1))
+        .filter(pos => pos >= 0);
+      if (shiftPositions483b.length >= 4) {
+        const third483b = Math.floor(n483b / 3);
+        const zone1483b = shiftPositions483b.filter(pos => pos < third483b).length;
+        const zone2483b = shiftPositions483b.filter(pos => pos >= third483b && pos < 2 * third483b).length;
+        const zone3483b = shiftPositions483b.filter(pos => pos >= 2 * third483b).length;
+        const maxZone483b = Math.max(zone1483b, zone2483b, zone3483b);
+        const totalShifts483b = shiftPositions483b.length;
+        if (maxZone483b / totalShifts483b > 0.75) {
+          const zoneLabel483b = maxZone483b === zone1483b ? `Scenes 0–${third483b - 1}` :
+            maxZone483b === zone2483b ? `Scenes ${third483b}–${2 * third483b - 1}` :
+            `Scenes ${2 * third483b}–${n483b - 1}`;
+          issues.push({
+            location: `Relationship shifts — ${maxZone483b}/${totalShifts483b} clustered in ${zoneLabel483b}`,
+            rule: 'RELATIONSHIP_SHIFT_THIRDS_CLUSTER',
+            severity: 'minor',
+            description: `${maxZone483b} of the story's ${totalShifts483b} relationship shifts (${Math.round(maxZone483b / totalShifts483b * 100)}%) fall in a single structural third (${zoneLabel483b}) — bond activity is packed into one zone while the other two-thirds are relationally sparse. Relationships need room to develop across the whole story: early shifts establish dynamics, mid-story shifts complicate them, late shifts close or transform them. A single burst of bond activity followed by (or preceded by) relational silence teaches the audience that the story's relational engine only runs intermittently — not that it is building toward anything.`,
+            suggestedFix: 'Spread relationship shifts more evenly across the story: if they are currently clustered in the first third, seed a mid-story complication or quiet warming for a secondary pair; if they are in the final third, plant an earlier shift to give the audience a bond to invest in before the late-act drama. Each structural third should have at least one meaningful shift — establishing, complicating, and resolving — to give the relational arc a shape.',
+          });
+        }
+      }
+    }
+  }
+
+  // RELATIONSHIP_ACT2A_VOID (zone presence/absence × Act 2a zone (25%–50%) × shift signal,
+  // n≥10, ≥3 shifts outside this zone): No relationship shift occurs in the 25%–50% range
+  // while at least three shifts exist elsewhere — the early-conflict zone is relationally
+  // silent. Act 2a is where initial complications should strain and test the bonds established
+  // in Act 1: the audience has been introduced to the relationships and is now watching to see
+  // how the story's central pressure affects them. When the Act 2a zone is relationally silent,
+  // bonds that were established in Act 1 are suspended until Act 2b or Act 3 — the complication
+  // begins but the relationships don't move. Zone presence/absence mode × Act 2a zone. Completes
+  // the zone set alongside RELATIONSHIP_ACT1_VOID (Wave 469: 0–25%), MIDPOINT_FREEZE (Wave 276:
+  // middle 50%), RELATIONSHIP_ACT2B_DESERT (Wave 318: 50–75%), and RELATIONSHIP_CLIMAX_VOID
+  // (Wave 441: final 15%). Distinct from RELATIONSHIP_SHIFT_DROUGHT (Wave 343: longest run ≥40%
+  // of the story — run length, not zone identity) and LATE_RELATIONSHIP_INTRODUCTION (Wave 161:
+  // a per-pair first-shift timing check, not a global zone check).
+  if (records.length >= 10) {
+    const n483c = records.length;
+    const act2aStart483c = Math.floor(n483c * 0.25);
+    const act2aEnd483c = Math.floor(n483c * 0.50);
+    const act2aShifts483c = (records as any[])
+      .slice(act2aStart483c, act2aEnd483c)
+      .filter(r => ((r.relationshipShifts ?? []) as any[]).length > 0)
+      .length;
+    const outsideShifts483c = (records as any[])
+      .filter((r, pos) =>
+        (pos < act2aStart483c || pos >= act2aEnd483c) &&
+        ((r.relationshipShifts ?? []) as any[]).length > 0,
+      )
+      .length;
+    if (act2aShifts483c === 0 && outsideShifts483c >= 3) {
+      issues.push({
+        location: `Act 2a (Scenes ${act2aStart483c}–${act2aEnd483c - 1}) — relationally silent`,
+        rule: 'RELATIONSHIP_ACT2A_VOID',
+        severity: 'minor',
+        description: `No relationship shift occurs in the Act 2a zone (Scenes ${act2aStart483c}–${act2aEnd483c - 1}, 25%–50%) while ${outsideShifts483c} shifts appear in the rest of the story. The early-conflict zone is where established bonds should be tested: Act 1 introduced the relationships, and the complication that opens Act 2 should start cracking them. When Act 2a is relationally silent, the story's central complications begin but none of the human bonds move in response — the characters are under pressure but the pressure doesn't affect how they relate to each other.`,
+        suggestedFix: `Add at least one relationship shift in Scenes ${act2aStart483c}–${act2aEnd483c - 1}: an early complication that puts two characters at odds, a moment of unexpected alliance under pressure, or a subtle warming or cooling that foreshadows a larger Act 2b rupture or repair. The shift doesn't need to be large — even a minor bond move in the early-conflict zone tells the audience that the story's pressure is affecting the relationships, not just the plot.`,
       });
     }
   }
