@@ -21940,6 +21940,83 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 495 — pacingPass: clock aftermath curiosity flat, revelation emotional aftermath flat, curiosity peak uncaused', async () => {
+    const makeRec495 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain495 = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\n\nAction line for scene ${i}.`).join('\n\n');
+    const runP495 = async (records: any[]) => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      return pacingPass({ fountain: makeFountain495(records.length), original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // CLOCK_AFTERMATH_CURIOSITY_FLAT fire: n=10; clocks at 1,3,5; curiosity only at 0,9 (not after clocks)
+    it('CLOCK_AFTERMATH_CURIOSITY_FLAT fires when clock scenes are never followed by curiosity rise', async () => {
+      const recs495a: any[] = Array.from({ length: 10 }, (_, i) => makeRec495(i, {
+        clockRaised: [1, 3, 5].includes(i),
+        curiosityDelta: [0, 9].includes(i) ? 1 : 0,
+      }));
+      const res = await runP495(recs495a);
+      assert.ok(res.issues.some((x: any) => x.rule === 'CLOCK_AFTERMATH_CURIOSITY_FLAT'), 'CLOCK_AFTERMATH_CURIOSITY_FLAT should fire');
+    });
+
+    // CLOCK_AFTERMATH_CURIOSITY_FLAT no-fire: curiosity at scene 4 (aftermath of clock at 3)
+    it('CLOCK_AFTERMATH_CURIOSITY_FLAT does not fire when at least one clock is followed by curiosity rise', async () => {
+      const recs495an: any[] = Array.from({ length: 10 }, (_, i) => makeRec495(i, {
+        clockRaised: [1, 3, 5].includes(i),
+        curiosityDelta: i === 4 ? 1 : 0,
+      }));
+      const res = await runP495(recs495an);
+      assert.ok(!res.issues.some((x: any) => x.rule === 'CLOCK_AFTERMATH_CURIOSITY_FLAT'), 'CLOCK_AFTERMATH_CURIOSITY_FLAT should not fire');
+    });
+
+    // REVELATION_EMOTIONAL_AFTERMATH_FLAT fire: n=10; revelations at 1,3,5; all aftermaths neutral
+    it('REVELATION_EMOTIONAL_AFTERMATH_FLAT fires when revelation scenes are never followed by emotional shift', async () => {
+      const recs495b: any[] = Array.from({ length: 10 }, (_, i) => makeRec495(i, {
+        revelation: [1, 3, 5].includes(i) ? 'something revealed' : null,
+      }));
+      const res = await runP495(recs495b);
+      assert.ok(res.issues.some((x: any) => x.rule === 'REVELATION_EMOTIONAL_AFTERMATH_FLAT'), 'REVELATION_EMOTIONAL_AFTERMATH_FLAT should fire');
+    });
+
+    // REVELATION_EMOTIONAL_AFTERMATH_FLAT no-fire: scene 4 (after revelation at 3) is 'negative'
+    it('REVELATION_EMOTIONAL_AFTERMATH_FLAT does not fire when at least one revelation is followed by emotional shift', async () => {
+      const recs495bn: any[] = Array.from({ length: 10 }, (_, i) => makeRec495(i, {
+        revelation: [1, 3, 5].includes(i) ? 'something revealed' : null,
+        emotionalShift: i === 4 ? 'negative' : 'neutral',
+      }));
+      const res = await runP495(recs495bn);
+      assert.ok(!res.issues.some((x: any) => x.rule === 'REVELATION_EMOTIONAL_AFTERMATH_FLAT'), 'REVELATION_EMOTIONAL_AFTERMATH_FLAT should not fire');
+    });
+
+    // CURIOSITY_PEAK_UNCAUSED fire: n=8; peak curiosityDelta=3 at pos 5; no turn/rev/clock in 3,4,5
+    it('CURIOSITY_PEAK_UNCAUSED fires when the highest-curiosity scene has no upstream cause', async () => {
+      const recs495c: any[] = Array.from({ length: 8 }, (_, i) => makeRec495(i, {
+        curiosityDelta: i === 5 ? 3 : 0,
+        clockRaised: i === 0,
+      }));
+      const res = await runP495(recs495c);
+      assert.ok(res.issues.some((x: any) => x.rule === 'CURIOSITY_PEAK_UNCAUSED'), 'CURIOSITY_PEAK_UNCAUSED should fire');
+    });
+
+    // CURIOSITY_PEAK_UNCAUSED no-fire: revelation at scene 4 (one before peak at 5) provides cause
+    it('CURIOSITY_PEAK_UNCAUSED does not fire when the highest-curiosity scene has an upstream cause', async () => {
+      const recs495cn: any[] = Array.from({ length: 8 }, (_, i) => makeRec495(i, {
+        curiosityDelta: i === 5 ? 3 : 0,
+        revelation: i === 4 ? 'a clue surfaces' : null,
+      }));
+      const res = await runP495(recs495cn);
+      assert.ok(!res.issues.some((x: any) => x.rule === 'CURIOSITY_PEAK_UNCAUSED'), 'CURIOSITY_PEAK_UNCAUSED should not fire');
+    });
+  });
+
   describe('Wave 481 — pacingPass: clock aftermath suspense flat, suspense peak uncaused, emotional peak uncaused', async () => {
     const makeRec481 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

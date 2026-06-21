@@ -104,6 +104,20 @@
 // emotionally non-neutral scenes lacks any upstream cause in prior 2 scenes — the emotional
 // climax is unmotivated; backward-cause × emotional peak, second backward-cause check in
 // pacing.ts).
+// Wave 495 additions: clock aftermath curiosity flat (≥3 clock-raising scenes none followed
+// by curiosity rise in next 2 scenes — deadlines never open new questions downstream;
+// sequence/aftermath × curiosity × clock trigger, extending the aftermath family to the clock ×
+// curiosity cross-channel, distinct from CLOCK_AFTERMATH_SUSPENSE_FLAT which uses the suspense
+// channel and CURIOSITY_AFTERMATH_FLAT which uses the high-suspense trigger), revelation
+// emotional aftermath flat (≥3 revelation scenes none followed by emotional shift in next 2
+// scenes — disclosures never register in characters' feelings; sequence/aftermath × emotional
+// × revelation trigger, completing the aftermath grid for the revelation trigger, distinct from
+// REVELATION_SUSPENSE_AFTERMATH_FLAT which uses the suspense channel and SUSPENSE_EMOTIONAL_
+// AFTERMATH_FLAT which uses the suspense trigger), curiosity peak uncaused (the single highest-
+// curiosity scene has no revelation, dramatic turn, or clock event in itself or either prior
+// scene — the story's greatest question-raise arrives without informational cause; backward-cause
+// × curiosity peak, third backward-cause check completing the peak-cause family alongside
+// SUSPENSE_PEAK_UNCAUSED and EMOTIONAL_PEAK_UNCAUSED).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2395,6 +2409,129 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `The story's most dramatically charged emotional scene (Scene ${emotPeakPos481c}, the non-neutral scene with the highest suspenseDelta) has no clock event, dramatic turn, or revelation in itself or in either of the two preceding scenes — the emotional climax arrives without narrative motivation. An emotional peak should be the consequence of accumulated pressure: a revelation that forces a character to confront what they have avoided, a turn that makes the full emotional cost visible, a deadline that strips the last protection. Without an upstream cause, the emotion reads as weather — a feeling that exists because the story needs it rather than because events have driven the character there.`,
           suggestedFix: `Provide Scene ${emotPeakPos481c}'s emotional peak with a dramatic cause in itself or the prior two scenes: a revelation that reframes everything, a dramatic turn that closes the character's last exit, or a clock event that makes waiting any longer impossible. The cause doesn't need to be the only reason for the emotion — but one visible dramatic trigger in the surrounding scenes transforms the peak from mood into consequence, and consequence is always more moving than mood.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 495: CLOCK_AFTERMATH_CURIOSITY_FLAT, REVELATION_EMOTIONAL_AFTERMATH_FLAT, CURIOSITY_PEAK_UNCAUSED ──
+  const n495 = records.length;
+
+  // CLOCK_AFTERMATH_CURIOSITY_FLAT (sequence/aftermath × curiosity × clock trigger, n≥8,
+  // ≥3 qualifying clock scenes not in last 2 positions): Every clock-raising scene is followed
+  // by 2 scenes with curiosityDelta ≤ 0 — deadlines never open new questions downstream.
+  // A clock event should do more than compress time: it should also raise the audience's
+  // wondering, generating the question "can the protagonist beat this deadline and how?" When
+  // clock pressure consistently fails to produce curiosity in its wake, the deadline operates
+  // as a structural label rather than a mystery engine — the audience is told time is short but
+  // not compelled to ask what will happen next. Sequence/aftermath mode × curiosity channel ×
+  // clock trigger. Distinct from CLOCK_AFTERMATH_SUSPENSE_FLAT (Wave 481: suspense channel —
+  // this checks whether deadlines open questions, not whether they escalate danger), CURIOSITY_
+  // AFTERMATH_FLAT (Wave 439: trigger is a high-suspense scene, not a clock event), CLOCK_PRESSURE_
+  // RUN (Wave 467: consecutive presence, not aftermath): this is the second cross-channel aftermath
+  // check for the clock trigger, adding curiosity to the suspense channel already covered.
+  if (n495 >= 8) {
+    const qualClockRecs495a = (records as any[]).filter((r, pos) =>
+      (r.clockRaised === true || (r.clockDelta ?? 0) > 0) && pos < n495 - 2,
+    );
+    if (qualClockRecs495a.length >= 3) {
+      const allClockNoCuriosityAftermath495a = qualClockRecs495a.every((r: any) => {
+        const pos495a = (records as any[]).indexOf(r);
+        for (let off = 1; off <= 2; off++) {
+          const nxt = (records as any[])[pos495a + off];
+          if (nxt && (nxt.curiosityDelta ?? 0) > 0) return false;
+        }
+        return true;
+      });
+      if (allClockNoCuriosityAftermath495a) {
+        issues.push({
+          location: `${qualClockRecs495a.length} clock scene(s) — curiosity aftermath absent`,
+          rule: 'CLOCK_AFTERMATH_CURIOSITY_FLAT',
+          severity: 'minor',
+          description: `None of the story's ${qualClockRecs495a.length} clock-raising scenes is followed by a curiosity rise (curiosityDelta > 0) in either of the next two scenes — every deadline lands without opening a new question downstream. A clock event should do more than compress time: it should also generate wondering in its wake — "can the protagonist beat this, and how?" When deadlines consistently fail to raise curiosity downstream, the ticking-clock mechanism operates as a structural label rather than a mystery engine: the audience is told time is short but not prompted to ask what happens next, robbing the deadline of its forward-pull.`,
+          suggestedFix: `Let at least one clock event trigger a curiosity rise in the following scene or two: the deadline introduced in scene 10 should have scenes 11–12 raising the question of how — new complications that the audience doesn't know how to resolve yet. The curiosity in the clock's aftermath is what converts a deadline from information into suspense; without it, the audience notes the timer but doesn't lean forward.`,
+        });
+      }
+    }
+  }
+
+  // REVELATION_EMOTIONAL_AFTERMATH_FLAT (sequence/aftermath × emotional × revelation trigger,
+  // n≥8, ≥3 qualifying revelation scenes not in last 2 positions): Every revelation scene is
+  // followed by 2 scenes with neutral emotionalShift — disclosures never register in any
+  // character's feelings. A revelation should cause an emotional aftershock: the character
+  // absorbs a new truth and it changes how they feel, even briefly. When every disclosure is
+  // followed by emotional silence, the audience watches truths surface without any human
+  // reaction — the story's revelations are informational updates rather than gut-level
+  // shocks. Sequence/aftermath mode × emotional channel × revelation trigger. Distinct from
+  // REVELATION_SUSPENSE_AFTERMATH_FLAT (Wave 467: suspense channel — this checks emotional
+  // feeling, not danger level), SUSPENSE_EMOTIONAL_AFTERMATH_FLAT (Wave 453: trigger is suspense,
+  // not revelation): this completes the revelation-trigger aftermath family alongside the
+  // suspense-channel check, adding the emotional channel.
+  if (n495 >= 8) {
+    const qualRevRecs495b = (records as any[]).filter((r, pos) =>
+      r.revelation !== null && r.revelation !== undefined && r.revelation !== '' &&
+      pos < n495 - 2,
+    );
+    if (qualRevRecs495b.length >= 3) {
+      const allRevNoEmotionalAftermath495b = qualRevRecs495b.every((r: any) => {
+        const pos495b = (records as any[]).indexOf(r);
+        for (let off = 1; off <= 2; off++) {
+          const nxt = (records as any[])[pos495b + off];
+          if (nxt && (nxt.emotionalShift ?? 'neutral') !== 'neutral') return false;
+        }
+        return true;
+      });
+      if (allRevNoEmotionalAftermath495b) {
+        issues.push({
+          location: `${qualRevRecs495b.length} revelation scene(s) — emotional aftermath absent`,
+          rule: 'REVELATION_EMOTIONAL_AFTERMATH_FLAT',
+          severity: 'minor',
+          description: `None of the story's ${qualRevRecs495b.length} revelation scenes is followed by an emotional shift (positive or negative) in either of the next two scenes — every disclosure is absorbed without any character's feelings visibly changing. A revelation should cause an emotional aftershock: a truth that shifts the picture changes how the characters feel about themselves, each other, and the world they are navigating. When every disclosure is met with emotional silence in the scenes that follow, the audience watches information surface but never witnesses the human weight of knowing — the revelations become plot events rather than experiences that cost or elate the people they concern.`,
+          suggestedFix: `Let at least one revelation trigger an emotional shift in the scene or two that follow: a character receiving a truth that makes them grieve, rage, recoil, or feel the lifting of a weight they have been carrying. The emotional aftermath of a revelation is what converts information into consequence — the revelation says "this is true," and the emotional scene that follows says "and here is what it costs or frees."`,
+        });
+      }
+    }
+  }
+
+  // CURIOSITY_PEAK_UNCAUSED (backward-cause × curiosity peak, n≥8, peak at pos≥2): The story's
+  // single highest-curiosity scene has no revelation, dramatic turn, or clock event in itself or
+  // in either of the two preceding scenes — the greatest question-raise in the story emerges from
+  // a dramatic vacuum. A curiosity peak should be caused by an informational or pivotal event:
+  // a revelation that opens a deeper mystery, a dramatic turn that reframes everything the
+  // audience thought they knew, or a deadline that raises the stakes of the unanswered question.
+  // When the highest-curiosity moment has no upstream cause, the question-raise reads as
+  // authorial manipulation — the audience is made to wonder not because events have opened a gap
+  // but because the writer withheld something. Backward-cause mode × curiosity peak ×
+  // cause-signal set {revelation, turn, clock}. Third backward-cause check in pacing.ts,
+  // completing the peak-cause family: SUSPENSE_PEAK_UNCAUSED (Wave 481b: suspense channel)
+  // and EMOTIONAL_PEAK_UNCAUSED (Wave 481c: emotional peak) — this adds the curiosity peak.
+  if (n495 >= 8) {
+    let peakCurPos495c = -1;
+    let peakCurVal495c = -Infinity;
+    for (let i495c = 0; i495c < n495; i495c++) {
+      const cd495c = (records as any[])[i495c].curiosityDelta ?? 0;
+      if (cd495c > peakCurVal495c) {
+        peakCurVal495c = cd495c;
+        peakCurPos495c = i495c;
+      }
+    }
+    if (peakCurVal495c > 0 && peakCurPos495c >= 2) {
+      const hasCause495c = [-2, -1, 0].some(offset => {
+        const r495c = (records as any[])[peakCurPos495c + offset];
+        return (
+          r495c.clockRaised === true ||
+          (r495c.clockDelta ?? 0) > 0 ||
+          (r495c.dramaticTurn ?? 'nothing') !== 'nothing' ||
+          (r495c.revelation !== null && r495c.revelation !== undefined && r495c.revelation !== '')
+        );
+      });
+      if (!hasCause495c) {
+        issues.push({
+          location: `Scene ${peakCurPos495c} — highest-curiosity scene (curiosityDelta: ${peakCurVal495c})`,
+          rule: 'CURIOSITY_PEAK_UNCAUSED',
+          severity: 'minor',
+          description: `The story's highest-curiosity scene (Scene ${peakCurPos495c}, curiosityDelta: ${peakCurVal495c}) has no revelation, dramatic turn, or clock event in itself or in either of the two preceding scenes — the greatest question-raise in the story emerges from a dramatic vacuum. A curiosity peak should be the consequence of an informational or pivotal event: a disclosure that opens a deeper mystery, a turn that reframes everything the audience thought they knew, or a deadline that raises the stakes of an unanswered question. When the highest-curiosity moment has no upstream cause, the question-raise reads as authorial withholding — the audience wonders not because events have opened a gap but because information was simply not provided.`,
+          suggestedFix: `Add at least one of a revelation, dramatic turn, or clock event to Scene ${peakCurPos495c} or the two scenes before it. The peak curiosity should feel like a question that the story has actively opened — a disclosure that generates a deeper mystery, a pivot that recontextualises the unknown, a deadline that makes the unanswered question urgent. A question-raise caused by an event lands as earned mystery; one without cause lands as a gap the audience can't locate.`,
         });
       }
     }
