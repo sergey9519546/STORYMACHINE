@@ -120,6 +120,21 @@
 // aftermath × clock × payoff trigger — ≥3 qualifying payoffs none followed by a clock raise in
 // the next 2 scenes while ≥2 clock scenes exist; adds the clock channel to the payoff-aftermath
 // family and is distinct from PAYOFF_CLOCK_DECOUPLED which audits same-scene co-occurrence).
+// Wave 524 additions: seed suspense aftermath absent (sequence/aftermath × suspense × seed
+// trigger — ≥3 qualifying seeds none followed by suspenseDelta>0 in next 2 scenes while ≥2
+// suspense scenes exist; planting clues never raises tension in what follows; adds suspense to
+// the seed-aftermath family alongside curiosity/revelation/dramatic-turn; distinct from SEED_
+// CURIOSITY_AFTERMATH_ABSENT, SEED_REVELATION_AFTERMATH_ABSENT, SEED_DRAMATIC_TURN_AFTERMATH_
+// ABSENT, and the pacing-pass check CURIOSITY_AFTERMATH_FLAT which uses a high-suspense trigger),
+// seed emotion aftermath absent (sequence/aftermath × emotion × seed trigger — ≥3 qualifying
+// seeds none followed by non-neutral emotionalShift in next 2 scenes while ≥2 emotional scenes
+// exist; clue-planting never generates felt consequence; adds emotion to seed-aftermath family;
+// distinct from all other seed-aftermath checks which use different output channels), payoff
+// relational aftermath absent (sequence/aftermath × relational shift × payoff trigger — ≥3
+// qualifying payoffs none followed by a relationship shift in next 2 scenes while ≥2 relational
+// scenes exist; thread resolutions never move bonds in their wake; first relational-channel entry
+// in the payoff-aftermath family, distinct from PAYOFF_REVELATION_AFTERMATH_ABSENT, PAYOFF_SEED_
+// AFTERMATH_ABSENT, and PAYOFF_CLOCK_AFTERMATH_ABSENT which use different aftermath channels).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2477,6 +2492,126 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
           description: `The script has a run of ${maxDroughtRun510c} consecutive scenes without any clue seeding (seededClueIds empty) while ${seedScenesElsewhere510c.length} seed scenes exist elsewhere — the thread-planting engine goes dark for a sustained stretch. During a five-or-more scene drought, the audience is given no new mysteries to track: the story continues to develop without adding to the question-debt that keeps viewers invested between moments of explicit payoff. The connective tissue between action and unresolved question vanishes from the drought zone, and those scenes risk reading as pure event — things happening without the added layer of what this will mean for what the audience doesn't yet understand.`,
           suggestedFix: `Plant at least one new clue within the drought run — a detail, a contradiction, a behaviour that registers as evidence for a question the audience hasn't yet been able to formulate. The seed doesn't need to be prominent; a small plant embedded in an action scene is enough to signal that the question-debt is still accumulating and that the scenes the audience is watching now will pay off later.`,
         });
+      }
+    }
+  }
+
+  // ── Wave 524 checks ──────────────────────────────────────────────────────
+  {
+    // SEED_SUSPENSE_AFTERMATH_ABSENT — sequence/aftermath × suspense × seed trigger.
+    // n≥8, ≥3 qualifying seed scenes (seededClueIds non-empty, not in last 2 positions),
+    // ≥2 suspense scenes (suspenseDelta > 0) elsewhere. Every seed is followed by 2 scenes
+    // with suspenseDelta ≤ 0 → fire. Planting a clue never raises tension in what immediately
+    // follows. Foreshadowing should generate pressure alongside anticipation; when seeds plant
+    // questions but produce no tension in their aftermath, the planted threads feel like
+    // informational deposits rather than pressure-building investments.
+    // Distinct from: SEED_CURIOSITY_AFTERMATH_ABSENT (Wave 482: curiosity channel), SEED_
+    // REVELATION_AFTERMATH_ABSENT (Wave 510: revelation channel), SEED_DRAMATIC_TURN_AFTERMATH_
+    // ABSENT (Wave 496: dramatic-turn channel). Adds suspense to the seed-aftermath family.
+    const n524a = records.length;
+    if (n524a >= 8) {
+      const qualSeeds524a = (records as any[]).filter((r, pos) =>
+        ((r.seededClueIds ?? []) as string[]).length > 0 && pos < n524a - 2,
+      );
+      const suspScenes524a = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 0);
+      if (qualSeeds524a.length >= 3 && suspScenes524a.length >= 2) {
+        const allSeedNoSuspAftermath524a = qualSeeds524a.every((r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos + off];
+            if (nxt && (nxt.suspenseDelta ?? 0) > 0) return false;
+          }
+          return true;
+        });
+        if (allSeedNoSuspAftermath524a) {
+          issues.push({
+            location: `${qualSeeds524a.length} seed scene(s) — no suspense rise in any aftermath window`,
+            rule: 'SEED_SUSPENSE_AFTERMATH_ABSENT',
+            severity: 'minor',
+            description: `Every clue-planting scene in the story (${qualSeeds524a.length} scene(s) with seededClueIds) is followed by two scenes where suspense does not rise (suspenseDelta ≤ 0), despite ${suspScenes524a.length} suspense-raising scenes existing elsewhere. Planting a clue should activate tension alongside anticipation: the audience knows something is hidden, and knowing that something is hidden should make them feel the pressure of what it might mean. When every seed's aftermath is tension-free, the planted threads operate purely as information deposits — they set up future answers but generate no immediate pressure that makes the audience feel the weight of what they have just been shown.`,
+            suggestedFix: `After at least one seed scene, let the following scene carry a positive suspenseDelta — a threat that now feels more real because of what was just planted, a new obstacle that the seed complicates, or a deadline that the newly planted clue makes more urgent. A seed followed by a suspense rise is a double investment: the audience gains both a question to carry and a pressure to feel while carrying it.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // SEED_EMOTION_AFTERMATH_ABSENT — sequence/aftermath × emotion × seed trigger.
+    // n≥8, ≥3 qualifying seed scenes (seededClueIds non-empty, not in last 2 positions),
+    // ≥2 emotional scenes (non-neutral emotionalShift) elsewhere. Every seed is followed
+    // by 2 emotionally neutral scenes → fire. Clue-planting never generates felt consequence:
+    // the audience sees evidence planted but the characters who planted it (or the ones around
+    // them) never feel anything in response.
+    // Distinct from: all existing seed-aftermath checks (curiosity/revelation/dramatic-turn/
+    // suspense channels), PAYOFF_AFTERMATH_EMOTION_FLAT in pacing.ts (payoff trigger not seed).
+    // Adds emotion to the seed-aftermath family, completing the set on the emotional channel.
+    const n524b = records.length;
+    if (n524b >= 8) {
+      const qualSeeds524b = (records as any[]).filter((r, pos) =>
+        ((r.seededClueIds ?? []) as string[]).length > 0 && pos < n524b - 2,
+      );
+      const emotScenes524b = (records as any[]).filter(r => (r.emotionalShift ?? 'neutral') !== 'neutral');
+      if (qualSeeds524b.length >= 3 && emotScenes524b.length >= 2) {
+        const allSeedNoEmoAftermath524b = qualSeeds524b.every((r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos + off];
+            if (nxt && (nxt.emotionalShift ?? 'neutral') !== 'neutral') return false;
+          }
+          return true;
+        });
+        if (allSeedNoEmoAftermath524b) {
+          issues.push({
+            location: `${qualSeeds524b.length} seed scene(s) — no emotional beat in any aftermath window`,
+            rule: 'SEED_EMOTION_AFTERMATH_ABSENT',
+            severity: 'minor',
+            description: `Every clue-planting scene in the story (${qualSeeds524b.length} scene(s) with seededClueIds) is followed by two emotionally neutral scenes, despite ${emotScenes524b.length} emotional scene(s) existing elsewhere. Planting a clue is a protagonist act — they have gathered evidence, noticed a detail, or prepared a contingency — and that act should generate a felt consequence: relief at having planted a safeguard, unease at what the evidence implies, or excitement at the thread that has now been opened. When every seed's aftermath is emotionally flat, foreshadowing reads as pure procedural action rather than as a moment that matters to the characters living inside it.`,
+            suggestedFix: `After at least one seed scene, introduce an emotional beat in the following scene — a character registering the weight of what was just planted. The feeling need not be large; even a brief moment of unease, hope, or resolve in the scene immediately after a seed confirms that the planted thread is alive in the character's emotional world, not just in the audience's information queue.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // PAYOFF_RELATIONAL_AFTERMATH_ABSENT — sequence/aftermath × relational shift × payoff trigger.
+    // n≥8, ≥3 qualifying payoffs (payoffSetupIds non-empty, not in last 2 positions),
+    // ≥2 relational scenes (non-empty relationshipShifts) elsewhere. Every payoff is followed
+    // by 2 scenes with no relationship shift → fire. Thread resolutions never move bonds in
+    // their aftermath: when a planted promise is delivered, the characters' relationships remain
+    // entirely unchanged in the scenes that follow.
+    // Distinct from: PAYOFF_REVELATION_AFTERMATH_ABSENT (revelation channel), PAYOFF_SEED_
+    // AFTERMATH_ABSENT (seed channel), PAYOFF_CLOCK_AFTERMATH_ABSENT (clock channel). First
+    // relational-channel entry in the payoff-aftermath family; distinct from PAYOFF_RELATIONAL_
+    // DECOUPLED if it exists (same-scene) and from all aftermath checks with seed/revelation
+    // triggers.
+    const n524c = records.length;
+    if (n524c >= 8) {
+      const qualPayoffs524c = (records as any[]).filter((r, pos) =>
+        ((r.payoffSetupIds ?? []) as string[]).length > 0 && pos < n524c - 2,
+      );
+      const relScenes524c = (records as any[]).filter(r =>
+        ((r.relationshipShifts ?? []) as any[]).length > 0,
+      );
+      if (qualPayoffs524c.length >= 3 && relScenes524c.length >= 2) {
+        const allPayoffNoRelAftermath524c = qualPayoffs524c.every((r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos + off];
+            if (nxt && ((nxt.relationshipShifts ?? []) as any[]).length > 0) return false;
+          }
+          return true;
+        });
+        if (allPayoffNoRelAftermath524c) {
+          issues.push({
+            location: `${qualPayoffs524c.length} payoff scene(s) — no relational shift in any aftermath window`,
+            rule: 'PAYOFF_RELATIONAL_AFTERMATH_ABSENT',
+            severity: 'minor',
+            description: `Every planted promise delivered in the story (${qualPayoffs524c.length} payoff scene(s)) is followed by two scenes in which no relationship moves, despite ${relScenes524c.length} relational scene(s) existing elsewhere. A thread resolution should move bonds in what follows: the delivered promise changes what the characters now know about each other (or what they owe each other), and that change should surface in the relational landscape of the immediately following scenes. When every payoff's aftermath is relationally frozen, resolutions feel purely thematic — they answer questions but do not move the people inside the story closer together or further apart.`,
+            suggestedFix: `After at least one payoff scene, introduce a relationship shift in the following scene — a bond that warms because a planted promise was honored, or fractures because a planted threat was realized. The relational consequence need not be large; even a small shift in the scene after a payoff confirms that the delivery mattered to the people involved and gives the payoff a second layer beyond its informational closure.`,
+          });
+        }
       }
     }
   }

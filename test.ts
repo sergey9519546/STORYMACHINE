@@ -22232,6 +22232,99 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 524 — payoffPass: seed suspense aftermath absent, seed emotion aftermath absent, payoff relational aftermath absent', async () => {
+    const makeRec524 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runPY524 = async (records: any[]) => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    it('SEED_SUSPENSE_AFTERMATH_ABSENT fires when all seeds have no suspense rise in their aftermath', async () => {
+      // 10 scenes: seeds at 0,2,4 (not last 2); suspense at 8,9 (no overlap with aftermath windows 1-2, 3-4, 5-6)
+      const recs524a = Array.from({ length: 10 }, (_, i) =>
+        makeRec524(i, {
+          seededClueIds: [0, 2, 4].includes(i) ? ['c1'] : [],
+          suspenseDelta: [8, 9].includes(i) ? 1 : 0,
+        }),
+      );
+      const res = await runPY524(recs524a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_SUSPENSE_AFTERMATH_ABSENT'), 'SEED_SUSPENSE_AFTERMATH_ABSENT should fire');
+    });
+
+    it('SEED_SUSPENSE_AFTERMATH_ABSENT does not fire when a seed is followed by a suspense rise', async () => {
+      // 10 scenes: seeds at 0,2,4; suspense at 1 (directly after seed 0) — falls in aftermath
+      const recs524an = Array.from({ length: 10 }, (_, i) =>
+        makeRec524(i, {
+          seededClueIds: [0, 2, 4].includes(i) ? ['c1'] : [],
+          suspenseDelta: [1, 8].includes(i) ? 1 : 0,
+        }),
+      );
+      const res = await runPY524(recs524an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_SUSPENSE_AFTERMATH_ABSENT'), 'SEED_SUSPENSE_AFTERMATH_ABSENT should not fire');
+    });
+
+    it('SEED_EMOTION_AFTERMATH_ABSENT fires when all seeds have no emotional beat in their aftermath', async () => {
+      // 10 scenes: seeds at 0,2,4; emotional at 8,9 (no overlap with aftermath windows 1-2, 3-4, 5-6)
+      const recs524b = Array.from({ length: 10 }, (_, i) =>
+        makeRec524(i, {
+          seededClueIds: [0, 2, 4].includes(i) ? ['c1'] : [],
+          emotionalShift: [8, 9].includes(i) ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runPY524(recs524b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_EMOTION_AFTERMATH_ABSENT'), 'SEED_EMOTION_AFTERMATH_ABSENT should fire');
+    });
+
+    it('SEED_EMOTION_AFTERMATH_ABSENT does not fire when a seed is followed by an emotional scene', async () => {
+      // 10 scenes: seeds at 0,2,4; emotional at 1 (directly after seed 0) — falls in aftermath
+      const recs524bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec524(i, {
+          seededClueIds: [0, 2, 4].includes(i) ? ['c1'] : [],
+          emotionalShift: i === 1 ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runPY524(recs524bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_EMOTION_AFTERMATH_ABSENT'), 'SEED_EMOTION_AFTERMATH_ABSENT should not fire');
+    });
+
+    it('PAYOFF_RELATIONAL_AFTERMATH_ABSENT fires when all payoffs have no relational shift in their aftermath', async () => {
+      // 10 scenes: payoffs at 0,2,4; relational shifts at 8,9 (outside aftermath windows)
+      const recs524c = Array.from({ length: 10 }, (_, i) =>
+        makeRec524(i, {
+          payoffSetupIds: [0, 2, 4].includes(i) ? ['s1'] : [],
+          relationshipShifts: [8, 9].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.3 }] : [],
+        }),
+      );
+      const res = await runPY524(recs524c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_RELATIONAL_AFTERMATH_ABSENT'), 'PAYOFF_RELATIONAL_AFTERMATH_ABSENT should fire');
+    });
+
+    it('PAYOFF_RELATIONAL_AFTERMATH_ABSENT does not fire when a payoff is followed by a relational shift', async () => {
+      // 10 scenes: payoffs at 0,2,4; relational shift at 1 (directly after payoff 0)
+      const recs524cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec524(i, {
+          payoffSetupIds: [0, 2, 4].includes(i) ? ['s1'] : [],
+          relationshipShifts: [1, 8].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.3 }] : [],
+        }),
+      );
+      const res = await runPY524(recs524cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_RELATIONAL_AFTERMATH_ABSENT'), 'PAYOFF_RELATIONAL_AFTERMATH_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 510 — payoffPass: seed revelation aftermath absent, payoff seed aftermath absent, seed drought run', async () => {
     const makeRec510 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
