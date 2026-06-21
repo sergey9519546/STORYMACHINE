@@ -130,6 +130,22 @@
 // scene — the story's greatest question-raise arrives without informational cause; backward-cause
 // × curiosity peak, third backward-cause check completing the peak-cause family alongside
 // SUSPENSE_PEAK_UNCAUSED and EMOTIONAL_PEAK_UNCAUSED).
+// Wave 523 additions: clock aftermath emotion flat (sequence/aftermath × emotion × clock trigger
+// — n≥8, ≥3 clockRaised scenes not in last 2 positions, every clockRaised scene followed by 2
+// emotionally neutral scenes; deadlines never register in the protagonist's felt state; completes
+// the clock-aftermath family alongside clock→suspense and clock→curiosity; distinct from
+// REVELATION_EMOTIONAL_AFTERMATH_FLAT which uses a revelation trigger and SUSPENSE_EMOTIONAL_
+// AFTERMATH_FLAT which uses a suspense trigger), payoff aftermath emotion flat (sequence/aftermath
+// × emotion × payoff trigger — n≥8, ≥3 payoff scenes not in last 2 positions, every payoff scene
+// followed by 2 emotionally neutral scenes; thread resolutions never register in felt state;
+// extends the payoff-aftermath family from payoff→curiosity to payoff→emotion; distinct from all
+// existing aftermath×emotion checks which use revelation or suspense as the trigger), payoff
+// aftermath suspense flat (sequence/aftermath × suspense × payoff trigger — n≥8, ≥3 payoff scenes
+// not in last 2 positions, avg suspenseDelta of immediately following scene ≤ 0; callbacks never
+// generate forward tension; adds the suspense channel to the payoff-aftermath family alongside
+// payoff→curiosity; distinct from PAYOFF_SUSPENSE_DECOUPLED which is co-occurrence in the same
+// scene and from CLOCK_AFTERMATH_SUSPENSE_FLAT / REVELATION_SUSPENSE_AFTERMATH_FLAT which use
+// different triggers).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2643,6 +2659,116 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
           description: `None of the story's ${qualPayoffRecs509c.length} payoff scenes is followed by a curiosity rise (curiosityDelta > 0) in either of the next two scenes — every callback closes a loop without opening a new question downstream. A resolved setup should do more than satisfy: the answer to an old mystery should reorient the audience's wondering, revealing what they need to understand next. When every payoff is followed by curiosity silence, the resolution machinery operates strictly as exhaust — closing loops without generating forward pull — and the story gradually loses the engine that keeps the audience leaning forward between acts.`,
           suggestedFix: `Let at least one payoff trigger a question in the scene or two that follows: the answered setup should reveal a new layer of the story's central mystery, or show the protagonist realising that the resolved question has exposed a more pressing one. A callback that generates a new question is a ratchet, converting the earned satisfaction of a closed loop into the forward pressure of a newly opened one.`,
         });
+      }
+    }
+  }
+
+  // ── Wave 523 checks ──────────────────────────────────────────────────────
+  {
+    // CLOCK_AFTERMATH_EMOTION_FLAT — sequence/aftermath × emotion × clock trigger.
+    // n≥8, ≥3 clockRaised scenes (not in last 2 positions). Every clockRaised scene is
+    // followed by 2 emotionally neutral scenes → fire. Deadlines never register in
+    // the protagonist's felt state: a clock is raised and then the next two scenes play
+    // out without any emotional response to the imposed urgency.
+    // Distinct from: CLOCK_AFTERMATH_SUSPENSE_FLAT (Wave 481: clock→suspense aftermath),
+    // CLOCK_AFTERMATH_CURIOSITY_FLAT (Wave 495: clock→curiosity aftermath — different channels).
+    // REVELATION_EMOTIONAL_AFTERMATH_FLAT (Wave 495: revelation trigger), SUSPENSE_EMOTIONAL_
+    // AFTERMATH_FLAT (suspense trigger). Completes clock-aftermath family on the emotion channel.
+    const n523a = records.length;
+    if (n523a >= 8) {
+      const qualClockRecs523a = (records as any[]).filter((r, pos) =>
+        r.clockRaised === true && pos < n523a - 2,
+      );
+      if (qualClockRecs523a.length >= 3) {
+        const allClockNoEmoAftermath523a = qualClockRecs523a.every((r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos + off];
+            if (nxt && (nxt.emotionalShift ?? 'neutral') !== 'neutral') return false;
+          }
+          return true;
+        });
+        if (allClockNoEmoAftermath523a) {
+          issues.push({
+            location: `${qualClockRecs523a.length} clock scene(s) — emotion absent in all aftermath windows`,
+            rule: 'CLOCK_AFTERMATH_EMOTION_FLAT',
+            severity: 'minor',
+            description: `Every deadline beat in the story (${qualClockRecs523a.length} clockRaised scene(s)) is followed by two emotionally neutral scenes. Deadlines are designed to produce urgency — but urgency that never registers in the protagonist's emotional state is purely mechanical. When a clock is raised and the next two scenes play out with no felt response to the imposed time pressure, the deadline reads as a logistical fact rather than as something the protagonist is experiencing. Pacing depends on the audience feeling the cost of time; a clock that triggers no emotional reaction teaches them that deadlines in this story do not matter to the people inside it.`,
+            suggestedFix: `After at least one clockRaised scene, introduce an emotional beat in the following scene — a moment of fear, resolve, grief, or desperate hope that shows the protagonist registering the time pressure. The emotional response need not be large; even a brief beat of felt urgency before the next action beat grounds the deadline in character experience and tells the audience that the clock is real to someone inside the story.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // PAYOFF_AFTERMATH_EMOTION_FLAT — sequence/aftermath × emotion × payoff trigger.
+    // n≥8, ≥3 payoff scenes (payoffSetupIds non-empty) not in last 2 positions. Every payoff
+    // is followed by 2 emotionally neutral scenes → fire. Thread resolutions never register
+    // in the protagonist's felt state: a promise is cashed and then the next two scenes play
+    // out without any emotional consequence to the delivery.
+    // Distinct from: PAYOFF_AFTERMATH_CURIOSITY_FLAT (Wave 509: payoff→curiosity — different
+    // aftermath channel), REVELATION_EMOTIONAL_AFTERMATH_FLAT (Wave 495: revelation trigger),
+    // SUSPENSE_EMOTIONAL_AFTERMATH_FLAT (suspense trigger), CLOCK_AFTERMATH_EMOTION_FLAT (above:
+    // clock trigger). Extends payoff-aftermath family to the emotion channel.
+    const n523b = records.length;
+    if (n523b >= 8) {
+      const qualPayoffRecs523b = (records as any[]).filter((r, pos) =>
+        ((r.payoffSetupIds ?? []) as any[]).length > 0 && pos < n523b - 2,
+      );
+      if (qualPayoffRecs523b.length >= 3) {
+        const allPayoffNoEmoAftermath523b = qualPayoffRecs523b.every((r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos + off];
+            if (nxt && (nxt.emotionalShift ?? 'neutral') !== 'neutral') return false;
+          }
+          return true;
+        });
+        if (allPayoffNoEmoAftermath523b) {
+          issues.push({
+            location: `${qualPayoffRecs523b.length} payoff scene(s) — emotion absent in all aftermath windows`,
+            rule: 'PAYOFF_AFTERMATH_EMOTION_FLAT',
+            severity: 'minor',
+            description: `Every planted promise delivered in the story (${qualPayoffRecs523b.length} payoff scene(s)) is followed by two emotionally neutral scenes. Payoffs should carry emotional weight: when a setup delivers, the protagonist should feel something — relief, grief, vindication, horror, joy — in the scenes that follow. When every payoff is met by affective silence, resolution feels procedural: threads are checked off rather than experienced. The emotional aftermath of a delivered promise is the moment the audience is reminded of what the setup cost and what the delivery means for the protagonist's arc.`,
+            suggestedFix: `After at least one payoff scene, introduce an emotional beat in the following scene — a character's immediate felt response to the delivered promise. The response can be brief; even a single line of emotionally charged action or dialogue that shows someone feeling the weight of what just resolved is enough to anchor the payoff in the character's experience and lift it from logistics to drama.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // PAYOFF_AFTERMATH_SUSPENSE_FLAT — sequence/aftermath × suspense × payoff trigger.
+    // n≥8, ≥3 payoff scenes (payoffSetupIds non-empty) not in last 2 positions.
+    // Average suspenseDelta of the scene immediately following each payoff ≤ 0 → fire.
+    // Callbacks never generate forward tension: every thread resolution lands in scenes that
+    // produce no net suspense gain in what follows, so payoffs flatten rather than accelerate.
+    // Distinct from: PAYOFF_SUSPENSE_DECOUPLED (Wave 509: co-occurrence — payoff and high-
+    // suspense never in the same scene; this is aftermath — what follows the payoff scene),
+    // PAYOFF_AFTERMATH_CURIOSITY_FLAT (Wave 509: curiosity channel), PAYOFF_AFTERMATH_EMOTION_FLAT
+    // (above: emotion channel), CLOCK_AFTERMATH_SUSPENSE_FLAT (clock trigger), REVELATION_
+    // SUSPENSE_AFTERMATH_FLAT (revelation trigger). Adds suspense channel to payoff-aftermath family.
+    const n523c = records.length;
+    if (n523c >= 8) {
+      const qualPayoffRecs523c = (records as any[]).filter((r, pos) =>
+        ((r.payoffSetupIds ?? []) as any[]).length > 0 && pos < n523c - 2,
+      );
+      if (qualPayoffRecs523c.length >= 3) {
+        const avgNextSusp523c = qualPayoffRecs523c.reduce((sum: number, r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          const nxt = (records as any[])[pos + 1];
+          return sum + (nxt ? (nxt.suspenseDelta ?? 0) : 0);
+        }, 0) / qualPayoffRecs523c.length;
+        if (avgNextSusp523c <= 0) {
+          issues.push({
+            location: `${qualPayoffRecs523c.length} payoff scene(s) — avg next-scene suspenseDelta: ${avgNextSusp523c.toFixed(2)}`,
+            rule: 'PAYOFF_AFTERMATH_SUSPENSE_FLAT',
+            severity: 'minor',
+            description: `The scenes immediately following the story's ${qualPayoffRecs523c.length} payoff scenes average a suspenseDelta of ${avgNextSusp523c.toFixed(2)} — callbacks never generate forward tension in what immediately follows. A delivered promise should either resolve tension (the threat was cashed and the audience can exhale) or escalate it (the payoff reveals a deeper problem and raises the stakes). When every payoff is followed by a suspense-neutral scene, deliveries flatten rather than pivot the pacing; the audience receives the resolution and then drifts forward without any ratcheting effect. Payoffs that don't affect the tension level in what follows feel like isolated episodes rather than story-structural turning points.`,
+            suggestedFix: `After at least one payoff scene, let the following scene carry a positive suspenseDelta — either by having the payoff reveal an escalating threat, or by having a character respond to the delivery in a way that raises the stakes. A payoff followed by a suspense rise is a ratchet: it both satisfies a prior setup and applies new pressure, converting closure into acceleration rather than rest.`,
+          });
+        }
       }
     }
   }

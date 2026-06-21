@@ -22940,6 +22940,93 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 523 — pacingPass: clock aftermath emotion flat, payoff aftermath emotion flat, payoff aftermath suspense flat', async () => {
+    const makeRec523 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain523 = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\n\nAction line for scene ${i}.`).join('\n\n');
+    const runPA523 = async (records: any[]) => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: makeFountain523(records.length), original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+      });
+    };
+
+    it('CLOCK_AFTERMATH_EMOTION_FLAT fires when all clock scenes are followed by emotional silence', async () => {
+      // 10 scenes: clockRaised at 1,3,5 (not last 2); next scenes all emotionally neutral
+      const recs523a = Array.from({ length: 10 }, (_, i) =>
+        makeRec523(i, { clockRaised: [1, 3, 5].includes(i) }),
+      );
+      const res = await runPA523(recs523a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_AFTERMATH_EMOTION_FLAT'), 'CLOCK_AFTERMATH_EMOTION_FLAT should fire');
+    });
+
+    it('CLOCK_AFTERMATH_EMOTION_FLAT does not fire when a clock scene is followed by emotion', async () => {
+      // 10 scenes: clockRaised at 1,3,5; scene 2 (after scene 1) has positive emotionalShift
+      const recs523an = Array.from({ length: 10 }, (_, i) =>
+        makeRec523(i, {
+          clockRaised: [1, 3, 5].includes(i),
+          emotionalShift: i === 2 ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runPA523(recs523an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_AFTERMATH_EMOTION_FLAT'), 'CLOCK_AFTERMATH_EMOTION_FLAT should not fire');
+    });
+
+    it('PAYOFF_AFTERMATH_EMOTION_FLAT fires when all payoff scenes are followed by emotional silence', async () => {
+      // 10 scenes: payoffs at 1,3,5 (not last 2); all following scenes emotionally neutral
+      const recs523b = Array.from({ length: 10 }, (_, i) =>
+        makeRec523(i, { payoffSetupIds: [1, 3, 5].includes(i) ? ['s1'] : [] }),
+      );
+      const res = await runPA523(recs523b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_AFTERMATH_EMOTION_FLAT'), 'PAYOFF_AFTERMATH_EMOTION_FLAT should fire');
+    });
+
+    it('PAYOFF_AFTERMATH_EMOTION_FLAT does not fire when a payoff is followed by an emotional scene', async () => {
+      // 10 scenes: payoffs at 1,3,5; scene 2 (after scene 1) has negative emotionalShift
+      const recs523bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec523(i, {
+          payoffSetupIds: [1, 3, 5].includes(i) ? ['s1'] : [],
+          emotionalShift: i === 2 ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runPA523(recs523bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_AFTERMATH_EMOTION_FLAT'), 'PAYOFF_AFTERMATH_EMOTION_FLAT should not fire');
+    });
+
+    it('PAYOFF_AFTERMATH_SUSPENSE_FLAT fires when avg next-scene suspenseDelta after payoffs ≤ 0', async () => {
+      // 10 scenes: payoffs at 1,3,5; following scenes at 2,4,6 all have suspenseDelta = 0
+      const recs523c = Array.from({ length: 10 }, (_, i) =>
+        makeRec523(i, {
+          payoffSetupIds: [1, 3, 5].includes(i) ? ['s1'] : [],
+          suspenseDelta: 0,
+        }),
+      );
+      const res = await runPA523(recs523c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_AFTERMATH_SUSPENSE_FLAT'), 'PAYOFF_AFTERMATH_SUSPENSE_FLAT should fire');
+    });
+
+    it('PAYOFF_AFTERMATH_SUSPENSE_FLAT does not fire when avg next-scene suspenseDelta after payoffs > 0', async () => {
+      // 10 scenes: payoffs at 1,3,5; next scenes 2,4,6 each have suspenseDelta = 1 (avg > 0)
+      const recs523cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec523(i, {
+          payoffSetupIds: [1, 3, 5].includes(i) ? ['s1'] : [],
+          suspenseDelta: [2, 4, 6].includes(i) ? 1 : 0,
+        }),
+      );
+      const res = await runPA523(recs523cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_AFTERMATH_SUSPENSE_FLAT'), 'PAYOFF_AFTERMATH_SUSPENSE_FLAT should not fire');
+    });
+  });
+
   describe('Wave 509 — pacingPass: suspense flatline run, payoff suspense decoupled, payoff aftermath curiosity flat', async () => {
     const makeRec509 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
