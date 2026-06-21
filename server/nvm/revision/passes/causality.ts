@@ -102,6 +102,16 @@
 // payoff zone cluster (distribution/timing — >75% of payoff scenes fall in a single third; thread
 // resolutions burst in one zone while the other thirds remain open; distinct from PAYOFF_BACK_LOADED
 // which uses a binary first/second-half partition and from the payoff correlation checks).
+// Wave 489 additions: dramatic turn temporal cluster (distribution/timing × dramatic-turn × thirds —
+// n≥9, ≥4 turn scenes, >75% in one third; the dramatic-turn channel complement of EMOTIONAL_ZONE_
+// CLUSTER, SEED_TEMPORAL_CLUSTER, and PAYOFF_ZONE_CLUSTER; completes the distribution/timing thirds
+// family for the four main narrative event types), clock peak uncaused (single-peak isolation ×
+// backward-cause × clock channel — the scene with the highest clockDelta at pos≥2 has no causal
+// driver in the 2 prior scenes; the clock-channel complement of SUSPENSE_PEAK_UNCAUSED which audits
+// the suspense channel), seed aftermath curiosity void (sequence/aftermath × seed → curiosity — n≥8,
+// ≥3 seed scenes not at last position, avg curiosityDelta of scene immediately following each seed ≤ 0;
+// distinct from SEED_SCENE_CURIOSITY_VOID which checks the seed scene's OWN curiosityDelta and from
+// CURIOSITY_SPIKE_NO_FALLOUT which checks what follows a curiosity spike rather than a seed scene).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2448,6 +2458,131 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
           description: `${maxZ475c} of ${payoffPositions475c.length} thread-resolution scenes (${(maxZ475c / payoffPositions475c.length * 100).toFixed(0)}%) fall within the ${zone475c} third — the story concentrates its dramatic satisfactions in one structural zone while the other two-thirds remain narratively open. A cluster of resolutions in the ${zone475c} zone creates a satisfaction burst surrounded by unresolved territory: if it is early, the audience has nothing to track for the rest of the script; if it is in the middle, both opening investment and closing reward are absent; if it is late, the entire script has been building without any delivered promises until the end. The most satisfying narrative architecture delivers resolutions throughout, proving at each stage that the story keeps what it plants.`,
           suggestedFix: `Redistribute at least one or two payoff scenes into the zones currently empty of resolution: advance a thread's payoff earlier if it creates breathing room before new threads open, or hold one later if it strengthens the climax. The goal is an architecture where the audience feels the story consistently delivering — not banking all its payoffs into one zone and leaving the others structurally inert.`,
         });
+      }
+    }
+  }
+
+  // ── Wave 489: DRAMATIC_TURN_TEMPORAL_CLUSTER, CLOCK_PEAK_UNCAUSED, SEED_AFTERMATH_CURIOSITY_VOID ──
+
+  // DRAMATIC_TURN_TEMPORAL_CLUSTER — Distribution/timing × dramatic-turn × thirds.
+  // n≥9, ≥4 scenes with a non-trivial dramatic turn (dramaticTurn not 'nothing'/empty/undefined).
+  // >75% in a single structural third → fire. When the story's pivots, reversals, and twists all
+  // land in one zone, the arc outside that zone lacks structural joints — it runs in a straight
+  // line without the causal ruptures that generate new dramatic questions.
+  // Distinct from: EMOTIONAL_ZONE_CLUSTER (Wave 475: emotionally charged scenes — different signal),
+  // SEED_TEMPORAL_CLUSTER (Wave 475: clue-planting — different signal), PAYOFF_ZONE_CLUSTER
+  // (Wave 475: thread resolutions — different signal; this completes the distribution/timing thirds
+  // family for the four main narrative event types), DRAMATIC_TURN_CLUSTER (Wave 310: 3+ turns in a
+  // 3-scene window — run-based local density, not arc-wide zone distribution).
+  {
+    const n489a = records.length;
+    if (n489a >= 9) {
+      const turnPositions489a = (records as any[])
+        .map((r, pos) => ({
+          pos,
+          hasTurn: r.dramaticTurn !== undefined && r.dramaticTurn !== null &&
+            r.dramaticTurn !== 'nothing' && r.dramaticTurn !== '',
+        }))
+        .filter(x => x.hasTurn)
+        .map(x => x.pos);
+      if (turnPositions489a.length >= 4) {
+        const third489a = Math.floor(n489a / 3);
+        const zone1489a = turnPositions489a.filter(p => p < third489a).length;
+        const zone2489a = turnPositions489a.filter(p => p >= third489a && p < 2 * third489a).length;
+        const zone3489a = turnPositions489a.filter(p => p >= 2 * third489a).length;
+        const maxZ489a = Math.max(zone1489a, zone2489a, zone3489a);
+        if (maxZ489a / turnPositions489a.length > 0.75) {
+          const zoneName489a = zone1489a === maxZ489a ? 'opening' : zone2489a === maxZ489a ? 'middle' : 'closing';
+          issues.push({
+            location: `${maxZ489a}/${turnPositions489a.length} dramatic turn(s) in the ${zoneName489a} third`,
+            rule: 'DRAMATIC_TURN_TEMPORAL_CLUSTER',
+            severity: 'minor',
+            description: `${maxZ489a} of ${turnPositions489a.length} dramatic-turn scenes (${(maxZ489a / turnPositions489a.length * 100).toFixed(0)}%) fall in the ${zoneName489a} structural third. The story concentrates its reversals, pivots, and structural joints in one zone while the other two-thirds run without causal rupture. Dramatic turns are the story's gear-shifts: they generate new questions, force new goals, and change the audience's expectations about what happens next. When turns cluster in one zone, the rest of the arc loses its structural musculature — audiences experience one burst of dramatic dislocation surrounded by long, joint-free stretches.`,
+            suggestedFix: `Redistribute at least one or two dramatic turns out of the ${zoneName489a} cluster and into the zones currently without reversals. Not every new turn requires a major plot development: a reversal of expectation, a shifted goal, or a character choice that forecloses one path and opens another can serve as a structural joint. The goal is to give the audience new orientation points across all three thirds, not just in the ${zoneName489a} zone.`,
+          });
+        }
+      }
+    }
+  }
+
+  // CLOCK_PEAK_UNCAUSED — Single-peak isolation × backward-cause × clock channel.
+  // n≥8. Find the scene with the highest clockDelta (time-pressure escalation). If it is at array
+  // pos≥2 and neither of the 2 preceding scenes contains a structural driver (revelation, dramatic
+  // turn, suspense rise, seeded clues, or non-neutral emotion) → fire. The story's maximum urgency
+  // spike appears without a causal build — pressure materializes from narrative vacuum.
+  // Distinct from: SUSPENSE_PEAK_UNCAUSED (Wave 433: same mode on the suspense channel — this is
+  // the clock-channel complement), CLOCK_RAISE_NO_FALLOUT (Wave 391: aftermath check — what
+  // follows a clock-raise; this checks backward-cause BEFORE the clock peak), CLOCK_RAISE_NO_
+  // SUSPENSE / CLOCK_RAISE_CURIOSITY_VOID / CLOCK_RAISE_RELATIONSHIP_VOID / CLOCK_RAISED_NO_EMOTION
+  // (average/aggregate or co-occurrence checks on the clock scene itself and its simultaneous signals
+  // — different analytical mode and position).
+  {
+    const n489b = records.length;
+    if (n489b >= 8) {
+      const clockDeltas489b = (records as any[]).map(r => r.clockDelta ?? 0);
+      const maxClockDelta489b = Math.max(...clockDeltas489b);
+      if (maxClockDelta489b > 0) {
+        const peakClockPos489b = clockDeltas489b.indexOf(maxClockDelta489b);
+        if (peakClockPos489b >= 2) {
+          const prior1_489b = records[peakClockPos489b - 1] as any;
+          const prior2_489b = records[peakClockPos489b - 2] as any;
+          const hasCause489b = [prior1_489b, prior2_489b].some(r =>
+            r !== undefined && (
+              (r.revelation !== null && r.revelation !== '' && r.revelation !== undefined) ||
+              (r.dramaticTurn !== undefined && r.dramaticTurn !== 'nothing' && r.dramaticTurn !== '') ||
+              (r.suspenseDelta ?? 0) > 0 ||
+              ((r.seededClueIds ?? []).length > 0) ||
+              (r.emotionalShift !== 'neutral')
+            ),
+          );
+          if (!hasCause489b) {
+            const peakScene = records[peakClockPos489b] as any;
+            issues.push({
+              location: `Scene ${peakScene.sceneIdx} (${peakScene.slug}) — peak clockDelta (${maxClockDelta489b}) appears without a prior causal driver`,
+              rule: 'CLOCK_PEAK_UNCAUSED',
+              severity: 'minor',
+              description: `The scene with the highest time-pressure escalation (clockDelta ${maxClockDelta489b} at scene ${peakScene.sceneIdx}) has no structural driver in the two preceding scenes — no revelation, dramatic turn, suspense rise, planted clue, or emotional shift in scenes ${peakScene.sceneIdx - 2} and ${peakScene.sceneIdx - 1}. The story's maximum urgency spike arrives without a causal gradient: a clock that reaches its peak with no preparation reads as an arbitrary escalation rather than a built-up consequence of narrative events.`,
+              suggestedFix: `Give scene ${peakScene.sceneIdx - 1} or ${peakScene.sceneIdx - 2} a structural driver that motivates the urgency peak: a revelation that creates the constraint, a dramatic turn that opens a new deadline, or a suspense escalation that makes the clock pressure legible as a story consequence rather than an authorial decree.`,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // SEED_AFTERMATH_CURIOSITY_VOID — Sequence/aftermath × seed → curiosity aftermath.
+  // n≥8, ≥3 seed scenes (seededClueIds.length > 0) not at last position. Average curiosityDelta of
+  // the scene immediately following each seed scene ≤ 0. When seeds are planted, the next scene
+  // never increases the audience's wondering — foreshadowing closes the field of questions rather
+  // than opening it. The moment after a clue is planted is when the audience should be most primed
+  // to wonder: what does this clue mean? what is being set up? If that aftermath is curiosity-zero
+  // or curiosity-negative, the clue landed without igniting the wondering it was designed to fuel.
+  // Distinct from: SEED_SCENE_CURIOSITY_VOID (Wave 363: checks the seed scene's OWN curiosityDelta
+  // — whether curiosity rises IN the seed scene itself; this checks the NEXT scene's curiosityDelta),
+  // CLUE_SEED_SUSPENSE_VOID (Wave 335: checks suspenseDelta of the seed scene itself — different
+  // signal and different time slot), CURIOSITY_SPIKE_NO_FALLOUT (Wave 391: checks what follows a
+  // CURIOSITY SPIKE, not what follows a SEED; different trigger signal), CURIOSITY_FRONT_LOADED
+  // (Wave 268: global distribution of curiosity spikes — not seed-triggered aftermath).
+  {
+    const n489c = records.length;
+    if (n489c >= 8) {
+      const seedAndNext489c = (records as any[])
+        .map((r, pos) => ({ pos, count: ((r.seededClueIds ?? []) as any[]).length }))
+        .filter(x => x.count > 0 && x.pos < n489c - 1);
+      if (seedAndNext489c.length >= 3) {
+        const totalCurAftermath489c = seedAndNext489c.reduce((sum, x) => {
+          return sum + ((records as any[])[x.pos + 1].curiosityDelta ?? 0);
+        }, 0);
+        const avgCurAftermath489c = totalCurAftermath489c / seedAndNext489c.length;
+        if (avgCurAftermath489c <= 0) {
+          issues.push({
+            location: `${seedAndNext489c.length} seed scene(s) — avg next-scene curiosityDelta ${avgCurAftermath489c.toFixed(2)}`,
+            rule: 'SEED_AFTERMATH_CURIOSITY_VOID',
+            severity: 'minor',
+            description: `The scene immediately following each of the ${seedAndNext489c.length} qualifying clue-planting scene(s) averages a curiosityDelta of ${avgCurAftermath489c.toFixed(2)}. Foreshadowing consistently fails to open wondering in what follows — seeds are planted and the next beat closes the epistemic field rather than igniting it. The scene after a planted clue is the moment of peak audience curiosity: they have just received a mystery, and the next scene should deepen or redirect that wondering. When the seed-aftermath is curiosity-neutral or curiosity-negative, the planted clue functions as an inert deposit rather than a wonder-generator.`,
+            suggestedFix: `Engineer at least one seed scene whose immediately following scene increases curiosity: introduce a character who reacts to the planted clue with suspicion, add a new complication that makes the clue more urgent, or open a new question that the clue makes the audience want answered. The most effective foreshadowing creates a wondering cascade — the clue lands, and what follows makes the audience want to know more, not less.`,
+          });
+        }
       }
     }
   }

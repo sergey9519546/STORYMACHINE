@@ -29656,6 +29656,87 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 489 — causalityPass: dramatic turn temporal cluster, clock peak uncaused, seed aftermath curiosity void', async () => {
+    const makeRec489 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      seededClueIds: [], payoffSetupIds: [], revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], dramaticTurn: 'nothing',
+      purpose: 'development', unresolvedClues: [],
+      ...overrides,
+    });
+    const runC489 = async (records: any[]) => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DRAMATIC_TURN_TEMPORAL_CLUSTER fires when >75% of dramatic-turn scenes fall in one third', async () => {
+      // n=12; turns at positions 0,1,2,3 (all in first third, floor(12/3)=4 → zone1=0-3)
+      // 4/4=100% > 75% → fire
+      const recs489a = Array.from({ length: 12 }, (_, i) =>
+        makeRec489(i, { dramaticTurn: [0, 1, 2, 3].includes(i) ? 'reversal' : 'nothing' }),
+      );
+      const res = await runC489(recs489a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DRAMATIC_TURN_TEMPORAL_CLUSTER'), 'DRAMATIC_TURN_TEMPORAL_CLUSTER should fire');
+    });
+
+    it('DRAMATIC_TURN_TEMPORAL_CLUSTER does not fire when turns are spread across all thirds', async () => {
+      // n=12; turns at positions 0 (zone1), 4 (zone2), 8 (zone3), 11 (zone3) → max=2/4=50% ≤ 75%
+      const recs489anr = Array.from({ length: 12 }, (_, i) =>
+        makeRec489(i, { dramaticTurn: [0, 4, 8, 11].includes(i) ? 'reversal' : 'nothing' }),
+      );
+      const res = await runC489(recs489anr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DRAMATIC_TURN_TEMPORAL_CLUSTER'), 'DRAMATIC_TURN_TEMPORAL_CLUSTER should not fire');
+    });
+
+    it('CLOCK_PEAK_UNCAUSED fires when the highest-clockDelta scene has no causal driver in prior 2 scenes', async () => {
+      // n=8; peak clockDelta=5 at pos 4; scenes 2 and 3 are flat (no drivers) → fire
+      const recs489b = Array.from({ length: 8 }, (_, i) =>
+        makeRec489(i, { clockDelta: i === 4 ? 5 : 0 }),
+      );
+      const res = await runC489(recs489b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'CLOCK_PEAK_UNCAUSED'), 'CLOCK_PEAK_UNCAUSED should fire');
+    });
+
+    it('CLOCK_PEAK_UNCAUSED does not fire when prior scene has a structural driver', async () => {
+      // Same but scene 3 has suspenseDelta>0 (cause) → hasCause=true → no fire
+      const recs489bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec489(i, {
+          clockDelta: i === 4 ? 5 : 0,
+          suspenseDelta: i === 3 ? 1 : 0,
+        }),
+      );
+      const res = await runC489(recs489bnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'CLOCK_PEAK_UNCAUSED'), 'CLOCK_PEAK_UNCAUSED should not fire');
+    });
+
+    it('SEED_AFTERMATH_CURIOSITY_VOID fires when avg curiosityDelta after seed scenes is ≤0', async () => {
+      // n=8; seed scenes at pos 0,2,4 (each with seededClueIds); pos 1,3,5 (aftermath) curiosityDelta=0
+      // avg=0 ≤ 0 → fire
+      const recs489c = Array.from({ length: 8 }, (_, i) =>
+        makeRec489(i, {
+          seededClueIds: [0, 2, 4].includes(i) ? ['clue-1'] : [],
+          curiosityDelta: 0,
+        }),
+      );
+      const res = await runC489(recs489c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'SEED_AFTERMATH_CURIOSITY_VOID'), 'SEED_AFTERMATH_CURIOSITY_VOID should fire');
+    });
+
+    it('SEED_AFTERMATH_CURIOSITY_VOID does not fire when at least one seed aftermath has positive curiosityDelta', async () => {
+      // Same but pos 1 (aftermath of seed at pos 0) has curiosityDelta=2 → avg > 0 → no fire
+      const recs489cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec489(i, {
+          seededClueIds: [0, 2, 4].includes(i) ? ['clue-1'] : [],
+          curiosityDelta: i === 1 ? 2 : 0,
+        }),
+      );
+      const res = await runC489(recs489cnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'SEED_AFTERMATH_CURIOSITY_VOID'), 'SEED_AFTERMATH_CURIOSITY_VOID should not fire');
+    });
+  });
+
   describe('Wave 475 — causalityPass: emotional zone cluster, seed temporal cluster, payoff zone cluster', async () => {
     const makeRec475 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
