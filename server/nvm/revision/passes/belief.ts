@@ -111,6 +111,18 @@
 // assertion absence — n≥8, ≥2 assertion scenes, ≥2 negative-emotion scenes, no assertion lands
 // in a negative-emotion scene; the negative-valence complement of TOLD_BELIEF_EMOTIONAL_FLATLINE
 // which fires when assertions are emotionally neutral; this fires when they are never in defeat).
+// Wave 502 additions: revelation seed decoupled (co-occurrence × revelation × seed — n≥8, ≥2
+// revelation scenes, ≥2 seed scenes, no scene carries both; disclosures and planted evidence
+// never coincide, the seed-channel complement of REVELATION_PAYOFF_DECOUPLED and distinct from
+// TOLD_BELIEF_SEED_DECOUPLED which checks assertion × seed), revelation curiosity aftermath void
+// (average/aggregate × revelation → curiosity aftermath — n≥8, ≥3 qualifying revelation scenes
+// [pos < n-1], avg curiosityDelta of immediately following scenes ≤ 0; revelations close the
+// epistemic field in the next beat, distinct from REVELATION_CURIOSITY_DECOUPLED which checks
+// curiosityDelta OF the revelation scene itself, and from ASSERTION_CURIOSITY_AFTERMATH_VOID
+// which uses assertion as trigger), assertion consecutive flood (run-based × assertion channel —
+// n≥8, ≥4 assertion scenes, longest consecutive run ≥ 3; claims pile up without processing
+// room, the run-based complement of ASSERTION_SINGLETON_RUN and the assertion-channel mirror
+// of REVELATION_CONSECUTIVE_FLOOD).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2317,6 +2329,132 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `The script has ${assertionScenes488c.length} assertion scenes and ${negScenes488c.length} scenes with negative emotional shifts, but no scene is both. Assertions never land in a moment of defeat, crisis, or loss — claims are voiced only when the story is emotionally neutral or positive. The most dramatically powerful assertions are made under adversity: a character insisting on a belief as the situation deteriorates, voicing a claim precisely as it is being disproven, or staking a position in a moment of despair. When assertions only arrive in calm or triumphant moments, the belief layer is sheltered from the story's harshest emotional tests.`,
           suggestedFix: `Place at least one assertion in a scene with a negative emotional shift — a character who clings to a belief as the situation deteriorates, who makes a claim in a moment of loss, or who declares a position precisely when the story appears to be refuting it. Assertions under adversity generate dramatic irony that assertions during calm cannot.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 502 checks ──────────────────────────────────────────────────────────
+
+  // REVELATION_SEED_DECOUPLED
+  // Co-occurrence × revelation × seed structural channel.
+  // A screenplay builds suspense by seeding clues that pay off as revelations.
+  // When revelations and seeds never share the same scene, the two channels are
+  // completely decoupled: revelations arrive without any planted groundwork, and
+  // seeds never crystallise into a visible surprise. The result is that either the
+  // revelations feel unmotivated (dropped from nowhere) or the seeded clues are
+  // never cashed (planted and forgotten). Either failure mode undermines the
+  // audience's investment in the mystery layer.
+  // Distinct from: PAYOFF_REVELATION_DECOUPLED (Wave 466: checks payoffSetupIds ×
+  // revelation co-occurrence, not seededClueIds; seeds are prospective — they point
+  // forward to future payoffs — while payoffSetupIds confirm a prior promise has
+  // landed; this rule targets the upstream planting step, not the downstream
+  // confirmation step), TOLD_BELIEF_RELATIONSHIP_DECOUPLED (co-occurrence failure in
+  // a different channel pair), and all revelation-timing / revelation-distribution
+  // checks which examine when revelations appear rather than what co-occurs with them.
+  {
+    const n502a = records.length;
+    if (n502a >= 8) {
+      const revScenes502a = (records as any[]).filter(
+        r => r.revelation !== null && r.revelation !== '' && r.revelation !== undefined,
+      );
+      const seedScenes502a = (records as any[]).filter(
+        r => ((r.seededClueIds ?? []) as any[]).length > 0,
+      );
+      if (revScenes502a.length >= 2 && seedScenes502a.length >= 2) {
+        const anyCoOccur502a = (records as any[]).some(
+          r =>
+            (r.revelation !== null && r.revelation !== '' && r.revelation !== undefined) &&
+            ((r.seededClueIds ?? []) as any[]).length > 0,
+        );
+        if (!anyCoOccur502a) {
+          issues.push({
+            location: `${revScenes502a.length} revelation scenes and ${seedScenes502a.length} seed scenes — zero overlap`,
+            rule: 'REVELATION_SEED_DECOUPLED',
+            severity: 'minor',
+            description: `The script has ${revScenes502a.length} revelation scenes and ${seedScenes502a.length} clue-seeding scenes, but no scene does both. Revelations and seeds are fully decoupled: the two mystery-layer channels never reinforce one another. Revelations feel unmotivated (the audience has not been primed in that moment), and seeds are planted in vacuums that never carry the charge of discovered truth. The most structurally dense mystery beats are scenes that simultaneously plant a new question and resolve a prior one — the reveal of one truth primes the audience to notice the next seed.`,
+            suggestedFix: `Write at least one scene that contains both a revelation and a seeded clue — for example, a scene in which a truth is unveiled that also introduces a fresh piece of evidence or a new mystery for the audience to track. This overlap creates a causal chain that gives the mystery layer momentum.`,
+          });
+        }
+      }
+    }
+  }
+
+  // REVELATION_CURIOSITY_AFTERMATH_VOID
+  // Average/aggregate × revelation → curiosity aftermath channel.
+  // A revelation is a high-information event: it resolves ambiguity and should
+  // consequently activate the audience's desire to understand what comes next. If
+  // the scene immediately following a revelation carries no positive curiosity delta
+  // on average, the script is failing to capitalise on the narrative energy the
+  // reveal generates. The audience is left with answered questions but no new
+  // questions raised — the mystery engine stalls rather than accelerating.
+  // Distinct from: all revelation-timing checks (they measure when revelations
+  // appear, not what follows them), REVELATION_SEED_DECOUPLED (co-occurrence within
+  // the revelation scene, not the scene after), PAYOFF_REVELATION_DECOUPLED (Wave
+  // 466: payoffSetupIds in the same scene as a revelation, not curiosity aftermath),
+  // CURIOSITY_SPIKE_ISOLATED (Wave 303: distribution of curiosity spikes overall,
+  // not conditioned on revelations), and any suspense-aftermath check (a different
+  // numerical channel).
+  {
+    const n502b = records.length;
+    if (n502b >= 8 && witnessedBeliefs.length >= 3) {
+      const qualRev502b = witnessedBeliefs
+        .map(w => ({ w, pos: (records as any[]).findIndex((r: any) => r.sceneIdx === w.sceneIdx) }))
+        .filter(({ pos }) => pos >= 0 && pos < n502b - 1);
+      if (qualRev502b.length >= 3) {
+        const total502b = qualRev502b.reduce(
+          (sum, { pos }) => sum + (((records as any[])[pos + 1] as any).curiosityDelta ?? 0),
+          0,
+        );
+        const avg502b = total502b / qualRev502b.length;
+        if (avg502b <= 0) {
+          issues.push({
+            location: `${qualRev502b.length} revelations examined — average curiosity aftermath ${avg502b.toFixed(2)}`,
+            rule: 'REVELATION_CURIOSITY_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `Across ${qualRev502b.length} revelations, the scene immediately following each has an average curiosity delta of ${avg502b.toFixed(2)} (≤ 0). Revelations should spark new questions: each truth unveiled ought to prime the audience to want to know what comes next. When post-revelation scenes consistently carry zero or negative curiosity, the story resolves mystery without restocking it — the audience is informed but not re-engaged, and the drive to keep watching diminishes.`,
+            suggestedFix: `After each revelation, ensure the next scene raises at least a small new question — a new detail that doesn't quite fit, a character reaction that needs explaining, or a consequence that opens a fresh unknown. Revelations are most powerful when they trade one form of uncertainty for another rather than simply closing a loop.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ASSERTION_CONSECUTIVE_FLOOD
+  // Run-based × assertion channel.
+  // A screenplay's belief layer is most effective when assertions are distributed
+  // across the narrative arc rather than massed in consecutive bursts. When three or
+  // more scenes in a row contain belief assertions, the sequence feels like a lecture
+  // or manifesto — the dramatic argument is stated repeatedly without intervening
+  // action, complication, or contradiction to test it. The flood also dilutes each
+  // individual assertion because the audience cannot process claims without the
+  // breathing room that plot movement provides.
+  // Distinct from: ASSERTION_NEGATIVE_DECOUPLED (Wave 488: co-occurrence of
+  // assertions with emotional negativity — a channel × valence check, not
+  // distribution), TOLD_BELIEF_SCENE_UNDERCOUNT (Wave 302: total count of assertion
+  // scenes is too low — the inverse scarcity problem), TOLD_BELIEF_FINAL_ACT_ABSENT
+  // (Wave 344: assertions missing from a zone, not a consecutive-run measurement),
+  // and all other distribution checks that use zone thirds rather than run length.
+  {
+    const n502c = records.length;
+    if (n502c >= 8 && toldBeliefs.length >= 4) {
+      const assertionSceneSet502c = new Set(toldBeliefs.map(t => t.sceneIdx));
+      let maxAssRun502c = 0;
+      let curAssRun502c = 0;
+      for (const r of records as any[]) {
+        if (assertionSceneSet502c.has(r.sceneIdx)) {
+          if (++curAssRun502c > maxAssRun502c) maxAssRun502c = curAssRun502c;
+        } else {
+          curAssRun502c = 0;
+        }
+      }
+      if (maxAssRun502c >= 3) {
+        issues.push({
+          location: `longest consecutive assertion run: ${maxAssRun502c} scenes`,
+          rule: 'ASSERTION_CONSECUTIVE_FLOOD',
+          severity: 'minor',
+          description: `The script contains a run of ${maxAssRun502c} consecutive scenes in which characters state beliefs. Assertion floods — three or more consecutive belief-statement scenes — read as lectures or manifestos: the dramatic argument is repeated without plot movement, complication, or contradiction to test it. Each assertion in the run competes with the others for attention, and the audience loses the ability to sit with any single claim before the next one arrives.`,
+          suggestedFix: `Break up consecutive assertion scenes with at least one intervening scene of plot action, complication, or quiet observation. Assertions are strongest when they are spaced apart so each has room to resonate — and when what happens between them appears to confirm, contradict, or complicate the claim just made.`,
         });
       }
     }

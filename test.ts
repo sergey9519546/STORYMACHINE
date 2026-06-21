@@ -31745,6 +31745,93 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 502 — beliefPass: revelation-seed decoupled, revelation curiosity aftermath void, assertion consecutive flood', async () => {
+    const makeRec502 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      seededClueIds: [], payoffSetupIds: [], revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], dramaticTurn: 'nothing',
+      purpose: 'development', unresolvedClues: [],
+      ...overrides,
+    });
+    const runB502 = async (records: any[]) => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('REVELATION_SEED_DECOUPLED fires when revelation and seed scenes never overlap', async () => {
+      // n=10; revelations at pos 2,6 (no seeds); seeds at pos 4,7 (no revelation)
+      // revScenes=2 >= 2, seedScenes=2 >= 2, anyCoOccur=false → fire
+      const recs502a = Array.from({ length: 10 }, (_, i) =>
+        makeRec502(i, {
+          revelation: [2, 6].includes(i) ? 'A truth is revealed.' : null,
+          seededClueIds: [4, 7].includes(i) ? ['clue-x'] : [],
+        }),
+      );
+      const res = await runB502(recs502a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'REVELATION_SEED_DECOUPLED'), 'REVELATION_SEED_DECOUPLED should fire');
+    });
+
+    it('REVELATION_SEED_DECOUPLED does not fire when a revelation and seed co-occur in the same scene', async () => {
+      // n=10; scene 4 has both revelation and seededClueIds → anyCoOccur=true → no fire
+      const recs502anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec502(i, {
+          revelation: [2, 4, 6].includes(i) ? 'Truth surfaces.' : null,
+          seededClueIds: [4, 7].includes(i) ? ['clue-A'] : [],
+        }),
+      );
+      const res = await runB502(recs502anr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'REVELATION_SEED_DECOUPLED'), 'REVELATION_SEED_DECOUPLED should not fire');
+    });
+
+    it('REVELATION_CURIOSITY_AFTERMATH_VOID fires when post-revelation curiosity average is <= 0', async () => {
+      // n=10; revelations at pos 1,3,5; next scenes (2,4,6) all curiosityDelta=0 → avg=0 <= 0 → fire
+      const recs502b = Array.from({ length: 10 }, (_, i) =>
+        makeRec502(i, {
+          revelation: [1, 3, 5].includes(i) ? 'A secret comes out.' : null,
+          curiosityDelta: 0,
+        }),
+      );
+      const res = await runB502(recs502b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'REVELATION_CURIOSITY_AFTERMATH_VOID'), 'REVELATION_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('REVELATION_CURIOSITY_AFTERMATH_VOID does not fire when post-revelation curiosity average is > 0', async () => {
+      // n=10; revelations at pos 1,3,5; scene 2 has curiosityDelta=3 (others 0) → avg=1 > 0 → no fire
+      const recs502bnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec502(i, {
+          revelation: [1, 3, 5].includes(i) ? 'Hidden truth.' : null,
+          curiosityDelta: i === 2 ? 3 : 0,
+        }),
+      );
+      const res = await runB502(recs502bnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'REVELATION_CURIOSITY_AFTERMATH_VOID'), 'REVELATION_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('ASSERTION_CONSECUTIVE_FLOOD fires when three or more consecutive assertion scenes exist', async () => {
+      // n=10; assertions (dialogueHighlights) at pos 2,3,4,7 → run of 3 at 2-4, maxRun=3 >= 3 → fire
+      const recs502c = Array.from({ length: 10 }, (_, i) =>
+        makeRec502(i, {
+          dialogueHighlights: [2, 3, 4, 7].includes(i) ? ['HERO: Truth is inescapable.'] : [],
+        }),
+      );
+      const res = await runB502(recs502c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'ASSERTION_CONSECUTIVE_FLOOD'), 'ASSERTION_CONSECUTIVE_FLOOD should fire');
+    });
+
+    it('ASSERTION_CONSECUTIVE_FLOOD does not fire when assertion scenes are all separated', async () => {
+      // n=10; assertions at pos 2,4,6,8 → each isolated, maxRun=1 < 3 → no fire
+      const recs502cnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec502(i, {
+          dialogueHighlights: [2, 4, 6, 8].includes(i) ? ['HERO: Beliefs matter.'] : [],
+        }),
+      );
+      const res = await runB502(recs502cnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'ASSERTION_CONSECUTIVE_FLOOD'), 'ASSERTION_CONSECUTIVE_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 488 — beliefPass: revelation temporal cluster, revelation relationship peak absent, assertion negative decoupled', async () => {
     const makeRec488 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
