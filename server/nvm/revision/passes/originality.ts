@@ -89,6 +89,16 @@
 // (≥3 consecutive action lines ending with "..." — a run of trailing-off stage directions;
 // run-based × action prose × ellipsis, distinct from ELLIPSIS_ACTION_OVERUSE which measures
 // proportion not consecutive run length).
+// Wave 480 additions: dialogue filler run (≥3 consecutive dialogue speeches each opening with
+// a verbal hedge like "Well," or "Look," — filler bunched into an unbroken sequence rather
+// than scattered; run-based × dialogue × filler opener, consecutive-run variant of
+// DIALOGUE_FILLER_OPENER which counts total not runs), action average line brevity (≥8 action
+// lines averaging ≤4 words each — the prose layer is collectively telegraphic shorthand with
+// no image construction; average/aggregate × action prose × word length, first average/aggregate
+// check in originality.ts), action peak paragraph (≥4 action paragraphs, peak ≥5× average and
+// ≥40 words — one sprawling over-written set piece surrounded by sparse prose; single-peak
+// isolation × action prose × paragraph length, first single-peak isolation check in
+// originality.ts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2445,6 +2455,158 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         description: `A run of ${maxEllipsisRun466c} consecutive action lines each end with "..." — stage directions that trail off without completing the image, in an unbroken sequence. A single ellipsis in action prose can signal a withheld detail or a deliberate mystery; a run of three or more consecutive incomplete lines signals the writer cannot commit to the image, and the action prose fragments into a series of impressions. The screenplay camera cannot cut to a trailing off — it records specific things in specific arrangements. Consecutive incomplete action lines produce a reading experience of mood without substance: the scene gestures but never arrives.`,
         suggestedFix: 'Complete the trailing action lines: decide what the camera actually shows — the specific object, the precise expression, the exact movement — and write that instead of the ellipsis. If the incompletion is intentional (a deliberately withheld image), use one ellipsis where the mystery is greatest and complete the rest. Three or more consecutive trailing-off action lines in a row indicates that the scene has not yet been written — only its outline, written in gestures.',
       });
+    }
+  }
+
+  // ── Wave 480: DIALOGUE_FILLER_RUN, ACTION_AVERAGE_LINE_BREVITY, ACTION_PEAK_PARAGRAPH ──
+
+  // DIALOGUE_FILLER_RUN (run-based × dialogue × filler opener, ≥5 dialogue speeches,
+  // maxConsecutiveRun ≥ 3): Three or more consecutive dialogue speeches each open with a verbal
+  // hedge — "Well,", "Look,", "Listen,", "Actually,", etc. — creating an unbroken chain of
+  // throat-clearing before meaning arrives. Where DIALOGUE_FILLER_OPENER (Wave 452) detects
+  // four or more filler-openers anywhere across the script, this run check fires even when
+  // the total count is low if the fillers are bunched: three hedges in a row have a much
+  // stronger rhythmic numbing effect than three spread across eighty pages. A run of filler
+  // openers in consecutive speeches signals a scene or exchange where characters are
+  // perpetually stalling — each speech begins by signaling uncertainty rather than charging
+  // in. Run-based mode × dialogue layer × filler-opener pattern. Distinct from DIALOGUE_
+  // FILLER_OPENER (Wave 452: total count ≥ 4, not consecutive), DIALOGUE_ELLIPSIS_FLOOD
+  // (Wave 452: trailing-off punctuation, not opening word), ELLIPSIS_RUN_ACTION (Wave 466:
+  // run of action ellipses, not dialogue openers).
+  {
+    const fillerRe480a = /^(well[,\s]|look[,\s!]|listen[,\s]|actually[,\s]|honestly[,\s]|basically[,\s]|i mean[,\s]|you know[,\s]|anyway[,\s]|whatever[,\s]|seriously[,\s])/i;
+    let inDlg480a = false;
+    let isFirstDlgLine480a = false;
+    let totalSpeeches480a = 0;
+    let curFillerRun480a = 0;
+    let maxFillerRun480a = 0;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg480a = false; isFirstDlgLine480a = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg480a = false; isFirstDlgLine480a = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) {
+        inDlg480a = true; isFirstDlgLine480a = true; totalSpeeches480a++;
+        continue;
+      }
+      if (t.startsWith('(')) continue;
+      if (!inDlg480a) continue;
+      if (isFirstDlgLine480a) {
+        if (fillerRe480a.test(t)) {
+          curFillerRun480a++;
+          if (curFillerRun480a > maxFillerRun480a) maxFillerRun480a = curFillerRun480a;
+        } else {
+          curFillerRun480a = 0;
+        }
+        isFirstDlgLine480a = false;
+      }
+    }
+    if (totalSpeeches480a >= 5 && maxFillerRun480a >= 3) {
+      issues.push({
+        location: `${maxFillerRun480a} consecutive speech(es) open with a verbal filler`,
+        rule: 'DIALOGUE_FILLER_RUN',
+        severity: 'minor',
+        description: `${maxFillerRun480a} consecutive dialogue speeches each open with a verbal hedge — "Well,", "Look,", "Listen,", "Actually,", or similar — stacking hesitation into an unbroken chain. Where one or two scattered filler openers read as character voice, a run of three or more in succession creates a rhythm of perpetual stalling: each speech signals uncertainty before it delivers meaning, and the cumulative effect is an exchange where no character begins with conviction. Readers feel the momentum drain from the scene with each new hedge, before a single word of actual content has been spoken.`,
+        suggestedFix: 'Break the run by having at least one speaker in the sequence lead with their actual first meaningful word: "Well, I think we should leave" becomes "We should leave." A character who charges in without a hedge contrasts sharply with one who hedges, so breaking even one link in the chain varies the rhythm and restores dramatic momentum to the exchange.',
+      });
+    }
+  }
+
+  // ACTION_AVERAGE_LINE_BREVITY (average/aggregate × action prose × word count, ≥8 action
+  // lines, avg ≤ 4 words per line): The action prose layer is collectively telegraphic — the
+  // average action line is four words or fewer. A screenplay's action prose is the visual
+  // fabric of the film: specific objects in specific arrangements, movements through describable
+  // space, physical details that make a director's and actor's imagination land on the same
+  // concrete image. When action lines average four words or fewer across the whole script, the
+  // prose has reduced to shorthand notation rather than image construction — the direction is
+  // present but the scene is not. An average of ≤4 words signals that the visual layer has not
+  // been written, only gestured at. Average/aggregate mode × action prose layer × word-count
+  // dimension. Distinct from REACTION_SHOT_OVERUSE (Wave 163: proportion of ≤5-word terse
+  // reaction shots — a subset of short lines, not the global average), ELLIPSIS_ACTION_OVERUSE
+  // (Wave 424: proportion of trailing-off lines — punctuation mark, not length), ACTION_PRONOUN_
+  // OPENER_FLOOD (Wave 466: how paragraphs begin, not their length): this is the first check
+  // on the aggregate word-count density of the action prose layer.
+  {
+    let actionLineCount480b = 0;
+    let actionWordTotal480b = 0;
+    let inDlg480b = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg480b = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg480b = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg480b = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (inDlg480b) continue;
+      actionLineCount480b++;
+      actionWordTotal480b += t.split(/\s+/).filter(Boolean).length;
+    }
+    if (actionLineCount480b >= 8) {
+      const avgActionWords480b = actionWordTotal480b / actionLineCount480b;
+      if (avgActionWords480b <= 4) {
+        issues.push({
+          location: `Action prose — avg ${avgActionWords480b.toFixed(1)} words/line across ${actionLineCount480b} lines`,
+          rule: 'ACTION_AVERAGE_LINE_BREVITY',
+          severity: 'minor',
+          description: `The ${actionLineCount480b} action lines average ${avgActionWords480b.toFixed(1)} words each — the visual prose layer has been reduced to telegraphic shorthand. A screenplay's action description is the only place where the visual world is actually constructed: specific objects in specific arrangements, physical details that make a director's imagination land on the same concrete image as the writer's. At four words per line or fewer, the action layer is present only as notation — "She sits.", "He runs.", "Door closes." — not as scene. An audience's imagination cannot populate blank space; the director cannot construct what has not been written.`,
+          suggestedFix: 'Expand at least a third of the action lines to full sentences that complete the image: instead of "She sits." try "She drops into the chair as if her legs gave out." The additional words should not be adverbs — they should be specific physical or environmental details that tell the camera where to look and the actor what their body is doing. A line that averages five or more words signals that the writer has chosen to write scenes, not just outline them.',
+        });
+      }
+    }
+  }
+
+  // ACTION_PEAK_PARAGRAPH (single-peak isolation × action prose × paragraph length, ≥4 action
+  // paragraphs, peak word count ≥ 5× average and ≥ 40 words): One action paragraph is
+  // dramatically longer than all the others — a single sprawling over-written set piece
+  // surrounded by otherwise sparse prose. When one paragraph dwarfs the rest by a factor of
+  // five or more, the script's visual register is wildly inconsistent: the reader speeds
+  // through quick cuts and notation, then encounters a wall of prose — a tonal jolt that reads
+  // as either a showpiece the writer loved and couldn't cut, or a passage written at a different
+  // time in a different style. The single long paragraph also suffers from being read at a
+  // different pace than the story warrants, since the script's default reading rhythm is the
+  // short block. Single-peak isolation mode × action prose layer × paragraph word-count
+  // magnitude. Distinct from ACTION_AVERAGE_LINE_BREVITY (Wave 480a: overall brevity — this
+  // checks for an isolated outlier peak, not global average), ELLIPSIS_ACTION_OVERUSE (Wave 424:
+  // trailing punctuation, not length), REACTION_SHOT_OVERUSE (Wave 163: terse-shot proportion):
+  // this is the first single-peak isolation check in originality.ts.
+  {
+    const paragraphWords480c: number[] = [];
+    let curParaWords480c = 0;
+    let prevWasBlank480c = true;
+    let inDlg480c = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) {
+        if (curParaWords480c > 0) { paragraphWords480c.push(curParaWords480c); curParaWords480c = 0; }
+        prevWasBlank480c = true; inDlg480c = false; continue;
+      }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) {
+        if (curParaWords480c > 0) { paragraphWords480c.push(curParaWords480c); curParaWords480c = 0; }
+        prevWasBlank480c = false; inDlg480c = false; continue;
+      }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) {
+        if (curParaWords480c > 0) { paragraphWords480c.push(curParaWords480c); curParaWords480c = 0; }
+        inDlg480c = true; prevWasBlank480c = false; continue;
+      }
+      if (t.startsWith('(')) { prevWasBlank480c = false; continue; }
+      if (inDlg480c) { prevWasBlank480c = false; continue; }
+      curParaWords480c += t.split(/\s+/).filter(Boolean).length;
+      prevWasBlank480c = false;
+    }
+    if (curParaWords480c > 0) paragraphWords480c.push(curParaWords480c);
+    if (paragraphWords480c.length >= 4) {
+      const peakWords480c = Math.max(...paragraphWords480c);
+      // Compare peak against the average of all OTHER paragraphs (excluding the peak itself)
+      // so the outlier doesn't inflate the baseline it is measured against.
+      const othersSum480c = paragraphWords480c.reduce((s, n) => s + n, 0) - peakWords480c;
+      const othersAvg480c = othersSum480c / (paragraphWords480c.length - 1);
+      if (peakWords480c >= 40 && othersAvg480c > 0 && peakWords480c / othersAvg480c >= 5) {
+        issues.push({
+          location: `Action paragraphs — peak ${peakWords480c} words vs rest avg ${othersAvg480c.toFixed(1)} words (${(peakWords480c / othersAvg480c).toFixed(1)}× outlier)`,
+          rule: 'ACTION_PEAK_PARAGRAPH',
+          severity: 'minor',
+          description: `One action paragraph runs to ${peakWords480c} words — ${(peakWords480c / othersAvg480c).toFixed(1)}× the average of ${othersAvg480c.toFixed(1)} words for all other action paragraphs. The prose layer's visual register is wildly inconsistent: the reader speeds through notation and brief cuts, then encounters a single sprawling description that reads at a different tempo and in a different register from the surrounding pages. A single outlier this large signals either a showpiece the writer couldn't trim or a passage written at a different time in a different mode — neither serves the unified reading experience a produced script requires.`,
+          suggestedFix: 'Break the long paragraph into smaller beats with visual cuts between them, or trim back to the three or four essential images and trust the director to fill the rest. A paragraph should rarely exceed 50 words in a produced screenplay; six to twelve words per line, with a blank line between beats, matches the reading rhythm the rest of the script has established. If the passage is a showpiece chase or action set piece, apply the same economy — specific images in short blocks — rather than novelistic prose.',
+        });
+      }
     }
   }
 

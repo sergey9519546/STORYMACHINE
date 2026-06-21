@@ -21921,6 +21921,161 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 480 — originalityPass: dialogue filler run, action average line brevity, action peak paragraph', async () => {
+    const runO480 = async (fountain: string) => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      return originalityPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DIALOGUE_FILLER_RUN fires when 3 or more consecutive speeches open with filler words', async () => {
+      // 6 speeches: first 3 open with filler (Well / Look / Listen) — run of 3 → fires
+      const f480a = `INT. OFFICE - DAY
+
+ANNA
+Well, I think we should go.
+
+MARK
+Look, that's not the plan.
+
+ANNA
+Listen, I know what you want.
+
+MARK
+Let's just decide.
+
+ANNA
+Fine.
+
+MARK
+Agreed.
+`;
+      const res = await runO480(f480a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_FILLER_RUN'), 'DIALOGUE_FILLER_RUN should fire');
+    });
+
+    it('DIALOGUE_FILLER_RUN does not fire when filler speeches are not consecutive', async () => {
+      // 6 speeches: fillers at speeches 1, 3, 5 — none consecutive → no fire
+      const f480anr = `INT. OFFICE - DAY
+
+ANNA
+Well, I think we should go.
+
+MARK
+That's not the plan.
+
+ANNA
+Look, I know what you want.
+
+MARK
+Let's just decide.
+
+ANNA
+Actually, fine.
+
+MARK
+Agreed.
+`;
+      const res = await runO480(f480anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_FILLER_RUN'), 'DIALOGUE_FILLER_RUN should not fire');
+    });
+
+    it('ACTION_AVERAGE_LINE_BREVITY fires when action lines average 4 words or fewer', async () => {
+      // 10 action lines all ≤4 words → avg ≤ 4 → fires
+      const f480b = `INT. ROOM - DAY
+
+She sits.
+
+He waits.
+
+Door opens.
+
+Light shifts.
+
+Clock ticks.
+
+Rain starts.
+
+Wind howls.
+
+Floor creaks.
+
+Glass breaks.
+
+Steps stop.
+`;
+      const res = await runO480(f480b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_AVERAGE_LINE_BREVITY'), 'ACTION_AVERAGE_LINE_BREVITY should fire');
+    });
+
+    it('ACTION_AVERAGE_LINE_BREVITY does not fire when action lines average more than 4 words', async () => {
+      // 8 action lines, each 7-10 words → avg > 4 → no fire
+      const f480bnr = `INT. ROOM - DAY
+
+She crosses slowly to the rain-streaked window.
+
+He leans against the doorframe and watches her.
+
+The clock on the wall reads half past midnight.
+
+Papers fan across the desk in the cold breeze.
+
+A coffee mug sits cooling beside the keyboard.
+
+Light from the street cuts long shadows on the floor.
+
+She picks up the phone and sets it back down.
+
+He finally steps inside and closes the door behind him.
+`;
+      const res = await runO480(f480bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_AVERAGE_LINE_BREVITY'), 'ACTION_AVERAGE_LINE_BREVITY should not fire');
+    });
+
+    it('ACTION_PEAK_PARAGRAPH fires when one action paragraph is 5x the average length and 40+ words', async () => {
+      // 4 action paragraphs: 3 short (3-4 words each) and 1 very long (50 words) → peak/avg >> 5 → fires
+      const f480c = `INT. ROOM - DAY
+
+She sits.
+
+INT. OFFICE - DAY
+
+He waits.
+
+INT. HALLWAY - DAY
+
+Door opens.
+
+INT. ROOFTOP - NIGHT
+
+The city sprawls below her in every direction — ten thousand lights blinking in the wet dark, traffic threading through canyons of glass and steel, a distant siren climbing and falling, the whole enormous machinery of the place grinding on without noticing that she is standing here at its edge, holding the envelope, trying to decide whether to open it or let the wind take it.
+`;
+      const res = await runO480(f480c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_PEAK_PARAGRAPH'), 'ACTION_PEAK_PARAGRAPH should fire');
+    });
+
+    it('ACTION_PEAK_PARAGRAPH does not fire when action paragraphs are similar in length', async () => {
+      // 4 action paragraphs all similar length (10-15 words each) → no outlier → no fire
+      const f480cnr = `INT. ROOM - DAY
+
+She crosses to the window and looks out at the rain-wet street below.
+
+INT. OFFICE - DAY
+
+He leans back in his chair and stares at the ceiling tiles above him.
+
+INT. HALLWAY - DAY
+
+The door at the end swings open and a figure steps through the frame.
+
+INT. ROOFTOP - NIGHT
+
+Stars are barely visible through the low cloud cover hanging over the city tonight.
+`;
+      const res = await runO480(f480cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_PEAK_PARAGRAPH'), 'ACTION_PEAK_PARAGRAPH should not fire');
+    });
+  });
+
   describe('Wave 466 — originalityPass: action pronoun opener flood, dialogue question flood, ellipsis run action', async () => {
     const runO466 = async (fountain: string) => {
       const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
