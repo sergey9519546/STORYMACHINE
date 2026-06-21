@@ -123,6 +123,16 @@
 // n≥8, ≥4 assertion scenes, longest consecutive run ≥ 3; claims pile up without processing
 // room, the run-based complement of ASSERTION_SINGLETON_RUN and the assertion-channel mirror
 // of REVELATION_CONSECUTIVE_FLOOD).
+// Wave 530 additions: assertion positive decoupled (co-occurrence × positive emotion × assertion —
+// n≥8, ≥2 assertion scenes, ≥2 positive-emotion scenes, no assertion scene has emotionalShift=
+// 'positive'; the positive-valence complement of ASSERTION_NEGATIVE_DECOUPLED, completing the
+// valence × assertion co-occurrence pair), positive scene revelation void (co-occurrence × positive
+// emotion × revelation absence — n≥8, ≥2 revelation scenes, ≥2 positive-emotion scenes, no positive-
+// emotion scene carries a revelation; the positive-valence sibling of NEGATIVE_SCENE_REVELATION_VOID
+// completing the valence × revelation co-occurrence pair), assertion turn aftermath void (sequence/
+// aftermath × dramatic turn × assertion trigger — n≥8, ≥2 qualifying assertion scenes [pos < n-2],
+// ≥2 turn scenes, no assertion followed by a dramatic turn in next 2 scenes; distinct from TOLD_
+// BELIEF_DRAMATIC_TURN_DECOUPLED which checks co-occurrence in the same scene).
 // Wave 516 additions: revelation relationship aftermath void (sequence/aftermath × revelation →
 // relationship-shift aftermath — n≥8, ≥2 qualifying revelation scenes not at last position, ≥2
 // relationship-shift scenes exist globally, none of the scenes immediately following a revelation
@@ -2600,6 +2610,125 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
             suggestedFix: `After at least one revelation, let the next scene plant a new seed — a detail, object, or moment of behavior that the audience will want to understand. The scene immediately after a disclosure is the most receptive to a new mystery seed: the audience's curiosity has just been satisfied and is now hungry again. A revelation without a following seed treats closure as the end of the mystery rather than the beginning of the next layer.`,
           });
         }
+      }
+    }
+  }
+
+  // ── Wave 530: ASSERTION_POSITIVE_DECOUPLED, POSITIVE_SCENE_REVELATION_VOID, ASSERTION_TURN_AFTERMATH_VOID ──
+
+  // ASSERTION_POSITIVE_DECOUPLED (co-occurrence × positive emotion × assertion, n≥8,
+  // ≥2 assertion scenes, ≥2 positive-emotion scenes, no assertion scene has emotionalShift=
+  // 'positive'): The story has ≥2 scenes where a character asserts a belief and ≥2 scenes
+  // with positive emotional charge, but no scene is both. Assertions never land in a moment
+  // of triumph, joy, or hope — claims are voiced only in neutral or negative emotional
+  // registers. The most powerfully dramatic assertions are sometimes made precisely at a
+  // moment of victory — a character whose belief is confirmed by success, who declares their
+  // position as the universe appears to agree, or who makes a claim in a rare moment of
+  // genuine confidence. When assertions are systematically absent from the story's positive
+  // emotional moments, the belief layer is quarantined from the narrative's joyful register.
+  // Co-occurrence/decoupling mode × positive-valence × assertion channel. Distinct from
+  // ASSERTION_NEGATIVE_DECOUPLED (Wave 488: the negative-valence complement — this checks
+  // the positive register), TOLD_BELIEF_EMOTIONAL_FLATLINE (Wave 334: all assertion scenes
+  // are emotionally neutral — fires when assertions have no charge at all; this fires
+  // specifically when the charge exists but is always negative or neutral, never positive),
+  // POSITIVE_SCENE_REVELATION_VOID (below: same valence channel but revelation signal, not
+  // assertion).
+  if (records.length >= 8) {
+    const assertionSceneSet530a = new Set(toldBeliefs.map(t => t.sceneIdx));
+    const assertionScenes530a = (records as any[]).filter(r => assertionSceneSet530a.has(r.sceneIdx));
+    const posScenes530a = (records as any[]).filter(r => r.emotionalShift === 'positive');
+    if (assertionScenes530a.length >= 2 && posScenes530a.length >= 2) {
+      const anyPosAssertion530a = assertionScenes530a.some(r => r.emotionalShift === 'positive');
+      if (!anyPosAssertion530a) {
+        issues.push({
+          location: `${assertionScenes530a.length} assertion scene(s) — none coincides with a positive emotional shift`,
+          rule: 'ASSERTION_POSITIVE_DECOUPLED',
+          severity: 'minor',
+          description: `The script has ${assertionScenes530a.length} assertion scenes and ${posScenes530a.length} scenes with positive emotional shifts, but no scene is both. Assertions never land in a moment of triumph, confidence, or hope — claims are voiced only when the story is emotionally neutral or negative. The dramatically powerful assertion made from a position of genuine conviction — a character declaring their belief precisely as the universe appears to confirm it, or staking a claim in a rare moment of joy — is absent. When assertions are systematically quarantined from the story's positive emotional moments, the belief layer can only speak in tones of doubt, defeat, or neutrality.`,
+          suggestedFix: `Place at least one assertion in a scene with positive emotional charge — a character who declares their belief in a moment of triumph or hope, who makes a claim because circumstances are briefly in their favor, or who states their position from a moment of genuine confidence rather than from crisis or neutrality. An assertion made from a positive register has a different dramatic weight: it can later be undone by the story, creating a fall that is all the more powerful because the character spoke from a moment of certainty.`,
+        });
+      }
+    }
+  }
+
+  // POSITIVE_SCENE_REVELATION_VOID (co-occurrence × positive emotion × revelation absence,
+  // n≥8, ≥2 revelation scenes, ≥2 positive-emotion scenes, no positive-emotion scene
+  // carries a revelation): Every revelation lands in a neutral or negative emotional scene
+  // while positive-emotion scenes carry no disclosure. Revelations that only arrive in
+  // moments of failure or neutrality tell the audience that learning the truth is always
+  // costly or flatly delivered — the discovery register is systematically negative or
+  // blank. A revelation in a positive-emotion scene creates a particular dramatic texture:
+  // a truth that arrives at a moment of joy, a disclosure that the character receives as
+  // good news, or a discovery that briefly appears to confirm a hope before being recontextualized.
+  // The permanent absence of this pairing drains the revelation register of tonal variety.
+  // Co-occurrence/decoupling mode × positive-valence × revelation channel. Distinct from
+  // NEGATIVE_SCENE_REVELATION_VOID (Wave 446: no revelation in negative scenes — the negative
+  // side; this is the positive-valence complement), REVELATION_DRAMA_VACUUM (Wave 281: all
+  // revelation scenes are emotionally flat — different population: the revelation scenes
+  // themselves are neutral; this fires when positive-emotion scenes contain no revelation —
+  // the positive-emotion scenes are disclosure-free), ASSERTION_POSITIVE_DECOUPLED (above:
+  // same valence channel but assertion signal, not revelation).
+  if (records.length >= 8) {
+    const revScenes530b = (records as any[]).filter(r =>
+      r.revelation !== null && r.revelation !== undefined && r.revelation !== '',
+    );
+    const posScenes530b = (records as any[]).filter(r => r.emotionalShift === 'positive');
+    if (revScenes530b.length >= 2 && posScenes530b.length >= 2) {
+      const anyPosRev530b = posScenes530b.some(r =>
+        r.revelation !== null && r.revelation !== undefined && r.revelation !== '',
+      );
+      if (!anyPosRev530b) {
+        issues.push({
+          location: `${posScenes530b.length} positive-emotion scene(s) — none carries a revelation`,
+          rule: 'POSITIVE_SCENE_REVELATION_VOID',
+          severity: 'minor',
+          description: `The script has ${revScenes530b.length} revelation scenes and ${posScenes530b.length} scenes with positive emotional shifts, but no scene is both. Every disclosure arrives in a neutral or negative emotional context — learning the truth is always presented as flat or costly. Revelations that only land in negative or neutral scenes train the audience to associate disclosure with failure, which narrows the story's tonal range and prevents the particular dramatic texture of a positive revelation: the truth that arrives as welcome news, the discovery that briefly confirms a hope, or the disclosure that gives a character a moment of genuine elation before recontextualization strips it away.`,
+          suggestedFix: `Give at least one revelation to a scene with positive emotional charge — a disclosure that the character receives as joyful news, a truth that emerges in a moment of triumph, or a revelation that arrives alongside a genuine win. The subsequent dramatic movement (where the revelation is complicated or reversed) is all the more powerful when the revelation itself was received with hope.`,
+        });
+      }
+    }
+  }
+
+  // ASSERTION_TURN_AFTERMATH_VOID (sequence/aftermath × dramatic turn × assertion trigger,
+  // n≥8, ≥2 qualifying assertion scenes [pos < n-2], ≥2 turn scenes globally, no qualifying
+  // assertion followed by a dramatic turn in the next 2 scenes): Every scene where a character
+  // asserts a belief passes without the story pivoting in the next two scenes — claims never
+  // trigger reversals in their wake. An assertion at its most dramatic is a provocation: a
+  // character stakes a position, and the story responds by immediately challenging or reversing
+  // it. When no assertion is followed within two scenes by a dramatic turn, the belief layer
+  // and the plot's reversal engine operate in structural isolation — declarations go unanswered
+  // by the narrative. Sequence/aftermath mode × dramatic-turn aftermath × assertion trigger.
+  // Distinct from TOLD_BELIEF_DRAMATIC_TURN_DECOUPLED (Wave 348: co-occurrence — turn and
+  // assertion never IN THE SAME scene; this checks whether a turn follows within 2 scenes —
+  // aftermath direction, one temporal step later), ASSERTION_AFTERMATH_VOID (Wave 418:
+  // assertion → no revelation/relationship/suspense in 2 scenes — different aftermath signals),
+  // ASSERTION_CAUSAL_VACUUM (Wave 460: backward-cause — nothing precedes assertion; this checks
+  // what FOLLOWS an assertion — opposite temporal direction).
+  if (records.length >= 8) {
+    const assertionIdxs530c = [...new Set(toldBeliefs.map(t => t.sceneIdx))];
+    const turnScenes530c = (records as any[]).filter(r =>
+      (r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '',
+    );
+    const qualAssertionPositions530c = assertionIdxs530c
+      .map(idx => (records as any[]).findIndex(r => r.sceneIdx === idx))
+      .filter(pos => pos >= 0 && pos < records.length - 2);
+    if (qualAssertionPositions530c.length >= 2 && turnScenes530c.length >= 2) {
+      const anyAssertionFollowedByTurn530c = qualAssertionPositions530c.some(pos => {
+        const next1 = (records as any[])[pos + 1];
+        const next2 = (records as any[])[pos + 2];
+        return (
+          (next1 && (next1.dramaticTurn ?? 'nothing') !== 'nothing' && next1.dramaticTurn !== '') ||
+          (next2 && (next2.dramaticTurn ?? 'nothing') !== 'nothing' && next2.dramaticTurn !== '')
+        );
+      });
+      if (!anyAssertionFollowedByTurn530c) {
+        issues.push({
+          location: `${qualAssertionPositions530c.length} assertion scene(s) — none followed by a dramatic turn within 2 scenes`,
+          rule: 'ASSERTION_TURN_AFTERMATH_VOID',
+          severity: 'minor',
+          description: `None of the story's ${qualAssertionPositions530c.length} assertion scenes is followed by a dramatic turn (reversal or pivot) within the next two scenes, even though ${turnScenes530c.length} turns exist elsewhere. An assertion at its most powerful is a provocation: a character stakes a position, and the narrative responds by immediately reversing circumstances, forcing the declared belief to be confronted. When no assertion triggers a turn in its wake, the belief layer and the story's reversal engine operate in permanent structural isolation — characters declare positions that the plot ignores rather than answers, and turns arrive without a character's stated belief to challenge.`,
+          suggestedFix: `After at least one assertion, place a dramatic turn within two scenes — a reversal that either validates or challenges the declared belief. The most powerful structure is: character asserts ("this will work"), then the story pivots ("or does it?"), forcing the character to either maintain or abandon their position in light of what just changed. This turn-as-response makes the assertion a dramatic stake rather than an exposition delivery.`,
+        });
       }
     }
   }

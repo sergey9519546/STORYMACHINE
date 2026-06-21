@@ -33906,6 +33906,95 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 530 — beliefPass: assertion positive decoupled, positive scene revelation void, assertion turn aftermath void', async () => {
+    const makeRec530 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      seededClueIds: [], payoffSetupIds: [], revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], dramaticTurn: 'nothing',
+      purpose: 'development', unresolvedClues: [],
+      ...overrides,
+    });
+    const runB530 = async (records: any[]) => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // ASSERTION_POSITIVE_DECOUPLED fire: n=10; assertions (dialogueHighlights) at 1,4;
+    // positive emotion at 6,8; no overlap → fires
+    it('ASSERTION_POSITIVE_DECOUPLED fires when assertion scenes and positive-emotion scenes never coincide', async () => {
+      const recs530a = Array.from({ length: 10 }, (_, i) =>
+        makeRec530(i, {
+          dialogueHighlights: [1, 4].includes(i) ? ['ALICE: The truth matters.'] : [],
+          emotionalShift: [6, 8].includes(i) ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runB530(recs530a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ASSERTION_POSITIVE_DECOUPLED'), 'ASSERTION_POSITIVE_DECOUPLED should fire');
+    });
+
+    // ASSERTION_POSITIVE_DECOUPLED no-fire: assertion at 4, positive emotion also at 4 → overlap → no fire
+    it('ASSERTION_POSITIVE_DECOUPLED does not fire when at least one assertion scene is also positively emotional', async () => {
+      const recs530anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec530(i, {
+          dialogueHighlights: [1, 4].includes(i) ? ['ALICE: The truth matters.'] : [],
+          emotionalShift: [4, 8].includes(i) ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runB530(recs530anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ASSERTION_POSITIVE_DECOUPLED'), 'ASSERTION_POSITIVE_DECOUPLED should not fire');
+    });
+
+    // POSITIVE_SCENE_REVELATION_VOID fire: n=10; revelations at 2,5; positive emotion at 7,9; no overlap → fires
+    it('POSITIVE_SCENE_REVELATION_VOID fires when no positive-emotion scene carries a revelation', async () => {
+      const recs530b = Array.from({ length: 10 }, (_, i) =>
+        makeRec530(i, {
+          revelation: [2, 5].includes(i) ? 'Secret revealed.' : null,
+          emotionalShift: [7, 9].includes(i) ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runB530(recs530b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'POSITIVE_SCENE_REVELATION_VOID'), 'POSITIVE_SCENE_REVELATION_VOID should fire');
+    });
+
+    // POSITIVE_SCENE_REVELATION_VOID no-fire: positive scene at 5 has revelation → overlap → no fire
+    it('POSITIVE_SCENE_REVELATION_VOID does not fire when at least one positive-emotion scene has a revelation', async () => {
+      const recs530bnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec530(i, {
+          revelation: [2, 5].includes(i) ? 'Secret revealed.' : null,
+          emotionalShift: [5, 9].includes(i) ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runB530(recs530bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'POSITIVE_SCENE_REVELATION_VOID'), 'POSITIVE_SCENE_REVELATION_VOID should not fire');
+    });
+
+    // ASSERTION_TURN_AFTERMATH_VOID fire: n=10; assertions at 0,2; turns at 6,8 (>2 scenes away from any assertion) → fires
+    it('ASSERTION_TURN_AFTERMATH_VOID fires when no assertion is followed by a dramatic turn within 2 scenes', async () => {
+      const recs530c = Array.from({ length: 10 }, (_, i) =>
+        makeRec530(i, {
+          dialogueHighlights: [0, 2].includes(i) ? ['ALICE: The truth matters.'] : [],
+          dramaticTurn: [6, 8].includes(i) ? 'reversal' : 'nothing',
+        }),
+      );
+      const res = await runB530(recs530c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ASSERTION_TURN_AFTERMATH_VOID'), 'ASSERTION_TURN_AFTERMATH_VOID should fire');
+    });
+
+    // ASSERTION_TURN_AFTERMATH_VOID no-fire: assertion at 2, turn at 4 (2 scenes later) → in window → no fire
+    it('ASSERTION_TURN_AFTERMATH_VOID does not fire when an assertion is followed by a dramatic turn within 2 scenes', async () => {
+      const recs530cnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec530(i, {
+          dialogueHighlights: [0, 2].includes(i) ? ['ALICE: The truth matters.'] : [],
+          dramaticTurn: [4, 8].includes(i) ? 'reversal' : 'nothing',
+        }),
+      );
+      const res = await runB530(recs530cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ASSERTION_TURN_AFTERMATH_VOID'), 'ASSERTION_TURN_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 516 — beliefPass: revelation relationship aftermath void, revelation clock aftermath void, revelation seed aftermath void', async () => {
     const makeRec516 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
