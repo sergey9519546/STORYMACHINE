@@ -122,6 +122,17 @@
 // silent (sequence/aftermath × payoff trigger → theme — n≥8, ≥2 qualifying payoff scenes not at
 // last position, none followed by a resonant scene; first aftermath check with the payoff channel,
 // distinct from THEME_REVELATION_AFTERMATH_SILENT which uses the revelation trigger).
+// Wave 542 additions: resonant suspense flat (average/aggregate × suspense × resonant set —
+// every resonant scene has suspenseDelta ≤ 0 while ≥2 suspense-spike scenes exist globally;
+// theme always surfaces in tension-free contexts; distinct from QUIET_SCENES_ONLY which also
+// requires emotional neutrality and from HIGH_SUSPENSE_SCENES_DECOUPLED which checks the
+// reverse direction), Act 2b resonant causeless (backward-cause × Act 2b zone 50%–75% —
+// the first resonant scene in Act 2b lacks any structural catalyst in the 2 prior scenes while
+// catalysts exist elsewhere; fills the Act 2b cell in the backward-cause zone family alongside
+// midpoint/first/last/peak zone cells), resonant aftermath curiosity void (sequence/aftermath ×
+// curiosity × resonant trigger — ≥2 qualifying resonant scenes none followed by curiosityDelta>0
+// in next 2 scenes while ≥2 curiosity-spike scenes exist; theme surfacing never generates
+// questions; first aftermath check using the resonant scene as trigger rather than as aftermath).
 // Wave 528 additions: relationship shift aftermath silent (sequence/aftermath × relationship shift
 // trigger → theme — n≥8, ≥2 qualifying relationship-shift scenes none followed by a resonant scene;
 // the first aftermath check triggered by relationshipShifts, distinct from THEME_RELATIONSHIP_DECOUPLED
@@ -2860,6 +2871,136 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         });
       }
     }
+
+    // ── Wave 542: THEME_RESONANT_SUSPENSE_FLAT, THEME_ACT2B_RESONANT_CAUSELESS,
+    //              THEME_RESONANT_AFTERMATH_CURIOSITY_VOID ─────────────────────────────────
+
+    // THEME_RESONANT_SUSPENSE_FLAT (average/aggregate × suspense × resonant set, n≥8,
+    // ≥2 resonant scenes, ≥2 suspense-spike scenes [suspenseDelta>0]): Every resonant scene
+    // has suspenseDelta ≤ 0 — theme always surfaces in tension-free contexts, never in a scene
+    // where the stakes are also rising. Theme voiced in low-tension beats reads as commentary
+    // rather than consequence: the story pauses to make its thematic statement in scenes where
+    // nothing dangerous is happening, then moves on to danger in scenes where meaning is silent.
+    // The audience receives the thematic register and the tension register as fully separate
+    // tracks — they feel the suspense without the meaning, and they receive the meaning without
+    // the suspense. Average/aggregate mode × suspense channel × resonant set. Distinct from
+    // THEME_HIGH_SUSPENSE_SCENES_DECOUPLED (Wave 279: high-suspense scenes carry no theme —
+    // the HIGH-SUSPENSE end; this checks that resonant scenes have NO positive suspense at all),
+    // THEME_QUIET_SCENES_ONLY (Wave 307: every resonant scene is neutral AND low-suspense — a
+    // stricter double condition; this fires when only the suspense sub-condition holds).
+    if (records.length >= 8 && resonantScenes.length >= 2) {
+      const suspenseScenes542a = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 0);
+      if (suspenseScenes542a.length >= 2) {
+        const allResonantFlat542a = resonantScenes.every(r => (r.suspenseDelta ?? 0) <= 0);
+        if (allResonantFlat542a) {
+          issues.push({
+            location: `${resonantScenes.length} resonant scene(s) — none with positive suspenseDelta`,
+            rule: 'THEME_RESONANT_SUSPENSE_FLAT',
+            severity: 'minor',
+            description: `Every scene that voices "${themeRaw}" (${resonantScenes.length} resonant scene(s)) has a suspenseDelta of 0 or below — the theme only surfaces when tension is not rising — even though ${suspenseScenes542a.length} scenes elsewhere carry positive suspenseDelta. Theme voiced exclusively in tension-free moments reads as editorial commentary rather than as dramatic consequence: the story pauses from its tension-raising to deliver meaning, then resumes tension in scenes where meaning is silent. The two registers never touch: the audience experiences suspense without thematic anchoring, and receives thematic anchoring without any suspense to make the meaning urgent. When theme and tension share a scene, the theme gains weight from what is at stake in that moment; when they are always decoupled, neither operates at full force.`,
+            suggestedFix: `Let at least one resonant scene also carry a positive suspenseDelta — a scene where the theme is voiced in the context of rising stakes, not in a tension-free pause. A character articulating what the story is about while facing danger, or a scene that crystallizes the theme in the middle of an escalating situation, gives the thematic moment the urgency that makes meaning feel inevitable rather than inserted.`,
+          });
+        }
+      }
+    }
+
+    // THEME_ACT2B_RESONANT_CAUSELESS (backward-cause × Act 2b zone 50%–75%, n≥8, ≥2 global
+    // catalysts, ≥1 resonant scene in Act 2b zone, no Act 2b resonant scene preceded by a
+    // catalyst in prior 2 scenes): The first thematically resonant scene in Act 2b (the
+    // 50%–75% escalation run-up to the climax) lacks any upstream cause — no revelation,
+    // dramatic turn, suspense rise, clock, or emotional shift in the 2 preceding scenes —
+    // even though catalysts exist elsewhere. Act 2b is where the story presses toward maximum
+    // pressure before the climax: the protagonist has failed to resolve the central problem,
+    // the opposition is bearing down, and everything is escalating. A causeless thematic beat
+    // in this zone reads as the writer stepping in to state meaning rather than the events
+    // generating it through accumulation. Backward-cause mode × Act 2b zone × resonant trigger.
+    // Distinct from THEME_MIDPOINT_RESONANT_CAUSELESS (Wave 528: 40%–60% zone), THEME_FIRST/
+    // LAST_RESONANT_CAUSELESS (first/last scenes in the story), THEME_PEAK_UNMOTIVATED (densest
+    // scene in the whole script, not zone-specific).
+    const n542b = records.length;
+    if (n542b >= 8) {
+      const act2bStart542b = Math.floor(n542b * 0.50);
+      const act2bEnd542b = Math.floor(n542b * 0.75);
+      const act2bResonantIdxs542b = records
+        .map((r, i) => ({ r, i }))
+        .filter(({ r, i }) =>
+          i >= act2bStart542b && i < act2bEnd542b &&
+          sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        )
+        .map(({ i }) => i);
+      const globalCatalystCount542b = (records as any[]).filter(r =>
+        (r.revelation !== null && r.revelation !== '' && r.revelation !== undefined) ||
+        (r.dramaticTurn !== undefined && r.dramaticTurn !== 'nothing' && r.dramaticTurn !== '') ||
+        (r.suspenseDelta ?? 0) > 0 ||
+        r.clockRaised === true ||
+        (r.emotionalShift ?? 'neutral') !== 'neutral',
+      ).length;
+      if (act2bResonantIdxs542b.length > 0 && globalCatalystCount542b >= 2) {
+        const firstAct2bRes542b = act2bResonantIdxs542b[0];
+        const hasCause542b = firstAct2bRes542b >= 2 && [
+          (records as any[])[firstAct2bRes542b - 1],
+          (records as any[])[firstAct2bRes542b - 2],
+        ].some(r =>
+          r !== undefined && (
+            (r.revelation !== null && r.revelation !== '' && r.revelation !== undefined) ||
+            (r.dramaticTurn !== undefined && r.dramaticTurn !== 'nothing' && r.dramaticTurn !== '') ||
+            (r.suspenseDelta ?? 0) > 0 ||
+            r.clockRaised === true ||
+            (r.emotionalShift ?? 'neutral') !== 'neutral'
+          ),
+        );
+        if (!hasCause542b) {
+          const act2bScene542b = (records as any[])[firstAct2bRes542b];
+          issues.push({
+            location: `Scene ${act2bScene542b.sceneIdx} (${act2bScene542b.slug}) — first Act 2b resonant scene, causeless`,
+            rule: 'THEME_ACT2B_RESONANT_CAUSELESS',
+            severity: 'minor',
+            description: `The first thematically resonant scene in Act 2b (50%–75% of the story) — scene ${act2bScene542b.sceneIdx} — appears without any structural preparation: the 2 preceding scenes carry no revelation, dramatic turn, suspense rise, deadline, or emotional shift that would motivate the theme's surfacing at this escalation zone, even though such catalysts exist elsewhere. Act 2b is the story's pressure-maximum zone: the protagonist is failing, the stakes are highest, and the theme should arrive as a consequence of that mounting pressure rather than as an aside within it. A causeless thematic beat in Act 2b reads as a thesis statement dropped into the escalation rather than earned by it — the meaning surfaces without the pressure that should have generated it.`,
+            suggestedFix: `Add a structural catalyst in one of the two scenes before scene ${act2bScene542b.sceneIdx}: a revelation that makes the theme's question land with the urgency of the approach to the climax, a dramatic turn that forces the characters to confront what the story is about, or a moment of tension or emotional charge that the Act 2b thematic beat then responds to. In the escalation zone, theme should feel provoked by the story's mounting pressure, not inserted into a gap between pressures.`,
+          });
+        }
+      }
+    }
+
+    // THEME_RESONANT_AFTERMATH_CURIOSITY_VOID (sequence/aftermath × curiosity × resonant trigger,
+    // n≥8, ≥2 qualifying resonant scenes [pos < n-2], ≥2 curiosity-spike scenes [curiosityDelta>0]):
+    // No resonant scene is followed by a curiosity spike in the next 2 scenes, despite curiosity
+    // scenes existing elsewhere. When the story voices its theme, it should also open questions:
+    // a thematic beat that lands without generating any new wondering in the scenes that follow
+    // is a statement rather than a provocation. The theme's power is partly in how it reframes
+    // what the audience is watching for — but when every resonant scene's aftermath is curiosity-flat,
+    // the theme surfaces as assertion rather than as the engine of new forward pull.
+    // Sequence/aftermath mode × curiosity channel × resonant trigger. First aftermath check that
+    // uses the resonant scene as the TRIGGER (not the aftermath target). Distinct from all existing
+    // aftermath checks (which fire when X → theme is missing), co-occurrence checks (same scene),
+    // and CURIOSITY_AFTERMATH_SILENT (Wave 514: curiosity spike as trigger → theme as aftermath).
+    if (records.length >= 8 && resonantScenes.length >= 2) {
+      const qualResonant542c = resonantScenes.filter(r => {
+        const pos = (records as any[]).indexOf(r);
+        return pos < records.length - 2;
+      });
+      const curiosityScenes542c = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0);
+      if (qualResonant542c.length >= 2 && curiosityScenes542c.length >= 2) {
+        const allResNoCuriosity542c = qualResonant542c.every((r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos + off];
+            if (nxt && (nxt.curiosityDelta ?? 0) > 0) return false;
+          }
+          return true;
+        });
+        if (allResNoCuriosity542c) {
+          issues.push({
+            location: `${qualResonant542c.length} resonant scene(s) — no curiosity spike in any aftermath window`,
+            rule: 'THEME_RESONANT_AFTERMATH_CURIOSITY_VOID',
+            severity: 'minor',
+            description: `None of the story's ${qualResonant542c.length} thematically resonant scene(s) is followed by a curiosity spike (curiosityDelta > 0) within the next two scenes, even though ${curiosityScenes542c.length} curiosity-generating scenes exist elsewhere. A thematic beat should open questions as well as answer them: when the story voices "${themeRaw}", the audience should be left wondering something they weren't wondering before — how will this apply to the protagonist's next choice, what the theme's implication means for a specific relationship, or what the stated truth will cost in the scenes ahead. When every resonant scene's aftermath is curiosity-flat, the theme operates as assertion rather than provocation — it makes a statement and closes the beat without generating any new forward pull. A theme that provokes wondering is dramatically active; a theme that only declares is editorially passive.`,
+            suggestedFix: `After at least one resonant scene, introduce a curiosity-raising beat in the following one or two scenes — a question opened by what the theme just stated, an implication that the audience now wants to track, or a character discovery that the thematic moment makes newly uncertain. The curiosity spike after a resonant scene tells the audience that the theme is not just a statement but an active force that changes what they are watching for.`,
+          });
+        }
+      }
+    }
+
   }
 
   const { revised, usedLLM } = await rewritePass({

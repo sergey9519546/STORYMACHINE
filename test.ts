@@ -18713,6 +18713,109 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 542 — themePass: resonant suspense flat, Act 2b resonant causeless, resonant aftermath curiosity void', async () => {
+    const makeRec542 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const THEME542 = 'redemption forgiveness courage';
+    const themed542 = ['act of redemption'];
+    const runT542 = async (records: any[]) => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: THEME542 },
+      });
+    };
+
+    // THEME_RESONANT_SUSPENSE_FLAT fire:
+    // 10 scenes; resonant (dialogueHighlights) at 0,5 both with suspenseDelta=0;
+    // suspense scenes at 2,7 (suspenseDelta=1) → ≥2 suspense; all resonant flat → fires
+    it('THEME_RESONANT_SUSPENSE_FLAT fires when all resonant scenes have flat suspense while suspense scenes exist', async () => {
+      const recs542a = Array.from({ length: 10 }, (_, i) =>
+        makeRec542(i, {
+          dialogueHighlights: [0, 5].includes(i) ? themed542 : [],
+          suspenseDelta: [2, 7].includes(i) ? 1 : 0,
+        }),
+      );
+      const res = await runT542(recs542a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_RESONANT_SUSPENSE_FLAT'), 'THEME_RESONANT_SUSPENSE_FLAT should fire');
+    });
+
+    // THEME_RESONANT_SUSPENSE_FLAT no-fire:
+    // resonant at 0 (suspenseDelta=0) and 5 (suspenseDelta=1) → one resonant has positive suspense → no fire
+    it('THEME_RESONANT_SUSPENSE_FLAT does not fire when at least one resonant scene has positive suspense', async () => {
+      const recs542anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec542(i, {
+          dialogueHighlights: [0, 5].includes(i) ? themed542 : [],
+          suspenseDelta: [2, 5, 7].includes(i) ? 1 : 0,
+        }),
+      );
+      const res = await runT542(recs542anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_RESONANT_SUSPENSE_FLAT'), 'THEME_RESONANT_SUSPENSE_FLAT should not fire');
+    });
+
+    // THEME_ACT2B_RESONANT_CAUSELESS fire:
+    // n=10; Act 2b = [5,7); resonant at 5 (in zone); prior scenes 3,4 fully neutral (no catalysts);
+    // global catalysts at 0,9 (suspenseDelta=1) → globalCatalystCount=2; firstAct2bRes=5≥2; !hasCause → fires
+    it('THEME_ACT2B_RESONANT_CAUSELESS fires when first Act 2b resonant scene has no catalyst in prior 2 scenes', async () => {
+      const recs542b = Array.from({ length: 10 }, (_, i) =>
+        makeRec542(i, {
+          dialogueHighlights: i === 5 ? themed542 : [],
+          suspenseDelta: [0, 9].includes(i) ? 1 : 0,
+        }),
+      );
+      const res = await runT542(recs542b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_ACT2B_RESONANT_CAUSELESS'), 'THEME_ACT2B_RESONANT_CAUSELESS should fire');
+    });
+
+    // THEME_ACT2B_RESONANT_CAUSELESS no-fire:
+    // n=10; resonant at 5; prior scene 4 has suspenseDelta=1 (a catalyst) → hasCause=true → no fire
+    it('THEME_ACT2B_RESONANT_CAUSELESS does not fire when prior scene carries a catalyst', async () => {
+      const recs542bnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec542(i, {
+          dialogueHighlights: i === 5 ? themed542 : [],
+          suspenseDelta: [0, 4, 9].includes(i) ? 1 : 0,
+        }),
+      );
+      const res = await runT542(recs542bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_ACT2B_RESONANT_CAUSELESS'), 'THEME_ACT2B_RESONANT_CAUSELESS should not fire');
+    });
+
+    // THEME_RESONANT_AFTERMATH_CURIOSITY_VOID fire:
+    // 10 scenes; resonant at 0 and 5 (both pos < 8 = n-2); curiosity at 8,9 (outside aftermath
+    // windows [1,2] and [6,7]); qualResonant=2, curiosityScenes=2; allResNoCuriosity=true → fires
+    it('THEME_RESONANT_AFTERMATH_CURIOSITY_VOID fires when no resonant scene is followed by a curiosity spike', async () => {
+      const recs542c = Array.from({ length: 10 }, (_, i) =>
+        makeRec542(i, {
+          dialogueHighlights: [0, 5].includes(i) ? themed542 : [],
+          curiosityDelta: [8, 9].includes(i) ? 1 : 0,
+        }),
+      );
+      const res = await runT542(recs542c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_RESONANT_AFTERMATH_CURIOSITY_VOID'), 'THEME_RESONANT_AFTERMATH_CURIOSITY_VOID should fire');
+    });
+
+    // THEME_RESONANT_AFTERMATH_CURIOSITY_VOID no-fire:
+    // resonant at 0 and 5; curiosity at 1 (in aftermath window of resonant 0) → not all flat → no fire
+    it('THEME_RESONANT_AFTERMATH_CURIOSITY_VOID does not fire when a resonant scene is followed by a curiosity spike', async () => {
+      const recs542cnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec542(i, {
+          dialogueHighlights: [0, 5].includes(i) ? themed542 : [],
+          curiosityDelta: [1, 8].includes(i) ? 1 : 0,
+        }),
+      );
+      const res = await runT542(recs542cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_RESONANT_AFTERMATH_CURIOSITY_VOID'), 'THEME_RESONANT_AFTERMATH_CURIOSITY_VOID should not fire');
+    });
+  });
+
   describe('Wave 528 — themePass: relationship shift aftermath silent, midpoint resonant causeless, back heavy', async () => {
     const makeRec528 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
