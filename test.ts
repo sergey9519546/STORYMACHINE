@@ -25200,6 +25200,92 @@ I always listen.
     });
   });
 
+  describe('Wave 521 — intentionPass: seed peak uncaused, seed front-loaded, payoff emotion decoupled', async () => {
+    const makeRec521 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN521 = async (records: any[]) => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    it('SEED_PEAK_UNCAUSED fires when the densest seed scene has no cause in prior 2 scenes', async () => {
+      // 8 scenes: scene 4 plants 2 seeds (the peak); scenes 2,3 have no revelation/turn/suspense/clock
+      const recs521a = Array.from({ length: 8 }, (_, i) =>
+        makeRec521(i, {
+          seededClueIds: i === 0 ? ['c1'] : i === 4 ? ['c2', 'c3'] : [],
+        }),
+      );
+      const res = await runIN521(recs521a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_PEAK_UNCAUSED'), 'SEED_PEAK_UNCAUSED should fire');
+    });
+
+    it('SEED_PEAK_UNCAUSED does not fire when the peak seed scene is preceded by a suspense rise', async () => {
+      // 8 scenes: scene 4 plants 2 seeds; scene 3 has suspenseDelta > 0 (causal event)
+      const recs521an = Array.from({ length: 8 }, (_, i) =>
+        makeRec521(i, {
+          seededClueIds: i === 0 ? ['c1'] : i === 4 ? ['c2', 'c3'] : [],
+          suspenseDelta: i === 3 ? 1 : 0,
+        }),
+      );
+      const res = await runIN521(recs521an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_PEAK_UNCAUSED'), 'SEED_PEAK_UNCAUSED should not fire');
+    });
+
+    it('SEED_FRONTLOADED fires when >70% of seed scenes fall in the first half', async () => {
+      // 10 scenes: seeds at 0,1,2,3 (first half) and 8 (second half) — 4/5 = 80% front
+      const recs521b = Array.from({ length: 10 }, (_, i) =>
+        makeRec521(i, { seededClueIds: [0, 1, 2, 3, 8].includes(i) ? ['c1'] : [] }),
+      );
+      const res = await runIN521(recs521b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_FRONTLOADED'), 'SEED_FRONTLOADED should fire');
+    });
+
+    it('SEED_FRONTLOADED does not fire when seeds are spread across both halves', async () => {
+      // 10 scenes: seeds at 1,2,6,7 — 2/4 = 50%, not front-loaded
+      const recs521bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec521(i, { seededClueIds: [1, 2, 6, 7].includes(i) ? ['c1'] : [] }),
+      );
+      const res = await runIN521(recs521bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_FRONTLOADED'), 'SEED_FRONTLOADED should not fire');
+    });
+
+    it('PAYOFF_EMOTION_DECOUPLED fires when all payoff scenes are emotionally neutral', async () => {
+      // 8 scenes: payoffs at 2,4,6 (all neutral); emotion at 1,3 (non-payoff)
+      const recs521c = Array.from({ length: 8 }, (_, i) =>
+        makeRec521(i, {
+          payoffSetupIds: [2, 4, 6].includes(i) ? ['setup1'] : [],
+          emotionalShift: [1, 3].includes(i) ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runIN521(recs521c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_EMOTION_DECOUPLED'), 'PAYOFF_EMOTION_DECOUPLED should fire');
+    });
+
+    it('PAYOFF_EMOTION_DECOUPLED does not fire when at least one payoff scene has emotional charge', async () => {
+      // 8 scenes: payoffs at 2,4,6; scene 4 is emotionally charged (positive)
+      const recs521cn = Array.from({ length: 8 }, (_, i) =>
+        makeRec521(i, {
+          payoffSetupIds: [2, 4, 6].includes(i) ? ['setup1'] : [],
+          emotionalShift: i === 4 ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runIN521(recs521cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_EMOTION_DECOUPLED'), 'PAYOFF_EMOTION_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 507 — intentionPass: payoff suspense aftermath void, revelation closing void, payoff seed decoupled', async () => {
     const makeRec507 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

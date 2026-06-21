@@ -115,6 +115,20 @@
 // (co-occurrence/decoupling × payoff × seed — n≥8, ≥2 payoff scenes, ≥2 seed scenes, zero
 // overlap; resolutions never simultaneously plant new threads; distinct from PAYOFF_DRAMA_DECOUPLED
 // which pairs payoff × dramatic turn, and SEED_DRAMA_DECOUPLED which pairs seed × dramatic turn).
+// Wave 521 additions: seed peak uncaused (backward-cause × single-peak × seed — n≥8, ≥2 seed
+// scenes, the single scene planting the most clues has no revelation, dramatic turn, suspense rise,
+// or clockRaise in either of the 2 preceding scenes; foreshadowing peaks without preparation; first
+// backward-cause check in this pass, distinct from PROACTIVE_PAYOFF_PEAK_DECOUPLED which audits
+// the payoff peak vs. initiative and PROACTIVE_SUSPENSE_PEAK_DECOUPLED which audits suspense peak),
+// seed front-loaded (distribution/timing × seed × first half — n≥8, ≥4 seed scenes, >70% in first
+// half while back half has ≥1; foreshadowing planted before the midpoint leaves the back half
+// threadless; first distribution check on the seed channel, distinct from REVELATION_FRONTLOADED
+// which uses the revelation channel and SEED_MIDPOINT_VOID which is a zone not distribution check),
+// payoff emotion decoupled (co-occurrence × payoff × emotionalShift — n≥8, ≥3 payoff scenes, ≥2
+// emotional scenes, zero overlap; thread resolutions are always emotionally flat; first check
+// pairing the payoff channel with emotionalShift in co-occurrence mode, distinct from PAYOFF_
+// CURIOSITY_FLAT and PAYOFF_SUSPENSE_FLAT which use average mode, and from PAYOFF_DRAMA_DECOUPLED /
+// PAYOFF_REVELATION_DECOUPLED / PAYOFF_SEED_DECOUPLED which pair payoff with different channels).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2603,6 +2617,122 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `The story has ${payoffRecs507c.length} payoff scenes and ${seedRecs507c.length} clue-seeding scenes, but none overlap — resolutions and new threads are always in separate scenes. The most structurally efficient beats close a loop while opening another: a payoff that simultaneously plants a new question carries double momentum. When payoffs and seeds are fully decoupled, closures are purely terminal — each thread resolution is a dead end rather than a pivot to the next layer of the story's mystery. The audience experiences each payoff as a finality rather than as a discovery that changes what they are waiting for next.`,
             suggestedFix: `Let at least one payoff scene also seed a new thread: a resolved mystery that reveals a deeper one, a delivered promise that simultaneously hints at an unfulfilled one, or a callback that closes one question and opens another. The payoff-plus-seed pattern is the most efficient structural beat in any mystery-bearing screenplay: it satisfies the audience's forward anticipation while immediately replenishing it.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 521 checks ──────────────────────────────────────────────────────
+  {
+    // SEED_PEAK_UNCAUSED — backward-cause × single-peak × seed.
+    // The single scene planting the most clues (highest seededClueIds.length) has no
+    // revelation, dramatic turn, suspense rise, or clockRaise in either of the 2 preceding
+    // scenes. The story's densest foreshadowing moment arrives without narrative preparation:
+    // the seeds land in a causal vacuum, which makes the planting feel like arbitrary
+    // distribution rather than a moment earned by story momentum.
+    // Distinct from: PROACTIVE_PAYOFF_PEAK_DECOUPLED (single-peak × payoff peak × proactive
+    // initiative — different channel and different paired signal), PROACTIVE_SUSPENSE_PEAK_
+    // DECOUPLED (single-peak × suspense × proactive), and all co-occurrence/zone/run-based
+    // seed checks. First backward-cause check in this pass.
+    const n521a = records.length;
+    if (n521a >= 8) {
+      const seedCounts521a = (records as any[]).map((r, i) => ({
+        i, count: ((r.seededClueIds ?? []) as any[]).length,
+      }));
+      const maxSeedCount521a = Math.max(...seedCounts521a.map(x => x.count));
+      if (maxSeedCount521a > 0) {
+        const peakSeedIdx521a = seedCounts521a.find(x => x.count === maxSeedCount521a)!.i;
+        const totalSeeds521a = seedCounts521a.filter(x => x.count > 0).length;
+        if (totalSeeds521a >= 2) {
+          const hasCause521a = [1, 2].some(off => {
+            const prev = peakSeedIdx521a - off;
+            if (prev < 0) return false;
+            const r = (records as any[])[prev];
+            return (
+              (r.revelation !== null && r.revelation !== undefined && r.revelation !== '') ||
+              (r.dramaticTurn && r.dramaticTurn !== 'nothing' && r.dramaticTurn !== '') ||
+              (r.suspenseDelta ?? 0) > 0 ||
+              r.clockRaised === true
+            );
+          });
+          if (!hasCause521a) {
+            issues.push({
+              location: `scene ${peakSeedIdx521a}: densest foreshadowing (${maxSeedCount521a} seed(s)) — no cause in preceding 2 scenes`,
+              rule: 'SEED_PEAK_UNCAUSED',
+              severity: 'minor',
+              description: `The single scene planting the most clues (scene ${peakSeedIdx521a}, ${maxSeedCount521a} seed(s)) has no revelation, dramatic turn, suspense rise, or raised deadline in either of the two preceding scenes. The story's peak foreshadowing moment arrives in a causal vacuum — the audience has not just been given any event of sufficient weight to make the planting feel earned. Clue-planting lands hardest when it follows a moment that heightens attention: a revelation that triggers the protagonist to place a contingency, a dramatic turn that forces them to prepare for what's coming, or a suspense rise that motivates covering a vulnerability. When the densest planting has no such anchor in the scene fabric, it reads as authorial distribution rather than character action.`,
+              suggestedFix: `In the 1–2 scenes preceding scene ${peakSeedIdx521a}, introduce at least one narrative event that motivates the clue-planting to follow: a revelation that raises stakes, a dramatic turn that pivots the protagonist's agenda, a suspense peak that makes them act preemptively, or a clock that starts counting down. This causal anchor transforms foreshadowing from distribution into consequence.`,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  {
+    // SEED_FRONTLOADED — distribution/timing × seed × first half.
+    // n≥8, ≥4 seed scenes (seededClueIds non-empty). >70% fall in the first half while
+    // the back half carries ≥1 → fire. Foreshadowing planted overwhelmingly in the first
+    // half leaves the story's second movement without new threads to pull the audience
+    // forward — the planted clues age through the back half without anything restocking
+    // the sense of live anticipation.
+    // Distinct from: REVELATION_FRONTLOADED (distribution × revelation × first half —
+    // different channel), SEED_MIDPOINT_VOID (zone × midpoint — checks only the midpoint
+    // zone, not the global halves distribution), SEED_RUN_ISOLATED (run-based — consecutive
+    // burst, not temporal distribution). First distribution/timing check on the seed channel.
+    const n521b = records.length;
+    const half521b = Math.floor(n521b / 2);
+    const seedScenes521b = (records as any[]).map((r, i) => ({
+      i, isSeed: ((r.seededClueIds ?? []) as any[]).length > 0,
+    })).filter(x => x.isSeed);
+    if (n521b >= 8 && seedScenes521b.length >= 4) {
+      const frontSeeds521b = seedScenes521b.filter(x => x.i < half521b).length;
+      const backSeeds521b = seedScenes521b.length - frontSeeds521b;
+      const ratio521b = frontSeeds521b / seedScenes521b.length;
+      if (ratio521b > 0.70 && backSeeds521b >= 1) {
+        issues.push({
+          location: `seed distribution: ${frontSeeds521b} front / ${backSeeds521b} back`,
+          rule: 'SEED_FRONTLOADED',
+          severity: 'minor',
+          description: `${Math.round(ratio521b * 100)}% of the script's clue-planting scenes (${frontSeeds521b} of ${seedScenes521b.length}) fall in the first half, leaving the second half with only ${backSeeds521b}. A story that front-loads its foreshadowing exhausts the planted-thread supply before the climax: the audience carries all the open questions through a back half where nothing new is being planted to refresh the sense of live anticipation. By the climax, the planted threads have aged without reinforcement, and the payoffs — when they arrive — feel like the resolution of concerns the audience may have set aside rather than live suspense they've been tracking.`,
+          suggestedFix: `Introduce at least one clue-planting scene in the second half — a new contingency prepared, a fresh thread planted, or an earlier seed revisited with new significance. This restocks the audience's sense that the story is still concealing things worth discovering and ensures that second-half payoffs feel like answers to live questions rather than reminders of forgotten ones.`,
+        });
+      }
+    }
+  }
+
+  {
+    // PAYOFF_EMOTION_DECOUPLED — co-occurrence × payoff × emotionalShift.
+    // n≥8, ≥3 payoff scenes (payoffSetupIds non-empty), ≥2 emotional scenes (non-neutral
+    // emotionalShift). No payoff scene is emotionally charged → fire. Thread resolutions
+    // feel procedural: the story cashes its planted promises in emotionally neutral scenes
+    // while emotional beats happen separately, and the two never coincide. A payoff lands
+    // hardest when the protagonist simultaneously feels the weight of the delivery.
+    // Distinct from: PAYOFF_CURIOSITY_FLAT (average × payoff × curiosityDelta — different
+    // mode and channel), PAYOFF_SUSPENSE_FLAT (average × payoff × suspenseDelta — different
+    // mode and channel), PAYOFF_DRAMA_DECOUPLED / PAYOFF_REVELATION_DECOUPLED / PAYOFF_SEED_
+    // DECOUPLED (co-occurrence mode but paired with dramatic turn / revelation / seed channels,
+    // not emotionalShift). First check pairing payoff with the emotionalShift channel.
+    const n521c = records.length;
+    if (n521c >= 8) {
+      const payoffRecs521c = (records as any[]).filter(
+        r => ((r.payoffSetupIds ?? []) as any[]).length > 0,
+      );
+      const emotionalScenes521c = (records as any[]).filter(
+        r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+      );
+      if (payoffRecs521c.length >= 3 && emotionalScenes521c.length >= 2) {
+        const anyPayoffEmotional521c = payoffRecs521c.some(
+          r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+        );
+        if (!anyPayoffEmotional521c) {
+          issues.push({
+            location: `${payoffRecs521c.length} payoff scenes — all emotionally neutral`,
+            rule: 'PAYOFF_EMOTION_DECOUPLED',
+            severity: 'minor',
+            description: `The story has ${payoffRecs521c.length} payoff scenes (planted promises delivered) and ${emotionalScenes521c.length} emotionally charged scenes, but they never overlap — every thread resolution happens in an emotionally neutral scene while emotional beats occur separately. Payoffs that land in affectively flat scenes feel procedural: the audience receives the delivery as information rather than as an event that costs the protagonist something felt. The double-impact of a payoff coinciding with an emotional beat — the revelation that also breaks the protagonist's heart, the resolution that also provides a moment of joy or grief — is one of the highest-yield structural opportunities in screenwriting.`,
+            suggestedFix: `Fuse at least one payoff scene with an emotional charge: a promise resolved at the moment the protagonist feels the weight of what it cost, a secret disclosed in a scene of joy or grief, or a thread tied off in the same moment the character registers its significance emotionally. A payoff that registers both as closure and as feeling lands on two simultaneous registers and is far harder to forget.`,
           });
         }
       }
