@@ -120,6 +120,19 @@
 // aftermath × clock × payoff trigger — ≥3 qualifying payoffs none followed by a clock raise in
 // the next 2 scenes while ≥2 clock scenes exist; adds the clock channel to the payoff-aftermath
 // family and is distinct from PAYOFF_CLOCK_DECOUPLED which audits same-scene co-occurrence).
+// Wave 538 additions: payoff dramatic turn aftermath absent (sequence/aftermath × dramatic
+// turn × payoff trigger — ≥3 qualifying payoffs none followed by a dramatic turn in next 2
+// scenes while ≥2 turn scenes exist; every delivery produces no pivot in its wake; completes
+// the payoff-aftermath family with the dramatic-turn channel, distinct from PAYOFF_DRAMATIC_
+// TURN_DECOUPLED which audits same-scene co-occurrence), seed relationship aftermath absent
+// (sequence/aftermath × relationship × seed trigger — ≥3 qualifying seeds none followed by a
+// relationship shift in next 2 scenes while ≥2 relational scenes exist; planted clues never
+// strain bonds in their aftermath; adds the relationship channel to the seed-aftermath family,
+// distinct from CLUE_SEED_RELATIONSHIP_DECOUPLED which audits same-scene co-occurrence), seed
+// clock aftermath absent (sequence/aftermath × clock × seed trigger — ≥3 qualifying seeds none
+// followed by clockRaised=true in next 2 scenes while ≥2 clock scenes exist; seeds and deadlines
+// never compound; adds the clock channel to the seed-aftermath family, distinct from CLUE_SEED_
+// CLOCK_DECOUPLED which audits same-scene co-occurrence).
 // Wave 524 additions: seed suspense aftermath absent (sequence/aftermath × suspense × seed
 // trigger — ≥3 qualifying seeds none followed by suspenseDelta>0 in next 2 scenes while ≥2
 // suspense scenes exist; planting clues never raises tension in what follows; adds suspense to
@@ -2610,6 +2623,126 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `Every planted promise delivered in the story (${qualPayoffs524c.length} payoff scene(s)) is followed by two scenes in which no relationship moves, despite ${relScenes524c.length} relational scene(s) existing elsewhere. A thread resolution should move bonds in what follows: the delivered promise changes what the characters now know about each other (or what they owe each other), and that change should surface in the relational landscape of the immediately following scenes. When every payoff's aftermath is relationally frozen, resolutions feel purely thematic — they answer questions but do not move the people inside the story closer together or further apart.`,
             suggestedFix: `After at least one payoff scene, introduce a relationship shift in the following scene — a bond that warms because a planted promise was honored, or fractures because a planted threat was realized. The relational consequence need not be large; even a small shift in the scene after a payoff confirms that the delivery mattered to the people involved and gives the payoff a second layer beyond its informational closure.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // PAYOFF_DRAMATIC_TURN_AFTERMATH_ABSENT — sequence/aftermath × dramatic turn × payoff trigger.
+    // n≥8, ≥3 qualifying payoffs (payoffSetupIds non-empty, not in last 2 positions),
+    // ≥2 dramatic-turn scenes (dramaticTurn !== 'nothing') elsewhere. Every payoff is followed
+    // by 2 scenes with no dramatic turn → fire. Thread resolution should energize the story into
+    // a new pivot; when no payoff is followed by a turn in its aftermath, closures produce no
+    // momentum — the story resolves questions but never redirects.
+    // Distinct from: PAYOFF_DRAMATIC_TURN_DECOUPLED (Wave 342: co-occurrence, same scene),
+    // PAYOFF_REVELATION_AFTERMATH_ABSENT (revelation channel), PAYOFF_SEED_AFTERMATH_ABSENT (seed
+    // channel), PAYOFF_CLOCK_AFTERMATH_ABSENT (clock channel). Completes the payoff-aftermath
+    // family with the dramatic-turn channel.
+    const n538a = records.length;
+    if (n538a >= 8) {
+      const qualPayoffs538a = (records as any[]).filter((r, pos) =>
+        ((r.payoffSetupIds ?? []) as string[]).length > 0 && pos < n538a - 2,
+      );
+      const turnScenes538a = (records as any[]).filter(r => (r.dramaticTurn ?? 'nothing') !== 'nothing');
+      if (qualPayoffs538a.length >= 3 && turnScenes538a.length >= 2) {
+        const allPayoffNoTurnAftermath538a = qualPayoffs538a.every((r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos + off];
+            if (nxt && (nxt.dramaticTurn ?? 'nothing') !== 'nothing') return false;
+          }
+          return true;
+        });
+        if (allPayoffNoTurnAftermath538a) {
+          issues.push({
+            location: `${qualPayoffs538a.length} payoff scene(s) — no dramatic turn in any aftermath window`,
+            rule: 'PAYOFF_DRAMATIC_TURN_AFTERMATH_ABSENT',
+            severity: 'minor',
+            description: `Every planted promise delivered in the story (${qualPayoffs538a.length} payoff scene(s)) is followed by two scenes in which no dramatic turn occurs, despite ${turnScenes538a.length} pivot scene(s) existing elsewhere. A thread resolution should channel its release energy into a new directional shift: the delivered promise changes what the characters know or can do, and that change should propel the story into a new pivot within the following two scenes. When every payoff's aftermath is pivot-free, closures operate as terminal events — they answer the story's questions but generate no forward momentum, making the resolution phase feel like a gradual winding-down rather than a continuing engine.`,
+            suggestedFix: `After at least one payoff scene, introduce a dramatic turn within the following scene — a reversal, discovery, or shift in direction enabled or triggered by the promise that was just delivered. The turn need not be large; even a small pivot that redefines what the characters want next confirms that the payoff changed the story's trajectory rather than simply closing a loop.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // SEED_RELATIONSHIP_AFTERMATH_ABSENT — sequence/aftermath × relationship × seed trigger.
+    // n≥8, ≥3 qualifying seed scenes (seededClueIds non-empty, not in last 2 positions),
+    // ≥2 relational scenes (non-empty relationshipShifts) elsewhere. Every seed is followed
+    // by 2 scenes with no relationship shift → fire. Planting a clue is a discovery that
+    // should reshape the relational landscape; when no seed leads to a bond shift in its
+    // aftermath, the planted threads live in informational isolation, disconnected from the
+    // human relationships they should be straining.
+    // Distinct from: CLUE_SEED_RELATIONSHIP_DECOUPLED (Wave 342: co-occurrence, same scene),
+    // SEED_DRAMATIC_TURN_AFTERMATH_ABSENT (Wave 496: dramatic-turn channel), SEED_CURIOSITY_
+    // AFTERMATH_ABSENT (Wave 482: curiosity channel), SEED_REVELATION_AFTERMATH_ABSENT (Wave 510:
+    // revelation channel). Adds the relationship channel to the seed-aftermath family.
+    const n538b = records.length;
+    if (n538b >= 8) {
+      const qualSeeds538b = (records as any[]).filter((r, pos) =>
+        ((r.seededClueIds ?? []) as string[]).length > 0 && pos < n538b - 2,
+      );
+      const relScenes538b = (records as any[]).filter(r =>
+        ((r.relationshipShifts ?? []) as any[]).length > 0,
+      );
+      if (qualSeeds538b.length >= 3 && relScenes538b.length >= 2) {
+        const allSeedNoRelAftermath538b = qualSeeds538b.every((r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos + off];
+            if (nxt && ((nxt.relationshipShifts ?? []) as any[]).length > 0) return false;
+          }
+          return true;
+        });
+        if (allSeedNoRelAftermath538b) {
+          issues.push({
+            location: `${qualSeeds538b.length} seed scene(s) — no relational shift in any aftermath window`,
+            rule: 'SEED_RELATIONSHIP_AFTERMATH_ABSENT',
+            severity: 'minor',
+            description: `Every clue-planting scene in the story (${qualSeeds538b.length} scene(s) with seededClueIds) is followed by two scenes in which no relationship moves, despite ${relScenes538b.length} relational scene(s) existing elsewhere. Planting a clue is an act of discovery — a character notices, hides, or weaponizes information — and that act should strain the bonds between characters in what immediately follows: the person who planted the seed is now carrying a secret, and that secret should surface as tension, distance, or betrayal in the relational landscape of the next scenes. When every seed's aftermath is relationally frozen, the planted threads feel like pure information deposits that exist in a vacuum, disconnected from the human relationships they should be pressurising.`,
+            suggestedFix: `After at least one seed scene, introduce a relationship shift in the following scene — a character who now knows something pulling away from one who doesn't, or a new alliance forming around the shared discovery. The relational consequence need not be large; even a subtle shift in the scene after a seed confirms that the planted information is alive in the story's relational economy, not just in its information queue.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // SEED_CLOCK_AFTERMATH_ABSENT — sequence/aftermath × clock × seed trigger.
+    // n≥8, ≥3 qualifying seed scenes (seededClueIds non-empty, not in last 2 positions),
+    // ≥2 clock scenes (clockRaised=true) elsewhere. Every seed is followed by 2 scenes
+    // with no clock raise → fire. Planting a clue should activate urgency alongside
+    // anticipation; when no seed is followed by a ticking-clock escalation, the clue-planting
+    // engine and the deadline engine never compound, missing the most powerful form of
+    // foreshadowing: evidence that carries an expiry date.
+    // Distinct from: CLUE_SEED_CLOCK_DECOUPLED (Wave 384: co-occurrence, same scene), SEED_
+    // DRAMATIC_TURN_AFTERMATH_ABSENT (Wave 496: turn channel), SEED_RELATIONSHIP_AFTERMATH_ABSENT
+    // (Wave 538: relationship channel). Adds the clock channel to the seed-aftermath family.
+    const n538c = records.length;
+    if (n538c >= 8) {
+      const qualSeeds538c = (records as any[]).filter((r, pos) =>
+        ((r.seededClueIds ?? []) as string[]).length > 0 && pos < n538c - 2,
+      );
+      const clockScenes538c = (records as any[]).filter(r => r.clockRaised === true);
+      if (qualSeeds538c.length >= 3 && clockScenes538c.length >= 2) {
+        const allSeedNoClockAftermath538c = qualSeeds538c.every((r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos + off];
+            if (nxt && nxt.clockRaised === true) return false;
+          }
+          return true;
+        });
+        if (allSeedNoClockAftermath538c) {
+          issues.push({
+            location: `${qualSeeds538c.length} seed scene(s) — no clock raise in any aftermath window`,
+            rule: 'SEED_CLOCK_AFTERMATH_ABSENT',
+            severity: 'minor',
+            description: `Every clue-planting scene in the story (${qualSeeds538c.length} scene(s) with seededClueIds) is followed by two scenes in which no deadline is activated (clockRaised stays false), despite ${clockScenes538c.length} clock-raising scene(s) existing elsewhere. Planting a clue should couple with urgency: once evidence is hidden in the story, the clock that makes that evidence matter should start ticking nearby. When seeds and clock raises always occur in separate pockets of the narrative, the planted threads lack expiry dates — the audience knows a secret exists but feels no time pressure around it, producing curiosity without the tension that makes that curiosity urgent.`,
+            suggestedFix: `After at least one seed scene, let the following scene raise a deadline or escalate an existing clock — a threat that becomes more pressing because of what was just discovered, or a new ticking fuse lit by the information that was just planted. The coupling creates foreshadowing with teeth: the audience now carries both a hidden question and a ticking pressure that makes resolving that question feel urgent.`,
           });
         }
       }

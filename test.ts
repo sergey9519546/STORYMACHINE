@@ -22599,6 +22599,99 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 538 — payoffPass: payoff dramatic turn aftermath absent, seed relationship aftermath absent, seed clock aftermath absent', async () => {
+    const makeRec538 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runPY538 = async (records: any[]) => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    it('PAYOFF_DRAMATIC_TURN_AFTERMATH_ABSENT fires when no payoff is followed by a dramatic turn', async () => {
+      // 10 scenes: payoffs at 0,2,4 (not last 2); dramatic turns at 8,9 (outside aftermath windows 1-2, 3-4, 5-6)
+      const recs538a = Array.from({ length: 10 }, (_, i) =>
+        makeRec538(i, {
+          payoffSetupIds: [0, 2, 4].includes(i) ? ['s1'] : [],
+          dramaticTurn: [8, 9].includes(i) ? 'reversal' : 'nothing',
+        }),
+      );
+      const res = await runPY538(recs538a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_DRAMATIC_TURN_AFTERMATH_ABSENT'), 'PAYOFF_DRAMATIC_TURN_AFTERMATH_ABSENT should fire');
+    });
+
+    it('PAYOFF_DRAMATIC_TURN_AFTERMATH_ABSENT does not fire when a payoff is followed by a dramatic turn', async () => {
+      // 10 scenes: payoffs at 0,2,4; dramatic turn at 1 (within aftermath window of payoff at 0)
+      const recs538an = Array.from({ length: 10 }, (_, i) =>
+        makeRec538(i, {
+          payoffSetupIds: [0, 2, 4].includes(i) ? ['s1'] : [],
+          dramaticTurn: [1, 9].includes(i) ? 'reversal' : 'nothing',
+        }),
+      );
+      const res = await runPY538(recs538an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_DRAMATIC_TURN_AFTERMATH_ABSENT'), 'PAYOFF_DRAMATIC_TURN_AFTERMATH_ABSENT should not fire');
+    });
+
+    it('SEED_RELATIONSHIP_AFTERMATH_ABSENT fires when no seed is followed by a relationship shift', async () => {
+      // 10 scenes: seeds at 0,2,4; relationship shifts at 8,9 (outside aftermath windows 1-2, 3-4, 5-6)
+      const recs538b = Array.from({ length: 10 }, (_, i) =>
+        makeRec538(i, {
+          seededClueIds: [0, 2, 4].includes(i) ? ['c1'] : [],
+          relationshipShifts: [8, 9].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.4 }] : [],
+        }),
+      );
+      const res = await runPY538(recs538b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_RELATIONSHIP_AFTERMATH_ABSENT'), 'SEED_RELATIONSHIP_AFTERMATH_ABSENT should fire');
+    });
+
+    it('SEED_RELATIONSHIP_AFTERMATH_ABSENT does not fire when a seed is followed by a relationship shift', async () => {
+      // 10 scenes: seeds at 0,2,4; relationship shift at 1 (within aftermath window of seed at 0)
+      const recs538bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec538(i, {
+          seededClueIds: [0, 2, 4].includes(i) ? ['c1'] : [],
+          relationshipShifts: [1, 8].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.4 }] : [],
+        }),
+      );
+      const res = await runPY538(recs538bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_RELATIONSHIP_AFTERMATH_ABSENT'), 'SEED_RELATIONSHIP_AFTERMATH_ABSENT should not fire');
+    });
+
+    it('SEED_CLOCK_AFTERMATH_ABSENT fires when no seed is followed by a clock raise', async () => {
+      // 10 scenes: seeds at 0,2,4; clock at 8,9 (outside aftermath windows 1-2, 3-4, 5-6)
+      const recs538c = Array.from({ length: 10 }, (_, i) =>
+        makeRec538(i, {
+          seededClueIds: [0, 2, 4].includes(i) ? ['c1'] : [],
+          clockRaised: [8, 9].includes(i),
+        }),
+      );
+      const res = await runPY538(recs538c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_CLOCK_AFTERMATH_ABSENT'), 'SEED_CLOCK_AFTERMATH_ABSENT should fire');
+    });
+
+    it('SEED_CLOCK_AFTERMATH_ABSENT does not fire when a seed is followed by a clock raise', async () => {
+      // 10 scenes: seeds at 0,2,4; clock at 1 (within aftermath window of seed at 0)
+      const recs538cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec538(i, {
+          seededClueIds: [0, 2, 4].includes(i) ? ['c1'] : [],
+          clockRaised: [1, 9].includes(i),
+        }),
+      );
+      const res = await runPY538(recs538cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_CLOCK_AFTERMATH_ABSENT'), 'SEED_CLOCK_AFTERMATH_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 524 — payoffPass: seed suspense aftermath absent, seed emotion aftermath absent, payoff relational aftermath absent', async () => {
     const makeRec524 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
