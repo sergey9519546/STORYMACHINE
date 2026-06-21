@@ -30978,6 +30978,94 @@ The lights go out.`;
     });
   });
 
+  describe('Wave 532 — dialoguePass: dramatic-turn aftermath silent, payoff aftermath silent, middle zone silent', async () => {
+    const makeRec532 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
+      sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false,
+      revelation: null, dramaticTurn: 'nothing', payoffSetupIds: [], relationshipShifts: [],
+      emotionalShift: 'neutral', seededClueIds: [], dialogueHighlights: [], unresolvedClues: [],
+      purpose: '', slug: `s${sceneIdx}`, ...extra,
+    });
+    const runD532 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    // Build n scenes; dlgFn(i) returns number of dialogue lines for scene i
+    const buildScenes532 = (count: number, dlgFn: (i: number) => number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\n`;
+        const n = dlgFn(i);
+        for (let j = 0; j < n; j++) {
+          f += j % 2 === 0
+            ? `ALICE\nShe found the documents early this morning.\n\n`
+            : `BOB\nWe should leave before they close the gate.\n\n`;
+        }
+        if (n === 0) f += `The door crashes open. A figure steps from the dark.\n\n`;
+      }
+      return f;
+    };
+
+    it('DIALOGUE_DRAMATIC_TURN_AFTERMATH_SILENT fires when all dramatic-turn aftermaths have no dialogue', async () => {
+      // n=10; dramatic turns at pos 2,5 (not at last pos 9);
+      // following scenes (pos 3,6) have no dialogue; other scenes (0,1,4,7,8,9) have dialogue → fires
+      const f532a = buildScenes532(10, i => [3, 6].includes(i) ? 0 : 2);
+      const recs532a = Array.from({ length: 10 }, (_, i) =>
+        makeRec532(i, [2, 5].includes(i) ? { dramaticTurn: 'reversal' } : {})
+      );
+      const res = await runD532(f532a, recs532a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_DRAMATIC_TURN_AFTERMATH_SILENT'), 'DIALOGUE_DRAMATIC_TURN_AFTERMATH_SILENT should fire');
+    });
+
+    it('DIALOGUE_DRAMATIC_TURN_AFTERMATH_SILENT does not fire when a dramatic-turn aftermath has dialogue', async () => {
+      // Same but scene 3 (after turn at 2) now has dialogue → anyTurnAftermathHasDlg=true → no fire
+      const f532anr = buildScenes532(10, i => i === 6 ? 0 : 2);
+      const recs532anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec532(i, [2, 5].includes(i) ? { dramaticTurn: 'reversal' } : {})
+      );
+      const res = await runD532(f532anr, recs532anr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_DRAMATIC_TURN_AFTERMATH_SILENT'), 'DIALOGUE_DRAMATIC_TURN_AFTERMATH_SILENT should not fire');
+    });
+
+    it('DIALOGUE_PAYOFF_AFTERMATH_SILENT fires when all payoff aftermaths have no dialogue', async () => {
+      // n=10; payoffs at pos 2,5 (not at last pos 9);
+      // following scenes (pos 3,6) have no dialogue; other scenes have dialogue → fires
+      const f532b = buildScenes532(10, i => [3, 6].includes(i) ? 0 : 2);
+      const recs532b = Array.from({ length: 10 }, (_, i) =>
+        makeRec532(i, [2, 5].includes(i) ? { payoffSetupIds: ['setup-A'] } : {})
+      );
+      const res = await runD532(f532b, recs532b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_PAYOFF_AFTERMATH_SILENT'), 'DIALOGUE_PAYOFF_AFTERMATH_SILENT should fire');
+    });
+
+    it('DIALOGUE_PAYOFF_AFTERMATH_SILENT does not fire when a payoff aftermath has dialogue', async () => {
+      // Same but scene 3 (after payoff at 2) now has dialogue → anyPayoffAftermathHasDlg=true → no fire
+      const f532bnr = buildScenes532(10, i => i === 6 ? 0 : 2);
+      const recs532bnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec532(i, [2, 5].includes(i) ? { payoffSetupIds: ['setup-A'] } : {})
+      );
+      const res = await runD532(f532bnr, recs532bnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_PAYOFF_AFTERMATH_SILENT'), 'DIALOGUE_PAYOFF_AFTERMATH_SILENT should not fire');
+    });
+
+    it('DIALOGUE_MIDDLE_ZONE_SILENT fires when middle third has no dialogue while opening and closing do', async () => {
+      // n=9, third=3: opening pos 0-2, middle pos 3-5, closing pos 6-8
+      // dialogue at pos 0,1 (opening) and pos 6,7 (closing); NO dialogue at pos 3,4,5 (middle)
+      // scenesWithDlg=4 ≥ 4; openHasDlg=true, middleHasDlg=false, closeHasDlg=true → fires
+      const f532c = buildScenes532(9, i => ([0, 1, 6, 7].includes(i) ? 2 : 0));
+      const recs532c = Array.from({ length: 9 }, (_, i) => makeRec532(i));
+      const res = await runD532(f532c, recs532c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_MIDDLE_ZONE_SILENT'), 'DIALOGUE_MIDDLE_ZONE_SILENT should fire');
+    });
+
+    it('DIALOGUE_MIDDLE_ZONE_SILENT does not fire when middle third has at least one dialogue scene', async () => {
+      // n=9; same setup but pos 4 (middle third) now has dialogue → middleHasDlg=true → no fire
+      const f532cnr = buildScenes532(9, i => ([0, 1, 4, 6, 7].includes(i) ? 2 : 0));
+      const recs532cnr = Array.from({ length: 9 }, (_, i) => makeRec532(i));
+      const res = await runD532(f532cnr, recs532cnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_MIDDLE_ZONE_SILENT'), 'DIALOGUE_MIDDLE_ZONE_SILENT should not fire');
+    });
+  });
+
   describe('Wave 518 — dialoguePass: seed scene dialogue absent, relationship shift scene dialogue absent, revelation aftermath silent', async () => {
     const makeRec518 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
       sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false,

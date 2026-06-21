@@ -120,6 +120,20 @@
 // have zero dialogue lines; thread resolutions are rendered in silence; distinct from REVELATION_
 // SCENE_VOID, DRAMATIC_TURN_SCENE_VOID, CLOCK_SCENE_VOID which audit different event types, and
 // from POSITIVE_SCENE_VOID / NEGATIVE_SCENE_VOID which audit emotional register not event type).
+// Wave 532 additions: dialogue dramatic-turn aftermath silent (sequence/aftermath × dramatic-turn
+// trigger → dialogue absence in next scene — n≥8, ≥2 dramatic-turn scenes not at last position, ≥3
+// scenes with dialogue, none of the immediately following scenes has dialogue; pivots land without
+// verbal registration; the dramatic-turn-trigger parallel of DIALOGUE_REVELATION_AFTERMATH_SILENT,
+// distinct from DIALOGUE_DRAMATIC_TURN_SCENE_VOID which is co-occurrence within the turn scene),
+// dialogue payoff aftermath silent (sequence/aftermath × payoff trigger → dialogue absence in next
+// scene — n≥8, ≥2 payoff scenes not at last position, ≥3 scenes with dialogue, none of the
+// immediately following scenes has dialogue; fulfilled promises play without verbal fallout; the
+// payoff-trigger parallel completing the aftermath set alongside revelation and dramatic-turn triggers,
+// distinct from PAYOFF_SCENE_DIALOGUE_ABSENT which is co-occurrence within the payoff scene), dialogue
+// middle zone silent (zone presence/absence × middle third × dialogue absence — n≥9, ≥4 scenes with
+// dialogue, opening and closing thirds each have ≥1 dialogue scene but middle third has zero; the
+// central story zone is silent; first zone-absence check on the middle third, distinct from CLIMAX_VOID
+// [closing 20%], OPENING_SILENT [opening 20%], and SCENE_TEMPORAL_CLUSTER [concentration not absence]).
 // Wave 518 additions: seed scene dialogue absent (co-occurrence/decoupling × seed event × dialogue
 // absence — n≥8, ≥2 seed scenes, ≥3 scenes with dialogue, all seed scenes have zero dialogue; clue-
 // planting happens in silence; the seed-channel parallel of PAYOFF_SCENE_DIALOGUE_ABSENT, completing
@@ -2836,6 +2850,127 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
             suggestedFix: `After at least one revelation scene, let the following scene carry dialogue — a character's response to what was disclosed, even if indirect, evasive, or oblique. A single line that shows a character has processed the truth (or is trying not to) gives the revelation its aftermath. Silence after a disclosure can be powerful, but only as a deliberate dramatic choice; the default should be to give the truth somewhere to land in spoken language.`,
           });
         }
+      }
+    }
+  }
+
+  // ── Wave 532: DIALOGUE_DRAMATIC_TURN_AFTERMATH_SILENT, DIALOGUE_PAYOFF_AFTERMATH_SILENT,
+  //              DIALOGUE_MIDDLE_ZONE_SILENT ──────────────────────────────────────────────────────────
+  {
+    const n532 = records.length;
+    const lineToScene532 = buildLineToSceneMap(fountain);
+    const dlgPerScene532 = new Map<number, number>();
+    for (const d of dialogue) {
+      const si = lineToScene532[d.lineNum - 1] ?? -1;
+      if (si >= 0) dlgPerScene532.set(si, (dlgPerScene532.get(si) ?? 0) + 1);
+    }
+    const scenesWithDlg532 = (records as any[]).filter(
+      r => (dlgPerScene532.get(r.sceneIdx) ?? 0) > 0,
+    ).length;
+
+    if (n532 >= 8 && scenesWithDlg532 >= 3) {
+      // DIALOGUE_DRAMATIC_TURN_AFTERMATH_SILENT — Sequence/aftermath × dramatic-turn trigger →
+      // dialogue absence in next scene. n≥8, ≥2 qualifying dramatic-turn scenes (dramaticTurn not
+      // 'nothing'/empty, not at last position), ≥3 scenes with dialogue, none of the immediately
+      // following scenes contains any dialogue. A dramatic turn is the story's gear-shift: the pivot
+      // that reorients the protagonist's goal, reverses an expectation, or changes what the audience
+      // understands about what has happened. The scene following a turn is where the new reality is
+      // absorbed — where characters and the audience process the shift. When every dramatic-turn
+      // aftermath is silent, each pivot lands without any verbal registration and the story's
+      // structural joints feel like visual edits rather than dramatically inhabited turns.
+      // Distinct from: DIALOGUE_REVELATION_AFTERMATH_SILENT (Wave 518: revelation trigger — this is
+      // the dramatic-turn-trigger parallel), DIALOGUE_DENSE_AFTERMATH_SILENT (Wave 476: dense
+      // dialogue as trigger), DIALOGUE_DRAMATIC_TURN_SCENE_VOID (Wave 462: co-occurrence — checks
+      // absence WITHIN the turn scene itself; this checks the NEXT scene — aftermath mode).
+      const turnScenes532a = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) =>
+          r.dramaticTurn !== undefined && r.dramaticTurn !== null &&
+          r.dramaticTurn !== 'nothing' && r.dramaticTurn !== '' &&
+          pos < n532 - 1,
+        );
+      if (turnScenes532a.length >= 2) {
+        const anyTurnAftermathHasDlg532a = turnScenes532a.some(({ pos }) => {
+          const nextSceneIdx = (records as any[])[pos + 1].sceneIdx;
+          return (dlgPerScene532.get(nextSceneIdx) ?? 0) > 0;
+        });
+        if (!anyTurnAftermathHasDlg532a) {
+          issues.push({
+            location: `${turnScenes532a.length} dramatic-turn scene(s) — none followed by a scene with dialogue`,
+            rule: 'DIALOGUE_DRAMATIC_TURN_AFTERMATH_SILENT',
+            severity: 'minor',
+            description: `The script has ${turnScenes532a.length} qualifying dramatic-turn scenes, but every one is followed immediately by a scene with no dialogue. When the story pivots — a reversal of fortune, a reorientation of goal, or a structural gear-shift — the beat that follows is where characters and audience process the new reality. That processing most naturally takes the form of speech: characters speaking to what just changed, even obliquely, confirms that the pivot has weight. When every dramatic-turn aftermath is silent, each pivot lands without verbal register and the story's structural joints feel like visual edits rather than dramatically inhabited turns.`,
+            suggestedFix: `After at least one dramatic-turn scene, let the following scene carry dialogue — a character reacting to what has changed, acknowledging the new situation even indirectly, or attempting to navigate the shift in power or goal. The aftermath dialogue does not need to explain the turn explicitly; even an exchange that reflects the changed dynamic — altered priorities, new urgency, shifted relationship — gives each reversal the verbal grounding it needs to feel inhabited rather than merely structural.`,
+          });
+        }
+      }
+
+      // DIALOGUE_PAYOFF_AFTERMATH_SILENT — Sequence/aftermath × payoff trigger →
+      // dialogue absence in next scene. n≥8, ≥2 qualifying payoff scenes (payoffSetupIds non-empty,
+      // not at last position), ≥3 scenes with dialogue, none of the immediately following scenes
+      // contains any dialogue. A payoff is when a planted promise is fulfilled — the seeded detail
+      // returns, the set-up resolves, the gun fires. The scene that follows a payoff is where
+      // satisfaction, consequence, or emotional fallout should be verbalized: characters whose goals
+      // have shifted, relationships that have changed, new questions that the fulfilled promise opens.
+      // When every payoff aftermath is silent, the satisfactions the story has built land without
+      // anyone speaking to their significance — resolutions dissolve into action without a voice.
+      // Distinct from: DIALOGUE_REVELATION_AFTERMATH_SILENT (Wave 518: revelation trigger — different
+      // trigger, though payoffs and revelations sometimes overlap), DIALOGUE_DRAMATIC_TURN_AFTERMATH_
+      // SILENT (dramatic-turn trigger — above), PAYOFF_SCENE_DIALOGUE_ABSENT (Wave 504: co-occurrence
+      // — checks absence WITHIN the payoff scene itself; this checks the NEXT scene — aftermath mode).
+      const payoffScenes532b = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) =>
+          ((r.payoffSetupIds ?? []) as any[]).length > 0 && pos < n532 - 1,
+        );
+      if (payoffScenes532b.length >= 2) {
+        const anyPayoffAftermathHasDlg532b = payoffScenes532b.some(({ pos }) => {
+          const nextSceneIdx = (records as any[])[pos + 1].sceneIdx;
+          return (dlgPerScene532.get(nextSceneIdx) ?? 0) > 0;
+        });
+        if (!anyPayoffAftermathHasDlg532b) {
+          issues.push({
+            location: `${payoffScenes532b.length} payoff scene(s) — none followed by a scene with dialogue`,
+            rule: 'DIALOGUE_PAYOFF_AFTERMATH_SILENT',
+            severity: 'minor',
+            description: `The script has ${payoffScenes532b.length} qualifying payoff scenes, but every one is followed immediately by a scene with no dialogue. When a planted promise is fulfilled — the seeded clue returns as a revelation, the foreshadowed consequence lands — the scene that follows is where satisfaction, consequence, and emotional fallout should be verbalized. Characters speaking after a payoff confirms the resolution has weight, registers changed relationships and goals, or opens the new questions the fulfilled promise creates. When every payoff aftermath is silent, the satisfactions the story has been building land without anyone speaking to their significance — resolutions complete without verbal registration.`,
+            suggestedFix: `After at least one payoff scene, let the following scene carry dialogue — characters whose relationships or goals have shifted because of the fulfilled promise, a reaction that confirms the resolution's weight, or a new question the paid-off thread opens. The payoff aftermath is not just a structural beat; it is the emotional beat where the story absorbs what it has just delivered, and spoken language is the primary register of that absorption.`,
+          });
+        }
+      }
+    }
+
+    // DIALOGUE_MIDDLE_ZONE_SILENT — Zone presence/absence × middle third × dialogue absence.
+    // n≥9, ≥4 scenes with dialogue total. Opening third (pos 0 to floor(n/3)−1) has ≥1 dialogue
+    // scene AND closing third (pos 2×floor(n/3) to n−1) has ≥1 dialogue scene BUT middle third
+    // (pos floor(n/3) to 2×floor(n/3)−1) has ZERO dialogue scenes → fire. The story's verbal
+    // middle is completely silent while the opening and closing thirds contain spoken language —
+    // the central structural zone passes without a word while bookending zones are verbally active.
+    // Distinct from: DIALOGUE_CLIMAX_VOID (Wave 434: closing 20% — binary zone, fixed percentage,
+    // not thirds-based), DIALOGUE_OPENING_SILENT (Wave 462: opening 20% — same binary approach;
+    // this fills the complementary middle-zone gap), DIALOGUE_SCENE_TEMPORAL_CLUSTER (Wave 490:
+    // dialogue-presence scenes concentrated in one third — overconcentration fires when >75% are
+    // in one zone; this fires when the middle zone has ZERO dialogue regardless of concentration).
+    // First zone-absence check on the middle third in this pass.
+    if (n532 >= 9 && scenesWithDlg532 >= 4) {
+      const third532c = Math.floor(n532 / 3);
+      const openHasDlg532c = (records as any[]).some(
+        (r, pos) => pos < third532c && (dlgPerScene532.get(r.sceneIdx) ?? 0) > 0,
+      );
+      const middleHasDlg532c = (records as any[]).some(
+        (r, pos) => pos >= third532c && pos < 2 * third532c && (dlgPerScene532.get(r.sceneIdx) ?? 0) > 0,
+      );
+      const closeHasDlg532c = (records as any[]).some(
+        (r, pos) => pos >= 2 * third532c && (dlgPerScene532.get(r.sceneIdx) ?? 0) > 0,
+      );
+      if (openHasDlg532c && closeHasDlg532c && !middleHasDlg532c) {
+        issues.push({
+          location: `Middle third (scenes ${third532c}–${2 * third532c - 1}) has no dialogue; opening and closing thirds do`,
+          rule: 'DIALOGUE_MIDDLE_ZONE_SILENT',
+          severity: 'minor',
+          description: `The story's middle third (scenes at positions ${third532c}–${2 * third532c - 1}) contains no dialogue, while both the opening and closing thirds include scenes with spoken language. The central structural zone of the story — where the protagonist's situation deepens, complications accumulate, and relationships are tested — passes as silent spectacle. The middle section of a screenplay is where the story most needs spoken confrontation, negotiation, and revelation: the escalation arc that carries the audience from the opening premise to the closing resolution depends on characters speaking to their changing circumstances. When the middle is entirely without dialogue, that arc is rendered in pure action without any verbal dimension.`,
+          suggestedFix: `Introduce at least one dialogue scene in the middle third of the script. A confrontation between characters whose goals are now in conflict, a negotiation that reveals the shifting power balance, or even a short verbal exchange that registers the protagonist's changed situation gives the middle section its necessary verbal anchor. The story's central zone should be as verbally alive as its opening and closing — this is where the audience needs to hear characters speaking to the pressure they are under.`,
+        });
       }
     }
   }
