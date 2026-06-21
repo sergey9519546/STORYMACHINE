@@ -19264,6 +19264,79 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 485 — structurePass: negative scene run, revelation clock decoupled, climax aftermath flat', async () => {
+    const makeRec485 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const runST485 = async (records: any[]) => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      return structurePass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('NEGATIVE_SCENE_RUN fires when 5 or more consecutive scenes are emotionally negative', async () => {
+      // 10 scenes: scenes 3-7 all negative (5 consecutive) → fires
+      const recs485a = Array.from({ length: 10 }, (_, i) =>
+        makeRec485(i, { emotionalShift: i >= 3 && i <= 7 ? 'negative' : 'neutral' }),
+      );
+      const res = await runST485(recs485a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'NEGATIVE_SCENE_RUN'), 'NEGATIVE_SCENE_RUN should fire');
+    });
+
+    it('NEGATIVE_SCENE_RUN does not fire when negative scenes are not consecutive', async () => {
+      // 10 scenes: negative at 2,4,6,8 — none consecutive → max run = 1 → no fire
+      const recs485anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec485(i, { emotionalShift: [2, 4, 6, 8].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runST485(recs485anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'NEGATIVE_SCENE_RUN'), 'NEGATIVE_SCENE_RUN should not fire');
+    });
+
+    it('REVELATION_CLOCK_DECOUPLED fires when revelations and clock scenes never coincide', async () => {
+      // 12 scenes: revelations at 3,7 (no clock); clock at 5,9 (no revelation) → fires
+      const recs485b = Array.from({ length: 12 }, (_, i) => makeRec485(i));
+      recs485b[3] = makeRec485(3, { revelation: 'the truth' });
+      recs485b[5] = makeRec485(5, { clockRaised: true });
+      recs485b[7] = makeRec485(7, { revelation: 'another truth' });
+      recs485b[9] = makeRec485(9, { clockDelta: 1 });
+      const res = await runST485(recs485b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_CLOCK_DECOUPLED'), 'REVELATION_CLOCK_DECOUPLED should fire');
+    });
+
+    it('REVELATION_CLOCK_DECOUPLED does not fire when a revelation coincides with a clock event', async () => {
+      // 12 scenes: scene 5 has both revelation and clockRaised → co-occurrence → no fire
+      const recs485bnr = Array.from({ length: 12 }, (_, i) => makeRec485(i));
+      recs485bnr[3] = makeRec485(3, { revelation: 'truth A' });
+      recs485bnr[5] = makeRec485(5, { revelation: 'truth B', clockRaised: true });
+      recs485bnr[9] = makeRec485(9, { clockDelta: 1 });
+      const res = await runST485(recs485bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_CLOCK_DECOUPLED'), 'REVELATION_CLOCK_DECOUPLED should not fire');
+    });
+
+    it('CLIMAX_AFTERMATH_FLAT fires when the finale peak is followed by 2 emotionally/relationally flat scenes', async () => {
+      // 10 scenes: peak at scene 7 (suspenseDelta=5, in final 30% = scene 7-9); scenes 8,9 both neutral/no shifts → fires
+      const recs485c = Array.from({ length: 10 }, (_, i) => makeRec485(i));
+      recs485c[7] = makeRec485(7, { suspenseDelta: 5 });
+      // scenes 8,9 stay neutral (default) → no aftermath → fires
+      const res = await runST485(recs485c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLIMAX_AFTERMATH_FLAT'), 'CLIMAX_AFTERMATH_FLAT should fire');
+    });
+
+    it('CLIMAX_AFTERMATH_FLAT does not fire when the finale peak is followed by an emotional shift', async () => {
+      // 10 scenes: peak at scene 7; scene 8 has emotionalShift='negative' → aftermath present → no fire
+      const recs485cnr = Array.from({ length: 10 }, (_, i) => makeRec485(i));
+      recs485cnr[7] = makeRec485(7, { suspenseDelta: 5 });
+      recs485cnr[8] = makeRec485(8, { emotionalShift: 'negative' });
+      const res = await runST485(recs485cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLIMAX_AFTERMATH_FLAT'), 'CLIMAX_AFTERMATH_FLAT should not fire');
+    });
+  });
+
   describe('Wave 471 — structurePass: curiosity peak emotional void, positive scene run, revelation turn decoupled', async () => {
     const makeRec471 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

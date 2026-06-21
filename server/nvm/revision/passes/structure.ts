@@ -93,6 +93,15 @@
 // and ≥2 turns but no scene carries both; the truth-surfacing and direction-changing machinery
 // always operate in separate beats; completes the revelation co-occurrence family with curiosity
 // and suspense channels now joined by the dramatic-turn channel).
+// Wave 485 additions: negative scene run (run-based × negative emotional valence — 5+ consecutive
+// scenes all emotionalShift='negative'; the run mirror of POSITIVE_SCENE_RUN on the negative side,
+// a sustained descent without contrast or relief), revelation clock decoupled (co-occurrence/
+// decoupling × revelation × clock — ≥2 revelation scenes and ≥2 clock scenes but no scene carries
+// both; disclosures never land under deadline pressure, completing the revelation co-occurrence
+// family alongside curiosity/suspense/turn channels), climax aftermath flat (sequence/aftermath ×
+// climax trigger — the peak-suspense scene in the final 30% is followed by 2 scenes with no
+// emotional shift and no relationship shift; the climax produces no human ripple; first aftermath
+// check triggered by the story's climax position).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2199,6 +2208,118 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `The script has ${revScenes471c.length} revelation scene(s) and ${turnScenes471c.length} dramatic-turn scene(s), but no scene carries both — revelations always arrive in non-pivot moments, and pivots always arrive without a coincident disclosure. The most powerful structural single-scene move is the revelation-that-reverses: truth surfaces, and in the same beat the story's direction changes because of what has been learned. This double-impact moment is structurally absent; the script's truth-surfacing and direction-changing machinery are always operating in isolation, and no scene achieves the compressive force that comes from combining both.`,
           suggestedFix: `Arrange at least one scene that carries both a revelation and a dramatic turn: let the disclosed truth be the thing that pivots the story in a new direction within the same scene. The character learns something — and as a direct consequence in that scene — everything about the story's direction changes. This single-scene combination is the most efficient structural unit in dramatic writing, and the script currently has all the ingredients but keeps them apart.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 485: NEGATIVE_SCENE_RUN, REVELATION_CLOCK_DECOUPLED, CLIMAX_AFTERMATH_FLAT ──
+
+  // NEGATIVE_SCENE_RUN (run-based × negative emotional valence, n≥8, longest consecutive run
+  // of emotionalShift='negative' ≥ 5): Five or more consecutive scenes carry negative emotional
+  // charge without interruption — a sustained descent into darkness without any contrast, cost-
+  // and-recovery beat, or moment of relief. Where POSITIVE_SCENE_RUN (Wave 471) flags prolonged
+  // tonal warmth, this flags prolonged tonal darkness. Uninterrupted darkness numbs as surely as
+  // uninterrupted light: after four or five consecutive negative scenes, each new setback stops
+  // registering as a specific loss and starts feeling like the story's permanent condition. The
+  // audience has no emotional reference point from which to feel the depth of any particular
+  // negative beat. Even the darkest tragedies need contrast — a moment of memory, warmth, or
+  // even dark comedy — to make the audience feel each individual blow rather than process them
+  // collectively as wallpaper. Run-based mode × negative emotional valence. Distinct from
+  // POSITIVE_SCENE_RUN (Wave 471: positive valence — same mode, opposite pole),
+  // EMOTIONAL_ARC_UNIFORM (Wave 278: >70% globally in one register — global proportion, not run),
+  // POSITIVE_SCENE_DROUGHT (Wave 443: global ratio check, not consecutive run).
+  if (n >= 8) {
+    let maxNegRun485a = 0, curNegRun485a = 0;
+    for (const r of (records as any[])) {
+      if (r.emotionalShift === 'negative') {
+        curNegRun485a++;
+        if (curNegRun485a > maxNegRun485a) maxNegRun485a = curNegRun485a;
+      } else {
+        curNegRun485a = 0;
+      }
+    }
+    if (maxNegRun485a >= 5) {
+      issues.push({
+        location: `Consecutive negative scenes — run of ${maxNegRun485a}`,
+        rule: 'NEGATIVE_SCENE_RUN',
+        severity: 'minor',
+        description: `${maxNegRun485a} consecutive scenes all carry emotionalShift = 'negative' — an uninterrupted tonal descent without any contrast, recovery beat, or relief. Sustained darkness numbs as surely as sustained warmth: after four or five consecutive negative scenes, each new setback stops registering as a specific loss and starts feeling like the permanent condition of the story's world. The audience has no emotional reference point from which to feel the depth of any particular blow — without contrast, the darkness becomes ambient and individual losses merge into a single monotonous register.`,
+        suggestedFix: `Break the run of ${maxNegRun485a} negative scenes with a scene of neutral or positive register before it completes — not a false reprieve, but a breath: a moment of dark humour, a memory of warmth, a brief alliance between characters, a tactical success that costs something. The single scene of contrast makes every negative scene around it register more specifically and more deeply than a fifth consecutive low point in a row.`,
+      });
+    }
+  }
+
+  // REVELATION_CLOCK_DECOUPLED (co-occurrence/decoupling × revelation × clock channel, n≥10,
+  // ≥2 revelation scenes, ≥2 clock scenes, no scene carries both): The story has revelations and
+  // clock events but no scene delivers a disclosure under deadline pressure — truth is always
+  // surfaced in calm moments while urgency operates in a separate informational world. A revelation
+  // that arrives under a ticking clock is doubly charged: the audience must process new information
+  // while time is running out, and the deadline makes the disclosure more consequential because the
+  // window to act on it is closing. When the two engines never coincide, revelations land without
+  // urgency and clock events land without the cognitive load of new information — each is half as
+  // intense as it could be. Co-occurrence/decoupling mode × revelation × clock. Distinct from
+  // REVELATION_CURIOSITY_DECOUPLED (Wave 443: curiosity channel), REVELATION_SUSPENSE_DECOUPLED
+  // (Wave 457: suspense), REVELATION_TURN_DECOUPLED (Wave 471: dramatic turn): this completes the
+  // revelation co-occurrence family with the clock channel.
+  if (n >= 10) {
+    const revScenes485b = (records as any[]).filter(r => !!r.revelation);
+    const clockScenes485b = (records as any[]).filter(r =>
+      r.clockRaised === true || (r.clockDelta ?? 0) > 0,
+    );
+    if (revScenes485b.length >= 2 && clockScenes485b.length >= 2) {
+      const anyCoOccur485b = (records as any[]).some(
+        r => !!r.revelation && (r.clockRaised === true || (r.clockDelta ?? 0) > 0),
+      );
+      if (!anyCoOccur485b) {
+        issues.push({
+          location: `${revScenes485b.length} revelation scene(s) and ${clockScenes485b.length} clock scene(s) — never co-occurring`,
+          rule: 'REVELATION_CLOCK_DECOUPLED',
+          severity: 'minor',
+          description: `The script has ${revScenes485b.length} revelation scene(s) and ${clockScenes485b.length} clock scene(s), but no scene delivers a disclosure under deadline pressure — truth is always surfaced in calm moments while urgency operates in a separate informational world. A revelation that arrives under a ticking clock is doubly charged: the audience must process new information while time is running out, and the deadline makes the disclosure more consequential because the window to act on it is closing. When revelation and clock never coincide, each engine runs at half its potential intensity.`,
+          suggestedFix: 'Arrange at least one scene that delivers both a revelation and a clock event simultaneously: the truth surfaces as the deadline tightens, or the disclosure itself starts a countdown. "She tells him the truth — and they have thirty seconds before the door locks" is a single scene that does double work: the information matters more because time is running out, and the deadline matters more because it determines what can be done with the revealed information.',
+        });
+      }
+    }
+  }
+
+  // CLIMAX_AFTERMATH_FLAT (sequence/aftermath × climax trigger, n≥8, climax scene in final 30%,
+  // room for 2 scenes after): The story's highest-suspense scene in the final 30% is followed by
+  // two scenes that carry neither an emotional shift nor a relationship shift — the climax produces
+  // no human ripple. A climactic moment should detonate consequences: characters should feel what
+  // just happened, bonds should shift under the weight of the resolution. When the 2 scenes after
+  // the highest-tension beat are both emotionally neutral and relationally static, the climax has
+  // been delivered but not processed — the audience experiences the peak and then watches the story
+  // return to baseline without any human acknowledgement of what just occurred. Sequence/aftermath
+  // mode × climax trigger. Distinct from CLIMAX_UNPREPARED (Wave 429: backward-cause — what comes
+  // BEFORE the climax; this checks what comes AFTER), INCITING_AFTERMATH_STALL (Wave 429: inciting
+  // incident trigger, not climax), FINAL_IMAGE_WEAK (Wave 306: the last scene's charge — not
+  // the aftermath window of the climax specifically): first aftermath check triggered by climax.
+  if (n >= 8) {
+    const climaxStart485c = Math.floor(n * 0.70);
+    let climaxPos485c = -1;
+    let climaxSusp485c = -Infinity;
+    for (let i = climaxStart485c; i < n; i++) {
+      const sd = (records as any[])[i].suspenseDelta ?? 0;
+      if (sd > climaxSusp485c) {
+        climaxSusp485c = sd;
+        climaxPos485c = i;
+      }
+    }
+    if (climaxPos485c >= 0 && climaxSusp485c > 0 && climaxPos485c + 2 < n) {
+      const next1485c = (records as any[])[climaxPos485c + 1];
+      const next2485c = (records as any[])[climaxPos485c + 2];
+      const hasEmoAftermath485c = (next1485c?.emotionalShift ?? 'neutral') !== 'neutral' ||
+        (next2485c?.emotionalShift ?? 'neutral') !== 'neutral';
+      const hasRelAftermath485c = ((next1485c?.relationshipShifts ?? []) as any[]).length > 0 ||
+        ((next2485c?.relationshipShifts ?? []) as any[]).length > 0;
+      if (!hasEmoAftermath485c && !hasRelAftermath485c) {
+        issues.push({
+          location: `Scene ${climaxPos485c} — highest-suspense finale scene followed by 2 flat aftermath scenes`,
+          rule: 'CLIMAX_AFTERMATH_FLAT',
+          severity: 'minor',
+          description: `The story's climactic peak (Scene ${climaxPos485c}, suspenseDelta: ${climaxSusp485c}) is followed by two scenes that carry neither an emotional shift nor a relationship shift — the climax produces no human ripple. A climactic moment should detonate consequences: characters should feel what just happened, bonds should shift under the weight of what was resolved. When the two scenes after the highest-tension finale beat are emotionally neutral and relationally static, the climax has been delivered but not processed — the story reaches its peak and then returns to baseline without any character acknowledging what just occurred.`,
+          suggestedFix: `Let Scenes ${climaxPos485c + 1}–${climaxPos485c + 2} carry at least one emotional or relational consequence of what happened at the climax: a character registers relief, grief, or resolution; a bond shifts in the wake of what was just decided or revealed. The aftermath of a climax is where the audience learns what the story meant to the people who lived it — the scenes immediately after the peak are structurally as important as the peak itself.`,
         });
       }
     }
