@@ -146,6 +146,20 @@
 // followed by clockRaised=true in next 2 scenes while ≥2 clock scenes exist; seeds and deadlines
 // never compound; adds the clock channel to the seed-aftermath family, distinct from CLUE_SEED_
 // CLOCK_DECOUPLED which audits same-scene co-occurrence).
+// Wave 566 additions: payoff clock peak decoupled (single-peak isolation × clockDelta × payoff —
+// n≥8, ≥2 payoff scenes, maxClockDelta>1, the single highest-clockDelta scene carries no payoff;
+// the maximum-urgency moment is not where any thread resolves; adds the clock channel to the payoff
+// peak-decoupled family alongside PAYOFF_SUSPENSE/CURIOSITY/RELATIONSHIP_PEAK_DECOUPLED, distinct from
+// PAYOFF_CLOCK_DECOUPLED [co-occurrence aggregate] and PAYOFF_CLOCK_AFTERMATH_ABSENT [aftermath]),
+// seed emotional valence uniform (valence × emotion × seed trigger — n≥8, ≥2 seed scenes carrying
+// non-neutral emotion, all one valence; foreshadowing locked into a single feeling-tone; completes the
+// valence family across both triggers [seed, payoff] and both channels [relationship, emotion],
+// distinct from PAYOFF_EMOTIONAL_VALENCE_UNIFORM [payoff trigger], SEED_RELATIONSHIP_VALENCE_UNIFORM
+// [relationship channel], SEED_EMOTION_AFTERMATH_ABSENT [aftermath], CLUE_SEED_EMOTION_FLAT [neutral
+// not monotone]), clue seed temporal cluster (distribution/timing × seed × structural thirds — n≥9,
+// ≥3 seed scenes, >75% in a single third; foreshadowing ghettoized into one zone; the seed-channel
+// sibling of PAYOFF_TEMPORAL_CLUSTER, finer-grained than the binary CLUE_SEED_FRONT_LOADED / CLUE_SEED_
+// LATE_MAJORITY and distinct from CLUE_SEED_MIDPOINT_VOID [absence not over-concentration]).
 // Wave 524 additions: seed suspense aftermath absent (sequence/aftermath × suspense × seed
 // trigger — ≥3 qualifying seeds none followed by suspenseDelta>0 in next 2 scenes while ≥2
 // suspense scenes exist; planting clues never raises tension in what follows; adds suspense to
@@ -2877,6 +2891,128 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
               suggestedFix: `Introduce at least one payoff scene whose emotional charge runs ${val552c === 'positive' ? 'negative' : 'positive'} — a delivered promise that lands with ${val552c === 'positive' ? 'grief, loss, or painful confirmation of a feared truth (a clue that was right all along, a loyalty that turned out to be conditional)' : 'relief, vindication, or earned joy (a feared betrayal revealed as misdirection, a thread that resolves with unexpected grace)'}. The contrast gives the resolution engine both registers, so each closure carries genuine uncertainty about whether the delivery will hurt or heal.`,
             });
           }
+        }
+      }
+    }
+  }
+
+  // ── Wave 566: PAYOFF_CLOCK_PEAK_DECOUPLED, SEED_EMOTIONAL_VALENCE_UNIFORM,
+  //              CLUE_SEED_TEMPORAL_CLUSTER ──────────────────────────────────────────────────────
+  {
+    // PAYOFF_CLOCK_PEAK_DECOUPLED — single-peak isolation × clockDelta × payoff.
+    // n≥8, ≥2 payoff scenes, maxClockDelta > 1. The single highest-clockDelta scene (the story's
+    // maximum-urgency moment) carries no payoff, even though planted threads resolve elsewhere. The
+    // peak-deadline beat — when time pressure is at its most acute — is not where any thread snaps
+    // shut, so the most charged delivery slot for a payoff goes unused. Resolving a long-planted
+    // thread at the moment the clock is loudest doubles the force: the audience gets the answer and
+    // the urgency at once. When the clock peak and the payoff engine never meet, the story forfeits
+    // the compound impact of a promise delivered against a ticking deadline.
+    // Distinct from: PAYOFF_SUSPENSE_PEAK_DECOUPLED / PAYOFF_CURIOSITY_PEAK_DECOUPLED / PAYOFF_
+    // RELATIONSHIP_PEAK_DECOUPLED (Waves 384/412: same single-peak mode, but the suspense, curiosity,
+    // and relationship channels — this adds the clock channel, completing the payoff peak-decoupled
+    // family), PAYOFF_CLOCK_DECOUPLED (co-occurrence — fires when NO payoff scene raises a clock, an
+    // aggregate same-scene check, not single-peak isolation), PAYOFF_CLOCK_AFTERMATH_ABSENT (aftermath
+    // mode — what follows a payoff). First clock-channel entry in the payoff peak-decoupled family.
+    const n566a = records.length;
+    if (n566a >= 8) {
+      const payoffScenes566a = (records as any[]).filter(r => ((r.payoffSetupIds ?? []) as string[]).length > 0);
+      const maxClock566a = Math.max(...(records as any[]).map(r => r.clockDelta ?? 0));
+      if (payoffScenes566a.length >= 2 && maxClock566a > 1) {
+        const peakClock566a = (records as any[]).find(r => (r.clockDelta ?? 0) === maxClock566a);
+        if (peakClock566a && ((peakClock566a.payoffSetupIds ?? []) as string[]).length === 0) {
+          issues.push({
+            location: `Scene ${peakClock566a.sceneIdx} — peak clockDelta (${maxClock566a})`,
+            rule: 'PAYOFF_CLOCK_PEAK_DECOUPLED',
+            severity: 'minor',
+            description: `The story's highest-clockDelta scene (Scene ${peakClock566a.sceneIdx}, clockDelta ${maxClock566a}) carries no payoff, even though ${payoffScenes566a.length} other scenes resolve planted threads. The moment of maximum deadline pressure — when the clock is loudest and the audience most feels time running out — is not where any thread snaps shut. The peak-urgency beat and the satisfaction of resolution never meet, so the most charged delivery slot for a payoff is left empty. A promise delivered at the moment the clock is at its most acute lands with doubled force: the audience receives the answer and the urgency in a single beat.`,
+            suggestedFix: 'Land a payoff at the peak-clock scene: resolving a long-planted thread at the moment of maximum deadline pressure fuses urgency with satisfaction — the audience gets the delivery and the ticking clock at once. The scene where time is most acutely running out is one of the most powerful places in the story to pay something off, because the resolution arrives under pressure rather than in calm.',
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // SEED_EMOTIONAL_VALENCE_UNIFORM — valence × emotional × seed trigger.
+    // n≥8, ≥2 seed scenes carrying a non-neutral emotionalShift. Every emotionally-charged seed
+    // scene shares the same valence (all 'positive' or all 'negative') → fire. When clue-planting is
+    // coupled to emotion, those emotions should run in both directions: some discoveries land with
+    // dread or unease (a clue that implies danger), while others land with hope or relief (a clue
+    // that promises a way forward). Monotone emotional valence locks the foreshadowing engine into a
+    // single feeling-tone — every planted thread arrives pre-colored with the same affect, draining
+    // the seeds of their full dramatic range and making the audience able to predict the emotional
+    // register of each new clue before its content registers.
+    // Distinct from: PAYOFF_EMOTIONAL_VALENCE_UNIFORM (Wave 552: payoff trigger vs. seed trigger
+    // here), SEED_RELATIONSHIP_VALENCE_UNIFORM (Wave 552: relationship channel vs. emotion channel
+    // here), SEED_EMOTION_AFTERMATH_ABSENT (Wave 524: aftermath mode, fires when seeds produce NO
+    // emotion in the 2 following scenes — this check fires when emotion IS present in the seed scenes
+    // but is one-signed), CLUE_SEED_EMOTION_FLAT (co-occurrence — fires when seed scenes are
+    // emotionally neutral; this fires when they are emotional but monotone). Completes the valence
+    // family across both triggers (seed, payoff) and both channels (relationship, emotion).
+    const n566b = records.length;
+    if (n566b >= 8) {
+      const seedEmoRecs566b = (records as any[]).filter(r =>
+        ((r.seededClueIds ?? []) as string[]).length > 0 &&
+        r.emotionalShift !== 'neutral' && r.emotionalShift != null,
+      );
+      if (seedEmoRecs566b.length >= 2) {
+        const allPos566b = seedEmoRecs566b.every((r: any) => r.emotionalShift === 'positive');
+        const allNeg566b = seedEmoRecs566b.every((r: any) => r.emotionalShift === 'negative');
+        if (allPos566b || allNeg566b) {
+          const val566b = allPos566b ? 'positive' : 'negative';
+          issues.push({
+            location: `${seedEmoRecs566b.length} emotionally-charged seed scene(s) — all ${val566b}`,
+            rule: 'SEED_EMOTIONAL_VALENCE_UNIFORM',
+            severity: 'minor',
+            description: `Every clue-planting scene that carries a non-neutral emotional charge (${seedEmoRecs566b.length} scene(s) with seededClueIds and ${val566b} emotionalShift) skews the same way — foreshadowing always arrives wrapped in ${val566b === 'positive' ? 'hope, relief, or anticipation' : 'dread, unease, or foreboding'}. Planted clues are discoveries, and discoveries should land with asymmetric emotional effects: some seeds promise danger (a detail glimpsed that implies threat), others promise possibility (a clue that hints at a way through). When every emotionally-charged seed runs ${val566b}, the foreshadowing engine is locked into one feeling-tone, and the audience learns to read every new clue's emotional register before its content arrives — the planted threads lose the uncertainty that makes foreshadowing suspenseful rather than merely decorative.`,
+            suggestedFix: `Introduce at least one seed scene whose emotional charge runs ${allPos566b ? 'negative' : 'positive'} — a planted clue that lands with ${allPos566b ? 'dread or foreboding (a detail that implies a hidden threat, evidence of something gone wrong)' : 'hope or relief (a clue that hints at an unexpected resource, a sign that a feared outcome may be avoidable)'}. The mix of emotional valences gives the foreshadowing engine both registers, so each new clue carries genuine uncertainty about whether what it portends will be welcome or feared.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // CLUE_SEED_TEMPORAL_CLUSTER — distribution/timing × seed × structural thirds.
+    // n≥9, ≥3 seed scenes (seededClueIds non-empty), >75% of them fall in a single structural third
+    // → fire. The story's foreshadowing is ghettoized into one structural zone — the opening, middle,
+    // or closing third carries the overwhelming majority of all clue-planting while the other
+    // two-thirds plant almost nothing. A thirds-based cluster is finer-grained than the binary
+    // half-partition checks: a script can split its seeds evenly across the two halves and still
+    // concentrate three-quarters of them in, say, the middle third, leaving both the opening and the
+    // climax approach without fresh foreshadowing. When seeds cluster in one zone, the planting engine
+    // fires in a single burst rather than threading anticipation continuously through the story — the
+    // audience receives a concentrated dose of "remember this" and then a long stretch with no new
+    // promises to carry forward.
+    // Distinct from: CLUE_SEED_FRONT_LOADED (Wave 384: binary first-half >X% concentration — this
+    // uses three zones and can fire on a middle- or closing-third cluster the half-check would miss),
+    // CLUE_SEED_LATE_MAJORITY (binary second-half majority — same half-partition limitation), CLUE_
+    // SEED_MIDPOINT_VOID (zone presence/absence — fires on ABSENCE from the middle, this fires on
+    // OVER-concentration in any single third), PAYOFF_TEMPORAL_CLUSTER (Wave 496: same thirds mode
+    // and >75% threshold but on the payoff channel — this is the seed-channel sibling). First
+    // thirds-based distribution check on the seed channel in this pass.
+    const n566c = records.length;
+    if (n566c >= 9) {
+      const seedPositions566c = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r }) => ((r.seededClueIds ?? []) as string[]).length > 0)
+        .map(({ pos }) => pos);
+      if (seedPositions566c.length >= 3) {
+        const third566c = Math.floor(n566c / 3);
+        const firstZone566c = seedPositions566c.filter(p => p < third566c).length;
+        const lastZone566c = seedPositions566c.filter(p => p >= 2 * third566c).length;
+        const midZone566c = seedPositions566c.length - firstZone566c - lastZone566c;
+        const maxZone566c = Math.max(firstZone566c, midZone566c, lastZone566c);
+        if (maxZone566c / seedPositions566c.length > 0.75) {
+          const zoneName566c =
+            maxZone566c === firstZone566c ? 'opening' : maxZone566c === lastZone566c ? 'closing' : 'middle';
+          issues.push({
+            location: `seed distribution: ${firstZone566c} opening / ${midZone566c} middle / ${lastZone566c} closing third — ${Math.round((maxZone566c / seedPositions566c.length) * 100)}% in the ${zoneName566c} third`,
+            rule: 'CLUE_SEED_TEMPORAL_CLUSTER',
+            severity: 'minor',
+            description: `${Math.round((maxZone566c / seedPositions566c.length) * 100)}% of the story's ${seedPositions566c.length} clue-planting scenes are concentrated in the ${zoneName566c} structural third, leaving the other two-thirds with almost no foreshadowing. Unlike a front-vs-back skew, this is a single-zone cluster: the seeds are planted almost entirely within one third of the runtime while the rest of the story plants nothing. When foreshadowing is ghettoized into one zone, the planting engine fires in a single concentrated burst rather than threading anticipation continuously through the narrative — the audience receives a dose of "remember this" all at once and then carries it through long stretches with no new promises being made. The most propulsive mysteries plant clues across all three structural zones so the audience always has fresh threads to track.`,
+            suggestedFix: `Redistribute some of the ${zoneName566c} third's seeds into the other two zones so foreshadowing threads through the full arc rather than bursting in one stretch. Each structural third can carry its own planted promise: an early seed that establishes a question, a middle seed that complicates it, and a late seed that sets up the climax's final turn. Spreading clue-planting across the thirds keeps the audience continuously anticipating rather than front-loading or burying the story's promises in a single zone.`,
+          });
         }
       }
     }

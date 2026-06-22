@@ -23528,6 +23528,99 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 566 — payoffPass: payoff clock peak decoupled, seed emotional valence uniform, clue seed temporal cluster', async () => {
+    const makeRec566 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runPY566 = async (records: any[]) => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // PAYOFF_CLOCK_PEAK_DECOUPLED fire:
+    // n=8; peak clockDelta=3 at idx 2 (no payoff there); payoffs at idx 5,6 → peak-clock scene unpaid → fires
+    it('PAYOFF_CLOCK_PEAK_DECOUPLED fires when the highest-clockDelta scene carries no payoff', async () => {
+      const recs566a = Array.from({ length: 8 }, (_, i) =>
+        makeRec566(i, {
+          clockDelta: i === 2 ? 3 : 0,
+          payoffSetupIds: [5, 6].includes(i) ? ['p1'] : [],
+        }),
+      );
+      const res = await runPY566(recs566a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CLOCK_PEAK_DECOUPLED'), 'PAYOFF_CLOCK_PEAK_DECOUPLED should fire');
+    });
+
+    // PAYOFF_CLOCK_PEAK_DECOUPLED no-fire:
+    // n=8; peak clockDelta=3 at idx 2 which DOES carry a payoff; another payoff at idx 6 → peak-clock paid → no fire
+    it('PAYOFF_CLOCK_PEAK_DECOUPLED does not fire when the peak-clock scene carries a payoff', async () => {
+      const recs566an = Array.from({ length: 8 }, (_, i) =>
+        makeRec566(i, {
+          clockDelta: i === 2 ? 3 : 0,
+          payoffSetupIds: [2, 6].includes(i) ? ['p1'] : [],
+        }),
+      );
+      const res = await runPY566(recs566an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CLOCK_PEAK_DECOUPLED'), 'PAYOFF_CLOCK_PEAK_DECOUPLED should not fire');
+    });
+
+    // SEED_EMOTIONAL_VALENCE_UNIFORM fire:
+    // n=8; seeds at idx 1,3,5 all with emotionalShift='negative' → all one valence → fires
+    it('SEED_EMOTIONAL_VALENCE_UNIFORM fires when all emotionally-charged seed scenes share one valence', async () => {
+      const recs566b = Array.from({ length: 8 }, (_, i) =>
+        makeRec566(i, {
+          seededClueIds: [1, 3, 5].includes(i) ? ['c1'] : [],
+          emotionalShift: [1, 3, 5].includes(i) ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runPY566(recs566b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_EMOTIONAL_VALENCE_UNIFORM'), 'SEED_EMOTIONAL_VALENCE_UNIFORM should fire');
+    });
+
+    // SEED_EMOTIONAL_VALENCE_UNIFORM no-fire:
+    // n=8; seed at idx 1 negative, idx 3 positive → mixed valences → no fire
+    it('SEED_EMOTIONAL_VALENCE_UNIFORM does not fire when seed emotions have mixed valences', async () => {
+      const recs566bn = Array.from({ length: 8 }, (_, i) =>
+        makeRec566(i, {
+          seededClueIds: [1, 3, 5].includes(i) ? ['c1'] : [],
+          emotionalShift: i === 1 ? 'negative' : i === 3 ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runPY566(recs566bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_EMOTIONAL_VALENCE_UNIFORM'), 'SEED_EMOTIONAL_VALENCE_UNIFORM should not fire');
+    });
+
+    // CLUE_SEED_TEMPORAL_CLUSTER fire:
+    // n=9; third=3; seeds at idx 3,4,5 (all middle third) → 3/3=100%>75% → fires
+    it('CLUE_SEED_TEMPORAL_CLUSTER fires when >75% of seeds fall in a single structural third', async () => {
+      const recs566c = Array.from({ length: 9 }, (_, i) =>
+        makeRec566(i, { seededClueIds: [3, 4, 5].includes(i) ? ['c1'] : [] }),
+      );
+      const res = await runPY566(recs566c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLUE_SEED_TEMPORAL_CLUSTER'), 'CLUE_SEED_TEMPORAL_CLUSTER should fire');
+    });
+
+    // CLUE_SEED_TEMPORAL_CLUSTER no-fire:
+    // n=9; seeds at idx 1,4,7 → one per third, max 1/3=33%≤75% → no fire
+    it('CLUE_SEED_TEMPORAL_CLUSTER does not fire when seeds are spread across thirds', async () => {
+      const recs566cn = Array.from({ length: 9 }, (_, i) =>
+        makeRec566(i, { seededClueIds: [1, 4, 7].includes(i) ? ['c1'] : [] }),
+      );
+      const res = await runPY566(recs566cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLUE_SEED_TEMPORAL_CLUSTER'), 'CLUE_SEED_TEMPORAL_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 524 — payoffPass: seed suspense aftermath absent, seed emotion aftermath absent, payoff relational aftermath absent', async () => {
     const makeRec524 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
