@@ -124,6 +124,19 @@
 // positive-emotion scenes ≥ 4; a sustained positive run means the protagonist's world is going well
 // without adversity for too long; distinct from EMOTIONAL_NEUTRAL_RUN, SUSPENSE_DECLINE_RUN, and
 // EMOTIONAL_POSITIVE_DESERT which use different modes on the emotional channel).
+// Wave 545 additions: payoff aftermath curiosity void (average/aggregate × payoff → curiosity
+// aftermath — n≥8, ≥3 qualifying payoff scenes [pos<n-1], avg curiosityDelta of immediately
+// following scenes ≤ 0; resolutions complete promises without reopening questions; the curiosity-
+// channel complement of PAYOFF_AFTERMATH_SUSPENSE_VOID; distinct from PAYOFF_CURIOSITY_DECOUPLED
+// which checks the payoff scene's OWN curiosityDelta), emotional opening third absent (zone
+// presence/absence × emotional charge × opening third — n≥9, ≥3 emotionally charged scenes
+// globally, none in first third; story's affective register never engages in its opening zone;
+// distinct from EMOTIONAL_CLOSING_THIRD_ABSENT [Wave 517: closing zone], EMOTIONAL_ZONE_CLUSTER
+// [concentration check, not absence], EMOTIONAL_NEUTRAL_RUN [run-based]), seed stasis run
+// (run-based × seed-absence × seed channel — n≥8, ≥3 seed scenes, max consecutive non-seed gap
+// ≥7; the foreshadowing engine silent for its longest uninterrupted stretch; distinct from SEED_
+// TEMPORAL_CLUSTER [distribution/timing], CLUE_SEED_CLUSTER [per-scene overconcentration], seed
+// aftermath/co-occurrence checks; the seed-channel parallel of ASSERTION_DROUGHT in belief.ts).
 // Wave 531 additions: suspense spike relationship void (co-occurrence/decoupling × high-suspense ×
 // relationship — n≥8, ≥2 scenes with suspenseDelta > 1 AND ≥2 scenes with relationship shifts, yet
 // no high-suspense scene carries a relationship shift; danger operates in a social vacuum; completes
@@ -2973,6 +2986,127 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
             suggestedFix: `Ensure at least one seed scene is followed by a scene with a positive suspenseDelta: introduce a complication that makes the seeded element feel more threatening, raise a secondary deadline connected to the planted clue, or have a character react to the implications of what was planted in a way that increases felt stakes. The most effective foreshadowing is not just informational — it makes the audience feel the weight of what is coming rather than merely registering that something has been set up.`,
           });
         }
+      }
+    }
+  }
+
+  // ── Wave 545: PAYOFF_AFTERMATH_CURIOSITY_VOID, EMOTIONAL_OPENING_THIRD_ABSENT,
+  //              SEED_STASIS_RUN ──────────────────────────────────────────────────────────────────
+
+  // PAYOFF_AFTERMATH_CURIOSITY_VOID (average/aggregate × payoff → curiosity aftermath, n≥8,
+  // ≥3 qualifying payoff scenes [pos < n-1], avg curiosityDelta of scenes immediately following
+  // each qualifying payoff ≤ 0): Every thread-resolution scene is followed by a beat where the
+  // audience's field of open questions shrinks or holds flat rather than opening new wondering.
+  // A payoff's job is two-directional: it closes a narrative promise AND it should ideally prime
+  // the audience toward what comes next. When the average curiosityDelta of post-payoff scenes is
+  // ≤ 0, resolutions operate as closures only — the audience finishes each answered promise without
+  // a new question forming to replace it. The story's mystery engine and its resolution engine run
+  // as separate systems. Average/aggregate mode × payoff trigger × curiosity aftermath channel.
+  // Distinct from PAYOFF_CURIOSITY_DECOUPLED (Wave 335: checks the payoff scene's OWN
+  // curiosityDelta ≤ 0 — the payoff scene doesn't generate curiosity in the same beat; this
+  // checks the FOLLOWING scene — aftermath direction, one temporal step later), PAYOFF_AFTERMATH_
+  // SUSPENSE_VOID (Wave 517: same structure × suspense channel — the suspense-aftermath complement),
+  // SEED_AFTERMATH_CURIOSITY_VOID (Wave 489: seed as trigger, not payoff).
+  {
+    const n545a = records.length;
+    if (n545a >= 8) {
+      const payoffAndNext545a = (records as any[])
+        .map((r, pos) => ({ pos, count: ((r.payoffSetupIds ?? []) as any[]).length }))
+        .filter(x => x.count > 0 && x.pos < n545a - 1);
+      if (payoffAndNext545a.length >= 3) {
+        const totalCurAftermath545a = payoffAndNext545a.reduce((sum, x) => {
+          return sum + (((records as any[])[x.pos + 1] as any).curiosityDelta ?? 0);
+        }, 0);
+        const avgCurAftermath545a = totalCurAftermath545a / payoffAndNext545a.length;
+        if (avgCurAftermath545a <= 0) {
+          issues.push({
+            location: `${payoffAndNext545a.length} payoff scene(s) — avg next-scene curiosityDelta ${avgCurAftermath545a.toFixed(2)}`,
+            rule: 'PAYOFF_AFTERMATH_CURIOSITY_VOID',
+            severity: 'minor',
+            description: `The scene immediately following each of the ${payoffAndNext545a.length} qualifying payoff scene(s) averages a curiosityDelta of ${avgCurAftermath545a.toFixed(2)} — resolutions consistently fail to reopen the audience's field of questions. A payoff completes a narrative promise, but its most durable dramatic function is also to make the audience wonder what comes next: a closed thread should raise a new question, complicate an existing one, or create the conditions for a new mystery. When the post-payoff scene averages zero or negative curiosityDelta, thread resolutions operate as pure closures — the audience receives an answer without being primed toward the next unknown. Each satisfied promise drains the story's forward tension without replenishing it.`,
+            suggestedFix: `After at least one payoff scene, let the following beat introduce a new question, complication, or uncertainty — a detail that the resolution has now made possible to notice, a consequence of the closed thread that creates new wondering, or a character whose reaction to the resolution opens a fresh dramatic question. The payoff is the moment when the audience is most receptive to a new mystery: their curiosity has just been satisfied and is ready to engage with the next unknown.`,
+          });
+        }
+      }
+    }
+  }
+
+  // EMOTIONAL_OPENING_THIRD_ABSENT (zone presence/absence × emotional charge × opening third,
+  // n≥9, ≥3 emotionally charged scenes [emotionalShift ≠ 'neutral'], none in the opening third
+  // [pos < floor(n/3)]): The story's first structural zone — the establishment section — is
+  // completely emotionally flat while the rest of the narrative carries felt emotional charge.
+  // The opening third's job is to anchor the audience to characters through felt stakes: the
+  // protagonist's desire must be felt, not just described, for the conflict's eventual escalation
+  // to carry weight. When the opening third is entirely emotionally neutral, the audience spends
+  // the establishment section watching events that register intellectually but don't land as
+  // emotionally consequential — the first impression is one of narrative flatness. Zone presence/
+  // absence mode × emotional charge × opening zone. Distinct from EMOTIONAL_CLOSING_THIRD_ABSENT
+  // (Wave 517: closing zone — the story's resolution is emotionally flat; different zone),
+  // EMOTIONAL_ZONE_CLUSTER (Wave 475: distribution/timing × thirds — fires when >75% of charged
+  // scenes concentrate in one third; this fires when the OPENING THIRD SPECIFICALLY has zero;
+  // opposite problem in the same family), EMOTIONAL_NEUTRAL_RUN (Wave 324: run-based — fires on
+  // 6+ consecutive neutral scenes regardless of structural position).
+  {
+    const n545b = records.length;
+    if (n545b >= 9) {
+      const thirdEnd545b = Math.floor(n545b / 3);
+      const chargedScenes545b = (records as any[]).filter(r => r.emotionalShift !== 'neutral');
+      if (chargedScenes545b.length >= 3) {
+        const openingCharged545b = (records as any[]).filter(
+          (r, i) => i < thirdEnd545b && r.emotionalShift !== 'neutral',
+        );
+        if (openingCharged545b.length === 0) {
+          issues.push({
+            location: `Opening third (scenes 0–${thirdEnd545b - 1}) — no emotionally charged scene`,
+            rule: 'EMOTIONAL_OPENING_THIRD_ABSENT',
+            severity: 'minor',
+            description: `The opening third of the story (scenes 0–${thirdEnd545b - 1}) contains no emotionally charged scene — every scene in the establishment zone has a neutral emotional shift — while ${chargedScenes545b.length} charged scenes exist in the subsequent two-thirds. The opening third's job is to anchor the audience to characters through felt stakes: the protagonist's desire, fear, or attachment must be emotionally registered in the opening zone for the story's eventual conflict to carry weight. When the first structural zone is entirely emotionally neutral, the audience spends the establishment section watching events that register intellectually but don't land as emotionally consequential — the story's initial contract is one of observation rather than investment.`,
+            suggestedFix: `Place at least one emotionally charged scene in the opening third (scenes 0–${thirdEnd545b - 1}) — a moment where the protagonist experiences something that generates felt positive or negative emotion rather than neutral observation. The charged scene doesn't need to be a crisis: a small but genuine moment of joy, fear, hope, or loss in the opening zone tells the audience that they are watching a story that intends to make them feel something, and gives them an emotional stake that the subsequent conflict can then threaten or reward.`,
+          });
+        }
+      }
+    }
+  }
+
+  // SEED_STASIS_RUN (run-based × seed-absence × seed channel, n≥8, ≥3 seed scenes
+  // [seededClueIds.length > 0], max consecutive non-seed scenes ≥ 7): An unbroken stretch of ≥7
+  // scenes passes without any clue being planted, even though ≥3 seed scenes exist elsewhere.
+  // The foreshadowing engine goes completely silent during its longest uninterrupted stretch —
+  // no new mystery thread is opened, no detail is placed that will pay off later. Seeds are the
+  // structural mechanism of forward momentum: each planted clue is a promise that the audience
+  // will subconsciously track toward resolution. A drought of 7+ consecutive unseeded scenes means
+  // the audience passes an extended zone where no new promises are being made — the story is
+  // consuming its existing setup without replenishing it. Run-based × seed-absence. Distinct from
+  // SEED_TEMPORAL_CLUSTER (Wave 475: distribution/timing × thirds — fires when >75% of seeds
+  // concentrate in one third, not when a specific sustained run is seed-free), CLUE_SEED_CLUSTER
+  // (Wave 254: per-scene overconcentration — 3+ seeds in one scene, the opposite problem),
+  // SEED_AFTERMATH_CURIOSITY_VOID and SEED_AFTERMATH_SUSPENSE_VOID (aftermath mode, not run-based
+  // absence), the seed co-occurrence checks (same scene, different mode).
+  if (records.length >= 8) {
+    const seedSceneIdxSet545c = new Set(
+      (records as any[])
+        .filter(r => ((r.seededClueIds ?? []) as any[]).length > 0)
+        .map(r => r.sceneIdx),
+    );
+    if (seedSceneIdxSet545c.size >= 3) {
+      let maxGap545c = 0, curGap545c = 0;
+      for (const r of records as any[]) {
+        if (seedSceneIdxSet545c.has(r.sceneIdx)) {
+          if (curGap545c > maxGap545c) maxGap545c = curGap545c;
+          curGap545c = 0;
+        } else {
+          curGap545c++;
+        }
+      }
+      if (curGap545c > maxGap545c) maxGap545c = curGap545c;
+      if (maxGap545c >= 7) {
+        issues.push({
+          location: `Seed stasis — ${maxGap545c} consecutive scenes carry no planted clue`,
+          rule: 'SEED_STASIS_RUN',
+          severity: 'minor',
+          description: `An unbroken run of ${maxGap545c} consecutive scenes passes without any planted clue — no seededClueIds, no new foreshadowing signal — even though ${seedSceneIdxSet545c.size} seed scenes exist elsewhere. The foreshadowing engine goes completely silent during its longest uninterrupted stretch: no new mystery thread is opened, no detail is placed that will pay off later. Seeds are the structural mechanism of forward momentum: each planted clue is a promise the audience will subconsciously track toward eventual resolution. A ${maxGap545c}-scene seed drought means the audience passes an extended zone where no new promises are being made — the story consumes its existing setup without replenishing it. The cumulative effect is a growing sense that the story has stopped investing in its future, which weakens the audience's anticipatory engagement.`,
+          suggestedFix: `Plant at least one new clue within the ${maxGap545c}-scene drought — a detail, object, behavior, or piece of information that will pay off in a later scene. The seed doesn't need to be obviously significant: the best seeds often feel incidental in their placing and only become meaningful in retrospect. Breaking the drought with a single planted detail restores the audience's sense that the story is consistently preparing for something, not just playing out existing momentum.`,
+        });
       }
     }
   }

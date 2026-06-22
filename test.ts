@@ -33680,6 +33680,97 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 545 — causalityPass: payoff aftermath curiosity void, emotional opening third absent, seed stasis run', async () => {
+    const makeRec545 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const runCA545 = async (records: any[]) => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // PAYOFF_AFTERMATH_CURIOSITY_VOID fire:
+    // n=10; payoffs at i=2,4,6 (pos<9); following scenes 3,5,7 all have curiosityDelta=0
+    // avgCurAftermath=(0+0+0)/3=0≤0 → fires
+    it('PAYOFF_AFTERMATH_CURIOSITY_VOID fires when post-payoff scenes average zero curiosityDelta', async () => {
+      const recs545a = Array.from({ length: 10 }, (_, i) =>
+        makeRec545(i, {
+          payoffSetupIds: [2, 4, 6].includes(i) ? ['setup-1'] : [],
+          curiosityDelta: 0,
+        }),
+      );
+      const res = await runCA545(recs545a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_AFTERMATH_CURIOSITY_VOID'), 'PAYOFF_AFTERMATH_CURIOSITY_VOID should fire');
+    });
+
+    // PAYOFF_AFTERMATH_CURIOSITY_VOID no-fire:
+    // payoffs at i=2,4,6; scene 3 (follows payoff 2) has curiosityDelta=1 → avg=(1+0+0)/3>0 → no fire
+    it('PAYOFF_AFTERMATH_CURIOSITY_VOID does not fire when at least one post-payoff scene has positive curiosityDelta', async () => {
+      const recs545anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec545(i, {
+          payoffSetupIds: [2, 4, 6].includes(i) ? ['setup-1'] : [],
+          curiosityDelta: i === 3 ? 1 : 0,
+        }),
+      );
+      const res = await runCA545(recs545anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_AFTERMATH_CURIOSITY_VOID'), 'PAYOFF_AFTERMATH_CURIOSITY_VOID should not fire');
+    });
+
+    // EMOTIONAL_OPENING_THIRD_ABSENT fire:
+    // n=9; thirdEnd=3; charged scenes at i=4,6,8 (all≥3); opening third 0-2 has none → fires
+    it('EMOTIONAL_OPENING_THIRD_ABSENT fires when opening third contains no emotionally charged scenes', async () => {
+      const recs545b = Array.from({ length: 9 }, (_, i) =>
+        makeRec545(i, {
+          emotionalShift: [4, 6, 8].includes(i) ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runCA545(recs545b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'EMOTIONAL_OPENING_THIRD_ABSENT'), 'EMOTIONAL_OPENING_THIRD_ABSENT should fire');
+    });
+
+    // EMOTIONAL_OPENING_THIRD_ABSENT no-fire:
+    // n=9; charged scenes at i=1,4,6 — i=1 is in opening third (1<3) → not empty → no fire
+    it('EMOTIONAL_OPENING_THIRD_ABSENT does not fire when the opening third has at least one charged scene', async () => {
+      const recs545bnr = Array.from({ length: 9 }, (_, i) =>
+        makeRec545(i, {
+          emotionalShift: [1, 4, 6].includes(i) ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runCA545(recs545bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'EMOTIONAL_OPENING_THIRD_ABSENT'), 'EMOTIONAL_OPENING_THIRD_ABSENT should not fire');
+    });
+
+    // SEED_STASIS_RUN fire:
+    // n=10; seeds at i=0,1,9; gap between i=1 and i=9 = 7 scenes (2-8); maxGap=7≥7 → fires
+    it('SEED_STASIS_RUN fires when 7+ consecutive scenes contain no planted clue', async () => {
+      const recs545c = Array.from({ length: 10 }, (_, i) =>
+        makeRec545(i, {
+          seededClueIds: [0, 1, 9].includes(i) ? ['clue-x'] : [],
+        }),
+      );
+      const res = await runCA545(recs545c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_STASIS_RUN'), 'SEED_STASIS_RUN should fire');
+    });
+
+    // SEED_STASIS_RUN no-fire:
+    // seeds at i=0,4,9; gaps = 3 (1-3) and 4 (5-8) → maxGap=4<7 → no fire
+    it('SEED_STASIS_RUN does not fire when no seed gap reaches 7 consecutive scenes', async () => {
+      const recs545cnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec545(i, {
+          seededClueIds: [0, 4, 9].includes(i) ? ['clue-x'] : [],
+        }),
+      );
+      const res = await runCA545(recs545cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_STASIS_RUN'), 'SEED_STASIS_RUN should not fire');
+    });
+  });
+
   describe('Wave 531 — causalityPass: suspense spike relationship void, clock temporal cluster, seed aftermath suspense void', async () => {
     const makeRec531 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
