@@ -120,6 +120,19 @@
 // aftermath × clock × payoff trigger — ≥3 qualifying payoffs none followed by a clock raise in
 // the next 2 scenes while ≥2 clock scenes exist; adds the clock channel to the payoff-aftermath
 // family and is distinct from PAYOFF_CLOCK_DECOUPLED which audits same-scene co-occurrence).
+// Wave 552 additions: payoff drought run (run-based × payoff × consecutive absence —
+// 5+ consecutive scenes with no payoff while ≥4 payoffs exist; the payoff-side mirror of
+// SEED_DROUGHT_RUN which detects the same drought pattern on the seed trigger; distinct from
+// SETUP_PAYOFF_DEAD_RUN which requires both seeds AND payoffs absent simultaneously), seed
+// relationship valence uniform (valence × relationship × seed trigger — ≥2 seed scenes
+// that each also move a relationship all have shifts of the same sign, so the clue-planting
+// engine is relationally monotone; distinct from PAYOFF_RELATIONSHIP_VALENCE_UNIFORM which
+// uses payoff trigger, and CLUE_SEED_RELATIONSHIP_DECOUPLED which fires when no overlap at
+// all), payoff emotional valence uniform (valence × emotional × payoff trigger — ≥3 payoffs,
+// ≥2 with non-neutral emotionalShift, all share one valence so resolutions only produce grief
+// or only relief; distinct from PAYOFF_EMOTION_DECOUPLED which fires when ALL payoffs are
+// emotionally neutral, and PAYOFF_RELATIONSHIP_VALENCE_UNIFORM which uses the relationship
+// channel).
 // Wave 538 additions: payoff dramatic turn aftermath absent (sequence/aftermath × dramatic
 // turn × payoff trigger — ≥3 qualifying payoffs none followed by a dramatic turn in next 2
 // scenes while ≥2 turn scenes exist; every delivery produces no pivot in its wake; completes
@@ -2744,6 +2757,126 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
             description: `Every clue-planting scene in the story (${qualSeeds538c.length} scene(s) with seededClueIds) is followed by two scenes in which no deadline is activated (clockRaised stays false), despite ${clockScenes538c.length} clock-raising scene(s) existing elsewhere. Planting a clue should couple with urgency: once evidence is hidden in the story, the clock that makes that evidence matter should start ticking nearby. When seeds and clock raises always occur in separate pockets of the narrative, the planted threads lack expiry dates — the audience knows a secret exists but feels no time pressure around it, producing curiosity without the tension that makes that curiosity urgent.`,
             suggestedFix: `After at least one seed scene, let the following scene raise a deadline or escalate an existing clock — a threat that becomes more pressing because of what was just discovered, or a new ticking fuse lit by the information that was just planted. The coupling creates foreshadowing with teeth: the audience now carries both a hidden question and a ticking pressure that makes resolving that question feel urgent.`,
           });
+        }
+      }
+    }
+  }
+
+  {
+    // PAYOFF_DROUGHT_RUN — run-based × payoff × consecutive absence.
+    // n≥10, ≥4 payoff scenes. Longest consecutive run of scenes with no payoff ≥5 → fire.
+    // The payoff engine should deliver at a rate that keeps open loops from going stale;
+    // a drought of 5+ consecutive non-payoff scenes in a story that otherwise resolves
+    // threads signals that the delivery engine has stalled — the audience forgets which
+    // promises were made while the silence accumulates.
+    // Distinct from: PAYOFF_CONSECUTIVE_RUN (Wave 426: run-based × consecutive presence —
+    // the inverse, a "resolution avalanche" of 3+ payoffs in a row), SEED_DROUGHT_RUN (Wave
+    // 510: same drought mode but seed trigger), SETUP_PAYOFF_DEAD_RUN (Wave 342: requires
+    // both seeds AND payoffs simultaneously absent — this fires on the payoff axis alone).
+    const n552a = records.length;
+    if (n552a >= 10) {
+      const isPayoff552a = new Set(
+        (records as any[])
+          .filter(r => ((r.payoffSetupIds ?? []) as string[]).length > 0)
+          .map(r => r.sceneIdx),
+      );
+      if (isPayoff552a.size >= 4) {
+        let maxRun552a = 0;
+        let curRun552a = 0;
+        for (const r of records as any[]) {
+          if (isPayoff552a.has(r.sceneIdx)) {
+            curRun552a = 0;
+          } else {
+            curRun552a++;
+            if (curRun552a > maxRun552a) maxRun552a = curRun552a;
+          }
+        }
+        if (maxRun552a >= 5) {
+          issues.push({
+            location: `${maxRun552a} consecutive scene(s) with no payoff`,
+            rule: 'PAYOFF_DROUGHT_RUN',
+            severity: 'minor',
+            description: `Despite ${isPayoff552a.size} payoff scene(s) distributed across the story, there is a run of ${maxRun552a} consecutive scenes in which no planted promise is delivered. A payoff drought of this length allows open loops to go cold: the audience remembers that a clue was planted, but the sustained silence makes them uncertain whether the story is still tracking that thread or has quietly abandoned it. The planted-promise engine should fire at a frequency that keeps open loops alive in the audience's working memory, not in clusters separated by long stretches where nothing is resolved.`,
+            suggestedFix: `Break the ${maxRun552a}-scene payoff drought by delivering at least one planted promise within the run — even a minor thread resolved mid-drought keeps the delivery engine active and reassures the audience that the story is still tracking its promises. If the drought is intentional (a deliberate deferral building pressure), add a scene mid-run that explicitly echoes an unresolved clue, confirming the thread is still live rather than forgotten.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // SEED_RELATIONSHIP_VALENCE_UNIFORM — valence × relationship × seed trigger.
+    // n≥8, ≥2 seed scenes that each also carry a relationship shift (seededClueIds non-empty
+    // AND non-empty relationshipShifts). Every relational shift amount across all such scenes
+    // shares one sign (all > 0 or all < 0) → fire. When the clue-planting engine is
+    // coupled to relational shifts, those shifts should have mixed valences: some truths draw
+    // characters together while others drive them apart. Monotone valence robs the seeded
+    // threads of their full dramatic range.
+    // Distinct from: PAYOFF_RELATIONSHIP_VALENCE_UNIFORM (Wave 426: payoff trigger vs. seed
+    // trigger here), CLUE_SEED_RELATIONSHIP_DECOUPLED (Wave 342: co-occurrence mode, fires
+    // when NO seed scene has any relShift — opposite condition), SEED_RELATIONSHIP_AFTERMATH_
+    // ABSENT (Wave 538: aftermath mode, fires when no relShift appears in the 2 scenes after
+    // any seed — a different structural position).
+    const n552b = records.length;
+    if (n552b >= 8) {
+      const seedRelRecs552b = (records as any[]).filter(r =>
+        ((r.seededClueIds ?? []) as string[]).length > 0 &&
+        ((r.relationshipShifts ?? []) as any[]).length > 0,
+      );
+      if (seedRelRecs552b.length >= 2) {
+        const amounts552b = seedRelRecs552b.flatMap((r: any) =>
+          ((r.relationshipShifts ?? []) as Array<{ amount: number }>).map(s => s.amount),
+        );
+        const allPos552b = amounts552b.every(a => a > 0);
+        const allNeg552b = amounts552b.every(a => a < 0);
+        if (allPos552b || allNeg552b) {
+          const valence552b = allPos552b ? 'positive (repair-only)' : 'negative (rupture-only)';
+          issues.push({
+            location: `${seedRelRecs552b.length} seed-with-relationship scene(s) — all ${valence552b}`,
+            rule: 'SEED_RELATIONSHIP_VALENCE_UNIFORM',
+            severity: 'minor',
+            description: `Every scene that both plants a clue and moves a relationship (${seedRelRecs552b.length} scene(s) with seededClueIds and non-empty relationshipShifts) carries relational shifts in the same direction (${valence552b}). Planted clues are discoveries — information that should have asymmetric effects on the bonds around them: some truths draw characters together (shared secrets, confirmed loyalties) while others fracture alliances (betrayals exposed, vulnerabilities weaponised). When every seed-with-relationship scene skews one way, the clue-planting engine is locked into a single relational gear, robbing the planted threads of their full emotional range and making the story's information-and-relationship engines predictably coupled.`,
+            suggestedFix: `Introduce at least one seed scene whose relational consequence runs ${allPos552b ? 'negative' : 'positive'} — a planted clue that ${allPos552b ? 'fractures a bond (a discovery that implies betrayal, a secret that creates distance, evidence of hidden disloyalty)' : 'repairs or deepens a bond (a shared discovery that creates alliance, a truth that confirms loyalty, evidence of hidden protection)'}. The mix of relational valences gives the planted-thread engine both emotional colors, so that each new clue carries genuine uncertainty about what it will do to the relationships around it.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // PAYOFF_EMOTIONAL_VALENCE_UNIFORM — valence × emotional × payoff trigger.
+    // n≥8, ≥3 payoff scenes, ≥2 with non-neutral emotionalShift. Every non-neutral payoff
+    // scene shares the same emotional valence (all 'positive' or all 'negative') → fire.
+    // When resolutions always produce relief or always produce grief, the payoff engine is
+    // emotionally monotone: the audience can predict the feeling-tone of each closure before
+    // it arrives, draining the scenes of affective surprise.
+    // Distinct from: PAYOFF_EMOTION_DECOUPLED (Wave 317: co-occurrence mode — fires when ALL
+    // payoffs are emotionally neutral; this check fires when emotion IS present but one-signed),
+    // PAYOFF_RELATIONSHIP_VALENCE_UNIFORM (Wave 426: valence × relationship channel vs. emotion
+    // channel here), SEED_RELATIONSHIP_VALENCE_UNIFORM (Wave 552: seed trigger vs. payoff trigger
+    // here, and relationship channel vs. emotion channel).
+    const n552c = records.length;
+    if (n552c >= 8) {
+      const payoffRecs552c = (records as any[]).filter(r =>
+        ((r.payoffSetupIds ?? []) as string[]).length > 0,
+      );
+      if (payoffRecs552c.length >= 3) {
+        const nonNeutral552c = payoffRecs552c.filter(
+          (r: any) => r.emotionalShift !== 'neutral' && r.emotionalShift != null,
+        );
+        if (nonNeutral552c.length >= 2) {
+          const allPositive552c = nonNeutral552c.every((r: any) => r.emotionalShift === 'positive');
+          const allNegative552c = nonNeutral552c.every((r: any) => r.emotionalShift === 'negative');
+          if (allPositive552c || allNegative552c) {
+            const val552c = allPositive552c ? 'positive' : 'negative';
+            issues.push({
+              location: `${nonNeutral552c.length} emotionally-charged payoff scene(s) — all ${val552c}`,
+              rule: 'PAYOFF_EMOTIONAL_VALENCE_UNIFORM',
+              severity: 'minor',
+              description: `Every payoff scene with a non-neutral emotional charge (${nonNeutral552c.length} scene(s)) carries a ${val552c} emotional shift — delivered promises produce only ${val552c === 'positive' ? 'relief, triumph, or joy' : 'grief, loss, or defeat'}. Resolutions should have emotionally diverse consequences: some threads pay off with earned relief (a feared truth proved false, a loyalty confirmed), while others land with painful recognition (a feared truth confirmed, a sacrifice seen too late to matter). When all emotionally-charged closures skew ${val552c}, the audience loses the element of surprise in the resolution phase — each new payoff arrives pre-announced by its predictable feeling-tone, and the cumulative effect is a resolution engine that feels rigged to one emotional outcome.`,
+              suggestedFix: `Introduce at least one payoff scene whose emotional charge runs ${val552c === 'positive' ? 'negative' : 'positive'} — a delivered promise that lands with ${val552c === 'positive' ? 'grief, loss, or painful confirmation of a feared truth (a clue that was right all along, a loyalty that turned out to be conditional)' : 'relief, vindication, or earned joy (a feared betrayal revealed as misdirection, a thread that resolves with unexpected grace)'}. The contrast gives the resolution engine both registers, so each closure carries genuine uncertainty about whether the delivery will hurt or heal.`,
+            });
+          }
         }
       }
     }

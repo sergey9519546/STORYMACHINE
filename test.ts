@@ -22942,6 +22942,131 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 552 — payoffPass: payoff drought run, seed relationship valence uniform, payoff emotional valence uniform', async () => {
+    const makeRec552 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runPY552 = async (records: any[]) => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    it('PAYOFF_DROUGHT_RUN fires when 5+ consecutive scenes have no payoff among 4+ payoffs', async () => {
+      // 10 scenes: payoffs at 0,1,8,9 (4 payoffs); drought 2-7 = 6 consecutive non-payoff scenes.
+      // Payoffs given suspenseDelta:1, curiosityDelta:1 to avoid suspense/curiosity mismatch checks.
+      // revelation on payoff scenes to avoid PAYOFF_REVELATION_DISCONNECT.
+      // sc2 has emotionalShift:'negative' to prevent PAYOFF_EMOTIONAL_RECOIL_ABSENT.
+      const recs552a = Array.from({ length: 10 }, (_, i) =>
+        makeRec552(i, {
+          payoffSetupIds: [0, 1, 8, 9].includes(i) ? [`p${i}`] : [],
+          suspenseDelta: [0, 1, 8, 9].includes(i) ? 1 : 0,
+          curiosityDelta: [0, 1, 8, 9].includes(i) ? 1 : 0,
+          revelation: [0, 1, 8, 9].includes(i) ? 'found' : null,
+          emotionalShift: i === 2 ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runPY552(recs552a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_DROUGHT_RUN'), 'PAYOFF_DROUGHT_RUN should fire');
+    });
+
+    it('PAYOFF_DROUGHT_RUN does not fire when longest non-payoff run is only 4', async () => {
+      // 10 scenes: payoffs at 0,5,7,9 (4 payoffs); longest drought = scenes 1-4 = 4 consecutive.
+      const recs552an = Array.from({ length: 10 }, (_, i) =>
+        makeRec552(i, {
+          payoffSetupIds: [0, 5, 7, 9].includes(i) ? [`p${i}`] : [],
+          suspenseDelta: [0, 5, 7, 9].includes(i) ? 1 : 0,
+          curiosityDelta: [0, 5, 7, 9].includes(i) ? 1 : 0,
+          revelation: [0, 5, 7, 9].includes(i) ? 'found' : null,
+          emotionalShift: i === 6 ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runPY552(recs552an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_DROUGHT_RUN'), 'PAYOFF_DROUGHT_RUN should not fire');
+    });
+
+    it('SEED_RELATIONSHIP_VALENCE_UNIFORM fires when all seed-with-relationship scenes share one relational sign', async () => {
+      // 8 scenes: seeds at 0,1 each with positive relShift. Other scenes neutral/no-seeds.
+      // Seeds have suspenseDelta:1, curiosityDelta:1, emotionalShift:'positive' to avoid flat checks.
+      const recs552b = Array.from({ length: 8 }, (_, i) =>
+        makeRec552(i, {
+          seededClueIds: [0, 1].includes(i) ? [`c${i}`] : [],
+          relationshipShifts: [0, 1].includes(i)
+            ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.5 }]
+            : [],
+          suspenseDelta: [0, 1].includes(i) ? 1 : 0,
+          curiosityDelta: [0, 1].includes(i) ? 1 : 0,
+          emotionalShift: [0, 1].includes(i) ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runPY552(recs552b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_RELATIONSHIP_VALENCE_UNIFORM'), 'SEED_RELATIONSHIP_VALENCE_UNIFORM should fire');
+    });
+
+    it('SEED_RELATIONSHIP_VALENCE_UNIFORM does not fire when seed-with-relationship scenes have mixed valence', async () => {
+      // 8 scenes: seed at 0 with positive relShift, seed at 1 with negative relShift → mixed.
+      const recs552bn = Array.from({ length: 8 }, (_, i) =>
+        makeRec552(i, {
+          seededClueIds: [0, 1].includes(i) ? [`c${i}`] : [],
+          relationshipShifts: i === 0
+            ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.5 }]
+            : i === 1
+              ? [{ pairKey: 'A|B', dimension: 'trust', amount: -0.4 }]
+              : [],
+          suspenseDelta: [0, 1].includes(i) ? 1 : 0,
+          curiosityDelta: [0, 1].includes(i) ? 1 : 0,
+          emotionalShift: [0, 1].includes(i) ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runPY552(recs552bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_RELATIONSHIP_VALENCE_UNIFORM'), 'SEED_RELATIONSHIP_VALENCE_UNIFORM should not fire');
+    });
+
+    it('PAYOFF_EMOTIONAL_VALENCE_UNIFORM fires when all non-neutral payoffs share one emotional valence', async () => {
+      // 8 scenes: payoffs at 2,4,6; sc2 and sc6 have emotionalShift:'positive'; sc4 neutral.
+      // 2 non-neutral payoffs, both positive → fire.
+      // revelation on payoff scenes to avoid PAYOFF_REVELATION_DISCONNECT.
+      // sc3 has emotionalShift:'negative' to avoid PAYOFF_EMOTIONAL_RECOIL_ABSENT.
+      // sc4 payoff has suspenseDelta:1 so sc2's aftermath (sc3,sc4) has suspense rise → avoids PAYOFF_SUSPENSE_RECOIL_ABSENT.
+      const recs552c = Array.from({ length: 8 }, (_, i) =>
+        makeRec552(i, {
+          payoffSetupIds: [2, 4, 6].includes(i) ? [`p${i}`] : [],
+          emotionalShift: [2, 6].includes(i) ? 'positive' : i === 3 ? 'negative' : 'neutral',
+          suspenseDelta: [2, 4, 6].includes(i) ? 1 : 0,
+          curiosityDelta: [2, 4, 6].includes(i) ? 1 : 0,
+          revelation: [2, 4, 6].includes(i) ? 'found' : null,
+        }),
+      );
+      const res = await runPY552(recs552c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_EMOTIONAL_VALENCE_UNIFORM'), 'PAYOFF_EMOTIONAL_VALENCE_UNIFORM should fire');
+    });
+
+    it('PAYOFF_EMOTIONAL_VALENCE_UNIFORM does not fire when non-neutral payoffs have mixed valence', async () => {
+      // 8 scenes: payoffs at 2,4,6; sc2 positive, sc4 negative, sc6 positive → mixed.
+      const recs552cn = Array.from({ length: 8 }, (_, i) =>
+        makeRec552(i, {
+          payoffSetupIds: [2, 4, 6].includes(i) ? [`p${i}`] : [],
+          emotionalShift: i === 2 ? 'positive' : i === 4 ? 'negative' : i === 6 ? 'positive' : 'neutral',
+          suspenseDelta: [2, 4, 6].includes(i) ? 1 : 0,
+          curiosityDelta: [2, 4, 6].includes(i) ? 1 : 0,
+          revelation: [2, 4, 6].includes(i) ? 'found' : null,
+        }),
+      );
+      const res = await runPY552(recs552cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_EMOTIONAL_VALENCE_UNIFORM'), 'PAYOFF_EMOTIONAL_VALENCE_UNIFORM should not fire');
+    });
+  });
+
   describe('Wave 538 — payoffPass: payoff dramatic turn aftermath absent, seed relationship aftermath absent, seed clock aftermath absent', async () => {
     const makeRec538 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
