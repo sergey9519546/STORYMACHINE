@@ -161,6 +161,22 @@
 // resolution arrives without felt emotional engagement; the emotional complement of CLOCK_FINAL_THIRD_
 // ABSENT; distinct from EMOTIONAL_ZONE_CLUSTER which flags concentration and EMOTIONAL_NEUTRAL_RUN
 // which is run-based).
+// Wave 559 additions: relationship shift uncaused (backward-cause × relationship channel — n≥8,
+// ≥3 relationship-shift scenes at pos≥2, ALL preceded in prior 2 scenes by no suspense/revelation/
+// turn driver; bond changes drop from nowhere without any narrative pressure; first backward-cause
+// check on the relationship channel, distinct from all other backward-cause checks [suspense spike,
+// curiosity spike, positive emotion, dramatic turn, clock peak] which use different signal channels,
+// and from DRAMATIC_TURN_RELATIONSHIP_VOID [co-occurrence × same scene] and RELATIONSHIP_STASIS_RUN
+// [run-based × absence]), relationship closing third absent (zone presence/absence × relationship ×
+// closing third — n≥9, ≥3 relationship-shift scenes globally, 0 in the final third; all bond
+// dynamics resolve before the climax; distinct from EMOTIONAL_CLOSING_THIRD_ABSENT [emotion not
+// relationship] and CLOCK_FINAL_THIRD_ABSENT [clock not relationship]; first zone-absence check on
+// the relationship channel), payoff relationship aftermath void (average/aggregate × payoff →
+// relationship aftermath — n≥8, ≥3 qualifying payoff scenes [pos<n-1], all scenes immediately
+// following a payoff carry no relationship shifts; thread resolutions never ripple into bond changes;
+// distinct from PAYOFF_RELATIONSHIP_VOID [co-occurrence × same scene — payoff scene itself has no
+// relationship shift; this checks the scene AFTER], PAYOFF_AFTERMATH_SUSPENSE_VOID [suspense channel
+// aftermath], PAYOFF_AFTERMATH_CURIOSITY_VOID [curiosity channel aftermath]).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3107,6 +3123,125 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
           description: `An unbroken run of ${maxGap545c} consecutive scenes passes without any planted clue — no seededClueIds, no new foreshadowing signal — even though ${seedSceneIdxSet545c.size} seed scenes exist elsewhere. The foreshadowing engine goes completely silent during its longest uninterrupted stretch: no new mystery thread is opened, no detail is placed that will pay off later. Seeds are the structural mechanism of forward momentum: each planted clue is a promise the audience will subconsciously track toward eventual resolution. A ${maxGap545c}-scene seed drought means the audience passes an extended zone where no new promises are being made — the story consumes its existing setup without replenishing it. The cumulative effect is a growing sense that the story has stopped investing in its future, which weakens the audience's anticipatory engagement.`,
           suggestedFix: `Plant at least one new clue within the ${maxGap545c}-scene drought — a detail, object, behavior, or piece of information that will pay off in a later scene. The seed doesn't need to be obviously significant: the best seeds often feel incidental in their placing and only become meaningful in retrospect. Breaking the drought with a single planted detail restores the audience's sense that the story is consistently preparing for something, not just playing out existing momentum.`,
         });
+      }
+    }
+  }
+
+  // ── Wave 559: RELATIONSHIP_SHIFT_UNCAUSED, RELATIONSHIP_CLOSING_THIRD_ABSENT,
+  //              PAYOFF_RELATIONSHIP_AFTERMATH_VOID ───────────────────────────────────────────────
+  {
+    // RELATIONSHIP_SHIFT_UNCAUSED (backward-cause × relationship channel, n≥8, ≥3 relationship-
+    // shift scenes at pos≥2, ALL preceded in the 2 prior scenes by no suspense rise/revelation/
+    // dramatic turn): Every bond movement in the script arrives without any visible causal
+    // driver — relationships change with no upstream force generating the change. The natural
+    // mechanism of relational change is narrative pressure: a revelation that exposes the truth
+    // of a relationship, a dramatic turn that recontextualizes how characters relate to each
+    // other, or a suspense spike that forces characters into proximity or conflict that moves
+    // their bond. When all relationship shifts emerge from calm, driver-free sequences, the
+    // relational changes feel arbitrary rather than earned — the audience sees the bond move
+    // without seeing what moved it. Backward-cause mode × relationship channel. Distinct from
+    // all other backward-cause checks in this pass (SUSPENSE_SPIKE_WITHOUT_CAUSE, CURIOSITY_SPIKE_
+    // WITHOUT_CAUSE, POSITIVE_REACTION_WITHOUT_CAUSE, DRAMATIC_TURN_WITHOUT_CAUSE, SUSPENSE_PEAK_
+    // UNCAUSED, CLOCK_PEAK_UNCAUSED — all check different SIGNAL channels as the effect), from
+    // DRAMATIC_TURN_RELATIONSHIP_VOID (Wave 447: co-occurrence × same scene — whether turns and
+    // relationship shifts ever COINCIDE; this checks backward causation, different direction and
+    // window), from RELATIONSHIP_STASIS_RUN (Wave 461: run-based × relationship-absence — fires
+    // on gaps between shifts, not on the causal history of the shifts).
+    if (records.length >= 8) {
+      const qualRelShifts559a = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) => ((r.relationshipShifts ?? []) as any[]).length > 0 && pos >= 2);
+      if (qualRelShifts559a.length >= 3) {
+        const allUncaused559a = qualRelShifts559a.every(({ pos }) => {
+          for (let off = 1; off <= 2; off++) {
+            const prior = (records as any[])[pos - off];
+            if ((prior.suspenseDelta ?? 0) > 0) return false;
+            if (prior.revelation !== null && prior.revelation !== undefined && prior.revelation !== '') return false;
+            if ((prior.dramaticTurn ?? 'nothing') !== 'nothing' && prior.dramaticTurn !== '') return false;
+          }
+          return true;
+        });
+        if (allUncaused559a) {
+          issues.push({
+            location: `${qualRelShifts559a.length} relationship-shift scene(s) — none preceded by suspense, revelation, or turn in prior 2 scenes`,
+            rule: 'RELATIONSHIP_SHIFT_UNCAUSED',
+            severity: 'minor',
+            description: `Every relationship-shift scene (${qualRelShifts559a.length} instances at position ≥2) is preceded in the two prior scenes by no suspense rise, revelation, or dramatic turn — bond changes arrive without any visible narrative driver. The natural mechanism of relational change is pressure: a revelation that exposes the truth of a relationship, a dramatic turn that recontextualizes how characters relate, or a suspense spike that forces characters into conflict or proximity that moves the bond. When all relationship shifts emerge from calm, driver-free sequences, the relational changes feel arbitrary rather than earned — the audience sees the bond move without the story showing what moved it. The relational engine operates in a causal vacuum, decoupled from every other structural event.`,
+            suggestedFix: `Before at least one relationship-shift scene, ensure the two preceding scenes carry a driver: a revelation that reframes the relationship, a dramatic turn that puts pressure on the bond, or a suspense spike that forces characters into a situation where the relationship must change. The cleaner the causal chain (driver → relationship shift), the more the audience feels they understand the story's relational logic.`,
+          });
+        }
+      }
+    }
+
+    // RELATIONSHIP_CLOSING_THIRD_ABSENT (zone presence/absence × relationship channel × closing
+    // third, n≥9, ≥3 relationship-shift scenes globally, 0 in the final third [pos ≥ 2n/3]):
+    // All bond dynamics in the story resolve before the climax — the final third contains no
+    // relationship movement while ≥3 relationship shifts exist in the first two-thirds. The
+    // closing third of a screenplay is typically where interpersonal consequences peak: the
+    // protagonist's arc of relational change should culminate in the climax and denouement, not
+    // complete itself in the midpoint and leave the finale interpersonally static. When no
+    // relationship shift occurs in the final third, the story's climax is entirely relational-
+    // vacuum — characters reach the resolution with their bonds already settled, and the finale
+    // can only work with what the audience already knows about how characters relate. Zone
+    // presence/absence mode × relationship channel. Distinct from EMOTIONAL_CLOSING_THIRD_ABSENT
+    // (Wave 517: emotion not relationship — fires when the emotional channel is absent from the
+    // closing third), CLOCK_FINAL_THIRD_ABSENT (Wave 503: clock not relationship), RELATIONSHIP_
+    // STASIS_RUN (Wave 461: run-based × consecutive scenes with no shift — fires on the length
+    // of a gap anywhere in the story, not specifically on the closing structural zone).
+    if (records.length >= 9) {
+      const relShiftPositions559b = (records as any[])
+        .map((r, i) => ({ r, i }))
+        .filter(({ r }) => ((r.relationshipShifts ?? []) as any[]).length > 0)
+        .map(({ i }) => i);
+      if (relShiftPositions559b.length >= 3) {
+        const closingStart559b = Math.ceil(records.length * 2 / 3);
+        const inFinal559b = relShiftPositions559b.some(i => i >= closingStart559b);
+        if (!inFinal559b) {
+          issues.push({
+            location: `${relShiftPositions559b.length} relationship-shift scene(s) — none in the final third (scenes ${closingStart559b}–${records.length - 1})`,
+            rule: 'RELATIONSHIP_CLOSING_THIRD_ABSENT',
+            severity: 'minor',
+            description: `The script has ${relShiftPositions559b.length} relationship-shift scenes, all occurring before the final third (scene ${closingStart559b} onward). The closing third — from approximately the 67% mark through the end — contains no bond movement. The climax and denouement arrive with the story's interpersonal dynamics already settled: characters reach the resolution with their relationships in a fixed state, and the finale can only work with what the audience already knows about how they relate. A story's interpersonal peak typically belongs in the closing section: the alliance that decides the climax, the betrayal that makes the resolution possible or impossible, or the reconciliation that gives the denouement its emotional payoff. When the relational channel goes silent before the finale, the story's conclusion is structurally weaker.`,
+            suggestedFix: `Introduce at least one relationship shift in the final third — a bond move that matters to how the climax and resolution play out. The closing-third relationship shift need not be a dramatic reversal: even a small movement in a key relationship (an acknowledgment, a severance, a reconciliation) gives the finale an interpersonal dimension that makes the resolution feel humanly earned rather than purely plot-mechanical.`,
+          });
+        }
+      }
+    }
+
+    // PAYOFF_RELATIONSHIP_AFTERMATH_VOID (average/aggregate × payoff → relationship aftermath,
+    // n≥8, ≥3 qualifying payoff scenes [pos<n-1], all scenes immediately following a payoff
+    // carry no relationship shifts): Thread resolutions never ripple into bond changes — the
+    // scene immediately after each payoff passes without any relationship shift, even though
+    // payoffs elsewhere in the story coincide with relationship movement. A payoff at its most
+    // structurally productive does more than close a thread: it changes how characters relate
+    // to each other because of what was resolved. When the scene after every payoff contains
+    // no relationship shift, resolutions complete their promises in a relational vacuum — the
+    // resolved thread doesn't alter any bond, and the story's resolution layer is decoupled
+    // from its relational layer. Average/aggregate mode × payoff trigger × relationship
+    // aftermath. Distinct from PAYOFF_RELATIONSHIP_VOID (Wave 461: co-occurrence × same scene —
+    // the payoff SCENE ITSELF carries no relationship shift; this checks the FOLLOWING scene —
+    // aftermath direction, one temporal step later), PAYOFF_AFTERMATH_SUSPENSE_VOID (Wave 517:
+    // same aftermath structure × suspense channel — not relationship), PAYOFF_AFTERMATH_CURIOSITY_
+    // VOID (Wave 545: same structure × curiosity channel — not relationship).
+    if (records.length >= 8) {
+      const qualPayoffPos559c = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) => ((r.payoffSetupIds ?? []) as string[]).length > 0 && pos < records.length - 1)
+        .map(({ pos }) => pos);
+      if (qualPayoffPos559c.length >= 3) {
+        const allRelVoid559c = qualPayoffPos559c.every(pos => {
+          const next = (records as any[])[pos + 1];
+          return ((next.relationshipShifts ?? []) as any[]).length === 0;
+        });
+        if (allRelVoid559c) {
+          issues.push({
+            location: `${qualPayoffPos559c.length} qualifying payoff scene(s) — none followed by a relationship shift`,
+            rule: 'PAYOFF_RELATIONSHIP_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `Every payoff scene (${qualPayoffPos559c.length} instances not at the last position) is immediately followed by a scene with no relationship shift — thread resolutions never ripple into bond changes. A payoff is most structurally productive when it does more than close a thread: the resolved promise changes how characters relate to each other because of what was settled. When the scene after every payoff passes with no relationship shift, resolutions operate in a relational vacuum — the story resolves its planted threads without any of those resolutions altering the interpersonal landscape. The payoff layer and the relationship layer are decoupled in the moment immediately after resolution, the scene most receptive to interpersonal consequence.`,
+            suggestedFix: `After at least one payoff, let the immediately following scene carry a relationship shift generated by what was just resolved: a bond that changes because the threat was eliminated, an alliance that forms or breaks because the promise was kept or broken, or a dynamic that shifts because both characters now know what the payoff revealed. Even a small relationship move in the wake of a payoff gives the resolution an interpersonal dimension — the story resolves not just its plots but its people.`,
+          });
+        }
       }
     }
   }

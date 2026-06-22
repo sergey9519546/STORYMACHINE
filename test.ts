@@ -34722,6 +34722,103 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 559 — causalityPass: relationship shift uncaused, relationship closing third absent, payoff relationship aftermath void', async () => {
+    const makeRec559 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const runC559 = async (records: any[]) => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: records.map(() => ({})), approvedSpans: [] });
+    };
+
+    // RELATIONSHIP_SHIFT_UNCAUSED fire:
+    // 8 scenes; relationship shifts at pos 2,4,6 (all ≥2); prior 2 scenes of each have no
+    // suspense/revelation/turn → all uncaused → fires
+    it('RELATIONSHIP_SHIFT_UNCAUSED fires when all relationship shifts lack causal drivers in prior 2 scenes', async () => {
+      const recs559a = Array.from({ length: 8 }, (_, i) =>
+        makeRec559(i, {
+          relationshipShifts: [2, 4, 6].includes(i) ? [{ pairKey: 'A-B', dimension: 'trust', amount: 1 }] : [],
+          suspenseDelta: 0,
+          revelation: null,
+          dramaticTurn: 'nothing',
+        }),
+      );
+      const res = await runC559(recs559a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_UNCAUSED'), 'RELATIONSHIP_SHIFT_UNCAUSED should fire');
+    });
+
+    // RELATIONSHIP_SHIFT_UNCAUSED no-fire:
+    // 8 scenes; relationship shift at pos 3; scene at pos 2 has suspenseDelta>0 → caused → no fire
+    it('RELATIONSHIP_SHIFT_UNCAUSED does not fire when a relationship shift is preceded by a suspense driver', async () => {
+      const recs559anr = Array.from({ length: 8 }, (_, i) =>
+        makeRec559(i, {
+          relationshipShifts: [3, 5, 7].includes(i) ? [{ pairKey: 'A-B', dimension: 'trust', amount: 1 }] : [],
+          suspenseDelta: i === 2 ? 2 : 0, // scene 2 causes shift at scene 3
+        }),
+      );
+      const res = await runC559(recs559anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_UNCAUSED'), 'RELATIONSHIP_SHIFT_UNCAUSED should not fire');
+    });
+
+    // RELATIONSHIP_CLOSING_THIRD_ABSENT fire:
+    // 9 scenes; relationship shifts at pos 0,1,2; closingStart=ceil(9*2/3)=6; none at pos≥6 → fires
+    it('RELATIONSHIP_CLOSING_THIRD_ABSENT fires when no relationship shifts occur in the final third', async () => {
+      const recs559b = Array.from({ length: 9 }, (_, i) =>
+        makeRec559(i, {
+          relationshipShifts: [0, 1, 2].includes(i) ? [{ pairKey: 'A-B', dimension: 'trust', amount: 1 }] : [],
+        }),
+      );
+      const res = await runC559(recs559b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_CLOSING_THIRD_ABSENT'), 'RELATIONSHIP_CLOSING_THIRD_ABSENT should fire');
+    });
+
+    // RELATIONSHIP_CLOSING_THIRD_ABSENT no-fire:
+    // 9 scenes; relationship shifts at pos 0,1,7; closingStart=6; pos 7 ≥ 6 → inFinal=true → no fire
+    it('RELATIONSHIP_CLOSING_THIRD_ABSENT does not fire when a relationship shift exists in the final third', async () => {
+      const recs559bnr = Array.from({ length: 9 }, (_, i) =>
+        makeRec559(i, {
+          relationshipShifts: [0, 1, 7].includes(i) ? [{ pairKey: 'A-B', dimension: 'trust', amount: 1 }] : [],
+        }),
+      );
+      const res = await runC559(recs559bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_CLOSING_THIRD_ABSENT'), 'RELATIONSHIP_CLOSING_THIRD_ABSENT should not fire');
+    });
+
+    // PAYOFF_RELATIONSHIP_AFTERMATH_VOID fire:
+    // 8 scenes; payoffs at pos 0,2,4 (all<7); scenes at 1,3,5 have empty relationshipShifts →
+    // 3 qualifying, all followed by no relationship shift → fires
+    it('PAYOFF_RELATIONSHIP_AFTERMATH_VOID fires when all payoff scenes are followed by no relationship shift', async () => {
+      const recs559c = Array.from({ length: 8 }, (_, i) =>
+        makeRec559(i, {
+          payoffSetupIds: [0, 2, 4].includes(i) ? ['setup-A'] : [],
+          relationshipShifts: [],
+        }),
+      );
+      const res = await runC559(recs559c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_RELATIONSHIP_AFTERMATH_VOID'), 'PAYOFF_RELATIONSHIP_AFTERMATH_VOID should fire');
+    });
+
+    // PAYOFF_RELATIONSHIP_AFTERMATH_VOID no-fire:
+    // 8 scenes; payoffs at pos 0,2,4; scene at pos 1 has relationshipShifts non-empty →
+    // not all void → no fire
+    it('PAYOFF_RELATIONSHIP_AFTERMATH_VOID does not fire when a payoff aftermath carries a relationship shift', async () => {
+      const recs559cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec559(i, {
+          payoffSetupIds: [0, 2, 4].includes(i) ? ['setup-A'] : [],
+          relationshipShifts: i === 1 ? [{ pairKey: 'A-B', dimension: 'trust', amount: 1 }] : [],
+        }),
+      );
+      const res = await runC559(recs559cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_RELATIONSHIP_AFTERMATH_VOID'), 'PAYOFF_RELATIONSHIP_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 545 — causalityPass: payoff aftermath curiosity void, emotional opening third absent, seed stasis run', async () => {
     const makeRec545 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
