@@ -115,6 +115,17 @@
 // longest speech ≥10 words is in the first 25%, ≥3 long speeches exist in the rest; the inverse of
 // DIALOGUE_OPENING_ZONE_LONG_ABSENT and distinct from DIALOGUE_LENGTH_OUTLIER which checks ratio to
 // mean rather than zonal position; first single-peak isolation check using positional zone).
+// Wave 543 additions: action passive run (run-based × passive construction × action lines —
+// ≥10 action lines, ≥3 passive globally, maxRun ≥4; first run-based check on the action-line
+// corpus in this pass; distinct from PASSIVE_ACTION_VOICE which fires on global proportion ≥15%
+// and cannot detect a local passive streak while the overall rate stays below threshold), dialogue
+// affirmation flood (valence × affirmation content × dialogue — ≥10 dialogue lines, >30% contain
+// explicit affirmative assent: yes/yeah/right/exactly/absolutely/of course/agreed/definitely etc.;
+// positive-valence complement of DIALOGUE_NEGATION_FLOOD completing the valence polarity pair),
+// dialogue exclamation backward causeless (backward-cause × exclamation channel × dialogue —
+// ≥8 dialogue lines, ≥2 qualifiable !-ending lines [i>0], ALL preceded by a line ending in
+// neither "?" nor "!" in the immediately prior dialogue line; all emotional intensity is
+// self-generated rather than provoked; first backward-cause check on the exclamation channel).
 // Wave 529 additions: dialogue question zone middle absent (zone presence/absence × question mark ×
 // middle 50% — ≥12 dialogue lines, ≥4 questions globally, zero in middle 50% while ≥2 exist in outer
 // zones; fills the middle-zone cell in the zone × question-absence grid alongside OPENING_ZONE_... and
@@ -3126,6 +3137,125 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `Every question-ending dialogue line (${qAfterIdxs529c.length} instances) is immediately followed by a response of ≥10 words. Questions are invitations — brief, pointed, forward-facing moves. When every question earns a monologue in return, dialogue loses the conversational ping-pong that makes exchange dynamic. The scene collapses into a Q&A format where the interrogative functions purely as a prompt for extended elaboration: asking becomes a way to cue a speech rather than to receive information. Natural conversation mixes long and short responses depending on what the question demands; a uniform policy of extended answers signals that the dialogue is structured as interview rather than negotiation.`,
             suggestedFix: `After at least one question, give a short response — an answer that answers, a deflection that deflects in one clause, a counter-question. Not every question needs an aria in response. A well-placed single sentence after a question gives the asker their due and moves the exchange forward; the monologue can then come after a moment of silence or a second, more specific question has established the invitation for it.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 543: ACTION_PASSIVE_RUN, DIALOGUE_AFFIRMATION_FLOOD,
+  //              DIALOGUE_EXCLAMATION_BACKWARD_CAUSELESS ──────────────────────────────────────────
+  {
+    // ACTION_PASSIVE_RUN (run-based × passive construction × action lines, ≥10 action lines,
+    // ≥3 passive lines globally, maxPassRun ≥4): Four or more consecutive action lines each use
+    // a passive construction ("is heard", "can be seen", "is found", etc.), creating an unbroken
+    // stretch where the prose never names an acting subject. Individual passive lines carry specific
+    // information — offscreen sounds, observer-perspective description — but a run of four or more
+    // passive lines signals that the writer has lost the habit of assigning agency: the camera drifts
+    // through a sequence of things-being-done without anyone doing them. Passive action drains the
+    // visual authority that makes screenplay prose cinematic. Run-based mode × passive-construction
+    // channel × action lines. First run-based check on the action-line corpus in this pass (all prior
+    // run checks operate on dialogue lines). Distinct from PASSIVE_ACTION_VOICE (Wave 160: global
+    // proportion >15% — a script-wide rate that cannot detect a local passive streak while the overall
+    // rate stays below threshold; this catches local passive runs even when the global rate is low).
+    if (actionOnlyLines.length >= 10) {
+      const PASS_PATS543a = [
+        /\bis heard\b/i, /\bcan be seen\b/i, /\bcan be heard\b/i, /\bwas seen\b/i,
+        /\bwas heard\b/i, /\bare seen\b/i, /\bare heard\b/i, /\bis seen\b/i,
+        /\bis found\b/i, /\bwas found\b/i, /\bwere found\b/i, /\bis felt\b/i,
+        /\bcan be felt\b/i, /\bseems to be\b/i, /\bappears to be\b/i,
+        /\bis placed\b/i, /\bwas placed\b/i, /\bis left\b/i, /\bwas left\b/i,
+        /\bis taken\b/i, /\bwas taken\b/i,
+      ];
+      const passiveTotal543a = actionOnlyLines.filter(l => PASS_PATS543a.some(p => p.test(l))).length;
+      if (passiveTotal543a >= 3) {
+        let curPass543a = 0, maxPass543a = 0;
+        for (const line of actionOnlyLines) {
+          if (PASS_PATS543a.some(p => p.test(line))) {
+            if (++curPass543a > maxPass543a) maxPass543a = curPass543a;
+          } else {
+            curPass543a = 0;
+          }
+        }
+        if (maxPass543a >= 4) {
+          issues.push({
+            location: 'Action prose',
+            rule: 'ACTION_PASSIVE_RUN',
+            severity: 'minor',
+            description: `${maxPass543a} consecutive action lines each use a passive construction ("is heard", "can be seen", "is found", etc.) — the prose refuses to name any acting subject across an unbroken stretch of ${maxPass543a} lines. Individual passive lines carry specific information (offscreen sounds, observer-perspective description) but a run of ${maxPass543a} passive lines signals that the script has lost the habit of assigning agency: the camera drifts through a sequence of things-being-done without anyone doing them. Passive action drains the visual authority that makes screenplay prose cinematic — the camera needs a subject to follow, and a sustained passive run leaves it without one.`,
+            suggestedFix: `Rewrite at least two of the passive lines in the run with active constructions that name a subject: "A sound is heard" → "Footsteps echo from the hall." or assign the action to a character. The passive register is useful when the agent is genuinely unknown or irrelevant, but ${maxPass543a} consecutive passive lines signal that the script is describing ambient states rather than a sequence of caused events with agents.`,
+          });
+        }
+      }
+    }
+
+    // DIALOGUE_AFFIRMATION_FLOOD (valence × affirmation content × dialogue, ≥10 dialogue lines,
+    // >30% contain explicit affirmative assent — "yes", "yeah", "right", "exactly", "of course",
+    // "sure", "agreed", "absolutely", "definitely", "certainly", "indeed", "correct", "precisely"):
+    // When more than 30% of dialogue lines carry explicit affirmation, characters spend most of
+    // their speech validating each other — no conflict, no resistance, no dramatic friction.
+    // Heavy-affirmation dialogue has no dramatic engine: the scene becomes a mutual confirmation
+    // society where no force opposes any desire. Valence mode × affirmation content. Positive-valence
+    // complement of DIALOGUE_NEGATION_FLOOD (Wave 417: >40% negation). The pair jointly audit the
+    // valence polarity of the dialogue corpus. Distinct from DIALOGUE_NEGATION_FLOOD (opposite
+    // valence), all syntactic proportion checks (hedging-opener, conditional-flood, etc. — those
+    // fire on grammatical form, not semantic affirmation content).
+    const dlg543b: string[] = [];
+    let inDlg543b = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg543b = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg543b = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg543b = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg543b) dlg543b.push(t);
+    }
+    if (dlg543b.length >= 10) {
+      const AFF_PAT543b = /\b(yes|yeah|yep|right|exactly|of course|agreed|absolutely|definitely|certainly|indeed|correct|precisely|affirmative)\b/i;
+      const affCount543b = dlg543b.filter(t => AFF_PAT543b.test(t)).length;
+      if (affCount543b / dlg543b.length > 0.30) {
+        issues.push({
+          location: `Dialogue — ${affCount543b} of ${dlg543b.length} lines contain explicit affirmation`,
+          rule: 'DIALOGUE_AFFIRMATION_FLOOD',
+          severity: 'minor',
+          description: `${affCount543b} of ${dlg543b.length} dialogue lines (${Math.round(affCount543b / dlg543b.length * 100)}%) contain explicit affirmative assent — "yes", "right", "exactly", "absolutely", "of course", or similar. When more than 30% of dialogue is occupied by characters agreeing, validating, and confirming each other, the scene operates as a mutual-affirmation society: no force opposes any desire, no resistance tests any proposal, no character pushes back against what another has said. Drama depends on competing forces; a dialogue where characters mostly agree strips the scene of the conflict that makes engagement possible. Heavy affirmation also signals that lines are filling space rather than doing dramatic work: "Yes, exactly, right" confirms what has already been established without moving anything forward.`,
+          suggestedFix: `Replace at least ${Math.ceil(affCount543b * 0.4)} of the affirmative lines with resistance, qualification, or complication: a yes-but that moves the scene forward, a concern that hasn't been addressed, a counter-position that forces renegotiation. Characters who agree effortlessly have nothing at stake; characters who must earn agreement through argument and revelation generate scenes.`,
+        });
+      }
+    }
+
+    // DIALOGUE_EXCLAMATION_BACKWARD_CAUSELESS (backward-cause × exclamation channel × dialogue,
+    // ≥8 dialogue lines, ≥2 qualifiable !-ending lines [position > 0], ALL preceded by a line
+    // ending in neither "?" nor "!" in the immediately prior dialogue line): Every exclamation in
+    // the dialogue arrives without a provoking question or prior escalation — all emotional intensity
+    // is self-generated rather than triggered by the exchange. The natural mechanism of dramatic
+    // intensity is provocation: a question that challenges, threatens, or reveals, generating a
+    // heightened response; or a prior exclamation that escalates further. When all exclamations
+    // arrive without that upstream trigger, the script is manufacturing emotion top-down — inserting
+    // intensity from outside the dramatic logic rather than letting intensity be generated by what
+    // came just before. Backward-cause mode × exclamation channel. Distinct from DIALOGUE_MONOLOGUE_
+    // UNPROMPTED (Wave 459: backward-cause × long speech ≥10 words → no prior question in 2 lines —
+    // different trigger [length not !], window [2 lines not 1], pattern [positive length check]),
+    // DIALOGUE_EXCLAMATION_RUN (Wave 515: run-based × consecutive !-ending lines), DIALOGUE_
+    // EXCLAMATION_ZONE_CLUSTER (Wave 487: distribution/timing × thirds), ALL_CAPS_SHOUT (Wave 308:
+    // caps-word content, not ! punctuation), zone-presence/absence checks (DIALOGUE_OPENING_ZONE_
+    // EXCLAMATION_ABSENT, DIALOGUE_CLOSING_ZONE_...).
+    if (dlg543b.length >= 8) {
+      const qualExcl543c = dlg543b
+        .map((t, i) => ({ t, i }))
+        .filter(({ t, i }) => t.trimEnd().endsWith('!') && i > 0);
+      if (qualExcl543c.length >= 2) {
+        const allCauseless543c = qualExcl543c.every(({ i }) => {
+          const prev = dlg543b[i - 1];
+          return !prev.trimEnd().endsWith('?') && !prev.trimEnd().endsWith('!');
+        });
+        if (allCauseless543c) {
+          issues.push({
+            location: `Dialogue — ${qualExcl543c.length} exclamation line(s), none preceded by "?" or "!"`,
+            rule: 'DIALOGUE_EXCLAMATION_BACKWARD_CAUSELESS',
+            severity: 'minor',
+            description: `Every exclamation-ending dialogue line (${qualExcl543c.length} instance(s)) is immediately preceded by a line that ends in neither "?" nor "!" — all emotional intensity arrives without a triggering question or prior escalation in the exchange. The natural mechanism of dramatic intensity is provocation: a pointed question that challenges or reveals, or a prior exclamation that escalates, generating a heightened response. When all exclamations arrive without that upstream trigger, the script is inserting emotional intensity from outside the dramatic logic of the scene rather than letting intensity be generated by what the character heard immediately before. The audience feels the exclamation landing without the momentum that would justify its force — the intensity seems authored rather than provoked.`,
+            suggestedFix: `Before at least one exclamation-ending line, convert the immediately preceding dialogue line from a statement into a "?" — a pointed question, challenge, or revelation that the exclamation is then responding to. An exclamation that answers a question is dramatically earned; an exclamation that answers a mild statement arrives as manufactured intensity. The simplest fix is to end one of the setup lines with "?" so that the emotional escalation is the character responding to something, not generating intensity from nowhere.`,
           });
         }
       }

@@ -36317,6 +36317,130 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 543 — voicePass: action passive run, dialogue affirmation flood, exclamation backward causeless', async () => {
+    const runV543 = async (fountain: string) => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      return voicePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // ACTION_PASSIVE_RUN fire:
+    // 10 action lines; first 5 are passive (is heard / can be seen / is found / can be felt / is heard);
+    // passiveTotal=5≥3; maxPassRun=5≥4 → fires
+    it('ACTION_PASSIVE_RUN fires when 4+ consecutive action lines use passive constructions', async () => {
+      const f543a = [
+        'INT. ROOM - DAY', '',
+        'A sound is heard from outside.',
+        'A figure can be seen through the glass.',
+        'A letter is found on the table.',
+        'The shadow can be felt before it arrives.',
+        'A noise is heard again.',
+        'John picks up the letter.',
+        'Mary walks to the door.',
+        'She looks outside.',
+        'He follows her.',
+        'They stop.',
+      ].join('\n');
+      const res = await runV543(f543a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_PASSIVE_RUN'), 'ACTION_PASSIVE_RUN should fire');
+    });
+
+    // ACTION_PASSIVE_RUN no-fire:
+    // 10 action lines; passive at positions 0,3,7,8 — runs of 1,1,2 → maxPassRun=2<4 → no fire
+    it('ACTION_PASSIVE_RUN does not fire when passive lines are not in a consecutive run of 4', async () => {
+      const f543anr = [
+        'INT. ROOM - DAY', '',
+        'A sound is heard from outside.',
+        'John picks up the letter.',
+        'Mary walks to the door.',
+        'A figure can be seen through the glass.',
+        'She looks outside.',
+        'He follows her.',
+        'They stop.',
+        'A letter is found on the table.',
+        'The shadow can be felt before it arrives.',
+        'Someone opens the door.',
+      ].join('\n');
+      const res = await runV543(f543anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_PASSIVE_RUN'), 'ACTION_PASSIVE_RUN should not fire');
+    });
+
+    // DIALOGUE_AFFIRMATION_FLOOD fire:
+    // 10 dialogue lines; 5 contain yes/absolutely/right/yes/exactly → 50%>30% → fires
+    it('DIALOGUE_AFFIRMATION_FLOOD fires when more than 30% of dialogue lines carry explicit affirmation', async () => {
+      const f543b = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'Yes, that is what I thought.', '',
+        'BOB', 'Absolutely, I agree.', '',
+        'ALICE', 'Right, let us proceed.', '',
+        'BOB', 'Yes, we should.', '',
+        'ALICE', 'I will handle the paperwork.', '',
+        'BOB', 'Exactly, good thinking.', '',
+        'ALICE', 'Let me start today.', '',
+        'BOB', 'Take care.', '',
+        'ALICE', 'I will be in touch.', '',
+        'BOB', 'Sounds fine to me.',
+      ].join('\n');
+      const res = await runV543(f543b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_AFFIRMATION_FLOOD'), 'DIALOGUE_AFFIRMATION_FLOOD should fire');
+    });
+
+    // DIALOGUE_AFFIRMATION_FLOOD no-fire:
+    // 10 dialogue lines; 0 contain affirmation words → 0%≤30% → no fire
+    it('DIALOGUE_AFFIRMATION_FLOOD does not fire when fewer than 30% of dialogue lines contain affirmation', async () => {
+      const f543bnr = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'I am uncertain about this plan.', '',
+        'BOB', 'We need to check the numbers.', '',
+        'ALICE', 'There might be complications.', '',
+        'BOB', 'Let me look into it further.', '',
+        'ALICE', 'What do you need from me?', '',
+        'BOB', 'I have the files from last week.', '',
+        'ALICE', 'The report is not finished.', '',
+        'BOB', 'I will need more time for this.', '',
+        'ALICE', 'When can we meet to discuss?', '',
+        'BOB', 'I am available on Thursday.',
+      ].join('\n');
+      const res = await runV543(f543bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_AFFIRMATION_FLOOD'), 'DIALOGUE_AFFIRMATION_FLOOD should not fire');
+    });
+
+    // DIALOGUE_EXCLAMATION_BACKWARD_CAUSELESS fire:
+    // 8 dialogue lines; "!" at i=2 (prev=".") and i=5 (prev=".") → both causeless → fires
+    it('DIALOGUE_EXCLAMATION_BACKWARD_CAUSELESS fires when all exclamation lines are preceded by non-? non-! lines', async () => {
+      const f543c = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'I think we should leave now.', '',
+        'BOB', 'The car is outside waiting.', '',
+        'ALICE', 'We have to go immediately!', '',
+        'BOB', 'The keys are on the table.', '',
+        'ALICE', 'I cannot believe this situation.', '',
+        'BOB', 'We need to hurry up!', '',
+        'ALICE', 'The bags are packed already.', '',
+        'BOB', 'Let us move then.',
+      ].join('\n');
+      const res = await runV543(f543c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_EXCLAMATION_BACKWARD_CAUSELESS'), 'DIALOGUE_EXCLAMATION_BACKWARD_CAUSELESS should fire');
+    });
+
+    // DIALOGUE_EXCLAMATION_BACKWARD_CAUSELESS no-fire:
+    // 8 dialogue lines; "!" at i=1 (prev="?" at i=0) → has cause → no fire
+    it('DIALOGUE_EXCLAMATION_BACKWARD_CAUSELESS does not fire when an exclamation line is preceded by a question', async () => {
+      const f543cnr = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'Are you ready to leave now?', '',
+        'BOB', 'We have to go right this moment!', '',
+        'ALICE', 'Where are the car keys?', '',
+        'BOB', 'I cannot find them anywhere!', '',
+        'ALICE', 'The car is outside.', '',
+        'BOB', 'We should hurry.', '',
+        'ALICE', 'The bags are already packed.', '',
+        'BOB', 'Let us go then.',
+      ].join('\n');
+      const res = await runV543(f543cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_EXCLAMATION_BACKWARD_CAUSELESS'), 'DIALOGUE_EXCLAMATION_BACKWARD_CAUSELESS should not fire');
+    });
+  });
+
   describe('Wave 529 — voicePass: question zone middle absent, hesitation run, question aftermath long', async () => {
     const runV529 = async (fountain: string) => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
