@@ -158,6 +158,18 @@
 // seeded scenes globally, none of the following scenes have seededClueIds non-empty; the aftermath
 // sibling of REVELATION_SEED_DECOUPLED which checks co-occurrence in the same scene and distinct
 // from REVELATION_CURIOSITY_AFTERMATH_VOID which uses the curiosity channel as aftermath signal).
+// Wave 572 additions: assertion clock aftermath void (sequence/aftermath × assertion → clock — n≥8,
+// ≥2 qualifying assertion scenes, ≥2 clock scenes globally, no assertion followed by a raised clock;
+// claims never set a deadline ticking on their consequences), assertion seed aftermath void (sequence/
+// aftermath × assertion → seed — ≥2 assertion scenes, ≥2 seed scenes, no assertion followed by a
+// seeded clue; claims never trail planted evidence), assertion payoff aftermath void (sequence/
+// aftermath × assertion → payoff — ≥2 assertion scenes, ≥2 payoff scenes, no assertion followed by a
+// payoff; claims never coincide with thread resolution). These fill the clock, seed, and payoff
+// channels of the assertion-aftermath family alongside curiosity (Wave 474), emotion (Wave 558), and
+// dramatic-turn (Wave 530); each isolates a single channel (firing even when other aftermath channels
+// are active) and so is distinct from the conjunction-based ASSERTION_AFTERMATH_VOID (Wave 418, over
+// revelation/relationship/suspense) and from its same-scene co-occurrence sibling (TOLD_BELIEF_CLOCK/
+// SEED_DECOUPLED, ASSERTION_PAYOFF_DECOUPLED).
 // Wave 558 additions: assertion emotional aftermath flat (average/aggregate × assertion → emotional
 // aftermath — n≥8, ≥3 qualifying assertion scenes [pos<n-1], all scenes immediately following an
 // assertion have emotionalShift neutral/null; claims arrive without charging what follows
@@ -3002,6 +3014,125 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `${maxZone558c} of ${seededPositions558c.length} clue-planting scenes (${Math.round(maxZone558c / seededPositions558c.length * 100)}%) are concentrated in the ${zoneName558c} third — physical evidence is being planted in one structural burst rather than distributed through the narrative. A well-managed mystery seeds physical evidence throughout the story as dramatic pressure mounts: each planted clue establishes, deepens, or complicates the implication in response to what the audience currently knows and suspects. When seeds cluster in one zone, the other two-thirds of the story provide no material for the audience to notice, file away, or reinterpret as their understanding develops. The zones without seeds feel informationally hollow on re-watch or re-read.`,
             suggestedFix: `Redistribute at least one seed from the ${zoneName558c} cluster into each of the other structural zones. A seed in the opening zone establishes the mystery's physical landscape; one in the middle zone recontextualizes what the audience thought they understood; one near the end creates anticipation before the payoff. Three-zone seeding gives the audience new evidence to notice at each structural stage, sustaining engagement across the entire narrative rather than concentrating the evidentiary work in one phase.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 572: ASSERTION_CLOCK_AFTERMATH_VOID, ASSERTION_SEED_AFTERMATH_VOID,
+  //              ASSERTION_PAYOFF_AFTERMATH_VOID ──────────────────────────────────────────────────
+  // The assertion-aftermath family covers the curiosity (Wave 474), emotion (Wave 558), and
+  // dramatic-turn (Wave 530) channels, and the broad ASSERTION_AFTERMATH_VOID (Wave 418) audits a
+  // strict conjunction of {revelation, relationship, suspense} all going quiet. The clock, seed, and
+  // payoff channels have no dedicated assertion-aftermath check at all. This wave fills those three,
+  // each isolating a single output channel (and so firing even when other aftermath channels are
+  // active) rather than requiring the simultaneous silence of several.
+
+  // ASSERTION_CLOCK_AFTERMATH_VOID (sequence/aftermath × assertion → clock aftermath, n≥8, ≥2
+  // qualifying assertion scenes [told belief, pos < n-1], ≥2 clock-raised scenes globally, none of
+  // the scenes immediately following an assertion has clockRaised=true): Every claim a character
+  // stakes passes without a deadline tightening in the next beat. A bold assertion is a natural
+  // trigger for urgency — a character declares a position and the consequence is that time begins to
+  // run out on acting upon it. When no assertion is ever followed by a raised clock, the belief layer
+  // and the urgency engine are temporally decoupled: claims are made but never set a clock ticking on
+  // their consequences. Sequence/aftermath mode × assertion trigger × clock channel. Distinct from
+  // TOLD_BELIEF_CLOCK_DECOUPLED (Wave 376: co-occurrence × clock in the assertion scene ITSELF — this
+  // checks the FOLLOWING scene, the aftermath direction), REVELATION_CLOCK_AFTERMATH_VOID (Wave 516:
+  // revelation trigger, not assertion), ASSERTION_AFTERMATH_VOID (Wave 418: a conjunction over
+  // revelation/relationship/suspense that does not include the clock channel at all — this isolates
+  // clock and fires even when those other channels are active in the aftermath).
+  {
+    const n572a = records.length;
+    if (n572a >= 8) {
+      const assertSet572a = new Set(toldBeliefs.map(t => t.sceneIdx));
+      const qualAssert572a = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) => assertSet572a.has(r.sceneIdx) && pos < n572a - 1);
+      const clockScenes572a = (records as any[]).filter(r => r.clockRaised === true);
+      if (qualAssert572a.length >= 2 && clockScenes572a.length >= 2) {
+        const anyClockAftermath572a = qualAssert572a.some(({ pos }) => (records as any[])[pos + 1].clockRaised === true);
+        if (!anyClockAftermath572a) {
+          issues.push({
+            location: `${qualAssert572a.length} assertion scene(s) — none followed by a raised clock`,
+            rule: 'ASSERTION_CLOCK_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `The script has ${qualAssert572a.length} qualifying assertion scenes and ${clockScenes572a.length} scenes that raise a clock, but no assertion is followed immediately by a scene in which a deadline tightens. A bold claim is a natural trigger for urgency: a character stakes a position, and the consequence is that time begins to run out on acting upon it before someone else does, or before the claim is tested. When no assertion is ever followed by a raised clock, the belief layer and the urgency engine are temporally decoupled — claims are made but never set a clock ticking on their consequences, so taking a position carries no time pressure. The propositional world and the deadline world operate in separate stretches of the story.`,
+            suggestedFix: `After at least one assertion scene, let the next scene raise a clock that the claim provokes — a deadline created by the position the character just took, a window that begins to close once the claim is on the table, a countdown toward the moment the assertion will be proven or disproven. An assertion that starts a clock ticking converts a verbal stance into time-pressured stakes.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ASSERTION_SEED_AFTERMATH_VOID (sequence/aftermath × assertion → seed aftermath, n≥8, ≥2
+  // qualifying assertion scenes [told belief, pos < n-1], ≥2 scenes with non-empty seededClueIds
+  // globally, none of the scenes immediately following an assertion plants a clue): Every claim a
+  // character makes passes without a clue being seeded in the next beat. An assertion is a natural
+  // springboard for foreshadowing — a character stakes a position, and the scene that follows plants
+  // the evidence that will later confirm or contradict it. When no assertion is ever followed by a
+  // seed, the belief layer and the foreshadowing layer are temporally decoupled: claims are made but
+  // never trail planted evidence in their wake, so the audience is never invited to watch for what
+  // will prove a stated belief right or wrong. Sequence/aftermath mode × assertion trigger × seed
+  // channel. Distinct from TOLD_BELIEF_SEED_DECOUPLED (Wave 376: co-occurrence × seed in the
+  // assertion scene ITSELF — this checks the FOLLOWING scene), REVELATION_SEED_AFTERMATH_VOID (Wave
+  // 516: revelation trigger, not assertion), SEED_TEMPORAL_CLUSTER (Wave 558: distribution of seeds,
+  // not conditioned on an assertion trigger), ASSERTION_AFTERMATH_VOID (Wave 418: conjunction that
+  // does not include the seed channel — this isolates seed and fires even when other channels are active).
+  {
+    const n572b = records.length;
+    if (n572b >= 8) {
+      const assertSet572b = new Set(toldBeliefs.map(t => t.sceneIdx));
+      const qualAssert572b = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) => assertSet572b.has(r.sceneIdx) && pos < n572b - 1);
+      const seedScenes572b = (records as any[]).filter(r => ((r.seededClueIds ?? []) as string[]).length > 0);
+      if (qualAssert572b.length >= 2 && seedScenes572b.length >= 2) {
+        const anySeedAftermath572b = qualAssert572b.some(({ pos }) => (((records as any[])[pos + 1].seededClueIds ?? []) as string[]).length > 0);
+        if (!anySeedAftermath572b) {
+          issues.push({
+            location: `${qualAssert572b.length} assertion scene(s) — none followed by a seeded clue`,
+            rule: 'ASSERTION_SEED_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `The script has ${qualAssert572b.length} qualifying assertion scenes and ${seedScenes572b.length} scenes that plant a clue, but no assertion is followed immediately by a scene that seeds evidence. An assertion is a natural springboard for foreshadowing: a character stakes a position, and the scene that follows can plant the evidence that will eventually confirm or contradict it. When no assertion is ever followed by a seed, the belief layer and the foreshadowing layer are temporally decoupled — claims are made but never trail planted evidence in their wake, so the audience is never invited to watch for what will prove a stated belief right or wrong. The story's propositions and its evidentiary planting never feed each other.`,
+            suggestedFix: `After at least one assertion scene, let the next scene seed a clue connected to the claim — a planted detail that the audience will later recognize as the proof or refutation of what was just asserted. A claim that trails evidence in its wake turns a verbal position into a thread the audience tracks: they carry the assertion forward and watch the seeded clue to see whether the belief holds.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ASSERTION_PAYOFF_AFTERMATH_VOID (sequence/aftermath × assertion → payoff aftermath, n≥8, ≥2
+  // qualifying assertion scenes [told belief, pos < n-1], ≥2 scenes with non-empty payoffSetupIds
+  // globally, none of the scenes immediately following an assertion resolves a planted promise):
+  // Every claim a character makes passes without a thread resolving in the next beat. The moment
+  // after a character stakes a strong position is a charged place to deliver a payoff — the claim
+  // raises the stakes, and a planted promise cashing out in its immediate wake makes the assertion
+  // feel consequential. When no assertion is ever followed by a payoff, the belief layer and the
+  // resolution layer are temporally decoupled: claims are made but never coincide with the narrative
+  // closures that would give them weight. Sequence/aftermath mode × assertion trigger × payoff
+  // channel. Distinct from ASSERTION_PAYOFF_DECOUPLED (Wave 462: co-occurrence × payoff in the
+  // assertion scene ITSELF — this checks the FOLLOWING scene, the aftermath direction), REVELATION_
+  // PAYOFF_DECOUPLED (Wave: revelation trigger / co-occurrence), ASSERTION_AFTERMATH_VOID (Wave 418:
+  // conjunction over revelation/relationship/suspense that does not include the payoff channel — this
+  // isolates payoff and fires even when those other channels are active in the aftermath).
+  {
+    const n572c = records.length;
+    if (n572c >= 8) {
+      const assertSet572c = new Set(toldBeliefs.map(t => t.sceneIdx));
+      const qualAssert572c = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) => assertSet572c.has(r.sceneIdx) && pos < n572c - 1);
+      const payoffScenes572c = (records as any[]).filter(r => ((r.payoffSetupIds ?? []) as string[]).length > 0);
+      if (qualAssert572c.length >= 2 && payoffScenes572c.length >= 2) {
+        const anyPayoffAftermath572c = qualAssert572c.some(({ pos }) => (((records as any[])[pos + 1].payoffSetupIds ?? []) as string[]).length > 0);
+        if (!anyPayoffAftermath572c) {
+          issues.push({
+            location: `${qualAssert572c.length} assertion scene(s) — none followed by a payoff`,
+            rule: 'ASSERTION_PAYOFF_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `The script has ${qualAssert572c.length} qualifying assertion scenes and ${payoffScenes572c.length} scenes that resolve a planted promise, but no assertion is followed immediately by a payoff. The beat after a character stakes a strong position is a charged place to deliver a payoff: the claim raises the stakes, and a planted promise cashing out in its immediate wake makes the assertion feel consequential — the position taken and the thread resolved reinforce each other. When no assertion is ever followed by a payoff, the belief layer and the resolution layer are temporally decoupled: claims are made but never coincide with the narrative closures that would give them weight, so taking a position never lands alongside the satisfaction of a thread completing.`,
+            suggestedFix: `After at least one assertion scene, let the next scene deliver a payoff — a planted promise resolving in the wake of the claim, so that the position taken and the thread completed land together. The payoff need not be caused by the assertion, but their adjacency lets the resolution lend the claim consequence: the audience feels the assertion mattered because the story's machinery delivered something in its immediate aftermath.`,
           });
         }
       }

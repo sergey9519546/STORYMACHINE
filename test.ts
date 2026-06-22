@@ -37074,6 +37074,101 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 572 — beliefPass: assertion clock aftermath void, assertion seed aftermath void, assertion payoff aftermath void', async () => {
+    const makeRec572 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const ASSERT572 = ['ALICE: the truth is out now'];
+    const runB572 = async (records: any[]) => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // ASSERTION_CLOCK_AFTERMATH_VOID fire:
+    // 10 scenes; assertions at 0,3 (pos<9); clocks at 6,7 (≥2, not at aftermath positions 1,4) → fires
+    it('ASSERTION_CLOCK_AFTERMATH_VOID fires when no assertion is followed by a raised clock', async () => {
+      const recs572a = Array.from({ length: 10 }, (_, i) =>
+        makeRec572(i, {
+          dialogueHighlights: [0, 3].includes(i) ? ASSERT572 : [],
+          clockRaised: [6, 7].includes(i),
+        }),
+      );
+      const res = await runB572(recs572a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ASSERTION_CLOCK_AFTERMATH_VOID'), 'ASSERTION_CLOCK_AFTERMATH_VOID should fire');
+    });
+
+    // ASSERTION_CLOCK_AFTERMATH_VOID no-fire:
+    // assertions at 0,3; clock at 1 (aftermath of assertion@0) and 7 → assertion followed by clock → no fire
+    it('ASSERTION_CLOCK_AFTERMATH_VOID does not fire when an assertion is followed by a raised clock', async () => {
+      const recs572an = Array.from({ length: 10 }, (_, i) =>
+        makeRec572(i, {
+          dialogueHighlights: [0, 3].includes(i) ? ASSERT572 : [],
+          clockRaised: [1, 7].includes(i),
+        }),
+      );
+      const res = await runB572(recs572an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ASSERTION_CLOCK_AFTERMATH_VOID'), 'ASSERTION_CLOCK_AFTERMATH_VOID should not fire');
+    });
+
+    // ASSERTION_SEED_AFTERMATH_VOID fire:
+    // assertions at 0,3; seeds at 6,7 (not at aftermath positions 1,4) → fires
+    it('ASSERTION_SEED_AFTERMATH_VOID fires when no assertion is followed by a seeded clue', async () => {
+      const recs572b = Array.from({ length: 10 }, (_, i) =>
+        makeRec572(i, {
+          dialogueHighlights: [0, 3].includes(i) ? ASSERT572 : [],
+          seededClueIds: [6, 7].includes(i) ? ['c1'] : [],
+        }),
+      );
+      const res = await runB572(recs572b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ASSERTION_SEED_AFTERMATH_VOID'), 'ASSERTION_SEED_AFTERMATH_VOID should fire');
+    });
+
+    // ASSERTION_SEED_AFTERMATH_VOID no-fire:
+    // seed at 1 (aftermath of assertion@0) and 7 → assertion followed by seed → no fire
+    it('ASSERTION_SEED_AFTERMATH_VOID does not fire when an assertion is followed by a seeded clue', async () => {
+      const recs572bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec572(i, {
+          dialogueHighlights: [0, 3].includes(i) ? ASSERT572 : [],
+          seededClueIds: [1, 7].includes(i) ? ['c1'] : [],
+        }),
+      );
+      const res = await runB572(recs572bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ASSERTION_SEED_AFTERMATH_VOID'), 'ASSERTION_SEED_AFTERMATH_VOID should not fire');
+    });
+
+    // ASSERTION_PAYOFF_AFTERMATH_VOID fire:
+    // assertions at 0,3; payoffs at 6,7 (not at aftermath positions 1,4) → fires
+    it('ASSERTION_PAYOFF_AFTERMATH_VOID fires when no assertion is followed by a payoff', async () => {
+      const recs572c = Array.from({ length: 10 }, (_, i) =>
+        makeRec572(i, {
+          dialogueHighlights: [0, 3].includes(i) ? ASSERT572 : [],
+          payoffSetupIds: [6, 7].includes(i) ? ['p1'] : [],
+        }),
+      );
+      const res = await runB572(recs572c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ASSERTION_PAYOFF_AFTERMATH_VOID'), 'ASSERTION_PAYOFF_AFTERMATH_VOID should fire');
+    });
+
+    // ASSERTION_PAYOFF_AFTERMATH_VOID no-fire:
+    // payoff at 1 (aftermath of assertion@0) and 7 → assertion followed by payoff → no fire
+    it('ASSERTION_PAYOFF_AFTERMATH_VOID does not fire when an assertion is followed by a payoff', async () => {
+      const recs572cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec572(i, {
+          dialogueHighlights: [0, 3].includes(i) ? ASSERT572 : [],
+          payoffSetupIds: [1, 7].includes(i) ? ['p1'] : [],
+        }),
+      );
+      const res = await runB572(recs572cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ASSERTION_PAYOFF_AFTERMATH_VOID'), 'ASSERTION_PAYOFF_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 558 — beliefPass: assertion emotional aftermath flat, revelation curiosity peak early, seed temporal cluster', async () => {
     const makeRec558 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
