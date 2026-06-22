@@ -136,6 +136,21 @@
 // CURIOSITY_CLOSING_ZONE_ABSENT which is zone-absence not distribution-ratio, from CONFLICT_REPAIR_
 // FRONT_LOADED which targets positive shifts not curiosity, and from ARC_CURIOSITY_BACK_LOADED which
 // targets opposite concentration direction; first distribution/timing check on curiosity in this pass).
+// Wave 548 additions: peak repair uncaused (backward-cause × single-peak isolation × positive relational
+// shift — n≥8, ≥2 repair scenes ≥+0.3; the single biggest positive shift has no rupture, revelation,
+// dramatic-turn, or clock in its prior 2 scenes; the peak reconciliation is spontaneous; first check
+// combining single-peak isolation + backward-cause on the positive-shift channel, distinct from
+// CONFLICT_REPAIR_UNCAUSED [all repairs aggregate] and CONFLICT_PEAK_RUPTURE_UNCAUSED [backward-cause ×
+// peak RUPTURE]), closing clock absent (zone presence/absence × clockRaised × closing third — n≥9,
+// ≥2 clock scenes in the first two-thirds, none in the final third; the story's deadline urgency goes
+// silent exactly as the climax approaches; first zone check on the clockRaised channel in the closing
+// third, distinct from THREAT_AMNESIA [Act 1 to second half], CONFLICT_CLOCK_DECOUPLED [co-occurrence ×
+// relational content], and CONFLICT_CLOCK_AFTERMATH_VOID [aftermath mode]), seed repair decoupled
+// (co-occurrence × seededClueIds × positive relational shift — n≥8, ≥2 seed scenes, ≥2 repair scenes
+// ≥+0.3, zero overlap; the story plants clues and warms bonds but never in the same scene; distinct from
+// CONFLICT_CLUE_DECOUPLED [seed × rupture — the negative direction], CONFLICT_RUPTURE_SEED_AFTERMATH_VOID
+// [aftermath mode], and CONFLICT_REVELATION_REPAIR_DECOUPLED [revelation × repair — different signal pair];
+// first co-occurrence check joining seed and repair channels).
 // Wave 520 additions: rupture payoff aftermath void (sequence/aftermath × payoff × rupture aftermath
 // — n≥8, ≥2 ruptures ≤ -0.3, ≥2 payoff scenes; every rupture followed by 2 scenes with no
 // payoffSetupIds; bond-breaking never immediately precedes thread resolution; final uncovered aftermath
@@ -2886,6 +2901,160 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
           description: `${Math.round(ratio534c * 100)}% of the script's curiosity-generating scenes (${frontCount534c} of ${curiosityScenes534c.length}) fall in the first half, leaving the second half with only ${backCount534c}. The story's wondering engine exhausts itself before the climax — open questions accumulate in the opening movements then dwindle as the stakes should be intensifying. The most urgent need to know should arise as the story approaches resolution, not during the setup: the questions that make the audience desperate to reach the ending should be generated in or sustained into the second half. When curiosity is front-loaded, the back half's escalating conflict occurs in a narrowing epistemic field, with the audience already informed enough to stop wondering.`,
           suggestedFix: `Redistribute at least some curiosity-generating beats into the second half — a new angle on an existing mystery, a revelation that opens more questions than it answers, or a character action whose full meaning remains unclear until the very end. Sustained wonder through the climax zone is what keeps the audience invested not just in what happens next but in what it all means.`,
         });
+      }
+    }
+  }
+
+  // ── Wave 548: CONFLICT_PEAK_REPAIR_UNCAUSED, CONFLICT_CLOSING_CLOCK_ABSENT,
+  //              CONFLICT_SEED_REPAIR_DECOUPLED ────────────────────────────────────────────────────
+
+  // CONFLICT_PEAK_REPAIR_UNCAUSED — backward-cause × single-peak isolation × positive relational shift.
+  // n≥8, ≥2 repair scenes (positive shift ≥ +0.3). The single most significant positive relationship
+  // shift (the story's biggest reconciliation by magnitude) has no major rupture (shift ≤ -0.3),
+  // revelation, dramatic turn, or clock raise in the two preceding scenes. The peak repair is
+  // spontaneous: the most emotionally significant bond-warming in the entire story arrives without
+  // visible cause. Reconciliations that come from nowhere feel unearned — the audience witnesses the
+  // repair but has not been given the catalyst that makes it believable. Repairs need justification:
+  // a revelation that dissolves a misunderstanding, a dramatic turn that removes an obstacle, a threat
+  // that forces two estranged characters back together, or a rupture whose very extremity prompts
+  // remorse and healing.
+  // Distinct from: CONFLICT_REPAIR_UNCAUSED (Wave 478: backward-cause × ALL repair scenes in aggregate
+  // — checks whether any of the repair scenes has a cause in prior 2 scenes; this isolates only the
+  // single peak positive shift), CONFLICT_PEAK_RUPTURE_UNCAUSED (Wave 464: backward-cause × peak
+  // RUPTURE — same backward-cause mode but on the negative shift direction), all CONFLICT_PEAK_*
+  // checks (Wave 352/366/408: single-peak isolation but on different channels — those audit the peak
+  // RUPTURE scene's in-scene channels, not the peak REPAIR scene's backward-cause). First check combining
+  // single-peak isolation + backward-cause on the positive-shift / repair channel in this pass.
+  {
+    const n548a = records.length;
+    if (n548a >= 8) {
+      const repairScenes548a = (records as any[]).map((r, i) => ({
+        r,
+        i,
+        mag: Math.max(
+          0,
+          ...((r.relationshipShifts ?? []) as Array<{ amount: number }>)
+            .filter(s => s.amount >= 0.3)
+            .map(s => s.amount),
+        ),
+      })).filter(x => x.mag > 0);
+      if (repairScenes548a.length >= 2) {
+        const peak548a = repairScenes548a.reduce((best, x) => x.mag > best.mag ? x : best);
+        const peakIdx548a = peak548a.i;
+        if (peakIdx548a >= 2) {
+          const hasCause548a = [peakIdx548a - 2, peakIdx548a - 1].some(ci => {
+            const c = (records as any[])[ci];
+            return (
+              ((c.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3) ||
+              (c.revelation !== null && c.revelation !== '' && c.revelation !== undefined) ||
+              ((c.dramaticTurn ?? 'nothing') !== 'nothing' && c.dramaticTurn !== '') ||
+              c.clockRaised === true
+            );
+          });
+          if (!hasCause548a) {
+            issues.push({
+              location: `Scene ${(records as any[])[peakIdx548a].sceneIdx} — peak repair (magnitude ${peak548a.mag.toFixed(2)})`,
+              rule: 'CONFLICT_PEAK_REPAIR_UNCAUSED',
+              severity: 'minor',
+              description: `The story's most significant positive relationship shift (+${peak548a.mag.toFixed(2)}) at Scene ${(records as any[])[peakIdx548a].sceneIdx} has no rupture, revelation, dramatic turn, or clock raise in the two preceding scenes — the peak reconciliation arrives without visible cause. The most emotionally significant repair in the entire story should be the most earned: a disclosure that dissolves a misunderstanding, a turn that removes an obstacle, or a threat that forces estranged characters back together. A spontaneous peak repair reads as authorial convenience rather than character consequence.`,
+              suggestedFix: 'Add a cause for the peak repair in the one or two scenes before it: a revelation that reframes what went wrong between the characters, a dramatic turn that changes the stakes so that the estrangement no longer makes sense, a shared threat that forces cooperation, or a rupture whose extremity prompts immediate remorse. The story\'s most important reconciliation should arrive as the most inevitable consequence.',
+            });
+          }
+        } else if (peakIdx548a < 2) {
+          // Peak repair is in scene 0 or 1 — inherently uncaused by script structure
+          issues.push({
+            location: `Scene ${(records as any[])[peakIdx548a].sceneIdx} — peak repair (magnitude ${peak548a.mag.toFixed(2)})`,
+            rule: 'CONFLICT_PEAK_REPAIR_UNCAUSED',
+            severity: 'minor',
+            description: `The story's most significant positive relationship shift (+${peak548a.mag.toFixed(2)}) occurs at Scene ${(records as any[])[peakIdx548a].sceneIdx} — in the opening scenes, before any prior cause can exist. The peak reconciliation is the story's first event; repairs this early in a script have no buildup and no earned context.`,
+            suggestedFix: 'Move the most significant repair later in the story so it can follow a visible cause — a revelation, a rupture, or a dramatic turn. The biggest reconciliation should arrive at the moment of maximum earned context, not at the opening.',
+          });
+        }
+      }
+    }
+  }
+
+  // CONFLICT_CLOSING_CLOCK_ABSENT — zone presence/absence × clockRaised × closing third.
+  // n≥9, ≥2 clockRaised scenes in the first two-thirds of the story, none in the final structural
+  // third (pos ≥ floor(n/3)*2). The story's deadline urgency goes silent exactly as the climax
+  // approaches. The closing act needs clock pressure to feel urgent — without a ticking clock in the
+  // final third, the climax must find urgency through other means while the dedicated urgency engine
+  // (the deadline system) has been switched off. A clock that runs only through the setup and midpoint
+  // then stops leaves the audience without the visceral time pressure that makes climax scenes feel
+  // truly consequential. The escalating consequences of a deadline should peak in the closing zone,
+  // not before.
+  // Distinct from: THREAT_AMNESIA (Wave 158: clock raised in Act 1 [first 25%] but not in second half
+  // [50%+] — different zone boundary and different trigger; this checks the closing THIRD specifically
+  // and requires ≥2 clocks in the opening two-thirds, whereas THREAT_AMNESIA requires only one in Act 1
+  // and fires if the second half has none at all), CONFLICT_CLOCK_DECOUPLED (Wave 338: co-occurrence ×
+  // clock × relational content — checks whether clock scenes carry negative relationship shifts, not
+  // whether they appear in the closing zone), CONFLICT_CLOCK_AFTERMATH_VOID (Wave 450: aftermath ×
+  // clock → rupture in next 2 scenes — checks what follows a clock scene), CONFLICT_CLOCK_RUPTURE_
+  // DECOUPLED (Wave 534: co-occurrence × clock × rupture — overlap check). First zone presence/absence
+  // check on the clockRaised channel specifically in the closing third of this pass.
+  {
+    const n548b = records.length;
+    if (n548b >= 9) {
+      const third548b = Math.floor(n548b / 3);
+      const clocksInFirstTwoThirds548b = (records as any[]).filter(
+        (r, i) => i < 2 * third548b && r.clockRaised === true,
+      ).length;
+      if (clocksInFirstTwoThirds548b >= 2) {
+        const anyClockInFinalThird548b = (records as any[]).slice(2 * third548b).some(
+          (r: any) => r.clockRaised === true,
+        );
+        if (!anyClockInFinalThird548b) {
+          issues.push({
+            location: `final third (scenes ${2 * third548b}–${n548b - 1}): no clock raised`,
+            rule: 'CONFLICT_CLOSING_CLOCK_ABSENT',
+            severity: 'minor',
+            description: `The story raises a clock (clockRaised) ${clocksInFirstTwoThirds548b} time(s) in its first two-thirds but never in the final structural third (scenes ${2 * third548b}–${n548b - 1}). The deadline urgency engine goes silent as the story approaches its climax. Without clock pressure in the closing act, the climax must find urgency through other means — and the visceral time-pressure that clock scenes create (the "or else" that makes every decision consequential) is absent at the moment the audience most needs to feel it. A clock that runs only through the setup and midpoint then stops forces the closing act to generate urgency without the story's strongest urgency tool.`,
+            suggestedFix: 'Re-invoke the clock in the final third: escalate the deadline (a second, closer deadline), reveal a new consequence of failure, or show the original deadline expiring with immediate effect. The closing act is where all the ticking should culminate — the audience should feel time running out as the protagonist makes their last moves.',
+          });
+        }
+      }
+    }
+  }
+
+  // CONFLICT_SEED_REPAIR_DECOUPLED — co-occurrence × seededClueIds × positive relational shift.
+  // n≥8, ≥2 seed scenes (seededClueIds non-empty), ≥2 repair scenes (any positive shift ≥ +0.3).
+  // No scene has both a seeded clue AND a positive relationship shift → fire. The story plants clues
+  // and warms bonds, but never in the same scene. A repair scene is a structurally powerful moment to
+  // embed foreshadowing: the emotional warmth creates a false sense of security while the planted clue
+  // signals future trouble, creating dramatic irony. Conversely, a seed planted at the moment of a
+  // repair can hint that the reconciliation is fragile or that the restored bond will face a new test.
+  // When seed and repair never co-occur, the foreshadowing layer and the relational-warmth layer run
+  // on entirely separate tracks — neither is given the dramatic amplification of operating inside the
+  // other.
+  // Distinct from: CONFLICT_CLUE_DECOUPLED (Wave 394: co-occurrence × seed × rupture [NEGATIVE shift]
+  // — same mode but the negative shift direction; this is the positive-shift complement, and the two
+  // together cover both directions of the relational channel against the seed channel),
+  // CONFLICT_RUPTURE_SEED_AFTERMATH_VOID (Wave 506: aftermath × seed after rupture — different temporal
+  // mode, different trigger direction), CONFLICT_REVELATION_REPAIR_DECOUPLED (Wave 506: co-occurrence ×
+  // revelation × repair — different signal pair; revelation vs. seed), CONFLICT_PAYOFF_DECOUPLED (Wave
+  // 394: co-occurrence × payoff × rupture — payoff not seed). First co-occurrence check pairing the
+  // seededClueIds channel with the positive-shift / repair channel in this pass.
+  {
+    const n548c = records.length;
+    if (n548c >= 8) {
+      const seedScenes548c = (records as any[]).filter(
+        r => ((r.seededClueIds ?? []) as any[]).length > 0,
+      );
+      const repairScenes548c = (records as any[]).filter(r =>
+        ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount >= 0.3),
+      );
+      if (seedScenes548c.length >= 2 && repairScenes548c.length >= 2) {
+        const repairSceneIdxSet548c = new Set(repairScenes548c.map((r: any) => r.sceneIdx));
+        const anySeedRepairOverlap548c = seedScenes548c.some((r: any) => repairSceneIdxSet548c.has(r.sceneIdx));
+        if (!anySeedRepairOverlap548c) {
+          issues.push({
+            location: `${seedScenes548c.length} seed scene(s) and ${repairScenes548c.length} repair scene(s) — zero overlap`,
+            rule: 'CONFLICT_SEED_REPAIR_DECOUPLED',
+            severity: 'minor',
+            description: `The story plants ${seedScenes548c.length} clue(s) and warms ${repairScenes548c.length} bond(s) (positive shift ≥ +0.3), but foreshadowing and relational healing never occur in the same scene. A repair scene is one of the most structurally powerful moments to embed a seed: the emotional warmth creates a false sense of security while the planted clue signals future trouble, building dramatic irony. Equally, a clue seeded at the moment of reconciliation can hint that the restored bond will face a new test — that the repair is incomplete or conditional. When seed and repair are always decoupled, the story misses the compound effect of foreshadowing planted inside a moment of relational warmth.`,
+            suggestedFix: 'Introduce at least one scene where a positive relationship shift and a seeded clue co-occur: a reconciliation scene in which a detail is casually mentioned that will become important later, or a warming scene in which an object, phrase, or action foreshadows a future complication. Scenes where dramatic irony and emotional warmth combine are among the most effective structural placements for foreshadowing.',
+          });
+        }
       }
     }
   }

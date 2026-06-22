@@ -27245,6 +27245,94 @@ I always listen.
     });
   });
 
+  describe('Wave 548 — conflictPass: peak repair uncaused, closing clock absent, seed repair decoupled', async () => {
+    const rup548 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
+    const makeRec548 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF548 = async (records: any[]) => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    it('CONFLICT_PEAK_REPAIR_UNCAUSED fires when the peak repair has no cause in prior 2 scenes', async () => {
+      // n=8; repairs at idx 4 (+0.8) and idx 6 (+0.4); peak=idx 4.
+      // Prior scenes 2 and 3: no rupture, no revelation, no turn, no clock → uncaused → fires.
+      const recs548a = Array.from({ length: 8 }, (_, i) =>
+        makeRec548(i, {
+          relationshipShifts: i === 4 ? rup548(0.8) : i === 6 ? rup548(0.4) : [],
+        }),
+      );
+      const res = await runCF548(recs548a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_PEAK_REPAIR_UNCAUSED'), 'CONFLICT_PEAK_REPAIR_UNCAUSED should fire');
+    });
+
+    it('CONFLICT_PEAK_REPAIR_UNCAUSED does not fire when peak repair has a revelation in prior scene', async () => {
+      // n=8; peak repair at idx 5 (+0.8); prior scene idx 4 has revelation → caused → no fire.
+      const recs548an = Array.from({ length: 8 }, (_, i) =>
+        makeRec548(i, {
+          relationshipShifts: i === 5 ? rup548(0.8) : i === 7 ? rup548(0.4) : [],
+          revelation: i === 4 ? 'they knew all along' : null,
+        }),
+      );
+      const res = await runCF548(recs548an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_PEAK_REPAIR_UNCAUSED'), 'CONFLICT_PEAK_REPAIR_UNCAUSED should not fire');
+    });
+
+    it('CONFLICT_CLOSING_CLOCK_ABSENT fires when ≥2 clocks in first two-thirds and none in final third', async () => {
+      // n=9; third=3; clocks at idx 1 and 3 (both in first two-thirds 0-5); none in 6-8 → fires.
+      const recs548b = Array.from({ length: 9 }, (_, i) =>
+        makeRec548(i, { clockRaised: i === 1 || i === 3 }),
+      );
+      const res = await runCF548(recs548b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_CLOSING_CLOCK_ABSENT'), 'CONFLICT_CLOSING_CLOCK_ABSENT should fire');
+    });
+
+    it('CONFLICT_CLOSING_CLOCK_ABSENT does not fire when a clock is raised in the final third', async () => {
+      // n=9; third=3; clocks at idx 1, 3 (opening two-thirds) and idx 7 (final third, idx≥6) → no fire.
+      const recs548bn = Array.from({ length: 9 }, (_, i) =>
+        makeRec548(i, { clockRaised: i === 1 || i === 3 || i === 7 }),
+      );
+      const res = await runCF548(recs548bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_CLOSING_CLOCK_ABSENT'), 'CONFLICT_CLOSING_CLOCK_ABSENT should not fire');
+    });
+
+    it('CONFLICT_SEED_REPAIR_DECOUPLED fires when seed and repair never share a scene', async () => {
+      // n=8; seeds at idx 1 and 3; repairs (positive shifts) at idx 5 and 6 — zero overlap → fires.
+      const recs548c = Array.from({ length: 8 }, (_, i) =>
+        makeRec548(i, {
+          seededClueIds: i === 1 || i === 3 ? ['clue1'] : [],
+          relationshipShifts: i === 5 || i === 6 ? rup548(0.5) : [],
+        }),
+      );
+      const res = await runCF548(recs548c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_SEED_REPAIR_DECOUPLED'), 'CONFLICT_SEED_REPAIR_DECOUPLED should fire');
+    });
+
+    it('CONFLICT_SEED_REPAIR_DECOUPLED does not fire when one scene has both seed and repair', async () => {
+      // n=8; seed and repair co-occur at idx 3 (seededClueIds + positive shift); seed at idx 1, repair at idx 5 → overlap → no fire.
+      const recs548cn = Array.from({ length: 8 }, (_, i) =>
+        makeRec548(i, {
+          seededClueIds: i === 1 || i === 3 ? ['clue1'] : [],
+          relationshipShifts: i === 3 || i === 5 ? rup548(0.5) : [],
+        }),
+      );
+      const res = await runCF548(recs548cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_SEED_REPAIR_DECOUPLED'), 'CONFLICT_SEED_REPAIR_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 534 — conflictPass: clock rupture decoupled, rupture curiosity void, curiosity front-loaded', async () => {
     const rup534 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
     const makeRec534 = (idx: number, overrides: any = {}): any => ({
