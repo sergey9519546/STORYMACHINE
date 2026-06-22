@@ -37538,6 +37538,142 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 557 — voicePass: hedged affirmation flood, long speech zone cluster, negation self-feeding', async () => {
+    const runV557 = async (fountain: string) => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      return voicePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // DIALOGUE_HEDGED_AFFIRMATION_FLOOD fire:
+    // 12 dialogue lines; 4 lines contain BOTH hesitation (um/uh/er/hmm) AND affirmation
+    // (yes/right/exactly/absolutely) → 4/12 ≈ 33% > 15% → fires
+    it('DIALOGUE_HEDGED_AFFIRMATION_FLOOD fires when >15% of lines contain both hesitation and affirmation', async () => {
+      const f557a = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'Um, yes, I think so.', '',
+        'BOB', 'Uh, right, I agree with that.', '',
+        'ALICE', 'I want to check the documents now.', '',
+        'BOB', 'Er, exactly, that makes sense here.', '',
+        'ALICE', 'The deadline is tomorrow morning.', '',
+        'BOB', 'Hmm, absolutely, we should move faster.', '',
+        'ALICE', 'I will write the report today.', '',
+        'BOB', 'Good plan, let us do it.', '',
+        'ALICE', 'I will start now immediately.', '',
+        'BOB', 'That sounds reasonable enough.', '',
+        'ALICE', 'The papers are ready and waiting.', '',
+        'BOB', 'Send them over to me please.',
+      ].join('\n');
+      const res = await runV557(f557a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_HEDGED_AFFIRMATION_FLOOD'), 'DIALOGUE_HEDGED_AFFIRMATION_FLOOD should fire');
+    });
+
+    // DIALOGUE_HEDGED_AFFIRMATION_FLOOD no-fire:
+    // 12 dialogue lines; 4 lines with hesitation but NO affirmation → 0 lines with BOTH → 0% ≤ 15%
+    it('DIALOGUE_HEDGED_AFFIRMATION_FLOOD does not fire when hesitation lines lack affirmation', async () => {
+      const f557anr = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'Um, I am not sure about this plan.', '',
+        'BOB', 'Uh, let me think about that more.', '',
+        'ALICE', 'The situation seems complicated to me.', '',
+        'BOB', 'Er, we need more time to decide here.', '',
+        'ALICE', 'What do you need from me now?', '',
+        'BOB', 'I have the files from last week.', '',
+        'ALICE', 'The report is not finished yet.', '',
+        'BOB', 'I will need more time for this task.', '',
+        'ALICE', 'When can we meet to discuss it?', '',
+        'BOB', 'I am available on Thursday morning.', '',
+        'ALICE', 'That works for me then.', '',
+        'BOB', 'I will send the agenda over.',
+      ].join('\n');
+      const res = await runV557(f557anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_HEDGED_AFFIRMATION_FLOOD'), 'DIALOGUE_HEDGED_AFFIRMATION_FLOOD should not fire');
+    });
+
+    // DIALOGUE_LONG_SPEECH_ZONE_CLUSTER fire:
+    // 12 dialogue lines; third=4; long speeches (≥10 words) at i=0,1,2,3 (all in first third);
+    // firstZone=4, 4/4=100% > 75% → fires
+    it('DIALOGUE_LONG_SPEECH_ZONE_CLUSTER fires when 3+ long speeches cluster in one third', async () => {
+      const f557b = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'She walks across the room and stops at the door looking out into the night.', '',
+        'BOB', 'He follows her slowly and they stand together at the window watching the rain fall.', '',
+        'ALICE', 'The rain comes down harder now and the street below is flooding with dark water.', '',
+        'BOB', 'She turns to him and says nothing but her eyes are wet from more than rain.', '',
+        'ALICE', 'Okay.', '',
+        'BOB', 'Fine.', '',
+        'ALICE', 'I see.', '',
+        'BOB', 'Right.', '',
+        'ALICE', 'Come in.', '',
+        'BOB', 'Stay here.', '',
+        'ALICE', 'Move on.', '',
+        'BOB', 'End it.',
+      ].join('\n');
+      const res = await runV557(f557b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_LONG_SPEECH_ZONE_CLUSTER'), 'DIALOGUE_LONG_SPEECH_ZONE_CLUSTER should fire');
+    });
+
+    // DIALOGUE_LONG_SPEECH_ZONE_CLUSTER no-fire:
+    // 12 dialogue lines; long speeches at i=0 (first), i=5 (middle), i=10 (last) →
+    // firstZone=1, midZone=1, lastZone=1; maxZone=1, 1/3≈33% ≤ 75% → no fire
+    it('DIALOGUE_LONG_SPEECH_ZONE_CLUSTER does not fire when long speeches are distributed across thirds', async () => {
+      const f557bnr = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'She walks across the room and stops at the door looking out into the night.', '',
+        'BOB', 'Fine.', '',
+        'ALICE', 'Okay.', '',
+        'BOB', 'I see.', '',
+        'ALICE', 'Right.', '',
+        'BOB', 'He follows her slowly and they stand together at the window watching the rain.', '',
+        'ALICE', 'Come in.', '',
+        'BOB', 'Stay here.', '',
+        'ALICE', 'Move on.', '',
+        'BOB', 'End it.', '',
+        'ALICE', 'The rain comes down harder now and the street below is completely flooding dark.', '',
+        'BOB', 'Sure.',
+      ].join('\n');
+      const res = await runV557(f557bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_LONG_SPEECH_ZONE_CLUSTER'), 'DIALOGUE_LONG_SPEECH_ZONE_CLUSTER should not fire');
+    });
+
+    // DIALOGUE_NEGATION_SELF_FEEDING fire:
+    // 8 dialogue lines; negation at i=0,1,2,3; negIdxs=[1,2,3] (i>0 with negation);
+    // each preceded by negation (i=0,1,2 all have negation) → fires
+    it('DIALOGUE_NEGATION_SELF_FEEDING fires when all negation lines at i>0 are preceded by negation', async () => {
+      const f557c = [
+        'INT. ROOM - DAY', '',
+        'ALICE', "I don't know what to do next.", '', // i=0 negation
+        'BOB', "I can't decide either way.", '', // i=1 negation, prev negation ✓
+        'ALICE', "Nobody knows the answer to this.", '', // i=2 negation, prev negation ✓
+        'BOB', "Nothing makes sense here at all.", '', // i=3 negation, prev negation ✓
+        'ALICE', 'What should we try next then?', '', // i=4 no negation
+        'BOB', 'Let us look at the map again.', '', // i=5 no negation
+        'ALICE', 'Maybe the road ahead is clear.', '', // i=6 no negation
+        'BOB', 'That could work well for us.', // i=7 no negation
+      ].join('\n');
+      const res = await runV557(f557c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_NEGATION_SELF_FEEDING'), 'DIALOGUE_NEGATION_SELF_FEEDING should fire');
+    });
+
+    // DIALOGUE_NEGATION_SELF_FEEDING no-fire:
+    // 8 dialogue lines; negation at i=1,3,4 (i>0); i=1 preceded by non-negation at i=0 →
+    // not all preceded by negation → no fire
+    it('DIALOGUE_NEGATION_SELF_FEEDING does not fire when a negation line is preceded by a non-negation line', async () => {
+      const f557cnr = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'I will check the documents first.', '', // i=0 no negation
+        'BOB', "I don't have time today at all.", '', // i=1 negation, prev no negation → breaks
+        'ALICE', 'We can try another way instead.', '', // i=2 no negation
+        'BOB', "Nothing is certain yet about this.", '', // i=3 negation, prev no negation
+        'ALICE', "I won't give up on this plan.", '', // i=4 negation, prev no negation
+        'BOB', 'Let us keep going forward together.', '', // i=5 no negation
+        'ALICE', 'The answer will come eventually.', '', // i=6 no negation
+        'BOB', 'We will figure it out soon.', // i=7 no negation
+      ].join('\n');
+      const res = await runV557(f557cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_NEGATION_SELF_FEEDING'), 'DIALOGUE_NEGATION_SELF_FEEDING should not fire');
+    });
+  });
+
   describe('Wave 543 — voicePass: action passive run, dialogue affirmation flood, exclamation backward causeless', async () => {
     const runV543 = async (fountain: string) => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
