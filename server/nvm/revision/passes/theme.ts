@@ -122,6 +122,18 @@
 // silent (sequence/aftermath × payoff trigger → theme — n≥8, ≥2 qualifying payoff scenes not at
 // last position, none followed by a resonant scene; first aftermath check with the payoff channel,
 // distinct from THEME_REVELATION_AFTERMATH_SILENT which uses the revelation trigger).
+// Wave 570 additions: resonant aftermath emotion void (sequence/aftermath × emotion × resonant
+// trigger — ≥2 qualifying resonant scenes none followed by an emotional shift in next 2 scenes while
+// ≥2 emotional scenes exist; theme surfacing produces no felt response in its wake), resonant
+// aftermath relationship void (sequence/aftermath × relationship × resonant trigger — ≥2 qualifying
+// resonant scenes none followed by a relationship shift in next 2 scenes while ≥2 shift scenes exist;
+// theme never reshapes bonds in its wake), resonant aftermath clock void (sequence/aftermath × clock
+// × resonant trigger — ≥2 qualifying resonant scenes none followed by a clock raise in next 2 scenes
+// while ≥2 clock scenes exist; theme never converts into urgency in its wake). These add the emotion,
+// relationship, and clock output channels to the resonant-as-trigger aftermath family alongside the
+// curiosity (Wave 542) and suspense (Wave 556) channels; each is distinct from its reverse-direction
+// sibling (THEME_*_AFTERMATH_SILENT, where X is the trigger and theme the aftermath) and from the
+// co-occurrence/peak checks on the same channels.
 // Wave 556 additions: resonant aftermath suspense void (sequence/aftermath × suspense × resonant
 // trigger — ≥2 qualifying resonant scenes none followed by suspenseDelta>0 in next 2 scenes while
 // ≥2 suspense scenes exist; theme surfacing never activates tension in its aftermath; suspense-
@@ -3107,6 +3119,124 @@ export async function themePass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `Every scene in the story that contains flagged dialogue highlights (${dlgHighScenes556c.length} scene(s)) carries no theme-related language — the script's most verbally memorable moments are thematically mute. Dialogue highlights are the lines most likely to be remembered and quoted: they carry the script's voice at its most concentrated. When not one of these memorable lines connects to the story's central theme ("${themeRaw}"), the dialogue that will outlast the viewing experience has nothing to do with what the story is ultimately about. The most powerful screenwriting positions thematic meaning inside the dialogue that the audience will carry with them — the lines that land most forcefully should be among the clearest bearers of the story's meaning.`,
             suggestedFix: `Introduce at least one dialogue highlight that carries the theme's language, imagery, or central question — a line that is both memorable as dialogue and resonant as thematic statement. The line need not be on-the-nose; even an oblique reference to the theme's central tension inside a line that is vivid and character-specific accomplishes both things at once: it earns its place as a highlight while doing thematic work. Look for moments in the existing dialogue highlights where a word substitution or one added clause could introduce the theme without sacrificing the line's dramatic currency.`,
+          });
+        }
+      }
+    }
+
+    // ── Wave 570: THEME_RESONANT_AFTERMATH_EMOTION_VOID, THEME_RESONANT_AFTERMATH_RELATIONSHIP_VOID,
+    //              THEME_RESONANT_AFTERMATH_CLOCK_VOID ───────────────────────────────────────────
+    // The resonant-trigger aftermath family (the theme scene as TRIGGER, asking what fires in the
+    // 2 scenes after) covers only curiosity (Wave 542) and suspense (Wave 556). This wave adds the
+    // emotion, relationship, and clock aftermath channels — auditing whether the theme, once voiced,
+    // produces felt response, relational movement, and urgency in its immediate wake.
+
+    // THEME_RESONANT_AFTERMATH_EMOTION_VOID — sequence/aftermath × emotion × resonant trigger.
+    // n≥8, ≥2 qualifying resonant scenes (pos < n-2), ≥2 emotionally charged scenes elsewhere.
+    // No resonant scene is followed by an emotional shift in the next 2 scenes → fire. When the
+    // story voices "${themeRaw}", the scenes that follow stay emotionally flat — the theme surfaces
+    // and the characters register nothing in its wake. Theme is most powerful when it costs the
+    // protagonist something felt: a stated truth that lands as grief, resolve, or dread in the
+    // beats that follow. When every resonant scene's aftermath is emotionally neutral, the meaning
+    // is delivered as a proposition rather than as an experience that moves the people who hear it.
+    // Sequence/aftermath × emotion channel × resonant trigger. Distinct from THEME_RESONANCE_
+    // EMOTIONALLY_INERT (audits the resonant scene's OWN emotion, not the 2 scenes after), THEME_
+    // POSITIVE/NEGATIVE_EMOTION_AFTERMATH_SILENT (emotion as TRIGGER → theme as aftermath — the
+    // reverse direction), THEME_RESONANT_AFTERMATH_CURIOSITY_VOID / _SUSPENSE_VOID (Waves 542/556:
+    // same resonant-trigger aftermath family, different output channels).
+    if (records.length >= 8 && resonantScenes.length >= 2) {
+      const qualResonant570a = resonantScenes.filter((r: any) => (records as any[]).indexOf(r) < records.length - 2);
+      const emotionalScenes570a = (records as any[]).filter(r => (r.emotionalShift ?? 'neutral') !== 'neutral');
+      if (qualResonant570a.length >= 2 && emotionalScenes570a.length >= 2) {
+        const allResNoEmotion570a = qualResonant570a.every((r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos + off];
+            if (nxt && (nxt.emotionalShift ?? 'neutral') !== 'neutral') return false;
+          }
+          return true;
+        });
+        if (allResNoEmotion570a) {
+          issues.push({
+            location: `${qualResonant570a.length} resonant scene(s) — no emotional shift in any aftermath window`,
+            rule: 'THEME_RESONANT_AFTERMATH_EMOTION_VOID',
+            severity: 'minor',
+            description: `None of the story's ${qualResonant570a.length} thematically resonant scene(s) is followed by an emotional shift within the next two scenes, even though ${emotionalScenes570a.length} emotionally charged scenes exist elsewhere. When the story voices "${themeRaw}", the beats that follow stay emotionally flat — the theme surfaces and the characters register nothing in its wake. Theme lands hardest when it costs the protagonist something felt: a stated truth that resolves into grief, resolve, or dread in the scenes immediately after. When every resonant scene's aftermath is emotionally neutral, the meaning is delivered as a proposition rather than as an experience that moves the people who voice or hear it — the audience receives the idea but never watches it land on anyone.`,
+            suggestedFix: `After at least one resonant scene, let the following one or two scenes carry a non-neutral emotional shift — a moment where a character is visibly changed by the truth the theme just stated. The emotional aftermath need not be large; even a brief beat of felt consequence converts the thematic statement from an abstract assertion into something the story's people have to live with.`,
+          });
+        }
+      }
+    }
+
+    // THEME_RESONANT_AFTERMATH_RELATIONSHIP_VOID — sequence/aftermath × relationship × resonant trigger.
+    // n≥8, ≥2 qualifying resonant scenes (pos < n-2), ≥2 relationship-shift scenes elsewhere. No
+    // resonant scene is followed by a relationship shift in the next 2 scenes → fire. When the story
+    // voices its theme, no bond moves in the wake: the meaning surfaces but never reshapes how the
+    // characters stand with one another. A theme is most alive when it has interpersonal consequence
+    // — a stated truth that draws two characters together or drives them apart in the beats that
+    // follow. When every resonant scene's aftermath is relationally frozen, the theme operates in a
+    // purely intellectual register, disconnected from the relational world it should be reshaping.
+    // Sequence/aftermath × relationship channel × resonant trigger. Distinct from THEME_RELATIONSHIP_
+    // SHIFT_AFTERMATH_SILENT (Wave 528: relationship shift as TRIGGER → theme as aftermath — the
+    // reverse direction), THEME_RELATIONSHIP_DECOUPLED / _SHIFT_DECOUPLED (co-occurrence, same scene),
+    // THEME_RELATIONSHIP_PEAK_ABSENT (single-peak), and the curiosity/suspense/emotion siblings in
+    // this resonant-trigger aftermath family.
+    if (records.length >= 8 && resonantScenes.length >= 2) {
+      const qualResonant570b = resonantScenes.filter((r: any) => (records as any[]).indexOf(r) < records.length - 2);
+      const relScenes570b = (records as any[]).filter(r => ((r.relationshipShifts ?? []) as any[]).length > 0);
+      if (qualResonant570b.length >= 2 && relScenes570b.length >= 2) {
+        const allResNoRel570b = qualResonant570b.every((r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos + off];
+            if (nxt && ((nxt.relationshipShifts ?? []) as any[]).length > 0) return false;
+          }
+          return true;
+        });
+        if (allResNoRel570b) {
+          issues.push({
+            location: `${qualResonant570b.length} resonant scene(s) — no relationship shift in any aftermath window`,
+            rule: 'THEME_RESONANT_AFTERMATH_RELATIONSHIP_VOID',
+            severity: 'minor',
+            description: `None of the story's ${qualResonant570b.length} thematically resonant scene(s) is followed by a relationship shift within the next two scenes, even though ${relScenes570b.length} bond-moving scenes exist elsewhere. When the story voices "${themeRaw}", no bond moves in the wake — the meaning surfaces but never reshapes how the characters stand with one another. A theme is most alive when it has interpersonal consequence: a stated truth that draws two characters together or drives them apart in the beats that follow. When every resonant scene's aftermath is relationally frozen, the theme operates in a purely intellectual register, decoupled from the relational world it should be reshaping — the audience receives the idea but never sees it reorganize the bonds the story is built on.`,
+            suggestedFix: `After at least one resonant scene, let the following one or two scenes carry a relationship shift provoked by the theme — a bond that warms or fractures because of the truth just stated. The relational consequence gives the theme a second life beyond its statement: the meaning is not only declared but enacted in how the characters now treat one another, which is where an audience feels a theme most concretely.`,
+          });
+        }
+      }
+    }
+
+    // THEME_RESONANT_AFTERMATH_CLOCK_VOID — sequence/aftermath × clock × resonant trigger.
+    // n≥8, ≥2 qualifying resonant scenes (pos < n-2), ≥2 clock-raised scenes elsewhere. No resonant
+    // scene is followed by a clock raise in the next 2 scenes → fire. When the story voices its
+    // theme, no deadline tightens in the wake: the meaning surfaces but never converts into urgency.
+    // The most propulsive thematic beats make their meaning time-critical — a stated truth that
+    // reveals the protagonist must now act before a window closes. When every resonant scene's
+    // aftermath is clock-free while clocks fire elsewhere, the theme is sealed off from the story's
+    // urgency engine: meaning is voiced in moments that never become pressing, and the audience hears
+    // the idea without ever feeling it create a race against time. Sequence/aftermath × clock channel
+    // × resonant trigger. Distinct from THEME_CLOCK_AFTERMATH_SILENT (Wave 472: clock as TRIGGER →
+    // theme as aftermath — the reverse direction), THEME_CLOCK_RESONANCE_ABSENT / THEME_CLOCK_SCENE_
+    // SILENT (co-occurrence, same scene), THEME_CLOCK_PEAK_ABSENT (single-peak), and the curiosity/
+    // suspense/emotion/relationship siblings in this resonant-trigger aftermath family.
+    if (records.length >= 8 && resonantScenes.length >= 2) {
+      const qualResonant570c = resonantScenes.filter((r: any) => (records as any[]).indexOf(r) < records.length - 2);
+      const clockScenes570c = (records as any[]).filter(r => r.clockRaised === true);
+      if (qualResonant570c.length >= 2 && clockScenes570c.length >= 2) {
+        const allResNoClock570c = qualResonant570c.every((r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos + off];
+            if (nxt && nxt.clockRaised === true) return false;
+          }
+          return true;
+        });
+        if (allResNoClock570c) {
+          issues.push({
+            location: `${qualResonant570c.length} resonant scene(s) — no clock raised in any aftermath window`,
+            rule: 'THEME_RESONANT_AFTERMATH_CLOCK_VOID',
+            severity: 'minor',
+            description: `None of the story's ${qualResonant570c.length} thematically resonant scene(s) is followed by a clock raise within the next two scenes, even though ${clockScenes570c.length} clock-raising scenes exist elsewhere. When the story voices "${themeRaw}", no deadline tightens in the wake — the meaning surfaces but never converts into urgency. The most propulsive thematic beats make their meaning time-critical: a stated truth that reveals the protagonist must act before a window closes, a theme whose implications start a countdown. When every resonant scene's aftermath is clock-free while clocks fire elsewhere, the theme is sealed off from the story's urgency engine — meaning is voiced in moments that never become pressing, and the audience hears the idea without ever feeling it create a race against time.`,
+            suggestedFix: `After at least one resonant scene, raise a clock within the following one or two scenes — let the theme's statement create or expose a deadline. A truth that makes the protagonist realize time is now against them turns the thematic beat into an engine of urgency rather than a pause for reflection. The theme gains propulsion when its meaning is immediately bound to the pressure of a closing window.`,
           });
         }
       }

@@ -18713,6 +18713,107 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 570 — themePass: resonant aftermath emotion void, resonant aftermath relationship void, resonant aftermath clock void', async () => {
+    const makeRec570 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const THEME570 = 'redemption forgiveness courage';
+    const themed570 = ['act of redemption'];
+    const mkRel570 = () => [{ pairKey: 'A|B', dimension: 'trust', amount: 0.3 }];
+    const runT570 = async (records: any[]) => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: THEME570 },
+      });
+    };
+
+    // THEME_RESONANT_AFTERMATH_EMOTION_VOID fire:
+    // 10 scenes: resonant at 0,5 (pos<8); emotion at 8,9 (≥2, outside aftermath windows [1,2],[6,7]) → fire
+    it('THEME_RESONANT_AFTERMATH_EMOTION_VOID fires when no resonant scene is followed by an emotional shift within 2', async () => {
+      const recs570a = Array.from({ length: 10 }, (_, i) =>
+        makeRec570(i, {
+          dialogueHighlights: [0, 5].includes(i) ? themed570 : [],
+          emotionalShift: [8, 9].includes(i) ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runT570(recs570a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_RESONANT_AFTERMATH_EMOTION_VOID'), 'THEME_RESONANT_AFTERMATH_EMOTION_VOID should fire');
+    });
+
+    // THEME_RESONANT_AFTERMATH_EMOTION_VOID no-fire:
+    // emotion at 1 (aftermath of resonant@0) and 8 → resonant@0 followed by emotion → no fire
+    it('THEME_RESONANT_AFTERMATH_EMOTION_VOID does not fire when a resonant aftermath carries emotion', async () => {
+      const recs570an = Array.from({ length: 10 }, (_, i) =>
+        makeRec570(i, {
+          dialogueHighlights: [0, 5].includes(i) ? themed570 : [],
+          emotionalShift: [1, 8].includes(i) ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runT570(recs570an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_RESONANT_AFTERMATH_EMOTION_VOID'), 'THEME_RESONANT_AFTERMATH_EMOTION_VOID should not fire');
+    });
+
+    // THEME_RESONANT_AFTERMATH_RELATIONSHIP_VOID fire:
+    // resonant at 0,5; relationship shifts at 8,9 (outside aftermath windows) → fire
+    it('THEME_RESONANT_AFTERMATH_RELATIONSHIP_VOID fires when no resonant scene is followed by a relationship shift within 2', async () => {
+      const recs570b = Array.from({ length: 10 }, (_, i) =>
+        makeRec570(i, {
+          dialogueHighlights: [0, 5].includes(i) ? themed570 : [],
+          relationshipShifts: [8, 9].includes(i) ? mkRel570() : [],
+        }),
+      );
+      const res = await runT570(recs570b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_RESONANT_AFTERMATH_RELATIONSHIP_VOID'), 'THEME_RESONANT_AFTERMATH_RELATIONSHIP_VOID should fire');
+    });
+
+    // THEME_RESONANT_AFTERMATH_RELATIONSHIP_VOID no-fire:
+    // relationship shift at 1 (aftermath of resonant@0) and 8 → no fire
+    it('THEME_RESONANT_AFTERMATH_RELATIONSHIP_VOID does not fire when a resonant aftermath moves a bond', async () => {
+      const recs570bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec570(i, {
+          dialogueHighlights: [0, 5].includes(i) ? themed570 : [],
+          relationshipShifts: [1, 8].includes(i) ? mkRel570() : [],
+        }),
+      );
+      const res = await runT570(recs570bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_RESONANT_AFTERMATH_RELATIONSHIP_VOID'), 'THEME_RESONANT_AFTERMATH_RELATIONSHIP_VOID should not fire');
+    });
+
+    // THEME_RESONANT_AFTERMATH_CLOCK_VOID fire:
+    // resonant at 0,5; clocks at 8,9 (outside aftermath windows) → fire
+    it('THEME_RESONANT_AFTERMATH_CLOCK_VOID fires when no resonant scene is followed by a clock within 2', async () => {
+      const recs570c = Array.from({ length: 10 }, (_, i) =>
+        makeRec570(i, {
+          dialogueHighlights: [0, 5].includes(i) ? themed570 : [],
+          clockRaised: [8, 9].includes(i),
+        }),
+      );
+      const res = await runT570(recs570c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_RESONANT_AFTERMATH_CLOCK_VOID'), 'THEME_RESONANT_AFTERMATH_CLOCK_VOID should fire');
+    });
+
+    // THEME_RESONANT_AFTERMATH_CLOCK_VOID no-fire:
+    // clock at 1 (aftermath of resonant@0) and 8 → no fire
+    it('THEME_RESONANT_AFTERMATH_CLOCK_VOID does not fire when a resonant aftermath raises a clock', async () => {
+      const recs570cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec570(i, {
+          dialogueHighlights: [0, 5].includes(i) ? themed570 : [],
+          clockRaised: [1, 8].includes(i),
+        }),
+      );
+      const res = await runT570(recs570cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_RESONANT_AFTERMATH_CLOCK_VOID'), 'THEME_RESONANT_AFTERMATH_CLOCK_VOID should not fire');
+    });
+  });
+
   describe('Wave 556 — themePass: resonant aftermath suspense void, resonant curiosity flat, dialogue highlight decoupled', async () => {
     const makeRec556 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
