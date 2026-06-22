@@ -158,6 +158,20 @@
 // seeded scenes globally, none of the following scenes have seededClueIds non-empty; the aftermath
 // sibling of REVELATION_SEED_DECOUPLED which checks co-occurrence in the same scene and distinct
 // from REVELATION_CURIOSITY_AFTERMATH_VOID which uses the curiosity channel as aftermath signal).
+// Wave 558 additions: assertion emotional aftermath flat (average/aggregate × assertion → emotional
+// aftermath — n≥8, ≥3 qualifying assertion scenes [pos<n-1], all scenes immediately following an
+// assertion have emotionalShift neutral/null; claims arrive without charging what follows
+// emotionally; distinct from TOLD_BELIEF_EMOTIONAL_FLATLINE [assertion scene itself neutral, not
+// aftermath] and REVELATION_EMOTIONAL_AFTERMATH_FLAT [revelation trigger]), revelation curiosity
+// peak early (single-peak isolation × revelation × curiosityDelta — n≥8, ≥3 revelation scenes
+// with curiosityDelta>0, the one with the highest curiosityDelta is in the first 25% while ≥2
+// curiosity-generating revelations exist later; the script front-loads its most curiosity-rich
+// disclosure; distinct from REVELATION_CURIOSITY_PEAK_ABSENT [non-revelation has peak curiosity]
+// and REVELATION_CURIOSITY_DECOUPLED [avg of all revelation curiosityDelta ≤0 — all low, not one
+// peak early]), seed temporal cluster (distribution/timing × seed × thirds — n≥9, ≥3 seeded
+// scenes, >75% in one structural third; evidence planting is ghettoized into one zone; first
+// distribution/timing check on the seed channel, distinct from ASSERTION_TEMPORAL_CLUSTER [assertion
+// channel] and REVELATION_TEMPORAL_CLUSTER [revelation channel]).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -2866,6 +2880,130 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
           description: `None of the story's ${qualTurnPositions544c.length} dramatic turn scenes is followed by a revelation within the next two scenes, even though ${revScenes544c.length} revelations exist elsewhere. A dramatic turn at its most powerful is also an epistemic event: the reversal exposes what the pre-turn state was concealing, the changed circumstances make a previously unavailable truth visible, or the pivot creates the pressure under which a hidden reality finally surfaces. When no turn is followed by a revelation within two scenes, every reversal plays out without epistemic consequence — the plot changes direction but the audience learns nothing new from the change. Turns and revelations become two separate systems: the story's structure pivots in one place, and its epistemic events occur in entirely different moments, never reinforcing each other.`,
           suggestedFix: `After at least one dramatic turn, let the next one or two scenes carry a revelation — a truth that the turn has made available, a secret that the reversal has exposed, or a disclosure that could only emerge because circumstances have changed. The revelation need not be enormous: even a small disclosure that the pre-turn state couldn't carry gives the structural pivot an epistemic dimension, making it feel like the reversal changed what the story knows as well as what it does.`,
         });
+      }
+    }
+  }
+
+  // ── Wave 558: ASSERTION_EMOTIONAL_AFTERMATH_FLAT, REVELATION_CURIOSITY_PEAK_EARLY,
+  //              SEED_TEMPORAL_CLUSTER ──────────────────────────────────────────────────────────
+  {
+    // ASSERTION_EMOTIONAL_AFTERMATH_FLAT (average/aggregate × assertion → emotional aftermath,
+    // n≥8, ≥3 qualifying assertion scenes [pos<n-1], all scenes immediately following an assertion
+    // have emotionalShift 'neutral' or null): Every claim a character makes passes without
+    // generating an emotional charge in the scene immediately after. The function of an assertion
+    // is to stake a position that forces others to react — when a character declares that something
+    // is true, the surrounding world should emotionally reorganize in response. When all aftermath
+    // scenes are neutral, assertions arrive without consequence: the claim lands, nothing shifts,
+    // and the next scene operates as though the position was never taken. Average/aggregate mode ×
+    // assertion trigger × emotional aftermath. Distinct from TOLD_BELIEF_EMOTIONAL_FLATLINE (Wave
+    // 334: the assertion SCENE ITSELF carries neutral emotionalShift — the claim arrives without
+    // tone in the same scene; this checks the scene AFTER, not the scene of the assertion),
+    // REVELATION_EMOTIONAL_AFTERMATH_FLAT (Wave 474: revelation trigger, not assertion — the
+    // revelation-channel aftermath mirror of this check), ASSERTION_CURIOSITY_AFTERMATH_VOID
+    // (Wave 474: curiosity channel aftermath — checks curiosityDelta of following scene, not
+    // emotionalShift), TOLD_BELIEF_SUSPENSE_DECOUPLED (Wave 334: co-occurrence × suspenseDelta in
+    // assertion scene itself — different signal and position).
+    if (records.length >= 8) {
+      const assertionSceneSet558a = new Set(toldBeliefs.map(t => t.sceneIdx));
+      const qualAssertPos558a = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) => assertionSceneSet558a.has(r.sceneIdx) && pos < records.length - 1)
+        .map(({ pos }) => pos);
+      if (qualAssertPos558a.length >= 3) {
+        const allNeutralAftermath558a = qualAssertPos558a.every(pos => {
+          const next = (records as any[])[pos + 1];
+          return next.emotionalShift === 'neutral' || next.emotionalShift == null;
+        });
+        if (allNeutralAftermath558a) {
+          issues.push({
+            location: `${qualAssertPos558a.length} qualifying assertion scene(s) — all followed by emotionally neutral scenes`,
+            rule: 'ASSERTION_EMOTIONAL_AFTERMATH_FLAT',
+            severity: 'minor',
+            description: `Every character assertion (${qualAssertPos558a.length} qualifying instances) is followed immediately by an emotionally neutral scene — claims arrive without charging what comes after. When a character stakes a position, the surrounding world should reorganize emotionally in response: others react with anger or relief, the tension shifts, or the next scene opens in a register shaped by the claim that just landed. When all assertion aftermaths are emotionally neutral, the belief-battle layer is structurally quarantined from the emotional layer — characters assert things, nothing emotionally responds, and the propositional world of the story is decoupled from its affective world.`,
+            suggestedFix: `After at least one assertion, let the immediately following scene open in an emotionally non-neutral state: a scene with a positive or negative emotionalShift that has been generated by the claim that came before. The assertion need not be the sole cause of the emotional charge — the story can layer causes — but the emotional aftermath of a claim is where the audience feels whether the assertion mattered.`,
+          });
+        }
+      }
+    }
+
+    // REVELATION_CURIOSITY_PEAK_EARLY (single-peak isolation × revelation × curiosityDelta
+    // position, n≥8, ≥3 revelation scenes with curiosityDelta>0, the revelation with the highest
+    // curiosityDelta is in the first 25% of scenes while ≥2 curiosity-generating revelations
+    // follow): The script's most curiosity-rich disclosure comes before the audience has fully
+    // invested in the story, while the later revelations that follow generate less epistemic
+    // appetite. A high-curiosityDelta revelation landing early is a structural front-load: the
+    // most powerful epistemic hook fires before the stakes are established, making the rest of
+    // the disclosure layer feel anticlimactic by comparison. Single-peak isolation mode ×
+    // revelation channel × curiosityDelta. Distinct from REVELATION_CURIOSITY_PEAK_ABSENT (Wave
+    // 362: the scene with the highest curiosityDelta is NOT a revelation scene at all — a different
+    // failure mode where the peak belongs to a non-revelation; this fires when the peak IS a
+    // revelation but it is early), REVELATION_CURIOSITY_DECOUPLED (Wave 323: average/aggregate ×
+    // all revelation curiosityDelta ≤ 0 — fires when ALL revelations generate no curiosity; this
+    // fires when one revelation generates the MOST curiosity and it is early), REVELATION_TEMPORAL_
+    // CLUSTER (Wave 488: distribution/timing × revelation positions — checks where revelations
+    // cluster, not which has highest curiosityDelta), REVELATION_CURIOSITY_AFTERMATH_VOID (Wave
+    // 502: aftermath × following scene's curiosityDelta — different channel and direction).
+    if (records.length >= 8) {
+      const revWithCuriosity558b = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r }) =>
+          r.revelation !== null && r.revelation !== undefined && r.revelation !== '' &&
+          (r.curiosityDelta ?? 0) > 0,
+        );
+      if (revWithCuriosity558b.length >= 3) {
+        const maxCuriosity558b = Math.max(...revWithCuriosity558b.map(x => x.r.curiosityDelta ?? 0));
+        const peakRev558b = revWithCuriosity558b.find(x => (x.r.curiosityDelta ?? 0) === maxCuriosity558b)!;
+        const earlyThreshold558b = Math.floor(records.length * 0.25);
+        const laterRevCuriosity558b = revWithCuriosity558b.filter(x => x.pos > peakRev558b.pos);
+        if (peakRev558b.pos < earlyThreshold558b && laterRevCuriosity558b.length >= 2) {
+          issues.push({
+            location: `Peak-curiosity revelation at scene ${peakRev558b.pos} (first 25%) while ${laterRevCuriosity558b.length} curiosity-generating revelation(s) follow`,
+            rule: 'REVELATION_CURIOSITY_PEAK_EARLY',
+            severity: 'minor',
+            description: `The revelation with the highest curiosityDelta (${maxCuriosity558b}) appears at scene ${peakRev558b.pos} — within the first 25% of the script — while ${laterRevCuriosity558b.length} other curiosity-generating revelation(s) follow with lower curiosityDelta. The script's most epistemically appetite-generating disclosure fires before the audience has fully invested in the story, while the disclosures that follow generate diminishing curiosity. A high-curiosity revelation is most powerful when it arrives at a point where the audience cares deeply about what is being discovered — typically in Act 2 or at a structural pivot when stakes are established. An early-peak revelation hooks the audience but delivers the best epistemic hook before the world is fully inhabited, making subsequent disclosures feel comparatively flat.`,
+            suggestedFix: `Move the highest-curiosity revelation later in the script, or increase the curiosityDelta of the later revelations so the disclosure layer builds rather than peaks and declines. The most powerful revelation schedule generates escalating curiosity: each disclosure opens more questions than it closes, with the most curiosity-generating revelation arriving at the moment of greatest dramatic investment — typically at or just past the midpoint.`,
+          });
+        }
+      }
+    }
+
+    // SEED_TEMPORAL_CLUSTER (distribution/timing × seed channel × thirds, n≥9, ≥3 scenes with
+    // seededClueIds non-empty, >75% of seeded scenes in one structural third): Physical evidence
+    // planting is structurally ghettoized — clue-seeding clusters into one positional zone rather
+    // than distributing through the narrative as dramatic pressure accumulates. A well-managed
+    // mystery seeds clues throughout the story in response to the scene's emotional and structural
+    // pressure: a seed in Act 1 establishes the landscape, one in Act 2 deepens the implication,
+    // one near the climax creates anticipation. When >75% of seeds cluster in one third, the
+    // audience receives planted evidence in one sustained burst and then waits with no new
+    // material for the rest of the zone. Distribution/timing mode × seed channel. Distinct from
+    // ASSERTION_TEMPORAL_CLUSTER (Wave 474: assertion channel — same analytical mode, different
+    // narrative register: verbal claims not physical evidence) and REVELATION_TEMPORAL_CLUSTER
+    // (Wave 488: revelation channel — same mode, different channel: disclosures not plantings),
+    // REVELATION_SEED_DECOUPLED (Wave 502: co-occurrence × revelation × seed in same scene —
+    // different mode), REVELATION_SEED_AFTERMATH_VOID (Wave 516: aftermath × revelation → seed —
+    // sequence/aftermath mode, not distribution/timing). First distribution/timing check
+    // specifically on the seed planting channel.
+    if (records.length >= 9) {
+      const seededPositions558c = (records as any[])
+        .map((r, i) => ({ r, i }))
+        .filter(({ r }) => ((r.seededClueIds ?? []) as string[]).length > 0)
+        .map(({ i }) => i);
+      if (seededPositions558c.length >= 3) {
+        const third558c = Math.floor(records.length / 3);
+        const firstZone558c = seededPositions558c.filter(i => i < third558c).length;
+        const midZone558c = seededPositions558c.filter(i => i >= third558c && i < 2 * third558c).length;
+        const lastZone558c = seededPositions558c.filter(i => i >= 2 * third558c).length;
+        const maxZone558c = Math.max(firstZone558c, midZone558c, lastZone558c);
+        if (maxZone558c / seededPositions558c.length > 0.75) {
+          const zoneName558c = firstZone558c === maxZone558c ? 'opening' : midZone558c === maxZone558c ? 'middle' : 'closing';
+          issues.push({
+            location: `${maxZone558c}/${seededPositions558c.length} seed scenes in the ${zoneName558c} third`,
+            rule: 'SEED_TEMPORAL_CLUSTER',
+            severity: 'minor',
+            description: `${maxZone558c} of ${seededPositions558c.length} clue-planting scenes (${Math.round(maxZone558c / seededPositions558c.length * 100)}%) are concentrated in the ${zoneName558c} third — physical evidence is being planted in one structural burst rather than distributed through the narrative. A well-managed mystery seeds physical evidence throughout the story as dramatic pressure mounts: each planted clue establishes, deepens, or complicates the implication in response to what the audience currently knows and suspects. When seeds cluster in one zone, the other two-thirds of the story provide no material for the audience to notice, file away, or reinterpret as their understanding develops. The zones without seeds feel informationally hollow on re-watch or re-read.`,
+            suggestedFix: `Redistribute at least one seed from the ${zoneName558c} cluster into each of the other structural zones. A seed in the opening zone establishes the mystery's physical landscape; one in the middle zone recontextualizes what the audience thought they understood; one near the end creates anticipation before the payoff. Three-zone seeding gives the audience new evidence to notice at each structural stage, sustaining engagement across the entire narrative rather than concentrating the evidentiary work in one phase.`,
+          });
+        }
       }
     }
   }

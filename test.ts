@@ -36042,6 +36042,103 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 558 — beliefPass: assertion emotional aftermath flat, revelation curiosity peak early, seed temporal cluster', async () => {
+    const makeRec558 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const runB558 = async (records: any[]) => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // ASSERTION_EMOTIONAL_AFTERMATH_FLAT fire:
+    // 10 scenes; assertions at positions 0,3,6 (all pos<9); scenes at 1,4,7 all neutral →
+    // 3 qualifying assertions, all followed by neutral → fires
+    it('ASSERTION_EMOTIONAL_AFTERMATH_FLAT fires when all assertion aftermaths are emotionally neutral', async () => {
+      const recs558a = Array.from({ length: 10 }, (_, i) =>
+        makeRec558(i, {
+          dialogueHighlights: [0, 3, 6].includes(i) ? ['ALICE: something is happening here'] : [],
+          emotionalShift: [0, 1, 3, 4, 6, 7].includes(i) ? 'neutral' : 'neutral',
+        }),
+      );
+      const res = await runB558(recs558a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ASSERTION_EMOTIONAL_AFTERMATH_FLAT'), 'ASSERTION_EMOTIONAL_AFTERMATH_FLAT should fire');
+    });
+
+    // ASSERTION_EMOTIONAL_AFTERMATH_FLAT no-fire:
+    // 10 scenes; assertions at 0,3,6; scene at position 4 (after assertion at 3) is 'positive' →
+    // not all neutral → no fire
+    it('ASSERTION_EMOTIONAL_AFTERMATH_FLAT does not fire when at least one assertion aftermath is non-neutral', async () => {
+      const recs558anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec558(i, {
+          dialogueHighlights: [0, 3, 6].includes(i) ? ['BOB: the truth must emerge now'] : [],
+          emotionalShift: i === 4 ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runB558(recs558anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ASSERTION_EMOTIONAL_AFTERMATH_FLAT'), 'ASSERTION_EMOTIONAL_AFTERMATH_FLAT should not fire');
+    });
+
+    // REVELATION_CURIOSITY_PEAK_EARLY fire:
+    // 10 scenes; revelation with curiosityDelta at pos 0 (delta=5), 5 (delta=2), 7 (delta=1);
+    // earlyThreshold=floor(10*0.25)=2; peak at pos 0 < 2, 2 later rev-with-curiosity → fires
+    it('REVELATION_CURIOSITY_PEAK_EARLY fires when the highest-curiosity revelation is in the first 25%', async () => {
+      const recs558b = Array.from({ length: 10 }, (_, i) =>
+        makeRec558(i, {
+          revelation: [0, 5, 7].includes(i) ? 'a truth is revealed' : null,
+          curiosityDelta: i === 0 ? 5 : i === 5 ? 2 : i === 7 ? 1 : 0,
+        }),
+      );
+      const res = await runB558(recs558b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_CURIOSITY_PEAK_EARLY'), 'REVELATION_CURIOSITY_PEAK_EARLY should fire');
+    });
+
+    // REVELATION_CURIOSITY_PEAK_EARLY no-fire:
+    // 10 scenes; revelation with curiosityDelta at pos 3 (delta=5), 6 (delta=3), 8 (delta=1);
+    // earlyThreshold=2; peak at pos 3 is NOT < 2 → no fire
+    it('REVELATION_CURIOSITY_PEAK_EARLY does not fire when the peak-curiosity revelation is past the first 25%', async () => {
+      const recs558bnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec558(i, {
+          revelation: [3, 6, 8].includes(i) ? 'a truth is revealed' : null,
+          curiosityDelta: i === 3 ? 5 : i === 6 ? 3 : i === 8 ? 1 : 0,
+        }),
+      );
+      const res = await runB558(recs558bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_CURIOSITY_PEAK_EARLY'), 'REVELATION_CURIOSITY_PEAK_EARLY should not fire');
+    });
+
+    // SEED_TEMPORAL_CLUSTER fire:
+    // 12 scenes; seeded at positions 0,1,2 (all in first third=floor(12/3)=4 → positions 0-3);
+    // firstZone=3/3=100% > 75% → fires
+    it('SEED_TEMPORAL_CLUSTER fires when 3+ seed scenes are concentrated in one structural third', async () => {
+      const recs558c = Array.from({ length: 12 }, (_, i) =>
+        makeRec558(i, {
+          seededClueIds: [0, 1, 2].includes(i) ? ['clue-A'] : [],
+        }),
+      );
+      const res = await runB558(recs558c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_TEMPORAL_CLUSTER'), 'SEED_TEMPORAL_CLUSTER should fire');
+    });
+
+    // SEED_TEMPORAL_CLUSTER no-fire:
+    // 12 scenes; seeded at 0, 4, 8 (one per third); maxZone=1/3≈33% ≤ 75% → no fire
+    it('SEED_TEMPORAL_CLUSTER does not fire when seed scenes are distributed across thirds', async () => {
+      const recs558cnr = Array.from({ length: 12 }, (_, i) =>
+        makeRec558(i, {
+          seededClueIds: [0, 4, 8].includes(i) ? ['clue-A'] : [],
+        }),
+      );
+      const res = await runB558(recs558cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_TEMPORAL_CLUSTER'), 'SEED_TEMPORAL_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 544 — beliefPass: revelation closing quarter absent, assertion drought, turn revelation aftermath void', async () => {
     const makeRec544 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
