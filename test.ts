@@ -28977,6 +28977,92 @@ I always listen.
     });
   });
 
+  describe('Wave 561 — characterArcPass: suspense drought run, relational zone cluster, clock relational aftermath void', async () => {
+    const makeRec561 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const runARC561 = async (records: any[]) => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // ARC_SUSPENSE_DROUGHT_RUN fire:
+    // n=12; suspense-positive at i=0,1,2 (3 scenes); i=3-11 all suspenseDelta=0 → run of 9 ≥6 → fires
+    it('ARC_SUSPENSE_DROUGHT_RUN fires when a run of 6+ consecutive scenes has no raised suspense', async () => {
+      const recs561a = Array.from({ length: 12 }, (_, i) =>
+        makeRec561(i, { suspenseDelta: [0, 1, 2].includes(i) ? 1 : 0 }),
+      );
+      const res = await runARC561(recs561a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_SUSPENSE_DROUGHT_RUN'), 'ARC_SUSPENSE_DROUGHT_RUN should fire');
+    });
+
+    // ARC_SUSPENSE_DROUGHT_RUN no-fire:
+    // n=12; suspense at i=0,5,11 → longest non-suspense run is i=6..10 (5) < 6 → no fire
+    it('ARC_SUSPENSE_DROUGHT_RUN does not fire when no non-suspense run reaches 6 scenes', async () => {
+      const recs561anr = Array.from({ length: 12 }, (_, i) =>
+        makeRec561(i, { suspenseDelta: [0, 5, 11].includes(i) ? 1 : 0 }),
+      );
+      const res = await runARC561(recs561anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_SUSPENSE_DROUGHT_RUN'), 'ARC_SUSPENSE_DROUGHT_RUN should not fire');
+    });
+
+    // ARC_RELATIONAL_ZONE_CLUSTER fire:
+    // n=9; third=3; relShifts at i=3,4,5 (all middle third) → 3/3=100%>75% → fires
+    it('ARC_RELATIONAL_ZONE_CLUSTER fires when >75% of relationship shifts fall in a single structural third', async () => {
+      const recs561b = Array.from({ length: 9 }, (_, i) =>
+        makeRec561(i, {
+          relationshipShifts: [3, 4, 5].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.3 }] : [],
+        }),
+      );
+      const res = await runARC561(recs561b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_ZONE_CLUSTER'), 'ARC_RELATIONAL_ZONE_CLUSTER should fire');
+    });
+
+    // ARC_RELATIONAL_ZONE_CLUSTER no-fire:
+    // n=9; relShifts at i=1,4,7 → one per third, max 1/3=33%≤75% → no fire
+    it('ARC_RELATIONAL_ZONE_CLUSTER does not fire when relationship shifts are spread across thirds', async () => {
+      const recs561bnr = Array.from({ length: 9 }, (_, i) =>
+        makeRec561(i, {
+          relationshipShifts: [1, 4, 7].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.3 }] : [],
+        }),
+      );
+      const res = await runARC561(recs561bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_ZONE_CLUSTER'), 'ARC_RELATIONAL_ZONE_CLUSTER should not fire');
+    });
+
+    // ARC_CLOCK_RELATIONAL_AFTERMATH_VOID fire:
+    // n=8; clockRaised at i=0,1 (pos<7); relShifts at i=5,6 (not within 2 of any clock scene) → fires
+    it('ARC_CLOCK_RELATIONAL_AFTERMATH_VOID fires when no clock-raised scene is followed by a relationship shift', async () => {
+      const recs561c = Array.from({ length: 8 }, (_, i) =>
+        makeRec561(i, {
+          clockRaised: [0, 1].includes(i),
+          relationshipShifts: [5, 6].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.3 }] : [],
+        }),
+      );
+      const res = await runARC561(recs561c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_CLOCK_RELATIONAL_AFTERMATH_VOID'), 'ARC_CLOCK_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    // ARC_CLOCK_RELATIONAL_AFTERMATH_VOID no-fire:
+    // n=8; clockRaised at i=0,1; relShift at i=2 (within 2 of clock at 0) and i=6 → anyClockFollowed → no fire
+    it('ARC_CLOCK_RELATIONAL_AFTERMATH_VOID does not fire when a clock-raised scene is followed by a relationship shift', async () => {
+      const recs561cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec561(i, {
+          clockRaised: [0, 1].includes(i),
+          relationshipShifts: [2, 6].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.3 }] : [],
+        }),
+      );
+      const res = await runARC561(recs561cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_CLOCK_RELATIONAL_AFTERMATH_VOID'), 'ARC_CLOCK_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 547 — characterArcPass: suspense opening zone absent, negative relational aftermath void, payoff front-loaded', async () => {
     const makeRec547 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

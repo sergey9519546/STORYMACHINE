@@ -156,6 +156,20 @@
 // scenes, >70% in first half while back half has ≥1; resolutions burst before pressure peaks;
 // the front-half distribution complement of PAYOFF_BACK_LOADED in causality.ts; distinct from
 // ARC_PAYOFF_DROUGHT_RUN [run-based] and ARC_RELATIONAL_FRONT_LOADED [different channel]).
+// Wave 561 additions: suspense drought run (run-based × suspenseDelta × absence — n≥10, ≥3
+// suspense-positive scenes, longest consecutive run with suspenseDelta ≤ 0 ≥ 6; the tension engine
+// stalls for an extended local stretch; completes the drought-run family on the suspense channel
+// alongside ARC_CURIOSITY/RELATIONAL/PAYOFF_DROUGHT_RUN, distinct from ARC_SUSPENSE_FRONT_LOADED
+// [global half-skew] and ARC_SUSPENSE_OPENING_ZONE_ABSENT [fixed opening zone]), relational zone
+// cluster (distribution/timing × relationship × structural thirds — n≥9, ≥3 relShift scenes, >75%
+// in a single third; bonds ghettoized into one zone; finer-grained than the binary ARC_RELATIONAL_
+// FRONT/BACK_LOADED half-partitions and can fire on a middle-third cluster neither catches, distinct
+// from ARC_SHIFT_CONCENTRATION's ≤3-scene micro-burst, the relational-channel sibling of ARC_TURN_
+// ZONE_CLUSTER), clock relational aftermath void (sequence/aftermath × clock → relational aftermath
+// — n≥8, ≥2 clockRaised scenes [pos<n-1], ≥2 relShift scenes globally, no clock scene followed by a
+// relShift in next 2 scenes; deadlines never strain bonds; the clock-trigger member of the relational-
+// aftermath family alongside ARC_NEGATIVE/POSITIVE/REVELATION_RELATIONAL_AFTERMATH_VOID, distinct from
+// ARC_CLOCK_EMOTION_DECOUPLED [same-scene] and ARC_CLOCK_CURIOSITY_AFTERMATH_VOID [curiosity channel]).
 // Wave 519 additions: curiosity drought run (run-based × curiosityDelta × absence — n≥10,
 // ≥3 curiosity-positive scenes, longest run with curiosityDelta ≤ 0 ≥ 6; the wonder engine
 // stalls for an extended stretch; first run-based check on the curiosity channel, distinct from
@@ -2886,6 +2900,145 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `${Math.round(frontRatio547c * 100)}% of the story's thread resolutions (${frontCount547c} of ${payoffScenes547c.length} payoff scenes) occur in the first half, with only ${backCount547c} in the second half. Most narrative promises are fulfilled before the story reaches its maximum pressure — payoffs arrive during the setup and initial complication rather than at the moments of escalation, climax, and resolution where their completion would carry the most weight. A payoff kept under high stakes is structurally more satisfying than the same payoff kept before the story has built the pressure that makes the kept promise feel urgent. When payoffs front-load, the back half must sustain the audience without the structural satisfaction of completed promises, and the climax resolves without the accumulated payoff architecture that would give it maximum weight.`,
             suggestedFix: `Redistribute at least ${Math.ceil(frontCount547c * 0.3)} of the first-half payoffs into the second half — hold some narrative promises longer and complete them as the story escalates toward its climax. The most structurally powerful payoff arrives at or near the climax: the promise kept under maximum pressure, the narrative setup that pays off when the protagonist most needs it or when its completion changes what the audience understands about the resolution. Hold back some payoffs and let the back half carry more of the thread completions.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 561: ARC_SUSPENSE_DROUGHT_RUN, ARC_RELATIONAL_ZONE_CLUSTER,
+  //              ARC_CLOCK_RELATIONAL_AFTERMATH_VOID ──────────────────────────────────────────────
+
+  // ARC_SUSPENSE_DROUGHT_RUN (run-based × suspenseDelta × absence, n≥10, ≥3 suspense-positive
+  // scenes globally, longest consecutive run of scenes with suspenseDelta ≤ 0 is ≥ 6): The
+  // story's tension engine stalls for an extended consecutive stretch — six or more scenes pass
+  // in a row with no raised suspense, even though suspense rises elsewhere. A run-based drought is
+  // distinct from a distribution skew: the suspense may be perfectly balanced front-to-back across
+  // the script and still contain a dead zone in the middle where the audience's felt pressure
+  // flatlines for a sixth of the runtime or more. An extended tension drought lets the dramatic
+  // grip go slack: the audience, having been shown that this is a story where tension can rise,
+  // spends a long uninterrupted stretch with no pressure on the protagonist, and the momentum the
+  // earlier suspense built dissipates before the next rise can recover it. Run-based mode ×
+  // suspenseDelta × absence. Distinct from ARC_SUSPENSE_FRONT_LOADED (Wave 519: distribution/timing
+  // — >70% of suspense in first half; a global skew, not a local consecutive run), ARC_SUSPENSE_
+  // OPENING_ZONE_ABSENT (Wave 547: zone presence/absence — opening third has none; a fixed-zone
+  // check, not a sliding run anywhere in the script), ARC_CURIOSITY_DROUGHT_RUN / ARC_RELATIONAL_
+  // DROUGHT_RUN / ARC_PAYOFF_DROUGHT_RUN (Waves 519/449/505: run-based siblings on the curiosity,
+  // relational, and payoff channels — this completes the drought-run family on the suspense channel).
+  {
+    const n561a = records.length;
+    if (n561a >= 10) {
+      const suspScenes561a = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 0);
+      if (suspScenes561a.length >= 3) {
+        let longestRun561a = 0;
+        let currentRun561a = 0;
+        for (const r of records as any[]) {
+          if ((r.suspenseDelta ?? 0) <= 0) {
+            currentRun561a++;
+            if (currentRun561a > longestRun561a) longestRun561a = currentRun561a;
+          } else {
+            currentRun561a = 0;
+          }
+        }
+        if (longestRun561a >= 6) {
+          issues.push({
+            location: `longest suspense drought: ${longestRun561a} consecutive scenes with no raised tension`,
+            rule: 'ARC_SUSPENSE_DROUGHT_RUN',
+            severity: 'minor',
+            description: `The story contains a run of ${longestRun561a} consecutive scenes with no positive suspenseDelta — an extended tension drought — even though ${suspScenes561a.length} suspense-positive scenes exist across the script. Unlike a front-to-back distribution skew, this is a local dead zone: a sixth of the runtime or more passes in an unbroken stretch where the audience's felt pressure flatlines. Having been shown that this is a story where tension can rise, the audience spends a long uninterrupted span with no pressure on the protagonist, and the dramatic momentum the surrounding suspense built dissipates before the next rise can recover it. Tension that is technically present in the script but absent for a long consecutive run leaves the middle of the experience slack.`,
+            suggestedFix: `Break up the ${longestRun561a}-scene drought by seeding at least one suspense-positive beat into the middle of the run: a complication that raises the stakes, a threat that surfaces, a deadline that tightens, or a danger that becomes tangible. The drought doesn't need the story's maximum tension — it needs enough raised pressure to keep the audience's grip from going slack across an extended stretch. A story sustains its hold by never letting the felt tension flatline for too long, even between its larger peaks.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ARC_RELATIONAL_ZONE_CLUSTER (distribution/timing × relationship × structural thirds, n≥9,
+  // ≥3 relationship-shift scenes, >75% of them fall in a single structural third): The story's
+  // relational movement is ghettoized into one structural third — the opening, middle, or closing
+  // zone carries the overwhelming majority of all bond shifts while the other two-thirds are
+  // relationally inert. A thirds-based cluster is a finer-grained distribution check than the
+  // binary half-partition checks: a script can split its relational shifts evenly across the two
+  // halves and still concentrate three-quarters of them into, say, the middle third, leaving both
+  // the opening and the climax relationally flat. When bonds only ever move in one zone, the
+  // protagonist's interpersonal arc reads as an isolated episode rather than a continuous thread:
+  // the relationships either change all at once and then freeze, or stay static until a single
+  // burst, rather than evolving across the full sweep of the story. Distribution/timing mode ×
+  // relational channel × structural thirds. Distinct from ARC_RELATIONAL_FRONT_LOADED (Wave 463)
+  // and ARC_RELATIONAL_BACK_LOADED (Wave 407: binary half-partitions — front vs. back; this uses
+  // three zones and can fire on a middle-third cluster that neither half-check would catch), ARC_
+  // SHIFT_CONCENTRATION (Wave 270: a ≤3-scene micro-burst regardless of zone — a tighter window
+  // than a structural third), ARC_TURN_ZONE_CLUSTER (Wave 477: same thirds mode on the dramatic-
+  // turn channel — this is the relational-channel sibling).
+  {
+    const n561b = records.length;
+    if (n561b >= 9) {
+      const relShiftPositions561b = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r }) => ((r.relationshipShifts ?? []) as any[]).length > 0)
+        .map(({ pos }) => pos);
+      if (relShiftPositions561b.length >= 3) {
+        const third561b = Math.floor(n561b / 3);
+        const firstZone561b = relShiftPositions561b.filter(p => p < third561b).length;
+        const lastZone561b = relShiftPositions561b.filter(p => p >= 2 * third561b).length;
+        const midZone561b = relShiftPositions561b.length - firstZone561b - lastZone561b;
+        const maxZone561b = Math.max(firstZone561b, midZone561b, lastZone561b);
+        if (maxZone561b / relShiftPositions561b.length > 0.75) {
+          const zoneName561b =
+            maxZone561b === firstZone561b ? 'opening' : maxZone561b === lastZone561b ? 'closing' : 'middle';
+          issues.push({
+            location: `relationship shifts: ${firstZone561b} opening / ${midZone561b} middle / ${lastZone561b} closing third — ${Math.round((maxZone561b / relShiftPositions561b.length) * 100)}% in the ${zoneName561b} third`,
+            rule: 'ARC_RELATIONAL_ZONE_CLUSTER',
+            severity: 'minor',
+            description: `${Math.round((maxZone561b / relShiftPositions561b.length) * 100)}% of the story's ${relShiftPositions561b.length} relationship-shift scenes are concentrated in the ${zoneName561b} structural third, leaving the other two-thirds relationally inert. Unlike a front-vs-back skew, this is a single-zone cluster: the bonds move almost entirely within one third of the runtime and stay frozen across the rest. When relational movement is ghettoized into one zone, the protagonist's interpersonal arc reads as an isolated episode rather than a continuous thread — relationships either change all at once and then freeze, or stay static until a single concentrated burst, rather than evolving across the full sweep of the story. The most resonant interpersonal arcs let bonds shift, recover, and shift again across all three structural zones, so the relational world feels alive throughout.`,
+            suggestedFix: `Redistribute some of the ${zoneName561b} third's relationship shifts into the other two zones so that bonds move across the full arc rather than clustering in one stretch. Each structural third can carry its own relational beat: an early shift that establishes the dynamics, a middle shift that tests them under pressure, and a late shift that resolves or transforms them. Spreading bond movement across the thirds turns an isolated relational episode into a continuous interpersonal thread the audience can follow from setup to climax.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ARC_CLOCK_RELATIONAL_AFTERMATH_VOID (sequence/aftermath × clock trigger → relational aftermath,
+  // n≥8, ≥2 qualifying clockRaised scenes [pos < n-1], ≥2 relationship-shift scenes globally, none
+  // of the qualifying clock scenes is followed by a relationship shift within 2 scenes): The
+  // protagonist's deadlines never move bonds — every moment a clock is raised passes without any
+  // relational consequence in the immediate aftermath. When time pressure tightens, the people
+  // around the protagonist should feel it too: an alliance strains under the deadline, a bond is
+  // tested by the urgency, someone is forced to choose sides as the clock runs down. When raised
+  // clocks never trigger relational movement in the following scenes, the story's urgency operates
+  // as a purely plot-mechanical device disconnected from the interpersonal world — the deadline
+  // drives events but never the relationships those events should strain. Sequence/aftermath mode ×
+  // clock trigger × relational aftermath. Distinct from ARC_CLOCK_EMOTION_DECOUPLED (Wave 435:
+  // co-occurrence × the clock scene's own emotional state — same-scene, not aftermath), ARC_CLOCK_
+  // CURIOSITY_AFTERMATH_VOID (Wave 505: clock → curiosity aftermath — different aftermath channel),
+  // ARC_NEGATIVE_RELATIONAL_AFTERMATH_VOID / ARC_POSITIVE_RELATIONAL_AFTERMATH_VOID / ARC_
+  // REVELATION_RELATIONAL_AFTERMATH_VOID (Waves 547/477/463: same relational-aftermath output but
+  // triggered by emotion or revelation — this is the clock-trigger member of that family).
+  {
+    const n561c = records.length;
+    if (n561c >= 8) {
+      const relShiftScenes561c = (records as any[]).filter(
+        r => ((r.relationshipShifts ?? []) as any[]).length > 0,
+      );
+      const qualClockScenes561c = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) => r.clockRaised === true && pos < n561c - 1);
+      if (relShiftScenes561c.length >= 2 && qualClockScenes561c.length >= 2) {
+        const anyClockFollowedByRel561c = qualClockScenes561c.some(({ pos }) => {
+          const next1 = (records as any[])[pos + 1];
+          const next2 = (records as any[])[pos + 2];
+          return (
+            (next1 && ((next1.relationshipShifts ?? []) as any[]).length > 0) ||
+            (next2 && ((next2.relationshipShifts ?? []) as any[]).length > 0)
+          );
+        });
+        if (!anyClockFollowedByRel561c) {
+          issues.push({
+            location: `${qualClockScenes561c.length} clock-raised scene(s) — none followed by a relationship shift within 2 scenes`,
+            rule: 'ARC_CLOCK_RELATIONAL_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `None of the story's ${qualClockScenes561c.length} clock-raised scenes is followed by a relationship shift within the next two scenes, even though ${relShiftScenes561c.length} bond movements exist elsewhere. When time pressure tightens — a deadline is set, a countdown begins, the window to act narrows — the people around the protagonist should feel the strain: an alliance buckles under the urgency, a bond is tested by the pressure, someone is forced to choose sides as the clock runs down. When raised clocks never trigger relational movement in the following beats, the story's urgency operates as a purely plot-mechanical device disconnected from the interpersonal world: the deadline drives the events but never the relationships those events should strain. The clock and the relational arc run as separate systems, and the time pressure carries no human cost.`,
+            suggestedFix: `After at least one clock-raised scene, let the next one or two scenes carry a relationship shift that the deadline provokes — an ally who pulls back as the stakes climb, a bond that fractures under the time pressure, or an attachment that deepens when the countdown forces the characters together. Time pressure is most powerful when it strains relationships, not just the plot: the deadline that tests a bond carries a human cost the audience feels, where the deadline that only drives events remains a mechanical device.`,
           });
         }
       }
