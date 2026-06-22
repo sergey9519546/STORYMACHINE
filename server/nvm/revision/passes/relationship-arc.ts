@@ -155,6 +155,18 @@
 // relational stretch; distinct from RELATIONSHIP_DIMENSION_RUN which tracks dimension monopoly,
 // PAIR_RUPTURE_RUN which tracks consecutive negative shifts from any pair, and DEPTH_GAP which
 // measures total amplitude concentration across the whole story).
+// Wave 567 additions: relationship peak revelation absent (single-peak isolation × revelation ×
+// relationship — n≥8, the story's largest-magnitude shift carries no revelation while ≥2 other shift
+// scenes coincide with a disclosure; the biggest bond change is not a moment of truth), relationship
+// peak dramatic-turn absent (single-peak × dramatic-turn × relationship — the largest shift carries no
+// turn while ≥2 other shift scenes ride a pivot; the biggest swing is structurally inert), relationship
+// peak clock absent (single-peak × clock × relationship — the largest shift raises no clock while ≥2
+// other shift scenes move under deadline pressure; the biggest swing plays in calm water). These fill
+// the revelation, dramatic-turn, and clock channels of the peak family alongside RELATIONSHIP_PEAK_
+// EMOTION_FLAT, RELATIONSHIP_CURIOSITY_PEAK_ABSENT, and RELATIONSHIP_SUSPENSE_PEAK_ABSENT; each is
+// distinct from its aggregate co-occurrence sibling (RELATIONSHIP_REVELATION_SILENT / RELATIONSHIP_
+// DRAMATIC_TURN_DECOUPLED / RELATIONSHIP_CLOCK_DECOUPLED, which fire only when NO shift carries the
+// channel) by isolating the single peak shift even when most shifts DO carry the channel.
 // Wave 525 additions: relationship shift seed aftermath void (sequence/aftermath × seed × shift
 // trigger — ≥3 shift scenes not in last 2 positions, ≥2 seed scenes, every shift followed by 2
 // scenes with no seededClueIds; bond-moving never activates foreshadowing in its aftermath; adds
@@ -3142,6 +3154,123 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
           description: `${conPairs553c.length === 1 ? 'One pair has' : `${conPairs553c.length} pairs have`} more than 75% of ${conPairs553c.length === 1 ? 'its' : 'their'} relationship shifts concentrated in a single structural third (${desc553c}). A bond that does all its relational work in one narrow act-segment is architecturally compressed: it drives the story intensely within one zone and then goes relationally dormant in the remaining two-thirds. The audience invests in this specific relationship during its active period, then watches it freeze — a structural imbalance that weakens the arc of that bond independently of whether the overall shift landscape is distributed. A credible relationship arc needs establishing moments, complicating moments, and transformative moments spread across the story's structure.`,
           suggestedFix: `Spread at least one shift for this pair into each of the currently underrepresented thirds — even a minor shift (a cooler exchange, a quiet warming) in the dormant zones confirms that the relationship is still alive and evolving outside its dominant period. If the pair is compressed into the opening third, add a complication mid-story and a resolution or transformation in the final third; if it is compressed into the closing third, seed an earlier establishing shift and a mid-story complication that gives the late-story movement something to build on.`,
         });
+      }
+    }
+  }
+
+  // ── Wave 567: RELATIONSHIP_PEAK_REVELATION_ABSENT, RELATIONSHIP_PEAK_DRAMATIC_TURN_ABSENT,
+  //              RELATIONSHIP_PEAK_CLOCK_ABSENT ──────────────────────────────────────────────────
+  // The single-peak family (anchored on the story's largest-magnitude relationship shift) covers
+  // the emotion (Wave 385), curiosity (Wave 357), and suspense (Wave 371) channels but never the
+  // revelation, dramatic-turn, or clock channels. This wave fills those three cells: it asks whether
+  // the story's BIGGEST bond change coincides with a disclosure, a pivot, and time pressure — the
+  // three channels that would give the peak relational moment maximum narrative force.
+  {
+    const n567 = records.length;
+    if (n567 >= 8) {
+      // Identify the single largest-magnitude relationship shift (the peak relational moment).
+      // Strict ">" means the first scene achieving the max is the peak, mirroring Wave 385.
+      let peakMag567 = 0;
+      let peakScene567 = -1;
+      const shiftScenes567: any[] = [];
+      for (const r of records as any[]) {
+        const shifts = (r.relationshipShifts ?? []) as Array<{ amount: number }>;
+        if (shifts.length > 0) shiftScenes567.push(r);
+        for (const sh of shifts) {
+          if (Math.abs(sh.amount) > peakMag567) { peakMag567 = Math.abs(sh.amount); peakScene567 = r.sceneIdx; }
+        }
+      }
+      const peakRec567 = peakScene567 >= 0
+        ? (records as any[]).find(r => r.sceneIdx === peakScene567)
+        : null;
+
+      // Channel predicates.
+      const hasRevelation567 = (r: any): boolean =>
+        r.revelation !== null && r.revelation !== undefined && r.revelation !== '';
+      const hasTurn567 = (r: any): boolean =>
+        (r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '';
+      const hasClock567 = (r: any): boolean => r.clockRaised === true;
+
+      // RELATIONSHIP_PEAK_REVELATION_ABSENT — single-peak isolation × revelation × relationship.
+      // The story's largest bond change carries no revelation, even though ≥2 OTHER shift scenes do
+      // coincide with a disclosure. The biggest relational turning point is not a moment of truth —
+      // the bond moves most at a beat where nothing is learned, so the peak relational swing and the
+      // peak epistemic event never fuse. When bonds elsewhere shift alongside revelations but the
+      // single most consequential shift does not, the story's most important relational moment lands
+      // as a change without a discovered reason behind it.
+      // Distinct from: RELATIONSHIP_REVELATION_SILENT (aggregate co-occurrence — fires when NO shift
+      // scene carries a revelation; this fires even when MOST shifts coincide with revelations but
+      // the single peak does not), RELATIONSHIP_REVELATION_EMOTION_DECOUPLED (audits the emotion of
+      // revelation+shift scenes, not the peak), RELATIONSHIP_PEAK_EMOTION_FLAT (peak shift × emotion
+      // channel — same anchor, different channel). First revelation entry in the peak family.
+      if (peakRec567 && !hasRevelation567(peakRec567)) {
+        const revShiftOther567 = shiftScenes567.filter(
+          r => r.sceneIdx !== peakScene567 && hasRevelation567(r),
+        );
+        if (revShiftOther567.length >= 2) {
+          issues.push({
+            location: `Scene ${peakScene567} — largest relationship shift (|${peakMag567.toFixed(2)}|), no revelation`,
+            rule: 'RELATIONSHIP_PEAK_REVELATION_ABSENT',
+            severity: 'minor',
+            description: `The story's largest relationship shift (Scene ${peakScene567}, magnitude ${peakMag567.toFixed(2)}) carries no revelation, even though ${revShiftOther567.length} other shift scenes move a bond alongside a disclosure. The single most consequential relational turning point is not a moment of truth: the bond moves most at a beat where nothing is learned, so the peak relational swing and the peak epistemic event never coincide. When other bond changes are powered by discoveries but the biggest one is not, the story's most important relational moment reads as a change without a discovered cause — a swing the audience registers but is given no new knowledge to anchor.`,
+            suggestedFix: 'Tie the peak relationship shift to a revelation: let the moment the bond moves most also be the moment a crucial truth surfaces — a betrayal exposed, an identity confirmed, a hidden motive revealed. The biggest relational swing earns its weight when it is driven by a discovery, so the audience both feels the bond change and understands the truth that forced it.',
+          });
+        }
+      }
+
+      // RELATIONSHIP_PEAK_DRAMATIC_TURN_ABSENT — single-peak isolation × dramatic turn × relationship.
+      // The story's largest bond change carries no dramatic turn, even though ≥2 OTHER shift scenes
+      // coincide with a pivot. The biggest relational swing is not a story turning point — the bond
+      // moves most at a beat the story does not register as a reversal or recognition, so the peak
+      // relational moment and the peak structural pivot never align. When bonds elsewhere shift on
+      // story turns but the single most consequential shift does not, the relationship's defining
+      // moment is structurally inert: it changes the bond without redirecting the narrative.
+      // Distinct from: RELATIONSHIP_DRAMATIC_TURN_DECOUPLED (Wave 357: aggregate co-occurrence —
+      // fires when NO shift scene carries a turn; this fires when MOST do but the peak does not),
+      // RELATIONSHIP_SHIFT_DRAMATIC_TURN_AFTERMATH_VOID (Wave 511: aftermath mode — what follows a
+      // shift), RELATIONSHIP_PEAK_REVELATION_ABSENT (Wave 567 sibling: revelation channel). First
+      // dramatic-turn entry in the peak family.
+      if (peakRec567 && !hasTurn567(peakRec567)) {
+        const turnShiftOther567 = shiftScenes567.filter(
+          r => r.sceneIdx !== peakScene567 && hasTurn567(r),
+        );
+        if (turnShiftOther567.length >= 2) {
+          issues.push({
+            location: `Scene ${peakScene567} — largest relationship shift (|${peakMag567.toFixed(2)}|), no dramatic turn`,
+            rule: 'RELATIONSHIP_PEAK_DRAMATIC_TURN_ABSENT',
+            severity: 'minor',
+            description: `The story's largest relationship shift (Scene ${peakScene567}, magnitude ${peakMag567.toFixed(2)}) carries no dramatic turn, even though ${turnShiftOther567.length} other shift scenes move a bond inside a story pivot. The single most consequential relational swing is not a turning point in the narrative: the bond moves most at a beat the story does not register as a reversal or recognition, so the peak relational moment and the peak structural pivot never align. When other bond changes ride story turns but the biggest one does not, the relationship's defining moment is structurally inert — it transforms the bond without redirecting the story, leaving the largest relational swing disconnected from the plot's momentum.`,
+            suggestedFix: 'Stage the peak relationship shift as a dramatic turn: let the moment the bond moves most also reverse the story\'s direction or reframe what the characters understand. The biggest relational swing should be a hinge for the whole narrative, not a change that happens off the story\'s main track — when the bond and the plot turn together, the moment carries both relational and structural weight.',
+          });
+        }
+      }
+
+      // RELATIONSHIP_PEAK_CLOCK_ABSENT — single-peak isolation × clock × relationship.
+      // The story's largest bond change raises no clock, even though ≥2 OTHER shift scenes coincide
+      // with deadline pressure. The biggest relational swing happens free of time pressure — the bond
+      // moves most in a beat with no ticking clock, so the peak relational moment and the urgency
+      // engine never meet. When bonds elsewhere shift under deadlines but the single most consequential
+      // shift does not, the story's most important relational turn plays in calm water rather than
+      // carrying the doubled charge of a bond moving precisely as time runs out.
+      // Distinct from: RELATIONSHIP_CLOCK_DECOUPLED (Wave 371: aggregate co-occurrence — fires when NO
+      // shift scene raises a clock; this fires when MOST do but the peak does not), RELATIONSHIP_SHIFT_
+      // CLOCK_AFTERMATH_VOID (Wave 497: aftermath mode — what follows a shift), RELATIONSHIP_SUSPENSE_
+      // PEAK_ABSENT (Wave 371: anchors on the peak-SUSPENSE scene and checks for a shift — inverse
+      // framing; this anchors on the peak SHIFT and checks for a clock). First clock entry in the peak
+      // family, completing it across the revelation, dramatic-turn, and clock channels this wave.
+      if (peakRec567 && !hasClock567(peakRec567)) {
+        const clockShiftOther567 = shiftScenes567.filter(
+          r => r.sceneIdx !== peakScene567 && hasClock567(r),
+        );
+        if (clockShiftOther567.length >= 2) {
+          issues.push({
+            location: `Scene ${peakScene567} — largest relationship shift (|${peakMag567.toFixed(2)}|), no clock raised`,
+            rule: 'RELATIONSHIP_PEAK_CLOCK_ABSENT',
+            severity: 'minor',
+            description: `The story's largest relationship shift (Scene ${peakScene567}, magnitude ${peakMag567.toFixed(2)}) raises no clock, even though ${clockShiftOther567.length} other shift scenes move a bond under deadline pressure. The single most consequential relational swing happens free of time pressure: the bond moves most in a beat with no ticking clock, so the peak relational moment and the urgency engine never meet. When other bond changes land under deadlines but the biggest one does not, the story's most important relational turn plays in calm water — it forfeits the doubled charge of a bond fracturing or forging precisely as time runs out, the convergence that makes a relational climax feel both urgent and inevitable.`,
+            suggestedFix: 'Place the peak relationship shift under a live clock: let the moment the bond moves most also be a moment when time is running out — a reconciliation forced by a closing window, a betrayal exposed in the scramble before a deadline. The biggest relational swing carries maximum force when urgency and relational change crest together, so the audience feels both the weight of the bond moving and the pressure of time at the same instant.',
+          });
+        }
       }
     }
   }

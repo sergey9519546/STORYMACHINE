@@ -22463,6 +22463,106 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 567 — relationshipArcPass: peak revelation absent, peak dramatic-turn absent, peak clock absent', async () => {
+    const mkShift567 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
+    const makeRec567 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runRA567 = async (records: any[]) => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // RELATIONSHIP_PEAK_REVELATION_ABSENT fire:
+    // n=8; peak shift at scene 2 (|0.9|, no revelation); scenes 4,6 carry shift + revelation → fires
+    it('RELATIONSHIP_PEAK_REVELATION_ABSENT fires when the largest shift carries no revelation while others do', async () => {
+      const recs567a = Array.from({ length: 8 }, (_, i) =>
+        makeRec567(i, {
+          relationshipShifts: i === 2 ? mkShift567(0.9) : [4, 6].includes(i) ? mkShift567(0.4) : [],
+          revelation: [4, 6].includes(i) ? 'truth surfaced' : null,
+        }),
+      );
+      const res = await runRA567(recs567a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_PEAK_REVELATION_ABSENT'), 'RELATIONSHIP_PEAK_REVELATION_ABSENT should fire');
+    });
+
+    // RELATIONSHIP_PEAK_REVELATION_ABSENT no-fire:
+    // peak shift scene 2 DOES carry a revelation → no fire
+    it('RELATIONSHIP_PEAK_REVELATION_ABSENT does not fire when the peak shift coincides with a revelation', async () => {
+      const recs567an = Array.from({ length: 8 }, (_, i) =>
+        makeRec567(i, {
+          relationshipShifts: i === 2 ? mkShift567(0.9) : [4, 6].includes(i) ? mkShift567(0.4) : [],
+          revelation: [2, 4, 6].includes(i) ? 'truth surfaced' : null,
+        }),
+      );
+      const res = await runRA567(recs567an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_PEAK_REVELATION_ABSENT'), 'RELATIONSHIP_PEAK_REVELATION_ABSENT should not fire');
+    });
+
+    // RELATIONSHIP_PEAK_DRAMATIC_TURN_ABSENT fire:
+    // n=8; peak shift scene 2 (no turn); scenes 4,6 carry shift + dramaticTurn → fires
+    it('RELATIONSHIP_PEAK_DRAMATIC_TURN_ABSENT fires when the largest shift carries no dramatic turn while others do', async () => {
+      const recs567b = Array.from({ length: 8 }, (_, i) =>
+        makeRec567(i, {
+          relationshipShifts: i === 2 ? mkShift567(0.9) : [4, 6].includes(i) ? mkShift567(0.4) : [],
+          dramaticTurn: [4, 6].includes(i) ? 'reversal' : 'nothing',
+        }),
+      );
+      const res = await runRA567(recs567b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_PEAK_DRAMATIC_TURN_ABSENT'), 'RELATIONSHIP_PEAK_DRAMATIC_TURN_ABSENT should fire');
+    });
+
+    // RELATIONSHIP_PEAK_DRAMATIC_TURN_ABSENT no-fire:
+    // peak shift scene 2 DOES carry a dramatic turn → no fire
+    it('RELATIONSHIP_PEAK_DRAMATIC_TURN_ABSENT does not fire when the peak shift coincides with a dramatic turn', async () => {
+      const recs567bn = Array.from({ length: 8 }, (_, i) =>
+        makeRec567(i, {
+          relationshipShifts: i === 2 ? mkShift567(0.9) : [4, 6].includes(i) ? mkShift567(0.4) : [],
+          dramaticTurn: [2, 4, 6].includes(i) ? 'reversal' : 'nothing',
+        }),
+      );
+      const res = await runRA567(recs567bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_PEAK_DRAMATIC_TURN_ABSENT'), 'RELATIONSHIP_PEAK_DRAMATIC_TURN_ABSENT should not fire');
+    });
+
+    // RELATIONSHIP_PEAK_CLOCK_ABSENT fire:
+    // n=8; peak shift scene 2 (no clock); scenes 4,6 carry shift + clockRaised → fires
+    it('RELATIONSHIP_PEAK_CLOCK_ABSENT fires when the largest shift raises no clock while others do', async () => {
+      const recs567c = Array.from({ length: 8 }, (_, i) =>
+        makeRec567(i, {
+          relationshipShifts: i === 2 ? mkShift567(0.9) : [4, 6].includes(i) ? mkShift567(0.4) : [],
+          clockRaised: [4, 6].includes(i),
+        }),
+      );
+      const res = await runRA567(recs567c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_PEAK_CLOCK_ABSENT'), 'RELATIONSHIP_PEAK_CLOCK_ABSENT should fire');
+    });
+
+    // RELATIONSHIP_PEAK_CLOCK_ABSENT no-fire:
+    // peak shift scene 2 DOES raise a clock → no fire
+    it('RELATIONSHIP_PEAK_CLOCK_ABSENT does not fire when the peak shift raises a clock', async () => {
+      const recs567cn = Array.from({ length: 8 }, (_, i) =>
+        makeRec567(i, {
+          relationshipShifts: i === 2 ? mkShift567(0.9) : [4, 6].includes(i) ? mkShift567(0.4) : [],
+          clockRaised: [2, 4, 6].includes(i),
+        }),
+      );
+      const res = await runRA567(recs567cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_PEAK_CLOCK_ABSENT'), 'RELATIONSHIP_PEAK_CLOCK_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 525 — relationshipArcPass: shift seed aftermath void, shift payoff aftermath void, seed decoupled', async () => {
     const mkShift525 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
     const makeRec525 = (idx: number, overrides: any = {}): any => ({
