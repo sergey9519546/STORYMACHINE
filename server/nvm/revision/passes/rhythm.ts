@@ -106,6 +106,16 @@
 // high (average/aggregate × sentence count per line — ≥8 action lines averaging >3 sentences each,
 // multi-clause overload that collapses the shot-by-shot grammar of cinematic action; the average/
 // aggregate complement of SINGLE_SENTENCE_FLOOD and SENTENCE_COUNT_PEAK).
+// Wave 568 additions: action long thirds cluster (distribution/timing × long ≥12w × structural
+// thirds — ≥9 action lines, ≥4 long lines, >75% in a single even-third; the descriptive register
+// ghettoized into one zone; distinct from the 25/50/25 zone-ABSENCE checks [absence not over-
+// concentration] and from ACTION_DENSITY_PEAK_EARLY/LATE [density peak position]), action short
+// thirds cluster (distribution/timing × short ≤4w × structural thirds — the short-line sibling,
+// staccato compression confined to one zone; distinct from CONSECUTIVE_SHORT_RUN [contiguous run]
+// and SHORT_LINE_POVERTY [scarcity]), action alternation run (run-based × strict short↔long
+// alternation — ≥6 consecutive lines swapping ≤4w/≥12w every line; a mechanical see-saw, the
+// over-regular kind of monotony; distinct from the monotonic ASCENT/DESCENT runs, the same-channel
+// CONSECUTIVE runs, and ACTION_SHORTLONG_SEGREGATED [separation, the structural opposite]).
 // Wave 554 additions: action long beat uncaused (backward-cause × long channel — ≥3 long ≥12w
 // lines after position 1 all lack a short ≤4w predecessor within 2 lines; long prose arrives
 // without the compression that earns its density; backward-cause mirror of IMPACT_BEAT_UNCAUSED
@@ -2560,6 +2570,130 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `Fewer than 15% of action lines contain a comma (${commaCount554c} of ${actionLines.length}) — the script's action prose is almost entirely comma-free. Commas are the primary tool for syntactic complexity within a single action sentence: they introduce dependent clauses ("She hesitates, then moves"), list actions in sequence ("She opens the door, scans the room, steps inside"), and insert parenthetical qualifications that give an action its emotional subtext ("He smiles, just barely"). When virtually no action lines use commas, every sentence must be simple and unmodified — subject, verb, object, full stop. The cumulative reading experience is syntactically monotone: each beat arrives as a single unadorned statement, and the prose is rhythmically restricted even when word count and sentence count are varied.`,
           suggestedFix: `Introduce commas into at least 15% of action lines by adding syntactic complexity where the action allows it: join a main action to a qualifying detail ("She opens the door, her hand shaking"), enumerate two simultaneous observations ("The room is empty, the window open"), or add a mid-sentence pause that gives an action its physical texture ("He stops, listens, then takes the stairs two at a time"). Each well-placed comma adds a rhythmic beat inside the sentence that the surrounding simple lines cannot provide.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 568: ACTION_LONG_THIRDS_CLUSTER, ACTION_SHORT_THIRDS_CLUSTER, ACTION_ALTERNATION_RUN ──
+
+  {
+    // ACTION_LONG_THIRDS_CLUSTER — distribution/timing × long-line channel × structural thirds.
+    // ≥9 action lines, ≥4 long lines (≥12 words), >75% of them concentrated in a single structural
+    // third of the action-line sequence → fire. The descriptive/elaborate register is ghettoized
+    // into one structural zone — the opening, middle, or closing third carries almost all the long
+    // lines while the other two-thirds are written entirely in short and medium beats. A thirds-based
+    // distribution cluster is distinct from the zone-ABSENCE checks: those fire when a fixed 25/50/25
+    // zone LACKS a long line; this fires on OVER-concentration in any single even-third, reporting the
+    // imbalance as one finding with the dominant zone named. When elaboration clusters in one zone, the
+    // prose's textural variety is front-, middle-, or back-loaded: the audience gets all the richly
+    // realized staging in one stretch and a comparatively flat descriptive register everywhere else.
+    // Distinct from: ACTION_OPENING/MIDDLE/FINALE_LONG_ABSENT (Waves 498/470/526: zone presence/absence
+    // on a 25/50/25 partition — fires on ABSENCE from a fixed zone, not over-concentration in an even
+    // third), ACTION_DENSITY_PEAK_EARLY/LATE (peak position of word-count density, not the distribution
+    // of long-line counts across thirds), ACTION_SHORTLONG_SEGREGATED (short vs long spatial separation
+    // — a bisection check, not a single-zone over-concentration), ACTION_FINALE_BLOAT (zone-average
+    // comparison). First thirds-distribution cluster check on the long-line channel in this pass.
+    if (actionLines.length >= 9) {
+      const L568a = actionLines.length;
+      const longPos568a = wordCounts.map((w, i) => ({ w, i })).filter(x => x.w >= 12).map(x => x.i);
+      if (longPos568a.length >= 4) {
+        const third568a = Math.floor(L568a / 3);
+        const first568a = longPos568a.filter(p => p < third568a).length;
+        const last568a = longPos568a.filter(p => p >= 2 * third568a).length;
+        const mid568a = longPos568a.length - first568a - last568a;
+        const max568a = Math.max(first568a, mid568a, last568a);
+        if (max568a / longPos568a.length > 0.75) {
+          const zone568a = max568a === first568a ? 'opening' : max568a === last568a ? 'closing' : 'middle';
+          issues.push({
+            location: `long action lines: ${first568a} opening / ${mid568a} middle / ${last568a} closing third — ${Math.round((max568a / longPos568a.length) * 100)}% in the ${zone568a} third`,
+            rule: 'ACTION_LONG_THIRDS_CLUSTER',
+            severity: 'minor',
+            description: `${Math.round((max568a / longPos568a.length) * 100)}% of the script's ${longPos568a.length} long action lines (≥12 words) are concentrated in the ${zone568a} structural third, leaving the other two-thirds written almost entirely in short and medium beats. The descriptive, image-building register is ghettoized into one zone: the audience receives all the richly realized, fully committed staging in one stretch and a comparatively spare descriptive texture everywhere else. Cinematic prose earns its rhythm by varying density throughout — a detailed beat that anchors a moment's physical reality should be available in the opening, the middle, AND the climax. When the long lines cluster in a single third, the textural variety is front-, middle-, or back-loaded, and two-thirds of the script reads at a uniform low density regardless of what the drama demands.`,
+            suggestedFix: `Redistribute some of the ${zone568a} third's long lines into the other two zones — move or add a fully realized descriptive beat where the current prose runs uniformly short. Each structural third benefits from at least one long line that constructs a detailed image: an establishing beat in the opening, a textured complication in the middle, a precisely staged moment at the climax. Spreading the elaborate register across the thirds gives the whole script the density variation that makes its rhythm feel calibrated rather than lopsided.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // ACTION_SHORT_THIRDS_CLUSTER — distribution/timing × short-line channel × structural thirds.
+    // ≥9 action lines, ≥4 short lines (≤4 words), >75% of them concentrated in a single structural
+    // third → fire. The compressed/staccato register is ghettoized into one structural zone — one
+    // third carries almost all the short impact beats while the other two-thirds run uniformly at
+    // medium or long length. Like its long-line sibling, this is a single-zone over-concentration
+    // check on an even-thirds partition, distinct from the fixed-zone absence checks. When the short
+    // beats cluster in one zone, the prose's capacity for compression and impact is confined to one
+    // stretch: the audience gets all the punchy, accelerated rhythm in one third and a comparatively
+    // even, unaccented cadence everywhere else, so the staccato tool that should be available to
+    // sharpen any moment is spent entirely in a single act-segment.
+    // Distinct from: ACTION_OPENING/MIDDLE/FINALE_SHORT_ABSENT (Waves 498/470/484: zone presence/
+    // absence on a 25/50/25 partition — fires on ABSENCE from a fixed zone, not over-concentration),
+    // CONSECUTIVE_SHORT_RUN (Wave 484: a local consecutive run of short lines — a contiguous-run check,
+    // not a global thirds distribution), SHORT_LINE_POVERTY (too FEW short lines overall — scarcity,
+    // not concentration), ACTION_SHORTLONG_SEGREGATED (short/long bisection). The short-channel sibling
+    // of ACTION_LONG_THIRDS_CLUSTER; first thirds-distribution cluster check on the short-line channel.
+    if (actionLines.length >= 9) {
+      const L568b = actionLines.length;
+      const shortPos568b = wordCounts.map((w, i) => ({ w, i })).filter(x => x.w <= 4).map(x => x.i);
+      if (shortPos568b.length >= 4) {
+        const third568b = Math.floor(L568b / 3);
+        const first568b = shortPos568b.filter(p => p < third568b).length;
+        const last568b = shortPos568b.filter(p => p >= 2 * third568b).length;
+        const mid568b = shortPos568b.length - first568b - last568b;
+        const max568b = Math.max(first568b, mid568b, last568b);
+        if (max568b / shortPos568b.length > 0.75) {
+          const zone568b = max568b === first568b ? 'opening' : max568b === last568b ? 'closing' : 'middle';
+          issues.push({
+            location: `short action lines: ${first568b} opening / ${mid568b} middle / ${last568b} closing third — ${Math.round((max568b / shortPos568b.length) * 100)}% in the ${zone568b} third`,
+            rule: 'ACTION_SHORT_THIRDS_CLUSTER',
+            severity: 'minor',
+            description: `${Math.round((max568b / shortPos568b.length) * 100)}% of the script's ${shortPos568b.length} short action lines (≤4 words) are concentrated in the ${zone568b} structural third, leaving the other two-thirds running uniformly at medium or long length. The compressed, staccato register — the tool that snaps a moment to its barest essential and accelerates the reading pace — is ghettoized into one zone. The audience gets all the punchy, percussive rhythm in one stretch and a comparatively even, unaccented cadence everywhere else. Compression is most powerful as a contrast available throughout: a short impact beat can sharpen any moment in any act. When the short lines cluster in a single third, two-thirds of the script forfeits the rhythmic punctuation that brevity provides.`,
+            suggestedFix: `Redistribute some of the ${zone568b} third's short lines into the other two zones — introduce a compressed impact beat where the prose currently runs uniformly long. Each structural third benefits from the percussive contrast of a short line: a clipped beat that lands a moment hard. Spreading the staccato register across the thirds keeps the compression tool live throughout the script rather than spending it all in one act-segment.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // ACTION_ALTERNATION_RUN — run-based × strict short↔long alternation.
+    // ≥8 action lines, a run of ≥6 consecutive action lines whose word counts strictly alternate
+    // between short (≤4 words) and long (≥12 words) → fire. A short/long see-saw sustained over six
+    // or more lines becomes a mechanical ping-pong: the reader internalizes the alternation and
+    // anticipates each swing before it arrives, so the contrast between compression and elaboration —
+    // which is powerful as an occasional, deliberate move — flattens into a predictable oscillation.
+    // Strict alternation is its own rhythmic monotony: not the monotony of sameness, but the monotony
+    // of an over-regular pattern. The technique that should feel like the prose responding to each
+    // beat's weight instead reads as a formula stamped across an extended stretch.
+    // Distinct from: ACTION_WORD_COUNT_ASCENT_RUN / ACTION_WORD_COUNT_DESCENT_RUN (Waves 526/512:
+    // strictly monotonic sequences — this is a strictly ALTERNATING sequence, the opposite of
+    // monotonic), CONSECUTIVE_SHORT_RUN / ACTION_CONSECUTIVE_LONG_RUN / ACTION_CONSECUTIVE_MEDIUM_RUN
+    // (same-channel consecutive runs — this requires two channels swapping every line), ACTION_
+    // SHORTLONG_SEGREGATED (short and long lines SEPARATED into clusters — the structural opposite of
+    // tight interleaving), MONOTONOUS_RHYTHM / ACTION_WORDCOUNT_FLATLINE (low-variance uniformity —
+    // this is high-variance but over-regular). First strict-alternation run check in this pass.
+    if (actionLines.length >= 8) {
+      let maxAlt568c = 0;
+      let cur568c = 0;
+      let prevCat568c: 'S' | 'L' | null = null;
+      for (const w of wordCounts) {
+        const cat568c: 'S' | 'L' | null = w <= 4 ? 'S' : w >= 12 ? 'L' : null;
+        if (cat568c === null) { cur568c = 0; prevCat568c = null; continue; }
+        if (prevCat568c === null) cur568c = 1;
+        else if (cat568c !== prevCat568c) cur568c++;
+        else cur568c = 1;
+        prevCat568c = cat568c;
+        if (cur568c > maxAlt568c) maxAlt568c = cur568c;
+      }
+      if (maxAlt568c >= 6) {
+        issues.push({
+          location: `${maxAlt568c} consecutive action lines — strict short/long alternation`,
+          rule: 'ACTION_ALTERNATION_RUN',
+          severity: 'minor',
+          description: `The script has a run of ${maxAlt568c} consecutive action lines whose word counts strictly alternate between short (≤4 words) and long (≥12 words) — a sustained see-saw between compression and elaboration. The contrast between a clipped impact beat and an expansive descriptive line is powerful as an occasional, deliberate move, but stretched into a six-plus-line ping-pong it becomes a mechanical pattern: the reader internalizes the alternation and anticipates each swing before it lands. This is rhythmic monotony of a subtler kind — not the flatness of uniform line lengths, but the over-regularity of a predictable oscillation. The prose stops feeling calibrated to each beat's dramatic weight and starts feeling stamped from an alternating template.`,
+          suggestedFix: `Break the alternation by introducing a medium-length line (5–11 words) into the run, or by letting two short or two long lines sit back-to-back where the drama warrants. The short/long contrast lands hardest when it arrives unexpectedly; a stretch of strict alternation spends that contrast on a pattern the reader has already predicted. Vary the cadence so the compression and elaboration feel like responses to the action rather than steps in a metronomic swing.`,
         });
       }
     }

@@ -20778,6 +20778,64 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 568 — rhythmPass: long thirds cluster, short thirds cluster, alternation run', async () => {
+    const runR568 = async (fountain: string) => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    // One action line per scene with the given word count (simple words, no commas)
+    const makeF568Wc = (wcs: number[]) =>
+      wcs.map((n, i) => `INT. SC${i} - DAY\n\n${Array(n).fill('word').join(' ')}.`).join('\n\n');
+
+    // ACTION_LONG_THIRDS_CLUSTER fire:
+    // 12 lines; third=4; long (≥12w) at positions 4,5,6,7 (all middle third) → 4/4=100% > 75% → fires
+    it('ACTION_LONG_THIRDS_CLUSTER fires when >75% of long lines fall in a single structural third', async () => {
+      const f568a = makeF568Wc([7, 7, 7, 7, 12, 12, 12, 12, 7, 7, 7, 7]);
+      const res = await runR568(f568a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_LONG_THIRDS_CLUSTER'), 'ACTION_LONG_THIRDS_CLUSTER should fire');
+    });
+
+    // ACTION_LONG_THIRDS_CLUSTER no-fire:
+    // 12 lines; long at 0,4,8,11 → first 1 / mid 1 / last 2 → max 2/4=50% ≤ 75% → no fire
+    it('ACTION_LONG_THIRDS_CLUSTER does not fire when long lines are spread across thirds', async () => {
+      const f568anr = makeF568Wc([12, 7, 7, 7, 12, 7, 7, 7, 12, 7, 7, 12]);
+      const res = await runR568(f568anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_LONG_THIRDS_CLUSTER'), 'ACTION_LONG_THIRDS_CLUSTER should not fire');
+    });
+
+    // ACTION_SHORT_THIRDS_CLUSTER fire:
+    // 12 lines; third=4; short (≤4w) at positions 0,1,2,3 (all opening third) → 4/4=100% > 75% → fires
+    it('ACTION_SHORT_THIRDS_CLUSTER fires when >75% of short lines fall in a single structural third', async () => {
+      const f568b = makeF568Wc([3, 3, 3, 3, 7, 7, 7, 7, 7, 7, 7, 7]);
+      const res = await runR568(f568b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_SHORT_THIRDS_CLUSTER'), 'ACTION_SHORT_THIRDS_CLUSTER should fire');
+    });
+
+    // ACTION_SHORT_THIRDS_CLUSTER no-fire:
+    // 12 lines; short at 0,4,8,11 → first 1 / mid 1 / last 2 → max 2/4=50% ≤ 75% → no fire
+    it('ACTION_SHORT_THIRDS_CLUSTER does not fire when short lines are spread across thirds', async () => {
+      const f568bnr = makeF568Wc([3, 7, 7, 7, 3, 7, 7, 7, 3, 7, 7, 3]);
+      const res = await runR568(f568bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_SHORT_THIRDS_CLUSTER'), 'ACTION_SHORT_THIRDS_CLUSTER should not fire');
+    });
+
+    // ACTION_ALTERNATION_RUN fire:
+    // 12 lines; positions 0-5 strictly alternate short(3)/long(12) → run of 6 ≥ 6 → fires
+    it('ACTION_ALTERNATION_RUN fires when 6+ consecutive lines strictly alternate short/long', async () => {
+      const f568c = makeF568Wc([3, 12, 3, 12, 3, 12, 7, 7, 7, 7, 7, 7]);
+      const res = await runR568(f568c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_ALTERNATION_RUN'), 'ACTION_ALTERNATION_RUN should fire');
+    });
+
+    // ACTION_ALTERNATION_RUN no-fire:
+    // 12 lines; a medium (7w) at position 3 breaks the alternation → longest alternation run is 3 < 6 → no fire
+    it('ACTION_ALTERNATION_RUN does not fire when a medium line breaks the alternation', async () => {
+      const f568cnr = makeF568Wc([3, 12, 3, 7, 12, 3, 12, 7, 7, 7, 7, 7]);
+      const res = await runR568(f568cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_ALTERNATION_RUN'), 'ACTION_ALTERNATION_RUN should not fire');
+    });
+  });
+
   describe('Wave 554 — rhythmPass: long beat uncaused, sentence burst run, punctuation desert', async () => {
     const runR554 = async (fountain: string) => {
       const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
