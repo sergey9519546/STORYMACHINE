@@ -126,6 +126,19 @@
 // ≥8 dialogue lines, ≥2 qualifiable !-ending lines [i>0], ALL preceded by a line ending in
 // neither "?" nor "!" in the immediately prior dialogue line; all emotional intensity is
 // self-generated rather than provoked; first backward-cause check on the exclamation channel).
+// Wave 571 additions: dialogue negation zone cluster (distribution/timing × negation × thirds —
+// ≥12 dialogue lines, ≥3 negation lines, >75% in one third; refusal ghettoized into one zone; the
+// negation member of the zone-cluster family alongside DIALOGUE_QUESTION/EXCLAMATION/LONG_SPEECH_
+// ZONE_CLUSTER, distinct from DIALOGUE_NEGATION_FLOOD [global rate], DIALOGUE_NEGATION_RUN
+// [consecutive], and DIALOGUE_NEGATION_SELF_FEEDING [backward-cause]), dialogue hedged negation flood
+// (co-occurrence × hesitation sound × negation word — ≥10 dialogue lines, >15% contain BOTH a
+// hesitation sound AND a negation word; the "uncertain no" tic where characters refuse while visibly
+// unsure, draining oppositions of friction; the negation member of the hedged-X family alongside
+// DIALOGUE_HEDGED_AFFIRMATION_FLOOD [the "uncertain yes"] and DIALOGUE_HEDGED_QUESTION_FLOOD),
+// dialogue opening zone question absent (zone presence/absence × question mark × opening 25% — ≥12
+// dialogue lines, ≥4 questions globally, zero in the opening quarter while ≥2 exist later; the setup
+// withholds the interrogative hook; completes the opening/middle/closing question zone-absence triptych
+// alongside DIALOGUE_QUESTION_ZONE_MIDDLE_ABSENT and DIALOGUE_CLOSING_ZONE_QUESTION_ABSENT).
 // Wave 557 additions: dialogue hedged affirmation flood (co-occurrence × hesitation sound ×
 // affirmation word — ≥10 dialogue lines, >15% contain BOTH a hesitation sound [um/uh/er/hmm]
 // AND an explicit affirmation word in the same line; the "uncertain yes" tic where characters
@@ -3413,6 +3426,136 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `Every negation-containing dialogue line (${negIdxs557c.length} instances, excluding the opening line) is immediately preceded by another negation-containing line — refusal feeds only from prior refusal with no affirmative catalyst between them. The natural dramatic texture of negation is resistance: a character wanting something, another character blocking that want, generating tension from the friction between desire and denial. When all negation lines grow from prior negation rather than from an affirmative statement they're pushing against, the refusal is self-generating rather than adversarial — a static field of denial rather than a dynamic exchange of competing intents. No character is ever in a state of wanting something when a "no" arrives.`,
             suggestedFix: `Before at least one negation line, place an affirmative or desire-expressing line that the negation is genuinely resisting: a request that gets denied, a proposal that gets rejected, an assertion that gets contradicted. "I need this." / "No, you don't." generates tension; "I don't know." / "Me neither." is merely shared uncertainty. Negation is dramatically powerful when it opposes something; when it only follows more negation, it reinforces stasis rather than creating conflict.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 571: DIALOGUE_NEGATION_ZONE_CLUSTER, DIALOGUE_HEDGED_NEGATION_FLOOD,
+  //              DIALOGUE_OPENING_ZONE_QUESTION_ABSENT ─────────────────────────────────────────────
+  {
+    // DIALOGUE_NEGATION_ZONE_CLUSTER (distribution/timing × negation × thirds, ≥12 dialogue lines,
+    // ≥3 negation-containing lines, >75% in one structural third): Refusal and denial are
+    // structurally ghettoized into a single positional zone rather than arising from dramatic
+    // pressure throughout. When negation clusters in one third, the other zones are conflict-thin —
+    // characters never push back in those zones even when the action would warrant resistance.
+    // Negation should map to where the protagonist meets opposition, not to a phase-behavior of the
+    // script. In the non-cluster zones the dialogue reads as frictionless agreement; in the cluster
+    // zone it reads as relentless denial. Distribution/timing mode × negation channel × thirds.
+    // Parallel to DIALOGUE_QUESTION_ZONE_CLUSTER (Wave 473: ? channel), DIALOGUE_EXCLAMATION_ZONE_
+    // CLUSTER (Wave 487: ! channel), and DIALOGUE_LONG_SPEECH_ZONE_CLUSTER (Wave 557: length
+    // channel) — this adds the negation channel to the zone-cluster family. Distinct from DIALOGUE_
+    // NEGATION_FLOOD (Wave 417: global rate, position-agnostic), DIALOGUE_NEGATION_RUN (Wave 515:
+    // consecutive-adjacency, not thirds concentration), DIALOGUE_NEGATION_SELF_FEEDING (Wave 557:
+    // backward-cause, each negation preceded by negation — a causal-chain check, not a zone count).
+    const dlg571a: string[] = [];
+    let inDlg571a = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg571a = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg571a = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg571a = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg571a) dlg571a.push(t);
+    }
+    if (dlg571a.length >= 12) {
+      const NEG_RE571a = /\b(no\b|not\b|never\b|can't|won't|don't|isn't|aren't|wasn't|weren't|couldn't|wouldn't|shouldn't|nothing|nobody|nowhere|neither|nor)\b/i;
+      const negIdxs571a = dlg571a.map((t, i) => ({ t, i })).filter(x => NEG_RE571a.test(x.t)).map(x => x.i);
+      if (negIdxs571a.length >= 3) {
+        const third571a = Math.floor(dlg571a.length / 3);
+        const firstZone571a = negIdxs571a.filter(i => i < third571a).length;
+        const midZone571a = negIdxs571a.filter(i => i >= third571a && i < 2 * third571a).length;
+        const lastZone571a = negIdxs571a.filter(i => i >= 2 * third571a).length;
+        const maxZone571a = Math.max(firstZone571a, midZone571a, lastZone571a);
+        if (maxZone571a / negIdxs571a.length > 0.75) {
+          const zoneName571a = firstZone571a === maxZone571a ? 'opening' : midZone571a === maxZone571a ? 'middle' : 'closing';
+          issues.push({
+            location: `Dialogue — ${maxZone571a}/${negIdxs571a.length} negation lines in the ${zoneName571a} third`,
+            rule: 'DIALOGUE_NEGATION_ZONE_CLUSTER',
+            severity: 'minor',
+            description: `${maxZone571a} of ${negIdxs571a.length} negation-containing dialogue lines are concentrated in the ${zoneName571a} third of the dialogue — refusal and denial are structurally ghettoized into a single zone. When pushback clusters in one third, the other zones read as frictionless: characters never resist, contradict, or refuse there even when the dramatic situation would call for it, and the ${zoneName571a} third reads as relentless denial. Negation should map to where the protagonist meets opposition — to the beats where wants collide — not to a designated phase of the script. The clustering makes resistance feel like a property of one structural position rather than a response to what is happening dramatically.`,
+            suggestedFix: `Redistribute at least one negation beat from the ${zoneName571a} cluster into a different third, at a point where a character genuinely has something to push back against. A "no" lands hardest when it opposes an active want; seed resistance into the conflict-thin zones by finding the moment in each where a character's desire meets a denial, rather than letting all the refusal accumulate in one stretch.`,
+          });
+        }
+      }
+    }
+
+    // DIALOGUE_HEDGED_NEGATION_FLOOD (co-occurrence × hesitation sound × negation word, ≥10 dialogue
+    // lines, >15% contain BOTH a hesitation sound ["um","uh","er","hmm"] AND a negation word in the
+    // same line): The "uncertain no" tic — characters refuse while visibly unsure, producing a
+    // register of apologetic resistance where denial signals discomfort rather than conviction. When
+    // more than 15% of dialogue lines combine hesitation with negation, the dramatic weight of refusal
+    // collapses: a "no" delivered through hedging cannot generate the friction that opposition needs,
+    // because the audience reads it as reluctance rather than a firm stance. Co-occurrence mode:
+    // joint presence of a paralinguistic signal (hesitation) and a semantic-register signal
+    // (negation). Distinct from DIALOGUE_HEDGED_AFFIRMATION_FLOOD (Wave 557: hesitation + AFFIRMATION
+    // — the opposite semantic pole, the "uncertain yes"), DIALOGUE_HEDGED_QUESTION_FLOOD (Wave 431:
+    // hedging opener + "?" — different signals), DIALOGUE_NEGATION_FLOOD (Wave 417: negation alone),
+    // DIALOGUE_HESITATION_FLOOD (Wave 361: hesitation alone). The negation member of the hedged-X
+    // co-occurrence family alongside hedged affirmation and hedged question.
+    const dlg571b: string[] = [];
+    let inDlg571b = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg571b = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg571b = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg571b = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg571b) dlg571b.push(t);
+    }
+    if (dlg571b.length >= 10) {
+      const HES_PAT571b = /\b(um|uh|er|hmm|hm)\b/i;
+      const NEG_PAT571b = /\b(no\b|not\b|never\b|can't|won't|don't|isn't|aren't|wasn't|weren't|couldn't|wouldn't|shouldn't|nothing|nobody|nowhere|neither|nor)\b/i;
+      const hedgedNegCount571b = dlg571b.filter(t => HES_PAT571b.test(t) && NEG_PAT571b.test(t)).length;
+      if (hedgedNegCount571b / dlg571b.length > 0.15) {
+        issues.push({
+          location: `Dialogue — ${hedgedNegCount571b} of ${dlg571b.length} lines contain both hesitation and negation`,
+          rule: 'DIALOGUE_HEDGED_NEGATION_FLOOD',
+          severity: 'minor',
+          description: `${hedgedNegCount571b} of ${dlg571b.length} dialogue lines (${Math.round(hedgedNegCount571b / dlg571b.length * 100)}%) contain both a hesitation sound ("um", "uh", "er", "hmm") and a negation word ("no", "not", "never", "can't") in the same line — the "uncertain no" tic. Characters refuse while visibly unsure, producing a register of apologetic resistance: denial that signals discomfort rather than conviction. When more than 15% of dialogue lines combine hedging with negation, the dramatic weight of refusal collapses — a "no" delivered through hesitation cannot generate the friction that opposition needs, because the audience reads it as reluctance rather than a firm stance. Conflict requires characters who can refuse cleanly; perpetual hedged refusal makes every opposition feel negotiable and drains scenes of their stakes.`,
+          suggestedFix: `Replace hedged refusals with either firm resistance (no hesitation: "No. That's not happening.") or genuine wavering that is dramatized as a choice rather than a verbal tic. A character who says "Um, no, I don't think so" is neither committed to refusing nor genuinely torn — decide which the moment calls for and write it cleanly. Reserve the uncertain no for the one or two beats where reluctant refusal under pressure is the explicit dramatic point.`,
+        });
+      }
+    }
+
+    // DIALOGUE_OPENING_ZONE_QUESTION_ABSENT (zone presence/absence × question mark × opening 25%,
+    // ≥12 dialogue lines, ≥4 question-ending lines globally, zero questions in the opening 25% while
+    // ≥2 exist in the rest): The dialogue's opening quarter contains no question-ending line while
+    // questions appear later. The interrogative register — which generates uncertainty, invites
+    // response, and signals the unresolved tension that pulls an audience in — is absent from the
+    // dialogue's establishing zone. When no character asks a question in the opening quarter, the
+    // setup operates in pure assertion: characters declare and state rather than probe and wonder,
+    // so the dialogue introduces its world without the question-and-response dynamism that signals
+    // a live negotiation. The opening is precisely where an unanswered question best hooks the
+    // audience. Zone presence/absence mode × question-mark channel × opening zone. Distinct from
+    // DIALOGUE_QUESTION_ZONE_MIDDLE_ABSENT (Wave 529: middle 50%) and DIALOGUE_CLOSING_ZONE_QUESTION_
+    // ABSENT (Wave 487: closing 25%) — this completes the opening/middle/closing question zone-absence
+    // triptych. Distinct from DIALOGUE_QUESTION_ZONE_CLUSTER (Wave 473: over-concentration, not
+    // absence) and DIALOGUE_INTERROGATIVE_SATURATION (Wave 294: global proportion, no zone sensitivity).
+    const dlg571c: string[] = [];
+    let inDlg571c = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg571c = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg571c = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg571c = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg571c) dlg571c.push(t);
+    }
+    if (dlg571c.length >= 12) {
+      const qTotal571c = dlg571c.filter(t => t.trimEnd().endsWith('?')).length;
+      if (qTotal571c >= 4) {
+        const openEnd571c = Math.floor(dlg571c.length * 0.25);
+        const openQCount571c = dlg571c.slice(0, openEnd571c).filter(t => t.trimEnd().endsWith('?')).length;
+        const restQCount571c = dlg571c.slice(openEnd571c).filter(t => t.trimEnd().endsWith('?')).length;
+        if (openQCount571c === 0 && restQCount571c >= 2) {
+          issues.push({
+            location: `Opening dialogue (lines 1–${openEnd571c}) — no question-ending line`,
+            rule: 'DIALOGUE_OPENING_ZONE_QUESTION_ABSENT',
+            severity: 'minor',
+            description: `The opening 25% of dialogue (lines 1–${openEnd571c}) contains no question-ending line, while ${restQCount571c} questions appear later — the dialogue's establishing zone is written without any interrogative moment. Questions are how characters express uncertainty, invite response, and signal unresolved tension; an unanswered question in the opening is one of the most reliable hooks for pulling an audience into a scene. When the entire opening quarter operates in pure assertion — characters declaring and stating rather than probing and wondering — the setup lacks the question-and-response dynamism that makes early dialogue feel like a live negotiation rather than a sequence of announcements. The absence is most telling because questions do arrive later: the interrogative register exists in the script but is withheld from the moment it would do the most work.`,
+            suggestedFix: `Add at least one question-ending line in the opening quarter (dialogue lines 1–${openEnd571c}) — a character asking for information, voicing a doubt, or reaching toward another. An early question seeds the uncertainty that an audience leans into: it tells them there is something not yet known, someone who wants an answer, a tension that the scene will have to resolve. Opening on assertion alone asks the audience to invest before the dialogue has posed anything for them to wonder about.`,
           });
         }
       }

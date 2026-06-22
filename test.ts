@@ -38667,6 +38667,145 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 571 — voicePass: negation zone cluster, hedged negation flood, opening zone question absent', async () => {
+    const runV571 = async (fountain: string) => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      return voicePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // DIALOGUE_NEGATION_ZONE_CLUSTER fire:
+    // 12 dialogue lines; third=4; negation at speeches 0,1,2 (all first third) → 3/3=100% > 75% → fires
+    it('DIALOGUE_NEGATION_ZONE_CLUSTER fires when >75% of negation lines fall in one third', async () => {
+      const f571a = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'No, I will not go.', '',
+        'BOB', "I can't accept this.", '',
+        'ALICE', "Never, I won't agree.", '',
+        'BOB', 'We should leave before dawn.', '',
+        'ALICE', 'The papers are ready today.', '',
+        'BOB', 'Send them over to me.', '',
+        'ALICE', 'I will write the report.', '',
+        'BOB', 'The meeting starts at noon.', '',
+        'ALICE', 'I have the files here.', '',
+        'BOB', 'Let us begin the work.', '',
+        'ALICE', 'The deadline is tomorrow.', '',
+        'BOB', 'I will start immediately.',
+      ].join('\n');
+      const res = await runV571(f571a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_NEGATION_ZONE_CLUSTER'), 'DIALOGUE_NEGATION_ZONE_CLUSTER should fire');
+    });
+
+    // DIALOGUE_NEGATION_ZONE_CLUSTER no-fire:
+    // negation at speeches 0,5,9 → one per third → max 1/3=33% ≤ 75% → no fire
+    it('DIALOGUE_NEGATION_ZONE_CLUSTER does not fire when negation lines are spread across thirds', async () => {
+      const f571anr = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'No, I will not go.', '',
+        'BOB', 'We should leave before dawn.', '',
+        'ALICE', 'The papers are ready today.', '',
+        'BOB', 'Send them over to me.', '',
+        'ALICE', 'I will write the report.', '',
+        'BOB', "I can't accept this plan.", '',
+        'ALICE', 'The meeting starts at noon.', '',
+        'BOB', 'I have the files here.', '',
+        'ALICE', 'Let us begin the work.', '',
+        'BOB', "Never, I won't agree to it.", '',
+        'ALICE', 'The deadline is tomorrow.', '',
+        'BOB', 'I will start immediately.',
+      ].join('\n');
+      const res = await runV571(f571anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_NEGATION_ZONE_CLUSTER'), 'DIALOGUE_NEGATION_ZONE_CLUSTER should not fire');
+    });
+
+    // DIALOGUE_HEDGED_NEGATION_FLOOD fire:
+    // 12 dialogue lines; 4 contain BOTH hesitation (um/uh/er/hmm) AND negation → 4/12 ≈ 33% > 15% → fires
+    it('DIALOGUE_HEDGED_NEGATION_FLOOD fires when >15% of lines contain both hesitation and negation', async () => {
+      const f571b = [
+        'INT. ROOM - DAY', '',
+        'ALICE', "Um, no, I don't think so.", '',
+        'BOB', "Uh, I can't, never.", '',
+        'ALICE', 'I will write the report today.', '',
+        'BOB', 'Er, not really, no.', '',
+        'ALICE', 'The papers are ready today.', '',
+        'BOB', "Hmm, I won't, not now.", '',
+        'ALICE', 'Send the files over please.', '',
+        'BOB', 'The meeting starts at noon.', '',
+        'ALICE', 'I have the documents here.', '',
+        'BOB', 'Let us begin the work now.', '',
+        'ALICE', 'The deadline is tomorrow morning.', '',
+        'BOB', 'I will start the task soon.',
+      ].join('\n');
+      const res = await runV571(f571b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_HEDGED_NEGATION_FLOOD'), 'DIALOGUE_HEDGED_NEGATION_FLOOD should fire');
+    });
+
+    // DIALOGUE_HEDGED_NEGATION_FLOOD no-fire:
+    // hesitation lines carry no negation → 0 lines with BOTH → 0% ≤ 15%
+    it('DIALOGUE_HEDGED_NEGATION_FLOOD does not fire when hesitation lines lack negation', async () => {
+      const f571bnr = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'Um, I think that works well.', '',
+        'BOB', 'Uh, let me consider that more.', '',
+        'ALICE', 'The situation seems complex today.', '',
+        'BOB', 'Er, we need more time here.', '',
+        'ALICE', 'What do you have for me?', '',
+        'BOB', 'I have the files from before.', '',
+        'ALICE', 'The report is ready to send.', '',
+        'BOB', 'I will need more time today.', '',
+        'ALICE', 'When can we meet to talk?', '',
+        'BOB', 'I am free on Thursday morning.', '',
+        'ALICE', 'That works for me then.', '',
+        'BOB', 'I will send the agenda over.',
+      ].join('\n');
+      const res = await runV571(f571bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_HEDGED_NEGATION_FLOOD'), 'DIALOGUE_HEDGED_NEGATION_FLOOD should not fire');
+    });
+
+    // DIALOGUE_OPENING_ZONE_QUESTION_ABSENT fire:
+    // 12 dialogue lines; openEnd=3; questions at 5,6,7,8 (none in opening 0-2) → openQ=0, restQ=4 → fires
+    it('DIALOGUE_OPENING_ZONE_QUESTION_ABSENT fires when the opening quarter has no question while questions exist later', async () => {
+      const f571c = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'I will write the report.', '',
+        'BOB', 'The papers are ready today.', '',
+        'ALICE', 'We should leave before dawn.', '',
+        'BOB', 'I have the files here now.', '',
+        'ALICE', 'Let us begin the work.', '',
+        'BOB', 'What do you need from me?', '',
+        'ALICE', 'Where did you put the keys?', '',
+        'BOB', 'When will the meeting start?', '',
+        'ALICE', 'Who is coming to the office?', '',
+        'BOB', 'The deadline is tomorrow.', '',
+        'ALICE', 'I will start immediately.', '',
+        'BOB', 'Send them over to me.',
+      ].join('\n');
+      const res = await runV571(f571c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_OPENING_ZONE_QUESTION_ABSENT'), 'DIALOGUE_OPENING_ZONE_QUESTION_ABSENT should fire');
+    });
+
+    // DIALOGUE_OPENING_ZONE_QUESTION_ABSENT no-fire:
+    // a question at speech 1 (inside the opening quarter) → openQ ≥ 1 → no fire
+    it('DIALOGUE_OPENING_ZONE_QUESTION_ABSENT does not fire when the opening quarter contains a question', async () => {
+      const f571cnr = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'I will write the report.', '',
+        'BOB', 'What do you need from me?', '',
+        'ALICE', 'We should leave before dawn.', '',
+        'BOB', 'I have the files here now.', '',
+        'ALICE', 'Let us begin the work.', '',
+        'BOB', 'Where did you put the keys?', '',
+        'ALICE', 'When will the meeting start?', '',
+        'BOB', 'Who is coming to the office?', '',
+        'ALICE', 'The deadline is tomorrow.', '',
+        'BOB', 'I will start immediately.', '',
+        'ALICE', 'Send them over to me.', '',
+        'BOB', 'The work is almost done.',
+      ].join('\n');
+      const res = await runV571(f571cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_OPENING_ZONE_QUESTION_ABSENT'), 'DIALOGUE_OPENING_ZONE_QUESTION_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 557 — voicePass: hedged affirmation flood, long speech zone cluster, negation self-feeding', async () => {
     const runV557 = async (fountain: string) => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
