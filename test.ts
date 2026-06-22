@@ -26369,6 +26369,104 @@ I always listen.
     });
   });
 
+  describe('Wave 549 — intentionPass: revelation suspense flat, revelation emotion decoupled, revelation cause void', async () => {
+    const makeRec549 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN549 = async (records: any[]) => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, reversalCount: 0, revelationCount: records.filter((r: any) => r.revelation).length,
+          openClues: 0, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    it('REVELATION_SUSPENSE_FLAT fires when all revelation scenes have avg suspenseDelta ≤ 0', async () => {
+      // n=8; revelations at idx 2, 4, 6 all with suspenseDelta=0 → avg=0 ≤ 0 → fires.
+      const recs549a = Array.from({ length: 8 }, (_, i) =>
+        makeRec549(i, {
+          revelation: [2, 4, 6].includes(i) ? 'truth revealed' : null,
+          suspenseDelta: 0,
+        }),
+      );
+      const res = await runIN549(recs549a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_SUSPENSE_FLAT'), 'REVELATION_SUSPENSE_FLAT should fire');
+    });
+
+    it('REVELATION_SUSPENSE_FLAT does not fire when revelation scenes have positive avg suspenseDelta', async () => {
+      // n=8; revelations at idx 2, 4, 6 with suspenseDelta 1, 0, 1 → avg=0.67 > 0 → no fire.
+      const recs549an = Array.from({ length: 8 }, (_, i) =>
+        makeRec549(i, {
+          revelation: [2, 4, 6].includes(i) ? 'truth revealed' : null,
+          suspenseDelta: [2, 6].includes(i) ? 1 : 0,
+        }),
+      );
+      const res = await runIN549(recs549an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_SUSPENSE_FLAT'), 'REVELATION_SUSPENSE_FLAT should not fire');
+    });
+
+    it('REVELATION_EMOTION_DECOUPLED fires when no revelation scene has non-neutral emotion', async () => {
+      // n=8; revelations at 2,4,6 all neutral; emotional scenes at 1,5 (non-neutral) → zero overlap → fires.
+      const recs549b = Array.from({ length: 8 }, (_, i) =>
+        makeRec549(i, {
+          revelation: [2, 4, 6].includes(i) ? 'truth revealed' : null,
+          emotionalShift: [1, 5].includes(i) ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runIN549(recs549b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_EMOTION_DECOUPLED'), 'REVELATION_EMOTION_DECOUPLED should fire');
+    });
+
+    it('REVELATION_EMOTION_DECOUPLED does not fire when a revelation scene has non-neutral emotion', async () => {
+      // n=8; revelation at 4 with emotionalShift 'positive'; revelations at 2,6 neutral; emotional at 1 → overlap at 4 → no fire.
+      const recs549bn = Array.from({ length: 8 }, (_, i) =>
+        makeRec549(i, {
+          revelation: [2, 4, 6].includes(i) ? 'truth revealed' : null,
+          emotionalShift: i === 4 || i === 1 ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runIN549(recs549bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_EMOTION_DECOUPLED'), 'REVELATION_EMOTION_DECOUPLED should not fire');
+    });
+
+    it('REVELATION_CAUSE_VOID fires when all revelations have no upstream trigger', async () => {
+      // n=8; revelations at 2, 4, 6 all with no proactive, no turn, no suspense rise in
+      // themselves or prior scenes → all uncaused → fires.
+      const recs549c = Array.from({ length: 8 }, (_, i) =>
+        makeRec549(i, {
+          revelation: [2, 4, 6].includes(i) ? 'truth revealed' : null,
+          suspenseDelta: 0,
+          clockRaised: false,
+          seededClueIds: [],
+          dramaticTurn: 'nothing',
+        }),
+      );
+      const res = await runIN549(recs549c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_CAUSE_VOID'), 'REVELATION_CAUSE_VOID should fire');
+    });
+
+    it('REVELATION_CAUSE_VOID does not fire when a revelation has a suspense rise in prior scene', async () => {
+      // n=8; revelation at 2,4,6; prior scene idx 3 has suspenseDelta=1 (trigger for revelation at 4) → caused → no fire.
+      const recs549cn = Array.from({ length: 8 }, (_, i) =>
+        makeRec549(i, {
+          revelation: [2, 4, 6].includes(i) ? 'truth revealed' : null,
+          suspenseDelta: i === 3 ? 1 : 0,
+        }),
+      );
+      const res = await runIN549(recs549cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_CAUSE_VOID'), 'REVELATION_CAUSE_VOID should not fire');
+    });
+  });
+
   describe('Wave 535 — intentionPass: payoff clock decoupled, payoff peak uncaused, payoff back-loaded', async () => {
     const makeRec535 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

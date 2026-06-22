@@ -129,6 +129,18 @@
 // all resolutions deferred to the back half; the back-loaded complement of SEED_FRONTLOADED which
 // audits the seed channel front-loaded; distinct from PAYOFF_EMOTION_DECOUPLED which is co-
 // occurrence and from PAYOFF_SUSPENSE_AFTERMATH_VOID which is aftermath mode).
+// Wave 549 additions: revelation suspense flat (average/aggregate × revelation × suspenseDelta —
+// n≥8, ≥3 revelation scenes, avg suspenseDelta ≤ 0; disclosures never raise tension; sibling of
+// REVELATION_CURIOSITY_FLAT in the suspense direction; distinct from CONFLICT_SUSPENSE_DECOUPLED
+// [conflict scenes] and PAYOFF_SUSPENSE_AFTERMATH_VOID [payoff aftermath]), revelation emotion
+// decoupled (co-occurrence × revelation × emotionalShift — n≥8, ≥3 revelation scenes, ≥2 emotional
+// scenes, zero overlap; truths always surface in emotionally flat scenes; distinct from PAYOFF_
+// EMOTION_DECOUPLED [payoff × emotion] and SEED_EMOTIONAL_DECOUPLED [seed × emotion]; first check
+// pairing revelation with emotionalShift in co-occurrence mode), revelation cause void (backward-cause
+// × revelation as effect — n≥8, ≥3 revelation scenes; every disclosure has no proactive act, dramatic
+// turn, or suspense rise in itself or the prior scene; revelation-channel parallel of SEED_CAUSE_VOID;
+// distinct from PROACTIVE_REVELATION_ABSENT [aftermath: proactive → revelation downstream] and from
+// PAYOFF_PEAK_UNCAUSED [backward-cause × peak payoff]).
 // Wave 521 additions: seed peak uncaused (backward-cause × single-peak × seed — n≥8, ≥2 seed
 // scenes, the single scene planting the most clues has no revelation, dramatic turn, suspense rise,
 // or clockRaise in either of the 2 preceding scenes; foreshadowing peaks without preparation; first
@@ -2870,6 +2882,140 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
           description: `${Math.round(backRatio535c * 100)}% of the script's thread-resolution scenes (${backPayoffs535c} of ${payoffIdxs535c.length}) fall in the second half, leaving the first half with only ${frontPayoffs535c}. The story defers nearly all its payoffs to the final movements: the audience spends the first half accumulating planted promises without receiving any meaningful evidence that the story keeps what it plants. A completely back-loaded payoff architecture trains the audience to expect nothing to resolve until the end — reducing the structural satisfaction that intermediate resolutions provide, and making the first half feel like pure accumulation without any delivered promise to confirm the foreshadowing is still live.`,
           suggestedFix: `Distribute at least one or two payoff scenes into the first half — a minor thread resolved early, an early confirmation that the story delivers on what it plants, or a partial payoff that renews audience faith in the planted material. The most satisfying payoff architectures prove the story's contract in the first half with minor resolutions, while reserving the major payoffs for the climactic zone.`,
         });
+      }
+    }
+  }
+
+  // ── Wave 549: REVELATION_SUSPENSE_FLAT, REVELATION_EMOTION_DECOUPLED, REVELATION_CAUSE_VOID ──
+
+  // REVELATION_SUSPENSE_FLAT — average/aggregate × revelation × suspenseDelta.
+  // n≥8, ≥3 revelation scenes (revelation non-null/non-empty). Avg suspenseDelta across all
+  // revelation scenes ≤ 0 → fire. Disclosures collectively fail to raise atmospheric tension — the
+  // moments when the audience learns something important are never the moments when the stakes feel
+  // most dangerous. A revelation should do double work in both the epistemic and affective dimensions:
+  // it should disclose a truth AND tighten the situation around the characters. When averaged across
+  // all revelation scenes, a suspenseDelta ≤ 0 means that disclosures drain tension on net rather
+  // than feeding it. The audience is told more as the story goes on, but feels less urgency with each
+  // new disclosure — revelation and tension operate in separate registers.
+  // Distinct from: REVELATION_CURIOSITY_FLAT (Wave 479: average × revelation × curiosityDelta — same
+  // mode and trigger, different output channel; this is the suspense-channel sibling), CONFLICT_
+  // SUSPENSE_DECOUPLED (conflict.ts: average × conflict scenes × suspenseDelta — different pass and
+  // different trigger channel; this audits revelation scenes not relationship-rupture scenes), PAYOFF_
+  // SUSPENSE_AFTERMATH_VOID (Wave 507: aftermath × payoff → suspense in next scene — different mode,
+  // different trigger channel, and aftermath not same-scene). Second average/aggregate check on the
+  // revelation channel, completing the "revelation generates no [X]" average family alongside
+  // REVELATION_CURIOSITY_FLAT.
+  {
+    const n549a = records.length;
+    if (n549a >= 8) {
+      const revRecs549a = (records as any[]).filter(
+        r => r.revelation !== null && r.revelation !== undefined && r.revelation !== '',
+      );
+      if (revRecs549a.length >= 3) {
+        const avgRevSuspense549a = revRecs549a.reduce(
+          (sum: number, r: any) => sum + (r.suspenseDelta ?? 0), 0,
+        ) / revRecs549a.length;
+        if (avgRevSuspense549a <= 0) {
+          issues.push({
+            location: `Revelation scenes — avg suspenseDelta ${avgRevSuspense549a.toFixed(2)} (≤ 0)`,
+            rule: 'REVELATION_SUSPENSE_FLAT',
+            severity: 'minor',
+            description: `Across all ${revRecs549a.length} revelation scenes the average suspenseDelta is ${avgRevSuspense549a.toFixed(2)} — disclosures collectively fail to raise atmospheric tension. A revelation should do double work: it should tell the audience something important AND tighten the danger around the characters. When truth-telling scenes average zero or negative suspense, the story treats knowledge and danger as separate concerns — the audience learns more as the story goes on but feels less urgency with each new disclosure. Revelation and tension decouple, and disclosures become information deliveries rather than escalation events.`,
+            suggestedFix: 'Stage revelations inside moments of danger or rising stakes: a truth disclosed as the clock ticks, an answer arriving at the moment of maximum vulnerability. Each disclosure should leave the protagonist in a worse or more uncertain position than before — a revelation that tightens the vise is twice as powerful as one that merely fills in a gap. Even partial revelations that create new threats work better than complete disclosures in moments of safety.',
+          });
+        }
+      }
+    }
+  }
+
+  // REVELATION_EMOTION_DECOUPLED — co-occurrence × revelation × emotionalShift.
+  // n≥8, ≥3 revelation scenes (revelation non-null/non-empty), ≥2 emotionally charged scenes
+  // (emotionalShift ≠ 'neutral'). No revelation scene also carries a non-neutral emotional shift
+  // → fire. Truths always surface in emotionally flat scenes while emotional beats happen separately.
+  // Revelations and emotional reactions are decoupled: the audience receives a disclosure in one
+  // scene and feels an emotion in a different scene, never simultaneously. The highest-impact version
+  // of a revelation is one that also produces an immediate emotional charge in the same scene — the
+  // character learns something and the audience watches them feel the weight of it in real time.
+  // When the two always occupy separate scenes, the story asks the audience to make the emotional
+  // connection themselves rather than giving them the combined impact in one compressed beat.
+  // Distinct from: PAYOFF_EMOTION_DECOUPLED (Wave 521: co-occurrence × payoff × emotion — payoff
+  // channel not revelation channel), SEED_EMOTIONAL_DECOUPLED (Wave 451: co-occurrence × seed ×
+  // emotion — seed channel not revelation channel), REVELATION_CURIOSITY_FLAT (average mode not
+  // co-occurrence, and curiosity not emotion), PROACTIVE_EMOTION_DECOUPLED (Wave 339: co-occurrence
+  // × proactive × emotion — proactive trigger not revelation trigger). First co-occurrence check in
+  // this pass pairing revelation with the emotionalShift channel.
+  {
+    const n549b = records.length;
+    if (n549b >= 8) {
+      const revRecs549b = (records as any[]).filter(
+        r => r.revelation !== null && r.revelation !== undefined && r.revelation !== '',
+      );
+      const emotionalScenes549b = (records as any[]).filter(
+        r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+      );
+      if (revRecs549b.length >= 3 && emotionalScenes549b.length >= 2) {
+        const anyRevEmotional549b = revRecs549b.some(
+          r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+        );
+        if (!anyRevEmotional549b) {
+          issues.push({
+            location: `${revRecs549b.length} revelation scene(s) — all emotionally neutral`,
+            rule: 'REVELATION_EMOTION_DECOUPLED',
+            severity: 'minor',
+            description: `The story has ${revRecs549b.length} revelation scene(s) and ${emotionalScenes549b.length} emotionally charged scene(s), but they never overlap — every disclosure happens in a scene with a neutral emotional shift while emotional activation occurs separately. The highest-impact revelation is one where the character simultaneously learns something and the audience watches them register the emotional cost of the knowledge. When revelation and emotional reaction always live in separate scenes, the story makes the audience connect the dots between truth and feeling themselves rather than giving them the combined impact in a single compressed beat. Decoupled revelations feel procedural; emotional reactions that follow in the next scene feel reported rather than witnessed.`,
+            suggestedFix: `Fuse at least one revelation with an emotional charge: the scene where a character learns a crucial truth should also be the scene where they are visibly moved by it — grief at a betrayal revealed, elation at an identity confirmed, dread at a threat disclosed. The double-impact of receiving truth and registering its emotional weight in real time, in the same scene, is one of the most powerful beats available in screenwriting.`,
+          });
+        }
+      }
+    }
+  }
+
+  // REVELATION_CAUSE_VOID — backward-cause × revelation as effect.
+  // n≥8, ≥3 revelation scenes (revelation non-null/non-empty). Every revelation scene has no
+  // proactive act (isProactive258), dramatic turn (≠ 'nothing'), or suspense rise (suspenseDelta > 0)
+  // in itself OR in the immediately preceding scene. All disclosures arrive in a causal vacuum —
+  // the story never earns its revelations through prior protagonist initiative, a story pivot, or
+  // a tension escalation. Revelations that arrive without narrative preparation feel like authorial
+  // gifts rather than consequences of story mechanics: the truth surfaces because the writer decided
+  // it should, not because the story's causal machinery produced it. An earned revelation follows
+  // from something: a protagonist who acted and uncovered a truth, a dramatic turn whose consequences
+  // forced a disclosure, or a suspense escalation that made concealment impossible.
+  // Distinct from: SEED_CAUSE_VOID (Wave 451: backward-cause × seed channel — same analytical mode,
+  // same causal trigger set, but seed/clue planting as the effect rather than revelation; this is the
+  // revelation-channel parallel), PAYOFF_PEAK_UNCAUSED (Wave 535: backward-cause × peak payoff —
+  // same mode but payoff-channel single-peak, not revelation aggregate), PROACTIVE_REVELATION_ABSENT
+  // (Wave 339: aftermath mode, proactive → revelation in NEXT 2 scenes — forward-cause not backward;
+  // this checks what precedes revelation scenes, that checks what follows proactive scenes),
+  // REVELATION_WITHOUT_PROACTIVE (Wave 258: co-occurrence mode — checks whether revelation scenes
+  // coincide with proactive acts, not backward-cause from prior scene). First backward-cause check
+  // targeting revelation as the effect in this pass.
+  {
+    const n549c = records.length;
+    if (n549c >= 8) {
+      const revRecs549c = (records as any[]).filter(
+        r => r.revelation !== null && r.revelation !== undefined && r.revelation !== '',
+      );
+      if (revRecs549c.length >= 3) {
+        const isUpstreamTrigger549c = (r: any): boolean =>
+          isProactive258(r) ||
+          ((r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '') ||
+          (r.suspenseDelta ?? 0) > 0;
+        const allRevUncaused549c = revRecs549c.every((r: any) => {
+          const idx = (records as any[]).indexOf(r);
+          return (
+            !isUpstreamTrigger549c(r) &&
+            (idx === 0 || !isUpstreamTrigger549c((records as any[])[idx - 1]))
+          );
+        });
+        if (allRevUncaused549c) {
+          issues.push({
+            location: `All ${revRecs549c.length} revelation scene(s) — no upstream trigger`,
+            rule: 'REVELATION_CAUSE_VOID',
+            severity: 'minor',
+            description: `Every revelation scene in the story (${revRecs549c.length} scene(s)) has no upstream dramatic trigger in itself or the immediately preceding scene — no proactive protagonist act, no dramatic turn, and no suspense escalation. All disclosures arrive in a causal vacuum: the audience receives truth without any story-mechanical event that explains or motivated the disclosure. Revelations that are causally unanchored feel like authorial gifts rather than consequences of story mechanics — the character learns something because the writer decided they should, not because they acted, because a pivot forced the truth into the open, or because escalating stakes made concealment impossible. An earned revelation is a result: of something the protagonist did, something the story turned, or something the pressure made unavoidable.`,
+            suggestedFix: `Attach each revelation to a prior causal event: a protagonist action that uncovered the truth (isProactive, seeds a clue, raises a clock), a dramatic turn whose consequences forced disclosure, or a suspense escalation that made further concealment impossible. Even a partial trigger — the protagonist asking the right question at the right moment — transforms a revelation from a scriptwriter's intervention into a dramatic consequence. A revelation the audience saw coming because the story earned it lands harder than a revelation that simply arrives.`,
+          });
+        }
       }
     }
   }
