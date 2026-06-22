@@ -120,6 +120,18 @@
 // contain wish/if-only/should-have counterfactual language; characters speak in backward-looking
 // regret rather than present-tense confrontation; distinct from PRESENT_PERFECT_FLOOD which
 // measures past tense broadly and FUTURE_TENSE_FLOOD which measures forward projection).
+// Wave 550 additions: parenthetical flood (underweight/bloat × parenthetical × per-speech density —
+// >35% of ≥8 character speeches are followed immediately by a parenthetical direction; the script
+// over-directs every performance beat, removing interpretive space from the actor and reader;
+// distinct from all existing dialogue content checks which target the spoken text itself and from
+// all action-line checks; first check in this pass targeting parenthetical lines), dialogue long
+// speech flood (underweight/bloat × dialogue × speech length — >30% of ≥8 dialogue lines contain
+// >15 words; the dialogue is verbose and monologue-heavy, the opposite extreme from DIALOGUE_SHORT_
+// SPEECH_FLOOD; first check targeting excessive dialogue line length in this pass), action adverb
+// flood (underweight/bloat × action × adverb density — >35% of ≥8 action lines contain at least
+// one "-ly" adverb; over-modified action prose where the writer tells rather than shows through
+// the adverb; distinct from PASSIVE_VERB_DOMINANCE [passive verb construction] and ACTION_PRONOUN_
+// OPENER_FLOOD [opener position]; first adverb-density check on action lines).
 // Wave 536 additions: dialogue negative imperative flood (underweight/bloat × dialogue × negative
 // command register — >20% of ≥8 dialogue lines open with a prohibition or negative imperative:
 // "don't," "never," "stop," "can't you," "won't you," "you can't," "you don't," "do not," "no
@@ -3175,6 +3187,135 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${shortCount536c} of ${dlgTotal536c} dialogue lines (${Math.round(shortCount536c / dlgTotal536c * 100)}%) contain three words or fewer. Dialogue dominated by micro-speeches — "Yes." / "I know." / "Fine." / "Get out." — evacuates the spoken language of specificity, nuance, and individual character voice. Very short speeches are powerful in isolation, as the punctuation of an otherwise richer exchange; when they constitute the overwhelming majority of the dialogue, the verbal texture of the story is reduced to the barest transactional minimum. Characters who communicate almost exclusively in fragments cannot reveal the complexity of what they want or who they are — the most specific character voices require at least some speeches of sufficient length to carry a full thought.`,
         suggestedFix: `Expand at least half of the three-word-or-under lines into fuller speeches that reveal what is behind the brevity: what the character is refusing to say fully, what they want and cannot ask for directly, or what they observe that opens a new angle on the scene. Short speeches can be an effective rhetorical device — a sudden burst of brevity after longer exchanges — but they need a context of richer verbal expression to carry their weight.`,
+      });
+    }
+  }
+
+  // ── Wave 550: PARENTHETICAL_FLOOD, DIALOGUE_LONG_SPEECH_FLOOD, ACTION_ADVERB_FLOOD ──────────────
+
+  // PARENTHETICAL_FLOOD — underweight/bloat × parenthetical × per-speech density.
+  // >35% of ≥8 character speeches are immediately followed by a parenthetical direction.
+  // A parenthetical ("(sighs)", "(beat)", "(angry)") is an over-direction: it instructs
+  // the actor exactly how to deliver the line, removing the interpretive space that makes
+  // performances nuanced and memorable. Professional screenwriting convention reserves
+  // parentheticals for cases where the intended meaning cannot be inferred from context
+  // or where a specific direction is necessary to prevent misreading. When >35% of all
+  // speeches are immediately prefaced with a parenthetical, the writer is doing the actor's
+  // job — pre-interpreting every beat before the line is read. A script crowded with
+  // parentheticals signals over-control and reads as amateur or stage-direction prose.
+  // Distinct from: all dialogue content checks (HEDGING_FLOOD, COMMAND_FLOOD, AGREEMENT_RUN,
+  // etc. — those target the spoken text itself, not the parenthetical instructions preceding
+  // it), all action-line checks (PASSIVE_VERB_DOMINANCE, PRONOUN_OPENER_FLOOD — those target
+  // action not parenthetical lines). First check in this pass targeting parenthetical density.
+  {
+    let speechCount550a = 0;
+    let parentheticalCount550a = 0;
+    let lastWasCharCue550a = false;
+    let lastWasParen550a = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { lastWasCharCue550a = false; lastWasParen550a = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { lastWasCharCue550a = false; lastWasParen550a = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) {
+        speechCount550a++;
+        lastWasCharCue550a = true;
+        lastWasParen550a = false;
+        continue;
+      }
+      if (t.startsWith('(') && lastWasCharCue550a && !lastWasParen550a) {
+        parentheticalCount550a++;
+        lastWasParen550a = true;
+        lastWasCharCue550a = false;
+        continue;
+      }
+      lastWasCharCue550a = false;
+    }
+    if (speechCount550a >= 8 && parentheticalCount550a / speechCount550a > 0.35) {
+      issues.push({
+        location: `${parentheticalCount550a} of ${speechCount550a} dialogue speeches preceded by a parenthetical direction`,
+        rule: 'PARENTHETICAL_FLOOD',
+        severity: 'minor',
+        description: `${parentheticalCount550a} of ${speechCount550a} dialogue speeches (${Math.round(parentheticalCount550a / speechCount550a * 100)}%) are immediately preceded by a parenthetical direction — "(sighs)," "(beat)," "(angry)," "(quietly)," etc. Professional screenwriting convention reserves parentheticals for cases where the intended reading cannot be inferred from context or where a specific direction prevents critical misreading. When more than a third of all speeches are parenthetically directed, the writer is pre-interpreting every performance beat, removing the interpretive space that makes an actor's delivery nuanced and personal. A script dense with parentheticals reads as over-controlled and signals a writer who does not trust the dialogue, the actor, or the director to find the intended meaning. The best lines need no parenthetical — they contain the emotional direction in the word choices themselves.`,
+        suggestedFix: `Delete parentheticals wherever the dialogue's content, rhythm, or context makes the delivery self-evident. Reserve parentheticals for genuinely ambiguous cases — where the same line could be read as sarcasm or sincerity, where a character's physical action must be described mid-speech, or where a change in address must be marked. After deleting obvious parentheticals, review whether the remaining dialogue carries its intended emotional charge without additional direction; if it does not, revise the words rather than adding instructions.`,
+      });
+    }
+  }
+
+  // DIALOGUE_LONG_SPEECH_FLOOD — underweight/bloat × dialogue × speech length (excessive).
+  // >30% of ≥8 dialogue lines contain >15 words. Dialogue dominated by long, expository speeches
+  // burdens the scene with monologue-like density: characters make formal arguments, deliver
+  // explanations, or narrate their interior states at a length that theatre can support but
+  // that cinema and television resist. Long speeches occupy screen time without physical action,
+  // reduce scene dynamics (one character talks while others listen), and signal that the writer
+  // is relying on dialogue to convey information the camera should be showing. They also work
+  // against the verbal rhythm patterns that distinguish cinematic dialogue — the staccato
+  // exchange, the interrupted line, the reaction shot between short beats.
+  // Distinct from: DIALOGUE_SHORT_SPEECH_FLOOD (Wave 536: ≤3 word speeches — the opposite
+  // extreme; this targets excessive length, that targets excessive brevity), DIALOGUE_COMMAND_FLOOD
+  // (opener pattern not length), DIALOGUE_HEDGING_FLOOD (register content not length). First check
+  // on excessive dialogue line length in this pass.
+  {
+    let dlgTotal550b = 0;
+    let longCount550b = 0;
+    let inDlg550b = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg550b = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg550b = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg550b = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (!inDlg550b) continue;
+      dlgTotal550b++;
+      const wordCount550b = t.split(/\s+/).filter((w: string) => w.length > 0).length;
+      if (wordCount550b > 15) longCount550b++;
+    }
+    if (dlgTotal550b >= 8 && longCount550b / dlgTotal550b > 0.30) {
+      issues.push({
+        location: `${longCount550b} of ${dlgTotal550b} dialogue lines contain >15 words`,
+        rule: 'DIALOGUE_LONG_SPEECH_FLOOD',
+        severity: 'minor',
+        description: `${longCount550b} of ${dlgTotal550b} dialogue lines (${Math.round(longCount550b / dlgTotal550b * 100)}%) contain more than 15 words. Dialogue dominated by lengthy, expository speeches creates a monologue texture that cinema resists: long unbroken speeches occupy screen time without physical action, reduce scene dynamics to one character talking while others listen, and signal that the writer is using dialogue to convey information that should be visible. Cinematic dialogue is characteristically brief, interrupted, subtext-laden, and shaped around reaction shots — patterns that long speeches preclude. At >30%, the script has more in common with theatrical or literary prose than with screenwriting, where the image and the cut — not the speech — are the primary storytelling tools.`,
+        suggestedFix: `Break long speeches into shorter exchanges: interrupt the speaker with a reaction, a physical action, or another character's line. Cut any sentence from a long speech that conveys information the audience already has or that can be shown rather than stated. The target should be no single speech longer than 3–4 lines of dialogue — speeches that extend beyond that are monologues, and monologues should be used sparingly and purposefully, not as the default mode of conversation.`,
+      });
+    }
+  }
+
+  // ACTION_ADVERB_FLOOD — underweight/bloat × action × adverb density.
+  // >35% of ≥8 action lines contain at least one adverb ending in "-ly". Over-modified action prose
+  // signals a writer who tells rather than shows through word choice: "she walks quickly" instead of
+  // "she sprints," "he speaks quietly" instead of "he murmurs." An adverb applied to a verb is a
+  // symptom of an imprecise verb: the specific verb already contains the manner the adverb is
+  // attempting to add. When adverbs dominate action prose at this rate, the writing is doing double
+  // work (verb + modifier) instead of the single, more precise verb that screenwriting favors. Action
+  // lines are the closest the screenplay has to cinematography — the camera sees specific action, not
+  // general action with a manner qualifier. Imprecise action prose is the opposite of cinematic prose.
+  // Distinct from: PASSIVE_VERB_DOMINANCE (Wave 438: passive verb construction — different grammatical
+  // phenomenon, passivity vs. adverb modification), ACTION_PRONOUN_OPENER_FLOOD (Wave 466: opener
+  // position × pronoun — different target, opener character not adverb content), all dialogue checks
+  // (those target spoken text not action lines). First adverb-density check on action lines in this pass.
+  {
+    const advRe550c = /\b\w+ly\b/i;
+    let actionTotal550c = 0;
+    let advCount550c = 0;
+    let inDlg550c = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg550c = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg550c = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg550c = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (inDlg550c) continue;
+      // This is an action line
+      actionTotal550c++;
+      if (advRe550c.test(t)) advCount550c++;
+    }
+    if (actionTotal550c >= 8 && advCount550c / actionTotal550c > 0.35) {
+      issues.push({
+        location: `${advCount550c} of ${actionTotal550c} action lines contain an adverb ending in "-ly"`,
+        rule: 'ACTION_ADVERB_FLOOD',
+        severity: 'minor',
+        description: `${advCount550c} of ${actionTotal550c} action lines (${Math.round(advCount550c / actionTotal550c * 100)}%) contain at least one adverb ending in "-ly." Adverb-saturated action prose is a hallmark of telling rather than showing: "she walks quickly" is a less vivid choice than "she sprints," and "he speaks quietly" is weaker than "he murmurs." When more than a third of action lines rely on an adverb to supply the manner of an action, the verbs are not doing their job: each adverb signals an imprecise verb that needed modification. Cinematic action prose favors specific, manner-bearing verbs ("slams," "creeps," "collapses") over general verbs with modifying adverbs ("closes forcefully," "moves slowly," "falls down dramatically"). The camera sees what characters do, not how they do it in the abstract — only specific verbs produce specific images.`,
+        suggestedFix: `Replace each adverb-modified verb pair with a single, specific verb that contains the manner: "walks quickly" → "strides," "moves slowly" → "creeps," "looks carefully" → "studies," "speaks quietly" → "murmurs," "runs fast" → "sprints." Read each adverb as a diagnostic: it indicates that a more precise verb exists and is not being used. After replacement, the action lines will be shorter, more visual, and more specific — the three qualities that distinguish cinematic prose from general narrative prose.`,
       });
     }
   }

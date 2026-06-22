@@ -24720,6 +24720,60 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 550 — originalityPass: parenthetical flood, dialogue long speech flood, action adverb flood', async () => {
+    const runO550 = async (fountain: string) => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      return originalityPass({
+        fountain, original: fountain, records: [],
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    it('PARENTHETICAL_FLOOD fires when >35% of speeches have an immediate parenthetical', async () => {
+      // 8 speeches; 4 immediately followed by a parenthetical (50% > 35%)
+      const f550a = `INT. ROOM - DAY\n\nALICE\n(quietly)\nI need to tell you something.\n\nBOB\nWhat is it?\n\nALICE\n(nervous)\nI saw what happened last night.\n\nBOB\nYou did?\n\nALICE\n(firmly)\nYes, I saw everything.\n\nBOB\nThen you know.\n\nALICE\n(whispering)\nI know. And I've kept quiet.\n\nBOB\nThank you for that.\n\n`;
+      const res = await runO550(f550a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PARENTHETICAL_FLOOD'), 'PARENTHETICAL_FLOOD should fire');
+    });
+
+    it('PARENTHETICAL_FLOOD does not fire when parentheticals are below 35%', async () => {
+      // 8 speeches; only 2 have an immediate parenthetical (25% ≤ 35%)
+      const f550an = `INT. ROOM - DAY\n\nALICE\nI need to tell you something.\n\nBOB\nWhat is it?\n\nALICE\n(quietly)\nI saw what happened last night.\n\nBOB\nYou did?\n\nALICE\nYes, I saw everything.\n\nBOB\nThen you know.\n\nALICE\n(firmly)\nI do. And I've kept quiet.\n\nBOB\nThank you for that.\n\n`;
+      const res = await runO550(f550an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PARENTHETICAL_FLOOD'), 'PARENTHETICAL_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_LONG_SPEECH_FLOOD fires when >30% of dialogue lines have >15 words', async () => {
+      // 8 dialogue lines; 3 have >15 words (37.5% > 30%)
+      const f550b = `INT. ROOM - DAY\n\nALICE\nI have been thinking about this for a very long time and I believe we need to act now before it is too late for all of us.\n\nBOB\nI know.\n\nALICE\nYou have to understand that the situation has changed dramatically over the past few weeks and nothing is the same as it was.\n\nBOB\nThat's true.\n\nALICE\nThis is going to be the hardest decision I have ever made in my entire life and I need you to support me through it.\n\nBOB\nOf course.\n\nALICE\nLet's go.\n\nBOB\nYes.\n\n`;
+      const res = await runO550(f550b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_LONG_SPEECH_FLOOD'), 'DIALOGUE_LONG_SPEECH_FLOOD should fire');
+    });
+
+    it('DIALOGUE_LONG_SPEECH_FLOOD does not fire when long speeches are at or below 30%', async () => {
+      // 8 dialogue lines; only 2 have >15 words (25% ≤ 30%)
+      const f550bn = `INT. ROOM - DAY\n\nALICE\nI need to tell you something.\n\nBOB\nWhat is it?\n\nALICE\nI saw what happened last night and I have been thinking about it ever since.\n\nBOB\nYou did.\n\nALICE\nYes.\n\nBOB\nThen you understand.\n\nALICE\nThis is something we need to consider very carefully before we decide anything at all.\n\nBOB\nFine.\n\n`;
+      const res = await runO550(f550bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_LONG_SPEECH_FLOOD'), 'DIALOGUE_LONG_SPEECH_FLOOD should not fire');
+    });
+
+    it('ACTION_ADVERB_FLOOD fires when >35% of action lines contain a "-ly" adverb', async () => {
+      // 8 action lines; 4 contain "-ly" adverbs (50% > 35%)
+      const f550c = `INT. ROOM - DAY\n\nShe walks quickly to the window.\n\nALICE\nI see them.\n\nHe speaks quietly to himself.\n\nBOB\nWe must go.\n\nShe closes the door softly.\n\nALICE\nNow.\n\nHe turns and moves rapidly toward the exit.\n\nBOB\nLet's move.\n\nShe stands still.\n\nALICE\nWait.\n\nHe watches carefully.\n\nBOB\nReady.\n\nShe breathes.\n\nALICE\nOkay.\n\nHe nods.\n\nBOB\nGo.\n\n`;
+      const res = await runO550(f550c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_ADVERB_FLOOD'), 'ACTION_ADVERB_FLOOD should fire');
+    });
+
+    it('ACTION_ADVERB_FLOOD does not fire when adverbs are at or below 35% of action lines', async () => {
+      // 8 action lines; only 2 contain "-ly" adverbs (25% ≤ 35%)
+      const f550cn = `INT. ROOM - DAY\n\nShe crosses to the window.\n\nALICE\nI see them.\n\nHe murmurs to himself.\n\nBOB\nWe must go.\n\nShe shuts the door.\n\nALICE\nNow.\n\nHe sprints toward the exit.\n\nBOB\nLet's move.\n\nShe pauses.\n\nALICE\nWait.\n\nHe studies the room carefully.\n\nBOB\nReady.\n\nShe exhales slowly.\n\nALICE\nOkay.\n\nHe nods.\n\nBOB\nGo.\n\n`;
+      const res = await runO550(f550cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_ADVERB_FLOOD'), 'ACTION_ADVERB_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 536 — originalityPass: dialogue negative imperative flood, dialogue exclamation run, dialogue short speech flood', async () => {
     const runO536 = async (fountain: string) => {
       const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
