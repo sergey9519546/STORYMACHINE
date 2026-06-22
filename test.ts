@@ -27986,6 +27986,100 @@ I always listen.
     });
   });
 
+  describe('Wave 562 — conflictPass: repair drought run, repair emotion decoupled, repair curiosity aftermath void', async () => {
+    const rep562 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
+    const makeRec562 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF562 = async (records: any[]) => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // CONFLICT_REPAIR_DROUGHT_RUN fire:
+    // n=12; repairs at idx 0,1 (+0.5); idx 2-11 no repair → run of 10 ≥6 → fires
+    it('CONFLICT_REPAIR_DROUGHT_RUN fires when a run of 6+ consecutive scenes has no bond repair', async () => {
+      const recs562a = Array.from({ length: 12 }, (_, i) =>
+        makeRec562(i, { relationshipShifts: [0, 1].includes(i) ? rep562(0.5) : [] }),
+      );
+      const res = await runCF562(recs562a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_REPAIR_DROUGHT_RUN'), 'CONFLICT_REPAIR_DROUGHT_RUN should fire');
+    });
+
+    // CONFLICT_REPAIR_DROUGHT_RUN no-fire:
+    // n=12; repairs at idx 0,5,11 → longest non-repair run is idx 6..10 (5) < 6 → no fire
+    it('CONFLICT_REPAIR_DROUGHT_RUN does not fire when no non-repair run reaches 6 scenes', async () => {
+      const recs562anr = Array.from({ length: 12 }, (_, i) =>
+        makeRec562(i, { relationshipShifts: [0, 5, 11].includes(i) ? rep562(0.5) : [] }),
+      );
+      const res = await runCF562(recs562anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_REPAIR_DROUGHT_RUN'), 'CONFLICT_REPAIR_DROUGHT_RUN should not fire');
+    });
+
+    // CONFLICT_REPAIR_EMOTION_DECOUPLED fire:
+    // n=8; repairs at idx 1,3,5 all neutral; non-repair scenes idx 0 (positive), idx 2 (negative) carry emotion → fires
+    it('CONFLICT_REPAIR_EMOTION_DECOUPLED fires when all repair scenes are emotionally neutral while emotion exists elsewhere', async () => {
+      const recs562b = Array.from({ length: 8 }, (_, i) =>
+        makeRec562(i, {
+          relationshipShifts: [1, 3, 5].includes(i) ? rep562(0.5) : [],
+          emotionalShift: i === 0 ? 'positive' : i === 2 ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runCF562(recs562b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_REPAIR_EMOTION_DECOUPLED'), 'CONFLICT_REPAIR_EMOTION_DECOUPLED should fire');
+    });
+
+    // CONFLICT_REPAIR_EMOTION_DECOUPLED no-fire:
+    // same but repair scene idx 3 carries emotion (positive) → not all repairs neutral → no fire
+    it('CONFLICT_REPAIR_EMOTION_DECOUPLED does not fire when a repair scene carries emotion', async () => {
+      const recs562bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec562(i, {
+          relationshipShifts: [1, 3, 5].includes(i) ? rep562(0.5) : [],
+          emotionalShift: i === 0 ? 'positive' : i === 2 ? 'negative' : i === 3 ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runCF562(recs562bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_REPAIR_EMOTION_DECOUPLED'), 'CONFLICT_REPAIR_EMOTION_DECOUPLED should not fire');
+    });
+
+    // CONFLICT_REPAIR_CURIOSITY_AFTERMATH_VOID fire:
+    // n=8; repairs at idx 1,3 (not last); curiosity at idx 6,7 (≥2 globally, outside aftermath windows) → all void → fires
+    it('CONFLICT_REPAIR_CURIOSITY_AFTERMATH_VOID fires when no repair is followed by a curiosity rise within 2 scenes', async () => {
+      const recs562c = Array.from({ length: 8 }, (_, i) =>
+        makeRec562(i, {
+          relationshipShifts: [1, 3].includes(i) ? rep562(0.5) : [],
+          curiosityDelta: [6, 7].includes(i) ? 2 : 0,
+        }),
+      );
+      const res = await runCF562(recs562c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_REPAIR_CURIOSITY_AFTERMATH_VOID'), 'CONFLICT_REPAIR_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    // CONFLICT_REPAIR_CURIOSITY_AFTERMATH_VOID no-fire:
+    // n=8; repairs at idx 1,3; curiosity at idx 2 (in aftermath of repair at idx 1) and idx 7 → not all void → no fire
+    it('CONFLICT_REPAIR_CURIOSITY_AFTERMATH_VOID does not fire when a repair aftermath raises curiosity', async () => {
+      const recs562cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec562(i, {
+          relationshipShifts: [1, 3].includes(i) ? rep562(0.5) : [],
+          curiosityDelta: [2, 7].includes(i) ? 2 : 0,
+        }),
+      );
+      const res = await runCF562(recs562cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_REPAIR_CURIOSITY_AFTERMATH_VOID'), 'CONFLICT_REPAIR_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 548 — conflictPass: peak repair uncaused, closing clock absent, seed repair decoupled', async () => {
     const rup548 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
     const makeRec548 = (idx: number, overrides: any = {}): any => ({

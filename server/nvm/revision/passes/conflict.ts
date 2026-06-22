@@ -151,6 +151,20 @@
 // CONFLICT_CLUE_DECOUPLED [seed × rupture — the negative direction], CONFLICT_RUPTURE_SEED_AFTERMATH_VOID
 // [aftermath mode], and CONFLICT_REVELATION_REPAIR_DECOUPLED [revelation × repair — different signal pair];
 // first co-occurrence check joining seed and repair channels).
+// Wave 562 additions: repair drought run (run-based × repair absence × valence — n≥10, ≥2 repair
+// scenes, longest consecutive run of non-repair scenes ≥6; relational warmth goes dark for an
+// extended stretch; first run-based ABSENCE check on the repair channel, distinct from CONFLICT_
+// CALM_STRETCH [non-conflict gap, not non-repair], CONFLICT_POSITIVE_SPIRAL [presence run not
+// absence], and CONFLICT_REPAIR_FRONT_LOADED [distribution not run]), repair emotion decoupled
+// (co-occurrence/decoupling × repair × emotionalShift — n≥8, ≥3 repair scenes all emotionally
+// neutral while ≥2 non-repair scenes carry emotion; bonds heal but the protagonist feels nothing;
+// distinct from CONFLICT_EMOTION_DECOUPLED [audits rupture/conflict scenes — the negative direction]
+// and CONFLICT_POSITIVE_EMOTION_RUPTURE [inverted valence on the conflict channel]), repair curiosity
+// aftermath void (sequence/aftermath × repair → curiosity — n≥8, ≥2 repair scenes [pos<n-1], ≥2
+// curiosity scenes globally, every repair followed by 2 scenes with curiosityDelta ≤ 0; reconciliation
+// never opens new questions; the positive-shift complement of CONFLICT_AFTERMATH_CURIOSITY_VOID [rupture
+// trigger], distinct from CONFLICT_RUPTURE_CURIOSITY_DECOUPLED [same-scene co-occurrence] and CONFLICT_
+// CURIOSITY_CLOSING_ZONE_ABSENT [zone check]).
 // Wave 520 additions: rupture payoff aftermath void (sequence/aftermath × payoff × rupture aftermath
 // — n≥8, ≥2 ruptures ≤ -0.3, ≥2 payoff scenes; every rupture followed by 2 scenes with no
 // payoffSetupIds; bond-breaking never immediately precedes thread resolution; final uncovered aftermath
@@ -3053,6 +3067,161 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `The story plants ${seedScenes548c.length} clue(s) and warms ${repairScenes548c.length} bond(s) (positive shift ≥ +0.3), but foreshadowing and relational healing never occur in the same scene. A repair scene is one of the most structurally powerful moments to embed a seed: the emotional warmth creates a false sense of security while the planted clue signals future trouble, building dramatic irony. Equally, a clue seeded at the moment of reconciliation can hint that the restored bond will face a new test — that the repair is incomplete or conditional. When seed and repair are always decoupled, the story misses the compound effect of foreshadowing planted inside a moment of relational warmth.`,
             suggestedFix: 'Introduce at least one scene where a positive relationship shift and a seeded clue co-occur: a reconciliation scene in which a detail is casually mentioned that will become important later, or a warming scene in which an object, phrase, or action foreshadows a future complication. Scenes where dramatic irony and emotional warmth combine are among the most effective structural placements for foreshadowing.',
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 562: CONFLICT_REPAIR_DROUGHT_RUN, CONFLICT_REPAIR_EMOTION_DECOUPLED,
+  //              CONFLICT_REPAIR_CURIOSITY_AFTERMATH_VOID ──────────────────────────────────────────
+
+  // CONFLICT_REPAIR_DROUGHT_RUN — run-based × repair absence × valence (positive shift channel).
+  // n≥10, ≥2 repair scenes (positive shift ≥ +0.3), longest consecutive run of non-repair scenes
+  // is ≥6 → fire. The story's relational warmth goes dark for an extended consecutive stretch: six
+  // or more scenes pass in a row with no bond healing, even though repairs exist elsewhere. A
+  // run-based repair drought is distinct from a distribution skew — the repairs may be balanced
+  // front-to-back across the script and still leave a long uninterrupted span where no bond ever
+  // warms. When relational repair flatlines for a sixth of the runtime or more, the audience spends
+  // a long stretch with no evidence that bonds can improve, and the relational hope the surrounding
+  // repairs built dissipates before the next warming can recover it. The story's emotional texture
+  // turns relentlessly cold for the duration of the drought.
+  // Distinct from: CONFLICT_CALM_STRETCH (Wave 492: run-based × non-CONFLICT gap — ≥5 consecutive
+  // scenes with no rupture/conflict signal; this audits absence of REPAIR specifically, the positive
+  // direction, not absence of conflict), CONFLICT_POSITIVE_SPIRAL (Wave 436: run-based × ≥3
+  // consecutive scenes each WITH a positive shift — the presence run, this is the absence run),
+  // CONFLICT_RELENTLESS_RUN / CONFLICT_NEGATIVE_SPIRAL (Waves 313/285: run-based on the NEGATIVE
+  // shift channel), CONFLICT_REPAIR_FRONT_LOADED (Wave 520: distribution/timing, not a consecutive
+  // run). First run-based check auditing the ABSENCE of repair in this pass.
+  {
+    const n562a = records.length;
+    if (n562a >= 10) {
+      const repairCount562a = (records as any[]).filter(r =>
+        ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount >= 0.3),
+      ).length;
+      if (repairCount562a >= 2) {
+        let longestRun562a = 0;
+        let currentRun562a = 0;
+        for (const r of records as any[]) {
+          const isRepair562a = ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(
+            s => s.amount >= 0.3,
+          );
+          if (!isRepair562a) {
+            currentRun562a++;
+            if (currentRun562a > longestRun562a) longestRun562a = currentRun562a;
+          } else {
+            currentRun562a = 0;
+          }
+        }
+        if (longestRun562a >= 6) {
+          issues.push({
+            location: `longest repair drought: ${longestRun562a} consecutive scenes with no bond healing`,
+            rule: 'CONFLICT_REPAIR_DROUGHT_RUN',
+            severity: 'minor',
+            description: `The story contains a run of ${longestRun562a} consecutive scenes with no positive relationship shift (≥ +0.3) — an extended relational-warmth drought — even though ${repairCount562a} repair scene(s) exist across the script. Unlike a front-to-back distribution skew, this is a local dead zone: a sixth of the runtime or more passes in an unbroken stretch where no bond ever heals or warms. The audience spends a long uninterrupted span with no evidence that relationships can improve, and the relational hope the surrounding repairs built dissipates before the next warming can recover it. Relational warmth that is technically present in the script but absent for a long consecutive run leaves an extended cold stretch where the interpersonal world feels frozen.`,
+            suggestedFix: `Break up the ${longestRun562a}-scene repair drought by seeding at least one positive relational beat into the middle of the run: a small reconciliation, an acknowledged moment of warmth, an alliance reaffirmed, or a bond that improves under pressure. The drought doesn't need a complete reconciliation — it needs enough relational warmth to keep the interpersonal world from feeling frozen across an extended stretch. A story sustains emotional texture by never letting bond-healing flatline for too long between its larger repairs.`,
+          });
+        }
+      }
+    }
+  }
+
+  // CONFLICT_REPAIR_EMOTION_DECOUPLED — co-occurrence/decoupling × repair × emotionalShift.
+  // n≥8, ≥3 repair scenes (positive shift ≥ +0.3), ≥2 emotionally non-neutral scenes elsewhere
+  // (proving the story CAN render feeling), every repair scene emotionally neutral → fire. Bonds
+  // heal but the protagonist registers no feeling about any of them: every reconciliation, every
+  // moment of relational warmth, passes without an emotional beat attached. Repair is one of the
+  // most emotionally charged events available to a story — a broken bond restored should move the
+  // protagonist visibly. When every repair scene is emotionally flat while emotion exists elsewhere,
+  // the relational-warmth layer and the felt-emotion layer run on separate tracks: bonds mend in
+  // scenes the protagonist experiences without affect, draining the reconciliations of the emotional
+  // payoff that makes them land.
+  // Distinct from: CONFLICT_EMOTION_DECOUPLED (Wave 299: co-occurrence × CONFLICT/rupture scenes ×
+  // neutral emotion — audits the NEGATIVE shift / conflict scenes being neutral; this audits the
+  // POSITIVE shift / repair scenes, the opposite relational direction), CONFLICT_POSITIVE_EMOTION_
+  // RUPTURE (Wave 450: co-occurrence × rupture × POSITIVE emotion — inverted valence on the conflict
+  // channel), ARC_RELATIONAL_SHIFT_EMOTION_FLAT in character-arc.ts (audits ALL relationship-shift
+  // scenes regardless of direction in a different pass; this isolates repair scenes specifically in
+  // the conflict pass). First co-occurrence check pairing the repair channel with emotional flatness.
+  {
+    const n562b = records.length;
+    if (n562b >= 8) {
+      const repairScenes562b = (records as any[]).filter(r =>
+        ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount >= 0.3),
+      );
+      const repairIdxSet562b = new Set(repairScenes562b.map((r: any) => r.sceneIdx));
+      const emotionalNonRepair562b = (records as any[]).filter(
+        r =>
+          !repairIdxSet562b.has(r.sceneIdx) &&
+          r.emotionalShift !== 'neutral' &&
+          r.emotionalShift !== null &&
+          r.emotionalShift !== undefined &&
+          r.emotionalShift !== '',
+      ).length;
+      if (repairScenes562b.length >= 3 && emotionalNonRepair562b >= 2) {
+        const allRepairsNeutral562b = repairScenes562b.every(
+          (r: any) =>
+            r.emotionalShift === 'neutral' ||
+            r.emotionalShift === null ||
+            r.emotionalShift === undefined ||
+            r.emotionalShift === '',
+        );
+        if (allRepairsNeutral562b) {
+          issues.push({
+            location: `${repairScenes562b.length} repair scene(s) — all emotionally neutral`,
+            rule: 'CONFLICT_REPAIR_EMOTION_DECOUPLED',
+            severity: 'minor',
+            description: `All ${repairScenes562b.length} of the story's bond-repair scenes (positive shift ≥ +0.3) carry no emotional charge, even though ${emotionalNonRepair562b} other scene(s) render felt emotion. Repair is one of the most emotionally significant events available to a story — a broken bond restored, an estrangement healed, an alliance rebuilt should move the protagonist visibly. When every reconciliation is emotionally flat while emotion exists elsewhere, the relational-warmth layer and the felt-emotion layer run on separate tracks: bonds mend in scenes the protagonist experiences without affect. The audience watches the relationships improve but is given no emotional cue to feel the weight of the healing, draining the reconciliations of the payoff that makes them resonate.`,
+            suggestedFix: `Attach an emotional beat to at least one repair scene: let the protagonist register relief, gratitude, joy, or even a complicated bittersweetness as a bond heals. The emotion need not be uncomplicated — a reconciliation tinged with lingering hurt is often more resonant than uncomplicated warmth — but the repair should move the protagonist visibly. A bond that mends while the protagonist feels nothing reads as a plot mechanic rather than an emotional event.`,
+          });
+        }
+      }
+    }
+  }
+
+  // CONFLICT_REPAIR_CURIOSITY_AFTERMATH_VOID — sequence/aftermath × repair → curiosity aftermath.
+  // n≥8, ≥2 repair scenes (positive shift ≥ +0.3) not at the final position, ≥2 curiosity-positive
+  // scenes globally (proving the wondering engine works), every repair followed by 2 scenes with
+  // curiosityDelta ≤ 0 → fire. Reconciliation never opens new questions: every time a bond heals,
+  // the scenes that follow raise no curiosity. A repair is a natural springboard for new wondering —
+  // a restored alliance invites the question of what the reunited characters will now attempt; a
+  // healed bond raises the question of whether it will hold. When repair aftermaths are uniformly
+  // curiosity-flat while the story raises curiosity elsewhere, the relational-warmth engine and the
+  // wondering engine never feed each other: reconciliations close emotional loops without opening
+  // narrative ones, and the forward pull that a repair could generate is left untapped.
+  // Distinct from: CONFLICT_AFTERMATH_CURIOSITY_VOID (Wave 422: aftermath × RUPTURE → curiosity —
+  // same aftermath channel but the NEGATIVE shift trigger; this is the positive-shift / repair
+  // complement, and together they cover both relational directions feeding the curiosity aftermath),
+  // CONFLICT_REPAIR_FRONT_LOADED (Wave 520: distribution, not aftermath), CONFLICT_RUPTURE_CURIOSITY_
+  // DECOUPLED (Wave 478: co-occurrence × curiosity IN the rupture scene — same-scene, not aftermath),
+  // CONFLICT_CURIOSITY_CLOSING_ZONE_ABSENT (Wave 520: zone check, not aftermath). First aftermath
+  // check using the repair signal as trigger in this pass.
+  {
+    const n562c = records.length;
+    if (n562c >= 8) {
+      const curiosityCount562c = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0).length;
+      const repairRecs562c = (records as any[])
+        .map((r, i) => ({ r, i }))
+        .filter(
+          ({ r, i }) =>
+            i < n562c - 1 &&
+            ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount >= 0.3),
+        );
+      if (curiosityCount562c >= 2 && repairRecs562c.length >= 2) {
+        const allCuriosityVoid562c = repairRecs562c.every(({ i }) => {
+          for (let off = 1; off <= 2; off++) {
+            const next = (records as any[])[i + off];
+            if (next && (next.curiosityDelta ?? 0) > 0) return false;
+          }
+          return true;
+        });
+        if (allCuriosityVoid562c) {
+          issues.push({
+            location: `${repairRecs562c.length} repair scene(s) — none followed by a curiosity rise within 2 scenes`,
+            rule: 'CONFLICT_REPAIR_CURIOSITY_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `Every one of the story's ${repairRecs562c.length} bond-repair scenes (positive shift ≥ +0.3) is followed by two scenes with no curiosity rise, even though the story raises curiosity in ${curiosityCount562c} scene(s) elsewhere. A repair is a natural springboard for new wondering — a restored alliance invites the question of what the reunited characters will now attempt together; a healed bond raises the question of whether it will hold under the next pressure. When every reconciliation's aftermath is curiosity-flat, the relational-warmth engine and the wondering engine never feed each other: repairs close emotional loops without opening narrative ones, and the forward pull a reconciliation could generate is left untapped. The story heals bonds and raises questions in entirely separate moments.`,
+            suggestedFix: `After at least one repair, let the next scene or two open a new question that the reconciliation makes possible: what the restored alliance will now risk together, whether the healed bond can survive a fresh test, or what the reunited characters will discover now that they are working as one. A reconciliation that opens a new question carries forward momentum; one that closes an emotional loop without opening a narrative one lets the story's energy dissipate at the moment a bond is restored.`,
           });
         }
       }
