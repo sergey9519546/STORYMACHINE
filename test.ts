@@ -27012,6 +27012,94 @@ I always listen.
     });
   });
 
+  describe('Wave 563 — intentionPass: revelation drought run, revelation zone cluster, revelation clock aftermath void', async () => {
+    const makeRec563 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN563 = async (records: any[]) => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, reversalCount: 0, revelationCount: records.filter((r: any) => r.revelation).length,
+          openClues: 0, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // REVELATION_DROUGHT_RUN fire:
+    // n=12; revelations at idx 0,1; idx 2-11 none → run of 10 ≥6 → fires
+    it('REVELATION_DROUGHT_RUN fires when a run of 6+ consecutive scenes has no revelation', async () => {
+      const recs563a = Array.from({ length: 12 }, (_, i) =>
+        makeRec563(i, { revelation: [0, 1].includes(i) ? 'truth surfaced' : null }),
+      );
+      const res = await runIN563(recs563a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_DROUGHT_RUN'), 'REVELATION_DROUGHT_RUN should fire');
+    });
+
+    // REVELATION_DROUGHT_RUN no-fire:
+    // n=12; revelations at idx 0,5,11 → longest non-revelation run is idx 6..10 (5) < 6 → no fire
+    it('REVELATION_DROUGHT_RUN does not fire when no non-revelation run reaches 6 scenes', async () => {
+      const recs563anr = Array.from({ length: 12 }, (_, i) =>
+        makeRec563(i, { revelation: [0, 5, 11].includes(i) ? 'truth surfaced' : null }),
+      );
+      const res = await runIN563(recs563anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_DROUGHT_RUN'), 'REVELATION_DROUGHT_RUN should not fire');
+    });
+
+    // REVELATION_ZONE_CLUSTER fire:
+    // n=9; third=3; revelations at idx 3,4,5 (all middle third) → 3/3=100%>75% → fires
+    it('REVELATION_ZONE_CLUSTER fires when >75% of revelations fall in a single structural third', async () => {
+      const recs563b = Array.from({ length: 9 }, (_, i) =>
+        makeRec563(i, { revelation: [3, 4, 5].includes(i) ? 'truth surfaced' : null }),
+      );
+      const res = await runIN563(recs563b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_ZONE_CLUSTER'), 'REVELATION_ZONE_CLUSTER should fire');
+    });
+
+    // REVELATION_ZONE_CLUSTER no-fire:
+    // n=9; revelations at idx 1,4,7 → one per third, max 1/3=33%≤75% → no fire
+    it('REVELATION_ZONE_CLUSTER does not fire when revelations are spread across thirds', async () => {
+      const recs563bnr = Array.from({ length: 9 }, (_, i) =>
+        makeRec563(i, { revelation: [1, 4, 7].includes(i) ? 'truth surfaced' : null }),
+      );
+      const res = await runIN563(recs563bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_ZONE_CLUSTER'), 'REVELATION_ZONE_CLUSTER should not fire');
+    });
+
+    // REVELATION_CLOCK_AFTERMATH_VOID fire:
+    // n=8; revelations at idx 1,3 (pos<7); clocks at idx 6,7 (≥2 globally, outside aftermath windows) → all void → fires
+    it('REVELATION_CLOCK_AFTERMATH_VOID fires when no revelation is followed by a clock raise within 2 scenes', async () => {
+      const recs563c = Array.from({ length: 8 }, (_, i) =>
+        makeRec563(i, {
+          revelation: [1, 3].includes(i) ? 'truth surfaced' : null,
+          clockRaised: [6, 7].includes(i),
+        }),
+      );
+      const res = await runIN563(recs563c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_CLOCK_AFTERMATH_VOID'), 'REVELATION_CLOCK_AFTERMATH_VOID should fire');
+    });
+
+    // REVELATION_CLOCK_AFTERMATH_VOID no-fire:
+    // n=8; revelations at idx 1,3; clock at idx 2 (aftermath of rev at idx 1) and idx 7 → not all void → no fire
+    it('REVELATION_CLOCK_AFTERMATH_VOID does not fire when a revelation aftermath raises a clock', async () => {
+      const recs563cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec563(i, {
+          revelation: [1, 3].includes(i) ? 'truth surfaced' : null,
+          clockRaised: [2, 7].includes(i),
+        }),
+      );
+      const res = await runIN563(recs563cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_CLOCK_AFTERMATH_VOID'), 'REVELATION_CLOCK_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 549 — intentionPass: revelation suspense flat, revelation emotion decoupled, revelation cause void', async () => {
     const makeRec549 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

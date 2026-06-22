@@ -141,6 +141,18 @@
 // turn, or suspense rise in itself or the prior scene; revelation-channel parallel of SEED_CAUSE_VOID;
 // distinct from PROACTIVE_REVELATION_ABSENT [aftermath: proactive → revelation downstream] and from
 // PAYOFF_PEAK_UNCAUSED [backward-cause × peak payoff]).
+// Wave 563 additions: revelation drought run (run-based × revelation absence — n≥10, ≥2 revelation
+// scenes, longest consecutive run of non-revelation scenes ≥6; the disclosure engine goes dark for
+// an extended local stretch; the ABSENCE complement of REVELATION_RUN [presence run], distinct from
+// REVELATION_FRONTLOADED [global half-skew] and REVELATION_CLOSING_VOID [fixed closing zone]),
+// revelation zone cluster (distribution/timing × revelation × structural thirds — n≥9, ≥3 revelation
+// scenes, >75% in a single third; disclosures ghettoized into one zone; finer-grained than the binary
+// REVELATION_FRONTLOADED half-partition and can fire on a middle-third cluster it would miss, distinct
+// from REVELATION_CLOSING_VOID [absence not over-concentration]), revelation clock aftermath void
+// (sequence/aftermath × revelation → clock — n≥8, ≥2 revelation scenes [pos<n-1], ≥2 clock scenes
+// globally, every revelation followed by 2 scenes with no clockRaised; disclosure never tightens the
+// deadline in its wake; the revelation-trigger sibling of PROACTIVE_CLOCK_AFTERMATH_ABSENT, distinct
+// from REVELATION_CAUSE_VOID [backward-cause, what precedes] and PAYOFF_CLOCK_DECOUPLED [same-scene]).
 // Wave 521 additions: seed peak uncaused (backward-cause × single-peak × seed — n≥8, ≥2 seed
 // scenes, the single scene planting the most clues has no revelation, dramatic turn, suspense rise,
 // or clockRaise in either of the 2 preceding scenes; foreshadowing peaks without preparation; first
@@ -3014,6 +3026,151 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `Every revelation scene in the story (${revRecs549c.length} scene(s)) has no upstream dramatic trigger in itself or the immediately preceding scene — no proactive protagonist act, no dramatic turn, and no suspense escalation. All disclosures arrive in a causal vacuum: the audience receives truth without any story-mechanical event that explains or motivated the disclosure. Revelations that are causally unanchored feel like authorial gifts rather than consequences of story mechanics — the character learns something because the writer decided they should, not because they acted, because a pivot forced the truth into the open, or because escalating stakes made concealment impossible. An earned revelation is a result: of something the protagonist did, something the story turned, or something the pressure made unavoidable.`,
             suggestedFix: `Attach each revelation to a prior causal event: a protagonist action that uncovered the truth (isProactive, seeds a clue, raises a clock), a dramatic turn whose consequences forced disclosure, or a suspense escalation that made further concealment impossible. Even a partial trigger — the protagonist asking the right question at the right moment — transforms a revelation from a scriptwriter's intervention into a dramatic consequence. A revelation the audience saw coming because the story earned it lands harder than a revelation that simply arrives.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 563: REVELATION_DROUGHT_RUN, REVELATION_ZONE_CLUSTER,
+  //              REVELATION_CLOCK_AFTERMATH_VOID ──────────────────────────────────────────────────
+
+  // REVELATION_DROUGHT_RUN — run-based × revelation absence.
+  // n≥10, ≥2 revelation scenes (revelation non-null/non-empty), longest consecutive run of
+  // non-revelation scenes is ≥6 → fire. The story's disclosure engine goes dark for an extended
+  // consecutive stretch: six or more scenes pass in a row with no new truth surfacing, even though
+  // revelations exist elsewhere. A run-based revelation drought is distinct from a distribution skew
+  // — the revelations may be balanced front-to-back across the script and still leave a long
+  // uninterrupted span where the audience learns nothing new. When disclosure flatlines for a sixth
+  // of the runtime or more, the epistemic engine stalls: the audience spends a long stretch with no
+  // forward progress in their understanding, and the momentum that earlier disclosures built
+  // dissipates before the next revelation can recover it. A story sustains intellectual engagement by
+  // feeding new information at a steady cadence; an extended revelation drought lets the audience's
+  // sense of forward discovery go slack.
+  // Distinct from: REVELATION_RUN (Wave 479: run-based × ≥3 CONSECUTIVE revelation scenes — the
+  // PRESENCE run, this is the ABSENCE run; the two are complements on the same channel), REVELATION_
+  // FRONTLOADED (Wave 465: distribution/timing × 70% first-half ratio — a global skew, not a local
+  // consecutive run), REVELATION_CLOSING_VOID (zone presence/absence × final third — a fixed-zone
+  // check, not a sliding run anywhere in the script). First run-based ABSENCE check on the revelation
+  // channel in this pass, paralleling PROACTIVE_DESERT_RUN on the proactive channel.
+  {
+    const n563a = records.length;
+    if (n563a >= 10) {
+      const revCount563a = (records as any[]).filter(
+        r => r.revelation !== null && r.revelation !== undefined && r.revelation !== '',
+      ).length;
+      if (revCount563a >= 2) {
+        let longestRun563a = 0;
+        let currentRun563a = 0;
+        for (const r of records as any[]) {
+          const isRev563a = r.revelation !== null && r.revelation !== undefined && r.revelation !== '';
+          if (!isRev563a) {
+            currentRun563a++;
+            if (currentRun563a > longestRun563a) longestRun563a = currentRun563a;
+          } else {
+            currentRun563a = 0;
+          }
+        }
+        if (longestRun563a >= 6) {
+          issues.push({
+            location: `longest revelation drought: ${longestRun563a} consecutive scenes with no disclosure`,
+            rule: 'REVELATION_DROUGHT_RUN',
+            severity: 'minor',
+            description: `The story contains a run of ${longestRun563a} consecutive scenes with no revelation — an extended disclosure drought — even though ${revCount563a} revelation scene(s) exist across the script. Unlike a front-to-back distribution skew, this is a local dead zone: a sixth of the runtime or more passes in an unbroken stretch where the audience learns nothing new. The epistemic engine stalls — the audience spends a long uninterrupted span with no forward progress in their understanding, and the momentum that earlier disclosures built dissipates before the next revelation can recover it. New information that is technically present in the script but absent for a long consecutive run leaves an extended stretch where the audience's sense of forward discovery goes slack.`,
+            suggestedFix: `Break up the ${longestRun563a}-scene revelation drought by seeding at least one disclosure into the middle of the run: a partial truth surfaced, a detail reframed, a secret half-exposed, or a new piece of the puzzle revealed. The drought doesn't need a major plot reversal — it needs enough new information to keep the audience's sense of forward discovery alive across an extended stretch. A story sustains intellectual engagement by feeding new understanding at a steady cadence, not by withholding all disclosure for a long span between its larger reveals.`,
+          });
+        }
+      }
+    }
+  }
+
+  // REVELATION_ZONE_CLUSTER — distribution/timing × revelation × structural thirds.
+  // n≥9, ≥3 revelation scenes (revelation non-null/non-empty), >75% of them fall in a single
+  // structural third → fire. The story's disclosures are ghettoized into one structural zone — the
+  // opening, middle, or closing third carries the overwhelming majority of all revelations while
+  // the other two-thirds disclose almost nothing. A thirds-based cluster is a finer-grained
+  // distribution check than the binary half-partition: a script can split its revelations evenly
+  // across the two halves and still concentrate three-quarters of them into, say, the middle third,
+  // leaving both the opening and the climax informationally inert. When revelations cluster in one
+  // zone, the epistemic arc reads as a single burst of disclosure surrounded by long stretches where
+  // the audience's understanding does not advance, rather than a steady accumulation of truth that
+  // builds toward the climax.
+  // Distinct from: REVELATION_FRONTLOADED (Wave 465: binary half-partition — >70% in the first half;
+  // this uses three zones and can fire on a middle-third cluster that the half-check would miss),
+  // REVELATION_CLOSING_VOID (Wave 465: zone presence/absence — final third has none; this fires on
+  // OVER-concentration in any single third, not absence from the closing one), REVELATION_DROUGHT_RUN
+  // (Wave 563 sibling: run-based local stretch, not a global zone concentration), REVELATION_RUN
+  // (run-based presence). First thirds-based distribution check on the revelation channel in this pass.
+  {
+    const n563b = records.length;
+    if (n563b >= 9) {
+      const revPositions563b = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r }) => r.revelation !== null && r.revelation !== undefined && r.revelation !== '')
+        .map(({ pos }) => pos);
+      if (revPositions563b.length >= 3) {
+        const third563b = Math.floor(n563b / 3);
+        const firstZone563b = revPositions563b.filter(p => p < third563b).length;
+        const lastZone563b = revPositions563b.filter(p => p >= 2 * third563b).length;
+        const midZone563b = revPositions563b.length - firstZone563b - lastZone563b;
+        const maxZone563b = Math.max(firstZone563b, midZone563b, lastZone563b);
+        if (maxZone563b / revPositions563b.length > 0.75) {
+          const zoneName563b =
+            maxZone563b === firstZone563b ? 'opening' : maxZone563b === lastZone563b ? 'closing' : 'middle';
+          issues.push({
+            location: `revelation distribution: ${firstZone563b} opening / ${midZone563b} middle / ${lastZone563b} closing third — ${Math.round((maxZone563b / revPositions563b.length) * 100)}% in the ${zoneName563b} third`,
+            rule: 'REVELATION_ZONE_CLUSTER',
+            severity: 'minor',
+            description: `${Math.round((maxZone563b / revPositions563b.length) * 100)}% of the story's ${revPositions563b.length} revelation scenes are concentrated in the ${zoneName563b} structural third, leaving the other two-thirds disclosing almost nothing. Unlike a front-vs-back skew, this is a single-zone cluster: the truths surface almost entirely within one third of the runtime while the rest of the story does not advance the audience's understanding. When revelations are ghettoized into one zone, the epistemic arc reads as a single burst of disclosure surrounded by long informationally inert stretches, rather than a steady accumulation of truth that builds toward the climax. The most engaging mysteries dole out their disclosures across all three structural zones so the audience's understanding deepens continuously from setup to resolution.`,
+            suggestedFix: `Redistribute some of the ${zoneName563b} third's revelations into the other two zones so that disclosure advances across the full arc rather than bursting in one stretch. Each structural third can carry its own revelation: an early disclosure that reframes the setup, a middle disclosure that complicates the situation, and a late disclosure that recontextualizes the climax. Spreading revelations across the thirds turns a single burst of truth into a continuous epistemic thread the audience can follow throughout.`,
+          });
+        }
+      }
+    }
+  }
+
+  // REVELATION_CLOCK_AFTERMATH_VOID — sequence/aftermath × revelation → clock aftermath.
+  // n≥8, ≥2 revelation scenes (revelation non-null/non-empty) not at the final position, ≥2
+  // clockRaised scenes globally (proving the story uses clocks), every revelation followed by 2
+  // scenes with no clock raised → fire. Disclosure never tightens the deadline in its wake: every
+  // time a truth surfaces, the scenes that follow add no time pressure. A revelation is a natural
+  // trigger for new urgency — learning a threat is closer than believed, discovering a deadline was
+  // moved up, realizing the window to act is narrower than assumed. When revelation aftermaths are
+  // uniformly clock-free while the story raises clocks elsewhere, the disclosure engine and the
+  // urgency engine never feed each other: truths surface in one part of the story and deadlines
+  // tighten in another, and the escalating pressure a revelation could generate is left untapped.
+  // Distinct from: REVELATION_CAUSE_VOID (Wave 549: backward-cause × what PRECEDES revelation — this
+  // checks what FOLLOWS it, the opposite temporal direction), PAYOFF_CLOCK_DECOUPLED (Wave 535:
+  // co-occurrence × payoff × clock in the SAME scene — different trigger channel and same-scene not
+  // aftermath), SEED_CLOCKLESS (co-occurrence × seed × clock — seed trigger, same-scene), PROACTIVE_
+  // CLOCK_AFTERMATH_ABSENT (Wave 465: aftermath × PROACTIVE → clock — same aftermath mode and output
+  // channel but the proactive trigger; this is the revelation-trigger sibling). First aftermath check
+  // pairing the revelation trigger with the clock output channel in this pass.
+  {
+    const n563c = records.length;
+    if (n563c >= 8) {
+      const clockCount563c = (records as any[]).filter(r => r.clockRaised === true).length;
+      const revRecs563c = (records as any[])
+        .map((r, i) => ({ r, i }))
+        .filter(
+          ({ r, i }) =>
+            i < n563c - 1 && r.revelation !== null && r.revelation !== undefined && r.revelation !== '',
+        );
+      if (clockCount563c >= 2 && revRecs563c.length >= 2) {
+        const allClockVoid563c = revRecs563c.every(({ i }) => {
+          for (let off = 1; off <= 2; off++) {
+            const next = (records as any[])[i + off];
+            if (next && next.clockRaised === true) return false;
+          }
+          return true;
+        });
+        if (allClockVoid563c) {
+          issues.push({
+            location: `${revRecs563c.length} revelation scene(s) — none followed by a clock raise within 2 scenes`,
+            rule: 'REVELATION_CLOCK_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `Every one of the story's ${revRecs563c.length} revelation scenes is followed by two scenes in which no clock is raised, even though the story raises a clock in ${clockCount563c} scene(s) elsewhere. A revelation is a natural trigger for new urgency — the audience learns a threat is closer than believed, discovers a deadline was moved up, or realizes the window to act is narrower than assumed. When every disclosure's aftermath is clock-free, the disclosure engine and the urgency engine never feed each other: truths surface in one part of the story and deadlines tighten in another, and the escalating pressure a revelation could generate is left untapped. The story discloses and pressures in entirely separate moments, so the audience never feels a truth immediately raise the stakes.`,
+            suggestedFix: `After at least one revelation, let the next scene or two raise a clock that the disclosure makes urgent: the truth surfaced reveals the deadline is closer, the discovery exposes a new time-limited threat, or the answer makes clear that the protagonist must act before a window closes. A revelation that immediately tightens the clock does double work — it advances understanding AND escalates pressure — where a disclosure that lands without any urgency in its wake lets the story's tension dissipate at the moment the audience is most engaged.`,
           });
         }
       }
