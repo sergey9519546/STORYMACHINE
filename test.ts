@@ -24329,6 +24329,90 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 565 — pacingPass: seed aftermath suspense flat, seed aftermath curiosity flat, seed aftermath emotion flat', async () => {
+    const makeRec565 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain565 = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\n\nAction line for scene ${i}.`).join('\n\n');
+    const runP565 = async (records: any[]) => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: makeFountain565(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({})),
+        approvedSpans: [],
+      });
+    };
+
+    // SEED_AFTERMATH_SUSPENSE_FLAT fire:
+    // n=8; seeds at idx 1,3,5 (all < n-2=6); next scenes (2,4,6) suspenseDelta=0 → avg=0 ≤ 0 → fires
+    it('SEED_AFTERMATH_SUSPENSE_FLAT fires when all seeds have avg next-scene suspenseDelta ≤ 0', async () => {
+      const recs565a = Array.from({ length: 8 }, (_, i) =>
+        makeRec565(i, { seededClueIds: [1, 3, 5].includes(i) ? ['clue1'] : [], suspenseDelta: 0 }),
+      );
+      const res = await runP565(recs565a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_AFTERMATH_SUSPENSE_FLAT'), 'SEED_AFTERMATH_SUSPENSE_FLAT should fire');
+    });
+
+    // SEED_AFTERMATH_SUSPENSE_FLAT no-fire:
+    // n=8; seeds at 1,3,5; scene 4 (next after seed at 3) suspenseDelta=2 → avg > 0 → no fire
+    it('SEED_AFTERMATH_SUSPENSE_FLAT does not fire when a seed is followed by positive suspenseDelta', async () => {
+      const recs565an = Array.from({ length: 8 }, (_, i) =>
+        makeRec565(i, { seededClueIds: [1, 3, 5].includes(i) ? ['clue1'] : [], suspenseDelta: i === 4 ? 2 : 0 }),
+      );
+      const res = await runP565(recs565an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_AFTERMATH_SUSPENSE_FLAT'), 'SEED_AFTERMATH_SUSPENSE_FLAT should not fire');
+    });
+
+    // SEED_AFTERMATH_CURIOSITY_FLAT fire:
+    // n=8; seeds at 1,3,5; all 2-scene windows have curiosityDelta=0 → all flat → fires
+    it('SEED_AFTERMATH_CURIOSITY_FLAT fires when all seeds are followed by 2 scenes with curiosityDelta ≤ 0', async () => {
+      const recs565b = Array.from({ length: 8 }, (_, i) =>
+        makeRec565(i, { seededClueIds: [1, 3, 5].includes(i) ? ['clue1'] : [], curiosityDelta: 0 }),
+      );
+      const res = await runP565(recs565b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_AFTERMATH_CURIOSITY_FLAT'), 'SEED_AFTERMATH_CURIOSITY_FLAT should fire');
+    });
+
+    // SEED_AFTERMATH_CURIOSITY_FLAT no-fire:
+    // n=8; seeds at 1,3,5; scene 4 (aftermath of seed at 3) curiosityDelta=1 → not all flat → no fire
+    it('SEED_AFTERMATH_CURIOSITY_FLAT does not fire when a seed aftermath has curiosityDelta > 0', async () => {
+      const recs565bn = Array.from({ length: 8 }, (_, i) =>
+        makeRec565(i, { seededClueIds: [1, 3, 5].includes(i) ? ['clue1'] : [], curiosityDelta: i === 4 ? 1 : 0 }),
+      );
+      const res = await runP565(recs565bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_AFTERMATH_CURIOSITY_FLAT'), 'SEED_AFTERMATH_CURIOSITY_FLAT should not fire');
+    });
+
+    // SEED_AFTERMATH_EMOTION_FLAT fire:
+    // n=8; seeds at 1,3,5; all aftermath scenes emotionally neutral → fires
+    it('SEED_AFTERMATH_EMOTION_FLAT fires when all seeds are followed by 2 neutral-emotion scenes', async () => {
+      const recs565c = Array.from({ length: 8 }, (_, i) =>
+        makeRec565(i, { seededClueIds: [1, 3, 5].includes(i) ? ['clue1'] : [], emotionalShift: 'neutral' }),
+      );
+      const res = await runP565(recs565c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_AFTERMATH_EMOTION_FLAT'), 'SEED_AFTERMATH_EMOTION_FLAT should fire');
+    });
+
+    // SEED_AFTERMATH_EMOTION_FLAT no-fire:
+    // n=8; seeds at 1,3,5; scene 4 (aftermath of seed at 3) emotionalShift='negative' → not all neutral → no fire
+    it('SEED_AFTERMATH_EMOTION_FLAT does not fire when a seed aftermath carries emotion', async () => {
+      const recs565cn = Array.from({ length: 8 }, (_, i) =>
+        makeRec565(i, { seededClueIds: [1, 3, 5].includes(i) ? ['clue1'] : [], emotionalShift: i === 4 ? 'negative' : 'neutral' }),
+      );
+      const res = await runP565(recs565cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_AFTERMATH_EMOTION_FLAT'), 'SEED_AFTERMATH_EMOTION_FLAT should not fire');
+    });
+  });
+
   describe('Wave 551 — pacingPass: turn aftermath suspense flat, turn aftermath curiosity flat, turn aftermath emotion flat', async () => {
     const makeRec551 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

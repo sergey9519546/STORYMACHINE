@@ -158,6 +158,17 @@
 // third; the disclosure engine skips the complication zone entirely; distinct from REVELATION_
 // TEMPORAL_CLUSTER in belief.ts which is concentration not absence, and from REVELATION_SUSPENSE_
 // AFTERMATH_FLAT which is aftermath mode; first zone check on revelation in this pass).
+// Wave 565 additions: seed aftermath suspense flat (sequence/aftermath × suspense × seed trigger —
+// n≥8, ≥3 seed scenes [seededClueIds non-empty] not in last 2 positions, avg suspenseDelta of the
+// immediately following scene ≤ 0; foreshadowing never tightens tension in its wake; the seed row of
+// the suspense-aftermath family alongside revelation/clock/payoff/turn triggers), seed aftermath
+// curiosity flat (sequence/aftermath × curiosity × seed trigger — n≥8, ≥3 seed scenes not in last 2
+// positions, every seed followed by 2 scenes with curiosityDelta ≤ 0; foreshadowing never ignites
+// wondering; the seed row of the curiosity-aftermath family), seed aftermath emotion flat (sequence/
+// aftermath × emotion × seed trigger — n≥8, ≥3 seed scenes not in last 2 positions, every seed
+// followed by 2 emotionally neutral scenes; foreshadowing never registers in felt state; completes the
+// seed-aftermath family and the emotion-aftermath family across all five triggers — revelation, clock,
+// payoff, turn, and seed). This wave fills the one missing trigger row (seed) in the aftermath matrix.
 // Wave 523 additions: clock aftermath emotion flat (sequence/aftermath × emotion × clock trigger
 // — n≥8, ≥3 clockRaised scenes not in last 2 positions, every clockRaised scene followed by 2
 // emotionally neutral scenes; deadlines never register in the protagonist's felt state; completes
@@ -3042,6 +3053,135 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `Every one of the story's ${qualTurnRecs551c.length} dramatic-turn scenes (reversals, recognitions, twists) is followed by two emotionally neutral scenes. Story pivots are landing without felt consequences: the story turns, and then the characters continue through the next two scenes as if nothing has changed in their emotional state. A dramatic turn should change what the protagonist is up against — and that change should register as a felt experience before the plot moves on. When pivots are never followed by emotional beats, the turns read as informational updates rather than as events that cost the protagonist something. Pacing is not just about events per unit time; it is about events that land in the character's interiority, and turns without emotional aftermath are structurally complete but dramatically unanchored.`,
             suggestedFix: `After at least one dramatic-turn scene, let the following scene carry a non-neutral emotional shift — a moment of dread, relief, resolve, or grief that shows the protagonist registering what the pivot has cost or revealed. The emotional beat need not be long; a single line of acted response before the next scene of action is enough to anchor the turn in the character's experience and convert the structural event into a felt story moment.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 565: SEED_AFTERMATH_SUSPENSE_FLAT, SEED_AFTERMATH_CURIOSITY_FLAT,
+  //              SEED_AFTERMATH_EMOTION_FLAT ──────────────────────────────────────────────────────
+  // The seed (foreshadowing) trigger is the one missing row in this pass's aftermath matrix: the
+  // suspense, curiosity, and emotion aftermath families already cover the revelation, clock, payoff,
+  // and dramatic-turn triggers (Waves 467/481/495/523/537/551) but never the seed trigger. This wave
+  // completes the matrix by auditing what happens in the scenes immediately after a clue is planted.
+
+  // SEED_AFTERMATH_SUSPENSE_FLAT — sequence/aftermath × suspense × seed trigger.
+  // n≥8, ≥3 seed scenes (seededClueIds non-empty) not in the last 2 positions. Average suspenseDelta
+  // of the scene immediately following each seed ≤ 0 → fire. Foreshadowing never tightens tension in
+  // its wake: a clue is planted and the next scene carries no rising pressure. A well-placed seed
+  // should create anticipatory dread — the audience registers that something has been set in motion,
+  // and the following scene should feel the weight of that pending consequence. When every seed is
+  // followed by a suspense-neutral or downward scene, the planted clues read as inert bookkeeping —
+  // information filed for later rather than a charge that makes the immediate aftermath feel more
+  // dangerous. Foreshadowing is a tension instrument; a seed that does not raise the pressure of what
+  // follows is a promise made without any accompanying unease.
+  // Distinct from: REVELATION_SUSPENSE_AFTERMATH_FLAT (Wave 467: revelation trigger), CLOCK_AFTERMATH_
+  // SUSPENSE_FLAT (Wave 481: clock trigger), PAYOFF_AFTERMATH_SUSPENSE_FLAT (Wave 523: payoff trigger),
+  // TURN_AFTERMATH_SUSPENSE_FLAT (Wave 551: dramatic-turn trigger). First aftermath × suspense check on
+  // the seed trigger in this pass — the seed row of the suspense-aftermath family.
+  {
+    const n565a = records.length;
+    if (n565a >= 8) {
+      const qualSeedRecs565a = (records as any[]).filter((r, pos) =>
+        ((r.seededClueIds ?? []) as any[]).length > 0 && pos < n565a - 2,
+      );
+      if (qualSeedRecs565a.length >= 3) {
+        const avgNextSusp565a = qualSeedRecs565a.reduce((sum: number, r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          const nxt = (records as any[])[pos + 1];
+          return sum + (nxt ? (nxt.suspenseDelta ?? 0) : 0);
+        }, 0) / qualSeedRecs565a.length;
+        if (avgNextSusp565a <= 0) {
+          issues.push({
+            location: `${qualSeedRecs565a.length} seed scene(s) — avg next-scene suspenseDelta: ${avgNextSusp565a.toFixed(2)}`,
+            rule: 'SEED_AFTERMATH_SUSPENSE_FLAT',
+            severity: 'minor',
+            description: `The scenes immediately following the story's ${qualSeedRecs565a.length} clue-planting (seed) scenes average a suspenseDelta of ${avgNextSusp565a.toFixed(2)} — foreshadowing never tightens tension in its wake. A well-placed seed should create anticipatory dread: the audience registers that something has been set in motion, and the scene that follows should feel the weight of that pending consequence. When every seed is followed by a tension-neutral or downward scene, the planted clues read as inert bookkeeping — information filed for later rather than a charge that makes the immediate aftermath feel more dangerous. Pacing depends on planted promises generating unease; a seed that does not raise the pressure of what follows is a promise made without any accompanying tension.`,
+            suggestedFix: `After at least one seed scene, let the following scene carry a positive suspenseDelta — a beat where the planted clue's implication begins to press on the protagonist, or where the act of planting itself creates a new exposure or risk. Even a brief rise in pressure after a seed converts the foreshadowing from a filed note into a felt threat, and gives the eventual payoff a tension lineage the audience has already been made to feel.`,
+          });
+        }
+      }
+    }
+  }
+
+  // SEED_AFTERMATH_CURIOSITY_FLAT — sequence/aftermath × curiosity × seed trigger.
+  // n≥8, ≥3 seed scenes (seededClueIds non-empty) not in the last 2 positions. Every seed is
+  // followed by 2 scenes with curiosityDelta ≤ 0 → fire. Foreshadowing never ignites wondering in
+  // what follows: a clue is planted and the audience asks no new questions in the two scenes after.
+  // A seed is, at its core, a question-generator — it shows the audience something whose significance
+  // is not yet clear, and the scenes that follow should carry the heightened wondering of "what does
+  // that mean / when will it matter." When every seed's aftermath is curiosity-flat, the clues are
+  // being planted without the epistemic hook that makes foreshadowing pull the audience forward.
+  // Distinct from: REVELATION_CURIOSITY_AFTERMATH_FLAT (Wave 537: revelation trigger), CLOCK_AFTERMATH_
+  // CURIOSITY_FLAT (Wave 495: clock trigger), TURN_AFTERMATH_CURIOSITY_FLAT (Wave 551: dramatic-turn
+  // trigger), PAYOFF_AFTERMATH_CURIOSITY_FLAT (Wave 509: payoff trigger). First aftermath × curiosity
+  // check on the seed trigger in this pass — the seed row of the curiosity-aftermath family.
+  {
+    const n565b = records.length;
+    if (n565b >= 8) {
+      const qualSeedRecs565b = (records as any[]).filter((r, pos) =>
+        ((r.seededClueIds ?? []) as any[]).length > 0 && pos < n565b - 2,
+      );
+      if (qualSeedRecs565b.length >= 3) {
+        const allSeedNoCurAftermath565b = qualSeedRecs565b.every((r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos + off];
+            if (nxt && (nxt.curiosityDelta ?? 0) > 0) return false;
+          }
+          return true;
+        });
+        if (allSeedNoCurAftermath565b) {
+          issues.push({
+            location: `${qualSeedRecs565b.length} seed scene(s) — curiosity aftermath absent in all 2-scene windows`,
+            rule: 'SEED_AFTERMATH_CURIOSITY_FLAT',
+            severity: 'minor',
+            description: `Every one of the story's ${qualSeedRecs565b.length} clue-planting (seed) scenes is followed by two scenes with no curiosity rise (curiosityDelta ≤ 0 in both). Foreshadowing consistently lands without generating new open questions in what follows — every planted clue is filed away rather than turned into a hook. A seed is fundamentally a question-generator: it shows the audience something whose significance is not yet clear, and the scenes that follow should carry the heightened wondering of "what does that mean" and "when will it matter." When every seed's aftermath is curiosity-flat, the clues are being planted without the epistemic pull that makes foreshadowing propulsive rather than merely tidy.`,
+            suggestedFix: `After at least one seed scene, let the following scene carry a positive curiosityDelta — a beat that draws attention to the planted clue's strangeness, raises a question about its meaning, or shows a character noticing something is off. The most propulsive foreshadowing makes the audience actively wonder about the seed in the scenes right after it is planted, so the eventual payoff answers a question they have been carrying rather than one they had forgotten they were asked.`,
+          });
+        }
+      }
+    }
+  }
+
+  // SEED_AFTERMATH_EMOTION_FLAT — sequence/aftermath × emotion × seed trigger.
+  // n≥8, ≥3 seed scenes (seededClueIds non-empty) not in the last 2 positions. Every seed is
+  // followed by 2 emotionally neutral scenes → fire. Foreshadowing never produces a felt response
+  // in what follows: a clue is planted and the protagonist moves through the next two scenes with no
+  // registered emotional consequence. The strongest seeds are not neutral information drops — they
+  // carry an emotional charge for the character who plants or witnesses them (unease, hope, dread,
+  // suspicion) that colors the scenes that follow. When every seed's aftermath is affectively silent,
+  // the clues read as authorial plumbing rather than as events the characters experience — the
+  // machinery of the plot showing through without the human texture that makes foreshadowing feel
+  // like part of the story rather than scaffolding for it.
+  // Distinct from: REVELATION_EMOTIONAL_AFTERMATH_FLAT (Wave 495: revelation trigger), CLOCK_AFTERMATH_
+  // EMOTION_FLAT (Wave 523: clock trigger), PAYOFF_AFTERMATH_EMOTION_FLAT (Wave 523: payoff trigger),
+  // TURN_AFTERMATH_EMOTION_FLAT (Wave 551: dramatic-turn trigger). Completes the seed-aftermath family
+  // alongside SEED_AFTERMATH_SUSPENSE_FLAT and SEED_AFTERMATH_CURIOSITY_FLAT, and completes the
+  // emotion-aftermath family across all five triggers (revelation, clock, payoff, turn, and seed).
+  {
+    const n565c = records.length;
+    if (n565c >= 8) {
+      const qualSeedRecs565c = (records as any[]).filter((r, pos) =>
+        ((r.seededClueIds ?? []) as any[]).length > 0 && pos < n565c - 2,
+      );
+      if (qualSeedRecs565c.length >= 3) {
+        const allSeedNoEmoAftermath565c = qualSeedRecs565c.every((r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos + off];
+            if (nxt && (nxt.emotionalShift ?? 'neutral') !== 'neutral') return false;
+          }
+          return true;
+        });
+        if (allSeedNoEmoAftermath565c) {
+          issues.push({
+            location: `${qualSeedRecs565c.length} seed scene(s) — emotion absent in all aftermath windows`,
+            rule: 'SEED_AFTERMATH_EMOTION_FLAT',
+            severity: 'minor',
+            description: `Every one of the story's ${qualSeedRecs565c.length} clue-planting (seed) scenes is followed by two emotionally neutral scenes. Foreshadowing is landing without felt consequence: a clue is planted, and the protagonist moves through the next two scenes as if nothing of weight has been set in motion. The strongest seeds are not neutral information drops — they carry an emotional charge for the character who plants or witnesses them (unease, hope, dread, suspicion) that colors the scenes that follow. When every seed's aftermath is affectively silent, the clues read as authorial plumbing rather than as events the characters experience: the machinery of the plot shows through without the human texture that makes foreshadowing feel woven into the story rather than bolted onto it.`,
+            suggestedFix: `After at least one seed scene, let the following scene carry a non-neutral emotional shift — a flicker of dread, suspicion, or hope that shows the planted clue has registered on the protagonist's interior state. The emotional beat need not be large; a single acted response colors the foreshadowing with feeling and tells the audience that the seed matters to the character, not just to the plot. Seeds that are felt are remembered; seeds that are merely filed are the ones whose eventual payoff lands flat.`,
           });
         }
       }
