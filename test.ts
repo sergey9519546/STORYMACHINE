@@ -21996,6 +21996,129 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 553 — relationshipArcPass: relationship emotion decoupled, pair dimension monopoly, pair thirds concentrated', async () => {
+    const mkShift553 = (pairKey: string, amount: number, dimension = 'trust') =>
+      [{ pairKey, dimension, amount }];
+    const makeRec553 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runRA553 = async (records: any[]) => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    it('RELATIONSHIP_EMOTION_DECOUPLED fires when >70% of shift scenes are emotionally neutral', async () => {
+      // 8 scenes: shifts at 0,2,4,6 (4 shift scenes), all neutral emotionalShift → 100% neutral → fire.
+      const recs553a = Array.from({ length: 8 }, (_, i) =>
+        makeRec553(i, {
+          relationshipShifts: [0, 2, 4, 6].includes(i)
+            ? mkShift553('A|B', i % 2 === 0 ? 0.3 : -0.3)
+            : [],
+          emotionalShift: 'neutral',
+        }),
+      );
+      const res = await runRA553(recs553a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_EMOTION_DECOUPLED'), 'RELATIONSHIP_EMOTION_DECOUPLED should fire');
+    });
+
+    it('RELATIONSHIP_EMOTION_DECOUPLED does not fire when ≥30% of shift scenes have non-neutral emotion', async () => {
+      // 8 scenes: shifts at 0,2,4,6; sc0 and sc2 positive emotion (2 of 4 = 50% non-neutral) → no fire.
+      const recs553an = Array.from({ length: 8 }, (_, i) =>
+        makeRec553(i, {
+          relationshipShifts: [0, 2, 4, 6].includes(i)
+            ? mkShift553('A|B', i % 2 === 0 ? 0.3 : -0.3)
+            : [],
+          emotionalShift: [0, 2].includes(i) ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runRA553(recs553an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_EMOTION_DECOUPLED'), 'RELATIONSHIP_EMOTION_DECOUPLED should not fire');
+    });
+
+    it('PAIR_DIMENSION_MONOPOLY fires when a pair with 4+ shifts uses only one relationship dimension while 2+ dimensions exist globally', async () => {
+      // 9 scenes: pair A|B has 4 shifts all in 'trust'; pair C|D has 1 shift in 'closeness' → 2 global dims.
+      // A|B's netByDimension.size === 1 while globalDims.size === 2 → fire.
+      const recs553b = Array.from({ length: 9 }, (_, i) =>
+        makeRec553(i, {
+          emotionalShift: 'positive',
+          relationshipShifts: [0, 2, 4, 6].includes(i)
+            ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.3 }]
+            : i === 8
+              ? [{ pairKey: 'C|D', dimension: 'closeness', amount: 0.2 }]
+              : [],
+        }),
+      );
+      const res = await runRA553(recs553b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAIR_DIMENSION_MONOPOLY'), 'PAIR_DIMENSION_MONOPOLY should fire');
+    });
+
+    it('PAIR_DIMENSION_MONOPOLY does not fire when a pair uses 2+ dimensions', async () => {
+      // 9 scenes: pair A|B has 4 shifts — 2 in 'trust', 2 in 'closeness' → netByDimension.size === 2 → no fire.
+      const recs553bn = Array.from({ length: 9 }, (_, i) =>
+        makeRec553(i, {
+          emotionalShift: 'positive',
+          relationshipShifts: [0, 2].includes(i)
+            ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.3 }]
+            : [3, 5].includes(i)
+              ? [{ pairKey: 'A|B', dimension: 'closeness', amount: 0.3 }]
+              : i === 8
+                ? [{ pairKey: 'C|D', dimension: 'power', amount: 0.2 }]
+                : [],
+        }),
+      );
+      const res = await runRA553(recs553bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAIR_DIMENSION_MONOPOLY'), 'PAIR_DIMENSION_MONOPOLY should not fire');
+    });
+
+    it('PAIR_THIRDS_CONCENTRATED fires when a pair has >75% of 4+ shifts in one structural third', async () => {
+      // 9 scenes (third=3): pair A|B has shifts at 0,1,2,7 (4 shifts); 3 in first third (0,1,2) = 75%.
+      // Need >75% so use 4 shifts in first third (0,1,2) out of 4 total = 100% → fire.
+      // Use 4 shifts at positions 0,1,2,2 — wait, same scene. Use 0,1,2,3 but third = floor(9/3)=3, so first third is positions 0-2, second is 3-5, third is 6-8.
+      // Shifts at 0,1,2,8: 3 in first third + 1 in third third → 3/4=75%, not >75%. Use 0,1,2 with one more in first third — but positions 0-2 give 3 and we need 4 total → let's use 4 shifts all in first third (0,0,1,2) — can't repeat. Let's use 9 scenes, shifts at 0,1,2,3(=second third starts here).
+      // Actually with 9 scenes, third = 3: first third = [0,1,2], second = [3,4,5], third = [6,7,8].
+      // 4 shifts all in first third: 0,1,2 is only 3 positions. Use pair shifts in a single scene multiple times via different dimensions? No, pairStats aggregates all shifts.
+      // Use 5 scenes with shifts at first third positions 0,1,2 and one more...
+      // Better: use more shifts. Shifts at 0,1,2,2 won't work (only one shift per scene per pair).
+      // Use n=12 scenes: third=4. Shifts at 0,1,2,3,8 → 4 in first third, 1 in third third = 4/5=80% > 75% → fire!
+      const recs553c = Array.from({ length: 12 }, (_, i) =>
+        makeRec553(i, {
+          emotionalShift: 'positive',
+          relationshipShifts: [0, 1, 2, 3, 8].includes(i)
+            ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.3 }]
+            : [],
+        }),
+      );
+      const res = await runRA553(recs553c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAIR_THIRDS_CONCENTRATED'), 'PAIR_THIRDS_CONCENTRATED should fire');
+    });
+
+    it('PAIR_THIRDS_CONCENTRATED does not fire when pair shifts are spread across thirds', async () => {
+      // 12 scenes: pair A|B shifts at 0,4,8,11 — one in each third (4 shifts spread across thirds) → no fire.
+      // third=4: first [0-3], second [4-7], third [8-11]. One in each → max 1/4 = 25% → no fire.
+      const recs553cn = Array.from({ length: 12 }, (_, i) =>
+        makeRec553(i, {
+          emotionalShift: 'positive',
+          relationshipShifts: [0, 4, 8, 11].includes(i)
+            ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.3 }]
+            : [],
+        }),
+      );
+      const res = await runRA553(recs553cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAIR_THIRDS_CONCENTRATED'), 'PAIR_THIRDS_CONCENTRATED should not fire');
+    });
+  });
+
   describe('Wave 539 — relationshipArcPass: pair seed flat, pair payoff flat, pair shift run', async () => {
     const mkShift539 = (pairKey: string, amount: number) => [{ pairKey, dimension: 'trust', amount }];
     const makeRec539 = (idx: number, overrides: any = {}): any => ({

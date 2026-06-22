@@ -130,6 +130,19 @@
 // run (run-based × shift dimension — ≥4 consecutive shift scenes all using only one relationship
 // dimension while ≥2 distinct dimensions exist globally; a local single-axis burst distinct from
 // SHIFT_DIMENSION_CONCENTRATION which audits the whole-story proportion).
+// Wave 553 additions: relationship emotion decoupled (average/aggregate × emotion × global
+// shift — >70% of shift scenes have neutral emotionalShift while ≥4 exist; parallel to
+// RELATIONSHIP_CURIOSITY_DECOUPLED and RELATIONSHIP_SUSPENSE_DECOUPLED, fills the emotion
+// channel in the average/aggregate × global-shift family; distinct from WARMTH_UNFELT which
+// only audits positive shifts and RELATIONSHIP_RUPTURE_EMOTION_FLAT which only audits negative),
+// pair dimension monopoly (underweight/bloat × dimension × per-pair — a pair with ≥4 shifts
+// whose every shift uses only one relationship dimension while ≥2 distinct dimensions exist
+// globally; the per-pair complement of SHIFT_DIMENSION_CONCENTRATION which fires when ALL
+// shifts globally share one dimension, and distinct from DIMENSION_ONE_WAY which fires on
+// directional uniformity not dimensional breadth), pair thirds concentrated (distribution/timing
+// × thirds × per-pair — a pair with ≥4 shifts where >75% fall in one structural third; the
+// per-pair complement of RELATIONSHIP_SHIFT_THIRDS_CLUSTER which aggregates all pairs globally,
+// distinct from PAIR_SECOND_HALF_VOID/PAIR_FIRST_HALF_VOID which use half-based zones).
 // Wave 539 additions: pair seed flat (co-occurrence × seed × per-pair — a pair with ≥3 shifts
 // has none of its shift scenes coinciding with any seededClueId, while ≥3 seed scenes exist
 // globally; per-pair complement of RELATIONSHIP_SEED_DECOUPLED, adds the seed channel to the
@@ -3014,6 +3027,121 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
             suggestedFix: `Insert at least one shift from a different pair within the ${maxPairRun539c}-scene run — a secondary bond reacting to the same events that are moving the primary pair, or an independent relational development happening in parallel. The secondary shift need not be large; even a single small shift from another pair breaks the monopoly and restores the sense that the story's relational world is an ensemble rather than a spotlight.`,
           });
         }
+      }
+    }
+  }
+
+  {
+    // RELATIONSHIP_EMOTION_DECOUPLED — average/aggregate × emotion × global-shift trigger.
+    // n≥8, ≥4 shift scenes total. >70% of shift scenes have neutral emotionalShift → fire.
+    // Bond changes should register as felt events; when the majority of shift scenes carry no
+    // emotional charge, the relational engine operates in an affective vacuum — the story
+    // charts relationship dynamics on paper but does not convey them in the body of the scene.
+    // Distinct from: WARMTH_UNFELT (Wave 304: positive-shift × neutral emotion only — a subset),
+    // RELATIONSHIP_RUPTURE_EMOTION_FLAT (Wave 343: negative-shift × neutral emotion only — a
+    // subset), PAIR_EMOTION_FLAT (Wave 385: per-pair level — fires when ONE pair's shifts are
+    // all in neutral scenes), RELATIONSHIP_CURIOSITY_DECOUPLED / RELATIONSHIP_SUSPENSE_DECOUPLED
+    // (Wave 318/329: different channels; this fills the emotion channel in the same family).
+    const n553a = records.length;
+    if (n553a >= 8) {
+      const shiftScenes553a = (records as any[]).filter(r =>
+        ((r.relationshipShifts ?? []) as any[]).length > 0,
+      );
+      if (shiftScenes553a.length >= 4) {
+        const neutral553a = shiftScenes553a.filter(
+          (r: any) => r.emotionalShift === 'neutral' || r.emotionalShift == null,
+        ).length;
+        if (neutral553a / shiftScenes553a.length > 0.7) {
+          issues.push({
+            location: `${neutral553a} of ${shiftScenes553a.length} relationship-shift scene(s) — emotionally neutral`,
+            rule: 'RELATIONSHIP_EMOTION_DECOUPLED',
+            severity: 'minor',
+            description: `More than 70% of scenes in which a relationship shifts (${neutral553a} of ${shiftScenes553a.length}) carry a neutral emotional tone. Bond changes should register as felt events — moments where the audience experiences the warmth of a deepening connection or the sting of a rupture alongside the characters who are living it. When the majority of shift scenes are emotionally inert, the relational engine operates in an affective vacuum: the story correctly tracks who grew closer to whom and who pulled apart, but the audience never feels those changes in the room. Bonds move on paper but not in the body, and the cumulative effect is a relationship architecture that feels more like logistics than drama.`,
+            suggestedFix: `Introduce a non-neutral emotional charge into at least 30% of shift scenes — when a bond deepens, texture the scene with warmth, relief, or joy; when a bond fractures, let grief, shame, or anger color the scene alongside the relational fact. Even a minor emotional tone shift within a shift scene confirms that the bond change mattered to the people involved, preventing the relational arc from feeling like stage-management rather than lived experience.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // PAIR_DIMENSION_MONOPOLY — underweight/bloat × dimension × per-pair.
+    // n≥8, ≥2 distinct dimensions exist globally (in netByDimension across all pairs),
+    // ≥1 pair with ≥4 shifts whose netByDimension has exactly 1 entry → fire. A relationship
+    // that evolves exclusively along one axis lacks the depth needed to feel complex; real bonds
+    // shift in multiple registers simultaneously — trust and closeness compound, loyalty and
+    // power redistribute together.
+    // Distinct from: SHIFT_DIMENSION_CONCENTRATION (Wave 290: ALL shifts globally share one
+    // dimension — fires even when no single pair has 4+ shifts; this fires per-pair), DIMENSION_
+    // ONE_WAY (Wave 304: a dimension always shifts in one direction globally — directional
+    // uniformity vs. breadth of dimensions used per pair), SHIFT_DIMENSION_RUN (Wave 497:
+    // ≥4 consecutive shift scenes all same dimension — a local temporal run vs. per-pair total).
+    const n553b = records.length;
+    if (n553b >= 8) {
+      const globalDims553b = new Set<string>();
+      for (const s of pairStats.values()) {
+        for (const d of s.netByDimension.keys()) globalDims553b.add(d);
+      }
+      if (globalDims553b.size >= 2) {
+        const monopolyPairs553b: string[] = [];
+        for (const [pk553b, stats553b] of pairStats) {
+          if (stats553b.shifts.length >= 4 && stats553b.netByDimension.size === 1) {
+            monopolyPairs553b.push(pk553b);
+          }
+        }
+        if (monopolyPairs553b.length > 0) {
+          issues.push({
+            location: `Pair(s) ${monopolyPairs553b.join(', ')} — single-dimension evolution`,
+            rule: 'PAIR_DIMENSION_MONOPOLY',
+            severity: 'minor',
+            description: `${monopolyPairs553b.length === 1 ? 'One pair' : `${monopolyPairs553b.length} pairs`} (${monopolyPairs553b.join('; ')}) accumulate${monopolyPairs553b.length === 1 ? 's' : ''} 4 or more relationship shifts, yet every shift uses the same relationship dimension — the bond between these characters evolves exclusively along one axis. Real relationships shift in multiple registers simultaneously: a deepening of trust may also redistribute power; a rupture of closeness may raise simultaneous questions of loyalty. When one bond moves in a single dimension over 4+ scenes, that relationship's complexity is structurally constrained, and the audience experiences it as a single-track arc rather than a fully inhabited bond — they come to expect the next shift to be about the same thing the previous ones were about.`,
+            suggestedFix: `Introduce at least one shift for this pair using a different relationship dimension — let a bond change surface across a second axis. If trust has been the sole dimension, show a shift in closeness, power, or loyalty that compounds the trust movement; if closeness has dominated, register a trust or loyalty change that adds a second register to the relationship's evolution. The multi-dimensional beat gives the bond texture and confirms that these characters are complex enough that their connection ramifies across more than one aspect of how they relate.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // PAIR_THIRDS_CONCENTRATED — distribution/timing × thirds × per-pair.
+    // n≥9, ≥1 pair with ≥4 shifts where >75% of those shifts fall in one structural third → fire.
+    // When a specific pair does all its relational work in one narrow act-segment, that bond is
+    // architecturally compressed: it drives the story intensely within one zone and then goes
+    // relationally dormant in the other two-thirds, producing an imbalanced arc for that
+    // relationship specifically (not the aggregate of all pairs).
+    // Distinct from: RELATIONSHIP_SHIFT_THIRDS_CLUSTER (Wave 483: aggregate of ALL shifts across
+    // all pairs in one third — fires on global concentration even if no single pair is concentrated),
+    // RELATIONSHIP_WARMTH_CLUSTER / RUPTURE_THIRDS_CLUSTER (Wave 497/511: positive/negative-valence
+    // global thirds), PAIR_SECOND_HALF_VOID / PAIR_FIRST_HALF_VOID (Wave 371/357: half-based zones,
+    // not thirds), PAIR_MIDPOINT_VOID (Wave 385: per-pair × 40–60% midpoint void, not thirds-cluster).
+    const n553c = records.length;
+    if (n553c >= 9) {
+      const posMap553c = new Map<number, number>();
+      (records as any[]).forEach((r, pos) => posMap553c.set(r.sceneIdx, pos));
+      const third553c = Math.floor(n553c / 3);
+      const conPairs553c: Array<{ pk: string; zone: string; pct: number }> = [];
+      for (const [pk553c, stats553c] of pairStats) {
+        if (stats553c.shifts.length >= 4) {
+          const positions553c = stats553c.shifts.map(s => posMap553c.get(s.sceneIdx) ?? s.sceneIdx);
+          const z1 = positions553c.filter(p => p < third553c).length;
+          const z2 = positions553c.filter(p => p >= third553c && p < 2 * third553c).length;
+          const z3 = positions553c.filter(p => p >= 2 * third553c).length;
+          const maxZ = Math.max(z1, z2, z3);
+          if (maxZ / stats553c.shifts.length > 0.75) {
+            const zone553c = z1 === maxZ ? 'opening' : z2 === maxZ ? 'middle' : 'closing';
+            conPairs553c.push({ pk: pk553c, zone: zone553c, pct: Math.round(maxZ / stats553c.shifts.length * 100) });
+          }
+        }
+      }
+      if (conPairs553c.length > 0) {
+        const desc553c = conPairs553c.map(x => `${x.pk} (${x.pct}% in ${x.zone} third)`).join('; ');
+        issues.push({
+          location: `Pair(s) ${desc553c}`,
+          rule: 'PAIR_THIRDS_CONCENTRATED',
+          severity: 'minor',
+          description: `${conPairs553c.length === 1 ? 'One pair has' : `${conPairs553c.length} pairs have`} more than 75% of ${conPairs553c.length === 1 ? 'its' : 'their'} relationship shifts concentrated in a single structural third (${desc553c}). A bond that does all its relational work in one narrow act-segment is architecturally compressed: it drives the story intensely within one zone and then goes relationally dormant in the remaining two-thirds. The audience invests in this specific relationship during its active period, then watches it freeze — a structural imbalance that weakens the arc of that bond independently of whether the overall shift landscape is distributed. A credible relationship arc needs establishing moments, complicating moments, and transformative moments spread across the story's structure.`,
+          suggestedFix: `Spread at least one shift for this pair into each of the currently underrepresented thirds — even a minor shift (a cooler exchange, a quiet warming) in the dormant zones confirms that the relationship is still alive and evolving outside its dominant period. If the pair is compressed into the opening third, add a complication mid-story and a resolution or transformation in the final third; if it is compressed into the closing third, seed an earlier establishing shift and a mid-story complication that gives the late-story movement something to build on.`,
+        });
       }
     }
   }
