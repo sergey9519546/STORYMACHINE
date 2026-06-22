@@ -19851,6 +19851,94 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 569 — structurePass: turn aftermath clock void, turn curiosity decoupled, midpoint clock void', async () => {
+    const makeRec569 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const runST569 = async (records: any[]) => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      return structurePass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // TURN_AFTERMATH_CLOCK_VOID fire:
+    // n=10; turns at 1,3,5 (pos<8); clocks at 0,9 (≥2, outside aftermath windows {2,3},{4,5},{6,7}) → all void → fires
+    it('TURN_AFTERMATH_CLOCK_VOID fires when no dramatic turn is followed by a clock within 2 scenes', async () => {
+      const recs569a = Array.from({ length: 10 }, (_, i) =>
+        makeRec569(i, {
+          dramaticTurn: [1, 3, 5].includes(i) ? 'reversal' : 'nothing',
+          clockRaised: [0, 9].includes(i),
+        }),
+      );
+      const res = await runST569(recs569a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TURN_AFTERMATH_CLOCK_VOID'), 'TURN_AFTERMATH_CLOCK_VOID should fire');
+    });
+
+    // TURN_AFTERMATH_CLOCK_VOID no-fire:
+    // n=10; turns at 1,3,5; clock at 2 (aftermath of turn@1) and 9 → turn@1 followed by clock → no fire
+    it('TURN_AFTERMATH_CLOCK_VOID does not fire when a turn aftermath raises a clock', async () => {
+      const recs569an = Array.from({ length: 10 }, (_, i) =>
+        makeRec569(i, {
+          dramaticTurn: [1, 3, 5].includes(i) ? 'reversal' : 'nothing',
+          clockRaised: [2, 9].includes(i),
+        }),
+      );
+      const res = await runST569(recs569an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TURN_AFTERMATH_CLOCK_VOID'), 'TURN_AFTERMATH_CLOCK_VOID should not fire');
+    });
+
+    // TURN_CURIOSITY_DECOUPLED fire:
+    // n=8; turns at 1,3; curiosity at 5,6 — no turn scene carries curiosity → fires
+    it('TURN_CURIOSITY_DECOUPLED fires when turn scenes and curiosity scenes never overlap', async () => {
+      const recs569b = Array.from({ length: 8 }, (_, i) =>
+        makeRec569(i, {
+          dramaticTurn: [1, 3].includes(i) ? 'recognition' : 'nothing',
+          curiosityDelta: [5, 6].includes(i) ? 2 : 0,
+        }),
+      );
+      const res = await runST569(recs569b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TURN_CURIOSITY_DECOUPLED'), 'TURN_CURIOSITY_DECOUPLED should fire');
+    });
+
+    // TURN_CURIOSITY_DECOUPLED no-fire:
+    // n=8; turns at 1,3; curiosity at 3,6 — turn@3 also carries curiosity → overlap → no fire
+    it('TURN_CURIOSITY_DECOUPLED does not fire when a turn scene also raises curiosity', async () => {
+      const recs569bn = Array.from({ length: 8 }, (_, i) =>
+        makeRec569(i, {
+          dramaticTurn: [1, 3].includes(i) ? 'recognition' : 'nothing',
+          curiosityDelta: [3, 6].includes(i) ? 2 : 0,
+        }),
+      );
+      const res = await runST569(recs569bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TURN_CURIOSITY_DECOUPLED'), 'TURN_CURIOSITY_DECOUPLED should not fire');
+    });
+
+    // MIDPOINT_CLOCK_VOID fire:
+    // n=10; midpoint window = scenes 4,5; clocks at 0,9 (≥2, none in midpoint) → fires
+    it('MIDPOINT_CLOCK_VOID fires when the 40%-60% midpoint window has no clock while clocks exist elsewhere', async () => {
+      const recs569c = Array.from({ length: 10 }, (_, i) =>
+        makeRec569(i, { clockRaised: [0, 9].includes(i) }),
+      );
+      const res = await runST569(recs569c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'MIDPOINT_CLOCK_VOID'), 'MIDPOINT_CLOCK_VOID should fire');
+    });
+
+    // MIDPOINT_CLOCK_VOID no-fire:
+    // n=10; clock at 4 (inside the midpoint window 4-5) and 9 → midpoint has a clock → no fire
+    it('MIDPOINT_CLOCK_VOID does not fire when a clock is raised in the midpoint window', async () => {
+      const recs569cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec569(i, { clockRaised: [4, 9].includes(i) }),
+      );
+      const res = await runST569(recs569cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'MIDPOINT_CLOCK_VOID'), 'MIDPOINT_CLOCK_VOID should not fire');
+    });
+  });
+
   describe('Wave 555 — structurePass: clock suspense decoupled, revelation causeless, turn aftermath emotion void', async () => {
     const makeRec555 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

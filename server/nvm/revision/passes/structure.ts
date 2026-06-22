@@ -112,6 +112,19 @@
 // ≥2 qualifying turn scenes none followed by a suspense spike in next 2 scenes while ≥3 suspense
 // scenes exist; first aftermath check using the dramatic-turn trigger, distinct from REVELATION_
 // AFTERMATH_CLOCK_VOID [revelation trigger] and INCITING_AFTERMATH_STALL [inciting incident trigger]).
+// Wave 569 additions: turn aftermath clock void (sequence/aftermath × clock × dramatic-turn trigger
+// — ≥3 qualifying turn scenes none followed by a clock raise in next 2 scenes while ≥2 clock scenes
+// exist; pivots never tighten a deadline in their wake; the clock-channel sibling of TURN_AFTERMATH_
+// SUSPENSE/CURIOSITY/EMOTION_VOID, completing the turn-trigger aftermath family; distinct from
+// REVELATION_AFTERMATH_CLOCK_VOID [revelation trigger] and CLOCK_TURN_DECOUPLED [same-scene]), turn
+// curiosity decoupled (co-occurrence/decoupling × curiosity × dramatic-turn trigger — ≥2 turn scenes
+// and ≥2 curiosity scenes but zero overlap; pivots never open a question in the scene they turn; the
+// turn-trigger entry in the curiosity co-occurrence family alongside CLOCK_CURIOSITY_DECOUPLED and
+// REVELATION_CURIOSITY_DECOUPLED, distinct from TURN_AFTERMATH_CURIOSITY_VOID [aftermath, next 2
+// scenes] and TURN_EMOTION_DECOUPLED [emotion channel]), midpoint clock void (zone presence/absence ×
+// clock × midpoint 40%–60% — n≥10, ≥2 clock scenes globally, none in the center window; the structural
+// pivot carries no time pressure; the clock-channel sibling of MIDPOINT_SUSPENSE/CURIOSITY/DRAMATIC_
+// TURN_VOID, distinct from CLOCK_RAISED_LATE [first-occurrence] and CLOCK_PRESSURE_FINALE_ABSENT [finale]).
 // Wave 555 additions: clock suspense decoupled (co-occurrence/decoupling × clock × suspense
 // — ≥2 clock scenes and ≥2 suspense-positive scenes but zero overlap; urgency and tension
 // never coincide in the same scene; distinct from CLOCK_CURIOSITY_DECOUPLED which audits the
@@ -2955,6 +2968,120 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
             suggestedFix: `After at least one dramatic turn, introduce an emotionally charged scene within the following two beats — a scene where a character registers what the pivot means for them (grief at a loss of direction, relief at a new opportunity, fear at the new exposure). The emotional aftermath need not be large; even a brief non-neutral beat confirms that the turn changed what it felt like to be in the story, not just where the story was going.`,
           });
         }
+      }
+    }
+  }
+
+  // ── Wave 569: TURN_AFTERMATH_CLOCK_VOID, TURN_CURIOSITY_DECOUPLED, MIDPOINT_CLOCK_VOID ──
+
+  {
+    // TURN_AFTERMATH_CLOCK_VOID — sequence/aftermath × clock × dramatic-turn trigger.
+    // n≥8, ≥3 qualifying turn scenes (dramaticTurn≠'nothing', not in last 2 positions), ≥2
+    // clock-raised scenes globally. Every qualifying turn is followed by 2 scenes with no clock
+    // raised → fire. A dramatic pivot reorients the story; the scenes that follow are the natural
+    // place for a new deadline to crystallize — the reversal exposes a threat that is now
+    // time-bound, the recognition reveals the window to act is closing. When no turn is ever
+    // followed by a clock in its wake, pivots reroute the plot without translating into time
+    // pressure: the story changes direction but the urgency engine never engages with the change,
+    // so the reversal's stakes stay abstract rather than becoming a race against the clock.
+    // Distinct from: TURN_AFTERMATH_SUSPENSE_VOID (Wave 513: suspense channel), TURN_AFTERMATH_
+    // CURIOSITY_VOID (Wave 541: curiosity channel), TURN_AFTERMATH_EMOTION_VOID (Wave 555: emotion
+    // channel) — this adds the clock channel, completing the turn-trigger aftermath family. Distinct
+    // from REVELATION_AFTERMATH_CLOCK_VOID (Wave 499: revelation trigger vs. turn trigger here) and
+    // from CLOCK_TURN_DECOUPLED (Wave 513: co-occurrence — turn and clock in the SAME scene, not the
+    // 2 scenes after). First clock-channel aftermath check on the dramatic-turn trigger.
+    if (n >= 8) {
+      const qualTurns569a = (records as any[]).filter((r, pos) =>
+        (r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '' && pos < n - 2,
+      );
+      const clockScenes569a = (records as any[]).filter(r => r.clockRaised === true);
+      if (qualTurns569a.length >= 3 && clockScenes569a.length >= 2) {
+        const allTurnNoClockAftermath569a = qualTurns569a.every((r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos + off];
+            if (nxt && nxt.clockRaised === true) return false;
+          }
+          return true;
+        });
+        if (allTurnNoClockAftermath569a) {
+          issues.push({
+            location: `${qualTurns569a.length} turn scene(s) — no clock raised in any aftermath window`,
+            rule: 'TURN_AFTERMATH_CLOCK_VOID',
+            severity: 'minor',
+            description: `Every scene that pivots the story (${qualTurns569a.length} scene(s) with a dramatic turn) is followed by two scenes in which no clock is raised, despite ${clockScenes569a.length} clock-raising scenes existing elsewhere. A reversal or recognition is a natural trigger for new urgency: the pivot exposes a threat that is now time-bound, or reveals that the window to act has narrowed. When no turn is ever followed by a clock in its immediate wake, pivots reroute the plot without engaging the urgency engine — the story changes direction but the new direction carries no deadline, so the reversal's stakes remain abstract rather than becoming a race against time. The pivot and the clock operate in permanently separate stretches of the story.`,
+            suggestedFix: `After at least one dramatic turn, raise a clock within the following two scenes — let the pivot create the deadline. A reversal that exposes a ticking threat, a recognition that reveals time is shorter than believed, or a twist that starts a countdown all convert the structural turn into felt urgency. The most propulsive pivots don't just change where the story is going; they make getting there suddenly time-critical.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // TURN_CURIOSITY_DECOUPLED — co-occurrence/decoupling × curiosity × dramatic-turn trigger.
+    // n≥8, ≥2 dramatic-turn scenes, ≥2 curiosity-positive scenes (curiosityDelta>0). No turn scene
+    // also carries curiosityDelta>0 → fire. A dramatic turn should reframe what the audience does
+    // not yet know — a reversal that opens new questions, a recognition that reveals prior
+    // understanding was incomplete. The most generative pivots raise curiosity in the very scene
+    // they turn: the audience both registers the change of direction AND wonders where the new
+    // direction leads. When turns and curiosity spikes always occupy separate scenes, pivots deliver
+    // structural reorientation without epistemic opening — the story turns but the turn itself raises
+    // no new question, so the reversal feels like a closed event rather than a door into the unknown.
+    // Distinct from: TURN_AFTERMATH_CURIOSITY_VOID (Wave 541: aftermath mode — checks the 2 scenes
+    // AFTER a turn; this checks the turn scene ITSELF for same-scene co-occurrence), TURN_EMOTION_
+    // DECOUPLED (Wave 527: same co-occurrence mode but the emotion channel), CLOCK_CURIOSITY_
+    // DECOUPLED (Wave 499: clock trigger) and REVELATION_CURIOSITY_DECOUPLED (Wave 457: revelation
+    // trigger) — this adds the dramatic-turn trigger to the curiosity co-occurrence family.
+    if (n >= 8) {
+      const turnScenes569b = (records as any[]).filter(
+        r => (r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '',
+      );
+      const curiosityScenes569b = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0);
+      if (turnScenes569b.length >= 2 && curiosityScenes569b.length >= 2) {
+        const turnIdxSet569b = new Set(turnScenes569b.map(r => r.sceneIdx));
+        const anyOverlap569b = curiosityScenes569b.some(r => turnIdxSet569b.has(r.sceneIdx));
+        if (!anyOverlap569b) {
+          issues.push({
+            location: `${turnScenes569b.length} turn scene(s), ${curiosityScenes569b.length} curiosity scene(s) — no overlap`,
+            rule: 'TURN_CURIOSITY_DECOUPLED',
+            severity: 'minor',
+            description: `The story has ${turnScenes569b.length} scenes that pivot the narrative (dramatic turns) and ${curiosityScenes569b.length} scenes that raise curiosity (curiosityDelta>0), but no scene carries both simultaneously. A dramatic turn should reframe what the audience does not yet know — a reversal that opens new questions, a recognition that exposes incomplete understanding. The most generative pivots raise curiosity in the very scene they turn, so the audience registers the change of direction AND wonders where it leads. When turns and curiosity spikes always occupy separate scenes, pivots deliver structural reorientation without epistemic opening: the story turns, but the turn itself raises no new question, and the reversal reads as a closed event rather than a door into the unknown.`,
+            suggestedFix: `Let at least one dramatic turn also raise curiosity in the same scene — stage the pivot so it opens a question rather than merely closing one. A reversal that reveals a new mystery, a recognition that makes the audience re-examine what they thought they understood, or a twist that implies more is hidden all fuse the structural turn with epistemic pull. A pivot that turns the story and opens a question in the same beat is far more propulsive than one that only redirects.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // MIDPOINT_CLOCK_VOID — zone presence/absence × clock × midpoint zone (40%–60%).
+    // n≥10, ≥2 midpoint scenes, ≥2 clock-raised scenes globally, no clock raised within the
+    // 40%–60% center window → fire. The midpoint is the structural pivot where a strong story
+    // tightens its grip and accelerates the second half out of the turn; a deadline imposed at the
+    // midpoint is one of the most reliable engines for that acceleration. When the story raises
+    // clocks elsewhere but the exact center carries no time pressure, the structural pivot passes
+    // without urgency — the second half launches without the contracting window that would give the
+    // back half its drive. The urgency engine goes quiet precisely where the story most needs to
+    // re-energize.
+    // Distinct from: MIDPOINT_SUSPENSE_VOID (Wave 373: suspense channel — same 40%–60% zone, the
+    // clock channel here), MIDPOINT_CURIOSITY_VOID / MIDPOINT_DRAMATIC_TURN_VOID / MIDPOINT_
+    // EMOTIONAL_FLATLINE (same midpoint zone, different channels — this adds clock, completing the
+    // midpoint-channel set), CLOCK_RAISED_LATE (Wave: the FIRST clock arrives late — a single
+    // first-occurrence check, not a zone-absence audit), CLOCK_PRESSURE_FINALE_ABSENT (the finale
+    // zone, not the midpoint). First clock-channel zone-absence check on the midpoint in this pass.
+    if (n >= 10) {
+      const midStart569c = Math.floor(n * 0.4);
+      const midEnd569c = Math.floor(n * 0.6);
+      const midRecs569c = (records as any[]).slice(midStart569c, midEnd569c);
+      const clockScenes569c = (records as any[]).filter(r => r.clockRaised === true);
+      if (midRecs569c.length >= 2 && clockScenes569c.length >= 2 && !midRecs569c.some(r => r.clockRaised === true)) {
+        issues.push({
+          location: `Midpoint (Scenes ${midStart569c}–${midEnd569c - 1}) — clock void`,
+          rule: 'MIDPOINT_CLOCK_VOID',
+          severity: 'minor',
+          description: `The midpoint zone (Scenes ${midStart569c}–${midEnd569c - 1}) contains no scene that raises a clock, even though the story raises deadlines in ${clockScenes569c.length} scenes elsewhere. The midpoint is the structural pivot where a strong story tightens its grip and accelerates the second half out of the turn, and a deadline imposed at the center is one of the most reliable engines for that acceleration. When the exact middle carries no time pressure while clocks fire elsewhere, the pivot passes without urgency — the back half launches without a contracting window to drive it, and the urgency engine goes quiet precisely where the story most needs to re-energize. The audience reaches the center with no felt sense that time is now working against the protagonist.`,
+          suggestedFix: `Raise a clock at the midpoint: let the pivot that reframes the story also impose a deadline — a countdown that starts at the center, a window that begins to close as the second half opens, a threat that now carries a timer. The middle of the story is one of the most powerful places to introduce time pressure, because it gives the back half a concrete reason to accelerate rather than merely continue.`,
+        });
       }
     }
   }
