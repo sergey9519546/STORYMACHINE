@@ -142,6 +142,20 @@
 // has ≥1; wonder ignites only late, never sustaining early investment; the back-half distribution
 // complement of ARC_SUSPENSE_FRONT_LOADED, distinct from ARC_CURIOSITY_DROUGHT_RUN which is run-
 // based and from CURIOSITY_FRONT_LOADED in causality.ts which is the opposite direction).
+// Wave 547 additions: suspense opening zone absent (zone presence/absence × suspenseDelta ×
+// opening third — n≥9, ≥3 suspense-positive scenes globally, none in opening structural third;
+// protagonist enters the story without any felt tension; the suspense-channel sibling of ARC_
+// CLOCK_OPENING_ZONE_ABSENT; distinct from ARC_SUSPENSE_FRONT_LOADED [>70% IN first half, fires
+// when suspense IS there concentrated] and ARC_FIRST_HALF_EMOTIONALLY_FLAT [entire first half
+// neutral, emotion not suspense]), negative relational aftermath void (sequence/aftermath ×
+// negative emotion → relational aftermath — n≥8, ≥2 qualifying negative-emotion scenes
+// [pos<n-2], ≥2 relShift scenes globally, no negative scene followed by a relShift in next 2
+// scenes; protagonist's defeats never move bonds; distinct from ARC_POSITIVE_RELATIONAL_AFTERMATH_
+// VOID [positive trigger] and ARC_REVELATION_RELATIONAL_AFTERMATH_VOID [revelation trigger]),
+// payoff front-loaded (distribution/timing × payoff × first-half concentration — n≥8, ≥4 payoff
+// scenes, >70% in first half while back half has ≥1; resolutions burst before pressure peaks;
+// the front-half distribution complement of PAYOFF_BACK_LOADED in causality.ts; distinct from
+// ARC_PAYOFF_DROUGHT_RUN [run-based] and ARC_RELATIONAL_FRONT_LOADED [different channel]).
 // Wave 519 additions: curiosity drought run (run-based × curiosityDelta × absence — n≥10,
 // ≥3 curiosity-positive scenes, longest run with curiosityDelta ≤ 0 ≥ 6; the wonder engine
 // stalls for an extended stretch; first run-based check on the curiosity channel, distinct from
@@ -2746,6 +2760,134 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
           description: `${Math.round(backRatio533c * 100)}% of the script's curiosity-generating moments (${backCount533c} of ${curScenes533c.length}) fall in the second half, leaving the first half with only ${frontCount533c}. The wonder engine starts cold: the audience spends the setup with minimal intrigue and only receives the questions that make a story compelling in the back half. Curiosity needs to be seeded early — the questions that the first half poses are what make the second half's answers feel earned and satisfying. When wondering only arrives late, the audience has no established stakes of "what happens next" to carry them through the opening act.`,
           suggestedFix: `Redistribute curiosity-generating moments into the first half of the story: plant a mystery, introduce a character whose motives are unclear, or open a question whose stakes become clear only later. The first half should establish questions that the second half answers — curiosity concentrated entirely in the back half means the story has made its audience wait for the experience that justifies their investment.`,
         });
+      }
+    }
+  }
+
+  // ── Wave 547: ARC_SUSPENSE_OPENING_ZONE_ABSENT, ARC_NEGATIVE_RELATIONAL_AFTERMATH_VOID,
+  //              ARC_PAYOFF_FRONT_LOADED ──────────────────────────────────────────────────────────
+
+  // ARC_SUSPENSE_OPENING_ZONE_ABSENT (zone presence/absence × suspenseDelta × opening third,
+  // n≥9, ≥3 suspense-positive scenes globally, none in the opening structural third [pos < n/3]):
+  // The protagonist enters the story without any felt tension in the setup zone — the first
+  // structural third is entirely suspense-free while the rest of the story escalates. The
+  // opening third's job is to anchor the audience to the stakes that the protagonist faces:
+  // a setup that carries no raised tension tells the audience that what they are watching is
+  // consequence-free during the period when their first impressions of the dramatic world are
+  // forming. When suspense is entirely absent from the opening zone, the setup registers as
+  // inert observation before tension eventually kicks in elsewhere. Zone presence/absence mode
+  // × suspenseDelta × opening zone. Distinct from ARC_CLOCK_OPENING_ZONE_ABSENT (Wave 519:
+  // clock-channel sibling — clockRaised in opening third; this audits suspenseDelta instead),
+  // ARC_SUSPENSE_FRONT_LOADED (Wave 519: distribution/timing — >70% of suspense in first half;
+  // fires when suspense IS concentrated there, the opposite structural problem), ARC_FIRST_HALF_
+  // EMOTIONALLY_FLAT (Wave 312: entire first half emotionally neutral — emotion not suspense).
+  {
+    const n547a = records.length;
+    if (n547a >= 9) {
+      const third547a = Math.floor(n547a / 3);
+      const suspScenes547a = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 0);
+      if (suspScenes547a.length >= 3) {
+        const openingSuspCount547a = (records as any[]).filter(
+          (r, i) => i < third547a && (r.suspenseDelta ?? 0) > 0,
+        ).length;
+        if (openingSuspCount547a === 0) {
+          issues.push({
+            location: `Opening third (scenes 0–${third547a - 1}) — no suspense-positive scene`,
+            rule: 'ARC_SUSPENSE_OPENING_ZONE_ABSENT',
+            severity: 'minor',
+            description: `The opening structural third of the story (scenes 0–${third547a - 1}) contains no scene with a positive suspenseDelta — the setup zone is entirely tension-free — while ${suspScenes547a.length} suspense-positive scenes exist in the remaining two-thirds. The opening third is when the audience forms their first understanding of the stakes: what the protagonist has to lose, what danger the world contains, what makes the situation feel pressing. When the setup zone carries no raised tension, the audience enters the story without the felt pressure that would give the protagonist's choices dramatic weight. Tension that only begins after the opening third asks the audience to invest in events before they have been given any reason to care what happens.`,
+            suggestedFix: `Place at least one suspense-positive scene in the opening third (scenes 0–${third547a - 1}): a moment where the stakes are made tangible through rising tension — a threat introduced, a deadline implied, a danger made real. The opening zone doesn't need the story's maximum tension, but it needs enough to tell the audience that what they are watching has consequences: that the protagonist's world is one where things can go wrong, and are beginning to.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ARC_NEGATIVE_RELATIONAL_AFTERMATH_VOID (sequence/aftermath × negative emotion → relational
+  // aftermath, n≥8, ≥2 qualifying negative-emotion scenes [pos < n-2], ≥2 relationship-shift
+  // scenes globally, none of the qualifying negative scenes is followed by a relationship shift
+  // within 2 scenes): The protagonist's defeats never move bonds — every moment of negative
+  // emotional charge passes without any relational consequence in the immediate aftermath. When
+  // a character suffers, the people around them should respond: a relationship fractures, a bond
+  // is tested, an alliance shifts, or an attachment deepens. When the protagonist's negative
+  // experiences never trigger relational movement in the following scenes, loss and failure operate
+  // as purely individual experiences disconnected from the interpersonal world. Sequence/aftermath
+  // mode × negative-emotion trigger × relational aftermath. Distinct from ARC_POSITIVE_RELATIONAL_
+  // AFTERMATH_VOID (Wave 477: positive trigger — the protagonist's joys never move bonds; this
+  // audits the negative trigger, the opposite emotional polarity), ARC_REVELATION_RELATIONAL_
+  // AFTERMATH_VOID (Wave 463: revelation trigger — different trigger, not emotional charge),
+  // ARC_TURN_EMOTIONAL_AFTERMATH_VOID (Wave 449: dramatic-turn trigger → emotional aftermath —
+  // different trigger and aftermath channel), ARC_RELATIONAL_SHIFT_EMOTION_FLAT (Wave 365:
+  // co-occurrence × relational scene's own emotion — different mode and direction).
+  {
+    const n547b = records.length;
+    if (n547b >= 8) {
+      const relShiftScenes547b = (records as any[]).filter(
+        r => ((r.relationshipShifts ?? []) as any[]).length > 0,
+      );
+      const qualNegScenes547b = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) => r.emotionalShift === 'negative' && pos < n547b - 2);
+      if (relShiftScenes547b.length >= 2 && qualNegScenes547b.length >= 2) {
+        const anyNegFollowedByRel547b = qualNegScenes547b.some(({ pos }) => {
+          const next1 = (records as any[])[pos + 1];
+          const next2 = (records as any[])[pos + 2];
+          return (
+            (next1 && ((next1.relationshipShifts ?? []) as any[]).length > 0) ||
+            (next2 && ((next2.relationshipShifts ?? []) as any[]).length > 0)
+          );
+        });
+        if (!anyNegFollowedByRel547b) {
+          issues.push({
+            location: `${qualNegScenes547b.length} negative-emotion scene(s) — none followed by a relationship shift within 2 scenes`,
+            rule: 'ARC_NEGATIVE_RELATIONAL_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `None of the story's ${qualNegScenes547b.length} negative-emotion scenes is followed by a relationship shift within the next two scenes, even though ${relShiftScenes547b.length} bond movements exist elsewhere. When the protagonist suffers — when something goes wrong, a failure lands, or a loss hits — the people around them should respond: a bond fractures under the pressure, an ally moves closer in support, an antagonist seizes the advantage. When the protagonist's defeats never trigger relational movement in the following beats, emotional losses operate as purely individual experiences disconnected from the interpersonal world. The story's adversity and its relational arc run as separate systems: the protagonist fails alone, and their bonds move independently, in scenes unconnected to the moments of defeat.`,
+            suggestedFix: `After at least one negative-emotion scene, let the next one or two scenes carry a relationship shift — a bond that responds to the protagonist's setback. The relational consequence need not be dramatic: an ally who pulls back, a rival who presses forward, or a relationship whose dynamic shifts because of what just happened all connect the emotional world of defeat to the interpersonal world of consequences. The most resonant arcs show defeat not as a solitary experience but as something that reverberates through the protagonist's relationships.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ARC_PAYOFF_FRONT_LOADED (distribution/timing × payoff × first-half concentration, n≥8,
+  // ≥4 payoff scenes, >70% in the first half while the back half has ≥1): More than 70% of
+  // the story's thread resolutions occur in the first half — narrative promises are fulfilled
+  // before the pressure of the second half has peaked, leaving the climax and resolution with
+  // diminished payoff architecture. Payoffs are structurally most powerful when they coincide
+  // with or follow the story's maximum pressure: a narrative promise kept at a moment of high
+  // stakes carries both the satisfaction of completion and the urgency of the dramatic context.
+  // When payoffs front-load, the first half delivers most of the thread resolutions while the
+  // escalation, climax, and resolution proceed without the structural satisfaction of kept
+  // promises. Distribution/timing mode × payoff channel × first-half concentration. Distinct
+  // from PAYOFF_BACK_LOADED in causality.ts (Wave 268: fires when all callbacks are in the
+  // second half — the opposite concentration; this fires when the first half dominates),
+  // ARC_PAYOFF_DROUGHT_RUN (Wave 505: run-based — longest consecutive non-payoff stretch ≥6;
+  // different mode), ARC_PAYOFF_AFTERMATH_EMOTIONAL_VOID (Wave 491: aftermath mode, not timing),
+  // ARC_EMOTIONAL_FRONT_LOADED and ARC_RELATIONAL_FRONT_LOADED (same temporal pattern on
+  // different channels).
+  {
+    const n547c = records.length;
+    if (n547c >= 8) {
+      const half547c = Math.floor(n547c / 2);
+      const payoffScenes547c = (records as any[]).filter(
+        r => ((r.payoffSetupIds ?? []) as any[]).length > 0,
+      );
+      if (payoffScenes547c.length >= 4) {
+        const frontCount547c = (records as any[]).slice(0, half547c).filter(
+          r => ((r.payoffSetupIds ?? []) as any[]).length > 0,
+        ).length;
+        const backCount547c = payoffScenes547c.length - frontCount547c;
+        const frontRatio547c = frontCount547c / payoffScenes547c.length;
+        if (frontRatio547c > 0.70 && backCount547c >= 1) {
+          issues.push({
+            location: `payoff distribution: ${frontCount547c} front-half / ${backCount547c} back-half`,
+            rule: 'ARC_PAYOFF_FRONT_LOADED',
+            severity: 'minor',
+            description: `${Math.round(frontRatio547c * 100)}% of the story's thread resolutions (${frontCount547c} of ${payoffScenes547c.length} payoff scenes) occur in the first half, with only ${backCount547c} in the second half. Most narrative promises are fulfilled before the story reaches its maximum pressure — payoffs arrive during the setup and initial complication rather than at the moments of escalation, climax, and resolution where their completion would carry the most weight. A payoff kept under high stakes is structurally more satisfying than the same payoff kept before the story has built the pressure that makes the kept promise feel urgent. When payoffs front-load, the back half must sustain the audience without the structural satisfaction of completed promises, and the climax resolves without the accumulated payoff architecture that would give it maximum weight.`,
+            suggestedFix: `Redistribute at least ${Math.ceil(frontCount547c * 0.3)} of the first-half payoffs into the second half — hold some narrative promises longer and complete them as the story escalates toward its climax. The most structurally powerful payoff arrives at or near the climax: the promise kept under maximum pressure, the narrative setup that pays off when the protagonist most needs it or when its completion changes what the audience understands about the resolution. Hold back some payoffs and let the back half carry more of the thread completions.`,
+          });
+        }
       }
     }
   }

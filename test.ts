@@ -28148,6 +28148,93 @@ I always listen.
     });
   });
 
+  describe('Wave 547 — characterArcPass: suspense opening zone absent, negative relational aftermath void, payoff front-loaded', async () => {
+    const makeRec547 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const runARC547 = async (records: any[]) => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // ARC_SUSPENSE_OPENING_ZONE_ABSENT fire:
+    // n=9; third=3; suspense at i=4,6,8 (all≥3); opening third 0-2 has none → fires
+    it('ARC_SUSPENSE_OPENING_ZONE_ABSENT fires when opening structural third has no suspense-positive scenes', async () => {
+      const recs547a = Array.from({ length: 9 }, (_, i) =>
+        makeRec547(i, { suspenseDelta: [4, 6, 8].includes(i) ? 1 : 0 }),
+      );
+      const res = await runARC547(recs547a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_SUSPENSE_OPENING_ZONE_ABSENT'), 'ARC_SUSPENSE_OPENING_ZONE_ABSENT should fire');
+    });
+
+    // ARC_SUSPENSE_OPENING_ZONE_ABSENT no-fire:
+    // suspense at i=1,4,6 — i=1 is in opening third (1<3) → not empty → no fire
+    it('ARC_SUSPENSE_OPENING_ZONE_ABSENT does not fire when the opening third has at least one suspense-positive scene', async () => {
+      const recs547anr = Array.from({ length: 9 }, (_, i) =>
+        makeRec547(i, { suspenseDelta: [1, 4, 6].includes(i) ? 1 : 0 }),
+      );
+      const res = await runARC547(recs547anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_SUSPENSE_OPENING_ZONE_ABSENT'), 'ARC_SUSPENSE_OPENING_ZONE_ABSENT should not fire');
+    });
+
+    // ARC_NEGATIVE_RELATIONAL_AFTERMATH_VOID fire:
+    // n=10; negative scenes at i=2,5 (pos<8); relShifts at i=0,9 (not within 2 of neg scenes)
+    // qualNeg=[{pos:2},{pos:5}]≥2; relShiftScenes≥2; neither neg scene followed by relShift in 2 → fires
+    it('ARC_NEGATIVE_RELATIONAL_AFTERMATH_VOID fires when no negative-emotion scene is followed by a relationship shift', async () => {
+      const recs547b = Array.from({ length: 10 }, (_, i) =>
+        makeRec547(i, {
+          emotionalShift: [2, 5].includes(i) ? 'negative' : 'neutral',
+          relationshipShifts: [0, 9].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.3 }] : [],
+        }),
+      );
+      const res = await runARC547(recs547b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_NEGATIVE_RELATIONAL_AFTERMATH_VOID'), 'ARC_NEGATIVE_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    // ARC_NEGATIVE_RELATIONAL_AFTERMATH_VOID no-fire:
+    // relShift at i=4 (within 2 of neg scene at i=2? pos=2, next2=records[4] → yes) → anyFollowed=true → no fire
+    it('ARC_NEGATIVE_RELATIONAL_AFTERMATH_VOID does not fire when a negative scene is followed by a relationship shift', async () => {
+      const recs547bnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec547(i, {
+          emotionalShift: [2, 5].includes(i) ? 'negative' : 'neutral',
+          relationshipShifts: [0, 4].includes(i) ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.3 }] : [],
+        }),
+      );
+      const res = await runARC547(recs547bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_NEGATIVE_RELATIONAL_AFTERMATH_VOID'), 'ARC_NEGATIVE_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    // ARC_PAYOFF_FRONT_LOADED fire:
+    // n=10; half=5; payoffs at i=0,1,2,3,8 (5 total); front(0-4)=4, back=1; 4/5=80%>70% → fires
+    it('ARC_PAYOFF_FRONT_LOADED fires when more than 70% of payoff scenes fall in the first half', async () => {
+      const recs547c = Array.from({ length: 10 }, (_, i) =>
+        makeRec547(i, {
+          payoffSetupIds: [0, 1, 2, 3, 8].includes(i) ? ['setup-x'] : [],
+        }),
+      );
+      const res = await runARC547(recs547c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_PAYOFF_FRONT_LOADED'), 'ARC_PAYOFF_FRONT_LOADED should fire');
+    });
+
+    // ARC_PAYOFF_FRONT_LOADED no-fire:
+    // payoffs at i=1,2,5,7 (4 total); front(0-4)=2, back=2; 2/4=50%≤70% → no fire
+    it('ARC_PAYOFF_FRONT_LOADED does not fire when payoff scenes are not concentrated in the first half', async () => {
+      const recs547cnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec547(i, {
+          payoffSetupIds: [1, 2, 5, 7].includes(i) ? ['setup-x'] : [],
+        }),
+      );
+      const res = await runARC547(recs547cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_PAYOFF_FRONT_LOADED'), 'ARC_PAYOFF_FRONT_LOADED should not fire');
+    });
+  });
+
   describe('Wave 533 — characterArcPass: curiosity peak relational void, dramatic-turn emotional aftermath void, curiosity back-loaded', async () => {
     const makeRec533 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
