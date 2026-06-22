@@ -34909,6 +34909,94 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 544 — beliefPass: revelation closing quarter absent, assertion drought, turn revelation aftermath void', async () => {
+    const makeRec544 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const runB544 = async (records: any[]) => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // REVELATION_CLOSING_QUARTER_ABSENT fire:
+    // n=10; closingStart=7; revelations at i=1,3,5 (all<7); closing quarter i=7,8,9 has none → fires
+    it('REVELATION_CLOSING_QUARTER_ABSENT fires when all revelations occur before the closing quarter', async () => {
+      const recs544a = Array.from({ length: 10 }, (_, i) =>
+        makeRec544(i, { revelation: [1, 3, 5].includes(i) ? 'a truth is exposed here' : null }),
+      );
+      const res = await runB544(recs544a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_CLOSING_QUARTER_ABSENT'), 'REVELATION_CLOSING_QUARTER_ABSENT should fire');
+    });
+
+    // REVELATION_CLOSING_QUARTER_ABSENT no-fire:
+    // n=10; revelations at i=1,3,7 — one in closing quarter (i=7≥7) → no fire
+    it('REVELATION_CLOSING_QUARTER_ABSENT does not fire when a revelation exists in the closing quarter', async () => {
+      const recs544anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec544(i, { revelation: [1, 3, 7].includes(i) ? 'a truth is exposed here' : null }),
+      );
+      const res = await runB544(recs544anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_CLOSING_QUARTER_ABSENT'), 'REVELATION_CLOSING_QUARTER_ABSENT should not fire');
+    });
+
+    // ASSERTION_DROUGHT fire:
+    // n=10; assertions (dialogueHighlights with colon) at i=0,1,9; gap between 1 and 9 = 7 scenes (2-8)
+    // assertionSceneIdxSet={0,1,9} size=3≥3; maxGap=7≥7 → fires
+    it('ASSERTION_DROUGHT fires when 7+ consecutive scenes contain no character assertion', async () => {
+      const recs544b = Array.from({ length: 10 }, (_, i) =>
+        makeRec544(i, {
+          dialogueHighlights: [0, 1, 9].includes(i) ? ['ALICE: this is what I believe to be true'] : [],
+        }),
+      );
+      const res = await runB544(recs544b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ASSERTION_DROUGHT'), 'ASSERTION_DROUGHT should fire');
+    });
+
+    // ASSERTION_DROUGHT no-fire:
+    // n=10; assertions at i=0,4,9; gaps = 3 (1-3) and 4 (5-8) → maxGap=4 < 7 → no fire
+    it('ASSERTION_DROUGHT does not fire when no assertion gap reaches 7 consecutive scenes', async () => {
+      const recs544bnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec544(i, {
+          dialogueHighlights: [0, 4, 9].includes(i) ? ['ALICE: this is what I believe to be true'] : [],
+        }),
+      );
+      const res = await runB544(recs544bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ASSERTION_DROUGHT'), 'ASSERTION_DROUGHT should not fire');
+    });
+
+    // TURN_REVELATION_AFTERMATH_VOID fire:
+    // n=10; turns at i=2,5 (both pos<8); revelations at i=0,9;
+    // turn 2→next 3,4 no rev; turn 5→next 6,7 no rev → anyFollowed=false → fires
+    it('TURN_REVELATION_AFTERMATH_VOID fires when no dramatic turn is followed by a revelation within 2 scenes', async () => {
+      const recs544c = Array.from({ length: 10 }, (_, i) =>
+        makeRec544(i, {
+          dramaticTurn: [2, 5].includes(i) ? 'reversal' : 'nothing',
+          revelation: [0, 9].includes(i) ? 'something disclosed' : null,
+        }),
+      );
+      const res = await runB544(recs544c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TURN_REVELATION_AFTERMATH_VOID'), 'TURN_REVELATION_AFTERMATH_VOID should fire');
+    });
+
+    // TURN_REVELATION_AFTERMATH_VOID no-fire:
+    // turns at i=2,5; revelations at i=0,4; turn at 2 → next2=records[4] has revelation → has aftermath → no fire
+    it('TURN_REVELATION_AFTERMATH_VOID does not fire when a turn is followed by a revelation within 2 scenes', async () => {
+      const recs544cnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec544(i, {
+          dramaticTurn: [2, 5].includes(i) ? 'reversal' : 'nothing',
+          revelation: [0, 4].includes(i) ? 'something disclosed' : null,
+        }),
+      );
+      const res = await runB544(recs544cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TURN_REVELATION_AFTERMATH_VOID'), 'TURN_REVELATION_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 530 — beliefPass: assertion positive decoupled, positive scene revelation void, assertion turn aftermath void', async () => {
     const makeRec530 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

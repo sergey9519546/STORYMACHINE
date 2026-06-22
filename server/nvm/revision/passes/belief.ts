@@ -123,6 +123,18 @@
 // n≥8, ≥4 assertion scenes, longest consecutive run ≥ 3; claims pile up without processing
 // room, the run-based complement of ASSERTION_SINGLETON_RUN and the assertion-channel mirror
 // of REVELATION_CONSECUTIVE_FLOOD).
+// Wave 544 additions: revelation closing quarter absent (zone presence/absence × revelation ×
+// closing 25% — n≥8, ≥3 revelations globally, 0 in the final 25% while ≥2 in the first 75%;
+// the story stops disclosing before its climax; distinct from TOLD_BELIEF_ACT_3_ABSENT [assertion
+// channel] and REVELATION_FINAL_ACT_ONLY [opposite: all revelations IN final quarter]), assertion
+// drought (run-based × assertion-absence × assertion-specific channel — n≥8, ≥3 assertion scenes,
+// max consecutive gap ≥7; fires on the assertion channel alone, so revelation presence can mask
+// the drought from TOLD_BELIEF_DROUGHT; distinct from ASSERTION_SINGLETON_RUN [no two consecutive
+// assertions — over-dispersion, not sustained silence]), turn revelation aftermath void (sequence/
+// aftermath × dramatic turn → revelation aftermath — n≥8, ≥2 qualifying turn scenes [pos<n-2],
+// ≥2 revelation scenes globally, no turn followed by revelation in next 2 scenes; distinct from
+// ASSERTION_TURN_AFTERMATH_VOID [assertion as trigger], REVELATION_DRAMATIC_TURN_DECOUPLED [same-
+// scene co-occurrence], REVELATION_ASSERTION_DISCONNECT [assertion → revelation, not turn → revelation]).
 // Wave 530 additions: assertion positive decoupled (co-occurrence × positive emotion × assertion —
 // n≥8, ≥2 assertion scenes, ≥2 positive-emotion scenes, no assertion scene has emotionalShift=
 // 'positive'; the positive-valence complement of ASSERTION_NEGATIVE_DECOUPLED, completing the
@@ -2728,6 +2740,131 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `None of the story's ${qualAssertionPositions530c.length} assertion scenes is followed by a dramatic turn (reversal or pivot) within the next two scenes, even though ${turnScenes530c.length} turns exist elsewhere. An assertion at its most powerful is a provocation: a character stakes a position, and the narrative responds by immediately reversing circumstances, forcing the declared belief to be confronted. When no assertion triggers a turn in its wake, the belief layer and the story's reversal engine operate in permanent structural isolation — characters declare positions that the plot ignores rather than answers, and turns arrive without a character's stated belief to challenge.`,
           suggestedFix: `After at least one assertion, place a dramatic turn within two scenes — a reversal that either validates or challenges the declared belief. The most powerful structure is: character asserts ("this will work"), then the story pivots ("or does it?"), forcing the character to either maintain or abandon their position in light of what just changed. This turn-as-response makes the assertion a dramatic stake rather than an exposition delivery.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 544: REVELATION_CLOSING_QUARTER_ABSENT, ASSERTION_DROUGHT,
+  //              TURN_REVELATION_AFTERMATH_VOID ──────────────────────────────────────────────────
+
+  // REVELATION_CLOSING_QUARTER_ABSENT (zone presence/absence × revelation × closing 25%, n≥8,
+  // ≥3 revelations globally, 0 in the final 25% while ≥2 exist in the first 75%): The story's
+  // resolution zone is completely revelation-free — every disclosure occurs before the 75% mark
+  // and the climax/denouement delivers nothing new. A story that stops disclosing before its
+  // resolution means the audience enters the finale already knowing everything the script intends
+  // them to know: the climax is purely behavioral, the denouement has no fresh truth to settle,
+  // and the closing quarter produces no epistemic surprise. The most powerful revelation placement
+  // is often in the closing quarter — the final disclosure recontextualizes what came before,
+  // gives the resolution its epistemic weight, or delivers the surprise that makes the whole
+  // preceding narrative retrospectively more meaningful. Zone presence/absence mode × revelation
+  // channel × closing zone. Distinct from TOLD_BELIEF_ACT_3_ABSENT (Wave 362: assertion channel
+  // in Act 3 — this checks revelation, not assertion), REVELATION_FINAL_ACT_ONLY (Wave 267: fires
+  // when ALL revelations are confined to the final quarter — the opposite problem: this fires when
+  // the final quarter is completely revelation-free), REVELATION_TEMPORAL_CLUSTER (Wave 488:
+  // distribution/timing × thirds — fires when >75% concentrate in one third, not when a specific
+  // zone is completely empty of revelations).
+  if (records.length >= 8) {
+    const closingStart544a = Math.floor(records.length * 0.75);
+    const allRevIdxs544a = (records as any[])
+      .map((r, i) => ({ r, i }))
+      .filter(({ r }) => r.revelation !== null && r.revelation !== '' && r.revelation !== undefined);
+    const closingRevs544a = allRevIdxs544a.filter(({ i }) => i >= closingStart544a);
+    const earlyRevs544a = allRevIdxs544a.filter(({ i }) => i < closingStart544a);
+    if (allRevIdxs544a.length >= 3 && closingRevs544a.length === 0 && earlyRevs544a.length >= 2) {
+      issues.push({
+        location: `${allRevIdxs544a.length} revelation(s) in first 75%, 0 in closing 25% (scenes ${closingStart544a}–${records.length - 1})`,
+        rule: 'REVELATION_CLOSING_QUARTER_ABSENT',
+        severity: 'minor',
+        description: `The script has ${allRevIdxs544a.length} revelation scenes, all occurring before the 75% mark — the closing quarter (scenes ${closingStart544a}–${records.length - 1}) contains no disclosure. The audience enters the finale already knowing everything the script has decided to share: the climax is purely behavioral (characters act on prior knowledge), and the denouement has no fresh truth to settle. A revelation in the closing quarter is among the most structurally powerful placements: the final disclosure recontextualizes what came before, delivers the surprise that makes all preceding scenes retrospectively more meaningful, or gives the resolution its epistemic anchor. Without it, the closing quarter can only work with what the audience already knows — a structural limitation that removes an entire register of dramatic effect from the finale.`,
+        suggestedFix: `Move or add a revelation into the closing quarter (scenes ${closingStart544a}–${records.length - 1}): a disclosure that recontextualizes the climax, a final truth that answers the central question, or a late revelation that gives the resolution its emotional core. The most effective closing-quarter revelation is one the audience feels they should have anticipated but didn't — one that retrospectively illuminates all preceding scenes and makes the ending feel both surprising and inevitable.`,
+      });
+    }
+  }
+
+  // ASSERTION_DROUGHT (run-based × assertion-absence × assertion-specific channel, n≥8,
+  // ≥3 assertion scenes, max consecutive non-assertion gap ≥7): An unbroken run of ≥7 scenes
+  // passes without any character asserting a belief, claim, or position — the story's belief-
+  // battle layer goes completely silent for a sustained stretch while assertions exist elsewhere.
+  // The belief layer's function is to register each character's current model of the world:
+  // a drought of 7+ scenes means the audience passes an extended sequence without any update
+  // to the story's propositional map. Events occur but no character frames them within their
+  // worldview — the epistemic texture goes dark for the longest stretch of the story. Run-based
+  // × assertion-absence. Distinct from TOLD_BELIEF_DROUGHT (Wave 309: ≥5 consecutive scenes
+  // with NO assertion OR revelation combined — a single revelation satisfies that check while
+  // the assertion drought continues; this fires on the assertion channel alone), REVELATION_DROUGHT
+  // (Wave 446: ≥6 consecutive with no revelation — different channel), ASSERTION_SINGLETON_RUN
+  // (Wave 432: no two consecutive assertion scenes ever appear — the over-dispersion check that
+  // fires when the gaps exist without requiring a specific minimum length).
+  if (records.length >= 8) {
+    const assertionSceneIdxSet544b = new Set(toldBeliefs.map(t => t.sceneIdx));
+    if (assertionSceneIdxSet544b.size >= 3) {
+      let maxGap544b = 0, curGap544b = 0;
+      for (const r of records as any[]) {
+        if (assertionSceneIdxSet544b.has(r.sceneIdx)) {
+          if (curGap544b > maxGap544b) maxGap544b = curGap544b;
+          curGap544b = 0;
+        } else {
+          curGap544b++;
+        }
+      }
+      if (curGap544b > maxGap544b) maxGap544b = curGap544b;
+      if (maxGap544b >= 7) {
+        issues.push({
+          location: `Assertion drought — ${maxGap544b} consecutive scenes carry no character assertion`,
+          rule: 'ASSERTION_DROUGHT',
+          severity: 'minor',
+          description: `An unbroken run of ${maxGap544b} consecutive scenes passes without any character asserting a belief, claim, or position — the story's epistemic layer goes dark for its longest stretch while ${assertionSceneIdxSet544b.size} assertion scenes exist elsewhere. Character assertions are the mechanism by which the audience tracks each character's current model of the world: claims staked that the story will test, contradict, or confirm. A ${maxGap544b}-scene drought means the audience passes an extended sequence without any propositional update. Events occur but no character states what those events mean within their worldview — the belief-battle layer is absent from the story's longest uninterrupted run. The audience may follow what is happening while losing track of what anyone believes about what is happening.`,
+          suggestedFix: `Introduce at least one assertion within the ${maxGap544b}-scene drought — a character stating a belief about what is happening, why it is happening, or what will happen next. The assertion doesn't need to be a major declaration: a small claim about intention, a position taken in response to an event, or a character stating what they believe about another character all restore the belief-layer's presence. Breaking the drought with a claim that will later be tested or proven wrong adds the most structural value.`,
+        });
+      }
+    }
+  }
+
+  // TURN_REVELATION_AFTERMATH_VOID (sequence/aftermath × dramatic turn → revelation aftermath,
+  // n≥8, ≥2 qualifying turn scenes [pos < n-2], ≥2 revelation scenes globally, no qualifying
+  // turn followed by a revelation in the next 2 scenes): Every story pivot passes without
+  // triggering a disclosure in the immediate aftermath — reversals and revelations operate in
+  // structural isolation. A dramatic turn at its most productive is also an epistemic event:
+  // the reversal exposes what the pre-turn state was concealing, the changed circumstances reveal
+  // a truth that was previously unavailable, or the pivot creates the conditions under which a
+  // secret can finally be disclosed. When no turn is followed by a revelation within two scenes,
+  // every reversal plays out without epistemic consequence — plot changes without learning. Turns
+  // and revelations become two separate mechanical systems rather than the interlocked engine of
+  // a story that discovers what it means through what it does. Sequence/aftermath mode × dramatic-
+  // turn trigger → revelation aftermath. Distinct from ASSERTION_TURN_AFTERMATH_VOID (Wave 530:
+  // assertion as trigger → turn as aftermath — different direction and trigger), REVELATION_
+  // DRAMATIC_TURN_DECOUPLED (Wave 390: co-occurrence × same scene — turn and revelation never
+  // coincide; this checks whether revelation follows within 2 scenes, a different window and
+  // direction), REVELATION_ASSERTION_DISCONNECT (Wave 348: assertion → revelation aftermath —
+  // assertion as trigger, not turn).
+  if (records.length >= 8) {
+    const revScenes544c = (records as any[]).filter(r =>
+      r.revelation !== null && r.revelation !== '' && r.revelation !== undefined,
+    );
+    const qualTurnPositions544c = (records as any[])
+      .map((r, i) => ({ r, i }))
+      .filter(({ r, i }) =>
+        (r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '' &&
+        i < records.length - 2,
+      )
+      .map(({ i }) => i);
+    if (qualTurnPositions544c.length >= 2 && revScenes544c.length >= 2) {
+      const anyTurnFollowedByRev544c = qualTurnPositions544c.some(pos => {
+        const next1 = (records as any[])[pos + 1];
+        const next2 = (records as any[])[pos + 2];
+        return (
+          (next1 && next1.revelation !== null && next1.revelation !== '' && next1.revelation !== undefined) ||
+          (next2 && next2.revelation !== null && next2.revelation !== '' && next2.revelation !== undefined)
+        );
+      });
+      if (!anyTurnFollowedByRev544c) {
+        issues.push({
+          location: `${qualTurnPositions544c.length} qualifying turn(s) — none followed by a revelation within 2 scenes`,
+          rule: 'TURN_REVELATION_AFTERMATH_VOID',
+          severity: 'minor',
+          description: `None of the story's ${qualTurnPositions544c.length} dramatic turn scenes is followed by a revelation within the next two scenes, even though ${revScenes544c.length} revelations exist elsewhere. A dramatic turn at its most powerful is also an epistemic event: the reversal exposes what the pre-turn state was concealing, the changed circumstances make a previously unavailable truth visible, or the pivot creates the pressure under which a hidden reality finally surfaces. When no turn is followed by a revelation within two scenes, every reversal plays out without epistemic consequence — the plot changes direction but the audience learns nothing new from the change. Turns and revelations become two separate systems: the story's structure pivots in one place, and its epistemic events occur in entirely different moments, never reinforcing each other.`,
+          suggestedFix: `After at least one dramatic turn, let the next one or two scenes carry a revelation — a truth that the turn has made available, a secret that the reversal has exposed, or a disclosure that could only emerge because circumstances have changed. The revelation need not be enormous: even a small disclosure that the pre-turn state couldn't carry gives the structural pivot an epistemic dimension, making it feel like the reversal changed what the story knows as well as what it does.`,
         });
       }
     }
