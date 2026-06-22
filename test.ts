@@ -18713,6 +18713,103 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 556 — themePass: resonant aftermath suspense void, resonant curiosity flat, dialogue highlight decoupled', async () => {
+    const makeRec556 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const THEME556 = 'redemption forgiveness courage';
+    const themed556 = ['act of redemption'];
+    const unthemed556 = ['hello world today'];
+    const runT556 = async (records: any[]) => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: THEME556 },
+      });
+    };
+
+    it('THEME_RESONANT_AFTERMATH_SUSPENSE_VOID fires when no resonant scene is followed by a suspense spike within 2', async () => {
+      // 10 scenes: resonant at 0,5 (pos<8, qualResonant=2); suspense at 8,9 — outside aftermath windows [1-2],[6-7] → fire
+      const recs556a = Array.from({ length: 10 }, (_, i) =>
+        makeRec556(i, {
+          dialogueHighlights: [0, 5].includes(i) ? themed556 : [],
+          suspenseDelta: [8, 9].includes(i) ? 1 : 0,
+        }),
+      );
+      const res = await runT556(recs556a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_RESONANT_AFTERMATH_SUSPENSE_VOID'), 'THEME_RESONANT_AFTERMATH_SUSPENSE_VOID should fire');
+    });
+
+    it('THEME_RESONANT_AFTERMATH_SUSPENSE_VOID does not fire when a resonant scene is followed by a suspense spike', async () => {
+      // 10 scenes: resonant at 0,5; suspense at 1 (within aftermath of resonant at 0) → no fire
+      const recs556an = Array.from({ length: 10 }, (_, i) =>
+        makeRec556(i, {
+          dialogueHighlights: [0, 5].includes(i) ? themed556 : [],
+          suspenseDelta: [1, 8].includes(i) ? 1 : 0,
+        }),
+      );
+      const res = await runT556(recs556an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_RESONANT_AFTERMATH_SUSPENSE_VOID'), 'THEME_RESONANT_AFTERMATH_SUSPENSE_VOID should not fire');
+    });
+
+    it('THEME_RESONANT_CURIOSITY_FLAT fires when all resonant scenes have curiosityDelta ≤ 0 while curiosity spikes exist', async () => {
+      // 10 scenes: resonant at 0,3,7 (dialogueHighlights=themed); curiosityDelta=0 on all resonant scenes;
+      // curiosity spikes at 5,8 (curiosityDelta=1) → ≥2 curiosity scenes; all resonant flat → fire
+      const recs556b = Array.from({ length: 10 }, (_, i) =>
+        makeRec556(i, {
+          dialogueHighlights: [0, 3, 7].includes(i) ? themed556 : [],
+          curiosityDelta: [5, 8].includes(i) ? 1 : 0,
+        }),
+      );
+      const res = await runT556(recs556b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_RESONANT_CURIOSITY_FLAT'), 'THEME_RESONANT_CURIOSITY_FLAT should fire');
+    });
+
+    it('THEME_RESONANT_CURIOSITY_FLAT does not fire when at least one resonant scene has curiosityDelta > 0', async () => {
+      // 10 scenes: resonant at 0,3,7; resonant at 7 also has curiosityDelta=1 → one resonant has curiosity → no fire
+      const recs556bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec556(i, {
+          dialogueHighlights: [0, 3, 7].includes(i) ? themed556 : [],
+          curiosityDelta: [5, 7, 8].includes(i) ? 1 : 0,
+        }),
+      );
+      const res = await runT556(recs556bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_RESONANT_CURIOSITY_FLAT'), 'THEME_RESONANT_CURIOSITY_FLAT should not fire');
+    });
+
+    it('THEME_DIALOGUE_HIGHLIGHT_DECOUPLED fires when all 3+ dialogue-highlight scenes are thematically silent', async () => {
+      // 10 scenes: dialogue highlights at 0,2,4 all unthemed (silent);
+      // scene 7 has revelation with theme text → resonant (ensures silentScenes.length < n so gate opens);
+      // dlgHighScenes=3, all silent → fire
+      const recs556c = Array.from({ length: 10 }, (_, i) =>
+        makeRec556(i, {
+          dialogueHighlights: [0, 2, 4].includes(i) ? unthemed556 : [],
+          revelation: i === 7 ? 'act of redemption' : null,
+        }),
+      );
+      const res = await runT556(recs556c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_DIALOGUE_HIGHLIGHT_DECOUPLED'), 'THEME_DIALOGUE_HIGHLIGHT_DECOUPLED should fire');
+    });
+
+    it('THEME_DIALOGUE_HIGHLIGHT_DECOUPLED does not fire when at least one dialogue-highlight scene carries theme', async () => {
+      // 10 scenes: dialogue highlights at 0 (unthemed), 2 (unthemed), 4 (themed) → one resonant → no fire
+      const recs556cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec556(i, {
+          dialogueHighlights: i === 4 ? themed556 : [0, 2].includes(i) ? unthemed556 : [],
+        }),
+      );
+      const res = await runT556(recs556cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_DIALOGUE_HIGHLIGHT_DECOUPLED'), 'THEME_DIALOGUE_HIGHLIGHT_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 542 — themePass: resonant suspense flat, Act 2b resonant causeless, resonant aftermath curiosity void', async () => {
     const makeRec542 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

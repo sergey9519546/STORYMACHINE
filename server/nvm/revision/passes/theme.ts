@@ -122,6 +122,19 @@
 // silent (sequence/aftermath × payoff trigger → theme — n≥8, ≥2 qualifying payoff scenes not at
 // last position, none followed by a resonant scene; first aftermath check with the payoff channel,
 // distinct from THEME_REVELATION_AFTERMATH_SILENT which uses the revelation trigger).
+// Wave 556 additions: resonant aftermath suspense void (sequence/aftermath × suspense × resonant
+// trigger — ≥2 qualifying resonant scenes none followed by suspenseDelta>0 in next 2 scenes while
+// ≥2 suspense scenes exist; theme surfacing never activates tension in its aftermath; suspense-
+// channel sibling of THEME_RESONANT_AFTERMATH_CURIOSITY_VOID, fills the aftermath × suspense cell
+// in the resonant-as-trigger family), resonant curiosity flat (average/aggregate × curiosity ×
+// resonant set — ≥3 resonant scenes, all with curiosityDelta ≤ 0 while ≥2 curiosity-spike scenes
+// exist globally; theme always surfaces in curiosity-flat moments; curiosity-channel complement of
+// THEME_RESONANT_SUSPENSE_FLAT and distinct from THEME_QUIET_SCENES_ONLY which also requires
+// emotional neutrality), theme dialogue highlight decoupled (co-occurrence/decoupling × dialogue
+// highlight signal — ≥3 scenes with non-empty dialogueHighlights all thematically silent; the
+// most verbally dense scenes of the script never carry theme language; distinct from THEME_DIALOGUE_
+// PEAK_SILENT which only checks the single peak scene, and from CLUE_SCENES_DECOUPLED which uses
+// a different signal).
 // Wave 542 additions: resonant suspense flat (average/aggregate × suspense × resonant set —
 // every resonant scene has suspenseDelta ≤ 0 while ≥2 suspense-spike scenes exist globally;
 // theme always surfaces in tension-free contexts; distinct from QUIET_SCENES_ONLY which also
@@ -2996,6 +3009,104 @@ export async function themePass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `None of the story's ${qualResonant542c.length} thematically resonant scene(s) is followed by a curiosity spike (curiosityDelta > 0) within the next two scenes, even though ${curiosityScenes542c.length} curiosity-generating scenes exist elsewhere. A thematic beat should open questions as well as answer them: when the story voices "${themeRaw}", the audience should be left wondering something they weren't wondering before — how will this apply to the protagonist's next choice, what the theme's implication means for a specific relationship, or what the stated truth will cost in the scenes ahead. When every resonant scene's aftermath is curiosity-flat, the theme operates as assertion rather than provocation — it makes a statement and closes the beat without generating any new forward pull. A theme that provokes wondering is dramatically active; a theme that only declares is editorially passive.`,
             suggestedFix: `After at least one resonant scene, introduce a curiosity-raising beat in the following one or two scenes — a question opened by what the theme just stated, an implication that the audience now wants to track, or a character discovery that the thematic moment makes newly uncertain. The curiosity spike after a resonant scene tells the audience that the theme is not just a statement but an active force that changes what they are watching for.`,
+          });
+        }
+      }
+    }
+
+    // THEME_RESONANT_AFTERMATH_SUSPENSE_VOID — sequence/aftermath × suspense × resonant trigger.
+    // n≥8, ≥2 qualifying resonant scenes (pos < n-2), ≥2 suspense-positive scenes (suspenseDelta>0).
+    // No resonant scene is followed by a suspense spike in the next 2 scenes → fire. When the
+    // story voices its theme, the scenes that follow should tighten rather than relax: a thematic
+    // statement arrives and the audience waits for the story to charge that meaning with tension.
+    // When every resonant scene's aftermath is suspense-flat, the theme surfaces into context that
+    // refuses to escalate — the audience hears the meaning but feels no urgency activated by it.
+    // Sequence/aftermath × suspense channel × resonant trigger. Suspense-channel sibling of
+    // THEME_RESONANT_AFTERMATH_CURIOSITY_VOID (Wave 542: curiosity channel). Distinct from
+    // THEME_RESONANT_SUSPENSE_FLAT (Wave 542: average/aggregate × suspense on the resonant scene
+    // itself — this checks the AFTERMATH, two scenes after the resonant scene).
+    if (records.length >= 8 && resonantScenes.length >= 2) {
+      const qualResonant556a = resonantScenes.filter((r: any) => {
+        const pos = (records as any[]).indexOf(r);
+        return pos < records.length - 2;
+      });
+      const suspenseScenes556a = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 0);
+      if (qualResonant556a.length >= 2 && suspenseScenes556a.length >= 2) {
+        const allResNoSuspense556a = qualResonant556a.every((r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos + off];
+            if (nxt && (nxt.suspenseDelta ?? 0) > 0) return false;
+          }
+          return true;
+        });
+        if (allResNoSuspense556a) {
+          issues.push({
+            location: `${qualResonant556a.length} resonant scene(s) — no suspense spike in any aftermath window`,
+            rule: 'THEME_RESONANT_AFTERMATH_SUSPENSE_VOID',
+            severity: 'minor',
+            description: `None of the story's ${qualResonant556a.length} thematically resonant scene(s) is followed by a suspense spike (suspenseDelta > 0) within the next two scenes, despite ${suspenseScenes556a.length} suspense-generating scenes existing elsewhere in the story. A thematic beat should activate the story's tension rather than interrupt it: when "${themeRaw}" surfaces, what follows should feel charged with the weight of that meaning — the scenes immediately after should tighten as the characters now carry the implications of what the theme just stated. When every resonant scene's aftermath is suspense-flat, the theme operates as a pause rather than an escalation: the story stops, states its meaning, and then returns to a narrative that refuses to register any new pressure from the declaration. The meaning surfaces but does not electrify.`,
+            suggestedFix: `After at least one resonant scene, introduce a suspense rise within the following two beats — a scene where the thematic declaration creates new stakes or anxiety rather than diffusing into a flat return to plot. The suspense need not be large; even a small increase in tension after a thematic moment tells the audience that what was just said has consequences that are already accumulating in the story's engine.`,
+          });
+        }
+      }
+    }
+
+    // THEME_RESONANT_CURIOSITY_FLAT — average/aggregate × curiosity × resonant set.
+    // n≥8, ≥3 resonant scenes, all resonant scenes have curiosityDelta ≤ 0 while ≥2 curiosity-
+    // spike scenes (curiosityDelta > 0) exist globally → fire. The theme always surfaces in
+    // curiosity-flat moments: the story voices its meaning without generating any new wondering
+    // in the scenes where it is directly present. Meaning and curiosity should compound —
+    // resonant scenes should leave the audience asking what the theme's implications mean for
+    // the specific situation they are watching.
+    // Distinct from: THEME_RESONANT_SUSPENSE_FLAT (Wave 542: suspense channel — both are
+    // average/aggregate but different metrics), THEME_QUIET_SCENES_ONLY (Wave 307: requires
+    // emotional neutrality AND low suspense on ALL resonant scenes, not curiosity), THEME_RESONANT_
+    // AFTERMATH_CURIOSITY_VOID (Wave 542: checks curiosity in the AFTERMATH, 2 scenes after the
+    // resonant scene; this checks the resonant scene ITSELF for curiosityDelta).
+    if (records.length >= 8 && resonantScenes.length >= 3) {
+      const curiosityScenes556b = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0);
+      if (curiosityScenes556b.length >= 2) {
+        const allResonantCuriosityFlat556b = resonantScenes.every(
+          (r: any) => (r.curiosityDelta ?? 0) <= 0,
+        );
+        if (allResonantCuriosityFlat556b) {
+          issues.push({
+            location: `${resonantScenes.length} resonant scene(s) — all with curiosityDelta ≤ 0`,
+            rule: 'THEME_RESONANT_CURIOSITY_FLAT',
+            severity: 'minor',
+            description: `Every scene that voices the theme "${themeRaw}" (${resonantScenes.length} resonant scene(s)) has a flat or negative curiosityDelta, even though ${curiosityScenes556b.length} curiosity-generating scenes exist elsewhere in the story. The theme always surfaces in moments of closed inquiry — the audience is not wondering anything new when the meaning is stated. Meaning and curiosity are natural partners: a thematic moment should ideally arrive inside or alongside a curiosity spike, so that the audience is already asking questions when the story provides part of the answer — or the theme's assertion should itself generate new wondering. When every resonant scene is curiosity-flat, the theme operates in its own register, sealed off from the audience's active inquiry, and the co-arrival of meaning and wondering never occurs.`,
+            suggestedFix: `Let at least one resonant scene also generate curiosity (curiosityDelta > 0) — introduce a thematic moment alongside a discovery that opens a new question, or let the theme's statement itself raise a question about what it will cost the protagonist to act on it. The coupling of resonance and curiosity gives the theme forward momentum: it is not just declared but made into a question the audience carries into the next scenes.`,
+          });
+        }
+      }
+    }
+
+    // THEME_DIALOGUE_HIGHLIGHT_DECOUPLED — co-occurrence/decoupling × dialogueHighlights × theme.
+    // n≥8, ≥3 scenes with non-empty dialogueHighlights (scripted speech that stood out enough to
+    // be flagged), all such scenes are thematically silent (no theme keyword in their scene text
+    // including the highlights themselves) → fire. When every dialogue-highlight scene carries no
+    // theme language, the script's most verbally memorable moments never voice the story's meaning:
+    // the dialogue that will be remembered has nothing to do with what the story is about.
+    // Distinct from: THEME_DIALOGUE_PEAK_SILENT (Wave 472: single-peak isolation — only the single
+    // scene with the MOST highlights; this fires when ALL dialogue-highlight scenes are silent even
+    // if they each have only one highlight), THEME_CLUE_SCENES_DECOUPLED (Wave 265: clue signal,
+    // not dialogue), THEME_CURIOSITY_SCENES_DECOUPLED (Wave 265: curiosity signal).
+    if (records.length >= 8) {
+      const dlgHighScenes556c = (records as any[]).filter(
+        r => ((r.dialogueHighlights ?? []) as string[]).length > 0,
+      );
+      if (dlgHighScenes556c.length >= 3) {
+        const allDlgSilent556c = dlgHighScenes556c.every(
+          (r: any) => !sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+        );
+        if (allDlgSilent556c) {
+          issues.push({
+            location: `${dlgHighScenes556c.length} dialogue-highlight scene(s) — all thematically silent`,
+            rule: 'THEME_DIALOGUE_HIGHLIGHT_DECOUPLED',
+            severity: 'minor',
+            description: `Every scene in the story that contains flagged dialogue highlights (${dlgHighScenes556c.length} scene(s)) carries no theme-related language — the script's most verbally memorable moments are thematically mute. Dialogue highlights are the lines most likely to be remembered and quoted: they carry the script's voice at its most concentrated. When not one of these memorable lines connects to the story's central theme ("${themeRaw}"), the dialogue that will outlast the viewing experience has nothing to do with what the story is ultimately about. The most powerful screenwriting positions thematic meaning inside the dialogue that the audience will carry with them — the lines that land most forcefully should be among the clearest bearers of the story's meaning.`,
+            suggestedFix: `Introduce at least one dialogue highlight that carries the theme's language, imagery, or central question — a line that is both memorable as dialogue and resonant as thematic statement. The line need not be on-the-nose; even an oblique reference to the theme's central tension inside a line that is vivid and character-specific accomplishes both things at once: it earns its place as a highlight while doing thematic work. Look for moments in the existing dialogue highlights where a word substitution or one added clause could introduce the theme without sacrificing the line's dramatic currency.`,
           });
         }
       }
