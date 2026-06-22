@@ -31804,6 +31804,132 @@ The lights go out.`;
     });
   });
 
+  describe('Wave 546 — dialoguePass: relationship peak silent, negation front-loaded, suspense aftermath silent', async () => {
+    const makeRec546 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
+      sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false,
+      revelation: null, dramaticTurn: 'nothing', payoffSetupIds: [], relationshipShifts: [],
+      emotionalShift: 'neutral', seededClueIds: [], dialogueHighlights: [], unresolvedClues: [],
+      purpose: '', slug: `s${sceneIdx}`, ...extra,
+    });
+    const runD546 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    // 8 scenes; dlgFn returns number of dialogue lines per scene i
+    const build546 = (count: number, dlgFn: (i: number) => number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\n`;
+        const n = dlgFn(i);
+        for (let j = 0; j < n; j++) {
+          f += j % 2 === 0
+            ? `ALICE\nShe found the documents this morning.\n\n`
+            : `BOB\nWe should leave before they close the gate.\n\n`;
+        }
+        if (n === 0) f += `The door crashes open and a figure steps in.\n\n`;
+      }
+      return f;
+    };
+
+    // DIALOGUE_RELATIONSHIP_PEAK_SILENT fire:
+    // 8 scenes; scene 3 (pos=3≥2) has relShift amount=0.8 (peak) with NO dialogue;
+    // scene 1 has relShift amount=0.3 and HAS dialogue; ≥3 dialogue scenes total → fires
+    it('DIALOGUE_RELATIONSHIP_PEAK_SILENT fires when the peak relationship-shift scene has no dialogue', async () => {
+      const f546a = build546(8, i => i === 3 ? 0 : 2);
+      const recs546a = Array.from({ length: 8 }, (_, i) =>
+        makeRec546(i, {
+          relationshipShifts: i === 1
+            ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.3 }]
+            : i === 3
+              ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.8 }]
+              : [],
+        }),
+      );
+      const res = await runD546(f546a, recs546a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_RELATIONSHIP_PEAK_SILENT'), 'DIALOGUE_RELATIONSHIP_PEAK_SILENT should fire');
+    });
+
+    // DIALOGUE_RELATIONSHIP_PEAK_SILENT no-fire:
+    // same records but scene 3 (peak) now HAS dialogue → no fire
+    it('DIALOGUE_RELATIONSHIP_PEAK_SILENT does not fire when the peak relationship-shift scene has dialogue', async () => {
+      const f546anr = build546(8, _ => 2); // all scenes have dialogue
+      const recs546anr = Array.from({ length: 8 }, (_, i) =>
+        makeRec546(i, {
+          relationshipShifts: i === 1
+            ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.3 }]
+            : i === 3
+              ? [{ pairKey: 'A|B', dimension: 'trust', amount: 0.8 }]
+              : [],
+        }),
+      );
+      const res = await runD546(f546anr, recs546anr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_RELATIONSHIP_PEAK_SILENT'), 'DIALOGUE_RELATIONSHIP_PEAK_SILENT should not fire');
+    });
+
+    // DIALOGUE_NEGATION_FRONT_LOADED fire:
+    // 10 dialogue lines; first 4 contain negation words; all 4 in first half (0-4)
+    // 4/4 = 100% > 75% → fires
+    it('DIALOGUE_NEGATION_FRONT_LOADED fires when more than 75% of negation lines are in the first half', async () => {
+      const f546b = [
+        'INT. SCENE 0 - DAY', '',
+        'ALICE', 'No, that is not going to happen here.', '',
+        'BOB', 'Never mind, I will not try again.', '',
+        'ALICE', 'Nothing will work if we do not proceed.', '',
+        'BOB', 'That cannot be the right approach.', '',
+        'ALICE', 'We should move forward together though.', '',
+        'BOB', 'The plan makes sense for everyone here.', '',
+        'ALICE', 'Let us try the approach this time.', '',
+        'BOB', 'I understand what you mean exactly.', '',
+        'ALICE', 'Let us get started on this right away.', '',
+        'BOB', 'Everything looks good to me today.',
+      ].join('\n');
+      const res = await runD546(f546b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_NEGATION_FRONT_LOADED'), 'DIALOGUE_NEGATION_FRONT_LOADED should fire');
+    });
+
+    // DIALOGUE_NEGATION_FRONT_LOADED no-fire:
+    // negation at lines 0,1,7,8 → first half (0-4): 2 of 4 = 50% ≤ 75% → no fire
+    it('DIALOGUE_NEGATION_FRONT_LOADED does not fire when negation is not concentrated in the first half', async () => {
+      const f546bnr = [
+        'INT. SCENE 0 - DAY', '',
+        'ALICE', 'No, I cannot do that right now.', '',
+        'BOB', 'That will never work out for us.', '',
+        'ALICE', 'We should move forward together.', '',
+        'BOB', 'The plan makes sense for everyone.', '',
+        'ALICE', 'Let us try a new approach here.', '',
+        'BOB', 'I understand the situation fully.', '',
+        'ALICE', 'Nothing is going the right way now.', '',
+        'BOB', 'That is not working out at all.', '',
+        'ALICE', 'Let us get this finished today.', '',
+        'BOB', 'Everything looks fine to me now.',
+      ].join('\n');
+      const res = await runD546(f546bnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_NEGATION_FRONT_LOADED'), 'DIALOGUE_NEGATION_FRONT_LOADED should not fire');
+    });
+
+    // DIALOGUE_SUSPENSE_AFTERMATH_SILENT fire:
+    // n=10; suspense at i=2,5 (pos<9); scenes 3,6 (following) have no dialogue; ≥3 with dialogue → fires
+    it('DIALOGUE_SUSPENSE_AFTERMATH_SILENT fires when all suspense-spike scenes are followed by silent scenes', async () => {
+      const f546c = build546(10, i => [3, 6].includes(i) ? 0 : 2);
+      const recs546c = Array.from({ length: 10 }, (_, i) =>
+        makeRec546(i, { suspenseDelta: [2, 5].includes(i) ? 1 : 0 }),
+      );
+      const res = await runD546(f546c, recs546c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_SUSPENSE_AFTERMATH_SILENT'), 'DIALOGUE_SUSPENSE_AFTERMATH_SILENT should fire');
+    });
+
+    // DIALOGUE_SUSPENSE_AFTERMATH_SILENT no-fire:
+    // scene 3 (after spike at 2) HAS dialogue → anyFollowedByDlg=true → no fire
+    it('DIALOGUE_SUSPENSE_AFTERMATH_SILENT does not fire when a suspense-spike is followed by a dialogue scene', async () => {
+      const f546cnr = build546(10, i => i === 6 ? 0 : 2);
+      const recs546cnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec546(i, { suspenseDelta: [2, 5].includes(i) ? 1 : 0 }),
+      );
+      const res = await runD546(f546cnr, recs546cnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_SUSPENSE_AFTERMATH_SILENT'), 'DIALOGUE_SUSPENSE_AFTERMATH_SILENT should not fire');
+    });
+  });
+
   describe('Wave 532 — dialoguePass: dramatic-turn aftermath silent, payoff aftermath silent, middle zone silent', async () => {
     const makeRec532 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
       sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false,

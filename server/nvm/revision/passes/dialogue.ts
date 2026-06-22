@@ -134,6 +134,19 @@
 // dialogue, opening and closing thirds each have ≥1 dialogue scene but middle third has zero; the
 // central story zone is silent; first zone-absence check on the middle third, distinct from CLIMAX_VOID
 // [closing 20%], OPENING_SILENT [opening 20%], and SCENE_TEMPORAL_CLUSTER [concentration not absence]).
+// Wave 546 additions: dialogue relationship peak silent (single-peak isolation × relationship-shift
+// magnitude × dialogue absence — n≥8, ≥2 relShift scenes, ≥3 dialogue scenes, the scene with max
+// total absolute relationship-magnitude has no dialogue while ≥1 other relShift scene does; the
+// relational-magnitude single-peak check, distinct from RELATIONSHIP_SHIFT_SCENE_DIALOGUE_ABSENT
+// [all relShift scenes silent] and TENSION_PEAK_SILENT/CURIOSITY_PEAK_SILENT [different channels]),
+// dialogue negation front-loaded (distribution/timing × negation content × first half — dlg≥8,
+// ≥3 negation lines globally, >75% fall in first half; refusal/denial concentrated in setup and
+// absent in escalation; distinct from NEGATION_FLOOD [global rate] and QUESTION_BACK_LOADED
+// [opposite direction, different content]), dialogue suspense aftermath silent (sequence/aftermath ×
+// suspense spike → dialogue absence in following scene — n≥8, ≥2 qualifying suspense-spike scenes
+// [suspenseDelta>0, not at last pos], ≥3 dialogue scenes, none of the following scenes has dialogue;
+// distinct from TENSION_PEAK_SILENT [single-peak, the spike scene itself], DRAMATIC_TURN_AFTERMATH_
+// SILENT [turn trigger], REVELATION_AFTERMATH_SILENT [revelation trigger]).
 // Wave 518 additions: seed scene dialogue absent (co-occurrence/decoupling × seed event × dialogue
 // absence — n≥8, ≥2 seed scenes, ≥3 scenes with dialogue, all seed scenes have zero dialogue; clue-
 // planting happens in silence; the seed-channel parallel of PAYOFF_SCENE_DIALOGUE_ABSENT, completing
@@ -2971,6 +2984,140 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
           description: `The story's middle third (scenes at positions ${third532c}–${2 * third532c - 1}) contains no dialogue, while both the opening and closing thirds include scenes with spoken language. The central structural zone of the story — where the protagonist's situation deepens, complications accumulate, and relationships are tested — passes as silent spectacle. The middle section of a screenplay is where the story most needs spoken confrontation, negotiation, and revelation: the escalation arc that carries the audience from the opening premise to the closing resolution depends on characters speaking to their changing circumstances. When the middle is entirely without dialogue, that arc is rendered in pure action without any verbal dimension.`,
           suggestedFix: `Introduce at least one dialogue scene in the middle third of the script. A confrontation between characters whose goals are now in conflict, a negotiation that reveals the shifting power balance, or even a short verbal exchange that registers the protagonist's changed situation gives the middle section its necessary verbal anchor. The story's central zone should be as verbally alive as its opening and closing — this is where the audience needs to hear characters speaking to the pressure they are under.`,
         });
+      }
+    }
+  }
+
+  // ── Wave 546: DIALOGUE_RELATIONSHIP_PEAK_SILENT, DIALOGUE_NEGATION_FRONT_LOADED,
+  //              DIALOGUE_SUSPENSE_AFTERMATH_SILENT ────────────────────────────────────────────────
+  {
+    const n546 = records.length;
+    const lineToScene546 = buildLineToSceneMap(fountain);
+    const dlgPerScene546 = new Map<number, number>();
+    for (const d of dialogue) {
+      const si = lineToScene546[d.lineNum - 1] ?? -1;
+      if (si >= 0) dlgPerScene546.set(si, (dlgPerScene546.get(si) ?? 0) + 1);
+    }
+    const scenesWithDlg546 = (records as any[]).filter(
+      r => (dlgPerScene546.get(r.sceneIdx) ?? 0) > 0,
+    ).length;
+
+    // DIALOGUE_RELATIONSHIP_PEAK_SILENT (single-peak isolation × relationship-shift magnitude ×
+    // dialogue absence, n≥8, ≥2 scenes with relationship shifts [mag > 0], ≥3 dialogue scenes,
+    // the scene with the highest total absolute relationship-shift magnitude [pos ≥ 2] has no
+    // dialogue while ≥1 other relationship-shift scene has dialogue): The story's most intense
+    // bond moment passes in silence. When the peak relational scene carries no spoken language,
+    // the audience watches the most profound interpersonal shift without any character voice
+    // registering, arguing, or responding to it at that moment. Single-peak isolation mode ×
+    // relationship-shift magnitude × dialogue absence. Distinct from DIALOGUE_RELATIONSHIP_SHIFT_
+    // SCENE_DIALOGUE_ABSENT (Wave 518: co-occurrence — ALL relationship-shift scenes are silent;
+    // this fires when only the SINGLE PEAK is silent while other relational scenes carry dialogue —
+    // single-peak isolation, not full co-occurrence absence), DIALOGUE_TENSION_PEAK_SILENT
+    // (Wave 434: single-peak × suspenseDelta channel), DIALOGUE_CURIOSITY_PEAK_SILENT
+    // (Wave 448: single-peak × curiosityDelta channel).
+    if (n546 >= 8 && scenesWithDlg546 >= 3) {
+      const relMagPerScene546a = new Map<number, number>();
+      for (const r of records as any[]) {
+        const mag = ((r.relationshipShifts ?? []) as any[]).reduce(
+          (s: number, sh: any) => s + Math.abs(sh.amount ?? 0), 0,
+        );
+        if (mag > 0) relMagPerScene546a.set(r.sceneIdx, mag);
+      }
+      if (relMagPerScene546a.size >= 2) {
+        let peakSceneIdx546a = -1, peakMag546a = 0;
+        for (const [sid, mag] of relMagPerScene546a) {
+          if (mag > peakMag546a) { peakMag546a = mag; peakSceneIdx546a = sid; }
+        }
+        const peakPos546a = (records as any[]).findIndex(r => r.sceneIdx === peakSceneIdx546a);
+        if (peakPos546a >= 2) {
+          const peakHasDlg546a = (dlgPerScene546.get(peakSceneIdx546a) ?? 0) > 0;
+          const anyOtherRelHasDlg546a = [...relMagPerScene546a.keys()].some(
+            sid => sid !== peakSceneIdx546a && (dlgPerScene546.get(sid) ?? 0) > 0,
+          );
+          if (!peakHasDlg546a && anyOtherRelHasDlg546a) {
+            const peakRec546a = (records as any[])[peakPos546a];
+            issues.push({
+              location: `Scene ${peakSceneIdx546a} (${peakRec546a?.slug}) — peak relationship magnitude (${peakMag546a.toFixed(2)}), no dialogue`,
+              rule: 'DIALOGUE_RELATIONSHIP_PEAK_SILENT',
+              severity: 'minor',
+              description: `Scene ${peakSceneIdx546a} carries the story's highest total relationship-shift magnitude (${peakMag546a.toFixed(2)}) — the single moment of most intense bond movement — yet contains no dialogue. Other relationship-shift scenes carry spoken language, but the peak interpersonal moment of the story passes in silence: no character speaks, argues, confesses, or responds in words during the scene where bonds move most dramatically. The peak relational moment is where the audience most needs to hear characters register the change — to speak it, deny it, process it aloud, or react to it with language that the audience can hold. Silence at the relational peak divorces the story's most intense interpersonal event from its verbal dimension.`,
+              suggestedFix: `Add dialogue to scene ${peakSceneIdx546a}: even a short exchange or a single line from one character responding to the most charged interpersonal moment of the story. The dialogue doesn't need to name what is happening directly — characters in high emotional charge rarely do — but spoken language in the relational peak gives the scene's intensity a voice and prevents the story's most profound bond movement from happening in a verbal vacuum.`,
+            });
+          }
+        }
+      }
+    }
+
+    // DIALOGUE_NEGATION_FRONT_LOADED (distribution/timing × negation content × first half,
+    // dialogue≥8, ≥3 negation-containing lines globally, >75% of negation lines in the first
+    // half of the dialogue corpus): Refusal and denial concentrate in the story's opening
+    // dialogue while the escalation and resolution sections are largely negation-free. Negation
+    // is the primary register of dramatic resistance — characters staking boundaries with "no",
+    // "never", "can't", "won't", "nothing" — and it is most powerful when it arrives at the
+    // moment of highest stakes. When negation front-loads, the story is most combative in its
+    // premise-setting section and least resistant in its climax and resolution: the most
+    // restrictive language arrives before the confrontations it should accompany, and the later
+    // sections where stakes peak are left without the verbal resistance that should escalate with
+    // the drama. Distribution/timing mode × negation content × first-half concentration. Distinct
+    // from DIALOGUE_NEGATION_FLOOD (Wave 462: global proportion >30% — a script-wide rate that
+    // cannot detect temporal imbalance), DIALOGUE_NEGATIVE_OPENER_FLOOD (Wave 336: lines opening
+    // with "No"/"Can't"/"Never" — opener pattern not temporal distribution), DIALOGUE_QUESTION_
+    // BACK_LOADED (Wave 448: question mark × second-half concentration — the directional complement
+    // on a different content channel; this checks front-loading, that checks back-loading).
+    if (dialogue.length >= 8) {
+      const NEG_PAT546b = /\b(no|not|never|can'?t|won'?t|don'?t|doesn'?t|didn'?t|isn'?t|aren'?t|wasn'?t|weren'?t|nothing|nobody|none|nowhere|cannot)\b/i;
+      const negLines546b = dialogue.filter(d => NEG_PAT546b.test(d.line));
+      if (negLines546b.length >= 3) {
+        const halfLen546b = Math.floor(dialogue.length / 2);
+        const firstHalfNegSet546b = new Set(
+          dialogue.slice(0, halfLen546b).filter(d => NEG_PAT546b.test(d.line)).map(d => d.lineNum),
+        );
+        const firstHalfNegCount546b = negLines546b.filter(d => firstHalfNegSet546b.has(d.lineNum)).length;
+        if (firstHalfNegCount546b / negLines546b.length > 0.75) {
+          issues.push({
+            location: `Dialogue — ${firstHalfNegCount546b} of ${negLines546b.length} negation lines in first half`,
+            rule: 'DIALOGUE_NEGATION_FRONT_LOADED',
+            severity: 'minor',
+            description: `${firstHalfNegCount546b} of the script's ${negLines546b.length} negation-containing dialogue lines (${Math.round(firstHalfNegCount546b / negLines546b.length * 100)}%) fall in the first half of the dialogue corpus. Refusal and denial — "no", "never", "can't", "won't", "nothing", "cannot" — concentrate in the story's opening dialogue while the escalation and resolution sections are largely negation-free. Negation is the primary register of dramatic resistance: a character saying "never" under maximum pressure is more powerful than the same word in the premise-setting section. When negation front-loads, the story's refusal vocabulary exhausts itself before the confrontations it should accompany. The later sections where stakes peak become passive and acquiescent at precisely the dramatic moment where character limits and boundaries should be most forcefully stated.`,
+            suggestedFix: `Redistribute negation language into the second half: let at least one scene of escalation or climax carry a refusal, denial, or limit-statement that matches the pressure of that structural moment. The most powerful dramatic negations arrive under maximum stakes — "I won't" from a character who has everything to lose is more potent than the same word from a character who is barely past the premise. The resistance register should escalate alongside the story, not peak in the setup.`,
+          });
+        }
+      }
+    }
+
+    // DIALOGUE_SUSPENSE_AFTERMATH_SILENT (sequence/aftermath × suspense spike → dialogue absence
+    // in following scene, n≥8, ≥2 qualifying high-suspense scenes [suspenseDelta > 0, not at last
+    // position], ≥3 scenes with dialogue, none of the immediately following scenes has dialogue):
+    // Every scene where tension rises leads directly into a scene with no spoken language. When
+    // stakes rise and the next scene is silent, the escalation consistently produces wordless
+    // aftermath rather than the verbal confrontation, argument, or decision-making that normally
+    // accompanies raised pressure. The scene after a suspense spike is where characters should
+    // respond to the heightened stakes in words — arguing about what to do, negotiating under
+    // duress, making decisions spoken aloud. When every post-spike scene is silent, tension and
+    // language operate as separate systems. Sequence/aftermath mode × suspense trigger × dialogue
+    // absence. Distinct from DIALOGUE_TENSION_PEAK_SILENT (Wave 434: single-peak isolation — the
+    // ONE highest-suspense scene itself is silent; this checks what follows ANY positive-suspenseDelta
+    // scene, not just the peak), DIALOGUE_DRAMATIC_TURN_AFTERMATH_SILENT (Wave 532: dramatic-turn
+    // trigger — different trigger), DIALOGUE_REVELATION_AFTERMATH_SILENT (Wave 518: revelation
+    // trigger — different trigger).
+    if (n546 >= 8 && scenesWithDlg546 >= 3) {
+      const qualSuspScenes546c = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) => (r.suspenseDelta ?? 0) > 0 && pos < n546 - 1);
+      if (qualSuspScenes546c.length >= 2) {
+        const anySuspAftermathHasDlg546c = qualSuspScenes546c.some(({ pos }) => {
+          const nextSceneIdx = (records as any[])[pos + 1].sceneIdx;
+          return (dlgPerScene546.get(nextSceneIdx) ?? 0) > 0;
+        });
+        if (!anySuspAftermathHasDlg546c) {
+          issues.push({
+            location: `${qualSuspScenes546c.length} suspense-spike scene(s) — none followed by a scene with dialogue`,
+            rule: 'DIALOGUE_SUSPENSE_AFTERMATH_SILENT',
+            severity: 'minor',
+            description: `The script has ${qualSuspScenes546c.length} scenes where suspense rises (suspenseDelta > 0), but every one is immediately followed by a scene with no dialogue. When a scene raises stakes, the scene that follows is where those raised stakes should generate verbal response: characters processing the danger, arguing about what to do, negotiating under pressure, or making decisions spoken aloud. When every post-spike scene is silent, escalating tension consistently leads to wordless aftermath — the story raises stakes in action and then processes those raised stakes in action, without any character ever speaking in the scenes of heightened pressure or their immediate sequel. The verbal dimension of the story and its tension engine run as separate systems.`,
+            suggestedFix: `After at least one suspense-spike scene, let the following scene include dialogue — even a brief exchange where characters react to the raised stakes. The lines don't need to be extensive: an argument about what to do next, a decision spoken under pressure, or a character acknowledging the danger aloud gives the heightened moment a verbal dimension and anchors the rising tension in character voice rather than pure action. The scene after a spike is the moment when the audience most wants to hear characters speak.`,
+          });
+        }
       }
     }
   }
