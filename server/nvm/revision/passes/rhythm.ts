@@ -106,6 +106,16 @@
 // high (average/aggregate × sentence count per line — ≥8 action lines averaging >3 sentences each,
 // multi-clause overload that collapses the shot-by-shot grammar of cinematic action; the average/
 // aggregate complement of SINGLE_SENTENCE_FLOOD and SENTENCE_COUNT_PEAK).
+// Wave 554 additions: action long beat uncaused (backward-cause × long channel — ≥3 long ≥12w
+// lines after position 1 all lack a short ≤4w predecessor within 2 lines; long prose arrives
+// without the compression that earns its density; backward-cause mirror of IMPACT_BEAT_UNCAUSED
+// which checks the short→long direction), action sentence burst run (run-based × sentence count
+// — 4+ consecutive action lines each containing ≥2 sentence-ending marks; a local multi-clause
+// avalanche distinct from ACTION_SENTENCE_AVERAGE_HIGH which is a global average and from
+// SENTENCE_COUNT_PEAK which isolates a single outlier), action punctuation desert (underweight/
+// bloat × comma × scarcity — ≥10 action lines with <15% containing any comma, locking the
+// prose into subject-verb-object simplicity without dependent clauses or list structure;
+// complement of ACTION_COMMA_DENSE_FLOOD which fires at >30% with ≥3 commas per line).
 // Wave 540 additions: action consecutive medium run (run-based × medium word count 5–11w — 6+
 // consecutive action lines each between 5–11 words while ≥1 short ≤4w and ≥1 long ≥12w exist
 // globally; the extremes exist but are excluded from this stretch, a "middle rut" that misses
@@ -2453,6 +2463,105 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         description: `${maxFreq540c} of ${wordCounts.length} action lines (${(maxFreq540c / wordCounts.length * 100).toFixed(0)}%) share exactly the same word count of ${modalLen540c} words — a modal spike that produces a metronomic cadence. When more than 40% of action lines carry the same word count, the prose converges on a single beat length that the reader internalizes well before the script ends: each new line arriving at the expected length confirms a rhythm rather than varying it. Screenplay action should surprise the eye with its density changes — short lines compressing impact, long lines expanding space and context — and a modal lock on one word count drains that variability, making the prose feel stamped from a template rather than calibrated to each beat's dramatic weight.`,
         suggestedFix: `Redistribute the ${modalLen540c}-word lines: convert a portion of them to shorter beats (remove a descriptive clause, reduce an action to its essential verb) or longer beats (add the specific spatial or physical detail that makes the moment real). Aim for no word count to account for more than 25% of all action lines — the prose should feel like it is calibrated beat by beat, not measured out in uniform portions.`,
       });
+    }
+  }
+
+  {
+    // ACTION_LONG_BEAT_UNCAUSED — backward-cause × long channel.
+    // ≥8 action lines, ≥3 long ≥12w lines at positions i≥2. Every qualifying long line lacks
+    // a short ≤4w line in the prior 2 action lines → fire. An elaborate prose beat is the
+    // resolution of compression: the short line compresses a moment to its essence, and the
+    // long line expands from that essence into context and texture. When no long line is ever
+    // preceded by a short in its ramp-up window, elaboration arrives without setup — density
+    // appears from nowhere rather than emerging from a preparation of brevity.
+    // Distinct from: IMPACT_BEAT_UNCAUSED (Wave 470: backward-cause × short channel — checks
+    // that a short beat was preceded by a long; this is the mirror, checking that a long beat
+    // is preceded by a short), ACTION_LONG_RECOVERY_ABSENT (Wave 442: long→short aftermath,
+    // not antecedent), ACTION_SHORT_EXPANSION_ABSENT (Wave 540: short→long aftermath direction).
+    if (actionLines.length >= 8) {
+      const qualLongs554a = wordCounts
+        .map((w, i) => ({ w, i }))
+        .filter(x => x.i >= 2 && x.w >= 12);
+      if (qualLongs554a.length >= 3) {
+        const allLongNoCause554a = qualLongs554a.every(({ i }) => {
+          for (let off = 1; off <= 2; off++) {
+            if (i - off >= 0 && wordCounts[i - off] <= 4) return false;
+          }
+          return true;
+        });
+        if (allLongNoCause554a) {
+          issues.push({
+            location: `${qualLongs554a.length} long action line(s) ≥12 words — no short ≤4w predecessor within 2 lines`,
+            rule: 'ACTION_LONG_BEAT_UNCAUSED',
+            severity: 'minor',
+            description: `${qualLongs554a.length} action lines each run to 12 or more words, yet none of them is preceded within 2 lines by a short action line (≤4 words). An elaborate prose beat is the resolution of compression: the short line strips a moment to its barest element — object, action, consequence — and the long line that follows it earns its density by expanding from that compressed starting point into context, texture, and implication. When elaborate prose appears without prior compression, each long line must justify its length from inside itself, without the rhythmic setup that makes density feel earned rather than indulgent. The audience encounters elaboration before brevity has told them what to hold on to.`,
+            suggestedFix: `Before at least one long action line (≥12 words), write a short beat (≤4 words) within the prior two lines — a compressed fragment that isolates a single action, object, or sensation. "She stops." / followed one or two lines later by a long line that expands what that stopping meant: the elaboration now arrives as the consequence of the compression rather than appearing from nowhere.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // ACTION_SENTENCE_BURST_RUN — run-based × sentence count ≥2 × consecutive presence.
+    // ≥8 action lines, 4+ consecutive lines each containing ≥2 sentence-ending marks → fire.
+    // A local run of multi-clause action lines creates a wall of compound prose that loses the
+    // shot-grammar of cinematic action: each action line should ideally capture one visual beat,
+    // and stacking 4+ multi-sentence lines back-to-back compresses multiple beats per frame
+    // without breathing room between images.
+    // Distinct from: ACTION_SENTENCE_AVERAGE_HIGH (Wave 484: average/aggregate × avg > 3
+    // sentences per line globally — a whole-script aggregate, not a local consecutive run),
+    // SENTENCE_COUNT_PEAK (Wave 456: single-peak isolation × one outlier line with ≥5 sentences
+    // and ≥3× average — fires on the single worst offender, not a run), POLYSYNDETON_OVERLOAD
+    // (Wave 344: coordinator chains not sentence-end punctuation), SINGLE_SENTENCE_FLOOD (Wave
+    // 277: the opposite — all lines have exactly 1 sentence globally).
+    if (actionLines.length >= 8) {
+      const sentCounts554b = actionLines.map(l => countSentences(l.text));
+      let maxRun554b = 0;
+      let cur554b = 0;
+      for (const sc of sentCounts554b) {
+        if (sc >= 2) {
+          cur554b++;
+          if (cur554b > maxRun554b) maxRun554b = cur554b;
+        } else {
+          cur554b = 0;
+        }
+      }
+      if (maxRun554b >= 4) {
+        issues.push({
+          location: `${maxRun554b} consecutive action line(s) — each ≥2 sentences`,
+          rule: 'ACTION_SENTENCE_BURST_RUN',
+          severity: 'minor',
+          description: `${maxRun554b} consecutive action lines each contain two or more sentence-ending marks — a sustained wall of multi-clause prose that collapses the shot-grammar of cinematic action. Screenplay action at its most precise operates one image per line: each action beat establishes a single visual fact (what the camera sees) and lets the white space between lines function as the edit. A run of ${maxRun554b} consecutive multi-sentence lines compresses two or more visual beats per action line back-to-back, giving the reader a sustained density with no visual breathing room — the line-breaks lose their function as implicit cuts, and the action reads as prose rather than as a shooting script.`,
+          suggestedFix: `Break the multi-clause run by splitting at least one double-sentence action line into two single-sentence lines, each on its own line. "She picks up the gun. She checks the chamber." becomes "She picks up the gun." on its own line, and "She checks the chamber." on the next — two visual beats, two edits, with the white space between them doing rhythmic work. If more than one beat genuinely belongs in one visual moment, keep them together, but ensure the surrounding lines are single-sentence to restore the contrast.`,
+        });
+      }
+    }
+  }
+
+  {
+    // ACTION_PUNCTUATION_DESERT — underweight/bloat × comma × scarcity.
+    // ≥10 action lines with <15% containing any comma → fire. When virtually no action lines
+    // use commas, the prose is locked into unmodified subject-verb-object structure: no
+    // dependent clauses, no list enumerations, no parenthetical insertions, no mid-sentence
+    // pauses. Commas are the primary tool for adding rhythmic complexity within a single
+    // sentence; their total absence produces prose that can only deliver simple, unqualified
+    // statements, and the cumulative reading experience is syntactically monotone.
+    // Distinct from: ACTION_COMMA_DENSE_FLOOD (Wave 526: the opposite — >30% with ≥3 commas
+    // per line — fires on comma excess; this fires on comma starvation), COMMA_SPLICE_OVERUSE
+    // (Wave 386: checks a specific misuse pattern of commas joining pronoun clauses, not
+    // overall comma frequency), all word-count proportion checks which do not audit punctuation.
+    if (actionLines.length >= 10) {
+      const commaCount554c = actionLines.filter(l => l.text.includes(',')).length;
+      if (commaCount554c / actionLines.length < 0.15) {
+        issues.push({
+          location: `${commaCount554c} of ${actionLines.length} action line(s) contain a comma`,
+          rule: 'ACTION_PUNCTUATION_DESERT',
+          severity: 'minor',
+          description: `Fewer than 15% of action lines contain a comma (${commaCount554c} of ${actionLines.length}) — the script's action prose is almost entirely comma-free. Commas are the primary tool for syntactic complexity within a single action sentence: they introduce dependent clauses ("She hesitates, then moves"), list actions in sequence ("She opens the door, scans the room, steps inside"), and insert parenthetical qualifications that give an action its emotional subtext ("He smiles, just barely"). When virtually no action lines use commas, every sentence must be simple and unmodified — subject, verb, object, full stop. The cumulative reading experience is syntactically monotone: each beat arrives as a single unadorned statement, and the prose is rhythmically restricted even when word count and sentence count are varied.`,
+          suggestedFix: `Introduce commas into at least 15% of action lines by adding syntactic complexity where the action allows it: join a main action to a qualifying detail ("She opens the door, her hand shaking"), enumerate two simultaneous observations ("The room is empty, the window open"), or add a mid-sentence pause that gives an action its physical texture ("He stops, listens, then takes the stairs two at a time"). Each well-placed comma adds a rhythmic beat inside the sentence that the surrounding simple lines cannot provide.`,
+        });
+      }
     }
   }
 

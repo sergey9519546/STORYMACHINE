@@ -20594,6 +20594,67 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 554 — rhythmPass: long beat uncaused, sentence burst run, punctuation desert', async () => {
+    const runR554 = async (fountain: string) => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    // Builds fountain with one action line per scene of given word counts (all simple words, no commas)
+    const makeF554Wc = (wcs: number[]) =>
+      wcs.map((n, i) => `INT. SC${i} - DAY\n\n${Array(n).fill('word').join(' ')}.`).join('\n\n');
+    // Builds fountain where each scene has one action line with ns sentences each "She acts."
+    const makeF554Sent = (sentCounts: number[]) =>
+      sentCounts.map((ns, i) => `INT. SC${i} - DAY\n\n${Array(ns).fill('She acts.').join(' ')}`).join('\n\n');
+
+    it('ACTION_LONG_BEAT_UNCAUSED fires when all long ≥12w lines have no short ≤4w predecessor within 2', async () => {
+      // 10 lines: [8,9,12,7,8,12,9,7,12,8] — long at pos 2,5,8; prior-2 of each: [8,9],[7,8],[9,7] — no short ≤4w → fire
+      const f554a = makeF554Wc([8, 9, 12, 7, 8, 12, 9, 7, 12, 8]);
+      const res = await runR554(f554a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_LONG_BEAT_UNCAUSED'), 'ACTION_LONG_BEAT_UNCAUSED should fire');
+    });
+
+    it('ACTION_LONG_BEAT_UNCAUSED does not fire when at least one long line is preceded by a short', async () => {
+      // 10 lines: [8,4,12,7,8,12,9,7,12,8] — long at pos 2; prior of pos 2: [8,4] — 4w ≤ 4w → caused → no fire
+      const f554an = makeF554Wc([8, 4, 12, 7, 8, 12, 9, 7, 12, 8]);
+      const res = await runR554(f554an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_LONG_BEAT_UNCAUSED'), 'ACTION_LONG_BEAT_UNCAUSED should not fire');
+    });
+
+    it('ACTION_SENTENCE_BURST_RUN fires when 4+ consecutive action lines each have ≥2 sentences', async () => {
+      // 8 lines: [1,1,2,2,2,2,1,1] sentences — run of 4 consecutive ≥2-sentence lines at pos 2-5 → fire
+      const f554b = makeF554Sent([1, 1, 2, 2, 2, 2, 1, 1]);
+      const res = await runR554(f554b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_SENTENCE_BURST_RUN'), 'ACTION_SENTENCE_BURST_RUN should fire');
+    });
+
+    it('ACTION_SENTENCE_BURST_RUN does not fire when max consecutive ≥2-sentence run is only 3', async () => {
+      // 8 lines: [1,1,2,2,2,1,1,1] sentences — run of 3 consecutive ≥2-sentence lines → no fire
+      const f554bn = makeF554Sent([1, 1, 2, 2, 2, 1, 1, 1]);
+      const res = await runR554(f554bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_SENTENCE_BURST_RUN'), 'ACTION_SENTENCE_BURST_RUN should not fire');
+    });
+
+    it('ACTION_PUNCTUATION_DESERT fires when <15% of ≥10 action lines contain a comma', async () => {
+      // 10 action lines: only line at index 0 has a comma (1/10 = 10% < 15%) → fire
+      const lines554c = Array.from({ length: 10 }, (_, i) => {
+        const action = i === 0 ? 'She stops, listens.' : 'word word word word word word.';
+        return `INT. SC${i} - DAY\n\n${action}`;
+      }).join('\n\n');
+      const res = await runR554(lines554c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_PUNCTUATION_DESERT'), 'ACTION_PUNCTUATION_DESERT should fire');
+    });
+
+    it('ACTION_PUNCTUATION_DESERT does not fire when ≥15% of action lines contain a comma', async () => {
+      // 10 action lines: lines 0 and 1 have commas (2/10 = 20% ≥ 15%) → no fire
+      const lines554cn = Array.from({ length: 10 }, (_, i) => {
+        const action = i < 2 ? 'She stops, listens.' : 'word word word word word word.';
+        return `INT. SC${i} - DAY\n\n${action}`;
+      }).join('\n\n');
+      const res = await runR554(lines554cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_PUNCTUATION_DESERT'), 'ACTION_PUNCTUATION_DESERT should not fire');
+    });
+  });
+
   describe('Wave 540 — rhythmPass: consecutive medium run, short expansion absent, word-count modal lock', async () => {
     const runR540 = async (fountain: string) => {
       const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
