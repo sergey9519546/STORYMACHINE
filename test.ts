@@ -23836,6 +23836,102 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 551 — pacingPass: turn aftermath suspense flat, turn aftermath curiosity flat, turn aftermath emotion flat', async () => {
+    const makeRec551 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain551 = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\n\nAction line for scene ${i}.`).join('\n\n');
+    const runP551 = async (records: any[]) => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: makeFountain551(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({})),
+        approvedSpans: [],
+      });
+    };
+
+    it('TURN_AFTERMATH_SUSPENSE_FLAT fires when all turns have avg next-scene suspenseDelta ≤ 0', async () => {
+      // n=8; turns at idx 1,3,5 (all ≠ last 2 positions [6,7]); next scenes all have suspenseDelta=0 → avg=0 ≤ 0 → fires.
+      const recs551a = Array.from({ length: 8 }, (_, i) =>
+        makeRec551(i, {
+          dramaticTurn: [1, 3, 5].includes(i) ? 'reversal' : 'nothing',
+          suspenseDelta: 0,
+        }),
+      );
+      const res = await runP551(recs551a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TURN_AFTERMATH_SUSPENSE_FLAT'), 'TURN_AFTERMATH_SUSPENSE_FLAT should fire');
+    });
+
+    it('TURN_AFTERMATH_SUSPENSE_FLAT does not fire when turns are followed by positive suspenseDelta', async () => {
+      // n=8; turns at idx 1,3,5; next scene after idx 3 (=idx 4) has suspenseDelta=2 → avg > 0 → no fire.
+      const recs551an = Array.from({ length: 8 }, (_, i) =>
+        makeRec551(i, {
+          dramaticTurn: [1, 3, 5].includes(i) ? 'reversal' : 'nothing',
+          suspenseDelta: i === 4 ? 2 : 0,
+        }),
+      );
+      const res = await runP551(recs551an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TURN_AFTERMATH_SUSPENSE_FLAT'), 'TURN_AFTERMATH_SUSPENSE_FLAT should not fire');
+    });
+
+    it('TURN_AFTERMATH_CURIOSITY_FLAT fires when all turns are followed by 2 scenes with curiosityDelta ≤ 0', async () => {
+      // n=8; turns at 1,3,5; all windows (scenes 2-3, 4-5, 6-7) have curiosityDelta=0 → all flat → fires.
+      const recs551b = Array.from({ length: 8 }, (_, i) =>
+        makeRec551(i, {
+          dramaticTurn: [1, 3, 5].includes(i) ? 'recognition' : 'nothing',
+          curiosityDelta: 0,
+        }),
+      );
+      const res = await runP551(recs551b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TURN_AFTERMATH_CURIOSITY_FLAT'), 'TURN_AFTERMATH_CURIOSITY_FLAT should fire');
+    });
+
+    it('TURN_AFTERMATH_CURIOSITY_FLAT does not fire when a turn aftermath has curiosityDelta > 0', async () => {
+      // n=8; turns at 1,3,5; scene 4 (aftermath of turn at 3) has curiosityDelta=1 → not all flat → no fire.
+      const recs551bn = Array.from({ length: 8 }, (_, i) =>
+        makeRec551(i, {
+          dramaticTurn: [1, 3, 5].includes(i) ? 'recognition' : 'nothing',
+          curiosityDelta: i === 4 ? 1 : 0,
+        }),
+      );
+      const res = await runP551(recs551bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TURN_AFTERMATH_CURIOSITY_FLAT'), 'TURN_AFTERMATH_CURIOSITY_FLAT should not fire');
+    });
+
+    it('TURN_AFTERMATH_EMOTION_FLAT fires when all turns are followed by 2 neutral-emotion scenes', async () => {
+      // n=8; turns at 1,3,5; all aftermath scenes neutral → fires.
+      const recs551c = Array.from({ length: 8 }, (_, i) =>
+        makeRec551(i, {
+          dramaticTurn: [1, 3, 5].includes(i) ? 'twist' : 'nothing',
+          emotionalShift: 'neutral',
+        }),
+      );
+      const res = await runP551(recs551c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TURN_AFTERMATH_EMOTION_FLAT'), 'TURN_AFTERMATH_EMOTION_FLAT should fire');
+    });
+
+    it('TURN_AFTERMATH_EMOTION_FLAT does not fire when a turn aftermath has non-neutral emotion', async () => {
+      // n=8; turns at 1,3,5; scene 2 (aftermath of turn at 1) has emotionalShift='positive' → not all neutral → no fire.
+      const recs551cn = Array.from({ length: 8 }, (_, i) =>
+        makeRec551(i, {
+          dramaticTurn: [1, 3, 5].includes(i) ? 'twist' : 'nothing',
+          emotionalShift: i === 2 ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runP551(recs551cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TURN_AFTERMATH_EMOTION_FLAT'), 'TURN_AFTERMATH_EMOTION_FLAT should not fire');
+    });
+  });
+
   describe('Wave 537 — pacingPass: revelation curiosity aftermath flat, payoff opening zone absent, revelation middle zone absent', async () => {
     const makeRec537 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

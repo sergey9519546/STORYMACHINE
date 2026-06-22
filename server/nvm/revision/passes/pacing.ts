@@ -130,6 +130,20 @@
 // scene — the story's greatest question-raise arrives without informational cause; backward-cause
 // × curiosity peak, third backward-cause check completing the peak-cause family alongside
 // SUSPENSE_PEAK_UNCAUSED and EMOTIONAL_PEAK_UNCAUSED).
+// Wave 551 additions: turn aftermath suspense flat (sequence/aftermath × suspense × dramatic-turn
+// trigger — n≥8, ≥3 dramatic-turn scenes not in last 2 positions, avg next-scene suspenseDelta ≤ 0;
+// story pivots never accelerate tension in what immediately follows; completes the dramatic-turn-
+// aftermath family alongside curiosity and emotion; distinct from all clock/revelation/payoff aftermath
+// checks which use different triggers), turn aftermath curiosity flat (sequence/aftermath × curiosity
+// × dramatic-turn trigger — n≥8, ≥3 dramatic-turn scenes not in last 2 positions, every turn followed
+// by 2 scenes with curiosityDelta ≤ 0; pivots never ignite wondering in what follows; distinct from
+// REVELATION_CURIOSITY_AFTERMATH_FLAT [revelation trigger] and CLOCK_AFTERMATH_CURIOSITY_FLAT [clock
+// trigger]; first aftermath × curiosity check on dramatic-turn trigger), turn aftermath emotion flat
+// (sequence/aftermath × emotion × dramatic-turn trigger — n≥8, ≥3 dramatic-turn scenes not in last
+// 2 positions, every turn followed by 2 emotionally neutral scenes; pivots never register in the
+// protagonist's felt state; distinct from CLOCK_AFTERMATH_EMOTION_FLAT and REVELATION_EMOTIONAL_
+// AFTERMATH_FLAT which use different triggers; completes the turn-aftermath family and the three
+// remaining emotion-aftermath cells across the full trigger set).
 // Wave 537 additions: revelation curiosity aftermath flat (sequence/aftermath × curiosity ×
 // revelation trigger — n≥8, ≥3 revelation scenes not in last 2 positions, every revelation
 // followed by 2 scenes with curiosityDelta ≤ 0; disclosures never ignite wondering in what
@@ -2901,6 +2915,133 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `The story has ${revPositions537c.length} revelation scene(s), but none fall in the middle structural third (scenes ${third537c}–${2 * third537c - 1}). The disclosure engine skips the complication zone entirely: truths surface in the opening or closing acts but the central section — where complications deepen and the protagonist's situation becomes most pressured — passes without any informational shift. The middle third is where revelations are most structurally powerful: a truth disclosed mid-game changes what the protagonist is tracking and makes the complication zone feel like discovery rather than accumulation. When the middle has no revelations, the complication zone relies on action alone without the informational dimension that changes what the audience understands about what they are watching.`,
             suggestedFix: `Introduce at least one revelation in the middle structural third: a truth disclosed at the moment the protagonist's situation is most pressured, a secret that reframes the earlier complications, or a disclosure that changes what the protagonist must do and how urgently. A mid-story revelation is the most powerful tool for converting accumulating pressure into informational gear-change.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 551: TURN_AFTERMATH_SUSPENSE_FLAT, TURN_AFTERMATH_CURIOSITY_FLAT,
+  //              TURN_AFTERMATH_EMOTION_FLAT ──────────────────────────────────────────────────────────
+
+  // TURN_AFTERMATH_SUSPENSE_FLAT — sequence/aftermath × suspense × dramatic-turn trigger.
+  // n≥8, ≥3 dramatic-turn scenes (dramaticTurn ≠ 'nothing' and ≠ '') not in last 2 positions.
+  // Average suspenseDelta of the scene immediately following each turn ≤ 0 → fire. Story pivots —
+  // reversals, recognitions, twists — never accelerate tension in what immediately follows. A dramatic
+  // turn is one of the most structurally powerful events in a screenplay: it reorients the story, and
+  // the scene after a pivot should feel the force of that reorientation as rising pressure. When every
+  // turn is followed by a suspense-neutral or negative scene, the pivots flatten into informational
+  // updates rather than escalating events. The structural purpose of a turn is to increase the
+  // protagonist's predicament — and that should translate to a measurable suspense rise in the scene
+  // that follows.
+  // Distinct from: REVELATION_SUSPENSE_AFTERMATH_FLAT (Wave 467: revelation trigger — same aftermath
+  // channel, different trigger), CLOCK_AFTERMATH_SUSPENSE_FLAT (Wave 481: clock trigger), PAYOFF_
+  // AFTERMATH_SUSPENSE_FLAT (Wave 523: payoff trigger). First aftermath × suspense check on the
+  // dramatic-turn trigger in this pass.
+  {
+    const n551a = records.length;
+    if (n551a >= 8) {
+      const qualTurnRecs551a = (records as any[]).filter((r, pos) =>
+        (r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '' && pos < n551a - 2,
+      );
+      if (qualTurnRecs551a.length >= 3) {
+        const avgNextSusp551a = qualTurnRecs551a.reduce((sum: number, r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          const nxt = (records as any[])[pos + 1];
+          return sum + (nxt ? (nxt.suspenseDelta ?? 0) : 0);
+        }, 0) / qualTurnRecs551a.length;
+        if (avgNextSusp551a <= 0) {
+          issues.push({
+            location: `${qualTurnRecs551a.length} dramatic-turn scene(s) — avg next-scene suspenseDelta: ${avgNextSusp551a.toFixed(2)}`,
+            rule: 'TURN_AFTERMATH_SUSPENSE_FLAT',
+            severity: 'minor',
+            description: `The scenes immediately following the story's ${qualTurnRecs551a.length} dramatic-turn scenes (reversals, recognitions, twists) average a suspenseDelta of ${avgNextSusp551a.toFixed(2)} — story pivots never accelerate tension in what immediately follows. A dramatic turn should rearrange the protagonist's predicament in a way that tightens the situation: the scene after a reversal should feel the force of the pivot as increased pressure. When every turn is followed by a tension-neutral or downward scene, the pivots read as informational updates — they tell the audience something has changed without making the change feel dangerous. Pacing depends on turns generating escalation; turns that do not increase the felt stakes in the scene that follows are structural gear-changes that fail to shift the vehicle into a higher register.`,
+            suggestedFix: `After at least one dramatic-turn scene, let the following scene carry a positive suspenseDelta: introduce a consequence of the turn that immediately increases the protagonist's danger or the story's uncertainty. Even a brief scene of rising pressure in the wake of a pivot — the protagonist now under a threat the turn created — translates the structural turn into a felt pacing event.`,
+          });
+        }
+      }
+    }
+  }
+
+  // TURN_AFTERMATH_CURIOSITY_FLAT — sequence/aftermath × curiosity × dramatic-turn trigger.
+  // n≥8, ≥3 dramatic-turn scenes (dramaticTurn ≠ 'nothing') not in last 2 positions. Every turn
+  // is followed by 2 scenes with curiosityDelta ≤ 0 → fire. Story pivots — reversals, recognitions,
+  // twists — never ignite wondering in what follows: every pivot lands and the audience stops asking
+  // new questions in the two scenes that follow. A dramatic turn should reframe what the audience
+  // does not know: a reversal suggests new implications, a recognition reveals that prior
+  // understanding was wrong, a twist makes the audience re-evaluate what they have seen. The scenes
+  // following a turn should carry the heightened wondering that comes from a changed landscape. When
+  // every turn is followed by curiosity-flat scenes, the pivots deliver informational closure without
+  // the epistemic opening that would make the reorientation feel generative rather than merely complete.
+  // Distinct from: REVELATION_CURIOSITY_AFTERMATH_FLAT (Wave 537: revelation trigger), CLOCK_
+  // AFTERMATH_CURIOSITY_FLAT (Wave 495: clock trigger). First aftermath × curiosity check on the
+  // dramatic-turn trigger in this pass.
+  {
+    const n551b = records.length;
+    if (n551b >= 8) {
+      const qualTurnRecs551b = (records as any[]).filter((r, pos) =>
+        (r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '' && pos < n551b - 2,
+      );
+      if (qualTurnRecs551b.length >= 3) {
+        const allTurnNoCurAftermath551b = qualTurnRecs551b.every((r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos + off];
+            if (nxt && (nxt.curiosityDelta ?? 0) > 0) return false;
+          }
+          return true;
+        });
+        if (allTurnNoCurAftermath551b) {
+          issues.push({
+            location: `${qualTurnRecs551b.length} dramatic-turn scene(s) — curiosity aftermath absent in all 2-scene windows`,
+            rule: 'TURN_AFTERMATH_CURIOSITY_FLAT',
+            severity: 'minor',
+            description: `Every one of the story's ${qualTurnRecs551b.length} dramatic-turn scenes (reversals, recognitions, twists) is followed by two scenes with no curiosity rise (curiosityDelta ≤ 0 in both). Story pivots consistently land without generating new open questions in what follows — every reversal, recognition, or twist closes rather than opens the audience's wondering. The most structurally powerful turns do two things at once: they reorient the story AND create new questions about what the reorientation means. A turn that is followed by curiosity-flat scenes tells the audience that the pivot has been processed and integrated rather than that it has opened a new and more complex landscape to explore.`,
+            suggestedFix: `After at least one dramatic-turn scene, let the following scene carry a positive curiosityDelta: introduce an implication of the turn that raises a new question, reveal that the reversal has a layer the audience did not know about, or let the recognition reframe what the audience thought they understood in a way that generates more wondering rather than less. The best turns accelerate the audience's need to see what comes next rather than completing a question they had already formed.`,
+          });
+        }
+      }
+    }
+  }
+
+  // TURN_AFTERMATH_EMOTION_FLAT — sequence/aftermath × emotion × dramatic-turn trigger.
+  // n≥8, ≥3 dramatic-turn scenes (dramaticTurn ≠ 'nothing') not in last 2 positions. Every turn
+  // is followed by 2 emotionally neutral scenes → fire. Story pivots — reversals, recognitions,
+  // twists — never produce a felt response in what follows: characters pivot and then continue
+  // through the next two scenes without any registered emotional consequence. The purpose of a
+  // dramatic turn is to change something about the protagonist's situation dramatically enough
+  // that it must be felt, not just acknowledged. A turn that is structurally complete (something
+  // reversed or recognized) but affectively silent in the aftermath reads as a mechanical plot
+  // adjustment rather than a story event. The felt state of the protagonist after a turn is what
+  // converts the structural event into narrative momentum — without it, the pivot is a diagram,
+  // not a story.
+  // Distinct from: REVELATION_EMOTIONAL_AFTERMATH_FLAT (Wave 495: revelation trigger), CLOCK_
+  // AFTERMATH_EMOTION_FLAT (Wave 523: clock trigger), PAYOFF_AFTERMATH_EMOTION_FLAT (Wave 523:
+  // payoff trigger). Completes the dramatic-turn-aftermath family alongside TURN_AFTERMATH_SUSPENSE_
+  // FLAT and TURN_AFTERMATH_CURIOSITY_FLAT, and completes the emotion-aftermath family across all
+  // triggers (revelation, clock, payoff, and dramatic turn).
+  {
+    const n551c = records.length;
+    if (n551c >= 8) {
+      const qualTurnRecs551c = (records as any[]).filter((r, pos) =>
+        (r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '' && pos < n551c - 2,
+      );
+      if (qualTurnRecs551c.length >= 3) {
+        const allTurnNoEmoAftermath551c = qualTurnRecs551c.every((r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos + off];
+            if (nxt && (nxt.emotionalShift ?? 'neutral') !== 'neutral') return false;
+          }
+          return true;
+        });
+        if (allTurnNoEmoAftermath551c) {
+          issues.push({
+            location: `${qualTurnRecs551c.length} dramatic-turn scene(s) — emotion absent in all aftermath windows`,
+            rule: 'TURN_AFTERMATH_EMOTION_FLAT',
+            severity: 'minor',
+            description: `Every one of the story's ${qualTurnRecs551c.length} dramatic-turn scenes (reversals, recognitions, twists) is followed by two emotionally neutral scenes. Story pivots are landing without felt consequences: the story turns, and then the characters continue through the next two scenes as if nothing has changed in their emotional state. A dramatic turn should change what the protagonist is up against — and that change should register as a felt experience before the plot moves on. When pivots are never followed by emotional beats, the turns read as informational updates rather than as events that cost the protagonist something. Pacing is not just about events per unit time; it is about events that land in the character's interiority, and turns without emotional aftermath are structurally complete but dramatically unanchored.`,
+            suggestedFix: `After at least one dramatic-turn scene, let the following scene carry a non-neutral emotional shift — a moment of dread, relief, resolve, or grief that shows the protagonist registering what the pivot has cost or revealed. The emotional beat need not be long; a single line of acted response before the next scene of action is enough to anchor the turn in the character's experience and convert the structural event into a felt story moment.`,
           });
         }
       }
