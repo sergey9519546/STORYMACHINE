@@ -146,6 +146,18 @@
 // characters communicate in fragments — one-word, two-word, or three-word utterances — without
 // substantive expression; distinct from ONE_WORD_LINE_DOMINANCE in dialogue.ts which uses a 35%
 // threshold for single-word lines, since this extends the threshold to ≤3 words at a 60% rate).
+// Wave 564 additions: slug INT/EXT monotone (distribution/monotony × scene heading × interior/
+// exterior register — ≥8 classifiable slugs, zero mixed INT/EXT slugs, dominant register >90%; the
+// story unfolds in one spatial mode; distinct from SCENE_SLUG_TIME_MONOTONE [time-of-day axis],
+// LOCATION_REPETITION [named place], and CONTINUOUS_SLUG_OVERUSE [CONTINUOUS tag]), dialogue em-dash
+// interruption flood (underweight/bloat × dialogue × trailing interruption dash — ≥8 dialogue lines,
+// >30% end with "—" or "--"; interruption becomes a tic that makes every exchange frantic; distinct
+// from DIALOGUE_ELLIPSIS_FLOOD [trailing "..." — soft trail-off vs hard cut-off], DIALOGUE_
+// EXCLAMATION_FLOOD [trailing "!"], and all opener-position dialogue checks), action polysyndeton
+// flood (underweight/bloat × action × internal "and"-clause chaining — ≥8 action lines, >20% contain
+// ≥2 standalone "and" conjunctions; run-on action with no internal hierarchy; distinct from OPENING_
+// CONJUNCTION_OVERUSE and ACTION_THEN_OPENER_FLOOD [opener-position single conjunctions] and ACTION_
+// OPENER_MONOTONY [repeated first word], targeting INTERNAL coordination density instead).
 // Wave 522 additions: dialogue hedging flood (underweight/bloat × dialogue × uncertainty register —
 // >25% of ≥8 dialogue lines contain hedging/uncertainty vocabulary: "maybe," "perhaps," "I think,"
 // "I guess," "probably," "possibly," "sort of," "kind of," "apparently," "might be," "seem to";
@@ -3316,6 +3328,135 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${advCount550c} of ${actionTotal550c} action lines (${Math.round(advCount550c / actionTotal550c * 100)}%) contain at least one adverb ending in "-ly." Adverb-saturated action prose is a hallmark of telling rather than showing: "she walks quickly" is a less vivid choice than "she sprints," and "he speaks quietly" is weaker than "he murmurs." When more than a third of action lines rely on an adverb to supply the manner of an action, the verbs are not doing their job: each adverb signals an imprecise verb that needed modification. Cinematic action prose favors specific, manner-bearing verbs ("slams," "creeps," "collapses") over general verbs with modifying adverbs ("closes forcefully," "moves slowly," "falls down dramatically"). The camera sees what characters do, not how they do it in the abstract — only specific verbs produce specific images.`,
         suggestedFix: `Replace each adverb-modified verb pair with a single, specific verb that contains the manner: "walks quickly" → "strides," "moves slowly" → "creeps," "looks carefully" → "studies," "speaks quietly" → "murmurs," "runs fast" → "sprints." Read each adverb as a diagnostic: it indicates that a more precise verb exists and is not being used. After replacement, the action lines will be shorter, more visual, and more specific — the three qualities that distinguish cinematic prose from general narrative prose.`,
+      });
+    }
+  }
+
+  // ── Wave 564: SLUG_INT_EXT_MONOTONE, DIALOGUE_EM_DASH_INTERRUPTION_FLOOD,
+  //              ACTION_THE_OPENER_FLOOD ──────────────────────────────────────────────────────────
+
+  // SLUG_INT_EXT_MONOTONE — distribution/monotony × scene heading × interior/exterior register.
+  // ≥8 classifiable scene sluglines (each clearly INT. or EXT.), zero mixed (INT/EXT., I/E.) slugs,
+  // and the dominant register accounts for >90% of them → fire. The story unfolds in one spatial
+  // register: every scene is an interior, or every scene is an exterior. Interior and exterior carry
+  // distinct cinematic grammar — interiors are enclosed, controlled, intimate, claustrophobic;
+  // exteriors are open, exposed, weather-bound, expansive. A screenplay that never crosses between
+  // them flattens its visual world to a single spatial mode, forfeiting the contrast that makes a
+  // cut from a cramped room to an open horizon (or vice versa) carry meaning. The interior/exterior
+  // alternation is one of the most basic tools for giving a film visual rhythm and for using space
+  // to externalize a character's psychological state.
+  // Distinct from: SCENE_SLUG_TIME_MONOTONE (Wave 245: monotony on the TIME-of-day indicator —
+  // DAY/NIGHT/etc.; this audits the INT/EXT prefix, an orthogonal axis of the slugline), LOCATION_
+  // REPETITION / REPEATED_LOCATION_EXCESS (Wave 273: same NAMED location overused — a different
+  // slugline field, the place name not the interior/exterior register), CONTINUOUS_SLUG_OVERUSE
+  // (Wave 368: the CONTINUOUS time tag). First check on the interior/exterior register of sluglines.
+  {
+    let intCount564a = 0;
+    let extCount564a = 0;
+    let mixedCount564a = 0;
+    for (const line of lines) {
+      const t = line.trim();
+      if (/^(INT\/EXT\.|I\/E\.)/i.test(t)) { mixedCount564a++; continue; }
+      if (/^INT\./i.test(t)) { intCount564a++; continue; }
+      if (/^EXT\./i.test(t)) { extCount564a++; continue; }
+    }
+    const classifiable564a = intCount564a + extCount564a;
+    if (classifiable564a >= 8 && mixedCount564a === 0) {
+      const dominant564a = Math.max(intCount564a, extCount564a);
+      if (dominant564a / classifiable564a > 0.9) {
+        const register564a = intCount564a >= extCount564a ? 'interior (INT.)' : 'exterior (EXT.)';
+        issues.push({
+          location: `${dominant564a} of ${classifiable564a} scene sluglines are ${register564a}`,
+          rule: 'SLUG_INT_EXT_MONOTONE',
+          severity: 'minor',
+          description: `${dominant564a} of ${classifiable564a} scene sluglines (${Math.round(dominant564a / classifiable564a * 100)}%) are ${register564a} — the story unfolds in essentially one spatial register. Interior and exterior carry distinct cinematic grammar: interiors are enclosed, controlled, intimate, often claustrophobic; exteriors are open, exposed, weather-bound, expansive. A screenplay that never crosses between them flattens its visual world to a single spatial mode and forfeits the contrast that makes a cut from a cramped room to an open horizon (or the reverse) carry meaning. The interior/exterior alternation is a basic tool for giving a film visual rhythm and for using physical space to externalize a character's psychological state — a tool this script leaves almost entirely unused.`,
+          suggestedFix: `Move at least some scenes into the opposite register: if the story is interior-bound, find the scenes that could play outdoors — a confrontation that spills into the street, a private moment on a rooftop, a journey between locations. The shift need not be arbitrary; let the change of space mean something — a character who finally steps outside after being trapped indoors, or one who retreats inside after exposure. Spatial contrast is one of the cheapest and most powerful sources of cinematic variety.`,
+        });
+      }
+    }
+  }
+
+  // DIALOGUE_EM_DASH_INTERRUPTION_FLOOD — underweight/bloat × dialogue × trailing interruption dash.
+  // ≥8 dialogue lines, >30% end with an em-dash ("—") or a double-hyphen ("--") → fire. The trailing
+  // dash is the screenplay convention for an interrupted or cut-off line: the character is stopped
+  // mid-thought by another speaker, an event, or their own hesitation. Used sparingly, interruption
+  // creates urgency and overlap that makes dialogue feel alive. Used on more than a third of all
+  // lines, it becomes a verbal tic that makes every exchange feel frantic and unfinished — no one
+  // ever completes a thought, every beat is a collision, and the device loses all impact through
+  // repetition. A script where interruption is the default rhythm reads as mannered and exhausting:
+  // the technique that should mark the story's most charged confrontations is spent on ordinary
+  // conversation.
+  // Distinct from: DIALOGUE_ELLIPSIS_FLOOD (Wave 452: trailing "..." — the trailing-OFF / fading
+  // device, a different punctuation mark and a different effect; the dash is a hard cut-off, the
+  // ellipsis a soft trail), DIALOGUE_EXCLAMATION_FLOOD (Wave 536: trailing "!" — emphatic not
+  // interruptive), DIALOGUE_QUESTION_FLOOD (trailing "?"), DIALOGUE_FILLER_OPENER / _RUN (opener
+  // position not line ending). First check targeting the trailing interruption dash in dialogue.
+  {
+    let dlgTotal564b = 0;
+    let dashCount564b = 0;
+    let inDlg564b = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg564b = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg564b = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg564b = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (!inDlg564b) continue;
+      dlgTotal564b++;
+      if (/(—|--)$/.test(t)) dashCount564b++;
+    }
+    if (dlgTotal564b >= 8 && dashCount564b / dlgTotal564b > 0.30) {
+      issues.push({
+        location: `${dashCount564b} of ${dlgTotal564b} dialogue lines end with an interruption dash`,
+        rule: 'DIALOGUE_EM_DASH_INTERRUPTION_FLOOD',
+        severity: 'minor',
+        description: `${dashCount564b} of ${dlgTotal564b} dialogue lines (${Math.round(dashCount564b / dlgTotal564b * 100)}%) end with an em-dash or double-hyphen — the convention for an interrupted or cut-off line. Used sparingly, interruption creates urgency and overlap that makes dialogue feel alive and reactive. Used on more than a third of all lines, it becomes a verbal tic: every exchange feels frantic and unfinished, no character ever completes a thought, and the device loses all impact through sheer repetition. A script where interruption is the default rhythm reads as mannered and exhausting — the technique that should be reserved for the story's most charged collisions is spent on ordinary conversation, leaving nothing in reserve for the moments that should genuinely cut a character off.`,
+        suggestedFix: `Let most lines complete. Reserve the interruption dash for the moments where being cut off matters — a confession stopped before it lands, an argument where speakers genuinely talk over each other, a warning that arrives too late. Replace the bulk of the trailing dashes with completed lines or with periods; the contrast will make the remaining interruptions land hard. If two characters genuinely overlap throughout a scene, that frantic rhythm should be a deliberate, isolated choice — not the texture of the entire script.`,
+      });
+    }
+  }
+
+  // ACTION_POLYSYNDETON_FLOOD — underweight/bloat × action prose × internal "and"-clause chaining.
+  // ≥8 action lines, >20% of them contain two or more standalone "and" conjunctions → fire. A line
+  // with multiple "and"s strings actions into an undifferentiated chain: "He grabs the bag and bolts
+  // for the door and throws it open and runs." Polysyndeton has legitimate uses — it can create
+  // breathless momentum in a single charged beat — but when more than a fifth of all action lines
+  // chain three-plus clauses with "and," the device stops being a choice and becomes the writer's
+  // default sentence-assembly method. The result is action prose with no internal hierarchy: every
+  // beat carries equal weight because nothing is subordinated, broken out, or given its own line.
+  // On screen, each of those chained actions is a separate shot or moment; collapsing them into one
+  // run-on sentence flattens the editing rhythm the prose should imply and buries the one action in
+  // the chain that actually matters.
+  // Distinct from: OPENING_CONJUNCTION_OVERUSE (Wave: action lines that OPEN with And/But/So — opener
+  // position, a single leading conjunction; this audits INTERNAL "and" density, two-plus per line),
+  // ACTION_THEN_OPENER_FLOOD (Wave 466: "Then" sequential openers — opener position, different word),
+  // COPULA_ACTION_DOMINANCE (is/are/was constructions — a different grammatical phenomenon), ACTION_
+  // OPENER_MONOTONY (repeated first word — opener-position monotony, not internal coordination). First
+  // check on internal clause-chaining density in action prose.
+  {
+    let actionTotal564c = 0;
+    let polysyndetonCount564c = 0;
+    let inDlg564c = false;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg564c = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg564c = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg564c = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (inDlg564c) continue;
+      // This is an action line — count standalone "and" conjunctions (word-boundaried, so "band",
+      // "hand", "Andrew" do not match). Two or more signals a chained, run-on construction.
+      actionTotal564c++;
+      const andMatches564c = t.match(/\band\b/gi);
+      if (andMatches564c && andMatches564c.length >= 2) polysyndetonCount564c++;
+    }
+    if (actionTotal564c >= 8 && polysyndetonCount564c / actionTotal564c > 0.20) {
+      issues.push({
+        location: `${polysyndetonCount564c} of ${actionTotal564c} action lines chain 3+ clauses with "and"`,
+        rule: 'ACTION_POLYSYNDETON_FLOOD',
+        severity: 'minor',
+        description: `${polysyndetonCount564c} of ${actionTotal564c} action lines (${Math.round(polysyndetonCount564c / actionTotal564c * 100)}%) contain two or more standalone "and" conjunctions — stringing three or more actions into a single undifferentiated chain ("He grabs the bag and bolts for the door and throws it open"). Polysyndeton can create breathless momentum in a single charged beat, but when more than a fifth of all action lines chain clauses this way, it has stopped being a deliberate device and become the default sentence-assembly method. The result is action prose with no internal hierarchy: every beat carries equal weight because nothing is subordinated or broken out onto its own line. On screen each chained action is a separate shot or moment; collapsing them into one run-on sentence flattens the editing rhythm the prose should imply and buries the single action in the chain that actually matters.`,
+        suggestedFix: `Break the chained lines apart. Give the action that matters its own sentence — often its own line — and cut or subordinate the connective tissue around it. "He grabs the bag and bolts for the door and throws it open and runs" becomes "He grabs the bag. Bolts for the door, throws it open — and runs." Reserve polysyndeton for the rare beat where the unbroken rush is the point. Varying clause length and structure restores the internal hierarchy that tells the reader (and the editor) which action is the beat and which are merely the lead-up.`,
       });
     }
   }

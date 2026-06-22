@@ -25309,6 +25309,60 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 564 — originalityPass: slug INT/EXT monotone, dialogue em-dash interruption flood, action polysyndeton flood', async () => {
+    const runO564 = async (fountain: string) => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      return originalityPass({
+        fountain, original: fountain, records: [],
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // SLUG_INT_EXT_MONOTONE fire: 8 slugs all INT., 0 EXT, 0 mixed → 8/8=100% > 90% → fires
+    it('SLUG_INT_EXT_MONOTONE fires when >90% of classifiable slugs share one register', async () => {
+      const f564a = `INT. ROOM - DAY\n\nShe enters.\n\nINT. OFFICE - NIGHT\n\nHe waits.\n\nINT. CAR - DAY\n\nThey drive.\n\nINT. KITCHEN - NIGHT\n\nShe cooks.\n\nINT. HALLWAY - DAY\n\nHe walks.\n\nINT. BEDROOM - NIGHT\n\nShe rests.\n\nINT. BASEMENT - DAY\n\nHe searches.\n\nINT. ATTIC - NIGHT\n\nShe finds it.\n\n`;
+      const res = await runO564(f564a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SLUG_INT_EXT_MONOTONE'), 'SLUG_INT_EXT_MONOTONE should fire');
+    });
+
+    // SLUG_INT_EXT_MONOTONE no-fire: 4 INT + 4 EXT → dominant 4/8=50% ≤ 90% → no fire
+    it('SLUG_INT_EXT_MONOTONE does not fire when interior and exterior are balanced', async () => {
+      const f564an = `INT. ROOM - DAY\n\nShe enters.\n\nEXT. STREET - NIGHT\n\nHe waits.\n\nINT. CAR - DAY\n\nThey drive.\n\nEXT. PARK - NIGHT\n\nShe walks.\n\nINT. HALLWAY - DAY\n\nHe walks.\n\nEXT. ROOFTOP - NIGHT\n\nShe rests.\n\nINT. BASEMENT - DAY\n\nHe searches.\n\nEXT. FIELD - NIGHT\n\nShe finds it.\n\n`;
+      const res = await runO564(f564an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SLUG_INT_EXT_MONOTONE'), 'SLUG_INT_EXT_MONOTONE should not fire');
+    });
+
+    // DIALOGUE_EM_DASH_INTERRUPTION_FLOOD fire: 8 dialogue lines, 4 end with "—" (50% > 30%) → fires
+    it('DIALOGUE_EM_DASH_INTERRUPTION_FLOOD fires when >30% of dialogue lines end with an interruption dash', async () => {
+      const f564b = `INT. ROOM - DAY\n\nALICE\nWait, I didn't—\n\nBOB\nYou always say that—\n\nALICE\nBut you never listen to me at all.\n\nBOB\nThat's not—\n\nALICE\nI just need a moment to think.\n\nBOB\nWe don't have—\n\nALICE\nFine. Let's go now.\n\nBOB\nOkay then.\n\n`;
+      const res = await runO564(f564b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_EM_DASH_INTERRUPTION_FLOOD'), 'DIALOGUE_EM_DASH_INTERRUPTION_FLOOD should fire');
+    });
+
+    // DIALOGUE_EM_DASH_INTERRUPTION_FLOOD no-fire: 8 dialogue lines, 2 end with "—" (25% ≤ 30%) → no fire
+    it('DIALOGUE_EM_DASH_INTERRUPTION_FLOOD does not fire when interruption dashes are at or below 30%', async () => {
+      const f564bn = `INT. ROOM - DAY\n\nALICE\nWait, I didn't—\n\nBOB\nYou always say that—\n\nALICE\nBut you never listen to me at all.\n\nBOB\nThat is not true.\n\nALICE\nI just need a moment to think.\n\nBOB\nWe do not have time.\n\nALICE\nFine. Let's go now.\n\nBOB\nOkay then.\n\n`;
+      const res = await runO564(f564bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_EM_DASH_INTERRUPTION_FLOOD'), 'DIALOGUE_EM_DASH_INTERRUPTION_FLOOD should not fire');
+    });
+
+    // ACTION_POLYSYNDETON_FLOOD fire: 8 action lines, 3 contain ≥2 "and" (37.5% > 20%) → fires
+    it('ACTION_POLYSYNDETON_FLOOD fires when >20% of action lines chain 3+ clauses with "and"', async () => {
+      const f564c = `INT. ROOM - DAY\n\nHe grabs the bag and bolts for the door and runs.\n\nShe opens the window.\n\nHe climbs out and drops to the ground and sprints.\n\nThe car waits.\n\nShe turns the key and guns the engine and speeds off.\n\nA figure watches.\n\nThe road stretches ahead.\n\nRain falls.\n\n`;
+      const res = await runO564(f564c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_POLYSYNDETON_FLOOD'), 'ACTION_POLYSYNDETON_FLOOD should fire');
+    });
+
+    // ACTION_POLYSYNDETON_FLOOD no-fire: 8 action lines, 1 contains ≥2 "and" (12.5% ≤ 20%) → no fire
+    it('ACTION_POLYSYNDETON_FLOOD does not fire when "and"-chained lines are at or below 20%', async () => {
+      const f564cn = `INT. ROOM - DAY\n\nHe grabs the bag and bolts for the door and runs.\n\nShe opens the window.\n\nHe climbs out.\n\nThe car waits.\n\nShe turns the key.\n\nA figure watches.\n\nThe road stretches ahead.\n\nRain falls.\n\n`;
+      const res = await runO564(f564cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_POLYSYNDETON_FLOOD'), 'ACTION_POLYSYNDETON_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 550 — originalityPass: parenthetical flood, dialogue long speech flood, action adverb flood', async () => {
     const runO550 = async (fountain: string) => {
       const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
