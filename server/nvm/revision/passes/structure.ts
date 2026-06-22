@@ -112,6 +112,20 @@
 // ≥2 qualifying turn scenes none followed by a suspense spike in next 2 scenes while ≥3 suspense
 // scenes exist; first aftermath check using the dramatic-turn trigger, distinct from REVELATION_
 // AFTERMATH_CLOCK_VOID [revelation trigger] and INCITING_AFTERMATH_STALL [inciting incident trigger]).
+// Wave 555 additions: clock suspense decoupled (co-occurrence/decoupling × clock × suspense
+// — ≥2 clock scenes and ≥2 suspense-positive scenes but zero overlap; urgency and tension
+// never coincide in the same scene; distinct from CLOCK_CURIOSITY_DECOUPLED which audits the
+// curiosity channel and CLOCK_TURN_DECOUPLED which audits the dramatic-turn channel; completes
+// the clock co-occurrence family with the suspense channel), revelation causeless (backward-cause
+// × revelation signal — ≥3 revelation scenes at positions ≥3, every one preceded in the prior 3
+// scenes by no suspense spike, no clock raise, and no dramatic turn; disclosures erupt without
+// structural build-up; distinct from DRAMATIC_TURN_CAUSELESS which uses the turn trigger and
+// CLIMAX_UNPREPARED which uses the climax-position trigger), turn aftermath emotion void (sequence/
+// aftermath × emotion × dramatic-turn trigger — ≥3 qualifying turn scenes none followed by an
+// emotional shift in next 2 scenes while ≥2 emotional scenes exist; pivots never move the
+// emotional register in their aftermath; the emotion-channel sibling of TURN_AFTERMATH_SUSPENSE_VOID
+// and TURN_AFTERMATH_CURIOSITY_VOID, completing the turn-trigger aftermath channel family with the
+// emotional register).
 // Wave 541 additions: revelation aftermath suspense void (sequence/aftermath × suspense ×
 // revelation trigger — ≥3 qualifying revelations none followed by a suspense spike in next
 // 2 scenes while ≥2 suspense-spike scenes exist; disclosures never activate tension in their
@@ -2822,6 +2836,125 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
           description: `${maxNeutralRun541c} consecutive scenes carry no emotional charge (all emotionalShift='neutral'), even though ${emotionalScenes541c.length} emotionally charged scenes exist elsewhere in the story. In a ${maxNeutralRun541c}-scene neutral run, the audience tracks events without registering them as felt experience — the plot advances as information rather than as something that matters to anyone. Emotional engagement requires recurrence: the audience's investment is maintained by regular emotional signals that remind them the events have stakes. A 6+-scene neutral stretch severs that connection: the audience is watching rather than feeling, and by the end of the run the story's emotional temperature has cooled enough that even the next emotional beat arrives against a lowered baseline of investment.`,
           suggestedFix: `Introduce at least one emotionally charged scene (positive or negative emotionalShift) within the ${maxNeutralRun541c}-scene neutral run — a moment where what is happening registers as felt experience for the protagonist. The charge need not be large; even a small positive shift (a brief moment of relief or connection) or a small negative shift (a flash of fear or loss) within the run re-engages the audience's emotional tracking and prevents the stretch from becoming an affect-free zone.`,
         });
+      }
+    }
+  }
+
+  {
+    // CLOCK_SUSPENSE_DECOUPLED — co-occurrence/decoupling × clock × suspense.
+    // n≥8, ≥2 clock-raised scenes, ≥2 suspense-positive scenes (suspenseDelta>0). No scene
+    // carries both clockRaised=true AND suspenseDelta>0 → fire. Deadline pressure and narrative
+    // tension are the story's most powerful co-occurring amplifiers: a scene where a clock ticks
+    // AND suspense rises simultaneously compounds urgency with anxiety, making both signals more
+    // forceful than either alone. When these two channels always operate in separate scenes, the
+    // audience never experiences the compound beat of a ticking deadline that also escalates
+    // tension — the pressure of time and the pressure of uncertainty pass in different moments.
+    // Distinct from: CLOCK_CURIOSITY_DECOUPLED (Wave 499: curiosity channel — this adds the
+    // suspense channel), CLOCK_TURN_DECOUPLED (Wave 513: dramatic-turn channel), REVELATION_
+    // CLOCK_DECOUPLED (Wave 485: revelation trigger rather than clock trigger). Completes the
+    // clock co-occurrence family with the suspense-channel entry.
+    if (n >= 8) {
+      const clockScenes555a = (records as any[]).filter(r => r.clockRaised === true);
+      const suspenseScenes555a = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 0);
+      if (clockScenes555a.length >= 2 && suspenseScenes555a.length >= 2) {
+        const clockIdxSet555a = new Set(clockScenes555a.map(r => r.sceneIdx));
+        const anyOverlap555a = suspenseScenes555a.some(r => clockIdxSet555a.has(r.sceneIdx));
+        if (!anyOverlap555a) {
+          issues.push({
+            location: `${clockScenes555a.length} clock scene(s), ${suspenseScenes555a.length} suspense scene(s) — no overlap`,
+            rule: 'CLOCK_SUSPENSE_DECOUPLED',
+            severity: 'minor',
+            description: `The story has ${clockScenes555a.length} scenes that raise a deadline (clockRaised) and ${suspenseScenes555a.length} scenes that escalate suspense (suspenseDelta>0), but no scene carries both simultaneously. Deadline pressure and narrative tension are the story's two most potent co-occurring amplifiers: a scene where a ticking clock coincides with a suspense spike compounds urgency with anxiety, making both signals more forceful than either alone. When these channels always operate separately, the audience never experiences the most electrifying structural beat — the moment where time is running out AND something awful might happen inside that contracting window. The clock and the suspense axis pass each other in separate scenes, reducing their combined force.`,
+            suggestedFix: `Let at least one clock-raising scene also carry a suspense escalation — introduce a ticking deadline into a scene that already heightens anxiety, or allow the revelation of a deadline to itself create tension. The simultaneous activation of both channels is dramatically more powerful than either alone: the clock makes the suspense feel urgent, and the suspense makes the clock feel dangerous rather than merely logistical.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // REVELATION_CAUSELESS — backward-cause × revelation signal.
+    // n≥8, ≥3 revelation scenes at positions i≥3. Every revelation lacks a structural
+    // build-up in the prior 3 scenes: no suspenseDelta>0, no clockRaised=true, no
+    // dramaticTurn≠'nothing' → fire. Disclosures land with greatest force when the preceding
+    // scenes have elevated tension, raised a deadline, or pivoted the story's direction — the
+    // prior action creates a pressure vessel that the revelation discharges. When every
+    // revelation arrives into a flat, unpressurised context, the disclosures feel arbitrary:
+    // they deliver information rather than releasing accumulated structural energy.
+    // Distinct from: DRAMATIC_TURN_CAUSELESS (Wave 457: backward-cause × turn trigger — this
+    // uses revelation trigger), CLIMAX_UNPREPARED (Wave 429: backward-cause × climax position —
+    // this audits any revelation regardless of position), REVELATION_SUSPENSE_DECOUPLED (Wave
+    // 457: co-occurrence mode — fires when no revelation scene has suspenseDelta>0 in the
+    // same scene; this checks PRIOR scenes, not the revelation scene itself).
+    if (n >= 8) {
+      const qualRevs555b = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) =>
+          r.revelation !== null && r.revelation !== undefined && r.revelation !== '' && pos >= 3,
+        );
+      if (qualRevs555b.length >= 3) {
+        const allCauseless555b = qualRevs555b.every(({ pos }) => {
+          for (let off = 1; off <= 3; off++) {
+            if (pos - off < 0) break;
+            const prior = (records as any[])[pos - off];
+            if ((prior.suspenseDelta ?? 0) > 0) return false;
+            if (prior.clockRaised === true) return false;
+            if ((prior.dramaticTurn ?? 'nothing') !== 'nothing' && prior.dramaticTurn !== '') return false;
+          }
+          return true;
+        });
+        if (allCauseless555b) {
+          issues.push({
+            location: `${qualRevs555b.length} revelation scene(s) — none preceded by structural build-up`,
+            rule: 'REVELATION_CAUSELESS',
+            severity: 'minor',
+            description: `Every revelation in the story (${qualRevs555b.length} scene(s)) arrives without any structural build-up in the prior three scenes: no scene before the disclosure escalates suspense, raises a deadline, or pivots the story's direction. A revelation is not just information — it is a structural discharge. It lands with maximum force when the prior scenes have pressurised the context: a suspense spike primes the audience for something terrible or transformative; a clock raise makes the disclosure feel like a race-against-time answer; a dramatic turn just before a revelation makes the disclosure feel like the consequence of the pivot. When revelations always arrive into narratively flat contexts, they deliver facts rather than release structural energy, and the audience receives the information without the full weight the story could have placed on it.`,
+            suggestedFix: `Introduce at least one escalating signal within the three scenes before a revelation: raise suspense (let the prior scene suggest something terrible is about to emerge), activate a clock (give the revelation an urgency by placing it under deadline), or stage a dramatic turn immediately before it (so the pivot creates the question that the revelation then answers). Even one such pairing lifts the revelation from information-delivery into structural event.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // TURN_AFTERMATH_EMOTION_VOID — sequence/aftermath × emotion × dramatic-turn trigger.
+    // n≥8, ≥3 qualifying turn scenes (dramaticTurn≠'nothing', not in last 2 positions),
+    // ≥2 emotional scenes (emotionalShift≠'neutral'). Every qualifying turn is followed by
+    // 2 scenes with neutral emotionalShift → fire. A dramatic pivot should reorient the
+    // characters' felt experience — the story changes direction, and that change should
+    // register as felt consequence in the immediately following scenes. When no turn generates
+    // any emotional aftermath, pivots reroute the plot without touching the characters' inner
+    // states, making the reversals feel structural rather than experienced.
+    // Distinct from: TURN_AFTERMATH_SUSPENSE_VOID (Wave 513: suspense channel), TURN_AFTERMATH_
+    // CURIOSITY_VOID (Wave 541: curiosity channel), REVELATION_AFTERMATH_EMOTION_VOID (Wave 527:
+    // revelation trigger vs. turn trigger here), TURN_EMOTION_DECOUPLED (Wave 527: co-occurrence
+    // mode, same scene — this is the aftermath version, checking 2 scenes after). Completes the
+    // turn-trigger aftermath family with the emotional-register channel.
+    if (n >= 8) {
+      const qualTurns555c = (records as any[]).filter((r, pos) =>
+        (r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '' && pos < n - 2,
+      );
+      const emotionalScenes555c = (records as any[]).filter(r =>
+        (r.emotionalShift ?? 'neutral') !== 'neutral',
+      );
+      if (qualTurns555c.length >= 3 && emotionalScenes555c.length >= 2) {
+        const allTurnNoEmotionAftermath555c = qualTurns555c.every((r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos + off];
+            if (nxt && (nxt.emotionalShift ?? 'neutral') !== 'neutral') return false;
+          }
+          return true;
+        });
+        if (allTurnNoEmotionAftermath555c) {
+          issues.push({
+            location: `${qualTurns555c.length} turn scene(s) — no emotional shift in any aftermath window`,
+            rule: 'TURN_AFTERMATH_EMOTION_VOID',
+            severity: 'minor',
+            description: `Every scene that pivots the story (${qualTurns555c.length} scene(s) with a dramatic turn) is followed by two scenes with neutral emotional tone, despite ${emotionalScenes555c.length} emotionally charged scenes existing elsewhere. A reversal or shift in direction should reorient what the characters feel, not just what happens to them: the story turns, and the turn should register in the immediate emotional aftermath of those who have to navigate the new reality. When no turn is followed by emotional charge in its wake, pivots are purely informational — they reroute the plot without touching the characters' inner states, making the reversals feel mechanical rather than lived. The audience watches the story change direction without feeling what it is like to be inside the change.`,
+            suggestedFix: `After at least one dramatic turn, introduce an emotionally charged scene within the following two beats — a scene where a character registers what the pivot means for them (grief at a loss of direction, relief at a new opportunity, fear at the new exposure). The emotional aftermath need not be large; even a brief non-neutral beat confirms that the turn changed what it felt like to be in the story, not just where the story was going.`,
+          });
+        }
       }
     }
   }

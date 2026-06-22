@@ -19754,6 +19754,93 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 555 — structurePass: clock suspense decoupled, revelation causeless, turn aftermath emotion void', async () => {
+    const makeRec555 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const runST555 = async (records: any[]) => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      return structurePass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CLOCK_SUSPENSE_DECOUPLED fires when clock scenes and suspense scenes never overlap', async () => {
+      // 10 scenes: clock at 0,1; suspense at 8,9 — zero scenes with both → fire
+      const recs555a = Array.from({ length: 10 }, (_, i) =>
+        makeRec555(i, {
+          clockRaised: [0, 1].includes(i),
+          suspenseDelta: [8, 9].includes(i) ? 1 : 0,
+        }),
+      );
+      const res = await runST555(recs555a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_SUSPENSE_DECOUPLED'), 'CLOCK_SUSPENSE_DECOUPLED should fire');
+    });
+
+    it('CLOCK_SUSPENSE_DECOUPLED does not fire when at least one scene has both clock and suspense', async () => {
+      // 10 scenes: clock at 0,1,5; suspense at 5,8 — scene 5 has both → overlap → no fire
+      const recs555an = Array.from({ length: 10 }, (_, i) =>
+        makeRec555(i, {
+          clockRaised: [0, 1, 5].includes(i),
+          suspenseDelta: [5, 8].includes(i) ? 1 : 0,
+        }),
+      );
+      const res = await runST555(recs555an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_SUSPENSE_DECOUPLED'), 'CLOCK_SUSPENSE_DECOUPLED should not fire');
+    });
+
+    it('REVELATION_CAUSELESS fires when all revelations at pos≥3 lack prior build-up', async () => {
+      // 10 scenes: revelations at 3,5,7; prior 3 of each are all neutral (no suspense/clock/turn) → fire
+      const recs555b = Array.from({ length: 10 }, (_, i) =>
+        makeRec555(i, {
+          revelation: [3, 5, 7].includes(i) ? 'truth revealed' : null,
+        }),
+      );
+      const res = await runST555(recs555b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_CAUSELESS'), 'REVELATION_CAUSELESS should fire');
+    });
+
+    it('REVELATION_CAUSELESS does not fire when at least one revelation is preceded by a suspense spike', async () => {
+      // 10 scenes: revelations at 3,5,7; scene 2 has suspenseDelta=1 — prior 3 of revelation at 3 includes a suspense spike → caused → no fire
+      const recs555bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec555(i, {
+          revelation: [3, 5, 7].includes(i) ? 'truth revealed' : null,
+          suspenseDelta: i === 2 ? 1 : 0,
+        }),
+      );
+      const res = await runST555(recs555bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_CAUSELESS'), 'REVELATION_CAUSELESS should not fire');
+    });
+
+    it('TURN_AFTERMATH_EMOTION_VOID fires when no dramatic turn is followed by emotional shift within 2 scenes', async () => {
+      // 10 scenes: turns at 0,2,4 (pos<8); emotional scenes at 8,9 — all outside aftermath windows [1-2],[3-4],[5-6] → fire
+      const recs555c = Array.from({ length: 10 }, (_, i) =>
+        makeRec555(i, {
+          dramaticTurn: [0, 2, 4].includes(i) ? 'reversal' : 'nothing',
+          emotionalShift: [8, 9].includes(i) ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runST555(recs555c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TURN_AFTERMATH_EMOTION_VOID'), 'TURN_AFTERMATH_EMOTION_VOID should fire');
+    });
+
+    it('TURN_AFTERMATH_EMOTION_VOID does not fire when a turn is followed by emotional shift within 2 scenes', async () => {
+      // 10 scenes: turns at 0,2,4; emotional shift at 1 (within aftermath window of turn at 0) → no fire
+      const recs555cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec555(i, {
+          dramaticTurn: [0, 2, 4].includes(i) ? 'reversal' : 'nothing',
+          emotionalShift: i === 1 ? 'positive' : [8, 9].includes(i) ? 'negative' : 'neutral',
+        }),
+      );
+      const res = await runST555(recs555cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TURN_AFTERMATH_EMOTION_VOID'), 'TURN_AFTERMATH_EMOTION_VOID should not fire');
+    });
+  });
+
   describe('Wave 541 — structurePass: revelation aftermath suspense void, turn aftermath curiosity void, emotional neutral run', async () => {
     const makeRec541 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
