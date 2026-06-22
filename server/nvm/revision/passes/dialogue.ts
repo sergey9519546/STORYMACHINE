@@ -160,6 +160,22 @@
 // any dialogue; distinct from DIALOGUE_REVELATION_SCENE_VOID which is co-occurrence within the
 // revelation scene itself, and from DIALOGUE_DENSE_AFTERMATH_SILENT which uses dense-dialogue as
 // trigger; first aftermath check conditioned on a revelation trigger in this pass).
+// Wave 560 additions: dialogue clock aftermath silent (sequence/aftermath × clock trigger →
+// dialogue absence in next scene — n≥8, ≥2 qualifying clockRaised scenes not at last pos, ≥3 scenes
+// with dialogue, none of the following scenes has dialogue; deadline machinery fires in silence and
+// passes without verbal registration; the clock-trigger complement of DIALOGUE_REVELATION_AFTERMATH_
+// SILENT, distinct from DIALOGUE_CLOCK_SCENE_VOID [co-occurrence within the clock scene itself]),
+// dialogue seed aftermath silent (sequence/aftermath × seed trigger → dialogue absence in next scene
+// — n≥8, ≥2 qualifying seed scenes not at last pos, ≥3 scenes with dialogue, none of the following
+// scenes has dialogue; every planted clue passes into silence without verbal acknowledgment; distinct
+// from SEED_SCENE_DIALOGUE_ABSENT [co-occurrence in the seed scene itself] and from DIALOGUE_PAYOFF_
+// AFTERMATH_SILENT [payoff trigger — the resolution sibling]), dialogue relationship shift aftermath
+// silent (sequence/aftermath × relationship-shift trigger → dialogue absence in next scene — n≥8,
+// ≥2 qualifying relShift scenes not at last pos, ≥3 scenes with dialogue, none of the following
+// scenes has dialogue; every bond change passes without verbal registration in the next beat;
+// distinct from RELATIONSHIP_SHIFT_SCENE_DIALOGUE_ABSENT [co-occurrence in the shift scene itself]
+// and from all other aftermath triggers in this pass, completing the event-type aftermath family
+// alongside clock/revelation/dramatic-turn/payoff/suspense/seed).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3116,6 +3132,123 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `The script has ${qualSuspScenes546c.length} scenes where suspense rises (suspenseDelta > 0), but every one is immediately followed by a scene with no dialogue. When a scene raises stakes, the scene that follows is where those raised stakes should generate verbal response: characters processing the danger, arguing about what to do, negotiating under pressure, or making decisions spoken aloud. When every post-spike scene is silent, escalating tension consistently leads to wordless aftermath — the story raises stakes in action and then processes those raised stakes in action, without any character ever speaking in the scenes of heightened pressure or their immediate sequel. The verbal dimension of the story and its tension engine run as separate systems.`,
             suggestedFix: `After at least one suspense-spike scene, let the following scene include dialogue — even a brief exchange where characters react to the raised stakes. The lines don't need to be extensive: an argument about what to do next, a decision spoken under pressure, or a character acknowledging the danger aloud gives the heightened moment a verbal dimension and anchors the rising tension in character voice rather than pure action. The scene after a spike is the moment when the audience most wants to hear characters speak.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 560: DIALOGUE_CLOCK_AFTERMATH_SILENT, DIALOGUE_SEED_AFTERMATH_SILENT,
+  //              DIALOGUE_RELATIONSHIP_SHIFT_AFTERMATH_SILENT ──────────────────────────────────────
+  {
+    const n560 = records.length;
+    const lineToScene560 = buildLineToSceneMap(fountain);
+    const dlgPerScene560 = new Map<number, number>();
+    for (const d of dialogue) {
+      const si = lineToScene560[d.lineNum - 1] ?? -1;
+      if (si >= 0) dlgPerScene560.set(si, (dlgPerScene560.get(si) ?? 0) + 1);
+    }
+    const scenesWithDlg560 = (records as any[]).filter(
+      r => (dlgPerScene560.get(r.sceneIdx) ?? 0) > 0,
+    ).length;
+
+    if (n560 >= 8 && scenesWithDlg560 >= 3) {
+      // DIALOGUE_CLOCK_AFTERMATH_SILENT (sequence/aftermath × clock trigger → dialogue absence in
+      // next scene, n≥8, ≥2 qualifying clockRaised scenes [not at last position], ≥3 scenes with
+      // dialogue, none of the immediately following scenes has dialogue): Every deadline scene is
+      // followed by a silent scene — the moment after the clock is raised passes without any
+      // character voice processing, negotiating, or responding to the new time pressure. A clock
+      // raise establishes urgency: someone names, discovers, or triggers the deadline that will now
+      // govern the story's remaining energy. The scene immediately after a clock raise is the most
+      // natural place for verbal registration — characters arguing about the deadline, calculating
+      // whether it can be met, or denying its significance. When that scene is silent, the urgency
+      // has nowhere to go. Sequence/aftermath mode × clock trigger × dialogue absence. Distinct
+      // from DIALOGUE_CLOCK_SCENE_VOID (Wave 476: co-occurrence × clock scene itself has no dialogue —
+      // the clock raise happens in silence; this checks the FOLLOWING scene — aftermath direction),
+      // DIALOGUE_DRAMATIC_TURN_AFTERMATH_SILENT (Wave 532: dramatic-turn trigger),
+      // DIALOGUE_REVELATION_AFTERMATH_SILENT (Wave 518: revelation trigger),
+      // DIALOGUE_SUSPENSE_AFTERMATH_SILENT (Wave 546: suspense trigger — different event type).
+      const qualClocks560a = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) => r.clockRaised === true && pos < n560 - 1);
+      if (qualClocks560a.length >= 2) {
+        const anyClockAftermath560a = qualClocks560a.some(({ pos }) => {
+          const nextSceneIdx = (records as any[])[pos + 1].sceneIdx;
+          return (dlgPerScene560.get(nextSceneIdx) ?? 0) > 0;
+        });
+        if (!anyClockAftermath560a) {
+          issues.push({
+            location: `${qualClocks560a.length} clock-raise scene(s) — none followed by a scene with dialogue`,
+            rule: 'DIALOGUE_CLOCK_AFTERMATH_SILENT',
+            severity: 'minor',
+            description: `Every clock-raise scene (${qualClocks560a.length} instances) is immediately followed by a scene with no dialogue — deadline urgency fires and then passes without any character speaking in the wake of the new time pressure. A clock raise establishes the narrative pressure that governs the story's remaining energy: it creates a constraint that characters must respond to in word and action. When the scene after every clock raise is silent, that urgency has nowhere for a character to land their voice — no negotiation of the deadline, no denial of its significance, no declaration about what will or won't be sacrificed. The time constraint becomes a visual or structural beat rather than a dramatic one.`,
+            suggestedFix: `After at least one clock-raise, let the following scene carry dialogue that responds to the new urgency: a character calculating what the deadline means, arguing about whether it can be met, deciding what must be abandoned to make it, or denying the constraint exists. The line doesn't need to mention the clock explicitly — a character who speaks differently because of the deadline (shorter, sharper, more evasive) registers the urgency through their voice even without naming it.`,
+          });
+        }
+      }
+
+      // DIALOGUE_SEED_AFTERMATH_SILENT (sequence/aftermath × seed trigger → dialogue absence in
+      // next scene, n≥8, ≥2 qualifying seed scenes [seededClueIds non-empty, not at last pos], ≥3
+      // scenes with dialogue, none of the immediately following scenes has dialogue): Every clue-
+      // planting scene is followed by a silent scene — the moment after a promise is embedded in
+      // the story passes without any character voice touching, circling, or establishing proximity
+      // to the planted material. Seeds are the story's most important long-horizon deposits: they
+      // create the conditions for later payoffs by making the planted element emotionally present.
+      // When the scene after every seed is silent, the planted clue lives entirely in visual or
+      // action space — no character voice confirms its existence, establishes a relationship to it,
+      // or signals (even obliquely) that the material is in the world. Sequence/aftermath mode ×
+      // seed trigger × dialogue absence. Distinct from SEED_SCENE_DIALOGUE_ABSENT (Wave 518:
+      // co-occurrence × the seed scene ITSELF has no dialogue; this checks the FOLLOWING scene),
+      // DIALOGUE_PAYOFF_AFTERMATH_SILENT (Wave 532: payoff trigger — the resolution sibling of this
+      // check), DIALOGUE_REVELATION_AFTERMATH_SILENT (Wave 518: revelation trigger).
+      const qualSeeds560b = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) => ((r.seededClueIds ?? []) as string[]).length > 0 && pos < n560 - 1);
+      if (qualSeeds560b.length >= 2) {
+        const anySeedAftermath560b = qualSeeds560b.some(({ pos }) => {
+          const nextSceneIdx = (records as any[])[pos + 1].sceneIdx;
+          return (dlgPerScene560.get(nextSceneIdx) ?? 0) > 0;
+        });
+        if (!anySeedAftermath560b) {
+          issues.push({
+            location: `${qualSeeds560b.length} seed scene(s) — none followed by a scene with dialogue`,
+            rule: 'DIALOGUE_SEED_AFTERMATH_SILENT',
+            severity: 'minor',
+            description: `Every clue-planting scene (${qualSeeds560b.length} instances) is immediately followed by a scene with no dialogue — each planted promise passes into silence without any character voice acknowledging, approaching, or (even obliquely) confirming the planted material's presence in the world. Seeds are most effective when the scene after them gives the planted material some verbal exposure: a character who mentions the object, asks an innocent question near it, or establishes a relationship to it that will later carry resonance. When the aftermath is always silent, seeds are purely visual deposits — the story plants them without any subsequent voice giving them texture or proximity in the narrative.`,
+            suggestedFix: `After at least one seed, let the following scene include dialogue that touches the planted material without revealing its significance — a question about the object, a passing mention by a character who doesn't know what it means, or a reaction that is innocent now and charged in retrospect. The most powerful seeds are ones the audience doesn't know are seeds: a character speaking near the planted material as if it were ordinary gives the payoff its depth when the material becomes extraordinary.`,
+          });
+        }
+      }
+
+      // DIALOGUE_RELATIONSHIP_SHIFT_AFTERMATH_SILENT (sequence/aftermath × relationship-shift
+      // trigger → dialogue absence in next scene, n≥8, ≥2 qualifying relShift scenes [not at last
+      // pos], ≥3 scenes with dialogue, none of the immediately following scenes has dialogue): Every
+      // bond change in the story is followed by a silent scene — the moment after a relationship
+      // shifts passes without any character voice registering, responding to, or (even indirectly)
+      // processing the changed dynamic. Relationship shifts are the most interpersonally charged
+      // events in a narrative; the scene after a bond change is where the new dynamic either
+      // settles into place or erupts into further instability. When every relational aftermath is
+      // silent, the shifted bond is never verbally inhabited — no character acknowledges the change,
+      // navigates the altered space, or speaks in the register of the new dynamic. Sequence/aftermath
+      // mode × relationship-shift trigger × dialogue absence. Distinct from RELATIONSHIP_SHIFT_SCENE_
+      // DIALOGUE_ABSENT (Wave 518: co-occurrence × the shift scene ITSELF has no dialogue; this checks
+      // the FOLLOWING scene — aftermath direction), DIALOGUE_DRAMATIC_TURN_AFTERMATH_SILENT (Wave 532:
+      // dramatic-turn trigger), DIALOGUE_SUSPENSE_AFTERMATH_SILENT (Wave 546: suspense trigger).
+      const qualRelShifts560c = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) => ((r.relationshipShifts ?? []) as any[]).length > 0 && pos < n560 - 1);
+      if (qualRelShifts560c.length >= 2) {
+        const anyRelAftermath560c = qualRelShifts560c.some(({ pos }) => {
+          const nextSceneIdx = (records as any[])[pos + 1].sceneIdx;
+          return (dlgPerScene560.get(nextSceneIdx) ?? 0) > 0;
+        });
+        if (!anyRelAftermath560c) {
+          issues.push({
+            location: `${qualRelShifts560c.length} relationship-shift scene(s) — none followed by a scene with dialogue`,
+            rule: 'DIALOGUE_RELATIONSHIP_SHIFT_AFTERMATH_SILENT',
+            severity: 'minor',
+            description: `Every relationship-shift scene (${qualRelShifts560c.length} instances) is immediately followed by a scene with no dialogue — bond changes in the story consistently pass into a silence in which no character speaks within the new dynamic. A relationship that has just shifted carries its change into the next scene: characters are in a different configuration than they were before, and the scene after the shift is where the new reality either settles (two people now more cautious with each other, or closer, or rawer) or erupts further. When the aftermath of every bond change is silent, the shifted relationship is never verbally inhabited — no character navigates the new dynamic through speech, and the bond's alteration exists structurally without any voice confirming what changed and what it costs.`,
+            suggestedFix: `After at least one relationship-shift, let the following scene carry dialogue that is shaped by the new dynamic — characters speaking differently to each other because of what changed, avoiding a topic that would have been natural before, or engaging more fully because the prior distance has narrowed. The line doesn't need to reference the shift explicitly: a character who speaks in a different register toward the person whose bond shifted shows the change has been inhabited rather than simply recorded.`,
           });
         }
       }

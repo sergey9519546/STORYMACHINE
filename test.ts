@@ -32720,6 +32720,95 @@ The lights go out.`;
     });
   });
 
+  describe('Wave 560 — dialoguePass: clock aftermath silent, seed aftermath silent, relationship shift aftermath silent', async () => {
+    const makeRec560 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
+      sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false,
+      revelation: null, dramaticTurn: 'nothing', payoffSetupIds: [], relationshipShifts: [],
+      emotionalShift: 'neutral', seededClueIds: [], dialogueHighlights: [], unresolvedClues: [],
+      purpose: '', slug: `s${sceneIdx}`, ...extra,
+    });
+    const runD560 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    // Build n scenes; dlgFn(i) returns number of speaker-line pairs; 0 = silent action-only scene
+    const buildScenes560 = (count: number, dlgFn: (i: number) => number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\n`;
+        const n = dlgFn(i);
+        for (let j = 0; j < n; j++) {
+          f += j % 2 === 0
+            ? `ALICE\nShe found the documents early this morning.\n\n`
+            : `BOB\nWe should leave before they close the gate.\n\n`;
+        }
+        if (n === 0) f += `The door crashes open. A figure steps from the dark.\n\n`;
+      }
+      return f;
+    };
+
+    // DIALOGUE_CLOCK_AFTERMATH_SILENT fire:
+    // n=10; clocks at pos 2,5 (clockRaised=true, pos<9); next scenes 3,6 have no dialogue;
+    // other scenes have 2 lines each; scenesWithDlg≥3 → fires
+    it('DIALOGUE_CLOCK_AFTERMATH_SILENT fires when all clock-raise scenes are followed by silent scenes', async () => {
+      const f560a = buildScenes560(10, i => [3, 6].includes(i) ? 0 : 2);
+      const recs560a = Array.from({ length: 10 }, (_, i) =>
+        makeRec560(i, { clockRaised: [2, 5].includes(i) }));
+      const res = await runD560(f560a, recs560a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_CLOCK_AFTERMATH_SILENT'), 'DIALOGUE_CLOCK_AFTERMATH_SILENT should fire');
+    });
+
+    // DIALOGUE_CLOCK_AFTERMATH_SILENT no-fire:
+    // scene 3 (after clock at 2) HAS dialogue → anyClockAftermath=true → no fire
+    it('DIALOGUE_CLOCK_AFTERMATH_SILENT does not fire when a clock-raise is followed by a scene with dialogue', async () => {
+      const f560anr = buildScenes560(10, i => i === 6 ? 0 : 2);
+      const recs560anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec560(i, { clockRaised: [2, 5].includes(i) }));
+      const res = await runD560(f560anr, recs560anr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_CLOCK_AFTERMATH_SILENT'), 'DIALOGUE_CLOCK_AFTERMATH_SILENT should not fire');
+    });
+
+    // DIALOGUE_SEED_AFTERMATH_SILENT fire:
+    // n=10; seeds at pos 2,5; next scenes 3,6 have no dialogue; other scenes have 2 lines → fires
+    it('DIALOGUE_SEED_AFTERMATH_SILENT fires when all seed scenes are followed by silent scenes', async () => {
+      const f560b = buildScenes560(10, i => [3, 6].includes(i) ? 0 : 2);
+      const recs560b = Array.from({ length: 10 }, (_, i) =>
+        makeRec560(i, { seededClueIds: [2, 5].includes(i) ? ['clue-A'] : [] }));
+      const res = await runD560(f560b, recs560b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_SEED_AFTERMATH_SILENT'), 'DIALOGUE_SEED_AFTERMATH_SILENT should fire');
+    });
+
+    // DIALOGUE_SEED_AFTERMATH_SILENT no-fire:
+    // scene 3 (after seed at 2) HAS dialogue → no fire
+    it('DIALOGUE_SEED_AFTERMATH_SILENT does not fire when a seed scene is followed by a scene with dialogue', async () => {
+      const f560bnr = buildScenes560(10, i => i === 6 ? 0 : 2);
+      const recs560bnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec560(i, { seededClueIds: [2, 5].includes(i) ? ['clue-A'] : [] }));
+      const res = await runD560(f560bnr, recs560bnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_SEED_AFTERMATH_SILENT'), 'DIALOGUE_SEED_AFTERMATH_SILENT should not fire');
+    });
+
+    // DIALOGUE_RELATIONSHIP_SHIFT_AFTERMATH_SILENT fire:
+    // n=10; relShifts at pos 2,5; next scenes 3,6 have no dialogue; other scenes have 2 lines → fires
+    it('DIALOGUE_RELATIONSHIP_SHIFT_AFTERMATH_SILENT fires when all relationship-shift scenes are followed by silent scenes', async () => {
+      const f560c = buildScenes560(10, i => [3, 6].includes(i) ? 0 : 2);
+      const recs560c = Array.from({ length: 10 }, (_, i) =>
+        makeRec560(i, { relationshipShifts: [2, 5].includes(i) ? [{ pairKey: 'A-B', dimension: 'trust', amount: 1 }] : [] }));
+      const res = await runD560(f560c, recs560c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_RELATIONSHIP_SHIFT_AFTERMATH_SILENT'), 'DIALOGUE_RELATIONSHIP_SHIFT_AFTERMATH_SILENT should fire');
+    });
+
+    // DIALOGUE_RELATIONSHIP_SHIFT_AFTERMATH_SILENT no-fire:
+    // scene 3 (after relShift at 2) HAS dialogue → no fire
+    it('DIALOGUE_RELATIONSHIP_SHIFT_AFTERMATH_SILENT does not fire when a relationship-shift is followed by a scene with dialogue', async () => {
+      const f560cnr = buildScenes560(10, i => i === 6 ? 0 : 2);
+      const recs560cnr = Array.from({ length: 10 }, (_, i) =>
+        makeRec560(i, { relationshipShifts: [2, 5].includes(i) ? [{ pairKey: 'A-B', dimension: 'trust', amount: 1 }] : [] }));
+      const res = await runD560(f560cnr, recs560cnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_RELATIONSHIP_SHIFT_AFTERMATH_SILENT'), 'DIALOGUE_RELATIONSHIP_SHIFT_AFTERMATH_SILENT should not fire');
+    });
+  });
+
   describe('Wave 546 — dialoguePass: relationship peak silent, negation front-loaded, suspense aftermath silent', async () => {
     const makeRec546 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
       sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false,
