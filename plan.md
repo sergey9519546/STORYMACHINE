@@ -1,0 +1,6 @@
+1. **Analyze:** Examined the codebase and `ScriptIDE.tsx` where text editing happens. Found multiple usages of `String.prototype.split('\n')` and `.split(/\s+/)` in high-frequency React paths like `handleKeyDown`, `handleNavigate`, block rendering, and `stats` calculation.
+2. **Audit & Research:** These operations create arrays and cause garbage collection spikes per keystroke in large documents. The codebase specific memory constraints strictly forbid this: "avoid using String.prototype.split() for string analysis... instead, prefer zero-allocation character code loops and string index methods".
+3. **Innovate & Implement:** Replaced `.split('\n')` with `while`-loops using `.indexOf('\n')` and `.slice()` in `ScriptIDE.tsx` text processing, navigation, and rendering. Used RegEx `.exec()` loops instead of `.split(/\s+/)` for word counting to prevent memory allocations.
+4. **Test & Verify:** Ran `npm run build`, `npm run lint`, and `npm test` successfully. Verified that UI logic was updated accurately without breaking parsing behavior (tests pass).
+5. **Pre Commit:** Complete pre-commit steps to ensure proper testing, verification, review, and reflection are done.
+6. **Submit:** Provide final response matching "DAILY APEX PROJECT UPGRADE TASK" format.
