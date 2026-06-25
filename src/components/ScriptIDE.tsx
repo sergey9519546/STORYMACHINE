@@ -441,8 +441,11 @@ export default function ScriptIDE({
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
     let actionLines = 0;
-    let wordCount = scriptText.trim().split(/\s+/).length;
-    if (scriptText.trim() === "") wordCount = 0;
+    let wordCount = 0;
+    const wordRegex = /\S+/g;
+    while (wordRegex.exec(scriptText) !== null) {
+      wordCount++;
+    }
 
     blocks.forEach((block) => {
       if (block.type === "character") {
@@ -593,8 +596,8 @@ export default function ScriptIDE({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const cursor = e.currentTarget.selectionStart;
     const textBeforeCursor = scriptText.substring(0, cursor);
-    const lines = textBeforeCursor.split("\n");
-    const currentLine = lines[lines.length - 1];
+    const lastNewlineIdx = textBeforeCursor.lastIndexOf("\n");
+    const currentLine = lastNewlineIdx === -1 ? textBeforeCursor : textBeforeCursor.slice(lastNewlineIdx + 1);
 
     if (e.key === "i" || e.key === "I") {
       if (currentLine === "") {
@@ -737,11 +740,23 @@ export default function ScriptIDE({
   // ── Navigation ───────────────────────────────────────────────────────────────
   const handleNavigate = (lineIndex: number) => {
     if (!editorRef.current) return;
-    const lines = scriptText.split("\n");
     let charCount = 0;
-    for (let i = 0; i < lineIndex; i++) {
-      charCount += lines[i].length + 1;
+    let currentLineIdx = 0;
+    let startIndex = 0;
+
+    while (currentLineIdx < lineIndex) {
+      const nextNewline = scriptText.indexOf("\n", startIndex);
+      if (nextNewline === -1) {
+        charCount = scriptText.length;
+        break;
+      }
+      startIndex = nextNewline + 1;
+      currentLineIdx++;
     }
+    if (currentLineIdx === lineIndex) {
+      charCount = startIndex;
+    }
+
     editorRef.current.focus();
     editorRef.current.setSelectionRange(charCount, charCount);
 
