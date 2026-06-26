@@ -158,6 +158,16 @@
 // third; the disclosure engine skips the complication zone entirely; distinct from REVELATION_
 // TEMPORAL_CLUSTER in belief.ts which is concentration not absence, and from REVELATION_SUSPENSE_
 // AFTERMATH_FLAT which is aftermath mode; first zone check on revelation in this pass).
+// Wave 579 additions: payoff peak uncaused (backward-cause × payoff channel × single-peak — n≥8,
+// ≥2 payoff scenes, the peak payoff scene [most payoffSetupIds] has no revelation/turn/clock in
+// itself or prior 2 scenes; completes the backward-cause family alongside suspense/emotional/
+// curiosity peak uncaused), suspense closing zone absent (zone presence/absence × suspense ×
+// closing structural third — n≥9, ≥3 suspense scenes, none in final third; tension engine silent
+// when it should be highest; distinct from SUSPENSE_EARLY_PEAK [relative comparison] and
+// SUSPENSE_FLATLINE_RUN [run-based]; first zone-absence check on the suspense channel), clock zone
+// cluster (distribution/timing × clock × structural zone concentration — n≥9, ≥3 clock scenes,
+// >75% concentrated in one third; urgency isolated in one act not escalating; distinct from
+// CLOCK_PRESSURE_RUN [run-based adjacency] and CURIOSITY_FRONTLOAD [different channel]).
 // Wave 565 additions: seed aftermath suspense flat (sequence/aftermath × suspense × seed trigger —
 // n≥8, ≥3 seed scenes [seededClueIds non-empty] not in last 2 positions, avg suspenseDelta of the
 // immediately following scene ≤ 0; foreshadowing never tightens tension in its wake; the seed row of
@@ -3182,6 +3192,125 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `Every one of the story's ${qualSeedRecs565c.length} clue-planting (seed) scenes is followed by two emotionally neutral scenes. Foreshadowing is landing without felt consequence: a clue is planted, and the protagonist moves through the next two scenes as if nothing of weight has been set in motion. The strongest seeds are not neutral information drops — they carry an emotional charge for the character who plants or witnesses them (unease, hope, dread, suspicion) that colors the scenes that follow. When every seed's aftermath is affectively silent, the clues read as authorial plumbing rather than as events the characters experience: the machinery of the plot shows through without the human texture that makes foreshadowing feel woven into the story rather than bolted onto it.`,
             suggestedFix: `After at least one seed scene, let the following scene carry a non-neutral emotional shift — a flicker of dread, suspicion, or hope that shows the planted clue has registered on the protagonist's interior state. The emotional beat need not be large; a single acted response colors the foreshadowing with feeling and tells the audience that the seed matters to the character, not just to the plot. Seeds that are felt are remembered; seeds that are merely filed are the ones whose eventual payoff lands flat.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 579: ─────────────────────────────────────────────────────────────
+
+  // PAYOFF_PEAK_UNCAUSED — backward-cause × payoff channel × single-peak isolation.
+  // n≥8, ≥2 payoff scenes; the scene with the highest count of payoff setup resolutions
+  // (payoffSetupIds.length) has no revelation, dramatic turn, or clock event in itself or
+  // either of the two preceding scenes → fire. A payoff is the culminating moment where
+  // everything the story seeded finally arrives. The most powerful payoffs feel caused: they
+  // follow a revelation, a turn, or a deadline that gathers the earlier setups into one
+  // convergent beat. When the story's densest payoff emerges from a dramatic vacuum, the
+  // resolution reads as arbitrary arrival rather than earned climax.
+  // Distinct from: SUSPENSE_PEAK_UNCAUSED (Wave 481: backward-cause × suspense peak — a
+  // different signal), EMOTIONAL_PEAK_UNCAUSED (Wave 481: backward-cause × emotional peak),
+  // CURIOSITY_PEAK_UNCAUSED (Wave 495: backward-cause × curiosity peak), PAYOFF_SUSPENSE_
+  // DECOUPLED (co-occurrence × same-scene — payoff and suspense never coincide; not a causal
+  // analysis). First backward-cause check on the payoff channel — completes the backward-cause
+  // family across suspense, emotional, curiosity, and payoff peak types.
+  {
+    const n579a = records.length;
+    if (n579a >= 8) {
+      const payoffRecs579a = (records as any[]).filter((r: any) =>
+        ((r.payoffSetupIds ?? []) as any[]).length > 0,
+      );
+      if (payoffRecs579a.length >= 2) {
+        const peakRec579a = payoffRecs579a.reduce((best: any, r: any) =>
+          ((r.payoffSetupIds ?? []) as any[]).length > ((best.payoffSetupIds ?? []) as any[]).length ? r : best,
+        );
+        const peakPos579a = (records as any[]).indexOf(peakRec579a);
+        const hasCause579a = [0, 1, 2].some(off => {
+          const r = (records as any[])[peakPos579a - off];
+          if (!r) return false;
+          return r.revelation === true ||
+            (r.dramaticTurn && r.dramaticTurn !== 'nothing') ||
+            r.clockRaised === true;
+        });
+        if (!hasCause579a) {
+          issues.push({
+            location: `Payoff peak at scene ${peakPos579a + 1} has no causal event in prior 2 scenes`,
+            rule: 'PAYOFF_PEAK_UNCAUSED',
+            severity: 'minor',
+            description: `The story's densest payoff scene — the one resolving the most planted setups — occurs at scene ${peakPos579a + 1} with no revelation, dramatic turn, or clock event in itself or either of the two preceding scenes. A payoff is the culminating moment where everything the story seeded finally arrives; the most powerful payoffs feel caused. They follow a revelation that reframes everything, a turn that forces a new path, or a deadline that makes waiting impossible — some convergent event that gathers the earlier setups into one earned arrival. When the story's most semantically loaded payoff scene emerges from a dramatic vacuum, the resolution reads as arbitrary rather than inevitable: the audience receives the answer without having felt the question pressurized into urgency.`,
+            suggestedFix: `Give the payoff peak a motivating cause in the scenes immediately before it — a revelation that makes the planted promise suddenly urgent, a dramatic turn that forces the payoff to land now rather than later, or a raised clock that makes delay impossible. The cause need not be elaborate; even a brief trigger scene that signals "this is the moment and here is why" converts the payoff from coincidental arrival to earned convergence. Alternatively, restructure so the payoff peak arrives in the wake of another major structural event rather than in undisturbed dramatic air.`,
+          });
+        }
+      }
+    }
+  }
+
+  // SUSPENSE_CLOSING_ZONE_ABSENT — zone presence/absence × suspense × closing structural third.
+  // n≥9, ≥3 scenes with suspenseDelta>0 exist, none of them fall in the final structural third
+  // (positions ≥ ⌊2n/3⌋) → fire. The story's tension engine goes quiet at the very end: all
+  // suspense is spent before the climax zone arrives. A screenplay that raises tension in the
+  // first two acts but carries none into the third leaves the closing stretch emotionally cold
+  // — the audience has been cued to expect escalating danger and instead the pressure dissolves
+  // when it should be at its highest.
+  // Distinct from: SUSPENSE_EARLY_PEAK (Wave 288: compares Act 1 avg to Act 3 avg — relative
+  // magnitudes, not complete absence; early peak can fire even if closing third has some tension),
+  // SUSPENSE_FLATLINE_RUN (Wave 509: run-based — consecutive stretch of flat suspense, not a zone-
+  // level absence), PAYOFF_OPENING_ZONE_ABSENT (Wave 537: zone absence × payoff channel, not
+  // suspense), REVELATION_MIDDLE_ZONE_ABSENT (Wave 537: zone absence × revelation × middle third,
+  // not closing third). First zone-absence check on the suspense channel in this pass.
+  {
+    const n579b = records.length;
+    if (n579b >= 9) {
+      const suspScenes579b = (records as any[]).filter((r: any) => (r.suspenseDelta ?? 0) > 0);
+      if (suspScenes579b.length >= 3) {
+        const closingStart579b = Math.floor(2 * n579b / 3);
+        const hasSuspInClosing579b = (records as any[]).some((r: any, i: number) =>
+          i >= closingStart579b && (r.suspenseDelta ?? 0) > 0,
+        );
+        if (!hasSuspInClosing579b) {
+          issues.push({
+            location: `${suspScenes579b.length} suspense scenes all fall before the final structural third (scene ${closingStart579b + 1}–${n579b})`,
+            rule: 'SUSPENSE_CLOSING_ZONE_ABSENT',
+            severity: 'minor',
+            description: `The story has ${suspScenes579b.length} scenes with rising suspense, but none of them fall in the closing structural third (scenes ${closingStart579b + 1}–${n579b}). The tension engine goes quiet precisely when it should be running hottest: all of the story's suspense is spent in the first two-thirds, leaving the climax zone empty of forward-pulling dread. A screenplay that builds tension in setup and complication but carries none into the resolution leaves the closing stretch emotionally cold — the audience has been cued to expect escalating danger and instead the pressure dissolves when it should converge. The closing third is the structural zone where suspense should be most concentrated; its complete absence signals that the dramatic engine has stalled before the finish.`,
+            suggestedFix: `Introduce at least one suspense-raising beat in the closing third — a deadline that closes in, a new threat that emerges, or a consequence of the climax that raises the stakes for the final resolution. Even a single positive suspenseDelta in the closing stretch demonstrates that the tension engine is still running as the story arrives at its climax. If the story intentionally releases all tension early for a quiet, reflective ending, that choice should be deliberate — and the earlier suspense should escalate far enough to earn the full release.`,
+          });
+        }
+      }
+    }
+  }
+
+  // CLOCK_ZONE_CLUSTER — distribution/timing × clock × structural zone concentration.
+  // n≥9, ≥3 scenes with clockRaised === true; >75% of those clock-raising scenes concentrated
+  // in one structural third (opening/middle/closing) → fire. Temporal urgency loaded into a
+  // single act rather than escalating through the story. A deadline machine works by escalating:
+  // early urgency is overtaken by tighter deadlines, each act adding new time pressure. When
+  // more than three-quarters of all clock raises are packed into one structural third, the
+  // urgency is isolated instead of escalating — a burst of deadline-pressure in one zone
+  // followed by temporal ease in the others.
+  // Distinct from: CLOCK_PRESSURE_RUN (Wave 467: run-based — ≥4 consecutive clock scenes,
+  // tests local adjacency not global zone distribution), CLOCK_SCENE_PACING_MISMATCH and
+  // CLOCK_SCENE_UNDERWEIGHT (scene-length checks on clock scenes — a different analytical
+  // axis), CURIOSITY_FRONTLOAD (Wave 425: distribution/timing × curiosity — different channel).
+  // First distribution/timing check on the clock channel in this pass.
+  {
+    const n579c = records.length;
+    if (n579c >= 9) {
+      const clockTotal579c = (records as any[]).filter((r: any) => r.clockRaised === true).length;
+      if (clockTotal579c >= 3) {
+        const third579c = Math.floor(n579c / 3);
+        const z1Count579c = (records as any[]).filter((r: any, i: number) => i < third579c && r.clockRaised === true).length;
+        const z2Count579c = (records as any[]).filter((r: any, i: number) => i >= third579c && i < 2 * third579c && r.clockRaised === true).length;
+        const z3Count579c = (records as any[]).filter((r: any, i: number) => i >= 2 * third579c && r.clockRaised === true).length;
+        const maxZ579c = Math.max(z1Count579c, z2Count579c, z3Count579c);
+        if (maxZ579c / clockTotal579c > 0.75) {
+          const dominantZone579c = maxZ579c === z1Count579c ? 'opening' : maxZ579c === z2Count579c ? 'middle' : 'closing';
+          issues.push({
+            location: `${maxZ579c} of ${clockTotal579c} clock-raising scenes concentrated in the ${dominantZone579c} structural third`,
+            rule: 'CLOCK_ZONE_CLUSTER',
+            severity: 'minor',
+            description: `${maxZ579c} of ${clockTotal579c} clock-raising scenes (${Math.round(maxZ579c / clockTotal579c * 100)}%) are concentrated in the ${dominantZone579c} structural third. A deadline machine works by escalating: early urgency is overtaken by tighter deadlines, each act adding new time pressure until the final race against the clock. When more than three-quarters of all clock raises are packed into one structural zone, urgency is isolated rather than escalating — a burst of deadline-pressure in one act followed by temporal ease in the others. The story's urgency feels episodic and local rather than cumulative, and the zones without clock pressure lose the forward-pull that makes pacing feel driven. The audience experiences a deadline spike rather than a sustained build.`,
+            suggestedFix: `Redistribute clock-raising moments across all three structural thirds so that urgency escalates rather than spikes. The opening third should introduce a first deadline; the middle should tighten or add to it; the closing third should make the clock impossible to ignore. If the ${dominantZone579c} third genuinely belongs as the urgency zone for this story, at minimum ensure at least one other third carries at least one clock raise — even a single seed of urgency in an otherwise loose zone gives the temporal pressure a lineage across the whole story rather than a single-act burst.`,
           });
         }
       }

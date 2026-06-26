@@ -24769,6 +24769,90 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 579 — pacingPass: payoff peak uncaused, suspense closing zone absent, clock zone cluster', async () => {
+    const makeRec579 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: false,
+      dialogueHighlights: [], relationshipShifts: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const makeFountain579 = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\n\nAction line for scene ${i}.`).join('\n\n');
+    const runP579 = async (records: any[]) => {
+      const { pacingPass } = await import('./server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: makeFountain579(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({})),
+        approvedSpans: [],
+      });
+    };
+
+    // PAYOFF_PEAK_UNCAUSED fire: n=10; peak payoff at idx 4 (3 setups), other payoff at idx 8 (1 setup);
+    // no revelation/turn/clock in idx 2,3,4 → hasCause=false → fires
+    it('PAYOFF_PEAK_UNCAUSED fires when the densest payoff scene has no causal event in prior 2 scenes', async () => {
+      const recs579a = Array.from({ length: 10 }, (_, i) =>
+        makeRec579(i, {
+          payoffSetupIds: i === 4 ? ['a', 'b', 'c'] : i === 8 ? ['x'] : [],
+        }),
+      );
+      const res = await runP579(recs579a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_PEAK_UNCAUSED'), 'PAYOFF_PEAK_UNCAUSED should fire');
+    });
+
+    // PAYOFF_PEAK_UNCAUSED no-fire: same setup but idx 3 has revelation=true → prior scene has cause → no fire
+    it('PAYOFF_PEAK_UNCAUSED does not fire when a prior scene provides a causal event for the payoff peak', async () => {
+      const recs579anr = Array.from({ length: 10 }, (_, i) =>
+        makeRec579(i, {
+          payoffSetupIds: i === 4 ? ['a', 'b', 'c'] : i === 8 ? ['x'] : [],
+          revelation: i === 3,
+        }),
+      );
+      const res = await runP579(recs579anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_PEAK_UNCAUSED'), 'PAYOFF_PEAK_UNCAUSED should not fire');
+    });
+
+    // SUSPENSE_CLOSING_ZONE_ABSENT fire: n=9; suspenseDelta>0 at idx 0-5 only; closing third (idx 6-8) all flat
+    it('SUSPENSE_CLOSING_ZONE_ABSENT fires when suspense scenes are all absent from the final third', async () => {
+      const recs579b = Array.from({ length: 9 }, (_, i) =>
+        makeRec579(i, { suspenseDelta: i < 6 ? 1 : 0 }),
+      );
+      const res = await runP579(recs579b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SUSPENSE_CLOSING_ZONE_ABSENT'), 'SUSPENSE_CLOSING_ZONE_ABSENT should fire');
+    });
+
+    // SUSPENSE_CLOSING_ZONE_ABSENT no-fire: idx 8 (closing third) has suspenseDelta=1
+    it('SUSPENSE_CLOSING_ZONE_ABSENT does not fire when at least one suspense scene falls in the closing third', async () => {
+      const recs579bnr = Array.from({ length: 9 }, (_, i) =>
+        makeRec579(i, { suspenseDelta: i === 8 ? 1 : i < 5 ? 1 : 0 }),
+      );
+      const res = await runP579(recs579bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SUSPENSE_CLOSING_ZONE_ABSENT'), 'SUSPENSE_CLOSING_ZONE_ABSENT should not fire');
+    });
+
+    // CLOCK_ZONE_CLUSTER fire: n=9; all 3 clockRaised scenes at idx 0,1,2 (opening third) → 3/3=100% > 75%
+    it('CLOCK_ZONE_CLUSTER fires when >75% of clock scenes are concentrated in one structural third', async () => {
+      const recs579c = Array.from({ length: 9 }, (_, i) =>
+        makeRec579(i, { clockRaised: i < 3 }),
+      );
+      const res = await runP579(recs579c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_ZONE_CLUSTER'), 'CLOCK_ZONE_CLUSTER should fire');
+    });
+
+    // CLOCK_ZONE_CLUSTER no-fire: 4 clock scenes spread: idx 0 (z1), idx 3,4 (z2), idx 7 (z3) → max 2/4=50% ≤ 75%
+    it('CLOCK_ZONE_CLUSTER does not fire when clock scenes are spread across structural thirds', async () => {
+      const recs579cnr = Array.from({ length: 9 }, (_, i) =>
+        makeRec579(i, { clockRaised: [0, 3, 4, 7].includes(i) }),
+      );
+      const res = await runP579(recs579cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_ZONE_CLUSTER'), 'CLOCK_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 565 — pacingPass: seed aftermath suspense flat, seed aftermath curiosity flat, seed aftermath emotion flat', async () => {
     const makeRec565 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
