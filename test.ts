@@ -22710,6 +22710,107 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 581 — relationshipArcPass: relationship peak uncaused, pair amplitude decay, relationship clock valence uniform', async () => {
+    const mkSh581 = (amount: number, pair = 'A|B') => [{ pairKey: pair, dimension: 'trust', amount }];
+    const makeRec581 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runRA581 = async (records: any[]) => {
+      const { relationshipArcPass } = await import('./server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // RELATIONSHIP_PEAK_UNCAUSED fire: n=8; peak shift at idx 3 (|0.8|); idx 1,2,3 have no
+    // revelation/turn/suspense → hasCause=false → fires
+    it('RELATIONSHIP_PEAK_UNCAUSED fires when the peak shift has no causal event in prior 2 scenes', async () => {
+      const recs581a = Array.from({ length: 8 }, (_, i) =>
+        makeRec581(i, {
+          relationshipShifts: i === 0 ? mkSh581(0.3) : i === 3 ? mkSh581(0.8) : [],
+        }),
+      );
+      const res = await runRA581(recs581a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_PEAK_UNCAUSED'), 'RELATIONSHIP_PEAK_UNCAUSED should fire');
+    });
+
+    // RELATIONSHIP_PEAK_UNCAUSED no-fire: idx 2 has suspenseDelta=2 (prior scene has cause) → no fire
+    it('RELATIONSHIP_PEAK_UNCAUSED does not fire when a prior scene provides a causal event for the peak', async () => {
+      const recs581anr = Array.from({ length: 8 }, (_, i) =>
+        makeRec581(i, {
+          relationshipShifts: i === 0 ? mkSh581(0.3) : i === 3 ? mkSh581(0.8) : [],
+          suspenseDelta: i === 2 ? 2 : 0,
+        }),
+      );
+      const res = await runRA581(recs581anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_PEAK_UNCAUSED'), 'RELATIONSHIP_PEAK_UNCAUSED should not fire');
+    });
+
+    // PAIR_AMPLITUDE_DECAY fire: pair A|B has 4 shifts at idx 1,2,5,6 with mag 0.8,0.7,0.1,0.1;
+    // earlyMean=0.75, lateMean=0.1 < 0.5*0.75=0.375 → fires
+    it('PAIR_AMPLITUDE_DECAY fires when a pair\'s late-half mean magnitude is <50% of its early-half mean', async () => {
+      const recs581b = Array.from({ length: 8 }, (_, i) =>
+        makeRec581(i, {
+          relationshipShifts:
+            i === 1 ? mkSh581(0.8) :
+            i === 2 ? mkSh581(0.7) :
+            i === 5 ? mkSh581(0.1) :
+            i === 6 ? mkSh581(0.1) : [],
+        }),
+      );
+      const res = await runRA581(recs581b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAIR_AMPLITUDE_DECAY'), 'PAIR_AMPLITUDE_DECAY should fire');
+    });
+
+    // PAIR_AMPLITUDE_DECAY no-fire: late-half mean (0.3) is NOT < 0.5*early-half mean (0.2) → no fire
+    it('PAIR_AMPLITUDE_DECAY does not fire when the amplitude decline is within the 50% threshold', async () => {
+      const recs581bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec581(i, {
+          relationshipShifts:
+            i === 1 ? mkSh581(0.4) :
+            i === 2 ? mkSh581(0.4) :
+            i === 5 ? mkSh581(0.3) :
+            i === 6 ? mkSh581(0.3) : [],
+        }),
+      );
+      const res = await runRA581(recs581bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAIR_AMPLITUDE_DECAY'), 'PAIR_AMPLITUDE_DECAY should not fire');
+    });
+
+    // RELATIONSHIP_CLOCK_VALENCE_UNIFORM fire: n=8; 3 clock+shift scenes all with positive shifts → fires
+    it('RELATIONSHIP_CLOCK_VALENCE_UNIFORM fires when all clock-raised shift scenes move bonds in one direction', async () => {
+      const recs581c = Array.from({ length: 8 }, (_, i) =>
+        makeRec581(i, {
+          clockRaised: [1, 3, 5].includes(i),
+          relationshipShifts: [1, 3, 5].includes(i) ? mkSh581(0.5) : [],
+        }),
+      );
+      const res = await runRA581(recs581c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_CLOCK_VALENCE_UNIFORM'), 'RELATIONSHIP_CLOCK_VALENCE_UNIFORM should fire');
+    });
+
+    // RELATIONSHIP_CLOCK_VALENCE_UNIFORM no-fire: idx 5 has negative shift → mixed valence → no fire
+    it('RELATIONSHIP_CLOCK_VALENCE_UNIFORM does not fire when clock-raised shift scenes have mixed valences', async () => {
+      const recs581cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec581(i, {
+          clockRaised: [1, 3, 5].includes(i),
+          relationshipShifts: [1, 3].includes(i) ? mkSh581(0.5) : i === 5 ? mkSh581(-0.4) : [],
+        }),
+      );
+      const res = await runRA581(recs581cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_CLOCK_VALENCE_UNIFORM'), 'RELATIONSHIP_CLOCK_VALENCE_UNIFORM should not fire');
+    });
+  });
+
   describe('Wave 567 — relationshipArcPass: peak revelation absent, peak dramatic-turn absent, peak clock absent', async () => {
     const mkShift567 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
     const makeRec567 = (idx: number, overrides: any = {}): any => ({

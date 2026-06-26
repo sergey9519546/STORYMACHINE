@@ -155,6 +155,16 @@
 // relational stretch; distinct from RELATIONSHIP_DIMENSION_RUN which tracks dimension monopoly,
 // PAIR_RUPTURE_RUN which tracks consecutive negative shifts from any pair, and DEPTH_GAP which
 // measures total amplitude concentration across the whole story).
+// Wave 581 additions: relationship peak uncaused (backward-cause × peak shift — n≥8, the story's
+// largest-magnitude bond change has no revelation/turn/suspense>0 in itself or prior 2 scenes;
+// completes the backward-cause family alongside pair repair/rupture unmotivated; distinct from
+// those per-pair checks by isolating the global peak regardless of valence), pair amplitude decay
+// (distribution/timing × per-pair × amplitude decay — a pair with ≥4 shifts where late-half mean
+// magnitude < 0.5× early-half mean; the relationship's engine winds down dramatically; decay mirror
+// of PAIR_AMPLITUDE_GROWTH [Wave 427]), relationship clock valence uniform (valence × relationship ×
+// clock trigger — n≥8, ≥3 clock+shift scenes, all have shifts exclusively positive OR exclusively
+// negative; deadline-driven bonds always move in one direction; clock-trigger complement of payoff
+// and seed valence checks; distinct from RELATIONSHIP_CLOCK_DECOUPLED [no overlap at all]).
 // Wave 567 additions: relationship peak revelation absent (single-peak isolation × revelation ×
 // relationship — n≥8, the story's largest-magnitude shift carries no revelation while ≥2 other shift
 // scenes coincide with a disclosure; the biggest bond change is not a moment of truth), relationship
@@ -3269,6 +3279,141 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
             severity: 'minor',
             description: `The story's largest relationship shift (Scene ${peakScene567}, magnitude ${peakMag567.toFixed(2)}) raises no clock, even though ${clockShiftOther567.length} other shift scenes move a bond under deadline pressure. The single most consequential relational swing happens free of time pressure: the bond moves most in a beat with no ticking clock, so the peak relational moment and the urgency engine never meet. When other bond changes land under deadlines but the biggest one does not, the story's most important relational turn plays in calm water — it forfeits the doubled charge of a bond fracturing or forging precisely as time runs out, the convergence that makes a relational climax feel both urgent and inevitable.`,
             suggestedFix: 'Place the peak relationship shift under a live clock: let the moment the bond moves most also be a moment when time is running out — a reconciliation forced by a closing window, a betrayal exposed in the scramble before a deadline. The biggest relational swing carries maximum force when urgency and relational change crest together, so the audience feels both the weight of the bond moving and the pressure of time at the same instant.',
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 581: ─────────────────────────────────────────────────────────────
+
+  // RELATIONSHIP_PEAK_UNCAUSED — backward-cause × peak shift × any cause.
+  // n≥8 scenes with at least one shift; the single largest-magnitude bond change occurs in a
+  // scene with no revelation, dramatic turn, or suspense rise (suspenseDelta>0) in itself or
+  // either of the two preceding scenes → fire. The story's most consequential bond moment
+  // arrives without any narrative catalyst powering it. The largest relational swings should
+  // feel caused: driven by a truth surfacing, a pivot, or escalating tension that makes the
+  // bond change inevitable. When the peak shift occurs in a dramatic vacuum, the biggest
+  // relational moment reads as unmotivated.
+  // Distinct from: PAIR_REPAIR_UNMOTIVATED (Wave 427: backward-cause × per-pair × positive
+  // shifts — requires prior conflict absence; this is a global peak-isolation check that fires
+  // on any cause absence for the single peak regardless of valence), PAIR_RUPTURE_UNMOTIVATED
+  // (Wave 455: backward-cause × per-pair × negative only; same per-pair limitation), RELATIONSHIP_
+  // PEAK_REVELATION_ABSENT (Wave 567: requires other shifts to carry revelation; fires even if the
+  // peak has other causes; this fires whenever the peak has NO cause of any kind). First backward-
+  // cause × peak check in relationship-arc.ts.
+  {
+    const n581a = records.length;
+    if (n581a >= 8) {
+      let peakMag581a = 0;
+      let peakPos581a = -1;
+      (records as any[]).forEach((r: any, pos: number) => {
+        for (const sh of (r.relationshipShifts ?? []) as Array<{amount: number}>) {
+          if (Math.abs(sh.amount) > peakMag581a) { peakMag581a = Math.abs(sh.amount); peakPos581a = pos; }
+        }
+      });
+      if (peakPos581a >= 0 && peakMag581a > 0) {
+        const hasCause581a = [0, 1, 2].some(off => {
+          const r = (records as any[])[peakPos581a - off];
+          if (!r) return false;
+          return (r.revelation !== null && r.revelation !== undefined && r.revelation !== '') ||
+            ((r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '') ||
+            (r.suspenseDelta ?? 0) > 0;
+        });
+        if (!hasCause581a) {
+          issues.push({
+            location: `Scene index ${peakPos581a + 1} — largest shift magnitude (|${peakMag581a.toFixed(2)}|), no causal event in prior 2 scenes`,
+            rule: 'RELATIONSHIP_PEAK_UNCAUSED',
+            severity: 'minor',
+            description: `The story's largest relationship shift (magnitude ${peakMag581a.toFixed(2)}) occurs without any revelation, dramatic turn, or suspense rise in itself or either of the two preceding scenes. The most consequential bond change in the story arrives in a dramatic vacuum: the relationship moves most at a beat nothing has built toward, so the peak relational swing reads as unmotivated rather than inevitable. The largest relational moments earn their weight when they are driven by a discovery, a pivot, or escalating pressure — something that makes the bond change feel necessary rather than incidental. A peak shift that arrives without any convergent cause loses the doubling effect of relational change happening at a moment of narrative force.`,
+            suggestedFix: `Give the peak relationship shift a motivating cause in the two scenes before it — a revelation that exposes a truth the bond cannot survive or requires, a dramatic turn that forces the relationship into a new state, or a suspense escalation that puts the bond under pressure and breaks or cements it. The most powerful relational climaxes fuse the bond's biggest movement with the story's biggest pressure — when both happen at once, the moment carries both relational and structural weight.`,
+          });
+        }
+      }
+    }
+  }
+
+  // PAIR_AMPLITUDE_DECAY — distribution/timing × per-pair × amplitude decay.
+  // For any pair with ≥4 shifts: split their shifts at the midpoint of appearance order
+  // (first half vs second half); if the mean magnitude of the second-half shifts is less than
+  // 0.5× the mean of the first-half → fire. The pair's relational engine winds down dramatically
+  // — early bond movements carry significantly more force than later ones. The relationship loses
+  // amplitude as it approaches its resolution; the dramatic stakes of the bond fade rather than
+  // intensify or hold steady.
+  // Distinct from: PAIR_AMPLITUDE_GROWTH (Wave 427: fires when late-half avg > 1.5× early-half
+  // — amplitude INCREASE; this fires on amplitude DECREASE at the < 0.5× threshold; the decay
+  // mirror on the same analytical axis), RELATIONSHIP_GLOBAL_AMPLITUDE_FRONTLOAD (Wave 343: story-
+  // wide across ALL pairs, ≥1.5× ratio; this is per-pair and more severe at < 0.5× ratio), PAIR_
+  // SECOND_HALF_VOID (Wave 357: ZERO second-half shifts; this fires when they still exist but are
+  // much smaller than the early ones). First per-pair amplitude decay check in this pass.
+  {
+    const n581b = records.length;
+    if (n581b >= 8) {
+      const pairShifts581b = new Map<string, Array<{pos: number; mag: number}>>();
+      (records as any[]).forEach((r: any, pos: number) => {
+        for (const sh of (r.relationshipShifts ?? []) as Array<{pairKey: string; amount: number}>) {
+          if (!pairShifts581b.has(sh.pairKey)) pairShifts581b.set(sh.pairKey, []);
+          pairShifts581b.get(sh.pairKey)!.push({ pos, mag: Math.abs(sh.amount) });
+        }
+      });
+      for (const [pair, shiftList] of pairShifts581b) {
+        if (shiftList.length < 4) continue;
+        shiftList.sort((a, b) => a.pos - b.pos);
+        const half581b = Math.floor(shiftList.length / 2);
+        const earlyMean581b = shiftList.slice(0, half581b).reduce((s, x) => s + x.mag, 0) / half581b;
+        const lateMean581b = shiftList.slice(half581b).reduce((s, x) => s + x.mag, 0) / (shiftList.length - half581b);
+        if (earlyMean581b > 0 && lateMean581b < 0.5 * earlyMean581b) {
+          issues.push({
+            location: `Pair ${pair} — ${shiftList.length} shifts, early-half avg |${earlyMean581b.toFixed(2)}, late-half avg |${lateMean581b.toFixed(2)}|`,
+            rule: 'PAIR_AMPLITUDE_DECAY',
+            severity: 'minor',
+            description: `The relationship between ${pair} has a severe amplitude decay: the first half of their ${shiftList.length} bond shifts averages a magnitude of ${earlyMean581b.toFixed(2)}, but the second half averages only ${lateMean581b.toFixed(2)} — less than half the early-half force. The pair's relational engine winds down dramatically. Their most consequential bond-changing moments are all concentrated in the early part of their arc, leaving the later scenes to offer only small, low-stakes movements. A relationship that loses amplitude over time signals that the writers are giving up on the pair — the bond still technically moves, but with none of the force that made its early stages feel consequential. Audiences track a relationship through its ongoing drama; a pair that dwindles to minor shifts by the end of the story feels abandoned rather than resolved.`,
+            suggestedFix: `Redistribute the pair's most consequential bond movements more evenly across their arc, or deliberately escalate toward a major shift in their later scenes. If the pair's early arc was correctly high-stakes, their later scenes need shifts of comparable magnitude — a later confrontation, a defining moment of rupture or reconciliation — to honor the weight the early arc established. The pair's biggest shift should ideally arrive late, not early, so the relationship builds toward its defining moment rather than fading from it.`,
+          });
+          break;
+        }
+      }
+    }
+  }
+
+  // RELATIONSHIP_CLOCK_VALENCE_UNIFORM — valence × relationship × clock trigger.
+  // n≥8, ≥3 scenes carry both clockRaised===true and at least one relationship shift;
+  // every such scene's net shift direction is the same (all shifts sum positive, or all sum
+  // negative) → fire. Bonds never move in both directions under deadline pressure — all
+  // urgency-driven relational moments either exclusively warm or exclusively rupture. The clock
+  // is one of cinema's most potent relational catalysts because it forces choices that reveal
+  // character; but if all deadline-driven bond changes run in one direction, urgency becomes
+  // monotone as a relational force. The clock should sometimes force rapprochement and sometimes
+  // tear bonds apart; when it only does one, the instrument is playing one note.
+  // Distinct from: RELATIONSHIP_CLOCK_DECOUPLED (Wave 371: no shift in ANY clock scene — fires
+  // when there is NO overlap at all; this fires when the overlap exists but is valence-uniform),
+  // PAIR_CLOCK_FLAT (Wave 413: per-pair, a pair's shifts never coincide with clock scenes; co-
+  // occurrence mode not valence), PAYOFF_RELATIONSHIP_VALENCE_UNIFORM (Wave 426: payoff trigger,
+  // not clock), SEED_RELATIONSHIP_VALENCE_UNIFORM (Wave 552: seed trigger, not clock). First clock-
+  // trigger entry in the relationship valence family.
+  {
+    const n581c = records.length;
+    if (n581c >= 8) {
+      const clockShiftScenes581c = (records as any[]).filter((r: any) => {
+        if (!r.clockRaised) return false;
+        return ((r.relationshipShifts ?? []) as any[]).length > 0;
+      });
+      if (clockShiftScenes581c.length >= 3) {
+        const signs581c = clockShiftScenes581c.map((r: any) => {
+          const total = ((r.relationshipShifts ?? []) as Array<{amount: number}>)
+            .reduce((s: number, sh: {amount: number}) => s + sh.amount, 0);
+          return total > 0 ? 'pos' : total < 0 ? 'neg' : 'zero';
+        });
+        const allPos581c = signs581c.every((s: string) => s === 'pos');
+        const allNeg581c = signs581c.every((s: string) => s === 'neg');
+        if (allPos581c || allNeg581c) {
+          const dir581c = allPos581c ? 'warming' : 'rupturing';
+          issues.push({
+            location: `${clockShiftScenes581c.length} clock-raised shift scenes all ${dir581c}`,
+            rule: 'RELATIONSHIP_CLOCK_VALENCE_UNIFORM',
+            severity: 'minor',
+            description: `Every scene that combines deadline pressure with a relationship shift moves all bonds in the same direction — all ${clockShiftScenes581c.length} clock-raised shift scenes are ${dir581c}. The clock is one of cinema's most potent relational catalysts because it forces choices that reveal character and accelerate relationship trajectories; it should sometimes force rapprochement (walls come down under pressure, rivals ally) and sometimes tear bonds apart (the urgency exposes fault lines, survival instincts override loyalty). When every urgency-driven bond change goes in one direction, the clock becomes monotone as a relational instrument — a machine that only ${dir581c === 'warming' ? 'warms bonds in crisis' : 'breaks bonds in crisis'} without ever doing the opposite. The audience learns to predict the relational effect of every deadline, which drains both the urgency and the relationship change of their impact.`,
+            suggestedFix: `Introduce at least one clock-raised scene where the bond moves in the opposite direction — if all deadline scenes currently warm bonds (characters bond under pressure), find one where urgency instead reveals a betrayal or forces a rupture; if all deadline scenes currently rupture bonds (pressure tears relationships apart), find one where characters are forced to trust each other. The surprise of a deadline producing the opposite relational effect from what the story has established is itself a powerful beat, and it restores the sense that bonds move unpredictably under pressure.`,
           });
         }
       }
