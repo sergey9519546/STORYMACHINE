@@ -35657,6 +35657,88 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 573 — causalityPass: relationship opening third absent, suspense temporal cluster, curiosity temporal cluster', async () => {
+    const makeRec573 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const mkShift573 = (amount: number) => [{ pairKey: 'A-B', dimension: 'trust', amount }];
+    const runCaus573 = async (records: any[]) => causalityPass({
+      fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+      original: '', records, structure: {
+        escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+        approachingClimax: false, revelationCount: 0, actBreaks: [],
+      } as any,
+      annotations: Array.from({ length: records.length }, () => ({})),
+      approvedSpans: [],
+    });
+
+    it('RELATIONSHIP_OPENING_THIRD_ABSENT fires when ≥3 relShift scenes all outside the opening third', async () => {
+      // 9 scenes: opening third = scenes 0–2; all shifts at scenes 3,5,7
+      const recs573a = Array.from({ length: 9 }, (_, i) => makeRec573(i));
+      recs573a[3] = makeRec573(3, { relationshipShifts: mkShift573(0.5) });
+      recs573a[5] = makeRec573(5, { relationshipShifts: mkShift573(0.4) });
+      recs573a[7] = makeRec573(7, { relationshipShifts: mkShift573(0.6) });
+      const res = await runCaus573(recs573a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_OPENING_THIRD_ABSENT'), 'RELATIONSHIP_OPENING_THIRD_ABSENT should fire');
+    });
+
+    it('RELATIONSHIP_OPENING_THIRD_ABSENT does not fire when a relShift exists in the opening third', async () => {
+      // shift at scene 1 (in opening third 0–2) → condition unsatisfied
+      const recs573a = Array.from({ length: 9 }, (_, i) => makeRec573(i));
+      recs573a[1] = makeRec573(1, { relationshipShifts: mkShift573(0.5) });
+      recs573a[5] = makeRec573(5, { relationshipShifts: mkShift573(0.4) });
+      recs573a[7] = makeRec573(7, { relationshipShifts: mkShift573(0.6) });
+      const res = await runCaus573(recs573a);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_OPENING_THIRD_ABSENT'), 'RELATIONSHIP_OPENING_THIRD_ABSENT should not fire');
+    });
+
+    it('SUSPENSE_TEMPORAL_CLUSTER fires when >75% of suspense scenes cluster in one third', async () => {
+      // 9 scenes, third=3; all 3 suspense-rise scenes in opening third (0,1,2) → 100% > 75%
+      const recs573b = Array.from({ length: 9 }, (_, i) => makeRec573(i));
+      recs573b[0] = makeRec573(0, { suspenseDelta: 1 });
+      recs573b[1] = makeRec573(1, { suspenseDelta: 1 });
+      recs573b[2] = makeRec573(2, { suspenseDelta: 1 });
+      const res = await runCaus573(recs573b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SUSPENSE_TEMPORAL_CLUSTER'), 'SUSPENSE_TEMPORAL_CLUSTER should fire');
+    });
+
+    it('SUSPENSE_TEMPORAL_CLUSTER does not fire when suspense is distributed across thirds', async () => {
+      // one suspense scene per third (0, 3, 7) → maxZ/total = 1/3 = 33%
+      const recs573b = Array.from({ length: 9 }, (_, i) => makeRec573(i));
+      recs573b[0] = makeRec573(0, { suspenseDelta: 1 });
+      recs573b[3] = makeRec573(3, { suspenseDelta: 1 });
+      recs573b[7] = makeRec573(7, { suspenseDelta: 1 });
+      const res = await runCaus573(recs573b);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SUSPENSE_TEMPORAL_CLUSTER'), 'SUSPENSE_TEMPORAL_CLUSTER should not fire');
+    });
+
+    it('CURIOSITY_TEMPORAL_CLUSTER fires when >75% of curiosity scenes cluster in one third', async () => {
+      // 9 scenes; all 3 curiosity-rise scenes in closing third (6,7,8) → 100% > 75%
+      const recs573c = Array.from({ length: 9 }, (_, i) => makeRec573(i));
+      recs573c[6] = makeRec573(6, { curiosityDelta: 1 });
+      recs573c[7] = makeRec573(7, { curiosityDelta: 1 });
+      recs573c[8] = makeRec573(8, { curiosityDelta: 1 });
+      const res = await runCaus573(recs573c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CURIOSITY_TEMPORAL_CLUSTER'), 'CURIOSITY_TEMPORAL_CLUSTER should fire');
+    });
+
+    it('CURIOSITY_TEMPORAL_CLUSTER does not fire when curiosity is distributed across thirds', async () => {
+      // one curiosity scene per third (1, 4, 7) → maxZ/total = 1/3 = 33%
+      const recs573c = Array.from({ length: 9 }, (_, i) => makeRec573(i));
+      recs573c[1] = makeRec573(1, { curiosityDelta: 1 });
+      recs573c[4] = makeRec573(4, { curiosityDelta: 1 });
+      recs573c[7] = makeRec573(7, { curiosityDelta: 1 });
+      const res = await runCaus573(recs573c);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CURIOSITY_TEMPORAL_CLUSTER'), 'CURIOSITY_TEMPORAL_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 559 — causalityPass: relationship shift uncaused, relationship closing third absent, payoff relationship aftermath void', async () => {
     const makeRec559 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
