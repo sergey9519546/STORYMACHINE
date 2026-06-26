@@ -34526,6 +34526,95 @@ The lights go out.`;
     });
   });
 
+  describe('Wave 588 — dialoguePass: curiosity-spike scene void, closing-zone silent, hedge back-loaded', async () => {
+    const makeRec588 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
+      sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing', payoffSetupIds: [], relationshipShifts: [],
+      emotionalShift: 'neutral', seededClueIds: [], dialogueHighlights: [], unresolvedClues: [],
+      purpose: '', slug: `s${sceneIdx}`, ...extra,
+    });
+    const runD588 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    const buildScenes588 = (count: number, dlgFn: (i: number) => number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\n`;
+        const n = dlgFn(i);
+        for (let j = 0; j < n; j++) {
+          f += j % 2 === 0
+            ? `ALICE\nShe found the documents early this morning.\n\n`
+            : `BOB\nWe should leave before they close the gate.\n\n`;
+        }
+        if (n === 0) f += `The door crashes open. A figure steps from the dark.\n\n`;
+      }
+      return f;
+    };
+
+    // DIALOGUE_CURIOSITY_SPIKE_SCENE_VOID fire:
+    // n=10; curiosityDelta>0 at scenes 2,5; those scenes have 0 dialogue; others have 2 lines → fires
+    it('DIALOGUE_CURIOSITY_SPIKE_SCENE_VOID fires when all curiosity-spike scenes have no dialogue', async () => {
+      const recs588a = Array.from({ length: 10 }, (_, i) => makeRec588(i, { curiosityDelta: i === 2 || i === 5 ? 1 : 0 }));
+      const f588a = buildScenes588(10, i => i === 2 || i === 5 ? 0 : 2);
+      const res = await runD588(f588a, recs588a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_CURIOSITY_SPIKE_SCENE_VOID'), 'DIALOGUE_CURIOSITY_SPIKE_SCENE_VOID should fire');
+    });
+
+    // DIALOGUE_CURIOSITY_SPIKE_SCENE_VOID no-fire:
+    // scene 2 (curiosity spike) has 2 dialogue lines → does not fire
+    it('DIALOGUE_CURIOSITY_SPIKE_SCENE_VOID does not fire when a curiosity-spike scene has dialogue', async () => {
+      const recs588an = Array.from({ length: 10 }, (_, i) => makeRec588(i, { curiosityDelta: i === 2 || i === 5 ? 1 : 0 }));
+      const f588an = buildScenes588(10, i => i === 5 ? 0 : 2);
+      const res = await runD588(f588an, recs588an);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_CURIOSITY_SPIKE_SCENE_VOID'), 'DIALOGUE_CURIOSITY_SPIKE_SCENE_VOID should not fire');
+    });
+
+    // DIALOGUE_CLOSING_ZONE_SILENT fire:
+    // n=9; third=3; opening (0-2) and middle (3-5) have dialogue; closing (6-8) has none → fires
+    it('DIALOGUE_CLOSING_ZONE_SILENT fires when the closing third has no dialogue', async () => {
+      const recs588b = Array.from({ length: 9 }, (_, i) => makeRec588(i));
+      const f588b = buildScenes588(9, i => i >= 6 ? 0 : 2);
+      const res = await runD588(f588b, recs588b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_CLOSING_ZONE_SILENT'), 'DIALOGUE_CLOSING_ZONE_SILENT should fire');
+    });
+
+    // DIALOGUE_CLOSING_ZONE_SILENT no-fire:
+    // scene 7 (closing third) has 2 dialogue lines → does not fire
+    it('DIALOGUE_CLOSING_ZONE_SILENT does not fire when the closing third has a dialogue scene', async () => {
+      const recs588bn = Array.from({ length: 9 }, (_, i) => makeRec588(i));
+      const f588bn = buildScenes588(9, i => i === 7 ? 2 : i >= 6 ? 0 : 2);
+      const res = await runD588(f588bn, recs588bn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_CLOSING_ZONE_SILENT'), 'DIALOGUE_CLOSING_ZONE_SILENT should not fire');
+    });
+
+    // DIALOGUE_HEDGE_BACK_LOADED fire:
+    // 16 lines total; scenes 0-1 (first half): 0 hedges; scenes 2-3 (second half): 8 hedges → fires
+    it('DIALOGUE_HEDGE_BACK_LOADED fires when hedge lines concentrate in the second half', async () => {
+      const f588c = [
+        `INT. SCENE 0 - DAY\n\nALICE\nShe found the documents early this morning.\n\nBOB\nWe should leave before they close the gate.\n\nALICE\nThe report has arrived from the main office.\n\nBOB\nAll the files are ready for the final review.\n`,
+        `INT. SCENE 1 - DAY\n\nALICE\nThey will make their decision very soon now.\n\nBOB\nThe meeting seemed quite productive for us.\n\nALICE\nEveryone appeared to be satisfied with this.\n\nBOB\nThe outcome was better than we had expected.\n`,
+        `INT. SCENE 2 - DAY\n\nALICE\nMaybe we should consider another option here.\n\nBOB\nI think perhaps we need to try another way.\n\nALICE\nI suppose this could possibly work out well.\n\nBOB\nMaybe there is another path we have not tried.\n`,
+        `INT. SCENE 3 - DAY\n\nALICE\nI guess we could try yet another approach here.\n\nBOB\nKind of hard to know what direction to choose.\n\nALICE\nPerhaps the other option would have been fine.\n\nBOB\nI think maybe this is the right thing to do.\n`,
+      ].join('\n');
+      const res = await runD588(f588c, []);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_HEDGE_BACK_LOADED'), 'DIALOGUE_HEDGE_BACK_LOADED should fire');
+    });
+
+    // DIALOGUE_HEDGE_BACK_LOADED no-fire:
+    // first half has 2 hedge lines (> 1 limit) → does not fire
+    it('DIALOGUE_HEDGE_BACK_LOADED does not fire when the first half has more than one hedge line', async () => {
+      const f588cn = [
+        `INT. SCENE 0 - DAY\n\nALICE\nMaybe she found the documents this morning.\n\nBOB\nWe should probably leave before they close.\n\nALICE\nThe report has arrived from the main office.\n\nBOB\nAll the files are ready for the final review.\n`,
+        `INT. SCENE 1 - DAY\n\nALICE\nThey will make their decision very soon now.\n\nBOB\nThe meeting seemed quite productive for us.\n\nALICE\nEveryone appeared to be satisfied with this.\n\nBOB\nThe outcome was better than we had expected.\n`,
+        `INT. SCENE 2 - DAY\n\nALICE\nMaybe we should consider another option here.\n\nBOB\nI think perhaps we need to try another way.\n\nALICE\nI suppose this could possibly work out well.\n\nBOB\nMaybe there is another path we have not tried.\n`,
+        `INT. SCENE 3 - DAY\n\nALICE\nI guess we could try yet another approach here.\n\nBOB\nKind of hard to know what direction to choose.\n\nALICE\nPerhaps the other option would have been fine.\n\nBOB\nI think maybe this is the right thing to do.\n`,
+      ].join('\n');
+      const res = await runD588(f588cn, []);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_HEDGE_BACK_LOADED'), 'DIALOGUE_HEDGE_BACK_LOADED should not fire');
+    });
+  });
+
   describe('Wave 574 — dialoguePass: clock peak silent, sparse run, negation back-loaded', async () => {
     const makeRec574 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
       sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0,

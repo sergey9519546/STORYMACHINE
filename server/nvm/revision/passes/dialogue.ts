@@ -160,6 +160,22 @@
 // any dialogue; distinct from DIALOGUE_REVELATION_SCENE_VOID which is co-occurrence within the
 // revelation scene itself, and from DIALOGUE_DENSE_AFTERMATH_SILENT which uses dense-dialogue as
 // trigger; first aftermath check conditioned on a revelation trigger in this pass).
+// Wave 588 additions: dialogue curiosity-spike scene void (co-occurrence/decoupling × curiosity
+// spike × dialogue absence — n≥8, ≥2 curiosity-spike scenes [curiosityDelta>0], ≥3 dialogue
+// scenes globally, no curiosity-spike scene has any dialogue while dialogue exists in non-spike
+// scenes; the curiosity-channel co-occurrence complement of DIALOGUE_CURIOSITY_PEAK_SILENT [single-
+// peak isolation — only the highest-curiosityDelta scene is checked]; distinct from DIALOGUE_
+// REVELATION_SCENE_VOID [revelation trigger] and DIALOGUE_SUSPENSE_AFTERMATH_SILENT [aftermath ×
+// suspense]), dialogue closing-zone silent (zone presence/absence × closing third × dialogue absence
+// — n≥9, ≥4 dialogue scenes globally, opening and middle thirds each have ≥1 dialogue scene, closing
+// third has 0 dialogue scenes; the resolution act is entirely voiceless while opening and middle are
+// verbally active; distinct from DIALOGUE_MIDDLE_ZONE_SILENT [middle not closing — symmetric
+// opposite], DIALOGUE_CLIMAX_VOID [final 20% not final third], DIALOGUE_OPENING_SILENT [different
+// zone]), dialogue hedge back-loaded (distribution/timing × hedge lexeme × second half — dialogue≥14,
+// ≥5 hedging lines globally, second half carries ≥5 and first half ≤1; uncertainty/tentativeness
+// concentrated in the climax and resolution while setup dialogue is largely certain; the temporal
+// mirror of DIALOGUE_HEDGE_FRONT_LOADED [Wave 434: ≥5 in first half]; distinct from DIALOGUE_
+// NEGATION_BACK_LOADED [negation not hedge], DIALOGUE_QUESTION_BACK_LOADED [question channel]).
 // Wave 574 additions: dialogue clock peak silent (single-peak isolation × clockDelta ×
 // dialogue absence — n≥8, ≥2 clockDelta>0 scenes, ≥2 dialogue scenes, scene with max
 // clockDelta has no dialogue while ≥1 other clockDelta>0 scene does; the clockDelta single-
@@ -3412,6 +3428,134 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
             suggestedFix: `Introduce at least one negation-containing line in the first half — a refusal, denial, or limit-statement that establishes a character's resistance vocabulary before the story's escalation demands it. A low-stakes "I won't do that" or "never" in the setup primes the audience to understand the character's limits. When the back-half negation arrives, it carries the weight of an established pattern rather than feeling like a sudden shift.`,
           });
         }
+      }
+    }
+  }
+
+  // ── Wave 588: DIALOGUE_CURIOSITY_SPIKE_SCENE_VOID, DIALOGUE_CLOSING_ZONE_SILENT,
+  //              DIALOGUE_HEDGE_BACK_LOADED ────────────────────────────────────────────────────────
+  // DIALOGUE_CURIOSITY_SPIKE_SCENE_VOID (co-occurrence/decoupling × curiosity spike × dialogue
+  // absence, n≥8, ≥2 curiosity-spike scenes [curiosityDelta>0], ≥3 scenes with dialogue, no
+  // curiosity-spike scene carries any dialogue): Every scene where the story generates new questions
+  // or deepens mystery is executed without a word of speech. Curiosity and dialogue are natural
+  // partners — the question a character cannot hold back, the demand for information half-satisfied,
+  // the fragment of truth that opens more than it closes. When every curiosity-spike scene passes in
+  // silence, the mystery-generating machinery runs without vocal engagement: the audience's questions
+  // are planted through image and action alone, never through a character's spoken uncertainty.
+  // Co-occurrence/decoupling mode × curiosity-spike trigger × dialogue absence. Distinct from
+  // DIALOGUE_CURIOSITY_PEAK_SILENT (Wave 448: single-peak isolation — checks only the ONE highest-
+  // curiosityDelta scene; SPIKE_SCENE_VOID fires when ALL spike scenes are silent, including cases
+  // where a lower-spike scene might be silent while the peak is not), DIALOGUE_REVELATION_SCENE_VOID
+  // (Wave 448: revelation trigger, not curiosity spike), DIALOGUE_SUSPENSE_AFTERMATH_SILENT (Wave
+  // 546: aftermath mode × suspense trigger — different direction and trigger).
+  {
+    const n588a = records.length;
+    if (n588a >= 8) {
+      const lineToScene588a = buildLineToSceneMap(fountain);
+      const dlgPerScene588a = new Map<number, number>();
+      for (const d of dialogue) {
+        const si = lineToScene588a[d.lineNum - 1] ?? -1;
+        if (si >= 0) dlgPerScene588a.set(si, (dlgPerScene588a.get(si) ?? 0) + 1);
+      }
+      const scenesWithDlg588a = (records as any[]).filter(
+        r => (dlgPerScene588a.get(r.sceneIdx) ?? 0) > 0,
+      ).length;
+      if (scenesWithDlg588a >= 3) {
+        const curiSpikeScenes588a = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0);
+        if (curiSpikeScenes588a.length >= 2) {
+          const anySpikeDlg588a = curiSpikeScenes588a.some(r => (dlgPerScene588a.get(r.sceneIdx) ?? 0) > 0);
+          if (!anySpikeDlg588a) {
+            issues.push({
+              location: `${curiSpikeScenes588a.length} curiosity-spike scene(s) — none carry any dialogue`,
+              rule: 'DIALOGUE_CURIOSITY_SPIKE_SCENE_VOID',
+              severity: 'minor',
+              description: `The script has ${curiSpikeScenes588a.length} scenes where curiosity rises (curiosityDelta > 0) and ${scenesWithDlg588a} scenes with dialogue elsewhere, but no curiosity-spike scene carries a single spoken line. Every scene where the story generates new questions or deepens mystery is entirely visual — executed in action and image without any character speaking. Curiosity and dialogue are natural partners: the question a character cannot hold back, the demand for information half-satisfied, the fragment of truth that opens more than it closes. When all mystery-generating scenes are silent while dialogue flourishes in other scenes, the story's curiosity engine and its verbal dimension operate as separate systems, never intersecting in the scenes where the audience's wondering is most heightened.`,
+              suggestedFix: `Add at least one dialogue line to one of the ${curiSpikeScenes588a.length} curiosity-spike scenes — a question the character can no longer hold back, a partial disclosure that invites more wondering than it resolves, or an exchange that registers the new unknown. Even one line at the moment of heightened curiosity gives the mystery-generating beat a vocal dimension and anchors the audience's wondering in a character voice.`,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // DIALOGUE_CLOSING_ZONE_SILENT (zone presence/absence × closing third × dialogue absence,
+  // n≥9, ≥4 dialogue scenes globally, opening third has ≥1 dialogue, middle third has ≥1
+  // dialogue, closing third has 0 dialogue scenes): The story's resolution section — the final
+  // third where the climax unfolds and consequences are absorbed — is entirely voiceless while
+  // both the opening and middle thirds are verbally active. Film resolutions gain resonance from
+  // characters speaking at the decisive moment: the declaration, the vow, the reckoning. When
+  // the closing third contains no spoken language while opening and middle sections carry dialogue,
+  // the resolution plays out as pure spectacle — characters reach the climax without anyone
+  // speaking to what has been decided, won, or lost. Zone presence/absence mode × closing-third
+  // position. Distinct from DIALOGUE_MIDDLE_ZONE_SILENT (Wave 532: fires when MIDDLE is silent
+  // while opening AND closing are active — the symmetric opposite), DIALOGUE_CLIMAX_VOID (Wave
+  // 434: final 20% with a fixed percentage boundary, not a structural-third boundary), and
+  // DIALOGUE_OPENING_SILENT (Wave 462: opening zone, not closing).
+  {
+    const n588b = records.length;
+    if (n588b >= 9) {
+      const lineToScene588b = buildLineToSceneMap(fountain);
+      const dlgPerScene588b = new Map<number, number>();
+      for (const d of dialogue) {
+        const si = lineToScene588b[d.lineNum - 1] ?? -1;
+        if (si >= 0) dlgPerScene588b.set(si, (dlgPerScene588b.get(si) ?? 0) + 1);
+      }
+      const scenesWithDlg588b = (records as any[]).filter(
+        r => (dlgPerScene588b.get(r.sceneIdx) ?? 0) > 0,
+      ).length;
+      if (scenesWithDlg588b >= 4) {
+        const third588b = Math.floor(n588b / 3);
+        const openHasDlg588b = (records as any[]).some(
+          (r, pos) => pos < third588b && (dlgPerScene588b.get(r.sceneIdx) ?? 0) > 0,
+        );
+        const midHasDlg588b = (records as any[]).some(
+          (r, pos) => pos >= third588b && pos < 2 * third588b && (dlgPerScene588b.get(r.sceneIdx) ?? 0) > 0,
+        );
+        const closeHasDlg588b = (records as any[]).some(
+          (r, pos) => pos >= 2 * third588b && (dlgPerScene588b.get(r.sceneIdx) ?? 0) > 0,
+        );
+        if (openHasDlg588b && midHasDlg588b && !closeHasDlg588b) {
+          issues.push({
+            location: `Closing third (scenes ${2 * third588b}–${n588b - 1}) has no dialogue; opening and middle thirds do`,
+            rule: 'DIALOGUE_CLOSING_ZONE_SILENT',
+            severity: 'minor',
+            description: `The story's closing third (scenes at positions ${2 * third588b}–${n588b - 1}) contains no dialogue, while both the opening and middle thirds carry scenes with spoken language. The final section of the screenplay — where the climax unfolds and consequences are absorbed — is entirely voiceless. Film resolutions gain resonance from characters speaking at the decisive moment: the declaration of what was decided, the reckoning with what was lost, the acknowledgment of what changed. When the closing third passes without a single spoken line while the opening and middle sections are verbally active, the story reaches its most consequential structural zone without anyone inhabiting the moment in words. The resolution becomes pure spectacle — sequences of action and image without the character voice that makes climactic moments felt rather than merely witnessed.`,
+            suggestedFix: `Introduce at least one dialogue scene in the closing third (scenes ${2 * third588b}–${n588b - 1}). A declaration under maximum pressure, a one-line acknowledgment of what has changed, or a brief exchange in the aftermath that registers what was decided gives the resolution its necessary verbal anchor. Even a single line spoken at or near the climax lets the story's most important moment be inhabited in words rather than rendered in silence.`,
+          });
+        }
+      }
+    }
+  }
+
+  // DIALOGUE_HEDGE_BACK_LOADED (distribution/timing × hedging lexeme × second half, dialogue≥14,
+  // second half carries ≥5 hedge lines and first half ≤1): Uncertainty language — "maybe",
+  // "perhaps", "I think", "I guess", "I suppose", "probably", "possibly", "kind of", "sort of",
+  // "I mean", "or something" — is heavily concentrated in the escalation, climax, and resolution
+  // sections while the premise-setting dialogue is largely certain and direct. Characters who speak
+  // with conviction in the setup but become increasingly tentative in the climax invert the natural
+  // dramatic arc: doubt belongs in the opening where options are being weighed, and commitment
+  // should build toward resolution. When hedging floods the second half, characters become
+  // unexpectedly diffident precisely when the story demands the most decisive language. Distribution/
+  // timing mode × hedging lexeme. Distinct from DIALOGUE_HEDGE_FRONT_LOADED (Wave 434: ≥5 hedges
+  // in first half and ≤1 in second — the temporal mirror and opposite direction), DIALOGUE_NEGATION_
+  // BACK_LOADED (Wave 574: negation not hedge — different linguistic register), DIALOGUE_QUESTION_
+  // BACK_LOADED (Wave 448: question content, not hedging qualifier), and DIALOGUE_HEDGE_SATURATION
+  // (Wave 311: global rate check regardless of temporal position — this fires on temporal imbalance
+  // even when the overall hedge rate is below the saturation threshold).
+  {
+    if (dialogue.length >= 14) {
+      const hedgeRe588c = /\b(just|maybe|perhaps|probably|possibly|i think|i guess|i suppose|kind of|sort of|i mean|or something)\b/i;
+      const half588c = Math.floor(dialogue.length / 2);
+      const firstHedges588c = dialogue.slice(0, half588c).filter(d => hedgeRe588c.test(d.line)).length;
+      const secondHedges588c = dialogue.slice(half588c).filter(d => hedgeRe588c.test(d.line)).length;
+      if (secondHedges588c >= 5 && firstHedges588c <= 1) {
+        issues.push({
+          location: `Dialogue — ${secondHedges588c} of ${firstHedges588c + secondHedges588c} hedge lines in second half`,
+          rule: 'DIALOGUE_HEDGE_BACK_LOADED',
+          severity: 'minor',
+          description: `${secondHedges588c} hedge lines appear in the second half of dialogue while only ${firstHedges588c} appear in the first half — uncertainty language is overwhelmingly concentrated in the escalation, climax, and resolution while the setup dialogue speaks with unbroken certainty. Hedging ("maybe", "I think", "I suppose", "probably", "kind of") registers doubt and tentativeness; these qualifiers are most dramatically apt in the opening sections where characters are still weighing options and finding their footing. When hedging floods the second half, characters become increasingly diffident precisely when the story calls for its most decisive language — conviction erodes just as the stakes peak, and the climax is inhabited by the voice of wavering rather than the voice of commitment.`,
+          suggestedFix: `Redistribute hedging language into the first half: let setup and rising-action scenes carry at least two or three tentative lines — characters still weighing options, speaking diffidently before the pressure forces decisiveness. Reserve the second half for fewer but more charged hedges; a single moment of genuine doubt in the climax lands hard precisely because it is surrounded by more direct speech. When the setup wavers and the climax commits, the arc from uncertainty to conviction becomes felt through language.`,
+        });
       }
     }
   }
