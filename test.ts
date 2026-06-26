@@ -28652,6 +28652,88 @@ I always listen.
     });
   });
 
+  describe('Wave 576 — conflictPass: curiosity zone cluster, turn aftermath suspense void, revelation drought run', async () => {
+    const makeRec576 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF576 = async (records: any[]) => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    it('CONFLICT_CURIOSITY_ZONE_CLUSTER fires when >75% of curiosity spikes cluster in one third', async () => {
+      // 9 scenes; thirds=[0-2],[3-5],[6-8]; curiosity at 6,7,8 → 100% in closing third
+      const recs576a = Array.from({ length: 9 }, (_, i) => makeRec576(i));
+      recs576a[6] = makeRec576(6, { curiosityDelta: 1 });
+      recs576a[7] = makeRec576(7, { curiosityDelta: 1 });
+      recs576a[8] = makeRec576(8, { curiosityDelta: 1 });
+      const res = await runCF576(recs576a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_CURIOSITY_ZONE_CLUSTER'), 'CONFLICT_CURIOSITY_ZONE_CLUSTER should fire');
+    });
+
+    it('CONFLICT_CURIOSITY_ZONE_CLUSTER does not fire when curiosity is distributed across thirds', async () => {
+      // one curiosity spike per third (1, 4, 7) → maxZone/total = 1/3
+      const recs576a = Array.from({ length: 9 }, (_, i) => makeRec576(i));
+      recs576a[1] = makeRec576(1, { curiosityDelta: 1 });
+      recs576a[4] = makeRec576(4, { curiosityDelta: 1 });
+      recs576a[7] = makeRec576(7, { curiosityDelta: 1 });
+      const res = await runCF576(recs576a);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_CURIOSITY_ZONE_CLUSTER'), 'CONFLICT_CURIOSITY_ZONE_CLUSTER should not fire');
+    });
+
+    it('CONFLICT_TURN_AFTERMATH_SUSPENSE_VOID fires when no turn is followed by suspense within 2 scenes', async () => {
+      // n=9; turns at pos 1,4; suspense at 7 (not within 2 of 1 or 4)
+      const recs576b = Array.from({ length: 9 }, (_, i) => makeRec576(i));
+      recs576b[1] = makeRec576(1, { dramaticTurn: 'reversal' });
+      recs576b[4] = makeRec576(4, { dramaticTurn: 'revelation' });
+      recs576b[7] = makeRec576(7, { suspenseDelta: 1 });
+      recs576b[8] = makeRec576(8, { suspenseDelta: 1 });
+      const res = await runCF576(recs576b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_TURN_AFTERMATH_SUSPENSE_VOID'), 'CONFLICT_TURN_AFTERMATH_SUSPENSE_VOID should fire');
+    });
+
+    it('CONFLICT_TURN_AFTERMATH_SUSPENSE_VOID does not fire when a turn is followed by suspense within 2 scenes', async () => {
+      // turn at 1; suspense at 2 (within 1 scene) → condition satisfied → no fire
+      const recs576b = Array.from({ length: 9 }, (_, i) => makeRec576(i));
+      recs576b[1] = makeRec576(1, { dramaticTurn: 'reversal' });
+      recs576b[2] = makeRec576(2, { suspenseDelta: 1 });
+      recs576b[4] = makeRec576(4, { dramaticTurn: 'revelation' });
+      recs576b[7] = makeRec576(7, { suspenseDelta: 1 });
+      const res = await runCF576(recs576b);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_TURN_AFTERMATH_SUSPENSE_VOID'), 'CONFLICT_TURN_AFTERMATH_SUSPENSE_VOID should not fire');
+    });
+
+    it('CONFLICT_REVELATION_DROUGHT_RUN fires when ≥7 consecutive scenes have no revelation', async () => {
+      // 10 scenes; revelations at 0 and 8; non-revelation run 1-7 = 7 consecutive
+      const recs576c = Array.from({ length: 10 }, (_, i) => makeRec576(i));
+      recs576c[0] = makeRec576(0, { revelation: 'She knew the truth.' });
+      recs576c[8] = makeRec576(8, { revelation: 'He was lying all along.' });
+      const res = await runCF576(recs576c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_REVELATION_DROUGHT_RUN'), 'CONFLICT_REVELATION_DROUGHT_RUN should fire');
+    });
+
+    it('CONFLICT_REVELATION_DROUGHT_RUN does not fire when revelations are distributed without a long drought', async () => {
+      // revelations at 0,4,8 → max non-revelation run = 3 scenes < 7
+      const recs576c = Array.from({ length: 10 }, (_, i) => makeRec576(i));
+      recs576c[0] = makeRec576(0, { revelation: 'Discovery A.' });
+      recs576c[4] = makeRec576(4, { revelation: 'Discovery B.' });
+      recs576c[8] = makeRec576(8, { revelation: 'Discovery C.' });
+      const res = await runCF576(recs576c);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_REVELATION_DROUGHT_RUN'), 'CONFLICT_REVELATION_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 562 — conflictPass: repair drought run, repair emotion decoupled, repair curiosity aftermath void', async () => {
     const rep562 = (amount: number) => [{ pairKey: 'A|B', dimension: 'trust', amount }];
     const makeRec562 = (idx: number, overrides: any = {}): any => ({

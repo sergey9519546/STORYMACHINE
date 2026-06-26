@@ -151,6 +151,20 @@
 // CONFLICT_CLUE_DECOUPLED [seed × rupture — the negative direction], CONFLICT_RUPTURE_SEED_AFTERMATH_VOID
 // [aftermath mode], and CONFLICT_REVELATION_REPAIR_DECOUPLED [revelation × repair — different signal pair];
 // first co-occurrence check joining seed and repair channels).
+// Wave 576 additions: curiosity zone cluster (distribution/timing × curiosityDelta × structural
+// thirds — n≥9, ≥3 curiosity-positive scenes, >75% in one third; wonder spikes ghettoized into
+// one zone; finer-grained than binary half checks; distinct from CONFLICT_CURIOSITY_CLOSING_ZONE_
+// ABSENT [zone-absence × closing third only, not concentration in any third], CONFLICT_AFTERMATH_
+// CURIOSITY_VOID [aftermath mode not distribution], CONFLICT_RUPTURE_CURIOSITY_DECOUPLED [co-
+// occurrence not distribution]), dramatic-turn aftermath suspense void (sequence/aftermath ×
+// dramatic turn → suspense aftermath — n≥8, ≥2 qualifying turn scenes [pos<n-1], ≥2 suspense
+// scenes, no turn scene followed by suspenseDelta>0 within 2 scenes; pivots never escalate
+// conflict tension; the turn-trigger complement of CONFLICT_AFTERMATH_CURIOSITY_VOID [curiosity
+// channel] in this pass; distinct from CONFLICT_EMOTION_DECOUPLED [same-scene], CONFLICT_CLOSING_
+// SUSPENSE_VOID [zone not aftermath]), revelation drought run (run-based × revelation × absence —
+// n≥10, ≥2 revelation scenes, longest consecutive non-revelation run ≥7; the information-reveal
+// engine goes silent for an extended stretch; the revelation-channel sibling of CONFLICT_REPAIR_
+// DROUGHT_RUN [repair channel]; distinct from CONFLICT_CURIOSITY_CLOSING_ZONE_ABSENT [zone not run]).
 // Wave 562 additions: repair drought run (run-based × repair absence × valence — n≥10, ≥2 repair
 // scenes, longest consecutive run of non-repair scenes ≥6; relational warmth goes dark for an
 // extended stretch; first run-based ABSENCE check on the repair channel, distinct from CONFLICT_
@@ -3222,6 +3236,136 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `Every one of the story's ${repairRecs562c.length} bond-repair scenes (positive shift ≥ +0.3) is followed by two scenes with no curiosity rise, even though the story raises curiosity in ${curiosityCount562c} scene(s) elsewhere. A repair is a natural springboard for new wondering — a restored alliance invites the question of what the reunited characters will now attempt together; a healed bond raises the question of whether it will hold under the next pressure. When every reconciliation's aftermath is curiosity-flat, the relational-warmth engine and the wondering engine never feed each other: repairs close emotional loops without opening narrative ones, and the forward pull a reconciliation could generate is left untapped. The story heals bonds and raises questions in entirely separate moments.`,
             suggestedFix: `After at least one repair, let the next scene or two open a new question that the reconciliation makes possible: what the restored alliance will now risk together, whether the healed bond can survive a fresh test, or what the reunited characters will discover now that they are working as one. A reconciliation that opens a new question carries forward momentum; one that closes an emotional loop without opening a narrative one lets the story's energy dissipate at the moment a bond is restored.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 576: CONFLICT_CURIOSITY_ZONE_CLUSTER, CONFLICT_TURN_AFTERMATH_SUSPENSE_VOID,
+  //              CONFLICT_REVELATION_DROUGHT_RUN ────────────────────────────────────────────────
+  {
+    // CONFLICT_CURIOSITY_ZONE_CLUSTER (distribution/timing × curiosityDelta × structural thirds,
+    // n≥9, ≥3 curiosity-positive scenes [curiosityDelta>0], >75% of them fall in one structural
+    // third): The story's question-opening beats are ghettoized into one structural zone while the
+    // other two-thirds of the conflict arc are wonder-flat. A thirds-based cluster is finer-grained
+    // than the closing-zone-absence check: a script can have curiosity present in the closing third
+    // and still concentrate three-quarters of all wonder beats into, say, the opening third, leaving
+    // the middle and late sections question-quiet. When curiosity is zoned into one stretch, the
+    // conflict's mystery dimension reads as an early burst of wonder (or a late avalanche) rather
+    // than a continuous thread of deepening questions sustaining the conflict through all three acts.
+    // Distribution/timing mode × curiosity channel × structural thirds. Distinct from CONFLICT_
+    // CURIOSITY_CLOSING_ZONE_ABSENT (Wave 520: zone-presence/absence × closing third — fires when
+    // zero curiosity in the closing zone, regardless of concentration elsewhere), CONFLICT_AFTERMATH_
+    // CURIOSITY_VOID (aftermath mode), CONFLICT_RUPTURE_CURIOSITY_DECOUPLED (co-occurrence mode).
+    if (records.length >= 9) {
+      const curiPos576a = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r }) => (r.curiosityDelta ?? 0) > 0)
+        .map(({ pos }) => pos);
+      if (curiPos576a.length >= 3) {
+        const third576a = Math.floor(records.length / 3);
+        const z1Curi576a = curiPos576a.filter(p => p < third576a).length;
+        const z3Curi576a = curiPos576a.filter(p => p >= 2 * third576a).length;
+        const z2Curi576a = curiPos576a.length - z1Curi576a - z3Curi576a;
+        const maxZ576a = Math.max(z1Curi576a, z2Curi576a, z3Curi576a);
+        if (maxZ576a / curiPos576a.length > 0.75) {
+          const zoneName576a = z1Curi576a === maxZ576a ? 'opening' : z3Curi576a === maxZ576a ? 'closing' : 'middle';
+          issues.push({
+            location: `curiosity spikes: ${z1Curi576a} opening / ${z2Curi576a} middle / ${z3Curi576a} closing third — ${Math.round(maxZ576a / curiPos576a.length * 100)}% in the ${zoneName576a} third`,
+            rule: 'CONFLICT_CURIOSITY_ZONE_CLUSTER',
+            severity: 'minor',
+            description: `${Math.round(maxZ576a / curiPos576a.length * 100)}% of the conflict arc's ${curiPos576a.length} curiosity-spike scenes are concentrated in the ${zoneName576a} structural third, leaving the other two-thirds wonder-flat. The conflict's mystery dimension — the questions the escalating situation generates — is ghettoized into one zone rather than sustained across the full arc. When curiosity clusters in one stretch, the audience experiences a burst of wondering followed by a long question-quiet stretch rather than continuous deepening uncertainty. Effective conflict sustains wonder across all three structural zones: early questions establish what is at stake and unknown, middle questions deepen the mystery under pressure, and late questions hold the tension through the resolution.`,
+            suggestedFix: `Redistribute curiosity spikes so that each structural third carries at least one moment where the conflict opens a new question. Move some of the ${zoneName576a} third's wonder beats into the underweight zones, or add new curiosity-generating moments in the question-quiet sections. The conflict is most gripping when it keeps generating new questions across its full arc — when the audience never knows whether they understand enough to predict the outcome.`,
+          });
+        }
+      }
+    }
+
+    // CONFLICT_TURN_AFTERMATH_SUSPENSE_VOID (sequence/aftermath × dramatic turn → suspense aftermath,
+    // n≥8, ≥2 qualifying dramatic-turn scenes [dramaticTurn !== 'nothing', pos < n-1], ≥2 suspense-
+    // positive scenes globally, none of the qualifying turn scenes is followed by a suspenseDelta > 0
+    // scene within the next 2 scenes): Every reversal or pivot in the conflict arc passes without
+    // escalating the felt tension in its immediate aftermath — pivots restructure the situation but
+    // never raise the stakes for the protagonist in the two scenes that follow. A dramatic turn is
+    // a moment of structural reorientation: the conflict flips direction, new information changes
+    // the meaning of prior events, or the protagonist's position is fundamentally altered. The
+    // natural aftermath of a turn is heightened urgency — the protagonist's old position is gone
+    // and the new situation demands a recalibration that should register as increased pressure.
+    // When every turn's aftermath is suspense-flat, pivots function as pure plot mechanics rather
+    // than as escalation events: the situation changes but the protagonist's felt danger does not
+    // respond. Sequence/aftermath mode × dramatic turn trigger × suspense aftermath. Distinct from
+    // CONFLICT_EMOTION_DECOUPLED (co-occurrence × dramatic turn × emotional state — same-scene
+    // check on emotional channel), CONFLICT_CLOSING_SUSPENSE_VOID (zone × closing third × suspense
+    // absence — zone-based not aftermath), CONFLICT_AFTERMATH_CURIOSITY_VOID (same aftermath
+    // structure × curiosity channel — not suspense).
+    if (records.length >= 8) {
+      const qualTurns576b = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) =>
+          (r.dramaticTurn ?? 'nothing') !== 'nothing' &&
+          r.dramaticTurn !== '' &&
+          pos < records.length - 1,
+        );
+      const suspScenes576b = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 0);
+      if (qualTurns576b.length >= 2 && suspScenes576b.length >= 2) {
+        const anyTurnAftermathSusp576b = qualTurns576b.some(({ pos }) => {
+          const next1 = (records as any[])[pos + 1];
+          const next2 = pos + 2 < records.length ? (records as any[])[pos + 2] : null;
+          return (
+            (next1 && (next1.suspenseDelta ?? 0) > 0) ||
+            (next2 && (next2.suspenseDelta ?? 0) > 0)
+          );
+        });
+        if (!anyTurnAftermathSusp576b) {
+          issues.push({
+            location: `${qualTurns576b.length} dramatic-turn scene(s) — none followed by a suspense rise within 2 scenes`,
+            rule: 'CONFLICT_TURN_AFTERMATH_SUSPENSE_VOID',
+            severity: 'minor',
+            description: `None of the conflict's ${qualTurns576b.length} dramatic-turn scenes is followed by a positive suspenseDelta within the next two scenes, even though ${suspScenes576b.length} suspense-rise scenes exist elsewhere in the script. A dramatic turn is a moment of structural reorientation — the conflict flips direction, the protagonist's position changes, the meaning of prior events is restructured — and the natural aftermath is heightened urgency: the new situation demands a recalibration the protagonist has not yet completed, and that gap is where felt pressure should rise. When every pivot's aftermath is suspense-flat, turns function as pure plot mechanics: the situation changes but the protagonist's danger does not register in the two scenes immediately following the reversal. The conflict pivots without escalating.`,
+            suggestedFix: `After at least one dramatic turn, let the next one or two scenes carry a positive suspenseDelta that the new configuration generates — the heightened danger of a restructured situation, the pressure of the protagonist's revised position, or the urgency of having to respond to a conflict that has just changed shape. A turn that raises tension in its aftermath does more than restructure: it escalates. The audience, having just seen the conflict's direction change, experiences that change as increased pressure rather than as a neutral repositioning.`,
+          });
+        }
+      }
+    }
+
+    // CONFLICT_REVELATION_DROUGHT_RUN (run-based × revelation × absence, n≥10, ≥2 revelation scenes
+    // globally, longest consecutive run of scenes with no revelation ≥ 7): The conflict arc's
+    // information-disclosure engine goes silent for an extended consecutive stretch — seven or more
+    // scenes pass without a revelation, even though disclosure moments exist elsewhere. Revelations
+    // in a conflict arc are the mechanism by which hidden truths emerge under pressure: they reframe
+    // the conflict's meaning, expose hidden causes and motivations, and generate the kind of
+    // irrevocable knowledge that forces the characters into new positions. When revelations are absent
+    // for an extended run, the conflict advances through event-and-reaction sequences without any new
+    // hidden truth becoming known — the audience watches the conflict escalate without their
+    // understanding of it deepening. A long revelation drought means the conflict's epistemic
+    // dimension flatlines for a significant stretch: no hidden cause surfaces, no motivation is
+    // exposed, no previously misunderstood fact becomes clear. Run-based mode × revelation absence.
+    // Distinct from CONFLICT_CURIOSITY_CLOSING_ZONE_ABSENT (zone × closing third — fixed zone not
+    // sliding run), CONFLICT_REPAIR_DROUGHT_RUN (Wave 562: run-based × repair absence — different
+    // channel), CONFLICT_RUPTURE_CURIOSITY_DECOUPLED (co-occurrence × same-scene — not run-based).
+    if (records.length >= 10) {
+      const revealScenes576c = (records as any[]).filter(
+        r => r.revelation !== null && r.revelation !== undefined && r.revelation !== '',
+      );
+      if (revealScenes576c.length >= 2) {
+        let longestDrought576c = 0;
+        let cur576c = 0;
+        for (const r of records as any[]) {
+          if (r.revelation === null || r.revelation === undefined || r.revelation === '') {
+            cur576c++;
+            if (cur576c > longestDrought576c) longestDrought576c = cur576c;
+          } else {
+            cur576c = 0;
+          }
+        }
+        if (longestDrought576c >= 7) {
+          issues.push({
+            location: `longest revelation drought: ${longestDrought576c} consecutive scenes without a disclosure`,
+            rule: 'CONFLICT_REVELATION_DROUGHT_RUN',
+            severity: 'minor',
+            description: `The conflict arc contains a run of ${longestDrought576c} consecutive scenes with no revelation — an extended disclosure drought — even though ${revealScenes576c.length} revelation scenes exist elsewhere. Revelations are the mechanism by which hidden truths emerge under pressure: they reframe the conflict, expose hidden motivations, and generate the irrevocable knowledge that forces characters into new positions. An unbroken stretch of ${longestDrought576c} revelation-free scenes means the conflict advances through action and reaction for an extended run without any new hidden truth coming to light — the audience watches the situation escalate without their understanding of it deepening. The conflict's epistemic dimension flatlines: no cause surfaces, no motivation is exposed, no misunderstood fact becomes clear during the drought.`,
+            suggestedFix: `Break up the ${longestDrought576c}-scene revelation drought by surfacing at least one hidden truth within the run — a motivation exposed, a cause disclosed, a previously misunderstood fact clarified. The revelation doesn't need to be dramatic: a small disclosure that recontextualizes even one detail deepens the audience's understanding of the conflict and prevents the extended run from feeling like pure event-and-reaction without epistemic dimension. A conflict that periodically reveals something new keeps the audience's understanding evolving alongside the escalating situation.`,
           });
         }
       }
