@@ -156,6 +156,23 @@
 // scenes, >70% in first half while back half has ≥1; resolutions burst before pressure peaks;
 // the front-half distribution complement of PAYOFF_BACK_LOADED in causality.ts; distinct from
 // ARC_PAYOFF_DROUGHT_RUN [run-based] and ARC_RELATIONAL_FRONT_LOADED [different channel]).
+// Wave 575 additions: curiosity zone cluster (distribution/timing × curiosity × structural thirds
+// — n≥9, ≥3 curiosity-positive scenes [curiosityDelta>0], >75% in one third; wonder spikes are
+// ghettoized into one zone; finer-grained than binary half-partitions; the curiosity-channel
+// sibling of ARC_RELATIONAL_ZONE_CLUSTER [Wave 561] and ARC_TURN_ZONE_CLUSTER [Wave 477];
+// distinct from ARC_CURIOSITY_DROUGHT_RUN [run-based × absence] and ARC_CURIOSITY_PLATEAU
+// [average-mode]), clock drought run (run-based × clockRaised × absence — n≥10, ≥3 clockRaised
+// scenes, longest consecutive non-clock run ≥ 6; deadline engine goes silent for an extended
+// stretch; completes the drought-run family on the clock channel alongside ARC_SUSPENSE_DROUGHT_
+// RUN [Wave 561], ARC_CURIOSITY_DROUGHT_RUN [Wave 519], ARC_RELATIONAL_DROUGHT_RUN [Wave 449],
+// ARC_PAYOFF_DROUGHT_RUN [Wave 505]; distinct from ARC_CLOCK_OPENING_ZONE_ABSENT [fixed zone]),
+// suspense curiosity aftermath void (sequence/aftermath × suspenseDelta → curiosity aftermath —
+// n≥8, ≥2 qualifying suspense-spike scenes [suspenseDelta>0, pos<n-1], ≥2 curiosity-positive
+// scenes globally, none of the suspense spikes followed by curiosityDelta>0 in next 2 scenes;
+// tension rises never spark wonder; the suspense-trigger member of the curiosity-aftermath family
+// alongside ARC_CLOCK_CURIOSITY_AFTERMATH_VOID [Wave 505: clock trigger]; distinct from ARC_
+// REVELATION_CURIOSITY_DECOUPLED [co-occurrence × same scene], ARC_CURIOSITY_DROUGHT_RUN
+// [run-based × absence], ARC_SUSPENSE_EMOTION_DECOUPLED [same-scene × emotional channel]).
 // Wave 561 additions: suspense drought run (run-based × suspenseDelta × absence — n≥10, ≥3
 // suspense-positive scenes, longest consecutive run with suspenseDelta ≤ 0 ≥ 6; the tension engine
 // stalls for an extended local stretch; completes the drought-run family on the suspense channel
@@ -3039,6 +3056,139 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `None of the story's ${qualClockScenes561c.length} clock-raised scenes is followed by a relationship shift within the next two scenes, even though ${relShiftScenes561c.length} bond movements exist elsewhere. When time pressure tightens — a deadline is set, a countdown begins, the window to act narrows — the people around the protagonist should feel the strain: an alliance buckles under the urgency, a bond is tested by the pressure, someone is forced to choose sides as the clock runs down. When raised clocks never trigger relational movement in the following beats, the story's urgency operates as a purely plot-mechanical device disconnected from the interpersonal world: the deadline drives the events but never the relationships those events should strain. The clock and the relational arc run as separate systems, and the time pressure carries no human cost.`,
             suggestedFix: `After at least one clock-raised scene, let the next one or two scenes carry a relationship shift that the deadline provokes — an ally who pulls back as the stakes climb, a bond that fractures under the time pressure, or an attachment that deepens when the countdown forces the characters together. Time pressure is most powerful when it strains relationships, not just the plot: the deadline that tests a bond carries a human cost the audience feels, where the deadline that only drives events remains a mechanical device.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 575: ARC_CURIOSITY_ZONE_CLUSTER, ARC_CLOCK_DROUGHT_RUN,
+  //              ARC_SUSPENSE_CURIOSITY_AFTERMATH_VOID ───────────────────────────────────────────
+  {
+    // ARC_CURIOSITY_ZONE_CLUSTER (distribution/timing × curiosity × structural thirds, n≥9, ≥3
+    // curiosity-positive scenes [curiosityDelta > 0], >75% of them fall in a single structural
+    // third): The story's wonder-and-mystery spikes are ghettoized into one structural third —
+    // the protagonist's intrigue and question-opening beats cluster almost entirely in one zone
+    // while the other two-thirds are curiosity-flat. Like the relational and turn analogues, a
+    // thirds-based curiosity cluster is a finer-grained distribution check than the binary half-
+    // partitions: a script can split its curiosity beats evenly across the two halves and still
+    // concentrate three-quarters in, say, the opening third, leaving the middle and climax with
+    // no new questions opening for the protagonist. When wonder is ghettoized, the protagonist's
+    // investigative engagement reads as an early-story burst (or late-story avalanche) rather
+    // than a continuous thread of building mystery. Distribution/timing mode × curiosity channel
+    // × structural thirds. Distinct from ARC_CURIOSITY_DROUGHT_RUN (Wave 519: run-based × absence
+    // — fires on a consecutive local run, not a global zone concentration), ARC_CURIOSITY_PLATEAU
+    // (Wave 284: average/aggregate × Act-2b window — different mode and window), ARC_RELATIONAL_
+    // ZONE_CLUSTER (Wave 561: same thirds mode on the relational channel), ARC_TURN_ZONE_CLUSTER
+    // (Wave 477: same mode on the dramatic-turn channel).
+    const n575a = records.length;
+    if (n575a >= 9) {
+      const curiPositions575a = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r }) => (r.curiosityDelta ?? 0) > 0)
+        .map(({ pos }) => pos);
+      if (curiPositions575a.length >= 3) {
+        const third575a = Math.floor(n575a / 3);
+        const zone1Curi575a = curiPositions575a.filter(p => p < third575a).length;
+        const zone2Curi575a = curiPositions575a.filter(p => p >= third575a && p < 2 * third575a).length;
+        const zone3Curi575a = curiPositions575a.length - zone1Curi575a - zone2Curi575a;
+        const maxZoneCuri575a = Math.max(zone1Curi575a, zone2Curi575a, zone3Curi575a);
+        if (maxZoneCuri575a / curiPositions575a.length > 0.75) {
+          const zoneName575a = zone1Curi575a === maxZoneCuri575a
+            ? 'opening' : zone3Curi575a === maxZoneCuri575a ? 'closing' : 'middle';
+          issues.push({
+            location: `curiosity spikes: ${zone1Curi575a} opening / ${zone2Curi575a} middle / ${zone3Curi575a} closing third — ${Math.round((maxZoneCuri575a / curiPositions575a.length) * 100)}% in the ${zoneName575a} third`,
+            rule: 'ARC_CURIOSITY_ZONE_CLUSTER',
+            severity: 'minor',
+            description: `${Math.round((maxZoneCuri575a / curiPositions575a.length) * 100)}% of the story's ${curiPositions575a.length} curiosity-spike scenes are concentrated in the ${zoneName575a} structural third, leaving the other two-thirds curiosity-flat. Unlike a front-vs-back distribution skew, this is a single-zone cluster: the protagonist's wonder-and-mystery beats operate almost entirely within one stretch of the runtime and stay question-quiet across the rest. When intrigue is ghettoized into one zone, the protagonist's investigative engagement reads as an episode rather than a continuous thread — the questions open all at once and then go silent, rather than deepening across the full sweep of the story. The most engaging curiosity arcs keep new questions opening across all three structural zones: early questions hook the audience, middle questions deepen the mystery, and late questions hold the tension through the climax.`,
+            suggestedFix: `Redistribute some of the ${zoneName575a} third's curiosity spikes into the other two zones so that new questions open across the full arc. Each structural third can carry its own intrigue beat: an early question that establishes what the protagonist doesn't know, a middle question that complicates their understanding, and a late question that holds the tension through the resolution. Spreading wonder across the thirds turns an episodic burst of mystery into a continuous thread of deepening intrigue.`,
+          });
+        }
+      }
+    }
+
+    // ARC_CLOCK_DROUGHT_RUN (run-based × clockRaised × absence, n≥10, ≥3 clockRaised scenes
+    // globally, longest consecutive run of scenes with clockRaised = false ≥ 6): The story's
+    // deadline engine goes silent for an extended consecutive stretch — six or more scenes pass
+    // in a row with no clock raised, even though urgency mechanisms fire elsewhere. Like the
+    // suspense and curiosity drought analogues, this is a local dead zone rather than a global
+    // distribution skew: the story may balance its clocks perfectly front-to-back and still have
+    // an extended stretch in which no new urgency is established or reinforced, letting the felt
+    // pressure from earlier deadlines dissipate without any new constraint anchoring the
+    // protagonist's situation. A long clock drought means the story coasts on accumulated urgency
+    // for an extended stretch rather than refreshing it. Run-based mode × clockRaised × absence.
+    // Distinct from ARC_CLOCK_OPENING_ZONE_ABSENT (Wave 519: fixed opening-third zone — a zone-
+    // based check on a fixed window, not a sliding run anywhere in the script), ARC_CLOCK_
+    // EMOTION_DECOUPLED (co-occurrence × clock × emotion — different mode), ARC_CLOCK_CURIOSITY_
+    // AFTERMATH_VOID (aftermath × clock trigger — different mode), ARC_SUSPENSE_DROUGHT_RUN
+    // (Wave 561: run-based × suspenseDelta — different signal channel; this targets clockRaised).
+    const n575b = records.length;
+    if (n575b >= 10) {
+      const clockScenes575b = (records as any[]).filter(r => r.clockRaised === true);
+      if (clockScenes575b.length >= 3) {
+        let longestDrought575b = 0;
+        let currentDrought575b = 0;
+        for (const r of records as any[]) {
+          if (r.clockRaised !== true) {
+            currentDrought575b++;
+            if (currentDrought575b > longestDrought575b) longestDrought575b = currentDrought575b;
+          } else {
+            currentDrought575b = 0;
+          }
+        }
+        if (longestDrought575b >= 6) {
+          issues.push({
+            location: `longest clock drought: ${longestDrought575b} consecutive scenes with no raised deadline`,
+            rule: 'ARC_CLOCK_DROUGHT_RUN',
+            severity: 'minor',
+            description: `The story contains a run of ${longestDrought575b} consecutive scenes with no raised clock — an extended deadline drought — even though ${clockScenes575b.length} clock scenes exist across the script. This is a local dead zone, not a global distribution skew: the urgency mechanisms fire elsewhere in the story, but a stretch of ${longestDrought575b} scenes passes in an unbroken run where no new deadline is established and no urgency is refreshed. The felt pressure from earlier clocks dissipates across this stretch rather than being sustained by a new constraint anchoring the protagonist's situation. The story coasts on accumulated urgency for an extended stretch rather than reinforcing it — the protagonist moves through ${longestDrought575b} scenes without any new time constraint tightening.`,
+            suggestedFix: `Break up the ${longestDrought575b}-scene clock drought by raising or reinforcing at least one deadline within the run — not necessarily a new clock, but an existing one that tightens, updates, or resurfaces (a reminder of the deadline, a new development that changes its stakes). The story's felt urgency is strongest when deadlines are periodically refreshed rather than established once and left to fade. Even a single scene that reminds the protagonist — and the audience — of the time constraint prevents the run from coasting on pressure that has long since dissipated.`,
+          });
+        }
+      }
+    }
+
+    // ARC_SUSPENSE_CURIOSITY_AFTERMATH_VOID (sequence/aftermath × suspenseDelta → curiosity
+    // aftermath, n≥8, ≥2 qualifying suspense-spike scenes [suspenseDelta > 0, pos < n-1], ≥2
+    // curiosity-positive scenes globally, none of the qualifying suspense-spike scenes is
+    // followed by a curiosityDelta > 0 scene within the next 2 scenes): The protagonist's tension
+    // rises never spark new wonder — every moment where stakes increase is followed by 2 scenes
+    // with no raised curiosity. When danger or pressure escalates, the natural corollary is a
+    // deepening of what the protagonist doesn't know: who's responsible, what comes next, whether
+    // escape is possible. Suspense without curiosity aftermath is pressure without mystery: the
+    // protagonist feels the stakes rise but generates no new questions from the heightened situation.
+    // When every suspense spike passes without a curiosity rise in its immediate wake, tension and
+    // wonder operate as completely parallel systems — the story escalates danger and opens mystery
+    // through entirely separate mechanisms that never cross. Sequence/aftermath mode × suspenseDelta
+    // trigger × curiosity aftermath. Distinct from ARC_CLOCK_CURIOSITY_AFTERMATH_VOID (Wave 505:
+    // clock trigger → curiosity aftermath — this uses suspense as the trigger), ARC_REVELATION_
+    // CURIOSITY_DECOUPLED (Wave 337: co-occurrence × same scene × revelation trigger — curiosity
+    // within the revelation scene, not aftermath following a suspense spike), ARC_CURIOSITY_DROUGHT_
+    // RUN (Wave 519: run-based × curiosity absence — sustained absence regardless of trigger),
+    // ARC_SUSPENSE_EMOTION_DECOUPLED (Wave 298: co-occurrence × emotional state × same scene — not
+    // aftermath, not curiosity channel).
+    const n575c = records.length;
+    if (n575c >= 8) {
+      const curiPosScenes575c = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0);
+      const qualSuspScenes575c = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) => (r.suspenseDelta ?? 0) > 0 && pos < n575c - 1);
+      if (curiPosScenes575c.length >= 2 && qualSuspScenes575c.length >= 2) {
+        const anySuspFollowedByCuri575c = qualSuspScenes575c.some(({ pos }) => {
+          const next1 = (records as any[])[pos + 1];
+          const next2 = pos + 2 < n575c ? (records as any[])[pos + 2] : null;
+          return (
+            (next1 && (next1.curiosityDelta ?? 0) > 0) ||
+            (next2 && (next2.curiosityDelta ?? 0) > 0)
+          );
+        });
+        if (!anySuspFollowedByCuri575c) {
+          issues.push({
+            location: `${qualSuspScenes575c.length} suspense-spike scene(s) — none followed by a curiosity rise within 2 scenes`,
+            rule: 'ARC_SUSPENSE_CURIOSITY_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `None of the story's ${qualSuspScenes575c.length} suspense-spike scenes is followed by a scene with raised curiosity within the next two scenes, even though ${curiPosScenes575c.length} curiosity-positive scenes exist elsewhere. When stakes increase, the natural corollary is deeper mystery: who's responsible for the threat, what comes next, whether survival is possible in this new configuration. Suspense without curiosity aftermath is pressure without wonder — the protagonist feels the stakes rise but generates no new questions from the heightened situation. When every tension spike passes into a two-scene curiosity void, danger and mystery operate as completely parallel systems that never cross: the story escalates stakes through one channel and deepens questions through another, but the two never speak to each other in the immediate aftermath of the story's most charged moments.`,
+            suggestedFix: `After at least one suspense-spike scene, let the next one or two scenes carry a raised curiosityDelta — a new question that the escalated danger generates. The curiosity doesn't need to be explicit exposition: a revelation that the threat has a hidden dimension, a development that makes the protagonist wonder about an element they thought they understood, or an encounter that raises a new question under pressure all qualify. Tension that generates wonder makes the stakes feel more complex and the protagonist's situation more unknowable — and an unknowable situation is harder to look away from.`,
           });
         }
       }

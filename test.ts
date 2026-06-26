@@ -29737,6 +29737,90 @@ I always listen.
     });
   });
 
+  describe('Wave 575 — characterArcPass: curiosity zone cluster, clock drought run, suspense curiosity aftermath void', async () => {
+    const makeRec575 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const runArc575 = async (records: any[]) => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({})),
+        approvedSpans: [],
+      });
+    };
+
+    it('ARC_CURIOSITY_ZONE_CLUSTER fires when >75% of curiosity spikes are in one structural third', async () => {
+      // 9 scenes, thirds=[0-2],[3-5],[6-8]; 3 curiosity scenes all in opening (0,1,2) → 100% > 75%
+      const recs575a = Array.from({ length: 9 }, (_, i) => makeRec575(i));
+      recs575a[0] = makeRec575(0, { curiosityDelta: 1 });
+      recs575a[1] = makeRec575(1, { curiosityDelta: 1 });
+      recs575a[2] = makeRec575(2, { curiosityDelta: 1 });
+      const res = await runArc575(recs575a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_CURIOSITY_ZONE_CLUSTER'), 'ARC_CURIOSITY_ZONE_CLUSTER should fire');
+    });
+
+    it('ARC_CURIOSITY_ZONE_CLUSTER does not fire when curiosity spikes are distributed across thirds', async () => {
+      // one curiosity spike per third (0, 3, 7) → maxZone/total = 1/3 < 75%
+      const recs575a = Array.from({ length: 9 }, (_, i) => makeRec575(i));
+      recs575a[0] = makeRec575(0, { curiosityDelta: 1 });
+      recs575a[3] = makeRec575(3, { curiosityDelta: 1 });
+      recs575a[7] = makeRec575(7, { curiosityDelta: 1 });
+      const res = await runArc575(recs575a);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_CURIOSITY_ZONE_CLUSTER'), 'ARC_CURIOSITY_ZONE_CLUSTER should not fire');
+    });
+
+    it('ARC_CLOCK_DROUGHT_RUN fires when ≥6 consecutive scenes have no raised clock', async () => {
+      // 10 scenes; clocks at 0 and 7; non-clock run 1-6 = 6 consecutive → fires
+      const recs575b = Array.from({ length: 10 }, (_, i) => makeRec575(i));
+      recs575b[0] = makeRec575(0, { clockRaised: true });
+      recs575b[7] = makeRec575(7, { clockRaised: true });
+      recs575b[9] = makeRec575(9, { clockRaised: true });
+      const res = await runArc575(recs575b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_CLOCK_DROUGHT_RUN'), 'ARC_CLOCK_DROUGHT_RUN should fire');
+    });
+
+    it('ARC_CLOCK_DROUGHT_RUN does not fire when clock scenes are distributed without a long drought', async () => {
+      // 10 scenes; clocks at 0,3,6,9 → max non-clock run = 2 scenes < 6
+      const recs575b = Array.from({ length: 10 }, (_, i) => makeRec575(i));
+      recs575b[0] = makeRec575(0, { clockRaised: true });
+      recs575b[3] = makeRec575(3, { clockRaised: true });
+      recs575b[6] = makeRec575(6, { clockRaised: true });
+      recs575b[9] = makeRec575(9, { clockRaised: true });
+      const res = await runArc575(recs575b);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_CLOCK_DROUGHT_RUN'), 'ARC_CLOCK_DROUGHT_RUN should not fire');
+    });
+
+    it('ARC_SUSPENSE_CURIOSITY_AFTERMATH_VOID fires when no suspense spike is followed by curiosity within 2 scenes', async () => {
+      // n=9; suspense at 1,4; curiosity at 7 (not within 2 of 1 or 4); qualifies → fires
+      const recs575c = Array.from({ length: 9 }, (_, i) => makeRec575(i));
+      recs575c[1] = makeRec575(1, { suspenseDelta: 1 });
+      recs575c[4] = makeRec575(4, { suspenseDelta: 1 });
+      recs575c[7] = makeRec575(7, { curiosityDelta: 1 });
+      recs575c[8] = makeRec575(8, { curiosityDelta: 1 });
+      const res = await runArc575(recs575c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_SUSPENSE_CURIOSITY_AFTERMATH_VOID'), 'ARC_SUSPENSE_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_SUSPENSE_CURIOSITY_AFTERMATH_VOID does not fire when a suspense spike is followed by curiosity within 2 scenes', async () => {
+      // suspense at 1; curiosity at 2 (within 1 scene of suspense) → condition satisfied → no fire
+      const recs575c = Array.from({ length: 9 }, (_, i) => makeRec575(i));
+      recs575c[1] = makeRec575(1, { suspenseDelta: 1 });
+      recs575c[2] = makeRec575(2, { curiosityDelta: 1 });
+      recs575c[4] = makeRec575(4, { suspenseDelta: 1 });
+      recs575c[7] = makeRec575(7, { curiosityDelta: 1 });
+      const res = await runArc575(recs575c);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_SUSPENSE_CURIOSITY_AFTERMATH_VOID'), 'ARC_SUSPENSE_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 561 — characterArcPass: suspense drought run, relational zone cluster, clock relational aftermath void', async () => {
     const makeRec561 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
