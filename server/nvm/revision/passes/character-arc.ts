@@ -156,6 +156,23 @@
 // scenes, >70% in first half while back half has ≥1; resolutions burst before pressure peaks;
 // the front-half distribution complement of PAYOFF_BACK_LOADED in causality.ts; distinct from
 // ARC_PAYOFF_DROUGHT_RUN [run-based] and ARC_RELATIONAL_FRONT_LOADED [different channel]).
+// Wave 589 additions: dramatic-turn relational aftermath void (sequence/aftermath × dramatic-turn
+// → relationship aftermath — n≥8, ≥2 qualifying dramatic-turn scenes [pos<n-1], ≥2 relational-
+// shift scenes globally, no dramatic turn immediately followed by a relationship shift in the next
+// scene; the dramatic-turn-trigger member of the relational-aftermath family alongside ARC_CLOCK_
+// RELATIONAL_AFTERMATH_VOID [clock trigger], ARC_REVELATION_RELATIONAL_AFTERMATH_VOID [revelation
+// trigger], ARC_POSITIVE/NEGATIVE_RELATIONAL_AFTERMATH_VOID [emotion triggers]; distinct from ARC_
+// DRAMATIC_TURN_EMOTIONAL_AFTERMATH_VOID [emotion not relational]), payoff curiosity aftermath void
+// (sequence/aftermath × payoff → curiosity aftermath — n≥8, ≥2 qualifying payoff scenes [pos<n-1],
+// ≥2 curiosity-spike scenes globally, no payoff immediately followed by a curiosity spike; the payoff-
+// trigger member of the curiosity-aftermath family alongside ARC_CLOCK_CURIOSITY_AFTERMATH_VOID [clock
+// trigger] and ARC_SUSPENSE_CURIOSITY_AFTERMATH_VOID [suspense trigger]; distinct from ARC_PAYOFF_
+// AFTERMATH_EMOTIONAL_VOID [emotion not curiosity]), emotional drought run (run-based × emotional-
+// absence — n≥10, ≥4 emotional scenes [non-neutral emotionalShift], longest consecutive run of
+// neutral-shift scenes ≥ 7; completes the drought-run family on the emotional channel alongside
+// ARC_SUSPENSE/CURIOSITY/CLOCK/PAYOFF/RELATIONAL_DROUGHT_RUN; distinct from ARC_EMOTIONAL_FLATLINE
+// [global rate ≥80% neutral — this is a local run-based check that fires even when global rate is
+// below 80%]).
 // Wave 575 additions: curiosity zone cluster (distribution/timing × curiosity × structural thirds
 // — n≥9, ≥3 curiosity-positive scenes [curiosityDelta>0], >75% in one third; wonder spikes are
 // ghettoized into one zone; finer-grained than binary half-partitions; the curiosity-channel
@@ -3189,6 +3206,133 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `None of the story's ${qualSuspScenes575c.length} suspense-spike scenes is followed by a scene with raised curiosity within the next two scenes, even though ${curiPosScenes575c.length} curiosity-positive scenes exist elsewhere. When stakes increase, the natural corollary is deeper mystery: who's responsible for the threat, what comes next, whether survival is possible in this new configuration. Suspense without curiosity aftermath is pressure without wonder — the protagonist feels the stakes rise but generates no new questions from the heightened situation. When every tension spike passes into a two-scene curiosity void, danger and mystery operate as completely parallel systems that never cross: the story escalates stakes through one channel and deepens questions through another, but the two never speak to each other in the immediate aftermath of the story's most charged moments.`,
             suggestedFix: `After at least one suspense-spike scene, let the next one or two scenes carry a raised curiosityDelta — a new question that the escalated danger generates. The curiosity doesn't need to be explicit exposition: a revelation that the threat has a hidden dimension, a development that makes the protagonist wonder about an element they thought they understood, or an encounter that raises a new question under pressure all qualify. Tension that generates wonder makes the stakes feel more complex and the protagonist's situation more unknowable — and an unknowable situation is harder to look away from.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 589: ARC_DRAMATIC_TURN_RELATIONAL_AFTERMATH_VOID, ARC_PAYOFF_CURIOSITY_AFTERMATH_VOID,
+  //              ARC_EMOTIONAL_DROUGHT_RUN ─────────────────────────────────────────────────────────
+  {
+    // ARC_DRAMATIC_TURN_RELATIONAL_AFTERMATH_VOID (sequence/aftermath × dramatic-turn →
+    // relationship aftermath, n≥8, ≥2 qualifying dramatic-turn scenes [pos<n-1], ≥2 relational-
+    // shift scenes globally, no dramatic turn immediately followed by a relationship shift): Every
+    // narrative pivot passes without any relationship shifting in the immediately following scene.
+    // A dramatic turn is the story's gear-shift — a reversal, recognition, or twist that reorients
+    // the protagonist's situation — and the scene immediately after is where those around them
+    // should respond: a bond adjusting to the new reality, an alliance tested by the change, a
+    // connection strained or deepened by the turn. When no pivot is ever followed by a relationship
+    // shift, turns are relationally inert: the story's gear-shifts change the plot but never the
+    // interpersonal world. Sequence/aftermath mode × dramatic-turn trigger × relationship channel.
+    // Distinct from ARC_DRAMATIC_TURN_EMOTIONAL_AFTERMATH_VOID (Wave 547: emotion not relational
+    // — different aftermath channel), ARC_CLOCK_RELATIONAL_AFTERMATH_VOID (Wave 561: clock trigger
+    // — different trigger; also uses 2-scene window), ARC_REVELATION_RELATIONAL_AFTERMATH_VOID
+    // (Wave 463: revelation trigger), ARC_POSITIVE/NEGATIVE_RELATIONAL_AFTERMATH_VOID (emotion
+    // trigger), and ARC_TURN_RELATIONAL_DECOUPLED (co-occurrence × same scene — checks if the
+    // turn scene ITSELF carries a shift, not the following scene).
+    const n589a = records.length;
+    if (n589a >= 8) {
+      const relScenes589a = (records as any[]).filter(
+        r => ((r.relationshipShifts ?? []) as any[]).length > 0,
+      );
+      const qualTurnScenes589a = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) =>
+          (r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '' && pos < n589a - 1
+        );
+      if (relScenes589a.length >= 2 && qualTurnScenes589a.length >= 2) {
+        const anyTurnFollowedByRel589a = qualTurnScenes589a.some(({ pos }) =>
+          (((records as any[])[pos + 1].relationshipShifts ?? []) as any[]).length > 0
+        );
+        if (!anyTurnFollowedByRel589a) {
+          issues.push({
+            location: `${qualTurnScenes589a.length} dramatic-turn scene(s) — none immediately followed by a relationship shift`,
+            rule: 'ARC_DRAMATIC_TURN_RELATIONAL_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `None of the story's ${qualTurnScenes589a.length} dramatic-turn scenes is immediately followed by a scene with a relationship shift, even though ${relScenes589a.length} bond movements exist elsewhere. A dramatic turn — reversal, recognition, or twist — is the story's gear-shift, and the scene immediately after is the natural moment for those around the protagonist to respond: a bond adjusting to the new reality, an alliance tested by the change, a connection strained or deepened by the pivot. When no turn is ever followed by a relationship shift, the story's pivots are relationally inert: the plot changes direction, but the interpersonal world never registers the change. Turns and bonds run as separate systems, and the story's most consequential direction-changes never alter who trusts, depends on, or stands against whom.`,
+            suggestedFix: `After at least one dramatic turn, let the immediately following scene carry a relationship shift — a bond that responds to the pivot. The shift need not be caused by the turn; proximity is enough to let the reversal feel consequential in the relational world: a trust strained because everything changed, an alliance formed in the new reality the turn created, or a connection that breaks when the reversal exposes what someone actually wants.`,
+          });
+        }
+      }
+    }
+
+    // ARC_PAYOFF_CURIOSITY_AFTERMATH_VOID (sequence/aftermath × payoff → curiosity aftermath,
+    // n≥8, ≥2 qualifying payoff scenes [pos<n-1], ≥2 curiosity-spike scenes globally, no payoff
+    // immediately followed by a curiosity spike): Every resolved planted promise passes without a
+    // new question opening in the immediately following scene. A payoff closes a thread — and the
+    // scene immediately after is the natural place for the protagonist to wonder what comes next:
+    // the resolution of one promise should open the horizon of the next. When no payoff is ever
+    // followed by a curiosity spike, resolutions are terminal — each one closes a thread and leaves
+    // the scene that follows in a question-free zone, so the payoff layers of the story deliver
+    // satisfactions that generate no new forward momentum. Sequence/aftermath mode × payoff trigger
+    // × curiosity channel. Distinct from ARC_PAYOFF_AFTERMATH_EMOTIONAL_VOID (Wave 505: emotion not
+    // curiosity — different aftermath channel), ARC_CLOCK_CURIOSITY_AFTERMATH_VOID (Wave 505: clock
+    // trigger — different trigger), ARC_SUSPENSE_CURIOSITY_AFTERMATH_VOID (Wave 575: suspense
+    // trigger — different trigger), and ARC_PAYOFF_EMOTION_DECOUPLED (Wave 491: co-occurrence in
+    // the payoff scene itself — different mode).
+    const n589b = records.length;
+    if (n589b >= 8) {
+      const curiSpikeScenes589b = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0);
+      const qualPayoffScenes589b = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) => ((r.payoffSetupIds ?? []) as string[]).length > 0 && pos < n589b - 1);
+      if (curiSpikeScenes589b.length >= 2 && qualPayoffScenes589b.length >= 2) {
+        const anyPayoffFollowedByCuri589b = qualPayoffScenes589b.some(({ pos }) =>
+          ((records as any[])[pos + 1].curiosityDelta ?? 0) > 0
+        );
+        if (!anyPayoffFollowedByCuri589b) {
+          issues.push({
+            location: `${qualPayoffScenes589b.length} payoff scene(s) — none immediately followed by a curiosity spike`,
+            rule: 'ARC_PAYOFF_CURIOSITY_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `None of the story's ${qualPayoffScenes589b.length} payoff scenes is immediately followed by a scene with raised curiosity, even though ${curiSpikeScenes589b.length} curiosity-spike scenes exist elsewhere. A payoff closes a planted thread — and the scene immediately after is the natural place for the protagonist to wonder what comes next: one promise resolving should open the horizon of what remains unknown. When no payoff is ever followed by a curiosity spike, resolutions are terminal — each one closes a thread and leaves the following scene in a question-free zone. The story delivers satisfactions that generate no new forward pull: the audience watches each planted promise resolve without feeling the momentum of a new question forming in its wake.`,
+            suggestedFix: `After at least one payoff scene, let the immediately following scene carry a raised curiosityDelta — a new question opened by the resolution. The curiosity might arise from what the payoff revealed (a resolved thread exposing a new unknown), from what it changed (the protagonist in a new situation that generates fresh wondering), or from what it left unfinished. When a resolution generates wonder rather than only closure, the payoff layer drives the story forward rather than merely completing it.`,
+          });
+        }
+      }
+    }
+
+    // ARC_EMOTIONAL_DROUGHT_RUN (run-based × emotional-absence, n≥10, ≥4 emotional scenes
+    // [non-neutral emotionalShift], longest consecutive run of neutral-shift scenes ≥ 7): The
+    // story contains an extended stretch of emotionally flat scenes — 7 or more consecutive scenes
+    // where the protagonist registers no emotional shift — even though emotional engagement exists
+    // elsewhere in the arc. Unlike ARC_EMOTIONAL_FLATLINE (which fires on global rate ≥80%
+    // neutral), this is a local run-based check: the story can have healthy overall emotional
+    // texture and still contain a mid-arc flatline where the protagonist drifts through an
+    // extended neutral stretch without a single moment of felt experience. A 7-scene emotional
+    // drought is an extended zone of affective disengagement: the audience watches events without
+    // watching the protagonist feel them, and the arc's emotional thread goes dark for long
+    // enough that the stakes stop feeling inhabited. Run-based mode × emotional-absence. Distinct
+    // from ARC_EMOTIONAL_FLATLINE (Wave 152: global rate ≥80% neutral — this fires even when
+    // global rate is well below 80%, targeting local runs), ARC_SUSPENSE_DROUGHT_RUN (suspense
+    // not emotion), ARC_CURIOSITY_DROUGHT_RUN (curiosity not emotion), ARC_CLOCK_DROUGHT_RUN
+    // (clock not emotion), ARC_PAYOFF_DROUGHT_RUN (payoff not emotion), ARC_RELATIONAL_DROUGHT_RUN
+    // (relational not emotion).
+    const n589c = records.length;
+    if (n589c >= 10) {
+      const emotionalScenes589c = (records as any[]).filter(
+        r => r.emotionalShift !== 'neutral' && r.emotionalShift !== null && r.emotionalShift !== undefined
+      );
+      if (emotionalScenes589c.length >= 4) {
+        let maxDrought589c = 0;
+        let curDrought589c = 0;
+        for (const r of (records as any[])) {
+          const isNeutral = r.emotionalShift === 'neutral' || r.emotionalShift === null || r.emotionalShift === undefined;
+          if (isNeutral) {
+            curDrought589c++;
+            if (curDrought589c > maxDrought589c) maxDrought589c = curDrought589c;
+          } else {
+            curDrought589c = 0;
+          }
+        }
+        if (maxDrought589c >= 7) {
+          issues.push({
+            location: `longest emotional drought: ${maxDrought589c} consecutive scenes with neutral emotional shift`,
+            rule: 'ARC_EMOTIONAL_DROUGHT_RUN',
+            severity: 'minor',
+            description: `The story contains a run of ${maxDrought589c} consecutive scenes in which the protagonist registers no emotional shift — an extended flatline of felt experience — even though ${emotionalScenes589c.length} emotional moments exist elsewhere in the arc. A ${maxDrought589c}-scene emotional drought is an extended zone of affective disengagement: the audience watches events without watching the protagonist feel them, and the arc's emotional thread goes dark for long enough that the stakes stop feeling inhabited. Unlike a global flatness check, this is a local failure: the protagonist's emotional life is active in other sections of the story, which makes the extended neutral run more conspicuous — the audience knows feeling is possible here, and its absence registers as a void rather than a stylistic choice.`,
+            suggestedFix: `Break up the ${maxDrought589c}-scene neutral run by introducing at least one emotional shift within the stretch — a moment where the protagonist feels something, even briefly: a fear, a flash of relief, a pang of doubt, a surge of hope. The emotional beat does not need to be dramatic; a mild shift registered in a single scene is enough to signal that the protagonist is still inhabiting the story rather than passing through it. Sustained neutral stretches of this length suggest a segment where the protagonist has been written as observer rather than experiencer.`,
           });
         }
       }

@@ -30613,6 +30613,101 @@ I always listen.
     });
   });
 
+  describe('Wave 589 — characterArcPass: dramatic-turn relational aftermath void, payoff curiosity aftermath void, emotional drought run', async () => {
+    const makeRec589 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const runArc589 = async (records: any[]) => {
+      const { characterArcPass } = await import('./server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({})),
+        approvedSpans: [],
+      });
+    };
+
+    // ARC_DRAMATIC_TURN_RELATIONAL_AFTERMATH_VOID fire:
+    // 10 scenes; turns at 0,3 (pos<9); rel shifts at 6,8 (not at 1,4) → fires
+    it('ARC_DRAMATIC_TURN_RELATIONAL_AFTERMATH_VOID fires when no dramatic turn is followed by a relationship shift', async () => {
+      const recs589a = Array.from({ length: 10 }, (_, i) =>
+        makeRec589(i, {
+          dramaticTurn: i === 0 || i === 3 ? 'reversal' : 'nothing',
+          relationshipShifts: i === 6 || i === 8 ? [{ pairKey: 'alice|bob' }] : [],
+        })
+      );
+      const res = await runArc589(recs589a);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'ARC_DRAMATIC_TURN_RELATIONAL_AFTERMATH_VOID'), 'ARC_DRAMATIC_TURN_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    // ARC_DRAMATIC_TURN_RELATIONAL_AFTERMATH_VOID no-fire:
+    // rel shift at 1 (aftermath of turn at 0) → does not fire
+    it('ARC_DRAMATIC_TURN_RELATIONAL_AFTERMATH_VOID does not fire when a turn is followed by a relationship shift', async () => {
+      const recs589an = Array.from({ length: 10 }, (_, i) =>
+        makeRec589(i, {
+          dramaticTurn: i === 0 || i === 3 ? 'reversal' : 'nothing',
+          relationshipShifts: i === 1 || i === 7 ? [{ pairKey: 'alice|bob' }] : [],
+        })
+      );
+      const res = await runArc589(recs589an);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'ARC_DRAMATIC_TURN_RELATIONAL_AFTERMATH_VOID'), 'ARC_DRAMATIC_TURN_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    // ARC_PAYOFF_CURIOSITY_AFTERMATH_VOID fire:
+    // 10 scenes; payoffs at 0,3 (pos<9); curiosity spikes at 6,8 (not at 1,4) → fires
+    it('ARC_PAYOFF_CURIOSITY_AFTERMATH_VOID fires when no payoff is followed by a curiosity spike', async () => {
+      const recs589b = Array.from({ length: 10 }, (_, i) =>
+        makeRec589(i, {
+          payoffSetupIds: i === 0 || i === 3 ? ['thread-A'] : [],
+          curiosityDelta: i === 6 || i === 8 ? 1 : 0,
+        })
+      );
+      const res = await runArc589(recs589b);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'ARC_PAYOFF_CURIOSITY_AFTERMATH_VOID'), 'ARC_PAYOFF_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    // ARC_PAYOFF_CURIOSITY_AFTERMATH_VOID no-fire:
+    // curiosity spike at 1 (aftermath of payoff at 0) → does not fire
+    it('ARC_PAYOFF_CURIOSITY_AFTERMATH_VOID does not fire when a payoff is followed by a curiosity spike', async () => {
+      const recs589bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec589(i, {
+          payoffSetupIds: i === 0 || i === 3 ? ['thread-A'] : [],
+          curiosityDelta: i === 1 || i === 7 ? 1 : 0,
+        })
+      );
+      const res = await runArc589(recs589bn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'ARC_PAYOFF_CURIOSITY_AFTERMATH_VOID'), 'ARC_PAYOFF_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    // ARC_EMOTIONAL_DROUGHT_RUN fire:
+    // 12 scenes; emotional at 0,1,10,11; neutral at 2-9 → longest neutral run = 8 ≥ 7 → fires
+    it('ARC_EMOTIONAL_DROUGHT_RUN fires when the longest neutral run is ≥7', async () => {
+      const recs589c = Array.from({ length: 12 }, (_, i) =>
+        makeRec589(i, { emotionalShift: i === 0 || i === 1 || i === 10 || i === 11 ? 'positive' : 'neutral' })
+      );
+      const res = await runArc589(recs589c);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'ARC_EMOTIONAL_DROUGHT_RUN'), 'ARC_EMOTIONAL_DROUGHT_RUN should fire');
+    });
+
+    // ARC_EMOTIONAL_DROUGHT_RUN no-fire:
+    // 12 scenes; emotional at 0,1,2,3,9,10,11; neutral at 4-8 → longest neutral run = 5 < 7 → no fire
+    it('ARC_EMOTIONAL_DROUGHT_RUN does not fire when the longest neutral run is under 7', async () => {
+      const recs589cn = Array.from({ length: 12 }, (_, i) =>
+        makeRec589(i, {
+          emotionalShift: i <= 3 || i >= 9 ? 'positive' : 'neutral',
+        })
+      );
+      const res = await runArc589(recs589cn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'ARC_EMOTIONAL_DROUGHT_RUN'), 'ARC_EMOTIONAL_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 575 — characterArcPass: curiosity zone cluster, clock drought run, suspense curiosity aftermath void', async () => {
     const makeRec575 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
