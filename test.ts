@@ -18713,6 +18713,94 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 584 — themePass: resonant aftermath turn void, resonant emotion flat, resonant clock flat', async () => {
+    const makeRec584 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const THEME584 = 'redemption courage hope';
+    const themed584 = ['act of redemption'];
+    const runT584 = async (records: any[]) => {
+      const { themePass } = await import('./server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: THEME584 },
+      });
+    };
+
+    // THEME_RESONANT_AFTERMATH_TURN_VOID fire:
+    // 10 scenes; resonant at 0,4 (pos<8); turns at 7,8 (not in aftermath windows [1,2] or [5,6]) → fires
+    it('THEME_RESONANT_AFTERMATH_TURN_VOID fires when no resonant scene is followed by a turn within 2', async () => {
+      const recs584a = Array.from({ length: 10 }, (_, i) => makeRec584(i, {
+        dialogueHighlights: [0, 4].includes(i) ? themed584 : [],
+        dramaticTurn: [7, 8].includes(i) ? 'reversal' : 'nothing',
+      }));
+      const res = await runT584(recs584a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_RESONANT_AFTERMATH_TURN_VOID'), 'THEME_RESONANT_AFTERMATH_TURN_VOID should fire');
+    });
+
+    // THEME_RESONANT_AFTERMATH_TURN_VOID no-fire:
+    // same setup but turn at 1 (aftermath of resonant@0=[1,2]) → overlaps → no fire
+    it('THEME_RESONANT_AFTERMATH_TURN_VOID does not fire when a turn follows a resonant scene within 2', async () => {
+      const recs584anr = Array.from({ length: 10 }, (_, i) => makeRec584(i, {
+        dialogueHighlights: [0, 4].includes(i) ? themed584 : [],
+        dramaticTurn: [1, 7].includes(i) ? 'reversal' : 'nothing',
+      }));
+      const res = await runT584(recs584anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_RESONANT_AFTERMATH_TURN_VOID'), 'THEME_RESONANT_AFTERMATH_TURN_VOID should not fire');
+    });
+
+    // THEME_RESONANT_EMOTION_FLAT fire:
+    // 8 scenes; resonant at 0,1,2,3 (all neutral); emotional at 5,6 (negative) → fires
+    it('THEME_RESONANT_EMOTION_FLAT fires when all resonant scenes are emotionally neutral', async () => {
+      const recs584b = Array.from({ length: 8 }, (_, i) => makeRec584(i, {
+        dialogueHighlights: [0, 1, 2, 3].includes(i) ? themed584 : [],
+        emotionalShift: [5, 6].includes(i) ? 'negative' : 'neutral',
+      }));
+      const res = await runT584(recs584b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_RESONANT_EMOTION_FLAT'), 'THEME_RESONANT_EMOTION_FLAT should fire');
+    });
+
+    // THEME_RESONANT_EMOTION_FLAT no-fire:
+    // resonant at 0,1,2,3; scene 2 has emotionalShift='negative' → not all neutral → no fire
+    it('THEME_RESONANT_EMOTION_FLAT does not fire when a resonant scene carries emotion', async () => {
+      const recs584bnr = Array.from({ length: 8 }, (_, i) => makeRec584(i, {
+        dialogueHighlights: [0, 1, 2, 3].includes(i) ? themed584 : [],
+        emotionalShift: [2, 5].includes(i) ? 'negative' : 'neutral',
+      }));
+      const res = await runT584(recs584bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_RESONANT_EMOTION_FLAT'), 'THEME_RESONANT_EMOTION_FLAT should not fire');
+    });
+
+    // THEME_RESONANT_CLOCK_FLAT fire:
+    // 8 scenes; resonant at 0,2,4 (all clockRaised=false); clock at 6,7 → fires
+    it('THEME_RESONANT_CLOCK_FLAT fires when all resonant scenes have no clock raised', async () => {
+      const recs584c = Array.from({ length: 8 }, (_, i) => makeRec584(i, {
+        dialogueHighlights: [0, 2, 4].includes(i) ? themed584 : [],
+        clockRaised: [6, 7].includes(i),
+      }));
+      const res = await runT584(recs584c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_RESONANT_CLOCK_FLAT'), 'THEME_RESONANT_CLOCK_FLAT should fire');
+    });
+
+    // THEME_RESONANT_CLOCK_FLAT no-fire:
+    // resonant at 0,2,4; scene 2 also has clockRaised=true → not all clock-free → no fire
+    it('THEME_RESONANT_CLOCK_FLAT does not fire when a resonant scene has a clock raised', async () => {
+      const recs584cnr = Array.from({ length: 8 }, (_, i) => makeRec584(i, {
+        dialogueHighlights: [0, 2, 4].includes(i) ? themed584 : [],
+        clockRaised: [2, 6].includes(i),
+      }));
+      const res = await runT584(recs584cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_RESONANT_CLOCK_FLAT'), 'THEME_RESONANT_CLOCK_FLAT should not fire');
+    });
+  });
+
   describe('Wave 570 — themePass: resonant aftermath emotion void, resonant aftermath relationship void, resonant aftermath clock void', async () => {
     const makeRec570 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

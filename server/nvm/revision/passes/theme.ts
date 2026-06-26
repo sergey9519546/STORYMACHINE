@@ -122,6 +122,21 @@
 // silent (sequence/aftermath × payoff trigger → theme — n≥8, ≥2 qualifying payoff scenes not at
 // last position, none followed by a resonant scene; first aftermath check with the payoff channel,
 // distinct from THEME_REVELATION_AFTERMATH_SILENT which uses the revelation trigger).
+// Wave 584 additions: resonant aftermath turn void (sequence/aftermath × dramatic-turn ×
+// resonant trigger — ≥2 qualifying resonant scenes none followed by a dramatic turn in next 2
+// scenes while ≥2 turn scenes exist; theme never precipitates a reversal or recognition; adds
+// the dramatic-turn channel to the resonant-trigger aftermath family alongside curiosity/suspense/
+// emotion/relationship/clock; distinct from DRAMATIC_TURN_AFTERMATH_SILENT [turn is trigger],
+// completing the output-channel set), resonant emotion flat (average/aggregate × emotion ×
+// resonant-scene set — ≥4 resonant scenes all with emotionalShift='neutral' while ≥2 emotional
+// scenes exist globally; theme always voiced in affectively flat moments; distinct from
+// QUIET_SCENES_ONLY [requires BOTH neutral emotion AND low suspense] and RESONANT_VALENCE_UNIFORM
+// [fires on any dominant polarity, not only neutral] and RESONANT_SUSPENSE_FLAT [suspense channel]),
+// resonant clock flat (average/aggregate × clock × resonant-scene set — ≥3 resonant scenes all
+// without clock raised while ≥2 clock scenes exist; theme always voiced in deadline-free moments;
+// distinct from CLOCK_RAISED_DECOUPLED [reverse direction: clock scenes are theme-silent] and
+// RESONANT_AFTERMATH_CLOCK_VOID [aftermath mode]; completes the average/aggregate × channel set
+// alongside RESONANT_SUSPENSE_FLAT and RESONANT_CURIOSITY_FLAT with the clock channel).
 // Wave 570 additions: resonant aftermath emotion void (sequence/aftermath × emotion × resonant
 // trigger — ≥2 qualifying resonant scenes none followed by an emotional shift in next 2 scenes while
 // ≥2 emotional scenes exist; theme surfacing produces no felt response in its wake), resonant
@@ -3242,6 +3257,133 @@ export async function themePass(input: PassInput): Promise<PassResult> {
       }
     }
 
+  }
+
+  // ── Wave 584: THEME_RESONANT_AFTERMATH_TURN_VOID, THEME_RESONANT_EMOTION_FLAT,
+  //              THEME_RESONANT_CLOCK_FLAT ────────────────────────────────────────
+
+  {
+    // THEME_RESONANT_AFTERMATH_TURN_VOID — sequence/aftermath × dramatic-turn × resonant trigger.
+    // n≥8, ≥2 qualifying resonant scenes (pos<n-2), ≥2 dramatic-turn scenes globally.
+    // No resonant scene is followed by a dramatic turn in the next 2 scenes → fire.
+    // Theme voiced and the story continues without pivoting in the immediate aftermath —
+    // stated meaning never triggers a reversal or recognition in the beats that follow.
+    // The most propulsive thematic beats precipitate structural consequences: a character
+    // absorbs the theme and changes direction, or the newly-stated truth precipitates a
+    // recognition that flips the story. When every resonant scene's aftermath is turn-free
+    // while turns fire elsewhere, the theme is sealed commentary rather than an engine of
+    // structural consequence.
+    // Distinct from: DRAMATIC_TURN_AFTERMATH_SILENT (Wave 430: turn is the TRIGGER, theme
+    // is the aftermath — the reverse direction; this is theme as trigger, turn as aftermath),
+    // RESONANT_AFTERMATH_CURIOSITY_VOID / SUSPENSE_VOID / EMOTION_VOID / RELATIONSHIP_VOID /
+    // CLOCK_VOID (Waves 542/556/570: same resonant-trigger aftermath family, different output
+    // channels — this adds the dramatic-turn channel, completing the output channel set).
+    // First dramatic-turn-channel aftermath check on the resonant trigger.
+    // resonantScenes is scoped inside the silentScenes block above; recompute here.
+    const resonantScenes584a = (records as any[]).filter(
+      r => sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+    );
+    if (records.length >= 8 && resonantScenes584a.length >= 2) {
+      const qualRes584a = resonantScenes584a.filter(
+        (r: any) => (records as any[]).indexOf(r) < records.length - 2,
+      );
+      const turnScenes584a = (records as any[]).filter(
+        r => (r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '',
+      );
+      if (qualRes584a.length >= 2 && turnScenes584a.length >= 2) {
+        const allResNoTurn584a = qualRes584a.every((r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos + off];
+            if (nxt && (nxt.dramaticTurn ?? 'nothing') !== 'nothing' && nxt.dramaticTurn !== '') return false;
+          }
+          return true;
+        });
+        if (allResNoTurn584a) {
+          issues.push({
+            location: `${qualRes584a.length} resonant scene(s) — no dramatic turn in any aftermath window`,
+            rule: 'THEME_RESONANT_AFTERMATH_TURN_VOID',
+            severity: 'minor',
+            description: `None of the story's ${qualRes584a.length} thematically resonant scene(s) is followed by a dramatic turn within the next two scenes, even though ${turnScenes584a.length} turn scene(s) exist elsewhere. When the story voices "${themeRaw}", the scenes that follow continue without pivoting — the stated meaning never triggers a reversal or recognition in the immediate aftermath. The most propulsive thematic beats precipitate structural consequences: a character absorbs a theme and changes course, or a stated idea exposes a contradiction that flips the story's direction. When every resonant scene's aftermath is turn-free while turns fire elsewhere, the theme operates as sealed commentary rather than as an engine that reshapes the narrative.`,
+            suggestedFix: `After at least one resonant scene, let a dramatic turn follow within the next two scenes — a reversal or recognition that the thematic moment precipitates. A stated truth about "${themeRaw}" should cost something immediately: a pivot that shows how the character's thematic understanding changes what they decide, or a recognition that the theme makes unavoidable.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // THEME_RESONANT_EMOTION_FLAT — average/aggregate × emotion channel × resonant-scene set.
+    // ≥4 resonant scenes, all with emotionalShift='neutral', ≥2 emotionally charged scenes
+    // (emotionalShift≠'neutral') elsewhere → fire. Theme always surfaces in emotionally inert
+    // scenes — the meaning is voiced without any accompanying feeling. Theme is most powerful
+    // when it costs or rewards: a truth that arrives in grief, resolve, or joy carries more
+    // weight than one stated in a neutral beat.
+    // Distinct from: THEME_QUIET_SCENES_ONLY (Wave 307: every resonant scene is BOTH emotionally
+    // neutral AND low-suspense — this fires even when resonant scenes are high-suspense but
+    // emotionally flat, a genuinely distinct condition), RESONANT_SUSPENSE_FLAT (Wave 542:
+    // suspense channel — theme in tension-free contexts), RESONANT_CURIOSITY_FLAT (Wave 556:
+    // curiosity channel), THEME_RESONANT_VALENCE_UNIFORM (Wave 472: fires on any dominant
+    // polarity including negative/positive; this only fires on neutral — the zero-charge
+    // condition), THEME_CHARGED_SCENE_SILENT (Wave 374: reverse direction — emotional scenes
+    // thematically silent; this is resonant scenes that are emotionally silent).
+    // First average/aggregate × emotion-channel check on the resonant-scene set.
+    const resonantScenes584b = (records as any[]).filter(
+      r => sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+    );
+    if (records.length >= 8 && resonantScenes584b.length >= 4) {
+      const emotionScenes584b = (records as any[]).filter(
+        r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+      );
+      if (emotionScenes584b.length >= 2) {
+        const allResNeutral584b = resonantScenes584b.every(
+          (r: any) => (r.emotionalShift ?? 'neutral') === 'neutral',
+        );
+        if (allResNeutral584b) {
+          issues.push({
+            location: `all ${resonantScenes584b.length} resonant scenes are emotionally neutral`,
+            rule: 'THEME_RESONANT_EMOTION_FLAT',
+            severity: 'minor',
+            description: `Every one of the story's ${resonantScenes584b.length} thematically resonant scene(s) is emotionally neutral, even though ${emotionScenes584b.length} emotionally charged scenes exist elsewhere. The theme "${themeRaw}" is always voiced in affectively flat moments — the meaning arrives in scenes where the characters feel nothing, and departs the same way. Theme is most powerful when it costs or rewards: a truth that surfaces in grief, resolve, fear, or joy carries far more weight than one stated in a neutral beat. When the story's thematic language is confined to emotionally inert scenes, the idea remains a proposition rather than an experience the audience can feel alongside the characters.`,
+            suggestedFix: `Move at least one thematically resonant beat into an emotionally charged scene — let the theme surface when a character is in grief, triumph, dread, or joy. The theme gains experiential weight when the character feels it as well as states it. A scene where "${themeRaw}" is voiced and the character is simultaneously at an emotional high or low makes the idea land as felt truth.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // THEME_RESONANT_CLOCK_FLAT — average/aggregate × clock channel × resonant-scene set.
+    // ≥3 resonant scenes, all with clockRaised=false, ≥2 clock-raised scenes globally → fire.
+    // Theme always surfaces in deadline-free scenes — urgency and meaning never coincide in the
+    // same beat. A protagonist who must confront what the theme means under a closing window
+    // is one of drama's most potent combinations: the idea is tested by time pressure, not just
+    // stated in a calm moment.
+    // Distinct from: THEME_CLOCK_RAISED_DECOUPLED (Wave 293: the REVERSE direction — clock
+    // scenes are all thematically silent; this checks resonant scenes for clock absence, the
+    // complementary direction), THEME_RESONANT_AFTERMATH_CLOCK_VOID (Wave 570: aftermath mode
+    // — resonant scenes not followed by a clock in next 2 scenes; this checks the resonant
+    // scene ITSELF for clockRaised co-occurrence), RESONANT_SUSPENSE_FLAT (Wave 542: suspense
+    // channel, same average/aggregate mode), RESONANT_CURIOSITY_FLAT (Wave 556: curiosity
+    // channel). Completes the average/aggregate × channel set with the clock channel.
+    const resonantScenes584c = (records as any[]).filter(
+      r => sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords),
+    );
+    if (records.length >= 8 && resonantScenes584c.length >= 3) {
+      const clockScenes584c = (records as any[]).filter(r => r.clockRaised === true);
+      if (clockScenes584c.length >= 2) {
+        const allResNoClock584c = resonantScenes584c.every((r: any) => r.clockRaised !== true);
+        if (allResNoClock584c) {
+          issues.push({
+            location: `all ${resonantScenes584c.length} resonant scenes have no clock raised`,
+            rule: 'THEME_RESONANT_CLOCK_FLAT',
+            severity: 'minor',
+            description: `Every one of the story's ${resonantScenes584c.length} thematically resonant scene(s) carries no clock raise, even though ${clockScenes584c.length} clock-raising scenes exist elsewhere. The theme "${themeRaw}" is always voiced in moments free of deadline pressure — meaning surfaces in calm, unhurried scenes while urgency fires in thematically blank ones. A protagonist who must confront what the theme means under a closing window is one of drama's most potent combinations: the idea is tested by time pressure, not just stated. When all resonant scenes are clock-free, the audience hears the idea and feels the pressure in permanently separate beats, never experiencing the two together in the same crucible.`,
+            suggestedFix: `Stage at least one thematically resonant beat inside a deadline scene — a moment where the protagonist must confront what "${themeRaw}" means to them while time is running out. The theme's meaning is most urgent when the audience knows the window is closing: a choice made under a clock, a truth stated before a deadline, or a character forced to act on the theme's implications before it is too late.`,
+          });
+        }
+      }
+    }
   }
 
   const { revised, usedLLM } = await rewritePass({
