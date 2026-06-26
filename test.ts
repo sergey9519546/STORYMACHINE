@@ -23875,6 +23875,93 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 580 — payoffPass: seed opening zone absent, payoff seed decoupled, payoff consecutive valence run', async () => {
+    const makeRec580 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runPY580 = async (records: any[]) => {
+      const { payoffPass } = await import('./server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // SEED_OPENING_ZONE_ABSENT fire: n=9; 4 seeds at idx 3,4,5,7 — none in opening third (idx 0-2) → fires
+    it('SEED_OPENING_ZONE_ABSENT fires when all seed scenes fall outside the opening structural third', async () => {
+      const recs580a = Array.from({ length: 9 }, (_, i) =>
+        makeRec580(i, { seededClueIds: [3, 4, 5, 7].includes(i) ? ['clue1'] : [] }),
+      );
+      const res = await runPY580(recs580a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_OPENING_ZONE_ABSENT'), 'SEED_OPENING_ZONE_ABSENT should fire');
+    });
+
+    // SEED_OPENING_ZONE_ABSENT no-fire: seed at idx 0 (opening third) → hasSeedInOpening=true → no fire
+    it('SEED_OPENING_ZONE_ABSENT does not fire when at least one seed falls in the opening structural third', async () => {
+      const recs580anr = Array.from({ length: 9 }, (_, i) =>
+        makeRec580(i, { seededClueIds: [0, 3, 5, 7].includes(i) ? ['clue1'] : [] }),
+      );
+      const res = await runPY580(recs580anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_OPENING_ZONE_ABSENT'), 'SEED_OPENING_ZONE_ABSENT should not fire');
+    });
+
+    // PAYOFF_SEED_DECOUPLED fire: n=8; payoffs at idx 0,2,4 — seeds at idx 1,3,5 — no overlap → fires
+    it('PAYOFF_SEED_DECOUPLED fires when no scene carries both a payoff and a seed', async () => {
+      const recs580b = Array.from({ length: 8 }, (_, i) =>
+        makeRec580(i, {
+          payoffSetupIds: [0, 2, 4].includes(i) ? ['p1'] : [],
+          seededClueIds: [1, 3, 5].includes(i) ? ['s1'] : [],
+        }),
+      );
+      const res = await runPY580(recs580b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_SEED_DECOUPLED'), 'PAYOFF_SEED_DECOUPLED should fire');
+    });
+
+    // PAYOFF_SEED_DECOUPLED no-fire: idx 0 carries both a payoff and a seed → overlap exists → no fire
+    it('PAYOFF_SEED_DECOUPLED does not fire when at least one scene carries both a payoff and a seed', async () => {
+      const recs580bnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec580(i, {
+          payoffSetupIds: [0, 2, 4].includes(i) ? ['p1'] : [],
+          seededClueIds: [0, 3, 5].includes(i) ? ['s1'] : [],
+        }),
+      );
+      const res = await runPY580(recs580bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_SEED_DECOUPLED'), 'PAYOFF_SEED_DECOUPLED should not fire');
+    });
+
+    // PAYOFF_CONSECUTIVE_VALENCE_RUN fire: n=8; 4 payoffs — idx 2,3,4 all positive → run=3 ≥ 3 → fires
+    it('PAYOFF_CONSECUTIVE_VALENCE_RUN fires when 3+ consecutive payoffs share the same emotional valence', async () => {
+      const recs580c = Array.from({ length: 8 }, (_, i) =>
+        makeRec580(i, {
+          payoffSetupIds: [0, 2, 3, 4].includes(i) ? ['p1'] : [],
+          emotionalShift: i === 0 ? 'negative' : [2, 3, 4].includes(i) ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runPY580(recs580c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CONSECUTIVE_VALENCE_RUN'), 'PAYOFF_CONSECUTIVE_VALENCE_RUN should fire');
+    });
+
+    // PAYOFF_CONSECUTIVE_VALENCE_RUN no-fire: 4 payoffs alternating valence — max run=1 → no fire
+    it('PAYOFF_CONSECUTIVE_VALENCE_RUN does not fire when payoff emotional valences alternate', async () => {
+      const recs580cnr = Array.from({ length: 8 }, (_, i) =>
+        makeRec580(i, {
+          payoffSetupIds: [0, 2, 4, 6].includes(i) ? ['p1'] : [],
+          emotionalShift: i === 0 ? 'positive' : i === 2 ? 'negative' : i === 4 ? 'positive' : i === 6 ? 'positive' : 'neutral',
+        }),
+      );
+      const res = await runPY580(recs580cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CONSECUTIVE_VALENCE_RUN'), 'PAYOFF_CONSECUTIVE_VALENCE_RUN should not fire');
+    });
+  });
+
   describe('Wave 566 — payoffPass: payoff clock peak decoupled, seed emotional valence uniform, clue seed temporal cluster', async () => {
     const makeRec566 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

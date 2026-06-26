@@ -146,6 +146,18 @@
 // followed by clockRaised=true in next 2 scenes while ≥2 clock scenes exist; seeds and deadlines
 // never compound; adds the clock channel to the seed-aftermath family, distinct from CLUE_SEED_
 // CLOCK_DECOUPLED which audits same-scene co-occurrence).
+// Wave 580 additions: seed opening zone absent (zone presence/absence × seed × opening third —
+// n≥9, ≥4 seed scenes, none in opening structural third; setup act plants no foreshadowing;
+// distinct from CLUE_SEED_FRONT_LOADED [too much early], CLUE_SEED_MIDPOINT_VOID [different zone],
+// SEED_ACT3_VOID [closing zone]; first zone-absence check on the seed channel's opening zone),
+// payoff seed decoupled (co-occurrence/decoupling × payoff × seed cross-channel — n≥8, ≥3 payoff
+// and ≥3 seed scenes, no scene carries both simultaneously; distinct from PAYOFF_SEED_AFTERMATH_
+// ABSENT [aftermath mode] and PAYOFF_AFTERMATH_QUESTION_VOID [also aftermath]; first same-scene
+// co-occurrence check for the payoff × seed cross-channel pair), payoff consecutive valence run
+// (run-based × payoff × emotional valence — n≥8, ≥4 payoff scenes, 3+ consecutive payoff scenes
+// all with the same non-neutral emotionalShift; local monotone delivery stretch; distinct from
+// PAYOFF_EMOTIONAL_VALENCE_UNIFORM [global — ALL payoffs share one sign] and PAYOFF_CONSECUTIVE_RUN
+// [runs regardless of valence]; first run-based × valence check in payoff.ts).
 // Wave 566 additions: payoff clock peak decoupled (single-peak isolation × clockDelta × payoff —
 // n≥8, ≥2 payoff scenes, maxClockDelta>1, the single highest-clockDelta scene carries no payoff;
 // the maximum-urgency moment is not where any thread resolves; adds the clock channel to the payoff
@@ -3012,6 +3024,138 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `${Math.round((maxZone566c / seedPositions566c.length) * 100)}% of the story's ${seedPositions566c.length} clue-planting scenes are concentrated in the ${zoneName566c} structural third, leaving the other two-thirds with almost no foreshadowing. Unlike a front-vs-back skew, this is a single-zone cluster: the seeds are planted almost entirely within one third of the runtime while the rest of the story plants nothing. When foreshadowing is ghettoized into one zone, the planting engine fires in a single concentrated burst rather than threading anticipation continuously through the narrative — the audience receives a dose of "remember this" all at once and then carries it through long stretches with no new promises being made. The most propulsive mysteries plant clues across all three structural zones so the audience always has fresh threads to track.`,
             suggestedFix: `Redistribute some of the ${zoneName566c} third's seeds into the other two zones so foreshadowing threads through the full arc rather than bursting in one stretch. Each structural third can carry its own planted promise: an early seed that establishes a question, a middle seed that complicates it, and a late seed that sets up the climax's final turn. Spreading clue-planting across the thirds keeps the audience continuously anticipating rather than front-loading or burying the story's promises in a single zone.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 580: ─────────────────────────────────────────────────────────────
+
+  // SEED_OPENING_ZONE_ABSENT — zone presence/absence × seed × opening structural third.
+  // n≥9, ≥4 seed scenes (seededClueIds non-empty), none fall in the opening structural third
+  // (positions < ⌊n/3⌋) → fire. The setup act plants no foreshadowing — all clue-seeding is
+  // deferred past the opening, missing the prime window where audiences form expectations. The
+  // opening third is where the audience's curiosity architecture is established; seeds planted
+  // there become questions carried through the entire story. When the opening third plants
+  // nothing, the audience arrives at complication and climax without any pre-established
+  // promises to look forward to resolving.
+  // Distinct from: CLUE_SEED_FRONT_LOADED (Wave 384: >60% of seeds in first HALF — fires when
+  // TOO MUCH is planted early, opposite direction), CLUE_DENSITY_FRONT_COLLAPSE (Wave 289: all
+  // seeds in first 20% — over-concentration at the very start, opposite direction), CLUE_SEED_
+  // MIDPOINT_VOID (Wave 370: absence from 40–60% pivot zone — different zone), SEED_ACT3_VOID
+  // (Wave 482: absence from final 25%), CLUE_SEED_TEMPORAL_CLUSTER (Wave 566: over-concentration
+  // in any single third — fires when seeds are too concentrated, not absent). First zone-absence
+  // check on the seed channel's opening zone.
+  {
+    const n580a = records.length;
+    if (n580a >= 9) {
+      const seedPositions580a = (records as any[])
+        .map((r: any, pos: number) => ({ r, pos }))
+        .filter(({ r }) => ((r.seededClueIds ?? []) as any[]).length > 0)
+        .map(({ pos }) => pos);
+      if (seedPositions580a.length >= 4) {
+        const openingEnd580a = Math.floor(n580a / 3);
+        const hasSeedInOpening580a = seedPositions580a.some(p => p < openingEnd580a);
+        if (!hasSeedInOpening580a) {
+          issues.push({
+            location: `${seedPositions580a.length} seed scenes — none in the opening third (scenes 1–${openingEnd580a})`,
+            rule: 'SEED_OPENING_ZONE_ABSENT',
+            severity: 'minor',
+            description: `The story has ${seedPositions580a.length} clue-planting scenes, but none of them fall in the opening structural third (scenes 1–${openingEnd580a}). All foreshadowing is deferred past the setup act — the opening gives the audience no planted questions to carry into the complication. The opening third is the prime window for foreshadowing: seeds planted early become promises the audience tracks through the entire story, building the anticipation that makes eventual payoffs satisfying. When the opening plants nothing, the audience enters the complication and climax without any established threads to resolve, and the payoffs that arrive later must earn their satisfaction without the foundation of early-planted anticipation.`,
+            suggestedFix: `Plant at least one clue in the opening structural third — introduce an object, a detail, a behavior, or a fragment of information whose significance is not yet clear but which will matter later. It need not be obvious; the subtlest seeds can be the most satisfying when they pay off. The goal is to give the audience at least one "I should remember this" moment before the opening third ends, so the complication and climax have something they are delivering on rather than introducing from scratch.`,
+          });
+        }
+      }
+    }
+  }
+
+  // PAYOFF_SEED_DECOUPLED — co-occurrence/decoupling × payoff × seed (same-scene).
+  // n≥8, ≥3 payoff scenes (payoffSetupIds non-empty), ≥3 seed scenes (seededClueIds non-empty);
+  // no single scene carries both simultaneously → fire. The compound effect of simultaneously
+  // resolving one thread and planting another creates the most propulsive narrative beats: the
+  // audience receives satisfaction and immediately a new hook, so closure and curiosity coexist.
+  // When payoffs and seeds never share a scene, every resolution is a pure dead-end and every
+  // seed is an unattached beginning — completion and continuation engines run in separate lanes.
+  // Distinct from: PAYOFF_AFTERMATH_QUESTION_VOID (Wave 426: no seed in the 2 scenes AFTER a
+  // payoff — aftermath mode, not same-scene co-occurrence), PAYOFF_SEED_AFTERMATH_ABSENT (Wave
+  // 510: no seed scene in the 2 scenes following a payoff — also aftermath mode), CLUE_SEED_
+  // DRAMATIC_TURN_DECOUPLED (co-occurrence × seed × turn — different second signal). First co-
+  // occurrence check for the payoff × seed cross-channel pair (same-scene coincidence mode).
+  {
+    const n580b = records.length;
+    if (n580b >= 8) {
+      const payoffCount580b = (records as any[]).filter((r: any) =>
+        ((r.payoffSetupIds ?? []) as any[]).length > 0,
+      ).length;
+      const seedCount580b = (records as any[]).filter((r: any) =>
+        ((r.seededClueIds ?? []) as any[]).length > 0,
+      ).length;
+      if (payoffCount580b >= 3 && seedCount580b >= 3) {
+        const anyOverlap580b = (records as any[]).some((r: any) =>
+          ((r.payoffSetupIds ?? []) as any[]).length > 0 &&
+          ((r.seededClueIds ?? []) as any[]).length > 0,
+        );
+        if (!anyOverlap580b) {
+          issues.push({
+            location: `${payoffCount580b} payoff scenes and ${seedCount580b} seed scenes never coincide`,
+            rule: 'PAYOFF_SEED_DECOUPLED',
+            severity: 'minor',
+            description: `The story has ${payoffCount580b} scenes that resolve planted setups and ${seedCount580b} scenes that plant new clues, but no scene does both simultaneously. Scenes where a resolution and a new seed coincide are among the story's most propulsive beats: they close one open loop while immediately opening another, so the audience receives satisfaction and forward-pull in the same moment. When payoffs and seeds never share a scene, every resolution is a pure dead-end and every seed is an unattached beginning — the story's completion and curiosity engines run in entirely separate lanes. The audience leaves each payoff scene with one fewer thing to wonder about and no new replacement, and each seed scene introduces a thread with no sense of closure happening nearby.`,
+            suggestedFix: `Find at least one payoff scene where a new clue can be planted alongside the resolution — let the answer to one question immediately raise another. A character who resolves a confrontation and then discovers an incriminating object; a scene that delivers on a long-fused threat and simultaneously reveals that a trusted ally had advance knowledge. The seed need not be elaborate; even a brief new detail planted in the same scene as a payoff gives the audience a replacement hook while the satisfaction of the closed loop is still active.`,
+          });
+        }
+      }
+    }
+  }
+
+  // PAYOFF_CONSECUTIVE_VALENCE_RUN — run-based × payoff × emotional valence.
+  // n≥8, ≥4 payoff scenes; 3+ consecutive payoff scenes (payoffSetupIds non-empty and
+  // non-neutral emotionalShift) all carrying the same valence (all 'positive' or all
+  // 'negative') → fire. A local run of same-valence payoffs creates a monotone delivery
+  // stretch: the audience receives consecutive resolutions all wrapped in the same emotional
+  // register, each closure feeling like a copy of the last. Resolutions should vary: some
+  // bring relief (positive), some bring grief or loss (negative), and some land in neutral.
+  // Distinct from: PAYOFF_EMOTIONAL_VALENCE_UNIFORM (Wave 552: globally ALL payoffs share
+  // one sign — fires when there is no emotional variety across the entire script; this fires
+  // on a LOCAL consecutive run even when the script has overall variety), PAYOFF_CONSECUTIVE_
+  // RUN (Wave 426: 3+ consecutive payoffs regardless of emotional content — detects resolution
+  // avalanche, not valence monotone), SEED_EMOTIONAL_VALENCE_UNIFORM (Wave 566: global
+  // valence monotone on the seed trigger), PAYOFF_RELATIONSHIP_VALENCE_UNIFORM (Wave 426:
+  // relationship channel, not emotional channel). First run-based × valence check in payoff.ts.
+  {
+    const n580c = records.length;
+    if (n580c >= 8) {
+      const payoffTotal580c = (records as any[]).filter((r: any) =>
+        ((r.payoffSetupIds ?? []) as any[]).length > 0,
+      ).length;
+      if (payoffTotal580c >= 4) {
+        let maxRun580c = 0;
+        let curRun580c = 0;
+        let runVal580c = '';
+        for (const r of records as any[]) {
+          const isPayoff = ((r.payoffSetupIds ?? []) as any[]).length > 0;
+          const emo = r.emotionalShift ?? 'neutral';
+          if (isPayoff && emo !== 'neutral') {
+            if (emo === runVal580c) {
+              curRun580c++;
+            } else {
+              curRun580c = 1;
+              runVal580c = emo;
+            }
+            if (curRun580c > maxRun580c) maxRun580c = curRun580c;
+          } else {
+            curRun580c = 0;
+            runVal580c = '';
+          }
+        }
+        if (maxRun580c >= 3) {
+          issues.push({
+            location: `${maxRun580c} consecutive emotionally-charged payoff scenes share the same valence`,
+            rule: 'PAYOFF_CONSECUTIVE_VALENCE_RUN',
+            severity: 'minor',
+            description: `The story contains a run of ${maxRun580c} or more consecutive payoff scenes that all carry the same emotional valence — resolutions arriving in an unbroken same-register sequence. Closures derive their individual weight from variety: relief after grief, loss after satisfaction, neutral between charged beats. When three or more consecutive emotionally-charged payoffs all share one sign, the stretch of resolutions becomes predictable — the audience knows not just that something will be resolved but exactly how it will feel, so each closure in the run feels like a copy of the last rather than a new kind of arrival. Individual deliveries blur into an undifferentiated sequence even when they resolve distinct threads.`,
+            suggestedFix: `Break the same-valence run by inserting at least one payoff with a different emotional register — resolve a thread with loss rather than relief, or a neutral satisfying closure between charged ones. The variety need not be dramatic; a single payoff of opposite or neutral valence in the middle of the run restores the sense that each thread will resolve differently. If the same-valence run is intentional (a sequence of devastating losses in a tragedy's climax, or consecutive triumphs in a finale), that sustained register should be a deliberate tonal choice — and the preceding and following scenes should frame it as such rather than letting it read as default.`,
           });
         }
       }
