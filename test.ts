@@ -38203,6 +38203,101 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 586 — beliefPass: revelation dramatic-turn aftermath void, assertion relationship aftermath void, revelation payoff aftermath void', async () => {
+    const makeRec586 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const ASSERT586 = ['ALICE: the belief stands firm'];
+    const runBF586 = async (records: any[]) => {
+      const { beliefPass } = await import('./server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // REVELATION_DRAMATIC_TURN_AFTERMATH_VOID fire:
+    // 10 scenes; revelations at 0,3 (pos<8); dramatic turns at 7,9 (not at 1,2,4,5) → fires
+    it('REVELATION_DRAMATIC_TURN_AFTERMATH_VOID fires when no revelation is followed by a dramatic turn within 2 scenes', async () => {
+      const recs586a = Array.from({ length: 10 }, (_, i) =>
+        makeRec586(i, {
+          revelation: i === 0 || i === 3 ? 'the secret is out' : null,
+          dramaticTurn: i === 7 || i === 9 ? 'reversal' : 'nothing',
+        })
+      );
+      const res = await runBF586(recs586a);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'REVELATION_DRAMATIC_TURN_AFTERMATH_VOID'), 'REVELATION_DRAMATIC_TURN_AFTERMATH_VOID should fire');
+    });
+
+    // REVELATION_DRAMATIC_TURN_AFTERMATH_VOID no-fire:
+    // dramatic turn at 1 (within 2 of revelation at 0) → does not fire
+    it('REVELATION_DRAMATIC_TURN_AFTERMATH_VOID does not fire when a revelation is followed by a dramatic turn within 2 scenes', async () => {
+      const recs586an = Array.from({ length: 10 }, (_, i) =>
+        makeRec586(i, {
+          revelation: i === 0 || i === 3 ? 'the secret is out' : null,
+          dramaticTurn: i === 1 || i === 8 ? 'reversal' : 'nothing',
+        })
+      );
+      const res = await runBF586(recs586an);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'REVELATION_DRAMATIC_TURN_AFTERMATH_VOID'), 'REVELATION_DRAMATIC_TURN_AFTERMATH_VOID should not fire');
+    });
+
+    // ASSERTION_RELATIONSHIP_AFTERMATH_VOID fire:
+    // 10 scenes; assertions at 0,3 (pos<9); relationship shifts at 6,8 (not at 1,4) → fires
+    it('ASSERTION_RELATIONSHIP_AFTERMATH_VOID fires when no assertion is followed by a relationship shift', async () => {
+      const recs586b = Array.from({ length: 10 }, (_, i) =>
+        makeRec586(i, {
+          dialogueHighlights: i === 0 || i === 3 ? ASSERT586 : [],
+          relationshipShifts: i === 6 || i === 8 ? [{ characters: ['ALICE', 'BOB'], direction: 'strained' }] : [],
+        })
+      );
+      const res = await runBF586(recs586b);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'ASSERTION_RELATIONSHIP_AFTERMATH_VOID'), 'ASSERTION_RELATIONSHIP_AFTERMATH_VOID should fire');
+    });
+
+    // ASSERTION_RELATIONSHIP_AFTERMATH_VOID no-fire:
+    // relationship shift at 1 (aftermath of assertion at 0) → does not fire
+    it('ASSERTION_RELATIONSHIP_AFTERMATH_VOID does not fire when an assertion is followed by a relationship shift', async () => {
+      const recs586bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec586(i, {
+          dialogueHighlights: i === 0 || i === 3 ? ASSERT586 : [],
+          relationshipShifts: i === 1 || i === 7 ? [{ characters: ['ALICE', 'BOB'], direction: 'strained' }] : [],
+        })
+      );
+      const res = await runBF586(recs586bn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'ASSERTION_RELATIONSHIP_AFTERMATH_VOID'), 'ASSERTION_RELATIONSHIP_AFTERMATH_VOID should not fire');
+    });
+
+    // REVELATION_PAYOFF_AFTERMATH_VOID fire:
+    // 10 scenes; revelations at 0,3 (pos<9); payoffs at 6,8 (not at 1,4) → fires
+    it('REVELATION_PAYOFF_AFTERMATH_VOID fires when no revelation is followed by a payoff', async () => {
+      const recs586c = Array.from({ length: 10 }, (_, i) =>
+        makeRec586(i, {
+          revelation: i === 0 || i === 3 ? 'truth uncovered' : null,
+          payoffSetupIds: i === 6 || i === 8 ? ['thread-A'] : [],
+        })
+      );
+      const res = await runBF586(recs586c);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'REVELATION_PAYOFF_AFTERMATH_VOID'), 'REVELATION_PAYOFF_AFTERMATH_VOID should fire');
+    });
+
+    // REVELATION_PAYOFF_AFTERMATH_VOID no-fire:
+    // payoff at 1 (aftermath of revelation at 0) → does not fire
+    it('REVELATION_PAYOFF_AFTERMATH_VOID does not fire when a revelation is followed by a payoff', async () => {
+      const recs586cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec586(i, {
+          revelation: i === 0 || i === 3 ? 'truth uncovered' : null,
+          payoffSetupIds: i === 1 || i === 7 ? ['thread-A'] : [],
+        })
+      );
+      const res = await runBF586(recs586cn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'REVELATION_PAYOFF_AFTERMATH_VOID'), 'REVELATION_PAYOFF_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 572 — beliefPass: assertion clock aftermath void, assertion seed aftermath void, assertion payoff aftermath void', async () => {
     const makeRec572 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

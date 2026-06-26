@@ -158,6 +158,24 @@
 // seeded scenes globally, none of the following scenes have seededClueIds non-empty; the aftermath
 // sibling of REVELATION_SEED_DECOUPLED which checks co-occurrence in the same scene and distinct
 // from REVELATION_CURIOSITY_AFTERMATH_VOID which uses the curiosity channel as aftermath signal).
+// Wave 586 additions: revelation dramatic-turn aftermath void (sequence/aftermath × revelation →
+// dramatic-turn aftermath — n≥8, ≥2 qualifying revelation scenes [pos<n-2], ≥2 dramatic-turn
+// scenes globally, no revelation followed by a dramatic turn in the next 2 scenes; distinct from
+// REVELATION_DRAMATIC_TURN_DECOUPLED [Wave 390: co-occurrence × same scene], ASSERTION_TURN_
+// AFTERMATH_VOID [Wave 530: assertion trigger], and TURN_REVELATION_AFTERMATH_VOID [Wave 544:
+// turn as trigger → revelation in aftermath, which inverts trigger and output]), assertion
+// relationship aftermath void (sequence/aftermath × assertion → relationship-shift aftermath —
+// n≥8, ≥2 qualifying assertion scenes [pos<n-1], ≥2 relationship-shift scenes globally, no
+// assertion followed by a relationship shift in the next scene; distinct from REVELATION_
+// RELATIONSHIP_AFTERMATH_VOID [Wave 516: revelation trigger], ASSERTION_AFTERMATH_VOID [Wave
+// 418: conjunction over revelation/relationship/suspense — fires only when all 3 aftermath
+// channels are cold, whereas this isolates the relationship channel alone], and REVELATION_
+// RELATIONSHIP_DECOUPLED [co-occurrence, same scene]), revelation payoff aftermath void
+// (sequence/aftermath × revelation → payoff aftermath — n≥8, ≥2 qualifying revelation scenes
+// [pos<n-1], ≥2 payoff scenes globally, no revelation followed by a payoff in the next scene;
+// distinct from REVELATION_PAYOFF_DECOUPLED [co-occurrence × same scene], ASSERTION_PAYOFF_
+// AFTERMATH_VOID [Wave 572: assertion trigger], and ASSERTION_PAYOFF_DECOUPLED [co-occurrence
+// × assertion scene itself — different trigger AND mode]).
 // Wave 572 additions: assertion clock aftermath void (sequence/aftermath × assertion → clock — n≥8,
 // ≥2 qualifying assertion scenes, ≥2 clock scenes globally, no assertion followed by a raised clock;
 // claims never set a deadline ticking on their consequences), assertion seed aftermath void (sequence/
@@ -3133,6 +3151,134 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `The script has ${qualAssert572c.length} qualifying assertion scenes and ${payoffScenes572c.length} scenes that resolve a planted promise, but no assertion is followed immediately by a payoff. The beat after a character stakes a strong position is a charged place to deliver a payoff: the claim raises the stakes, and a planted promise cashing out in its immediate wake makes the assertion feel consequential — the position taken and the thread resolved reinforce each other. When no assertion is ever followed by a payoff, the belief layer and the resolution layer are temporally decoupled: claims are made but never coincide with the narrative closures that would give them weight, so taking a position never lands alongside the satisfaction of a thread completing.`,
             suggestedFix: `After at least one assertion scene, let the next scene deliver a payoff — a planted promise resolving in the wake of the claim, so that the position taken and the thread completed land together. The payoff need not be caused by the assertion, but their adjacency lets the resolution lend the claim consequence: the audience feels the assertion mattered because the story's machinery delivered something in its immediate aftermath.`,
+          });
+        }
+      }
+    }
+  }
+
+  // REVELATION_DRAMATIC_TURN_AFTERMATH_VOID (sequence/aftermath × revelation → dramatic-turn aftermath,
+  // n≥8, ≥2 qualifying revelation scenes [pos<n-2], ≥2 dramatic-turn scenes globally, no revelation
+  // followed by a dramatic turn in the next 2 scenes): Every revelation passes without a dramatic turn
+  // surfacing in its wake. A disclosure charges the beats immediately after it; the next two scenes are
+  // the natural home for a dramatic turn catalysed by the new information — a direction-change, a
+  // reversal, a hinge the story pivots on. When no revelation is ever followed by a dramatic turn within
+  // that window, the disclosure layer and the narrative-turn layer are temporally decoupled: the story
+  // keeps revealing facts, but those facts never crystallise into the pivots that shift direction.
+  // Sequence/aftermath mode × revelation trigger × dramatic-turn channel. Distinct from REVELATION_
+  // DRAMATIC_TURN_DECOUPLED (Wave 390: co-occurrence × same scene — fires when no revelation and
+  // dramatic turn share a scene), ASSERTION_TURN_AFTERMATH_VOID (Wave 530: assertion trigger instead
+  // of revelation), TURN_REVELATION_AFTERMATH_VOID (Wave 544: turn is the trigger and revelation is
+  // the aftermath output — the inverse direction).
+  {
+    const n586a = records.length;
+    if (n586a >= 8) {
+      const qualRev586a = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) =>
+          r.revelation !== null && r.revelation !== '' && r.revelation !== undefined && pos < n586a - 2
+        );
+      const turnScenes586a = (records as any[]).filter(
+        r => (r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== ''
+      );
+      if (qualRev586a.length >= 2 && turnScenes586a.length >= 2) {
+        const anyTurnAftermath586a = qualRev586a.some(({ pos }) => {
+          const next1 = (records as any[])[pos + 1];
+          const next2 = (records as any[])[pos + 2];
+          return (
+            ((next1.dramaticTurn ?? 'nothing') !== 'nothing' && next1.dramaticTurn !== '') ||
+            ((next2.dramaticTurn ?? 'nothing') !== 'nothing' && next2.dramaticTurn !== '')
+          );
+        });
+        if (!anyTurnAftermath586a) {
+          issues.push({
+            location: `${qualRev586a.length} revelation scene(s) — none followed by a dramatic turn within 2 scenes`,
+            rule: 'REVELATION_DRAMATIC_TURN_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `The script has ${qualRev586a.length} qualifying revelation scenes and ${turnScenes586a.length} scenes containing a dramatic turn, but no revelation is followed by a dramatic turn within the next two scenes. A disclosure charges the beats immediately after it: the two scenes following a revelation are the natural home for a dramatic turn catalysed by the new information — a direction-change, a reversal, a hinge the story pivots on. When no revelation is ever followed by a dramatic turn within that window, the disclosure layer and the narrative-turn layer are temporally decoupled: the story keeps revealing facts, but those facts never crystallise into the pivots that shift direction, so revelations feel absorbed without consequence.`,
+            suggestedFix: `After at least one revelation scene, let one of the next two scenes contain a dramatic turn — a reversal, escalation, or direction-change catalysed by the disclosure. The turn need not be caused by the revelation, but their proximity lets the disclosure feel like it tilted the course of events: the audience senses that what was revealed actually mattered because the story changed direction in its wake.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ASSERTION_RELATIONSHIP_AFTERMATH_VOID (sequence/aftermath × assertion → relationship-shift
+  // aftermath, n≥8, ≥2 qualifying assertion scenes [pos<n-1], ≥2 relationship-shift scenes globally,
+  // no assertion followed by a relationship shift in the next scene): Every claim a character makes
+  // passes without a relationship shifting in the immediately following scene. When a character stakes
+  // a strong position, the scene immediately after is the most natural place for another character's
+  // bond to stretch, crack, or deepen in response. When no assertion is ever followed by a relationship
+  // shift, the belief layer and the interpersonal layer are temporally decoupled: claims are made, but
+  // they never ripple into the connections between characters. Sequence/aftermath mode × assertion
+  // trigger × relationship channel. Distinct from REVELATION_RELATIONSHIP_AFTERMATH_VOID (Wave 516:
+  // revelation trigger, not assertion), ASSERTION_AFTERMATH_VOID (Wave 418: conjunction over
+  // revelation/relationship/suspense — fires only when ALL three aftermath channels are cold; this
+  // isolates the relationship channel and fires even when the other two channels are active), and
+  // REVELATION_RELATIONSHIP_DECOUPLED (co-occurrence × same scene × revelation trigger — different
+  // trigger AND mode).
+  {
+    const n586b = records.length;
+    if (n586b >= 8) {
+      const assertSet586b = new Set(toldBeliefs.map(t => t.sceneIdx));
+      const qualAssert586b = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) => assertSet586b.has(r.sceneIdx) && pos < n586b - 1);
+      const relScenes586b = (records as any[]).filter(
+        r => ((r.relationshipShifts ?? []) as any[]).length > 0
+      );
+      if (qualAssert586b.length >= 2 && relScenes586b.length >= 2) {
+        const anyRelAftermath586b = qualAssert586b.some(
+          ({ pos }) => (((records as any[])[pos + 1].relationshipShifts ?? []) as any[]).length > 0
+        );
+        if (!anyRelAftermath586b) {
+          issues.push({
+            location: `${qualAssert586b.length} assertion scene(s) — none followed by a relationship shift`,
+            rule: 'ASSERTION_RELATIONSHIP_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `The script has ${qualAssert586b.length} qualifying assertion scenes and ${relScenes586b.length} scenes with a relationship shift, but no assertion is immediately followed by a scene in which a relationship changes. When a character stakes a strong position, the scene immediately after is the natural place for another character's bond to stretch, crack, or deepen in response: the position taken should change what the people around them mean to each other. When no assertion is ever followed by a relationship shift, the belief layer and the interpersonal layer are temporally decoupled — claims are made, but they never ripple into the connections between characters, so taking a position has no relational cost or reward.`,
+            suggestedFix: `After at least one assertion scene, let the immediately following scene show a relationship shifting — an alliance formed, a bond stressed, or a connection deepening in response to the position just taken. The shift need not be caused by the assertion, but their adjacency makes the claim feel consequential: what the character believed and staked mattered to how the people around them relate to one another.`,
+          });
+        }
+      }
+    }
+  }
+
+  // REVELATION_PAYOFF_AFTERMATH_VOID (sequence/aftermath × revelation → payoff aftermath, n≥8, ≥2
+  // qualifying revelation scenes [pos<n-1], ≥2 scenes with non-empty payoffSetupIds globally, no
+  // revelation followed by a payoff in the next scene): Every disclosure passes without a planted
+  // promise resolving in its immediate wake. A revelation charges the scene it lands in; the scene
+  // immediately after is a natural moment to cash out a planted thread — the new information changes
+  // what the audience knows, and a payoff landing right then feels earned by the disclosure. When no
+  // revelation is ever followed by a payoff, the disclosure layer and the resolution layer are
+  // temporally decoupled: revelations open the epistemic field but never coincide with the satisfaction
+  // of a thread completing. Sequence/aftermath mode × revelation trigger × payoff channel. Distinct
+  // from REVELATION_PAYOFF_DECOUPLED (co-occurrence × same scene — fires when no revelation and payoff
+  // share a scene), ASSERTION_PAYOFF_AFTERMATH_VOID (Wave 572: assertion trigger instead of revelation),
+  // and ASSERTION_PAYOFF_DECOUPLED (Wave 462: assertion trigger AND co-occurrence in the assertion
+  // scene itself — different trigger AND mode).
+  {
+    const n586c = records.length;
+    if (n586c >= 8) {
+      const qualRev586c = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) =>
+          r.revelation !== null && r.revelation !== '' && r.revelation !== undefined && pos < n586c - 1
+        );
+      const payoffScenes586c = (records as any[]).filter(
+        r => ((r.payoffSetupIds ?? []) as string[]).length > 0
+      );
+      if (qualRev586c.length >= 2 && payoffScenes586c.length >= 2) {
+        const anyPayoffAftermath586c = qualRev586c.some(
+          ({ pos }) => (((records as any[])[pos + 1].payoffSetupIds ?? []) as string[]).length > 0
+        );
+        if (!anyPayoffAftermath586c) {
+          issues.push({
+            location: `${qualRev586c.length} revelation scene(s) — none followed by a payoff`,
+            rule: 'REVELATION_PAYOFF_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `The script has ${qualRev586c.length} qualifying revelation scenes and ${payoffScenes586c.length} scenes that resolve a planted promise, but no revelation is immediately followed by a payoff. A disclosure charges the scene it lands in; the scene right after is a natural moment to cash out a planted thread — the new information changes what the audience knows, and a payoff landing in its immediate wake feels earned by the disclosure, the revealed fact lending the thread its sense of completion. When no revelation is ever followed by a payoff, the disclosure layer and the resolution layer are temporally decoupled: revelations open the epistemic field but never coincide with the satisfaction of a thread completing.`,
+            suggestedFix: `After at least one revelation scene, let the immediately following scene deliver a payoff — a planted promise resolving in the wake of the disclosure. The payoff need not be caused by the revelation, but their adjacency lets the disclosure lend the thread a sense of completion: the audience senses that what was revealed mattered because the story's planted promises began cashing out in its wake.`,
           });
         }
       }
