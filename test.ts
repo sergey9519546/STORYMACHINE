@@ -39891,6 +39891,133 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 585 — voicePass: affirmation zone cluster, exclamation aftermath terse, hedged exclamation flood', async () => {
+    const runV585 = async (fountain: string) => {
+      const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');
+      return voicePass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // DIALOGUE_AFFIRMATION_ZONE_CLUSTER fire:
+    // 12 dialogue lines; third=4; affirmation at lines 0,1,2 (first third, positions 0-3) → 3/3=100%>75%
+    it('DIALOGUE_AFFIRMATION_ZONE_CLUSTER fires when >75% of affirmation lines fall in one third', async () => {
+      const f585a = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'Yes, of course I agree.', '',      // AFF — line 0
+        'BOB', 'Right, exactly what I thought.', '', // AFF — line 1
+        'ALICE', 'Absolutely, we are aligned.', '',  // AFF — line 2
+        'BOB', 'We should head out soon.', '',       // line 3
+        'ALICE', 'The meeting starts at noon.', '',  // line 4
+        'BOB', 'Let us get moving already.', '',     // line 5
+        'ALICE', 'I will see you there then.', '',   // line 6
+        'BOB', 'Everything looks good to me.', '',   // line 7
+        'ALICE', 'We need to check the plan.', '',   // line 8
+        'BOB', 'Let me call ahead first.', '',       // line 9
+        'ALICE', 'The door is already open.', '',    // line 10
+        'BOB', 'See you in ten minutes.', '',        // line 11
+      ].join('\n');
+      const res = await runV585(f585a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_AFFIRMATION_ZONE_CLUSTER'), 'DIALOGUE_AFFIRMATION_ZONE_CLUSTER should fire');
+    });
+
+    // DIALOGUE_AFFIRMATION_ZONE_CLUSTER no-fire:
+    // 12 lines; third=4; AFF at 0 (first), 5 (middle), 10 (last) → 1/1/1 → max=1/3=33%≤75%
+    it('DIALOGUE_AFFIRMATION_ZONE_CLUSTER does not fire when affirmation lines are spread across thirds', async () => {
+      const f585anr = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'Yes, I think so.', '',             // AFF — line 0 (first third 0-3)
+        'BOB', 'We should leave now.', '',           // line 1
+        'ALICE', 'The plan is clear enough.', '',    // line 2
+        'BOB', 'Let us check the map.', '',          // line 3
+        'ALICE', 'Right, that makes sense.', '',     // AFF — line 4 (middle third 4-7)
+        'BOB', 'Where do we go next?', '',           // line 5
+        'ALICE', 'I need to think first.', '',       // line 6
+        'BOB', 'What time does it start?', '',       // line 7
+        'ALICE', 'Absolutely, let us go.', '',       // AFF — line 8 (last third 8-11)
+        'BOB', 'Good, I am ready now.', '',          // line 9
+        'ALICE', 'We need to move fast.', '',        // line 10
+        'BOB', 'The door is open.', '',              // line 11
+      ].join('\n');
+      const res = await runV585(f585anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_AFFIRMATION_ZONE_CLUSTER'), 'DIALOGUE_AFFIRMATION_ZONE_CLUSTER should not fire');
+    });
+
+    // DIALOGUE_EXCLAMATION_AFTERMATH_TERSE fire:
+    // 8 dialogue lines; 2 !-ending lines at 0,2; lines 1,3 are ≤2-word responses → fires
+    it('DIALOGUE_EXCLAMATION_AFTERMATH_TERSE fires when all exclamation lines are followed by ≤2-word responses', async () => {
+      const f585b = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'That is absolutely outrageous!', '',
+        'BOB', 'Yes.', '',
+        'ALICE', 'I cannot believe you did this!', '',
+        'BOB', 'Sorry.', '',
+        'ALICE', 'What should we do now then?', '',
+        'BOB', 'Let me think about it.', '',
+        'ALICE', 'We need to talk about this more.', '',
+        'BOB', 'Agreed, let us sit down.', '',
+      ].join('\n');
+      const res = await runV585(f585b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_EXCLAMATION_AFTERMATH_TERSE'), 'DIALOGUE_EXCLAMATION_AFTERMATH_TERSE should fire');
+    });
+
+    // DIALOGUE_EXCLAMATION_AFTERMATH_TERSE no-fire:
+    // 8 lines; !-ending at line 0 followed by a 5-word response → no fire
+    it('DIALOGUE_EXCLAMATION_AFTERMATH_TERSE does not fire when an exclamation is followed by a longer response', async () => {
+      const f585bnr = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'That is absolutely outrageous!', '',
+        'BOB', 'I know and I am sorry.', '',    // 6 words → not terse
+        'ALICE', 'I cannot believe this happened!', '',
+        'BOB', 'Look, it was a mistake.', '',   // 5 words → not terse
+        'ALICE', 'What do we do now?', '',
+        'BOB', 'We need to talk later.', '',
+        'ALICE', 'Fine, meet me at six.', '',
+        'BOB', 'Okay.', '',
+      ].join('\n');
+      const res = await runV585(f585bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_EXCLAMATION_AFTERMATH_TERSE'), 'DIALOGUE_EXCLAMATION_AFTERMATH_TERSE should not fire');
+    });
+
+    // DIALOGUE_HEDGED_EXCLAMATION_FLOOD fire:
+    // 10 dialogue lines; 2 contain both hesitation AND "!"; 2/10=20% > 15% → fires
+    it('DIALOGUE_HEDGED_EXCLAMATION_FLOOD fires when >15% of lines have both hesitation and "!"', async () => {
+      const f585c = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'Um, that is amazing!', '',
+        'BOB', 'Uh, I cannot believe this!', '',
+        'ALICE', 'We should go now.', '',
+        'BOB', 'Let me check the map.', '',
+        'ALICE', 'It looks clear outside.', '',
+        'BOB', 'What time is it?', '',
+        'ALICE', 'Almost seven I think.', '',
+        'BOB', 'We need to hurry.', '',
+        'ALICE', 'Right, let us leave.', '',
+        'BOB', 'I will get the keys.', '',
+      ].join('\n');
+      const res = await runV585(f585c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_HEDGED_EXCLAMATION_FLOOD'), 'DIALOGUE_HEDGED_EXCLAMATION_FLOOD should fire');
+    });
+
+    // DIALOGUE_HEDGED_EXCLAMATION_FLOOD no-fire:
+    // 10 dialogue lines; only 1 hesitation+! line → 1/10=10% ≤ 15% → no fire
+    it('DIALOGUE_HEDGED_EXCLAMATION_FLOOD does not fire when only one line has hesitation and "!"', async () => {
+      const f585cnr = [
+        'INT. ROOM - DAY', '',
+        'ALICE', 'Um, that is amazing!', '',    // only one hedged-!
+        'BOB', 'Wow, that is great news.', '',
+        'ALICE', 'We should go now.', '',
+        'BOB', 'Let me check the map.', '',
+        'ALICE', 'It looks clear outside.', '',
+        'BOB', 'What time is it?', '',
+        'ALICE', 'Almost seven I think.', '',
+        'BOB', 'We need to hurry.', '',
+        'ALICE', 'Right, let us leave.', '',
+        'BOB', 'I will get the keys.', '',
+      ].join('\n');
+      const res = await runV585(f585cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_HEDGED_EXCLAMATION_FLOOD'), 'DIALOGUE_HEDGED_EXCLAMATION_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 571 — voicePass: negation zone cluster, hedged negation flood, opening zone question absent', async () => {
     const runV571 = async (fountain: string) => {
       const { voicePass } = await import('./server/nvm/revision/passes/voice.ts');

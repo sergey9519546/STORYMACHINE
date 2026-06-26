@@ -126,6 +126,20 @@
 // ≥8 dialogue lines, ≥2 qualifiable !-ending lines [i>0], ALL preceded by a line ending in
 // neither "?" nor "!" in the immediately prior dialogue line; all emotional intensity is
 // self-generated rather than provoked; first backward-cause check on the exclamation channel).
+// Wave 585 additions: dialogue affirmation zone cluster (distribution/timing × affirmation ×
+// thirds — ≥12 dialogue lines, ≥3 affirmation lines, >75% in one third; the positive-assent
+// register ghettoized into one structural zone; the affirmation-channel sibling of DIALOGUE_
+// NEGATION_ZONE_CLUSTER and DIALOGUE_QUESTION/EXCLAMATION/LONG_SPEECH_ZONE_CLUSTER; distinct
+// from DIALOGUE_AFFIRMATION_FLOOD [global rate]), dialogue exclamation aftermath terse (sequence/
+// aftermath × exclamation trigger × ≤2-word response — ≥8 dialogue lines, ≥2 qualifying
+// !-ending lines, all followed by ≤2-word responses; outbursts earn no engagement; the
+// exclamation-trigger sibling of DIALOGUE_QUESTION_AFTERMATH_TERSE and DIALOGUE_MONOLOGUE_
+// AFTERMATH_TERSE; distinct from DIALOGUE_EXCLAMATION_BACKWARD_CAUSELESS [backward-cause mode]),
+// dialogue hedged exclamation flood (co-occurrence × hesitation sound × "!" ending — ≥10 lines,
+// >15% contain BOTH hesitation sound [um/uh/er/hmm] AND end in "!"; the "uncertain outburst";
+// completes the hedged-X family alongside HEDGED_QUESTION/AFFIRMATION/NEGATION_FLOOD; distinct
+// from DIALOGUE_EXCLAMATION_BACKWARD_CAUSELESS [backward-cause], DIALOGUE_HESITATION_FLOOD
+// [hesitation alone], and DIALOGUE_EXCLAMATION_RUN [run-based]).
 // Wave 571 additions: dialogue negation zone cluster (distribution/timing × negation × thirds —
 // ≥12 dialogue lines, ≥3 negation lines, >75% in one third; refusal ghettoized into one zone; the
 // negation member of the zone-cluster family alongside DIALOGUE_QUESTION/EXCLAMATION/LONG_SPEECH_
@@ -3558,6 +3572,143 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
             suggestedFix: `Add at least one question-ending line in the opening quarter (dialogue lines 1–${openEnd571c}) — a character asking for information, voicing a doubt, or reaching toward another. An early question seeds the uncertainty that an audience leans into: it tells them there is something not yet known, someone who wants an answer, a tension that the scene will have to resolve. Opening on assertion alone asks the audience to invest before the dialogue has posed anything for them to wonder about.`,
           });
         }
+      }
+    }
+  }
+
+  // ── Wave 585: DIALOGUE_AFFIRMATION_ZONE_CLUSTER, DIALOGUE_EXCLAMATION_AFTERMATH_TERSE,
+  //              DIALOGUE_HEDGED_EXCLAMATION_FLOOD ──────────────────────────────────────────────
+  {
+    // DIALOGUE_AFFIRMATION_ZONE_CLUSTER — distribution/timing × affirmation × thirds.
+    // ≥12 dialogue lines, ≥3 affirmation-containing lines, >75% of those in one structural third
+    // → fire. The positive-assent register — where characters validate, agree, and confirm —
+    // is ghettoized into a single zone of the dialogue rather than arising organically from the
+    // drama throughout. Agreement has a dramatic function: it relieves tension, signals capitulation,
+    // or marks a turning point. When it clusters structurally it implies the script has a zone of
+    // forced resolution or a passage of deliberately conflict-free agreement that crowds out the
+    // interrogative and resistant registers that balance a scene's energy.
+    // Distinct from: DIALOGUE_AFFIRMATION_FLOOD (Wave 543: global proportion >30%, no zone
+    // sensitivity — a script can pass this check but still cluster its affirmations into one zone),
+    // DIALOGUE_NEGATION_ZONE_CLUSTER (Wave 571: negation channel — this is the affirmation sibling,
+    // completing the valence pair in the zone-cluster family), DIALOGUE_QUESTION_ZONE_CLUSTER (Wave
+    // 473: ? channel), DIALOGUE_EXCLAMATION_ZONE_CLUSTER (Wave 487: ! channel), DIALOGUE_LONG_SPEECH_
+    // ZONE_CLUSTER (Wave 557: speech length ≥10w channel). The affirmation member of the zone-cluster
+    // family, completing the zone-cluster audit alongside negation, question, exclamation, and long-speech.
+    const dlg585a: string[] = [];
+    let inDlg585a = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg585a = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg585a = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg585a = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg585a) dlg585a.push(t);
+    }
+    if (dlg585a.length >= 12) {
+      const AFF_PAT585a = /\b(yes|yeah|yep|right|exactly|of course|agreed|absolutely|definitely|certainly|indeed|correct|precisely|affirmative)\b/i;
+      const affPositions585a = dlg585a.map((t, i) => ({ i, match: AFF_PAT585a.test(t) })).filter(x => x.match).map(x => x.i);
+      if (affPositions585a.length >= 3) {
+        const third585a = Math.floor(dlg585a.length / 3);
+        const first585a = affPositions585a.filter(p => p < third585a).length;
+        const last585a = affPositions585a.filter(p => p >= 2 * third585a).length;
+        const mid585a = affPositions585a.length - first585a - last585a;
+        const max585a = Math.max(first585a, mid585a, last585a);
+        if (max585a / affPositions585a.length > 0.75) {
+          const zone585a = max585a === first585a ? 'opening' : max585a === last585a ? 'closing' : 'middle';
+          issues.push({
+            location: `Affirmation lines: ${first585a} opening / ${mid585a} middle / ${last585a} closing third — ${Math.round((max585a / affPositions585a.length) * 100)}% in the ${zone585a} third`,
+            rule: 'DIALOGUE_AFFIRMATION_ZONE_CLUSTER',
+            severity: 'minor',
+            description: `${Math.round((max585a / affPositions585a.length) * 100)}% of the dialogue's ${affPositions585a.length} affirmation-containing lines (yes, right, exactly, of course, etc.) are concentrated in the ${zone585a} structural third. Affirmation has a dramatic function: it relieves tension, signals capitulation, marks consensus reached. When it clusters structurally, the script has a zone of concentrated agreement while the other two-thirds of the dialogue are operating without any positive-assent register — either in sustained conflict or in neutral exchange. The clustering implies a structural resolution pocket or an artificially smooth passage rather than organic agreement arising from earned dramatic beats distributed across the scene.`,
+            suggestedFix: `Redistribute some affirmation lines from the ${zone585a} third into the other zones — let at least one confirming moment land in each structural section. Agreement should arise from dramatic necessity, not zone. A midpoint concession, an opening yes that sets a false baseline, and a closing confirmation of what was earned are all more dramatically purposeful than a cluster of assent in one stretch.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // DIALOGUE_EXCLAMATION_AFTERMATH_TERSE — sequence/aftermath × exclamation trigger × terse response.
+    // ≥8 dialogue lines, ≥2 !-ending lines not at the last position, ALL followed immediately by a
+    // ≤2-word response → fire. An exclamation outburst — emotional intensity raised to its maximum
+    // punctuation — earns only a clipped, minimal reply. The emotional voltage goes unengaged: the
+    // other character answers in monosyllables or a short phrase rather than meeting the intensity or
+    // being provoked into a fuller response. This drains exclamations of their dramatic consequence —
+    // they become atmospheric noise that the other character absorbs without registering.
+    // Distinct from: DIALOGUE_QUESTION_AFTERMATH_TERSE (Wave 501: question trigger — this is the
+    // exclamation-trigger sibling), DIALOGUE_MONOLOGUE_AFTERMATH_TERSE (Wave 487: long-speech ≥10w
+    // trigger), DIALOGUE_EXCLAMATION_BACKWARD_CAUSELESS (Wave 543: backward-cause mode — checks what
+    // PRECEDES the exclamation, not what FOLLOWS it), DIALOGUE_EXCLAMATION_RUN (Wave 515: run-based —
+    // consecutive exclamation lines, no aftermath direction), DIALOGUE_ASSERTION_RUN (Wave 459:
+    // declarative run, not aftermath). First aftermath check using the exclamation trigger.
+    const dlg585b: string[] = [];
+    let inDlg585b = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg585b = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg585b = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg585b = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg585b) dlg585b.push(t);
+    }
+    if (dlg585b.length >= 8) {
+      const qualExclLines585b = dlg585b
+        .map((t, i) => ({ t, i }))
+        .filter(({ t, i }) => t.trimEnd().endsWith('!') && i < dlg585b.length - 1);
+      if (qualExclLines585b.length >= 2) {
+        const countWords585b = (s: string) => s.split(/\s+/).filter(w => w.length > 0).length;
+        const allTerse585b = qualExclLines585b.every(({ i }) => countWords585b(dlg585b[i + 1]) <= 2);
+        if (allTerse585b) {
+          issues.push({
+            location: `Dialogue — ${qualExclLines585b.length} exclamation line(s) all followed by ≤2-word responses`,
+            rule: 'DIALOGUE_EXCLAMATION_AFTERMATH_TERSE',
+            severity: 'minor',
+            description: `Every exclamation-ending dialogue line (${qualExclLines585b.length} instance(s)) is immediately followed by a response of two words or fewer — emotional outbursts earn only clipped, minimal replies. An exclamation raises the scene's emotional voltage to its maximum punctuation; when the reply is a monosyllable or a short phrase, the intensity goes unengaged. The other character absorbs the outburst without meeting it, being provoked by it, or registering it with more than a token response. This drains exclamations of dramatic consequence — they become intensity spikes that the scene immediately deflates rather than amplifies or answers.`,
+            suggestedFix: `After at least one exclamation, give the other character a fuller response — a counter-reaction, a question provoked by the outburst, or an escalation that matches the emotional charge. An exclamation that earns only "Yeah" or "Okay" was not worth the exclamation mark. The follow-on should show that the emotional intensity registered and produced a dramatic response rather than an ambient deflation.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // DIALOGUE_HEDGED_EXCLAMATION_FLOOD — co-occurrence × hesitation sound × "!" ending.
+    // ≥10 dialogue lines, >15% contain BOTH a hesitation sound (um/uh/er/hmm) AND end in "!"
+    // → fire. The "uncertain outburst" — characters simultaneously stammer and exclaim, producing
+    // an incoherent register where hesitation (which signals tentativeness) and exclamation (which
+    // signals certainty or strong emotion) contradict each other. A hesitation sound implies the
+    // speaker is groping for words; an exclamation implies they have arrived at a feeling with
+    // maximum force. Lines carrying both signals undercut themselves: the hedge reads as authorial
+    // uncertainty about whether to commit to the emotional register, and the "!" reads as an
+    // editorial boost applied to what is already a tentative line.
+    // Distinct from: DIALOGUE_HEDGED_AFFIRMATION_FLOOD (Wave 557: hesitation + affirmation word —
+    // different second signal), DIALOGUE_HEDGED_NEGATION_FLOOD (Wave 571: hesitation + negation —
+    // different second signal), DIALOGUE_HEDGED_QUESTION_FLOOD (Wave 431: hedging-opener + "?" —
+    // different hesitation type and punctuation), DIALOGUE_EXCLAMATION_BACKWARD_CAUSELESS (Wave 543:
+    // backward-cause mode, not co-occurrence), DIALOGUE_HESITATION_FLOOD (Wave 361: hesitation alone),
+    // DIALOGUE_EXCLAMATION_RUN (Wave 515: run-based consecutive "!" lines). Completes the hedged-X
+    // co-occurrence family with the "!" channel alongside hedged question/affirmation/negation.
+    const dlg585c: string[] = [];
+    let inDlg585c = false;
+    for (const line of allLines) {
+      const t = line.trim();
+      if (!t) { inDlg585c = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg585c = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg585c = true; continue; }
+      if (/^\(/.test(t)) continue;
+      if (inDlg585c) dlg585c.push(t);
+    }
+    if (dlg585c.length >= 10) {
+      const HES_PAT585c = /\b(um|uh|er|hmm|hm)\b/i;
+      const hedgedExclCount585c = dlg585c.filter(t => HES_PAT585c.test(t) && t.trimEnd().endsWith('!')).length;
+      if (hedgedExclCount585c / dlg585c.length > 0.15) {
+        issues.push({
+          location: `Dialogue — ${hedgedExclCount585c} of ${dlg585c.length} lines contain both hesitation and "!"`,
+          rule: 'DIALOGUE_HEDGED_EXCLAMATION_FLOOD',
+          severity: 'minor',
+          description: `${hedgedExclCount585c} of ${dlg585c.length} dialogue lines (${Math.round(hedgedExclCount585c / dlg585c.length * 100)}%) contain both a hesitation sound ("um", "uh", "er", "hmm") and end in "!" — the "uncertain outburst." Hesitation signals that a speaker is groping for words, uncertain of their footing; an exclamation signals that a feeling or assertion has arrived with maximum force. Lines combining both signals contradict themselves: the stammer reads as authorial tentativeness about the emotional register, and the "!" reads as a boost applied editorially to a line that hasn't committed to the intensity. When more than 15% of dialogue lines carry both, the script is routinely hedging and exclaiming at the same time, producing a voice that is simultaneously unsure and emphatic — a register that reads as anxious rather than emotionally precise.`,
+          suggestedFix: `Choose one register per line: either the character is uncertain (keep the hesitation, drop the "!") or they are committed to an outburst (drop the hesitation, keep the "!"). A character can waver first and then exclaim, but in adjacent lines — not in the same line. The "Um... I can't believe this!" moment works as two beats: the stammer is followed by the clean exclamation. Don't stack the hedging inside the exclamation.`,
+        });
       }
     }
   }
