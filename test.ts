@@ -20967,6 +20967,83 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 582 — rhythmPass: long single sentence, shortest outlier, medium opening absent', async () => {
+    const runR582 = async (fountain: string) => {
+      const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({ fountain, original: fountain, records: [], structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    // Helper: create fountain with action lines of given word counts (single sentence each)
+    const makeF582 = (wcs: number[]) =>
+      wcs.map((n, i) => `INT. SC${i} - DAY\n\n${Array(n).fill('word').join(' ')}.`).join('\n\n');
+    // Helper: action line with n words split across s sentences
+    const makeMSLine582 = (n: number, s: number): string => {
+      const perSent = Math.floor(n / s);
+      const parts: string[] = [];
+      for (let j = 0; j < s; j++) {
+        const count = j === s - 1 ? n - perSent * j : perSent;
+        parts.push(Array(count).fill('word').join(' '));
+      }
+      return parts.join('. ') + '.';
+    };
+
+    // ACTION_LONG_SINGLE_SENTENCE fire:
+    // 8 action lines: 5 long (12w, 1 sentence each) + 3 short (5w)
+    // 5/5 long lines are single-sentence → 100% > 70% → fires
+    it('ACTION_LONG_SINGLE_SENTENCE fires when >70% of long lines are single-sentence', async () => {
+      const f582a = makeF582([12, 12, 12, 5, 12, 12, 5, 5]);
+      const res = await runR582(f582a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_LONG_SINGLE_SENTENCE'), 'ACTION_LONG_SINGLE_SENTENCE should fire');
+    });
+
+    // ACTION_LONG_SINGLE_SENTENCE no-fire:
+    // 8 action lines: 5 long (12w); 4 of the 5 long lines have 2 sentences → 1/5 = 20% ≤ 70%
+    it('ACTION_LONG_SINGLE_SENTENCE does not fire when most long lines have multiple sentences', async () => {
+      const msScene582 = `INT. SC_MS - DAY\n\n${makeMSLine582(12, 2)}`;
+      const f582anr = [
+        msScene582, msScene582, msScene582, msScene582,
+        `INT. SC4 - DAY\n\n${Array(12).fill('word').join(' ')}.`,
+        `INT. SC5 - DAY\n\n${Array(5).fill('word').join(' ')}.`,
+        `INT. SC6 - DAY\n\n${Array(5).fill('word').join(' ')}.`,
+        `INT. SC7 - DAY\n\n${Array(5).fill('word').join(' ')}.`,
+      ].join('\n\n');
+      const res = await runR582(f582anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_LONG_SINGLE_SENTENCE'), 'ACTION_LONG_SINGLE_SENTENCE should not fire');
+    });
+
+    // ACTION_SHORTEST_OUTLIER fire:
+    // 8 lines: 7 at 10 words, 1 at 2 words; avg = (70+2)/8 = 9; 2 ≤ 9*0.25=2.25 → fires
+    it('ACTION_SHORTEST_OUTLIER fires when shortest action line is ≤2 words and ≤25% of average', async () => {
+      const f582b = makeF582([10, 10, 10, 10, 10, 10, 10, 2]);
+      const res = await runR582(f582b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_SHORTEST_OUTLIER'), 'ACTION_SHORTEST_OUTLIER should fire');
+    });
+
+    // ACTION_SHORTEST_OUTLIER no-fire:
+    // 8 lines: 7 at 10 words, 1 at 4 words; avg=9w; 4 > 9*0.25=2.25 → no fire
+    it('ACTION_SHORTEST_OUTLIER does not fire when shortest line exceeds the 25% threshold', async () => {
+      const f582bnr = makeF582([10, 10, 10, 10, 10, 10, 10, 4]);
+      const res = await runR582(f582bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_SHORTEST_OUTLIER'), 'ACTION_SHORTEST_OUTLIER should not fire');
+    });
+
+    // ACTION_MEDIUM_OPENING_ABSENT fire:
+    // 12 action lines; opening = first floor(12/4)=3 lines: wcs 3,15,3 → none 5-11
+    // rest (9 lines): 7,7,7,7,10,5,8,13,6 → 7,7,7,7,10,5,8,6 = 8 medium ≥4 → fires
+    it('ACTION_MEDIUM_OPENING_ABSENT fires when opening 25% has no medium-length lines', async () => {
+      const f582c = makeF582([3, 15, 3, 7, 7, 7, 7, 10, 5, 8, 13, 6]);
+      const res = await runR582(f582c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_MEDIUM_OPENING_ABSENT'), 'ACTION_MEDIUM_OPENING_ABSENT should fire');
+    });
+
+    // ACTION_MEDIUM_OPENING_ABSENT no-fire:
+    // 12 action lines; opening = first 3: wcs 3,7,3 → wc=7 is medium → has medium → no fire
+    it('ACTION_MEDIUM_OPENING_ABSENT does not fire when opening contains a medium-length line', async () => {
+      const f582cnr = makeF582([3, 7, 3, 7, 7, 7, 7, 10, 5, 8, 13, 6]);
+      const res = await runR582(f582cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_MEDIUM_OPENING_ABSENT'), 'ACTION_MEDIUM_OPENING_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 568 — rhythmPass: long thirds cluster, short thirds cluster, alternation run', async () => {
     const runR568 = async (fountain: string) => {
       const { rhythmPass } = await import('./server/nvm/revision/passes/rhythm.ts');

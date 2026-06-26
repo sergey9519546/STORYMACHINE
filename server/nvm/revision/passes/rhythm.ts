@@ -106,6 +106,19 @@
 // high (average/aggregate × sentence count per line — ≥8 action lines averaging >3 sentences each,
 // multi-clause overload that collapses the shot-by-shot grammar of cinematic action; the average/
 // aggregate complement of SINGLE_SENTENCE_FLOOD and SENTENCE_COUNT_PEAK).
+// Wave 582 additions: action long single sentence (co-occurrence × long word count ≥12w ×
+// 1-sentence structure — ≥8 action lines, ≥4 long lines, >70% of those long lines are single-
+// sentence; verbose density without clause structure; distinct from SINGLE_SENTENCE_FLOOD which
+// tests all lines globally, SENTENCE_COUNT_PEAK which isolates the max-sentence outlier, and
+// LONG_LINE_FLOOD which counts proportion without examining sentence structure), action shortest
+// outlier (single-peak isolation × word count × floor valley — ≥8 action lines, avgWords > 5,
+// shortest line ≤2 words and ≤25% of avgWords; the floor counterpart of LONGEST_ACTION_OUTLIER;
+// distinct from CONSECUTIVE_SHORT_RUN [run-based], SHORT_LINE_POVERTY [scarcity], and MONOTONOUS_
+// RHYTHM [variance]), action medium opening absent (zone presence/absence × medium channel 5–11w ×
+// opening 25% — ≥12 action lines, ≥4 medium lines in rest but none in opening 25%; completes the
+// medium-channel cell in the zone × opening row alongside OPENING_SHORT_ABSENT [short channel] and
+// OPENING_LONG_ABSENT [long channel]; distinct from all same-zone checks on other channels and
+// from ACTION_CONSECUTIVE_MEDIUM_RUN [run-based]).
 // Wave 568 additions: action long thirds cluster (distribution/timing × long ≥12w × structural
 // thirds — ≥9 action lines, ≥4 long lines, >75% in a single even-third; the descriptive register
 // ghettoized into one zone; distinct from the 25/50/25 zone-ABSENCE checks [absence not over-
@@ -2694,6 +2707,98 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `The script has a run of ${maxAlt568c} consecutive action lines whose word counts strictly alternate between short (≤4 words) and long (≥12 words) — a sustained see-saw between compression and elaboration. The contrast between a clipped impact beat and an expansive descriptive line is powerful as an occasional, deliberate move, but stretched into a six-plus-line ping-pong it becomes a mechanical pattern: the reader internalizes the alternation and anticipates each swing before it lands. This is rhythmic monotony of a subtler kind — not the flatness of uniform line lengths, but the over-regularity of a predictable oscillation. The prose stops feeling calibrated to each beat's dramatic weight and starts feeling stamped from an alternating template.`,
           suggestedFix: `Break the alternation by introducing a medium-length line (5–11 words) into the run, or by letting two short or two long lines sit back-to-back where the drama warrants. The short/long contrast lands hardest when it arrives unexpectedly; a stretch of strict alternation spends that contrast on a pattern the reader has already predicted. Vary the cadence so the compression and elaboration feel like responses to the action rather than steps in a metronomic swing.`,
+        });
+      }
+    }
+  }
+
+  {
+    // ACTION_LONG_SINGLE_SENTENCE — co-occurrence × long word count ≥12w × 1-sentence structure.
+    // ≥8 action lines, ≥4 long lines (≥12 words) exist, and >70% of those long lines have exactly
+    // one sentence-ending mark → fire. A long line without internal punctuation delivers a dense
+    // prose block in an unbroken clause — no subordinate aside, no mid-thought semicolon earns the
+    // line's length. Applied systematically to the script's most expansive lines this becomes a
+    // habit of blunt, unstructured density: wordcount without syntactic variety.
+    // Distinct from: SINGLE_SENTENCE_FLOOD (global proportion — ALL lines, not just long ones),
+    // SENTENCE_COUNT_PEAK (single-peak isolation × maximum sentence count, the high end of the
+    // sentence spectrum not the low end), ACTION_SENTENCE_AVERAGE_HIGH (average/aggregate across all
+    // lines, not co-occurrence with the long channel), LONGEST_ACTION_OUTLIER (single-peak isolation
+    // × word count, position-agnostic, not checking sentence structure), LONG_LINE_FLOOD (global
+    // proportion of long lines without examining sentence structure). First co-occurrence × long
+    // channel × 1-sentence check in this pass.
+    if (actionLines.length >= 8) {
+      const allLong582a = wordCounts.filter(w => w >= 12).length;
+      const longSingle582a = wordCounts.filter((w, i) => w >= 12 && countSentences(actionLines[i].text) === 1).length;
+      if (allLong582a >= 4 && longSingle582a / allLong582a > 0.70) {
+        issues.push({
+          location: `${longSingle582a} of ${allLong582a} long action lines (≥12 words) are single-sentence`,
+          rule: 'ACTION_LONG_SINGLE_SENTENCE',
+          severity: 'minor',
+          description: `${Math.round((longSingle582a / allLong582a) * 100)}% of the script's long action lines (≥12 words) consist of a single unbroken sentence. A line that runs twelve or more words without internal punctuation — no subordinate clause, no bracketed aside, no list rhythm — delivers a dense prose block without the structural depth that earns its length. Single-clause elaboration can work for a stark, declarative effect; applied systematically to the script's most expansive lines, it makes the descriptive register feel bluntly efficient rather than carefully shaped. The absence of multi-clause structure in the longest lines leaves the prose without the syntactic variety that turns wordcount into texture.`,
+          suggestedFix: `Add internal clause structure to some long lines — a comma-bracketed appositive, a participial phrase, or a semicolon mid-thought. This doesn't shorten the line; it gives the length a reason. The reader should feel the breath of a complex thought rather than a uniform information dump.`,
+        });
+      }
+    }
+  }
+
+  {
+    // ACTION_SHORTEST_OUTLIER — single-peak isolation × word count × floor valley (minimum).
+    // ≥8 action lines, avgWords > 5, the single shortest action line has ≤2 words AND ≤25% of
+    // avgWords → fire. When the average line is substantive (>5 words) and a single line
+    // contracts to two words or fewer — less than a quarter of the average — that line is a
+    // radically compressed point-of-shock outlier relative to the script's own register.
+    // The contrast ratio (≤25% of avg) ensures the check fires only when the gap is extreme,
+    // not merely when a short line appears in a moderate-length script.
+    // Distinct from: LONGEST_ACTION_OUTLIER (Wave 428: ceiling counterpart — the single longest
+    // line ≥25w AND ≥4× avg; this is the floor counterpart), CONSECUTIVE_SHORT_RUN (Wave 484:
+    // run-based — 5+ consecutive short lines, not a single isolated floor outlier), SHORT_LINE_
+    // POVERTY (Wave 291: scarcity — absence of ANY short lines across the whole script; this
+    // fires when ONE line is anomalously short), ACTION_WORD_COUNT_DESCENT_RUN (Wave 512:
+    // run-based × strictly decreasing sequence, not a floor outlier), MONOTONOUS_RHYTHM (variance
+    // test — orthogonal to the absolute floor value). First floor-valley counterpart to
+    // LONGEST_ACTION_OUTLIER in this pass.
+    if (actionLines.length >= 8 && avgWords > 5) {
+      const minW582b = Math.min(...wordCounts);
+      const minIdx582b = wordCounts.indexOf(minW582b);
+      if (minW582b <= 2 && minW582b <= avgWords * 0.25) {
+        const minLine582b = actionLines[minIdx582b].text.slice(0, 60);
+        issues.push({
+          location: `action line ${actionLines[minIdx582b].lineNum}: "${minLine582b}"`,
+          rule: 'ACTION_SHORTEST_OUTLIER',
+          severity: 'minor',
+          description: `The script's shortest action line has only ${minW582b} word${minW582b !== 1 ? 's' : ''} — less than ${Math.round((minW582b / avgWords) * 100)}% of the script's ${Math.round(avgWords)}-word average. In a prose context where the average action line runs ${Math.round(avgWords)} words, a line collapsing to ${minW582b} creates a radical discontinuity: a point-of-shock outlier that can land as a powerful, deliberate impact beat or as an under-written placeholder. The contrast ratio flags it as anomalously short relative to the script's own register. An extreme floor outlier draws attention proportional to the gap; it should be there because it earns that weight.`,
+          suggestedFix: `Read the ${minW582b}-word line in context. If it is a deliberate staccato impact beat — a single action that ends a sequence, a response to a blow — the brevity may be intentional. If it reads as a placeholder or an incomplete beat, expand it to carry the scene's weight. If the gap from the rest of the prose feels unearned, adding a clause or detail brings it into the script's register.`,
+        });
+      }
+    }
+  }
+
+  {
+    // ACTION_MEDIUM_OPENING_ABSENT — zone presence/absence × medium channel (5–11w) × opening zone.
+    // ≥12 action lines, ≥4 medium-length lines (5–11 words) in the non-opening portion, but the
+    // opening 25% of action lines contains none → fire. The medium register is the workhorse prose
+    // of screenplay action: neither the clipped impact beat (≤4w) nor the expansive description
+    // block (≥12w), it carries scene mechanics, character action, and environment in measured
+    // strokes. An opening zone void of this register — all short staccato or long descriptive
+    // blocks — starts the script at the rhythm extremes without the baseline mid-range that
+    // orients the audience. This fills the medium × opening-zone cell in the zone-absence grid.
+    // Distinct from: OPENING_SHORT_ABSENT (Wave 456: zone × opening × short ≤4w channel —
+    // different channel), OPENING_LONG_ABSENT (Wave 498: zone × opening × long ≥12w channel —
+    // different channel), ACTION_MIDDLE_SHORT_ABSENT / ACTION_MIDDLE_LONG_ABSENT (Waves 512/470:
+    // different zone: middle not opening), ACTION_FINALE_SHORT_ABSENT / ACTION_FINALE_LONG_ABSENT
+    // (Waves 484/526: different zone: finale not opening), ACTION_CONSECUTIVE_MEDIUM_RUN (Wave 540:
+    // run-based × medium channel, not zone-absence). First medium × opening-zone cell in this pass.
+    if (actionLines.length >= 12) {
+      const openEnd582c = Math.floor(actionLines.length / 4);
+      const openingMed582c = wordCounts.slice(0, openEnd582c).filter(w => w >= 5 && w <= 11).length;
+      const restMed582c = wordCounts.slice(openEnd582c).filter(w => w >= 5 && w <= 11).length;
+      if (openingMed582c === 0 && restMed582c >= 4) {
+        issues.push({
+          location: `opening 25% of action lines (first ${openEnd582c} of ${actionLines.length}): no medium-length lines (5–11 words)`,
+          rule: 'ACTION_MEDIUM_OPENING_ABSENT',
+          severity: 'minor',
+          description: `The opening 25% of action lines contains no medium-length line (5–11 words), while ${restMed582c} appear later in the script. The medium register — sentences neither clipped to a blunt beat nor expanded into a full descriptive block — is the workhorse prose that establishes scene mechanics, character action, and environment in measured strokes. An opening section that skips entirely to short staccato hits or long descriptive expansions starts the script at the rhythm extremes before the baseline is set. Its absence in the setup leaves the opening action either too punchy or too dense without the mid-range that grounds the dramatic world.`,
+          suggestedFix: `Look at the first ${openEnd582c} action lines. If they run to very short beats (≤4 words each) or to long descriptive passages (≥12 words), introduce at least one medium-length sentence (5–11 words) that establishes a concrete action, object, or spatial detail. The opening does not need to average medium length — just touch the register to calibrate the reader's ear for the prose that follows.`,
         });
       }
     }
