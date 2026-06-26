@@ -25833,6 +25833,196 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 578 — originalityPass: slug same-location run, action present-continuous flood, dialogue backstory opener flood', async () => {
+    const runO578 = async (fountain: string) => {
+      const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');
+      return originalityPass({
+        fountain, original: fountain, records: [],
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    it('SLUG_SAME_LOCATION_RUN fires when ≥5 consecutive sluglines share the same base location', async () => {
+      const fountain578a = `INT. LIVING ROOM - DAY
+
+Action here.
+
+INT. LIVING ROOM - NIGHT
+
+Action here.
+
+EXT. LIVING ROOM - DAY
+
+Action here.
+
+INT. LIVING ROOM - MORNING
+
+Action here.
+
+INT. LIVING ROOM - EVENING
+
+Action here.
+
+EXT. GARDEN - DAY
+
+Action here.
+
+INT. KITCHEN - DAY
+
+Action here.
+
+INT. BEDROOM - NIGHT
+
+Action here.`;
+      const res = await runO578(fountain578a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SLUG_SAME_LOCATION_RUN'), 'SLUG_SAME_LOCATION_RUN should fire');
+    });
+
+    it('SLUG_SAME_LOCATION_RUN does not fire when no location runs ≥5 consecutive scenes', async () => {
+      const fountain578anr = `INT. LIVING ROOM - DAY
+
+Action here.
+
+INT. KITCHEN - NIGHT
+
+Action here.
+
+INT. BEDROOM - DAY
+
+Action here.
+
+INT. OFFICE - MORNING
+
+Action here.
+
+INT. LIVING ROOM - NIGHT
+
+Action here.
+
+EXT. GARDEN - DAY
+
+Action here.
+
+INT. LIVING ROOM - DAY
+
+Action here.
+
+INT. KITCHEN - NIGHT
+
+Action here.`;
+      const res = await runO578(fountain578anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SLUG_SAME_LOCATION_RUN'), 'SLUG_SAME_LOCATION_RUN should not fire');
+    });
+
+    it('ACTION_PRESENT_CONTINUOUS_FLOOD fires when >25% of action lines use progressive aspect', async () => {
+      const fountain578b = `INT. TEST - DAY
+
+John is running across the field.
+Mary is watching from above.
+He is carrying the stolen goods.
+She is hiding in the corner.
+John stops.
+He turns.
+She moves.
+He grabs the case.
+She opens the door.
+He runs.`;
+      const res = await runO578(fountain578b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ACTION_PRESENT_CONTINUOUS_FLOOD'), 'ACTION_PRESENT_CONTINUOUS_FLOOD should fire');
+    });
+
+    it('ACTION_PRESENT_CONTINUOUS_FLOOD does not fire when ≤25% of action lines use progressive aspect', async () => {
+      const fountain578bnr = `INT. TEST - DAY
+
+John runs across the field.
+Mary watches from above.
+He is carrying the map.
+She is hiding.
+John stops.
+He turns.
+She moves.
+He grabs the case.
+She opens the door.
+He runs.`;
+      const res = await runO578(fountain578bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ACTION_PRESENT_CONTINUOUS_FLOOD'), 'ACTION_PRESENT_CONTINUOUS_FLOOD should not fire');
+    });
+
+    it('DIALOGUE_BACKSTORY_OPENER_FLOOD fires when >20% of dialogue lines open with a past-temporal anchor', async () => {
+      const fountain578c = `INT. TEST - DAY
+
+ALICE
+Years ago, I made a terrible mistake.
+
+BOB
+Back then, we had nothing to lose.
+
+ALICE
+When I was young, we all believed that.
+
+BOB
+What do you mean exactly?
+
+ALICE
+You know what I mean.
+
+BOB
+No I really don't.
+
+ALICE
+Stop playing games.
+
+BOB
+I am not playing games.
+
+ALICE
+Fine. Forget it.
+
+BOB
+As you wish.`;
+      const res = await runO578(fountain578c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_BACKSTORY_OPENER_FLOOD'), 'DIALOGUE_BACKSTORY_OPENER_FLOOD should fire');
+    });
+
+    it('DIALOGUE_BACKSTORY_OPENER_FLOOD does not fire when ≤20% of dialogue lines open with a past-temporal anchor', async () => {
+      const fountain578cnr = `INT. TEST - DAY
+
+ALICE
+We need to talk about this now.
+
+BOB
+What do you want from me?
+
+ALICE
+Years ago, I trusted you completely.
+
+BOB
+And I proved you right.
+
+ALICE
+Not anymore.
+
+BOB
+What changed?
+
+ALICE
+You changed.
+
+BOB
+That is not fair.
+
+ALICE
+Nothing about this is fair.
+
+BOB
+Fine. Walk away then.`;
+      const res = await runO578(fountain578cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_BACKSTORY_OPENER_FLOOD'), 'DIALOGUE_BACKSTORY_OPENER_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 564 — originalityPass: slug INT/EXT monotone, dialogue em-dash interruption flood, action polysyndeton flood', async () => {
     const runO564 = async (fountain: string) => {
       const { originalityPass } = await import('./server/nvm/revision/passes/originality.ts');

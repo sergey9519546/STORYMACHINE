@@ -146,6 +146,15 @@
 // characters communicate in fragments — one-word, two-word, or three-word utterances — without
 // substantive expression; distinct from ONE_WORD_LINE_DOMINANCE in dialogue.ts which uses a 35%
 // threshold for single-word lines, since this extends the threshold to ≤3 words at a 60% rate).
+// Wave 578 additions: slug same-location run (run-based × slug × consecutive same base location —
+// ≥8 sluglines, max consecutive identical base location run ≥5; distinct from LOCATION_REPETITION
+// [global proportion] and SLUG_INT_EXT_MONOTONE [interior/exterior register axis]), action present-
+// continuous flood (underweight/bloat × action prose × continuous-progressive aspect — ≥8 action
+// lines, >25% use "is/are/was/were + gerund"; distinct from PASSIVE_VERB_DOMINANCE [passive voice]
+// and COPULA_ACTION_DOMINANCE [linking-verb state predicates]), dialogue backstory opener flood
+// (underweight/bloat × dialogue × past-temporal exposition openers — ≥8 dialogue lines, >20%
+// open with "years ago"/"back then"/"when I was"/etc.; distinct from DIALOGUE_WISH_STATEMENT_FLOOD
+// [regret-counterfactual register] and DIALOGUE_FILLER_OPENER [non-temporal hedges]).
 // Wave 564 additions: slug INT/EXT monotone (distribution/monotony × scene heading × interior/
 // exterior register — ≥8 classifiable slugs, zero mixed INT/EXT slugs, dominant register >90%; the
 // story unfolds in one spatial mode; distinct from SCENE_SLUG_TIME_MONOTONE [time-of-day axis],
@@ -3457,6 +3466,135 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${polysyndetonCount564c} of ${actionTotal564c} action lines (${Math.round(polysyndetonCount564c / actionTotal564c * 100)}%) contain two or more standalone "and" conjunctions — stringing three or more actions into a single undifferentiated chain ("He grabs the bag and bolts for the door and throws it open"). Polysyndeton can create breathless momentum in a single charged beat, but when more than a fifth of all action lines chain clauses this way, it has stopped being a deliberate device and become the default sentence-assembly method. The result is action prose with no internal hierarchy: every beat carries equal weight because nothing is subordinated or broken out onto its own line. On screen each chained action is a separate shot or moment; collapsing them into one run-on sentence flattens the editing rhythm the prose should imply and buries the single action in the chain that actually matters.`,
         suggestedFix: `Break the chained lines apart. Give the action that matters its own sentence — often its own line — and cut or subordinate the connective tissue around it. "He grabs the bag and bolts for the door and throws it open and runs" becomes "He grabs the bag. Bolts for the door, throws it open — and runs." Reserve polysyndeton for the rare beat where the unbroken rush is the point. Varying clause length and structure restores the internal hierarchy that tells the reader (and the editor) which action is the beat and which are merely the lead-up.`,
+      });
+    }
+  }
+
+  // ── Wave 578: ─────────────────────────────────────────────────────────────
+
+  // SLUG_SAME_LOCATION_RUN — run-based × slug × consecutive same-location sequence.
+  // ≥8 total sluglines; extract base location (strip INT./EXT./INT\/EXT./I\/E. prefix and
+  // trailing time-of-day label separated by a dash: DAY, NIGHT, MORNING, EVENING, DUSK,
+  // DAWN, LATER, CONTINUOUS, SAME, etc.); track the longest consecutive run of the identical
+  // base location; fire if run ≥5.
+  // Cinema depends on spatial movement: each location transition is a cut in the story's
+  // geography. An unbroken stretch of five or more scenes in the same base arena — even across
+  // INT./EXT. variations or time-of-day changes — signals the story has stalled in one place,
+  // draining the feeling of journey and progress.
+  // Distinct from: LOCATION_REPETITION (Wave 273: counts total sluglines where one named location
+  // makes up >70% of all sluglines — global proportion across the whole script, not consecutive
+  // adjacency), SLUG_INT_EXT_MONOTONE (Wave 564: interior/exterior register axis, not the location
+  // name), CONTINUOUS_SLUG_OVERUSE (Wave 368: the CONTINUOUS time tag, not the location itself).
+  // First run-based check on consecutive same-location sequences in sluglines.
+  {
+    const slugLines578a: string[] = [];
+    for (const line of lines) {
+      const t = line.trim();
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) slugLines578a.push(t);
+    }
+    if (slugLines578a.length >= 8) {
+      const baseLoc578a = (slug: string) => slug
+        .replace(/^(INT\.\/EXT\.|I\/E\.|INT\.|EXT\.)\s*/i, '')
+        .replace(/\s*-+\s*(DAY|NIGHT|MORNING|EVENING|DUSK|DAWN|LATER|CONTINUOUS|SAME|MOMENTS LATER|DAY\/NIGHT|NIGHT\/DAY|EARLY MORNING|LATE NIGHT)\s*$/i, '')
+        .trim().toLowerCase();
+      let maxRun578a = 0;
+      let curRun578a = 0;
+      let prevLoc578a = '';
+      for (const slug of slugLines578a) {
+        const loc = baseLoc578a(slug);
+        if (loc === prevLoc578a) { curRun578a++; } else { curRun578a = 1; prevLoc578a = loc; }
+        if (curRun578a > maxRun578a) maxRun578a = curRun578a;
+      }
+      if (maxRun578a >= 5) {
+        issues.push({
+          location: `${maxRun578a} consecutive sluglines share the same base location`,
+          rule: 'SLUG_SAME_LOCATION_RUN',
+          severity: 'minor',
+          description: `The script runs ${maxRun578a} or more consecutive scene headings in the same base location — a stretch of action that never leaves one physical space, regardless of INT./EXT. variations or time-of-day changes. Cinematic grammar relies on location contrast: each location transition is a cut in the story's spatial map, a shift in atmosphere and possibility. An unbroken run of five-plus scenes in the same arena collapses that geography into a single static stage, making the film feel spatially locked-in. Even when dramatic intensity is high, the absence of spatial change dulls the sense of journey and removes one of cinema's most basic tools for marking progression — the cut to somewhere new.`,
+          suggestedFix: `Break the run by relocating at least one scene in the stretch to a different physical space — a corridor, a car, an exterior, a neighboring room. The new location need not be exotic; even a brief scene in a distinct space restores the sense of movement and gives the editor a spatial cut to work with. If the story genuinely demands an extended single-location stretch (a siege, a courtroom drama, a party), make that confinement intentional and visible: the claustrophobia itself should be a dramatic choice, not an artifact of staging convenience.`,
+        });
+      }
+    }
+  }
+
+  // ACTION_PRESENT_CONTINUOUS_FLOOD — underweight/bloat × action prose × continuous-progressive
+  // aspect. ≥8 action lines; >25% of them contain a continuous-progressive construction: a
+  // form of "be" (is, are, was, were) followed immediately by a gerund (word ending in -ing).
+  // The continuous progressive describes an ongoing background state rather than a completed,
+  // decisive action. In screenplay action prose, this aspect is the signature of mood-painting
+  // ("she is staring at the floor", "the crowd is moving in") versus event-snapping ("she stares",
+  // "the crowd moves"). When more than a quarter of all action lines default to the progressive,
+  // the prose reads as a diffuse ambient atmosphere rather than a sequence of discrete events.
+  // Distinct from: PASSIVE_VERB_DOMINANCE (Wave 438: "is seen"/"are found"/"can be heard" —
+  // passive voice; the grammatical subject is acted upon, agent absent or demoted; continuous
+  // progressive keeps the actor as subject and describes their ongoing action), COPULA_ACTION_
+  // DOMINANCE (Wave 259: "is"/"are"/"was"/"were" as linking verbs before adjective or noun
+  // predicates — "he is alone", "the room is dark"; predicate is a state description, not a
+  // gerund action), ACTION_ADVERB_FLOOD (Wave 424/550: manner adverbs — a different phenomenon).
+  // First check targeting continuous-progressive aspect in action prose.
+  {
+    let actionTotal578b = 0;
+    let progCount578b = 0;
+    let inDlg578b = false;
+    const PROG_PAT578b = /\b(is|are|was|were)\s+[a-z]+ing\b/i;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg578b = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg578b = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg578b = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (inDlg578b) continue;
+      actionTotal578b++;
+      if (PROG_PAT578b.test(t)) progCount578b++;
+    }
+    if (actionTotal578b >= 8 && progCount578b / actionTotal578b > 0.25) {
+      issues.push({
+        location: `${progCount578b} of ${actionTotal578b} action lines use continuous-progressive aspect`,
+        rule: 'ACTION_PRESENT_CONTINUOUS_FLOOD',
+        severity: 'minor',
+        description: `${progCount578b} of ${actionTotal578b} action lines (${Math.round(progCount578b / actionTotal578b * 100)}%) use a continuous-progressive construction — "is running," "are watching," "was climbing," "were waiting." The continuous progressive implies an ongoing background state rather than a completed, directed action. In screenplay action prose, simple present tense is the standard because it is instantaneous and decisive: "runs," "watches," "climbs." The progressive form describes what a character is doing as a condition rather than an event — mood-painting instead of event-sequencing. When more than a quarter of all action lines default to this aspect, the prose reads as a series of ambient states rather than a driven sequence: the story is something that is happening diffusely, not something that cuts into frame as purposeful action.`,
+        suggestedFix: `Replace progressive constructions with simple present tense: "is running" → "runs," "are watching" → "watch," "was climbing" → "climbed." Simple present is the screenplay convention for precisely this reason — it is immediate, decisive, and on-screen. Reserve the progressive for the rare lines where the ongoing-state reading genuinely serves the moment ("she is still sitting there when he finally arrives"), and let the rest snap into present tense. The rewrite typically also shortens lines and tightens visual rhythm.`,
+      });
+    }
+  }
+
+  // DIALOGUE_BACKSTORY_OPENER_FLOOD — underweight/bloat × dialogue × past-temporal exposition
+  // openers. ≥8 dialogue lines; >20% of them open with a past-temporal backstory anchor phrase:
+  // "Years ago,", "Back then,", "Before you", "When I was", "Back when", "In those days", etc.
+  // These openers are the grammatical signature of delivered backstory — a character pauses the
+  // present drama to report an event from the past. Used occasionally they are legitimate
+  // exposition; when more than a fifth of all dialogue lines open this way, the script runs its
+  // emotional work through retrospective narration rather than present conflict.
+  // Distinct from: DIALOGUE_WISH_STATEMENT_FLOOD (Wave 508: "used to / I wish / if only / should
+  // have" — backward-looking regret and counterfactual register; the orientation is wishing and
+  // mourning loss, not reporting events; backstory openers report events factually by anchoring
+  // them at a specific past time), PRESENT_PERFECT_FLOOD (past-tense verbs broadly across any
+  // sentence position — not tied to line-opening temporal anchors that explicitly mark a jump to
+  // the past), DIALOGUE_FILLER_OPENER (Wave 452: "Well,/Look,/Listen," — non-temporal hedges that
+  // stall the start of a line but carry no time-placement content). First check targeting past-
+  // temporal backstory openers at the start of dialogue lines.
+  {
+    let dlgTotal578c = 0;
+    let backstoryCount578c = 0;
+    let inDlg578c = false;
+    const BACKSTORY_PAT578c = /^(years?\s+ago\b|back\s+(then|when)\b|before\s+(you|we|i|he|she|they|the|all)\b|when\s+(i|you|he|she|we|they|it)\s+(was|were|had|could|would)\b|in\s+those\s+days\b|back\s+in\s+those\b|once\s+upon\s+a\b|a\s+long\s+time\s+ago\b|those\s+days\b|those\s+were\b)/i;
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) { inDlg578c = false; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { inDlg578c = false; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) { inDlg578c = true; continue; }
+      if (t.startsWith('(')) continue;
+      if (!inDlg578c) continue;
+      dlgTotal578c++;
+      if (BACKSTORY_PAT578c.test(t)) backstoryCount578c++;
+    }
+    if (dlgTotal578c >= 8 && backstoryCount578c / dlgTotal578c > 0.20) {
+      issues.push({
+        location: `${backstoryCount578c} of ${dlgTotal578c} dialogue lines open with a past-temporal backstory anchor`,
+        rule: 'DIALOGUE_BACKSTORY_OPENER_FLOOD',
+        severity: 'minor',
+        description: `${backstoryCount578c} of ${dlgTotal578c} dialogue lines (${Math.round(backstoryCount578c / dlgTotal578c * 100)}%) open with a past-temporal backstory anchor — "Years ago," "Back then," "Before you," "When I was," and similar phrases that pause the present drama to deliver a report from the past. Used occasionally, these openers legitimately ground a character's behavior in their history. When more than a fifth of all dialogue lines begin this way, the script has organized its emotional work around retrospective narration rather than present conflict: characters speak in the past tense about events the audience cannot see, while the drama actually happening in the scene plays out in summary. The audience watches characters recall rather than act.`,
+        suggestedFix: `Find the backstory moments that are doing the most dramatic work and dramatize them as scenes: show the event rather than having a character report it. For remaining backstory dialogue, test whether the temporal anchor is necessary — often "Years ago, I made a mistake" can be trimmed to "I made a mistake" because the past-ness is understood. Reserve explicit temporal backstory openers for the single defining formative moment that must be named aloud, then trust the present conflict to carry the drama. What characters do now, in front of the audience, is always more dramatic than what they remember.`,
       });
     }
   }
