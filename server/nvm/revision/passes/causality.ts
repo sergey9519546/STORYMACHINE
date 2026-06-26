@@ -161,6 +161,21 @@
 // resolution arrives without felt emotional engagement; the emotional complement of CLOCK_FINAL_THIRD_
 // ABSENT; distinct from EMOTIONAL_ZONE_CLUSTER which flags concentration and EMOTIONAL_NEUTRAL_RUN
 // which is run-based).
+// Wave 587 additions: dramatic-turn suspense aftermath void (sequence/aftermath × dramatic-turn →
+// suspense aftermath — n≥8, ≥2 qualifying dramatic-turn scenes [pos<n-1], ≥2 suspense-rise scenes
+// globally, no dramatic turn immediately followed by a suspense rise; distinct from DRAMATIC_TURN_
+// AFTERMATH_VOID [conjunction of emotion AND suspense AND relationship over 2-scene window per
+// scene], DRAMATIC_TURN_NO_SUSPENSE [co-occurrence × same scene], and CLOCK_RAISE_NO_SUSPENSE
+// [clock trigger]), clock curiosity aftermath void (sequence/aftermath × clock-raised → curiosity
+// aftermath — n≥8, ≥2 qualifying clock-raised scenes [pos<n-1], ≥2 curiosity-spike scenes
+// globally, no clock raise immediately followed by a curiosity spike; distinct from CLOCK_RAISE_
+// CURIOSITY_VOID [co-occurrence × same scene], CLOCK_RAISE_NO_SUSPENSE [suspense not curiosity,
+// co-occurrence], and PAYOFF_AFTERMATH_CURIOSITY_VOID [different trigger]), payoff closing-third
+// absent (zone presence/absence × payoff × closing third — n≥9, ≥3 payoff scenes globally, 0
+// in the closing third [pos ≥ floor(2n/3)]; the story exhausts its thread resolutions before the
+// climactic zone; distinct from PAYOFF_ZONE_CLUSTER [distribution/timing — >75% in ONE third],
+// PAYOFF_BACK_LOADED [fires when all payoffs are in the second half, not closing-third absence],
+// RELATIONSHIP_OPENING_THIRD_ABSENT [opposite structural position and different signal]).
 // Wave 573 additions: relationship opening third absent (zone presence/absence × relationship ×
 // opening third — n≥9, ≥3 relationship-shift scenes globally, 0 in the opening third
 // [pos < floor(n/3)]; the story's first act is entirely devoid of relationship movement;
@@ -3369,6 +3384,114 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `${curiPositions573c.length} curiosity-spike scenes (curiosityDelta > 0) are heavily concentrated in the ${zoneNameCuri} third of the script (${maxZCuri} of ${curiPositions573c.length}, ${Math.round(maxZCuri / curiPositions573c.length * 100)}%). The other two structural thirds are nearly mystery-free. The curiosity channel works best when questions are opened and sustained throughout all three acts: early mystery hooks the audience, middle questions deepen engagement, and late questions maintain tension through the resolution. When one zone carries more than three-quarters of all curiosity spikes, the story concentrates its mystery engagement in one section while the others are question-quiet — the audience's investigative interest peaks and then falls flat rather than evolving steadily through the story's arc.`,
             suggestedFix: `Redistribute curiosity spikes so that each structural third contains at least one scene where a new question is opened or an existing question deepens (positive curiosityDelta). Move some of the ${zoneNameCuri}-third mystery beats to the underweight thirds, or add new question-generating moments in the zones that currently carry little to no mystery engagement. Sustained curiosity across all three acts keeps the audience engaged throughout.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 587: DRAMATIC_TURN_SUSPENSE_AFTERMATH_VOID, CLOCK_CURIOSITY_AFTERMATH_VOID,
+  //              PAYOFF_CLOSING_THIRD_ABSENT ────────────────────────────────────────────────────────
+  {
+    // DRAMATIC_TURN_SUSPENSE_AFTERMATH_VOID (sequence/aftermath × dramatic-turn → suspense aftermath,
+    // n≥8, ≥2 qualifying dramatic-turn scenes [pos<n-1], ≥2 suspense-rise scenes globally, no
+    // dramatic turn immediately followed by a suspense rise): Every narrative pivot passes without
+    // tension building in the immediately following scene. A dramatic turn signals a change in the
+    // story's direction — a reversal, recognition, or twist — and the scene right after is the most
+    // natural home for suspense to rise as the new situation's danger becomes apparent. When no turn
+    // is ever followed by a suspense rise in its immediate wake, pivots never translate into pressure:
+    // the story changes course but the audience never feels the danger of the new direction. Sequence/
+    // aftermath mode × dramatic-turn trigger × suspense channel. Distinct from DRAMATIC_TURN_AFTERMATH_
+    // VOID (Wave 310: per-scene conjunction of emotion AND suspense AND relationship over a 2-scene
+    // window — fires on any turn whose entire 2-scene wake is inert across all three channels; this
+    // checks an aggregate property across all turns over 1 scene, suspense only, fires even when other
+    // channels are active in the aftermath), DRAMATIC_TURN_NO_SUSPENSE (Wave 377: co-occurrence ×
+    // same scene — checks suspenseDelta of the turn scene itself, not the following scene), and CLOCK_
+    // RAISE_NO_SUSPENSE (Wave 377: clock trigger instead of dramatic turn).
+    if (records.length >= 8) {
+      const qualTurn587a = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) =>
+          (r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '' && pos < records.length - 1
+        );
+      const suspRiseScenes587a = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 0);
+      if (qualTurn587a.length >= 2 && suspRiseScenes587a.length >= 2) {
+        const anySuspAftermath587a = qualTurn587a.some(
+          ({ pos }) => ((records as any[])[pos + 1].suspenseDelta ?? 0) > 0
+        );
+        if (!anySuspAftermath587a) {
+          issues.push({
+            location: `${qualTurn587a.length} dramatic-turn scene(s) — none immediately followed by a suspense rise`,
+            rule: 'DRAMATIC_TURN_SUSPENSE_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `The script has ${qualTurn587a.length} qualifying dramatic-turn scenes and ${suspRiseScenes587a.length} scenes with a suspense rise, but no dramatic turn is immediately followed by a scene with rising tension. A narrative pivot signals that the story's direction has changed — and the scene right after is the most natural place for suspense to build as the new situation's danger becomes apparent. When no turn is ever followed by a suspense rise in its immediate wake, the pivots never translate into felt pressure: the story changes course, but the audience never experiences the danger of the new direction settling in.`,
+            suggestedFix: `After at least one dramatic turn, let the immediately following scene carry a positive suspenseDelta — rising tension as the consequences of the pivot become clear. The suspense rise need not be caused by the turn itself; its proximity is enough to let the reversal feel like it raised the stakes and tightened the screw.`,
+          });
+        }
+      }
+    }
+
+    // CLOCK_CURIOSITY_AFTERMATH_VOID (sequence/aftermath × clock-raised → curiosity aftermath, n≥8,
+    // ≥2 qualifying clock-raised scenes [pos<n-1], ≥2 curiosity-spike scenes globally, no clock
+    // raise immediately followed by a curiosity spike): Every deadline the story introduces passes
+    // without the scene immediately after generating new questions. A raised clock establishes urgency
+    // — but urgency and curiosity are distinct engines: the deadline tells the audience WHEN, while
+    // curiosity tells them WHAT and WHY. When no clock raise is ever followed by a curiosity spike
+    // in the next scene, the deadline layer and the mystery layer are temporally decoupled: the story
+    // introduces time pressure but never lets that pressure open new questions for the audience to
+    // pursue. Sequence/aftermath mode × clock trigger × curiosity channel. Distinct from CLOCK_RAISE_
+    // CURIOSITY_VOID (co-occurrence × same scene — checks curiosityDelta of the clock-raise scene
+    // itself, not the following scene), CLOCK_RAISE_NO_SUSPENSE (Wave 377: suspense not curiosity,
+    // co-occurrence same scene), and PAYOFF_AFTERMATH_CURIOSITY_VOID (Wave 545: payoff trigger, not
+    // clock).
+    if (records.length >= 8) {
+      const qualClock587b = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) => r.clockRaised === true && pos < records.length - 1);
+      const curiSpikeScenes587b = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0);
+      if (qualClock587b.length >= 2 && curiSpikeScenes587b.length >= 2) {
+        const anyCuriAftermath587b = qualClock587b.some(
+          ({ pos }) => ((records as any[])[pos + 1].curiosityDelta ?? 0) > 0
+        );
+        if (!anyCuriAftermath587b) {
+          issues.push({
+            location: `${qualClock587b.length} clock-raise scene(s) — none immediately followed by a curiosity spike`,
+            rule: 'CLOCK_CURIOSITY_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `The script has ${qualClock587b.length} qualifying clock-raise scenes and ${curiSpikeScenes587b.length} curiosity-spike scenes, but no raised deadline is immediately followed by a scene in which new questions emerge. A clock establishes urgency: it tells the audience when the protagonist must succeed. But urgency and curiosity are distinct narrative engines — the deadline says WHEN, while curiosity drives WHAT and WHY. When no clock raise is ever followed by a curiosity spike in the next scene, the deadline layer and the mystery layer are temporally decoupled: the story introduces time pressure but never lets that pressure open new questions, so deadlines feel mechanical rather than generative.`,
+            suggestedFix: `After at least one clock raise, let the immediately following scene generate new questions — a discovery prompted by the deadline, a consequence that opens new unknowns, or a revelation that the ticking clock makes more urgent. The curiosity spike need not be caused by the deadline; its proximity lets the clock feel like it revealed something as well as pressured something.`,
+          });
+        }
+      }
+    }
+
+    // PAYOFF_CLOSING_THIRD_ABSENT (zone presence/absence × payoff × closing third, n≥9, ≥3 payoff
+    // scenes globally, 0 in the closing third [pos ≥ floor(2n/3)]): The story has sufficient planted
+    // promises but exhausts them all before the climactic zone — the closing third, where the audience
+    // expects the accumulated setups to resolve, is entirely void of payoffs. Planted threads that
+    // close before the final third leave the climax without the satisfaction of resolution landing at
+    // the moment of highest consequence; the audience arrives at the story's most important act with
+    // nothing left to cash out. Zone presence/absence mode × payoff channel × closing-third position.
+    // Distinct from PAYOFF_ZONE_CLUSTER (distribution/timing — fires when >75% of payoffs cluster in
+    // ONE third; 0% in closing does not trigger it if payoffs spread between the other two thirds),
+    // PAYOFF_BACK_LOADED (Wave 268: fires when ALL payoffs are in the second half — the OPPOSITE
+    // direction, and uses a half-boundary not a third), and RELATIONSHIP_OPENING_THIRD_ABSENT (Wave
+    // 573: relationship not payoff, opening-third position not closing).
+    if (records.length >= 9) {
+      const payoffPositions587c = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r }) => ((r.payoffSetupIds ?? []) as string[]).length > 0)
+        .map(({ pos }) => pos);
+      if (payoffPositions587c.length >= 3) {
+        const closingStart587c = Math.floor((2 * records.length) / 3);
+        const inClosing587c = payoffPositions587c.some(pos => pos >= closingStart587c);
+        if (!inClosing587c) {
+          issues.push({
+            location: `${payoffPositions587c.length} payoff scene(s) — none in the closing third (scenes ${closingStart587c}–${records.length - 1})`,
+            rule: 'PAYOFF_CLOSING_THIRD_ABSENT',
+            severity: 'minor',
+            description: `The script has ${payoffPositions587c.length} payoff scenes, none of them occurring in the closing third (scenes ${closingStart587c}–${records.length - 1}). All planted promises are resolved before the climactic zone — the final third, where the audience expects the accumulated threads to land, is entirely void of payoffs. The closing third is where setups are meant to pay off at the moment of highest consequence: a planted promise resolving during the climax carries the weight of everything that came before it. When all payoffs arrive in the opening and middle sections, the closing act is left without the satisfaction of resolution — the story's final movement has nothing left to deliver.`,
+            suggestedFix: `Reserve at least one payoff for the closing third (scenes ${closingStart587c}–${records.length - 1}) — a planted promise that resolves at or near the climax. Moving an earlier payoff later, or holding a setup's resolution until the final act, ensures that the story's highest-consequence moment is also its most satisfying in terms of planted-thread delivery.`,
           });
         }
       }

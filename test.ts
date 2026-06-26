@@ -36704,6 +36704,94 @@ Maybe later then okay.`;
     });
   });
 
+  describe('Wave 587 — causalityPass: dramatic-turn suspense aftermath void, clock curiosity aftermath void, payoff closing-third absent', async () => {
+    const makeRec587 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const runCA587 = async (records: any[]) => {
+      const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // DRAMATIC_TURN_SUSPENSE_AFTERMATH_VOID fire:
+    // 10 scenes; dramatic turns at 0,3 (pos<9); suspense rises at 6,8 (not at 1,4) → fires
+    it('DRAMATIC_TURN_SUSPENSE_AFTERMATH_VOID fires when no dramatic turn is followed by a suspense rise', async () => {
+      const recs587a = Array.from({ length: 10 }, (_, i) =>
+        makeRec587(i, {
+          dramaticTurn: i === 0 || i === 3 ? 'reversal' : 'nothing',
+          suspenseDelta: i === 6 || i === 8 ? 1 : 0,
+        })
+      );
+      const res = await runCA587(recs587a);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'DRAMATIC_TURN_SUSPENSE_AFTERMATH_VOID'), 'DRAMATIC_TURN_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    // DRAMATIC_TURN_SUSPENSE_AFTERMATH_VOID no-fire:
+    // suspense rise at 1 (aftermath of dramatic turn at 0) → does not fire
+    it('DRAMATIC_TURN_SUSPENSE_AFTERMATH_VOID does not fire when a dramatic turn is followed by a suspense rise', async () => {
+      const recs587an = Array.from({ length: 10 }, (_, i) =>
+        makeRec587(i, {
+          dramaticTurn: i === 0 || i === 3 ? 'reversal' : 'nothing',
+          suspenseDelta: i === 1 || i === 7 ? 1 : 0,
+        })
+      );
+      const res = await runCA587(recs587an);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'DRAMATIC_TURN_SUSPENSE_AFTERMATH_VOID'), 'DRAMATIC_TURN_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    // CLOCK_CURIOSITY_AFTERMATH_VOID fire:
+    // 10 scenes; clocks raised at 0,3 (pos<9); curiosity spikes at 6,8 (not at 1,4) → fires
+    it('CLOCK_CURIOSITY_AFTERMATH_VOID fires when no clock raise is followed by a curiosity spike', async () => {
+      const recs587b = Array.from({ length: 10 }, (_, i) =>
+        makeRec587(i, {
+          clockRaised: i === 0 || i === 3,
+          curiosityDelta: i === 6 || i === 8 ? 1 : 0,
+        })
+      );
+      const res = await runCA587(recs587b);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'CLOCK_CURIOSITY_AFTERMATH_VOID'), 'CLOCK_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    // CLOCK_CURIOSITY_AFTERMATH_VOID no-fire:
+    // curiosity spike at 1 (aftermath of clock at 0) → does not fire
+    it('CLOCK_CURIOSITY_AFTERMATH_VOID does not fire when a clock raise is followed by a curiosity spike', async () => {
+      const recs587bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec587(i, {
+          clockRaised: i === 0 || i === 3,
+          curiosityDelta: i === 1 || i === 7 ? 1 : 0,
+        })
+      );
+      const res = await runCA587(recs587bn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'CLOCK_CURIOSITY_AFTERMATH_VOID'), 'CLOCK_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    // PAYOFF_CLOSING_THIRD_ABSENT fire:
+    // 9 scenes; payoffs at 0,2,4 (all in opening/middle thirds, none at pos≥6) → fires
+    it('PAYOFF_CLOSING_THIRD_ABSENT fires when payoffs exist but none are in the closing third', async () => {
+      const recs587c = Array.from({ length: 9 }, (_, i) =>
+        makeRec587(i, { payoffSetupIds: i === 0 || i === 2 || i === 4 ? ['t-A'] : [] })
+      );
+      const res = await runCA587(recs587c);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'PAYOFF_CLOSING_THIRD_ABSENT'), 'PAYOFF_CLOSING_THIRD_ABSENT should fire');
+    });
+
+    // PAYOFF_CLOSING_THIRD_ABSENT no-fire:
+    // payoff at 7 (closing third: pos≥6 in 9 scenes) → does not fire
+    it('PAYOFF_CLOSING_THIRD_ABSENT does not fire when a payoff appears in the closing third', async () => {
+      const recs587cn = Array.from({ length: 9 }, (_, i) =>
+        makeRec587(i, { payoffSetupIds: i === 0 || i === 2 || i === 7 ? ['t-A'] : [] })
+      );
+      const res = await runCA587(recs587cn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'PAYOFF_CLOSING_THIRD_ABSENT'), 'PAYOFF_CLOSING_THIRD_ABSENT should not fire');
+    });
+  });
+
   describe('Wave 573 — causalityPass: relationship opening third absent, suspense temporal cluster, curiosity temporal cluster', async () => {
     const makeRec573 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
