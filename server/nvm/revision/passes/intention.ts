@@ -141,6 +141,21 @@
 // turn, or suspense rise in itself or the prior scene; revelation-channel parallel of SEED_CAUSE_VOID;
 // distinct from PROACTIVE_REVELATION_ABSENT [aftermath: proactive → revelation downstream] and from
 // PAYOFF_PEAK_UNCAUSED [backward-cause × peak payoff]).
+// Wave 577 additions: seed zone cluster (distribution/timing × seed × structural thirds — n≥9,
+// ≥3 seed scenes, >75% in one third; clue-planting ghettoized into one zone; finer-grained than
+// SEED_FRONT_LOADED [binary half-partition]; distinct from SEED_MIDPOINT_VOID [zone-absence at
+// midpoint not concentration in any third], SEED_PEAK_UNCAUSED [backward-cause × seed peak]),
+// clock revelation aftermath void (sequence/aftermath × clock → revelation aftermath — n≥8, ≥2
+// qualifying clockRaised scenes [pos<n-1], ≥2 revelation scenes globally, every clock scene
+// followed by 2 scenes with no revelation; deadline escalations never surface hidden truths in
+// their wake; the clock-trigger complement of REVELATION_CLOCK_AFTERMATH_VOID [revelation trigger
+// → clock aftermath; this reverses the causal direction]; distinct from PROACTIVE_CLOCK_AFTERMATH_
+// ABSENT [different aftermath channel]), seed curiosity decoupled (co-occurrence/decoupling × seed
+// × curiosity — n≥8, ≥2 seed scenes, ≥2 curiosity-positive scenes, zero overlap; every seed scene
+// has curiosityDelta ≤ 0 while curiosity rises elsewhere; clue-planting never raises wonder in the
+// same scene; first co-occurrence check pairing the seed channel with curiosityDelta in this pass,
+// distinct from PAYOFF_EMOTION_DECOUPLED [payoff not seed channel] and REVELATION_CLOCK_AFTERMATH_
+// VOID [aftermath mode not co-occurrence × same scene]).
 // Wave 563 additions: revelation drought run (run-based × revelation absence — n≥10, ≥2 revelation
 // scenes, longest consecutive run of non-revelation scenes ≥6; the disclosure engine goes dark for
 // an extended local stretch; the ABSENCE complement of REVELATION_RUN [presence run], distinct from
@@ -3171,6 +3186,127 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `Every one of the story's ${revRecs563c.length} revelation scenes is followed by two scenes in which no clock is raised, even though the story raises a clock in ${clockCount563c} scene(s) elsewhere. A revelation is a natural trigger for new urgency — the audience learns a threat is closer than believed, discovers a deadline was moved up, or realizes the window to act is narrower than assumed. When every disclosure's aftermath is clock-free, the disclosure engine and the urgency engine never feed each other: truths surface in one part of the story and deadlines tighten in another, and the escalating pressure a revelation could generate is left untapped. The story discloses and pressures in entirely separate moments, so the audience never feels a truth immediately raise the stakes.`,
             suggestedFix: `After at least one revelation, let the next scene or two raise a clock that the disclosure makes urgent: the truth surfaced reveals the deadline is closer, the discovery exposes a new time-limited threat, or the answer makes clear that the protagonist must act before a window closes. A revelation that immediately tightens the clock does double work — it advances understanding AND escalates pressure — where a disclosure that lands without any urgency in its wake lets the story's tension dissipate at the moment the audience is most engaged.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 577: SEED_ZONE_CLUSTER, CLOCK_REVELATION_AFTERMATH_VOID,
+  //              SEED_CURIOSITY_DECOUPLED ────────────────────────────────────────────────────────
+  {
+    // SEED_ZONE_CLUSTER (distribution/timing × seed × structural thirds, n≥9, ≥3 seed scenes
+    // [seededClueIds non-empty], >75% of them fall in a single structural third): The story's
+    // clue-planting is concentrated in one structural zone — foreshadowing is not woven through
+    // the story's full arc but deposited almost entirely in one section while the other two-thirds
+    // are nearly promise-free. A thirds-based seed cluster is finer-grained than the binary
+    // SEED_FRONT_LOADED check: a script can distribute seeds evenly across the two halves and
+    // still concentrate three-quarters in, say, the opening third, leaving the middle and closing
+    // sections without new planted threads. When seeds cluster, the story invests in its future
+    // in one concentrated burst and then coasts on that investment — the audience's sense of
+    // forward-looking tension (built from planted clues awaiting payoff) peaks early and then
+    // fades rather than refreshing across the arc. Distribution/timing mode × seed channel ×
+    // structural thirds. Distinct from SEED_FRONT_LOADED (Wave 521: >70% in first HALF — binary
+    // partition, not thirds; can miss a middle-third cluster), SEED_MIDPOINT_VOID (zone × specific
+    // midpoint zone — absence not concentration), SEED_PEAK_UNCAUSED (backward-cause × seed peak).
+    if (records.length >= 9) {
+      const seedPos577a = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r }) => ((r.seededClueIds ?? []) as string[]).length > 0)
+        .map(({ pos }) => pos);
+      if (seedPos577a.length >= 3) {
+        const third577a = Math.floor(records.length / 3);
+        const z1Seed577a = seedPos577a.filter(p => p < third577a).length;
+        const z3Seed577a = seedPos577a.filter(p => p >= 2 * third577a).length;
+        const z2Seed577a = seedPos577a.length - z1Seed577a - z3Seed577a;
+        const maxZSeed577a = Math.max(z1Seed577a, z2Seed577a, z3Seed577a);
+        if (maxZSeed577a / seedPos577a.length > 0.75) {
+          const zoneName577a = z1Seed577a === maxZSeed577a ? 'opening' : z3Seed577a === maxZSeed577a ? 'closing' : 'middle';
+          issues.push({
+            location: `seed scenes: ${z1Seed577a} opening / ${z2Seed577a} middle / ${z3Seed577a} closing third — ${Math.round(maxZSeed577a / seedPos577a.length * 100)}% in the ${zoneName577a} third`,
+            rule: 'SEED_ZONE_CLUSTER',
+            severity: 'minor',
+            description: `${Math.round(maxZSeed577a / seedPos577a.length * 100)}% of the story's ${seedPos577a.length} seed scenes are concentrated in the ${zoneName577a} structural third, leaving the other two-thirds nearly clue-free. Foreshadowing is not woven across the story's arc but deposited in one zone and then left unreplaced. When seeds cluster, the story makes its promises in a concentrated burst — establishing the threads that will later pay off — and then plants no new promises across the other sections. The audience's sense of forward-looking tension (built from planted clues awaiting resolution) peaks in the ${zoneName577a} third and fades as the story moves into sections where no new threads are being laid. A well-seeded story refreshes its forward-tension regularly, ensuring the audience always has recently planted promises still outstanding.`,
+            suggestedFix: `Redistribute some of the ${zoneName577a} third's seed scenes into the other two structural zones so that new clues are planted across the full arc. Each zone can carry its own foreshadowing: an early seed that establishes the thread, a middle seed that deepens it or adds a new layer, and a late seed that opens one final promise before the resolution closes the loop. Spreading foreshadowing across the thirds ensures the audience always has recently planted promises — and the forward momentum they generate — available regardless of where in the story they are.`,
+          });
+        }
+      }
+    }
+
+    // CLOCK_REVELATION_AFTERMATH_VOID (sequence/aftermath × clock trigger → revelation aftermath,
+    // n≥8, ≥2 qualifying clockRaised scenes [not at last position], ≥2 revelation scenes globally,
+    // none of the qualifying clock scenes is followed by a revelation scene within 2 scenes): The
+    // story's deadline escalations never surface hidden truths in their immediate wake — every moment
+    // a clock is raised passes into a revelation-free aftermath. Deadlines are most productive when
+    // they generate pressure that forces disclosures: the protagonist under time constraint is pushed
+    // into confrontations that expose what was hidden, is forced to make decisions that require
+    // revealing what they know, or encounters others who disclose in the urgency of the countdown.
+    // When every clock raise is followed by a revelation-free stretch, urgency and disclosure operate
+    // as separate systems: time pressures are created in one part of the story, hidden truths surface
+    // in another, and the two never feed each other. This is the clock-trigger complement of
+    // REVELATION_CLOCK_AFTERMATH_VOID (Wave 563: revelation → clock; this checks clock → revelation).
+    // Sequence/aftermath mode × clock trigger × revelation aftermath. Distinct from REVELATION_CLOCK_
+    // AFTERMATH_VOID (Wave 563: revelation trigger → clock aftermath — reverse causal direction),
+    // PROACTIVE_CLOCK_AFTERMATH_ABSENT (different aftermath output), REVELATION_CAUSE_VOID (backward-
+    // cause × revelation cause — looks at what PRECEDES revelation, not what FOLLOWS a clock).
+    if (records.length >= 8) {
+      const qualClocks577b = (records as any[])
+        .map((r, pos) => ({ r, pos }))
+        .filter(({ r, pos }) => r.clockRaised === true && pos < records.length - 1);
+      const revealScenes577b = (records as any[]).filter(
+        r => r.revelation !== null && r.revelation !== undefined && r.revelation !== '',
+      );
+      if (qualClocks577b.length >= 2 && revealScenes577b.length >= 2) {
+        const anyClockFollowedByReveal577b = qualClocks577b.some(({ pos }) => {
+          for (let off = 1; off <= 2; off++) {
+            const next = (records as any[])[pos + off];
+            if (!next) continue;
+            if (next.revelation !== null && next.revelation !== undefined && next.revelation !== '') return true;
+          }
+          return false;
+        });
+        if (!anyClockFollowedByReveal577b) {
+          issues.push({
+            location: `${qualClocks577b.length} clock-raise scene(s) — none followed by a revelation within 2 scenes`,
+            rule: 'CLOCK_REVELATION_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `None of the story's ${qualClocks577b.length} clock-raise scenes is followed by a revelation within the next two scenes, even though ${revealScenes577b.length} disclosure moments exist elsewhere. Deadlines are most productive when they generate pressure that forces hidden truths into the open: the protagonist under time constraint is pushed into confrontations that expose what was concealed, forced to make decisions that require disclosing what they know, or encounters others who speak in the urgency of the countdown. When every clock raise passes into a revelation-free aftermath, urgency and disclosure operate as separate systems — time pressure is created in one part of the story, hidden truths surface in another, and the two never feed each other. The deadline mechanism never forces the epistemic layer to move.`,
+            suggestedFix: `After at least one clock raise, let the next scene or two carry a revelation that the deadline pressure forces into the open — the urgency of the countdown exposing what had been hidden, the time constraint forcing the protagonist into a confrontation where the truth must surface, or the pressure of the clock pushing another character to disclose. A deadline that forces disclosure does double work: it escalates pressure AND advances the audience's understanding, where a deadline that only drives action without generating any new knowledge leaves the story's informational layer decoupled from its urgency layer.`,
+          });
+        }
+      }
+    }
+
+    // SEED_CURIOSITY_DECOUPLED (co-occurrence/decoupling × seed × curiosity, n≥8, ≥2 seed scenes
+    // [seededClueIds non-empty], ≥2 curiosity-positive scenes [curiosityDelta > 0], zero overlap):
+    // Every scene that plants a clue is simultaneously curiosity-flat, while the story raises
+    // curiosity in scenes where no clue is being planted. Seeds and wonder operate as separate
+    // channels that never meet: foreshadowing is embedded without the scene generating any felt
+    // mystery, and the questions the audience experiences are never rooted in a planted clue.
+    // A seed that also raises curiosity is the ideal combination: the planted detail generates
+    // its own wonder in the moment (the audience feels something strange or significant without
+    // knowing what), and that curiosity sustains their investment in the future payoff. When the
+    // seed channel and the curiosity channel are fully decoupled in the same scene, seeds are
+    // procedurally embedded without any felt mystery, and wonder comes from non-seed sources that
+    // don't have a planted thread behind them. Co-occurrence/decoupling mode × seed channel ×
+    // curiosityDelta. Distinct from REVELATION_CURIOSITY_DECOUPLED (different trigger channel —
+    // revelation not seed), PAYOFF_EMOTION_DECOUPLED (Wave 521: payoff not seed, emotion not
+    // curiosity), SEED_ZONE_CLUSTER (distribution mode — not co-occurrence within the same scene),
+    // SEED_PEAK_UNCAUSED (backward-cause × seed peak — different mode and window).
+    if (records.length >= 8) {
+      const seedRecs577c = (records as any[]).filter(
+        r => ((r.seededClueIds ?? []) as string[]).length > 0,
+      );
+      const curiScenes577c = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0);
+      if (seedRecs577c.length >= 2 && curiScenes577c.length >= 2) {
+        const anySeedWithCuri577c = seedRecs577c.some(r => (r.curiosityDelta ?? 0) > 0);
+        if (!anySeedWithCuri577c) {
+          issues.push({
+            location: `${seedRecs577c.length} seed scene(s) — none with a positive curiosityDelta`,
+            rule: 'SEED_CURIOSITY_DECOUPLED',
+            severity: 'minor',
+            description: `Every one of the story's ${seedRecs577c.length} seed scenes has a curiosityDelta ≤ 0, while the story raises curiosity in ${curiScenes577c.length} scene(s) where no clue is being planted. Seeds and wonder operate as completely separate channels: foreshadowing is embedded without the scene generating any felt mystery, and the questions the audience experiences are never rooted in a planted clue. A seed that also raises curiosity is the ideal combination — the planted detail generates its own wonder in the moment, and that curiosity sustains the audience's investment in the eventual payoff. When clue-planting and curiosity are fully decoupled, seeds are procedurally embedded without generating felt mystery in the same scene, and wonder comes from non-seed sources that don't have a planted thread behind them.`,
+            suggestedFix: `In at least one seed scene, let the planted clue also raise a question (positive curiosityDelta) — the detail is embedded in a way that makes the audience feel something strange or significant without understanding why. A clue-plant that generates its own mystery is most effective: the audience notices something and wonders about it, which primes them to be interested in the eventual payoff even before they know what's coming. A seed that feels mysterious in the moment creates the double value of a planted thread AND an active question.`,
           });
         }
       }

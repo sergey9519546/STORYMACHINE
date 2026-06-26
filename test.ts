@@ -27590,6 +27590,91 @@ I always listen.
     });
   });
 
+  describe('Wave 577 — intentionPass: seed zone cluster, clock revelation aftermath void, seed curiosity decoupled', async () => {
+    const makeRec577 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN577 = async (records: any[]) => {
+      const { intentionPass } = await import('./server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: { revelationCount: records.filter((r: any) => r.revelation).length } as any,
+        annotations: Array.from({ length: records.length }, () => ({})),
+        approvedSpans: [],
+      });
+    };
+
+    it('SEED_ZONE_CLUSTER fires when >75% of seed scenes cluster in one structural third', async () => {
+      // 9 scenes; thirds=[0-2],[3-5],[6-8]; seeds at 0,1,2 → 100% in opening third
+      const recs577a = Array.from({ length: 9 }, (_, i) => makeRec577(i));
+      recs577a[0] = makeRec577(0, { seededClueIds: ['clue-a'] });
+      recs577a[1] = makeRec577(1, { seededClueIds: ['clue-b'] });
+      recs577a[2] = makeRec577(2, { seededClueIds: ['clue-c'] });
+      const res = await runIN577(recs577a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_ZONE_CLUSTER'), 'SEED_ZONE_CLUSTER should fire');
+    });
+
+    it('SEED_ZONE_CLUSTER does not fire when seed scenes are distributed across thirds', async () => {
+      // seeds at 0, 4, 7 (one per third) → maxZone/total = 1/3
+      const recs577a = Array.from({ length: 9 }, (_, i) => makeRec577(i));
+      recs577a[0] = makeRec577(0, { seededClueIds: ['clue-a'] });
+      recs577a[4] = makeRec577(4, { seededClueIds: ['clue-b'] });
+      recs577a[7] = makeRec577(7, { seededClueIds: ['clue-c'] });
+      const res = await runIN577(recs577a);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_ZONE_CLUSTER'), 'SEED_ZONE_CLUSTER should not fire');
+    });
+
+    it('CLOCK_REVELATION_AFTERMATH_VOID fires when no clock scene is followed by a revelation within 2 scenes', async () => {
+      // n=9; clocks at 1,4; revelation at 7 (not within 2 of 1 or 4)
+      const recs577b = Array.from({ length: 9 }, (_, i) => makeRec577(i));
+      recs577b[1] = makeRec577(1, { clockRaised: true });
+      recs577b[4] = makeRec577(4, { clockRaised: true });
+      recs577b[7] = makeRec577(7, { revelation: 'The plan was a trap.' });
+      recs577b[8] = makeRec577(8, { revelation: 'She knew all along.' });
+      const res = await runIN577(recs577b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_REVELATION_AFTERMATH_VOID'), 'CLOCK_REVELATION_AFTERMATH_VOID should fire');
+    });
+
+    it('CLOCK_REVELATION_AFTERMATH_VOID does not fire when a clock is followed by a revelation within 2 scenes', async () => {
+      // clock at 1; revelation at 2 (within 1 scene) → satisfied → no fire
+      const recs577b = Array.from({ length: 9 }, (_, i) => makeRec577(i));
+      recs577b[1] = makeRec577(1, { clockRaised: true });
+      recs577b[2] = makeRec577(2, { revelation: 'The truth surfaces.' });
+      recs577b[4] = makeRec577(4, { clockRaised: true });
+      recs577b[7] = makeRec577(7, { revelation: 'Another revelation.' });
+      const res = await runIN577(recs577b);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_REVELATION_AFTERMATH_VOID'), 'CLOCK_REVELATION_AFTERMATH_VOID should not fire');
+    });
+
+    it('SEED_CURIOSITY_DECOUPLED fires when all seed scenes have curiosityDelta ≤ 0', async () => {
+      // n=9; seeds at 1,3 (no curiosity); curiosity at 6,7 (no seeds) → fully decoupled
+      const recs577c = Array.from({ length: 9 }, (_, i) => makeRec577(i));
+      recs577c[1] = makeRec577(1, { seededClueIds: ['clue-a'] });
+      recs577c[3] = makeRec577(3, { seededClueIds: ['clue-b'] });
+      recs577c[6] = makeRec577(6, { curiosityDelta: 1 });
+      recs577c[7] = makeRec577(7, { curiosityDelta: 1 });
+      const res = await runIN577(recs577c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_CURIOSITY_DECOUPLED'), 'SEED_CURIOSITY_DECOUPLED should fire');
+    });
+
+    it('SEED_CURIOSITY_DECOUPLED does not fire when a seed scene also raises curiosity', async () => {
+      // seed at 1 with curiosityDelta=1 → overlap → no fire
+      const recs577c = Array.from({ length: 9 }, (_, i) => makeRec577(i));
+      recs577c[1] = makeRec577(1, { seededClueIds: ['clue-a'], curiosityDelta: 1 });
+      recs577c[3] = makeRec577(3, { seededClueIds: ['clue-b'] });
+      recs577c[6] = makeRec577(6, { curiosityDelta: 1 });
+      const res = await runIN577(recs577c);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_CURIOSITY_DECOUPLED'), 'SEED_CURIOSITY_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 563 — intentionPass: revelation drought run, revelation zone cluster, revelation clock aftermath void', async () => {
     const makeRec563 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
