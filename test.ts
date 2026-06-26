@@ -33566,6 +33566,93 @@ The lights go out.`;
     });
   });
 
+  describe('Wave 574 — dialoguePass: clock peak silent, sparse run, negation back-loaded', async () => {
+    const makeRec574 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
+      sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing', payoffSetupIds: [], relationshipShifts: [],
+      emotionalShift: 'neutral', seededClueIds: [], dialogueHighlights: [], unresolvedClues: [],
+      purpose: '', slug: `s${sceneIdx}`, ...extra,
+    });
+    const runD574 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('./server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    const buildScenes574 = (count: number, dlgFn: (i: number) => number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\n`;
+        const n = dlgFn(i);
+        for (let j = 0; j < n; j++) {
+          f += j % 2 === 0
+            ? `ALICE\nShe found the documents early this morning.\n\n`
+            : `BOB\nWe should leave before they close the gate.\n\n`;
+        }
+        if (n === 0) f += `The door crashes open. A figure steps from the dark.\n\n`;
+      }
+      return f;
+    };
+
+    it('DIALOGUE_CLOCK_PEAK_SILENT fires when peak-clockDelta scene has no dialogue while other clock scene does', async () => {
+      // n=10; clockDelta>0 at pos 2 (delta=1, has dlg) and pos 5 (delta=3, no dlg — peak)
+      const f574a = buildScenes574(10, i => i === 5 ? 0 : 2);
+      const recs574a = Array.from({ length: 10 }, (_, i) => makeRec574(i, {
+        clockDelta: i === 2 ? 1 : i === 5 ? 3 : 0,
+      }));
+      const res = await runD574(f574a, recs574a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_CLOCK_PEAK_SILENT'), 'DIALOGUE_CLOCK_PEAK_SILENT should fire');
+    });
+
+    it('DIALOGUE_CLOCK_PEAK_SILENT does not fire when peak-clockDelta scene has dialogue', async () => {
+      // peak clockDelta at pos 5 (delta=3, HAS dlg), other clock at pos 2 (delta=1, no dlg)
+      const f574anr = buildScenes574(10, i => i === 2 ? 0 : 2);
+      const recs574anr = Array.from({ length: 10 }, (_, i) => makeRec574(i, {
+        clockDelta: i === 2 ? 1 : i === 5 ? 3 : 0,
+      }));
+      const res = await runD574(f574anr, recs574anr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_CLOCK_PEAK_SILENT'), 'DIALOGUE_CLOCK_PEAK_SILENT should not fire');
+    });
+
+    it('DIALOGUE_SPARSE_RUN fires when ≥4 consecutive scenes each have ≤1 dialogue line', async () => {
+      // n=10; scenes 2,3,4,5 have 1 line (sparse); others have 3 lines → run=4 → fires
+      const f574b = buildScenes574(10, i => [2, 3, 4, 5].includes(i) ? 1 : 3);
+      const recs574b = Array.from({ length: 10 }, (_, i) => makeRec574(i));
+      const res = await runD574(f574b, recs574b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_SPARSE_RUN'), 'DIALOGUE_SPARSE_RUN should fire');
+    });
+
+    it('DIALOGUE_SPARSE_RUN does not fire when all scenes have ≥2 dialogue lines', async () => {
+      // n=10; all scenes have 3 dialogue lines → no sparse run
+      const f574bnr = buildScenes574(10, _ => 3);
+      const recs574bnr = Array.from({ length: 10 }, (_, i) => makeRec574(i));
+      const res = await runD574(f574bnr, recs574bnr);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_SPARSE_RUN'), 'DIALOGUE_SPARSE_RUN should not fire');
+    });
+
+    it('DIALOGUE_NEGATION_BACK_LOADED fires when >75% of negation lines are in the second half', async () => {
+      // 8 dialogue lines total; first half (0-3): no negation; second half (4-7): 4 negation lines
+      const f574c = [
+        `INT. SCENE 0 - DAY\n\nALICE\nShe found the documents early this morning.\n\nBOB\nLet us continue with the plan as discussed.\n`,
+        `INT. SCENE 1 - DAY\n\nALICE\nThe meeting seemed quite successful overall.\n\nBOB\nEveryone appeared to be happy with the outcome.\n`,
+        `INT. SCENE 2 - DAY\n\nALICE\nNo, we cannot stay here any longer.\n\nBOB\nShe never expected this to happen at all.\n`,
+        `INT. SCENE 3 - DAY\n\nALICE\nI can't believe what they did to us here.\n\nBOB\nNothing makes any sense to me right now.\n`,
+      ].join('\n');
+      const res = await runD574(f574c, []);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_NEGATION_BACK_LOADED'), 'DIALOGUE_NEGATION_BACK_LOADED should fire');
+    });
+
+    it('DIALOGUE_NEGATION_BACK_LOADED does not fire when negation is distributed across both halves', async () => {
+      // 8 dialogue lines; 2 negation in first half + 2 negation in second half → 50% < 75%
+      const f574cnr = [
+        `INT. SCENE 0 - DAY\n\nALICE\nNo, she cannot do that now at all.\n\nBOB\nLet us continue with the usual plan.\n`,
+        `INT. SCENE 1 - DAY\n\nALICE\nNothing makes sense to her today.\n\nBOB\nEveryone appeared to be pleased overall.\n`,
+        `INT. SCENE 2 - DAY\n\nALICE\nThe meeting seemed quite successful.\n\nBOB\nShe never expected this to happen.\n`,
+        `INT. SCENE 3 - DAY\n\nALICE\nI can't believe what they decided here.\n\nBOB\nLet us proceed as we had discussed.\n`,
+      ].join('\n');
+      const res = await runD574(f574cnr, []);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_NEGATION_BACK_LOADED'), 'DIALOGUE_NEGATION_BACK_LOADED should not fire');
+    });
+  });
+
   describe('Wave 560 — dialoguePass: clock aftermath silent, seed aftermath silent, relationship shift aftermath silent', async () => {
     const makeRec560 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
       sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false,

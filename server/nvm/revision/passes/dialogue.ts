@@ -160,6 +160,23 @@
 // any dialogue; distinct from DIALOGUE_REVELATION_SCENE_VOID which is co-occurrence within the
 // revelation scene itself, and from DIALOGUE_DENSE_AFTERMATH_SILENT which uses dense-dialogue as
 // trigger; first aftermath check conditioned on a revelation trigger in this pass).
+// Wave 574 additions: dialogue clock peak silent (single-peak isolation × clockDelta ×
+// dialogue absence — n≥8, ≥2 clockDelta>0 scenes, ≥2 dialogue scenes, scene with max
+// clockDelta has no dialogue while ≥1 other clockDelta>0 scene does; the clockDelta single-
+// peak completion of the peak-silence family alongside TENSION_PEAK_SILENT [suspenseDelta],
+// CURIOSITY_PEAK_SILENT [curiosityDelta], RELATIONSHIP_PEAK_SILENT [relationship magnitude];
+// distinct from CLOCK_SCENE_VOID [co-occurrence — ALL clockRaised scenes silent, not the
+// single peak]), dialogue sparse run (run-based × near-silence × consecutive scenes — n≥9,
+// ≥4 dialogue scenes globally, longest consecutive run of scenes each with ≤1 dialogue line
+// ≥4; extended near-silence where dialogue has almost disappeared; distinct from DIALOGUE_
+// SILENCE_RUN [Wave 504: ≥3 completely ZERO-dialogue consecutive scenes — this uses ≤1
+// threshold catching single-exchange runs that don't trigger absolute-silence check],
+// DIALOGUE_SCENE_TEMPORAL_CLUSTER [thirds concentration, not run-based]), dialogue negation
+// back-loaded (distribution/timing × negation content × second half — dialogue≥8, ≥3 negation
+// lines globally, >75% in second half; refusal/denial concentrated in escalation/resolution
+// while setup is largely acceptance-toned; the temporal mirror of DIALOGUE_NEGATION_FRONT_
+// LOADED [Wave 546: >75% in first half]; distinct from DIALOGUE_NEGATION_FLOOD [global rate],
+// DIALOGUE_QUESTION_BACK_LOADED [question channel × same direction]).
 // Wave 560 additions: dialogue clock aftermath silent (sequence/aftermath × clock trigger →
 // dialogue absence in next scene — n≥8, ≥2 qualifying clockRaised scenes not at last pos, ≥3 scenes
 // with dialogue, none of the following scenes has dialogue; deadline machinery fires in silence and
@@ -3249,6 +3266,150 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `Every relationship-shift scene (${qualRelShifts560c.length} instances) is immediately followed by a scene with no dialogue — bond changes in the story consistently pass into a silence in which no character speaks within the new dynamic. A relationship that has just shifted carries its change into the next scene: characters are in a different configuration than they were before, and the scene after the shift is where the new reality either settles (two people now more cautious with each other, or closer, or rawer) or erupts further. When the aftermath of every bond change is silent, the shifted relationship is never verbally inhabited — no character navigates the new dynamic through speech, and the bond's alteration exists structurally without any voice confirming what changed and what it costs.`,
             suggestedFix: `After at least one relationship-shift, let the following scene carry dialogue that is shaped by the new dynamic — characters speaking differently to each other because of what changed, avoiding a topic that would have been natural before, or engaging more fully because the prior distance has narrowed. The line doesn't need to reference the shift explicitly: a character who speaks in a different register toward the person whose bond shifted shows the change has been inhabited rather than simply recorded.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 574: DIALOGUE_CLOCK_PEAK_SILENT, DIALOGUE_SPARSE_RUN,
+  //              DIALOGUE_NEGATION_BACK_LOADED ────────────────────────────────────────────────────
+  {
+    // DIALOGUE_CLOCK_PEAK_SILENT (single-peak isolation × clockDelta × dialogue absence, n≥8,
+    // ≥2 scenes with clockDelta>0, ≥2 dialogue scenes, the scene with the highest clockDelta
+    // has no dialogue while ≥1 other clockDelta>0 scene does): The moment where time pressure
+    // climaxes most dramatically — the scene in which the clockDelta is highest — passes without
+    // any character speaking. The clock's sharpest escalation, the point where urgency peaks
+    // mechanically, happens in silence. clockDelta is the measure of how much a scene advances
+    // or compresses the story's time constraint: the scene with the highest value is where the
+    // deadline has its most visceral mechanical effect. When that scene is silent while other
+    // clock scenes carry dialogue, the story's most urgent mechanical beat is rendered without a
+    // character voice registering, fighting, or resigning to the new pressure. Single-peak
+    // isolation mode × clockDelta channel × dialogue absence. Distinct from DIALOGUE_TENSION_
+    // PEAK_SILENT (Wave 434: suspenseDelta peak — different channel), DIALOGUE_CURIOSITY_PEAK_
+    // SILENT (Wave 448: curiosityDelta peak), DIALOGUE_RELATIONSHIP_PEAK_SILENT (Wave 546:
+    // relationship magnitude peak), DIALOGUE_CLOCK_SCENE_VOID (Wave 476: co-occurrence —
+    // ALL clockRaised scenes are silent, not just the single peak).
+    if (records.length >= 8) {
+      const lineToScene574a = buildLineToSceneMap(fountain);
+      const dlgPerScene574a = new Map<number, number>();
+      for (const d of dialogue) {
+        const si = lineToScene574a[d.lineNum - 1] ?? -1;
+        if (si >= 0) dlgPerScene574a.set(si, (dlgPerScene574a.get(si) ?? 0) + 1);
+      }
+      const scenesWithDlg574a = (records as any[]).filter(
+        r => (dlgPerScene574a.get(r.sceneIdx) ?? 0) > 0,
+      ).length;
+      if (scenesWithDlg574a >= 2) {
+        const clockDeltaScenes574a = (records as any[])
+          .map((r, pos) => ({ r, pos }))
+          .filter(({ r }) => (r.clockDelta ?? 0) > 0);
+        if (clockDeltaScenes574a.length >= 2) {
+          let peakClockDelta574a = 0;
+          let peakPos574a = -1;
+          for (const { r, pos } of clockDeltaScenes574a) {
+            if ((r.clockDelta ?? 0) > peakClockDelta574a) {
+              peakClockDelta574a = r.clockDelta ?? 0;
+              peakPos574a = pos;
+            }
+          }
+          const peakHasDlg574a = (dlgPerScene574a.get((records as any[])[peakPos574a].sceneIdx) ?? 0) > 0;
+          const otherClockHasDlg574a = clockDeltaScenes574a.some(
+            ({ r, pos }) => pos !== peakPos574a && (dlgPerScene574a.get(r.sceneIdx) ?? 0) > 0,
+          );
+          if (!peakHasDlg574a && otherClockHasDlg574a) {
+            issues.push({
+              location: `Scene at position ${peakPos574a + 1} — peak clockDelta (${peakClockDelta574a}) with no dialogue`,
+              rule: 'DIALOGUE_CLOCK_PEAK_SILENT',
+              severity: 'minor',
+              description: `The scene with the highest clockDelta (${peakClockDelta574a}, at position ${peakPos574a + 1}) — the moment where the story's time pressure climaxes most mechanically — contains no dialogue, while at least one other clock-advancing scene does carry speech. The scene with the peak clockDelta is where the deadline has its most visceral effect on the narrative: urgency is at its highest mechanical intensity, and this is precisely when a character speaking — registering the time pressure, deciding under it, or refusing it — transforms deadline mechanics into dramatic voice. When the peak clock moment is silent while less intense clock moments carry dialogue, the story's sharpest urgency arrives without any character inhabiting it verbally.`,
+              suggestedFix: `Add at least one line of dialogue to the scene at position ${peakPos574a + 1} — the moment of peak time pressure. The line doesn't need to explain the deadline: a character who speaks faster, more clipped, or more decisively because of the urgency registers the clockDelta through vocal register rather than exposition. Even a single line spoken under the story's sharpest time pressure gives the peak mechanical moment a human dimension.`,
+            });
+          }
+        }
+      }
+    }
+
+    // DIALOGUE_SPARSE_RUN (run-based × near-silence × consecutive scenes, n≥9, ≥4 scenes with
+    // dialogue globally, longest consecutive run of scenes each carrying ≤1 dialogue line ≥4):
+    // The script contains an extended stretch of scenes where dialogue has almost disappeared —
+    // each scene carries at most one line of speech, sustained for 4 or more consecutive scenes.
+    // Near-silence can be purposeful, but a multi-scene sparse run means the story sustains a
+    // register of minimal verbal engagement for a significant stretch without even a two-line
+    // exchange. Unlike complete silence (which DIALOGUE_SILENCE_RUN catches), sparse runs have
+    // technically non-zero dialogue but not enough to constitute genuine verbal engagement — a
+    // single "Yes" or "No" per scene is structural near-silence. Run-based mode × near-silence
+    // threshold (≤1 dialogue line) × consecutive scenes. Distinct from DIALOGUE_SILENCE_RUN
+    // (Wave 504: ≥3 completely ZERO-dialogue consecutive scenes — this uses ≤1 line threshold,
+    // catching single-exchange runs that wouldn't trigger the absolute-silence check), DIALOGUE_
+    // SCENE_TEMPORAL_CLUSTER (Wave 490: overconcentration in one third — not run-based), DIALOGUE_
+    // DENSE_AFTERMATH_SILENT (Wave 476: aftermath of a single dense scene — not run-based).
+    if (records.length >= 9) {
+      const lineToScene574b = buildLineToSceneMap(fountain);
+      const dlgPerScene574b = new Map<number, number>();
+      for (const d of dialogue) {
+        const si = lineToScene574b[d.lineNum - 1] ?? -1;
+        if (si >= 0) dlgPerScene574b.set(si, (dlgPerScene574b.get(si) ?? 0) + 1);
+      }
+      const scenesWithDlg574b = (records as any[]).filter(
+        r => (dlgPerScene574b.get(r.sceneIdx) ?? 0) > 0,
+      ).length;
+      if (scenesWithDlg574b >= 4) {
+        let maxSparseRun574b = 0;
+        let curSparseRun574b = 0;
+        for (const r of (records as any[])) {
+          const cnt = dlgPerScene574b.get(r.sceneIdx) ?? 0;
+          if (cnt <= 1) {
+            curSparseRun574b++;
+            if (curSparseRun574b > maxSparseRun574b) maxSparseRun574b = curSparseRun574b;
+          } else {
+            curSparseRun574b = 0;
+          }
+        }
+        if (maxSparseRun574b >= 4) {
+          issues.push({
+            location: `Dialogue — longest consecutive near-silent run: ${maxSparseRun574b} scenes each with ≤1 dialogue line`,
+            rule: 'DIALOGUE_SPARSE_RUN',
+            severity: 'minor',
+            description: `The script's longest consecutive run of scenes each carrying ≤1 dialogue line is ${maxSparseRun574b} scenes — an extended stretch of near-silence in which characters are present but barely speaking. Unlike complete silence, a sparse run has technically non-zero dialogue per scene, but a single line is structural near-silence: it cannot constitute a verbal exchange, cannot develop subtext, and cannot carry relationship or argumentative escalation. A ${maxSparseRun574b}-scene run of single-or-zero-line scenes means the story sustains minimal verbal engagement for an extended stretch, relying almost entirely on action and image to carry the narrative weight across multiple consecutive scenes. If intentional (a montage, a pursuit), the sparse run is effective. If inadvertent, the script is losing the verbal dimension of dramatic engagement across an extended zone.`,
+            suggestedFix: `Review the ${maxSparseRun574b}-scene near-silent stretch and determine whether the minimal dialogue is deliberate. If the scenes are full-character interaction scenes rather than pure action or montage, consider adding at least 2–3 lines of dialogue per scene — even a brief exchange transforms a near-silent scene into a scene with a verbal dynamic. Breaking the run with one scene of genuine dialogue restores the audience's connection to character voice across an otherwise voice-drained stretch of the story.`,
+          });
+        }
+      }
+    }
+
+    // DIALOGUE_NEGATION_BACK_LOADED (distribution/timing × negation content × second half,
+    // dialogue≥8, ≥3 negation-containing lines globally, >75% of negation lines in the second
+    // half of the dialogue corpus): Refusal and denial concentrate almost entirely in the
+    // escalation and resolution sections, with minimal negation in the setup. The story's
+    // resistance, limits, and refusals accumulate in the back half — the premise-setting and
+    // rising-action sections are largely acceptance-toned, and only in the climactic and
+    // resolution sections does the negation register emerge. When refusal language floods the
+    // second half but barely appears in the first, dramatic resistance feels sudden and
+    // unearned — the characters' "no" arrives without the audience having seen them refuse or
+    // state limits in lower-stakes situations first. Distribution/timing mode × negation
+    // content × second-half concentration. Distinct from DIALOGUE_NEGATION_FRONT_LOADED
+    // (Wave 546: >75% in FIRST half — the temporal mirror of this check), DIALOGUE_NEGATION_
+    // FLOOD (Wave 462: global rate >30% — cannot detect temporal imbalance), DIALOGUE_QUESTION_
+    // BACK_LOADED (Wave 448: question mark × second half — same structural position on a
+    // different content channel), DIALOGUE_NEGATIVE_OPENER_FLOOD (Wave 336: lines opening
+    // with "No"/"Can't" — opener pattern, not temporal distribution).
+    if (dialogue.length >= 8) {
+      const NEG_PAT574c = /\b(no|not|never|can'?t|won'?t|don'?t|doesn'?t|didn'?t|isn'?t|aren'?t|wasn'?t|weren'?t|nothing|nobody|none|nowhere|cannot)\b/i;
+      const negLines574c = dialogue.filter(d => NEG_PAT574c.test(d.line));
+      if (negLines574c.length >= 3) {
+        const halfLen574c = Math.floor(dialogue.length / 2);
+        const secondHalfNegSet574c = new Set(
+          dialogue.slice(halfLen574c).filter(d => NEG_PAT574c.test(d.line)).map(d => d.lineNum),
+        );
+        const secondHalfNegCount574c = negLines574c.filter(d => secondHalfNegSet574c.has(d.lineNum)).length;
+        if (secondHalfNegCount574c / negLines574c.length > 0.75) {
+          issues.push({
+            location: `Dialogue — ${secondHalfNegCount574c} of ${negLines574c.length} negation lines in second half`,
+            rule: 'DIALOGUE_NEGATION_BACK_LOADED',
+            severity: 'minor',
+            description: `${secondHalfNegCount574c} of the script's ${negLines574c.length} negation-containing dialogue lines (${Math.round(secondHalfNegCount574c / negLines574c.length * 100)}%) fall in the second half of the dialogue corpus. Refusal and denial — "no", "never", "can't", "won't", "nothing", "cannot" — concentrate almost entirely in the escalation and resolution sections while the premise-setting and rising-action sections are largely acceptance-toned. The setup never establishes what these characters will and won't accept: no resistance, refusal, or limit is stated early, so the audience does not build a sense of the characters' negotiating range. When negation floods the second half without first-half foundation, the dramatic resistance feels sudden — the characters' "no" arrives at the climax without the audience having seen them refuse in lower-stakes situations first.`,
+            suggestedFix: `Introduce at least one negation-containing line in the first half — a refusal, denial, or limit-statement that establishes a character's resistance vocabulary before the story's escalation demands it. A low-stakes "I won't do that" or "never" in the setup primes the audience to understand the character's limits. When the back-half negation arrives, it carries the weight of an established pattern rather than feeling like a sudden shift.`,
           });
         }
       }
