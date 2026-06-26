@@ -112,6 +112,20 @@
 // ≥2 qualifying turn scenes none followed by a suspense spike in next 2 scenes while ≥3 suspense
 // scenes exist; first aftermath check using the dramatic-turn trigger, distinct from REVELATION_
 // AFTERMATH_CLOCK_VOID [revelation trigger] and INCITING_AFTERMATH_STALL [inciting incident trigger]).
+// Wave 583 additions: turn suspense decoupled (co-occurrence/decoupling × dramatic turn ×
+// suspense — n≥8, ≥2 turn scenes and ≥2 suspense-positive scenes but zero overlap; pivots
+// are emotionally cool at the moment they happen; suspense-channel sibling of TURN_CURIOSITY_
+// DECOUPLED and TURN_EMOTION_DECOUPLED, completing the dramatic-turn co-occurrence family;
+// distinct from TURN_AFTERMATH_SUSPENSE_VOID [aftermath mode] and DRAMATIC_TURN_CAUSELESS
+// [backward-cause]), clock aftermath emotion void (sequence/aftermath × clock trigger ×
+// emotion — n≥8, ≥3 qualifying clock-raise scenes, ≥2 emotional scenes, every clock aftermath
+// window is emotionally neutral; urgency operates in affective isolation; first aftermath check
+// using the clock-raise trigger, distinct from TURN_AFTERMATH_EMOTION_VOID [turn trigger] and
+// REVELATION_AFTERMATH_EMOTION_VOID [revelation trigger]), peak suspense curiosity void (single-
+// peak isolation × suspense peak × curiosity — n≥8, ≥2 curiosity scenes, peak suspenseDelta
+// scene has curiosityDelta≤0; the tensest moment raises no question; curiosity-channel sibling
+// of PEAK_SUSPENSE_EMOTIONAL_VACUUM; distinct from CURIOSITY_PEAK_EMOTIONAL_VOID [curiosity is
+// the peak] and CLOCK_CURIOSITY_DECOUPLED [co-occurrence mode across all scenes]).
 // Wave 569 additions: turn aftermath clock void (sequence/aftermath × clock × dramatic-turn trigger
 // — ≥3 qualifying turn scenes none followed by a clock raise in next 2 scenes while ≥2 clock scenes
 // exist; pivots never tighten a deadline in their wake; the clock-channel sibling of TURN_AFTERMATH_
@@ -3082,6 +3096,125 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
           description: `The midpoint zone (Scenes ${midStart569c}–${midEnd569c - 1}) contains no scene that raises a clock, even though the story raises deadlines in ${clockScenes569c.length} scenes elsewhere. The midpoint is the structural pivot where a strong story tightens its grip and accelerates the second half out of the turn, and a deadline imposed at the center is one of the most reliable engines for that acceleration. When the exact middle carries no time pressure while clocks fire elsewhere, the pivot passes without urgency — the back half launches without a contracting window to drive it, and the urgency engine goes quiet precisely where the story most needs to re-energize. The audience reaches the center with no felt sense that time is now working against the protagonist.`,
           suggestedFix: `Raise a clock at the midpoint: let the pivot that reframes the story also impose a deadline — a countdown that starts at the center, a window that begins to close as the second half opens, a threat that now carries a timer. The middle of the story is one of the most powerful places to introduce time pressure, because it gives the back half a concrete reason to accelerate rather than merely continue.`,
         });
+      }
+    }
+  }
+
+  // ── Wave 583: TURN_SUSPENSE_DECOUPLED, CLOCK_AFTERMATH_EMOTION_VOID, PEAK_SUSPENSE_CURIOSITY_VOID ──
+
+  {
+    // TURN_SUSPENSE_DECOUPLED — co-occurrence/decoupling × dramatic turn × suspense.
+    // n≥8, ≥2 dramatic-turn scenes (dramaticTurn≠'nothing'), ≥2 suspense-positive scenes
+    // (suspenseDelta>0), no scene carries both → fire. The most charged pivots co-occur with
+    // a suspense spike in the same scene — the reversal lands while tension is high, combining
+    // structural change with felt urgency. When turns and suspense always occupy separate scenes,
+    // pivots are emotionally cool at the moment they happen: the story changes direction without
+    // danger and builds danger without direction change, so the two engines never combine.
+    // Distinct from: TURN_CURIOSITY_DECOUPLED (Wave 569: curiosity channel — this uses suspense),
+    // TURN_EMOTION_DECOUPLED (Wave 527: emotion channel), TURN_AFTERMATH_SUSPENSE_VOID (Wave 513:
+    // aftermath mode — 2 scenes AFTER a turn; this checks the turn scene ITSELF), CLOCK_SUSPENSE_
+    // DECOUPLED (Wave 555: clock trigger vs. turn trigger here), DRAMATIC_TURN_CAUSELESS (Wave 457:
+    // backward-cause — prior build-up, not same-scene co-occurrence). Completes the dramatic-turn
+    // co-occurrence family with the suspense channel alongside curiosity and emotion channels.
+    if (n >= 8) {
+      const turnScenes583a = (records as any[]).filter(
+        r => (r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '',
+      );
+      const suspScenes583a = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 0);
+      if (turnScenes583a.length >= 2 && suspScenes583a.length >= 2) {
+        const turnIdxSet583a = new Set(turnScenes583a.map((r: any) => r.sceneIdx));
+        const anyOverlap583a = suspScenes583a.some((r: any) => turnIdxSet583a.has(r.sceneIdx));
+        if (!anyOverlap583a) {
+          issues.push({
+            location: `${turnScenes583a.length} turn scene(s), ${suspScenes583a.length} suspense scene(s) — no overlap`,
+            rule: 'TURN_SUSPENSE_DECOUPLED',
+            severity: 'minor',
+            description: `The story has ${turnScenes583a.length} scenes that pivot the narrative (dramatic turns) and ${suspScenes583a.length} scenes that raise suspense (suspenseDelta>0), but no scene carries both. A dramatic pivot is naturally a moment of heightened tension — the reversal lands while the audience is electrified, combining direction change with felt urgency. The most charged pivots co-occur with a suspense spike in the same scene so the audience registers the change as a genuinely dangerous shift. When turns and suspense always occupy separate scenes, pivots are emotionally cool at the moment they happen: the story changes direction in scenes without tension, and builds tension in scenes without direction change, so the two engines never combine into the explosive beat that makes a reversal feel threatening.`,
+            suggestedFix: `Stage at least one dramatic turn so it also spikes suspense in the same scene — let the pivot arrive at a high-tension moment, or let the reversal itself be the source of a new threat. A chase that turns when the route is blocked, a revelation that pivots and simultaneously ratchets the danger, or a confrontation that reverses and leaves the protagonist more exposed all fuse structural direction change with felt urgency.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // CLOCK_AFTERMATH_EMOTION_VOID — sequence/aftermath × clock trigger × emotion channel.
+    // n≥8, ≥3 qualifying clock-raise scenes (clockRaised=true, not in last 2 positions), ≥2
+    // emotionally-charged scenes (emotionalShift≠'neutral'). Every qualifying clock scene is
+    // followed by 2 scenes both emotionally neutral → fire. Raising a clock should expand the
+    // emotional stakes alongside the urgency: the deadline that crystallizes is not only an
+    // intellectual fact but an emotional experience — fear, dread, or galvanizing determination
+    // should appear in the immediate aftermath. When every clock raise is followed by emotionally
+    // inert scenes, urgency operates in affective isolation: the story grows more time-pressured
+    // without the human cost of that pressure appearing in the aftermath.
+    // Distinct from: TURN_AFTERMATH_EMOTION_VOID (Wave 555: turn trigger), REVELATION_AFTERMATH_
+    // EMOTION_VOID (Wave 527: revelation trigger), CLIMAX_AFTERMATH_FLAT (Wave 485: climax trigger,
+    // checks both emotion and relationship), CLOCK_SUSPENSE_DECOUPLED (Wave 555: same-scene co-
+    // occurrence not aftermath), MIDPOINT_CLOCK_VOID (Wave 569: zone absence, not aftermath).
+    // First clock-trigger aftermath check in this pass — completes the trigger-type dimension.
+    if (n >= 8) {
+      const qualClocks583b = (records as any[]).filter(
+        (r, pos) => r.clockRaised === true && pos < n - 2,
+      );
+      const emotionScenes583b = (records as any[]).filter(
+        r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+      );
+      if (qualClocks583b.length >= 3 && emotionScenes583b.length >= 2) {
+        const allClockNoEmotion583b = qualClocks583b.every((r: any) => {
+          const pos = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            const nxt = (records as any[])[pos + off];
+            if (nxt && (nxt.emotionalShift ?? 'neutral') !== 'neutral') return false;
+          }
+          return true;
+        });
+        if (allClockNoEmotion583b) {
+          issues.push({
+            location: `${qualClocks583b.length} clock-raise scene(s) — no emotional shift in any aftermath window`,
+            rule: 'CLOCK_AFTERMATH_EMOTION_VOID',
+            severity: 'minor',
+            description: `Every scene that raises a clock (${qualClocks583b.length} scene(s)) is followed by two scenes both emotionally neutral, despite ${emotionScenes583b.length} emotionally charged scenes existing elsewhere. A deadline crystallizing is not only an intellectual structural event — it is an emotional experience that should register immediately in the characters facing it. Fear, dread, galvanizing resolve, or desperate urgency in the aftermath is how the audience feels the clock's weight rather than merely noting it. When every clock raise is followed by affective inertia, the urgency engine operates in emotional isolation: the story grows more time-pressured without the human cost of that pressure appearing in the aftermath.`,
+            suggestedFix: `After at least one clock-raise scene, let the following scene carry an emotional charge — dread, fear, or galvanized determination as characters absorb the deadline. The clock's weight should register emotionally in the aftermath, not just structurally. A scene imposing a deadline followed immediately by an emotionally neutral scene misses the moment when urgency becomes feeling.`,
+          });
+        }
+      }
+    }
+  }
+
+  {
+    // PEAK_SUSPENSE_CURIOSITY_VOID — single-peak isolation × suspense peak × curiosity channel.
+    // n≥8, ≥2 curiosity-positive scenes (curiosityDelta>0), the scene with the single highest
+    // suspenseDelta has curiosityDelta≤0 → fire. The story's most tense scene fails to open a
+    // question — the peak is a closed pocket of high stakes without the wondering that pulls the
+    // audience forward through the danger. Peak tension and curiosity coinciding is the hallmark
+    // of a thriller's best moments: not only does the adrenaline spike but the wondering intensifies.
+    // When the tensest scene generates no curiosity, the audience is locked in the moment of danger
+    // without being propelled into what comes next.
+    // Distinct from: PEAK_SUSPENSE_EMOTIONAL_VACUUM (Wave 443: emotion channel — this is the
+    // curiosity-channel sibling of that check; same peak-isolation mode, different tested attribute),
+    // CURIOSITY_PEAK_EMOTIONAL_VOID (Wave 471: the curiosity channel is the PEAK, not the tested
+    // attribute — here suspense is the peak and curiosity is the tested attribute), CLOCK_CURIOSITY_
+    // DECOUPLED (Wave 499: co-occurrence/decoupling across all clock scenes, not single-peak
+    // isolation at the one maximum scene), TURN_CURIOSITY_DECOUPLED (Wave 569: same-scene
+    // co-occurrence across all turn scenes). First single-peak isolation check combining the
+    // suspense peak with the curiosity channel.
+    if (n >= 8) {
+      const curiosityScenes583c = (records as any[]).filter(r => (r.curiosityDelta ?? 0) > 0);
+      if (curiosityScenes583c.length >= 2) {
+        const peakSusp583c = Math.max(...(records as any[]).map(r => r.suspenseDelta ?? 0));
+        if (peakSusp583c > 0) {
+          const peakIdx583c = (records as any[]).findIndex(r => (r.suspenseDelta ?? 0) === peakSusp583c);
+          const peakRec583c = (records as any[])[peakIdx583c];
+          if ((peakRec583c.curiosityDelta ?? 0) <= 0) {
+            issues.push({
+              location: `Scene ${peakIdx583c} (peak suspenseDelta ${peakSusp583c}) — curiosityDelta ≤ 0`,
+              rule: 'PEAK_SUSPENSE_CURIOSITY_VOID',
+              severity: 'minor',
+              description: `The story's highest-tension scene (Scene ${peakIdx583c}, suspenseDelta ${peakSusp583c}) generates no curiosity (curiosityDelta ≤ 0), while ${curiosityScenes583c.length} other scenes raise questions. The tensest scene is a closed pocket of high stakes — the audience's adrenaline spikes without their wondering intensifying. Peak suspense and peak curiosity coinciding makes for a thriller's best moments: not only does the danger spike, but a question opens that pulls the audience forward through it. When the tensest scene raises no question, the peak is climactic without being propulsive: the audience is locked into the moment of danger without the wondering that drives them to find out what comes next.`,
+              suggestedFix: `Stage the peak suspense scene so it also opens a question — an unknown that the high-tension moment forces but does not yet answer. A confrontation peaking in danger while leaving the outcome uncertain, a chase that explodes in tension and reveals new information the audience wants to decipher, or a threat at its worst that implies a secret not yet understood all make the peak both gripping and propulsive.`,
+            });
+          }
+        }
       }
     }
   }

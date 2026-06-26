@@ -19952,6 +19952,88 @@ I think we can solve this together.
     });
   });
 
+  describe('Wave 583 — structurePass: turn suspense decoupled, clock aftermath emotion void, peak suspense curiosity void', async () => {
+    const makeRec583 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development',
+      ...overrides,
+    });
+    const runST583 = async (records: any[]) => {
+      const { structurePass } = await import('./server/nvm/revision/passes/structure.ts');
+      return structurePass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // TURN_SUSPENSE_DECOUPLED fire:
+    // 8 scenes; turns at 1,3; suspense at 5,7; no scene carries both → fires
+    it('TURN_SUSPENSE_DECOUPLED fires when turn scenes and suspense scenes never overlap', async () => {
+      const recs583a = Array.from({ length: 8 }, (_, i) => makeRec583(i, {
+        dramaticTurn: [1, 3].includes(i) ? 'reversal' : 'nothing',
+        suspenseDelta: [5, 7].includes(i) ? 2 : 0,
+      }));
+      const res = await runST583(recs583a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TURN_SUSPENSE_DECOUPLED'), 'TURN_SUSPENSE_DECOUPLED should fire');
+    });
+
+    // TURN_SUSPENSE_DECOUPLED no-fire:
+    // 8 scenes; scene 2 has both dramaticTurn='reversal' and suspenseDelta=2 → overlap → no fire
+    it('TURN_SUSPENSE_DECOUPLED does not fire when a turn scene also has suspense', async () => {
+      const recs583anr = Array.from({ length: 8 }, (_, i) => makeRec583(i, {
+        dramaticTurn: [2, 4].includes(i) ? 'reversal' : 'nothing',
+        suspenseDelta: [2, 6].includes(i) ? 2 : 0,
+      }));
+      const res = await runST583(recs583anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TURN_SUSPENSE_DECOUPLED'), 'TURN_SUSPENSE_DECOUPLED should not fire');
+    });
+
+    // CLOCK_AFTERMATH_EMOTION_VOID fire:
+    // 8 scenes; 3 clocks at 0,1,2; emotions at 6,7; aftermath of each clock is neutral → fires
+    it('CLOCK_AFTERMATH_EMOTION_VOID fires when no emotional scene follows any clock raise', async () => {
+      const recs583b = Array.from({ length: 8 }, (_, i) => makeRec583(i, {
+        clockRaised: [0, 1, 2].includes(i),
+        emotionalShift: [6, 7].includes(i) ? 'negative' : 'neutral',
+      }));
+      const res = await runST583(recs583b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_AFTERMATH_EMOTION_VOID'), 'CLOCK_AFTERMATH_EMOTION_VOID should fire');
+    });
+
+    // CLOCK_AFTERMATH_EMOTION_VOID no-fire:
+    // 8 scenes; 3 clocks at 0,2,4; scene 1 (aftermath of clock 0) is emotional → no fire
+    it('CLOCK_AFTERMATH_EMOTION_VOID does not fire when an emotional scene follows a clock raise', async () => {
+      const recs583bnr = Array.from({ length: 8 }, (_, i) => makeRec583(i, {
+        clockRaised: [0, 2, 4].includes(i),
+        emotionalShift: [1, 6].includes(i) ? 'negative' : 'neutral',
+      }));
+      const res = await runST583(recs583bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_AFTERMATH_EMOTION_VOID'), 'CLOCK_AFTERMATH_EMOTION_VOID should not fire');
+    });
+
+    // PEAK_SUSPENSE_CURIOSITY_VOID fire:
+    // 8 scenes; peak suspense at 3 (suspenseDelta=5, curiosityDelta=0); curiosity at 1,5 → fires
+    it('PEAK_SUSPENSE_CURIOSITY_VOID fires when peak suspense scene has no curiosity', async () => {
+      const recs583c = Array.from({ length: 8 }, (_, i) => makeRec583(i, {
+        suspenseDelta: i === 3 ? 5 : 0,
+        curiosityDelta: [1, 5].includes(i) ? 2 : 0,
+      }));
+      const res = await runST583(recs583c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PEAK_SUSPENSE_CURIOSITY_VOID'), 'PEAK_SUSPENSE_CURIOSITY_VOID should fire');
+    });
+
+    // PEAK_SUSPENSE_CURIOSITY_VOID no-fire:
+    // 8 scenes; peak suspense at 3 (suspenseDelta=5, curiosityDelta=2) → peak has curiosity → no fire
+    it('PEAK_SUSPENSE_CURIOSITY_VOID does not fire when peak suspense scene also has curiosity', async () => {
+      const recs583cnr = Array.from({ length: 8 }, (_, i) => makeRec583(i, {
+        suspenseDelta: i === 3 ? 5 : 0,
+        curiosityDelta: [1, 3, 5].includes(i) ? 2 : 0,
+      }));
+      const res = await runST583(recs583cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PEAK_SUSPENSE_CURIOSITY_VOID'), 'PEAK_SUSPENSE_CURIOSITY_VOID should not fire');
+    });
+  });
+
   describe('Wave 569 — structurePass: turn aftermath clock void, turn curiosity decoupled, midpoint clock void', async () => {
     const makeRec569 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
