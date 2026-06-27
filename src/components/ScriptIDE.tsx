@@ -441,8 +441,15 @@ export default function ScriptIDE({
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
     let actionLines = 0;
-    let wordCount = scriptText.trim().split(/\s+/).length;
-    if (scriptText.trim() === "") wordCount = 0;
+
+    let wordCount = 0;
+    const trimmed = scriptText.trim();
+    if (trimmed !== "") {
+      const execRegex = /\S+/g;
+      while (execRegex.exec(trimmed)) {
+        wordCount++;
+      }
+    }
 
     blocks.forEach((block) => {
       if (block.type === "character") {
@@ -592,15 +599,17 @@ export default function ScriptIDE({
   // ── Key handler ──────────────────────────────────────────────────────────────
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const cursor = e.currentTarget.selectionStart;
-    const textBeforeCursor = scriptText.substring(0, cursor);
-    const lines = textBeforeCursor.split("\n");
-    const currentLine = lines[lines.length - 1];
+    const textBeforeCursor = scriptText.slice(0, cursor);
+    const lastNewlineIdx = textBeforeCursor.lastIndexOf("\n");
+    const currentLine = lastNewlineIdx === -1
+      ? textBeforeCursor
+      : textBeforeCursor.slice(lastNewlineIdx + 1);
 
     if (e.key === "i" || e.key === "I") {
       if (currentLine === "") {
         e.preventDefault();
         const newText =
-          scriptText.substring(0, cursor) + "INT. " + scriptText.substring(cursor);
+          scriptText.slice(0, cursor) + "INT. " + scriptText.slice(cursor);
         setScriptText(newText);
         setTimeout(() => {
           if (editorRef.current) {
@@ -614,7 +623,7 @@ export default function ScriptIDE({
       if (currentLine === "") {
         e.preventDefault();
         const newText =
-          scriptText.substring(0, cursor) + "EXT. " + scriptText.substring(cursor);
+          scriptText.slice(0, cursor) + "EXT. " + scriptText.slice(cursor);
         setScriptText(newText);
         setTimeout(() => {
           if (editorRef.current) {
@@ -649,9 +658,9 @@ export default function ScriptIDE({
         );
         if (matchingChar) {
           const newText =
-            scriptText.substring(0, cursor - trimmedLine.length) +
+            scriptText.slice(0, cursor - trimmedLine.length) +
             matchingChar.name.toUpperCase() +
-            scriptText.substring(cursor);
+            scriptText.slice(cursor);
           setScriptText(newText);
           const newCursor = cursor + (matchingChar.name.length - trimmedLine.length);
           setTimeout(() => {
@@ -669,32 +678,32 @@ export default function ScriptIDE({
 
       if (currentLine.trim() === "") {
         newText =
-          scriptText.substring(0, cursor) +
+          scriptText.slice(0, cursor) +
           "          " +
-          scriptText.substring(cursor);
+          scriptText.slice(cursor);
         newCursor = cursor + 10;
       } else if (
         currentLine.startsWith("          ") &&
         !currentLine.startsWith("            ")
       ) {
         newText =
-          scriptText.substring(0, cursor - currentLine.length) +
+          scriptText.slice(0, cursor - currentLine.length) +
           "            (" +
           currentLine.trim() +
           ")" +
-          scriptText.substring(cursor);
+          scriptText.slice(cursor);
         newCursor = cursor + 4;
       } else if (currentLine.startsWith("            (")) {
         newText =
-          scriptText.substring(0, cursor - currentLine.length) +
+          scriptText.slice(0, cursor - currentLine.length) +
           "                                        " +
           currentLine.replace(/[()]/g, "").trim() +
           ":" +
-          scriptText.substring(cursor);
+          scriptText.slice(cursor);
         newCursor = cursor + 30;
       } else {
         newText =
-          scriptText.substring(0, cursor) + "    " + scriptText.substring(cursor);
+          scriptText.slice(0, cursor) + "    " + scriptText.slice(cursor);
         newCursor = cursor + 4;
       }
 
@@ -712,8 +721,8 @@ export default function ScriptIDE({
   const submitActionModal = (skip = false) => {
     if (!editorRef.current) return;
     const { cursor } = actionModal;
-    const textBefore = scriptText.substring(0, cursor);
-    const textAfter = scriptText.substring(cursor);
+    const textBefore = scriptText.slice(0, cursor);
+    const textAfter = scriptText.slice(cursor);
 
     let insertion = "\n";
     if (!skip && actionInput.trim()) {
@@ -737,11 +746,21 @@ export default function ScriptIDE({
   // ── Navigation ───────────────────────────────────────────────────────────────
   const handleNavigate = (lineIndex: number) => {
     if (!editorRef.current) return;
-    const lines = scriptText.split("\n");
+
     let charCount = 0;
-    for (let i = 0; i < lineIndex; i++) {
-      charCount += lines[i].length + 1;
+    let currentLine = 0;
+    let startIndex = 0;
+    while (currentLine < lineIndex && startIndex <= scriptText.length) {
+      const nextNewline = scriptText.indexOf('\n', startIndex);
+      if (nextNewline === -1) {
+        startIndex = scriptText.length;
+        break;
+      }
+      startIndex = nextNewline + 1;
+      currentLine++;
     }
+    charCount = startIndex;
+
     editorRef.current.focus();
     editorRef.current.setSelectionRange(charCount, charCount);
 
@@ -775,8 +794,8 @@ export default function ScriptIDE({
   const handleApplySuggestion = (suggestion: string) => {
     if (!editorRef.current) return;
     const cursor = editorRef.current.selectionStart;
-    const textBefore = scriptText.substring(0, cursor);
-    const textAfter = scriptText.substring(cursor);
+    const textBefore = scriptText.slice(0, cursor);
+    const textAfter = scriptText.slice(cursor);
     const newText = `${textBefore}\n${suggestion}\n${textAfter}`;
     setScriptText(newText);
     triggerAnalysis(newText);
