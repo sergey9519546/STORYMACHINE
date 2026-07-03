@@ -372,6 +372,16 @@
 // structural thirds — this purpose value has only ever appeared inside a composite low-momentum
 // purposes set; none of the three shared-library trio modes has ever isolated it as its own
 // standalone signal).
+//
+// Wave 857 additions: INTENTION_ESTABLISH_WORLD_DROUGHT_RUN (run-based × purpose ===
+// 'establish_world' absence — completes 2 of 3 slots for this purpose value alongside the
+// zone-cluster mode added in Wave 843; peak mode conventionally skipped for this categorical
+// field), INTENTION_CLIMAX_ZONE_CLUSTER (distribution/timing × purpose === 'climax' × structural
+// thirds — this purpose value has only ever appeared inside the dramaticPurposes composite set
+// [union with 'turning_point', 'revelation', 'raise_stakes']; a virgin standalone signal),
+// INTENTION_RESOLUTION_ZONE_CLUSTER (distribution/timing × purpose === 'resolution' × structural
+// thirds — this purpose value has only ever appeared inside a separate composite low-momentum
+// purposes set; likewise a virgin standalone signal).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4877,6 +4887,72 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r843c.maxZoneCount / r843c.count) * 100)}% of the scenes purposed to establish the world cluster in the ${r843c.zoneNames[r843c.maxZoneIdx]} third. When every act of world-building concentrates in one structural window, the character's pursuit of their goal loses fresh ground to act against anywhere else across the story.`,
         suggestedFix: `Purpose at least one scene outside the ${r843c.zoneNames[r843c.maxZoneIdx]} third to establish the world so the character's intention keeps fresh ground to act against more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 857: INTENTION_ESTABLISH_WORLD_DROUGHT_RUN, INTENTION_CLIMAX_ZONE_CLUSTER,
+  //              INTENTION_RESOLUTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // INTENTION_ESTABLISH_WORLD_DROUGHT_RUN — Run-based × purpose === 'establish_world' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 world-establishing scenes
+  // overall, fires when the longest consecutive run of scenes with no world-establishing purpose
+  // reaches 6. Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode
+  // added in Wave 843 (peak mode conventionally skipped for this categorical field).
+  {
+    const r857a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r857a.fires) {
+      issues.push({
+        location: `longest stretch with no world-building: ${r857a.longestRun} consecutive scenes`,
+        rule: 'INTENTION_ESTABLISH_WORLD_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r857a.longestRun} consecutive scenes with no world-establishing purpose at all, even though ${r857a.presentCount} scenes elsewhere ground the audience in setting or rules. A long unbroken stretch with no grounding leaves the character's pursuit of their goal without fresh ground to act against for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r857a.longestRun}-scene stretch to establish the world so the character's intention keeps fresh ground to act against throughout that stretch.`,
+      });
+    }
+  }
+
+  // INTENTION_CLIMAX_ZONE_CLUSTER — Distribution/timing × purpose === 'climax' × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 climax-purposed
+  // scenes, fires when more than 75% of them fall in a single structural third. This purpose
+  // value has only ever appeared inside the dramaticPurposes composite set (union with
+  // 'turning_point', 'revelation', 'raise_stakes'); a virgin standalone signal.
+  {
+    const r857b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r857b.fires) {
+      issues.push({
+        location: `${r857b.zoneNames[r857b.maxZoneIdx]} third — ${r857b.maxZoneCount} of ${r857b.count} climax-purposed scenes`,
+        rule: 'INTENTION_CLIMAX_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r857b.maxZoneCount / r857b.count) * 100)}% of the scenes purposed as the climax cluster in the ${r857b.zoneNames[r857b.maxZoneIdx]} third. When every peak moment concentrates in one structural window, the character's pursuit of their goal builds toward its biggest test in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Reconsider whether every climax-purposed scene belongs in the ${r857b.zoneNames[r857b.maxZoneIdx]} third so the character's intention builds toward its biggest test more evenly across the story.`,
+      });
+    }
+  }
+
+  // INTENTION_RESOLUTION_ZONE_CLUSTER — Distribution/timing × purpose === 'resolution' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // resolution-purposed scenes, fires when more than 75% of them fall in a single structural
+  // third. This purpose value has only ever appeared inside a separate composite low-momentum
+  // purposes set; likewise a virgin standalone signal.
+  {
+    const r857c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r857c.fires) {
+      issues.push({
+        location: `${r857c.zoneNames[r857c.maxZoneIdx]} third — ${r857c.maxZoneCount} of ${r857c.count} resolution-purposed scenes`,
+        rule: 'INTENTION_RESOLUTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r857c.maxZoneCount / r857c.count) * 100)}% of the scenes purposed to resolve the story cluster in the ${r857c.zoneNames[r857c.maxZoneIdx]} third. When every act of resolution concentrates in one structural window, the character's pursuit of their goal settles in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Reconsider whether every resolution-purposed scene belongs in the ${r857c.zoneNames[r857c.maxZoneIdx]} third so the character's intention settles more evenly across the story.`,
       });
     }
   }
