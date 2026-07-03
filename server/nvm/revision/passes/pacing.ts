@@ -239,6 +239,16 @@
 // emotion/clock/suspense), PACING_HIGHLIGHT_ZONE_CLUSTER (distribution/timing × dialogueHighlights
 // × structural thirds — >75% of highlighted-dialogue scenes concentrate in one third; the
 // zone-cluster template applied to a second channel after clock).
+// Wave 663 additions (built on the shared checks library, audit M2.2): PACING_RELATIONSHIP_PEAK_
+// UNCAUSED (single-peak isolation/backward-cause × relationshipShifts magnitude — the scene with
+// the most simultaneous bond changes has no dramatic turn or revelation in itself or the two
+// scenes before it; distinct from the existing SUSPENSE/EMOTIONAL/CURIOSITY/PAYOFF/STAGING_PEAK_
+// UNCAUSED family, none of which audit the relational channel), PACING_SEED_DROUGHT_RUN
+// (run-based × seededClueIds absence — seededClueIds has only ever been an aftermath-flat
+// trigger in this pass; the drought-run template applied to a sixth channel), PACING_PAYOFF_ZONE_
+// CLUSTER (distribution/timing × payoffSetupIds × structural thirds — payoffSetupIds anchors
+// three aftermath-flat checks and a peak-uncaused check already, but has never been
+// cluster-audited; the zone-cluster template applied to a third channel after clock/highlight).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -3758,6 +3768,74 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r649c.maxZoneCount} of the story's ${r649c.count} scenes carrying a standout line of dialogue (${Math.round((r649c.maxZoneCount / r649c.count) * 100)}%) cluster in the ${zoneName649c} third. Memorable dialogue concentrates almost exclusively in that stretch rather than landing throughout, leaving other structural thirds paced without a verbal high point to punctuate them.`,
         suggestedFix: `Give at least one scene outside the ${zoneName649c} third a standout line of dialogue — spreading memorable dialogue across the story lets each structural third carry its own verbal punctuation.`,
+      });
+    }
+  }
+
+  // ── Wave 663: PACING_RELATIONSHIP_PEAK_UNCAUSED, PACING_SEED_DROUGHT_RUN,
+  //              PACING_PAYOFF_ZONE_CLUSTER ──────────────────────────────────────────────────
+
+  // PACING_RELATIONSHIP_PEAK_UNCAUSED — Single-peak isolation/backward-cause × relationshipShifts
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // a relationship shift, a 2-scene lookback. Finds the single scene with the most simultaneous
+  // bond changes; fires when neither that scene nor either of the two before it contains a
+  // dramatic turn or revelation. Distinct from the existing SUSPENSE/EMOTIONAL/CURIOSITY/PAYOFF/
+  // STAGING_PEAK_UNCAUSED family, none of which audit the relational channel.
+  {
+    const r663a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.relationshipShifts ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r663a.fires) {
+      issues.push({
+        location: `scene ${r663a.peakIdx + 1} — peak relationship-shift density (${r663a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'PACING_RELATIONSHIP_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for relationship shifts (scene ${r663a.peakIdx + 1}, with ${r663a.peakMagnitude} simultaneous bond changes) has no dramatic turn or revelation in itself or the two scenes before it. The moment where relational upheaval concentrates most heavily arrives without any structural pivot or disclosure driving it, leaving the story's pacing to spend its most relationally dense beat on causally unearned momentum.`,
+        suggestedFix: `Give scene ${r663a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most relationally dense moment is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // PACING_SEED_DROUGHT_RUN — Run-based × seededClueIds absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 seed scenes overall, fires when the longest consecutive
+  // run of scenes with zero clue seeded reaches 6. seededClueIds has only ever been an
+  // aftermath-flat trigger in this pass; the drought-run template applied to a sixth channel.
+  {
+    const r663b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r663b.fires) {
+      issues.push({
+        location: `longest stretch with no clue seeded: ${r663b.longestRun} consecutive scenes`,
+        rule: 'PACING_SEED_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r663b.longestRun} consecutive scenes with no clue seeded at all, even though ${r663b.presentCount} scenes elsewhere do plant new material. A long unbroken stretch where nothing new is planted leaves the pacing coasting on prior setups with nothing fresh to draw on.`,
+        suggestedFix: `Seed a new clue or thread somewhere within the ${r663b.longestRun}-scene stretch so the pacing keeps planting forward momentum throughout, not only in isolated bursts.`,
+      });
+    }
+  }
+
+  // PACING_PAYOFF_ZONE_CLUSTER — Distribution/timing × payoffSetupIds × structural thirds. Built
+  // on checkZoneCluster from the shared checks library. n≥9, ≥3 payoff scenes, fires when >75% of
+  // them fall in a single structural third. payoffSetupIds anchors three aftermath-flat checks
+  // and a peak-uncaused check already, but has never been cluster-audited; the zone-cluster
+  // template applied to a third channel after clock and highlight.
+  {
+    const r663c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r663c.fires) {
+      const zoneName663c = r663c.zoneNames[r663c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName663c} third — ${r663c.maxZoneCount}/${r663c.count} payoff scenes`,
+        rule: 'PACING_PAYOFF_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r663c.maxZoneCount} of the story's ${r663c.count} thread-resolution scenes (${Math.round((r663c.maxZoneCount / r663c.count) * 100)}%) cluster in the ${zoneName663c} third. Resolution concentrates almost exclusively in that stretch rather than landing throughout, leaving other structural thirds paced without a sense of accumulated payoff.`,
+        suggestedFix: `Let at least one thread resolve outside the ${zoneName663c} third — spreading resolutions across the story lets each structural third carry its own sense of payoff.`,
       });
     }
   }

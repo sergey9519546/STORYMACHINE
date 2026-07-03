@@ -934,6 +934,86 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 663 — pacingPass: pacing relationship peak uncaused, pacing seed drought run, pacing payoff zone cluster', async () => {
+    const runP663 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PACING_RELATIONSHIP_PEAK_UNCAUSED fire:
+    // 8 scenes; shifts at 2 (1 shift) and 6 (5 shifts, the peak); no dramaticTurn or revelation at
+    // 6, 5, or 4
+    it('PACING_RELATIONSHIP_PEAK_UNCAUSED fires when the peak relationship-shift scene has no dramatic turn or revelation nearby', async () => {
+      const recs663a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs663a[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs663a[6] = makeSharedRecord(6, { relationshipShifts: [0, 1, 2, 3, 4].map(n => ({ pairKey: `a|${n}`, dimension: 'trust', amount: 0.2 })) });
+      const res = await runP663(recs663a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_RELATIONSHIP_PEAK_UNCAUSED'), 'PACING_RELATIONSHIP_PEAK_UNCAUSED should fire');
+    });
+
+    // PACING_RELATIONSHIP_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('PACING_RELATIONSHIP_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs663an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs663an[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs663an[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs663an[6] = makeSharedRecord(6, { relationshipShifts: [0, 1, 2, 3, 4].map(n => ({ pairKey: `a|${n}`, dimension: 'trust', amount: 0.2 })) });
+      const res = await runP663(recs663an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_RELATIONSHIP_PEAK_UNCAUSED'), 'PACING_RELATIONSHIP_PEAK_UNCAUSED should not fire');
+    });
+
+    // PACING_SEED_DROUGHT_RUN fire:
+    // 10 scenes; seeded at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('PACING_SEED_DROUGHT_RUN fires when the longest no-seed run is ≥6', async () => {
+      const recs663b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs663b[0] = makeSharedRecord(0, { seededClueIds: ['clue-x'] });
+      recs663b[1] = makeSharedRecord(1, { seededClueIds: ['clue-x'] });
+      recs663b[2] = makeSharedRecord(2, { seededClueIds: ['clue-x'] });
+      recs663b[9] = makeSharedRecord(9, { seededClueIds: ['clue-x'] });
+      const res = await runP663(recs663b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_SEED_DROUGHT_RUN'), 'PACING_SEED_DROUGHT_RUN should fire');
+    });
+
+    // PACING_SEED_DROUGHT_RUN no-fire:
+    // seeded at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('PACING_SEED_DROUGHT_RUN does not fire when seeding is distributed without a long drought', async () => {
+      const recs663bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs663bn[0] = makeSharedRecord(0, { seededClueIds: ['clue-x'] });
+      recs663bn[4] = makeSharedRecord(4, { seededClueIds: ['clue-x'] });
+      recs663bn[9] = makeSharedRecord(9, { seededClueIds: ['clue-x'] });
+      const res = await runP663(recs663bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_SEED_DROUGHT_RUN'), 'PACING_SEED_DROUGHT_RUN should not fire');
+    });
+
+    // PACING_PAYOFF_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; payoff scenes at 0,1,2 → 100% opening third
+    it('PACING_PAYOFF_ZONE_CLUSTER fires when >75% of payoff scenes cluster in one third', async () => {
+      const recs663c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs663c[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs663c[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs663c[2] = makeSharedRecord(2, { payoffSetupIds: ['thread-c'] });
+      const res = await runP663(recs663c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_PAYOFF_ZONE_CLUSTER'), 'PACING_PAYOFF_ZONE_CLUSTER should fire');
+    });
+
+    // PACING_PAYOFF_ZONE_CLUSTER no-fire:
+    // payoff scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('PACING_PAYOFF_ZONE_CLUSTER does not fire when payoff scenes are distributed across thirds', async () => {
+      const recs663cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs663cn[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs663cn[4] = makeSharedRecord(4, { payoffSetupIds: ['thread-b'] });
+      recs663cn[7] = makeSharedRecord(7, { payoffSetupIds: ['thread-c'] });
+      const res = await runP663(recs663cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_PAYOFF_ZONE_CLUSTER'), 'PACING_PAYOFF_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 649 — pacingPass: pacing staging peak uncaused, pacing open thread drought run, pacing highlight zone cluster', async () => {
     const runP649 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
